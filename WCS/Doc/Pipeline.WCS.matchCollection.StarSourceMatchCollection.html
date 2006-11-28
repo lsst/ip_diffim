@@ -1,0 +1,122 @@
+
+<!doctype html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: class StarSourceMatchCollection</title>
+</head><body bgcolor="#f0f0f8">
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><strong>Pipeline.WCS.matchCollection.StarSourceMatchCollection</strong> = <a name="Pipeline.WCS.matchCollection.StarSourceMatchCollection">class StarSourceMatchCollection</a>(<a href="__builtin__.html#object">__builtin__.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>#*************************************************<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="StarSourceMatchCollection-GetMatches"><strong>GetMatches</strong></a>(self)</dt><dd><tt>Return&nbsp;the&nbsp;matched&nbsp;set&nbsp;of&nbsp;fiducial/source&nbsp;stars.&nbsp;&nbsp;Reads&nbsp;the&nbsp;output<br>
+files&nbsp;generated&nbsp;by&nbsp;StarSourceMatchCollection.StarMatch<br>
+&nbsp;<br>
+Input<br>
+&nbsp;&nbsp;&nbsp;&nbsp;none<br>
+Return<br>
+&nbsp;&nbsp;&nbsp;&nbsp;nstars&nbsp;&nbsp;count&nbsp;of&nbsp;matched&nbsp;stars<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ra&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;numarray&nbsp;of&nbsp;ra&nbsp;of&nbsp;fiducial&nbsp;stars;&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Format:&nbsp;float;&nbsp;Units:&nbsp;decimal&nbsp;degrees<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dec&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;numarray&nbsp;of&nbsp;dec&nbsp;of&nbsp;fiducial&nbsp;stars;&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Format:&nbsp;float;&nbsp;Units:&nbsp;decimal&nbsp;degrees<br>
+&nbsp;&nbsp;&nbsp;&nbsp;xf2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;numarray&nbsp;of&nbsp;x&nbsp;pixel&nbsp;location&nbsp;of&nbsp;source&nbsp;stars<br>
+&nbsp;&nbsp;&nbsp;&nbsp;yf2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;numarray&nbsp;of&nbsp;y&nbsp;pixel&nbsp;location&nbsp;of&nbsp;source&nbsp;stars<br>
+&nbsp;<br>
+Input&nbsp;Files:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;starFindoffOut&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;file&nbsp;named&nbsp;by&nbsp;Policy,&nbsp;created&nbsp;by&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StarLink:FINDOFF&nbsp;execution,&nbsp;contains&nbsp;matched<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stars&nbsp;from&nbsp;StarCollection<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sourceFindoffOut&nbsp;&nbsp;&nbsp;&nbsp;file&nbsp;named&nbsp;by&nbsp;Policy,&nbsp;created&nbsp;by&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StarLink:FINDOFF&nbsp;execution,&nbsp;contains&nbsp;matched<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stars&nbsp;from&nbsp;ImageSourceCollection</tt></dd></dl>
+
+<dl><dt><a name="StarSourceMatchCollection-StarMatch"><strong>StarMatch</strong></a>(self)</dt><dd><tt>Run&nbsp;the&nbsp;StarLink&nbsp;program&nbsp;FINDOFF.&nbsp;Creates&nbsp;two&nbsp;output&nbsp;files&nbsp;which&nbsp;are<br>
+subsequently&nbsp;merged&nbsp;by&nbsp;&nbsp;a&nbsp;later&nbsp;user&nbsp;call&nbsp;to<br>
+StarSourceMatchCollection.<a href="#Pipeline.WCS.matchCollection.StarSourceMatchCollection-GetMatches">GetMatches</a>()<br>
+&nbsp;<br>
+Input&nbsp;&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None<br>
+&nbsp;<br>
+Return&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None<br>
+&nbsp;<br>
+Input&nbsp;Files<br>
+&nbsp;&nbsp;&nbsp;&nbsp;starFindoffIn&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;file&nbsp;named&nbsp;by&nbsp;Policy,&nbsp;created&nbsp;locally&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StarCollection,&nbsp;then&nbsp;read&nbsp;by&nbsp;StarLink:FINDOFF&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sourceFindoffIn&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;file&nbsp;named&nbsp;by&nbsp;Policy,&nbsp;created&nbsp;locally&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ImageSourceCollection,&nbsp;then&nbsp;read&nbsp;by&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StarLink:FINDOFF&nbsp;<br>
+&nbsp;<br>
+Output&nbsp;Files<br>
+&nbsp;&nbsp;&nbsp;&nbsp;starFindoffOut&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;file&nbsp;named&nbsp;by&nbsp;Policy,&nbsp;created&nbsp;by&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StarLink:FINDOFF&nbsp;execution,&nbsp;contains&nbsp;matched<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stars&nbsp;from&nbsp;StarCollection<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sourceFindoffOut&nbsp;&nbsp;&nbsp;&nbsp;file&nbsp;named&nbsp;by&nbsp;Policy,&nbsp;created&nbsp;by&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StarLink:FINDOFF&nbsp;execution,&nbsp;contains&nbsp;matched<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stars&nbsp;from&nbsp;ImageSourceCollection</tt></dd></dl>
+
+<dl><dt><a name="StarSourceMatchCollection-WriteMatches"><strong>WriteMatches</strong></a>(self, fileName)</dt><dd><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Write&nbsp;(RA,DEC)&nbsp;world&nbsp;coordinates&nbsp;and&nbsp;(x,y)&nbsp;&nbsp;pixel&nbsp;coordinates&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;matched&nbsp;stars.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Input<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filename&nbsp;&nbsp;&nbsp;&nbsp;name&nbsp;of&nbsp;output&nbsp;file;&nbsp;Format:&nbsp;string;&nbsp;Default:&nbsp;none<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Return<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;none<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Output&nbsp;File&nbsp;&nbsp;&nbsp;&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;World&nbsp;Coords&nbsp;and&nbsp;Pixel&nbsp;Coords&nbsp;for&nbsp;all&nbsp;matched&nbsp;stars<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;File&nbsp;Format:&nbsp;'%f&nbsp;%f&nbsp;%f&nbsp;%f<br>
+'&nbsp;%&nbsp;(ra&nbsp;dec&nbsp;x&nbsp;y)</tt></dd></dl>
+
+<dl><dt><a name="StarSourceMatchCollection-WriteMatchesAstrom"><strong>WriteMatchesAstrom</strong></a>(self, fileName)</dt><dd><tt>Write&nbsp;(RA,DEC)&nbsp;world&nbsp;coordinates&nbsp;and&nbsp;proper&nbsp;motions&nbsp;for<br>
+matched&nbsp;stars&nbsp;in&nbsp;a&nbsp;form&nbsp;suitable&nbsp;for&nbsp;StarLink&nbsp;Astrom&nbsp;program.<br>
+&nbsp;<br>
+Input<br>
+&nbsp;&nbsp;&nbsp;&nbsp;filename&nbsp;&nbsp;&nbsp;&nbsp;name&nbsp;of&nbsp;output&nbsp;file;&nbsp;Format:&nbsp;string;&nbsp;Default:&nbsp;none<br>
+&nbsp;<br>
+Return<br>
+&nbsp;&nbsp;&nbsp;&nbsp;none<br>
+&nbsp;<br>
+Output&nbsp;File&nbsp;&nbsp;&nbsp;&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ASTR&nbsp;file&nbsp;format</tt></dd></dl>
+
+<dl><dt><a name="StarSourceMatchCollection-WriteMatchesIRAF"><strong>WriteMatchesIRAF</strong></a>(self, fileName)</dt><dd><tt>Write&nbsp;(RA,DEC)&nbsp;world&nbsp;coordinates&nbsp;and&nbsp;proper&nbsp;motions&nbsp;for<br>
+matched&nbsp;stars&nbsp;in&nbsp;a&nbsp;form&nbsp;suitable&nbsp;for&nbsp;input&nbsp;to&nbsp;iraf&nbsp;ccmap<br>
+&nbsp;<br>
+Input<br>
+&nbsp;&nbsp;&nbsp;&nbsp;filename&nbsp;&nbsp;&nbsp;&nbsp;name&nbsp;of&nbsp;output&nbsp;file;&nbsp;Format:&nbsp;string;&nbsp;Default:&nbsp;none<br>
+&nbsp;<br>
+Return<br>
+&nbsp;&nbsp;&nbsp;&nbsp;none<br>
+&nbsp;<br>
+Output&nbsp;File&nbsp;&nbsp;&nbsp;&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;iraf&nbsp;file&nbsp;format</tt></dd></dl>
+
+<dl><dt><a name="StarSourceMatchCollection-__init__"><strong>__init__</strong></a>(self, stars, sources, metaData, logFile<font color="#909090">='StarMatch.log'</font>, policyFile<font color="#909090">=None</font>, **kws)</dt><dd><tt>Initialization&nbsp;of&nbsp;StarSourceMatchCollection<br>
+&nbsp;<br>
+Input<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stars&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StarCollection&nbsp;containing&nbsp;stars&nbsp;from&nbsp;catalog<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sources&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ImageSourceCollection&nbsp;containing&nbsp;detected&nbsp;sources&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in&nbsp;image;&nbsp;Default:&nbsp;none<br>
+&nbsp;&nbsp;&nbsp;&nbsp;logFile&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filename&nbsp;for&nbsp;logging;&nbsp;Default&nbsp;is&nbsp;"Log.out"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Filename&nbsp;format:&nbsp;ascii&nbsp;string<br>
+&nbsp;&nbsp;&nbsp;&nbsp;policyFile&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filename&nbsp;of&nbsp;Policy&nbsp;rules;&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1st&nbsp;default:&nbsp;"$LSSTProto/StarSourceMatchCollection.conf"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2cd&nbsp;default:&nbsp;"./StarSourceMatchCollection.conf"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Filename&nbsp;format:&nbsp;ascii&nbsp;string<br>
+Return<br>
+&nbsp;&nbsp;&nbsp;&nbsp;none</tt></dd></dl>
+
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__dict__</strong> = &lt;dictproxy object&gt;<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dl>
+
+<dl><dt><strong>__weakref__</strong> = &lt;attribute '__weakref__' of 'StarSourceMatchCollection' objects&gt;<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dl>
+
+</td></tr></table>
+</body></html>
