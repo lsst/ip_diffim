@@ -6,7 +6,7 @@ Description
     Third test of basic python module access within WCS pipeline
                                                                                 
 """
-from lsst.apps.fw.Image import CCDImage
+from lsst.fw.Image import CCDImage
 import RO.DS9
 import sys
 import os
@@ -15,7 +15,7 @@ print "Test source collection of an image at pole: polaris_20sec_2.fic\nStart te
 
 # Find the image, either in system location or local directory
 try:
-    testData = os.environ['LSSTProto'] + '/tests/WCS/data/polaris_20sec_2.fic'
+    testData = os.environ['LSSTProto'] + '/SampleData/data/polaris_20sec_2.fic'
 except:
     testData = "./polaris_20sec_2.fic"
                                                                                 

@@ -19,7 +19,7 @@ print "\n-------Start mpiNrayAllDist_WcsPerMEF on "+str(myid)+"...."
 
 # Acquire test image from local directory or system
 try:
-    testData = os.environ['LSSTProto'] + '/tests/WCS/data/642538p.fits'
+    testData = os.environ['LSSTProto'] + '/SampleData/data/642538p.fits'
 except:
     testData = "./642538p.fits"
 
@@ -30,8 +30,8 @@ except:
 # 
 #	      The mosaic conf file defines the CCD conf file to be used.
 try:
-    mosaicConfFile = os.environ['LSSTProto'] + '/etc/CFHT12K_Mosaic.conf'
-    ccdConfFile = os.environ['LSSTProto'] + '/etc/CFHT12K_CCD.conf'
+    mosaicConfFile = os.environ['LSST_POLICY_DIR'] + '/CFHT12K_Mosaic.conf'
+    ccdConfFile = os.environ['LSST_POLICY_DIR'] + '/CFHT12K_CCD.conf'
 except:
     mosaicConfFile = "./CFHT12K_Mosaic.conf"
     ccdConfFile = "./CFHT12K_CCD.conf"

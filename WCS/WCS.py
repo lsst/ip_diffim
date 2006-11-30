@@ -5,8 +5,8 @@ Creates a WCS object from a StarSourceMatchCollection
 """
 __all__ = ["WCS"]
 
-from lsst.apps.imageproc.WCS import StarSourceMatchCollection
-from lsst.apps.support.PyWCSlib import PyWCSlib
+from lsst.imageproc.WCS import StarSourceMatchCollection
+from lsst.support.PyWCSlib import PyWCSlib
 import numarray 
 import os
 import re
@@ -16,7 +16,7 @@ import tempfile
 import logging
 import pyfits
 from RO.StringUtil import *
-from lsst.apps.fw.Policy import Policy
+from lsst.fw.Policy import Policy
 
 
 #*********************************************************************

@@ -9,9 +9,9 @@ Description
 """
 import os
 import sys
-from lsst.apps.fw.Image import MosaicImage
-from lsst.apps.fw.Collection import *
-from lsst.apps.imageproc.WCS import *
+from lsst.fw.Image import MosaicImage
+from lsst.fw.Collection import *
+from lsst.imageproc.WCS import *
 import RO.DS9
 
 print "Test star match and WCS build on one CCD within MEF image.\nStart test7..."
@@ -19,7 +19,7 @@ print "Test star match and WCS build on one CCD within MEF image.\nStart test7..
 # Acquire the test image from system directory or local directory
 try:
     testData = os.environ['LSSTProto'] +\
-                          '/tests/WCS/data/642538p.fits'
+                          '/SampleData/data/642538p.fits'
 except:
     testData = os.path.abspath("./642538p.fits")
 
@@ -34,8 +34,8 @@ print "Image file: %s" %(testData)
 #             detector specifics
 #
 #             The mosaic conf file defines the CCD conf file to be used.
-mosaicConfFile = os.environ['LSSTProto'] + '/etc/CFHT12K_Mosaic.conf'
-ccdConfFile = os.environ['LSSTProto'] + '/etc/CFHT12K_CCD.conf'
+mosaicConfFile = os.environ['LSST_POLICY_DIR'] + '/CFHT12K_Mosaic.conf'
+ccdConfFile = os.environ['LSST_POLICY_DIR'] + '/CFHT12K_CCD.conf'
 
 if  not os.path.exists(mosaicConfFile) or not os.path.exists(ccdConfFile):
     mosaicConfFile = os.path.abspath("./conf/CFHT12K_Mosaic.conf")

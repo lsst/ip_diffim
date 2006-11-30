@@ -9,15 +9,15 @@ Description
 
 import sys
 import os
-from lsst.apps.fw.Image import Image
-from lsst.apps.fw.Image import CCDImage
+from lsst.fw.Image import Image
+from lsst.fw.Image import CCDImage
 import RO.DS9
 
 print "Test access of target 7 of FIC 642538p.fic and collection of its sources.\nStart test2.fic...."
 
 # Find the image, either in system location or local directory
 try:
-    testData = os.environ['LSSTProto'] + '/tests/WCS/data/642538p.fic'
+    testData = os.environ['LSSTProto'] + '/SampleData/data/642538p.fic'
 except:
     testData = "./642538p.fic"
                                                                                 

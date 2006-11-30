@@ -9,15 +9,15 @@ Description
 
 import sys
 import os
-from lsst.apps.fw.Image import Image
-from lsst.apps.fw.Image import CCDImage
+from lsst.fw.Image import Image
+from lsst.fw.Image import CCDImage
 import RO.DS9
 
 print "Start test2....access HDU 7 of MEF image then collect its sources"
 
 # Find the image, either in system location or local directory
 try:
-    testData = os.environ['LSSTProto'] + '/tests/WCS/data/642538p.fits'
+    testData = os.environ['LSSTProto'] + '/SampleData/data/642538p.fits'
 except:
     testData = os.path.abspath("./642538p.fits")
 

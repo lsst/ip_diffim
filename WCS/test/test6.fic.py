@@ -9,9 +9,9 @@ Description
 
 import sys
 import os
-from lsst.apps.fw.Image import CCDImage
-from lsst.apps.fw.Collection import *
-from lsst.apps.imageproc.WCS import *
+from lsst.fw.Image import CCDImage
+from lsst.fw.Collection import *
+from lsst.imageproc.WCS import *
 import RO.DS9
 
 print "Test star match and WCS build on single image: lbcb.20050812.072401_2.fic\nStart test6.fic...."
@@ -19,7 +19,7 @@ print "Test star match and WCS build on single image: lbcb.20050812.072401_2.fic
 # Acquire test image from system or local directory
 try:
     testData = os.environ['LSSTProto'] +\
-                          '/tests/WCS/data/lbcb.20050812.072401_2.fic'
+                          '/SampleData/data/lbcb.20050812.072401_2.fic'
 except:
     testData = "./lbcb.20050812.072401_2.fic"
                                                                                 

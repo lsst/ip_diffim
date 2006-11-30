@@ -18,7 +18,7 @@ import tempfile
 import logging
 import fileinput
 from RO.StringUtil import *
-from lsst.apps.fw.Policy import Policy
+from lsst.fw.Policy import Policy
 
 
 #*************************************************

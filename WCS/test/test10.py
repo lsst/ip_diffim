@@ -2,7 +2,7 @@
 
 import sys
 import os
-from lsst.apps.imageproc.WCS import *
+from lsst.imageproc.WCS import *
 
 print "Start test10: \nConstruct and use WCS from FITS keywords"
 

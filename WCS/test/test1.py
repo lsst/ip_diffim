@@ -6,14 +6,14 @@ Description
     First test of basic python module access within WCS pipeline
                                                                                 
 """
-from lsst.apps.fw.Image import CCDImage
+from lsst.fw.Image import CCDImage
 import os
 import sys
 
 print "Start test1..... access single image file"
 try:
     testData = os.environ['LSSTProto'] + \
-                          '/tests/WCS/data/lbcb.20050812.072401_2.fits'
+                          '/SampleData/data/lbcb.20050812.072401_2.fits'
 except:
     testData = os.path.abspath("./data/lbcb.20050812.072401_2.fits")
 

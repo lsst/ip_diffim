@@ -24,12 +24,12 @@ Transient Debris
 """
 import sys
 import RO.DS9
-from lsst.apps.fw.Image.Image import Image
-from lsst.apps.fw.Image.CCDImage import CCDImage
-from lsst.apps.fw.Image.MosaicImage import MosaicImage
-from lsst.apps.fw.Collection.StarCollection import StarCollection
-from lsst.apps.imageproc.WCS.StarSourceMatchCollection import StarSourceMatchCollection
-from lsst.apps.imageproc.WCS.WCS import WCS
+from lsst.fw.Image.Image import Image
+from lsst.fw.Image.CCDImage import CCDImage
+from lsst.fw.Image.MosaicImage import MosaicImage
+from lsst.fw.Collection.StarCollection import StarCollection
+from lsst.imageproc.WCS.StarSourceMatchCollection import StarSourceMatchCollection
+from lsst.imageproc.WCS.WCS import WCS
 
 if (len(sys.argv) < 5):
     print 'doMosaicWCS syntax:  ./doMosaicWCS.py <MEF file> <CCD #> <Mosaic Config> <CCD Config>'

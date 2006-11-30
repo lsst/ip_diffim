@@ -6,7 +6,7 @@ Description
     Fourth test of basic python module access within WCS pipeline
                                                                                 
 """
-from lsst.apps.fw.Image import CCDImage
+from lsst.fw.Image import CCDImage
 import RO.DS9
 import os
 import sys
@@ -16,7 +16,7 @@ print "Test access of single image file: lbcb.20050812.072401_2 and its source e
 # Find the image, either in system location or local directory
 try:
     testData = os.environ['LSSTProto'] +\
-                          '/tests/WCS/data/lbcb.20050812.072401_2.fic'
+                          '/SampleData/data/lbcb.20050812.072401_2.fic'
 except:
     testData = "./lbcb.20050812.072401_2.fic"
 

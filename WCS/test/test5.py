@@ -6,9 +6,9 @@ Fifth test of basic python module access within WCS pipeline
 
 import os
 import sys
-from lsst.apps.fw.Image import CCDImage
-from lsst.apps.fw.Collection import *
-from lsst.apps.imageproc.WCS import *
+from lsst.fw.Image import CCDImage
+from lsst.fw.Collection import *
+from lsst.imageproc.WCS import *
 import RO.DS9
 
 print "Start test5...star matching on image taken at the pole"
@@ -16,8 +16,8 @@ print "Start test5...star matching on image taken at the pole"
 # Find the image, either in system location or local directory
 try:
     testData = os.environ['LSSTProto'] +\
-                          '/tests/WCS/data/polaris_20sec_2.fits'
-#                          '/tests/WCS/data/lbcb.20050812.072401_2.fits'
+                          '/SampleData/data/polaris_20sec_2.fits'
+#                          '/SampleData/data/lbcb.20050812.072401_2.fits'
 except:
     testData = "./lbcb.20050812.072401_2.fits"
 

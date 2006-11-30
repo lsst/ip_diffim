@@ -21,11 +21,11 @@ Transient Debris
                                                                                 
 """
 import sys
-from lsst.apps.fw.Image.Image import Image
-from lsst.apps.fw.Image.CCDImage import CCDImage
-from lsst.apps.fw.Collection import StarCollection
+from lsst.fw.Image.Image import Image
+from lsst.fw.Image.CCDImage import CCDImage
+from lsst.fw.Collection import StarCollection
 import RO.DS9
-from lsst.apps.imageproc.WCS import *
+from lsst.imageproc.WCS import *
 
 if (len(sys.argv) < 3):
     print 'doWCS syntax:  ./doWCS.py <single FITS image file> <CCDImage configuration>'
