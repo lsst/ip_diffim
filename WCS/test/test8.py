@@ -65,7 +65,7 @@ except:
     sys.exit(1)
 
 try:
-    scat.SortByMag(truncLen=300)
+    scat.SortByMag(truncLen=1000)
 except:
     print 'Test8: ',sys.exc_type,"\nCause: ",sys.exc_value,"\n"
     sys.exit(1)
@@ -94,6 +94,11 @@ except:
     print 'Test8: ',sys.exc_type,"\nCause: ",sys.exc_value,"\n"
     print ("Test8: Failure: no stars matched, no WCS constructed\n")
     sys.exit(1)
+
+#
+# Now display the star collection from the catalog, using the wcs just determined
+#
+scat.DisplayStars(ds9, wcs)
 
 print "End test8"
 
