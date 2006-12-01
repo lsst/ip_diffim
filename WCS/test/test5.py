@@ -14,10 +14,10 @@ import RO.DS9
 print "Start test5...star matching on image taken at the pole"
 
 # Find the image, either in system location or local directory
+#                          '/SampleData/data/polaris_20sec_2.fits'
 try:
     testData = os.environ['LSSTProto'] +\
-                          '/SampleData/data/polaris_20sec_2.fits'
-#                          '/SampleData/data/lbcb.20050812.072401_2.fits'
+                          '/SampleData/data/lbcb.20050812.072401_2.fits'
 except:
     testData = "./lbcb.20050812.072401_2.fits"
 
@@ -44,9 +44,9 @@ except:
     sys.exit(1)
 
 # Use ds9 to display the Source Collection
-#ds9=RO.DS9.DS9Win()
-#ccdim.Display(ds9)
-#sc.DisplaySources(ds9,flagMask=255, starGalCut=0.8)
+ds9=RO.DS9.DS9Win()
+ccdim.Display(ds9)
+sc.DisplaySources(ds9,flagMask=255, starGalCut=0.8)
 
 # Acquire a fiducial stars for GSC catalog in region overlapping source image
 try:

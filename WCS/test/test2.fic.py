@@ -46,8 +46,8 @@ except:
     sys.exit(1)
 
 # Use ds9 to display the Source Collection
-#ds9=RO.DS9.DS9Win()
-#ccd7.Display(ds9)
-#sc7.DisplaySources(ds9,flagMask=255, starGalCut=0.8)
+ds9=RO.DS9.DS9Win()
+ccd7.Display(ds9)
+sc7.DisplaySources(ds9,flagMask=255, starGalCut=0.8)
 
 print "End test2.fic"

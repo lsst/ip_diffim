@@ -71,9 +71,9 @@ except:
     sys.exit(1)
 
 # Display if desired
-#ds9=RO.DS9.DS9Win()
-#ccd.Display(ds9)
-#sc.DisplaySources(ds9,flagMask=0, starGalCut=0)
+ds9=RO.DS9.DS9Win()
+ccd.Display(ds9)
+sc.DisplaySources(ds9,flagMask=0, starGalCut=0)
 
 # Initialize the match class with the source and fiducial star collections
 match=StarSourceMatchCollection(scat, sc, ccd.GetMetaData(),policyFile=os.path.abspath("./conf/StarSourceMatchCollection.conf"))
@@ -84,7 +84,8 @@ try:
     match.StarMatch()
     # Create the WCS for the CCD
     try:
-        wcs=WCS(match)
+        wcsConfFile = os.environ['LSST_POLICY_DIR'] + '/WCS.conf'
+        wcs=WCS(match, policyFile=wcsConfFile)
     except:
         print 'Test8: ',sys.exc_type,"\nCause: ",sys.exc_value,"\n"
         print ("Test8: Failure: no WCS constructed\n")

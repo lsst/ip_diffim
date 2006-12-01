@@ -73,9 +73,9 @@ except:
     sys.exit(1)
                                                                                 
 # Display if desired
-#ds9=RO.DS9.DS9Win()
-#ccd7.Display(ds9)
-#sc7.DisplaySources(ds9,flagMask=0, starGalCut=0)
+ds9=RO.DS9.DS9Win()
+ccd7.Display(ds9)
+sc7.DisplaySources(ds9,flagMask=0, starGalCut=0)
 
 # Initialize  the match class with the source and fiducial star collections
 match=StarSourceMatchCollection(scat7, sc7, ccd7.GetMetaData(),policyFile=os.path.abspath("./conf/StarSourceMatchCollection.conf"))
