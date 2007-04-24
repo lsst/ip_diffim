@@ -25,11 +25,7 @@ env.libs = dict([
 #
 # Build/install things
 #
-for d in Split("doc examples include/lsst/fw lib src tests"):
-    SConscript(os.path.join(d, "SConscript"))
-
-for d in map(lambda str: "python/lsst/fw/" + str,
-             Split("Catalog Core Display")):
+for d in Split("tests"):
     SConscript(os.path.join(d, "SConscript"))
 
 env['IgnoreFiles'] = r"(~$|\.pyc$|^\.svn$|\.o$)"
