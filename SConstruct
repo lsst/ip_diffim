@@ -5,10 +5,11 @@
 import glob, os.path
 import lsst.SConsUtils as scons
 
-env = scons.makeEnv("fw",
+env = scons.makeEnv("imageproc",
                     r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/tickets/7/SConstruct $",
                     [["boost", "boost/version.hpp", "boost_filesystem:C++"],
                      ["vw", "vw/Core.h", "vw:C++"],
+                     ["fw", "lsst/fw/LsstBase.h", "fw"],
                      ["python", "Python.h"],
                      ["cfitsio", "fitsio.h", "m cfitsio", "ffopen"],
                      ["wcstools", "wcs.h", "wcs", "wcscat"],
@@ -21,11 +22,12 @@ env.libs = dict([
     ("boost",	Split("boost_filesystem")),
     ("fits",	Split("fitsio")),
     ("vw",	Split("vw vwCore vwFileIO")),
+    ("fw",	Split("fw")),
     ])
 #
 # Build/install things
 #
-for d in Split("tests"):
+for d in Split("src tests"):
     SConscript(os.path.join(d, "SConscript"))
 
 env['IgnoreFiles'] = r"(~$|\.pyc$|^\.svn$|\.o$)"

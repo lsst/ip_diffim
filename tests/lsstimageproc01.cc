@@ -1,3 +1,7 @@
+#include "lsst/fw/LsstBase.h"
+#include "lsst/fw/Trace.h"
+
+#include <iostream>
 using namespace std;
 using namespace lsst::fw;
 
