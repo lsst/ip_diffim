@@ -13,14 +13,13 @@ public:
    typedef PixelLocator<MaskPixelT> MaskIteratorT;
    typedef typename PixelChannelType<MaskPixelT>::type MaskChannelT;
 
-   setmaskPixProcFunc(MaskedImage<ImagePixelT, VariancePixelT, MaskPixelT>& m) : PixelProcessingFunc<ImagePixelT, VariancePixelT, MaskPixelT>(m), initCount(0) {}
+   synthesizeCfhtPixProcFunc(MaskedImage<ImagePixelT, VariancePixelT, MaskPixelT>& m) : PixelProcessingFunc<ImagePixelT, VariancePixelT, MaskPixelT>(m), initCount(0) {}
 
    void init() {
       PixelProcessingFunc<ImagePixelT, VariancePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("manual", bitSat);
       DataProperty::DataPropertyPtrT metaDataPtr = PixelProcessingFunc<ImagePixelT, VariancePixelT, MaskPixelT>::_imagePtr->getMetaData();
       DataProperty::DataPropertyPtrT satPtr = metaDataPtr->find(boost::regex("MAXLIN"));
-      DataProperty::DataPropertyPtrT gainPtr = metaDataPtr->find(boost::regex("GAIN"));
-      DataProperty::DataPropertyPtrT rdnoisePtr = metaDataPtr->find(boost::regex("RDNOISE"));
+
       maskCount = 0;
       initCount++;
    }
@@ -30,13 +29,6 @@ public:
 	 *m = *m | bitSat;
 	 maskCount++;
       }
-      // synthesize variance :
-      // noise_e**2   = pixel_e + rdnoise**2
-      // pixel_e      = pixel_adu * gain
-      // noise_adu**2 = (noise_e / gain)**2
-      //              = pixel_e / gain**2 + (rdnoise/gain)**2
-      //              = pixel_adu / gain  + (rdnoise/gain)**2
-      *v = *i * igainValue + rdnoiseOverGainSquared;
    }
 
    int getCount() { return maskCount; }
@@ -45,10 +37,6 @@ private:
    MaskChannelT bitSat;
    int maskCount;
    int initCount;
-   float satValue;
-   float igainValue;   // inverse gain
-   float rdnoiseValue; 
-   float rdnoiseOverGainSquared;
 };
 
 
