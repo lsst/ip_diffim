@@ -15,6 +15,7 @@ env = scons.makeEnv("imageproc",
                      ["wcstools", "wcs.h", "wcs", "wcscat"],
                      ["xpa", "xpa.h", "xpa", "XPAPuts"],
                      ])
+
 #
 # Libraries that I need to link things.  This should be handled better
 #
@@ -24,6 +25,7 @@ env.libs = dict([
     ("vw",	Split("vw vwCore vwFileIO")),
     ("fw",	Split("fw")),
     ])
+
 #
 # Build/install things
 #
