@@ -1,0 +1,4 @@
+# -*- python -*-
+Import("env")
+
+env.Program(["testfw01.cc"], LIBS=env.libs["vw"] + ["fw"])
