@@ -2,77 +2,108 @@
 #include "lsst/fw/MaskedImage.h"
 #include "lsst/fw/Trace.h"
 #include "lsst/fw/DiskImageResourceFITS.h"
+#include "lsst/fw/DataProperty.h"
+#include "lsst/fw/Exception.h"
 
 #include <iostream>
-using namespace lsst;
 
-template <typename ImagePixelT, typename MaskPixelT> class synthesizeCfhtPixProcFunc : public PixelProcessingFunc<ImagePixelT, MaskPixelT> 
-{
+using namespace std;
+using namespace lsst::fw;
+
+template <typename ImagePixelT, typename MaskPixelT> 
+class synthesizeCfhtPixProcFunc : public PixelProcessingFunc<ImagePixelT, MaskPixelT> {
 public:
     typedef PixelLocator<ImagePixelT> ImageIteratorT;
-    //typedef PixelLocator<VariancePixelT> VarianceIteratorT;
     typedef PixelLocator<MaskPixelT> MaskIteratorT;
     typedef typename PixelChannelType<MaskPixelT>::type MaskChannelT;
     
-    //synthesizeCfhtPixProcFunc(MaskedImage<ImagePixelT, VariancePixelT, MaskPixelT>& m) : PixelProcessingFunc<ImagePixelT, VariancePixelT, MaskPixelT>(m), initCount(0) {}
     synthesizeCfhtPixProcFunc(MaskedImage<ImagePixelT, MaskPixelT>& m) : PixelProcessingFunc<ImagePixelT, MaskPixelT>(m), initCount(0) {}
     
     void init() {
-        //PixelProcessingFunc<ImagePixelT, VariancePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("manual", bitSat);
-        PixelProcessingFunc<ImagePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("manual", bitSat);
-        //DataProperty::DataPropertyPtrT metaDataPtr = PixelProcessingFunc<ImagePixelT, VariancePixelT, MaskPixelT>::_imagePtr->getMetaData();
-        DataProperty::DataPropertyPtrT metaDataPtr = PixelProcessingFunc<ImagePixelT, MaskPixelT>::_imagePtr->getMetaData();
-        DataProperty::DataPropertyPtrT satPtr = metaDataPtr->find(boost::regex("MAXLIN"));
-        satValue = boost::any_cast<const float>(satPtr->getValue());
-        maskCount = 0;
+        PixelProcessingFunc<ImagePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("saturated", satBit);
+        PixelProcessingFunc<ImagePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("zerovalued", badBit);
+        DataPropertyPtrT metaDataPtr = PixelProcessingFunc<ImagePixelT, MaskPixelT>::_imagePtr->getMetaData();
+        DataPropertyPtrT satPtr = metaDataPtr->find("MAXLIN");
+        satValue = boost::any_cast<const int>(satPtr->getValue());
+
+        satFrac = 0.9;
+        satValue *= satFrac;
+
+        badValue = 0;
+
+        satCount = 0;
+        badCount = 0;
         initCount++;
     }
     
-    //void operator ()(ImageIteratorT &i, VarianceIterator &v, MaskIteratorT &m) {
     void operator ()(ImageIteratorT &i, MaskIteratorT &m) {
-        if (*i > satValue) {
-            *m = *m | bitSat;
-            maskCount++;
+        if (*i >= satValue) {
+            *m = *m | satBit;
+            satCount++;
+        }
+
+        if (*i <= badValue) {
+            *m = *m | badBit;
+            badCount++;
         }
     }
     
-    int getCount() { return maskCount; }
+    int getSatCount() { return satCount; }
+    int getBadCount() { return badCount; }
     
 private:
-    MaskChannelT bitSat;
-    int maskCount;
+    MaskChannelT satBit;
+    MaskChannelT badBit;
+
     int initCount;
+
+    int satCount;
     float satValue;
+    float satFrac;
+
+    int badCount;
+    int badValue;
 };
 
 
 
 int main( int argc, char** argv )
 {
-    fw::Trace::setDestination(std::cout);
-    fw::Trace::setVerbosity(".", 0);
+    Trace::setDestination(cout);
+    Trace::setVerbosity(".", 0);
     
     typedef uint8 MaskPixelType;
     typedef float32 ImagePixelType;
-    
+
+    string scienceInputImage = argv[1];
+    string scienceOutputImage = argv[2];
+    string templateInputImage = argv[3];
+    string templateOutputImage = argv[4];
+
     MaskedImage<ImagePixelType,MaskPixelType> cfhtScienceMaskedImage;
-    cfhtScienceMaskedImage.readFits(argv[1]);
-    cfhtScienceMaskedImage.getMask()->addMaskPlane("manual");
+    cfhtScienceMaskedImage.readFits(scienceInputImage);
+    cfhtScienceMaskedImage.getMask()->addMaskPlane("saturated");
+    cfhtScienceMaskedImage.getMask()->addMaskPlane("zerovalued");
     cfhtScienceMaskedImage.setDefaultVariance();
     synthesizeCfhtPixProcFunc<ImagePixelType, MaskPixelType> maskScienceFunc(cfhtScienceMaskedImage);
     maskScienceFunc.init();
     cfhtScienceMaskedImage.processPixels(maskScienceFunc);
-    std::cout << "Set " << maskScienceFunc.getCount() << " mask bits" << std::endl;
+    cout << "Set " << maskScienceFunc.getSatCount() << " sat mask bits in " << scienceInputImage << endl;
+    cout << "Set " << maskScienceFunc.getBadCount() << " bad mask bits in " << scienceInputImage << endl;
+    cfhtScienceMaskedImage.writeFits(scienceOutputImage);
     
     MaskedImage<ImagePixelType,MaskPixelType> cfhtTemplateMaskedImage;
-    cfhtTemplateMaskedImage.readFits(argv[2]);
-    cfhtTemplateMaskedImage.getMask()->addMaskPlane("manual");
+    cfhtTemplateMaskedImage.readFits(templateInputImage);
+    cfhtTemplateMaskedImage.getMask()->addMaskPlane("saturated");
+    cfhtTemplateMaskedImage.getMask()->addMaskPlane("zerovalued");
     cfhtTemplateMaskedImage.setDefaultVariance();
     // Can I reuse maskScienceFunc?
     synthesizeCfhtPixProcFunc<ImagePixelType, MaskPixelType> maskTemplateFunc(cfhtTemplateMaskedImage);
     maskTemplateFunc.init();
     cfhtTemplateMaskedImage.processPixels(maskTemplateFunc);
-    std::cout << "Set " << maskTemplateFunc.getCount() << " mask bits" << std::endl;
+    cout << "Set " << maskTemplateFunc.getSatCount() << " sat mask bits in " << templateInputImage << endl;
+    cout << "Set " << maskTemplateFunc.getBadCount() << " bad mask bits in " << templateInputImage << endl;
+    cfhtTemplateMaskedImage.writeFits(templateOutputImage);
     
     return 1;
 }

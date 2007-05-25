@@ -1,4 +1,19 @@
 # -*- python -*-
 Import("env")
 
-env.Program(["testfw01.cc"], LIBS=env.libs["vw"] + ["fw"])
+env.Program(["CFHT2MaskedImage.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
+
+#
+# Tests
+#
+# This does not work
+#import os
+
+#exe    = "CFHT2MaskedImage"
+#target = "CFHT2MaskedImage.output"
+#try:
+#    if os.stat(exe).st_mode & 01:  # file exists and is executable
+#        env.Command(target, exe, "source $LSST_ROOT/loadLSST.csh; setup imageproc becker; examples/%s examples/871034p_1 examples/871034p_1_MI" % (exe))
+#except OSError:
+#    pass
+

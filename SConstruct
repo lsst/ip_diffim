@@ -29,7 +29,7 @@ env.libs = dict([
 #
 # Build/install things
 #
-for d in Split("src tests"):
+for d in Split("src tests examples"):
     SConscript(os.path.join(d, "SConscript"))
 
 env['IgnoreFiles'] = r"(~$|\.pyc$|^\.svn$|\.o$)"
