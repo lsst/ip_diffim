@@ -1,11 +1,7 @@
 // -*- lsst-c++ -*-
 #include "lsst/fw/MaskedImage.h"
 #include "lsst/fw/Trace.h"
-#include "lsst/fw/DiskImageResourceFITS.h"
 #include "lsst/fw/DataProperty.h"
-#include "lsst/fw/Exception.h"
-
-#include <iostream>
 
 using namespace std;
 using namespace lsst::fw;
@@ -25,10 +21,12 @@ public:
         DataPropertyPtrT metaDataPtr = PixelProcessingFunc<ImagePixelT, MaskPixelT>::_imagePtr->getMetaData();
         DataPropertyPtrT satPtr = metaDataPtr->find("MAXLIN");
         satValue = boost::any_cast<const int>(satPtr->getValue());
-
+        
+        // Mask anything within 90% of saturation for now
         satFrac = 0.9;
         satValue *= satFrac;
-
+        
+        // Bad (zero-valued) pixels
         badValue = 0;
 
         satCount = 0;

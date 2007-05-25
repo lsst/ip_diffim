@@ -1,11 +1,7 @@
 // -*- lsst-c++ -*-
 #include "lsst/fw/MaskedImage.h"
 #include "lsst/fw/Trace.h"
-#include "lsst/fw/DiskImageResourceFITS.h"
 #include "lsst/fw/DataProperty.h"
-#include "lsst/fw/Exception.h"
-
-#include <iostream>
 
 using namespace std;
 using namespace lsst::fw;
