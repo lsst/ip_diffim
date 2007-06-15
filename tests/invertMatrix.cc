@@ -5,8 +5,6 @@
 #include <boost/numeric/ublas/vector_proxy.hpp> 
 #include <boost/numeric/ublas/triangular.hpp>
 #include <boost/numeric/ublas/lu.hpp>
-//#include <boost/numeric/ublas/storage.hpp>  // needed for vw inverse
-//#include <boost/numeric/ublas/functional.hpp>  // needed for vw inverse
 #include <boost/timer.hpp> 
 #include <vw/Math/Matrix.h> 
 #include "lsst/fw/Exception.h"
