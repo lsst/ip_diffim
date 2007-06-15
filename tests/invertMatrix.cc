@@ -5,7 +5,10 @@
 #include <boost/numeric/ublas/vector_proxy.hpp> 
 #include <boost/numeric/ublas/triangular.hpp>
 #include <boost/numeric/ublas/lu.hpp>
+//#include <boost/numeric/ublas/storage.hpp>  // needed for vw inverse
+//#include <boost/numeric/ublas/functional.hpp>  // needed for vw inverse
 #include <boost/timer.hpp> 
+#include <vw/Math/Matrix.h> 
 #include "lsst/fw/Exception.h"
 
 using namespace boost::numeric;
@@ -13,29 +16,37 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
-    typedef ublas::vector<double> Vector;
-    typedef ublas::matrix<double> Matrix;
+    int N = atoi(argv[1]);
 
     /* just a stupid test matrix */
-    int N = atoi(argv[1]);
-    Matrix m(N,N), inverse(N,N), p(N,N);
+    ublas::matrix<double> m(N,N), inv(N,N), p(N,N);
+    vw::Matrix<double> mvw(N,N);
+    
+    
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            m (i, j)  = N * i + j + 2;
+            mvw(i, j) = N * i + j + 2;
+        }
+    }
+    
+    ublas::matrix<double> I = ublas::identity_matrix<double>(N, N);
+    m = m + N * I; // now m is not singular
 
-    for (unsigned i = 0; i < N; ++i)
-        for (unsigned j = 0; j < N; ++j)
-            m (i, j) = N * i + j + 2;
+    vw::Matrix<double> Ivw(N,N);
+    Ivw.set_identity();
+    mvw = mvw + N * Ivw; 
     
-    Matrix I3 = ublas::identity_matrix<double>(N, N);
-    m = m + N * I3; // now m is not singular
-    
+    boost::timer t;
+    double time;
+
     // BELOW IS THE GUTS OF THE CODE 
     //
     //
-    boost::timer t;
-    double time;
     t.restart(); 
 
     // create a working copy of the input
-    Matrix A(m);
+    ublas::matrix<double> A(m);
     
     // create a permutation matrix for the LU-factorization; pivots
     ublas::permutation_matrix<std::size_t> pm(A.size1());
@@ -50,25 +61,36 @@ int main(int argc, char** argv)
     }
 
     // create identity matrix of "inverse"
-    inverse.assign(ublas::identity_matrix<double>(A.size1()));
+    inv.assign(ublas::identity_matrix<double>(A.size1()));
     
     // backsubstitute to get the inverse
-    lu_substitute(A, pm, inverse);
+    lu_substitute(A, pm, inv);
 
     time = t.elapsed(); 
-    cout << "took " << time << "s" << endl; 
+    cout << "Boost took " << time << "s" << endl; 
     //
     //
     // ABOVE IS THE GUTS OF THE CODE 
 
     // verify you get out the identity matrix
-    p = ublas::prod< ublas::matrix<double> >(m,inverse); 
+    p = ublas::prod< ublas::matrix<double> >(m,inv); 
 
     if (N < 5) {
         cout << " input = " << m << endl;
-        cout << " inverse = " << inverse << endl;
+        cout << " inverse = " << inv << endl;
         cout << " product = " << p << endl;
     }
-    
+
+    // TRY THE SAME THING WITH VW
+    // 
+    // 
+    t.restart(); 
+    vw::Matrix<double> Avw = inverse(mvw);
+    time = t.elapsed(); 
+    cout << "VW took " << time << "s" << endl;     
+    if (N < 5) {
+        cout << " input = " << mvw << endl;
+        cout << " inverse = " << Avw << endl;
+    }
     return 0;
 } 
