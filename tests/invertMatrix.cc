@@ -5,33 +5,39 @@
 #include <boost/numeric/ublas/vector_proxy.hpp> 
 #include <boost/numeric/ublas/triangular.hpp>
 #include <boost/numeric/ublas/lu.hpp>
+#include <boost/timer.hpp> 
 #include "lsst/fw/Exception.h"
 
 using namespace boost::numeric;
 using namespace std;
 
-int main()
+int main(int argc, char** argv)
 {
     typedef ublas::vector<double> Vector;
     typedef ublas::matrix<double> Matrix;
 
     /* just a stupid test matrix */
-    Matrix m(3,3), inverse(3,3), p(3,3);
+    int N = atoi(argv[1]);
+    Matrix m(N,N), inverse(N,N), p(N,N);
 
-    for (unsigned i = 0; i < 3; ++ i)
-        for (unsigned j = 0; j < 3; ++ j)
-            m (i, j) = 3 * i + j + 2;
+    for (unsigned i = 0; i < N; ++i)
+        for (unsigned j = 0; j < N; ++j)
+            m (i, j) = N * i + j + 2;
     
-    Matrix I3 = ublas::identity_matrix<double>(3, 3);
-    m = m + 3 * I3; // now m is not singular
+    Matrix I3 = ublas::identity_matrix<double>(N, N);
+    m = m + N * I3; // now m is not singular
     
     // BELOW IS THE GUTS OF THE CODE 
     //
     //
+    boost::timer t;
+    double time;
+    t.restart(); 
+
     // create a working copy of the input
     Matrix A(m);
     
-    // create a permutation matrix for the LU-factorization
+    // create a permutation matrix for the LU-factorization; pivots
     ublas::permutation_matrix<std::size_t> pm(A.size1());
 
     // perform LU-factorization; for LSST throw exception instead of return
@@ -48,7 +54,9 @@ int main()
     
     // backsubstitute to get the inverse
     lu_substitute(A, pm, inverse);
-    
+
+    time = t.elapsed(); 
+    cout << "took " << time << "s" << endl; 
     //
     //
     // ABOVE IS THE GUTS OF THE CODE 
@@ -56,9 +64,11 @@ int main()
     // verify you get out the identity matrix
     p = ublas::prod< ublas::matrix<double> >(m,inverse); 
 
-    cout << " input = " << m << endl;
-    cout << " inverse = " << inverse << endl;
-    cout << " product = " << p << endl;
+    if (N < 5) {
+        cout << " input = " << m << endl;
+        cout << " inverse = " << inverse << endl;
+        cout << " product = " << p << endl;
+    }
     
     return 0;
 } 
