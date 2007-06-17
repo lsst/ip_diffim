@@ -2,5 +2,9 @@
 Import("env")
 
 env.Program(["lsstimageproc01.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
+# lsstimageproc03.cc is just pseudo-code
+env.Program(["lsstimageproc03.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
+
+# crunchy math test programs
 env.Program(["invertMatrix.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
 env.Program(["matrixMath.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
