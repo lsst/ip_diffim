@@ -1,10 +1,10 @@
 // -*- lsst-c++ -*-
+#include "lsst/fw/MaskedImage.h"
 #include "lsst/fw/Trace.h"
 #include "lsst/fw/Kernel.h"
-
-#include <boost/numeric/ublas/vector.hpp>
-#include <boost/numeric/ublas/matrix.hpp>
-#include <boost/numeric/ublas/lu.hpp>
+#include "lsstimageproc03.h"
+#include <vw/Math/Matrix.h> 
+#include <vw/Math/Vector.h> 
 
 using namespace std;
 using namespace lsst::fw;
@@ -16,8 +16,12 @@ void getTemplateChunkExposureFromTemplateExposure() {
 void wcsMatchExposure() {
 }
 
-void PSFMatchMaskedImage() {
-    getCollectionOfMaskedImagesForPSFMatching();
+void PSFMatchMaskedImages(MaskedImage convolveMaskedImage,
+                          MaskedImage noncololveMaskedImage,
+                          LinearCombinationKernel deltaFunctionKernelSet) {
+
+    vector<Object> objectCollection;
+    getCollectionOfMaskedImagesForPSFMatching(objectCollection);
 
     // Reusable view around each object
     MaskedImage<ImagePixelType,MaskPixelType>::MaskedImagePtrT convolvePtr;
@@ -28,7 +32,7 @@ void PSFMatchMaskedImage() {
 
     // Iterate over object; use iterator instead?
     for (unsigned nobj = 0; nobj < objectCollection.size(); nobj++) {
-        Object<XXX> diffImObject = objectCollection[nobj];
+        Object diffImObject = objectCollection[nobj];
         
         // grab view around each object
         // do i really want a new stamp or just a view?
@@ -45,88 +49,113 @@ void PSFMatchMaskedImage() {
         kernelVec.push_back(kernelPtr);
     }
 
-
-    computeSpatiallyVaryingPSFMatchingKernel();
+    // Does nothing currently
+    computeSpatiallyVaryingPSFMatchingKernel(kernelVec);
 }
-void getCollectionOfMaskedImagesForPSFMatching() {
+void getCollectionOfMaskedImagesForPSFMatching(vector<Object> objectCollection) {
+    Object obj1;
+    obj1.rowc = 100;
+    obj1.colc = 100;
+    obj1.drow = 10;
+    obj1.dcol = 10;
+    objectCollection.push_back(obj1);
 }
 
 void computePSFMatchingKernelForEachMaskedImage(MaskedImagePtrT convolvePtr,
                                                 MaskedImagePtrT nonconvolvePtr,
-                                                LinearCombinationKernel deltaFunctionKernelSet,
+                                                LinearCombinationKernel kernelSet,
                                                 boost::shared_ptr kernelVec) {
-    boost::numeric::ublas::vector<double> B(XXX);
-    boost::numeric::ublas::matrix<double> M(XXX, XXX);
+
+    unsigned nKernelParameters=0, nBackgroundParameters=0, nParameters=0;
+    for (unsigned i = 0; i < kernelSet.size(); i++)
+        nKernelParameters += kernelSet[i].getNKernelParameters();
+    
+    // XXX; need to set up a Function for the background
+    // Or, we just assume that across a single kernel, its 0th order.  This quite makes sense.
+    nBackgroundParameters = 1;
+    nParameters = nKernelParameters + nBackgroundParameters;
+    
+    vw::Vector<double> B(nParameters);
+    vw::Matrix<double> M(nParameters, nParameters);
+
+    // Calculate convolution of Reference image with Kernel
+    // We can make this faster for delta function kernels
+    // We might also want to pre-compute these things for each kernel, once we get to more complicated (Alard-Lupton) kernels.
+    vector<boost::shared_ptr<MaskedImage<ImagePixelType, MaskPixelType> > > convolvedVec;
+    for (unsigned ki1 = 0; ki1 < kernelSet.size(); ki1++) {
+        for (unsigned ki2=0; ki2 < kernelSet[ki1].getNKernelParameters(); ki2++) {
+            // The above loop is a placeholder for when we have multiple params to fit for per kernel
+            // We need a kernel method that returns pixelized representations of all the meshes we need to convolve
+            //   the image with at this stage.  For delta functions, or any single parameters functions, its just 
+            //   itself so we are OK.
+        }
+        boost::shared_ptr<MaskedImage<ImagePixelType, MaskPixelType> >
+            cImagePtr = Kernel::convolve(convolvePtr, kernelSet[ki1], 0, vw::NoEdgeExtension(), -1);
+        convolvedVec.push_back(cImagePtr);
+    }
 
     // integral over image's dx and dy
     for (unsigned row = 0; row < convolvePtr->getImage().nrow; row++) {
         for (unsigned col = 0; col < convolvePtr->getImage().ncol; col++) {
+            
+            // What is the correct way to access a pixel again?
+            double ncCamera = nonconvolvePtr[row,col].camera();
+            double ncVariance = nonconvolvePtr[row,col].variance();
 
-            double ncCamera   = nonconvolvePtr[row][col].camera();
-            double ncVariance = nonconvolvePtr[row][col].variance();
+            // Its an approximation to use this since you don't really know the kernel yet
+            // You really want the post-convolved variance
+            double cVariance = convolvePtr[row,col].variance();
+
+            // Quicker computation?
+            double iVariance = 1.0 / (ncVariance + cVariance);
 
             // kernel index i
-            for (unsigned kerni = 0; kerni < deltaFunctionKernelSet.size(); kerni++) {
-                kerneli = deltaFunctionKernelSet[kerni];
+            unsigned kidxi = 0;
+            for (unsigned ki1 = 0; ki1 < kernelSet.size(); ki1++) {
+                for (unsigned ki2 = 0; ki2 < kernelSet[ki1].getNKernelParameters(); ki2++, kidxi++) {
+                    
+                    double cdCamerai = convolvedVec[kidxi][row,col].camera();
+                    B[kidxi] += ncCamera * cdCamerai * iVariance;
+                    
+                    // kernel index j 
+                    unsigned kidxj = 0;
+                    for (unsigned kj1 = ki1; kj1 < kernelSet.size(); kj1++) {
+                        for (unsigned kj2 = 0; kj2 < kernelSet[kj2].getNKernelParameters(); kj2++, kidxj++) {
+                            double cdCameraj = convolvedVec[kidxj][row,col].camera();
+                            M[kidxi, kidxj] += cdCamerai * cdCameraj * iVariance;
+                        } // kj2
+                    } // kj1, kidxj
 
-                cData   = convolvePtr[row][col];
-                // This is effectively what we want to happen with the delta function kernel.
-                // cData = convolvePtr[row + kerneli->drow][col + kerneli->dcol];
-                // The more general case is
-                // convolve
-                boost::shared_ptr<MaskedImage<ImagePixelType, MaskPixelType> >
-                    cImagePtri = Kernel::convolve(convolvePtr[row][col], kerneli, threshold, vw::NoEdgeExtension(), -1);
-                
-                B[kerneli] += ncData.camera() * cImagePtri.camera() / (ncData.variance() + cImagePtri.variance());
-                
-                // background term (is this cData right?)
-                M[kerneli][nkernel] += cImagePtri.camera() / (cData.variance() + cImagePtri.variance());
-                
-                // kernel index j 
-                for (unsigned kernj = 0; kernj < deltaFunctionSet.size(); kernj++) {
-                    kernelj = deltaFunctionSet[kernj];
-                    
-                    // convolve
-                    boost::shared_ptr<MaskedImage<ImagePixelType, MaskPixelType> >
-                        cImagePtrj = Kernel::convolve(convolvePtr[row][col], kernelj, threshold, vw::NoEdgeExtension(), -1);
-                    
-                    M[kerni][kernj] += cImagePtri.camera() * cImagePtrj.camera() / (cImagePtri.variance() * cImagePtrj.variance());
-                }
-            }
-            
-            // background
-            M[nkernel][nkernel] += 1. / (ncData.variance() + cData.variance());
-            B[knernel]          += ncData.camera() / (ncData.variance() + cData.variance());
+                } // ki2
+            } // ki1, kidxi
+
+            // Here we have a single background term
+            B[kidxi+1] += ncCamera * iVariance;
+            M[kidxi+1,kixdj+1] += 1.0 * iVariance;
+
         } // col
     } // row
-    
-    vector LUv;
-    matrix LUm = LUD(LUv, M);
-    
-    vector solution;
-    LUSolve(LUm, B, LUv);
 
-
-    // create a working copy of the input
-    matrix<T> I(M);
- 
-    // create a permutation matrix for the LU-factorization
-    boost::numeric::ublas::permutation_matrix<std::size_t> pm(I.size1());
+    // Fill in rest of M
+    for (unsigned kidxi=0; kidxi < nKernelParameters; kidxi++) 
+        for (unsigned kidxj=kidxi+1; kidxj < nKernelParameters; kidxj++) 
+            M[kidxj, kidxi] = M[kidxi, kidxj];
     
-    // perform LU-factorization
-    int res = lu_factorize(I,pm);
-    if( res != 0 ) return false;
-    
-    // create identity matrix of "inverse"
-    inverse.assign(boost::numeric::ublas::identity_matrix<pixelType>(I.size1()));
-    
-    // backsubstitute to get the inverse
-    lu_substitute(I, pm, inverse);
-
-
+    // Invert M
+    vw::Matrix<double> Minv = inverse(M);
+    // Solve for x in Mx = B
+    vw::Vector<double> Soln = B * Minv;
 
     // rearrange vector into kernel Image
-    kernelVec = LUv;
+    vw::MatrixProxy<double> Kimage(Ksize, Ksize, Soln);
+    kernelVec = Kimage;  // somehow
+
+    // clean up
+    delete B;
+    delete M;
+    delete convolvedVec;
+    delete Minv;
+    delete Soln;
 }
 
 void computeSpatiallyVaryingPSFMatchingKernel() {
@@ -149,6 +178,15 @@ int main( int argc, char** argv )
     typedef uint8 maskPixelType;
     typedef float32 imagePixelType;
     typedef float32 kernelPixelType;
+
+    // Read input images
+    string scienceInputImage = argv[1];
+    MaskedImage<ImagePixelType,MaskPixelType> scienceMaskedImage;
+    scienceMaskedImage.readFits(templateInputImage);
+
+    string templateInputImage = argv[2];
+    MaskedImage<ImagePixelType,MaskPixelType> templateMaskedImage;
+    templateMaskedImage.readFits(templateInputImage);
 
     // set up basis of delta functions for kernel
     vector<boost::shared_ptr<Kernel<kernelPixelType> > > kernelVec;
@@ -175,9 +213,13 @@ int main( int argc, char** argv )
     vector<imagePixelType> kernelParams(kernelRows * kernelCols);
     LinearCombinationKernel<KernelPixelType> deltaFunctionKernelSet(kernelVec, kernelParams);
     
-    
+    // Currently does nothing
     getTemplateChunkExposureFromTemplateExposure();
-    PSFMatchMaskedImage();
+
+    // This has some functionality!  Lets at least get it to compile.
+    PSFMatchMaskedImages(scienceMaskedImage, templateMaskedImage, deltaFunctionKernelSet);
+
+    // Currently does nothing
     subtractMatchedImage();
     
 }
