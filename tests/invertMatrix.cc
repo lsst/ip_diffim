@@ -9,7 +9,7 @@
 #include <vw/Math/Matrix.h> 
 #include "lsst/fw/Exception.h"
 
-using namespace boost::numeric;
+//using namespace boost::numeric;  // Watch namespace issues; make sure "invert" is VW and not boost
 using namespace std;
 
 int main(int argc, char** argv)
@@ -17,7 +17,7 @@ int main(int argc, char** argv)
     int N = atoi(argv[1]);
 
     /* just a stupid test matrix */
-    ublas::matrix<double> m(N,N), inv(N,N), p(N,N);
+    boost::numeric::ublas::matrix<double> m(N,N), inv(N,N), p(N,N);
     vw::Matrix<double> mvw(N,N);
     
     
@@ -28,7 +28,7 @@ int main(int argc, char** argv)
         }
     }
     
-    ublas::matrix<double> I = ublas::identity_matrix<double>(N, N);
+    boost::numeric::ublas::matrix<double> I = boost::numeric::ublas::identity_matrix<double>(N, N);
     m = m + N * I; // now m is not singular
 
     vw::Matrix<double> Ivw(N,N);
@@ -44,10 +44,10 @@ int main(int argc, char** argv)
     t.restart(); 
 
     // create a working copy of the input
-    ublas::matrix<double> A(m);
+    boost::numeric::ublas::matrix<double> A(m);
     
     // create a permutation matrix for the LU-factorization; pivots
-    ublas::permutation_matrix<std::size_t> pm(A.size1());
+    boost::numeric::ublas::permutation_matrix<std::size_t> pm(A.size1());
 
     // perform LU-factorization; for LSST throw exception instead of return
     try {
@@ -59,7 +59,7 @@ int main(int argc, char** argv)
     }
 
     // create identity matrix of "inverse"
-    inv.assign(ublas::identity_matrix<double>(A.size1()));
+    inv.assign(boost::numeric::ublas::identity_matrix<double>(A.size1()));
     
     // backsubstitute to get the inverse
     lu_substitute(A, pm, inv);
@@ -71,7 +71,7 @@ int main(int argc, char** argv)
     // ABOVE IS THE GUTS OF THE CODE 
 
     // verify you get out the identity matrix
-    p = ublas::prod< ublas::matrix<double> >(m,inv); 
+    p = boost::numeric::ublas::prod< boost::numeric::ublas::matrix<double> >(m,inv); 
 
     if (N < 5) {
         cout << " input = " << m << endl;
@@ -83,7 +83,7 @@ int main(int argc, char** argv)
     // 
     // 
     t.restart(); 
-    vw::Matrix<double> Avw = inverse(mvw);
+    vw::Matrix<double> Avw = vw::math::inverse(mvw);
     time = t.elapsed(); 
     cout << "VW took " << time << "s" << endl;     
     if (N < 5) {
