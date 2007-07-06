@@ -1,36 +1,30 @@
-// -*- lsst-c++ -*-
 #include "lsst/fw/MaskedImage.h"
-#include "lsst/fw/Trace.h"
 #include "lsst/fw/Kernel.h"
-#include "lsstimageproc03.h"
-#include <vw/Math/Matrix.h> 
-#include <vw/Math/Vector.h> 
+#include "ImageSubtract.h"
 
 using namespace std;
 using namespace lsst::fw;
 
 int main( int argc, char** argv )
 {
-    // This is effectively Subtract Template From Science Chunk Exposure
-    
     Trace::setDestination(cout);
     Trace::setVerbosity(".", 0);
     
-    typedef uint8 maskPixelType;
-    typedef float32 imagePixelType;
-    typedef float32 kernelPixelType;
+    typedef uint8 MaskT;
+    typedef float32 PixelT;
+    typedef float32 KernelT;
 
     // Read input images
     string scienceInputImage = argv[1];
-    MaskedImage<ImagePixelType,MaskPixelType> scienceMaskedImage;
+    MaskedImage<PixelT,MaskT> scienceMaskedImage;
     scienceMaskedImage.readFits(templateInputImage);
-
+    
     string templateInputImage = argv[2];
-    MaskedImage<ImagePixelType,MaskPixelType> templateMaskedImage;
+    MaskedImage<PixelT,MaskT> templateMaskedImage;
     templateMaskedImage.readFits(templateInputImage);
 
     // set up basis of delta functions for kernel
-    vector<boost::shared_ptr<Kernel<kernelPixelType> > > kernelVec;
+    vector<Kernel<KernelT> > kernelVec;
     int kernelRows = 9;
     int kernelCols = 9;
     int colCtr = (kernelCols - 1) / 2;
@@ -40,20 +34,19 @@ int main( int argc, char** argv )
         
         for (unsigned col = 0; col < kernelCols; ++col) {
             int x = static_cast<int>(col) - colCtr;
-
+            
             Kernel<kernelPixelType>::Function2PtrType kfuncPtr(
                 new IntegerDeltaFunction2<kernelPixelType>(x, y)
-            );
-            boost::shared_ptr<Kernel<kernelPixelType> > kernelPtr(
+                );
+            Kernel<kernelPixelType> kernelPtr(
                 new AnalyticKernel<kernelPixelType>(kfuncPtr, kernelCols, kernelRows)
-            );
+                );
             kernelVec.push_back(kernelPtr);
-
         }
     }
-    vector<imagePixelType> kernelParams(kernelRows * kernelCols);
-    LinearCombinationKernel<KernelPixelType> deltaFunctionKernelSet(kernelVec, kernelParams);
-    
+    vector<PixelT> kernelParams(kernelRows * kernelCols);
+    LinearCombinationKernel<KernelT> deltaFunctionKernelSet(kernelVec, kernelParams);
+
     // Currently does nothing
     getTemplateChunkExposureFromTemplateExposure();
 
@@ -62,5 +55,5 @@ int main( int argc, char** argv )
 
     // Currently does nothing
     subtractMatchedImage();
-    
+
 }
