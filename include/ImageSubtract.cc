@@ -17,9 +17,27 @@
 #include "lsstimageproc03.h"
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
-
+#include "ImageSubtract.h"
 using namespace std;
 using namespace lsst::fw;
+
+// Inline Member Functions
+inline unsigned
+lsst::fw::Obejct::getColc() const {
+    return _colc;
+}
+inline unsigned
+lsst::fw::Obejct::getRowc() const {
+    return _rowc;
+}
+inline unsigned
+lsst::fw::Obejct::getDcol() const {
+    return _dcol;
+}
+inline unsigned
+lsst::fw::Obejct::getDrow() const {
+    return _drow;
+}
 
 /**
  * Computes spatially varying PSF matching kernel for image subtraction
@@ -39,7 +57,7 @@ static void computePSFMatchingKernelForMaskedImage(
     ) {
 
     vector<Object> objectCollection;
-    getCollectionOfMaskedImagesForPSFMatching(objectCollection);
+    getCollectionOfMaskedImagesForPSFMatching(&objectCollection);
 
     // Reusable view around each object
     MaskedImage<PixelT,MaskT>::MaskedImagePtrT imageToConvolvePtr;
@@ -66,7 +84,7 @@ static void computePSFMatchingKernelForMaskedImage(
     }
 
     // Does nothing currently
-    computeSpatiallyVaryingPSFMatchingKernel(kernelCoeffsVec);
+    computeSpatiallyVaryingPSFMatchingKernel(kernelBasisSet, kernelCoeffsVec);
 }
 
 /**
@@ -201,6 +219,13 @@ static void computePSFMatchingKernelForPostageStamp(
     delete Soln;
 }
 
+static void getCollectionOfMaskedImagesForPSFMatching(
+    vector<Object> &objectCollection ///< Vector of objects to use for diffim kernel
+    ) {
+    Object obj1 = new Object(100, 100, 10, 10);
+    objectCollection.push_back(obj1);
+}
+
 // TODO BELOW
 
 static void getTemplateChunkExposureFromTemplateExposure() {
@@ -209,14 +234,6 @@ static void getTemplateChunkExposureFromTemplateExposure() {
 static void wcsMatchExposure() {
 }
 
-static void getCollectionOfMaskedImagesForPSFMatching(vector<Object> objectCollection) {
-    Object obj1;
-    obj1.rowc = 100;
-    obj1.colc = 100;
-    obj1.drow = 10;
-    obj1.dcol = 10;
-    objectCollection.push_back(obj1);
-}
 
 
 
