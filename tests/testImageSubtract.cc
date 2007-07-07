@@ -17,7 +17,7 @@ int main( int argc, char** argv )
     // Read input images
     string scienceInputImage = argv[1];
     MaskedImage<PixelT,MaskT> scienceMaskedImage;
-    scienceMaskedImage.readFits(templateInputImage);
+    scienceMaskedImage.readFits(scienceInputImage);
     
     string templateInputImage = argv[2];
     MaskedImage<PixelT,MaskT> templateMaskedImage;
@@ -25,8 +25,8 @@ int main( int argc, char** argv )
 
     // set up basis of delta functions for kernel
     vector<Kernel<KernelT> > kernelVec;
-    int kernelRows = 9;
-    int kernelCols = 9;
+    unsigned kernelRows = 9;
+    unsigned kernelCols = 9;
     int colCtr = (kernelCols - 1) / 2;
     int rowCtr = (kernelRows - 1) / 2;
     for (unsigned row = 0; row < kernelRows; ++row) {
@@ -35,11 +35,11 @@ int main( int argc, char** argv )
         for (unsigned col = 0; col < kernelCols; ++col) {
             int x = static_cast<int>(col) - colCtr;
             
-            Kernel<kernelPixelType>::Function2PtrType kfuncPtr(
-                new IntegerDeltaFunction2<kernelPixelType>(x, y)
+            Kernel<KernelT>::Function2PtrType kfuncPtr(
+                new IntegerDeltaFunction2<KernelT>(x, y)
                 );
-            Kernel<kernelPixelType> kernelPtr(
-                new AnalyticKernel<kernelPixelType>(kfuncPtr, kernelCols, kernelRows)
+            Kernel<KernelT> kernelPtr(
+                new AnalyticKernel<KernelT>(kfuncPtr, kernelCols, kernelRows)
                 );
             kernelVec.push_back(kernelPtr);
         }

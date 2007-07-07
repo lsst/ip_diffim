@@ -18,7 +18,9 @@
 namespace lsst {
 namespace fw {
 
-    class Object : private LsstBase{
+    class Object : private LsstBase
+    {
+
     public:
         explicit Object();
         virtual ~Object() {};
@@ -26,7 +28,7 @@ namespace fw {
             unsigned rowc,
             unsigned colc,
             unsigned drow,
-            unsigned dcol,
+            unsigned dcol
         );
        inline unsigned getColc() const;
        inline unsigned getRowc() const;
@@ -37,15 +39,15 @@ namespace fw {
        unsigned _colc;
        unsigned _drow;
        unsigned _dcol;
-    }
+    };
     
-    template <PixelT, MaskT, KernelT>
+    template <class PixelT, class MaskT, class KernelT>
     static void computePSFMatchingKernelForMaskedImage(
         MaskedImage<PixelT,MaskT> const &imageToConvolve,
         MaskedImage<PixelT,MaskT> const &imageToNotConvolve,
         LinearCombinationKernel<KernelT> &kernelBasisSet);
     
-    template <PixelT, MaskT, KernelT>
+    template <class PixelT, class MaskT, class KernelT>
     static void computePSFMatchingKernelForPostageStamp(
         MaskedImage<PixelT, MaskT> const &imageToConvolve,
         MaskedImage<PixelT, MaskT> const &imageToNotConvolve,

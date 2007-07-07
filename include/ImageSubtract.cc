@@ -12,30 +12,29 @@
  */
 
 #include "lsst/fw/MaskedImage.h"
-#include "lsst/fw/Trace.h"
 #include "lsst/fw/Kernel.h"
-#include "lsstimageproc03.h"
+#include "lsst/fw/PixelAccessors.h"
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
-#include "ImageSubtract.h"
+
 using namespace std;
 using namespace lsst::fw;
 
 // Inline Member Functions
 inline unsigned
-lsst::fw::Obejct::getColc() const {
+Object::getColc() const {
     return _colc;
 }
 inline unsigned
-lsst::fw::Obejct::getRowc() const {
+Object::getRowc() const {
     return _rowc;
 }
 inline unsigned
-lsst::fw::Obejct::getDcol() const {
+Object::getDcol() const {
     return _dcol;
 }
 inline unsigned
-lsst::fw::Obejct::getDrow() const {
+Object::getDrow() const {
     return _drow;
 }
 
@@ -49,22 +48,22 @@ lsst::fw::Obejct::getDrow() const {
  * \throw Here too
  * \ingroup imageproc
  */
-template <PixelT, MaskT, KernelT>
+template <class PixelT, class MaskT, class KernelT>
 static void computePSFMatchingKernelForMaskedImage(
     MaskedImage<PixelT,MaskT> const &imageToConvolve, ///< Template image; convolved
     MaskedImage<PixelT,MaskT> const &imageToNotConvolve, ///< Science image; not convolved
-    LinearCombinationKernel<KernelT> &kernelBasisSet, ///< Input set of basis kernels; modified on return
+    LinearCombinationKernel<KernelT> &kernelBasisSet ///< Input set of basis kernels; modified on return
     ) {
 
     vector<Object> objectCollection;
-    getCollectionOfMaskedImagesForPSFMatching(&objectCollection);
+    getCollectionOfMaskedImagesForPSFMatching(objectCollection);
 
     // Reusable view around each object
     MaskedImage<PixelT,MaskT>::MaskedImagePtrT imageToConvolvePtr;
     MaskedImage<PixelT,MaskT>::MaskedImagePtrT imageToNotConvolvePtr;
 
     // Output kernels
-    vector<boost::shared_ptr<Kernel<kernelPixelType> > > kernelVec;
+    vector<Kernel<KernelT> > kernelCoeffsVec(objectCollection.size());
 
     // Iterate over object; use iterator instead?
     for (unsigned nobj = 0; nobj < objectCollection.size(); nobj++) {
@@ -72,12 +71,12 @@ static void computePSFMatchingKernelForMaskedImage(
         
         // grab view around each object
         // do i really want a new stamp or just a view?
-        BBox2i stamp(diffImObject.rowc - diffImObject.drow, diffImObject.rowc + diffImObject.drow, 
-                     diffImObject.colc - diffImObject.dcol, diffImObject.colc + diffImObject.dcol);
+        BBox2i stamp(diffImObject.getRowc() - diffImObject.getDrow(), diffImObject.getRowc() + diffImObject.getDrow(), 
+                     diffImObject.getColc() - diffImObject.getDcol(), diffImObject.getColc() + diffImObject.getDcol());
         imageToConvolvePtr    = imageToConvolve.getSubImage(stamp);
         imageToNotConvolvePtr = imageToNotConvolve.getSubImage(stamp);
 
-        std::vector<KernelT> kernelCoeffs(kernelBasisSet.getNKernelParameters());
+        vector<KernelT> kernelCoeffs(kernelBasisSet.getNKernelParameters());
 
         computePSFMatchingKernelForPostageStamp(imageToConvolvePtr, imageToNotConvolvePtr, kernelBasisSet, kernelCoeffs);
         kernelCoeffsVec.push_back(kernelCoeffs);
@@ -97,12 +96,13 @@ static void computePSFMatchingKernelForMaskedImage(
  * \throw Here too
  * \ingroup I guess imageproc for me
  */
-template <PixelT, MaskT, KernelT>
+template <class PixelT, class MaskT, class KernelT>
 static void computePSFMatchingKernelForPostageStamp(
     MaskedImage<PixelT, MaskT> const &imageToConvolve, ///< Goes with the code
     MaskedImage<PixelT, MaskT> const &imageToNotConvolve, ///< This is for doxygen
     LinearCombinationKernel<KernelT> &kernelBasisSet, ///< This is for doxygen
-    std::vector<KernelT> &kernelCoeffs) { ///< This is for doxygen
+    std::vector<KernelT> &kernelCoeffs ///< This is for doxygen
+    ) { 
 
     unsigned nKernelParameters=0, nBackgroundParameters=0, nParameters=0;
     
@@ -121,19 +121,19 @@ static void computePSFMatchingKernelForPostageStamp(
     vector<MaskedImage<PixelT, MaskT> > convolvedImageVec(nKernelParameters);
     for (unsigned ki = 0; ki < nKernelParameters; ki++) {
         MaskedImage<PixelT, MaskT>
-            convolvedImage = Kernel::convolve(imageToConvolve, kernelBasisSet[ki], 0, vw::NoEdgeExtension());
+            convolvedImage = Kernel<KernelT>::convolve(imageToConvolve, kernelBasisSet[ki], 0, vw::NoEdgeExtension());
         convolvedImageVec.push_back(convolvedImage);
     }
 
     // An accessor for each convolution plane
     vector<MaskedPixelAccessor<PixelT, MaskT> > convolvedAccessorRowVec(nKernelParameters);
     for (unsigned ki = 0; ki < nKernelParameters; ki++) {
-        MaskedPixelAccessor<PixelT, MaskT> convolvedAccessorRow(convolvedImageVec[i]);
+        MaskedPixelAccessor<PixelT, MaskT> convolvedAccessorRow(convolvedImageVec[ki]);
         convolvedAccessorRowVec.push_back(convolvedAccessorRow);
     }
 
     // An accessor for each input image
-    MaskedPixelAccessor<PixelT, MaskT> imageToConvolve(imageToConvolve);
+    MaskedPixelAccessor<PixelT, MaskT> imageToConvolveRow(imageToConvolve);
     MaskedPixelAccessor<PixelT, MaskT> imageToNotConvolveRow(imageToNotConvolve);
 
     // integral over image's dx and dy
@@ -142,7 +142,7 @@ static void computePSFMatchingKernelForPostageStamp(
         // An accessor for each convolution plane
         vector<MaskedPixelAccessor<PixelT, MaskT> > convolvedAccessorColVec(nKernelParameters);
         for (unsigned ki = 0; ki < nKernelParameters; ki++) {
-            MaskedPixelAccessor<PixelT, MaskT> convolvedAccessorCol = convolvedAccessorRow;
+            MaskedPixelAccessor<PixelT, MaskT> convolvedAccessorCol = convolvedAccessorRowVec[ki];
             convolvedAccessorColVec.push_back(convolvedAccessorCol);
         }
 
@@ -152,12 +152,12 @@ static void computePSFMatchingKernelForPostageStamp(
 
         for (unsigned col = 0; col < imageToConvolve.getCols(); col++) {
             
-            PixelT ncCamera = *nonconvolveCol.image;
-            PixelT ncVariance = *nonconvolveCol.variance;
+            PixelT ncCamera = *imageToNotConvolveCol.image;
+            PixelT ncVariance = *imageToNotConvolveCol.variance;
 
             // Its an approximation to use this since you don't really know the kernel yet
             // You really want the post-convolved variance but this is close enough
-            PixelT cVariance = *convolveCol.variance;
+            PixelT cVariance = *imageToConvolveCol.variance;
             
             // Quicker computation
             double iVariance = 1.0 / (ncVariance + cVariance);
@@ -170,19 +170,19 @@ static void computePSFMatchingKernelForPostageStamp(
                 // kernel index j 
                 for (unsigned kidxj = kidxi; kidxj < nKernelParameters; kidxj++) {
                     PixelT cdCameraj = *convolvedAccessorColVec[kidxj].image;
-                    M[kidxi, kidxj] += cdCamerai * cdCameraj * iVariance;
+                    M[kidxi][kidxj] += cdCamerai * cdCameraj * iVariance;
                 } // kidxj
             } // kidxi
 
             // Here we have a single background term
-            B[kidxi+1] += ncCamera * iVariance;
-            M[kidxi+1,kixdj+1] += 1.0 * iVariance;
+            B[nParameters] += ncCamera * iVariance;
+            M[nParameters][nParameters] += 1.0 * iVariance;
 
             // Step each accessor in column
             imageToConvolveCol.nextCol();
             imageToNotConvolveCol.nextCol();
             for (unsigned ki = 0; ki < nKernelParameters; ki++) {
-                convolvedAccessorColVec[i].nextCol();
+                convolvedAccessorColVec[ki].nextCol();
             }
         } // col
         
@@ -190,7 +190,7 @@ static void computePSFMatchingKernelForPostageStamp(
         imageToConvolveRow.nextRow();
         imageToNotConvolveRow.nextRow();
         for (unsigned ki = 0; ki < nKernelParameters; ki++) {
-            convolvedAccessorRowVec[i].nextRow();
+            convolvedAccessorRowVec[ki].nextRow();
         }
 
         // clean up
@@ -200,7 +200,7 @@ static void computePSFMatchingKernelForPostageStamp(
     // Fill in rest of M
     for (unsigned kidxi=0; kidxi < nKernelParameters; kidxi++) 
         for (unsigned kidxj=kidxi+1; kidxj < nKernelParameters; kidxj++) 
-            M[kidxj, kidxi] = M[kidxi, kidxj];
+            M[kidxj][kidxi] = M[kidxi][kidxj];
     
     // Invert M
     vw::Matrix<double> Minv = vw::math::inverse(M);
@@ -222,7 +222,7 @@ static void computePSFMatchingKernelForPostageStamp(
 static void getCollectionOfMaskedImagesForPSFMatching(
     vector<Object> &objectCollection ///< Vector of objects to use for diffim kernel
     ) {
-    Object obj1 = new Object(100, 100, 10, 10);
+    Object obj1(100, 100, 10, 10);
     objectCollection.push_back(obj1);
 }
 
