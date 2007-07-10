@@ -16,15 +16,15 @@
 #include <lsst/fw/Kernel.h>
 
 namespace lsst {
-namespace fw {
+namespace imageproc {
 
-    class Object : private LsstBase
+    class Source : private lsst::fw::LsstBase
     {
 
     public:
-        explicit Object();
-        virtual ~Object() {};
-        explicit Object(
+        explicit Source();
+        virtual ~Source() {};
+        explicit Source(
             unsigned rowc,
             unsigned colc,
             unsigned drow,
@@ -42,31 +42,27 @@ namespace fw {
     };
     
     template <class PixelT, class MaskT, class KernelT>
-    static void computePSFMatchingKernelForMaskedImage(
-        MaskedImage<PixelT,MaskT> const &imageToConvolve,
-        MaskedImage<PixelT,MaskT> const &imageToNotConvolve,
-        LinearCombinationKernel<KernelT> &kernelBasisSet);
+    void computePSFMatchingKernelForMaskedImage(
+        lsst::fw::MaskedImage<PixelT,MaskT> const &imageToConvolve,
+        lsst::fw::MaskedImage<PixelT,MaskT> const &imageToNotConvolve,
+        lsst::fw::LinearCombinationKernel<KernelT> &kernelBasisSet);
     
     template <class PixelT, class MaskT, class KernelT>
-    static void computePSFMatchingKernelForPostageStamp(
-        MaskedImage<PixelT, MaskT> const &imageToConvolve,
-        MaskedImage<PixelT, MaskT> const &imageToNotConvolve,
-        LinearCombinationKernel<KernelT> &kernelBasisSet,
+    void computePSFMatchingKernelForPostageStamp(
+        lsst::fw::MaskedImage<PixelT, MaskT>  &imageToConvolve,
+        lsst::fw::MaskedImage<PixelT, MaskT> const &imageToNotConvolve,
+        lsst::fw::LinearCombinationKernel<KernelT> &kernelBasisSet,
         std::vector<KernelT> &kernelCoeffs);
 
-    static void getCollectionOfMaskedImagesForPSFMatching(
-        vector<Object> &objectCollection);
+    void getCollectionOfMaskedImagesForPSFMatching(
+        vector<Source> &sourceCollection
+        );
 
-    static void getTemplateChunkExposureFromTemplateExposure(
-        );
-    static void wcsMatchExposure(
-        );
-    static void computeSpatiallyVaryingPSFMatchingKernel(
-        );
-    static void fitKernelsUsingPrincipalComponentAnalysis(
-        );
-    static void fitArraysUsingPrincipalComponentAnalysis(
-        );
+    void getTemplateChunkExposureFromTemplateExposure();
+    void wcsMatchExposure();
+    void computeSpatiallyVaryingPSFMatchingKernel();
+    void fitKernelsUsingPrincipalComponentAnalysis();
+    void fitArraysUsingPrincipalComponentAnalysis();
 
 }
 }

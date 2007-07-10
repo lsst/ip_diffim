@@ -13,28 +13,28 @@
 
 #include "lsst/fw/MaskedImage.h"
 #include "lsst/fw/Kernel.h"
+#include "lsst/fw/KernelFunctions.h"
 #include "lsst/fw/PixelAccessors.h"
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
 
 using namespace std;
-using namespace lsst::fw;
 
 // Inline Member Functions
 inline unsigned
-Object::getColc() const {
+lsst::imageproc::Source::getColc() const {
     return _colc;
 }
 inline unsigned
-Object::getRowc() const {
+lsst::imageproc::Source::getRowc() const {
     return _rowc;
 }
 inline unsigned
-Object::getDcol() const {
+lsst::imageproc::Source::getDcol() const {
     return _dcol;
 }
 inline unsigned
-Object::getDrow() const {
+lsst::imageproc::Source::getDrow() const {
     return _drow;
 }
 
@@ -49,41 +49,44 @@ Object::getDrow() const {
  * \ingroup imageproc
  */
 template <class PixelT, class MaskT, class KernelT>
-static void computePSFMatchingKernelForMaskedImage(
-    MaskedImage<PixelT,MaskT> const &imageToConvolve, ///< Template image; convolved
-    MaskedImage<PixelT,MaskT> const &imageToNotConvolve, ///< Science image; not convolved
-    LinearCombinationKernel<KernelT> &kernelBasisSet ///< Input set of basis kernels; modified on return
+void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
+    lsst::fw::MaskedImage<PixelT,MaskT> const &imageToConvolve, ///< Template image; convolved
+    lsst::fw::MaskedImage<PixelT,MaskT> const &imageToNotConvolve, ///< Science image; not convolved
+    lsst::fw::LinearCombinationKernel<KernelT> &kernelBasisSet ///< Input set of basis kernels; modified on return
     ) {
 
-    vector<Object> objectCollection;
-    getCollectionOfMaskedImagesForPSFMatching(objectCollection);
+    vector<lsst::imageproc::Source> sourceCollection;
+    getCollectionOfMaskedImagesForPSFMatching(sourceCollection);
 
-    // Reusable view around each object
-    MaskedImage<PixelT,MaskT>::MaskedImagePtrT imageToConvolvePtr;
-    MaskedImage<PixelT,MaskT>::MaskedImagePtrT imageToNotConvolvePtr;
+    // Reusable view around each source
+    // typedef typename MaskedImage<PixelT,MaskT>::MaskedImagePtrT maskedImagePtrTType;
+
+    typename lsst::fw::MaskedImage<PixelT,MaskT>::MaskedImagePtrT imageToConvolvePtr;
+    typename lsst::fw::MaskedImage<PixelT,MaskT>::MaskedImagePtrT imageToNotConvolvePtr;
 
     // Output kernels
-    vector<Kernel<KernelT> > kernelCoeffsVec(objectCollection.size());
+    // This vector of vectors thing is a bit tricky...
+    vector<vector<KernelT> > kernelCoeffsVec( sourceCollection.size(), vector<KernelT>(kernelBasisSet.getNKernelParameters()) );
 
-    // Iterate over object; use iterator instead?
-    for (unsigned nobj = 0; nobj < objectCollection.size(); nobj++) {
-        Object diffImObject = objectCollection[nobj];
+    // Iterate over source; use iterator instead?
+    for (unsigned nobj = 0; nobj < sourceCollection.size(); nobj++) {
+        Source diffImSource = sourceCollection[nobj];
         
-        // grab view around each object
+        // grab view around each source
         // do i really want a new stamp or just a view?
-        BBox2i stamp(diffImObject.getRowc() - diffImObject.getDrow(), diffImObject.getRowc() + diffImObject.getDrow(), 
-                     diffImObject.getColc() - diffImObject.getDcol(), diffImObject.getColc() + diffImObject.getDcol());
+        BBox2i stamp(diffImSource.getRowc() - diffImSource.getDrow(), diffImSource.getRowc() + diffImSource.getDrow(), 
+                     diffImSource.getColc() - diffImSource.getDcol(), diffImSource.getColc() + diffImSource.getDcol());
         imageToConvolvePtr    = imageToConvolve.getSubImage(stamp);
         imageToNotConvolvePtr = imageToNotConvolve.getSubImage(stamp);
 
-        vector<KernelT> kernelCoeffs(kernelBasisSet.getNKernelParameters());
-
-        computePSFMatchingKernelForPostageStamp(imageToConvolvePtr, imageToNotConvolvePtr, kernelBasisSet, kernelCoeffs);
-        kernelCoeffsVec.push_back(kernelCoeffs);
+        // you need to initialize the size of this one
+        //std::vector<KernelT> kernelCoeffs(kernelBasisSet.getNKernelParameters());
+        computePSFMatchingKernelForPostageStamp(*imageToConvolvePtr, *imageToNotConvolvePtr, kernelBasisSet, kernelCoeffsVec[nobj]);
+        //kernelCoeffsVec[nobj] = kernelCoeffs;
     }
 
     // Does nothing currently
-    computeSpatiallyVaryingPSFMatchingKernel(kernelBasisSet, kernelCoeffsVec);
+    //computeSpatiallyVaryingPSFMatchingKernel(kernelBasisSet, kernelCoeffsVec);
 }
 
 /**
@@ -97,10 +100,10 @@ static void computePSFMatchingKernelForMaskedImage(
  * \ingroup I guess imageproc for me
  */
 template <class PixelT, class MaskT, class KernelT>
-static void computePSFMatchingKernelForPostageStamp(
-    MaskedImage<PixelT, MaskT> const &imageToConvolve, ///< Goes with the code
-    MaskedImage<PixelT, MaskT> const &imageToNotConvolve, ///< This is for doxygen
-    LinearCombinationKernel<KernelT> &kernelBasisSet, ///< This is for doxygen
+void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
+    lsst::fw::MaskedImage<PixelT, MaskT> const &imageToConvolve, ///< Goes with the code
+    lsst::fw::MaskedImage<PixelT, MaskT> const &imageToNotConvolve, ///< This is for doxygen
+    lsst::fw::LinearCombinationKernel<KernelT> &kernelBasisSet, ///< This is for doxygen
     std::vector<KernelT> &kernelCoeffs ///< This is for doxygen
     ) { 
 
@@ -118,37 +121,50 @@ static void computePSFMatchingKernelForPostageStamp(
 
     // Calculate convolution of Reference image with Kernel
     // We can make this faster for delta function kernels
-    vector<MaskedImage<PixelT, MaskT> > convolvedImageVec(nKernelParameters);
-    for (unsigned ki = 0; ki < nKernelParameters; ki++) {
-        MaskedImage<PixelT, MaskT>
-            convolvedImage = Kernel<KernelT>::convolve(imageToConvolve, kernelBasisSet[ki], 0, vw::NoEdgeExtension());
+    std::vector<boost::shared_ptr<lsst::fw::Kernel<PixelT> > > kernelList = kernelBasisSet.getKernelList();
+    // convolve creates a MaskedImage, push it onto the back of the Vector
+    vector<lsst::fw::MaskedImage<PixelT, MaskT> > convolvedImageVec;
+
+    // Non-iterator
+    //    for (unsigned ki = 0; ki < nKernelParameters; ki++) {
+    //        lsst::fw::MaskedImage<PixelT, MaskT>
+    //            convolvedImage = lsst::fw::kernel::convolve(imageToConvolve, *(kernelList[ki]), 0.0, vw::NoEdgeExtension());
+    //        convolvedImageVec.push_back(convolvedImage);
+    //    }
+
+    // iterator
+    typename std::vector<boost::shared_ptr<lsst::fw::Kernel<PixelT> > >::iterator kiter = kernelList.begin();
+    for (; kiter != kernelList.end(); ++kiter) {
+        lsst::fw::MaskedImage<PixelT, MaskT>
+            convolvedImage = lsst::fw::kernel::convolve(imageToConvolve, *kiter, 0.0, vw::NoEdgeExtension());
         convolvedImageVec.push_back(convolvedImage);
-    }
+    } 
 
     // An accessor for each convolution plane
-    vector<MaskedPixelAccessor<PixelT, MaskT> > convolvedAccessorRowVec(nKernelParameters);
+    // NOTE : MaskedPixelAccessor has no empty constructor, therefore we need to push_back()
+    vector<lsst::fw::MaskedPixelAccessor<PixelT, MaskT> > convolvedAccessorRowVec;
     for (unsigned ki = 0; ki < nKernelParameters; ki++) {
-        MaskedPixelAccessor<PixelT, MaskT> convolvedAccessorRow(convolvedImageVec[ki]);
+        lsst::fw::MaskedPixelAccessor<PixelT, MaskT> convolvedAccessorRow(convolvedImageVec[ki]);
         convolvedAccessorRowVec.push_back(convolvedAccessorRow);
     }
 
     // An accessor for each input image
-    MaskedPixelAccessor<PixelT, MaskT> imageToConvolveRow(imageToConvolve);
-    MaskedPixelAccessor<PixelT, MaskT> imageToNotConvolveRow(imageToNotConvolve);
+    lsst::fw::MaskedPixelAccessor<PixelT, MaskT> imageToConvolveRow(imageToConvolve);
+    lsst::fw::MaskedPixelAccessor<PixelT, MaskT> imageToNotConvolveRow(imageToNotConvolve);
 
     // integral over image's dx and dy
     for (unsigned row = 0; row < imageToConvolve.getRows(); row++) {
 
         // An accessor for each convolution plane
-        vector<MaskedPixelAccessor<PixelT, MaskT> > convolvedAccessorColVec(nKernelParameters);
+        vector<lsst::fw::MaskedPixelAccessor<PixelT, MaskT> > convolvedAccessorColVec;
         for (unsigned ki = 0; ki < nKernelParameters; ki++) {
-            MaskedPixelAccessor<PixelT, MaskT> convolvedAccessorCol = convolvedAccessorRowVec[ki];
+            lsst::fw::MaskedPixelAccessor<PixelT, MaskT> convolvedAccessorCol = convolvedAccessorRowVec[ki];
             convolvedAccessorColVec.push_back(convolvedAccessorCol);
         }
 
         // An accessor for each input image
-        MaskedPixelAccessor<PixelT, MaskT> imageToConvolveCol = imageToConvolveRow;
-        MaskedPixelAccessor<PixelT, MaskT> imageToNotConvolveCol = imageToNotConvolveRow;
+        lsst::fw::MaskedPixelAccessor<PixelT, MaskT> imageToConvolveCol = imageToConvolveRow;
+        lsst::fw::MaskedPixelAccessor<PixelT, MaskT> imageToNotConvolveCol = imageToNotConvolveRow;
 
         for (unsigned col = 0; col < imageToConvolve.getCols(); col++) {
             
@@ -194,7 +210,7 @@ static void computePSFMatchingKernelForPostageStamp(
         }
 
         // clean up
-        delete convolvedAccessorColVec;
+        convolvedAccessorColVec.~vector<lsst::fw::MaskedPixelAccessor<PixelT, MaskT> >();
     } // row
 
     // Fill in rest of M
@@ -205,45 +221,45 @@ static void computePSFMatchingKernelForPostageStamp(
     // Invert M
     vw::Matrix<double> Minv = vw::math::inverse(M);
     // Solve for x in Mx = B
-    vw::Vector<double> Soln = B * Minv;
+    //vw::math::Vector<double> Soln = B * Minv;  // uh, this does not work for B
+    vw::math::Vector<double> Soln = Minv * B; // will this at least compile, '*' is a method for Minv
 
     // Worry about translating here...
-    kernelCoeffs = Soln;  // somehow
+    //kernelCoeffs = Soln;  // somehow
+    for (unsigned ki = 0; ki < nKernelParameters; ki++) {
+        kernelCoeffs[ki] = Soln[ki];
+    }
 
     // clean up
-    delete B;
-    delete M;
-    delete convolvedImageVec;
-    delete convolvedAccessorRowVec;
-    delete Minv;
-    delete Soln;
+    //delete B;
+    //delete M;
+    convolvedImageVec.~vector<lsst::fw::MaskedImage<PixelT, MaskT> >();
+    convolvedAccessorRowVec.~vector<lsst::fw::MaskedPixelAccessor<PixelT, MaskT> >();
+    //delete Minv;
+    //delete Soln;
 }
 
-static void getCollectionOfMaskedImagesForPSFMatching(
-    vector<Object> &objectCollection ///< Vector of objects to use for diffim kernel
+void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
+    vector<lsst::imageproc::Source> &sourceCollection ///< Vector of sources to use for diffim kernel
     ) {
-    Object obj1(100, 100, 10, 10);
-    objectCollection.push_back(obj1);
+    lsst::imageproc::Source src1(100, 100, 10, 10);
+    sourceCollection.push_back(src1);
 }
 
 // TODO BELOW
 
-static void getTemplateChunkExposureFromTemplateExposure() {
+void lsst::imageproc::getTemplateChunkExposureFromTemplateExposure() {
     wcsMatchExposure();
 }
-static void wcsMatchExposure() {
+void lsst::imageproc::wcsMatchExposure() {
 }
-
-
-
-
-static void computeSpatiallyVaryingPSFMatchingKernel() {
+void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel() {
     fitKernelsUsingPrincipalComponentAnalysis();
 }
-static void fitKernelsUsingPrincipalComponentAnalysis() {
+void lsst::imageproc::fitKernelsUsingPrincipalComponentAnalysis() {
     fitArraysUsingPrincipalComponentAnalysis();
 }
-static void fitArraysUsingPrincipalComponentAnalysis() {
+void lsst::imageproc::fitArraysUsingPrincipalComponentAnalysis() {
 }
 
 

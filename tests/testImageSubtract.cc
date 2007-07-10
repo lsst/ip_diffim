@@ -1,5 +1,6 @@
 #include "lsst/fw/MaskedImage.h"
 #include "lsst/fw/Kernel.h"
+#include "lsst/fw/FunctionLibrary.h"
 #include "ImageSubtract.h"
 
 using namespace std;
@@ -24,7 +25,10 @@ int main( int argc, char** argv )
     templateMaskedImage.readFits(templateInputImage);
 
     // set up basis of delta functions for kernel
-    vector<Kernel<KernelT> > kernelVec;
+    // One way
+    //vector<Kernel<KernelT> > kernelVec;
+    // Another way with pointers
+    vector<boost::shared_ptr<Kernel<KernelT> > > kernelVec;
     unsigned kernelRows = 9;
     unsigned kernelCols = 9;
     int colCtr = (kernelCols - 1) / 2;
@@ -38,9 +42,13 @@ int main( int argc, char** argv )
             Kernel<KernelT>::Function2PtrType kfuncPtr(
                 new IntegerDeltaFunction2<KernelT>(x, y)
                 );
-            Kernel<KernelT> kernelPtr(
+            // One way
+            //AnalyticKernel<KernelT> kernel(kfuncPtr, kernelCols, kernelRows);
+            // Another way with pointers
+            boost::shared_ptr<Kernel<KernelT> > kernelPtr(
                 new AnalyticKernel<KernelT>(kfuncPtr, kernelCols, kernelRows)
-                );
+            );
+ 
             kernelVec.push_back(kernelPtr);
         }
     }
@@ -48,12 +56,12 @@ int main( int argc, char** argv )
     LinearCombinationKernel<KernelT> deltaFunctionKernelSet(kernelVec, kernelParams);
 
     // Currently does nothing
-    getTemplateChunkExposureFromTemplateExposure();
+    //getTemplateChunkExposureFromTemplateExposure();
 
     // This has some functionality!  Lets at least get it to compile.
-    PSFMatchMaskedImages(scienceMaskedImage, templateMaskedImage, deltaFunctionKernelSet);
+    lsst::imageproc::computePSFMatchingKernelForMaskedImage(scienceMaskedImage, templateMaskedImage, deltaFunctionKernelSet);
 
     // Currently does nothing
-    subtractMatchedImage();
+    //subtractMatchedImage();
 
 }
