@@ -29,7 +29,7 @@ namespace imageproc {
             unsigned colc,
             unsigned drow,
             unsigned dcol
-        );
+            );
        inline unsigned getColc() const;
        inline unsigned getRowc() const;
        inline unsigned getDcol() const;
@@ -67,6 +67,6 @@ namespace imageproc {
 }
 }
 
-#include <ImageSubtract.cc>
+//#include <ImageSubtract.cc>
 
 #endif // !defined(LSST_Imageproc_ImageSubtract_H)

@@ -17,6 +17,7 @@
 #include "lsst/fw/PixelAccessors.h"
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
+#include "ImageSubtract.h"
 
 using namespace std;
 
@@ -37,6 +38,26 @@ inline unsigned
 lsst::imageproc::Source::getDrow() const {
     return _drow;
 }
+lsst::imageproc::Source::Source()
+:
+    lsst::fw::LsstBase(typeid(this)),
+    _rowc(0),
+    _colc(0),
+    _drow(0),
+    _dcol(0)
+{ }
+lsst::imageproc::Source::Source(
+    unsigned rowc, ///< row center
+    unsigned colc, ///< column center
+    unsigned drow, ///< row extent
+    unsigned dcol) ///< column extent
+:
+    lsst::fw::LsstBase(typeid(this)),
+    _rowc(rowc),
+    _colc(colc),
+    _drow(drow),
+    _dcol(dcol)
+{ }
 
 /**
  * Computes spatially varying PSF matching kernel for image subtraction
@@ -81,7 +102,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
 
         // you need to initialize the size of this one
         //std::vector<KernelT> kernelCoeffs(kernelBasisSet.getNKernelParameters());
-        computePSFMatchingKernelForPostageStamp(*imageToConvolvePtr, *imageToNotConvolvePtr, kernelBasisSet, kernelCoeffsVec[nobj]);
+        lsst::imageproc::computePSFMatchingKernelForPostageStamp(*imageToConvolvePtr, *imageToNotConvolvePtr, kernelBasisSet, kernelCoeffsVec[nobj]);
         //kernelCoeffsVec[nobj] = kernelCoeffs;
     }
 

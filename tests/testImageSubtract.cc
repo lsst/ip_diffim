@@ -1,7 +1,8 @@
-#include "lsst/fw/MaskedImage.h"
-#include "lsst/fw/Kernel.h"
-#include "lsst/fw/FunctionLibrary.h"
+#include <lsst/fw/MaskedImage.h>
+#include <lsst/fw/Kernel.h>
+#include <lsst/fw/FunctionLibrary.h>
 #include "ImageSubtract.h"
+#include <boost/shared_ptr.hpp>
 
 using namespace std;
 using namespace lsst::fw;
