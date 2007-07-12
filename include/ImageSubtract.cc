@@ -36,25 +36,22 @@ template <typename PixelT, typename MaskT, typename KernelT>
 void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     lsst::fw::MaskedImage<PixelT,MaskT> const &imageToConvolve, ///< Template image; convolved
     lsst::fw::MaskedImage<PixelT,MaskT> const &imageToNotConvolve, ///< Science image; not convolved
-    lsst::fw::LinearCombinationKernel<KernelT> &kernelBasisSet ///< Input set of basis kernels; modified on return
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec ///< Input set of basis kernels
     ) {
 
     vector<lsst::fw::Source> sourceCollection;
     getCollectionOfMaskedImagesForPSFMatching(sourceCollection);
 
     // Reusable view around each source
-    // typedef typename MaskedImage<PixelT,MaskT>::MaskedImagePtrT maskedImagePtrTType;
-
     typename lsst::fw::MaskedImage<PixelT,MaskT>::MaskedImagePtrT imageToConvolvePtr;
     typename lsst::fw::MaskedImage<PixelT,MaskT>::MaskedImagePtrT imageToNotConvolvePtr;
 
-    // Output kernels
-    // This vector of vectors thing is a bit tricky...
-    vector<vector<KernelT> > kernelCoeffsVec( sourceCollection.size(), vector<KernelT>(kernelBasisSet.getNKernelParameters()) );
+    // Collection of output kernels
+    vector<lsst::fw::LinearCombinationKernel<KernelT> > kernelVec(sourceCollection.size());
 
     // Iterate over source
-    typename std::vector<lsst::fw::Source>::iterator siter = sourceCollection.begin();
-    typename std::vector<vector<KernelT> >::iterator kiter = kernelCoeffsVec.begin();
+    typename vector<lsst::fw::Source>::iterator siter = sourceCollection.begin();
+    typename vector<lsst::fw::LinearCombinationKernel<KernelT> >::iterator kiter = kernelVec.begin();
 
     for (; siter != sourceCollection.end(); ++siter, ++kiter) {
         lsst::fw::Source diffImSource = *siter;
@@ -68,16 +65,19 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         imageToConvolvePtr    = imageToConvolve.getSubImage(stamp);
         imageToNotConvolvePtr = imageToNotConvolve.getSubImage(stamp);
 
-        // you need to initialize the size of kiter = kernelCoeffsVec[i]
-        //lsst::imageproc::computePSFMatchingKernelForPostageStamp<PixelT, MaskT, KernelT>
-        vector<KernelT> kernelCoeffs(kernelBasisSet.getNKernelParameters());
-        lsst::imageproc::computePSFMatchingKernelForPostageStamp
-            (*imageToConvolvePtr, *imageToNotConvolvePtr, kernelBasisSet, kernelCoeffs);
-        //(*imageToConvolvePtr, *imageToNotConvolvePtr, kernelBasisSet, *kiter);
-    }
+        vector<double> kernelCoeffs(kernelBasisVec.size());
 
-    // Does nothing currently
-    //computeSpatiallyVaryingPSFMatchingKernel(kernelBasisSet, kernelCoeffsVec);
+        // Find best single kernel for this stamp
+        lsst::imageproc::computePSFMatchingKernelForPostageStamp
+            (*imageToConvolvePtr, *imageToNotConvolvePtr, kernelBasisVec, kernelCoeffs);
+        
+        // Create a linear combination kernel from this and append to kernelVec
+        lsst::fw::LinearCombinationKernel<KernelT> sourceKernel(kernelBasisVec, kernelCoeffs);
+        *kiter = sourceKernel;
+    }
+    // Hold output PCA kernel
+    vector<lsst::fw::Kernel<KernelT> > kernelPCABasisVec;
+    lsst::imageproc::computePCAKernelBasis(kernelVec, kernelPCABasisVec);
 }
 
 /**
@@ -94,15 +94,15 @@ template <typename PixelT, typename MaskT, typename KernelT>
 void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     lsst::fw::MaskedImage<PixelT, MaskT> const &imageToConvolve, ///< Goes with the code
     lsst::fw::MaskedImage<PixelT, MaskT> const &imageToNotConvolve, ///< This is for doxygen
-    lsst::fw::LinearCombinationKernel<KernelT> &kernelBasisSet, ///< This is for doxygen
-    std::vector<KernelT> &kernelCoeffs ///< This is for doxygen
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec, ///< Input kernel basis set
+    vector<double> &kernelCoeffs ///< Output kernel basis coefficients
     ) { 
 
     int nKernelParameters=0, nBackgroundParameters=0, nParameters=0;
     const float threshold = 0.0;
     
     // We assume that each kernel in the Set has 1 parameter you fit for
-    nKernelParameters = kernelBasisSet.getNKernelParameters();
+    nKernelParameters = kernelBasisVec.size();
     // Or, we just assume that across a single kernel, background 0th order.  This quite makes sense.
     nBackgroundParameters = 1;
     // Total number of parameters
@@ -111,18 +111,14 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     vw::Vector<double> B(nParameters);
     vw::Matrix<double> M(nParameters, nParameters);
 
-    // Calculate convolution of Reference image with Kernel
-    // We can make this faster for delta function kernels
-    std::vector<boost::shared_ptr<lsst::fw::Kernel<PixelT> > > kernelList = kernelBasisSet.getKernelList();
-
     // convolve creates a MaskedImage, push it onto the back of the Vector
     // need to use shared pointers because MaskedImage copy does not work
     vector<boost::shared_ptr<lsst::fw::MaskedImage<PixelT, MaskT> > > convolvedImageVec;
 
-    typename vector<boost::shared_ptr<lsst::fw::Kernel<PixelT> > >::iterator kiter = kernelList.begin();
+    typename vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelBasisVec.begin();
     typename vector<boost::shared_ptr<lsst::fw::MaskedImage<PixelT, MaskT> > >::iterator citer = convolvedImageVec.begin();
 
-    for (; kiter != kernelList.end(); ++kiter, ++citer) {
+    for (; kiter != kernelBasisVec.end(); ++kiter, ++citer) {
 
         boost::shared_ptr<lsst::fw::MaskedImage<PixelT, MaskT> > imagePtr(
             new lsst::fw::MaskedImage<PixelT, MaskT>(lsst::fw::kernel::convolve(imageToConvolve, **kiter, threshold, vw::NoEdgeExtension(), -1))
@@ -233,24 +229,34 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
 void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
     vector<lsst::fw::Source> &sourceCollection ///< Vector of sources to use for diffim kernel
     ) {
-    lsst::fw::Source src1(100, 100, 10, 10);
+
+    lsst::fw::Source src1(100, 100, 10, 10); // Hack some positions here
     sourceCollection.push_back(src1);
+}
+
+template <typename KernelT>
+void lsst::imageproc::computePCAKernelBasis(
+    vector<lsst::fw::LinearCombinationKernel<KernelT> > const &kernelVec, ///< Original input kernel basis set
+    vector<lsst::fw::Kernel<KernelT> > &kernelPCABasisVec ///< Output principal components as kernel images
+    ) {
+    
+    int nParx, nPary;
+    nParx = 100;
+    nPary = 100;
+    vw::Matrix<double> A(100, 100);
+
+    // Use LAPACK SVD
+    // http://www.netlib.org/lapack/lug/node32.html
+    // Suggests to me that we use DGESVD or DGESDD (preferred)
 }
 
 // TODO BELOW
 
 void lsst::imageproc::getTemplateChunkExposureFromTemplateExposure() {
-    wcsMatchExposure();
 }
 void lsst::imageproc::wcsMatchExposure() {
 }
 void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel() {
-    fitKernelsUsingPrincipalComponentAnalysis();
-}
-void lsst::imageproc::fitKernelsUsingPrincipalComponentAnalysis() {
-    fitArraysUsingPrincipalComponentAnalysis();
-}
-void lsst::imageproc::fitArraysUsingPrincipalComponentAnalysis() {
 }
 
 

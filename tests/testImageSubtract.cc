@@ -14,7 +14,7 @@ int main( int argc, char** argv )
     
     typedef uint8 MaskT;
     typedef float32 PixelT;
-    typedef float32 KernelT;
+    typedef double KernelT;
 
     // Read input images
     string scienceInputImage = argv[1];
@@ -29,7 +29,7 @@ int main( int argc, char** argv )
     // One way
     //vector<Kernel<KernelT> > kernelVec;
     // Another way with pointers
-    vector<boost::shared_ptr<Kernel<KernelT> > > kernelVec;
+    vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;
     unsigned kernelRows = 9;
     unsigned kernelCols = 9;
     int colCtr = (kernelCols - 1) / 2;
@@ -50,18 +50,13 @@ int main( int argc, char** argv )
                 new AnalyticKernel<KernelT>(kfuncPtr, kernelCols, kernelRows)
             );
  
-            kernelVec.push_back(kernelPtr);
+            kernelBasisVec.push_back(kernelPtr);
         }
     }
-    vector<PixelT> kernelParams(kernelRows * kernelCols);
-    LinearCombinationKernel<KernelT> deltaFunctionKernelSet(kernelVec, kernelParams);
-
-    // Currently does nothing
-    //getTemplateChunkExposureFromTemplateExposure();
 
     // This has some functionality!  Lets at least get it to compile.
     lsst::imageproc::computePSFMatchingKernelForMaskedImage<PixelT, MaskT, KernelT>
-        (scienceMaskedImage, templateMaskedImage, deltaFunctionKernelSet);
+        (scienceMaskedImage, templateMaskedImage, kernelBasisVec);
 
     // Currently does nothing
     //subtractMatchedImage();
