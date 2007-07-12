@@ -14,30 +14,31 @@
 namespace lsst {
 namespace fw {
 
-    class Source : private lsst::fw::LsstBase
-    {
+    class Source : private lsst::fw::LsstBase {
 
     public:
         explicit Source();
         virtual ~Source() {};
         explicit Source(
-            unsigned rowc,
-            unsigned colc,
-            unsigned drow,
-            unsigned dcol
+            double rowc,
+            double colc,
+            double drow,
+            double dcol
             );
-       inline unsigned getColc() const;
-       inline unsigned getRowc() const;
-       inline unsigned getDcol() const;
-       inline unsigned getDrow() const;
+       inline double getColc() const;
+       inline double getRowc() const;
+       inline double getDcol() const;
+       inline double getDrow() const;
     private:
-       unsigned _rowc;
-       unsigned _colc;
-       unsigned _drow;
-       unsigned _dcol;
+       double _rowc;
+       double _colc;
+       double _drow;
+       double _dcol;
     };
     
 }   // namespace fw
 }   // namespace lsst
+
+#include <lsst/fw/Source.cc>
 
 #endif // !defined(LSST_FW_Source_H)

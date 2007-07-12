@@ -1,7 +1,7 @@
 #include <lsst/fw/MaskedImage.h>
 #include <lsst/fw/Kernel.h>
 #include <lsst/fw/FunctionLibrary.h>
-#include "ImageSubtract.h"
+#include <ImageSubtract.h>
 #include <boost/shared_ptr.hpp>
 
 using namespace std;
@@ -60,7 +60,8 @@ int main( int argc, char** argv )
     //getTemplateChunkExposureFromTemplateExposure();
 
     // This has some functionality!  Lets at least get it to compile.
-    lsst::imageproc::computePSFMatchingKernelForMaskedImage(scienceMaskedImage, templateMaskedImage, deltaFunctionKernelSet);
+    lsst::imageproc::computePSFMatchingKernelForMaskedImage<PixelT, MaskT, KernelT>
+        (scienceMaskedImage, templateMaskedImage, deltaFunctionKernelSet);
 
     // Currently does nothing
     //subtractMatchedImage();

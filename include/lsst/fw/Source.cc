@@ -12,35 +12,35 @@
  */
 
 // Inline Member Functions
-inline unsigned
+inline double
 lsst::fw::Source::getColc() const {
     return _colc;
 }
-inline unsigned
+inline double
 lsst::fw::Source::getRowc() const {
     return _rowc;
 }
-inline unsigned
+inline double
 lsst::fw::Source::getDcol() const {
     return _dcol;
 }
-inline unsigned
+inline double
 lsst::fw::Source::getDrow() const {
     return _drow;
 }
 lsst::fw::Source::Source()
 :
     lsst::fw::LsstBase(typeid(this)),
-    _rowc(0),
-    _colc(0),
-    _drow(0),
-    _dcol(0)
+    _rowc(0.),
+    _colc(0.),
+    _drow(0.),
+    _dcol(0.)
 { }
 lsst::fw::Source::Source(
-    unsigned rowc, ///< row center
-    unsigned colc, ///< column center
-    unsigned drow, ///< row extent
-    unsigned dcol) ///< column extent
+    double rowc, ///< row center
+    double colc, ///< column center
+    double drow, ///< row extent
+    double dcol) ///< column extent
 :
     lsst::fw::LsstBase(typeid(this)),
     _rowc(rowc),

@@ -4,8 +4,11 @@ Import("env")
 #env.Program(["lsstimageproc01.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
 ## lsstimageproc02.cc is just pseudo-code
 
+# basic test program
+#env.Program(["foo.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
+
 # testing ImageSubtract.cc/.h
-env.Program(["testImageSubtract.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"] + ["imageproc"])
+env.Program(["testImageSubtract.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
 
 # crunchy math test programs
 #env.Program(["invertMatrix.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
