@@ -44,6 +44,13 @@ namespace imageproc {
         vector<lsst::fw::Kernel<KernelT> > &kernelPCABasisVec
         );
 
+    template <typename aMatrixT, typename aVectorT>
+    void computePCAviaSVD(
+        aMatrixT &A,
+        aVectorT &eVal,
+        aMatrixT &eVec
+        );
+
     void getTemplateChunkExposureFromTemplateExposure();
     void wcsMatchExposure();
     void computeSpatiallyVaryingPSFMatchingKernel();
