@@ -14,6 +14,9 @@
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
 #include <vw/Math/LinearAlgebra.h> 
+#include <vw/Math/Functions.h> 
+
+using namespace std;
 
 template <typename aMatrixT, typename aVectorT>
 void lsst::imageproc::computePCAviaSVD(
@@ -71,8 +74,9 @@ void lsst::imageproc::computePCAviaSVD(
 
     // Have s represent the eigenvalues; they are already sorted by LAPACK
     for (int i = 0; i < s.size(); i++) {
-        eVal[i] = vw::math::sqrt(s[i]);
+        eVal[i] = vw::sqrt(s[i]);
     }
+    // We could use VectorProxys to do this
 
     // Eigenvectors are in the columns of eVec
     for (int col = 0; col < u.cols(); col++) {
@@ -80,5 +84,6 @@ void lsst::imageproc::computePCAviaSVD(
             eVec(row,col) = u(row, col);
         }
     }
+    // We could use MatrixProxys to do this 
 }
 

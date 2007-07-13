@@ -21,7 +21,7 @@ namespace imageproc {
     using namespace std;
 
     template <typename aMatrixT, typename aVectorT>
-    void lsst::imageproc::computePCAviaSVD(
+    void computePCAviaSVD(
         aMatrixT &A,
         aVectorT &eVal,
         aMatrixT &eVec

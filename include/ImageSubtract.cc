@@ -22,6 +22,8 @@
 #include <vw/Math/Functions.h> 
 #include <boost/shared_ptr.hpp>
 
+#include <PCA.h>
+
 using namespace std;
 
 /**
@@ -110,8 +112,8 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     // Total number of parameters
     nParameters = nKernelParameters + nBackgroundParameters;
     
-    vw::Vector<double> B(nParameters);
-    vw::Matrix<double> M(nParameters, nParameters);
+    vw::math::Vector<double> B(nParameters);
+    vw::math::Matrix<double> M(nParameters, nParameters);
 
     // convolve creates a MaskedImage, push it onto the back of the Vector
     // need to use shared pointers because MaskedImage copy does not work
@@ -208,7 +210,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
             M[kidxj][kidxi] = M[kidxi][kidxj];
     
     // Invert M
-    vw::Matrix<double> Minv = vw::math::inverse(M);
+    vw::math::Matrix<double> Minv = vw::math::inverse(M);
     // Solve for x in Mx = B
     //vw::math::Vector<double> Soln = B * Minv;  // uh, this does not work for B
     vw::math::Vector<double> Soln = Minv * B; // will this at least compile, '*' is a method for Minv
@@ -242,104 +244,78 @@ void lsst::imageproc::computePCAKernelBasis(
     vector<lsst::fw::Kernel<KernelT> > &kernelPCABasisVec ///< Output principal components as kernel images
     ) {
     
+    typedef double ImageT;
+
+    const int nKernel = kernelVec.size();
+    const int nCols = kernelVec[0].getCols();
+    const int nRows = kernelVec[0].getRows();
+    const int nPixels = nCols * nRows;
+
     int xEval=0;
     int yEval=0;
     bool doNormalize = false;
-    int nKernel = kernelVec.size();
-    int nPixels = kernelVec[0].getCols() * kernelVec[0].getRows();
-    vw::Matrix<double> A(nKernel, nPixels);
 
-    typedef double ImageT;
+    vw::Matrix<ImageT> A(nKernel, nPixels); // row, col where : row = number of kernels; col = number of pixels
+
     typedef typename vw::ImageView<ImageT>::pixel_accessor imageAccessorType;
 
-    // NOTE : 
-    // arguments to matrix-related functions are given in row,col
-    // arguments to image-related functions are given in col,row
+    // iterator over kernels
+    typename vector<lsst::fw::LinearCombinationKernel<KernelT> >::const_iterator kiter = kernelVec.begin();
 
     // fill up matrix for PCA
-    typename vector<lsst::fw::LinearCombinationKernel<KernelT> >::const_iterator kiter = kernelVec.begin();
-    // do i want kiter++ or ++kiter?
+    // does it matter if i use kiter++ or ++kiter?
     for (int ki = 0; kiter != kernelVec.end(); ki++, kiter++) {
         lsst::fw::Image<ImageT> kImage = kiter->getImage(xEval, yEval, doNormalize);
         imageAccessorType imageAccessor(kImage.origin());
         
-        int nRows = kImage.getRows();
-        int nCols = kImage.getCols();
-        for (int row = 0; row < nRows; row++) {
-            for (int col = 0; col < nCols; col++) {
-                A[ki][col + row * nRows] = *imageAccessor;
-                imageAccessor.next_col();
+        //assert(nRows == kImage.getRows());
+        //assert(nCols == kImage.getCols());
+        int aIdx = 0;
+        for (int col = 0; col < nCols; col++) {
+            for (int row = 0; row < nRows; row++, aIdx++) {
+
+                // NOTE : 
+                //   arguments to matrix-related functions are given in row,col
+                //   arguments to image-related functions are given in col,row
+                // HOWEVER :
+                //   it doesn't matter which order we put the kernel elements into the PCA
+                //   since they are not correlated 
+                //   as long as we do the same thing when extracting the components
+                // UNLESS :
+                //   we want to put in some weighting/regularlization into the PCA
+                //   not sure if that is even possible...
+
+                A(ki,aIdx) = *imageAccessor;
+                imageAccessor.next_row();
             }
-            imageAccessor.next_row();
+            imageAccessor.next_col();
         }
     }
-}
 
-template <typename aMatrixT, typename aVectorT>
-void lsst::imageproc::computePCAviaSVD(
-    aMatrixT &A,
-    aVectorT &eVal,
-    aMatrixT &eVec
-    ) {
+    vw::math::Matrix<ImageT> eVec(nKernel, nPixels);
+    vw::math::Vector<ImageT> eVal(nKernel);
+    
+    lsst::imageproc::computePCAviaSVD(A, eVec, eVal);
+    
+    // turn each eVec into an Image and then into a Kernel
+    for (int col = 0; col < eVec.cols(); col++) {
+        lsst::fw::Image<ImageT> basisImage(nCols, nRows);
+        imageAccessorType imageAccessor(basisImage.origin());
 
-    // Use LAPACK SVD
-    // http://www.netlib.org/lapack/lug/node32.html
-    // Suggests to me that we use DGESVD or DGESDD (preferred)
-    // Good, gesdd is used in LinearAlgebra.h
-
-    // All computations here are in double
-    // Cast to aMatrixT and aVectorT after computation
-    // This might be unncessarily inefficient
-    vw::math::Matrix<double> u, vt;
-    vw::math::Vector<double> s;
-    vw::math::complete_svd(A, u, s, vt);
-
-    /* Note on the math :
-
-    In the SVD, we find matrices U S and V such that 
-       A = U S V*
-    where V* is the conjugate transpose of V.  For a real-valued matrix this is just Vt.  
-    The diagonal entries of S are the singular values of A.
-
-    In this decomposition
-       A* A = V S* U* U S V*
-            = V (S* S) V*
-
-       A A* = U S V* V S* U*
-            = U (S S*) U*
-
-    ----------
-
-    In an eigenvalue decomposition, we assume that
-       A = U L U*
-    where U is a Unitary matrix, and L is the diagonal matrix with the eigenvalues of A.
-
-    ----------
-
-    By comparing these results, we can see that
-
-     o The SVD columns of U represent the eigenvectors of A A*
-     o The SVD columns of V represent the eigenvectors of A* A
-     o The SVD diagonal entries of S are the square root of the eigenvalues of both A A* and A* A
-
-    ----------
-
-    Finally, in a PCA, we want to find the eigenvectors of the covariance matrix A A*
-    Therefore the SVD yields principal components with the eigenvectors in U
-
-    */
-
-    // Have s represent the eigenvalues; they are already sorted by LAPACK
-    for (int i = 0; i < s.size(); i++) {
-        eVal[i] = vw::math::sqrt(s[i]);
-    }
-
-    // Eigenvectors are in the columns of eVec
-    for (int col = 0; col < u.cols(); col++) {
-        for (int row = 0; row < u.rows(); row++) {
-            eVec(row,col) = u(row, col);
+        // We could also use select_column to grab this info
+        for (int col = 0; col < nCols; col++) {
+            for (int row = 0; row < nRows; row++) {
+                *imageAccessor = eVec(row, col);
+                imageAccessor.next_row();
+            }
+            imageAccessor.next_col();
         }
+
+        lsst::fw::FixedKernel<ImageT> basisKernel(basisImage);
+        kernelPCABasisVec.append( basisKernel );
     }
+    // I need to pass the eigenvalues back as well
+    
 }
 
 // TODO BELOW
