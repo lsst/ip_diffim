@@ -240,11 +240,33 @@ void lsst::imageproc::computePCAKernelBasis(
     vector<lsst::fw::Kernel<KernelT> > &kernelPCABasisVec ///< Output principal components as kernel images
     ) {
     
-    int nParx, nPary;
-    nParx = 100;
-    nPary = 100;
-    vw::Matrix<double> A(100, 100);
+    int xEval=0;
+    int yEval=0;
+    bool doNormalize = false;
+    int nKernel = kernelVec.size();
+    int nPixels = kernelVec[0].getCols() * kernelVec[0].getRows();
+    vw::Matrix<double> A(nKernel, nPixels);
 
+    typedef double ImageT;
+    typedef typename vw::ImageView<ImageT>::pixel_accessor imageAccessorType;
+
+    typename vector<lsst::fw::LinearCombinationKernel<KernelT> >::const_iterator kiter = kernelVec.begin();
+    // do i want kiter++ or ++kiter?
+    for (int ki = 0; kiter != kernelVec.end(); ki++, kiter++) {
+        lsst::fw::Image<ImageT> kImage = kiter->getImage(xEval, yEval, doNormalize);
+        imageAccessorType imageAccessor(kImage.origin());
+        
+        int nRows = kImage.getRows();
+        int nCols = kImage.getCols();
+        for (int row = 0; row < nRows; row++) {
+            for (int col = 0; col < nCols; col++) {
+                A[ki][col + row * nRows] = *imageAccessor;
+                imageAccessor.next_col();
+            }
+            imageAccessor.next_row();
+        }
+    }
+    
     // Use LAPACK SVD
     // http://www.netlib.org/lapack/lug/node32.html
     // Suggests to me that we use DGESVD or DGESDD (preferred)
