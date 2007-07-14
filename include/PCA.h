@@ -22,10 +22,18 @@ namespace imageproc {
 
     template <typename aMatrixT, typename aVectorT>
     void computePCAviaSVD(
-        aMatrixT &A,
+        aMatrixT &M,
         aVectorT &eVal,
         aMatrixT &eVec
         );
+
+    template <typename aMatrixT>
+    void decomposeMatrixUsingBasis(
+        aMatrixT &M,
+        aMatrixT &eVec,
+        aMatrixT &coeff
+        );
+
 
 }
 }

@@ -1,6 +1,6 @@
 #include <vw/Math/Matrix.h> 
 #include <PCA.h>
-#include <iostream.h>
+#include <iostream>
 
 using namespace std;
 
@@ -26,6 +26,11 @@ int main( int argc, char** argv )
     cout << "EVal " << eVal << endl;
     cout << "EVec " << vw::math::transpose(eVec) << endl;
     cout << "EVec " << vw::math::transpose(eVec)[0] << endl;
+
+    vw::math::Matrix<ValueT> coeff(rowsN, colsN);
+    lsst::imageproc::decomposeMatrixUsingBasis(M, eVec, coeff);
+    cout << "Coeff " << coeff << endl;
+
     exit(1);
 
 
