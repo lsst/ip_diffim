@@ -21,10 +21,12 @@ namespace imageproc {
     using namespace std;
 
     template <typename aMatrixT, typename aVectorT>
-    void computePCAviaSVD(
+    void computePCA(
         aMatrixT &M,
+        aVectorT &rowMean,
         aVectorT &eVal,
-        aMatrixT &eVec
+        aMatrixT &eVec,
+        bool subtractMean = true
         );
 
     template <typename aMatrixT>
@@ -32,6 +34,22 @@ namespace imageproc {
         aMatrixT &M,
         aMatrixT &eVec,
         aMatrixT &coeff
+        );
+
+    template <typename aMatrixT>
+    void decomposeMatrixUsingBasis(
+        aMatrixT &M,
+        aMatrixT &eVec,
+        int nCoeff,
+        aMatrixT &coeff
+        );
+
+    template <typename aMatrixT>
+    void approximateMatrixUsingBasis(
+        aMatrixT &eVec,
+        aMatrixT &coeff,
+        int nCoeff,
+        aMatrixT &Mout
         );
 
 

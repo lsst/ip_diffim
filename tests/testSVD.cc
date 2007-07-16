@@ -1,4 +1,5 @@
 #include <vw/Math/Matrix.h> 
+#include <vw/Math/LinearAlgebra.h> 
 #include <PCA.h>
 #include <iostream>
 
@@ -8,30 +9,47 @@ int main( int argc, char** argv )
 {
     
     typedef double ValueT;
-    const int rowsN = 4;
-    const int colsN = 5;
-    vw::math::Matrix<ValueT> M(rowsN, colsN);
-    // These matrices start at upper left
-    M(0,0) = 1;
-    M(0,4) = 2;
-    M(1,2) = 3;
-    M(3,1) = 4;
-    cout << M << endl;
+    // Lets try decomposing another matrix using Basis functions
+    const int rowsN2 = 4; // Number of variables = m
+    const int colsN2 = 5; // Number of realizations = n
+    vw::math::Matrix<ValueT> M2(rowsN2, colsN2); // m x n
+    vw::math::Matrix<ValueT> eVec2(rowsN2, colsN2); // m x n
+    vw::math::Vector<ValueT> eVal2(colsN2); // n 
+    vw::math::Vector<ValueT> rowMean2(rowsN2); // m
+    M2(0,0) = 1;
+    M2(0,4) = 2;
+    M2(1,2) = 3;
+    M2(3,1) = 4;
+    cout << M2 << endl;
 
-    vw::math::Matrix<ValueT> eVec(rowsN, colsN);
-    vw::math::Vector<ValueT> eVal(colsN);
+    lsst::imageproc::computePCA(M2, rowMean2, eVal2, eVec2);
+    
+    cout << endl << "NEW PCA" << endl;
+    for (int i = 0; i < eVec2.cols(); i++) {
+        cout << "Eval " << i << " : " << eVal2[i] << endl;
+        cout << "Evec col " << i << " : " << vw::math::select_col(eVec2, i) << endl;
+        cout << endl;
+    }
+    
+    int nCoeff = 4;
+    vw::math::Matrix<ValueT> coeff2(colsN2, rowsN2);
 
-    lsst::imageproc::computePCAviaSVD(M, eVal, eVec);
+    lsst::imageproc::decomposeMatrixUsingBasis(M2, eVec2, coeff2);
+    cout << "C   : " << coeff2 << endl;
+    cout << "In  : " << M2 << endl;
+    vw::math::Matrix<ValueT> M3(rowsN2, colsN2); // m x n
+    lsst::imageproc::approximateMatrixUsingBasis(eVec2, coeff2, nCoeff, M3);
+    cout << "Out : " << M3 << endl;
 
-    cout << "EVal " << eVal << endl;
-    cout << "EVec " << vw::math::transpose(eVec) << endl;
-    cout << "EVec " << vw::math::transpose(eVec)[0] << endl;
+    cout << endl;
+    
+    vw::math::Matrix<ValueT> coeff3(colsN2, nCoeff);
+    lsst::imageproc::decomposeMatrixUsingBasis(M2, eVec2, nCoeff, coeff3);
+    cout << "C   : " << coeff3 << endl;
+    lsst::imageproc::approximateMatrixUsingBasis(eVec2, coeff3, nCoeff, M3);
+    cout << "Out : " << M3 << endl;
 
-    vw::math::Matrix<ValueT> coeff(rowsN, colsN);
-    lsst::imageproc::decomposeMatrixUsingBasis(M, eVec, coeff);
-    cout << "Coeff " << coeff << endl;
-
-    exit(1);
+}
 
 
 
@@ -84,4 +102,4 @@ int main( int argc, char** argv )
 //
 //    cout << "SVD took " << (boost::format("%.4f") % time) << "s" << endl; 
 
-}
+
