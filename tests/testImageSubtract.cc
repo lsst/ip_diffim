@@ -40,9 +40,10 @@ int main( int argc, char** argv )
         for (unsigned col = 0; col < kernelCols; ++col) {
             int x = static_cast<int>(col) - colCtr;
             
-            Kernel<KernelT>::Function2PtrType kfuncPtr(
+            Kernel<KernelT>::KernelFunctionPtrType kfuncPtr(
                 new IntegerDeltaFunction2<KernelT>(x, y)
                 );
+ 
             // One way
             //AnalyticKernel<KernelT> kernel(kfuncPtr, kernelCols, kernelRows);
             // Another way with pointers
@@ -55,7 +56,7 @@ int main( int argc, char** argv )
     }
 
     // This has some functionality!  Lets at least get it to compile.
-    lsst::imageproc::computePSFMatchingKernelForMaskedImage<PixelT, MaskT, KernelT>
+    lsst::imageproc::computePSFMatchingKernelForMaskedImage
         (scienceMaskedImage, templateMaskedImage, kernelBasisVec);
 
     // Currently does nothing

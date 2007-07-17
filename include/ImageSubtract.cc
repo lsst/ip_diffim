@@ -21,7 +21,6 @@
 #include <vw/Math/LinearAlgebra.h> 
 #include <vw/Math/Functions.h> 
 #include <boost/shared_ptr.hpp>
-
 #include <PCA.h>
 
 using namespace std;
@@ -234,8 +233,13 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
     vector<lsst::fw::Source> &sourceCollection ///< Vector of sources to use for diffim kernel
     ) {
 
-    lsst::fw::Source src1(100, 100, 10, 10); // Hack some positions here
+    // Hack some positions in for /lsst/becker/lsst_devel/DC2/fw/tests/data/871034p_1_MI_img.fits
+    lsst::fw::Source src1(1010.345, 2375.548, 10., 10.); 
+    lsst::fw::Source src2(404.248, 573.398, 10., 10.);
+    lsst::fw::Source src3(1686.743, 1880.935, 10., 10.);
     sourceCollection.push_back(src1);
+    sourceCollection.push_back(src2);
+    sourceCollection.push_back(src3);
 }
 
 template <typename KernelT>
@@ -255,7 +259,8 @@ void lsst::imageproc::computePCAKernelBasis(
     int yEval=0;
     bool doNormalize = false;
 
-    vw::Matrix<ImageT> A(nKernel, nPixels); // row, col where : row = number of kernels; col = number of pixels
+    // Matrix to invert.  Number of rows = number of pixels; number of columns = number of kernels
+    vw::Matrix<ImageT> M(nPixels, nKernel); 
 
     typedef typename vw::ImageView<ImageT>::pixel_accessor imageAccessorType;
 
@@ -267,12 +272,14 @@ void lsst::imageproc::computePCAKernelBasis(
     for (int ki = 0; kiter != kernelVec.end(); ki++, kiter++) {
         lsst::fw::Image<ImageT> kImage = kiter->getImage(xEval, yEval, doNormalize);
         imageAccessorType imageAccessor(kImage.origin());
+
+        kImage.writeFits( (boost::format("kFits_%d.fits\n") % ki).str() );
         
         //assert(nRows == kImage.getRows());
         //assert(nCols == kImage.getCols());
-        int aIdx = 0;
+        int mIdx = 0;
         for (int col = 0; col < nCols; col++) {
-            for (int row = 0; row < nRows; row++, aIdx++) {
+            for (int row = 0; row < nRows; row++, mIdx++) {
 
                 // NOTE : 
                 //   arguments to matrix-related functions are given in row,col
@@ -285,34 +292,38 @@ void lsst::imageproc::computePCAKernelBasis(
                 //   we want to put in some weighting/regularlization into the PCA
                 //   not sure if that is even possible...
 
-                A(ki,aIdx) = *imageAccessor;
+                M(mIdx, ki) = *imageAccessor;
                 imageAccessor.next_row();
             }
             imageAccessor.next_col();
         }
     }
 
-    vw::math::Matrix<ImageT> eVec(nKernel, nPixels);
+    vw::math::Matrix<ImageT> eVec(nPixels, nKernel);
     vw::math::Vector<ImageT> eVal(nKernel);
+    vw::math::Vector<ImageT> mMean(nPixels);
     
-    lsst::imageproc::computePCAviaSVD(A, eVec, eVal);
+    lsst::imageproc::computePCA(M, mMean, eVal, eVec, true);
     
     // turn each eVec into an Image and then into a Kernel
-    for (int col = 0; col < eVec.cols(); col++) {
+    for (int i = 0; i < eVec.cols(); i++) {
         lsst::fw::Image<ImageT> basisImage(nCols, nRows);
         imageAccessorType imageAccessor(basisImage.origin());
 
-        // We could also use select_column to grab this info
+        // Not sure how to bulk load information into Image
+        int kIdx = 0;
         for (int col = 0; col < nCols; col++) {
-            for (int row = 0; row < nRows; row++) {
-                *imageAccessor = eVec(row, col);
+            for (int row = 0; row < nRows; row++, kIdx++) {
+                *imageAccessor = eVec(kIdx, col);
                 imageAccessor.next_row();
             }
             imageAccessor.next_col();
         }
+        // debugging info
+        basisImage.writeFits( (boost::format("eFits_%d.fits\n") % i).str() );
 
         lsst::fw::FixedKernel<ImageT> basisKernel(basisImage);
-        kernelPCABasisVec.append( basisKernel );
+        //kernelPCABasisVec.append( basisKernel );
     }
     // I need to pass the eigenvalues back as well
     

@@ -31,7 +31,7 @@ void lsst::imageproc::computePCA(
     // Use LAPACK SVD
     // http://www.netlib.org/lapack/lug/node32.html
     // Suggests to me that we use DGESVD or DGESDD (preferred)
-    // Good, gesdd is used in LinearAlgebra.h
+    // Good, gesdd is used in vw/Math/LinearAlgebra.h
 
     /* Note on the input data :
 
@@ -41,8 +41,6 @@ void lsst::imageproc::computePCA(
 
          this code will subtract off mean of each row (mean of each measurement ensemble is zero) if requested
     */
-    
-
 
     // Subtract off row mean
     if (subtractMean) {

@@ -8,12 +8,12 @@ Import("env")
 #env.Program(["foo.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
 
 # testing matrix math
-env.Program(["testSVD.cc"], LIBS=env.libs["vw"] + ["fw"])
-env.Program(["testEigen.cc"], LIBS=env.libs["vw"] + ["fw"])
+#env.Program(["testSVD.cc"], LIBS=env.libs["vw"] + ["fw"])
+#env.Program(["testEigen.cc"], LIBS=env.libs["vw"] + ["fw"])
 # crunchy math test programs
 #env.Program(["invertMatrix.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
 #env.Program(["matrixMath.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
 
 # testing ImageSubtract.cc/.h
-#env.Program(["testImageSubtract.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
+env.Program(["testImageSubtract.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
 
