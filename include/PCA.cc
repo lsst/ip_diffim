@@ -134,8 +134,6 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
     int nCoeff, ///< Input : Number of coeffients to go to
     aMatrixT &coeff ///< Output : Fraction of each basis to reconstruct M from eVec in each row, shape M.cols() x nCoeff.
     ) {
-    double c;
-
     // Maybe more efficient when the number of coefficients you want is much smaller than the matrix
 
     // Do object-by-object
@@ -143,8 +141,7 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
         vw::math::Vector<double> mCol = vw::math::select_col(M, mi);
         for (int ei = 0; ei < nCoeff; ei++) {
             vw::math::Vector<double> eCol = vw::math::select_col(eVec, ei);
-            c = vw::math::dot_prod(mCol, eCol);
-            coeff(mi, ei) = c;
+            coeff(mi, ei) = vw::math::dot_prod(mCol, eCol);
         }
     }
 }
