@@ -10,21 +10,31 @@ using namespace lsst::fw;
 int main( int argc, char** argv )
 {
     Trace::setDestination(cout);
-    Trace::setVerbosity(".", 0);
+    Trace::setVerbosity(".", 5);
     
     typedef uint8 MaskT;
-    typedef float32 PixelT;
+    typedef float ImageT; // have to make sure this jibes with the input data!
     typedef double KernelT;
 
     // Read input images
     string scienceInputImage = argv[1];
-    MaskedImage<PixelT,MaskT> scienceMaskedImage;
-    scienceMaskedImage.readFits(scienceInputImage);
+    MaskedImage<ImageT,MaskT> scienceMaskedImage;
+    try {
+        scienceMaskedImage.readFits(scienceInputImage);
+    } catch (lsst::fw::Exception &e) {
+        cerr << "Failed to open " << scienceInputImage << ": " << e.what() << endl;
+        return 1;
+    }
     
     string templateInputImage = argv[2];
-    MaskedImage<PixelT,MaskT> templateMaskedImage;
-    templateMaskedImage.readFits(templateInputImage);
-
+    MaskedImage<ImageT,MaskT> templateMaskedImage;
+    try {
+        templateMaskedImage.readFits(templateInputImage);
+    } catch (lsst::fw::Exception &e) {
+        cerr << "Failed to open " << templateInputImage << ": " << e.what() << endl;
+        return 1;
+    }
+    
     // set up basis of delta functions for kernel
     // One way
     //vector<Kernel<KernelT> > kernelVec;
@@ -61,5 +71,6 @@ int main( int argc, char** argv )
 
     // Currently does nothing
     //subtractMatchedImage();
+    cout << endl;
 
 }

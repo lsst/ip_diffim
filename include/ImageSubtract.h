@@ -21,16 +21,16 @@ namespace imageproc {
 
     using namespace std;
     
-    template <typename PixelT, typename MaskT, typename KernelT>
+    template <typename ImageT, typename MaskT, typename KernelT>
     void computePSFMatchingKernelForMaskedImage(
-        lsst::fw::MaskedImage<PixelT,MaskT> const &imageToConvolve,
-        lsst::fw::MaskedImage<PixelT,MaskT> const &imageToNotConvolve,
+        lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
+        lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec);
     
-    template <typename PixelT, typename MaskT, typename KernelT>
+    template <typename ImageT, typename MaskT, typename KernelT>
     void computePSFMatchingKernelForPostageStamp(
-        lsst::fw::MaskedImage<PixelT, MaskT> const &imageToConvolve,
-        lsst::fw::MaskedImage<PixelT, MaskT> const &imageToNotConvolve,
+        lsst::fw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
+        lsst::fw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec,
         vector<double> &kernelCoeffs);
 

@@ -44,11 +44,11 @@ void lsst::imageproc::computePCA(
 
     // Subtract off row mean
     if (subtractMean) {
-        for (int row = 0; row < M.rows(); row++) {
+        for (unsigned int row = 0; row < M.rows(); row++) {
             vw::math::Vector<double> mRow = vw::math::select_row(M, row);
             mean = vw::math::sum(mRow) / mRow.size();
             rowMean(row) = mean;
-            for (int col = 0; col < M.cols(); col++) {
+            for (unsigned int col = 0; col < M.cols(); col++) {
                 M(row, col) -= mean;
             }
         }
@@ -99,15 +99,15 @@ void lsst::imageproc::computePCA(
 
     // Have s represent the eigenvalues; they are already sorted by LAPACK
     // NOTE : do I need to square these values?
-    for (int i = 0; i < s.size(); i++) {
+    for (unsigned int i = 0; i < s.size(); i++) {
         eVal[i] = s[i];
     }
     // We could use VectorProxys to do this
 
     
     // Eigenvectors are in the columns of eVec
-    for (int row = 0; row < u.rows(); row++) {
-        for (int col = 0; col < u.cols(); col++) {
+    for (unsigned int row = 0; row < u.rows(); row++) {
+        for (unsigned int col = 0; col < u.cols(); col++) {
             eVec(row,col) = u(row, col);
         }
     }

@@ -13,6 +13,10 @@
 
 // Inline Member Functions
 inline double
+lsst::fw::Source::getId() const {
+    return _id;
+}
+inline double
 lsst::fw::Source::getColc() const {
     return _colc;
 }
@@ -31,20 +35,23 @@ lsst::fw::Source::getDrow() const {
 lsst::fw::Source::Source()
 :
     lsst::fw::LsstBase(typeid(this)),
-    _rowc(0.),
+    _id(0.),
     _colc(0.),
-    _drow(0.),
-    _dcol(0.)
+    _rowc(0.),
+    _dcol(0.),
+    _drow(0.)
 { }
 lsst::fw::Source::Source(
-    double rowc, ///< row center
+    int id, ///< unique identifier
     double colc, ///< column center
-    double drow, ///< row extent
-    double dcol) ///< column extent
+    double rowc, ///< row center
+    double dcol, ///< column extent
+    double drow) ///< row extent
 :
     lsst::fw::LsstBase(typeid(this)),
-    _rowc(rowc),
+    _id(id),
     _colc(colc),
-    _drow(drow),
-    _dcol(dcol)
+    _rowc(rowc),
+    _dcol(dcol),
+    _drow(drow)
 { }

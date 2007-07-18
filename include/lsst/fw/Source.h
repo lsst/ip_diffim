@@ -20,20 +20,23 @@ namespace fw {
         explicit Source();
         virtual ~Source() {};
         explicit Source(
-            double rowc,
+            int id,
             double colc,
-            double drow,
-            double dcol
+            double rowc,
+            double dcol,
+            double drow
             );
+       inline double getId() const;
        inline double getColc() const;
        inline double getRowc() const;
        inline double getDcol() const;
        inline double getDrow() const;
     private:
-       double _rowc;
+       double _id;
        double _colc;
-       double _drow;
+       double _rowc;
        double _dcol;
+       double _drow;
     };
     
 }   // namespace fw
