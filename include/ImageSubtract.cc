@@ -87,8 +87,9 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         lsst::fw::LinearCombinationKernel<KernelT> sourceKernel(kernelBasisVec, kernelCoeffs);
         *kiter = sourceKernel;
 
+        // DEBUGGING
         lsst::fw::Image<KernelT> kImage = sourceKernel.getImage(0, 0, false);
-        kImage.writeFits( (boost::format("kFits_%d") % diffImSource.getId()).str() );
+        kImage.writeFits( (boost::format("kFits_%d.fits") % diffImSource.getId()).str() );
         
 
     }
@@ -139,9 +140,16 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     // convolve creates a MaskedImage, push it onto the back of the Vector
     // need to use shared pointers because MaskedImage copy does not work
     vector<boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > > convolvedImageVec(nKernelParameters);
-
-    typename vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelBasisVec.begin();
+    // and an iterator over this
     typename vector<boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > >::iterator citer = convolvedImageVec.begin();
+    
+    // iterator for input kernel basis
+    typename vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelBasisVec.begin();
+    // Buffer around source images
+    // The convolved images will be reduced in size by the kernel extent, half on either side.  the extra pixel gets taken from the top/right
+    // NOTE : we assume here that all kernels are the same size so that grabbing the size of the first one suffices
+    unsigned int startColBuffer = (*kiter)->getCtrCol();
+    unsigned int startRowBuffer = (*kiter)->getCtrRow();
 
     int kId = 0;
     for (; kiter != kernelBasisVec.end(); ++kiter, ++citer, ++kId) {
@@ -159,34 +167,47 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
         imagePtr->writeFits( (boost::format("cFits_%d") % kId).str() );
     } 
 
+    // Figure out how big the convolved images are
+    // NOTE : getCtrRow() pixels are subtracted from the left side, and getRows()-getCtrRow() from the right side
+    //        so we start at startRowBuffer = getCtrRow() and go getRows() pixels
+    //        this method will effectively accomplish grabbing the right subset of data from the images
+    citer = convolvedImageVec.begin();
+    unsigned int cCols = (*citer)->getCols();
+    unsigned int cRows = (*citer)->getRows();
 
     // An accessor for each convolution plane
     // NOTE : MaskedPixelAccessor has no empty constructor, therefore we need to push_back()
     vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> > convolvedAccessorRowVec;
     for (citer = convolvedImageVec.begin(); citer != convolvedImageVec.end(); ++citer) {
-        lsst::fw::MaskedPixelAccessor<ImageT, MaskT> convolvedAccessorRow(**citer);
-        convolvedAccessorRowVec.push_back(convolvedAccessorRow);
+        convolvedAccessorRowVec.push_back(lsst::fw::MaskedPixelAccessor<ImageT, MaskT>(**citer));
     }
 
-    // An accessor for each input image
+    // An accessor for each input image; address rows and cols separately
     lsst::fw::MaskedPixelAccessor<ImageT, MaskT> imageToConvolveRow(imageToConvolve);
     lsst::fw::MaskedPixelAccessor<ImageT, MaskT> imageToNotConvolveRow(imageToNotConvolve);
 
+    // Take into account buffer for kernel images
+    imageToConvolveRow.advance(startColBuffer, startRowBuffer);
+    imageToNotConvolveRow.advance(startColBuffer, startRowBuffer);
+
     // integral over image's dx and dy
-    for (unsigned int row = 0; row < imageToConvolve.getRows(); row++) {
+    // need to take into account that the convolution has reduced the size of the convovled image somewhat
+    // therefore we'll use the kernels to drive the size
+    for (unsigned int row = 0; row < cRows; row++) {
 
         // An accessor for each convolution plane
-        vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> > convolvedAccessorColVec;
-        for (int ki = 0; ki < nKernelParameters; ki++) {
-            lsst::fw::MaskedPixelAccessor<ImageT, MaskT> convolvedAccessorCol = convolvedAccessorRowVec[ki];
-            convolvedAccessorColVec.push_back(convolvedAccessorCol);
-        }
+        vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> > convolvedAccessorColVec = convolvedAccessorRowVec;
 
-        // An accessor for each input image
+        // An accessor for each input image; places the col accessor at the correct row
         lsst::fw::MaskedPixelAccessor<ImageT, MaskT> imageToConvolveCol = imageToConvolveRow;
         lsst::fw::MaskedPixelAccessor<ImageT, MaskT> imageToNotConvolveCol = imageToNotConvolveRow;
 
-        for (unsigned int col = 0; col < imageToConvolve.getCols(); col++) {
+        for (unsigned int col = 0; col < cCols; col++) {
+
+            lsst::fw::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 5, 
+                            boost::format("Accessing image row %d col %d") % (row+startRowBuffer) % (col+startColBuffer));
+            lsst::fw::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 5, 
+                            boost::format("Accessing convolved row %d col %d") % row % col);
             
             ImageT ncCamera = *imageToNotConvolveCol.image;
             ImageT ncVariance = *imageToNotConvolveCol.variance;
@@ -201,30 +222,33 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
             double iVariance = 1.0;
 
             // kernel index i
-            for (int kidxi = 0; kidxi < nKernelParameters; kidxi++) {
-                ImageT cdCamerai = *convolvedAccessorColVec[kidxi].image;
+            typename vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> >::iterator kiteri = convolvedAccessorColVec.begin();
+            for (int kidxi = 0; kiteri != convolvedAccessorColVec.end(); kiteri++, kidxi++) {
+                ImageT cdCamerai = *kiteri->image;
                 B[kidxi] += ncCamera * cdCamerai * iVariance;
-                cout << "B " << kidxi << " " << ncCamera << " " << cdCamerai << " " << iVariance << endl;
+                cout << "B " << kidxi << " " << ncCamera << " " << cdCamerai << " " << endl;
                 
                 // kernel index j 
-                for (int kidxj = kidxi; kidxj < nKernelParameters; kidxj++) {
-                    ImageT cdCameraj = *convolvedAccessorColVec[kidxj].image;
+                typename vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> >::iterator kiterj = kiteri;
+                for (int kidxj = kidxi; kiterj != convolvedAccessorColVec.end(); kiterj++, kidxj++) {
+                    ImageT cdCameraj = *kiterj->image;
                     M[kidxi][kidxj] += cdCamerai * cdCameraj * iVariance;
-                } // kidxj
-            } // kidxi
+                } 
+            } 
 
             // Here we have a single background term
-            B[nParameters] += ncCamera * iVariance;
-            cout << "B " << nParameters << " " << ncCamera << " " << iVariance << endl;
+            B[nParameters-1] += ncCamera * iVariance;
+            cout << "B " << nParameters << " " << ncCamera << " " << endl;
 
-            M[nParameters][nParameters] += 1.0 * iVariance;
+            M[nParameters-1][nParameters-1] += 1.0 * iVariance;
 
             // Step each accessor in column
             imageToConvolveCol.nextCol();
             imageToNotConvolveCol.nextCol();
             for (int ki = 0; ki < nKernelParameters; ki++) {
                 convolvedAccessorColVec[ki].nextCol();
-            }
+            }             
+
         } // col
         
         // Step each accessor in row
@@ -233,7 +257,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
         for (int ki = 0; ki < nKernelParameters; ki++) {
             convolvedAccessorRowVec[ki].nextRow();
         }
-
+        
         // clean up
         //convolvedAccessorColVec.~vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> >();
     } // row
@@ -244,6 +268,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
             M[kidxj][kidxi] = M[kidxi][kidxj];
 
     cout << "B : " << B << endl;
+    cout << "M : " << M << endl;
 
     // Invert M
     vw::math::Matrix<double> Minv = vw::math::inverse(M);
@@ -271,9 +296,15 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
     ) {
 
     // Hack some positions in for /lsst/becker/lsst_devel/DC2/fw/tests/data/871034p_1_MI_img.fits
-    lsst::fw::Source src1(1, 1010.345, 2375.548, 10., 10.); 
-    lsst::fw::Source src2(2, 404.248, 573.398, 10., 10.);
-    lsst::fw::Source src3(3, 1686.743, 1880.935, 10., 10.);
+    //lsst::fw::Source src1(1, 1010.345, 2375.548, 10., 10.); 
+    //lsst::fw::Source src2(2, 404.248, 573.398, 10., 10.);
+    //lsst::fw::Source src3(3, 1686.743, 1880.935, 10., 10.);
+
+    // HACK EVEN MORE; i'm using convolved images and the centers have shifted
+    lsst::fw::Source src1(1, 1010.345-3, 2375.548-3, 10., 10.); 
+    lsst::fw::Source src2(2, 404.248-3, 573.398-3, 10., 10.);
+    lsst::fw::Source src3(3, 1686.743-3, 1880.935-3, 10., 10.);
+
     sourceCollection.push_back(src1);
     sourceCollection.push_back(src2);
     sourceCollection.push_back(src3);
@@ -362,7 +393,7 @@ void lsst::imageproc::computePCAKernelBasis(
         basisImage.writeFits( (boost::format("eFits_%d") % i).str() );
 
         lsst::fw::FixedKernel<KernelT> basisKernel(basisImage);
-        //kernelPCABasisVec.append( basisKernel );
+        kernelPCABasisVec.push_back( basisKernel );
     }
     // I need to pass the eigenvalues back as well
     
