@@ -94,7 +94,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
 
     }
     // Hold output PCA kernel
-    vector<lsst::fw::Kernel<KernelT> > kernelPCABasisVec;
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelPCABasisVec;
     lsst::imageproc::computePCAKernelBasis(kernelVec, kernelPCABasisVec);
 }
 
@@ -117,7 +117,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     ) { 
 
     int nKernelParameters=0, nBackgroundParameters=0, nParameters=0;
-    const float threshold = 0.0;
+    const KernelT threshold = 0.0;
 
     lsst::fw::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 2, "Entering subroutine computePSFMatchingKernelForPostageStamp");
     
@@ -258,8 +258,6 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
             convolvedAccessorRowVec[ki].nextRow();
         }
         
-        // clean up
-        //convolvedAccessorColVec.~vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> >();
     } // row
 
     // Fill in rest of M
@@ -272,23 +270,14 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
 
     // Invert M
     vw::math::Matrix<double> Minv = vw::math::inverse(M);
+
     // Solve for x in Mx = B
-    //vw::math::Vector<double> Soln = B * Minv;  // uh, this does not work for B
-    vw::math::Vector<double> Soln = Minv * B; // will this at least compile, '*' is a method for Minv
+    vw::math::Vector<double> Soln = Minv * B;
 
     // Worry about translating here...
-    //kernelCoeffs = Soln;  // somehow
     for (int ki = 0; ki < nKernelParameters; ki++) {
         kernelCoeffs[ki] = Soln[ki];
     }
-
-    // clean up
-    //delete B;
-    //delete M;
-    //convolvedImageVec.~vector<boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > >();
-    //convolvedAccessorRowVec.~vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> >();
-    //delete Minv;
-    //delete Soln;
 }
 
 void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
@@ -313,7 +302,7 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
 template <typename KernelT>
 void lsst::imageproc::computePCAKernelBasis(
     vector<lsst::fw::LinearCombinationKernel<KernelT> > const &kernelVec, ///< Original input kernel basis set
-    vector<lsst::fw::Kernel<KernelT> > &kernelPCABasisVec ///< Output principal components as kernel images
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPCABasisVec ///< Output principal components as kernel images
     ) {
     
     //typedef double CalcT;
@@ -323,10 +312,6 @@ void lsst::imageproc::computePCAKernelBasis(
     const int nCols = kernelVec[0].getCols();
     const int nRows = kernelVec[0].getRows();
     const int nPixels = nCols * nRows;
-
-    int xEval=0;
-    int yEval=0;
-    bool doNormalize = false;
 
     lsst::fw::Trace("lsst.imageproc.computePCAKernelBasis", 2, "Entering subroutine computePCAKernelBasis");
 
@@ -342,13 +327,16 @@ void lsst::imageproc::computePCAKernelBasis(
     // fill up matrix for PCA
     // does it matter if i use kiter++ or ++kiter?
     for (int ki = 0; kiter != kernelVec.end(); ki++, kiter++) {
-        lsst::fw::Image<KernelT> kImage = kiter->getImage(xEval, yEval, doNormalize);
-        imageAccessorType imageAccessor(kImage.origin());
+        lsst::fw::Image<KernelT> kImage = kiter->getImage();
 
         //assert(nRows == kImage.getRows());
         //assert(nCols == kImage.getCols());
         int mIdx = 0;
+
+        imageAccessorType imageAccessorCol(kImage.origin());
         for (int col = 0; col < nCols; col++) {
+
+            imageAccessorType imageAccessorRow(imageAccessorCol);
             for (int row = 0; row < nRows; row++, mIdx++) {
 
                 // NOTE : 
@@ -362,38 +350,43 @@ void lsst::imageproc::computePCAKernelBasis(
                 //   we want to put in some weighting/regularlization into the PCA
                 //   not sure if that is even possible...
 
-                M(mIdx, ki) = *imageAccessor;
-                imageAccessor.next_row();
+                M(mIdx, ki) = *imageAccessorRow;
+                imageAccessorRow.next_row();
             }
-            imageAccessor.next_col();
+            imageAccessorCol.next_col();
         }
     }
 
     vw::math::Matrix<double> eVec(nPixels, nKernel);
     vw::math::Vector<double> eVal(nKernel);
     vw::math::Vector<double> mMean(nPixels);
-    
+
+    lsst::fw::Trace("lsst.imageproc.computePCAKernelBasis", 4, "Computing pricipal components");
     lsst::imageproc::computePCA(M, mMean, eVal, eVec, true);
-    
+    lsst::fw::Trace("lsst.imageproc.computePCAKernelBasis", 4, "Computed pricipal components");
+
     // turn each eVec into an Image and then into a Kernel
-    for (unsigned int i = 0; i < eVec.cols(); i++) {
+    for (unsigned int ki = 0; ki < eVec.cols(); ki++) {
         lsst::fw::Image<KernelT> basisImage(nCols, nRows);
-        imageAccessorType imageAccessor(basisImage.origin());
 
         // Not sure how to bulk load information into Image
         int kIdx = 0;
+
+        imageAccessorType imageAccessorCol(basisImage.origin());
         for (int col = 0; col < nCols; col++) {
+            
+            imageAccessorType imageAccessorRow(imageAccessorCol);
             for (int row = 0; row < nRows; row++, kIdx++) {
-                *imageAccessor = eVec(kIdx, col);
-                imageAccessor.next_row();
+
+                *imageAccessorRow = eVec(kIdx, ki);
+                imageAccessorRow.next_row();
             }
-            imageAccessor.next_col();
+            imageAccessorCol.next_col();
         }
         // debugging info
-        basisImage.writeFits( (boost::format("eFits_%d") % i).str() );
+        basisImage.writeFits( (boost::format("eFits_%d.fits") % ki).str() );
 
-        lsst::fw::FixedKernel<KernelT> basisKernel(basisImage);
-        kernelPCABasisVec.push_back( basisKernel );
+        kernelPCABasisVec.push_back(boost::shared_ptr<lsst::fw::Kernel<KernelT> > (new lsst::fw::FixedKernel<KernelT>(basisImage)));
     }
     // I need to pass the eigenvalues back as well
     

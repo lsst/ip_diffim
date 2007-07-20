@@ -41,7 +41,7 @@ namespace imageproc {
     template <typename KernelT>
     void computePCAKernelBasis(
         vector<lsst::fw::LinearCombinationKernel<KernelT> > const &kernelVec,
-        vector<lsst::fw::Kernel<KernelT> > &kernelPCABasisVec
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPCABasisVec
         );
 
     void getTemplateChunkExposureFromTemplateExposure();

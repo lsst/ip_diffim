@@ -40,8 +40,8 @@ int main( int argc, char** argv )
     //vector<Kernel<KernelT> > kernelVec;
     // Another way with pointers
     vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;
-    unsigned kernelRows = 5;
-    unsigned kernelCols = 5;
+    unsigned kernelRows = 3;
+    unsigned kernelCols = 3;
     int colCtr = (kernelCols - 1) / 2;
     int rowCtr = (kernelRows - 1) / 2;
     for (unsigned row = 0; row < kernelRows; ++row) {

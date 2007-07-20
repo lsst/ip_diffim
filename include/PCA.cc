@@ -54,12 +54,16 @@ void lsst::imageproc::computePCA(
         }
     }
 
+    lsst::fw::Trace("lsst.imageproc.computePCA", 5, "Test1");
+
     // All computations here are in double
     // Cast to aMatrixT and aVectorT after computation
     // This might be unncessarily inefficient
     vw::math::Matrix<double> u, vt;
     vw::math::Vector<double> s;
     vw::math::complete_svd(M, u, s, vt);
+
+    lsst::fw::Trace("lsst.imageproc.computePCA", 5, "Test2");
 
     /* Note on the math :
 
@@ -102,16 +106,17 @@ void lsst::imageproc::computePCA(
     for (unsigned int i = 0; i < s.size(); i++) {
         eVal[i] = s[i];
     }
-    // We could use VectorProxys to do this
+    // Could we use VectorProxys to do this?
 
-    
+    cout << "U" << u << endl;
+    // NOTE : u.cols() is the number of u.rows(), not s.size()
     // Eigenvectors are in the columns of eVec
-    for (unsigned int row = 0; row < u.rows(); row++) {
-        for (unsigned int col = 0; col < u.cols(); col++) {
+    for (unsigned int row = 0; row < M.rows(); row++) {
+        for (unsigned int col = 0; col < M.cols(); col++) {
             eVec(row,col) = u(row, col);
         }
     }
-    // We could use MatrixProxys to do this 
+    // Could we use MatrixProxys to do this?
 }
 
 template <typename aMatrixT>
