@@ -140,7 +140,7 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
     // Maybe more efficient when the number of coefficients you want is much smaller than the matrix
 
     // Do object-by-object
-    for (int mi = 0; mi < M.cols(); mi++) {
+    for (unsigned int mi = 0; mi < M.cols(); mi++) {
         vw::math::Vector<double> mCol = vw::math::select_col(M, mi);
         for (int ei = 0; ei < nCoeff; ei++) {
             vw::math::Vector<double> eCol = vw::math::select_col(eVec, ei);
@@ -158,7 +158,7 @@ void lsst::imageproc::approximateMatrixUsingBasis(
     aMatrixT &Mout ///< Reconstructed input data; each object in columns
     ) {
 
-    for (int i = 0; i < eVec.cols(); i++) {
+    for (unsigned int i = 0; i < eVec.cols(); i++) {
         vw::math::Vector<double> cVec(eVec.rows());
         for (int j = 0; j < nCoeff; j++) {
             cVec += coeff(i, j) * vw::math::select_col(eVec, j);

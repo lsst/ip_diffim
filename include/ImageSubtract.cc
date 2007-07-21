@@ -96,6 +96,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     // Hold output PCA kernel
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelPCABasisVec;
     lsst::imageproc::computePCAKernelBasis(kernelVec, kernelPCABasisVec);
+
 }
 
 /**
@@ -285,14 +286,14 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
     ) {
 
     // Hack some positions in for /lsst/becker/lsst_devel/DC2/fw/tests/data/871034p_1_MI_img.fits
-    //lsst::fw::Source src1(1, 1010.345, 2375.548, 10., 10.); 
-    //lsst::fw::Source src2(2, 404.248, 573.398, 10., 10.);
-    //lsst::fw::Source src3(3, 1686.743, 1880.935, 10., 10.);
+    lsst::fw::Source src1(1, 1010.345, 2375.548, 10., 10.); 
+    lsst::fw::Source src2(2, 404.248, 573.398, 10., 10.);
+    lsst::fw::Source src3(3, 1686.743, 1880.935, 10., 10.);
 
     // HACK EVEN MORE; i'm using convolved images and the centers have shifted
-    lsst::fw::Source src1(1, 1010.345-3, 2375.548-3, 10., 10.); 
-    lsst::fw::Source src2(2, 404.248-3, 573.398-3, 10., 10.);
-    lsst::fw::Source src3(3, 1686.743-3, 1880.935-3, 10., 10.);
+    //lsst::fw::Source src1(1, 1010.345-3, 2375.548-3, 10., 10.); 
+    //lsst::fw::Source src2(2, 404.248-3, 573.398-3, 10., 10.);
+    //lsst::fw::Source src3(3, 1686.743-3, 1880.935-3, 10., 10.);
 
     sourceCollection.push_back(src1);
     sourceCollection.push_back(src2);
@@ -309,9 +310,9 @@ void lsst::imageproc::computePCAKernelBasis(
     //typedef float ImageT;  // Watch out with multiple ImageT definitions!
 
     const int nKernel = kernelVec.size();
-    const int nCols = kernelVec[0].getCols();
-    const int nRows = kernelVec[0].getRows();
-    const int nPixels = nCols * nRows;
+    const int nKCols = kernelVec[0].getCols();
+    const int nKRows = kernelVec[0].getRows();
+    const int nPixels = nKCols * nKRows;
 
     lsst::fw::Trace("lsst.imageproc.computePCAKernelBasis", 2, "Entering subroutine computePCAKernelBasis");
 
@@ -329,15 +330,15 @@ void lsst::imageproc::computePCAKernelBasis(
     for (int ki = 0; kiter != kernelVec.end(); ki++, kiter++) {
         lsst::fw::Image<KernelT> kImage = kiter->getImage();
 
-        //assert(nRows == kImage.getRows());
-        //assert(nCols == kImage.getCols());
+        //assert(nKRows == kImage.getRows());
+        //assert(nKCols == kImage.getCols());
         int mIdx = 0;
 
         imageAccessorType imageAccessorCol(kImage.origin());
-        for (int col = 0; col < nCols; col++) {
+        for (int col = 0; col < nKCols; col++) {
 
             imageAccessorType imageAccessorRow(imageAccessorCol);
-            for (int row = 0; row < nRows; row++, mIdx++) {
+            for (int row = 0; row < nKRows; row++, mIdx++) {
 
                 // NOTE : 
                 //   arguments to matrix-related functions are given in row,col
@@ -365,18 +366,33 @@ void lsst::imageproc::computePCAKernelBasis(
     lsst::imageproc::computePCA(M, mMean, eVal, eVec, true);
     lsst::fw::Trace("lsst.imageproc.computePCAKernelBasis", 4, "Computed pricipal components");
 
+    // Write out the mean kernel
+    lsst::fw::Image<KernelT> meanImage(nKCols, nKRows);
+    imageAccessorType imageAccessorCol(meanImage.origin());
+    int mIdx = 0;
+    for (int col = 0; col < nKCols; col++) {
+        imageAccessorType imageAccessorRow(imageAccessorCol);
+        for (int row = 0; row < nKRows; row++, mIdx++) {
+            *imageAccessorRow = mMean(mIdx);
+            imageAccessorRow.next_row();
+        }
+        imageAccessorCol.next_col();
+    }
+    meanImage.writeFits( (boost::format("mFits.fits")).str() );
+    // NOTE : do we want to push this mean image onto kernelPCABasisVec?
+
     // turn each eVec into an Image and then into a Kernel
     for (unsigned int ki = 0; ki < eVec.cols(); ki++) {
-        lsst::fw::Image<KernelT> basisImage(nCols, nRows);
+        lsst::fw::Image<KernelT> basisImage(nKCols, nKRows);
 
         // Not sure how to bulk load information into Image
         int kIdx = 0;
 
         imageAccessorType imageAccessorCol(basisImage.origin());
-        for (int col = 0; col < nCols; col++) {
+        for (int col = 0; col < nKCols; col++) {
             
             imageAccessorType imageAccessorRow(imageAccessorCol);
-            for (int row = 0; row < nRows; row++, kIdx++) {
+            for (int row = 0; row < nKRows; row++, kIdx++) {
 
                 *imageAccessorRow = eVec(kIdx, ki);
                 imageAccessorRow.next_row();
@@ -388,8 +404,33 @@ void lsst::imageproc::computePCAKernelBasis(
 
         kernelPCABasisVec.push_back(boost::shared_ptr<lsst::fw::Kernel<KernelT> > (new lsst::fw::FixedKernel<KernelT>(basisImage)));
     }
-    // I need to pass the eigenvalues back as well
+
+    // We now have the basis functions determine
+    // Next determine the coefficients that go in front of all of the individual kernels
+    // The size of the coefficients will be rows=M.cols() cols=M.rows()
+    vw::math::Matrix<double> kCoeff;
+    lsst::imageproc::decomposeMatrixUsingBasis(M, eVec, kCoeff);
+
+    // We next do quality control here; we reconstruct the input kernels with the truncated basis function set
+    int nCoeff = 3; // This needs to come from the policy
+    vw::math::Matrix<double> approxM(nPixels, nKernel); 
+    lsst::imageproc::approximateMatrixUsingBasis(eVec, kCoeff, nCoeff, approxM);
+
+    vw::math::Vector<double> residualM(nKernel);
+    for (int i = 0; i < M.cols(); i++) {
+        double residual = 0;
+        for (int j = 0; j < M.rows(); j++) {
+            residual += M(i,j) - approxM(i,j);
+        }
+        residualM(i) = residual;
+    }
     
+    cout << "Residuals " << residualM << endl;
+
+    // And finally fit for the spatial variation using the coefficients
+
+    // Jeez I think we need a new class here
+    // It has an ID, object, object center, kernel, coefficnents, yikes...
 }
 
 // TODO BELOW
