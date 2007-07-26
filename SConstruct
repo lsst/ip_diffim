@@ -14,7 +14,7 @@ env = scons.makeEnv("imageproc",
                      ["cfitsio", "fitsio.h", "m cfitsio", "ffopen"],
                      ["wcstools", "wcs.h", "wcs", "wcscat"],
                      ["xpa", "xpa.h", "xpa", "XPAPuts"],
-                     ["minuit", "Minuit/FCNBase.h"]
+                     ["minuit", "Minuit/MnMigrad.h", "liblcg_Minuit"]
                      ])
 
 #
