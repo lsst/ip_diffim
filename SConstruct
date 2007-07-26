@@ -14,6 +14,7 @@ env = scons.makeEnv("imageproc",
                      ["cfitsio", "fitsio.h", "m cfitsio", "ffopen"],
                      ["wcstools", "wcs.h", "wcs", "wcscat"],
                      ["xpa", "xpa.h", "xpa", "XPAPuts"],
+                     ["minuit", "Minuit/FCNBase.h"]
                      ])
 
 #
@@ -24,6 +25,7 @@ env.libs = dict([
     ("fits",	Split("fitsio")),
     ("vw",	Split("vw vwCore vwFileIO")),
     ("fw",	Split("fw")),
+    ("minuit", Split("liblcg_Minuit")),
     ])
 
 #

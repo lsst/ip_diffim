@@ -15,5 +15,6 @@ Import("env")
 #env.Program(["matrixMath.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
 
 # testing ImageSubtract.cc/.h
-env.Program(["testImageSubtract.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
+#env.Program(["testImageSubtract.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
+env.Program(["testMinuit.cc"], LIBS=env.libs["vw"] + ["fw"] + env.libs["minuit"])
 
