@@ -21,23 +21,23 @@ lsst::fw::function::MinimizerFunctionBase1<ReturnT>::MinimizerFunctionBase1()
     _varianceVector(),
     _positionVector(),
     _errorDef(1.),
-    _theFunction()
+    _theFunctionPtr()
 {}
 
 template<typename ReturnT>
 lsst::fw::function::MinimizerFunctionBase1<ReturnT>::MinimizerFunctionBase1(
-    const std::vector<double>& measurementVector,
-    const std::vector<double>& varianceVector,
-    const std::vector<double>& positionVector, 
+    std::vector<double> const &measurementVector,
+    std::vector<double> const &varianceVector,
+    std::vector<double> const &positionVector, 
     double errorDef,
-    lsst::fw::function::Function1<ReturnT> theFunction)
+    boost::shared_ptr<lsst::fw::function::Function1<ReturnT> > theFunctionPtr)
 :
     lsst::fw::LsstBase(typeid(this)),
     _measurementVector(measurementVector),
     _varianceVector(varianceVector),
     _positionVector(positionVector),
     _errorDef(errorDef),
-    _theFunction(theFunction)
+    _theFunctionPtr(theFunctionPtr)
 {}
 
 template<typename ReturnT>
@@ -49,17 +49,17 @@ lsst::fw::function::MinimizerFunctionBase2<ReturnT>::MinimizerFunctionBase2()
     _position1Vector(),
     _position2Vector(),
     _errorDef(1.),
-    _theFunction()
+    _theFunctionPtr()
 {}
 
 template<typename ReturnT>
 lsst::fw::function::MinimizerFunctionBase2<ReturnT>::MinimizerFunctionBase2(
-    const std::vector<double>& measurementVector,
-    const std::vector<double>& varianceVector,
-    const std::vector<double>& position1Vector,
-    const std::vector<double>& position2Vector,
+    const std::vector<double> &measurementVector,
+    const std::vector<double> &varianceVector,
+    const std::vector<double> &position1Vector,
+    const std::vector<double> &position2Vector,
     double errorDef,
-    lsst::fw::function::Function2<ReturnT> theFunction)
+    boost::shared_ptr<lsst::fw::function::Function2<ReturnT> > theFunctionPtr)
 :
     lsst::fw::LsstBase(typeid(this)),
     _measurementVector(measurementVector),
@@ -67,7 +67,7 @@ lsst::fw::function::MinimizerFunctionBase2<ReturnT>::MinimizerFunctionBase2(
     _position1Vector(position1Vector),
     _position2Vector(position2Vector),
     _errorDef(errorDef),
-    _theFunction(theFunction)
+    _theFunctionPtr(theFunctionPtr)
 {}
 
 
@@ -76,12 +76,12 @@ lsst::fw::function::MinimizerFunctionBase2<ReturnT>::MinimizerFunctionBase2(
 template<typename ReturnT>
 double lsst::fw::function::MinimizerFunctionBase1<ReturnT>::operator() (const std::vector<double>& par) const {
     // Initialize the function with the fit parameters
-    this->_theFunction.setParameters(par);
+    this->_theFunctionPtr->setParameters(par);
     
     double chi2 = 0.;
     double resid;
-    for (unsigned int i = 0; i < this->_theMeasurements.size(); i++) {
-        resid = this->_theFunction(this->_positionVector[i]) - this->_measurementVector[i];
+    for (unsigned int i = 0; i < this->_measurementVector.size(); i++) {
+        resid = (*(this->_theFunctionPtr))(this->_positionVector[i]) - this->_measurementVector[i];
         chi2 += resid * resid / this->_varianceVector[i];
     }
     
@@ -92,12 +92,12 @@ double lsst::fw::function::MinimizerFunctionBase1<ReturnT>::operator() (const st
 template<typename ReturnT>
 double lsst::fw::function::MinimizerFunctionBase2<ReturnT>::operator() (const std::vector<double>& par) const {
     // Initialize the function with the fit parameters
-    this->_theFunction.setParameters(par);
+    this->_theFunctionPtr->setParameters(par);
     
     double chi2 = 0.;
     double resid;
-    for (unsigned int i = 0; i < this->_theMeasurements.size(); i++) {
-        resid = this->_theFunction(this->_position1Vector[i], this->_position1Vector[i]) - this->_measurementVector[i];
+    for (unsigned int i = 0; i < this->_measurementVector.size(); i++) {
+        resid = (*(this->_theFunctionPtr))(this->_position1Vector[i], this->_position1Vector[i]) - this->_measurementVector[i];
         chi2 += resid * resid / this->_varianceVector[i];
     }
     

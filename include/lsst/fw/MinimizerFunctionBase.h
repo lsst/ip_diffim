@@ -13,20 +13,22 @@
 
 #include <Minuit/FCNBase.h>
 #include <lsst/fw/Function.h>
+#include <boost/shared_ptr.hpp>
 
 namespace lsst {
 namespace fw {
 namespace function {
 
     template<typename ReturnT>
-    class MinimizerFunctionBase1 : public FCNBase {
+    class MinimizerFunctionBase1 : public FCNBase, private lsst::fw::LsstBase {
+    public:
         explicit MinimizerFunctionBase1();
         virtual ~MinimizerFunctionBase1() {};
-        explicit MinimizerFunctionBase1(const std::vector<double>& measurementVector,
-                                        const std::vector<double>& varianceVector,
-                                        const std::vector<double>& positionVector,
+        explicit MinimizerFunctionBase1(std::vector<double> const &measurementVector,
+                                        std::vector<double> const &varianceVector,
+                                        std::vector<double> const &positionVector,
                                         double errorDef,
-                                        lsst::fw::function::Function1<ReturnT> theFunction
+                                        boost::shared_ptr<lsst::fw::function::Function1<ReturnT> > theFunctionPtr
             );
         // Required by FCNBase
         virtual double up() const {return _errorDef;}
@@ -40,20 +42,21 @@ namespace function {
         std::vector<double> _measurementVector;
         std::vector<double> _varianceVector;
         std::vector<double> _positionVector;
-        lsst::fw::function::Function1<ReturnT> _theFunction;
         double _errorDef;
+        boost::shared_ptr<lsst::fw::function::Function1<ReturnT> > _theFunctionPtr;
     };
         
     template<typename ReturnT>
-    class MinimizerFunctionBase2 : public FCNBase {
+    class MinimizerFunctionBase2 : public FCNBase, private lsst::fw::LsstBase {
+    public:
         explicit MinimizerFunctionBase2();
         virtual ~MinimizerFunctionBase2() {};
-        explicit MinimizerFunctionBase2(const std::vector<double>& measurementVector,
-                                        const std::vector<double>& varianceVector,
-                                        const std::vector<double>& position1Vector,
-                                        const std::vector<double>& position2Vector,
+        explicit MinimizerFunctionBase2(std::vector<double> const &measurementVector,
+                                        std::vector<double> const &varianceVector,
+                                        std::vector<double> const &position1Vector,
+                                        std::vector<double> const &position2Vector,
                                         double errorDef,
-                                        lsst::fw::function::Function2<ReturnT> theFunction
+                                        boost::shared_ptr<lsst::fw::function::Function2<ReturnT> > theFunctionPtr
             );
         // Required by FCNBase
         virtual double up() const {return _errorDef;}
@@ -69,8 +72,8 @@ namespace function {
         std::vector<double> _varianceVector;
         std::vector<double> _position1Vector;
         std::vector<double> _position2Vector;
-        lsst::fw::function::Function2<ReturnT> _theFunction;
         double _errorDef;
+        boost::shared_ptr<lsst::fw::function::Function2<ReturnT> > _theFunctionPtr;
     };
         
     
