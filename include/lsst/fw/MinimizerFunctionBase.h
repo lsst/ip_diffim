@@ -12,6 +12,7 @@
  */
 
 #include <Minuit/FCNBase.h>
+#include <lsst/mwi/data/LsstData.h>
 #include <lsst/fw/Function.h>
 #include <boost/shared_ptr.hpp>
 
@@ -20,7 +21,7 @@ namespace fw {
 namespace function {
 
     template<typename ReturnT>
-    class MinimizerFunctionBase1 : public FCNBase, private lsst::fw::LsstBase {
+    class MinimizerFunctionBase1 : public FCNBase, private lsst::mwi::LsstBase {
     public:
         explicit MinimizerFunctionBase1();
         virtual ~MinimizerFunctionBase1() {};
@@ -47,7 +48,7 @@ namespace function {
     };
         
     template<typename ReturnT>
-    class MinimizerFunctionBase2 : public FCNBase, private lsst::fw::LsstBase {
+    class MinimizerFunctionBase2 : public FCNBase, private lsst::mwi::LsstBase {
     public:
         explicit MinimizerFunctionBase2();
         virtual ~MinimizerFunctionBase2() {};

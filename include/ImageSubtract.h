@@ -11,7 +11,6 @@
  * \ingroup imageproc
  */
 
-#include <lsst/fw/LsstBase.h>
 #include <lsst/fw/MaskedImage.h>
 #include <lsst/fw/Kernel.h>
 #include <lsst/fw/Source.h>
@@ -41,12 +40,18 @@ namespace imageproc {
     template <typename KernelT>
     void computePCAKernelBasis(
         vector<lsst::fw::LinearCombinationKernel<KernelT> > const &kernelVec,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPCABasisVec
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPCABasisVec,
+        vw::math::Matrix<double> &kernelCoefficients
         );
 
-    void getTemplateChunkExposureFromTemplateExposure();
-    void wcsMatchExposure();
-    void computeSpatiallyVaryingPSFMatchingKernel();
+    template <typename KernelT, typename ReturnT>
+    void computeSpatiallyVaryingPSFMatchingKernel(
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelPCABasisVec,
+        vw::math::Matrix<double> const &kernelCoefficients,
+        vector<lsst::fw::Source> const &sourceCollection,
+        boost::shared_ptr<lsst::fw::function::Function2<ReturnT> > spatiallyVaryingFunctionPtr,
+        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > spatiallyVaryingKernelPtr
+        );
 
 }
 }

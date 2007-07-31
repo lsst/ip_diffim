@@ -14,7 +14,7 @@
 namespace lsst {
 namespace fw {
 
-    class Source : private lsst::fw::LsstBase {
+    class Source : private lsst::mwi::LsstBase {
 
     public:
         explicit Source();

@@ -34,7 +34,7 @@ lsst::fw::Source::getDrow() const {
 }
 lsst::fw::Source::Source()
 :
-    lsst::fw::LsstBase(typeid(this)),
+    lsst::mwi::LsstBase(typeid(this)),
     _id(0.),
     _colc(0.),
     _rowc(0.),
@@ -103,7 +103,7 @@ lsst::fw::Source::Source(
     double dcol, ///< column extent
     double drow) ///< row extent
 :
-    lsst::fw::LsstBase(typeid(this)),
+    lsst::mwi::LsstBase(typeid(this)),
     _id(id),
     _colc(colc),
     _rowc(rowc),
