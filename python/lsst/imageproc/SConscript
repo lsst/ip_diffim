@@ -4,5 +4,5 @@ import lsst.SConsUtils as scons
 
 env.CheckSwig("python", ilang="c++", includedProducts="mwi fw")
 
-env.LoadableModuleIncomplete("_detectionLib", Split("detectionLib.i"),
-                             LIBS=env.getlibs("vw fw detection"))
+#env.LoadableModuleIncomplete("_imageprocLib", Split("imageprocLib.i"),
+#                             LIBS=env.getlibs("vw fw imageproc"))
