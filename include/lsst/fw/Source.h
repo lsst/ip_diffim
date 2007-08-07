@@ -20,26 +20,25 @@ namespace fw {
         explicit Source();
         virtual ~Source() {};
         explicit Source(
-            int id,
+            long int sourceId,
             double colc,
             double rowc,
             double dcol,
             double drow
             );
-       inline double getId() const;
+       inline double getSourceId() const;
        inline double getColc() const;
        inline double getRowc() const;
        inline double getDcol() const;
        inline double getDrow() const;
     private:
-       double _id;
+       long int _sourceId;
        double _colc;
        double _rowc;
        double _dcol;
        double _drow;
 
        // Below is LSST DB Schema
-       long int _sourceId;
        long int _ampExposureId;
        short int _filterId;
        long int _objectId;

@@ -13,8 +13,8 @@
 
 // Inline Member Functions
 inline double
-lsst::fw::Source::getId() const {
-    return _id;
+lsst::fw::Source::getSourceId() const {
+    return _sourceId;
 }
 inline double
 lsst::fw::Source::getColc() const {
@@ -35,13 +35,12 @@ lsst::fw::Source::getDrow() const {
 lsst::fw::Source::Source()
 :
     lsst::mwi::LsstBase(typeid(this)),
-    _id(0.),
+    _sourceId(0.),
     _colc(0.),
     _rowc(0.),
     _dcol(0.),
     _drow(0.),
     // Below is LSST DB Schema
-    _sourceId(0),
     _ampExposureId(0),
     _filterId(0),
     _objectId(0),
@@ -97,14 +96,14 @@ lsst::fw::Source::Source()
     _flag4wcs(0)
 { }
 lsst::fw::Source::Source(
-    int id, ///< unique identifier
+    int sourceId, ///< unique identifier
     double colc, ///< column center
     double rowc, ///< row center
     double dcol, ///< column extent
     double drow) ///< row extent
 :
     lsst::mwi::LsstBase(typeid(this)),
-    _id(id),
+    _sourceId(sourceId),
     _colc(colc),
     _rowc(rowc),
     _dcol(dcol),
