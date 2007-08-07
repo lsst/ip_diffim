@@ -1,7 +1,7 @@
 // -*- lsst-c++ -*-
 #include "lsst/fw/MaskedImage.h"
-#include "lsst/fw/Trace.h"
-#include "lsst/fw/DataProperty.h"
+#include "lsst/mwi/utils/Trace.h"
+#include "lsst/mwi/data/DataProperty.h"
 
 using namespace std;
 using namespace lsst::fw;
@@ -18,8 +18,8 @@ public:
     void init() {
         PixelProcessingFunc<ImagePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("saturated", satBit);
         PixelProcessingFunc<ImagePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("zerovalued", badBit);
-        DataPropertyPtrT metaDataPtr = PixelProcessingFunc<ImagePixelT, MaskPixelT>::_imagePtr->getMetaData();
-        DataPropertyPtrT satPtr = metaDataPtr->find("MAXLIN");
+        lsst::mwi::data::DataProperty::PtrType metaDataPtr = PixelProcessingFunc<ImagePixelT, MaskPixelT>::_imagePtr->getMetaData();
+        lsst::mwi::data::DataProperty::PtrType satPtr = metaDataPtr->findUnique("MAXLIN");
         satValue = boost::any_cast<const int>(satPtr->getValue());
         
         // Mask anything within 90% of saturation for now
