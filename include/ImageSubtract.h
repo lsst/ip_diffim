@@ -56,6 +56,22 @@ namespace imageproc {
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > spatiallyVaryingKernelPtr
         );
 
+    template <typename KernelT>
+    void generateDeltaFunctionKernelSet(
+        unsigned int const nRows,
+        unsigned int const nCols,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisVec
+        );
+
+    template <typename KernelT>
+    void generateAlardLuptonKernelSet(
+        unsigned int const nRows,
+        unsigned int const nCols,
+        vector<double> const sigGauss,
+        vector<double> const degGauss,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisVec
+        );
+
 }
 }
 

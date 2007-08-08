@@ -186,10 +186,12 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     for (; kiter != kernelBasisVec.end(); ++kiter, ++citer, ++kId) {
 
         lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, "Convolving an Object with Basis");
-
+        
+        // NOTE : we could also *precompute* the entire template image convolved with these functions
+        //        and save them somewhere to avoid this step each time.  however, our paradigm is to
+        //        compute whatever is needed on the fly.  hence this step here.
         boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > imagePtr(
             new lsst::fw::MaskedImage<ImageT, MaskT>(lsst::fw::kernel::convolve(imageToConvolve, **kiter, threshold, -1))
-            //new lsst::fw::MaskedImage<ImageT, MaskT>(lsst::fw::kernel::convolve(imageToConvolve, **kiter, threshold, vw::NoEdgeExtension(), -1))
             );
 
         lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, "Convolved an Object with Basis");
@@ -199,6 +201,11 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
         imagePtr->writeFits( (boost::format("cFits_%d") % kId).str() );
     } 
 
+    // WARNING WARNING WARNING WARNING
+    // WARNING WARNING WARNING WARNING
+    // WARNING WARNING WARNING WARNING
+    // WARNING WARNING WARNING WARNING
+    // WARNING WARNING WARNING WARNING
     // NOTE NOTE NOTE - Russ changed convolve to not truncate the images, so we
     // need to be smart all over again about where to start and stop
 
@@ -523,4 +530,42 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
      }
 }
 
+template <typename KernelT>
+void lsst::imageproc::generateDeltaFunctionKernelSet(
+    unsigned int const nRows, ///< Number of rows in the kernel basis
+    unsigned int const nCols, ///< Number of colunms in the kernel basis
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisVec ///< Output kernel basis function, length nRows * nCols
+    )
+{
+    int colCtr = (nCols - 1) / 2;
+    int rowCtr = (nRows - 1) / 2;
+    for (unsigned row = 0; row < nRows; ++row) {
+        int y = static_cast<int>(row) - rowCtr;
+        
+        for (unsigned col = 0; col < nCols; ++col) {
+            int x = static_cast<int>(col) - colCtr;
+            
+            typename lsst::fw::Kernel<KernelT>::KernelFunctionPtrType kfuncPtr(
+                new lsst::fw::function::IntegerDeltaFunction2<KernelT>(x, y)
+                );
+            
+            boost::shared_ptr<lsst::fw::Kernel<KernelT> > kernelPtr(
+                new lsst::fw::AnalyticKernel<KernelT>(kfuncPtr, nCols, nRows)
+                );
+            
+            kernelBasisVec.push_back(kernelPtr);
+        }
+    }
+}
 
+template <typename KernelT>
+void lsst::imageproc::generateAlardLuptonKernelSet(
+    int const nRows, ///< Number of rows in the kernel basis
+    int const nCols, ///< Number of columns in the kernel basis
+    vector<double> const sigGauss, ///< Width of gaussians in basis; size = number of Gaussians
+    vector<double> const degGauss, ///< Degree of spatial variation within each Gaussian; size = sigGauss.size()
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisVec ///< Output kernel basis function, length nRows * nCols
+    )
+{
+    // TO DO 
+}
