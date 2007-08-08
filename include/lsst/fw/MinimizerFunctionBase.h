@@ -21,7 +21,7 @@ namespace fw {
 namespace function {
 
     template<typename ReturnT>
-    class MinimizerFunctionBase1 : public FCNBase, private lsst::mwi::LsstBase {
+    class MinimizerFunctionBase1 : public FCNBase, private lsst::mwi::data::LsstBase {
     public:
         explicit MinimizerFunctionBase1();
         virtual ~MinimizerFunctionBase1() {};
@@ -48,7 +48,7 @@ namespace function {
     };
         
     template<typename ReturnT>
-    class MinimizerFunctionBase2 : public FCNBase, private lsst::mwi::LsstBase {
+    class MinimizerFunctionBase2 : public FCNBase, private lsst::mwi::data::LsstBase {
     public:
         explicit MinimizerFunctionBase2();
         virtual ~MinimizerFunctionBase2() {};

@@ -10,11 +10,12 @@
  *
  * \ingroup fw
  */
+#include <lsst/mwi/data/LsstBase.h>
 
 namespace lsst {
 namespace fw {
 
-    class Source : private lsst::mwi::LsstBase {
+    class Source : private lsst::mwi::data::LsstBase {
 
     public:
         explicit Source();
@@ -26,7 +27,7 @@ namespace fw {
             double dcol,
             double drow
             );
-       inline double getSourceId() const;
+       inline long int getSourceId() const;
        inline double getColc() const;
        inline double getRowc() const;
        inline double getDcol() const;

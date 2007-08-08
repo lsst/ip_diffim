@@ -12,7 +12,7 @@
  */
 
 // Inline Member Functions
-inline double
+inline long int
 lsst::fw::Source::getSourceId() const {
     return _sourceId;
 }
@@ -34,8 +34,8 @@ lsst::fw::Source::getDrow() const {
 }
 lsst::fw::Source::Source()
 :
-    lsst::mwi::LsstBase(typeid(this)),
-    _sourceId(0.),
+    lsst::mwi::data::LsstBase(typeid(this)),
+    _sourceId(0),
     _colc(0.),
     _rowc(0.),
     _dcol(0.),
@@ -96,13 +96,13 @@ lsst::fw::Source::Source()
     _flag4wcs(0)
 { }
 lsst::fw::Source::Source(
-    int sourceId, ///< unique identifier
+    long int sourceId, ///< unique identifier
     double colc, ///< column center
     double rowc, ///< row center
     double dcol, ///< column extent
     double drow) ///< row extent
 :
-    lsst::mwi::LsstBase(typeid(this)),
+    lsst::mwi::data::LsstBase(typeid(this)),
     _sourceId(sourceId),
     _colc(colc),
     _rowc(rowc),

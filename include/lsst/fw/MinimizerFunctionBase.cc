@@ -16,7 +16,7 @@
 template<typename ReturnT>
 lsst::fw::function::MinimizerFunctionBase1<ReturnT>::MinimizerFunctionBase1()
 :
-    lsst::mwi::LsstBase(typeid(this)),
+    lsst::mwi::data::LsstBase(typeid(this)),
     _measurementVector(),
     _varianceVector(),
     _positionVector(),
@@ -32,7 +32,7 @@ lsst::fw::function::MinimizerFunctionBase1<ReturnT>::MinimizerFunctionBase1(
     double errorDef,
     boost::shared_ptr<lsst::fw::function::Function1<ReturnT> > theFunctionPtr)
 :
-    lsst::mwi::LsstBase(typeid(this)),
+    lsst::mwi::data::LsstBase(typeid(this)),
     _measurementVector(measurementVector),
     _varianceVector(varianceVector),
     _positionVector(positionVector),
@@ -43,7 +43,7 @@ lsst::fw::function::MinimizerFunctionBase1<ReturnT>::MinimizerFunctionBase1(
 template<typename ReturnT>
 lsst::fw::function::MinimizerFunctionBase2<ReturnT>::MinimizerFunctionBase2()
 :
-    lsst::mwi::LsstBase(typeid(this)),
+    lsst::mwi::data::LsstBase(typeid(this)),
     _measurementVector(),
     _varianceVector(),
     _position1Vector(),
@@ -61,7 +61,7 @@ lsst::fw::function::MinimizerFunctionBase2<ReturnT>::MinimizerFunctionBase2(
     double errorDef,
     boost::shared_ptr<lsst::fw::function::Function2<ReturnT> > theFunctionPtr)
 :
-    lsst::mwi::LsstBase(typeid(this)),
+    lsst::mwi::data::LsstBase(typeid(this)),
     _measurementVector(measurementVector),
     _varianceVector(varianceVector),
     _position1Vector(position1Vector),

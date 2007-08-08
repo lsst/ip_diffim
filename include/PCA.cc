@@ -16,6 +16,7 @@
 #include <vw/Math/LinearAlgebra.h> 
 #include <vw/Math/Functions.h> 
 #include <iostream>
+#include <lsst/mwi/utils/Trace.h>
 using namespace std;
 
 template <typename aMatrixT, typename aVectorT>
@@ -54,7 +55,7 @@ void lsst::imageproc::computePCA(
         }
     }
 
-    lsst::fw::Trace("lsst.imageproc.computePCA", 5, "Test1");
+    lsst::mwi::utils::Trace("lsst.imageproc.computePCA", 5, "Test1");
 
     // All computations here are in double
     // Cast to aMatrixT and aVectorT after computation
@@ -63,7 +64,7 @@ void lsst::imageproc::computePCA(
     vw::math::Vector<double> s;
     vw::math::complete_svd(M, u, s, vt);
 
-    lsst::fw::Trace("lsst.imageproc.computePCA", 5, "Test2");
+    lsst::mwi::utils::Trace("lsst.imageproc.computePCA", 5, "Test2");
 
     /* Note on the math :
 
