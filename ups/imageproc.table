@@ -1,2 +1,2 @@
-setupRequired(fw becker)
-setupRequired(mwi becker)
+setupRequired(minuit)
+setupRequired(fw)
