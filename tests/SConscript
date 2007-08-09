@@ -18,7 +18,6 @@ Import("env")
 #env.Program(["testMinuit.cc"], LIBS=env.libs["vw"] + ["fw"] + ["mwi"] + env.libs["minuit"])
 
 # testing ImageSubtract.cc/.h
-env.Program(["testImageSubtract1.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"] + ["mwi"] + env.libs["minuit"])
-env.Program(["testImageSubtract2.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"] + ["mwi"] + env.libs["minuit"])
-env.Program(["testImageSubtract3.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"] + ["mwi"] + env.libs["minuit"])
-
+env.Program(["testImageSubtract1.cc"], LIBS=env.getlibs("imageproc"));
+env.Program(["testImageSubtract2.cc"], LIBS=env.getlibs("imageproc"));
+env.Program(["testImageSubtract3.cc"], LIBS=env.getlibs("imageproc"));
