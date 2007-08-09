@@ -19,7 +19,7 @@ int main( int argc, char** argv )
     typedef double KernelT;
 
     // Read input images
-    if (argc < 1) {
+    if (argc < 2) {
         cout << "This program takes a single input image on the command line" << endl;
         cout << "  and uses it as the template image." << endl;
         cout << "  The science image is derived from the template convolved with a spatially varying Gaussian." << endl;
@@ -50,8 +50,8 @@ int main( int argc, char** argv )
     unsigned int kernelCols = 7;
     
     // The kernel to convolve the template image with to yield the science image
-    double sigmaX = 4.0;
-    double sigmaY = 4.5;
+    double sigmaX = 1.0;
+    double sigmaY = 1.0;
     unsigned int polyOrder = 2;
     double minSigma = 0.1;
     double maxSigma = 3.0;
@@ -76,10 +76,13 @@ int main( int argc, char** argv )
     gaussSpVarKernel.setSpatialParameters(polyParams);
 
     // Convolved science image
+    lsst::mwi::utils::Trace("testImageSubtract2", 2, "Convolving input image for testing");
     const float threshold = 0.0;
-    const int edgeMaskBit = -1;
+    const int edgeMaskBit = 1;
     lsst::fw::MaskedImage<ImageT, MaskT> convolvedScienceMaskedImage =
         lsst::fw::kernel::convolve(scienceMaskedImage, gaussSpVarKernel, threshold, edgeMaskBit);
+
+    convolvedScienceMaskedImage.writeFits( (boost::format("%s_test3") % inputImage).str() );
        
     // set up basis of delta functions for kernel
     vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;

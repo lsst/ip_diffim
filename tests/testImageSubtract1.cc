@@ -19,7 +19,7 @@ int main( int argc, char** argv )
     typedef double KernelT;
 
     // Read input images
-    if (argc < 1) {
+    if (argc < 2) {
         cout << "This program takes a single input image on the command line" << endl;
         cout << "  and uses it as both the template and the science image." << endl;
         cout << "  Your output kernel should be a delta function." << endl;

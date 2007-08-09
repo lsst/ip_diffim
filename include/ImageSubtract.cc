@@ -168,6 +168,8 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
         }
     }
 
+    // NOTE - we need to enforce that the input images are large enough
+
     // convolve creates a MaskedImage, push it onto the back of the Vector
     // need to use shared pointers because MaskedImage copy does not work
     vector<boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > > convolvedImageVec(nKernelParameters);
@@ -176,13 +178,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     
     // iterator for input kernel basis
     typename vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelBasisVec.begin();
-    // Buffer around source images
-    // The convolved images will be reduced in size by the kernel extent, half on either side.  the extra pixel gets taken from the top/right
-    // NOTE : we assume here that all kernels are the same size so that grabbing the size of the first one suffices
-    unsigned int startColBuffer = (*kiter)->getCtrCol();
-    unsigned int startRowBuffer = (*kiter)->getCtrRow();
-
-    int kId = 0;
+    int kId = 0; // debugging
     for (; kiter != kernelBasisVec.end(); ++kiter, ++citer, ++kId) {
 
         lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, "Convolving an Object with Basis");
@@ -191,7 +187,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
         //        and save them somewhere to avoid this step each time.  however, our paradigm is to
         //        compute whatever is needed on the fly.  hence this step here.
         boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > imagePtr(
-            new lsst::fw::MaskedImage<ImageT, MaskT>(lsst::fw::kernel::convolve(imageToConvolve, **kiter, threshold, -1))
+            new lsst::fw::MaskedImage<ImageT, MaskT>(lsst::fw::kernel::convolve(imageToConvolve, **kiter, threshold, 1))
             );
 
         lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, "Convolved an Object with Basis");
@@ -201,21 +197,18 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
         imagePtr->writeFits( (boost::format("cFits_%d") % kId).str() );
     } 
 
-    // WARNING WARNING WARNING WARNING
-    // WARNING WARNING WARNING WARNING
-    // WARNING WARNING WARNING WARNING
-    // WARNING WARNING WARNING WARNING
-    // WARNING WARNING WARNING WARNING
-    // NOTE NOTE NOTE - Russ changed convolve to not truncate the images, so we
-    // need to be smart all over again about where to start and stop
-
-    // Figure out how big the convolved images are
-    // NOTE : getCtrRow() pixels are subtracted from the left side, and getRows()-getCtrRow() from the right side
-    //        so we start at startRowBuffer = getCtrRow() and go getRows() pixels
-    //        this method will effectively accomplish grabbing the right subset of data from the images
+    // NOTE ABOUT CONVOLUTION :
+    // getCtrCol:getCtrRow pixels are masked on the left:bottom side
+    // getCols()-getCtrCol():getRows()-getCtrRow() masked on right/top side
+    // 
+    // The convolved image and the input image are by default the same size, so
+    // we offset our initial pixel references by the same amount
+    kiter = kernelBasisVec.begin();
     citer = convolvedImageVec.begin();
-    unsigned int cCols = (*citer)->getCols();
-    unsigned int cRows = (*citer)->getRows();
+    unsigned int startCol = (*kiter)->getCtrCol();
+    unsigned int startRow = (*kiter)->getCtrRow();
+    unsigned int endCol   = (*citer)->getCols() - ((*kiter)->getCols() - (*kiter)->getCtrCol());
+    unsigned int endRow   = (*citer)->getRows() - ((*kiter)->getRows() - (*kiter)->getCtrRow());
 
     // An accessor for each convolution plane
     // NOTE : MaskedPixelAccessor has no empty constructor, therefore we need to push_back()
@@ -229,13 +222,14 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     lsst::fw::MaskedPixelAccessor<ImageT, MaskT> imageToNotConvolveRow(imageToNotConvolve);
 
     // Take into account buffer for kernel images
-    imageToConvolveRow.advance(startColBuffer, startRowBuffer);
-    imageToNotConvolveRow.advance(startColBuffer, startRowBuffer);
+    imageToConvolveRow.advance(startCol, startRow);
+    imageToNotConvolveRow.advance(startCol, startRow);
+    for (int ki = 0; ki < nKernelParameters; ki++) {
+        convolvedAccessorRowVec[ki].advance(startCol, startRow);
+    }
 
     // integral over image's dx and dy
-    // need to take into account that the convolution has reduced the size of the convovled image somewhat
-    // therefore we'll use the kernels to drive the size
-    for (unsigned int row = 0; row < cRows; row++) {
+    for (unsigned int row = startRow; row < endRow; row++) {
 
         // An accessor for each convolution plane
         vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> > convolvedAccessorColVec = convolvedAccessorRowVec;
@@ -244,12 +238,12 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
         lsst::fw::MaskedPixelAccessor<ImageT, MaskT> imageToConvolveCol = imageToConvolveRow;
         lsst::fw::MaskedPixelAccessor<ImageT, MaskT> imageToNotConvolveCol = imageToNotConvolveRow;
 
-        for (unsigned int col = 0; col < cCols; col++) {
+        for (unsigned int col = startCol; col < endCol; col++) {
 
-            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 5, 
-                            boost::format("Accessing image row %d col %d") % (row+startRowBuffer) % (col+startColBuffer));
-            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 5, 
-                            boost::format("Accessing convolved row %d col %d") % row % col);
+            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 4, 
+                            boost::format("Accessing image row %d col %d") % (row+startRow) % (col+startCol));
+            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 4, 
+                            boost::format("Accessing convolved row %d col %d") % (row+startRow) % (col+startCol));
             
             ImageT ncCamera = *imageToNotConvolveCol.image;
             ImageT ncVariance = *imageToNotConvolveCol.variance;
@@ -268,7 +262,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
             for (int kidxi = 0; kiteri != convolvedAccessorColVec.end(); kiteri++, kidxi++) {
                 ImageT cdCamerai = *kiteri->image;
                 B[kidxi] += ncCamera * cdCamerai * iVariance;
-                cout << "B " << kidxi << " " << ncCamera << " " << cdCamerai << " " << endl;
+                cout << "B1 " << kidxi << " " << ncCamera << " " << cdCamerai << " " << endl;
                 
                 // kernel index j 
                 typename vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> >::iterator kiterj = kiteri;
@@ -280,7 +274,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
 
             // Here we have a single background term
             B[nParameters-1] += ncCamera * iVariance;
-            cout << "B " << nParameters << " " << ncCamera << " " << endl;
+            cout << "B2 " << nParameters << " " << ncCamera << " " << endl;
 
             M[nParameters-1][nParameters-1] += 1.0 * iVariance;
 
@@ -564,7 +558,7 @@ void lsst::imageproc::generateAlardLuptonKernelSet(
     int const nCols, ///< Number of columns in the kernel basis
     vector<double> const sigGauss, ///< Width of gaussians in basis; size = number of Gaussians
     vector<double> const degGauss, ///< Degree of spatial variation within each Gaussian; size = sigGauss.size()
-    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisVec ///< Output kernel basis function, length nRows * nCols
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisVec ///< Output kernel basis function, length sum_n 0.5*(deg_n+1)*(deg_n+2)
     )
 {
     // TO DO 
