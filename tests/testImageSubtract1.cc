@@ -46,8 +46,8 @@ int main( int argc, char** argv )
     
     // set up basis of delta functions for kernel
     vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;
-    unsigned int kernelRows = 5;
-    unsigned int kernelCols = 5;
+    unsigned int kernelRows = 11;
+    unsigned int kernelCols = 11;
     lsst::imageproc::generateDeltaFunctionKernelSet(kernelRows, kernelCols, kernelBasisVec);
 
     lsst::imageproc::computePSFMatchingKernelForMaskedImage

@@ -42,13 +42,11 @@ namespace imageproc {
         vector<lsst::fw::LinearCombinationKernel<KernelT> > const &kernelVec,
         vector<double> &kernelResidualsVec,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPCABasisVec,
-        lsst::fw::Image<KernelT> &meanImage,
         vw::math::Matrix<double> &kernelCoefficients
         );
 
     template <typename KernelT, typename ReturnT>
     void computeSpatiallyVaryingPSFMatchingKernel(
-        lsst::fw::Image<KernelT> const &meanImage,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelPCABasisVec,
         vw::math::Matrix<double> const &kernelCoefficients,
         vector<lsst::fw::Source> const &sourceCollection,
