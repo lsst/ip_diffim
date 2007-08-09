@@ -168,15 +168,14 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
         }
     }
 
-    // NOTE - we need to enforce that the input images are large enough
-
     // convolve creates a MaskedImage, push it onto the back of the Vector
     // need to use shared pointers because MaskedImage copy does not work
     vector<boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > > convolvedImageVec(nKernelParameters);
     // and an iterator over this
     typename vector<boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > >::iterator citer = convolvedImageVec.begin();
     
-    // iterator for input kernel basis
+    // Iterator for input kernel basis
+    // Create C_ij in the syntax of Alard&Lupton
     typename vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelBasisVec.begin();
     int kId = 0; // debugging
     for (; kiter != kernelBasisVec.end(); ++kiter, ++citer, ++kId) {
@@ -187,7 +186,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
         //        and save them somewhere to avoid this step each time.  however, our paradigm is to
         //        compute whatever is needed on the fly.  hence this step here.
         boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > imagePtr(
-            new lsst::fw::MaskedImage<ImageT, MaskT>(lsst::fw::kernel::convolve(imageToConvolve, **kiter, threshold, 1))
+            new lsst::fw::MaskedImage<ImageT, MaskT>(lsst::fw::kernel::convolve(imageToNotConvolve, **kiter, threshold, 1))
             );
 
         lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, "Convolved an Object with Basis");
@@ -203,12 +202,17 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     // 
     // The convolved image and the input image are by default the same size, so
     // we offset our initial pixel references by the same amount
+    //
+    // NOTE : the last *good* pixel is endCol - 1
+    //        in your for loops, therefore say "col < endCol" not "col <= endCol"
     kiter = kernelBasisVec.begin();
     citer = convolvedImageVec.begin();
     unsigned int startCol = (*kiter)->getCtrCol();
     unsigned int startRow = (*kiter)->getCtrRow();
     unsigned int endCol   = (*citer)->getCols() - ((*kiter)->getCols() - (*kiter)->getCtrCol());
     unsigned int endRow   = (*citer)->getRows() - ((*kiter)->getRows() - (*kiter)->getCtrRow());
+    // NOTE - we need to enforce that the input images are large enough
+
 
     // An accessor for each convolution plane
     // NOTE : MaskedPixelAccessor has no empty constructor, therefore we need to push_back()
