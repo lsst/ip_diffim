@@ -10,27 +10,26 @@ env = scons.makeEnv("imageproc",
                     [["boost", "boost/version.hpp", "boost_filesystem:C++"],
                      ["boost", "boost/regex.hpp", "boost_regex:C++"],
                      ["vw", "vw/Core.h", "vw:C++"],
+                     ["vw", "vw/Core.h", "vwCore:C++"],
+                     ["vw", "vw/Math.h", "vwMath:C++"],
+                     ["lapack", None, "lapack", "dgesdd_"],
+                     ["mwi", "lsst/mwi/data.h", "mwi:C++"],
+                     ["fw", "lsst/fw/MaskedImage.h", "fw"],
                      ["python", "Python.h"],
-                     ["m", "math.h", "m", "sqrt"],
+		     ["m", "math.h", "m", "sqrt"],
                      ["cfitsio", "fitsio.h", "cfitsio", "ffopen"],
                      ["wcslib", "wcslib/wcs.h", "wcs"],
                      ["xpa", "xpa.h", "xpa", "XPAPuts"],
-                     ["mwi", "lsst/mwi/data.h", "mwi:C++"],
-                     ["fw", "lsst/fw/MaskedImage.h", "fw"],
                      ["minuit", "Minuit/MnMigrad.h", "lcg_Minuit"],
-                     ]
-                    )
+                     ])
 
-env.libs["imageproc"] +=  env.getlibs("mwi fw boost wcslib")
-
+env.libs["imageproc"] = []              # we don't have a -limageproc (yet)
+env.libs["imageproc"] += env.getlibs("boost vw fw fitsio cfitsio mwi minuit")
+env.libs["imageproc"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") fails as lapack isn't in eups
 #
 # Build/install things
 #
-#for d in Split("doc include/lsst/%s lib src tests" % env['eups_product']):
-for d in Split("examples include/lsst/fw lib src tests"):
-    SConscript(os.path.join(d, "SConscript"))
-
-for d in map(lambda str: os.path.join("python/lsst/%s" % env['eups_product'], str), Split(".")):
+for d in Split("lib src tests examples"):
     SConscript(os.path.join(d, "SConscript"))
 
 env['IgnoreFiles'] = r"(~$|\.pyc$|^\.svn$|\.o$)"
