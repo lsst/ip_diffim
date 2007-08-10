@@ -451,14 +451,20 @@ void lsst::imageproc::computePCAKernelBasis(
     // Next determine the coefficients that go in front of all of the individual kernels
     // The size of the coefficients will be rows=M.cols() cols=M.rows()
     // We save the first entry of kernelCoefficients for the Mean Image
+    kernelCoefficients.set_size(M.cols(), M.rows());
     for (unsigned int i = 0; i < M.cols(); i++) {
-        kernelCoefficients(0,i) = 1;
+        kernelCoefficients(i,0) = 1;
     }
-    vw::math::Matrix<double> subMatrix = vw::math::submatrix(kernelCoefficients, 0, 1, M.rows(), M.cols()-1);
+    vw::math::Matrix<double> subMatrix = vw::math::submatrix(kernelCoefficients, 0, 1, kernelCoefficients.rows(), kernelCoefficients.cols()-1);
+    // OK, WATCH SHAPES HERE.
+    // M.cols = 3; M.rows = 49
+    // kernelCoefficients.cols = 49; kernelCoefficients.rows = 3
+    // subMatrix returns from decomposeMatrixUsingBasis as a 3x3 matrix...
+
     lsst::imageproc::decomposeMatrixUsingBasis(M, eVec, subMatrix);
 
     // Write results into kernelCoefficients
-    for (unsigned int i = 1; i < M.rows(); i++) {
+    for (unsigned int i = 1; i < kernelCoefficients.rows(); i++) {
         vw::math::select_row(kernelCoefficients, i) = vw::math::select_row(subMatrix, i);
     }
 
