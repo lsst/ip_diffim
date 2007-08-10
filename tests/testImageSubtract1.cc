@@ -44,13 +44,31 @@ int main( int argc, char** argv )
         return 1;
     }
     
-    // set up basis of delta functions for kernel
+    // Generate basis of delta functions for kernel
     vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;
     unsigned int kernelRows = 7;
     unsigned int kernelCols = 7;
     lsst::imageproc::generateDeltaFunctionKernelSet(kernelRows, kernelCols, kernelBasisVec);
 
+    // Output kernel
+    boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > kernelPtr(
+        new lsst::fw::LinearCombinationKernel<KernelT>
+        );
+
+    // Function for spatially varying kernel.  Make null here for this test.
+    unsigned int kernelSpatialOrder = 0;
+    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > kernelFunctionPtr(
+        new lsst::fw::function::PolynomialFunction2<KernelT>(kernelSpatialOrder)
+        );
+
+    // Function for spatially varying background.  
+    unsigned int backgroundSpatialOrder = 0;
+    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > backgroundFunctionPtr(
+        new lsst::fw::function::PolynomialFunction2<KernelT>(backgroundSpatialOrder)
+        );
+
     lsst::imageproc::computePSFMatchingKernelForMaskedImage
-        (scienceMaskedImage, templateMaskedImage, kernelBasisVec);
+        (scienceMaskedImage, templateMaskedImage, kernelBasisVec, 
+         kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
 
 }

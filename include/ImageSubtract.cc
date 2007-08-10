@@ -46,8 +46,11 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve, ///< Template image; convolved
     lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve, ///< Science image; not convolved
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec, ///< Input set of basis kernels
-    boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > kernelPtr, ///< The output convolution kernel
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > backgroundFunctionPtr ///< Function for spatial variation of background
+
+    boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr, ///< The output convolution kernel
+    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > &kernelFunctionPtr, ///< Function for spatial variation of kernel
+    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > &backgroundFunctionPtr ///< Function for spatial variation of background
+    ) {
 
     vector<lsst::fw::Source> sourceCollection;
     getCollectionOfMaskedImagesForPSFMatching(sourceCollection);
@@ -75,11 +78,11 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         // do i really want a new stamp or just a view?
         // Bbox2i has x y cols rows
         // NOTE : we need to make sure we get the centering right with these +1, etc...
-        BBox2i stamp(floor(diffImSource.getColc() - diffImSource.getDcol()), 
-                     floor(diffImSource.getRowc() - diffImSource.getDrow()), 
-                     ceil(2 * diffImSource.getDcol() + 1),
-                     ceil(2 * diffImSource.getDrow() + 1)
-                     );
+        BBox2i stamp(static_cast<int>(floor(diffImSource.getColc() - diffImSource.getDcol())), 
+                     static_cast<int>(floor(diffImSource.getRowc() - diffImSource.getDrow())), 
+                     static_cast<int>(ceil(2 * diffImSource.getDcol() + 1)),
+                     static_cast<int>(ceil(2 * diffImSource.getDrow() + 1))
+            );
 
         imageToConvolvePtr    = imageToConvolve.getSubImage(stamp);
         imageToNotConvolvePtr = imageToNotConvolve.getSubImage(stamp);
@@ -110,32 +113,22 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     }
 
     vector<double> kernelResidualsVec;
-    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelBasisVec;
     vw::math::Matrix<double> kernelCoefficients;
 
-    if (type == DeltaFunction) {
-        lsst::imageproc::computePCAKernelBasis(kernelVec, kernelResidualsVec, kernelBasisVec, kernelCoefficients);
-    }
+    // In the end we want to test if the kernelBasisVec is Delta Functions; if so, do PCA
+    lsst::imageproc::computePCAKernelBasis(kernelVec, kernelResidualsVec, kernelBasisVec, kernelCoefficients);
 
-    // From policy
-    const unsigned int spatialOrder = 2;
-
-    boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > spatiallyVaryingKernelPtr(
-        new lsst::fw::LinearCombinationKernel<KernelT>
-        );
-    // NOTE - do we want KernelT or another template FuncT?
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > spatiallyVaryingFunctionPtr(
-        new lsst::fw::function::PolynomialFunction2<KernelT>(spatialOrder)
-        );
-
-    if (kernelPtr->getNSpatialParameters() > 1) {
+    // Compute spatial variation of the kernel if requested
+    if (kernelFunctionPtr != NULL) {
         computeSpatiallyVaryingPSFMatchingKernel(kernelBasisVec, 
                                                  kernelCoefficients, 
                                                  sourceCollection,
-                                                 spatiallyVaryingFunctionPtr, 
-                                                 spatiallyVaryingKernelPtr);
+                                                 kernelPtr,
+                                                 kernelFunctionPtr);
     }
 
+    // Compute spatial variation of the background if requested
+    // TODO
 }
 
 /**
@@ -504,12 +497,11 @@ void lsst::imageproc::computePCAKernelBasis(
 
 template <typename KernelT, typename ReturnT>
 void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
-    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const kernelBasisVec, ///< Input basis kernel set
-    vw::math::Matrix<double> const kernelCoefficients, ///< Basis coefficients for all kernels 
-    vector<double> const backgrounds, ///< Background measurements for all kernels
-    vector<lsst::fw::Source> const sourceCollection, ///< Needed right now for the centers of the kernels in the image; should be able to avoid this 
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec, ///< Input basis kernel set
+    vw::math::Matrix<double> const &kernelCoefficients, ///< Basis coefficients for all kernels 
+    vector<lsst::fw::Source> const &sourceCollection, ///< Needed right now for the centers of the kernels in the image; should be able to avoid this 
     boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr, ///< Output kernel
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > &backgroundFunctionPtr ///< Output background model
+    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > &kernelFunctionPtr ///< Function for spatial variation of kernel
     )
  {
      // NOTE - For a delta function basis set, the mean image is the first entry in kernelPCABasisVec.  
@@ -518,7 +510,7 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
      typename vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelBasisVec.begin();
 
      // Hold the fit parameters
-     vector<double> nParameters(spatiallyVaryingFunctionPtr->getNParameters());
+     vector<double> nParameters(kernelFunctionPtr->getNParameters());
      vector<vector<double> > fitParameters(kernelBasisVec.size(), nParameters);
 
      unsigned int ncoeff = 0;
@@ -542,12 +534,12 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
 
          double def = 1.0;
          lsst::fw::function::MinimizerFunctionBase2<KernelT> 
-             myFcn(measurements, variances, position1, position2, def, spatiallyVaryingFunctionPtr);
+             myFcn(measurements, variances, position1, position2, def, kernelFunctionPtr);
 
          // Initialize paramters
          // Name; value; uncertainty
          MnUserParameters upar;
-         for (unsigned int i = 0; i < spatiallyVaryingFunctionPtr->getNParameters(); i++) {
+         for (unsigned int i = 0; i < kernelFunctionPtr->getNParameters(); i++) {
              upar.add((boost::format("p%d") % i).str().c_str(), 0.0, 0.1);
          }
          
@@ -555,12 +547,12 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
          FunctionMinimum min = migrad();
          //MnMinos minos(myFcn, min); // only if you want serious uncertainties
 
-         for (unsigned int i = 0; i < spatiallyVaryingFunctionPtr->getNParameters(); i++) {
+         for (unsigned int i = 0; i < kernelFunctionPtr->getNParameters(); i++) {
              fitParameters[ncoeff][i] = min.userState().value((boost::format("p%d") % i).str().c_str());
          }
      }
      // Set up the spatially varying kernel and we are done!
-     lsst::fw::LinearCombinationKernel<KernelT> spatiallyVaryingKernel(kernelBasisVec, spatiallyVaryingFunctionPtr, fitParameters); 
+     lsst::fw::LinearCombinationKernel<KernelT> spatiallyVaryingKernel(kernelBasisVec, kernelFunctionPtr, fitParameters); 
 }
 
 template <typename KernelT>
@@ -572,11 +564,11 @@ void lsst::imageproc::generateDeltaFunctionKernelSet(
 {
     int colCtr = (nCols - 1) / 2;
     int rowCtr = (nRows - 1) / 2;
-    for (unsigned row = 0; row < nRows; ++row) {
-        int y = static_cast<int>(row) - rowCtr;
+    for (unsigned int row = 0; row < nRows; ++row) {
+        int y = row - rowCtr;
         
-        for (unsigned col = 0; col < nCols; ++col) {
-            int x = static_cast<int>(col) - colCtr;
+        for (unsigned int col = 0; col < nCols; ++col) {
+            int x = col - colCtr;
             
             typename lsst::fw::Kernel<KernelT>::KernelFunctionPtrType kfuncPtr(
                 new lsst::fw::function::IntegerDeltaFunction2<KernelT>(x, y)

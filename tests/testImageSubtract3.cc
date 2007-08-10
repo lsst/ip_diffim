@@ -84,11 +84,30 @@ int main( int argc, char** argv )
 
     convolvedScienceMaskedImage.writeFits( (boost::format("%s_test3") % inputImage).str() );
        
-    // set up basis of delta functions for kernel
+    // Generate basis of delta functions for kernel
     vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;
     lsst::imageproc::generateDeltaFunctionKernelSet(kernelRows, kernelCols, kernelBasisVec);
 
+
+    // Output kernel
+    boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > kernelPtr(
+        new lsst::fw::LinearCombinationKernel<KernelT>
+        );
+
+    // Function for spatially varying kernel.  Make null here for this test.
+    unsigned int kernelSpatialOrder = polyOrder;
+    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > kernelFunctionPtr(
+        new lsst::fw::function::PolynomialFunction2<KernelT>(kernelSpatialOrder)
+        );
+
+    // Function for spatially varying background.  
+    unsigned int backgroundSpatialOrder = 0;
+    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > backgroundFunctionPtr(
+        new lsst::fw::function::PolynomialFunction2<KernelT>(backgroundSpatialOrder)
+        );
+
     lsst::imageproc::computePSFMatchingKernelForMaskedImage
-        (convolvedScienceMaskedImage, templateMaskedImage, kernelBasisVec);
+        (convolvedScienceMaskedImage, templateMaskedImage, kernelBasisVec,
+         kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
 
 }
