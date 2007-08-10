@@ -12,7 +12,7 @@ using namespace lsst::fw;
 int main( int argc, char** argv )
 {
     lsst::mwi::utils::Trace::setDestination(cout);
-    lsst::mwi::utils::Trace::setVerbosity(".", 5);
+    lsst::mwi::utils::Trace::setVerbosity(".", 4);
     
     typedef uint8 MaskT;
     typedef float ImageT; // have to make sure this jibes with the input data!
@@ -46,8 +46,8 @@ int main( int argc, char** argv )
     
     // set up basis of delta functions for kernel
     vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;
-    unsigned int kernelRows = 11;
-    unsigned int kernelCols = 11;
+    unsigned int kernelRows = 7;
+    unsigned int kernelCols = 7;
     lsst::imageproc::generateDeltaFunctionKernelSet(kernelRows, kernelCols, kernelBasisVec);
 
     lsst::imageproc::computePSFMatchingKernelForMaskedImage

@@ -24,14 +24,19 @@ namespace imageproc {
     void computePSFMatchingKernelForMaskedImage(
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec);
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec,
+        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > kernelPtr,
+        boost::shared_ptr<lsst::fw::function::Function2<KernelT> > backgroundFunctionPtr
+        );
     
     template <typename ImageT, typename MaskT, typename KernelT>
     void computePSFMatchingKernelForPostageStamp(
         lsst::fw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec,
-        vector<double> &kernelCoeffs);
+        vector<double> &kernelCoeffs,
+        double &background
+        );
 
     void getCollectionOfMaskedImagesForPSFMatching(
         vector<lsst::fw::Source> &sourceCollection
@@ -47,11 +52,12 @@ namespace imageproc {
 
     template <typename KernelT, typename ReturnT>
     void computeSpatiallyVaryingPSFMatchingKernel(
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelPCABasisVec,
-        vw::math::Matrix<double> const &kernelCoefficients,
-        vector<lsst::fw::Source> const &sourceCollection,
-        boost::shared_ptr<lsst::fw::function::Function2<ReturnT> > spatiallyVaryingFunctionPtr,
-        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > spatiallyVaryingKernelPtr
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const kernelBasisVec,
+        vw::math::Matrix<double> const kernelCoefficients,
+        vector<double> const backgrounds,
+        vector<lsst::fw::Source> const sourceCollection,
+        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr,
+        boost::shared_ptr<lsst::fw::function::Function2<KernelT> > &backgroundFunctionPtr
         );
 
     template <typename KernelT>
