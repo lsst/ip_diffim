@@ -45,7 +45,7 @@ template <typename ImageT, typename MaskT, typename KernelT, typename FuncT>
 void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve, ///< Template image; convolved
     lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve, ///< Science image; not convolved
-    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec, ///< Input set of basis kernels
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisVec, ///< Input set of basis kernels
     boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr, ///< The output convolution kernel
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr, ///< Function for spatial variation of kernel
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr ///< Function for spatial variation of background
@@ -86,18 +86,18 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         imageToConvolvePtr    = imageToConvolve.getSubImage(stamp);
         imageToNotConvolvePtr = imageToNotConvolve.getSubImage(stamp);
 
-        vector<double> kernelCoeffs(kernelBasisVec.size());
+        vector<double> kernelCoeffs(kernelInBasisVec.size());
 
         imageToConvolvePtr->writeFits( (boost::format("iFits_%d") % diffImSource.getSourceId()).str() );
 
         // Find best single kernel for this stamp
         double background;
         lsst::imageproc::computePSFMatchingKernelForPostageStamp
-            (*imageToConvolvePtr, *imageToNotConvolvePtr, kernelBasisVec, kernelCoeffs, background);
+            (*imageToConvolvePtr, *imageToNotConvolvePtr, kernelInBasisVec, kernelCoeffs, background);
         backgrounds.push_back(background);
 
         // Create a linear combination kernel from this and append to kernelVec
-        lsst::fw::LinearCombinationKernel<KernelT> sourceKernel(kernelBasisVec, kernelCoeffs);
+        lsst::fw::LinearCombinationKernel<KernelT> sourceKernel(kernelInBasisVec, kernelCoeffs);
         *kiter = sourceKernel;
 
         // NOTE
@@ -114,14 +114,14 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     vector<double> kernelResidualsVec;
     vw::math::Matrix<double> kernelCoefficients;
 
-    // In the end we want to test if the kernelBasisVec is Delta Functions; if so, do PCA
-    //lsst::imageproc::computePCAKernelBasis(kernelVec, kernelResidualsVec, kernelBasisVec, kernelCoefficients);
-    lsst::imageproc::computePCAKernelBasis(kernelVec, kernelResidualsVec, kernelCoefficients);
+    // In the end we want to test if the kernelInBasisVec is Delta Functions; if so, do PCA
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelOutBasisVec;
+    lsst::imageproc::computePCAKernelBasis(kernelVec, kernelResidualsVec, kernelOutBasisVec, kernelCoefficients);
 
     // Compute spatial variation of the kernel if requested
     if (kernelFunctionPtr != NULL) {
         computeSpatiallyVaryingPSFMatchingKernel(
-            kernelBasisVec, 
+            kernelOutBasisVec, 
             kernelCoefficients, 
             sourceCollection,
             kernelPtr,
@@ -146,18 +146,19 @@ template <typename ImageT, typename MaskT, typename KernelT>
 void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     lsst::fw::MaskedImage<ImageT, MaskT> const &imageToConvolve, ///< Goes with the code
     lsst::fw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve, ///< This is for doxygen
-    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec, ///< Input kernel basis set
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisVec, ///< Input kernel basis set
     vector<double> &kernelCoeffs, ///< Output kernel basis coefficients
     double &background ///< Difference in the backgrounds
     ) { 
 
     int nKernelParameters=0, nBackgroundParameters=0, nParameters=0;
     const KernelT threshold = 0.0;
+    const int edgeMaskBit = 1;
 
     lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 2, "Entering subroutine computePSFMatchingKernelForPostageStamp");
     
     // We assume that each kernel in the Set has 1 parameter you fit for
-    nKernelParameters = kernelBasisVec.size();
+    nKernelParameters = kernelInBasisVec.size();
     // Or, we just assume that across a single kernel, background 0th order.  This quite makes sense.
     nBackgroundParameters = 1;
     // Total number of parameters
@@ -179,10 +180,10 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     typename vector<boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > >::iterator citer = convolvedImageVec.begin();
     
     // Iterator for input kernel basis
-    typename vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelBasisVec.begin();
+    typename vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelInBasisVec.begin();
     int kId = 0; // debugging
     // Create C_ij in the formalism of Alard & Lupton
-    for (; kiter != kernelBasisVec.end(); ++kiter, ++citer, ++kId) {
+    for (; kiter != kernelInBasisVec.end(); ++kiter, ++citer, ++kId) {
 
         lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, "Convolving an Object with Basis");
         
@@ -190,7 +191,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
         //        and save them somewhere to avoid this step each time.  however, our paradigm is to
         //        compute whatever is needed on the fly.  hence this step here.
         boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > imagePtr(
-            new lsst::fw::MaskedImage<ImageT, MaskT>(lsst::fw::kernel::convolve(imageToConvolve, **kiter, threshold, 1))
+            new lsst::fw::MaskedImage<ImageT, MaskT>(lsst::fw::kernel::convolve(imageToConvolve, **kiter, threshold, edgeMaskBit))
             );
 
         lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, "Convolved an Object with Basis");
@@ -209,7 +210,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     //
     // NOTE : the last *good* pixel is endCol - 1
     //        in your for loops, therefore say "col < endCol" not "col <= endCol"
-    kiter = kernelBasisVec.begin();
+    kiter = kernelInBasisVec.begin();
     citer = convolvedImageVec.begin();
     unsigned int startCol = (*kiter)->getCtrCol();
     unsigned int startRow = (*kiter)->getCtrRow();
@@ -495,7 +496,7 @@ void lsst::imageproc::computePCAKernelBasis(
 
 template <typename KernelT, typename FuncT>
 void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
-    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec, ///< Input basis kernel set
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelOutBasisVec, ///< Input basis kernel set
     vw::math::Matrix<double> const &kernelCoefficients, ///< Basis coefficients for all kernels 
     vector<lsst::fw::Source> const &sourceCollection, ///< Needed right now for the centers of the kernels in the image; should be able to avoid this 
     boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr, ///< Output kernel
@@ -505,14 +506,14 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
      // NOTE - For a delta function basis set, the mean image is the first entry in kernelPCABasisVec.  
      // This should *not* vary spatially.  Should we code this up or let the fitter determine that it does not vary..?
      // I think I would like some sort of typeid() discrimination here.  For later...
-     typename vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelBasisVec.begin();
+     typename vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelOutBasisVec.begin();
 
      // Hold the fit parameters
      vector<double> nParameters(kernelFunctionPtr->getNParameters());
-     vector<vector<double> > fitParameters(kernelBasisVec.size(), nParameters);
+     vector<vector<double> > fitParameters(kernelOutBasisVec.size(), nParameters);
 
      unsigned int ncoeff = 0;
-     for (; kiter != kernelBasisVec.end(); ncoeff++, kiter++) {
+     for (; kiter != kernelOutBasisVec.end(); ncoeff++, kiter++) {
          
          vector<double> measurements;
          vector<double> variances;
@@ -550,7 +551,7 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
          }
      }
      // Set up the spatially varying kernel and we are done!
-     lsst::fw::LinearCombinationKernel<KernelT> spatiallyVaryingKernel(kernelBasisVec, kernelFunctionPtr, fitParameters); 
+     lsst::fw::LinearCombinationKernel<KernelT> spatiallyVaryingKernel(kernelOutBasisVec, kernelFunctionPtr, fitParameters); 
 }
 
 template <typename KernelT>

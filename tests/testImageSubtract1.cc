@@ -46,7 +46,7 @@ int main( int argc, char** argv )
     }
     
     // Generate basis of delta functions for kernel
-    vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelBasisVec;
     unsigned int kernelRows = 7;
     unsigned int kernelCols = 7;
     lsst::imageproc::generateDeltaFunctionKernelSet(kernelRows, kernelCols, kernelBasisVec);

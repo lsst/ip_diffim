@@ -24,7 +24,7 @@ namespace imageproc {
     void computePSFMatchingKernelForMaskedImage(
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisVec,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr
@@ -34,7 +34,7 @@ namespace imageproc {
     void computePSFMatchingKernelForPostageStamp(
         lsst::fw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisVec,
         vector<double> &kernelCoeffs,
         double &background
         );
@@ -53,7 +53,7 @@ namespace imageproc {
 
     template <typename KernelT, typename FuncT>
     void computeSpatiallyVaryingPSFMatchingKernel(
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelOutBasisVec,
         vw::math::Matrix<double> const &kernelCoefficients,
         vector<lsst::fw::Source> const &sourceCollection,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr,

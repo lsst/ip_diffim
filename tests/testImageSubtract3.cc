@@ -78,7 +78,7 @@ int main( int argc, char** argv )
 
     // Convolved science image
     lsst::mwi::utils::Trace("testImageSubtract2", 2, "Convolving input image for testing");
-    const float threshold = 0.0;
+    const KernelT threshold = 0.0;
     const int edgeMaskBit = 1;
     lsst::fw::MaskedImage<ImageT, MaskT> convolvedScienceMaskedImage =
         lsst::fw::kernel::convolve(scienceMaskedImage, gaussSpVarKernel, threshold, edgeMaskBit);
