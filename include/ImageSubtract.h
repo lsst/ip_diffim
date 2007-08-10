@@ -55,7 +55,8 @@ namespace imageproc {
     void computeSpatiallyVaryingPSFMatchingKernel(
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelOutBasisVec,
         vw::math::Matrix<double> const &kernelCoefficients,
-        vector<lsst::fw::Source> const &sourceCollection,
+        vector<double> const &position1,
+        vector<double> const &position2,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr
         );

@@ -52,8 +52,8 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     ) {
 
     vector<lsst::fw::Source> sourceCollection;
-    vector<double> positions1;
-    vector<double> positions2;
+    vector<double> position1;
+    vector<double> position2;
     getCollectionOfMaskedImagesForPSFMatching(sourceCollection);
 
     lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 2, "Entering subroutine computePSFMatchingKernelForMaskedImage");
@@ -76,18 +76,16 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     for (; siter != sourceCollection.end(); ++siter, ++kiter) {
         lsst::fw::Source diffImSource = *siter;
         
-        // grab view around each source
-        // do i really want a new stamp or just a view?
-        // Bbox2i has x y cols rows
-        // NOTE : we need to make sure we get the centering right with these +1, etc...
+        // Grab view around each source
+        // Bbox2i : col0 row0 cols rows
         BBox2i stamp(static_cast<int>(floor(diffImSource.getColc() - diffImSource.getDcol())), 
                      static_cast<int>(floor(diffImSource.getRowc() - diffImSource.getDrow())), 
                      static_cast<int>(ceil(2 * diffImSource.getDcol() + 1)),
                      static_cast<int>(ceil(2 * diffImSource.getDrow() + 1))
             );
 
-        positions1.push_back(diffImSource.getColc());
-        positions2.push_back(diffImSource.getRowc());
+        position1.push_back(diffImSource.getColc());
+        position2.push_back(diffImSource.getRowc());
         
         imageToConvolvePtr    = imageToConvolve.getSubImage(stamp);
         imageToNotConvolvePtr = imageToNotConvolve.getSubImage(stamp);
@@ -130,7 +128,8 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         computeSpatiallyVaryingPSFMatchingKernel(
             kernelOutBasisVec, 
             kernelCoefficients, 
-            sourceCollection,
+            position1,
+            position2,
             kernelPtr,
             kernelFunctionPtr);
     }
@@ -140,8 +139,8 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         // HACK; NEED ACTUAL VARIANCES
         vector<double> variances(backgrounds.size(), 1); 
 
-        int nSigmaSquared = 1;
-        lsst::fw::function::MinimizerFunctionBase2<FuncT> bgFcn(backgrounds, variances, positions1, positions2, nSigmaSquared, backgroundFunctionPtr);
+        double nSigmaSquared = 1;
+        lsst::fw::function::MinimizerFunctionBase2<FuncT> bgFcn(backgrounds, variances, position1, position2, nSigmaSquared, backgroundFunctionPtr);
         MnUserParameters bgPar;
         // Start 0th parameter at mean background
         bgPar.add("p0", backgroundSum / backgrounds.size());
@@ -526,7 +525,8 @@ template <typename KernelT, typename FuncT>
 void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelOutBasisVec, ///< Input basis kernel set
     vw::math::Matrix<double> const &kernelCoefficients, ///< Basis coefficients for all kernels 
-    vector<lsst::fw::Source> const &sourceCollection, ///< Needed right now for the centers of the kernels in the image; should be able to avoid this 
+    vector<double> const &position1, ///< Needed right now for the centers of the kernels in the image; should be able to avoid this 
+    vector<double> const &position2, ///< Needed right now for the centers of the kernels in the image; should be able to avoid this 
     boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr, ///< Output kernel
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr ///< Function for spatial variation of kernel
     )
@@ -545,37 +545,29 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
          
          vector<double> measurements;
          vector<double> variances;
-         vector<double> position1;
-         vector<double> position2;
 
-         typename vector<lsst::fw::Source>::const_iterator siter = sourceCollection.begin();
-
-         unsigned int nsource = 0;
-         for (; siter != sourceCollection.end(); nsource++, siter++) {
-             // NOTE - need to make this work!
-             //position1.push_back(siter.colc_norm()); // between -1 and 1
-             //position2.push_back(siter.rowc_norm()); // between -1 and 1
-             measurements.push_back(kernelCoefficients(nsource, ncoeff));
+         for (unsigned int nMeas = 0; nMeas < kernelCoefficients.rows(); nMeas++) {
+             measurements.push_back(kernelCoefficients(nMeas, ncoeff));
              //variances.push_back(what);
          }
 
-         double def = 1.0;
-         lsst::fw::function::MinimizerFunctionBase2<KernelT> 
-             myFcn(measurements, variances, position1, position2, def, kernelFunctionPtr);
+         double nSigmaSquared = 1;
+         lsst::fw::function::MinimizerFunctionBase2<FuncT> 
+             kernelFcn(measurements, variances, position1, position2, nSigmaSquared, kernelFunctionPtr);
 
          // Initialize paramters
          // Name; value; uncertainty
-         MnUserParameters upar;
+         MnUserParameters kernelPar;
          for (unsigned int i = 0; i < kernelFunctionPtr->getNParameters(); i++) {
-             upar.add((boost::format("p%d") % i).str().c_str(), 0.0, 0.1);
+             kernelPar.add((boost::format("p%d") % i).str().c_str(), 0.0, 0.1);
          }
          
-         MnMigrad migrad(myFcn, upar);
-         FunctionMinimum min = migrad();
-         //MnMinos minos(myFcn, min); // only if you want serious uncertainties
+         MnMigrad migrad(kernelFcn, kernelPar);
+         FunctionMinimum kernelFit = migrad();
+         //MnMinos minos(kernelFcn, kernelFit); // only if you want serious uncertainties
 
          for (unsigned int i = 0; i < kernelFunctionPtr->getNParameters(); i++) {
-             fitParameters[ncoeff][i] = min.userState().value((boost::format("p%d") % i).str().c_str());
+             fitParameters[ncoeff][i] = kernelFit.userState().value((boost::format("p%d") % i).str().c_str());
          }
      }
      // Set up the spatially varying kernel and we are done!
