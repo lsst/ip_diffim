@@ -52,6 +52,8 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     ) {
 
     vector<lsst::fw::Source> sourceCollection;
+    vector<double> positions1;
+    vector<double> positions2;
     getCollectionOfMaskedImagesForPSFMatching(sourceCollection);
 
     lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 2, "Entering subroutine computePSFMatchingKernelForMaskedImage");
@@ -69,6 +71,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
 
     // Vector for backgrounds
     vector<double> backgrounds;
+    double backgroundSum;
 
     for (; siter != sourceCollection.end(); ++siter, ++kiter) {
         lsst::fw::Source diffImSource = *siter;
@@ -83,6 +86,9 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
                      static_cast<int>(ceil(2 * diffImSource.getDrow() + 1))
             );
 
+        positions1.push_back(diffImSource.getColc());
+        positions2.push_back(diffImSource.getRowc());
+        
         imageToConvolvePtr    = imageToConvolve.getSubImage(stamp);
         imageToNotConvolvePtr = imageToNotConvolve.getSubImage(stamp);
 
@@ -95,6 +101,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         lsst::imageproc::computePSFMatchingKernelForPostageStamp
             (*imageToConvolvePtr, *imageToNotConvolvePtr, kernelInBasisVec, kernelCoeffs, background);
         backgrounds.push_back(background);
+        backgroundSum += background;
 
         // Create a linear combination kernel from this and append to kernelVec
         lsst::fw::LinearCombinationKernel<KernelT> sourceKernel(kernelInBasisVec, kernelCoeffs);
@@ -129,7 +136,28 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     }
 
     // Compute spatial variation of the background if requested
-    // TODO
+    if (backgroundFunctionPtr != NULL) {
+        // HACK; NEED ACTUAL VARIANCES
+        vector<double> variances(backgrounds.size(), 1); 
+
+        int nSigmaSquared = 1;
+        lsst::fw::function::MinimizerFunctionBase2<FuncT> bgFcn(backgrounds, variances, positions1, positions2, nSigmaSquared, backgroundFunctionPtr);
+        MnUserParameters bgPar;
+        // Start 0th parameter at mean background
+        bgPar.add("p0", backgroundSum / backgrounds.size());
+        for (unsigned int npar = 1; npar < backgroundFunctionPtr->getNParameters(); npar++) {
+            // Start other parameters at value 0 with small variation
+            bgPar.add((boost::format("p%d") % npar).str().c_str(), 0, 0.1);
+        }
+        MnMigrad migrad(bgFcn, bgPar);
+        FunctionMinimum bgFit = migrad();
+        vector<double> bgFitParameters;
+        for (unsigned int npar = 0; npar < backgroundFunctionPtr->getNParameters(); npar++) {
+            bgFitParameters.push_back(bgFit.userState().value((boost::format("p%d") % npar).str().c_str()));
+        }
+        backgroundFunctionPtr->setParameters(bgFitParameters);
+    }
+    
 }
 
 /**
