@@ -17,6 +17,7 @@ int main( int argc, char** argv )
     typedef uint8 MaskT;
     typedef float ImageT; // have to make sure this jibes with the input data!
     typedef double KernelT;
+    typedef double FuncT;
 
     // Read input images
     if (argc < 2) {
@@ -57,14 +58,14 @@ int main( int argc, char** argv )
 
     // Function for spatially varying kernel.  Make null here for this test.
     unsigned int kernelSpatialOrder = 0;
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > kernelFunctionPtr(
-        new lsst::fw::function::PolynomialFunction2<KernelT>(kernelSpatialOrder)
+    boost::shared_ptr<lsst::fw::function::Function2<FuncT> > kernelFunctionPtr(
+        new lsst::fw::function::PolynomialFunction2<FuncT>(kernelSpatialOrder)
         );
 
     // Function for spatially varying background.  
     unsigned int backgroundSpatialOrder = 0;
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > backgroundFunctionPtr(
-        new lsst::fw::function::PolynomialFunction2<KernelT>(backgroundSpatialOrder)
+    boost::shared_ptr<lsst::fw::function::Function2<FuncT> > backgroundFunctionPtr(
+        new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
         );
 
     lsst::imageproc::computePSFMatchingKernelForMaskedImage

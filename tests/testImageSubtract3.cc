@@ -17,6 +17,7 @@ int main( int argc, char** argv )
     typedef uint8 MaskT;
     typedef float ImageT; // have to make sure this jibes with the input data!
     typedef double KernelT;
+    typedef double FuncT;
 
     // Read input images
     if (argc < 2) {
@@ -56,11 +57,11 @@ int main( int argc, char** argv )
     double minSigma = 0.1;
     double maxSigma = 3.0;
 
-    lsst::fw::Kernel<ImageT>::KernelFunctionPtrType gaussFuncPtr(
-        new lsst::fw::function::GaussianFunction2<ImageT>(sigmaX, sigmaY));
-    lsst::fw::Kernel<ImageT>::SpatialFunctionPtrType polyFuncPtr(
+    lsst::fw::Kernel<KernelT>::KernelFunctionPtrType gaussFuncPtr(
+        new lsst::fw::function::GaussianFunction2<FuncT>(sigmaX, sigmaY));
+    lsst::fw::Kernel<KernelT>::SpatialFunctionPtrType polyFuncPtr(
         new lsst::fw::function::PolynomialFunction2<double>(polyOrder));
-    lsst::fw::AnalyticKernel<ImageT> gaussSpVarKernel(
+    lsst::fw::AnalyticKernel<KernelT> gaussSpVarKernel(
         gaussFuncPtr, kernelCols, kernelRows, polyFuncPtr);
 
     // Get copy of spatial parameters (all zeros), set and feed back to the kernel
@@ -96,14 +97,14 @@ int main( int argc, char** argv )
 
     // Function for spatially varying kernel.  Make null here for this test.
     unsigned int kernelSpatialOrder = polyOrder;
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > kernelFunctionPtr(
-        new lsst::fw::function::PolynomialFunction2<KernelT>(kernelSpatialOrder)
+    boost::shared_ptr<lsst::fw::function::Function2<FuncT> > kernelFunctionPtr(
+        new lsst::fw::function::PolynomialFunction2<FuncT>(kernelSpatialOrder)
         );
 
     // Function for spatially varying background.  
     unsigned int backgroundSpatialOrder = 0;
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > backgroundFunctionPtr(
-        new lsst::fw::function::PolynomialFunction2<KernelT>(backgroundSpatialOrder)
+    boost::shared_ptr<lsst::fw::function::Function2<FuncT> > backgroundFunctionPtr(
+        new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
         );
 
     lsst::imageproc::computePSFMatchingKernelForMaskedImage

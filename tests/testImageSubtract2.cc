@@ -17,6 +17,7 @@ int main( int argc, char** argv )
     typedef uint8 MaskT;
     typedef float ImageT; // have to make sure this jibes with the input data!
     typedef double KernelT;
+    typedef double FuncT;
 
     // Read input images
     if (argc < 2) {
@@ -53,9 +54,9 @@ int main( int argc, char** argv )
     double sigmaX = 2.0;
     double sigmaY = 2.5;
 
-    lsst::fw::Kernel<ImageT>::KernelFunctionPtrType gaussFuncPtr(
-        new lsst::fw::function::GaussianFunction2<ImageT>(sigmaX, sigmaY));
-    lsst::fw::AnalyticKernel<ImageT> gaussKernel(gaussFuncPtr, kernelCols, kernelRows);
+    lsst::fw::Kernel<KernelT>::KernelFunctionPtrType gaussFuncPtr(
+        new lsst::fw::function::GaussianFunction2<FuncT>(sigmaX, sigmaY));
+    lsst::fw::AnalyticKernel<KernelT> gaussKernel(gaussFuncPtr, kernelCols, kernelRows);
 
     // Convolved science image
     lsst::mwi::utils::Trace("testImageSubtract2", 2, "Convolving input image for testing");
@@ -77,14 +78,14 @@ int main( int argc, char** argv )
 
     // Function for spatially varying kernel.  Make null here for this test.
     unsigned int kernelSpatialOrder = 0;
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > kernelFunctionPtr(
-        new lsst::fw::function::PolynomialFunction2<KernelT>(kernelSpatialOrder)
+    boost::shared_ptr<lsst::fw::function::Function2<FuncT> > kernelFunctionPtr(
+        new lsst::fw::function::PolynomialFunction2<FuncT>(kernelSpatialOrder)
         );
 
     // Function for spatially varying background.  
     unsigned int backgroundSpatialOrder = 0;
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > backgroundFunctionPtr(
-        new lsst::fw::function::PolynomialFunction2<KernelT>(backgroundSpatialOrder)
+    boost::shared_ptr<lsst::fw::function::Function2<FuncT> > backgroundFunctionPtr(
+        new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
         );
 
     lsst::imageproc::computePSFMatchingKernelForMaskedImage

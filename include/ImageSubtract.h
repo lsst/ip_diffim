@@ -20,14 +20,14 @@ namespace imageproc {
 
     using namespace std;
     
-    template <typename ImageT, typename MaskT, typename KernelT>
+    template <typename ImageT, typename MaskT, typename KernelT, typename FuncT>
     void computePSFMatchingKernelForMaskedImage(
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr,
-        boost::shared_ptr<lsst::fw::function::Function2<KernelT> > &kernelFunctionPtr,
-        boost::shared_ptr<lsst::fw::function::Function2<KernelT> > &backgroundFunctionPtr
+        boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr,
+        boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr
         );
     
     template <typename ImageT, typename MaskT, typename KernelT>
@@ -51,13 +51,13 @@ namespace imageproc {
         vw::math::Matrix<double> &kernelCoefficients
         );
 
-    template <typename KernelT, typename ReturnT>
+    template <typename KernelT, typename FuncT>
     void computeSpatiallyVaryingPSFMatchingKernel(
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec,
         vw::math::Matrix<double> const &kernelCoefficients,
         vector<lsst::fw::Source> const &sourceCollection,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr,
-        boost::shared_ptr<lsst::fw::function::Function2<KernelT> > &kernelFunctionPtr
+        boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr
         );
 
     template <typename KernelT>

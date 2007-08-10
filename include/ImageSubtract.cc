@@ -41,15 +41,14 @@ using namespace std;
  * \throw Here too
  * \ingroup imageproc
  */
-template <typename ImageT, typename MaskT, typename KernelT>
+template <typename ImageT, typename MaskT, typename KernelT, typename FuncT>
 void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve, ///< Template image; convolved
     lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve, ///< Science image; not convolved
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec, ///< Input set of basis kernels
-
     boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr, ///< The output convolution kernel
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > &kernelFunctionPtr, ///< Function for spatial variation of kernel
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > &backgroundFunctionPtr ///< Function for spatial variation of background
+    boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr, ///< Function for spatial variation of kernel
+    boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr ///< Function for spatial variation of background
     ) {
 
     vector<lsst::fw::Source> sourceCollection;
@@ -116,15 +115,17 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     vw::math::Matrix<double> kernelCoefficients;
 
     // In the end we want to test if the kernelBasisVec is Delta Functions; if so, do PCA
-    lsst::imageproc::computePCAKernelBasis(kernelVec, kernelResidualsVec, kernelBasisVec, kernelCoefficients);
+    //lsst::imageproc::computePCAKernelBasis(kernelVec, kernelResidualsVec, kernelBasisVec, kernelCoefficients);
+    lsst::imageproc::computePCAKernelBasis(kernelVec, kernelResidualsVec, kernelCoefficients);
 
     // Compute spatial variation of the kernel if requested
     if (kernelFunctionPtr != NULL) {
-        computeSpatiallyVaryingPSFMatchingKernel(kernelBasisVec, 
-                                                 kernelCoefficients, 
-                                                 sourceCollection,
-                                                 kernelPtr,
-                                                 kernelFunctionPtr);
+        computeSpatiallyVaryingPSFMatchingKernel(
+            kernelBasisVec, 
+            kernelCoefficients, 
+            sourceCollection,
+            kernelPtr,
+            kernelFunctionPtr);
     }
 
     // Compute spatial variation of the background if requested
@@ -359,9 +360,6 @@ void lsst::imageproc::computePCAKernelBasis(
     vw::math::Matrix<double> &kernelCoefficients ///< Output coefficients for each basis function for each kernel
     ) {
     
-    //typedef double CalcT;
-    //typedef float ImageT;  // Watch out with multiple ImageT definitions!
-
     const int nKernel = kernelVec.size();
     const int nKCols = kernelVec[0].getCols();
     const int nKRows = kernelVec[0].getRows();
@@ -495,13 +493,13 @@ void lsst::imageproc::computePCAKernelBasis(
     }
 }
 
-template <typename KernelT, typename ReturnT>
+template <typename KernelT, typename FuncT>
 void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisVec, ///< Input basis kernel set
     vw::math::Matrix<double> const &kernelCoefficients, ///< Basis coefficients for all kernels 
     vector<lsst::fw::Source> const &sourceCollection, ///< Needed right now for the centers of the kernels in the image; should be able to avoid this 
     boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr, ///< Output kernel
-    boost::shared_ptr<lsst::fw::function::Function2<KernelT> > &kernelFunctionPtr ///< Function for spatial variation of kernel
+    boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr ///< Function for spatial variation of kernel
     )
  {
      // NOTE - For a delta function basis set, the mean image is the first entry in kernelPCABasisVec.  
