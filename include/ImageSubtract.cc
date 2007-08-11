@@ -56,7 +56,8 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     vector<double> position2;
     getCollectionOfMaskedImagesForPSFMatching(sourceCollection);
 
-    lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 2, "Entering subroutine computePSFMatchingKernelForMaskedImage");
+    lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 2, 
+                            "Entering subroutine computePSFMatchingKernelForMaskedImage");
 
     // Reusable view around each source
     typename lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT imageToConvolvePtr;
@@ -140,7 +141,8 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         vector<double> variances(backgrounds.size(), 1); 
 
         double nSigmaSquared = 1;
-        lsst::fw::function::MinimizerFunctionBase2<FuncT> bgFcn(backgrounds, variances, position1, position2, nSigmaSquared, backgroundFunctionPtr);
+        lsst::fw::function::MinimizerFunctionBase2<FuncT> 
+            bgFcn(backgrounds, variances, position1, position2, nSigmaSquared, backgroundFunctionPtr);
         MnUserParameters bgPar;
         // Start 0th parameter at mean background
         bgPar.add("p0", backgroundSum / backgrounds.size());
@@ -153,6 +155,9 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         vector<double> bgFitParameters;
         for (unsigned int npar = 0; npar < backgroundFunctionPtr->getNParameters(); npar++) {
             bgFitParameters.push_back(bgFit.userState().value((boost::format("p%d") % npar).str().c_str()));
+            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
+                                    (boost::format("Fit Background Parameter %d : %f") 
+                                     % npar % bgFit.userState().value((boost::format("p%d") % npar).str().c_str())));
         }
         backgroundFunctionPtr->setParameters(bgFitParameters);
     }
@@ -182,7 +187,8 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     const KernelT threshold = 0.0;
     const int edgeMaskBit = 1;
 
-    lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 2, "Entering subroutine computePSFMatchingKernelForPostageStamp");
+    lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 2, 
+                            "Entering subroutine computePSFMatchingKernelForPostageStamp");
     
     // We assume that each kernel in the Set has 1 parameter you fit for
     nKernelParameters = kernelInBasisVec.size();
@@ -212,16 +218,19 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     // Create C_ij in the formalism of Alard & Lupton
     for (; kiter != kernelInBasisVec.end(); ++kiter, ++citer, ++kId) {
 
-        lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, "Convolving an Object with Basis");
+        lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, 
+                                "Convolving an Object with Basis");
         
         // NOTE : we could also *precompute* the entire template image convolved with these functions
         //        and save them somewhere to avoid this step each time.  however, our paradigm is to
         //        compute whatever is needed on the fly.  hence this step here.
         boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > imagePtr(
-            new lsst::fw::MaskedImage<ImageT, MaskT>(lsst::fw::kernel::convolve(imageToConvolve, **kiter, threshold, edgeMaskBit))
+            new lsst::fw::MaskedImage<ImageT, MaskT>
+            (lsst::fw::kernel::convolve(imageToConvolve, **kiter, threshold, edgeMaskBit))
             );
 
-        lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, "Convolved an Object with Basis");
+        lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, 
+                                "Convolved an Object with Basis");
 
         *citer = imagePtr;
         
@@ -288,10 +297,13 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
             }
 
             lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 4, 
-                                    boost::format("Accessing image row %d col %d : %f %f") % row % col % ncCamera % ncVariance);
+                                    boost::format("Accessing image row %d col %d : %f %f") 
+                                    % row % col % ncCamera % ncVariance);
 
             // kernel index i
-            typename vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> >::iterator kiteri = convolvedAccessorColVec.begin();
+            typename vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> >::iterator
+                kiteri = convolvedAccessorColVec.begin();
+
             for (int kidxi = 0; kiteri != convolvedAccessorColVec.end(); kiteri++, kidxi++) {
                 ImageT cdCamerai = *kiteri->image;
                 ImageT cdVariancei = *kiteri->variance;
@@ -301,7 +313,8 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
                     continue;
                 }
                 lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 5, 
-                                        boost::format("Accessing convolved image %d : %f %f") % kidxi % cdCamerai % cdVariancei);
+                                        boost::format("Accessing convolved image %d : %f %f") 
+                                        % kidxi % cdCamerai % cdVariancei);
 
                 B[kidxi] += ncCamera * cdCamerai / (ncVariance + cdVariancei);
                 
@@ -316,7 +329,9 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
                         continue;
                     }
                     lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 6, 
-                                            boost::format("Accessing convolved image %d : %f %f") % kidxj % cdCameraj % cdVariancej);
+                                            boost::format("Accessing convolved image %d : %f %f") 
+                                            % kidxj % cdCameraj % cdVariancej);
+
                     M[kidxi][kidxj] += cdCamerai * cdCameraj / (cdVariancei + cdVariancej);
                 } 
             } 
@@ -325,7 +340,8 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
             B[nParameters-1] += ncCamera / (ncVariance + cVariance); 
             M[nParameters-1][nParameters-1] += 1.0 / (ncVariance + cVariance);
             lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 4, 
-                                    boost::format("Background terms : %f %f") %B[nParameters-1] % M[nParameters-1][nParameters-1]);
+                                    boost::format("Background terms : %f %f") 
+                                    % B[nParameters-1] % M[nParameters-1][nParameters-1]);
 
             // Step each accessor in column
             imageToConvolveCol.nextCol();
@@ -393,7 +409,8 @@ void lsst::imageproc::computePCAKernelBasis(
     const int nKRows = kernelVec[0].getRows();
     const int nPixels = nKCols * nKRows;
 
-    lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 2, "Entering subroutine computePCAKernelBasis");
+    lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 2, 
+                            "Entering subroutine computePCAKernelBasis");
 
     // Matrix to invert.  Number of rows = number of pixels; number of columns = number of kernels
     // All calculations here are in double
@@ -443,29 +460,26 @@ void lsst::imageproc::computePCAKernelBasis(
     vw::math::Vector<double> mMean(nPixels);
 
     // M is mean-subtracted if subtractMean = true
+    // Eigencomponents in columns of eVec
     lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, "Computing pricipal components");
     lsst::imageproc::computePCA(M, mMean, eVal, eVec, true);
     lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, "Computed pricipal components");
 
     // We now have the basis functions determined
     // Next determine the coefficients that go in front of all of the individual kernels
-    // The size of the coefficients will be rows=M.cols() cols=M.rows()
     // We save the first entry of kernelCoefficients for the Mean Image
-    kernelCoefficients.set_size(M.cols(), M.rows());
-    for (unsigned int i = 0; i < M.cols(); i++) {
-        kernelCoefficients(i,0) = 1;
+    kernelCoefficients.set_size(nKernel+1, nKernel);
+    for (unsigned int i = 0; i < nKernel; i++) {
+        kernelCoefficients(0,i) = 1;
     }
-    vw::math::Matrix<double> subMatrix = vw::math::submatrix(kernelCoefficients, 0, 1, kernelCoefficients.rows(), kernelCoefficients.cols()-1);
-    // OK, WATCH SHAPES HERE.
-    // M.cols = 3; M.rows = 49
-    // kernelCoefficients.cols = 49; kernelCoefficients.rows = 3
-    // subMatrix returns from decomposeMatrixUsingBasis as a 3x3 matrix...
+    vw::math::Matrix<double> subMatrix = 
+        vw::math::submatrix(kernelCoefficients, 1, 0, nKernel, nKernel);
 
     lsst::imageproc::decomposeMatrixUsingBasis(M, eVec, subMatrix);
 
     // Write results into kernelCoefficients
-    for (unsigned int i = 1; i < kernelCoefficients.rows(); i++) {
-        vw::math::select_row(kernelCoefficients, i) = vw::math::select_row(subMatrix, i);
+    for (unsigned int i = 0; i < nKernel; i++) {
+        vw::math::select_row(kernelCoefficients, i+1) = vw::math::select_row(subMatrix, i);
     }
 
     // We next do quality control here; we reconstruct the input kernels with the truncated basis function set
@@ -479,7 +493,7 @@ void lsst::imageproc::computePCAKernelBasis(
         for (unsigned int j = 0; j < M.rows(); j++) {
             residual += M(i,j) - approxM(i,j);
         }
-        kernelResidualsVec[i] = residual;
+        kernelResidualsVec.push_back(residual);
         cout << " Residual " << i << " " << residual << endl;
     }
 
@@ -496,7 +510,8 @@ void lsst::imageproc::computePCAKernelBasis(
         imageAccessorCol.next_col();
     }
     // The mean image is the first member of kernelPCABasisVec
-    kernelPCABasisVec.push_back(boost::shared_ptr<lsst::fw::Kernel<KernelT> > (new lsst::fw::FixedKernel<KernelT>(meanImage)));
+    kernelPCABasisVec.push_back(boost::shared_ptr<lsst::fw::Kernel<KernelT> > 
+                                (new lsst::fw::FixedKernel<KernelT>(meanImage)));
 
     // Debugging
     meanImage.writeFits( (boost::format("mFits.fits")).str() );
@@ -520,7 +535,8 @@ void lsst::imageproc::computePCAKernelBasis(
             imageAccessorCol.next_col();
         }
         // Add to kernel basis
-        kernelPCABasisVec.push_back(boost::shared_ptr<lsst::fw::Kernel<KernelT> > (new lsst::fw::FixedKernel<KernelT>(basisImage)));
+        kernelPCABasisVec.push_back(boost::shared_ptr<lsst::fw::Kernel<KernelT> > 
+                                    (new lsst::fw::FixedKernel<KernelT>(basisImage)));
 
         // Debugging info
         basisImage.writeFits( (boost::format("eFits_%d.fits") % ki).str() );
@@ -574,10 +590,14 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
 
          for (unsigned int i = 0; i < kernelFunctionPtr->getNParameters(); i++) {
              fitParameters[ncoeff][i] = kernelFit.userState().value((boost::format("p%d") % i).str().c_str());
+             lsst::mwi::utils::Trace("lsst.imageproc.computeSpatiallyVaryingPSFMatchingKernel", 4, 
+                                     (boost::format("Fit Kernel %d, Parameter %d : %f") 
+                                      % ncoeff % i % kernelFit.userState().value((boost::format("p%d") % i).str().c_str())));
          }
      }
      // Set up the spatially varying kernel and we are done!
-     lsst::fw::LinearCombinationKernel<KernelT> spatiallyVaryingKernel(kernelOutBasisVec, kernelFunctionPtr, fitParameters); 
+     lsst::fw::LinearCombinationKernel<KernelT> 
+         spatiallyVaryingKernel(kernelOutBasisVec, kernelFunctionPtr, fitParameters); 
 }
 
 template <typename KernelT>

@@ -103,11 +103,9 @@ void lsst::imageproc::computePCA(
     */
 
     // Have s represent the eigenvalues; they are already sorted by LAPACK
-    // NOTE : do I need to square these values?
     for (unsigned int i = 0; i < s.size(); i++) {
-        eVal[i] = s[i];
+        eVal[i] = s[i]*s[i];
     }
-    // Could we use VectorProxys to do this?
 
     cout << "U" << u << endl;
     // NOTE : u.cols() is the number of u.rows(), not s.size()
