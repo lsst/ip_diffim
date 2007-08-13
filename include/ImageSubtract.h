@@ -19,7 +19,30 @@ namespace lsst {
 namespace imageproc {
 
     using namespace std;
-    
+
+    template <typename KernelT>
+    struct DiffImStruct {
+    public:
+        // The source assocated with the structure
+        lsst::fw::Source diffImSource;
+        
+        // From single kernel fit
+        double background;
+        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &diffImKernel;
+
+        // If using PCA, this holds the PCA Kernel
+        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &diffImPCAKernel;
+
+        // Goodness of fit metrics
+        double sourceResidualMean;
+        double sourceResidualVariance;
+        double kernelResidual;
+        double spatialKernelResidual;
+
+        // Flags
+        bool isGood=true;
+    };
+
     template <typename ImageT, typename MaskT, typename KernelT, typename FuncT>
     void computePSFMatchingKernelForMaskedImage(
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
@@ -45,18 +68,15 @@ namespace imageproc {
 
     template <typename KernelT>
     void computePCAKernelBasis(
-        vector<lsst::fw::LinearCombinationKernel<KernelT> > const &kernelVec,
-        vector<double> &kernelResidualsVec,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPCABasisVec,
-        vw::math::Matrix<double> &kernelCoefficients
+        vector<lsst::fw::DiffImStruct<KernelT> > &diffImStructVec,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPCABasisVec
         );
 
     template <typename KernelT, typename FuncT>
     void computeSpatiallyVaryingPSFMatchingKernel(
+        vector<lsst::fw::DiffImStruct<KernelT> > &diffImStructVec,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelOutBasisVec,
         vw::math::Matrix<double> const &kernelCoefficients,
-        vector<double> const &position1,
-        vector<double> const &position2,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr
         );
@@ -76,6 +96,23 @@ namespace imageproc {
         vector<double> const degGauss,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisVec
         );
+
+    template <typename ImageT, typename MaskT>
+    void lsst::imageproc::calculateMaskedImageResiduals(
+        lsst::fw::MaskedImage<ImageT,MaskT> const &inputImage,
+        int &nGoodPixels,
+        double &meanOfResiduals,
+        double &varianceOfResiduals
+        );
+
+    template <typename ImageT>
+    void lsst::imageproc::calculateImageResiduals(
+        lsst::fw::Image<ImageT> const &inputImage,
+        int &nGoodPixels,
+        double &meanOfResiduals,
+        double &varianceOfResiduals
+        );
+    
 
 }
 }

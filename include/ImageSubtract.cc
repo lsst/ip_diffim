@@ -51,30 +51,30 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr ///< Function for spatial variation of background
     ) {
 
-    vector<lsst::fw::Source> sourceCollection;
-    vector<double> position1;
-    vector<double> position2;
-    getCollectionOfMaskedImagesForPSFMatching(sourceCollection);
-
     lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 2, 
                             "Entering subroutine computePSFMatchingKernelForMaskedImage");
 
-    // Reusable view around each source
-    typename lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT imageToConvolvePtr;
-    typename lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT imageToNotConvolvePtr;
+    // FROM THE POLICY
+    const double MAXIMUM_SOURCE_RESIDUAL_ABS_MEAN = 1; // Mean should be 0
+    const double MAXIMUM_SOURCE_RESIDUAL_VARIANCE = 2; // Variance should be 1
+    const KernelT CONVOLVE_THRESHOLD = 0;
+    const int EDGE_MASK_BIT = 1;
 
-    // Collection of output kernels
-    vector<lsst::fw::LinearCombinationKernel<KernelT> > kernelVec(sourceCollection.size());
+    // This is a hack for now; we need to grab a collection of sources to do the difference imaging
+    vector<lsst::fw::Source> sourceCollection;
+    getCollectionOfMaskedImagesForPSFMatching(sourceCollection);
+
+    // Reusable view around each source
+    typename lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT imageToConvolveStampPtr;
+    typename lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT imageToNotConvolveStampPtr;
+
+    // Information for each Source
+    vector<lsst::fw::DiffImStruct<KernelT> > diffImStructVec;
 
     // Iterate over source
     typename vector<lsst::fw::Source>::iterator siter = sourceCollection.begin();
-    typename vector<lsst::fw::LinearCombinationKernel<KernelT> >::iterator kiter = kernelVec.begin();
 
-    // Vector for backgrounds
-    vector<double> backgrounds;
-    double backgroundSum;
-
-    for (; siter != sourceCollection.end(); ++siter, ++kiter) {
+    for (; siter != sourceCollection.end(); ++siter) {
         lsst::fw::Source diffImSource = *siter;
         
         // Grab view around each source
@@ -85,67 +85,101 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
                      static_cast<int>(ceil(2 * diffImSource.getDrow() + 1))
             );
 
-        position1.push_back(diffImSource.getColc());
-        position2.push_back(diffImSource.getRowc());
-        
-        imageToConvolvePtr    = imageToConvolve.getSubImage(stamp);
-        imageToNotConvolvePtr = imageToNotConvolve.getSubImage(stamp);
+        imageToConvolveStampPtr    = imageToConvolve.getSubImage(stamp);
+        imageToNotConvolveStampPtr = imageToNotConvolve.getSubImage(stamp);
 
-        vector<double> kernelCoeffs(kernelInBasisVec.size());
-
+        // DEBUGGING DEBUGGING DEBUGGING
         imageToConvolvePtr->writeFits( (boost::format("iFits_%d") % diffImSource.getSourceId()).str() );
+        // DEBUGGING DEBUGGING DEBUGGING
 
         // Find best single kernel for this stamp
         double background;
+        vector<double> kernelCoeffs(kernelInBasisVec.size());
         lsst::imageproc::computePSFMatchingKernelForPostageStamp
-            (*imageToConvolvePtr, *imageToNotConvolvePtr, kernelInBasisVec, kernelCoeffs, background);
-        backgrounds.push_back(background);
-        backgroundSum += background;
+            (*imageToConvolveStampPtr, *imageToNotConvolveStampPtr, kernelInBasisVec, kernelCoeffs, background);
 
-        // Create a linear combination kernel from this and append to kernelVec
+        // Create a linear combination kernel from this 
         lsst::fw::LinearCombinationKernel<KernelT> sourceKernel(kernelInBasisVec, kernelCoeffs);
-        *kiter = sourceKernel;
 
-        // NOTE
+        // Structure to carry around in imageproc.diffim
+        lsst::fw::DiffImStruct<KernelT> diffImSourceStruct = new lsst::fw::DiffImStruct<KernelT>;
+        diffImSourceStruct.diffImSource = *siter;
+        diffImSourceStruct.diffImKernel = sourceKernel;
+        diffImSourceStruct.background   = background;
+
         // QA - calculate the residual of the subtracted image here
+        lsst::fw::MaskedImage<ImageT, MaskT>
+            convolvedImageStamp = lsst::fw::kernel::convolve(*imageToConvolveStampPtr, sourceKernel, CONVOLVE_THRESHOLD, EDGE_MASK_BIT);
+        lsst::fw::MaskedImage<ImageT, MaskT>
+            differenceImageStamp = imageToNotConvolveStampPtr - convolvedImageStamp;
+        double meanOfResiduals = 0;
+        double varianceOfResiduals = 0;
+        int nGoodPixels = 0;
+        calculateMaskedImageResiduals(differenceImageStamp, nGoodPixels, meanOfResiduals, varianceOfResiduals);
+        diffImSourceStruct.sourceResidualMean = meanOfResiduals;
+        diffImSourceStruct.sourceResidualVariance = varianceOfResiduals;
 
-        // DEBUGGING
+        if (fabs(meanOfResiduals) > MAXIMUM_SOURCE_RESIDUAL_ABS_MEAN) {
+            diffImSource.isGood = false;
+        }
+        if (varianceOfResiduals > MAXIMUM_SOURCE_RESIDUAL_VARIANCE) {
+            diffImSource.isGood = false;
+        }
+        diffImStructVec.push_back(diffImSource);
+
+        // DEBUGGING DEBUGGING DEBUGGING
         double imSum;
         lsst::fw::Image<KernelT> kImage = sourceKernel.computeNewImage(imSum);
         kImage.writeFits( (boost::format("kFits_%d.fits") % diffImSource.getSourceId()).str() );
-        
+        // DEBUGGING DEBUGGING DEBUGGING
 
     }
 
-    vector<double> kernelResidualsVec;
-    vw::math::Matrix<double> kernelCoefficients;
-
     // In the end we want to test if the kernelInBasisVec is Delta Functions; if so, do PCA
+    // For DC2 we just do it
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelOutBasisVec;
-    lsst::imageproc::computePCAKernelBasis(kernelVec, kernelResidualsVec, kernelOutBasisVec, kernelCoefficients);
+    lsst::imageproc::computePCAKernelBasis(diffImStructVec, kernelOutBasisVec);
 
     // Compute spatial variation of the kernel if requested
     if (kernelFunctionPtr != NULL) {
         computeSpatiallyVaryingPSFMatchingKernel(
+            diffImStructVec,
             kernelOutBasisVec, 
-            kernelCoefficients, 
-            position1,
-            position2,
             kernelPtr,
             kernelFunctionPtr);
     }
 
     // Compute spatial variation of the background if requested
     if (backgroundFunctionPtr != NULL) {
-        // HACK; NEED ACTUAL VARIANCES
-        vector<double> variances(backgrounds.size(), 1); 
+        typename vector<lsst::fw::DiffImStruct<KernelT> >::iterator siter = diffImStructVec.begin();
+
+        int nGood = 0;
+        vector<double> backgrounds;
+        vector<double> variances;
+        vector<double> position1;
+        vector<double> position2;
+        int bgSum = 0;
+        for (; siter != diffImStructVec.end(); ++siter) {
+            if (*siter->isGood == true) {
+                nGood += 1;
+                backgrounds.push_back(*siter->background);
+                bgSum += *siter->background;
+                variances.push_back(*siter->sourceResidualVariance);   // approximation
+                position1.push_back(*siter->diffImSource.getColc());
+                position2.push_back(*siter->diffImSource.getRowc());
+            }
+        }
+
+        if (nGood == 0) {
+            // Throw an exception
+        }
 
         double nSigmaSquared = 1;
         lsst::fw::function::MinimizerFunctionBase2<FuncT> 
             bgFcn(backgrounds, variances, position1, position2, nSigmaSquared, backgroundFunctionPtr);
         MnUserParameters bgPar;
         // Start 0th parameter at mean background
-        bgPar.add("p0", backgroundSum / backgrounds.size());
+        bgPar.add("p0", bgSum / nGood);
         for (unsigned int npar = 1; npar < backgroundFunctionPtr->getNParameters(); npar++) {
             // Start other parameters at value 0 with small variation
             bgPar.add((boost::format("p%d") % npar).str().c_str(), 0, 0.1);
@@ -398,104 +432,146 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
 
 template <typename KernelT>
 void lsst::imageproc::computePCAKernelBasis(
-    vector<lsst::fw::LinearCombinationKernel<KernelT> > const &kernelVec, ///< Original input kernel basis set
-    vector<double> &kernelResidualsVec, ///< Output residuals of reconstructed kernel
-    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPCABasisVec, ///< Output principal components as kernel images
-    vw::math::Matrix<double> &kernelCoefficients ///< Output coefficients for each basis function for each kernel
+    vector<lsst::fw::DiffImStruct<KernelT> > &diffImStructVec, ///< Vector of input sources
+    vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPCABasisVec ///< Output principal components as kernel images
     ) {
     
-    const int nKernel = kernelVec.size();
-    const int nKCols = kernelVec[0].getCols();
-    const int nKRows = kernelVec[0].getRows();
-    const int nPixels = nKCols * nKRows;
-
-    lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 2, 
-                            "Entering subroutine computePCAKernelBasis");
-
+    // FROM THE POLICY
+    const unsigned int NCOEFF = 3; 
+    const unsigned int MAXIMUM_ITER_PCA = 5;
+    const double MAXIMUM_KERNEL_RESIDUAL = 1;
+    
+    // Image accessor
+    typedef typename vw::ImageView<KernelT>::pixel_accessor imageAccessorType;
+    
+    // Iterator over struct
+    typename vector<lsst::fw::DiffImStruct<KernelT> >::iterator siter;
+    
     // Matrix to invert.  Number of rows = number of pixels; number of columns = number of kernels
     // All calculations here are in double
-    vw::Matrix<double> M(nPixels, nKernel); 
-
-    typedef typename vw::ImageView<KernelT>::pixel_accessor imageAccessorType;
-
-    // iterator over kernels
-    typename vector<lsst::fw::LinearCombinationKernel<KernelT> >::const_iterator kiter = kernelVec.begin();
-
-    // fill up matrix for PCA
-    // does it matter if i use kiter++ or ++kiter?
-    double imSum;
-    for (int ki = 0; kiter != kernelVec.end(); ki++, kiter++) {
-        lsst::fw::Image<KernelT> kImage = kiter->computeNewImage(imSum);
-
-        //assert(nKRows == kImage.getRows());
-        //assert(nKCols == kImage.getCols());
-        int mIdx = 0;
-
-        imageAccessorType imageAccessorCol(kImage.origin());
-        for (int col = 0; col < nKCols; col++) {
-
-            imageAccessorType imageAccessorRow(imageAccessorCol);
-            for (int row = 0; row < nKRows; row++, mIdx++) {
-
-                // NOTE : 
-                //   arguments to matrix-related functions are given in row,col
-                //   arguments to image-related functions are given in col,row
-                // HOWEVER :
-                //   it doesn't matter which order we put the kernel elements into the PCA
-                //   since they are not correlated 
-                //   as long as we do the same thing when extracting the components
-                // UNLESS :
-                //   we want to put in some weighting/regularlization into the PCA
-                //   not sure if that is even possible...
-
-                M(mIdx, ki) = *imageAccessorRow;
-                imageAccessorRow.next_row();
+    vw::math::Matrix<double> M;
+    vw::math::Matrix<double> eVec;
+    vw::math::Vector<double> eVal;
+    vw::math::Vector<double> mMean;
+    vw::math::Matrix<double> kernelCoefficientMatrix;
+    
+    // Initialize for while loop
+    int nIter = 0;
+    int nReject = 1;
+    int nGood = diffimStructVec.size();
+    int nKCols = 0, nKRows = 0;
+    
+    lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 2, 
+                            "Entering subroutine computePCAKernelBasis");
+    
+    // Iterate over PCA inputs until all are good
+    while ( (nIter < MAXIMIM_ITER_PCA) and (nReject != 0) ) {
+        
+        nGood = 0;
+        siter = diffImStructVec.begin();
+        for (; siter != diffImStructVec.end(); ++siter) {
+            if (*siter->isGood == true) {
+                nGood += 1;
+                if (nKCols == 0) {
+                    nKCols = *siter->diffImKernel.getCols();
+                }
+                if (nKRows == 0) {
+                    nKRows = *siter->diffImKernel.getRows();
+                }
             }
-            imageAccessorCol.next_col();
         }
-    }
+        
+        nPixels = nKCols * nKRows;
+        M.set_size(nPixels, nGood);
+        
+        // fill up matrix for PCA
+        double imSum;
+        siter = diffImStructVec.begin();
 
-    vw::math::Matrix<double> eVec(nPixels, nKernel);
-    vw::math::Vector<double> eVal(nKernel);
-    vw::math::Vector<double> mMean(nPixels);
+        for (int ki = 0; siter != diffImStructVec.end(); ki++, siter++) {
+            if (*siter->isGood == false) {
+                continue;
+            }
 
-    // M is mean-subtracted if subtractMean = true
-    // Eigencomponents in columns of eVec
-    lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, "Computing pricipal components");
-    lsst::imageproc::computePCA(M, mMean, eVal, eVec, true);
-    lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, "Computed pricipal components");
+            lsst::fw::Image<KernelT> kImage = *siter->diffImKernel.computeNewImage(imSum);
+            
+            //assert(nKRows == kImage.getRows());
+            //assert(nKCols == kImage.getCols());
 
-    // We now have the basis functions determined
-    // Next determine the coefficients that go in front of all of the individual kernels
-    // We save the first entry of kernelCoefficients for the Mean Image
-    kernelCoefficients.set_size(nKernel+1, nKernel);
-    for (unsigned int i = 0; i < nKernel; i++) {
-        kernelCoefficients(0,i) = 1;
-    }
-    vw::math::Matrix<double> subMatrix = 
-        vw::math::submatrix(kernelCoefficients, 1, 0, nKernel, nKernel);
-
-    lsst::imageproc::decomposeMatrixUsingBasis(M, eVec, subMatrix);
-
-    // Write results into kernelCoefficients
-    for (unsigned int i = 0; i < nKernel; i++) {
-        vw::math::select_row(kernelCoefficients, i+1) = vw::math::select_row(subMatrix, i);
-    }
-
-    // We next do quality control here; we reconstruct the input kernels with the truncated basis function set
-    // From the policy
-    const unsigned int nCoeff = 3; 
-    vw::math::Matrix<double> approxM(nPixels, nKernel); 
-    lsst::imageproc::approximateMatrixUsingBasis(eVec, subMatrix, nCoeff, approxM);
-
-    for (unsigned int i = 0; i < M.cols(); i++) {
-        double residual = 0;
-        for (unsigned int j = 0; j < M.rows(); j++) {
-            residual += M(i,j) - approxM(i,j);
+            int mIdx = 0;
+            imageAccessorType imageAccessorCol(kImage.origin());
+            for (int col = 0; col < nKCols; col++) {
+                
+                imageAccessorType imageAccessorRow(imageAccessorCol);
+                for (int row = 0; row < nKRows; row++, mIdx++) {
+                    
+                    // NOTE : 
+                    //   arguments to matrix-related functions are given in row,col
+                    //   arguments to image-related functions are given in col,row
+                    // HOWEVER :
+                    //   it doesn't matter which order we put the kernel elements into the PCA
+                    //   since they are not correlated 
+                    //   as long as we do the same thing when extracting the components
+                    // UNLESS :
+                    //   we want to put in some weighting/regularlization into the PCA
+                    //   not sure if that is even possible...
+                    
+                    M(mIdx, ki) = *imageAccessorRow;
+                    imageAccessorRow.next_row();
+                }
+                imageAccessorCol.next_col();
+            }
         }
-        kernelResidualsVec.push_back(residual);
-        cout << " Residual " << i << " " << residual << endl;
-    }
+        
+        eVec.set_size(nPixels, nGood);
+        eVal.set_size(nGood);
+        mMean.set_size(nPixels);
+        
+        // M is mean-subtracted if subtractMean = true
+        // Eigencomponents in columns of eVec
+        lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, "Computing pricipal components");
+        lsst::imageproc::computePCA(M, mMean, eVal, eVec, true);
+        lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, "Computed pricipal components");
+
+        // We now have the basis functions determined
+        // Next determine the coefficients that go in front of all of the individual kernels
+        // We save the first entry of kernelCoefficients for the Mean Image
+        kernelCoefficientMatrix.set_size(nGood+1, nGood);
+        for (unsigned int i = 0; i < nGood; i++) {
+            kernelCoefficientMatrix(0,i) = 1;
+        }
+        vw::math::Matrix<double> subMatrix = 
+            vw::math::submatrix(kernelCoefficientMatrix, 1, 0, nGood, nGood);
+        
+        lsst::imageproc::decomposeMatrixUsingBasis(M, eVec, subMatrix);
+        
+        // Write results into kernelCoefficientMatrix
+        for (unsigned int i = 0; i < nKernel; i++) {
+            vw::math::select_row(kernelCoefficientMatrix, i+1) = vw::math::select_row(subMatrix, i);
+        }
+        
+        // We next do quality control here; we reconstruct the input kernels with the truncated basis function set
+        vw::math::Matrix<double> approxM(nPixels, nKernel); 
+        lsst::imageproc::approximateMatrixUsingBasis(eVec, subMatrix, NCOEFF, approxM);
+
+        nReject = 0;
+        siter = diffImStructVec.begin();
+        for (unsigned int i = 0; i < M.cols(); i++, siter++) {
+            double residual = 0;
+            for (unsigned int j = 0; j < M.rows(); j++) {
+                residual += M(i,j) - approxM(i,j);
+            }
+
+            *siter->kernelResidual = residual;
+            if (residual > MAXIMUM_KERNEL_RESIDUAL) {
+                *siter->isGood = false;
+                nReject += 1;
+            }
+            cout << " Residual " << i << " " << residual << endl;
+        }
+
+        nIter += 1;
+    } // End of iteration
 
     // Turn the Mean Image into a Kernel
     lsst::fw::Image<KernelT> meanImage(nKCols, nKRows);
@@ -513,8 +589,9 @@ void lsst::imageproc::computePCAKernelBasis(
     kernelPCABasisVec.push_back(boost::shared_ptr<lsst::fw::Kernel<KernelT> > 
                                 (new lsst::fw::FixedKernel<KernelT>(meanImage)));
 
-    // Debugging
+    // DEBUGGING DEBUGGING DEBUGGING 
     meanImage.writeFits( (boost::format("mFits.fits")).str() );
+    // DEBUGGING DEBUGGING DEBUGGING 
 
     // Turn each eVec into an Image and then into a Kernel
     for (unsigned int ki = 0; ki < eVec.cols(); ki++) {
@@ -538,66 +615,144 @@ void lsst::imageproc::computePCAKernelBasis(
         kernelPCABasisVec.push_back(boost::shared_ptr<lsst::fw::Kernel<KernelT> > 
                                     (new lsst::fw::FixedKernel<KernelT>(basisImage)));
 
-        // Debugging info
+        // DEBUGGING DEBUGGING DEBUGGING 
         basisImage.writeFits( (boost::format("eFits_%d.fits") % ki).str() );
+        // DEBUGGING DEBUGGING DEBUGGING 
+    }
+
+    // Finally, create a new LinearCombinationKernel for each Source
+    siter = diffImStructVec.begin();
+    for (unsigned int i = 0; siter != diffImStructVec.end(); i++, siter++) {
+        if (*siter->isGood == true) {
+            vector<double> kernelCoefficients;
+            kernelCoefficients.push_back(1);  // Mean kernel image
+
+            for (unsigned int j = 0; j < NCOEFF; j++) {
+                kernelCoefficients.push_back(kernelCoefficientMatrix(i,j));
+            }        
+
+            lsst::fw::LinearCombinationKernel<KernelT> PCAKernel(kernelPCABasisVec, kernelCoefficients);
+            *siter->diffImPCAKernel = PCAKernel;
+        }
     }
 }
 
 template <typename KernelT, typename FuncT>
 void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
+    vector<lsst::fw::DiffImStruct<KernelT> > &diffImStructVec, ///< Information on each kernel
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelOutBasisVec, ///< Input basis kernel set
     vw::math::Matrix<double> const &kernelCoefficients, ///< Basis coefficients for all kernels 
-    vector<double> const &position1, ///< Needed right now for the centers of the kernels in the image; should be able to avoid this 
-    vector<double> const &position2, ///< Needed right now for the centers of the kernels in the image; should be able to avoid this 
     boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr, ///< Output kernel
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr ///< Function for spatial variation of kernel
     )
  {
-     // NOTE - For a delta function basis set, the mean image is the first entry in kernelPCABasisVec.  
-     // This should *not* vary spatially.  Should we code this up or let the fitter determine that it does not vary..?
-     // I think I would like some sort of typeid() discrimination here.  For later...
-     typename vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelOutBasisVec.begin();
+     // FROM THE POLICY
+     const unsigned int MAXIMUM_ITER_SPATIAL_FIT = 5;
+     const double MAXIMUM_SPATIAL_KERNEL_RESIDUAL = 1;
 
-     // Hold the fit parameters
-     vector<double> nParameters(kernelFunctionPtr->getNParameters());
-     vector<vector<double> > fitParameters(kernelOutBasisVec.size(), nParameters);
+     // Struct iterator
+     typename vector<lsst::fw::DiffImStruct<KernelT> >::iterator siter;
 
-     unsigned int ncoeff = 0;
-     for (; kiter != kernelOutBasisVec.end(); ncoeff++, kiter++) {
-         
-         vector<double> measurements;
-         vector<double> variances;
+     // Initialize for while loop
+     int nIter = 0;
+     int nReject = 1;
+     int nGood = diffimStructVec.size();
 
-         for (unsigned int nMeas = 0; nMeas < kernelCoefficients.rows(); nMeas++) {
-             measurements.push_back(kernelCoefficients(nMeas, ncoeff));
-             //variances.push_back(what);
-         }
+     const int nParamters = kernelFunctionPtr->getNParameters();
+     
+     lsst::mwi::utils::Trace("lsst.imageproc.computeSpatiallyVaryingPSFMatchingKernel", 2, 
+                             "Entering subroutine computeSpatiallyVaryingPSFMatchingKernel");
+     
+     vector<double> measurements;
+     vector<double> variances;
+     vector<double> position1;
+     vector<double> position2;
 
-         double nSigmaSquared = 1;
-         lsst::fw::function::MinimizerFunctionBase2<FuncT> 
-             kernelFcn(measurements, variances, position1, position2, nSigmaSquared, kernelFunctionPtr);
-
-         // Initialize paramters
-         // Name; value; uncertainty
-         MnUserParameters kernelPar;
-         for (unsigned int i = 0; i < kernelFunctionPtr->getNParameters(); i++) {
-             kernelPar.add((boost::format("p%d") % i).str().c_str(), 0.0, 0.1);
-         }
-         
-         MnMigrad migrad(kernelFcn, kernelPar);
-         FunctionMinimum kernelFit = migrad();
-         //MnMinos minos(kernelFcn, kernelFit); // only if you want serious uncertainties
-
-         for (unsigned int i = 0; i < kernelFunctionPtr->getNParameters(); i++) {
-             fitParameters[ncoeff][i] = kernelFit.userState().value((boost::format("p%d") % i).str().c_str());
-             lsst::mwi::utils::Trace("lsst.imageproc.computeSpatiallyVaryingPSFMatchingKernel", 4, 
-                                     (boost::format("Fit Kernel %d, Parameter %d : %f") 
-                                      % ncoeff % i % kernelFit.userState().value((boost::format("p%d") % i).str().c_str())));
-         }
-     }
-     // Set up the spatially varying kernel and we are done!
+     // Set up the spatially varying kernel
      lsst::fw::LinearCombinationKernel<KernelT> 
-         spatiallyVaryingKernel(kernelOutBasisVec, kernelFunctionPtr, fitParameters); 
+         spatiallyVaryingKernel(kernelOutBasisVec, kernelFunctionPtr); 
+
+     // Iterate over PCA inputs until all are good
+     while ( (nIter < MAXIMUM_ITER_SPATIAL_FIT) and (nReject != 0) ) {
+
+         // NOTE - For a delta function basis set, the mean image is the first entry in kernelPCABasisVec.  
+         // This should *not* vary spatially.  Should we code this up or let the fitter determine that it does not vary..?
+
+         position1.clear();
+         position2.clear();
+         nGood = 0;
+         siter = diffImStructVec.begin();
+         for (; siter != diffImStructVec.end(); ++siter) {
+             if (*siter->isGood == true) {
+                 position1.push_back(*siter->diffImSource.getColc());
+                 position2.push_back(*siter->diffImSource.getRowc());
+                 nGood += 1;
+             }
+         }
+         
+         vector<vector<double> > fitParameters(nGood, nParameters);
+
+         unsigned int ncoeff = 0;
+         for (; kiter != kernelOutBasisVec.end(); ncoeff++, kiter++) {
+             
+             measurements.clear();
+             variances.clear();
+             siter = diffImStructVec.begin();
+             for (; siter != diffImStructVec.end(); ++siter) {
+                 if (*siter->isGood == true) {
+                     measurements.push_back(*siter->diffImPCAKernel.getKernelParameters()(ncoeff));
+                     variances.push_back(sourceResidualVariance); // approximation
+                 }
+             }
+             
+             double nSigmaSquared = 1;
+             lsst::fw::function::MinimizerFunctionBase2<FuncT> 
+                 kernelFcn(measurements, variances, position1, position2, nSigmaSquared, kernelFunctionPtr);
+             
+             MnUserParameters kernelPar;
+             // Start 0th parameter at 1
+             kernelPar.add("p0", 1);
+             for (unsigned int npar = 1; npar < kernelFunctionPtr->getNParameters(); npar++) {
+                 // Start other parameters at value 0 with small variation
+                 kernelPar.add((boost::format("p%d") % npar).str().c_str(), 0, 0.1);
+             }
+
+             MnMigrad migrad(kernelFcn, kernelPar);
+             FunctionMinimum kernelFit = migrad();
+             //MnMinos minos(kernelFcn, kernelFit); // only if you want serious uncertainties
+             
+             for (unsigned int i = 0; i < nParameters; i++) {
+                 fitParameters[ncoeff][i] = kernelFit.userState().value((boost::format("p%d") % i).str().c_str());
+                 lsst::mwi::utils::Trace("lsst.imageproc.computeSpatiallyVaryingPSFMatchingKernel", 4, 
+                                         (boost::format("Fit Kernel %d, Parameter %d : %f") 
+                                          % ncoeff % i % kernelFit.userState().value((boost::format("p%d") % i).str().c_str())));
+             }
+         }
+         
+         nReject = 0;
+         spatiallyVaryingKernel.setSpatialParameters(fitParameters);
+         double imSum;
+         siter = diffImStructVec.begin();
+         for (; siter != diffImStructVec.end(); ++siter) {
+             if (*siter->isGood == true) {
+                 lsst::fw::Image<KernelT> kImage = spatiallyVaryingKernel.computeNewImage(imSum, 
+                                                                                          *siter->diffImSource.colc,
+                                                                                          *siter->diffImSource.rowc);
+
+                 lsst::fw::Image<KernelT> diffImage = kImage - *siter->diffImPCAKernel.computeNewImage(imSum);
+                 double meanOfResiduals = 0;
+                 double varianceOfResiduals = 0;
+                 int nGoodPixels = 0;
+                 calculateImageResiduals(diffImage, nGoodPixels, meanOfResiduals, varianceOfResiduals);
+                 *siter->spatialKernelResidual = meanOfResiduals;
+                 if (meanOfResiduals > MAXIMUM_SPATIAL_KERNEL_RESIDUAL) {
+                     *siter->isGood = false;
+                     nReject += 1;
+                 }
+             }
+         }
+         nIter += 1;
+     }
 }
 
 template <typename KernelT>
@@ -638,4 +793,83 @@ void lsst::imageproc::generateAlardLuptonKernelSet(
     )
 {
     // TO DO 
+}
+
+template <typename ImageT, typename MaskT>
+void lsst::imageproc::calculateMaskedImageResiduals(
+    lsst::fw::MaskedImage<ImageT,MaskT> const &inputImage, ///< Input difference image to be analyzed
+    int &nGoodPixels, ///< Number of good pixels in the image
+    double &meanOfResiduals, ///< Mean residual/variance; ideally 0
+    double &varianceOfResiduals ///< Average variance of residual/variance; ideally 1
+    ) {
+
+    // FROM THE POLICY
+    const int BAD_MASK_BIT = 0x1;
+    
+    double x2Sum=0, xSum=0, wSum=0;
+
+    nGoodPixels = 0;
+    lsst::fw::MaskedPixelAccessor<ImageT, MaskT> accessorRow(inputImage);
+    for (unsigned int rows = 0; rows < inputImage.getRows(); rows++) {
+        lsst::fw::MaskedPixelAccessor<ImageT, MaskT> accessorCol = accessorRow;
+        for (unsigned int cols = 0; cols < inputImage.getCols(); cols++) {
+            if ((*accessorCol.mask & BAD_MASK_BIT) == 0) {
+                nGoodPixels += 1;
+                x2Sum += *accessorCol.image * *accessorCol.image / *accessorCol.variance;
+                xSum  += *accessorCol.image / *accessorCol.variance;
+                wSum  += 1. / *accessorCol.variance;
+            }
+            accessorCol.nextCol();
+        }
+        accessorRow.nextRow();
+    }
+    meanOfResiduals = -1;
+    varianceOfResiduals = -1;
+
+    if (nGoodPixels > 0) {
+        meanOfResiduals      = xSum / wSum;
+    }
+    if (nGoodPixels > 1) {
+        varianceOfResiduals  = x2Sum / wSum - meanOfResiduals*meanOfResiduals;
+        varianceOfResiduals /= (nGoodPixels - 1);
+    }
+}
+
+template <typename ImageT>
+void lsst::imageproc::calculateImageResiduals(
+    lsst::fw::Image<ImageT> const &inputImage, ///< Input difference image to be analyzed
+    int &nGoodPixels, ///< Number of good pixels in the image
+    double &meanOfResiduals, ///< Mean residual
+    double &varianceOfResiduals ///< Average variance of residual
+    ) {
+
+    double x2Sum=0, xSum=0, wSum=0;
+
+    nGoodPixels = 0;
+    typedef typename vw::ImageView<KernelT>::pixel_accessor imageAccessorType;
+
+    imageAccessorType imageAccessorCol(inputImage.origin());
+    for (unsigned int col = 0; col < inputImage.getCols(); col++) {
+        
+        imageAccessorType imageAccessorRow(imageAccessorCol);
+        for (unsigned int row = 0; row < inputImage.getRows(); row++) {
+            nGoodPixels += 1;
+            x2Sum       += *imageAccessorRow * *imageAccessorRow;
+            xSum        += *imageAccessorRow;
+            wSum        += 1;
+            imageAccessorRow.next_row();
+        }
+        imageAccessorCol.next_col();
+    }
+
+    meanOfResiduals = -1;
+    varianceOfResiduals = -1;
+
+    if (nGoodPixels > 0) {
+        meanOfResiduals      = xSum / wSum;
+    }
+    if (nGoodPixels > 1) {
+        varianceOfResiduals  = x2Sum / wSum - meanOfResiduals*meanOfResiduals;
+        varianceOfResiduals /= (nGoodPixels - 1);
+    }
 }
