@@ -1,19 +1,25 @@
 # -*- python -*-
 Import("env")
+import sys
 
-env.Program(["CFHT2MaskedImage.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
+env.Program(["CFHT2MaskedImage.cc"], LIBS=env.getlibs("imageproc"))
 
+import lsst.tests
+
+import lsst.SConsUtils as scons         # scons 1.17 supports "env.ProductDir", but for now use scons.ProductDir
+dataDir = scons.ProductDir("fwData")
+args = dict([
+    ("CFHT2MaskedImage", "%s/871034p_1 %s/871034p_1_MI" % (dataDir, dataDir)),
+    ])
 #
 # Tests
 #
-# This does not work
-#import os
+if dataDir:
+    ignoreList = None
+else:
+    print >> sys.stderr, "fwData is not set up; skipping tests requiring data"
+    ignoreList = args.keys()
 
-#exe    = "CFHT2MaskedImage"
-#target = "CFHT2MaskedImage.output"
-#try:
-#    if os.stat(exe).st_mode & 01:  # file exists and is executable
-#        env.Command(target, exe, "source $LSST_ROOT/loadLSST.csh; setup imageproc becker; examples/%s examples/871034p_1 examples/871034p_1_MI" % (exe))
-#except OSError:
-#    pass
-
+tests = lsst.tests.Control(env, args=args, ignoreList=ignoreList, verbose=True)
+tests.run("*.cc")
+tests.run("*.py")
