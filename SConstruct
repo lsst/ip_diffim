@@ -20,7 +20,7 @@ env = scons.makeEnv("imageproc",
                      ["cfitsio", "fitsio.h", "cfitsio", "ffopen"],
                      ["wcslib", "wcslib/wcs.h", "wcs"],
                      ["xpa", "xpa.h", "xpa", "XPAPuts"],
-                     ["minuit", "Minuit/FCNBase.h", "lcg_Minuit"],
+                     ["minuit", "Minuit/FCNBase.h", "lcg_Minuit:C++"],
                      ])
 
 env.libs["imageproc"] = []              # we don't have a -limageproc (yet)
