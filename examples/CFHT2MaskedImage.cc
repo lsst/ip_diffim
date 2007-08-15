@@ -88,5 +88,5 @@ int main( int argc, char** argv )
     cout << "Set " << maskFunc.getBadCount() << " bad mask bits in " << inputImage << endl;
     cfhtMaskedImage.writeFits(outputImage);
    
-    return 1;
+    return 0;
 }
