@@ -62,7 +62,16 @@ void lsst::imageproc::computePCA(
     // This might be unncessarily inefficient
     vw::math::Matrix<double> u, vt;
     vw::math::Vector<double> s;
+
+    cout << "CAW" << endl;
+    cout << M << endl;
+    cout << u << endl;
+    cout << vt << endl;
+    cout << s << endl;
+    
+        
     vw::math::complete_svd(M, u, s, vt);
+    cout << "CAW" << endl;
 
     lsst::mwi::utils::Trace("lsst.imageproc.computePCA", 5, "Test2");
 

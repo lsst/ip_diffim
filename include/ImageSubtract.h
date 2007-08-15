@@ -22,6 +22,9 @@ namespace imageproc {
 
     template <typename KernelT>
     struct DiffImContainer {
+        // Running ID
+        int id;
+
         // The source assocated with the structure
         lsst::fw::Source diffImSource;
         

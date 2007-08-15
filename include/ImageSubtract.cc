@@ -60,6 +60,8 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     const KernelT CONVOLVE_THRESHOLD = 0;
     const int EDGE_MASK_BIT = 1;
 
+    double imSum;
+
     // This is a hack for now; we need to grab a collection of sources to do the difference imaging
     vector<lsst::fw::Source> sourceCollection;
     getCollectionOfMaskedImagesForPSFMatching(sourceCollection);
@@ -74,6 +76,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     // Iterate over source
     typename vector<lsst::fw::Source>::iterator siter = sourceCollection.begin();
 
+    int nSource = 0;
     for (; siter != sourceCollection.end(); ++siter) {
         lsst::fw::Source diffImSource = *siter;
         
@@ -105,6 +108,8 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
 
         // Containerure to carry around in imageproc.diffim
         lsst::imageproc::DiffImContainer<KernelT> diffImSourceContainer;
+        diffImSourceContainer.id = nSource;
+        diffImSourceContainer.isGood = true;
         diffImSourceContainer.diffImSource = *siter;
         diffImSourceContainer.diffImKernelPtr = sourceKernelPtr;
         diffImSourceContainer.background = background;
@@ -112,10 +117,15 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         // QA - calculate the residual of the subtracted image here
         lsst::fw::MaskedImage<ImageT, MaskT>
             convolvedImageStamp = lsst::fw::kernel::convolve(*imageToConvolveStampPtr, *sourceKernelPtr, CONVOLVE_THRESHOLD, EDGE_MASK_BIT);
-        //lsst::fw::MaskedImage<ImageT, MaskT>
-        //differenceImageStamp = (*imageToNotConvolveStampPtr) - convolvedImageStamp;
+        //convolvedImageStamp -= (*imageToNotConvolveStampPtr);
+        //convolvedImageStamp *= -1;  // Not necessary probably
+
+        // DEBUGGING DEBUGGING DEBUGGING
+        convolvedImageStamp.writeFits( (boost::format("d1Fits_%d") % diffImSource.getSourceId()).str() );
+        imageToNotConvolveStampPtr->writeFits( (boost::format("ncFits_%d") % diffImSource.getSourceId()).str() );
         convolvedImageStamp -= (*imageToNotConvolveStampPtr);
-        convolvedImageStamp *= -1;  // Not necessary probably
+        convolvedImageStamp.writeFits( (boost::format("d2Fits_%d") % diffImSource.getSourceId()).str() );
+        // DEBUGGING DEBUGGING DEBUGGING
 
         double meanOfResiduals = 0;
         double varianceOfResiduals = 0;
@@ -125,15 +135,21 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         diffImSourceContainer.sourceResidualVariance = varianceOfResiduals;
 
         if (fabs(meanOfResiduals) > MAXIMUM_SOURCE_RESIDUAL_ABS_MEAN) {
+            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
+                                    (boost::format("Kernel %d, bad mean residual of source : %f") 
+                                     % diffImSourceContainer.id % meanOfResiduals));
             diffImSourceContainer.isGood = false;
         }
         if (varianceOfResiduals > MAXIMUM_SOURCE_RESIDUAL_VARIANCE) {
+            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
+                                    (boost::format("Kernel %d, bad residual variance of source : %f") 
+                                     % diffImSourceContainer.id % varianceOfResiduals));
             diffImSourceContainer.isGood = false;
         }
         diffImContainerVec.push_back(diffImSourceContainer);
+        nSource += 1;
 
         // DEBUGGING DEBUGGING DEBUGGING
-        double imSum;
         lsst::fw::Image<KernelT> kImage = sourceKernelPtr->computeNewImage(imSum);
         kImage.writeFits( (boost::format("kFits_%d.fits") % diffImSource.getSourceId()).str() );
         // DEBUGGING DEBUGGING DEBUGGING
@@ -488,7 +504,10 @@ void lsst::imageproc::computePCAKernelBasis(
         }
         
         nPixels = nKCols * nKRows;
+        cout << "UH" << endl;
+        cout << M << endl;
         M.set_size(nPixels, nGood);
+        cout << M << endl;
         
         // fill up matrix for PCA
         double imSum;
@@ -569,6 +588,9 @@ void lsst::imageproc::computePCAKernelBasis(
 
             (*siter).kernelResidual = residual;
             if (residual > MAXIMUM_KERNEL_RESIDUAL) {
+                lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, 
+                                        (boost::format("Kernel %d, poorly described by PCA basis : %f") 
+                                         % i % residual));
                 (*siter).isGood = false;
                 nReject += 1;
             }
@@ -757,6 +779,9 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
                  calculateImageResiduals(diffImage, nGoodPixels, meanOfResiduals, varianceOfResiduals);
                  (*siter).spatialKernelResidual = meanOfResiduals;
                  if (meanOfResiduals > MAXIMUM_SPATIAL_KERNEL_RESIDUAL) {
+                     lsst::mwi::utils::Trace("lsst.imageproc.computeSpatiallyVaryingPSFMatchingKernel", 4, 
+                                             (boost::format("Kernel %d, poorly described by spatial function basis : %f") 
+                                              % (*siter).id % meanOfResiduals));
                      (*siter).isGood = false;
                      nReject += 1;
                  }

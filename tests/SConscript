@@ -19,5 +19,5 @@ Import("env")
 
 # testing ImageSubtract.cc/.h
 env.Program(["testImageSubtract1.cc"], LIBS=env.getlibs("imageproc"));
-env.Program(["testImageSubtract2.cc"], LIBS=env.getlibs("imageproc"));
-env.Program(["testImageSubtract3.cc"], LIBS=env.getlibs("imageproc"));
+#env.Program(["testImageSubtract2.cc"], LIBS=env.getlibs("imageproc"));
+#env.Program(["testImageSubtract3.cc"], LIBS=env.getlibs("imageproc"));
