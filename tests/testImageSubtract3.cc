@@ -3,6 +3,7 @@
 #include <lsst/fw/FunctionLibrary.h>
 #include <lsst/mwi/utils/Trace.h>
 #include <lsst/mwi/exceptions/Exception.h>
+#include <lsst/mwi/data/Citizen.h>
 #include <ImageSubtract.h>
 #include <boost/shared_ptr.hpp>
 
@@ -11,6 +12,7 @@ using namespace lsst::fw;
 
 int main( int argc, char** argv )
 {
+    {
     lsst::mwi::utils::Trace::setDestination(cout);
     lsst::mwi::utils::Trace::setVerbosity(".", 5);
     
@@ -18,7 +20,7 @@ int main( int argc, char** argv )
     typedef float ImageT; // have to make sure this jibes with the input data!
     typedef double KernelT;
     typedef double FuncT;
-
+    
     // Read input images
     if (argc < 2) {
         cout << "This program takes a single input image on the command line" << endl;
@@ -45,7 +47,7 @@ int main( int argc, char** argv )
         cerr << "Failed to open template image " << inputImage << ": " << e.what() << endl;
         return 1;
     }
-
+    
     // Hardcoded
     unsigned int kernelRows = 7;
     unsigned int kernelCols = 7;
@@ -56,14 +58,14 @@ int main( int argc, char** argv )
     unsigned int polyOrder = 2;
     double minSigma = 0.1;
     double maxSigma = 3.0;
-
+    
     lsst::fw::Kernel<KernelT>::KernelFunctionPtrType gaussFuncPtr(
         new lsst::fw::function::GaussianFunction2<FuncT>(sigmaX, sigmaY));
     lsst::fw::Kernel<KernelT>::SpatialFunctionPtrType polyFuncPtr(
         new lsst::fw::function::PolynomialFunction2<double>(polyOrder));
     lsst::fw::AnalyticKernel<KernelT> gaussSpVarKernel(
         gaussFuncPtr, kernelCols, kernelRows, polyFuncPtr);
-
+    
     // Get copy of spatial parameters (all zeros), set and feed back to the kernel
     vector<vector<double> > polyParams = gaussSpVarKernel.getSpatialParameters();
     // Set spatial parameters for kernel parameter 0
@@ -75,40 +77,49 @@ int main( int argc, char** argv )
     polyParams[1][1] = 0.0;
     polyParams[1][2] = (maxSigma - minSigma) / static_cast<double>(scienceMaskedImage.getRows());
     gaussSpVarKernel.setSpatialParameters(polyParams);
-
+    
     // Convolved science image
     lsst::mwi::utils::Trace("testImageSubtract2", 2, "Convolving input image for testing");
     const KernelT threshold = 0.0;
     const int edgeMaskBit = 1;
     lsst::fw::MaskedImage<ImageT, MaskT> convolvedScienceMaskedImage =
         lsst::fw::kernel::convolve(scienceMaskedImage, gaussSpVarKernel, threshold, edgeMaskBit);
-
+    
     convolvedScienceMaskedImage.writeFits( (boost::format("%s_test3") % inputImage).str() );
-       
+    
     // Generate basis of delta functions for kernel
     vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;
     lsst::imageproc::generateDeltaFunctionKernelSet(kernelRows, kernelCols, kernelBasisVec);
-
-
+    
+    
     // Output kernel
     boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > kernelPtr(
         new lsst::fw::LinearCombinationKernel<KernelT>
         );
-
+    
     // Function for spatially varying kernel.  Make null here for this test.
     unsigned int kernelSpatialOrder = polyOrder;
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > kernelFunctionPtr(
         new lsst::fw::function::PolynomialFunction2<FuncT>(kernelSpatialOrder)
         );
-
+    
     // Function for spatially varying background.  
     unsigned int backgroundSpatialOrder = 0;
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > backgroundFunctionPtr(
         new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
         );
-
+    
     lsst::imageproc::computePSFMatchingKernelForMaskedImage
         (convolvedScienceMaskedImage, templateMaskedImage, kernelBasisVec,
          kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
-
+    
+    }
+    
+    if (Citizen::census(0) == 0) {
+        cerr << "No leaks detected" << endl;
+    } else {
+        cerr << "Leaked memory blocks:" << endl;
+        Citizen::census(cerr);
+    } 
+    
 }

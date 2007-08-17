@@ -121,6 +121,9 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         //convolvedImageStamp *= -1;  // Not necessary probably
 
         // DEBUGGING DEBUGGING DEBUGGING
+        
+        // ADDRESS PIXELS INDIVIDUALLY TO SEE WHATS GOING ON...
+        
         convolvedImageStamp.writeFits( (boost::format("d1Fits_%d") % diffImSource.getSourceId()).str() );
         imageToNotConvolveStampPtr->writeFits( (boost::format("ncFits_%d") % diffImSource.getSourceId()).str() );
         convolvedImageStamp -= (*imageToNotConvolveStampPtr);
