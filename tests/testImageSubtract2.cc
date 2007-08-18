@@ -28,6 +28,7 @@ int main( int argc, char** argv )
             cout << "  Your output kernel should be a delta function." << endl;
             cout << "  Basis function set is delta functions." << endl;
             cout << "  There is no spatial variation." << endl;
+            cout << "  I add 100 counts to the background to test for this" << endl;
             exit(1);
         }
         string inputImage = argv[1];
@@ -69,7 +70,9 @@ int main( int argc, char** argv )
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > backgroundFunctionPtr(
             new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
             );
-        
+
+        templateMaskedImage += 100;
+
         lsst::imageproc::computePSFMatchingKernelForMaskedImage
             (scienceMaskedImage, templateMaskedImage, kernelBasisVec, 
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);

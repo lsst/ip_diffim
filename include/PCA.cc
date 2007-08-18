@@ -62,16 +62,7 @@ void lsst::imageproc::computePCA(
     // This might be unncessarily inefficient
     vw::math::Matrix<double> u, vt;
     vw::math::Vector<double> s;
-
-    cout << "CAW" << endl;
-    cout << M << endl;
-    cout << u << endl;
-    cout << vt << endl;
-    cout << s << endl;
-    
-        
     vw::math::complete_svd(M, u, s, vt);
-    cout << "CAW" << endl;
 
     lsst::mwi::utils::Trace("lsst.imageproc.computePCA", 5, "Test2");
 
@@ -116,7 +107,6 @@ void lsst::imageproc::computePCA(
         eVal[i] = s[i]*s[i];
     }
 
-    cout << "U" << u << endl;
     // NOTE : u.cols() is the number of u.rows(), not s.size()
     // Eigenvectors are in the columns of eVec
     for (unsigned int row = 0; row < M.rows(); ++row) {
@@ -156,7 +146,6 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
         }
     }
 }
-
 
 template <typename aMatrixT>
 void lsst::imageproc::approximateMatrixUsingBasis(

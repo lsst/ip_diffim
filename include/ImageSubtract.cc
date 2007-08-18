@@ -117,18 +117,9 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         // QA - calculate the residual of the subtracted image here
         lsst::fw::MaskedImage<ImageT, MaskT>
             convolvedImageStamp = lsst::fw::kernel::convolve(*imageToConvolveStampPtr, *sourceKernelPtr, CONVOLVE_THRESHOLD, EDGE_MASK_BIT);
-        //convolvedImageStamp -= (*imageToNotConvolveStampPtr);
-        //convolvedImageStamp *= -1;  // Not necessary probably
-
-        // DEBUGGING DEBUGGING DEBUGGING
-        
-        // ADDRESS PIXELS INDIVIDUALLY TO SEE WHATS GOING ON...
-        
-        convolvedImageStamp.writeFits( (boost::format("d1Fits_%d") % diffImSource.getSourceId()).str() );
-        imageToNotConvolveStampPtr->writeFits( (boost::format("ncFits_%d") % diffImSource.getSourceId()).str() );
         convolvedImageStamp -= (*imageToNotConvolveStampPtr);
-        convolvedImageStamp.writeFits( (boost::format("d2Fits_%d") % diffImSource.getSourceId()).str() );
-        // DEBUGGING DEBUGGING DEBUGGING
+        convolvedImageStamp *= -1;
+        convolvedImageStamp -= background;
 
         double meanOfResiduals = 0;
         double varianceOfResiduals = 0;
@@ -155,6 +146,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         // DEBUGGING DEBUGGING DEBUGGING
         lsst::fw::Image<KernelT> kImage = sourceKernelPtr->computeNewImage(imSum);
         kImage.writeFits( (boost::format("kFits_%d.fits") % diffImSource.getSourceId()).str() );
+        convolvedImageStamp.writeFits( (boost::format("d1Fits_%d.fits") % diffImSource.getSourceId()).str() );
         // DEBUGGING DEBUGGING DEBUGGING
 
     }
@@ -188,6 +180,10 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
                 nGood += 1;
                 backgrounds.push_back((*siter).background);
                 bgSum += (*siter).background;
+                lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
+                                        (boost::format(" Background %d = %f") 
+                                         % (*siter).id % (*siter).background));
+                
                 variances.push_back((*siter).sourceResidualVariance);   // approximation
                 position1.push_back((*siter).diffImSource.getColc());
                 position2.push_back((*siter).diffImSource.getRowc());
@@ -392,11 +388,14 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
 
                     M[kidxi][kidxj] += cdCamerai * cdCameraj / (cdVariancei + cdVariancej);
                 } 
+                // Constant background term; effectively kidxj+1
+                // NOTE : is this cVariance or ncVariance????
+                M[kidxi][nParameters-1] += cdCamerai / (cVariance + cdVariancei);
             } 
 
-            // Here we have a single background term
+            // Background term; effectively kidxi+1
             B[nParameters-1] += ncCamera / (ncVariance + cVariance); 
-            M[nParameters-1][nParameters-1] += 1.0 / (ncVariance + cVariance);
+            M[nParameters-1][nParameters-1] += 1.0 / (cVariance + cVariance);
             lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 4, 
                                     boost::format("Background terms : %f %f") 
                                     % B[nParameters-1] % M[nParameters-1][nParameters-1]);
@@ -420,8 +419,8 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     } // row
 
     // Fill in rest of M
-    for (int kidxi=0; kidxi < nKernelParameters; ++kidxi) 
-        for (int kidxj=kidxi+1; kidxj < nKernelParameters; ++kidxj) 
+    for (int kidxi=0; kidxi < nParameters; ++kidxi) 
+        for (int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) 
             M[kidxj][kidxi] = M[kidxi][kidxj];
 
     cout << "B : " << B << endl;
@@ -445,9 +444,9 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
     ) {
 
     // Hack some positions in for /lsst/becker/lsst_devel/DC2/fw/tests/data/871034p_1_MI_img.fits
-    lsst::fw::Source src1(1, 1010.345, 2375.548, 10., 10.); 
-    lsst::fw::Source src2(2, 404.248, 573.398, 10., 10.);
-    lsst::fw::Source src3(3, 1686.743, 1880.935, 10., 10.);
+    lsst::fw::Source src1(1, 1010.345, 2375.548, 20., 20.); 
+    lsst::fw::Source src2(2, 404.248, 573.398, 20., 20.);
+    lsst::fw::Source src3(3, 1686.743, 1880.935, 20., 20.);
 
     sourceCollection.push_back(src1);
     sourceCollection.push_back(src2);
@@ -484,7 +483,7 @@ void lsst::imageproc::computePCAKernelBasis(
     unsigned int nReject = 1;
     unsigned int nGood = diffImContainerVec.size();
     unsigned int nKCols = 0, nKRows = 0;
-    unsigned int nPixels, nKernel;
+    unsigned int nPixels;
 
     lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 2, 
                             "Entering subroutine computePCAKernelBasis");
@@ -507,10 +506,7 @@ void lsst::imageproc::computePCAKernelBasis(
         }
         
         nPixels = nKCols * nKRows;
-        cout << "UH" << endl;
-        cout << M << endl;
         M.set_size(nPixels, nGood);
-        cout << M << endl;
         
         // fill up matrix for PCA
         double imSum;
@@ -562,24 +558,16 @@ void lsst::imageproc::computePCAKernelBasis(
 
         // We now have the basis functions determined
         // Next determine the coefficients that go in front of all of the individual kernels
-        // We save the first entry of kernelCoefficients for the Mean Image
-        kernelCoefficientMatrix.set_size(nGood+1, nGood);
-        for (unsigned int i = 0; i < nGood; ++i) {
-            kernelCoefficientMatrix(0,i) = 1;
-        }
-        vw::math::Matrix<double> subMatrix = 
-            vw::math::submatrix(kernelCoefficientMatrix, 1, 0, nGood, nGood);
-        
-        lsst::imageproc::decomposeMatrixUsingBasis(M, eVec, subMatrix);
-        
-        // Write results into kernelCoefficientMatrix
-        for (unsigned int i = 0; i < nKernel; ++i) {
-            vw::math::select_row(kernelCoefficientMatrix, i+1) = vw::math::select_row(subMatrix, i);
-        }
+        kernelCoefficientMatrix.set_size(nGood, NCOEFF);
+        lsst::imageproc::decomposeMatrixUsingBasis(M, eVec, NCOEFF, kernelCoefficientMatrix);
         
         // We next do quality control here; we reconstruct the input kernels with the truncated basis function set
-        vw::math::Matrix<double> approxM(nPixels, nKernel); 
-        lsst::imageproc::approximateMatrixUsingBasis(eVec, subMatrix, NCOEFF, approxM);
+        // Remember that M is mean-subtracted already
+        vw::math::Matrix<double> approxM(nPixels, nGood); 
+        lsst::imageproc::approximateMatrixUsingBasis(eVec, kernelCoefficientMatrix, NCOEFF, approxM);
+        
+        cout << "Uh " << nPixels << " " << nGood << endl;
+        cout << approxM << endl;
 
         nReject = 0;
         siter = diffImContainerVec.begin();
@@ -597,7 +585,7 @@ void lsst::imageproc::computePCAKernelBasis(
                 (*siter).isGood = false;
                 nReject += 1;
             }
-            cout << " Residual " << i << " " << residual << endl;
+            cout << " Static Kernel Residual " << i << " = " << residual << endl;
         }
 
         nIter += 1;
@@ -655,8 +643,8 @@ void lsst::imageproc::computePCAKernelBasis(
     for (unsigned int i = 0; siter != diffImContainerVec.end(); ++i, ++siter) {
         if ((*siter).isGood == true) {
             vector<double> kernelCoefficients;
-            kernelCoefficients.push_back(1);  // Mean kernel image
 
+            kernelCoefficients.push_back(1); // Mean image
             for (unsigned int j = 0; j < NCOEFF; ++j) {
                 kernelCoefficients.push_back(kernelCoefficientMatrix(i,j));
             }        
@@ -692,6 +680,7 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
      unsigned int nIter = 0;
      unsigned int nReject = 1;
      unsigned int nGood = diffImContainerVec.size();
+     unsigned int nKernel = kernelOutBasisVec.size();
      unsigned int nParameters = kernelFunctionPtr->getNParameters();
      
      lsst::mwi::utils::Trace("lsst.imageproc.computeSpatiallyVaryingPSFMatchingKernel", 2, 
@@ -701,10 +690,6 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
      vector<double> variances;
      vector<double> position1;
      vector<double> position2;
-
-     // Set up the spatially varying kernel
-     lsst::fw::LinearCombinationKernel<KernelT> 
-         spatiallyVaryingKernel(kernelOutBasisVec, kernelFunctionPtr); 
 
      // Iterate over PCA inputs until all are good
      while ( (nIter < MAXIMUM_ITER_SPATIAL_FIT) and (nReject != 0) ) {
@@ -724,12 +709,12 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
              }
          }
          
-         vector<double> nparVec(nParameters);
-         vector<vector<double> > fitParameters(nGood, nparVec);
+         vector<double> nParVec(nParameters);
+         vector<vector<double> > fitParameters(nKernel, nParVec);
 
-         unsigned int ncoeff = 0;
+         unsigned int nk = 0;
          kiter=kernelOutBasisVec.begin();
-         for (; kiter != kernelOutBasisVec.end(); ++ncoeff, ++kiter) {
+         for (; kiter != kernelOutBasisVec.end(); ++nk, ++kiter) {
              
              measurements.clear();
              variances.clear();
@@ -737,7 +722,7 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
              for (; siter != diffImContainerVec.end(); ++siter) {
                  if ((*siter).isGood == true) {
                      vector<double> kernelParameters = (*siter).diffImPCAKernelPtr->getKernelParameters();  // inefficient
-                     measurements.push_back(kernelParameters[ncoeff]);
+                     measurements.push_back(kernelParameters[nk]);
                      variances.push_back((*siter).sourceResidualVariance); // approximation
                  }
              }
@@ -759,18 +744,22 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
              //MnMinos minos(kernelFcn, kernelFit); // only if you want serious uncertainties
              
              for (unsigned int i = 0; i < nParameters; ++i) {
-                 fitParameters[ncoeff][i] = kernelFit.userState().value((boost::format("p%d") % i).str().c_str());
+                 fitParameters[nk][i] = kernelFit.userState().value((boost::format("p%d") % i).str().c_str());
                  lsst::mwi::utils::Trace("lsst.imageproc.computeSpatiallyVaryingPSFMatchingKernel", 4, 
                                          (boost::format("Fit Kernel %d, Parameter %d : %f") 
-                                          % ncoeff % i % kernelFit.userState().value((boost::format("p%d") % i).str().c_str())));
+                                          % nk % i % kernelFit.userState().value((boost::format("p%d") % i).str().c_str())));
              }
          }
          
+         // Set up the spatially varying kernel
+         lsst::fw::LinearCombinationKernel<KernelT> 
+             spatiallyVaryingKernel(kernelOutBasisVec, kernelFunctionPtr); 
+
          nReject = 0;
          spatiallyVaryingKernel.setSpatialParameters(fitParameters);
          double imSum;
          siter = diffImContainerVec.begin();
-         for (; siter != diffImContainerVec.end(); ++siter) {
+         for (unsigned int i = 0; siter != diffImContainerVec.end(); ++i, ++siter) {
              if ((*siter).isGood == true) {
                  lsst::fw::Image<KernelT> diffImage = spatiallyVaryingKernel.computeNewImage(imSum, 
                                                                                              (*siter).diffImSource.getColc(),
@@ -788,6 +777,7 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
                      (*siter).isGood = false;
                      nReject += 1;
                  }
+                 cout << " Spatial Kernel Residual " << i << " = " << meanOfResiduals << endl;
              }
          }
          nIter += 1;
