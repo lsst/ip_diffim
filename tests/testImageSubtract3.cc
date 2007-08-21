@@ -14,7 +14,7 @@ int main( int argc, char** argv )
 {
     {
     lsst::mwi::utils::Trace::setDestination(cout);
-    lsst::mwi::utils::Trace::setVerbosity(".", 5);
+    lsst::mwi::utils::Trace::setVerbosity(".", 4);
     
     typedef uint8 MaskT;
     typedef float ImageT; // have to make sure this jibes with the input data!
@@ -53,21 +53,21 @@ int main( int argc, char** argv )
     unsigned int kernelCols = 7;
     
     // The kernel to convolve the template image with to yield the science image
-    double sigmaX = 2.0;
-    double sigmaY = 2.5;
+    double sigmaX = 1.0;
+    double sigmaY = 2.0;
     
     lsst::fw::Kernel<KernelT>::KernelFunctionPtrType gaussFuncPtr(
         new lsst::fw::function::GaussianFunction2<FuncT>(sigmaX, sigmaY));
     lsst::fw::AnalyticKernel<KernelT> gaussKernel(gaussFuncPtr, kernelCols, kernelRows);
     
     // Convolved science image
-    lsst::mwi::utils::Trace("testImageSubtract2", 2, "Convolving input image for testing");
+    lsst::mwi::utils::Trace("testImageSubtract3", 2, "Convolving input image for testing");
     const KernelT threshold = 0.0;
     const int edgeMaskBit = 1;
     lsst::fw::MaskedImage<ImageT, MaskT> convolvedScienceMaskedImage =
         lsst::fw::kernel::convolve(scienceMaskedImage, gaussKernel, threshold, edgeMaskBit);
     
-    convolvedScienceMaskedImage.writeFits( (boost::format("%s_test2") % inputImage).str() );
+    convolvedScienceMaskedImage.writeFits( (boost::format("%s_test3") % inputImage).str() );
     
     // Generate basis of delta functions for kernel
     vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;
@@ -91,7 +91,7 @@ int main( int argc, char** argv )
         );
     
     lsst::imageproc::computePSFMatchingKernelForMaskedImage
-        (convolvedScienceMaskedImage, templateMaskedImage, kernelBasisVec,
+        (templateMaskedImage, convolvedScienceMaskedImage, kernelBasisVec,
          kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
     
     }

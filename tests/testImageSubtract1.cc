@@ -71,7 +71,7 @@ int main( int argc, char** argv )
             );
         
         lsst::imageproc::computePSFMatchingKernelForMaskedImage
-            (scienceMaskedImage, templateMaskedImage, kernelBasisVec, 
+            (templateMaskedImage, scienceMaskedImage, kernelBasisVec, 
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
         
     }

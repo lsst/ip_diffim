@@ -79,13 +79,13 @@ int main( int argc, char** argv )
     gaussSpVarKernel.setSpatialParameters(polyParams);
     
     // Convolved science image
-    lsst::mwi::utils::Trace("testImageSubtract2", 2, "Convolving input image for testing");
+    lsst::mwi::utils::Trace("testImageSubtract4", 2, "Convolving input image for testing");
     const KernelT threshold = 0.0;
     const int edgeMaskBit = 1;
     lsst::fw::MaskedImage<ImageT, MaskT> convolvedScienceMaskedImage =
         lsst::fw::kernel::convolve(scienceMaskedImage, gaussSpVarKernel, threshold, edgeMaskBit);
     
-    convolvedScienceMaskedImage.writeFits( (boost::format("%s_test3") % inputImage).str() );
+    convolvedScienceMaskedImage.writeFits( (boost::format("%s_test4") % inputImage).str() );
     
     // Generate basis of delta functions for kernel
     vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;
@@ -110,7 +110,7 @@ int main( int argc, char** argv )
         );
     
     lsst::imageproc::computePSFMatchingKernelForMaskedImage
-        (convolvedScienceMaskedImage, templateMaskedImage, kernelBasisVec,
+        (templateMaskedImage, convolvedScienceMaskedImage, kernelBasisVec,
          kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
     
     }

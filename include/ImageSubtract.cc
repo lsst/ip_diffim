@@ -18,6 +18,7 @@
 #include <lsst/fw/Source.h>
 #include <lsst/fw/MinimizerFunctionBase.h>
 #include <lsst/mwi/utils/Trace.h>
+#include <lsst/mwi/exceptions/Exception.h>
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
 #include <vw/Math/LinearAlgebra.h> 
@@ -43,8 +44,8 @@ using namespace std;
  */
 template <typename ImageT, typename MaskT, typename KernelT, typename FuncT>
 void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
-    lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve, ///< Template image; convolved
-    lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve, ///< Science image; not convolved
+    lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve, ///< Template image; is convolved
+    lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve, ///< Science image; is not convolved
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisVec, ///< Input set of basis kernels
     boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr, ///< The output convolution kernel
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr, ///< Function for spatial variation of kernel
@@ -92,7 +93,8 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         imageToNotConvolveStampPtr = imageToNotConvolve.getSubImage(stamp);
 
         // DEBUGGING DEBUGGING DEBUGGING
-        imageToConvolveStampPtr->writeFits( (boost::format("iFits_%d") % diffImSource.getSourceId()).str() );
+        imageToConvolveStampPtr->writeFits( (boost::format("csFits_%d") % diffImSource.getSourceId()).str() );
+        imageToNotConvolveStampPtr->writeFits( (boost::format("ncsFits_%d") % diffImSource.getSourceId()).str() );
         // DEBUGGING DEBUGGING DEBUGGING
 
         // Find best single kernel for this stamp
@@ -297,15 +299,13 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     // 
     // The convolved image and the input image are by default the same size, so
     // we offset our initial pixel references by the same amount
-    //
-    // NOTE : the last *good* pixel is endCol - 1
-    //        in your for loops, therefore say "col < endCol" not "col <= endCol"
     kiter = kernelInBasisVec.begin();
     citer = convolvedImageVec.begin();
     unsigned int startCol = (*kiter)->getCtrCol();
     unsigned int startRow = (*kiter)->getCtrRow();
-    unsigned int endCol   = (*citer)->getCols() - ((*kiter)->getCols() - (*kiter)->getCtrCol());
-    unsigned int endRow   = (*citer)->getRows() - ((*kiter)->getRows() - (*kiter)->getCtrRow());
+    // NOTE - I determined I needed this +1 by eye
+    unsigned int endCol   = (*citer)->getCols() - ((*kiter)->getCols() - (*kiter)->getCtrCol()) + 1;
+    unsigned int endRow   = (*citer)->getRows() - ((*kiter)->getRows() - (*kiter)->getCtrRow()) + 1;
     // NOTE - we need to enforce that the input images are large enough
     // How about some multiple of the PSF FWHM?  Or second moments?
 
@@ -342,15 +342,15 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
             ImageT ncCamera = *imageToNotConvolveCol.image;
             ImageT ncVariance = *imageToNotConvolveCol.variance;
             MaskT  ncMask = *imageToNotConvolveCol.mask;
-
             ImageT cVariance = *imageToConvolveCol.variance;
+            ImageT iVariance = 1.0 / (cVariance + ncVariance);
 
             // Do we skip these?
             if (ncMask & 0x1) {
                 continue;
             }
 
-            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 4, 
+            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 5, 
                                     boost::format("Accessing image row %d col %d : %f %f") 
                                     % row % col % ncCamera % ncVariance);
 
@@ -366,11 +366,13 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
                 if (cdMaski & 0x1) {
                     continue;
                 }
-                lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 5, 
+                lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 6, 
                                         boost::format("Accessing convolved image %d : %f %f") 
                                         % kidxi % cdCamerai % cdVariancei);
 
-                B[kidxi] += ncCamera * cdCamerai / (ncVariance + cdVariancei);
+                // Not sure what is the best variance to use
+                //B[kidxi] += ncCamera * cdCamerai / (ncVariance + cdVariancei);
+                B[kidxi] += ncCamera * cdCamerai * iVariance;
                 
                 // kernel index j 
                 typename vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> >::iterator kiterj = kiteri;
@@ -386,17 +388,21 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
                                             boost::format("Accessing convolved image %d : %f %f") 
                                             % kidxj % cdCameraj % cdVariancej);
 
-                    M[kidxi][kidxj] += cdCamerai * cdCameraj / (cdVariancei + cdVariancej);
+                    //M[kidxi][kidxj] += cdCamerai * cdCameraj / (cdVariancei + cdVariancej);
+                    M[kidxi][kidxj] += cdCamerai * cdCameraj * iVariance;
                 } 
                 // Constant background term; effectively kidxj+1
                 // NOTE : is this cVariance or ncVariance????
-                M[kidxi][nParameters-1] += cdCamerai / (cVariance + cdVariancei);
+                //M[kidxi][nParameters-1] += cdCamerai / (cVariance + cdVariancei);
+                M[kidxi][nParameters-1] += cdCamerai * iVariance;
             } 
 
             // Background term; effectively kidxi+1
-            B[nParameters-1] += ncCamera / (ncVariance + cVariance); 
-            M[nParameters-1][nParameters-1] += 1.0 / (cVariance + cVariance);
-            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 4, 
+            //B[nParameters-1] += ncCamera / (ncVariance + cVariance); 
+            //M[nParameters-1][nParameters-1] += 1.0 / (cVariance + cVariance);
+            B[nParameters-1] += ncCamera * iVariance;
+            M[nParameters-1][nParameters-1] += 1.0 * iVariance;
+            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 5, 
                                     boost::format("Background terms : %f %f") 
                                     % B[nParameters-1] % M[nParameters-1][nParameters-1]);
 
@@ -504,7 +510,12 @@ void lsst::imageproc::computePCAKernelBasis(
                 }
             }
         }
-        
+
+        if (nGood == 0) {
+            throw lsst::mwi::exceptions::Exception("No good kernels for PCA");
+        }
+                    
+                    
         nPixels = nKCols * nKRows;
         M.set_size(nPixels, nGood);
         
@@ -566,7 +577,6 @@ void lsst::imageproc::computePCAKernelBasis(
         vw::math::Matrix<double> approxM(nPixels, nGood); 
         lsst::imageproc::approximateMatrixUsingBasis(eVec, kernelCoefficientMatrix, NCOEFF, approxM);
         
-        cout << "Uh " << nPixels << " " << nGood << endl;
         cout << approxM << endl;
 
         nReject = 0;
