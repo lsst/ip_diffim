@@ -89,11 +89,67 @@ int main( int argc, char** argv )
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > backgroundFunctionPtr(
         new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
         );
+
+    // Hack some positions in for /lsst/becker/lsst_devel/DC2/fw/tests/data/871034p_1_MI_img.fits
+    vector<lsst::fw::Source> sourceCollection;
+    double radius = 20;
+    lsst::fw::Source src1(1, 78.654, 3573.945, radius, radius);
+    lsst::fw::Source src2(2, 341.149, 2753.536, radius, radius);
+    lsst::fw::Source src3(3, 353.237, 2755.959, radius, radius);
+    lsst::fw::Source src4(4, 367.756, 3827.671, radius, radius);
+    lsst::fw::Source src5(5, 381.062, 3212.948, radius, radius);
+    lsst::fw::Source src6(6, 404.433, 573.462, radius, radius);
+    lsst::fw::Source src7(7, 420.967, 3306.310, radius, radius);
+    lsst::fw::Source src8(8, 518.953, 2035.000, radius, radius);
+    lsst::fw::Source src9(9, 546.657, 285.079, radius, radius); // This one is a CR!
+    //lsst::fw::Source src10(10, 779.549, 1672.990, radius, radius);
+    //lsst::fw::Source src11(11, 1010.618, 2375.691, radius, radius);
+    //lsst::fw::Source src12(12, 1219.023, 1683.485, radius, radius);
+    //lsst::fw::Source src13(13, 1457.960, 2282.024, radius, radius);
+    //lsst::fw::Source src14(14, 1588.583, 3536.200, radius, radius);
+    //lsst::fw::Source src15(15, 1604.816, 4070.769, radius, radius);
+    //lsst::fw::Source src16(16, 1609.222, 4071.211, radius, radius);
+    //lsst::fw::Source src17(17, 1686.953, 1880.928, radius, radius);
+    //lsst::fw::Source src18(18, 1698.308, 3860.842, radius, radius);
+    //lsst::fw::Source src19(19, 1709.934, 3861.217, radius, radius);
+    //lsst::fw::Source src20(20, 1737.637, 3139.729, radius, radius);
+    //lsst::fw::Source src21(21, 1794.293, 2023.711, radius, radius);
+    //lsst::fw::Source src22(22, 1799.249, 733.596, radius, radius);
+    //lsst::fw::Source src23(23, 1959.672, 4232.035, radius, radius);
+    sourceCollection.push_back(src1);
+    sourceCollection.push_back(src2);
+    sourceCollection.push_back(src3);
+    sourceCollection.push_back(src4);
+    sourceCollection.push_back(src5);
+    sourceCollection.push_back(src6);
+    sourceCollection.push_back(src7);
+    sourceCollection.push_back(src8);
+    sourceCollection.push_back(src9);
+    //sourceCollection.push_back(src10);
+    //sourceCollection.push_back(src11);
+    //sourceCollection.push_back(src12);
+    //sourceCollection.push_back(src13);
+    //sourceCollection.push_back(src14);
+    //sourceCollection.push_back(src15);
+    //sourceCollection.push_back(src16);
+    //sourceCollection.push_back(src17);
+    //sourceCollection.push_back(src18);
+    //sourceCollection.push_back(src19);
+    //sourceCollection.push_back(src20);
+    //sourceCollection.push_back(src21);
+    //sourceCollection.push_back(src22);
+    //sourceCollection.push_back(src23);
     
     lsst::imageproc::computePSFMatchingKernelForMaskedImage
-        (templateMaskedImage, convolvedScienceMaskedImage, kernelBasisVec,
-         kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
-    
+        (templateMaskedImage, convolvedScienceMaskedImage, kernelBasisVec, 
+         sourceCollection, kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
+
+    lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =
+        lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, threshold, edgeMaskBit);
+
+    convolvedScienceMaskedImage -= convolvedTemplateMaskedImage;
+    convolvedScienceMaskedImage.writeFits( (boost::format("%s_diff3") % inputImage).str() );
+
     }
  
     if (Citizen::census(0) == 0) {

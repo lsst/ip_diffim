@@ -60,6 +60,17 @@ namespace imageproc {
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr
         );
     
+    template <typename ImageT, typename MaskT, typename KernelT, typename FuncT>
+    void computePSFMatchingKernelForMaskedImage(
+        lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
+        lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisVec,
+        vector<lsst::fw::Source> const &sourceCollection,
+        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr,
+        boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr,
+        boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr
+        );
+    
     template <typename ImageT, typename MaskT, typename KernelT>
     void computePSFMatchingKernelForPostageStamp(
         lsst::fw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
