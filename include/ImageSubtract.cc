@@ -74,10 +74,11 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
                             "Entering subroutine computePSFMatchingKernelForMaskedImage");
 
     // FROM THE POLICY
-    const double MAXIMUM_SOURCE_RESIDUAL_ABS_MEAN = 1; // Mean should be 0
+    const double MAXIMUM_SOURCE_RESIDUAL_MEAN = 1;     // Mean should be 0
     const double MAXIMUM_SOURCE_RESIDUAL_VARIANCE = 2; // Variance should be 1
     const KernelT CONVOLVE_THRESHOLD = 0;
     const int EDGE_MASK_BIT = 1;
+    bool BACKGROUND_FIT_CALCULATE_MINOS = true;
 
     double imSum;
 
@@ -131,6 +132,9 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         diffImSourceContainer.diffImSource = *siter;
         diffImSourceContainer.diffImKernelPtr = sourceKernelPtr;
         diffImSourceContainer.background = background;
+        diffImSourceContainer.colcNorm = 2 * diffImSource.getColc() / imageToConvolve.getCols() - 1;
+        diffImSourceContainer.rowcNorm = 2 * diffImSource.getRowc() / imageToConvolve.getRows() - 1;
+        
 
         // QA - calculate the residual of the subtracted image here
         lsst::fw::MaskedImage<ImageT, MaskT>
@@ -146,7 +150,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         diffImSourceContainer.sourceResidualMean = meanOfResiduals;
         diffImSourceContainer.sourceResidualVariance = varianceOfResiduals;
 
-        if (fabs(meanOfResiduals) > MAXIMUM_SOURCE_RESIDUAL_ABS_MEAN) {
+        if (fabs(meanOfResiduals) > MAXIMUM_SOURCE_RESIDUAL_MEAN) {
             lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
                                     (boost::format("Kernel %d, bad mean residual of source : %f") 
                                      % diffImSourceContainer.id % meanOfResiduals));
@@ -209,27 +213,46 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         }
 
         if (nGood == 0) {
-            // Throw an exception
+            throw lsst::mwi::exceptions::Exception("No good footprints for background estimation");
         }
 
         double nSigmaSquared = 1;
         lsst::fw::function::MinimizerFunctionBase2<FuncT> 
             bgFcn(backgrounds, variances, position1, position2, nSigmaSquared, backgroundFunctionPtr);
         MnUserParameters bgPar;
-        // Start 0th parameter at mean background
-        bgPar.add("p0", bgSum / nGood);
+        // Start 0th parameter at mean background with 10% variation
+        bgPar.add("p0", bgSum / nGood, 0.1 * bgSum / nGood);
         for (unsigned int npar = 1; npar < backgroundFunctionPtr->getNParameters(); ++npar) {
             // Start other parameters at value 0 with small variation
             bgPar.add((boost::format("p%d") % npar).str().c_str(), 0, 0.1);
         }
         MnMigrad migrad(bgFcn, bgPar);
         FunctionMinimum bgFit = migrad();
+        MnMinos minos(bgFcn, bgFit); 
+
+        if (!(bgFit.isValid())) {
+            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
+                                    (boost::format("WARNING : Spatial fit to background failed to converge")));
+        }
+            
+
         vector<double> bgFitParameters;
         for (unsigned int npar = 0; npar < backgroundFunctionPtr->getNParameters(); ++npar) {
             bgFitParameters.push_back(bgFit.userState().value((boost::format("p%d") % npar).str().c_str()));
-            lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
-                                    (boost::format("Fit Background Parameter %d : %f") 
-                                     % npar % bgFit.userState().value((boost::format("p%d") % npar).str().c_str())));
+            if ( (BACKGROUND_FIT_CALCULATE_MINOS == true) && (bgFit.isValid()) ) {
+                std::pair<double,double> e = minos(npar);
+                lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
+                                        (boost::format("Fit Background Parameter %d : %f (%f,%f)\n\n") 
+                                         % npar % bgFit.userState().value((boost::format("p%d") % npar).str().c_str())
+                                         % e.first % e.second));
+            }
+            else {
+                lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
+                                        (boost::format("Fit Background Parameter %d : %f (-%f,%f)\n\n") 
+                                         % npar % bgFit.userState().value((boost::format("p%d") % npar).str().c_str())
+                                         % bgFit.userState().error((boost::format("p%d") % npar).str().c_str())
+                                         % bgFit.userState().error((boost::format("p%d") % npar).str().c_str())));
+            }
         }
         backgroundFunctionPtr->setParameters(bgFitParameters);
     }
@@ -468,17 +491,17 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
     double radius = 20;
 
     // Hack some positions in for /lsst/becker/lsst_devel/DC2/fw/tests/data/871034p_1_MI_img.fits
-    lsst::fw::Source src1(1, 78.654, 3573.945, radius, radius);
-    lsst::fw::Source src2(2, 341.149, 2753.536, radius, radius);
-    lsst::fw::Source src3(3, 353.237, 2755.959, radius, radius);
-    lsst::fw::Source src4(4, 367.756, 3827.671, radius, radius);
-    lsst::fw::Source src5(5, 381.062, 3212.948, radius, radius);
+    lsst::fw::Source src1(0, 78.654, 3573.945, radius, radius);
+    lsst::fw::Source src2(1, 341.149, 2753.536, radius, radius);
+    lsst::fw::Source src3(2, 353.237, 2755.959, radius, radius);
+    lsst::fw::Source src4(3, 367.756, 3827.671, radius, radius);
+    lsst::fw::Source src5(4, 381.062, 3212.948, radius, radius);
 
-    sourceCollection.push_back(src4);
-    sourceCollection.push_back(src5);
     sourceCollection.push_back(src1);
     sourceCollection.push_back(src2);
     sourceCollection.push_back(src3);
+    sourceCollection.push_back(src4);
+    sourceCollection.push_back(src5);
 }
 template <typename KernelT>
 void lsst::imageproc::computePCAKernelBasis(
@@ -489,9 +512,10 @@ void lsst::imageproc::computePCAKernelBasis(
     // FROM THE POLICY
     const unsigned int MINIMUM_NUMBER_OF_BASES = 3; 
     const float MAXIMUM_FRACTION_OF_EIGENVALUES = 0.99;
-    const float MINIMUM_ACCEPTIBLE_EIGENVALUE = 1e-12;  // Unimplemented; which gets precedence, this or MINIMUM_NUMBER_OF_BASES?
+    const float MINIMUM_ACCEPTIBLE_EIGENVALUE = 1e-12;
     const unsigned int MAXIMUM_ITER_PCA = 5;
     const double MAXIMUM_KERNEL_RESIDUAL = 1;
+    const double MAXIMUM_KERNEL_RESIDUAL_VARIANCE = 2;
     
     // Image accessor
     typedef typename vw::ImageView<KernelT>::pixel_accessor imageAccessorType;
@@ -603,24 +627,26 @@ void lsst::imageproc::computePCAKernelBasis(
             evalFrac += eVal[i] / evalSum;
             if (eVal[i] < MINIMUM_ACCEPTIBLE_EIGENVALUE) {
                 lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, 
-                                        (boost::format("WARNING : Using eigenvector whose eigenvalue (%f) is smaller than acceptible (%f)")
+                                        (boost::format("WARNING : Using eigenvector whose eigenvalue (%.3e) is smaller than acceptible (%.3e)")
                                          % eVal[i] % MINIMUM_ACCEPTIBLE_EIGENVALUE));
             }
                 
         }
-        for (; nCoeffToUse < eVal.size(); ++nCoeffToUse) {
-            evalFrac += eVal[nCoeffToUse] / evalSum;
-            if (eVal[nCoeffToUse] < MINIMUM_ACCEPTIBLE_EIGENVALUE) {
-                lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, 
-                                        (boost::format("WARNING : Using eigenvector whose eigenvalue (%f) is smaller than acceptible (%f)")
-                                         % eVal[nCoeffToUse] % MINIMUM_ACCEPTIBLE_EIGENVALUE));
-            }
-            if (evalFrac > MAXIMUM_FRACTION_OF_EIGENVALUES) {
-                break;
+        if (evalFrac < MAXIMUM_FRACTION_OF_EIGENVALUES) {
+            for (; nCoeffToUse < eVal.size(); ++nCoeffToUse) {
+                evalFrac += eVal[nCoeffToUse] / evalSum;
+                if (eVal[nCoeffToUse] < MINIMUM_ACCEPTIBLE_EIGENVALUE) {
+                    lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, 
+                                            (boost::format("WARNING : Using eigenvector whose eigenvalue (%.3e) is smaller than acceptible (%.3e)")
+                                             % eVal[nCoeffToUse] % MINIMUM_ACCEPTIBLE_EIGENVALUE));
+                }
+                if (evalFrac > MAXIMUM_FRACTION_OF_EIGENVALUES) {
+                    break;
+                }
             }
         }
         lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, 
-                                (boost::format("Using %d basis functions representing %.2f of the variance") 
+                                (boost::format("Using %d basis functions (plus mean) representing %.5f of the variance") 
                                  % nCoeffToUse % evalFrac));
 
         // We now have the basis functions determined
@@ -639,21 +665,32 @@ void lsst::imageproc::computePCAKernelBasis(
         nReject = 0;
         siter = diffImContainerVec.begin();
         for (unsigned int i = 0; i < M.cols(); ++i, ++siter) {
-            double residual = 0;
+            double x2Sum = 0, xSum = 0, wSum = 0;
+            double residual;
             for (unsigned int j = 0; j < M.rows(); ++j) {
-                residual += M(i,j) - approxM(i,j);
+                residual = M(i,j) - approxM(i,j);
+                x2Sum += residual * residual;
+                xSum  += residual;
+                wSum  += 1;
             }
 
-            (*siter).kernelResidual = residual;
-            if (residual > MAXIMUM_KERNEL_RESIDUAL) {
+            (*siter).kernelResidual = xSum / wSum;
+            (*siter).kernelResidualVariance = x2Sum / wSum - (*siter).kernelResidual * (*siter).kernelResidual;
+            if ((*siter).kernelResidual > MAXIMUM_KERNEL_RESIDUAL) {
                 lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, 
-                                        (boost::format("Kernel %d, poorly described by PCA basis : %f") 
-                                         % i % residual));
+                                        (boost::format("Kernel %d, bad mean residual of PCA model : %f") 
+                                         % i % (*siter).kernelResidual));
                 (*siter).isGood = false;
                 nReject += 1;
             }
-            cout << 
-            cout << " Static Kernel Residual " << i << " = " << residual << endl;
+            if ((*siter).kernelResidualVariance > MAXIMUM_KERNEL_RESIDUAL_VARIANCE) {
+                lsst::mwi::utils::Trace("lsst.imageproc.computePCAKernelBasis", 4, 
+                                        (boost::format("Kernel %d, bad residual variance of PCA model : %f") 
+                                         % i % (*siter).kernelResidualVariance));
+                (*siter).isGood = false;
+                nReject += 1;
+            }
+            cout << " Static Kernel Residual " << i << " = " << (*siter).kernelResidual << " " << (*siter).kernelResidualVariance << endl;
         }
 
         nIter += 1;
@@ -680,7 +717,8 @@ void lsst::imageproc::computePCAKernelBasis(
     // DEBUGGING DEBUGGING DEBUGGING 
 
     // Turn each eVec into an Image and then into a Kernel
-    for (unsigned int ki = 0; ki < eVec.cols(); ++ki) {
+    //for (unsigned int ki = 0; ki < eVec.cols(); ++ki) {
+    for (unsigned int ki = 0; ki < nCoeffToUse; ++ki) { // Dont use all eVec.cols(); only the number of bases that you want
         lsst::fw::Image<KernelT> basisImage(nKCols, nKRows);
 
         // Not sure how to bulk load information into Image
@@ -738,6 +776,7 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
      // FROM THE POLICY
      const unsigned int MAXIMUM_ITER_SPATIAL_FIT = 5;
      const double MAXIMUM_SPATIAL_KERNEL_RESIDUAL = 1;
+     const double MAXIMUM_SPATIAL_KERNEL_RESIDUAL_VARIANCE = 1;
      bool SPATIAL_KERNEL_FIT_CALCULATE_MINOS = true;
 
      // Container iterator
@@ -760,6 +799,11 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
      vector<double> position1;
      vector<double> position2;
 
+         
+     // Set up the spatially varying kernel
+     spatiallyVaryingKernelPtr = boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> >
+         (new lsst::fw::LinearCombinationKernel<KernelT>(kernelOutBasisVec, kernelFunctionPtr));
+
      // Iterate over PCA inputs until all are good
      while ( (nIter < MAXIMUM_ITER_SPATIAL_FIT) and (nReject != 0) ) {
 
@@ -772,14 +816,17 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
          siter = diffImContainerVec.begin();
          for (; siter != diffImContainerVec.end(); ++siter) {
              if ((*siter).isGood == true) {
-                 position1.push_back((*siter).diffImSource.getColc());
-                 position2.push_back((*siter).diffImSource.getRowc());
+                 position1.push_back((*siter).colcNorm);
+                 position2.push_back((*siter).rowcNorm);
                  nGood += 1;
              }
          }
          
-         vector<double> nParVec(nParameters);
-         vector<vector<double> > fitParameters(nKernel, nParVec);
+         //vector<double> nParVec(nParameters);
+         vector<vector<double> > fitParameters = spatiallyVaryingKernelPtr->getSpatialParameters();
+         // DEBUGGING
+         assert(fitParameters.size() == nKernel);
+         assert(fitParameters[0].size() == nParameters);
 
          unsigned int nk = 0;
          kiter=kernelOutBasisVec.begin();
@@ -817,10 +864,15 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
              MnMigrad migrad(kernelFcn, kernelPar);
              FunctionMinimum kernelFit = migrad();
              MnMinos minos(kernelFcn, kernelFit); 
-             
+
+             if (!(kernelFit.isValid())) {
+                 lsst::mwi::utils::Trace("lsst.imageproc.computeSpatiallyVaryingPSFMatchingKernel", 4, 
+                                         (boost::format("WARNING : Spatial fit to Kernel %d failed to converge")) % nk);
+             }
+
              for (unsigned int i = 0; i < nParameters; ++i) {
                  fitParameters[nk][i] = kernelFit.userState().value(i);
-                 if (SPATIAL_KERNEL_FIT_CALCULATE_MINOS == true) {
+                 if ( (SPATIAL_KERNEL_FIT_CALCULATE_MINOS == true) && (kernelFit.isValid()) ) {
                      std::pair<double,double> e = minos(i);
                      lsst::mwi::utils::Trace("lsst.imageproc.computeSpatiallyVaryingPSFMatchingKernel", 4, 
                                              (boost::format("Fit to Kernel %d, spatial Parameter %d : %f (%f,%f)\n\n") 
@@ -836,36 +888,43 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
                  }
              }
          }
-         
-         // Set up the spatially varying kernel
-         // NOTE - I ALREADY ASSIGN THIS POINTER IN MY TEST CODE; IS THIS BAD/REDUNDANT?!?
-         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > spatiallyVaryingKernelPtr(
-             new lsst::fw::LinearCombinationKernel<KernelT>(kernelOutBasisVec, kernelFunctionPtr)
-             );
 
          nReject = 0;
          spatiallyVaryingKernelPtr->setSpatialParameters(fitParameters);
+
          double imSum;
          siter = diffImContainerVec.begin();
          for (unsigned int i = 0; siter != diffImContainerVec.end(); ++i, ++siter) {
              if ((*siter).isGood == true) {
                  lsst::fw::Image<KernelT> diffImage = spatiallyVaryingKernelPtr->computeNewImage(imSum, 
-                                                                                                 (*siter).diffImSource.getColc(),
-                                                                                                 (*siter).diffImSource.getRowc());
+                                                                                                 (*siter).colcNorm,
+                                                                                                 (*siter).rowcNorm);
+                 diffImage.writeFits( (boost::format("ksmFits_%d.fits") % (*siter).id).str() );
+
                  diffImage -= (*siter).diffImPCAKernelPtr->computeNewImage(imSum);
+
+
                  double meanOfResiduals = 0;
                  double varianceOfResiduals = 0;
                  int nGoodPixels = 0;
                  calculateImageResiduals(diffImage, nGoodPixels, meanOfResiduals, varianceOfResiduals);
                  (*siter).spatialKernelResidual = meanOfResiduals;
-                 if (meanOfResiduals > MAXIMUM_SPATIAL_KERNEL_RESIDUAL) {
+                 (*siter).spatialKernelResidualVariance = varianceOfResiduals;
+                 if ((*siter).spatialKernelResidual > MAXIMUM_SPATIAL_KERNEL_RESIDUAL) {
                      lsst::mwi::utils::Trace("lsst.imageproc.computeSpatiallyVaryingPSFMatchingKernel", 4, 
-                                             (boost::format("Kernel %d, poorly described by spatial function basis : %f") 
-                                              % (*siter).id % meanOfResiduals));
+                                             (boost::format("Kernel %d, bad mean residual of spatial fit : %f") 
+                                              % (*siter).id % (*siter).spatialKernelResidual));
                      (*siter).isGood = false;
                      nReject += 1;
                  }
-                 cout << " Spatial Kernel Residual " << i << " = " << meanOfResiduals << endl;
+                 if ((*siter).spatialKernelResidualVariance > MAXIMUM_SPATIAL_KERNEL_RESIDUAL_VARIANCE) {
+                     lsst::mwi::utils::Trace("lsst.imageproc.computeSpatiallyVaryingPSFMatchingKernel", 4, 
+                                             (boost::format("Kernel %d, bad residual variance of spatial fit : %f") 
+                                              % (*siter).id % (*siter).spatialKernelResidualVariance));
+                     (*siter).isGood = false;
+                     nReject += 1;
+                 }
+                 cout << " Static Kernel Residual " << i << " = " << (*siter).spatialKernelResidual << " " << (*siter).spatialKernelResidualVariance << endl;
              }
          }
          nIter += 1;
@@ -930,11 +989,11 @@ void lsst::imageproc::calculateMaskedImageResiduals(
     for (unsigned int rows = 0; rows < inputImage.getRows(); ++rows) {
         lsst::fw::MaskedPixelAccessor<ImageT, MaskT> accessorCol = accessorRow;
         for (unsigned int cols = 0; cols < inputImage.getCols(); ++cols) {
-            if ((*accessorCol.mask & BAD_MASK_BIT) == 0) {
+            if (((*accessorCol.mask) & BAD_MASK_BIT) == 0) {
                 nGoodPixels += 1;
-                x2Sum += *accessorCol.image * *accessorCol.image / *accessorCol.variance;
-                xSum  += *accessorCol.image / *accessorCol.variance;
-                wSum  += 1. / *accessorCol.variance;
+                x2Sum += (*accessorCol.image) * (*accessorCol.image) / (*accessorCol.variance);
+                xSum  += (*accessorCol.image) / (*accessorCol.variance);
+                wSum  += 1. / (*accessorCol.variance);
             }
             accessorCol.nextCol();
         }
@@ -971,8 +1030,8 @@ void lsst::imageproc::calculateImageResiduals(
         imageAccessorType imageAccessorRow(imageAccessorCol);
         for (unsigned int row = 0; row < inputImage.getRows(); ++row) {
             nGoodPixels += 1;
-            x2Sum       += *imageAccessorRow * *imageAccessorRow;
-            xSum        += *imageAccessorRow;
+            x2Sum       += (*imageAccessorRow) * (*imageAccessorRow);
+            xSum        += (*imageAccessorRow);
             wSum        += 1;
             imageAccessorRow.next_row();
         }
@@ -981,6 +1040,8 @@ void lsst::imageproc::calculateImageResiduals(
 
     meanOfResiduals = -1;
     varianceOfResiduals = -1;
+
+    cout << "CAW RESID " << nGoodPixels << " " << x2Sum << " " << xSum << " " << wSum << endl;
 
     if (nGoodPixels > 0) {
         meanOfResiduals      = xSum / wSum;

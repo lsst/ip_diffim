@@ -119,6 +119,9 @@ int main( int argc, char** argv )
         
         convolvedScienceMaskedImage -= convolvedTemplateMaskedImage;
         convolvedScienceMaskedImage.writeFits( (boost::format("%s_diff4") % inputImage).str() );
+
+        // TEST : The output kernel is has same spatial variation as we input above
+        //      : The background function has no spatial variation and value equal to 0
         
     }
     

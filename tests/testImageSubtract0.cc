@@ -8,6 +8,8 @@
 using namespace std;
 using namespace lsst::fw;
 
+// This is for debugging MaskedImage; has no testing other than it has to succeed
+
 int main( int argc, char** argv )
 {
     // Cool, for Citizen!

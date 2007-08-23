@@ -76,6 +76,9 @@ int main( int argc, char** argv )
         lsst::imageproc::computePSFMatchingKernelForMaskedImage
             (templateMaskedImage, scienceMaskedImage, kernelBasisVec, 
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
+
+        // TEST : the output kernel is a delta function.  The kernel coefficients of all bases other than the first (mean) are 0.
+        //      : The background function has no spatial variation and value equal to -100
         
     }
     

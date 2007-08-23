@@ -27,6 +27,8 @@ namespace imageproc {
 
         // The source assocated with the structure
         lsst::fw::Source diffImSource;
+        double colcNorm; // -1 to 1
+        double rowcNorm; // -1 to 1
         
         // From single kernel fit
         double background;
@@ -39,7 +41,9 @@ namespace imageproc {
         double sourceResidualMean;
         double sourceResidualVariance;
         double kernelResidual;
+        double kernelResidualVariance;
         double spatialKernelResidual;
+        double spatialKernelResidualVariance;
         
         // Flags
         bool isGood;
