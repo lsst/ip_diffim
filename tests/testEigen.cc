@@ -1,6 +1,6 @@
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/LinearAlgebra.h> 
-#include <PCA.h>
+#include <lsst/imageproc/PCA.h>
 #include <iostream>
 
 using namespace std;

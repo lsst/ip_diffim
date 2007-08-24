@@ -138,6 +138,6 @@ namespace imageproc {
 }
 }
 
-#include <ImageSubtract.cc>
+#include <lsst/imageproc/ImageSubtract.cc>
 
 #endif // !defined(LSST_Imageproc_ImageSubtract_H)

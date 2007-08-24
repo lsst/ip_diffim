@@ -4,7 +4,7 @@
 #include <lsst/mwi/utils/Trace.h>
 #include <lsst/mwi/exceptions/Exception.h>
 #include <lsst/mwi/data/Citizen.h>
-#include <ImageSubtract.h>
+#include <lsst/imageproc/ImageSubtract.h>
 #include <boost/shared_ptr.hpp>
 
 using namespace std;

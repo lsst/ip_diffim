@@ -56,7 +56,7 @@ namespace imageproc {
 }
 }
 
-#include <PCA.cc>
+#include <lsst/imageproc/PCA.cc>
 
 #endif // !defined(LSST_Imageproc_PCA_H)
 

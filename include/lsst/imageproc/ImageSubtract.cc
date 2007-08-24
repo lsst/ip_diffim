@@ -19,12 +19,12 @@
 #include <lsst/fw/MinimizerFunctionBase.h>
 #include <lsst/mwi/utils/Trace.h>
 #include <lsst/mwi/exceptions/Exception.h>
+#include <lsst/imageproc/PCA.h>
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
 #include <vw/Math/LinearAlgebra.h> 
 #include <vw/Math/Functions.h> 
 #include <boost/shared_ptr.hpp>
-#include <PCA.h>
 #include <Minuit/MnMigrad.h>
 #include <Minuit/MnMinos.h>
 #include <Minuit/MnPrint.h>
