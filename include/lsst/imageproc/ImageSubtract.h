@@ -119,6 +119,11 @@ namespace imageproc {
         );
 
     template <typename ImageT, typename MaskT>
+    bool checkMaskedImageForDiffim(
+        lsst::fw::MaskedImage<ImageT,MaskT> const &inputImage
+        );
+
+    template <typename ImageT, typename MaskT>
     void calculateMaskedImageResiduals(
         lsst::fw::MaskedImage<ImageT,MaskT> const &inputImage,
         int &nGoodPixels,

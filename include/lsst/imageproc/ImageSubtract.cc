@@ -968,7 +968,29 @@ void lsst::imageproc::generateAlardLuptonKernelSet(
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisVec ///< Output kernel basis function, length sum_n 0.5*(deg_n+1)*(deg_n+2)
     )
 {
-    // TO DO 
+    ; // TO DO 
+}
+
+template <typename ImageT, typename MaskT>
+bool checkMaskedImageForDiffim(
+    lsst::fw::MaskedImage<ImageT,MaskT> const &inputImage
+    )
+{
+    // FROM THE POLICY
+    const int BAD_MASK_BIT = 0x1;
+    
+    lsst::fw::MaskedPixelAccessor<ImageT, MaskT> accessorRow(inputImage);
+    for (unsigned int rows = 0; rows < inputImage.getRows(); ++rows) {
+        lsst::fw::MaskedPixelAccessor<ImageT, MaskT> accessorCol = accessorRow;
+        for (unsigned int cols = 0; cols < inputImage.getCols(); ++cols) {
+            if (((*accessorCol.mask) & BAD_MASK_BIT) != 0) {
+                return false;
+            }
+            accessorCol.nextCol();
+        }
+        accessorRow.nextRow();
+    }
+    return true;
 }
 
 template <typename ImageT, typename MaskT>
