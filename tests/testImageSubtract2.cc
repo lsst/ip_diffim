@@ -73,8 +73,13 @@ int main( int argc, char** argv )
 
         templateMaskedImage += 100;
 
+        // Use hard-coded positions for now
+        vector<lsst::detection::Footprint::PtrType> footprintVector;
+        lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(footprintVector);
+        
+
         lsst::imageproc::computePSFMatchingKernelForMaskedImage
-            (templateMaskedImage, scienceMaskedImage, kernelBasisVec, 
+            (templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintVector,
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
 
         // TEST : the output kernel is a delta function.  The kernel coefficients of all bases other than the first (mean) are 0.

@@ -40,10 +40,6 @@ int main( int argc, char** argv )
             return 1;
         }
 
-        // Find detections
-        lsst::detection::DetectionSet<ImageT,MaskT> 
-            detectionSet(templateMaskedImage, lsst::detection::Threshold(5, lsst::detection::Threshold::STDEV));
-
         string scienceImage = argv[2];
         MaskedImage<ImageT,MaskT> scienceMaskedImage;
         try {
@@ -52,21 +48,7 @@ int main( int argc, char** argv )
             cerr << "Failed to open science image " << scienceImage << ": " << e.what() << endl;
             return 1;
         }
-
-        // Do some culling of the Footprints; should be good in template image and science image
-        // All it does now is looked for any masked pixels in the footprint
-        vector<lsst::detection::Footprint::PtrType> footprintVector = detectionSet.getFootprints();
-        vector<lsst::detection::Footprint::PtrType>::iterator fiter = footprintVector.begin();
-        for (; fiter != footprintVector.end(); ++fiter) {
-            BBox2i footprintBBox = (*fiter)->getBBox();
-            lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT templateFootprintPtr = templateMaskedImage.getSubImage(footprintBBox);
-            lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT scienceFootprintPtr = scienceMaskedImage.getSubImage(footprintBBox);
-            if ( (lsst::imageproc::checkMaskedImageForDiffim(*templateFootprintPtr) == false) || 
-                 (lsst::imageproc::checkMaskedImageForDiffim(*scienceFootprintPtr) == false) ) {
-                fiter = footprintVector.erase(fiter);
-            }
-        }
-        
+       
         // Generate basis of delta functions for kernel
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelBasisVec;
         unsigned int kernelRows = 7;
@@ -90,6 +72,7 @@ int main( int argc, char** argv )
             new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
             );
 
+        // Now you let the code find the peaks!
         lsst::imageproc::computePSFMatchingKernelForMaskedImage
             (templateMaskedImage, scienceMaskedImage, kernelBasisVec, 
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);

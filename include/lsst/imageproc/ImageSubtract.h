@@ -13,7 +13,7 @@
 
 #include <lsst/fw/MaskedImage.h>
 #include <lsst/fw/Kernel.h>
-#include <lsst/fw/Source.h>
+#include <lsst/detection/Footprint.h>
 
 namespace lsst {
 namespace imageproc {
@@ -25,8 +25,8 @@ namespace imageproc {
         // Running ID
         int id;
 
-        // The source assocated with the structure
-        lsst::fw::Source diffImSource;
+        // The footprint assocated with the structure
+        lsst::detection::Footprint::PtrType diffImFootprintPtr;
         double colcNorm; // -1 to 1
         double rowcNorm; // -1 to 1
         
@@ -38,8 +38,8 @@ namespace imageproc {
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > diffImPCAKernelPtr;
         
         // Goodness of fit metrics
-        double sourceResidualMean;
-        double sourceResidualVariance;
+        double footprintResidualMean;
+        double footprintResidualVariance;
         double kernelResidual;
         double kernelResidualVariance;
         double spatialKernelResidual;
@@ -69,7 +69,7 @@ namespace imageproc {
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisVec,
-        vector<lsst::fw::Source> const &sourceCollection,
+        vector<lsst::detection::Footprint::PtrType> const &footprintVector,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr
@@ -85,7 +85,7 @@ namespace imageproc {
         );
 
     void getCollectionOfMaskedImagesForPSFMatching(
-        vector<lsst::fw::Source> &sourceCollection
+        vector<lsst::detection::Footprint::PtrType> &footprintVector
         );
 
     template <typename KernelT>

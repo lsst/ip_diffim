@@ -109,9 +109,13 @@ int main( int argc, char** argv )
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > backgroundFunctionPtr(
             new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
             );
-        
+
+        // Use hard-coded positions for now
+        vector<lsst::detection::Footprint::PtrType> footprintVector;
+        lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(footprintVector);
+
         lsst::imageproc::computePSFMatchingKernelForMaskedImage
-            (templateMaskedImage, convolvedScienceMaskedImage, kernelBasisVec,
+            (templateMaskedImage, convolvedScienceMaskedImage, kernelBasisVec, footprintVector,
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
         
         lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =

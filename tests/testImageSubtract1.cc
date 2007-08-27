@@ -73,8 +73,13 @@ int main( int argc, char** argv )
             new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
             );
         
+        // Use hard-coded positions for now
+        vector<lsst::detection::Footprint::PtrType> footprintVector;
+        lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(footprintVector);
+        
+        
         lsst::imageproc::computePSFMatchingKernelForMaskedImage
-            (templateMaskedImage, scienceMaskedImage, kernelBasisVec, 
+            (templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintVector,
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
         
         lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =

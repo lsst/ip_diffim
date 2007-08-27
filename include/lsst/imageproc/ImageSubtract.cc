@@ -15,10 +15,10 @@
 #include <lsst/fw/Kernel.h>
 #include <lsst/fw/KernelFunctions.h>
 #include <lsst/fw/PixelAccessors.h>
-#include <lsst/fw/Source.h>
 #include <lsst/fw/MinimizerFunctionBase.h>
 #include <lsst/mwi/utils/Trace.h>
 #include <lsst/mwi/exceptions/Exception.h>
+#include <lsst/detection/Footprint.h>
 #include <lsst/imageproc/PCA.h>
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
@@ -51,12 +51,59 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr, ///< Function for spatial variation of kernel
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr ///< Function for spatial variation of background
     ) {
-    
-    vector<lsst::fw::Source> sourceCollection;
-    getCollectionOfMaskedImagesForPSFMatching(sourceCollection);
 
-    lsst::imageproc::computePSFMatchingKernelForMaskedImage(imageToConvolve, imageToNotConvolve, kernelInBasisVec,
-                                                            sourceCollection, kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
+    // FROM THE POLICY
+    unsigned int FOOTPRINT_DIFFIM_NPIX_MIN = 10;
+    unsigned int FOOTPRINT_DIFFIM_GROW = 10;  // Eventually this will come from the kernel size, PSF FWHM, etc.
+
+    // Find detections
+    lsst::detection::DetectionSet<ImageT,MaskT> 
+        detectionSet(imageToConvolve, lsst::detection::Threshold(1000, lsst::detection::Threshold::VALUE));
+    
+    // Do some culling of the Footprints; should be good in template image and science image
+    // All it does now is looked for any masked pixels in the footprint
+    vector<lsst::detection::Footprint::PtrType> footprintVectorOut;
+
+    vector<lsst::detection::Footprint::PtrType> footprintVectorIn = detectionSet.getFootprints();
+    vector<lsst::detection::Footprint::PtrType>::iterator fiter = footprintVectorIn.begin();
+    for (; fiter != footprintVectorIn.end(); ) {
+        if ((*fiter)->getNpix() < FOOTPRINT_DIFFIM_NPIX_MIN) {
+            fiter = footprintVectorIn.erase(fiter); // SLOW; DON"T DO THIS IF YOU DON"T NEED TO
+        }
+        else {
+            BBox2i footprintBBox = (*fiter)->getBBox();
+
+            // NOTE - this will eventually be overridden by a grow method on Footprint
+            footprintBBox.grow(footprintBBox.max() + vw::Vector2i(FOOTPRINT_DIFFIM_GROW,FOOTPRINT_DIFFIM_GROW));
+            footprintBBox.grow(footprintBBox.min() - vw::Vector2i(FOOTPRINT_DIFFIM_GROW,FOOTPRINT_DIFFIM_GROW));
+
+            typename lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT templateFootprintPtr = imageToConvolve.getSubImage(footprintBBox);
+            typename lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT scienceFootprintPtr = imageToNotConvolve.getSubImage(footprintBBox);
+            if ( (lsst::imageproc::checkMaskedImageForDiffim(*templateFootprintPtr) == false) || 
+                 (lsst::imageproc::checkMaskedImageForDiffim(*scienceFootprintPtr) == false) ) {
+                fiter = footprintVectorIn.erase(fiter);
+            }
+            else {
+
+                // Create a new footprint with grow'd box
+                lsst::detection::Footprint::PtrType fpGrow(
+                    new lsst::detection::Footprint()
+                    );
+                fpGrow->rectangle(footprintBBox);
+                footprintVectorOut.push_back(fpGrow);
+                
+                ++fiter;
+            }
+        }
+    }
+
+    lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
+                            (boost::format("Detected %d footprints above threshold") 
+                             % footprintVectorOut.size()));
+
+    lsst::imageproc::computePSFMatchingKernelForMaskedImage(imageToConvolve, imageToNotConvolve, 
+                                                            kernelInBasisVec, footprintVectorOut,
+                                                            kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
 }
 
 template <typename ImageT, typename MaskT, typename KernelT, typename FuncT>
@@ -64,7 +111,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
     lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve, ///< Template image; is convolved
     lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve, ///< Science image; is not convolved
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisVec, ///< Input set of basis kernels
-    vector<lsst::fw::Source> const &sourceCollection, ///< Input sources to use
+    vector<lsst::detection::Footprint::PtrType> const &footprintVector, ///< Vector of input footprints to do diffim on
     boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr, ///< The output convolution kernel
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr, ///< Function for spatial variation of kernel
     boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr ///< Function for spatial variation of background
@@ -74,44 +121,33 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
                             "Entering subroutine computePSFMatchingKernelForMaskedImage");
 
     // FROM THE POLICY
-    const double MAXIMUM_SOURCE_RESIDUAL_MEAN = 1;     // Mean should be 0
-    const double MAXIMUM_SOURCE_RESIDUAL_VARIANCE = 2; // Variance should be 1
+    const double MAXIMUM_FOOTPRINT_RESIDUAL_MEAN = 1;     // Mean should be 0
+    const double MAXIMUM_FOOTPRINT_RESIDUAL_VARIANCE = 2; // Variance should be 1
     const KernelT CONVOLVE_THRESHOLD = 0;
     const int EDGE_MASK_BIT = 1;
-    bool BACKGROUND_FIT_CALCULATE_MINOS = true;
+    bool BACKGROUND_FIT_CALCULATE_MINOS = false;
 
     double imSum;
 
-    // Reusable view around each source
+    // Reusable view around each footprint
     typename lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT imageToConvolveStampPtr;
     typename lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT imageToNotConvolveStampPtr;
 
-    // Information for each Source
+    // Information for each Footprint
     vector<lsst::imageproc::DiffImContainer<KernelT> > diffImContainerVec;
 
-    // Iterate over source
-    typename vector<lsst::fw::Source>::const_iterator siter = sourceCollection.begin();
+    // Iterate over footprint
+    vector<lsst::detection::Footprint::PtrType>::const_iterator fiter = footprintVector.begin();
 
-    int nSource = 0;
-    for (; siter != sourceCollection.end(); ++siter) {
-        lsst::fw::Source diffImSource = *siter;
-        
-        // Grab view around each source
-        // Bbox2i : col0 row0 cols rows
-        BBox2i stamp(static_cast<int>(floor(diffImSource.getColc() - diffImSource.getDcol())), 
-                     static_cast<int>(floor(diffImSource.getRowc() - diffImSource.getDrow())), 
-                     static_cast<int>(ceil(2 * diffImSource.getDcol() + 1)),
-                     static_cast<int>(ceil(2 * diffImSource.getDrow() + 1))
-            );
-
-        imageToConvolveStampPtr    = imageToConvolve.getSubImage(stamp);
-        imageToNotConvolveStampPtr = imageToNotConvolve.getSubImage(stamp);
-
-        // Do I do a hard check here for *any* masked pixels in the images?
+    int nFootprint = 0;
+    for (; fiter != footprintVector.end(); ++fiter) {
+        BBox2i footprintBBox = (*fiter)->getBBox();
+        imageToConvolveStampPtr    = imageToConvolve.getSubImage(footprintBBox);
+        imageToNotConvolveStampPtr = imageToNotConvolve.getSubImage(footprintBBox);
 
         // DEBUGGING DEBUGGING DEBUGGING
-        imageToConvolveStampPtr->writeFits( (boost::format("csFits_%d") % diffImSource.getSourceId()).str() );
-        imageToNotConvolveStampPtr->writeFits( (boost::format("ncsFits_%d") % diffImSource.getSourceId()).str() );
+        imageToConvolveStampPtr->writeFits( (boost::format("csFits_%d") % nFootprint).str() );
+        imageToNotConvolveStampPtr->writeFits( (boost::format("ncsFits_%d") % nFootprint).str() );
         // DEBUGGING DEBUGGING DEBUGGING
 
         // Find best single kernel for this stamp
@@ -121,24 +157,26 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
             (*imageToConvolveStampPtr, *imageToNotConvolveStampPtr, kernelInBasisVec, kernelCoeffs, background);
 
         // Create a linear combination kernel from this 
-        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > sourceKernelPtr(
+        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > footprintKernelPtr(
             new lsst::fw::LinearCombinationKernel<KernelT>(kernelInBasisVec, kernelCoeffs)
             );
 
         // Container to carry around in imageproc.diffim
-        lsst::imageproc::DiffImContainer<KernelT> diffImSourceContainer;
-        diffImSourceContainer.id = nSource;
-        diffImSourceContainer.isGood = true;
-        diffImSourceContainer.diffImSource = *siter;
-        diffImSourceContainer.diffImKernelPtr = sourceKernelPtr;
-        diffImSourceContainer.background = background;
-        diffImSourceContainer.colcNorm = 2 * diffImSource.getColc() / imageToConvolve.getCols() - 1;
-        diffImSourceContainer.rowcNorm = 2 * diffImSource.getRowc() / imageToConvolve.getRows() - 1;
-        
+        lsst::imageproc::DiffImContainer<KernelT> diffImFootprintContainer;
+        diffImFootprintContainer.id = nFootprint;
+        diffImFootprintContainer.isGood = true;
+        diffImFootprintContainer.diffImFootprintPtr = *fiter;
+        diffImFootprintContainer.diffImKernelPtr = footprintKernelPtr;
+        diffImFootprintContainer.background = background;
+
+        vw::math::Vector<double,2> center = footprintBBox.center();
+        // NOTE - verify center() returns col, row
+        diffImFootprintContainer.colcNorm = 2 * center[0] / imageToConvolve.getCols() - 1;
+        diffImFootprintContainer.rowcNorm = 2 * center[1] / imageToConvolve.getRows() - 1;
 
         // QA - calculate the residual of the subtracted image here
         lsst::fw::MaskedImage<ImageT, MaskT>
-            convolvedImageStamp = lsst::fw::kernel::convolve(*imageToConvolveStampPtr, *sourceKernelPtr, CONVOLVE_THRESHOLD, EDGE_MASK_BIT);
+            convolvedImageStamp = lsst::fw::kernel::convolve(*imageToConvolveStampPtr, *footprintKernelPtr, CONVOLVE_THRESHOLD, EDGE_MASK_BIT);
         convolvedImageStamp -= (*imageToNotConvolveStampPtr);
         convolvedImageStamp *= -1;
         convolvedImageStamp -= background;
@@ -147,30 +185,30 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         double varianceOfResiduals = 0;
         int nGoodPixels = 0;
         calculateMaskedImageResiduals(convolvedImageStamp, nGoodPixels, meanOfResiduals, varianceOfResiduals);
-        diffImSourceContainer.sourceResidualMean = meanOfResiduals;
-        diffImSourceContainer.sourceResidualVariance = varianceOfResiduals;
+        diffImFootprintContainer.footprintResidualMean = meanOfResiduals;
+        diffImFootprintContainer.footprintResidualVariance = varianceOfResiduals;
 
-        if (fabs(meanOfResiduals) > MAXIMUM_SOURCE_RESIDUAL_MEAN) {
+        if (fabs(meanOfResiduals) > MAXIMUM_FOOTPRINT_RESIDUAL_MEAN) {
             lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
-                                    (boost::format("Kernel %d, bad mean residual of source : %f") 
-                                     % diffImSourceContainer.id % meanOfResiduals));
-            diffImSourceContainer.isGood = false;
+                                    (boost::format("Kernel %d, bad mean residual of footprint : %f") 
+                                     % diffImFootprintContainer.id % meanOfResiduals));
+            diffImFootprintContainer.isGood = false;
         }
-        if (varianceOfResiduals > MAXIMUM_SOURCE_RESIDUAL_VARIANCE) {
+        if (varianceOfResiduals > MAXIMUM_FOOTPRINT_RESIDUAL_VARIANCE) {
             lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForMaskedImage", 4, 
-                                    (boost::format("Kernel %d, bad residual variance of source : %f") 
-                                     % diffImSourceContainer.id % varianceOfResiduals));
-            diffImSourceContainer.isGood = false;
+                                    (boost::format("Kernel %d, bad residual variance of footprint : %f") 
+                                     % diffImFootprintContainer.id % varianceOfResiduals));
+            diffImFootprintContainer.isGood = false;
         }
-        diffImContainerVec.push_back(diffImSourceContainer);
-        nSource += 1;
+        diffImContainerVec.push_back(diffImFootprintContainer);
 
         // DEBUGGING DEBUGGING DEBUGGING
-        lsst::fw::Image<KernelT> kImage = sourceKernelPtr->computeNewImage(imSum);
-        kImage.writeFits( (boost::format("kFits_%d.fits") % diffImSource.getSourceId()).str() );
-        convolvedImageStamp.writeFits( (boost::format("d1Fits_%d.fits") % diffImSource.getSourceId()).str() );
+        lsst::fw::Image<KernelT> kImage = footprintKernelPtr->computeNewImage(imSum);
+        kImage.writeFits( (boost::format("kFits_%d.fits") % nFootprint).str() );
+        convolvedImageStamp.writeFits( (boost::format("d1Fits_%d.fits") % nFootprint).str() );
         // DEBUGGING DEBUGGING DEBUGGING
 
+        nFootprint += 1;
     }
 
     // In the end we want to test if the kernelInBasisVec is Delta Functions; if so, do PCA
@@ -206,9 +244,9 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
                                         (boost::format(" Background %d = %f") 
                                          % (*siter).id % (*siter).background));
                 
-                variances.push_back((*siter).sourceResidualVariance);   // approximation
-                position1.push_back((*siter).diffImSource.getColc());
-                position2.push_back((*siter).diffImSource.getRowc());
+                variances.push_back((*siter).footprintResidualVariance);   // approximation
+                position1.push_back((*siter).diffImFootprintPtr->getBBox().center()[0]);
+                position2.push_back((*siter).diffImFootprintPtr->getBBox().center()[1]);
             }
         }
 
@@ -472,7 +510,15 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     cout << "M : " << M << endl;
 
     // Invert M
-    vw::math::Matrix<double> Minv = vw::math::inverse(M);
+    vw::math::Matrix<double> Minv;
+    try {
+        Minv = vw::math::inverse(M);
+    } catch (lsst::mwi::exceptions::Exception &e) {
+        lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 1, 
+                                ("Invert matrix failed"));
+        // NOTE - lets be smarter here.
+        return;
+    }
 
     // Solve for x in Mx = B
     vw::math::Vector<double> Soln = Minv * B;
@@ -485,27 +531,82 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
 }
 
 void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
-    vector<lsst::fw::Source> &sourceCollection ///< Vector of sources to use for diffim kernel
+    vector<lsst::detection::Footprint::PtrType> &footprintVector ///< Collection of footprints to build kernels around
     ) {
 
     double radius = 20;
-
-    // Hack some positions in for /lsst/becker/lsst_devel/DC2/fw/tests/data/871034p_1_MI_img.fits
-    lsst::fw::Source src1(0, 78.654, 3573.945, radius, radius);
-    lsst::fw::Source src2(1, 341.149, 2753.536, radius, radius);
-    lsst::fw::Source src3(2, 353.237, 2755.959, radius, radius);
-    lsst::fw::Source src4(3, 367.756, 3827.671, radius, radius);
-    lsst::fw::Source src5(4, 381.062, 3212.948, radius, radius);
-
-    sourceCollection.push_back(src1);
-    sourceCollection.push_back(src2);
-    sourceCollection.push_back(src3);
-    sourceCollection.push_back(src4);
-    sourceCollection.push_back(src5);
+    
+    
+    const vw::BBox2i region1(static_cast<int>(78.654-radius/2),
+                             static_cast<int>(3573.945-radius/2),
+                             static_cast<int>(radius),
+                             static_cast<int>(radius));
+    lsst::detection::Footprint::PtrType fp1(
+        new lsst::detection::Footprint()
+        );
+    fp1->rectangle(region1);
+    footprintVector.push_back(fp1);
+    
+    
+    const vw::BBox2i region4(static_cast<int>(367.756-radius/2),
+                             static_cast<int>(3827.671-radius/2),
+                             static_cast<int>(radius),
+                             static_cast<int>(radius));
+    lsst::detection::Footprint::PtrType fp4(
+        new lsst::detection::Footprint()
+        );
+    fp4->rectangle(region4);
+    footprintVector.push_back(fp4);
+    
+    const vw::BBox2i region5(static_cast<int>(381.062-radius/2),
+                             static_cast<int>(3212.948-radius/2),
+                             static_cast<int>(radius),
+                             static_cast<int>(radius));
+    lsst::detection::Footprint::PtrType fp5(
+        new lsst::detection::Footprint()
+        );
+    fp5->rectangle(region5);
+    footprintVector.push_back(fp5);
+    
+    const vw::BBox2i region6(static_cast<int>(404.433-radius/2),
+                             static_cast<int>(573.462-radius/2),
+                             static_cast<int>(radius),
+                             static_cast<int>(radius));
+    lsst::detection::Footprint::PtrType fp6(
+        new lsst::detection::Footprint()
+        );
+    fp6->rectangle(region6);
+    footprintVector.push_back(fp6);
+    
+    const vw::BBox2i region7(static_cast<int>(420.967-radius/2),
+                             static_cast<int>(3306.310-radius/2),
+                             static_cast<int>(radius),
+                             static_cast<int>(radius));
+    lsst::detection::Footprint::PtrType fp7(
+        new lsst::detection::Footprint()
+        );
+    fp7->rectangle(region7);
+    footprintVector.push_back(fp7);
+    
+    const vw::BBox2i region9(static_cast<int>(546.657-radius/2),
+                             static_cast<int>(285.079-radius/2),
+                             static_cast<int>(radius),
+                             static_cast<int>(radius));
+    lsst::detection::Footprint::PtrType fp9(
+        new lsst::detection::Footprint()
+        );
+    fp9->rectangle(region9);
+    footprintVector.push_back(fp9);
+    
+    // OR
+    //lsst::detection::Footprint *fp4 = new lsst::detection::Footprint(1, region4);
+    //lsst::detection::Footprint::PtrType fpp4(fp4); 
+    //footprintVector.push_back(fpp4);
 }
+
 template <typename KernelT>
 void lsst::imageproc::computePCAKernelBasis(
-    vector<lsst::imageproc::DiffImContainer<KernelT> > &diffImContainerVec, ///< Vector of input sources
+    vector<lsst::imageproc::DiffImContainer<KernelT> > &diffImContainerVec, ///< Vector of input footprints
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPCABasisVec ///< Output principal components as kernel images
     ) {
     
@@ -744,7 +845,7 @@ void lsst::imageproc::computePCAKernelBasis(
         // DEBUGGING DEBUGGING DEBUGGING 
     }
 
-    // Finally, create a new LinearCombinationKernel for each Source
+    // Finally, create a new LinearCombinationKernel for each Footprint
     siter = diffImContainerVec.begin();
     for (unsigned int i = 0; siter != diffImContainerVec.end(); ++i, ++siter) {
         if ((*siter).isGood == true) {
@@ -777,7 +878,7 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
      const unsigned int MAXIMUM_ITER_SPATIAL_FIT = 5;
      const double MAXIMUM_SPATIAL_KERNEL_RESIDUAL = 1;
      const double MAXIMUM_SPATIAL_KERNEL_RESIDUAL_VARIANCE = 1;
-     bool SPATIAL_KERNEL_FIT_CALCULATE_MINOS = true;
+     bool SPATIAL_KERNEL_FIT_CALCULATE_MINOS = false;
 
      // Container iterator
      typename vector<lsst::imageproc::DiffImContainer<KernelT> >::iterator siter;
@@ -841,7 +942,7 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
                  if ((*siter).isGood == true) {
                      vector<double> kernelParameters = (*siter).diffImPCAKernelPtr->getKernelParameters();  // inefficient
                      measurements.push_back(kernelParameters[nk]);
-                     variances.push_back((*siter).sourceResidualVariance); // approximation
+                     variances.push_back((*siter).footprintResidualVariance); // approximation
                      cout << kernelParameters[nk] << " ";
                  }
              }
@@ -924,7 +1025,7 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
                      (*siter).isGood = false;
                      nReject += 1;
                  }
-                 cout << " Static Kernel Residual " << i << " = " << (*siter).spatialKernelResidual << " " << (*siter).spatialKernelResidualVariance << endl;
+                 cout << " Spatial Kernel Residual " << i << " = " << (*siter).spatialKernelResidual << " " << (*siter).spatialKernelResidualVariance << endl;
              }
          }
          nIter += 1;
@@ -972,7 +1073,7 @@ void lsst::imageproc::generateAlardLuptonKernelSet(
 }
 
 template <typename ImageT, typename MaskT>
-bool checkMaskedImageForDiffim(
+bool lsst::imageproc::checkMaskedImageForDiffim(
     lsst::fw::MaskedImage<ImageT,MaskT> const &inputImage
     )
 {
