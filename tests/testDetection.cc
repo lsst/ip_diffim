@@ -1,4 +1,5 @@
 #include <lsst/mwi/utils/Trace.h>
+#include <lsst/mwi/data/Citizen.h>
 #include <lsst/fw/MaskedImage.h>
 #include <lsst/detection/Footprint.h>
 
