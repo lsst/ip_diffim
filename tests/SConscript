@@ -17,10 +17,12 @@ Import("env")
 # testing minuit
 #env.Program(["testMinuit.cc"], LIBS=env.libs["vw"] + ["fw"] + ["mwi"] + env.libs["minuit"])
 
+env.Program(["testDetection.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # object detection
+
 # testing ImageSubtract.cc/.h
-#env.Program(["testImageSubtract0.cc"], LIBS=env.getlibs("imageproc"));
-#env.Program(["testImageSubtract1.cc"], LIBS=env.getlibs("imageproc"));  # test that we recover delta function kernel
-#env.Program(["testImageSubtract2.cc"], LIBS=env.getlibs("imageproc")); # add DC offset (background)
-#env.Program(["testImageSubtract3.cc"], LIBS=env.getlibs("imageproc"));  # convolve input image, no spatial variation
-#env.Program(["testImageSubtract4.cc"], LIBS=env.getlibs("imageproc"));  #                     , spatial variation
-env.Program(["testImageSubtract5.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # object detection
+#env.Program(["testImageSubtract0.cc"], LIBS=env.getlibs("imageproc")+["detection"]);
+#env.Program(["testImageSubtract1.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # test that we recover delta function kernel
+#env.Program(["testImageSubtract2.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # add DC offset (background)
+#env.Program(["testImageSubtract3.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # convolve input image, no spatial variation
+#env.Program(["testImageSubtract4.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  #                     , spatial variation
+#env.Program(["testImageSubtract5.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # object detection
