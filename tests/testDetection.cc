@@ -6,7 +6,7 @@
 using namespace std;
 using namespace lsst::fw;
 
-typedef uint8 MaskT;
+typedef uint16 MaskT;
 typedef float ImageT;
 typedef double KernelT;
 typedef double FuncT;
@@ -26,9 +26,14 @@ int main( int argc, char** argv )
             return 1;
         }
 
+        float threshold = atof(argv[2]);
+
         // Find detections
         lsst::detection::DetectionSet<ImageT,MaskT> 
-            detectionSet(templateMaskedImage, lsst::detection::Threshold(5, lsst::detection::Threshold::STDEV));
+            detectionSet(templateMaskedImage, lsst::detection::Threshold(threshold, lsst::detection::Threshold::VALUE));
+        vector<lsst::detection::Footprint::PtrType> footprintVector = detectionSet.getFootprints();
+        cout << " Detected " << footprintVector.size() << " footprints at value threshold " << threshold << endl;
+
     }
     
     if (Citizen::census(0) == 0) {
