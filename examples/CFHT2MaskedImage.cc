@@ -78,8 +78,8 @@ int main( int argc, char** argv )
 
     MaskedImage<ImagePixelType,MaskPixelType> cfhtMaskedImage;
     cfhtMaskedImage.readFits(inputImage);
-    cfhtMaskedImage.getMask()->addMaskPlane("saturated");
-    cfhtMaskedImage.getMask()->addMaskPlane("zerovalued");
+    cfhtMaskedImage.getMask()->addMaskPlane("SAT");
+    cfhtMaskedImage.getMask()->addMaskPlane("ZERO");
     cfhtMaskedImage.setDefaultVariance();
     synthesizeCfhtPixProcFunc<ImagePixelType, MaskPixelType> maskFunc(cfhtMaskedImage);
     maskFunc.init();
