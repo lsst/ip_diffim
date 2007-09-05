@@ -20,7 +20,7 @@
 using namespace std;
 
 template <typename aMatrixT, typename aVectorT>
-void lsst::imageproc::computePCA(
+void lsst::imageproc::computePca(
     aMatrixT &M, ///< Input : Data matrix has rows = variables, columns = instances.  Rows are mean-subtracted on output if subtractMean
     aVectorT &rowMean, ///< Ouput : Mean of rows
     aVectorT &eVal, ///< Output : Sorted Eigenvalues

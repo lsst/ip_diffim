@@ -19,6 +19,11 @@ int main( int argc, char** argv )
         new lsst::fw::function::Chebyshev1Function1<funcType>(order)
         );
 
+    const unsigned int polyorder = 0;
+    boost::shared_ptr<lsst::fw::function::PolynomialFunction1<funcType> > polyFuncPtr(
+        new lsst::fw::function::PolynomialFunction1<funcType>(polyorder)
+        );
+
     params[0] = 0;
     params[1] = 0.1;
     params[2] = 0.2;
@@ -72,6 +77,34 @@ int main( int argc, char** argv )
     std::cout<<"par1: "<<min.userState().value("p1")<<" "<<e1.first<<" "<<e1.second<<std::endl;
     std::cout<<"par2: "<<min.userState().value("p2")<<" "<<e2.first<<" "<<e2.second<<std::endl;
     std::cout<<"par3: "<<min.userState().value("p3")<<" "<<e3.first<<" "<<e3.second<<std::endl;
+
+    // Try fitting for a number with no variation
+    // Try fitting for a number with no variation
+    // Try fitting for a number with no variation
+    // Try fitting for a number with no variation
+    MnUserParameters upar2;
+    upar2.add("p0", 1, 0.1);
+    vector<double> measurements2(npts);
+    vector<double> variances2(npts);
+    vector<double> positions2(npts);
+    x = -1.;
+    for (unsigned int i = 0; i < npts; i++, x += 0.2) {
+        measurements[i] = 1.;
+        variances[i] = 0.1;
+        positions[i] = x;
+    }
+    def = 1.0;
+    lsst::fw::function::MinimizerFunctionBase1<funcType> myFcn2(measurements, variances, positions, def, polyFuncPtr);
+
+    MnMigrad migrad2(myFcn2, upar2);
+    FunctionMinimum min2 = migrad2();
+    MnMinos minos2(myFcn2, min2);
+
+    std::pair<double,double> e02 = minos2(0);
+
+    cout << "Best fit:" << endl;
+    std::cout<<"par0: "<<min2.userState().value("p0")<<" "<<e02.first<<" "<<e02.second<<std::endl;
+    
 
     return 0;
 }

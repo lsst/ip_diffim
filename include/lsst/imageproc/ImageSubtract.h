@@ -35,7 +35,7 @@ namespace imageproc {
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > diffImKernelPtr;
         
         // If using PCA, this holds the PCA Kernel
-        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > diffImPCAKernelPtr;
+        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > diffImPcaKernelPtr;
         
         // Goodness of fit metrics
         double footprintResidualMean;
@@ -58,7 +58,7 @@ namespace imageproc {
     void computePSFMatchingKernelForMaskedImage(
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisVec,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisList,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr
@@ -68,8 +68,8 @@ namespace imageproc {
     void computePSFMatchingKernelForMaskedImage(
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisVec,
-        vector<lsst::detection::Footprint::PtrType> const &footprintVector,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisList,
+        vector<lsst::detection::Footprint::PtrType> const &footprintList,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr
@@ -79,25 +79,25 @@ namespace imageproc {
     void computePSFMatchingKernelForPostageStamp(
         lsst::fw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisVec,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisList,
         vector<double> &kernelCoeffs,
         double &background
         );
 
     void getCollectionOfMaskedImagesForPSFMatching(
-        vector<lsst::detection::Footprint::PtrType> &footprintVector
+        vector<lsst::detection::Footprint::PtrType> &footprintList
         );
 
     template <typename KernelT>
-    void computePCAKernelBasis(
-        vector<lsst::imageproc::DiffImContainer<KernelT> > &diffImContainerVec,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPCABasisVec
+    void computePcaKernelBasis(
+        vector<lsst::imageproc::DiffImContainer<KernelT> > &diffImContainerList,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPcaBasisList
         );
 
     template <typename KernelT, typename FuncT>
     void computeSpatiallyVaryingPSFMatchingKernel(
-        vector<lsst::imageproc::DiffImContainer<KernelT> > &diffImContainerVec,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelOutBasisVec,
+        vector<lsst::imageproc::DiffImContainer<KernelT> > &diffImContainerList,
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelOutBasisList,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr
         );
@@ -106,7 +106,7 @@ namespace imageproc {
     void generateDeltaFunctionKernelSet(
         unsigned int const nRows,
         unsigned int const nCols,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisVec
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisList
         );
 
     template <typename KernelT>
@@ -115,7 +115,7 @@ namespace imageproc {
         unsigned int const nCols,
         vector<double> const sigGauss,
         vector<double> const degGauss,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisVec
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisList
         );
 
     template <typename ImageT, typename MaskT>

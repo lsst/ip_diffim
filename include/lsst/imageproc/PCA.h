@@ -21,7 +21,7 @@ namespace imageproc {
     using namespace std;
 
     template <typename aMatrixT, typename aVectorT>
-    void computePCA(
+    void computePca(
         aMatrixT &M,
         aVectorT &rowMean,
         aVectorT &eVal,

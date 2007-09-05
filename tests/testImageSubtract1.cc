@@ -82,11 +82,12 @@ int main( int argc, char** argv )
             (templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintVector,
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
         
-        lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =
-            lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, threshold, edgeMaskBit);
+        // TAKES TOO LONG FOR NOW...
+        //lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =
+        //lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, threshold, edgeMaskBit);
         
-        scienceMaskedImage -= convolvedTemplateMaskedImage;
-        scienceMaskedImage.writeFits( (boost::format("%s_diff1") % inputImage).str() );
+        //scienceMaskedImage -= convolvedTemplateMaskedImage;
+        //scienceMaskedImage.writeFits( (boost::format("%s_diff1") % inputImage).str() );
 
         // TEST : the output kernel is a delta function.  The kernel coefficients of all bases other than the first (mean) are 0.
     }
