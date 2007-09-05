@@ -11,25 +11,33 @@
  * \ingroup imageproc
  */
 
-#include <lsst/fw/MaskedImage.h>
+#include <string> // for upar.add
+
+#include <boost/shared_ptr.hpp>
+
 #include <lsst/fw/Kernel.h>
 #include <lsst/fw/KernelFunctions.h>
-#include <lsst/fw/PixelAccessors.h>
+#include <lsst/fw/MaskedImage.h>
 #include <lsst/fw/MinimizerFunctionBase.h>
-#include <lsst/mwi/utils/Trace.h>
+#include <lsst/fw/PixelAccessors.h>
+
 #include <lsst/mwi/exceptions/Exception.h>
+#include <lsst/mwi/utils/Trace.h>
+
 #include <lsst/detection/Footprint.h>
+
 #include <lsst/imageproc/PCA.h>
+
+#include <vw/Math/Functions.h> 
+#include <vw/Math/LinearAlgebra.h> 
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
-#include <vw/Math/LinearAlgebra.h> 
-#include <vw/Math/Functions.h> 
-#include <boost/shared_ptr.hpp>
+
+#include <Minuit/FunctionMinimum.h>
 #include <Minuit/MnMigrad.h>
 #include <Minuit/MnMinos.h>
 #include <Minuit/MnPrint.h>
-#include <Minuit/FunctionMinimum.h>
-#include <string> // for upar.add
+
 using namespace std;
 
 /**
@@ -129,13 +137,13 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
                             "Entering subroutine computePSFMatchingKernelForMaskedImage");
 
     // FROM THE POLICY
-    const double MAXIMUM_FOOTPRINT_RESIDUAL_MEAN = 1;     // Mean should be 0
-    const double MAXIMUM_FOOTPRINT_RESIDUAL_VARIANCE = 2; // Variance should be 1
-    const KernelT CONVOLVE_THRESHOLD = 0;
-    const int EDGE_MASK_BIT = 1;
+    double const MAXIMUM_FOOTPRINT_RESIDUAL_MEAN = 1.0;     // Mean should be 0
+    double const MAXIMUM_FOOTPRINT_RESIDUAL_VARIANCE = 2.0; // Variance should be 1
+    KernelT const CONVOLVE_THRESHOLD = 0.0;
+    int const EDGE_MASK_BIT = 1;
     bool BACKGROUND_FIT_CALCULATE_MINOS = false;
 
-    double imSum;
+    double imSum = 0.0;
 
     // Reusable view around each footprint
     typename lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT imageToConvolveStampPtr;
@@ -194,8 +202,8 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         convolvedImageStamp *= -1;
         convolvedImageStamp -= background;
 
-        double meanOfResiduals = 0;
-        double varianceOfResiduals = 0;
+        double meanOfResiduals = 0.0;
+        double varianceOfResiduals = 0.0;
         int nGoodPixels = 0;
         calculateMaskedImageResiduals(convolvedImageStamp, nGoodPixels, meanOfResiduals, varianceOfResiduals);
         diffImFootprintContainer.footprintResidualMean = meanOfResiduals;
@@ -245,7 +253,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
         vector<double> variances;
         vector<double> position1;
         vector<double> position2;
-        double bgSum = 0;
+        double bgSum = 0.0;
         for (typename vector<lsst::imageproc::DiffImContainer<KernelT> >::iterator i = diffImContainerList.begin(); i != diffImContainerList.end(); ++i) {
             if ((*i).isGood == true) {
                 nGood += 1;
@@ -265,7 +273,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
             throw lsst::mwi::exceptions::Exception("No good footprints for background estimation");
         }
 
-        double nSigmaSquared = 1;
+        double nSigmaSquared = 1.0;
         lsst::fw::function::MinimizerFunctionBase2<FuncT> 
             bgFcn(backgrounds, variances, position1, position2, nSigmaSquared, backgroundFunctionPtr);
         MnUserParameters bgPar;
@@ -327,9 +335,11 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     double &background ///< Difference in the backgrounds
     ) { 
 
-    int nKernelParameters=0, nBackgroundParameters=0, nParameters=0;
-    const KernelT threshold = 0.0;
-    const int edgeMaskBit = 1;
+    int nKernelParameters = 0;
+    int nBackgroundParameters = 0;
+    int nParameters = 0;
+    KernelT const threshold = 0.0;
+    int const edgeMaskBit = 1;
 
     lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 2, 
                             "Entering subroutine computePSFMatchingKernelForPostageStamp");
@@ -545,10 +555,10 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
     vector<lsst::detection::Footprint::PtrType> &footprintList ///< Collection of footprints to build kernels around
     ) {
 
-    double radius = 20;
+    double radius = 20.0;
     
     
-    const vw::BBox2i region1(static_cast<int>(78.654-radius/2),
+    vw::BBox2i const region1(static_cast<int>(78.654-radius/2),
                              static_cast<int>(3573.945-radius/2),
                              static_cast<int>(radius),
                              static_cast<int>(radius));
@@ -558,7 +568,7 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
     footprintList.push_back(fp1);
     
     
-    const vw::BBox2i region4(static_cast<int>(367.756-radius/2),
+    vw::BBox2i const region4(static_cast<int>(367.756-radius/2),
                              static_cast<int>(3827.671-radius/2),
                              static_cast<int>(radius),
                              static_cast<int>(radius));
@@ -567,7 +577,7 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
         );
     footprintList.push_back(fp4);
     
-    const vw::BBox2i region5(static_cast<int>(381.062-radius/2),
+    vw::BBox2i const region5(static_cast<int>(381.062-radius/2),
                              static_cast<int>(3212.948-radius/2),
                              static_cast<int>(radius),
                              static_cast<int>(radius));
@@ -576,7 +586,7 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
         );
     footprintList.push_back(fp5);
     
-    const vw::BBox2i region6(static_cast<int>(404.433-radius/2),
+    vw::BBox2i const region6(static_cast<int>(404.433-radius/2),
                              static_cast<int>(573.462-radius/2),
                              static_cast<int>(radius),
                              static_cast<int>(radius));
@@ -585,7 +595,7 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
         );
     footprintList.push_back(fp6);
     
-    const vw::BBox2i region7(static_cast<int>(420.967-radius/2),
+    vw::BBox2i const region7(static_cast<int>(420.967-radius/2),
                              static_cast<int>(3306.310-radius/2),
                              static_cast<int>(radius),
                              static_cast<int>(radius));
@@ -594,7 +604,7 @@ void lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(
         );
     footprintList.push_back(fp7);
     
-    const vw::BBox2i region9(static_cast<int>(546.657-radius/2),
+    vw::BBox2i const region9(static_cast<int>(546.657-radius/2),
                              static_cast<int>(285.079-radius/2),
                              static_cast<int>(radius),
                              static_cast<int>(radius));
@@ -616,12 +626,12 @@ void lsst::imageproc::computePcaKernelBasis(
     ) {
     
     // FROM THE POLICY
-    const unsigned int MINIMUM_NUMBER_OF_BASES = 3; 
-    const float MAXIMUM_FRACTION_OF_EIGENVALUES = 0.99;
-    const float MINIMUM_ACCEPTIBLE_EIGENVALUE = 1e-12;
-    const unsigned int MAXIMUM_ITER_PCA = 5;
-    const double MAXIMUM_KERNEL_RESIDUAL = 1;
-    const double MAXIMUM_KERNEL_RESIDUAL_VARIANCE = 2;
+    unsigned int const MINIMUM_NUMBER_OF_BASES = 3; 
+    float const MAXIMUM_FRACTION_OF_EIGENVALUES = 0.99;
+    float const MINIMUM_ACCEPTIBLE_EIGENVALUE = 1e-12;
+    unsigned int const MAXIMUM_ITER_PCA = 5;
+    double const MAXIMUM_KERNEL_RESIDUAL = 1.0;
+    double const MAXIMUM_KERNEL_RESIDUAL_VARIANCE = 2.0;
     
     // Image accessor
     typedef typename vw::ImageView<KernelT>::pixel_accessor imageAccessorType;
@@ -671,7 +681,7 @@ void lsst::imageproc::computePcaKernelBasis(
         M.set_size(nPixels, nGood);
         
         // fill up matrix for PCA
-        double imSum;
+        double imSum = 0.0;
         int ki = 0;
         for (iDiffImContainer i = diffImContainerList.begin(); i != diffImContainerList.end(); ++ki, ++i) {
             if ((*i).isGood == false) {
@@ -722,11 +732,11 @@ void lsst::imageproc::computePcaKernelBasis(
 
         nCoeffToUse = MINIMUM_NUMBER_OF_BASES;
         // Potentially override with larger number if the spectrum of eigenvalues requires it
-        double evalSum = 0;
+        double evalSum = 0.0;
         for (unsigned int i = 0; i < eVal.size(); ++i) {
             evalSum += eVal[i];
         }
-        double evalFrac = 0;
+        double evalFrac = 0.0;
         for (unsigned int i = 0; i < nCoeffToUse; ++i) {
             evalFrac += eVal[i] / evalSum;
             if (eVal[i] < MINIMUM_ACCEPTIBLE_EIGENVALUE) {
@@ -769,8 +779,8 @@ void lsst::imageproc::computePcaKernelBasis(
         nReject = 0;
         unsigned int iKernel = 0;
         for (iDiffImContainer i = diffImContainerList.begin(); i != diffImContainerList.end(); ++iKernel, ++i) {
-            double x2Sum = 0, xSum = 0, wSum = 0;
-            double residual;
+            double x2Sum = 0.0, xSum = 0.0, wSum = 0.0;
+            double residual = 0.0;
             for (unsigned int jKernel = 0; jKernel < M.rows(); ++jKernel) {
                 residual = M(iKernel,jKernel) - approxM(iKernel,jKernel);
                 x2Sum += residual * residual;
@@ -878,9 +888,9 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
     )
  {
      // FROM THE POLICY
-     const unsigned int MAXIMUM_ITER_SPATIAL_FIT = 5;
-     const double MAXIMUM_SPATIAL_KERNEL_RESIDUAL = 1;
-     const double MAXIMUM_SPATIAL_KERNEL_RESIDUAL_VARIANCE = 1;
+     unsigned int const MAXIMUM_ITER_SPATIAL_FIT = 5;
+     double const MAXIMUM_SPATIAL_KERNEL_RESIDUAL = 1.0;
+     double const MAXIMUM_SPATIAL_KERNEL_RESIDUAL_VARIANCE = 1.0;
      bool SPATIAL_KERNEL_FIT_CALCULATE_MINOS = false;
 
      // Container iterator
@@ -950,7 +960,7 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
 
              // NOTE - if we have fewer measurements than kernelFunctionPtr->getNParameters(), we should do something about it...
 
-             double nSigmaSquared = 1;
+             double nSigmaSquared = 1.0;
              lsst::fw::function::MinimizerFunctionBase2<FuncT> 
                  kernelFcn(measurements, variances, position1, position2, nSigmaSquared, kernelFunctionPtr);
              
@@ -998,7 +1008,7 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
          nReject = 0;
          spatiallyVaryingKernelPtr->setSpatialParameters(fitParameters);
 
-         double imSum;
+         double imSum = 0.0;
          for (iDiffImContainer i = diffImContainerList.begin(); i != diffImContainerList.end(); ++i) {
              if ((*i).isGood == true) {
                  lsst::fw::Image<KernelT> diffImage = spatiallyVaryingKernelPtr->computeNewImage(imSum, 
@@ -1029,8 +1039,8 @@ void lsst::imageproc::computeSpatiallyVaryingPSFMatchingKernel(
                  diffImage -= (*i).diffImPcaKernelPtr->computeNewImage(imSum);
                  diffImage.writeFits( (boost::format("ksmFits_%d.fits") % (*i).id).str() );
 
-                 double meanOfResiduals = 0;
-                 double varianceOfResiduals = 0;
+                 double meanOfResiduals = 0.0;
+                 double varianceOfResiduals = 0.0;
                  int nGoodPixels = 0;
                  calculateImageResiduals(diffImage, nGoodPixels, meanOfResiduals, varianceOfResiduals);
                  (*i).spatialKernelResidual = meanOfResiduals;
@@ -1128,12 +1138,12 @@ void lsst::imageproc::calculateMaskedImageResiduals(
     ) {
 
     // FROM THE POLICY
-    const int BAD_MASK_BIT = 0x1;
+    int const BAD_MASK_BIT = 0x1;
     // BASICALLY A HACK FOR DC2 TESTING; SENDING THE SAME IMAGE TO DIFFIM RESULTS IN 0 VARIANCE; MESSING UP FITTING
     // Add in quadrature as noise
     double MIN_VARIANCE = 1e-20;
     
-    double x2Sum=0, xSum=0, wSum=0;
+    double x2Sum=0.0, xSum=0.0, wSum=0.0;
 
     nGoodPixels = 0;
     lsst::fw::MaskedPixelAccessor<ImageT, MaskT> accessorCol(inputImage);
@@ -1171,7 +1181,7 @@ void lsst::imageproc::calculateImageResiduals(
     double &varianceOfResiduals ///< Average variance of residual
     ) {
 
-    double x2Sum=0, xSum=0, wSum=0;
+    double x2Sum=0.0, xSum=0.0, wSum=0.0;
 
     nGoodPixels = 0;
     typedef typename vw::ImageView<ImageT>::pixel_accessor imageAccessorType;

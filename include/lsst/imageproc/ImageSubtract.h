@@ -11,8 +11,9 @@
  * \ingroup imageproc
  */
 
-#include <lsst/fw/MaskedImage.h>
 #include <lsst/fw/Kernel.h>
+#include <lsst/fw/MaskedImage.h>
+
 #include <lsst/detection/Footprint.h>
 
 namespace lsst {

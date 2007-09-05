@@ -11,12 +11,15 @@
  * \ingroup imageproc
  */
 
+#include <iostream>
+
+#include <lsst/mwi/utils/Trace.h>
+
+#include <vw/Math/Functions.h> 
+#include <vw/Math/LinearAlgebra.h> 
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
-#include <vw/Math/LinearAlgebra.h> 
-#include <vw/Math/Functions.h> 
-#include <iostream>
-#include <lsst/mwi/utils/Trace.h>
+
 using namespace std;
 
 template <typename aMatrixT, typename aVectorT>

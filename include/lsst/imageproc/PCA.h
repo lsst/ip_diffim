@@ -11,9 +11,9 @@
  * \ingroup imageproc
  */
 
+#include <vw/Math/LinearAlgebra.h>
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
-#include <vw/Math/LinearAlgebra.h>
 
 namespace lsst {
 namespace imageproc {
