@@ -6,6 +6,9 @@
 #include <lsst/mwi/data/Citizen.h>
 #include <lsst/imageproc/ImageSubtract.h>
 #include <boost/shared_ptr.hpp>
+#include <lsst/mwi/policy/Policy.h>
+
+#define DEBUG_IO 1
 
 using namespace std;
 using namespace lsst::fw;

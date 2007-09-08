@@ -1,0 +1,77 @@
+# Default Image Subtraction Policy File
+
+# Size of the convolution kernel
+kernelRows: 7
+kernelCols: 7
+
+# Order of kernel spatial variation
+kernelSpatialOrder: 0
+
+# Order of background spatial variation
+backgroundSpatialOrder: 0
+
+# Convolution directives
+convolveThreshold: 0.0
+edgeMaskBit: 1
+
+# Use case computePSFMatchingKernelForMaskedImage
+computePSFMatchingKernelForMaskedImage: {
+    # Minimum number of pixels in an acceptible Footprint
+    footprintDiffimNpixMin: 10
+
+    # Grow footprint by this many pixels
+    footprintDiffimGrow: 20
+}
+
+# Use case computePSFMatchingKernelForMaskedImage
+computePSFMatchingKernelForMaskedImage: {
+    # Maximum sum (residual/variance) for an acceptable Kernel; mean should be 0
+    maximumFootprintResidualMean: 1.0
+
+    # Maximum variance (residual/variance) for an acceptable Kernel; variance should be 1
+    maximumFootprintResidualVariance: 2.0
+
+    # Use MINOS to get asymmetric error bars on background?
+    backgroundFitCalculateMinos: false
+}
+
+# Use case computePSFMatchingKernelForPostageStamp
+computePSFMatchingKernelForPostageStamp: {
+    # Empty
+}
+
+# Use case computePcaKernelBasis
+computePcaKernelBasis: {
+    # Minimum number of basis functions to use, after mean
+    minimumNumberOfBases: 3
+    
+    # Use enough basis function to model this much of the variance
+    maximumFractionOfEigenvalues: 0.99
+    
+    # Don't use bases whose eigenvalues are this small or smaller
+    minimumAcceptibleEigenvalue: 0.0000000000001
+
+    # Maximum number of iterations while doing PCA
+    maximumIteratonsPCA: 5
+
+    # Maximum mean residual comparing each Kernel to its PCA-derived model
+    maximumKernelResidualMean: 1.0
+
+    # Maximum varaince of residuals when comparing each Kernel to its PCA-derived model
+    maximumKernelResidualVariance: 2.0
+}
+
+# Use case computeSpatiallyVaryingPSFMatchingKernel
+computeSpatiallyVaryingPSFMatchingKernel: {
+    # Maximum iterations for spatial fit to Kernel basis coefficients
+    maximumIterationsSpatialFit: 5
+
+    # Maximum mean residual comparing each Kernel to its spatial model
+    maximumSpatialKernelResidualMean: 1.0
+
+    # Maximum varaince of residuals when comparing each Kernel to its spatial model
+    maximumSpatialKernelResidualVariance: 1.0
+
+    # Use MINOS to get asymmetric error bars on spatial parameters?
+    spatialFitCalculateMinos: false
+}

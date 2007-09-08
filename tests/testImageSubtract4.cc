@@ -7,6 +7,8 @@
 #include <lsst/imageproc/ImageSubtract.h>
 #include <boost/shared_ptr.hpp>
 
+#define DEBUG_IO 1
+
 using namespace std;
 using namespace lsst::fw;
 
