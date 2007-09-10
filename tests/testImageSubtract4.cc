@@ -1,11 +1,18 @@
+#include <fstream>
+
+#include <boost/shared_ptr.hpp>
+
 #include <lsst/fw/MaskedImage.h>
 #include <lsst/fw/Kernel.h>
 #include <lsst/fw/FunctionLibrary.h>
-#include <lsst/mwi/utils/Trace.h>
-#include <lsst/mwi/exceptions/Exception.h>
+
 #include <lsst/mwi/data/Citizen.h>
+#include <lsst/mwi/exceptions/Exception.h>
+#include <lsst/mwi/utils/Trace.h>
+#include <lsst/mwi/policy/Policy.h>
+#include <lsst/mwi/policy/paf/PAFParser.h>
+
 #include <lsst/imageproc/ImageSubtract.h>
-#include <boost/shared_ptr.hpp>
 
 #define DEBUG_IO 1
 
@@ -22,6 +29,38 @@ int main( int argc, char** argv )
         typedef float ImageT; // have to make sure this jibes with the input data!
         typedef double KernelT;
         typedef double FuncT;
+
+        // Read in Policy
+        ifstream is("examples/ImageSubtract_policy.paf");
+        Policy p;
+        PAFParser pp(p);
+        pp.parse(is);
+        is.close();
+
+        // Parse policy
+        Assert(p.exists("convolveThreshold"),
+               "Policy missing entry convolveThreshold");
+        KernelT convolveThreshold = p.getDouble("convolveThreshold");
+        
+        Assert(p.exists("edgeMaskBit"),
+               "Policy missing entry edgeMaskBit");
+        int edgeMaskBit = p.getInt("edgeMaskBit");
+
+        Assert(p.exists("kernelRows"),
+               "Policy missing entry kernelRows");
+        unsigned int kernelRows = p.getInt("kernelRows");
+
+        Assert(p.exists("kernelCols"),
+               "Policy missing entry kernelCols");
+        unsigned int kernelCols = p.getInt("kernelCols");
+
+        Assert(p.exists("kernelSpatialOrder"),
+               "Policy missing entry kernelSpatialOrder");
+        unsigned int kernelSpatialOrder = p.getInt("kernelSpatialOrder");
+
+        Assert(p.exists("backgroundSpatialOrder"),
+               "Policy missing entry backgroundSpatialOrder");
+        unsigned int backgroundSpatialOrder = p.getInt("backgroundSpatialOrder");
         
         // Read input images
         if (argc < 2) {
@@ -49,10 +88,6 @@ int main( int argc, char** argv )
             cerr << "Failed to open template image " << inputImage << ": " << e.what() << endl;
             return 1;
         }
-        
-        // Hardcoded
-        unsigned int kernelRows = 7;
-        unsigned int kernelCols = 7;
         
         // The kernel to convolve the template image with to yield the science image
         double sigmaX = 1.0;
@@ -82,10 +117,8 @@ int main( int argc, char** argv )
         
         // Convolved science image
         lsst::mwi::utils::Trace("testImageSubtract4", 2, "Convolving input image for testing");
-        const KernelT threshold = 0.0;
-        const int edgeMaskBit = 1;
         lsst::fw::MaskedImage<ImageT, MaskT> convolvedScienceMaskedImage =
-            lsst::fw::kernel::convolve(scienceMaskedImage, gaussSpVarKernel, threshold, edgeMaskBit);
+            lsst::fw::kernel::convolve(scienceMaskedImage, gaussSpVarKernel, convolveThreshold, edgeMaskBit);
         
         convolvedScienceMaskedImage.writeFits( (boost::format("%s_test4") % inputImage).str() );
         
@@ -101,13 +134,13 @@ int main( int argc, char** argv )
         
         // Function for spatially varying kernel. 
         // Give it less power than the Fcn we convolved the image with, see what happens
-        unsigned int kernelSpatialOrder = polyOrder-1;
+        // OVERRIDE POLICY HERE
+        kernelSpatialOrder = polyOrder;
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > kernelFunctionPtr(
             new lsst::fw::function::PolynomialFunction2<FuncT>(kernelSpatialOrder)
             );
         
         // Function for spatially varying background.  
-        unsigned int backgroundSpatialOrder = 0;
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > backgroundFunctionPtr(
             new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
             );
@@ -121,7 +154,7 @@ int main( int argc, char** argv )
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
         
         lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =
-            lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, threshold, edgeMaskBit);
+            lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, convolveThreshold, edgeMaskBit);
         
         convolvedScienceMaskedImage -= convolvedTemplateMaskedImage;
         convolvedScienceMaskedImage.writeFits( (boost::format("%s_diff4") % inputImage).str() );

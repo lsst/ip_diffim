@@ -180,7 +180,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
 
     Assert(p.exists("convolveThreshold"),
            "Policy missing entry convolveThreshold");
-    KernelT convovleThreshold = p.getDouble("convolveThreshold");
+    KernelT convolveThreshold = p.getDouble("convolveThreshold");
 
     Assert(p.exists("edgeMaskBit"),
            "Policy missing entry edgeMaskBit");
@@ -239,7 +239,7 @@ void lsst::imageproc::computePSFMatchingKernelForMaskedImage(
 
         // QA - calculate the residual of the subtracted image here
         lsst::fw::MaskedImage<ImageT, MaskT>
-            convolvedImageStamp = lsst::fw::kernel::convolve(*imageToConvolveStampPtr, *footprintKernelPtr, convovleThreshold, edgeMaskBit);
+            convolvedImageStamp = lsst::fw::kernel::convolve(*imageToConvolveStampPtr, *footprintKernelPtr, convolveThreshold, edgeMaskBit);
         convolvedImageStamp -= (*imageToNotConvolveStampPtr);
         convolvedImageStamp *= -1;
         convolvedImageStamp -= background;
@@ -383,7 +383,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
     // Parse the Policy
     Assert(p.exists("convolveThreshold"),
            "Policy missing entry convolveThreshold");
-    KernelT convovleThreshold = p.getDouble("convolveThreshold");
+    KernelT convolveThreshold = p.getDouble("convolveThreshold");
 
     Assert(p.exists("edgeMaskBit"),
            "Policy missing entry edgeMaskBit");
@@ -433,7 +433,7 @@ void lsst::imageproc::computePSFMatchingKernelForPostageStamp(
         //        compute whatever is needed on the fly.  hence this step here.
         boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > imagePtr(
             new lsst::fw::MaskedImage<ImageT, MaskT>
-            (lsst::fw::kernel::convolve(imageToConvolve, **kiter, threshold, edgeMaskBit))
+            (lsst::fw::kernel::convolve(imageToConvolve, **kiter, convolveThreshold, edgeMaskBit))
             );
 
         lsst::mwi::utils::Trace("lsst.imageproc.computePSFMatchingKernelForPostageStamp", 3, 
