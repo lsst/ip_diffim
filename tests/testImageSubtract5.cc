@@ -108,7 +108,7 @@ int main( int argc, char** argv )
             );
 
         // Now you let the code find the peaks!
-        lsst::imageproc::computePSFMatchingKernelForMaskedImage
+        lsst::imageproc::computePsfMatchingKernelForMaskedImage
             (templateMaskedImage, scienceMaskedImage, kernelBasisVec, 
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
 

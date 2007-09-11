@@ -11,10 +11,6 @@
  * \ingroup imageproc
  */
 
-#if defined(LSST_DPS_STAGE_H)
-#include <lsst/dps/Stage.h>
-#endif
-
 #include <lsst/fw/Kernel.h>
 #include <lsst/fw/MaskedImage.h>
 
@@ -63,27 +59,8 @@ namespace imageproc {
             }
     };
 
-#if defined(LSST_DPS_STAGE_H)
-    class ImageSubtractStage : public lsst::dps::Stage {
-        explicit ImageSubtractStage();
-        virtual ~ImageSubtractStage() {};
-    }
-#endif
-
-
     template <typename ImageT, typename MaskT, typename KernelT, typename FuncT>
-    void computePSFMatchingKernelForMaskedImage(
-        lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
-        lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisList,
-        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr,
-        boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr,
-        boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr,
-        lsst::mwi::policy::Policy &p
-        );
-    
-    template <typename ImageT, typename MaskT, typename KernelT, typename FuncT>
-    void computePSFMatchingKernelForMaskedImage(
+    void computePsfMatchingKernelForMaskedImage(
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisList,
@@ -95,7 +72,7 @@ namespace imageproc {
         );
     
     template <typename ImageT, typename MaskT, typename KernelT>
-    void computePSFMatchingKernelForPostageStamp(
+    void computePsfMatchingKernelForPostageStamp(
         lsst::fw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisList,
@@ -103,8 +80,16 @@ namespace imageproc {
         double &background,
         lsst::mwi::policy::Policy &p
         );
+    
+    template <typename ImageT, typename MaskT>
+    void getCollectionOfFootprintsForPsfMatching(
+        lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
+        lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
+        vector<lsst::detection::Footprint::PtrType> footprintListOut,
+        lsst::mwi::policy::Policy &p
+        );
 
-    void getCollectionOfMaskedImagesForPSFMatching(
+    void getCollectionOfMaskedImagesForPsfMatching(
         vector<lsst::detection::Footprint::PtrType> &footprintList
         );
 
@@ -116,13 +101,19 @@ namespace imageproc {
         );
 
     template <typename KernelT, typename FuncT>
-    void computeSpatiallyVaryingPSFMatchingKernel(
+    void computeSpatiallyVaryingPsfMatchingKernel(
         vector<lsst::imageproc::DiffImContainer<KernelT> > &diffImContainerList,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelOutBasisList,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr,
         lsst::mwi::policy::Policy &p
         );
+
+
+
+
+
+
 
     template <typename KernelT>
     void generateDeltaFunctionKernelSet(

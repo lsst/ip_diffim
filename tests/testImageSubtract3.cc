@@ -125,9 +125,9 @@ int main( int argc, char** argv )
         
         // Use hard-coded positions for now
         vector<lsst::detection::Footprint::PtrType> footprintVector;
-        lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(footprintVector);
+        lsst::imageproc::getCollectionOfMaskedImagesForPsfMatching(footprintVector);
 
-        lsst::imageproc::computePSFMatchingKernelForMaskedImage
+        lsst::imageproc::computePsfMatchingKernelForMaskedImage
             (templateMaskedImage, convolvedScienceMaskedImage, kernelBasisVec, 
              footprintVector, kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
         

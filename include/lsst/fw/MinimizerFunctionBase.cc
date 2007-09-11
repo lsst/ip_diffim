@@ -112,8 +112,8 @@ double lsst::fw::function::MinimizerFunctionBase2<ReturnT>::operator() (const st
 
 template<typename ReturnT>
 double lsst::fw::function::MinimizerFunctionBase<ReturnT>::minimize(
-    std::vector<double> &parameters, ///< Holds parameter guesses on input, fit paramters on output
-    std::vector<std::pair<double,double> > &errors ///< Holds paramter uncertainties, positive and negative
+    std::vector<double> &parameters, ///< Holds parameter guesses on input, fit parameters on output
+    std::vector<std::pair<double,double> > &errors ///< Holds parameter uncertainties, positive and negative
     ) {
     
     // We should come up with a recipe for step size
@@ -146,8 +146,8 @@ double lsst::fw::function::MinimizerFunctionBase<ReturnT>::minimize(
 
 template<typename ReturnT>
 double lsst::fw::function::MinimizerFunctionBase2<ReturnT>::minimize(
-    std::vector<double> &parameters, ///< Holds parameter guesses on input, fit paramters on output
-    std::vector<std::pair<double,double> > &errors ///< Holds paramter uncertainties, positive and negative
+    std::vector<double> &parameters, ///< Holds parameter guesses on input, fit parameters on output
+    std::vector<std::pair<double,double> > &errors ///< Holds parameter uncertainties, positive and negative
     ) {
     
     // We should come up with a recipe for step size
