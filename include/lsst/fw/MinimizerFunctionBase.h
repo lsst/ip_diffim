@@ -34,7 +34,9 @@ namespace function {
         // Required by FCNBase
         virtual double up() const {return _errorDef;}
         virtual double operator() (const std::vector<double>&) const;
-        
+
+        void minimize(std::vector<double> &parameters,
+                      std::vector<std::pair<double,double> > &errors);
         inline std::vector<double> getMeasurements() const {return _measurementVector;}
         inline std::vector<double> getVariances() const {return _varianceVector;}
         inline std::vector<double> getPositions() const {return _positionVector;}
@@ -63,6 +65,8 @@ namespace function {
         virtual double up() const {return _errorDef;}
         virtual double operator() (const std::vector<double>&) const;
         
+        void minimize(std::vector<double> &parameters,
+                      std::vector<std::pair<double,double> > &errors);
         inline std::vector<double> getMeasurements() const {return _measurementVector;}
         inline std::vector<double> getVariances() const {return _varianceVector;}
         inline std::vector<double> getPosition1() const {return _position1Vector;}

@@ -11,6 +11,12 @@
  * \ingroup fw
  */
 
+#include <string> // for upar.add
+
+#include <Minuit/FunctionMinimum.h>
+#include <Minuit/MnMigrad.h>
+#include <Minuit/MnMinos.h>
+#include <Minuit/MnPrint.h>
 
 // Constructors
 template<typename ReturnT>
@@ -104,3 +110,70 @@ double lsst::fw::function::MinimizerFunctionBase2<ReturnT>::operator() (const st
     return chi2;
 }
 
+template<typename ReturnT>
+double lsst::fw::function::MinimizerFunctionBase<ReturnT>::minimize(
+    std::vector<double> &parameters, ///< Holds parameter guesses on input, fit paramters on output
+    std::vector<std::pair<double,double> > &errors ///< Holds paramter uncertainties, positive and negative
+    ) {
+    
+    // We should come up with a recipe for step size
+    MnUserParameters fitPar;
+    for (unsigned int i = 0; i < parameters.size(); ++i) {
+        fitPar.add((boost::format("p%d") % i).str().c_str(), parameters[i]);
+    }
+
+    MnMigrad migrad(this, fitPar);
+    FunctionMinimum min = migrad();
+    MnMinos minos(this, min); 
+
+    if (!(min.isValid())) {
+        lsst::mwi::utils::Trace("lsst::fw::function::MinimizerFunctionBase::minimize", 4, 
+                                (boost::format("WARNING : Fit failed to converge")));
+    }
+    
+    for (unsigned int i = 0; i < parameters.size(); ++i) {
+        parameters[i] = min.userState().value((boost::format("p%d") % i).str().c_str());
+        if (min.isValid()) {
+            errors[i] = minos(i);
+        }
+        else {
+            double e = min.userState().error((boost::format("p%d") % i).str().c_str());
+            std::pair<double,double> ep(-1 * e, e);
+            errors[i] = ep;
+        }
+    }
+}
+
+template<typename ReturnT>
+double lsst::fw::function::MinimizerFunctionBase2<ReturnT>::minimize(
+    std::vector<double> &parameters, ///< Holds parameter guesses on input, fit paramters on output
+    std::vector<std::pair<double,double> > &errors ///< Holds paramter uncertainties, positive and negative
+    ) {
+    
+    // We should come up with a recipe for step size
+    MnUserParameters fitPar;
+    for (unsigned int i = 0; i < parameters.size(); ++i) {
+        fitPar.add((boost::format("p%d") % i).str().c_str(), parameters[i]);
+    }
+
+    MnMigrad migrad(this, fitPar);
+    FunctionMinimum min = migrad();
+    MnMinos minos(this, min); 
+
+    if (!(min.isValid())) {
+        lsst::mwi::utils::Trace("lsst::fw::function::MinimizerFunctionBase::minimize", 4, 
+                                (boost::format("WARNING : Fit failed to converge")));
+    }
+    
+    for (unsigned int i = 0; i < parameters.size(); ++i) {
+        parameters[i] = min.userState().value((boost::format("p%d") % i).str().c_str());
+        if (min.isValid()) {
+            errors[i] = minos(i);
+        }
+        else {
+            double e = min.userState().error((boost::format("p%d") % i).str().c_str());
+            std::pair<double,double> ep(-1 * e, e);
+            errors[i] = ep;
+        }
+    }
+}
