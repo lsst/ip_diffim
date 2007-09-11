@@ -50,7 +50,7 @@ computePcaKernelBasis: {
     maximumFractionOfEigenvalues: 0.99
     
     # Don't use bases whose eigenvalues are this small or smaller
-    minimumAcceptibleEigenvalue: 0.0000000000001
+    minimumAcceptibleEigenvalue: 1e-10
 
     # Maximum number of iterations while doing PCA
     maximumIteratonsPCA: 5
