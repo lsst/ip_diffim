@@ -15,13 +15,16 @@ backgroundSpatialOrder: 0
 convolveThreshold: 0.0
 edgeMaskBit: 1
 
-# Use case computePsfMatchingKernelForMaskedImage
-computePsfMatchingKernelForMaskedImage: {
+# Use case getCollectionOfFootprintsForPsfMatching
+getCollectionOfFootprintsForPsfMatching: {
     # Minimum number of pixels in an acceptible Footprint
     footprintDiffimNpixMin: 10
 
     # Grow footprint by this many pixels
     footprintDiffimGrow: 20
+
+    # Detection threshold
+    footprintDetectionThreshold: 15000
 }
 
 # Use case computePsfMatchingKernelForMaskedImage

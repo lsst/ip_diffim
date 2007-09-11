@@ -507,17 +507,17 @@ void lsst::imageproc::getCollectionOfFootprintsForPsfMatching(
     ) {
     
     // Parse the Policy
-    Assert(p.exists("computePsfMatchingKernelForMaskedImage.footprintDiffimNpixMin"), 
-           "Policy missing entry computePsfMatchingKernelForMaskedImage.footprintDiffimNpixMin");
-    unsigned int footprintDiffimNpixMin = p.getInt("computePsfMatchingKernelForMaskedImage.footprintDiffimNpixMin");
+    Assert(p.exists("getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin"), 
+           "Policy missing entry getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin");
+    unsigned int footprintDiffimNpixMin = p.getInt("getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin");
     
-    Assert(p.exists("computePsfMatchingKernelForMaskedImage.footprintDiffimGrow"),
-           "Policy missing entry computePsfMatchingKernelForMaskedImage.footprintDiffimGrow");
-    unsigned int footprintDiffimGrow = p.getInt("computePsfMatchingKernelForMaskedImage.footprintDiffimGrow");
+    Assert(p.exists("getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow"),
+           "Policy missing entry getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow");
+    unsigned int footprintDiffimGrow = p.getInt("getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow");
     
-    Assert(p.exists("computePsfMatchingKernelForMaskedImage.footprintDetectionThreshold"),
-           "Policy missing entry computePsfMatchingKernelForMaskedImage.footprintDetectionThreshold");
-    float footprintDetectionThreshold = p.getFloat("computePsfMatchingKernelForMaskedImage.footprintDetectionThreshold");
+    Assert(p.exists("getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold"),
+           "Policy missing entry getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold");
+    float footprintDetectionThreshold = p.getFloat("getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold");
     
     // Find detections
     lsst::detection::DetectionSet<ImageT,MaskT> 

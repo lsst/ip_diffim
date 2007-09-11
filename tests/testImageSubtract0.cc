@@ -50,9 +50,7 @@ int main( int argc, char** argv )
         
         // Now Works
         MaskedImage<ImageT, MaskT>
-            convolvedStamp = lsst::fw::kernel::convolve(*stampPtr, *kernelPtr, CONVOLVE_THRESHOLD, EDGE_MASK_BIT);
-
-        
+            convolvedStamp = lsst::fw::kernel::convolve(*stampPtr, *kernelPtr, CONVOLVE_THRESHOLD, EDGE_MASK_BIT);        
         
         // Write out the stamp
         stampPtr->writeFits( "test0_stamp" );

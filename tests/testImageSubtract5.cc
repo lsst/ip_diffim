@@ -108,6 +108,10 @@ int main( int argc, char** argv )
             );
 
         // Now you let the code find the peaks!
+        vector<lsst::detection::Footprint::PtrType> footprintVector;
+        lsst::imageproc::getCollectionOfFootprintsForPsfMatching(templateMaskedImage, scienceMaskedImage, footprintVector, policy);
+
+        // Do it
         lsst::imageproc::computePsfMatchingKernelForMaskedImage
             (templateMaskedImage, scienceMaskedImage, kernelBasisVec, 
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);

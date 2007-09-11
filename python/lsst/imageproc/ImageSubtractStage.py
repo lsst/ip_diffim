@@ -38,7 +38,7 @@ class ImageSubtractStage(Stage):
         imageproc.computePsfMatchingKernelForMaskedImage(templateImage, inputImage, basisSet,
                                                          kernelPtr, kernelFunctionPtr, backgroundFunctionPtr, policy)
 
-        differenceImage = inputImage - fw.convolve(templateImage, kernelPtr)
+        differenceImage = inputImage - fw.convolve(templateImage, kernelPtr, convolveThreshold, edgeMaskBit)
 
         # Ptr or not Ptr, that is the question.  The answer is Not
         
@@ -220,7 +220,11 @@ class ImageSubtractStage(Stage):
         #
         # Create final difference image
         #
-        differenceImage  = inputImage - fw.convolve(templateImage, spatialKernelPtr)
+        if type(spatialKernelPtr) == type(fw.LinearCombinationKernel()):
+            differenceImage  = inputImage - fw.convolveLinear(templateImage, spatialKernelPtr, convolveThreshold, edgeMaskBit)
+        else:
+            differenceImage  = inputImage - fw.convolve(templateImage, spatialKernelPtr, convolveThreshold, edgeMaskBit)
+            
         differenceImage -= backgroundFunctionPtr
 
         # NOTE - Do I do object detection here or not?  Suspect not
