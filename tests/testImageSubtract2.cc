@@ -32,34 +32,17 @@ int main( int argc, char** argv )
 
         // Read in Policy
         ifstream is("examples/ImageSubtract_policy.paf");
-        Policy p;
-        PAFParser pp(p);
+        lsst::mwi::policy::Policy p;
+        lsst::mwi::policy::paf::PAFParser pp(p);
         pp.parse(is);
         is.close();
 
         // Parse policy
-        Assert(p.exists("convolveThreshold"),
-               "Policy missing entry convolveThreshold");
-        KernelT convovleThreshold = p.getDouble("convolveThreshold");
-        
-        Assert(p.exists("edgeMaskBit"),
-               "Policy missing entry edgeMaskBit");
+        KernelT convolveThreshold = static_cast<KernelT>(p.getDouble("convolveThreshold"));
         int edgeMaskBit = p.getInt("edgeMaskBit");
-
-        Assert(p.exists("kernelRows"),
-               "Policy missing entry kernelRows");
         unsigned int kernelRows = p.getInt("kernelRows");
-
-        Assert(p.exists("kernelCols"),
-               "Policy missing entry kernelCols");
         unsigned int kernelCols = p.getInt("kernelCols");
-
-        Assert(p.exists("kernelSpatialOrder"),
-               "Policy missing entry kernelSpatialOrder");
         unsigned int kernelSpatialOrder = p.getInt("kernelSpatialOrder");
-
-        Assert(p.exists("backgroundSpatialOrder"),
-               "Policy missing entry backgroundSpatialOrder");
         unsigned int backgroundSpatialOrder = p.getInt("backgroundSpatialOrder");
 
         // Read input images
@@ -76,7 +59,7 @@ int main( int argc, char** argv )
         MaskedImage<ImageT,MaskT> scienceMaskedImage;
         try {
             scienceMaskedImage.readFits(inputImage);
-        } catch (lsst::mwi::exceptions::Exception &e) {
+        } catch (lsst::mwi::exceptions::ExceptionStack &e) {
             cerr << "Failed to open science image " << inputImage << ": " << e.what() << endl;
             return 1;
         }
@@ -84,7 +67,7 @@ int main( int argc, char** argv )
         MaskedImage<ImageT,MaskT> templateMaskedImage;
         try {
             templateMaskedImage.readFits(inputImage);
-        } catch (lsst::mwi::exceptions::Exception &e) {
+        } catch (lsst::mwi::exceptions::ExceptionStack &e) {
             cerr << "Failed to open template image " << inputImage << ": " << e.what() << endl;
             return 1;
         }
@@ -111,16 +94,16 @@ int main( int argc, char** argv )
         templateMaskedImage += 100;
 
         // Use hard-coded positions for now
-        vector<lsst::detection::Footprint::PtrType> footprintVector;
-        lsst::imageproc::getCollectionOfMaskedImagesForPSFMatching(footprintVector);
+        vector<lsst::detection::Footprint::PtrType> footprintList;
+        lsst::imageproc::getCollectionOfMaskedImagesForPsfMatching(footprintList);
         
 
-        lsst::imageproc::computePSFMatchingKernelForMaskedImage
-            (templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintVector,
-             kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
+        lsst::imageproc::computePsfMatchingKernelForMaskedImage
+            (templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintList,
+             kernelPtr, kernelFunctionPtr, backgroundFunctionPtr, p);
 
         lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =
-            lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, convovleThreshold, edgeMaskBit);
+            lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, convolveThreshold, edgeMaskBit);
 
         // Subtract off template
         scienceMaskedImage -= convolvedTemplateMaskedImage;

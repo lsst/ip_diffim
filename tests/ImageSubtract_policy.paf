@@ -34,9 +34,6 @@ computePsfMatchingKernelForMaskedImage: {
 
     # Maximum variance (residual/variance) for an acceptable Kernel; variance should be 1
     maximumFootprintResidualVariance: 2.0
-
-    # Use MINOS to get asymmetric error bars on background?
-    backgroundFitCalculateMinos: false
 }
 
 # Use case computePsfMatchingKernelForPostageStamp
@@ -75,7 +72,4 @@ computeSpatiallyVaryingPsfMatchingKernel: {
 
     # Maximum varaince of residuals when comparing each Kernel to its spatial model
     maximumSpatialKernelResidualVariance: 1.0
-
-    # Use MINOS to get asymmetric error bars on spatial parameters?
-    spatialFitCalculateMinos: false
 }

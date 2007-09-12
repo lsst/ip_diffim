@@ -38,28 +38,11 @@ int main( int argc, char** argv )
         is.close();
 
         // Parse policy
-        Assert(p.exists("convolveThreshold"),
-               "Policy missing entry convolveThreshold");
-        KernelT convolveThreshold = p.getDouble("convolveThreshold");
-        
-        Assert(p.exists("edgeMaskBit"),
-               "Policy missing entry edgeMaskBit");
+        KernelT convolveThreshold = static_cast<KernelT>(p.getDouble("convolveThreshold"));
         int edgeMaskBit = p.getInt("edgeMaskBit");
-
-        Assert(p.exists("kernelRows"),
-               "Policy missing entry kernelRows");
         unsigned int kernelRows = p.getInt("kernelRows");
-
-        Assert(p.exists("kernelCols"),
-               "Policy missing entry kernelCols");
         unsigned int kernelCols = p.getInt("kernelCols");
-
-        Assert(p.exists("kernelSpatialOrder"),
-               "Policy missing entry kernelSpatialOrder");
         unsigned int kernelSpatialOrder = p.getInt("kernelSpatialOrder");
-
-        Assert(p.exists("backgroundSpatialOrder"),
-               "Policy missing entry backgroundSpatialOrder");
         unsigned int backgroundSpatialOrder = p.getInt("backgroundSpatialOrder");
         
         // Read input images
@@ -75,7 +58,7 @@ int main( int argc, char** argv )
         MaskedImage<ImageT,MaskT> scienceMaskedImage;
         try {
             scienceMaskedImage.readFits(inputImage);
-        } catch (lsst::mwi::exceptions::Exception &e) {
+        } catch (lsst::mwi::exceptions::ExceptionStack &e) {
             cerr << "Failed to open science image " << inputImage << ": " << e.what() << endl;
             return 1;
         }
@@ -83,7 +66,7 @@ int main( int argc, char** argv )
         MaskedImage<ImageT,MaskT> templateMaskedImage;
         try {
             templateMaskedImage.readFits(inputImage);
-        } catch (lsst::mwi::exceptions::Exception &e) {
+        } catch (lsst::mwi::exceptions::ExceptionStack &e) {
             cerr << "Failed to open template image " << inputImage << ": " << e.what() << endl;
             return 1;
         }
@@ -108,13 +91,13 @@ int main( int argc, char** argv )
             );
         
         // Use hard-coded positions for now
-        vector<lsst::detection::Footprint::PtrType> footprintVector;
-        lsst::imageproc::getCollectionOfMaskedImagesForPsfMatching(footprintVector);
+        vector<lsst::detection::Footprint::PtrType> footprintList;
+        lsst::imageproc::getCollectionOfMaskedImagesForPsfMatching(footprintList);
         
         
         lsst::imageproc::computePsfMatchingKernelForMaskedImage
-            (templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintVector,
-             kernelPtr, kernelFunctionPtr, backgroundFunctionPtr);
+            (templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintList,
+             kernelPtr, kernelFunctionPtr, backgroundFunctionPtr, p);
         
         // TAKES TOO LONG FOR NOW...
         //lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =

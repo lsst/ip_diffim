@@ -111,7 +111,7 @@ double lsst::fw::function::MinimizerFunctionBase2<ReturnT>::operator() (const st
 }
 
 template<typename ReturnT>
-double lsst::fw::function::MinimizerFunctionBase<ReturnT>::minimize(
+void lsst::fw::function::MinimizerFunctionBase1<ReturnT>::minimize(
     std::vector<double> &parameters, ///< Holds parameter guesses on input, fit parameters on output
     std::vector<std::pair<double,double> > &errors ///< Holds parameter uncertainties, positive and negative
     ) {
@@ -122,9 +122,9 @@ double lsst::fw::function::MinimizerFunctionBase<ReturnT>::minimize(
         fitPar.add((boost::format("p%d") % i).str().c_str(), parameters[i]);
     }
 
-    MnMigrad migrad(this, fitPar);
+    MnMigrad migrad(*this, fitPar);
     FunctionMinimum min = migrad();
-    MnMinos minos(this, min); 
+    MnMinos minos(*this, min); 
 
     if (!(min.isValid())) {
         lsst::mwi::utils::Trace("lsst::fw::function::MinimizerFunctionBase::minimize", 4, 
@@ -145,7 +145,7 @@ double lsst::fw::function::MinimizerFunctionBase<ReturnT>::minimize(
 }
 
 template<typename ReturnT>
-double lsst::fw::function::MinimizerFunctionBase2<ReturnT>::minimize(
+void lsst::fw::function::MinimizerFunctionBase2<ReturnT>::minimize(
     std::vector<double> &parameters, ///< Holds parameter guesses on input, fit parameters on output
     std::vector<std::pair<double,double> > &errors ///< Holds parameter uncertainties, positive and negative
     ) {
@@ -156,9 +156,9 @@ double lsst::fw::function::MinimizerFunctionBase2<ReturnT>::minimize(
         fitPar.add((boost::format("p%d") % i).str().c_str(), parameters[i]);
     }
 
-    MnMigrad migrad(this, fitPar);
+    MnMigrad migrad(*this, fitPar);
     FunctionMinimum min = migrad();
-    MnMinos minos(this, min); 
+    MnMinos minos(*this, min); 
 
     if (!(min.isValid())) {
         lsst::mwi::utils::Trace("lsst::fw::function::MinimizerFunctionBase::minimize", 4, 

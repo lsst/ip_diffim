@@ -10,7 +10,6 @@
  *
  * \ingroup imageproc
  */
-
 #include <boost/shared_ptr.hpp>
 
 #include <lsst/fw/Kernel.h>
@@ -33,14 +32,6 @@
 #include <vw/Math/Vector.h> 
 
 using namespace std;
-
-
-/**
-   NOTE regarding python vs. C
-   Its probably best to eventually code use case computePsfMatchingKernelForMaskedImage in Python
-   And this will be the ImageSubtract Stage
-   For now, just wrap it in Python
-*/
 
 
 /**
@@ -69,27 +60,21 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
                             "Entering subroutine computePsfMatchingKernelForMaskedImage");
 
     // Parse the Policy
-    Assert(p.exists("computePsfMatchingKernelForMaskedImage.maximumFootprintResidualMean"),
-           "Policy missing entry computePsfMatchingKernelForMaskedImage.maximumFootprintResidualMean");
+    //Assert(p.exists("computePsfMatchingKernelForMaskedImage.maximumFootprintResidualMean"),
+    //"Policy missing entry computePsfMatchingKernelForMaskedImage.maximumFootprintResidualMean");
     double maximumFootprintResidualMean = p.getDouble("computePsfMatchingKernelForMaskedImage.maximumFootprintResidualMean");
 
-    Assert(p.exists("computePsfMatchingKernelForMaskedImage.maximumFootprintResidualVariance"),
-           "Policy missing entry computePsfMatchingKernelForMaskedImage.maximumFootprintResidualVariance");
+    //Assert(p.exists("computePsfMatchingKernelForMaskedImage.maximumFootprintResidualVariance"),
+    //"Policy missing entry computePsfMatchingKernelForMaskedImage.maximumFootprintResidualVariance");
     double maximumFootprintResidualVariance = p.getDouble("computePsfMatchingKernelForMaskedImage.maximumFootprintResidualVariance");
 
-    Assert(p.exists("computePsfMatchingKernelForMaskedImage.backgroundFitCalculateMinos"),
-           "Policy missing entry computePsfMatchingKernelForMaskedImage.backgroundFitCalculateMinos");
-    bool backgroundFitCalculateMinos = p.getBool("computePsfMatchingKernelForMaskedImage.backgroundFitCalculateMinos");
-
-    Assert(p.exists("convolveThreshold"),
-           "Policy missing entry convolveThreshold");
-    KernelT convolveThreshold = p.getDouble("convolveThreshold");
-
-    Assert(p.exists("edgeMaskBit"),
-           "Policy missing entry edgeMaskBit");
-    int edgeMaskBit = p.getInt("edgeMaskBit");
+    //Assert(p.exists("convolveThreshold"),
+    //"Policy missing entry convolveThreshold");
+    KernelT convolveThreshold = static_cast<KernelT>(p.getDouble("convolveThreshold"));
     
-    double imSum = 0.0;
+    //Assert(p.exists("edgeMaskBit"),
+    //"Policy missing entry edgeMaskBit");
+    int edgeMaskBit = p.getInt("edgeMaskBit");
 
     // Reusable view around each footprint
     typename lsst::fw::MaskedImage<ImageT,MaskT>::MaskedImagePtrT imageToConvolveStampPtr;
@@ -116,7 +101,7 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
         double background;
         vector<double> kernelCoeffs(kernelInBasisList.size());
         lsst::imageproc::computePsfMatchingKernelForPostageStamp
-            (*imageToConvolveStampPtr, *imageToNotConvolveStampPtr, kernelInBasisList, kernelCoeffs, background);
+            (*imageToConvolveStampPtr, *imageToNotConvolveStampPtr, kernelInBasisList, kernelCoeffs, background, p);
 
         // Create a linear combination kernel from this 
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > footprintKernelPtr(
@@ -172,6 +157,7 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
 
 #if defined(DEBUG_IO)
         {
+            double imSum = 0.0;
             lsst::fw::Image<KernelT> kImage = footprintKernelPtr->computeNewImage(imSum);
             kImage.writeFits( (boost::format("kFits_%d.fits") % nFootprint).str() );
             convolvedImageStamp.writeFits( (boost::format("d1Fits_%d") % nFootprint).str() );
@@ -184,7 +170,7 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
     // In the end we want to test if the kernelInBasisList is Delta Functions; if so, do PCA
     // For DC2 we just do it
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelOutBasisList;
-    lsst::imageproc::computePcaKernelBasis(diffImContainerList, kernelOutBasisList);
+    lsst::imageproc::computePcaKernelBasis(diffImContainerList, kernelOutBasisList, p);
 
     // Compute spatial variation of the kernel if requested
     if (kernelFunctionPtr != NULL) {
@@ -192,7 +178,8 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
             diffImContainerList,
             kernelOutBasisList, 
             kernelPtr,
-            kernelFunctionPtr);
+            kernelFunctionPtr,
+            p);
     }
 
     // Compute spatial variation of the background if requested
@@ -222,7 +209,7 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
         }
 
         if (nGood == 0) {
-            throw lsst::mwi::exceptions::Exception("No good footprints for background estimation");
+            throw lsst::mwi::exceptions::DomainError("No good footprints for background estimation");
         }
 
         double nSigmaSquared = 1.0;
@@ -230,9 +217,9 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
             bgFcn(backgrounds, variances, position1, position2, nSigmaSquared, backgroundFunctionPtr);
         
         // Initialize fit parameters at average background; higher order terms initially zero
-        nParameters = backgroundFunctionPtr->getNParameters();
+        int nParameters = backgroundFunctionPtr->getNParameters();
         std::vector<double> parameters(nParameters);
-        std::fill(parameters.begin(), paramters.end(), 0);
+        std::fill(parameters.begin(), parameters.end(), 0);
         parameters[0] = bgSum / nGood; 
         std::vector<std::pair<double,double> > errors(nParameters);
 
@@ -272,12 +259,12 @@ void lsst::imageproc::computePsfMatchingKernelForPostageStamp(
     ) { 
 
     // Parse the Policy
-    Assert(p.exists("convolveThreshold"),
-           "Policy missing entry convolveThreshold");
-    KernelT convolveThreshold = p.getDouble("convolveThreshold");
+    //Assert(p.exists("convolveThreshold"),
+    //"Policy missing entry convolveThreshold");
+    KernelT convolveThreshold = static_cast<KernelT>(p.getDouble("convolveThreshold"));
 
-    Assert(p.exists("edgeMaskBit"),
-           "Policy missing entry edgeMaskBit");
+    //Assert(p.exists("edgeMaskBit"),
+    //"Policy missing entry edgeMaskBit");
     int edgeMaskBit = p.getInt("edgeMaskBit");
 
 
@@ -481,7 +468,7 @@ void lsst::imageproc::computePsfMatchingKernelForPostageStamp(
     vw::math::Matrix<double> Minv;
     try {
         Minv = vw::math::inverse(M);
-    } catch (lsst::mwi::exceptions::Exception &e) {
+    } catch (lsst::mwi::exceptions::ExceptionStack &e) {
         lsst::mwi::utils::Trace("lsst.imageproc.computePsfMatchingKernelForPostageStamp", 1, 
                                 ("Invert matrix failed"));
         // NOTE - lets be smarter here.
@@ -507,17 +494,17 @@ void lsst::imageproc::getCollectionOfFootprintsForPsfMatching(
     ) {
     
     // Parse the Policy
-    Assert(p.exists("getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin"), 
-           "Policy missing entry getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin");
+    //Assert(p.exists("getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin"), 
+    //"Policy missing entry getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin");
     unsigned int footprintDiffimNpixMin = p.getInt("getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin");
     
-    Assert(p.exists("getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow"),
-           "Policy missing entry getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow");
+    //Assert(p.exists("getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow"),
+    //"Policy missing entry getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow");
     unsigned int footprintDiffimGrow = p.getInt("getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow");
     
-    Assert(p.exists("getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold"),
-           "Policy missing entry getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold");
-    float footprintDetectionThreshold = p.getFloat("getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold");
+    //Assert(p.exists("getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold"),
+    //"Policy missing entry getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold");
+    double footprintDetectionThreshold = p.getDouble("getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold");
     
     // Find detections
     lsst::detection::DetectionSet<ImageT,MaskT> 
@@ -545,7 +532,7 @@ void lsst::imageproc::getCollectionOfFootprintsForPsfMatching(
             try {
                 imageToConvolveFootprintPtr = imageToConvolve.getSubImage(footprintBBox);
                 imageToNotConvolveFootprintPtr = imageToNotConvolve.getSubImage(footprintBBox);
-            } catch (lsst::mwi::exceptions::Exception &e) {
+            } catch (lsst::mwi::exceptions::ExceptionStack &e) {
                 // Likely that the grown subImage was off the image
                 i = footprintListIn.erase(i);
             }
@@ -649,28 +636,28 @@ void lsst::imageproc::computePcaKernelBasis(
     ) {
     
     // Parse the Policy
-    Assert(p.exists("computePcaKernelBasis.minimumNumberOfBases"),
-           "Policy missing entry computePcaKernelBasis.minimumNumberOfBases");
+    //Assert(p.exists("computePcaKernelBasis.minimumNumberOfBases"),
+    //"Policy missing entry computePcaKernelBasis.minimumNumberOfBases");
     unsigned int minimumNumberOfBases = p.getInt("computePcaKernelBasis.minimumNumberOfBases");
 
-    Assert(p.exists("computePcaKernelBasis.maximumFractionOfEigenvalues"),
-           "Policy missing entry computePcaKernelBasis.maximumFractionOfEigenvalues");
+    //Assert(p.exists("computePcaKernelBasis.maximumFractionOfEigenvalues"),
+    //"Policy missing entry computePcaKernelBasis.maximumFractionOfEigenvalues");
     double maximumFractionOfEigenvalues = p.getDouble("computePcaKernelBasis.maximumFractionOfEigenvalues");
 
-    Assert(p.exists("computePcaKernelBasis.minimumAcceptibleEigenvalue"),
-           "Policy missing entry computePcaKernelBasis.minimumAcceptibleEigenvalue");
+    //Assert(p.exists("computePcaKernelBasis.minimumAcceptibleEigenvalue"),
+    //"Policy missing entry computePcaKernelBasis.minimumAcceptibleEigenvalue");
     double minimumAcceptibleEigenvalue = p.getDouble("computePcaKernelBasis.minimumAcceptibleEigenvalue");
 
-    Assert(p.exists("computePcaKernelBasis.maximumIteratonsPCA"),
-           "Policy missing entry computePcaKernelBasis.maximumIteratonsPCA");
+    //Assert(p.exists("computePcaKernelBasis.maximumIteratonsPCA"),
+    //"Policy missing entry computePcaKernelBasis.maximumIteratonsPCA");
     unsigned int maximumIteratonsPCA = p.getInt("computePcaKernelBasis.maximumIteratonsPCA");
 
-    Assert(p.exists("computePcaKernelBasis.maximumKernelResidualMean"),
-           "Policy missing entry computePcaKernelBasis.maximumKernelResidualMean");
+    //Assert(p.exists("computePcaKernelBasis.maximumKernelResidualMean"),
+    //"Policy missing entry computePcaKernelBasis.maximumKernelResidualMean");
     double maximumKernelResidualMean = p.getDouble("computePcaKernelBasis.maximumKernelResidualMean");
 
-    Assert(p.exists("computePcaKernelBasis.maximumKernelResidualVariance"),
-           "Policy missing entry computePcaKernelBasis.maximumKernelResidualVariance");
+    //Assert(p.exists("computePcaKernelBasis.maximumKernelResidualVariance"),
+    //"Policy missing entry computePcaKernelBasis.maximumKernelResidualVariance");
     double maximumKernelResidualVariance = p.getDouble("computePcaKernelBasis.maximumKernelResidualVariance");
 
     // Image accessor
@@ -713,7 +700,7 @@ void lsst::imageproc::computePcaKernelBasis(
         }
 
         if (nGood == 0) {
-            throw lsst::mwi::exceptions::Exception("No good kernels for PCA");
+            throw lsst::mwi::exceptions::DomainError("No good kernels for PCA");
         }
                     
                     
@@ -929,21 +916,17 @@ void lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel(
     )
  {
      // Parse the Policy
-     Assert(p.exists("computeSpatiallyVaryingPsfMatchingKernel.maximumIterationsSpatialFit"),
-            "Policy missing entry computeSpatiallyVaryingPsfMatchingKernel.maximumIterationsSpatialFit");
+     //Assert(p.exists("computeSpatiallyVaryingPsfMatchingKernel.maximumIterationsSpatialFit"),
+     //"Policy missing entry computeSpatiallyVaryingPsfMatchingKernel.maximumIterationsSpatialFit");
      unsigned int maximumIterationsSpatialFit = p.getInt("computeSpatiallyVaryingPsfMatchingKernel.maximumIterationsSpatialFit");
 
-     Assert(p.exists("computeSpatiallyVaryingPsfMatchingKernel.maximumSpatialKernelResidualMean"),
-            "Policy missing entry computeSpatiallyVaryingPsfMatchingKernel.maximumSpatialKernelResidualMean");
+     //Assert(p.exists("computeSpatiallyVaryingPsfMatchingKernel.maximumSpatialKernelResidualMean"),
+     //"Policy missing entry computeSpatiallyVaryingPsfMatchingKernel.maximumSpatialKernelResidualMean");
      double maximumSpatialKernelResidualMean = p.getDouble("computeSpatiallyVaryingPsfMatchingKernel.maximumSpatialKernelResidualMean");
 
-     Assert(p.exists("computeSpatiallyVaryingPsfMatchingKernel.maximumSpatialKernelResidualVariance"),
-            "Policy missing entry computeSpatiallyVaryingPsfMatchingKernel.maximumSpatialKernelResidualVariance");
+     //Assert(p.exists("computeSpatiallyVaryingPsfMatchingKernel.maximumSpatialKernelResidualVariance"),
+     //"Policy missing entry computeSpatiallyVaryingPsfMatchingKernel.maximumSpatialKernelResidualVariance");
      double maximumSpatialKernelResidualVariance = p.getDouble("computeSpatiallyVaryingPsfMatchingKernel.maximumSpatialKernelResidualVariance");
-
-     Assert(p.exists("computeSpatiallyVaryingPsfMatchingKernel.spatialFitCalculateMinos"),
-            "Policy missing entry computeSpatiallyVaryingPsfMatchingKernel.spatialFitCalculateMinos");
-     bool spatialFitCalculateMinos = p.getBool("computeSpatiallyVaryingPsfMatchingKernel.spatialFitCalculateMinos");
 
      // Container iterator
      typedef typename vector<lsst::imageproc::DiffImContainer<KernelT> >::iterator iDiffImContainer;
