@@ -31,7 +31,7 @@ int main( int argc, char** argv )
         typedef double FuncT;
 
         // Read in Policy
-        ifstream is("examples/ImageSubtract_policy.paf");
+        ifstream is("tests/ImageSubtract_policy.paf");
         Policy p;
         PAFParser pp(p);
         pp.parse(is);

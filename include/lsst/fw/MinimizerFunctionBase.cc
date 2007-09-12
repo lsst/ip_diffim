@@ -111,20 +111,22 @@ double lsst::fw::function::MinimizerFunctionBase2<ReturnT>::operator() (const st
 }
 
 template<typename ReturnT>
-void lsst::fw::function::MinimizerFunctionBase1<ReturnT>::minimize(
+void lsst::fw::function::minimize(
+    lsst::fw::function::MinimizerFunctionBase1<ReturnT> &theFunction, ///< The Function to minimize
     std::vector<double> &parameters, ///< Holds parameter guesses on input, fit parameters on output
+    std::vector<double> const &stepsize, ///< Holds step size 
     std::vector<std::pair<double,double> > &errors ///< Holds parameter uncertainties, positive and negative
     ) {
     
     // We should come up with a recipe for step size
     MnUserParameters fitPar;
     for (unsigned int i = 0; i < parameters.size(); ++i) {
-        fitPar.add((boost::format("p%d") % i).str().c_str(), parameters[i]);
+        fitPar.add((boost::format("p%d") % i).str().c_str(), parameters[i], stepsize[i]);
     }
 
-    MnMigrad migrad(*this, fitPar);
+    MnMigrad migrad(theFunction, fitPar);
     FunctionMinimum min = migrad();
-    MnMinos minos(*this, min); 
+    MnMinos minos(theFunction, min); 
 
     if (!(min.isValid())) {
         lsst::mwi::utils::Trace("lsst::fw::function::MinimizerFunctionBase::minimize", 4, 
@@ -145,20 +147,22 @@ void lsst::fw::function::MinimizerFunctionBase1<ReturnT>::minimize(
 }
 
 template<typename ReturnT>
-void lsst::fw::function::MinimizerFunctionBase2<ReturnT>::minimize(
+void lsst::fw::function::minimize(
+    lsst::fw::function::MinimizerFunctionBase2<ReturnT> &theFunction, ///< The Function to minimize
     std::vector<double> &parameters, ///< Holds parameter guesses on input, fit parameters on output
+    std::vector<double> const &stepsize, ///< Holds step size 
     std::vector<std::pair<double,double> > &errors ///< Holds parameter uncertainties, positive and negative
     ) {
     
     // We should come up with a recipe for step size
     MnUserParameters fitPar;
     for (unsigned int i = 0; i < parameters.size(); ++i) {
-        fitPar.add((boost::format("p%d") % i).str().c_str(), parameters[i]);
+        fitPar.add((boost::format("p%d") % i).str().c_str(), parameters[i], 0.1);
     }
 
-    MnMigrad migrad(*this, fitPar);
+    MnMigrad migrad(theFunction, fitPar);
     FunctionMinimum min = migrad();
-    MnMinos minos(*this, min); 
+    MnMinos minos(theFunction, min); 
 
     if (!(min.isValid())) {
         lsst::mwi::utils::Trace("lsst::fw::function::MinimizerFunctionBase::minimize", 4, 

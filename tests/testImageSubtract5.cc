@@ -31,7 +31,7 @@ int main( int argc, char** argv )
         lsst::mwi::utils::Trace::setVerbosity(".", 4);
 
         // Read in Policy
-        ifstream is("examples/ImageSubtract_policy.paf");
+        ifstream is("tests/ImageSubtract_policy.paf");
         lsst::mwi::policy::Policy p;
         lsst::mwi::policy::paf::PAFParser pp(p);
         pp.parse(is);

@@ -31,7 +31,7 @@ int main( int argc, char** argv )
         typedef double FuncT;
 
         // Read in Policy
-        ifstream is("examples/ImageSubtract_policy.paf");
+        ifstream is("tests/ImageSubtract_policy.paf");
         lsst::mwi::policy::Policy p;
         lsst::mwi::policy::paf::PAFParser pp(p);
         pp.parse(is);
@@ -101,9 +101,13 @@ int main( int argc, char** argv )
         lsst::imageproc::computePsfMatchingKernelForMaskedImage
             (templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintList,
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr, p);
-
-        lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =
-            lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, convolveThreshold, edgeMaskBit);
+        
+        //lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =
+        //lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, convolveThreshold, edgeMaskBit);
+        
+        lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage(templateMaskedImage.getCols(), 
+                                                                          templateMaskedImage.getRows());
+        lsst::fw::kernel::convolveLinear(convolvedTemplateMaskedImage, templateMaskedImage, *kernelPtr, edgeMaskBit);
 
         // Subtract off template
         scienceMaskedImage -= convolvedTemplateMaskedImage;

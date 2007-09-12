@@ -35,8 +35,8 @@ namespace function {
         virtual double up() const {return _errorDef;}
         virtual double operator() (const std::vector<double>&) const;
 
-        void minimize(std::vector<double> &parameters,
-                      std::vector<std::pair<double,double> > &errors);
+        //void minimizee(std::vector<double> &parameters,
+        //std::vector<std::pair<double,double> > &errors);
         inline std::vector<double> getMeasurements() const {return _measurementVector;}
         inline std::vector<double> getVariances() const {return _varianceVector;}
         inline std::vector<double> getPositions() const {return _positionVector;}
@@ -65,8 +65,8 @@ namespace function {
         virtual double up() const {return _errorDef;}
         virtual double operator() (const std::vector<double>&) const;
         
-        void minimize(std::vector<double> &parameters,
-                      std::vector<std::pair<double,double> > &errors);
+        //void minimizee(std::vector<double> &parameters,
+        //std::vector<std::pair<double,double> > &errors);
         inline std::vector<double> getMeasurements() const {return _measurementVector;}
         inline std::vector<double> getVariances() const {return _varianceVector;}
         inline std::vector<double> getPosition1() const {return _position1Vector;}
@@ -80,6 +80,22 @@ namespace function {
         double _errorDef;
         boost::shared_ptr<lsst::fw::function::Function2<ReturnT> > _theFunctionPtr;
     };
+        
+    template<typename ReturnT>
+    void minimize(
+        lsst::fw::function::MinimizerFunctionBase1<ReturnT> &theFunction,
+        std::vector<double> &parameters,
+        std::vector<double> const &stepsize,
+        std::vector<std::pair<double,double> > &errors
+        );
+
+    template<typename ReturnT>
+    void minimize(
+        lsst::fw::function::MinimizerFunctionBase2<ReturnT> &theFunction,
+        std::vector<double> &parameters,
+        std::vector<double> const &stepsize,
+        std::vector<std::pair<double,double> > &errors
+        );
         
     
 }   // namespace function        

@@ -219,12 +219,16 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
         // Initialize fit parameters at average background; higher order terms initially zero
         int nParameters = backgroundFunctionPtr->getNParameters();
         std::vector<double> parameters(nParameters);
+        std::vector<double> stepsize(nParameters);
         std::fill(parameters.begin(), parameters.end(), 0);
+        std::fill(stepsize.begin(), stepsize.end(), 0.1);
         parameters[0] = bgSum / nGood; 
+        stepsize[0] = 0.1 * parameters[0];
         std::vector<std::pair<double,double> > errors(nParameters);
 
         // Minimize!
-        bgFcn.minimize(parameters, errors);
+        //bgFcn.minimizee(parameters, stepsize, errors);
+        lsst::fw::function::minimize(bgFcn, parameters, stepsize, errors);
         backgroundFunctionPtr->setParameters(parameters);
 
         // Debugging information
@@ -999,14 +1003,19 @@ void lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel(
              lsst::fw::function::MinimizerFunctionBase2<FuncT> 
                  kernelFcn(measurements, variances, position1, position2, nSigmaSquared, kernelFunctionPtr);
 
-             // Initialize mean kernel at value 1; higher order terms initially zero
-             std::vector<double> parameters(nGood);
+             // Initialize const kernel at value 1; higher order terms initially zero
+             int nParameters = kernelFunctionPtr->getNParameters();
+             std::vector<double> parameters(nParameters);
+             std::vector<double> stepsize(nParameters);
              std::fill(parameters.begin(), parameters.end(), 0);
+             std::fill(stepsize.begin(), stepsize.end(), 0.05);  // assume order 5% contribution from eigenkernels
              parameters[0] = 1;
-             std::vector<std::pair<double,double> > errors(nGood);
+             parameters[0] = 0.1;  // assume 10% uncertainty on const term
+             std::vector<std::pair<double,double> > errors(nParameters);
 
              // Minimize!
-             kernelFcn.minimize(parameters, errors);
+             //kernelFcn.minimizee(parameters, stepsize, errors);
+             lsst::fw::function::minimize(kernelFcn, parameters, stepsize, errors);
              
              for (unsigned int i = 0; i < parameters.size(); ++i) {
                  fitParameters[nk][i] = parameters[i];
