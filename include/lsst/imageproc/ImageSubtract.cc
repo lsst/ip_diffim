@@ -12,6 +12,7 @@
  */
 #include <boost/shared_ptr.hpp>
 
+#include <lsst/fw/FunctionLibrary.h>
 #include <lsst/fw/Kernel.h>
 #include <lsst/fw/KernelFunctions.h>
 #include <lsst/fw/MaskedImage.h>

@@ -2,7 +2,7 @@
 Import("env")
 import lsst.SConsUtils as scons
 
-env.CheckSwig("python", ilang="c++", includedProducts="mwi fw")
+env.CheckSwig("python", ilang="c++", includedProducts="fw mwi detection")
 
-#env.LoadableModuleIncomplete("_imageprocLib", Split("imageprocLib.i"),
-#                             LIBS=env.getlibs("vw fw imageproc"))
+env.LoadableModuleIncomplete("_imageprocLib", Split("imageprocLib.i"),
+                             LIBS=env.getlibs("vw mwi fw detection imageproc"))
