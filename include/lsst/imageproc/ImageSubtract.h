@@ -68,7 +68,7 @@ namespace imageproc {
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &kernelPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &backgroundFunctionPtr,
-        lsst::mwi::policy::Policy &p
+        lsst::mwi::policy::Policy &policy
         );
     
     template <typename ImageT, typename MaskT, typename KernelT>
@@ -78,7 +78,7 @@ namespace imageproc {
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisList,
         vector<double> &kernelCoeffs,
         double &background,
-        lsst::mwi::policy::Policy &p
+        lsst::mwi::policy::Policy &policy
         );
     
     template <typename ImageT, typename MaskT>
@@ -86,7 +86,7 @@ namespace imageproc {
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
         vector<lsst::detection::Footprint::PtrType> footprintListOut,
-        lsst::mwi::policy::Policy &p
+        lsst::mwi::policy::Policy &policy
         );
 
     void getCollectionOfMaskedImagesForPsfMatching(
@@ -97,7 +97,7 @@ namespace imageproc {
     void computePcaKernelBasis(
         vector<lsst::imageproc::DiffImContainer<KernelT> > &diffImContainerList,
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelPcaBasisList,
-        lsst::mwi::policy::Policy &p
+        lsst::mwi::policy::Policy &policy
         );
 
     template <typename KernelT, typename FuncT>
@@ -106,7 +106,7 @@ namespace imageproc {
         vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelOutBasisList,
         boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > &spatiallyVaryingKernelPtr,
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > &kernelFunctionPtr,
-        lsst::mwi::policy::Policy &p
+        lsst::mwi::policy::Policy &policy
         );
 
 
