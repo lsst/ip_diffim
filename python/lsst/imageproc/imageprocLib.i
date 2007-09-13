@@ -16,7 +16,6 @@ Python bindings for imageproc module
 %inline %{
 namespace lsst { namespace fw { } }
 namespace lsst { namespace imageproc { } }
-namespace lsst { namespace detection { } }
 
 using namespace lsst;
 using namespace lsst::imageproc;
@@ -41,6 +40,20 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 /*******************/
 /* ImageSubtract.h */
 
+#include <lsst/fw/Kernel.h>
+%include "lsst/imageproc/ImageSubtract.h"
+%template(computePsfMatchingKernelForMaskedImage_FiDD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<float, uint8, double, double>;
+%template(computePsfMatchingKernelForPostageStamp_FiD) lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, uint8, double>;
+%template(getCollectionOfFootprintsForPsfMatching_Fi)  lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float, uint8>;
+%template(computePcaKernelBasis_D)                     lsst::imageproc::computePcaKernelBasis<double>;
+%template(computeSpatiallyVaryingPsfMatchingKernel_DD) lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel<double, double>;
+%template(generateDeltaFunctionKernelSet_D)            lsst::imageproc::generateDeltaFunctionKernelSet<double>;
+%template(generateAlardLuptonKernelSet_D)              lsst::imageproc::generateAlardLuptonKernelSet<double>;
+%template(checkMaskedImageForDiffim_Fi)                lsst::imageproc::checkMaskedImageForDiffim<float, uint8>;
+%template(calculateMaskedImageResiduals_Fi)            lsst::imageproc::calculateMaskedImageResiduals<float, uint8>;
+%template(calculateImageResiduals_F)                   lsst::imageproc::calculateImageResiduals<float>;
+
+/*
 %include "lsst/imageproc/ImageSubtract.h"
 %template(computePsfMatchingKernelForMaskedImage_DIDD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<double, int32, double, double>;
 %template(computePsfMatchingKernelForMaskedImage_DiDD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<double, int16, double, double>;
@@ -76,13 +89,14 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 
 %template(calculateImageResiduals_D)                   lsst::imageproc::calculateImageResiduals<double>;
 %template(calculateImageResiduals_F)                   lsst::imageproc::calculateImageResiduals<float>;
+*/
 
 /* ImageSubtract.h */
 /*******************/
 /* PCA.h */
 
-#include "vw/Math/Matrix.h" 
-#include "vw/Math/Vector.h"
+#include <vw/Math/Matrix.h>
+#include <vw/Math/Vector.h>
 %include "lsst/imageproc/PCA.h"
 %template(computePca_F)                  lsst::imageproc::computePca<vw::math::Matrix<float>, vw::math::Vector<float> >;
 %template(computePca_D)                  lsst::imageproc::computePca<vw::math::Matrix<double>, vw::math::Vector<double> >;
