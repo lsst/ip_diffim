@@ -1128,8 +1128,7 @@ void lsst::imageproc::generateAlardLuptonKernelSet(
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisList ///< Output kernel basis function, length sum_n 0.5*(deg_n+1)*(deg_n+2)
     )
 {
-    int i;
-    KernelT k;
+    ; // TO DO
 }
 
 template <typename ImageT, typename MaskT>
