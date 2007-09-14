@@ -8,9 +8,9 @@ Python bindings for imageproc module
 %feature("autodoc", "1");
 %module(docstring=imageprocLib_DOCSTRING) imageprocLib
 
+// Everything we will need in the _wrap.cc file
 %{
-#   include <lsst/imageproc/ImageSubtract.h>
-#   include <lsst/detection/Footprint.h>
+#include <lsst/imageproc/ImageSubtract.h>
 %}
 
 %inline %{
@@ -24,8 +24,10 @@ using namespace lsst::imageproc;
 %init %{
 %}
 
-%include "lsst/mwi/p_lsstSwig.i"
+// Everything whose bindings we will have to know about
+%include "lsst/mwi/p_lsstSwig.i"             // this needs to go first otherwise i don't know about e.g. boost
 %include "lsst/fw/Core/lsstImageTypes.i"     // vw and Image/Mask types and typedefs
+%include "lsst/detection/detectionLib.i"     // need otherwise FootprintContainerT not known about
 
 %pythoncode %{
 def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/tickets/7/python/lsst/imageproc/imageprocLib.i $"):
@@ -34,13 +36,15 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 
 %}
 
-
 // Here you give the names of the functions you want to Swig
 
 /*******************/
 /* ImageSubtract.h */
 
-#include <lsst/fw/Kernel.h>
+// this should be in kernel.i but i need it now
+%template(LinearCombinationKernelPtrTypeD) boost::shared_ptr<lsst::fw::LinearCombinationKernel<double> >;
+
+
 %include "lsst/imageproc/ImageSubtract.h"
 %template(computePsfMatchingKernelForMaskedImage_FU8DD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<float, uint8, double, double>;
 %template(computePsfMatchingKernelForPostageStamp_FU8D) lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, uint8, double>;
@@ -52,51 +56,12 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 %template(checkMaskedImageForDiffim_FU8)                lsst::imageproc::checkMaskedImageForDiffim<float, uint8>;
 %template(calculateMaskedImageResiduals_FU8)            lsst::imageproc::calculateMaskedImageResiduals<float, uint8>;
 %template(calculateImageResiduals_F)                    lsst::imageproc::calculateImageResiduals<float>;
-
-/*
-%include "lsst/imageproc/ImageSubtract.h"
-%template(computePsfMatchingKernelForMaskedImage_DIDD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<double, int32, double, double>;
-%template(computePsfMatchingKernelForMaskedImage_DiDD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<double, int16, double, double>;
-%template(computePsfMatchingKernelForMaskedImage_FIDD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<float,  int32, double, double>;
-%template(computePsfMatchingKernelForMaskedImage_FiDD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<float,  int16, double, double>;
-
-%template(computePsfMatchingKernelForPostageStamp_DID) lsst::imageproc::computePsfMatchingKernelForPostageStamp<double, int32, double>;
-%template(computePsfMatchingKernelForPostageStamp_DiD) lsst::imageproc::computePsfMatchingKernelForPostageStamp<double, int16, double>;
-%template(computePsfMatchingKernelForPostageStamp_FID) lsst::imageproc::computePsfMatchingKernelForPostageStamp<float,  int32, double>;
-%template(computePsfMatchingKernelForPostageStamp_FiD) lsst::imageproc::computePsfMatchingKernelForPostageStamp<float,  int16, double>;
-
-%template(getCollectionOfFootprintsForPsfMatching_DI)  lsst::imageproc::getCollectionOfFootprintsForPsfMatching<double, int32>;
-%template(getCollectionOfFootprintsForPsfMatching_Di)  lsst::imageproc::getCollectionOfFootprintsForPsfMatching<double, int16>;
-%template(getCollectionOfFootprintsForPsfMatching_FI)  lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float,  int32>;
-%template(getCollectionOfFootprintsForPsfMatching_Fi)  lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float,  int16>;
-
 // getCollectionOfMaskedImagesForPsfMatching is not templated
-
-%template(computePcaKernelBasis_D)                     lsst::imageproc::computePcaKernelBasis<double>;
-%template(computeSpatiallyVaryingPsfMatchingKernel_DD) lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel<double, double>;
-%template(generateDeltaFunctionKernelSet_D)            lsst::imageproc::generateDeltaFunctionKernelSet<double>;
-%template(generateAlardLuptonKernelSet_D)              lsst::imageproc::generateAlardLuptonKernelSet<double>;
-
-%template(checkMaskedImageForDiffim_DI)                lsst::imageproc::checkMaskedImageForDiffim<double, int32>;
-%template(checkMaskedImageForDiffim_Di)                lsst::imageproc::checkMaskedImageForDiffim<double, int16>;
-%template(checkMaskedImageForDiffim_FI)                lsst::imageproc::checkMaskedImageForDiffim<float, int32>;
-%template(checkMaskedImageForDiffim_Fi)                lsst::imageproc::checkMaskedImageForDiffim<float, int16>;
-
-%template(calculateMaskedImageResiduals_DI)            lsst::imageproc::calculateMaskedImageResiduals<double, int32>;
-%template(calculateMaskedImageResiduals_Di)            lsst::imageproc::calculateMaskedImageResiduals<double, int16>;
-%template(calculateMaskedImageResiduals_FI)            lsst::imageproc::calculateMaskedImageResiduals<float,  int32>;
-%template(calculateMaskedImageResiduals_Fi)            lsst::imageproc::calculateMaskedImageResiduals<float,  int16>;
-
-%template(calculateImageResiduals_D)                   lsst::imageproc::calculateImageResiduals<double>;
-%template(calculateImageResiduals_F)                   lsst::imageproc::calculateImageResiduals<float>;
-*/
 
 /* ImageSubtract.h */
 /*******************/
 /* PCA.h */
 
-#include <vw/Math/Matrix.h>
-#include <vw/Math/Vector.h>
 %include "lsst/imageproc/PCA.h"
 %template(computePca_F)                  lsst::imageproc::computePca<vw::math::Matrix<float>, vw::math::Vector<float> >;
 %template(computePca_D)                  lsst::imageproc::computePca<vw::math::Matrix<double>, vw::math::Vector<double> >;
@@ -110,6 +75,7 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 /* MinimizerFunctionBase.h */
 
 // Until we merge this in to fw trunk
+%include "Minuit/FCNBase.h"
 %include "lsst/fw/MinimizerFunctionBase.h"
 %template(MinimizerFunctionBase1_F) lsst::fw::function::MinimizerFunctionBase1<float>;
 %template(MinimizerFunctionBase1_D) lsst::fw::function::MinimizerFunctionBase1<double>;
