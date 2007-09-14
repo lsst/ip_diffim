@@ -44,8 +44,9 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 // this should be in kernel.i but i need it now
 %template(LinearCombinationKernelPtrTypeD) boost::shared_ptr<lsst::fw::LinearCombinationKernel<double> >;
 
-
 %include "lsst/imageproc/ImageSubtract.h"
+%template(DiffImContainerD)                             lsst::imageproc::DiffImContainer<double>;
+%template(vectorDiffImContainerD)                       std::vector<lsst::imageproc::DiffImContainer<double> >;
 %template(computePsfMatchingKernelForMaskedImage_FU8DD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<float, uint8, double, double>;
 %template(computePsfMatchingKernelForPostageStamp_FU8D) lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, uint8, double>;
 %template(getCollectionOfFootprintsForPsfMatching_FU8)  lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float, uint8>;
