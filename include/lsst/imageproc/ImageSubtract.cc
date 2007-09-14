@@ -1121,14 +1121,15 @@ void lsst::imageproc::generateDeltaFunctionKernelSet(
 
 template <typename KernelT>
 void lsst::imageproc::generateAlardLuptonKernelSet(
-    int const nRows, ///< Number of rows in the kernel basis
-    int const nCols, ///< Number of columns in the kernel basis
+    unsigned int const nRows, ///< Number of rows in the kernel basis
+    unsigned int const nCols, ///< Number of columns in the kernel basis
     vector<double> const sigGauss, ///< Width of gaussians in basis; size = number of Gaussians
     vector<double> const degGauss, ///< Degree of spatial variation within each Gaussian; size = sigGauss.size()
     vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > &kernelBasisList ///< Output kernel basis function, length sum_n 0.5*(deg_n+1)*(deg_n+2)
     )
 {
-    ; // TO DO 
+    int i;
+    KernelT k;
 }
 
 template <typename ImageT, typename MaskT>

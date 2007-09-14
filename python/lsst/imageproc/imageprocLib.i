@@ -42,16 +42,16 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 
 #include <lsst/fw/Kernel.h>
 %include "lsst/imageproc/ImageSubtract.h"
-%template(computePsfMatchingKernelForMaskedImage_FiDD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<float, uint8, double, double>;
-%template(computePsfMatchingKernelForPostageStamp_FiD) lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, uint8, double>;
-%template(getCollectionOfFootprintsForPsfMatching_Fi)  lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float, uint8>;
-%template(computePcaKernelBasis_D)                     lsst::imageproc::computePcaKernelBasis<double>;
-%template(computeSpatiallyVaryingPsfMatchingKernel_DD) lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel<double, double>;
-%template(generateDeltaFunctionKernelSet_D)            lsst::imageproc::generateDeltaFunctionKernelSet<double>;
-%template(generateAlardLuptonKernelSet_D)              lsst::imageproc::generateAlardLuptonKernelSet<double>;
-%template(checkMaskedImageForDiffim_Fi)                lsst::imageproc::checkMaskedImageForDiffim<float, uint8>;
-%template(calculateMaskedImageResiduals_Fi)            lsst::imageproc::calculateMaskedImageResiduals<float, uint8>;
-%template(calculateImageResiduals_F)                   lsst::imageproc::calculateImageResiduals<float>;
+%template(computePsfMatchingKernelForMaskedImage_FU8DD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<float, uint8, double, double>;
+%template(computePsfMatchingKernelForPostageStamp_FU8D) lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, uint8, double>;
+%template(getCollectionOfFootprintsForPsfMatching_FU8)  lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float, uint8>;
+%template(computePcaKernelBasis_D)                      lsst::imageproc::computePcaKernelBasis<double>;
+%template(computeSpatiallyVaryingPsfMatchingKernel_DD)  lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel<double, double>;
+%template(generateDeltaFunctionKernelSet_D)             lsst::imageproc::generateDeltaFunctionKernelSet<double>;
+%template(generateAlardLuptonKernelSet_D)               lsst::imageproc::generateAlardLuptonKernelSet<double>;
+%template(checkMaskedImageForDiffim_FU8)                lsst::imageproc::checkMaskedImageForDiffim<float, uint8>;
+%template(calculateMaskedImageResiduals_FU8)            lsst::imageproc::calculateMaskedImageResiduals<float, uint8>;
+%template(calculateImageResiduals_F)                    lsst::imageproc::calculateImageResiduals<float>;
 
 /*
 %include "lsst/imageproc/ImageSubtract.h"
