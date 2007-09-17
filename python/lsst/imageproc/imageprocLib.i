@@ -28,6 +28,7 @@ using namespace lsst::imageproc;
 %include "lsst/mwi/p_lsstSwig.i"             // this needs to go first otherwise i don't know about e.g. boost
 %include "lsst/fw/Core/lsstImageTypes.i"     // vw and Image/Mask types and typedefs
 %include "lsst/detection/detectionLib.i"     // need otherwise FootprintContainerT not known about
+%include "cpointer.i"
 
 %pythoncode %{
 def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/tickets/7/python/lsst/imageproc/imageprocLib.i $"):
@@ -45,8 +46,8 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 %template(LinearCombinationKernelPtrTypeD) boost::shared_ptr<lsst::fw::LinearCombinationKernel<double> >;
 
 %include "lsst/imageproc/ImageSubtract.h"
-%template(DiffImContainerD)                             lsst::imageproc::DiffImContainer<double>;
-%template(vectorDiffImContainerD)                       std::vector<lsst::imageproc::DiffImContainer<double> >;
+%template(DiffImContainer_D)                            lsst::imageproc::DiffImContainer<double>;
+%template(vectorDiffImContainer_D)                      std::vector<lsst::imageproc::DiffImContainer<double> >;
 %template(computePsfMatchingKernelForMaskedImage_FU8DD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<float, uint8, double, double>;
 %template(computePsfMatchingKernelForPostageStamp_FU8D) lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, uint8, double>;
 %template(getCollectionOfFootprintsForPsfMatching_FU8)  lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float, uint8>;
