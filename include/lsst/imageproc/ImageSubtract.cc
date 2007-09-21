@@ -2,9 +2,9 @@
 /**
  * \file
  *
- * Implementation of image subtraction
+ * \brief Implementation of image subtraction functions declared in ImageSubtract.h
  *
- * Implementation of image subtraction
+ * This file is meant to be included by lsst/imageproc/ImageSubtract.h
  *
  * \author Andrew Becker
  *
@@ -32,17 +32,21 @@
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
 
+#define DEBUG_IO 1
+
 using namespace std;
 
 
 /**
  * Computes spatially varying PSF matching kernel for image subtraction
  *
- * Note: Longer description here
+ * Implements the main use case of Image Subtraction.  Solves for kernel K and background B in the model
+ * 
+ *   T.conv.K = I + B
+ * 
+ * The difference image is (I + B - T.conv.K)
  *
- * \return This describes the return value if there is one
- * \throw Any exceptions thrown must be described here
- * \throw Here too
+ * \return This returns no values
  * \ingroup imageproc
  */
 template <typename ImageT, typename MaskT, typename KernelT, typename FuncT>
@@ -89,6 +93,7 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
     // Iterate over footprint
     int nFootprint = 0;
     for (iFootprint i = footprintList.begin(); i != footprintList.end(); ++i) {
+
         BBox2i footprintBBox = (*i)->getBBox();
         imageToConvolveStampPtr    = imageToConvolve.getSubImage(footprintBBox);
         imageToNotConvolveStampPtr = imageToNotConvolve.getSubImage(footprintBBox);
@@ -119,7 +124,6 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
 
         vw::math::Vector<double,2> center = footprintBBox.center();
         // NOTE - verify center() returns col, row
-        // Russ will not change function to span -1 to 1, so take this out for now
         //diffImFootprintContainer.colcNorm = 2 * center[0] / imageToConvolve.getCols() - 1;
         //diffImFootprintContainer.rowcNorm = 2 * center[1] / imageToConvolve.getRows() - 1;
         diffImFootprintContainer.colcNorm = center[0];
@@ -131,9 +135,10 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
         // QA - calculate the residual of the subtracted image here
         lsst::fw::MaskedImage<ImageT, MaskT>
             convolvedImageStamp = lsst::fw::kernel::convolve(*imageToConvolveStampPtr, *footprintKernelPtr, convolveThreshold, edgeMaskBit);
-        convolvedImageStamp -= (*imageToNotConvolveStampPtr);
         convolvedImageStamp *= -1;
-        convolvedImageStamp -= background;
+        convolvedImageStamp += (*imageToNotConvolveStampPtr);
+        // NOTE - WHY DOES THIS APPEAR TO HAVE THE WRONG SIGN!>!?!!?!?!??
+        convolvedImageStamp -= background;   
 
         double meanOfResiduals = 0.0;
         double varianceOfResiduals = 0.0;
@@ -228,7 +233,6 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
         std::vector<std::pair<double,double> > errors(nParameters);
 
         // Minimize!
-        //bgFcn.minimizee(parameters, stepsize, errors);
         lsst::fw::function::minimize(bgFcn, parameters, stepsize, errors);
         backgroundFunctionPtr->setParameters(parameters);
 
@@ -374,16 +378,13 @@ void lsst::imageproc::computePsfMatchingKernelForPostageStamp(
 
         for (unsigned int col = startCol; col < endCol; ++col) {
 
-            ImageT ncCamera = *imageToNotConvolveCol.image;
+            ImageT ncCamera   = *imageToNotConvolveCol.image;
             ImageT ncVariance = *imageToNotConvolveCol.variance;
-            MaskT  ncMask = *imageToNotConvolveCol.mask;
-            ImageT cVariance = *imageToConvolveCol.variance;
-            ImageT iVariance = 1.0 / (cVariance + ncVariance);
+            MaskT  ncMask     = *imageToNotConvolveCol.mask;
 
-            // Do we skip these?
-            if (ncMask & 0x1) {
-                continue;
-            }
+            ImageT cVariance  = *imageToConvolveCol.variance;
+
+            ImageT iVariance  = 1.0; // / (cVariance + ncVariance);
 
             lsst::mwi::utils::Trace("lsst.imageproc.computePsfMatchingKernelForPostageStamp", 5, 
                                     boost::format("Accessing image row %d col %d : %f %f") 
@@ -394,49 +395,38 @@ void lsst::imageproc::computePsfMatchingKernelForPostageStamp(
                 kiteri = convolvedAccessorColList.begin();
 
             for (int kidxi = 0; kiteri != convolvedAccessorColList.end(); ++kiteri, ++kidxi) {
-                ImageT cdCamerai = *kiteri->image;
+                ImageT cdCamerai   = *kiteri->image;
                 ImageT cdVariancei = *kiteri->variance;
-                MaskT cdMaski = *kiteri->mask;
-                // Do we skip these?
-                if (cdMaski & 0x1) {
-                    continue;
-                }
+                MaskT cdMaski      = *kiteri->mask;
+
                 lsst::mwi::utils::Trace("lsst.imageproc.computePsfMatchingKernelForPostageStamp", 6, 
                                         boost::format("Accessing convolved image %d : %f %f") 
                                         % kidxi % cdCamerai % cdVariancei);
 
-                // Not sure what is the best variance to use
-                //B[kidxi] += ncCamera * cdCamerai / (ncVariance + cdVariancei);
-                B[kidxi] += ncCamera * cdCamerai * iVariance;
-                
                 // kernel index j 
                 typename vector<lsst::fw::MaskedPixelAccessor<ImageT, MaskT> >::iterator kiterj = kiteri;
                 for (int kidxj = kidxi; kiterj != convolvedAccessorColList.end(); ++kiterj, ++kidxj) {
-                    ImageT cdCameraj = *kiterj->image;
+                    ImageT cdCameraj   = *kiterj->image;
                     ImageT cdVariancej = *kiterj->variance;
-                    MaskT cdMaskj = *kiterj->mask;
-                    // Do we skip these?
-                    if (cdMaskj & 0x1) {
-                        continue;
-                    }
+                    MaskT cdMaskj      = *kiterj->mask;
+
                     lsst::mwi::utils::Trace("lsst.imageproc.computePsfMatchingKernelForPostageStamp", 6, 
                                             boost::format("Accessing convolved image %d : %f %f") 
                                             % kidxj % cdCameraj % cdVariancej);
 
-                    //M[kidxi][kidxj] += cdCamerai * cdCameraj / (cdVariancei + cdVariancej);
                     M[kidxi][kidxj] += cdCamerai * cdCameraj * iVariance;
                 } 
-                // Constant background term; effectively kidxj+1
-                // NOTE : is this cVariance or ncVariance????
-                //M[kidxi][nParameters-1] += cdCamerai / (cVariance + cdVariancei);
+                
+                B[kidxi] += ncCamera * cdCamerai * iVariance;
+                
+                // Constant background term; effectively j=kidxj+1
                 M[kidxi][nParameters-1] += cdCamerai * iVariance;
             } 
 
-            // Background term; effectively kidxi+1
-            //B[nParameters-1] += ncCamera / (ncVariance + cVariance); 
-            //M[nParameters-1][nParameters-1] += 1.0 / (cVariance + cVariance);
+            // Background term; effectively i=kidxi+1
             B[nParameters-1] += ncCamera * iVariance;
             M[nParameters-1][nParameters-1] += 1.0 * iVariance;
+
             lsst::mwi::utils::Trace("lsst.imageproc.computePsfMatchingKernelForPostageStamp", 5, 
                                     boost::format("Background terms : %f %f") 
                                     % B[nParameters-1] % M[nParameters-1][nParameters-1]);
@@ -458,6 +448,8 @@ void lsst::imageproc::computePsfMatchingKernelForPostageStamp(
         }
         
     } // row
+
+    // NOTE: If we are going to regularize the solution to M, this is the place to do it
 
     // Fill in rest of M
     for (int kidxi=0; kidxi < nParameters; ++kidxi) 
@@ -494,7 +486,7 @@ template <typename ImageT, typename MaskT>
 void lsst::imageproc::getCollectionOfFootprintsForPsfMatching(
     lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve, ///< Template image; is convolved
     lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve, ///< Science image; is not convolved
-    vector<lsst::detection::Footprint::PtrType> footprintListOut, ///< Output list of footprints to do diffim on
+    vector<lsst::detection::Footprint::PtrType> &footprintListOut, ///< Output list of footprints to do diffim on
     lsst::mwi::policy::Policy &policy ///< Policy directing the behavior
     ) {
     
@@ -524,7 +516,7 @@ void lsst::imageproc::getCollectionOfFootprintsForPsfMatching(
     vector<lsst::detection::Footprint::PtrType> footprintListIn = detectionSet.getFootprints();
 
     for (vector<lsst::detection::Footprint::PtrType>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ) {
-        if ((*i)->getNpix() < footprintDiffimNpixMin) {
+        if (static_cast<unsigned int>((*i)->getNpix()) < footprintDiffimNpixMin) {
             i = footprintListIn.erase(i); // SLOW; DON"T DO THIS IF YOU DON"T NEED TO
         }
         else {
@@ -1015,7 +1007,6 @@ void lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel(
              std::vector<std::pair<double,double> > errors(nParameters);
 
              // Minimize!
-             //kernelFcn.minimizee(parameters, stepsize, errors);
              lsst::fw::function::minimize(kernelFcn, parameters, stepsize, errors);
              
              for (unsigned int i = 0; i < parameters.size(); ++i) {

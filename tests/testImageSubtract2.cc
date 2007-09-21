@@ -91,7 +91,7 @@ int main( int argc, char** argv )
             new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
             );
 
-        templateMaskedImage += 100;
+        scienceMaskedImage -= 100;
 
         // Use hard-coded positions for now
         vector<lsst::detection::Footprint::PtrType> footprintList;
@@ -102,32 +102,35 @@ int main( int argc, char** argv )
             (templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintList,
              kernelPtr, kernelFunctionPtr, backgroundFunctionPtr, p);
         
-        //lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =
-        //lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, convolveThreshold, edgeMaskBit);
-        
         lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage(templateMaskedImage.getCols(), 
                                                                           templateMaskedImage.getRows());
         lsst::fw::kernel::convolveLinear(convolvedTemplateMaskedImage, templateMaskedImage, *kernelPtr, edgeMaskBit);
+        convolvedTemplateMaskedImage.writeFits( (boost::format("%s_diff2XXX") % inputImage).str() );
+
+        lsst::fw::MaskedImage<ImageT, MaskT> 
+            convolvedTemplateMaskedImage2 = lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, convolveThreshold, edgeMaskBit);
+        convolvedTemplateMaskedImage2.writeFits( (boost::format("%s_diff2YYY") % inputImage).str() );
 
         // Subtract off template
         scienceMaskedImage -= convolvedTemplateMaskedImage;
+
+        scienceMaskedImage.writeFits( (boost::format("%s_diff2ZZZ") % inputImage).str() );
 
         // Subtract off background
         lsst::fw::MaskedPixelAccessor<ImageT, MaskT> accessorCol(scienceMaskedImage);
         for (unsigned int col = 0; col < scienceMaskedImage.getCols(); ++col) {
             lsst::fw::MaskedPixelAccessor<ImageT, MaskT> accessorRow = accessorCol;
             for (unsigned int row = 0; row < scienceMaskedImage.getRows(); ++row) {
-                *accessorRow.image -= (*backgroundFunctionPtr)(col, row);
+                *accessorRow.image += (*backgroundFunctionPtr)(col, row);
                 accessorRow.nextRow();
             }
             accessorCol.nextCol();
         }
 
-        scienceMaskedImage.writeFits( (boost::format("%s_diff2") % inputImage).str() );
+        // NOTE - Might be slicker to make an image from the background model.
+        //        Then add in science image, and subtract off convolved image
 
-        // TEST : the output kernel is a delta function.  The kernel coefficients of all bases other than the first (mean) are 0.
-        //      : The background function has no spatial variation and value equal to -100
-        
+        scienceMaskedImage.writeFits( (boost::format("%s_diff2") % inputImage).str() );
     }
     
     if (Citizen::census(0) == 0) {

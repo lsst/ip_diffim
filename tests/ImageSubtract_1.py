@@ -111,7 +111,7 @@ class BackgroundTestCase(unittest.TestCase):
         self.footprintList         = testObjects[6]
 
         self.backgroundOffset      = 100
-        self.templateMaskedImage  += self.backgroundOffset 
+        self.scienceMaskedImage   += self.backgroundOffset 
 
         imageproc.computePsfMatchingKernelForMaskedImage_FU8DD(self.templateMaskedImage,
                                                                self.scienceMaskedImage,

@@ -85,7 +85,7 @@ namespace imageproc {
     void getCollectionOfFootprintsForPsfMatching(
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToConvolve,
         lsst::fw::MaskedImage<ImageT,MaskT> const &imageToNotConvolve,
-        vector<lsst::detection::Footprint::PtrType> footprintListOut,
+        vector<lsst::detection::Footprint::PtrType> &footprintListOut,
         lsst::mwi::policy::Policy &policy
         );
 

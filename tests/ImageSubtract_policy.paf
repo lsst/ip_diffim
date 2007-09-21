@@ -21,10 +21,10 @@ getCollectionOfFootprintsForPsfMatching: {
     footprintDiffimNpixMin: 10
 
     # Grow footprint by this many pixels
-    footprintDiffimGrow: 20
+    footprintDiffimGrow: 15
 
     # Detection threshold
-    footprintDetectionThreshold: 15000
+    footprintDetectionThreshold: 15000.0
 }
 
 # Use case computePsfMatchingKernelForMaskedImage
