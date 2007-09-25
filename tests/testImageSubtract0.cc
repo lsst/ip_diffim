@@ -17,7 +17,7 @@ int main( int argc, char** argv )
         lsst::mwi::utils::Trace::setDestination(cout);
         lsst::mwi::utils::Trace::setVerbosity(".", 4);
         
-        typedef uint8 MaskT;
+        typedef lsst::fw::maskPixelType MaskT;
         typedef double ImageT; 
         typedef double KernelT;
         const KernelT CONVOLVE_THRESHOLD = 0;

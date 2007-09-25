@@ -13,18 +13,18 @@ import numpy as num
 
 from lsst.mwi.policy import Policy
 policy = Policy.createPolicy('tests/ImageSubtract_policy.paf')
-#convolveThreshold = policy.get('convolveThreshold', 0.0)
-#edgeMaskBit = policy.get('edgeMaskBit')
-#kernelRows = policy.get('kernelRows')
-#kernelCols = policy.get('kernelCols')
-#kernelSpatialOrder = policy.get('kernelSpatialOrder')
-#backgroundSpatialOrder = policy.get('backgroundSpatialOrder')
-convolveThreshold = 0.0
-edgeMaskBit = 1
-kernelRows = 7
-kernelCols = 7
-kernelSpatialOrder = 0
-backgroundSpatialOrder = 0
+convolveThreshold = policy.get('convolveThreshold')
+edgeMaskBit = policy.get('edgeMaskBit')
+kernelRows = policy.get('kernelRows')
+kernelCols = policy.get('kernelCols')
+kernelSpatialOrder = policy.get('kernelSpatialOrder')
+backgroundSpatialOrder = policy.get('backgroundSpatialOrder')
+#convolveThreshold = 0.0
+#edgeMaskBit = 1
+#kernelRows = 7
+#kernelCols = 7
+#kernelSpatialOrder = 0
+#backgroundSpatialOrder = 0
 DEBUG_IO = 0
 
 ###########

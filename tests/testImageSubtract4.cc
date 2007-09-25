@@ -25,7 +25,7 @@ int main( int argc, char** argv )
         lsst::mwi::utils::Trace::setDestination(cout);
         lsst::mwi::utils::Trace::setVerbosity(".", 5);
         
-        typedef uint8 MaskT;
+        typedef lsst::fw::maskPixelType MaskT;
         typedef float ImageT; // have to make sure this jibes with the input data!
         typedef double KernelT;
         typedef double FuncT;

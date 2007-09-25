@@ -19,7 +19,7 @@
 using namespace std;
 using namespace lsst::fw;
 
-typedef uint8 MaskT;
+typedef lsst::fw::maskPixelType MaskT;
 typedef float ImageT;
 typedef double KernelT;
 typedef double FuncT;
