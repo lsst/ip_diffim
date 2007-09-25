@@ -76,17 +76,17 @@ class ImageSubtractStage(lsst.dps.Stage):
         if self.activeClipboard.has_key('FootprintList'):
             footprintList = self.activeClipboard.get('FootprintList')
         else:
-            footprintList = imageproc.getCollectionOfFootprintsForPsfMatching_FU8(templateMaskedImage, scienceMaskedImage, footprintList, policy)
+            footprintList = imageproc.getCollectionOfFootprintsForPsfMatching_F(templateMaskedImage, scienceMaskedImage, footprintList, policy)
 
         if computeInC:
-            imageproc.computePsfMatchingKernelForMaskedImage_FU8DD(templateMaskedImage,
-                                                                   scienceMaskedImage,
-                                                                   kernelBasisVec,
-                                                                   footprintList,
-                                                                   kernelPtr,
-                                                                   kernelFunctionPtr,
-                                                                   backgroundFunctionPtr,
-                                                                   policy)
+            imageproc.computePsfMatchingKernelForMaskedImage_FDD(templateMaskedImage,
+                                                                 scienceMaskedImage,
+                                                                 kernelBasisVec,
+                                                                 footprintList,
+                                                                 kernelPtr,
+                                                                 kernelFunctionPtr,
+                                                                 backgroundFunctionPtr,
+                                                                 policy)
         else:
             
             ###########
@@ -110,11 +110,11 @@ class ImageSubtractStage(lsst.dps.Stage):
                 kernelCoeffs = fw.vectorD()
         
                 # background is a single number; SWIG returns it here.
-                background = imageproc.computePsfMatchingKernelForPostageStamp_FU8D(templateMaskedImageStampPtr.get(),
-                                                                                    scienceMaskedImageStampPtr.get(),
-                                                                                    kernelBasisVec,
-                                                                                    kernelCoeffs,
-                                                                                    policy)
+                background = imageproc.computePsfMatchingKernelForPostageStamp_FD(templateMaskedImageStampPtr.get(),
+                                                                                  scienceMaskedImageStampPtr.get(),
+                                                                                  kernelBasisVec,
+                                                                                  kernelCoeffs,
+                                                                                  policy)
                 # Best kernel for this footprint
                 footprintKernelPtr = fw.LinearCombinationKernelD(kernelBasisVec, kernelCoeffs)
         
@@ -144,7 +144,7 @@ class ImageSubtractStage(lsst.dps.Stage):
                 nGoodPixels = 0
                 meanOfResiduals = 0.0
                 varianceOfResiduals = 0.0
-                imageproc.calculateMaskedImageResiduals_FU8(differenceImageStamp, nGoodPixels, meanOfResiduals, varianceOfResiduals)
+                imageproc.calculateMaskedImageResiduals_F(differenceImageStamp, nGoodPixels, meanOfResiduals, varianceOfResiduals)
         
                 diffImFootprintContainer.footprintResidualMean = meanOfResiduals
                 diffImFootprintContainer.footprintResidualVariance = varianceOfResiduals

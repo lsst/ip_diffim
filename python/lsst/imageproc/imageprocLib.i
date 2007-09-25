@@ -11,7 +11,6 @@ Python bindings for imageproc module
 // Everything we will need in the _wrap.cc file
 %{
 #include <lsst/imageproc/ImageSubtract.h>
-#include <lsst/detection/Footprint.h>
 %}
 
 %inline %{
@@ -19,6 +18,7 @@ namespace lsst { namespace fw { } }
 namespace lsst { namespace imageproc { } }
 
 using namespace lsst;
+using namespace lsst::fw;
 using namespace lsst::imageproc;
 %}
 
@@ -43,27 +43,30 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 /*******************/
 /* ImageSubtract.h */
 
+// for lsst::fw::maskPixelType
+%include "lsst/fw/Mask.h"    
+
 // this should be in kernel.i but i need it now
 %template(LinearCombinationKernelPtrTypeD) boost::shared_ptr<lsst::fw::LinearCombinationKernel<double> >;
 
 %include "lsst/imageproc/ImageSubtract.h"
 %template(DiffImContainer_D)                            lsst::imageproc::DiffImContainer<double>;
 %template(vectorDiffImContainer_D)                      std::vector<lsst::imageproc::DiffImContainer<double> >;
-%template(computePsfMatchingKernelForMaskedImage_FU8DD) lsst::imageproc::computePsfMatchingKernelForMaskedImage<float, 
+%template(computePsfMatchingKernelForMaskedImage_FDD)   lsst::imageproc::computePsfMatchingKernelForMaskedImage<float, 
                                                                                                                 lsst::fw::maskPixelType, 
                                                                                                                 double, 
                                                                                                                 double>;
-%template(computePsfMatchingKernelForPostageStamp_FU8D) lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, 
+%template(computePsfMatchingKernelForPostageStamp_FD)   lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, 
                                                                                                                  lsst::fw::maskPixelType, 
                                                                                                                  double>;
-%template(getCollectionOfFootprintsForPsfMatching_FU8)  lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float, 
+%template(getCollectionOfFootprintsForPsfMatching_F)    lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float, 
                                                                                                                  lsst::fw::maskPixelType>;
 %template(computePcaKernelBasis_D)                      lsst::imageproc::computePcaKernelBasis<double>;
 %template(computeSpatiallyVaryingPsfMatchingKernel_DD)  lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel<double, double>;
 %template(generateDeltaFunctionKernelSet_D)             lsst::imageproc::generateDeltaFunctionKernelSet<double>;
 %template(generateAlardLuptonKernelSet_D)               lsst::imageproc::generateAlardLuptonKernelSet<double>;
-%template(checkMaskedImageForDiffim_FU8)                lsst::imageproc::checkMaskedImageForDiffim<float, lsst::fw::maskPixelType>;
-%template(calculateMaskedImageResiduals_FU8)            lsst::imageproc::calculateMaskedImageResiduals<float, lsst::fw::maskPixelType>;
+%template(checkMaskedImageForDiffim_F)                  lsst::imageproc::checkMaskedImageForDiffim<float, lsst::fw::maskPixelType>;
+%template(calculateMaskedImageResiduals_F)              lsst::imageproc::calculateMaskedImageResiduals<float, lsst::fw::maskPixelType>;
 %template(calculateImageResiduals_F)                    lsst::imageproc::calculateImageResiduals<float>;
 // getCollectionOfMaskedImagesForPsfMatching is not templated
 

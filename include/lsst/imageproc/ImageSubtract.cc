@@ -480,6 +480,7 @@ void lsst::imageproc::computePsfMatchingKernelForPostageStamp(
         kernelCoeffs[ki] = Soln[ki];
     }
     background = Soln[nParameters-1];
+
 }
 
 template <typename ImageT, typename MaskT>

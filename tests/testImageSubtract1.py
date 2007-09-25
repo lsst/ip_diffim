@@ -1,6 +1,7 @@
 import pdb
 import unittest
 import lsst.fw.Core.fwLib as fw
+from lsst.mwi.policy import Policy
 import lsst.detection.detectionLib as detection
 import lsst.imageproc.imageprocLib as imageproc
 import sys
@@ -11,7 +12,6 @@ import numpy as num
 # Get directives from policy
 #
 
-from lsst.mwi.policy import Policy
 policy = Policy.createPolicy('tests/ImageSubtract_policy.paf')
 convolveThreshold = policy.get('convolveThreshold')
 edgeMaskBit = policy.get('edgeMaskBit')
@@ -19,22 +19,16 @@ kernelRows = policy.get('kernelRows')
 kernelCols = policy.get('kernelCols')
 kernelSpatialOrder = policy.get('kernelSpatialOrder')
 backgroundSpatialOrder = policy.get('backgroundSpatialOrder')
-#convolveThreshold = 0.0
-#edgeMaskBit = 1
-#kernelRows = 7
-#kernelCols = 7
-#kernelSpatialOrder = 0
-#backgroundSpatialOrder = 0
 DEBUG_IO = 0
 
 ###########
 #
 # Get objects from clipboard or read them in
 #
-scienceMaskedImage  = fw.MaskedImageD()
+scienceMaskedImage  = fw.MaskedImageF()
 scienceMaskedImage.readFits(sys.argv[1])
 
-templateMaskedImage = fw.MaskedImageD()
+templateMaskedImage = fw.MaskedImageF()
 templateMaskedImage.readFits(sys.argv[2])
 
 ###########
@@ -65,18 +59,18 @@ if 1:
 else:
     # set detection policy
     policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 15000.0)
-    imageproc.getCollectionOfFootprintsForPsfMatching_FU8(templateMaskedImage, scienceMaskedImage, footprintList, policy)
+    imageproc.getCollectionOfFootprintsForPsfMatching_F(templateMaskedImage, scienceMaskedImage, footprintList, policy)
 
 if 0:
     # use c-code
-    imageproc.computePsfMatchingKernelForMaskedImage_FU8DD(templateMaskedImage,
-                                                           scienceMaskedImage,
-                                                           kernelBasisVec,
-                                                           footprintList,
-                                                           kernelPtr,
-                                                           kernelFunctionPtr,
-                                                           backgroundFunctionPtr,
-                                                           policy)
+    imageproc.computePsfMatchingKernelForMaskedImage_FDD(templateMaskedImage,
+                                                         scienceMaskedImage,
+                                                         kernelBasisVec,
+                                                         footprintList,
+                                                         kernelPtr,
+                                                         kernelFunctionPtr,
+                                                         backgroundFunctionPtr,
+                                                         policy)
 else:
     ###########
     #
@@ -96,16 +90,20 @@ else:
             scienceMaskedImageStampPtr.writeFits('sFits_%d' % (nFootprint))
 
 
-        kernelCoeffs = fw.vectorD()
+        # have to initialize this with a size here
+        kernelCoeffs = fw.vectorD( len(kernelBasisVec) )
 
         # background is a single number; SWIG returns it here.
-        background = imageproc.computePsfMatchingKernelForPostageStamp_FU8D(templateMaskedImageStampPtr.get(),
-                                                                            scienceMaskedImageStampPtr.get(),
-                                                                            kernelBasisVec,
-                                                                            kernelCoeffs,
-                                                                            policy)
+        background = imageproc.computePsfMatchingKernelForPostageStamp_FD(templateMaskedImageStampPtr.get(),
+                                                                          scienceMaskedImageStampPtr.get(),
+                                                                          kernelBasisVec,
+                                                                          kernelCoeffs,
+                                                                          policy)
+
+        print '# Background %d = %.3f' % (nFootprint, background)
+        
         # Best kernel for this footprint
-        footprintKernelPtr = fw.LinearCombinationKernelD(kernelBasisVec, kernelCoeffs)
+        footprintKernelPtr = imageproc.LinearCombinationKernelPtrTypeD( fw.LinearCombinationKernelD(kernelBasisVec, kernelCoeffs) )
 
         # Structure holding information about this footprint and its fit to a kernel
         diffImFootprintContainer = imageproc.DiffImContainer_D()
@@ -123,17 +121,19 @@ else:
         diffImFootprintContainer.rowcNorm = center.x()
 
         # calculate the residual of the subtracted image here
-        convolvedImageStamp = fw.convolveD(templateMaskedImageStampPtr,
-                                           footprintKernelPtr,
-                                           convolveThreshold,
-                                           edgeMaskBit)
+        print 'caw1'
+        convolvedImageStamp = fw.convolve(templateMaskedImageStampPtr.get(),
+                                          footprintKernelPtr.get(),
+                                          convolveThreshold,
+                                          edgeMaskBit)
+        print 'caw2'
         differenceImageStamp  = scienceMaskedImageStampPtr - convolvedImageStamp
         differenceImageStamp -= background
         
         nGoodPixels = 0
         meanOfResiduals = 0.0
         varianceOfResiduals = 0.0
-        imageproc.calculateMaskedImageResiduals_FU8(differenceImageStamp, nGoodPixels, meanOfResiduals, varianceOfResiduals)
+        imageproc.calculateMaskedImageResiduals_F(differenceImageStamp, nGoodPixels, meanOfResiduals, varianceOfResiduals)
 
         diffImFootprintContainer.footprintResidualMean = meanOfResiduals
         diffImFootprintContainer.footprintResidualVariance = varianceOfResiduals

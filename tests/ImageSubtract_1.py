@@ -231,6 +231,7 @@ def suite():
     suites += unittest.makeSuite(DeltaFunctionTestCase)
     suites += unittest.makeSuite(BackgroundTestCase)
     suites += unittest.makeSuite(GaussianTestCase)
+    suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
 if __name__ == "__main__":
