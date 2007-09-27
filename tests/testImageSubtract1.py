@@ -76,14 +76,24 @@ else:
     #
     # Calculate all individual Kernels
     #
+
+    # This is effectively use case computePsfMatchingKernelForMaskedImage.  Grab it's information from the Policy.
+    maximumFootprintResidualMean = policy.get('maximumFootprintResidualMean')
+    maximumFootprintResidualVariance = policy.get('maximumFootprintResidualVariance')
     
     diffImContainerList = imageproc.vectorDiffImContainer_D()
     nFootprint = 0
-    for iFootprint in footprintList:
-        footprintBBox = iFootprint.getBBox()
+    for iFootprintPtr in footprintList:
+        footprintBBox = iFootprintPtr.getBBox()
+        print '# Stamp %d = %d,%d -> %d,%d' % (nFootprint,
+                                               footprintBBox.min().x(),
+                                               footprintBBox.min().y(),
+                                               footprintBBox.max().x(),
+                                               footprintBBox.max().y())
 
         templateMaskedImageStampPtr = templateMaskedImage.getSubImage(footprintBBox)
         scienceMaskedImageStampPtr  = scienceMaskedImage.getSubImage(footprintBBox)
+        print 'DONE'
 
         if DEBUG_IO:
             templateMaskedImageStampPtr.writeFits('tFits_%d' % (nFootprint))
@@ -103,13 +113,16 @@ else:
         print '# Background %d = %.3f' % (nFootprint, background)
         
         # Best kernel for this footprint
-        footprintKernelPtr = imageproc.LinearCombinationKernelPtrTypeD( fw.LinearCombinationKernelD(kernelBasisVec, kernelCoeffs) )
+        footprintKernel    = fw.LinearCombinationKernelD(kernelBasisVec, kernelCoeffs)
+        footprintKernelPtr = imageproc.LinearCombinationKernelPtrTypeD(footprintKernel)
+        # Every time you put something in a pointer you have to do this
+        footprintKernel.this.disown()
 
         # Structure holding information about this footprint and its fit to a kernel
         diffImFootprintContainer = imageproc.DiffImContainer_D()
         diffImFootprintContainer.id = nFootprint
         diffImFootprintContainer.isGood = True
-        diffImFootprintContainer.diffImFootprintPtr = iFootprint
+        diffImFootprintContainer.diffImFootprintPtr = iFootprintPtr
         diffImFootprintContainer.diffImKernelPtr = footprintKernelPtr
         diffImFootprintContainer.background = background
 
@@ -121,23 +134,30 @@ else:
         diffImFootprintContainer.rowcNorm = center.x()
 
         # calculate the residual of the subtracted image here
-        print 'caw1'
         convolvedImageStamp = fw.convolve(templateMaskedImageStampPtr.get(),
                                           footprintKernelPtr.get(),
                                           convolveThreshold,
                                           edgeMaskBit)
-        print 'caw2'
-        differenceImageStamp  = scienceMaskedImageStampPtr - convolvedImageStamp
+
+        differenceImageStamp  = scienceMaskedImageStampPtr.get()
+    if 0:
+        differenceImageStamp -= convolvedImageStamp
         differenceImageStamp -= background
-        
+
+
         nGoodPixels = 0
         meanOfResiduals = 0.0
         varianceOfResiduals = 0.0
-        imageproc.calculateMaskedImageResiduals_F(differenceImageStamp, nGoodPixels, meanOfResiduals, varianceOfResiduals)
+        nGoodPixels, meanOfResiduals, varianceOfResiduals = imageproc.calculateMaskedImageResiduals_F(differenceImageStamp)
+        print '# Diffim stamp %d residual : mean residual = %.3f sigma; RMS = %.3f in sigma; npixels = %d' % (nFootprint,
+                                                                                                              meanOfResiduals,
+                                                                                                              varianceOfResiduals,
+                                                                                                              nGoodPixels)
+        
 
         diffImFootprintContainer.footprintResidualMean = meanOfResiduals
         diffImFootprintContainer.footprintResidualVariance = varianceOfResiduals
-        
+
         if abs(meanOfResiduals) > maximumFootprintResidualMean:
             diffImFootprintContainer.isGood = False
         if varianceOfResiduals > maximumFootprintResidualVariance:
@@ -146,12 +166,15 @@ else:
         diffImContainerList.append(diffImFootprintContainer)
         
         if DEBUG_IO:
-            kImage = footprintKernelPtr.computeNewImage()
+            kImage, imSum = footprintKernelPtr.get().computeNewImage()
             kImage.writeFits('kFits_%d.fits' % (nFootprint))
-            convolvedImageStamp.writeFits('dFits_%d' (nFootprint))
+            differenceImageStamp.writeFits('dFits_%d' % (nFootprint))
 
         nFootprint += 1
 
+    print '# Debugging done'
+    sys.exit(1)
+    
     #
     # Calculate all individual Kernels
     #

@@ -32,8 +32,8 @@ int main( int argc, char** argv )
 
         // Read in Policy
         ifstream is("tests/ImageSubtract_policy.paf");
-        Policy p;
-        PAFParser pp(p);
+        lsst::mwi::policy::Policy p;
+        lsst::mwi::policy::paf::PAFParser pp(p);
         pp.parse(is);
         is.close();
 

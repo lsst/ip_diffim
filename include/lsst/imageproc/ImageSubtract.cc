@@ -32,7 +32,7 @@
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
 
-#define DEBUG_IO 1
+#define DEBUG_IO 0
 
 using namespace std;
 
@@ -99,8 +99,8 @@ void lsst::imageproc::computePsfMatchingKernelForMaskedImage(
         imageToNotConvolveStampPtr = imageToNotConvolve.getSubImage(footprintBBox);
 
 #if defined(DEBUG_IO)
-        imageToConvolveStampPtr->writeFits( (boost::format("csFits_%d") % nFootprint).str() );
-        imageToNotConvolveStampPtr->writeFits( (boost::format("ncsFits_%d") % nFootprint).str() );
+        imageToConvolveStampPtr->writeFits( (boost::format("tFits_%d") % nFootprint).str() );
+        imageToNotConvolveStampPtr->writeFits( (boost::format("sFits_%d") % nFootprint).str() );
 #endif
 
         // Find best single kernel for this stamp
@@ -328,7 +328,8 @@ void lsst::imageproc::computePsfMatchingKernelForPostageStamp(
 
         *citer = imagePtr;
 #if defined(DEBUG_IO)       
-        imagePtr->writeFits( (boost::format("cFits_%d") % kId).str() );
+        // This is a bit too verbose and gets overwritten every object
+        //imagePtr->writeFits( (boost::format("cFits_%d") % kId).str() );
 #endif
     } 
 
