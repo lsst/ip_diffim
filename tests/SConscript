@@ -1,0 +1,29 @@
+# -*- python -*-
+Import("env")
+
+#env.Program(["lsstimageproc01.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
+## lsstimageproc02.cc is just pseudo-code
+
+# basic test program
+#env.Program(["foo.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
+
+# testing matrix math
+#env.Program(["testSVD.cc"], LIBS=env.libs["vw"] + ["fw"])
+#env.Program(["testEigen.cc"], LIBS=env.libs["vw"] + ["fw"])
+# crunchy math test programs
+#env.Program(["invertMatrix.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
+#env.Program(["matrixMath.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
+
+# testing minuit
+#env.Program(["testMinuit.cc"], LIBS=env.libs["vw"] + ["fw"] + ["mwi"] + env.libs["minuit"])
+
+#env.Program(["testDetection.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # object detection
+#env.Program(["testDetection2.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # object detection
+
+# testing ImageSubtract.cc/.h
+#env.Program(["testImageSubtract0.cc"], LIBS=env.getlibs("imageproc")+["detection"]);
+env.Program(["testImageSubtract1.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # test that we recover delta function kernel
+env.Program(["testImageSubtract2.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # add DC offset (background)
+#env.Program(["testImageSubtract3.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # convolve input image, no spatial variation
+#env.Program(["testImageSubtract4.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  #                     , spatial variation
+env.Program(["testImageSubtract5.cc"], LIBS=env.getlibs("imageproc")+["detection"]);  # object detection
