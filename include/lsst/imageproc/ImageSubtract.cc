@@ -306,9 +306,6 @@ std::vector<double> lsst::imageproc::computePsfMatchingKernelForPostageStamp(
     lsst::mwi::policy::Policy &policy ///< Policy directing the behavior
     ) { 
     
-    // Parse the mask bits
-    //int edgeMaskBit = policy.getInt("edgeMaskBit");
-
     /* grab mask bits from the image to convolve, since that is what we'll be operating on */
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
     
