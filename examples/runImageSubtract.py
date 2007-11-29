@@ -14,7 +14,8 @@ def runImageSubtract():
     
     defSciencePath = os.path.join(defInDir, "871034p_1_MI")
     defTemplatePath = os.path.join(defInDir, "871034p_1_MI")
-    defPolicyPath = os.path.join(moduleDir, "imageSubtractPipeline", "policy", "imageSubtract_policy.paf")
+    defPolicyPath = os.path.join(os.path.dirname(moduleDir), "pipeline", "examples",
+        "imageSubtractPipeline", "policy", "imageSubtract_policy.paf")
     defOutputPath = "diffImage"
     defVerbosity = 5 # change to 0 once this all works to hide all messages
     

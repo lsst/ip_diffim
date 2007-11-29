@@ -11,6 +11,7 @@ Python bindings for imageproc module
 // Everything we will need in the _wrap.cc file
 %{
 #include <lsst/imageproc/ImageSubtract.h>
+#include <lsst/imageproc/wcsMatch.h>
 %}
 
 %inline %{
@@ -97,6 +98,14 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 %template(approximateMatrixUsingBasis)   lsst::imageproc::approximateMatrixUsingBasis<vw::math::Matrix<double> >;
 
 /* PCA.h */
+
+/*******************/
+/* WCSMatch.h */
+%include "lsst/imageproc/wcsMatch.h"
+%template(wcsMatch)    lsst::imageproc::wcsMatch<boost::uint16_t, lsst::fw::maskPixelType>;
+%template(wcsMatch)    lsst::imageproc::wcsMatch<float, lsst::fw::maskPixelType>;
+%template(wcsMatch)    lsst::imageproc::wcsMatch<double, lsst::fw::maskPixelType>;
+
 /******************************************************************************/
 // Local Variables: ***
 // eval: (setq indent-tabs-mode nil) ***
