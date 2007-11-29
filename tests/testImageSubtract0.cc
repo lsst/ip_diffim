@@ -14,8 +14,7 @@ int main( int argc, char** argv )
 {
     // Cool, for Citizen!
     { 
-        lsst::mwi::utils::Trace::setDestination(cout);
-        lsst::mwi::utils::Trace::setVerbosity(".", 4);
+        lsst::mwi::utils::Trace::setVerbosity("lsst.imageproc", 4);
         
         typedef lsst::fw::maskPixelType MaskT;
         typedef double ImageT; 
@@ -25,12 +24,7 @@ int main( int argc, char** argv )
         
         string inputImage = argv[1];
         MaskedImage<ImageT,MaskT> scienceMaskedImage;
-        try {
-            scienceMaskedImage.readFits(inputImage);
-        } catch (lsst::mwi::exceptions::Exception &e) {
-            cerr << "Failed to open science image " << inputImage << ": " << e.what() << endl;
-            return 1;
-        }
+        scienceMaskedImage.readFits(inputImage);
         
         Kernel<KernelT>::KernelFunctionPtrType kfuncPtr(
             new lsst::fw::function::IntegerDeltaFunction2<KernelT>(0, 0)
@@ -57,7 +51,7 @@ int main( int argc, char** argv )
         
         // Write out the kernel
         double imSum;
-        Image<KernelT> kImage = kernelPtr->computeNewImage(imSum);
+        Image<KernelT> kImage = kernelPtr->computeNewImage(imSum, 0.0, 0.0, false);
         kImage.writeFits( "test0_kernel.fits" );
         
         // Write out the convolved image

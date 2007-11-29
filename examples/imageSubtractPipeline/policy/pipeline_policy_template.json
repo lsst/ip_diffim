@@ -1,0 +1,5 @@
+{
+    "appStages": ["lsst.dps.IOStage.InputStage", "lsst.imageproc.pipeline.ImageSubtractStage", "lsst.dps.IOStage.OutputStage"],
+    "eventTopics": ["None", "None", "None"],
+    "stagePolicies": ["policy/input_policy.paf", "%(imageSubtractPolicyPath)s", "policy/output_policy.paf"]
+}

@@ -4,16 +4,15 @@
  *
  * Implementation of PCA Methods
  *
- * Implementation of PCA Methods
- *
  * \author Andrew Becker
  *
  * \ingroup imageproc
  */
-
+#include <algorithm>
 #include <iostream>
 
 #include <lsst/mwi/utils/Trace.h>
+#include <lsst/mwi/exceptions.h>
 
 #include <vw/Math/Functions.h> 
 #include <vw/Math/LinearAlgebra.h> 
@@ -21,13 +20,15 @@
 #include <vw/Math/Vector.h> 
 
 using namespace std;
+//#define DEBUG_MATRIX 1
 
 template <typename aMatrixT, typename aVectorT>
 void lsst::imageproc::computePca(
-    aMatrixT &M, ///< Input : Data matrix has rows = variables, columns = instances.  Rows are mean-subtracted on output if subtractMean
     aVectorT &rowMean, ///< Ouput : Mean of rows
     aVectorT &eVal, ///< Output : Sorted Eigenvalues
     aMatrixT &eVec, ///< Output : Eigenvectors sorted by their eigenvalues
+    aMatrixT &M, ///< Input : Data matrix has rows = variables, columns = instances.
+        ///< Output: Rows are mean-subtracted on output if subtractMean true
     bool subtractMean ///< Flag : Subtract the mean from the rows or not
     ) {
     double mean;
@@ -45,6 +46,16 @@ void lsst::imageproc::computePca(
 
          this code will subtract off mean of each row (mean of each measurement ensemble is zero) if requested
     */
+    // Check output sizes
+    if (rowMean.size() != M.rows()) {
+        throw lsst::mwi::exceptions::InvalidParameter("rowMean size not M.rows()");
+    }
+    if (eVal.size() != M.cols()) {
+        throw lsst::mwi::exceptions::InvalidParameter("eVal size not M.cols()");
+    }
+    if ((eVec.rows() != M.rows()) || (eVec.cols() != M.cols())) {
+        throw lsst::mwi::exceptions::InvalidParameter("eVec shape does not match M");
+    }
 
     // Subtract off row mean
     if (subtractMean) {
@@ -58,16 +69,28 @@ void lsst::imageproc::computePca(
         }
     }
 
-    lsst::mwi::utils::Trace("lsst.imageproc.computePCA", 5, "Test1");
+    lsst::mwi::utils::Trace("lsst.imageproc.computePCA", 6, "Test1");
 
     // All computations here are in double
     // Cast to aMatrixT and aVectorT after computation
     // This might be unncessarily inefficient
     vw::math::Matrix<double> u, vt;
     vw::math::Vector<double> s;
-    vw::math::complete_svd(M, u, s, vt);
+#if defined(DEBUG_MATRIX)
+    std::cout << "#M for PCA" << M << std::endl;
+#endif
+    try {
+        vw::math::svd(M, u, s, vt);
+    } catch (std::exception e) {
+        throw lsst::mwi::exceptions::Runtime(std::string("in vw::math::complete_svd"));
+    }
+#if defined(DEBUG_MATRIX)
+    std::cout<< "#u from PCA" << u << std::endl;
+    std::cout<< "#s from PCA" << s << std::endl;
+    std::cout<< "#vt from PCA" << vt << std::endl;
+#endif
 
-    lsst::mwi::utils::Trace("lsst.imageproc.computePCA", 5, "Test2");
+    lsst::mwi::utils::Trace("lsst.imageproc.computePCA", 6, "Test2");
 
     /* Note on the math :
 
@@ -110,22 +133,29 @@ void lsst::imageproc::computePca(
         eVal[i] = s[i]*s[i];
     }
 
-    // NOTE : u.cols() is the number of u.rows(), not s.size()
-    // Eigenvectors are in the columns of eVec
+    // NOTE : when using "svd" as opposed to "complete_svd"
+    //        u is the same shape as M
+    //        rows = number of measurements (pixels)
+    //        cols = number of realizations (stars)
     for (unsigned int row = 0; row < M.rows(); ++row) {
         for (unsigned int col = 0; col < M.cols(); ++col) {
             eVec(row,col) = u(row, col);
         }
     }
-    // Could we use MatrixProxys to do this?
 }
 
 template <typename aMatrixT>
 void lsst::imageproc::decomposeMatrixUsingBasis(
-    aMatrixT &M, ///< Input : Mean-subtracted data matrix from which eVec was derived.  Rows = variables, columns = instances
-    aMatrixT &eVec, ///< Input : Basis vectors in columns
-    aMatrixT &coeff ///< Output : Fraction of each basis to reconstruct M from eVec in each row, shape M.cols() x M.rows()
+    aMatrixT &coeff,    ///< Output : Fraction of each basis to reconstruct M from eVec in each row, shape M.cols() x M.rows()
+    aMatrixT const &M,  ///< Input : Mean-subtracted data matrix from which eVec was derived.  Rows = variables, columns = instances
+    aMatrixT const &eVec    ///< Input : Basis vectors in columns
     ) {
+    if ((eVec.rows() != M.rows()) || (eVec.cols() != M.cols())) {
+        throw lsst::mwi::exceptions::InvalidParameter("eVec shape does not match M");
+    }
+    if ((coeff.rows() != M.cols()) || (coeff.cols() != M.rows())) {
+        throw lsst::mwi::exceptions::InvalidParameter("coeff shape does not match M transposed");
+    }
 
     // We get all coefficients with a single matrix multiplication
     coeff = vw::math::transpose(M) * eVec;
@@ -133,16 +163,25 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
 
 template <typename aMatrixT>
 void lsst::imageproc::decomposeMatrixUsingBasis(
-    aMatrixT &M, ///< Input : Mean-subtracted data matrix from which eVec was derived.  Rows = variables, columns = instances.
-    aMatrixT &eVec, ///< Input : Basis vectors in columns
-    int nCoeff, ///< Input : Number of coeffients to go to
-    aMatrixT &coeff ///< Output : Fraction of each basis to reconstruct M from eVec in each row, shape M.cols() x nCoeff.
+    aMatrixT &coeff, ///< Output : Fraction of each basis to reconstruct M from eVec in each row; shape M.cols() x at least nCoeff.
+    aMatrixT const &M,    ///< Input : Mean-subtracted data matrix from which eVec was derived.  Rows = variables, columns = instances.
+    aMatrixT const &eVec, ///< Input : Basis vectors in columns; shape matches M
+    int nCoeff      ///< Input : Number of coeffients to go to
     ) {
     // Maybe more efficient when the number of coefficients you want is much smaller than the matrix
+    if (nCoeff > static_cast<int>(eVec.cols())) {
+        throw lsst::mwi::exceptions::InvalidParameter("nCoeff > eVec.cols()");
+    }
+    if ((eVec.rows() != M.rows()) || (eVec.cols() != M.cols())) {
+        throw lsst::mwi::exceptions::InvalidParameter("eVec shape does not match M");
+    }
+    if ((coeff.rows() != M.cols())) {
+        throw lsst::mwi::exceptions::InvalidParameter("coeff.rows() not M.cols()");
+    }
 
     // Do object-by-object
     for (unsigned int mi = 0; mi < M.cols(); ++mi) {
-        vw::math::Vector<double> mCol = vw::math::select_col(M, mi);
+        vw::math::Vector<double> const mCol = vw::math::select_col(M, mi);
         for (int ei = 0; ei < nCoeff; ++ei) {
             vw::math::Vector<double> eCol = vw::math::select_col(eVec, ei);
             coeff(mi, ei) = vw::math::dot_prod(mCol, eCol);
@@ -152,17 +191,28 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
 
 template <typename aMatrixT>
 void lsst::imageproc::approximateMatrixUsingBasis(
-    aMatrixT &eVec, ///< Input : Basis vectors in columns
-    aMatrixT &coeff, ///< Input : Fraction of each basis to reconstruct M from eVec in each row
-    int nCoeff, ///< Input : How many coefficients to use
-    aMatrixT &Mout ///< Reconstructed input data; each object in columns
+    aMatrixT &M, ///< Output : Reconstructed input data; each object in columns
+    aMatrixT &eVec, ///< Input : Basis vectors in columns; shape matches M
+    aMatrixT &coeff, ///< Input : Fraction of each basis to reconstruct M from eVec in each row;
+        ///< shape M.cols() x at least nCoeff
+    int nCoeff ///< Input : How many coefficients to use
     ) {
+    if (nCoeff > static_cast<int>(eVec.cols())) {
+        throw lsst::mwi::exceptions::InvalidParameter("nCoeff > eVec.cols()");
+    }
+    if ((eVec.rows() != M.rows()) || (eVec.cols() != M.cols())) {
+        throw lsst::mwi::exceptions::InvalidParameter("eVec shape does not match M");
+    }
+    if ((coeff.rows() != M.cols())) {
+        throw lsst::mwi::exceptions::InvalidParameter("coeff.rows() not M.cols()");
+    }
 
-    for (unsigned int i = 0; i < eVec.cols(); ++i) {
-        vw::math::Vector<double> cVec(eVec.rows());
+    vw::math::Vector<double> cVec(eVec.rows());
+    for (unsigned int i = 0; i < M.cols(); ++i) {
+        vw::math::fill(cVec, 0.0);
         for (int j = 0; j < nCoeff; ++j) {
             cVec += coeff(i, j) * vw::math::select_col(eVec, j);
         }
-        vw::math::select_col(Mout, i) = cVec;
+        vw::math::select_col(M, i) = cVec;
     }
 }

@@ -7,7 +7,8 @@
 #include <boost/numeric/ublas/lu.hpp>
 #include <boost/timer.hpp> 
 #include <vw/Math/Matrix.h> 
-#include "lsst/fw/Exception.h"
+#include <vw/Math/LinearAlgebra.h> 
+#include <lsst/mwi/exceptions/Exception.h>
 
 //using namespace boost::numeric;  // Watch namespace issues; make sure "invert" is VW and not boost
 using namespace std;
@@ -50,13 +51,15 @@ int main(int argc, char** argv)
     boost::numeric::ublas::permutation_matrix<std::size_t> pm(A.size1());
 
     // perform LU-factorization; for LSST throw exception instead of return
+    /*
     try {
         int res = lu_factorize(A, pm);
-        if( res != 0 ) throw lsst::fw::Memory("LU factorization failed; singular matrix.  Get a better exception than this one!");
-    } catch (lsst::fw::Exception &e) {
+        if( res != 0 ) throw lsst::mwi::exceptions::Runtime("LU factorization failed; singular matrix.  Get a better exception than this one!");
+    } catch (lsst::mwi::exceptions::Exceptionstack &e) {
         cerr << "Caught exception: " << e.what() << "\n";
         return 1;
     }
+    */
 
     // create identity matrix of "inverse"
     inv.assign(boost::numeric::ublas::identity_matrix<double>(A.size1()));
@@ -90,5 +93,18 @@ int main(int argc, char** argv)
         cout << " input = " << mvw << endl;
         cout << " inverse = " << Avw << endl;
     }
+
+    // TRY THE SAME THING WITH VW
+    // 
+    // 
+    t.restart(); 
+    vw::Matrix<double> Avw2 = vw::math::pseudoinverse(mvw);
+    time = t.elapsed(); 
+    cout << "VW took " << time << "s" << endl;     
+    if (N < 5) {
+        cout << " input = " << mvw << endl;
+        cout << " inverse = " << Avw2 << endl;
+    }
+
     return 0;
 } 

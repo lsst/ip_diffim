@@ -22,8 +22,7 @@ using namespace lsst::fw;
 int main( int argc, char** argv )
 {
     {
-        lsst::mwi::utils::Trace::setDestination(cout);
-        lsst::mwi::utils::Trace::setVerbosity(".", 5);
+        lsst::mwi::utils::Trace::setVerbosity("lsst.imageproc", 4);
         
         typedef lsst::fw::maskPixelType MaskT;
         typedef float ImageT; // have to make sure this jibes with the input data!
@@ -39,9 +38,10 @@ int main( int argc, char** argv )
 
         // Parse policy
         KernelT convolveThreshold = static_cast<KernelT>(p.getDouble("convolveThreshold"));
+//        int badMaskBit = p.getInt("badMaskBit");
         int edgeMaskBit = p.getInt("edgeMaskBit");
-        unsigned int kernelRows = p.getInt("kernelRows");
         unsigned int kernelCols = p.getInt("kernelCols");
+        unsigned int kernelRows = p.getInt("kernelRows");
         unsigned int kernelSpatialOrder = p.getInt("kernelSpatialOrder");
         unsigned int backgroundSpatialOrder = p.getInt("backgroundSpatialOrder");
         
@@ -57,20 +57,10 @@ int main( int argc, char** argv )
         }
         string inputImage = argv[1];
         MaskedImage<ImageT,MaskT> scienceMaskedImage;
-        try {
-            scienceMaskedImage.readFits(inputImage);
-        } catch (lsst::mwi::exceptions::ExceptionStack &e) {
-            cerr << "Failed to open science image " << inputImage << ": " << e.what() << endl;
-            return 1;
-        }
+        scienceMaskedImage.readFits(inputImage);
         
         MaskedImage<ImageT,MaskT> templateMaskedImage;
-        try {
-            templateMaskedImage.readFits(inputImage);
-        } catch (lsst::mwi::exceptions::ExceptionStack &e) {
-            cerr << "Failed to open template image " << inputImage << ": " << e.what() << endl;
-            return 1;
-        }
+        templateMaskedImage.readFits(inputImage);
         
         // The kernel to convolve the template image with to yield the science image
         double sigmaX = 1.0;
@@ -101,20 +91,14 @@ int main( int argc, char** argv )
         // Convolved science image
         lsst::mwi::utils::Trace("testImageSubtract4", 2, "Convolving input image for testing");
         lsst::fw::MaskedImage<ImageT, MaskT> convolvedScienceMaskedImage =
-            lsst::fw::kernel::convolve(scienceMaskedImage, gaussSpVarKernel, convolveThreshold, edgeMaskBit);
+            lsst::fw::kernel::convolve(scienceMaskedImage, gaussSpVarKernel, convolveThreshold, edgeMaskBit, false);
         
         convolvedScienceMaskedImage.writeFits( (boost::format("%s_test4") % inputImage).str() );
         
         // Generate basis of delta functions for kernel
-        vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec;
-        lsst::imageproc::generateDeltaFunctionKernelSet(kernelRows, kernelCols, kernelBasisVec);
-        
-        
-        // Output kernel
-        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > kernelPtr(
-            new lsst::fw::LinearCombinationKernel<KernelT>
-            );
-        
+        vector<boost::shared_ptr<Kernel<KernelT> > > kernelBasisVec =
+            lsst::imageproc::generateDeltaFunctionKernelSet<KernelT>(kernelCols, kernelRows);
+                
         // Function for spatially varying kernel. 
         // Give it less power than the Fcn we convolved the image with, see what happens
         // OVERRIDE POLICY HERE
@@ -129,15 +113,17 @@ int main( int argc, char** argv )
             );
 
         // Use hard-coded positions for now
-        vector<lsst::detection::Footprint::PtrType> footprintList;
-        lsst::imageproc::getCollectionOfMaskedImagesForPsfMatching(footprintList);
+        vector<lsst::detection::Footprint::PtrType> footprintList =
+            lsst::imageproc::getCollectionOfMaskedImagesForPsfMatching();
 
-        lsst::imageproc::computePsfMatchingKernelForMaskedImage
-            (templateMaskedImage, convolvedScienceMaskedImage, kernelBasisVec, footprintList,
-             kernelPtr, kernelFunctionPtr, backgroundFunctionPtr, p);
+        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > kernelPtr =
+            lsst::imageproc::computePsfMatchingKernelForMaskedImage(
+                kernelFunctionPtr, backgroundFunctionPtr, templateMaskedImage, convolvedScienceMaskedImage,
+                kernelBasisVec, footprintList, p);
         
-        lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =
-            lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, convolveThreshold, edgeMaskBit);
+        lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage(templateMaskedImage.getCols(), 
+                                                                          templateMaskedImage.getRows());
+        lsst::fw::kernel::convolveLinear(convolvedTemplateMaskedImage, templateMaskedImage, *kernelPtr, edgeMaskBit);
         
         convolvedScienceMaskedImage -= convolvedTemplateMaskedImage;
         convolvedScienceMaskedImage.writeFits( (boost::format("%s_diff4") % inputImage).str() );

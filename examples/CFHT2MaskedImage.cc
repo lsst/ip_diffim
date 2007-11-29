@@ -16,8 +16,14 @@ public:
     synthesizeCfhtPixProcFunc(MaskedImage<ImagePixelT, MaskPixelT>& m) : PixelProcessingFunc<ImagePixelT, MaskPixelT>(m), initCount(0) {}
     
     void init() {
-        PixelProcessingFunc<ImagePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("saturated", satBit);
-        PixelProcessingFunc<ImagePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("zerovalued", badBit);
+        satMask = PixelProcessingFunc<ImagePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("SAT");
+        if (satMask == 0) {
+            cout << "Warning: saturated mask plane not found" << endl;
+        }
+        badMask = PixelProcessingFunc<ImagePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("BAD");
+        if (badMask == 0) {
+            cout << "Warning: zerovalued mask plane not found" << endl;
+        }
         lsst::mwi::data::DataProperty::PtrType metaDataPtr = PixelProcessingFunc<ImagePixelT, MaskPixelT>::_imagePtr->getMetaData();
         lsst::mwi::data::DataProperty::PtrType satPtr = metaDataPtr->findUnique("MAXLIN");
         satValue = boost::any_cast<const int>(satPtr->getValue());
@@ -36,12 +42,12 @@ public:
     
     void operator ()(ImageIteratorT &i, MaskIteratorT &m) {
         if (*i >= satValue) {
-            *m = *m | satBit;
+            *m = *m | satMask;
             satCount++;
         }
-
+        
         if (*i <= badValue) {
-            *m = *m | badBit;
+            *m = *m | badMask;
             badCount++;
         }
     }
@@ -50,8 +56,8 @@ public:
     int getBadCount() { return badCount; }
     
 private:
-    MaskChannelT satBit;
-    MaskChannelT badBit;
+    MaskChannelT satMask;
+    MaskChannelT badMask;
 
     int initCount;
 
@@ -70,7 +76,7 @@ int main( int argc, char** argv )
     Trace::setDestination(cout);
     Trace::setVerbosity(".", 0);
     
-    typedef uint8 MaskPixelType;
+    typedef lsst::fw::maskPixelType MaskPixelType;
     typedef float32 ImagePixelType;
 
     string inputImage = argv[1];
@@ -78,8 +84,8 @@ int main( int argc, char** argv )
 
     MaskedImage<ImagePixelType,MaskPixelType> cfhtMaskedImage;
     cfhtMaskedImage.readFits(inputImage);
+    cfhtMaskedImage.getMask()->addMaskPlane("BAD");
     cfhtMaskedImage.getMask()->addMaskPlane("SAT");
-    cfhtMaskedImage.getMask()->addMaskPlane("ZERO");
     cfhtMaskedImage.setDefaultVariance();
     synthesizeCfhtPixProcFunc<ImagePixelType, MaskPixelType> maskFunc(cfhtMaskedImage);
     maskFunc.init();

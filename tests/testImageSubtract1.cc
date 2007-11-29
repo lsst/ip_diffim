@@ -17,13 +17,11 @@
 #define DEBUG_IO 1
 
 using namespace std;
-using namespace lsst::fw;
 
 int main( int argc, char** argv )
 {
     {
-        lsst::mwi::utils::Trace::setDestination(cout);
-        lsst::mwi::utils::Trace::setVerbosity(".", 4);
+        lsst::mwi::utils::Trace::setVerbosity("lsst.imageproc", 4);
         
         typedef lsst::fw::maskPixelType MaskT;
         typedef float ImageT; // have to make sure this jibes with the input data!
@@ -38,10 +36,8 @@ int main( int argc, char** argv )
         is.close();
 
         // Parse policy
-        KernelT convolveThreshold = static_cast<KernelT>(p.getDouble("convolveThreshold"));
-        int edgeMaskBit = p.getInt("edgeMaskBit");
-        unsigned int kernelRows = p.getInt("kernelRows");
         unsigned int kernelCols = p.getInt("kernelCols");
+        unsigned int kernelRows = p.getInt("kernelRows");
         unsigned int kernelSpatialOrder = p.getInt("kernelSpatialOrder");
         unsigned int backgroundSpatialOrder = p.getInt("backgroundSpatialOrder");
         
@@ -55,30 +51,15 @@ int main( int argc, char** argv )
             exit(1);
         }
         string inputImage = argv[1];
-        MaskedImage<ImageT,MaskT> scienceMaskedImage;
-        try {
-            scienceMaskedImage.readFits(inputImage);
-        } catch (lsst::mwi::exceptions::ExceptionStack &e) {
-            cerr << "Failed to open science image " << inputImage << ": " << e.what() << endl;
-            return 1;
-        }
-        
-        MaskedImage<ImageT,MaskT> templateMaskedImage;
-        try {
-            templateMaskedImage.readFits(inputImage);
-        } catch (lsst::mwi::exceptions::ExceptionStack &e) {
-            cerr << "Failed to open template image " << inputImage << ": " << e.what() << endl;
-            return 1;
-        }
+        lsst::fw::MaskedImage<ImageT, MaskT> scienceMaskedImage;
+        scienceMaskedImage.readFits(inputImage);
+
+        lsst::fw::MaskedImage<ImageT, MaskT> templateMaskedImage;
+        templateMaskedImage.readFits(inputImage);
         
         // Generate basis of delta functions for kernel
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelBasisVec;
-        lsst::imageproc::generateDeltaFunctionKernelSet(kernelRows, kernelCols, kernelBasisVec);
-        
-        // Output kernel
-        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > kernelPtr(
-            new lsst::fw::LinearCombinationKernel<KernelT>
-            );
+        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelBasisVec =
+            lsst::imageproc::generateDeltaFunctionKernelSet<KernelT>(kernelCols, kernelRows);
         
         // Function for spatially varying kernel.  Make null here for this test.
         boost::shared_ptr<lsst::fw::function::Function2<FuncT> > kernelFunctionPtr(
@@ -91,22 +72,14 @@ int main( int argc, char** argv )
             );
         
         // Use hard-coded positions for now
-        vector<lsst::detection::Footprint::PtrType> footprintList;
-        lsst::imageproc::getCollectionOfMaskedImagesForPsfMatching(footprintList);
+        vector<lsst::detection::Footprint::PtrType> footprintList =
+            lsst::imageproc::getCollectionOfMaskedImagesForPsfMatching();
         
         
-        lsst::imageproc::computePsfMatchingKernelForMaskedImage
-            (templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintList,
-             kernelPtr, kernelFunctionPtr, backgroundFunctionPtr, p);
-        
-        // TAKES TOO LONG FOR NOW...
-        //lsst::fw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage =
-        //lsst::fw::kernel::convolve(templateMaskedImage, *kernelPtr, convolveThreshold, edgeMaskBit);
-        
-        //scienceMaskedImage -= convolvedTemplateMaskedImage;
-        //scienceMaskedImage.writeFits( (boost::format("%s_diff1") % inputImage).str() );
-
-        // TEST : the output kernel is a delta function.  The kernel coefficients of all bases other than the first (mean) are 0.
+        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > kernelPtr =
+            lsst::imageproc::computePsfMatchingKernelForMaskedImage(
+                kernelFunctionPtr, backgroundFunctionPtr,
+                templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintList, p);
     }
     
     if (Citizen::census(0) == 0) {

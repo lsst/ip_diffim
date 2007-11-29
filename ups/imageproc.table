@@ -1,5 +1,6 @@
 setupRequired(minuit)
 setupRequired(detection)
 setupRequired(fw)
+setupOptional(dps)
 
-envAppend(PYTHONPATH, ${PRODUCT_DIR}/python)
+envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)

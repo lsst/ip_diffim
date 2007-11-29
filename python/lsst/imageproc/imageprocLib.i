@@ -31,6 +31,11 @@ using namespace lsst::imageproc;
 %include "lsst/detection/detectionLib.i"     // need otherwise FootprintContainerT not known about
 %include "cpointer.i"
 
+// handle C++ arguments that should be outputs in python
+%apply int& OUTPUT { int& };
+%apply float& OUTPUT { float& };
+%apply double& OUTPUT { double& };
+
 %pythoncode %{
 def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/tickets/7/python/lsst/imageproc/imageprocLib.i $"):
     """Return a version given a HeadURL string; default: imageproc's version"""
@@ -46,56 +51,52 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 // for lsst::fw::maskPixelType
 %include "lsst/fw/Mask.h"    
 
-// this should be in kernel.i but i need it now
-%template(LinearCombinationKernelPtrTypeD) boost::shared_ptr<lsst::fw::LinearCombinationKernel<double> >;
-
 %include "lsst/imageproc/ImageSubtract.h"
-%template(DiffImContainer_D)                            lsst::imageproc::DiffImContainer<double>;
-%template(vectorDiffImContainer_D)                      std::vector<lsst::imageproc::DiffImContainer<double> >;
-%template(computePsfMatchingKernelForMaskedImage_FDD)   lsst::imageproc::computePsfMatchingKernelForMaskedImage<float, 
-                                                                                                                lsst::fw::maskPixelType, 
-                                                                                                                double, 
-                                                                                                                double>;
-%template(computePsfMatchingKernelForPostageStamp_FD)   lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, 
-                                                                                                                 lsst::fw::maskPixelType, 
-                                                                                                                 double>;
-%template(getCollectionOfFootprintsForPsfMatching_F)    lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float, 
-                                                                                                                 lsst::fw::maskPixelType>;
-%template(computePcaKernelBasis_D)                      lsst::imageproc::computePcaKernelBasis<double>;
-%template(computeSpatiallyVaryingPsfMatchingKernel_DD)  lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel<double, double>;
-%template(generateDeltaFunctionKernelSet_D)             lsst::imageproc::generateDeltaFunctionKernelSet<double>;
-%template(generateAlardLuptonKernelSet_D)               lsst::imageproc::generateAlardLuptonKernelSet<double>;
-%template(checkMaskedImageForDiffim_F)                  lsst::imageproc::checkMaskedImageForDiffim<float, lsst::fw::maskPixelType>;
-%template(calculateMaskedImageResiduals_F)              lsst::imageproc::calculateMaskedImageResiduals<float, lsst::fw::maskPixelType>;
-%template(calculateImageResiduals_F)                    lsst::imageproc::calculateImageResiduals<float>;
+%template(DiffImContainer_D)                lsst::imageproc::DiffImContainer<double>;
+%template(vectorDiffImContainer_D)          std::vector<lsst::imageproc::DiffImContainer<double> >;
+%template(ccomputePsfMatchingKernelForMaskedImage)
+    lsst::imageproc::computePsfMatchingKernelForMaskedImage<float, lsst::fw::maskPixelType, double>;
+%template(ccomputePsfMatchingKernelForMaskedImage)
+    lsst::imageproc::computePsfMatchingKernelForMaskedImage<double, lsst::fw::maskPixelType, double>;
+%template(computePsfMatchingKernelForPostageStamp)
+    lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, lsst::fw::maskPixelType, double>;
+%template(computePsfMatchingKernelForPostageStamp)
+    lsst::imageproc::computePsfMatchingKernelForPostageStamp<double, lsst::fw::maskPixelType, double>;
+%template(getCollectionOfFootprintsForPsfMatching)
+    lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float, lsst::fw::maskPixelType>;
+%template(getCollectionOfFootprintsForPsfMatching)
+    lsst::imageproc::getCollectionOfFootprintsForPsfMatching<double, lsst::fw::maskPixelType>;
+%template(computePcaKernelBasis)            lsst::imageproc::computePcaKernelBasis<double>;
+%template(computeSpatiallyVaryingPsfMatchingKernel)
+    lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel<double>;
+%template(generateDeltaFunctionKernelSetD)  lsst::imageproc::generateDeltaFunctionKernelSet<double>;
+%template(generateAlardLuptonKernelSetD)    lsst::imageproc::generateAlardLuptonKernelSet<double>;
+%template(maskOk)                           lsst::imageproc::maskOk<lsst::fw::maskPixelType>;
+%template(calculateMaskedImageResiduals)
+    lsst::imageproc::calculateMaskedImageResiduals<float, lsst::fw::maskPixelType>;
+%template(calculateMaskedImageResiduals)
+    lsst::imageproc::calculateMaskedImageResiduals<double, lsst::fw::maskPixelType>;
+%template(calculateImageResiduals)          lsst::imageproc::calculateImageResiduals<float>;
+%template(calculateImageResiduals)          lsst::imageproc::calculateImageResiduals<double>;
 // getCollectionOfMaskedImagesForPsfMatching is not templated
+%template(addFunction)                      lsst::imageproc::addFunction<double, double>;
+%template(addFunction)                      lsst::imageproc::addFunction<float, double>;
+%template(addFunction)                      lsst::imageproc::addFunction<double, float>;
+%template(addFunction)                      lsst::imageproc::addFunction<float, float>;
 
 /* ImageSubtract.h */
 /*******************/
 /* PCA.h */
 
 %include "lsst/imageproc/PCA.h"
-%template(computePca_F)                  lsst::imageproc::computePca<vw::math::Matrix<float>, vw::math::Vector<float> >;
-%template(computePca_D)                  lsst::imageproc::computePca<vw::math::Matrix<double>, vw::math::Vector<double> >;
-%template(decomposeMatrixUsingBasis_F)   lsst::imageproc::decomposeMatrixUsingBasis<vw::math::Matrix<float> >;
-%template(decomposeMatrixUsingBasis_D)   lsst::imageproc::decomposeMatrixUsingBasis<vw::math::Matrix<double> >;
-%template(approximateMatrixUsingBasis_F) lsst::imageproc::approximateMatrixUsingBasis<vw::math::Matrix<float> >;
-%template(approximateMatrixUsingBasis_D) lsst::imageproc::approximateMatrixUsingBasis<vw::math::Matrix<double> >;
+%template(computePca)                    lsst::imageproc::computePca<vw::math::Matrix<float>, vw::math::Vector<float> >;
+%template(computePca)                    lsst::imageproc::computePca<vw::math::Matrix<double>, vw::math::Vector<double> >;
+%template(decomposeMatrixUsingBasis)     lsst::imageproc::decomposeMatrixUsingBasis<vw::math::Matrix<float> >;
+%template(decomposeMatrixUsingBasis)     lsst::imageproc::decomposeMatrixUsingBasis<vw::math::Matrix<double> >;
+%template(approximateMatrixUsingBasis)   lsst::imageproc::approximateMatrixUsingBasis<vw::math::Matrix<float> >;
+%template(approximateMatrixUsingBasis)   lsst::imageproc::approximateMatrixUsingBasis<vw::math::Matrix<double> >;
 
 /* PCA.h */
-/*******************/
-/* MinimizerFunctionBase.h */
-
-// Until we merge this in to fw trunk
-%include "Minuit/FCNBase.h"
-%include "lsst/fw/MinimizerFunctionBase.h"
-%template(MinimizerFunctionBase1_F) lsst::fw::function::MinimizerFunctionBase1<float>;
-%template(MinimizerFunctionBase1_D) lsst::fw::function::MinimizerFunctionBase1<double>;
-%template(MinimizerFunctionBase2_F) lsst::fw::function::MinimizerFunctionBase2<float>;
-%template(MinimizerFunctionBase2_D) lsst::fw::function::MinimizerFunctionBase2<double>;
-%template(minimize_F)               lsst::fw::function::minimize<float>;
-%template(minimize_D)               lsst::fw::function::minimize<double>;
-
 /******************************************************************************/
 // Local Variables: ***
 // eval: (setq indent-tabs-mode nil) ***

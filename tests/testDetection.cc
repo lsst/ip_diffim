@@ -6,7 +6,7 @@
 using namespace std;
 using namespace lsst::fw;
 
-typedef uint8 MaskT;
+typedef lsst::fw::maskPixelType MaskT;
 typedef float ImageT;
 typedef double KernelT;
 typedef double FuncT;
@@ -21,7 +21,7 @@ int main( int argc, char** argv )
         MaskedImage<ImageT,MaskT> templateMaskedImage;
         try {
             templateMaskedImage.readFits(templateImage);
-        } catch (lsst::mwi::exceptions::Exception &e) {
+        } catch (lsst::mwi::exceptions::ExceptionStack &e) {
             cerr << "Failed to open template image " << templateImage << ": " << e.what() << endl;
             return 1;
         }

@@ -9,13 +9,17 @@ import lsst.tests
 import lsst.SConsUtils as scons         # scons 1.17 supports "env.ProductDir", but for now use scons.ProductDir
 dataDir = scons.ProductDir("fwData")
 args = dict([
-    ("CFHT2MaskedImage", "%s/871034p_1 %s/871034p_1_MI" % (dataDir, dataDir)),
+    ("CFHT2MaskedImage", "%s/871034p_1 %s/871034p_1_MI_unittest" % (dataDir, dataDir)),
     ])
 #
 # Tests
 #
 if dataDir:
-    ignoreList = None
+    ignoreList = [
+        "runCopyPipeline.py",
+        "runImageSubtract.py",
+        "runSubtractPipeline.py",
+    ]
 else:
     print >> sys.stderr, "fwData is not set up; skipping tests requiring data"
     ignoreList = args.keys()

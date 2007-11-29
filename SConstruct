@@ -25,8 +25,7 @@ env = scons.makeEnv("imageproc",
                      ["minuit", "Minuit/FCNBase.h", "lcg_Minuit:C++"],
                      ])
 
-env.libs["imageproc"] = []              # we don't have a -limageproc (yet)
-env.libs["imageproc"] += env.getlibs("boost vw fw fitsio cfitsio mwi minuit")
+env.libs["imageproc"] = env.getlibs("boost vw fw cfitsio mwi minuit detection")
 env.libs["imageproc"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") fails as lapack isn't in eups
 
 #
