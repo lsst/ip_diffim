@@ -45,7 +45,7 @@ class ImageSubtractStage(lsst.dps.Stage.Stage):
         #
         # Post results to clipboard
         #
-        activeClipboard.put('DifferenceExposure', differenceImage)
+        activeClipboard.put('DifferenceExposure', differenceExposure)
         activeClipboard.put('PsfMatchKernel', psfMatchingKernelPtr)
         activeClipboard.put('BackgroundModel', backgroundFunctionPtr)
         
