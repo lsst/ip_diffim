@@ -137,8 +137,8 @@ void lsst::imageproc::computePca(
     //        u is the same shape as M
     //        rows = number of measurements (pixels)
     //        cols = number of realizations (stars)
-    for (unsigned int row = 0; row < M.rows(); ++row) {
-        for (unsigned int col = 0; col < M.cols(); ++col) {
+    for (unsigned int row = 0; row < eVec.rows(); ++row) {
+        for (unsigned int col = 0; col < eVec.cols(); ++col) {
             eVec(row,col) = u(row, col);
         }
     }
