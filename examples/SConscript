@@ -17,6 +17,7 @@ args = dict([
 if dataDir:
     ignoreList = [
         "runImageSubtract.py",
+        "runWcsMatch.py",
     ]
 else:
     print >> sys.stderr, "fwData is not set up; skipping tests requiring data"
