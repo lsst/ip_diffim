@@ -17,24 +17,21 @@ import socket
 import time
 
 import lsst.mwi.data as mwiData
+import lsst.mwi.policy
 import lsst.mwi.utils
 import lsst.events
 
-IPAddress = socket.gethostname()
-
-def sendEvent(templatePath, sciencePath, differencePath, trialRun=False):
+def sendEvent(templatePath, sciencePath, differencePath, eventPolicy, trialRun=False):
     rootProperty = mwiData.SupportFactory.createPropertyNode("root");
 
     rootProperty.addProperty(mwiData.DataProperty("visitId", 1)) # this may be required
-    rootProperty.addProperty(mwiData.DataProperty("SciencePath", sciencePath))
-    rootProperty.addProperty(mwiData.DataProperty("TemplatePath", templatePath))
-    rootProperty.addProperty(mwiData.DataProperty("DifferencePath", differencePath))
+    rootProperty.addProperty(mwiData.DataProperty("sciencePath", sciencePath))
+    rootProperty.addProperty(mwiData.DataProperty("templatePath", templatePath))
+    rootProperty.addProperty(mwiData.DataProperty("differencePath", differencePath))
 
     if not trialRun:
-        print "Creating event"
-        externalEventTransmitter = lsst.events.EventTransmitter(IPAddress, "triggerAssociationEvent")
-        print "Sending event"
-        externalEventTransmitter.publish("eventtype", rootProperty)
+        externalEventTransmitter = lsst.events.EventTransmitter(eventPolicy)
+        externalEventTransmitter.publish("imageSubtractEventType", rootProperty)
 
 
 def main():
@@ -43,7 +40,9 @@ def main():
     
     defVerbosity = 5 # change to 0 once this all works to hide all messages
     
-    ConfigRelPath = os.path.join(moduleDir, "imageSubtractPipeline")
+    policyRelPath = os.path.join(moduleDir, "imageManySubtractPipeline", "policy")
+    
+    eventPolicy = lsst.mwi.policy.Policy(os.path.join(policyRelPath, "event_policy.paf"))
     
     usage = """usage: %%prog [options] [fileList]
     Note:
@@ -93,7 +92,7 @@ def main():
             templatePath = os.path.expandvars(templatePath)
             differencePath = os.path.expandvars(differencePath)
             print "Computing %r = \n  %r - %r" % (differencePath, sciencePath, templatePath)
-            sendEvent(templatePath, sciencePath, differencePath, options.trial)
+            sendEvent(templatePath, sciencePath, differencePath, eventPolicy, options.trial)
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,19 @@
+AdditionalData: "sciencePath=triggerImageSubtraction.sciencePath" "templatePath=triggerImageSubtraction.templatePath"
+InputItems: {
+    ScienceExposure: {
+        Type: "ExposureD"
+        PythonType: "lsst.fw.Core.fwLib.ExposureD"
+        StoragePolicy: {
+            Storage: "FitsStorage"
+            Location: "%{sciencePath}"
+        }
+    },
+    TemplateExposure: {
+        Type: "ExposureD"
+        PythonType: "lsst.fw.Core.fwLib.ExposureD"
+        StoragePolicy: {
+            Storage: "FitsStorage"
+            Location: "%{templatePath}"
+        }
+    }
+}

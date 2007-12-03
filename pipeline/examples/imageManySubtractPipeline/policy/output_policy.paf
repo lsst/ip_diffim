@@ -1,0 +1,9 @@
+OutputItems: {
+    DifferenceExposure: {
+        Required: true
+        StoragePolicy: {
+            Storage: "FitsStorage"
+            Location: "%{differencePath}"
+        }
+    }
+}
