@@ -88,9 +88,9 @@ def main():
                 differencePath = dataList[2]
             else:
                 differencePath = "%s_diff" % (os.path.split(sciencePath)[1],)
-            sciencePath = os.path.expandvars(sciencePath)
-            templatePath = os.path.expandvars(templatePath)
-            differencePath = os.path.expandvars(differencePath)
+            sciencePath = os.path.abspath(os.path.expandvars(sciencePath))
+            templatePath = os.path.abspath(os.path.expandvars(templatePath))
+            differencePath = os.path.abspath(os.path.expandvars(differencePath))
             print "Computing %r = \n  %r - %r" % (differencePath, sciencePath, templatePath)
             sendEvent(templatePath, sciencePath, differencePath, eventPolicy, options.trial)
 

@@ -1,3 +1,4 @@
+AdditionalData: "differencePath=triggerImageSubtraction.differencePath"
 OutputItems: {
     DifferenceExposure: {
         Required: true

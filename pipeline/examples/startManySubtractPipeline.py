@@ -76,9 +76,11 @@ def main():
         lsst.mwi.utils.Trace_setVerbosity("lsst.imageproc", options.verbosity)
     
     print """Starting the pipeline.
-Once it is running feed it images to subtract by running feedManySubtractPipeline.py
-from a new process.
-Type control-c to kill the pipeline when you are finished.
+Once you see a message like:
+  Python Slice handleEvents rank :  0  - waiting on receive...
+then run feedManySubtractPipeline.py from a new process
+to feed images to the image subtraction pipeline.
+Type control-c to kill the pipeline when all images have been processed.
 """
     configAbsPath = os.path.abspath(configRelPath)
     subprocess.call(os.path.join(configAbsPath, "run.sh"), cwd=configAbsPath)
