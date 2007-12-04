@@ -34,7 +34,7 @@ sleep 2s
 
 echo "Running mpiexec"
 
-mpiexec -usize ${usize}  -machinefile nodelist.scr -np 1 Pipeline.py
+mpiexec -usize ${usize}  -machinefile nodelist.scr -np 1 runPipeline.py
 
 sleep 1s
 

@@ -21,7 +21,7 @@ import lsst.mwi.policy
 import lsst.mwi.utils
 import lsst.events
 
-def sendEvent(templatePath, sciencePath, differencePath, eventPolicy, trialRun=False):
+def sendEvent(templatePath, sciencePath, differencePath, eventTransmitter, trialRun=False):
     rootProperty = mwiData.SupportFactory.createPropertyNode("root");
 
     rootProperty.addProperty(mwiData.DataProperty("visitId", 1)) # this may be required
@@ -30,8 +30,7 @@ def sendEvent(templatePath, sciencePath, differencePath, eventPolicy, trialRun=F
     rootProperty.addProperty(mwiData.DataProperty("differencePath", differencePath))
 
     if not trialRun:
-        externalEventTransmitter = lsst.events.EventTransmitter(eventPolicy)
-        externalEventTransmitter.publish("imageSubtractEventType", rootProperty)
+        eventTransmitter.publish("imageSubtractEventType", rootProperty)
 
 
 def main():
@@ -39,10 +38,6 @@ def main():
     defFileList = os.path.join(moduleDir, "fileList.txt")
     
     defVerbosity = 5 # change to 0 once this all works to hide all messages
-    
-    policyRelPath = os.path.join(moduleDir, "imageManySubtractPipeline", "policy")
-    
-    eventPolicy = lsst.mwi.policy.Policy(os.path.join(policyRelPath, "event_policy.paf"))
     
     usage = """usage: %%prog [options] [fileList]
     Note:
@@ -68,9 +63,12 @@ def main():
         if ind < len(args):
             return args[ind]
         return defValue
-    
-    fileListPath = os.path.abspath(getArg(0, defFileList))
 
+    policyRelPath = os.path.join(moduleDir, "imageManySubtractPipeline", "policy")
+    eventPolicy = lsst.mwi.policy.Policy(os.path.join(policyRelPath, "event_policy.paf"))
+    eventTransmitter = lsst.events.EventTransmitter(eventPolicy)
+
+    fileListPath = os.path.abspath(getArg(0, defFileList))
     print "File list:", fileListPath
 
     with file(fileListPath, "rU") as fileList:    
@@ -92,7 +90,7 @@ def main():
             templatePath = os.path.abspath(os.path.expandvars(templatePath))
             differencePath = os.path.abspath(os.path.expandvars(differencePath))
             print "Computing %r = \n  %r - %r" % (differencePath, sciencePath, templatePath)
-            sendEvent(templatePath, sciencePath, differencePath, eventPolicy, options.trial)
+            sendEvent(templatePath, sciencePath, differencePath, eventTransmitter, options.trial)
 
 if __name__ == "__main__":
     main()
