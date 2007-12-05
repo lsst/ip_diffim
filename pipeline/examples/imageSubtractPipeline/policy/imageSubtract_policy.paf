@@ -1,9 +1,12 @@
 #<?cfg paf policy ?>
 # Default Image Subtraction Policy File
 
+# Write intermediate FITS files? (boolean)
+debugIO: false
+
 # Size of the convolution kernel
-kernelRows: 9
-kernelCols: 9
+kernelRows: 15
+kernelCols: 15
 
 # Order of kernel spatial variation
 kernelSpatialOrder: 1
@@ -11,12 +14,6 @@ kernelSpatialOrder: 1
 # Order of background spatial variation
 backgroundSpatialOrder: 1
 
-# Convolution directives
-convolveThreshold: 0.0
-badMaskBit:  0  # 1 << 0 this matches Andy's 2007-10-31 standard
-edgeMaskBit: 4  # 1 << 4 this matches Andy's 2007-10-31 standard
-
-# Use case getCollectionOfFootprintsForPsfMatching
 getCollectionOfFootprintsForPsfMatching: {
     # Minimum number of pixels in an acceptible Footprint
     footprintDiffimNpixMin: 10
@@ -32,7 +29,7 @@ getCollectionOfFootprintsForPsfMatching: {
     #footprintDetectionThreshold: 5000.0
 
     # Minimum number of clean candidates
-    minimumCleanFootprints: 20
+    minimumCleanFootprints: 50
 
     # How do you change the detection threshold if minimumCleanFootprints not found
     # Make this shallow now for testing; don't want to get too many objects...
@@ -42,13 +39,12 @@ getCollectionOfFootprintsForPsfMatching: {
     minimumDetectionThreshold: 1000.0
 }
 
-# Use case computePsfMatchingKernelForMaskedImage
 computePsfMatchingKernelForMaskedImage: {
     # Maximum sum (residual/variance) for an acceptable Kernel; mean should be 0
-    maximumFootprintResidualMean: 1.0
+    maximumFootprintResidualMean: 0.75
 
     # Maximum variance (residual/variance) for an acceptable Kernel; variance should be 1
-    maximumFootprintResidualVariance: 2.0
+    maximumFootprintResidualVariance: 1.5
 
     # Maximum number of sigma in kernel sum for good kernel
     maximumKernelSumNSigma : 3.0
@@ -57,12 +53,10 @@ computePsfMatchingKernelForMaskedImage: {
     maximumIterationsKernelSum : 5
 }
 
-# Use case computePsfMatchingKernelForPostageStamp
 computePsfMatchingKernelForPostageStamp: {
     # Empty
 }
 
-# Use case computePcaKernelBasis
 computePcaKernelBasis: {
     # Minimum number of basis functions to use, after mean
     minimumNumberOfBases: 3
@@ -74,26 +68,25 @@ computePcaKernelBasis: {
     maximumFractionOfEigenvalues: 0.95
     
     # Don't use bases whose eigenvalues are this small or smaller
-    minimumAcceptibleEigenvalue: 1.0e-10
+    minimumAcceptibleEigenvalue: 0.01
 
     # Maximum number of iterations while doing PCA
     maximumIteratonsPCA: 5
 
     # Maximum mean residual comparing each Kernel to its PCA-derived model
-    maximumKernelResidualMean: 1.0
+    maximumKernelResidualMean: 0.75
 
     # Maximum varaince of residuals when comparing each Kernel to its PCA-derived model
-    maximumKernelResidualVariance: 2.0
+    maximumKernelResidualVariance: 1.5
 }
 
-# Use case computeSpatiallyVaryingPsfMatchingKernel
 computeSpatiallyVaryingPsfMatchingKernel: {
     # Maximum iterations for spatial fit to Kernel basis coefficients
     maximumIterationsSpatialFit: 5
 
     # Maximum mean residual comparing each Kernel to its spatial model
-    maximumSpatialKernelResidualMean: 1.0
+    maximumSpatialKernelResidualMean: 0.75
 
     # Maximum varaince of residuals when comparing each Kernel to its spatial model
-    maximumSpatialKernelResidualVariance: 1.0
+    maximumSpatialKernelResidualVariance: 1.5
 }

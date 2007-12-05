@@ -1,15 +1,15 @@
 InputItems: {
     ScienceExposure: {
-        Type: "ExposureD"
-        PythonType: "lsst.fw.Core.fwLib.ExposureD"
+        Type: "ExposureF"
+        PythonType: "lsst.fw.Core.fwLib.ExposureF"
         StoragePolicy: {
             Storage: "FitsStorage"
             Location: "%(scienceExposurePath)s"
         }
     },
     TemplateExposure: {
-        Type: "ExposureD"
-        PythonType: "lsst.fw.Core.fwLib.ExposureD"
+        Type: "ExposureF"
+        PythonType: "lsst.fw.Core.fwLib.ExposureF"
         StoragePolicy: {
             Storage: "FitsStorage"
             Location: "%(templateExposurePath)s"

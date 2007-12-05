@@ -11,6 +11,7 @@ import socket
 
 import lsst.mwi.data as mwiData
 import lsst.mwi.utils
+import startPipeline
 
 def main():
     moduleDir = os.path.split(__file__)[0]
@@ -74,6 +75,7 @@ def main():
     if options.verbosity > 0:
         print "Verbosity =", options.verbosity
         lsst.mwi.utils.Trace_setVerbosity("lsst.imageproc", options.verbosity)
+        lsst.mwi.utils.Trace_setVerbosity("dps", options.verbosity)
     
     print """Starting the pipeline.
 Once you see a message like:
@@ -82,8 +84,11 @@ then run feedManySubtractPipeline.py from a new process
 to feed images to the image subtraction pipeline.
 Type control-c to kill the pipeline when all images have been processed.
 """
-    configAbsPath = os.path.abspath(configRelPath)
-    subprocess.call(os.path.join(configAbsPath, "run.sh"), cwd=configAbsPath)
+    nodeList = os.path.abspath(os.path.join(configRelPath, "nodelist.scr"))
+    startPipeline.startPipeline(nodeList)
+    # or if you prefer to use a private copy of run.sh...
+    #configAbsPath = os.path.abspath(configRelPath)
+    #subprocess.call(os.path.join(configAbsPath, "run.sh"), cwd=configAbsPath)
 
 if __name__ == "__main__":
     main()

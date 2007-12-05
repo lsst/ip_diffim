@@ -1,8 +1,8 @@
 #<?cfg paf policy ?>
 # Default Image Subtraction Policy File
 
-# Write intermediate FITS files (1/0 = yes/no)
-debugIO: 0
+# Write intermediate FITS files? (boolean)
+debugIO: false
 
 # Size of the convolution kernel
 kernelRows: 15

@@ -12,6 +12,7 @@ import socket
 
 import lsst.mwi.data as mwiData
 import lsst.mwi.utils
+import startPipeline
 
 defInDir = os.environ.get("FWDATA_DIR", "")
 moduleDir = os.path.split(__file__)[0]
@@ -22,7 +23,7 @@ defPolicyPath = os.path.join("policy", "imageSubtract_policy.paf")
 defOutputPath = "diffImage"
 defVerbosity = 5 # change to 0 once this all works to hide all messages
 
-ConfigRelPath = os.path.join(moduleDir, "imageSubtractPipeline")
+configRelPath = os.path.join(moduleDir, "imageSubtractPipeline")
 
 usage = """usage: %%prog [options] [scienceImage [templateImage [policyFile [outputImage]]]]
 Note:
@@ -59,19 +60,19 @@ print "Output image:  ", outputPath
 
 def copyTemplatedConfigFile(templateName, templateDict):
     """Read a templated configuration file, fill it in and write it out.
-    templateName is a path relative to ConfigRelPath
+    templateName is a path relative to configRelPath
     templateDict contains the items to substitute in the template file
     """
     #print "copyTemplatedConfigFile(%r, %r)" % (templateName, templateDict)
     templateBaseName, templateExt = os.path.splitext(templateName)
     if not templateBaseName.endswith("_template"):
         raise RuntimeError("Invalid templateName %r; must end with _template" % (templateName,))
-    inPath = os.path.join(ConfigRelPath, templateName)
+    inPath = os.path.join(configRelPath, templateName)
     with file(inPath, "rU") as templateFile:
         templateText = templateFile.read()
         destText = templateText % templateDict
     outName = templateBaseName[:-len("_template")] + templateExt
-    outPath = os.path.join(ConfigRelPath, outName)
+    outPath = os.path.join(configRelPath, outName)
     with file(outPath, "w") as destFile:
         destFile.write(destText)
 
@@ -105,9 +106,13 @@ copyTemplatedConfigFile(
 if options.verbosity > 0:
     print "Verbosity =", options.verbosity
     lsst.mwi.utils.Trace_setVerbosity("lsst.imageproc", options.verbosity)
+    lsst.mwi.utils.Trace_setVerbosity("dps", options.verbosity)
 
-configAbsPath = os.path.abspath(ConfigRelPath)
-subprocess.call(os.path.join(configAbsPath, "run.sh"), cwd=configAbsPath)
+nodeList = os.path.abspath(os.path.join(configRelPath, "nodelist.scr"))
+startPipeline.startPipeline(nodeList)
+# or if you prefer to use a private copy of run.sh...
+#configAbsPath = os.path.abspath(configRelPath)
+#subprocess.call(os.path.join(configAbsPath, "run.sh"), cwd=configAbsPath)
 
 # check for memory leaks
 memId0 = 0

@@ -36,10 +36,15 @@ class ImageSubtractStage(lsst.dps.Stage.Stage):
             footprintList = None,
         )
         
+        # Turn the difference image into an exposure. Since we don't have a factory function for this,
+        # we have to know the Exposure type, which is based on the image type.
+        # The type of the difference image matches the type of the image that was convolved,
+        # which is the template image. It would be safer to use a factory function.,
+        differenceExposureClass = type(templateExposure)
         if scienceExposure.hasWcs():
-            differenceExposure = fw.ExposureD(differenceImage, scienceExposure.getWcs())
+            differenceExposure = differenceExposureClass(differenceImage, scienceExposure.getWcs())
         else:
-            differenceExposure = fw.ExposureD(differenceImage)
+            differenceExposure = differenceExposureClass(differenceImage)
 
         ###########
         #
