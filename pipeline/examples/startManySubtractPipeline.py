@@ -20,8 +20,8 @@ def main():
         print "Error: imageproc not setup"
         sys.exit(1)
     pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageManySubtractPipeline")
-    
-    defPolicyPath = os.path.join("policy", "imageSubtract_policy.paf")
+
+    defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
     defVerbosity = 5 # change to 0 once this all works to hide all messages
     
     usage = """usage: %%prog [options] [policyFile]
