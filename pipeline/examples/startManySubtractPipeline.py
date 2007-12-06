@@ -22,17 +22,17 @@ def main():
     pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageManySubtractPipeline")
 
     defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
-    defVerbosity = 5 # change to 0 once this all works to hide all messages
+    defVerbosity = 0
     
     usage = """usage: %%prog [options] [policyFile]
-    Note:
-    - default policy = %s
-    """ % (defPolicyPath,)
+
+Notes:
+- default --policy=%s""" % (defPolicyPath,)
     
     parser = optparse.OptionParser(usage)
-    parser.add_option("-v", "--verbosity",
-                      type=int, default=defVerbosity,
-                      help="verbosity of diagnostic trace messages; 9 for just warnings, less for less information")
+    parser.add_option("-p", "--policy", default=defPolicyPath, help="policy file")
+    parser.add_option("-v", "--verbosity", type=int, default=defVerbosity,
+        help="verbosity of diagnostic trace messages; default=%s" % (defVerbosity,))
     (options, args) = parser.parse_args()
     
     def getArg(ind, defValue):

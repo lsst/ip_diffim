@@ -21,7 +21,7 @@ import lsst.mwi.policy
 import lsst.mwi.utils
 import lsst.events
 
-def sendEvent(templatePath, sciencePath, differencePath, eventTransmitter, trialRun=False):
+def sendEvent(templatePath, sciencePath, differencePath, eventTransmitter):
     rootProperty = mwiData.SupportFactory.createPropertyNode("root");
 
     rootProperty.addProperty(mwiData.DataProperty("visitId", 1)) # this may be required
@@ -29,8 +29,7 @@ def sendEvent(templatePath, sciencePath, differencePath, eventTransmitter, trial
     rootProperty.addProperty(mwiData.DataProperty("templatePath", templatePath))
     rootProperty.addProperty(mwiData.DataProperty("differencePath", differencePath))
 
-    if not trialRun:
-        eventTransmitter.publish("imageSubtractEventType", rootProperty)
+    eventTransmitter.publish("imageSubtractEventType", rootProperty)
 
 
 def main():
@@ -42,7 +41,7 @@ def main():
     pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageManySubtractPipeline")
     defFileList = os.path.join(pipelineDir, "fileList.txt")
     
-    defVerbosity = 5 # change to 0 once this all works to hide all messages
+    defVerbosity = 0
     
     usage = """usage: %%prog [options] [fileList]
     Note:
@@ -59,9 +58,8 @@ def main():
     """ % (defFileList,)
     
     parser = optparse.OptionParser(usage)
-    parser.add_option("-t", "--trial",
-                      action="store_true", default=False,
-                      help="trial run: show what would be done but don't run the pipeline")
+    parser.add_option("-t", "--trial", action="store_true", default=False,
+        help="trial run: show what images would be subtracted, but don't run the pipeline")
     (options, args) = parser.parse_args()
     
     def getArg(ind, defValue):
@@ -89,12 +87,14 @@ def main():
             if len(dataList) > 2:
                 differencePath = dataList[2]
             else:
-                differencePath = "%s_diff" % (os.path.split(sciencePath)[1],)
+                # use default = <science_image_name>_diff
+                differencePath = "%s_diff" % (os.path.basename(sciencePath),)
             sciencePath = os.path.abspath(os.path.expandvars(sciencePath))
             templatePath = os.path.abspath(os.path.expandvars(templatePath))
             differencePath = os.path.abspath(os.path.expandvars(differencePath))
             print "Computing %r = \n  %r - %r" % (differencePath, sciencePath, templatePath)
-            sendEvent(templatePath, sciencePath, differencePath, eventTransmitter, options.trial)
+            if not options.trial:
+                sendEvent(templatePath, sciencePath, differencePath, eventTransmitter)
 
 if __name__ == "__main__":
     main()

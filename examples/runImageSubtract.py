@@ -9,35 +9,39 @@ import lsst.imageproc
 import lsst.mwi.utils
 
 def runImageSubtract():
-    defInDir = os.environ.get("FWDATA_DIR", "")
-    moduleDir = os.path.split(__file__)[0]
-    
-    defSciencePath = os.path.join(defInDir, "871034p_1_MI")
-    defTemplatePath = os.path.join(defInDir, "871034p_1_MI")
-    defPolicyPath = os.path.join(os.path.dirname(moduleDir), "pipeline", "examples",
-        "imageSubtractPipeline", "policy", "imageSubtract_policy.paf")
+    defDataDir = os.environ.get("FWDATA_DIR", "")
+    try:
+        imageProcDir = os.environ["IMAGEPROC_DIR"]
+    except KeyError:
+        print "Error: imageproc not setup"
+        sys.exit(1)
+    pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageSubtractPipeline")
+
+    defSciencePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_1")
+    defTemplatePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_1_tmpl")
+    defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
     defOutputPath = "diffImage"
-    defVerbosity = 5 # change to 0 once this all works to hide all messages
+    defVerbosity = 0
     
-    usage = """usage: %%prog [options] [scienceImage [templateImage [policyFile [outputImage]]]]
-    Note:
-    - image arguments are paths to MaskedImage fits files
-    - image arguments must NOT include the final _img.fits
-    - the result is science image - template image
-    - the template image is convolved, the science image is not
-    - default templateMaskedImage = %s
-    - default scienceMaskedImage = %s
-    - default policy = %s
-    - default outputImage = %s 
-    """ % (defSciencePath, defTemplatePath, defPolicyPath, defOutputPath)
+    usage = """usage: %%prog [options] [scienceImage [templateImage [outputImage]]]]
+
+Notes:
+- image arguments are paths to MaskedImage fits files
+- image arguments must NOT include the final _img.fits
+- the result is science image - template image
+- the template image is convolved, the science image is not
+- default scienceMaskedImage=%s
+- default templateMaskedImage=%s
+- default outputImage=%s 
+- default --policy=%s
+""" % (defSciencePath, defTemplatePath, defOutputPath, defPolicyPath)
     
     parser = optparse.OptionParser(usage)
-    parser.add_option("-v", "--verbosity",
-                      type=int, default=defVerbosity,
-                      help="verbosity of diagnostic trace messages; 1 for just warnings, more for more information")
-    parser.add_option("-d", "--debugIO",
-                      action="store_true", default=False,
-                      help="write diagnostic intermediate files")
+    parser.add_option("-p", "--policy", default=defPolicyPath, help="policy file")
+    parser.add_option("-d", "--debugIO", action="store_true", default=False,
+        help="write diagnostic intermediate files")
+    parser.add_option("-v", "--verbosity", type=int, default=defVerbosity,
+        help="verbosity of diagnostic trace messages; 1 for just warnings, more for more information")
     (options, args) = parser.parse_args()
     
     def getArg(ind, defValue):
@@ -45,15 +49,15 @@ def runImageSubtract():
             return args[ind]
         return defValue
     
-    templatePath = getArg(0, defTemplatePath)
-    sciencePath = getArg(1, defSciencePath)
-    policyPath = getArg(2, defPolicyPath)
-    outputPath = getArg(3, defOutputPath)
+    sciencePath = getArg(0, defSciencePath)
+    templatePath = getArg(1, defTemplatePath)
+    outputPath = getArg(2, defOutputPath)
+    policyPath = options.policy
     
-    print "Template image:", templatePath
     print "Science image: ", sciencePath
-    print "Policy file:   ", policyPath
+    print "Template image:", templatePath
     print "Output image:  ", outputPath
+    print "Policy file:   ", policyPath
     
     templateMaskedImage = fw.MaskedImageD()
     templateMaskedImage.readFits(templatePath)
