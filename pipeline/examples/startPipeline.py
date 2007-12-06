@@ -9,21 +9,35 @@ def startPipeline(nodeList):
     """Start pipeline execution
     
     Inputs:
-    - nodeList: path to node list file
+    - nodeList: path to node list file; environment variables and relative paths are expanded
+    
+    The node list file must be in the pipeline directory; this directory also contains
+    the "policy" directory (containing pipeline policy files) and must be writable.
+    
+    The node list file contains information about the nodes on which to run the pipeline.
+    There is one line per node in the format:
+       ipaddress:nslices
+    where nslices is the number of CPUs that you wish to use on that node.
+    Blank lines and lines beginning with # are ignored.
 
     The pipeline uses one slice just to run the preprocess and postprocess phase;
-    all other slices are used to run the processing stages.
-    
-    Thus to run on a single host specify one host with 2 slices.
-    Increase for parallel execution; for example, for two nodes with 4 cpus set nnodes=2 and nslices=3
-    
-    Warning: requires mpich2 to be setup
+    all other slices are used to run slices of the process phase.
+    For example:
+    - To run one slice of the process phase on one host (that has at least 2 CPUs):
+      specify one host with 2 slices (1 for pre/postprocess and 1 for process)
+    - To run three slices of the process phase on two hosts (each with at least 2 CPUs):
+      specify two hosts with 2 slices each (4 slices: 1 for pre/postprocess and 3 for process)
+      
+    Note for those coming from run.sh: nslices in the code below includes the slice for
+    the pre/postprocess phase and thus is one greater than nslices in run.sh;
+    as a result the universe size = nslices.
     """
-    nnodes, nslices = parseNodeList(nodeList)
-    usize = nslices + 1 # universe size
+    nodeList = os.path.abspath(os.path.expandvars(nodeList))
     pipelineDir = os.path.dirname(nodeList)
-    lsst.mwi.utils.Trace("dps.startPipeline", 3, "nnodes=%s; nslices=%s; usize=%s; pipelineDir=%s" % \
-        (nnodes, nslices, usize, pipelineDir))
+    lsst.mwi.utils.Trace("dps.startPipeline", 3, "pipelineDir=%s" % (pipelineDir,))
+
+    nnodes, nslices = parseNodeList(nodeList)
+    lsst.mwi.utils.Trace("dps.startPipeline", 3, "nnodes=%s; nslices=%s" % (nnodes, nslices))
     
     lsst.mwi.utils.Trace("dps.startPipeline", 3, "Running mpdboot")
     subprocess.call(["mpdboot", "--totalnum=%s" % (nnodes,), "--file=%s" % (nodeList,), "--verbose"])
@@ -35,7 +49,7 @@ def startPipeline(nodeList):
     
     lsst.mwi.utils.Trace("dps.startPipeline", 3, "Running mpiexec")
     subprocess.call(
-        ["mpiexec", "-usize", str(usize), "-machinefile", nodeList, "-np", "1", "runPipeline.py"],
+        ["mpiexec", "-usize", str(nslices), "-machinefile", nodeList, "-np", "1", "runPipeline.py"],
         cwd = pipelineDir,
     )
     
@@ -44,10 +58,14 @@ def startPipeline(nodeList):
     subprocess.call(["mpdallexit"])
 
 def parseNodeList(nodeList):
-    """Return (nnodes, nslices)"""
+    """Return (nnodes, nslices)
+    where:
+    - nnodes = number of nodes (host IP addresses) in file
+    - nslices = total number of slices specified    
+    """
     nnodes = 0
     nslices = 0
-    with file(nodeList) as nodeFile:
+    with file(nodeList, "r") as nodeFile:
         for line in nodeFile:
             line = line.strip()
             if not line:

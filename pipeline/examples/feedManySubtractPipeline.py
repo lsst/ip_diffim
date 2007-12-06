@@ -34,8 +34,13 @@ def sendEvent(templatePath, sciencePath, differencePath, eventTransmitter, trial
 
 
 def main():
-    moduleDir = os.path.split(__file__)[0]
-    defFileList = os.path.join(moduleDir, "fileList.txt")
+    try:
+        imageProcDir = os.environ["IMAGEPROC_DIR"]
+    except KeyError:
+        print "Error: imageproc not setup"
+        sys.exit(1)
+    pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageManySubtractPipeline")
+    defFileList = os.path.join(pipelineDir, "fileList.txt")
     
     defVerbosity = 5 # change to 0 once this all works to hide all messages
     
@@ -64,8 +69,7 @@ def main():
             return args[ind]
         return defValue
 
-    policyRelPath = os.path.join(moduleDir, "imageManySubtractPipeline", "policy")
-    eventPolicy = lsst.mwi.policy.Policy(os.path.join(policyRelPath, "event_policy.paf"))
+    eventPolicy = lsst.mwi.policy.Policy(os.path.join(pipelineDir, "policy", "event_policy.paf"))
     eventTransmitter = lsst.events.EventTransmitter(eventPolicy)
 
     fileListPath = os.path.abspath(getArg(0, defFileList))

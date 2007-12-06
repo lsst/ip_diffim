@@ -15,15 +15,18 @@ import lsst.mwi.utils
 import startPipeline
 
 defInDir = os.environ.get("FWDATA_DIR", "")
-moduleDir = os.path.split(__file__)[0]
+try:
+    imageProcDir = os.environ["IMAGEPROC_DIR"]
+except KeyError:
+    print "Error: imageproc not setup"
+    sys.exit(1)
+pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageSubtractPipeline")
 
 defSciencePath = os.path.join(defInDir, "871034p_1_MI")
 defTemplatePath = os.path.join(defInDir, "871034p_1_MI")
-defPolicyPath = os.path.join("policy", "imageSubtract_policy.paf")
+defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
 defOutputPath = "diffImage"
 defVerbosity = 5 # change to 0 once this all works to hide all messages
-
-configRelPath = os.path.join(moduleDir, "imageSubtractPipeline")
 
 usage = """usage: %%prog [options] [scienceImage [templateImage [policyFile [outputImage]]]]
 Note:
@@ -60,19 +63,19 @@ print "Output image:  ", outputPath
 
 def copyTemplatedConfigFile(templateName, templateDict):
     """Read a templated configuration file, fill it in and write it out.
-    templateName is a path relative to configRelPath
+    templateName is a path relative to pipelineDir
     templateDict contains the items to substitute in the template file
     """
     #print "copyTemplatedConfigFile(%r, %r)" % (templateName, templateDict)
     templateBaseName, templateExt = os.path.splitext(templateName)
     if not templateBaseName.endswith("_template"):
         raise RuntimeError("Invalid templateName %r; must end with _template" % (templateName,))
-    inPath = os.path.join(configRelPath, templateName)
+    inPath = os.path.join(pipelineDir, templateName)
     with file(inPath, "rU") as templateFile:
         templateText = templateFile.read()
         destText = templateText % templateDict
     outName = templateBaseName[:-len("_template")] + templateExt
-    outPath = os.path.join(configRelPath, outName)
+    outPath = os.path.join(pipelineDir, outName)
     with file(outPath, "w") as destFile:
         destFile.write(destText)
 
@@ -108,11 +111,10 @@ if options.verbosity > 0:
     lsst.mwi.utils.Trace_setVerbosity("lsst.imageproc", options.verbosity)
     lsst.mwi.utils.Trace_setVerbosity("dps", options.verbosity)
 
-nodeList = os.path.abspath(os.path.join(configRelPath, "nodelist.scr"))
+nodeList = os.path.join(pipelineDir, "nodelist.scr")
 startPipeline.startPipeline(nodeList)
 # or if you prefer to use a private copy of run.sh...
-#configAbsPath = os.path.abspath(configRelPath)
-#subprocess.call(os.path.join(configAbsPath, "run.sh"), cwd=configAbsPath)
+#subprocess.call(os.path.join(pipelineDir, "run.sh"), cwd=pipelineDir)
 
 # check for memory leaks
 memId0 = 0

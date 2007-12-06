@@ -15,12 +15,15 @@ import lsst.mwi.utils
 import startPipeline
 
 defInDir = os.environ.get("FWDATA_DIR", "")
-moduleDir = os.path.split(__file__)[0]
+try:
+    imageProcDir = os.environ["IMAGEPROC_DIR"]
+except KeyError:
+    print "Error: imageproc not setup"
+    sys.exit(1)
+pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageCopyPipeline")
 
 defInputPath = os.path.join(defInDir, "871034p_1_MI")
 defOutputPath = "imageCopy"
-
-configRelPath = os.path.join(moduleDir, "imageCopyPipeline")
 
 usage = """usage: %%prog [inputImage [outputImage]]
 Note:
@@ -43,19 +46,19 @@ outputImagePath = os.path.abspath(getArg(3, defOutputPath))
 
 def copyTemplatedConfigFile(templateName, templateDict):
     """Read a templated configuration file, fill it in and write it out.
-    templateName is a path relative to configRelPath
+    templateName is a path relative to pipelineDir
     templateDict contains the items to substitute in the template file
     """
     #print "copyTemplatedConfigFile(%r, %r)" % (templateName, templateDict)
     templateBaseName, templateExt = os.path.splitext(templateName)
     if not templateBaseName.endswith("_template"):
         raise RuntimeError("Invalid templateName %r; must end with _template" % (templateName,))
-    inPath = os.path.join(configRelPath, templateName)
+    inPath = os.path.join(pipelineDir, templateName)
     with file(inPath, "rU") as templateFile:
         templateText = templateFile.read()
         destText = templateText % templateDict
     outName = templateBaseName[:-len("_template")] + templateExt
-    outPath = os.path.join(configRelPath, outName)
+    outPath = os.path.join(pipelineDir, outName)
     with file(outPath, "w") as destFile:
         destFile.write(destText)
 
@@ -79,11 +82,10 @@ copyTemplatedConfigFile(
     ),
 )
 
-nodeList = os.path.abspath(os.path.join(configRelPath, "nodelist.scr"))
+nodeList = os.path.join(pipelineDir, "nodelist.scr")
 startPipeline.startPipeline(nodeList)
 # or if you prefer to use a private copy of run.sh...
-#configAbsPath = os.path.abspath(configRelPath)
-#subprocess.call(os.path.join(configAbsPath, "run.sh"), cwd=configAbsPath)
+#subprocess.call(os.path.join(pipelineDir, "run.sh"), cwd=pipelineDir)
 
 # check for memory leaks
 memId0 = 0

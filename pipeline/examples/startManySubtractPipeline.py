@@ -14,8 +14,12 @@ import lsst.mwi.utils
 import startPipeline
 
 def main():
-    moduleDir = os.path.split(__file__)[0]
-    configRelPath = os.path.join(moduleDir, "imageManySubtractPipeline")
+    try:
+        imageProcDir = os.environ["IMAGEPROC_DIR"]
+    except KeyError:
+        print "Error: imageproc not setup"
+        sys.exit(1)
+    pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageManySubtractPipeline")
     
     defPolicyPath = os.path.join("policy", "imageSubtract_policy.paf")
     defVerbosity = 5 # change to 0 once this all works to hide all messages
@@ -42,19 +46,19 @@ def main():
     
     def copyTemplatedConfigFile(templateName, templateDict):
         """Read a templated configuration file, fill it in and write it out.
-        templateName is a path relative to configRelPath
+        templateName is a path relative to pipelineDir
         templateDict contains the items to substitute in the template file
         """
         #print "copyTemplatedConfigFile(%r, %r)" % (templateName, templateDict)
         templateBaseName, templateExt = os.path.splitext(templateName)
         if not templateBaseName.endswith("_template"):
             raise RuntimeError("Invalid templateName %r; must end with _template" % (templateName,))
-        inPath = os.path.join(configRelPath, templateName)
+        inPath = os.path.join(pipelineDir, templateName)
         with file(inPath, "rU") as templateFile:
             templateText = templateFile.read()
             destText = templateText % templateDict
         outName = templateBaseName[:-len("_template")] + templateExt
-        outPath = os.path.join(configRelPath, outName)
+        outPath = os.path.join(pipelineDir, outName)
         with file(outPath, "w") as destFile:
             destFile.write(destText)
     
@@ -82,13 +86,16 @@ Once you see a message like:
   Python Slice handleEvents rank :  0  - waiting on receive...
 then run feedManySubtractPipeline.py from a new process
 to feed images to the image subtraction pipeline.
-Type control-c to kill the pipeline when all images have been processed.
+
+Control-C the pipeline when it is done (or you have had enough).
+
+Warning: the pipeline presently will only process the first event,
+thus the first pair of images. That will be fixed in dps at some point.
 """
-    nodeList = os.path.abspath(os.path.join(configRelPath, "nodelist.scr"))
+    nodeList = os.path.join(pipelineDir, "nodelist.scr")
     startPipeline.startPipeline(nodeList)
     # or if you prefer to use a private copy of run.sh...
-    #configAbsPath = os.path.abspath(configRelPath)
-    #subprocess.call(os.path.join(configAbsPath, "run.sh"), cwd=configAbsPath)
+    #subprocess.call(os.path.join(pipelineDir, "run.sh"), cwd=pipelineDir)
 
 if __name__ == "__main__":
     main()
