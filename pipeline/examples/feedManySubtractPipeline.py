@@ -94,10 +94,10 @@ def main():
             print "Compute %r = \n  %r - %r" % (differencePath, sciencePath, templatePath)
             if not options.trial:
                 sendEvent(templatePath, sciencePath, differencePath, triggerEventTransmitter)
-    if not options.trial:
-        print "Sending shutdown event"
-        rootProperty = mwiData.SupportFactory.createPropertyNode("root");
-        shutdownEventTransmitter.publish("imageSubtractEventType", rootProperty)
+#    if not options.trial:
+#        print "Sending shutdown event"
+#        rootProperty = mwiData.SupportFactory.createPropertyNode("root");
+#        shutdownEventTransmitter.publish("imageSubtractEventType", rootProperty)
 
 if __name__ == "__main__":
     main()

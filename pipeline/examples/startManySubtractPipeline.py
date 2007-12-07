@@ -24,7 +24,7 @@ def main():
     defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
     defVerbosity = 0
     
-    usage = """usage: %%prog [options] [policyFile]
+    usage = """usage: %%prog [options]
 
 Notes:
 - default --policy=%s""" % (defPolicyPath,)
@@ -35,14 +35,9 @@ Notes:
         help="verbosity of diagnostic trace messages; default=%s" % (defVerbosity,))
     (options, args) = parser.parse_args()
     
-    def getArg(ind, defValue):
-        if ind < len(args):
-            return args[ind]
-        return defValue
-    
-    policyPath = getArg(1, defPolicyPath)
+    policyPath = options.policy
 
-    print "Policy file:   ", policyPath
+    print "Policy file:", policyPath
     
     def copyTemplatedConfigFile(templateName, templateDict):
         """Read a templated configuration file, fill it in and write it out.
@@ -88,9 +83,6 @@ then run feedManySubtractPipeline.py from a new process
 to feed images to the image subtraction pipeline.
 
 Control-C the pipeline when it is done (or you have had enough).
-
-Warning: the pipeline presently will only process the first event,
-thus the first pair of images. That will be fixed in dps at some point.
 """
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
     startPipeline.startPipeline(nodeList)

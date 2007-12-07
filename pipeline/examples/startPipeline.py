@@ -78,6 +78,7 @@ def parseNodeList(nodeList):
             try:
                 # strip optional extra arguments
                 hostInfo = line.split()[0]
+                # parse optional number of slices
                 hostSlice = hostInfo.split(":")
                 if len(hostSlice) == 1:
                     nslices += 1
