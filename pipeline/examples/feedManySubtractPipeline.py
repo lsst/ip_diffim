@@ -2,11 +2,7 @@
 """Feed the image subtraction pipeline with a series of images.
 
 To do:
-- My attempts to create an eventTransmitter fails with "Connection refused"
-  (but this is printed to stdout; there's no obvious way to get that info in my program!)
-- Try creating an event by supplying a policy containing:
-  topicName = "triggerAssociationEvent"
-  useLocalSockets = True
+- Once pipelines can receive events using a local socket modify this example to work that way.
 """
 from __future__ import with_statement
 
@@ -68,7 +64,10 @@ def main():
         return defValue
 
     eventPolicy = lsst.mwi.policy.Policy(os.path.join(pipelineDir, "policy", "event_policy.paf"))
-    eventTransmitter = lsst.events.EventTransmitter(eventPolicy)
+    eventPolicy.add("topicName", "triggerImageSubtraction")
+    triggerEventTransmitter = lsst.events.EventTransmitter(eventPolicy)
+    eventPolicy.set("topicName", "shutdownImageSubtraction")
+    shutdownEventTransmitter = lsst.events.EventTransmitter(eventPolicy)
 
     fileListPath = os.path.abspath(getArg(0, defFileList))
     print "File list:", fileListPath
@@ -92,9 +91,13 @@ def main():
             sciencePath = os.path.abspath(os.path.expandvars(sciencePath))
             templatePath = os.path.abspath(os.path.expandvars(templatePath))
             differencePath = os.path.abspath(os.path.expandvars(differencePath))
-            print "Computing %r = \n  %r - %r" % (differencePath, sciencePath, templatePath)
+            print "Compute %r = \n  %r - %r" % (differencePath, sciencePath, templatePath)
             if not options.trial:
-                sendEvent(templatePath, sciencePath, differencePath, eventTransmitter)
+                sendEvent(templatePath, sciencePath, differencePath, triggerEventTransmitter)
+    if not options.trial:
+        print "Sending shutdown event"
+        rootProperty = mwiData.SupportFactory.createPropertyNode("root");
+        shutdownEventTransmitter.publish("imageSubtractEventType", rootProperty)
 
 if __name__ == "__main__":
     main()

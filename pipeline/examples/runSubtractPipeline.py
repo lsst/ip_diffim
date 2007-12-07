@@ -110,7 +110,7 @@ Notes:
     if options.verbosity > 0:
         print "Verbosity =", options.verbosity
         lsst.mwi.utils.Trace_setVerbosity("lsst.imageproc", options.verbosity)
-        lsst.mwi.utils.Trace_setVerbosity("dps", options.verbosity)
+    lsst.mwi.utils.Trace_setVerbosity("dps", 3)
     
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
     startPipeline.startPipeline(nodeList)

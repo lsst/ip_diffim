@@ -9,16 +9,18 @@ def startPipeline(nodeList):
     """Start pipeline execution
     
     Inputs:
-    - nodeList: path to node list file; environment variables and relative paths are expanded
+    - nodeList: path to mpi machine file; environment variables and relative paths are expanded
     
     The node list file must be in the pipeline directory; this directory also contains
     the "policy" directory (containing pipeline policy files) and must be writable.
     
     The node list file contains information about the nodes on which to run the pipeline.
-    There is one line per node in the format:
-       ipaddress:nslices
-    where nslices is the number of CPUs that you wish to use on that node.
+    In its simplest form there is one line per node in the format:
+       ipaddress[:nslices]
+    where nslices is the number of CPUs that you wish to use on that node; the defaults is 1.
     Blank lines and lines beginning with # are ignored.
+    Additional options may be specified; see documentation for MPICH2 used with
+    the MPD process management environment.
 
     The pipeline uses one slice just to run the preprocess and postprocess phase;
     all other slices are used to run slices of the process phase.
@@ -74,8 +76,15 @@ def parseNodeList(nodeList):
                 continue
 
             try:
-                host, slicesStr = line.split(":")
-                nslices += int(slicesStr)
+                # strip optional extra arguments
+                hostInfo = line.split()[0]
+                hostSlice = hostInfo.split(":")
+                if len(hostSlice) == 1:
+                    nslices += 1
+                elif len(hostSlice) == 2:
+                    nslices += int(hostSlice[1])
+                else:
+                    raise RuntimeError("Could not parse host info %r" % hostInfo)
             except Exception, e:
                 raise RuntimeError("Cannot parse nodeList line %r; error = %s" % (line, e))
             nnodes += 1
