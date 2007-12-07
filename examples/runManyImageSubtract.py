@@ -1,32 +1,16 @@
 #!/usr/bin/env python
-"""Feed the image subtraction pipeline with a series of images.
-
-To do:
-- Once pipelines can receive events using a local socket modify this example to work that way.
+"""Subtract multiple of pairs of images as specified in a file.
 """
 from __future__ import with_statement
 
 import os
 import sys
 import optparse
-import socket
-import time
 
 import lsst.mwi.data as mwiData
-import lsst.mwi.policy
+import lsst.fw.Core.fwLib as fw
 import lsst.mwi.utils
-import lsst.events
-
-def sendEvent(templatePath, sciencePath, differencePath, eventTransmitter):
-    rootProperty = mwiData.SupportFactory.createPropertyNode("root");
-
-    rootProperty.addProperty(mwiData.DataProperty("visitId", 1)) # this may be required
-    rootProperty.addProperty(mwiData.DataProperty("sciencePath", sciencePath))
-    rootProperty.addProperty(mwiData.DataProperty("templatePath", templatePath))
-    rootProperty.addProperty(mwiData.DataProperty("differencePath", differencePath))
-
-    eventTransmitter.publish("imageSubtractEventType", rootProperty)
-
+import lsst.imageproc
 
 def main():
     try:
@@ -34,9 +18,9 @@ def main():
     except KeyError:
         print "Error: imageproc not setup"
         sys.exit(1)
-    pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageManySubtractPipeline")
-    defFileList = os.path.join(pipelineDir, "fileList.txt")
-    
+
+    defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
+    defFileList = "fileList.txt"
     defVerbosity = 0
     
     usage = """usage: %%prog [options] [fileList]
@@ -52,11 +36,15 @@ Notes:
 - the template image is convolved, the science image is not
 - default difference image is <scienceName>_diff
   where <scienceName> is the name portion of sciencePath
-""" % (defFileList,)
+- default --policy=%s
+    """ % (defFileList, defPolicyPath)
     
     parser = optparse.OptionParser(usage)
+    parser.add_option("-p", "--policy", default=defPolicyPath, help="policy file")
     parser.add_option("-t", "--trial", action="store_true", default=False,
-        help="trial run: show what images would be subtracted, but don't run the pipeline")
+        help="trial run: show what images would be subtracted, but don't subtract")
+    parser.add_option("-v", "--verbosity", type=int, default=defVerbosity,
+        help="verbosity of diagnostic trace messages; 1 for just warnings, more for more information")
     (options, args) = parser.parse_args()
     
     def getArg(ind, defValue):
@@ -64,14 +52,15 @@ Notes:
             return args[ind]
         return defValue
 
-    eventPolicy = lsst.mwi.policy.Policy(os.path.join(pipelineDir, "policy", "event_policy.paf"))
-    eventPolicy.add("topicName", "triggerImageSubtraction")
-    triggerEventTransmitter = lsst.events.EventTransmitter(eventPolicy)
-    eventPolicy.set("topicName", "shutdownImageSubtraction")
-    shutdownEventTransmitter = lsst.events.EventTransmitter(eventPolicy)
-
     fileListPath = os.path.abspath(getArg(0, defFileList))
     print "File list:", fileListPath
+
+    if options.verbosity > 0:
+        print "Verbosity =", options.verbosity
+        lsst.mwi.utils.Trace_setVerbosity("lsst.imageproc", options.verbosity)
+
+    policyPath = options.policy
+    policy = lsst.mwi.policy.Policy.createPolicy(policyPath)
 
     with file(fileListPath, "rU") as fileList:    
         for lineNum, dataStr in enumerate(fileList):
@@ -93,12 +82,20 @@ Notes:
             templatePath = os.path.abspath(os.path.expandvars(templatePath))
             differencePath = os.path.abspath(os.path.expandvars(differencePath))
             print "Compute %r = \n  %r - %r" % (differencePath, sciencePath, templatePath)
+            
+            templateMaskedImage = fw.MaskedImageD()
+            templateMaskedImage.readFits(templatePath)
+            
+            scienceMaskedImage  = fw.MaskedImageD()
+            scienceMaskedImage.readFits(sciencePath)
+
             if not options.trial:
-                sendEvent(templatePath, sciencePath, differencePath, triggerEventTransmitter)
-#    if not options.trial:
-#        print "Sending shutdown event"
-#        rootProperty = mwiData.SupportFactory.createPropertyNode("root");
-#        shutdownEventTransmitter.publish("imageSubtractEventType", rootProperty)
+                differenceImage, psfMatchKernelPtr, backgroundFunctionPtr = lsst.imageproc.imageSubtract(
+                    imageToConvolve = templateMaskedImage,
+                    imageToNotConvolve = scienceMaskedImage,
+                    policy = policy,
+                )
+                differenceImage.writeFits(outputPath)
 
 if __name__ == "__main__":
     main()

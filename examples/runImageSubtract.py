@@ -75,7 +75,10 @@ Notes:
     
     # compute difference image
     differenceImage, psfMatchKernelPtr, backgroundFunctionPtr = lsst.imageproc.imageSubtract(
-        templateMaskedImage, scienceMaskedImage, policy)
+        imageToConvolve = templateMaskedImage,
+        imageToNotConvolve = scienceMaskedImage,
+        policy = policy,
+    )
     differenceImage.writeFits(outputPath)
 
 if __name__ == "__main__":
