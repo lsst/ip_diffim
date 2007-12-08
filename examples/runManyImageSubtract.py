@@ -95,7 +95,7 @@ Notes:
                     imageToNotConvolve = scienceMaskedImage,
                     policy = policy,
                 )
-                differenceImage.writeFits(outputPath)
+                differenceImage.writeFits(differencePath)
 
 if __name__ == "__main__":
     main()
