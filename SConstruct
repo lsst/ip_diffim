@@ -31,11 +31,7 @@ env.libs["imageproc"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") f
 #
 # Build/install things
 #
-for d in Split("lib src tests examples"):
-    SConscript(os.path.join(d, "SConscript"))
-
-# include
-for d in Split("include/lsst/%s" % env['eups_product']):
+for d in Split("doc include/lsst/imageproc lib src tests examples"):
     SConscript(os.path.join(d, "SConscript"))
 
 # python
