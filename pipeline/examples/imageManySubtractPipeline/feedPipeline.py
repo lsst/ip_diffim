@@ -17,6 +17,8 @@ import lsst.mwi.policy
 import lsst.mwi.utils
 import lsst.events
 
+EventHost = "lsst8.ncsa.uiuc.edu"
+
 def sendEvent(templatePath, sciencePath, differencePath, eventTransmitter):
     rootProperty = mwiData.SupportFactory.createPropertyNode("root");
 
@@ -64,11 +66,7 @@ Notes:
             return args[ind]
         return defValue
 
-    eventPolicy = lsst.mwi.policy.Policy(os.path.join(pipelineDir, "policy", "event_policy.paf"))
-    eventPolicy.add("topicName", "triggerImageSubtraction")
-    triggerEventTransmitter = lsst.events.EventTransmitter(eventPolicy)
-    eventPolicy.set("topicName", "shutdownImageSubtraction")
-    shutdownEventTransmitter = lsst.events.EventTransmitter(eventPolicy)
+    triggerEventTransmitter = lsst.events.EventTransmitter(EventHost, "triggerImageSubtraction")
 
     fileListPath = os.path.abspath(getArg(0, defFileList))
     print "File list:", fileListPath
@@ -97,8 +95,7 @@ Notes:
                 sendEvent(templatePath, sciencePath, differencePath, triggerEventTransmitter)
 #    if not options.trial:
 #        print "Sending shutdown event"
-#        rootProperty = mwiData.SupportFactory.createPropertyNode("root");
-#        shutdownEventTransmitter.publish("imageSubtractEventType", rootProperty)
+# the technique has changed and I don't know how to do it...
 
 if __name__ == "__main__":
     main()

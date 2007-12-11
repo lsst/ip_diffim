@@ -1,43 +1,50 @@
 #!/usr/bin/env python
-"""Run the image subtraction pipeline to perform image subtraction on a series of images.
+"""Run the image copy pipeline to copy one image
 """
 from __future__ import with_statement
 
 import os
 import sys
 import optparse
+import shutil
 import subprocess
 import socket
 
 import lsst.mwi.data as mwiData
 import lsst.mwi.utils
-import startPipeline
 
 def main():
+    defInDir = os.environ.get("FWDATA_DIR", "")
     try:
         imageProcDir = os.environ["IMAGEPROC_DIR"]
     except KeyError:
         print "Error: imageproc not setup"
         sys.exit(1)
-    pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageManySubtractPipeline")
-
-    defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
-    defVerbosity = 0
+    pipelineDir = os.path.dirname(os.path.abspath(__file__))
+    sys.path += [os.path.dirname(pipelineDir)]
+    import startPipeline
     
-    usage = """usage: %%prog [options]
-
-Notes:
-- default --policy=%s""" % (defPolicyPath,)
+    defInputPath = os.path.join(defInDir, "871034p_1_MI")
+    defOutputPath = "imageCopy"
+    
+    usage = """usage: %%prog [inputImage [outputImage]]
+    Note:
+    - image arguments are paths to MaskedImage fits files
+    - image arguments must NOT include the final _img.fits
+    - default inputMaskedImage = %s
+    - default outputImage = %s 
+    """ % (defInputPath, defOutputPath)
     
     parser = optparse.OptionParser(usage)
-    parser.add_option("-p", "--policy", default=defPolicyPath, help="policy file")
-    parser.add_option("-v", "--verbosity", type=int, default=defVerbosity,
-        help="verbosity of diagnostic trace messages; default=%s" % (defVerbosity,))
     (options, args) = parser.parse_args()
     
-    policyPath = options.policy
-
-    print "Policy file:", policyPath
+    def getArg(ind, defValue):
+        if ind < len(args):
+            return args[ind]
+        return defValue
+    
+    inputImagePath = os.path.abspath(getArg(0, defInputPath))
+    outputImagePath = os.path.abspath(getArg(3, defOutputPath))
     
     def copyTemplatedConfigFile(templateName, templateDict):
         """Read a templated configuration file, fill it in and write it out.
@@ -57,7 +64,7 @@ Notes:
         with file(outPath, "w") as destFile:
             destFile.write(destText)
     
-    # write configuration files, filling in templates as required
+    # write configuration files, filling in inputs as required
     copyTemplatedConfigFile(
         "nodelist_template.scr",
         dict(
@@ -65,29 +72,22 @@ Notes:
         ),
     )
     copyTemplatedConfigFile(
-        "pipeline_policy_template.paf",
+        "input_policy_template.paf",
         dict(
-            imageSubtractPolicyPath = policyPath,
+            inputImagePath = inputImagePath,
         ),
     )
-    
-    if options.verbosity > 0:
-        print "Verbosity =", options.verbosity
-        lsst.mwi.utils.Trace_setVerbosity("lsst.imageproc", options.verbosity)
+    copyTemplatedConfigFile(
+        "output_policy_template.paf",
+        dict(
+            outputImagePath = outputImagePath,
+        ),
+    )
+
     lsst.mwi.utils.Trace_setVerbosity("dps", 3)
     
-    print """Starting the pipeline.
-Once you see a message like:
-  Python Slice handleEvents rank :  0  - waiting on receive...
-then run feedManySubtractPipeline.py from a new process
-to feed images to the image subtraction pipeline.
-
-Control-C the pipeline when it is done (or you have had enough).
-"""
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
-    startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "imageManySubtractId")
-    # or if you prefer to use a private copy of run.sh...
-    #subprocess.call(os.path.join(pipelineDir, "run.sh"), cwd=pipelineDir)
+    startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "copyPipelineId")
 
 if __name__ == "__main__":
     main()
