@@ -8,7 +8,7 @@ stages of the desired file paths by creating input and output policy files
 from templates.
 
 To use:
-% python runCopyPipeline.py [--help]
+% python imageCopyPipeline/runPipeline.py [--help]
 
 *** Image Subtraction Pipeline
 
@@ -18,7 +18,7 @@ stages of the desired file paths by creating input and output policy files
 from templates.
 
 To use:
-% python runSubtractPipeline.py [--help]
+% python imageSubtractPipeline/runPipeline.py [--help]
 
 *** Image Many Subtract Pipeline
 
@@ -30,9 +30,17 @@ I plan to remove that requirement once I learn how to configure the pipeline app
 To use:
 * Create a file listing the images to subtract.
   For details on the file format run:
-  % python feedManySubtractPipeline.p --help
+  % python imageManySubtractPipeline/feedPipeline.p --help
 * Start the pipeline:
-  % python startManySubtractPipeline.py [--help]
+  % python imageManySubtractPipeline/runPipeline.p --help
 * Wait for the pipeline to start receiving events.
 * Feed the pipeline by running the following from another login:
-  % python feedDManySubtractPipeline.py [--help]
+  % python imageManySubtractPipeline/feedPipeline.p --help
+
+*** Image Subtract and Detect Pipeline
+
+Subtract a list of pairs of images and then run detection on them.
+The list of images is supplied in the same way as "imageManySubtractPipeline"
+and the pipeline is run in the same way except that you may specify two
+policy files: one for image subtraction and one for detection. For details run:
+  % python imageSubtractDetectPipeline/runPipeline.p --help
