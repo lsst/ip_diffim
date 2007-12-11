@@ -5,7 +5,7 @@ import subprocess
 import time
 import lsst.mwi.utils
 
-def startPipeline(nodeList):
+def startPipeline(nodeList, pipelinePolicy, runId):
     """Start pipeline execution
     
     Inputs:
@@ -51,7 +51,8 @@ def startPipeline(nodeList):
     
     lsst.mwi.utils.Trace("dps.startPipeline", 3, "Running mpiexec")
     subprocess.call(
-        ["mpiexec", "-usize", str(nslices), "-machinefile", nodeList, "-np", "1", "runPipeline.py"],
+        ["mpiexec", "-usize", str(nslices), "-machinefile", nodeList, "-np", "1",
+        "runPipeline.py", pipelinePolicy, runId],
         cwd = pipelineDir,
     )
     

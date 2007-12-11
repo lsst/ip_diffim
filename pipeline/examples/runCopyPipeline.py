@@ -86,7 +86,7 @@ def main():
     lsst.mwi.utils.Trace_setVerbosity("dps", 3)
     
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
-    startPipeline.startPipeline(nodeList)
+    startPipeline.startPipeline(nodeList, "policy/pipeline_policy.paf", "copyPipelineId")
     # or if you prefer to use a private copy of run.sh...
     #subprocess.call(os.path.join(pipelineDir, "run.sh"), cwd=pipelineDir)
 

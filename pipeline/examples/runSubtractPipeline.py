@@ -101,7 +101,7 @@ Notes:
         ),
     )
     copyTemplatedConfigFile(
-        os.path.join("policy", "pipeline_policy_template.json"),
+        os.path.join("policy", "pipeline_policy_template.paf"),
         dict(
             imageSubtractPolicyPath = policyPath,
         ),
