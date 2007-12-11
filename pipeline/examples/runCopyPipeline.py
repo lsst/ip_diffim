@@ -71,13 +71,13 @@ def main():
         ),
     )
     copyTemplatedConfigFile(
-        os.path.join("policy", "input_policy_template.paf"),
+        "input_policy_template.paf",
         dict(
             inputImagePath = inputImagePath,
         ),
     )
     copyTemplatedConfigFile(
-        os.path.join("policy", "output_policy_template.paf"),
+        "output_policy_template.paf",
         dict(
             outputImagePath = outputImagePath,
         ),
@@ -86,7 +86,7 @@ def main():
     lsst.mwi.utils.Trace_setVerbosity("dps", 3)
     
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
-    startPipeline.startPipeline(nodeList, "policy/pipeline_policy.paf", "copyPipelineId")
+    startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "copyPipelineId")
     # or if you prefer to use a private copy of run.sh...
     #subprocess.call(os.path.join(pipelineDir, "run.sh"), cwd=pipelineDir)
 

@@ -65,7 +65,7 @@ Notes:
         ),
     )
     copyTemplatedConfigFile(
-        os.path.join("policy", "pipeline_policy_template.paf"),
+        "pipeline_policy_template.paf",
         dict(
             imageSubtractPolicyPath = policyPath,
         ),
@@ -85,7 +85,7 @@ to feed images to the image subtraction pipeline.
 Control-C the pipeline when it is done (or you have had enough).
 """
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
-    startPipeline.startPipeline(nodeList)
+    startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "imageManySubtractId")
     # or if you prefer to use a private copy of run.sh...
     #subprocess.call(os.path.join(pipelineDir, "run.sh"), cwd=pipelineDir)
 

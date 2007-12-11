@@ -1,0 +1,4 @@
+shutdownTopic: "shutdownImageSubtraction"
+appStages: "lsst.dps.IOStage.InputStage" "lsst.imageproc.pipeline.ImageSubtractStage" "lsst.dps.IOStage.OutputStage"
+eventTopics: "triggerImageSubtraction" "None" "None"
+stagePolicies: "input_policy.paf" "%(imageSubtractPolicyPath)s" "output_policy.paf"

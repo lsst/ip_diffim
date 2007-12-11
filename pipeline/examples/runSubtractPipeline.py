@@ -88,20 +88,20 @@ Notes:
         ),
     )
     copyTemplatedConfigFile(
-        os.path.join("policy", "input_policy_template.paf"),
+        "input_policy_template.paf",
         dict(
             scienceExposurePath = sciencePath,
             templateExposurePath = templatePath,
         ),
     )
     copyTemplatedConfigFile(
-        os.path.join("policy", "output_policy_template.paf"),
+        "output_policy_template.paf",
         dict(
             differenceExposurePath = outputPath,
         ),
     )
     copyTemplatedConfigFile(
-        os.path.join("policy", "pipeline_policy_template.paf"),
+        "pipeline_policy_template.paf",
         dict(
             imageSubtractPolicyPath = policyPath,
         ),
@@ -113,7 +113,7 @@ Notes:
     lsst.mwi.utils.Trace_setVerbosity("dps", 3)
     
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
-    startPipeline.startPipeline(nodeList)
+    startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "imageSubtractId")
     # or if you prefer to use a private copy of run.sh...
     #subprocess.call(os.path.join(pipelineDir, "run.sh"), cwd=pipelineDir)
 

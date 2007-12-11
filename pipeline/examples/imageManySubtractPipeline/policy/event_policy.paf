@@ -1,5 +1,0 @@
-# once the pipeline can receive events via local sockets uncomment the next line and comment out the host name
-# (and if the EventTransmitter constructor is improved to allow using local sockets without a policy,
-# or if policy is improved to allow adding booleans, we can skip this silly policy file altogether)
-#useLocalSockets: true
-hostName: lsst8.ncsa.uiuc.edu
