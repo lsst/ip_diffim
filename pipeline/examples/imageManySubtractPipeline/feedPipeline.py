@@ -36,7 +36,7 @@ def main():
     except KeyError:
         print "Error: imageproc not setup"
         sys.exit(1)
-    pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageManySubtractPipeline")
+    pipelineDir = os.path.dirname(os.path.abspath(__file__))
     defFileList = os.path.join(pipelineDir, "fileList.txt")
     
     defVerbosity = 0
