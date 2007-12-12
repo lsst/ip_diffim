@@ -1,0 +1,21 @@
+#<?cfg paf policy ?>
+AdditionalData: "exposureId=triggerVisitEvent.exposureId" "visitId=triggerVisitEvent.visitId"
+OutputItems: {
+   DiaSources: {
+       Required: true
+       StoragePolicy: {
+           Storage: "DbTsvStorage"
+           Location: "mysql://lsst10.ncsa.uiuc.edu:3306/test"
+       }
+   }
+}
+Persistence: {
+   Formatter: {
+       DiaSourceVector: {
+           DiaSources: {
+               templateTableName: "DIASourceTemplate"
+           }
+       }
+   }
+}
+

@@ -1,0 +1,19 @@
+AdditionalData: "exposureId=triggerVisitEvent.exposureId"
+InputItems: {
+    ScienceExposure: {
+        Type: "ExposureF"
+        PythonType: "lsst.fw.Core.fwLib.ExposureF"
+        StoragePolicy: {
+            Storage: "FitsStorage"
+            Location: "/share/lsst9/DC2root/%{runId}/ipd/input/%{exposureId}/%{ccdId}/%{exposureId}p_%{ccdId}"
+        }
+    },
+    TemplateExposure: {
+        Type: "ExposureF"
+        PythonType: "lsst.fw.Core.fwLib.ExposureF"
+        StoragePolicy: {
+            Storage: "FitsStorage"
+            Location: "/share/lsst9/DC2root/%{runId}/ipd/input/%{exposureId}/%{ccdId}/%{exposureId}p_%{ccdId}_tmpl"
+        }
+    }
+}

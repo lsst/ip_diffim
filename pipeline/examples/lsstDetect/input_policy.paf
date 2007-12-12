@@ -1,0 +1,11 @@
+AdditionalData: "exposureId=triggerVisitEvent.exposureId"
+InputItems: {
+    DifferenceExposure: {
+        Type: "ExposureF"
+        PythonType: "lsst.fw.Core.fwLib.ExposureF"
+        StoragePolicy: {
+            Storage: "FitsStorage"
+            Location: "/share/lsst9/DC2root/%{runId}/ipd/output/%{exposureId}/%{ccdId}/%{exposureId}p_%{ccdId}_diff"
+        }
+    },
+}
