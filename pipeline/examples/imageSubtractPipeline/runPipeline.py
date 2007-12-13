@@ -6,23 +6,21 @@ from __future__ import with_statement
 import os
 import sys
 import optparse
-import shutil
 import subprocess
 import socket
 
+import eups
 import lsst.mwi.data as mwiData
 import lsst.mwi.utils
+import lsst.dps.startPipeline
 
 def main():
-    defDataDir = os.environ.get("FWDATA_DIR", "")
-    try:
-        imageProcDir = os.environ["IMAGEPROC_DIR"]
-    except KeyError:
+    defDataDir = eups.productDir("fwData", "setup") or "."
+    imageProcDir = eups.productDir("imageproc", "setup")
+    if imageProcDir == None:
         print "Error: imageproc not setup"
         sys.exit(1)
     pipelineDir = os.path.dirname(os.path.abspath(__file__))
-    sys.path += [os.path.dirname(pipelineDir)]
-    import startPipeline
     
     defSciencePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_1")
     defTemplatePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_1_tmpl")
@@ -114,13 +112,13 @@ Notes:
     lsst.mwi.utils.Trace_setVerbosity("dps", 3)
     
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
-    startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "imageSubtractId")
+    lsst.dps.startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "imageSubtractId")
 
 
 if __name__ == "__main__":
+    memId0 = mwiData.Citizen_getNextMemId()
     main()
     # check for memory leaks
-    memId0 = 0
     if mwiData.Citizen_census(0, memId0) != 0:
         print mwiData.Citizen_census(0, memId0), "Objects leaked:"
         print mwiData.Citizen_census(mwiData.cout, memId0)

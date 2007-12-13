@@ -9,23 +9,21 @@ import optparse
 import subprocess
 import socket
 
+import eups
 import lsst.mwi.data as mwiData
 import lsst.mwi.utils
+import lsst.dps.startPipeline
 
 def main():
-    try:
-        imageProcDir = os.environ["IMAGEPROC_DIR"]
-    except KeyError:
+    imageProcDir = eups.productDir("imageproc", "setup")
+    if imageProcDir == None:
         print "Error: imageproc not setup"
         sys.exit(1)
-    try:
-        detectionDir = os.environ["DETECTION_DIR"]
-    except KeyError:
+    detectionDir = eups.productDir("detection", "setup")
+    if imageProcDir == None:
         print "Error: detection not setup"
         sys.exit(1)
     pipelineDir = os.path.dirname(os.path.abspath(__file__))
-    sys.path += [os.path.dirname(pipelineDir)]
-    import startPipeline
 
     defSubtractionPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
     defDetectionPolicyPath = os.path.join(detectionDir, "pipeline", "DetectionStagePolicy.paf")
@@ -97,12 +95,12 @@ to feed images to the image subtraction pipeline.
 Control-C the pipeline when it is done (or you have had enough).
 """
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
-    startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "runId")
+    lsst.dps.startPipeline.startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "runId")
 
 if __name__ == "__main__":
+    memId0 = mwiData.Citizen_getNextMemId()
     main()
     # check for memory leaks
-    memId0 = 0
     if mwiData.Citizen_census(0, memId0) != 0:
         print mwiData.Citizen_census(0, memId0), "Objects leaked:"
         print mwiData.Citizen_census(mwiData.cout, memId0)
