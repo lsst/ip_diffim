@@ -1,21 +1,22 @@
 #!/usr/bin/env python
+"""Subtract one pair of images.
+"""
 import os
 import sys
 import optparse
 
+import eups
 import lsst.mwi.data as mwiData
 import lsst.fw.Core.fwLib as fw
 import lsst.imageproc
 import lsst.mwi.utils
 
-def runImageSubtract():
+def main():
     defDataDir = os.environ.get("FWDATA_DIR", "")
-    try:
-        imageProcDir = os.environ["IMAGEPROC_DIR"]
-    except KeyError:
+    imageProcDir = eups.productDir("imageproc", "setup")
+    if imageProcDir == None:
         print "Error: imageproc not setup"
         sys.exit(1)
-    pipelineDir = os.path.join(imageProcDir, "pipeline", "examples", "imageSubtractPipeline")
 
     defSciencePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_1")
     defTemplatePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_1_tmpl")
@@ -82,10 +83,9 @@ Notes:
     differenceImage.writeFits(outputPath)
 
 if __name__ == "__main__":
-    runImageSubtract()
-
+    memId0 = mwiData.Citizen_getNextMemId()
+    main()
     # check for memory leaks
-    memId0 = 0
     if mwiData.Citizen_census(0, memId0) != 0:
         print mwiData.Citizen_census(0, memId0), "Objects leaked:"
         print mwiData.Citizen_census(mwiData.cout, memId0)

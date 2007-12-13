@@ -3,17 +3,17 @@ import os
 import sys
 import optparse
 
+import eups
 import lsst.mwi.data as mwiData
 import lsst.fw.Core.fwLib as fw
 import lsst.imageproc.imageprocLib
 import lsst.mwi.utils
 
-def runWcsMatch():
-    defInDir = os.environ.get("FWDATA_DIR", "")
-    moduleDir = os.path.split(__file__)[0]
+def main():
+    defDataDir = os.environ.get("FWDATA_DIR", "")
     
-    defSciencePath = os.path.join(defInDir, "871034p_1_MI")
-    defTemplatePath = os.path.join(defInDir, "871034p_1_MI")
+    defSciencePath = os.path.join(defDataDir, "871034p_1_MI")
+    defTemplatePath = os.path.join(defDataDir, "871034p_1_MI")
     defOutputPath = "remappedImage"
     defKernelType = "lanczos"
     defKernelSize = 5
@@ -72,8 +72,9 @@ def runWcsMatch():
     remapExposure.getMaskedImage().writeFits(outputPath)
 
 if __name__ == "__main__":
-    runWcsMatch()
-    memId0 = 0
+    memId0 = mwiData.Citizen_getNextMemId()
+    main()
+    # check for memory leaks
     if mwiData.Citizen_census(0, memId0) != 0:
         print mwiData.Citizen_census(0, memId0), "Objects leaked:"
         print mwiData.Citizen_census(mwiData.cout, memId0)
