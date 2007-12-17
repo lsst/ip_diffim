@@ -1,6 +1,6 @@
 // -*- lsst-c++ -*-
-#ifndef LSST_Imageproc_ImageSubtract_H
-#define LSST_Imageproc_ImageSubtract_H
+#ifndef LSST_IMAGEPROC_IMAGESUBTRACT_H
+#define LSST_IMAGEPROC_IMAGESUBTRACT_H
 /**
  * \file
  *
@@ -16,9 +16,12 @@
 
 #include <lsst/mwi/policy/Policy.h>
 #include <lsst/fw/Kernel.h>
+#include <lsst/fw/KernelFunctions.h>
 #include <lsst/fw/MaskedImage.h>
 #include <lsst/fw/Function.h>
 #include <lsst/detection/Footprint.h>
+
+#include <lsst/imageproc/PCA.h>
 
 namespace lsst {
 namespace imageproc {
@@ -167,8 +170,4 @@ namespace imageproc {
 
 }} // lsst::imageproc
 
-#ifndef SWIG // don't bother SWIG with .cc files
-#include <lsst/imageproc/ImageSubtract.cc>
-#endif
-
-#endif // !defined(LSST_Imageproc_ImageSubtract_H)
+#endif // !defined(LSST_IMAGEPROC_IMAGESUBTRACT_H)

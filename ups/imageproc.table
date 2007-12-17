@@ -1,6 +1,5 @@
-setupRequired(minuit)
 setupRequired(detection)
-setupRequired(fw)
 setupOptional(dps)
 
+envPrepend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)

@@ -32,8 +32,8 @@
 #include <lsst/fw/PixelAccessors.h>
 #include <lsst/mwi/utils/Trace.h> 
 #include <lsst/fw/WCS.h> 
-#include <lsst/imageproc/wcsMatch.h>
 
+#include "lsst/imageproc/wcsMatch.h"
 
 /** \brief Remap an Exposure to a new WCS.
  *
@@ -273,9 +273,56 @@ lsst::fw::Exposure<ImageT, MaskT> lsst::imageproc::wcsMatch(
 
 } // wcsMatch
 
+/************************************************************************************************************/
+//
 // Explicit instantiations
+//
+typedef float imagePixelType;
 
-// template void lsst::imageproc::wcsMatch<float, lsst::fw::maskPixelType>;
-// template void lsst::imageproc::wcsMatch<double, lsst::fw::maskPixelType>; 
-// template void lsst::imageproc::wcsMatch<boost::uint16_t, lsst::fw::maskPixelType>;
+template
+int lsst::imageproc::wcsMatch(lsst::fw::Exposure<boost::uint16_t, lsst::fw::maskPixelType> &remapExposure,
+                              lsst::fw::Exposure<boost::uint16_t, lsst::fw::maskPixelType> const &origExposure,
+                              std::string const kernelType,
+                              const int kernelCols,
+                              const int kernelRows);
+template
+int lsst::imageproc::wcsMatch(lsst::fw::Exposure<imagePixelType, lsst::fw::maskPixelType> &remapExposure,
+                              lsst::fw::Exposure<imagePixelType, lsst::fw::maskPixelType> const &origExposure,
+                              std::string const kernelType,
+                              const int kernelCols,
+                              const int kernelRows);
 
+template
+lsst::fw::Exposure<boost::uint16_t, lsst::fw::maskPixelType> lsst::imageproc::wcsMatch(
+    int &numEdgePixels,
+    lsst::fw::WCS const &remapWcs,
+    const int numRemapCols,       
+    const int numRemapRows,       
+    lsst::fw::Exposure<boost::uint16_t, lsst::fw::maskPixelType> const &origExposure,
+    std::string const kernelType, 
+    const int kernelCols,  
+    const int kernelRows);
+
+template
+lsst::fw::Exposure<imagePixelType, lsst::fw::maskPixelType> lsst::imageproc::wcsMatch(
+    int &numEdgePixels,
+    lsst::fw::WCS const &remapWcs,
+    const int numRemapCols,       
+    const int numRemapRows,       
+    lsst::fw::Exposure<imagePixelType, lsst::fw::maskPixelType> const &origExposure,
+    std::string const kernelType, 
+    const int kernelCols,  
+    const int kernelRows);
+//
+// Why do we need a double image?
+//
+template
+lsst::fw::Exposure<double, lsst::fw::maskPixelType> lsst::imageproc::wcsMatch(
+    int &numEdgePixels,
+    lsst::fw::WCS const &remapWcs,
+    const int numRemapCols,       
+    const int numRemapRows,       
+    lsst::fw::Exposure<double, lsst::fw::maskPixelType> const &origExposure,
+    std::string const kernelType, 
+    const int kernelCols,  
+    const int kernelRows);

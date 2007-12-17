@@ -25,4 +25,5 @@ else:
 
 tests = lsst.tests.Control(env, args=args, ignoreList=ignoreList, verbose=True)
 tests.run("*.cc")
-tests.run("*.py")
+for target in tests.run("*.py"):
+    env.Depends(target, "../python/lsst/imageproc/_imageprocLib%s" % (env["LDMODULESUFFIX"]))

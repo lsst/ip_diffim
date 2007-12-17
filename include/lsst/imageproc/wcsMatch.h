@@ -54,8 +54,4 @@ namespace imageproc {
        
 }} // namespace fw::lsst
 
-#ifndef SWIG // don't bother SWIG with .cc files
-#include <lsst/imageproc/wcsMatch.cc>
-#endif
-
 #endif // !defined(LSST_FW_wcsMatch_H)

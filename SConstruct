@@ -25,7 +25,8 @@ env = scons.makeEnv("imageproc",
                      ["minuit", "Minuit/FCNBase.h", "lcg_Minuit:C++"],
                      ])
 
-env.libs["imageproc"] = env.getlibs("boost vw fw cfitsio mwi minuit detection")
+env.libs["imageproc"] = ["imageproc"]
+env.libs["imageproc"] += env.getlibs("boost vw fw cfitsio mwi minuit detection")
 env.libs["imageproc"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") fails as lapack isn't in eups
 
 #
@@ -48,6 +49,10 @@ Alias("install", env.Install(env['prefix'] + "/bin", glob.glob("bin/*.py")))
 Alias("install", env.InstallEups(env['prefix'] + "/ups", glob.glob("ups/*.table")))
 
 scons.CleanTree(r"*~ core *.so *.os *.o")
+
+files = scons.filesToTag()
+if files:
+    env.Command("TAGS", files, "etags -o $TARGET $SOURCES")
 
 env.Declare()
 env.Help("""

@@ -1,6 +1,6 @@
 // -*- lsst-c++ -*-
-#ifndef LSST_Imageproc_PCA_H
-#define LSST_Imageproc_PCA_H
+#ifndef LSST_IMAGEPROC_PCA_H
+#define LSST_IMAGEPROC_PCA_H
 /**
  * \file
  *
@@ -21,7 +21,7 @@ namespace imageproc {
     using namespace std;
 
     template <typename aMatrixT, typename aVectorT>
-    void computePca(
+    extern void computePca(
         aVectorT &rowMean,
         aVectorT &eVal,
         aMatrixT &eVec,
@@ -30,14 +30,14 @@ namespace imageproc {
         );
 
     template <typename aMatrixT>
-    void decomposeMatrixUsingBasis(
+    extern void decomposeMatrixUsingBasis(
         aMatrixT &coeff,
         aMatrixT const &M,
         aMatrixT const &eVec
         );
 
     template <typename aMatrixT>
-    void decomposeMatrixUsingBasis(
+    extern void decomposeMatrixUsingBasis(
         aMatrixT &coeff,
         aMatrixT const &M,
         aMatrixT const &eVec,
@@ -45,7 +45,7 @@ namespace imageproc {
         );
 
     template <typename aMatrixT>
-    void approximateMatrixUsingBasis(
+    extern void approximateMatrixUsingBasis(
         aMatrixT &M,
         aMatrixT &eVec,
         aMatrixT &coeff,
@@ -55,9 +55,4 @@ namespace imageproc {
 
 }} // lsst::imageproc
 
-#ifndef SWIG // don't bother SWIG with .cc files
-#include <lsst/imageproc/PCA.cc>
 #endif
-
-#endif // !defined(LSST_Imageproc_PCA_H)
-

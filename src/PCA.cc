@@ -15,9 +15,11 @@
 #include <lsst/mwi/exceptions.h>
 
 #include <vw/Math/Functions.h> 
-#include <vw/Math/LinearAlgebra.h> 
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
+#include <vw/Math/LinearAlgebra.h> 
+
+#include "lsst/imageproc/PCA.h"
 
 using namespace std;
 //#define DEBUG_MATRIX 1
@@ -216,3 +218,49 @@ void lsst::imageproc::approximateMatrixUsingBasis(
         vw::math::select_col(M, i) = cVec;
     }
 }
+
+//
+// Explicit instantiation.  imageprocLib.i requests both float and double; do
+// we really need both?
+//
+template
+void lsst::imageproc::computePca(vw::math::Vector<float> &rowMean,
+                                 vw::math::Vector<float> &eVal,
+                                 vw::math::Matrix<float> &eVec,
+                                 vw::math::Matrix<float> &M, bool subtractMean);
+template
+void lsst::imageproc::computePca(vw::math::Vector<double> &rowMean,
+                                 vw::math::Vector<double> &eVal,
+                                 vw::math::Matrix<double> &eVec,
+                                 vw::math::Matrix<double> &M, bool subtractMean);
+
+template
+void lsst::imageproc::decomposeMatrixUsingBasis(vw::math::Matrix<float> &coeff,
+                                                vw::math::Matrix<float> const &M,
+                                                vw::math::Matrix<float> const &eVec);
+template
+void lsst::imageproc::decomposeMatrixUsingBasis(vw::math::Matrix<double> &coeff,
+                                                vw::math::Matrix<double> const &M,
+                                                vw::math::Matrix<double> const &eVec);
+
+template
+void lsst::imageproc::decomposeMatrixUsingBasis(vw::math::Matrix<float> &coeff,
+                                                vw::math::Matrix<float> const &M,
+                                                vw::math::Matrix<float> const &eVec,
+                                                int nCoeff);
+template
+void lsst::imageproc::decomposeMatrixUsingBasis(vw::math::Matrix<double> &coeff,
+                                                vw::math::Matrix<double> const &M,
+                                                vw::math::Matrix<double> const &eVec,
+                                                int nCoeff);
+
+template
+void lsst::imageproc::approximateMatrixUsingBasis(vw::math::Matrix<float> &coeff,
+                                                  vw::math::Matrix<float> &M,
+                                                  vw::math::Matrix<float> &eVec,
+                                                  int nCoeff);
+template
+void lsst::imageproc::approximateMatrixUsingBasis(vw::math::Matrix<double> &coeff,
+                                                  vw::math::Matrix<double> &M,
+                                                  vw::math::Matrix<double> &eVec,
+                                                  int nCoeff);
