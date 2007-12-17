@@ -45,12 +45,7 @@ int main( int argc, char** argv )
         unsigned int kernelSpatialOrder = policy.getInt("kernelSpatialOrder");
         unsigned int backgroundSpatialOrder = policy.getInt("backgroundSpatialOrder");
 
-        int badMaskBit = policy.getInt("badMaskBit");
-        int edgeMaskBit = policy.getInt("edgeMaskBit");
-        MaskT edgePixelMask = (edgeMaskBit < 0) ? 0 : (1 << edgeMaskBit);
-        MaskT badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
-        badPixelMask |= edgePixelMask;
-        
+       
         // Read input images
         if (argc < 2) {
             cout << "This program takes 2 input images on the command line" << endl;
@@ -79,33 +74,11 @@ int main( int argc, char** argv )
             return 1;
         }
 
-//        /* Make sure the mask planes are there and consistent */
-//        int badMaskBitT = templateMaskedImage.getMask()->getMaskPlane("BAD");
-//        if (badMaskBitT == -1) {
-//            /* It doesn't exist yet */
-//            badMaskBitT = templateMaskedImage.getMask()->addMaskPlane("BAD");
-//        }
-//        int badMaskBitI = scienceMaskedImage.getMask()->getMaskPlane("BAD");
-//        if (badMaskBitI == -1) {
-//            /* It doesn't exist yet */
-//            badMaskBitI = scienceMaskedImage.getMask()->addMaskPlane("BAD");
-//        }
-//        assert(badMaskBitT == badMaskBitI);
-
-//        int edgeMaskBitT = templateMaskedImage.getMask()->getMaskPlane("EDGE");
-//        if (edgeMaskBitT == -1) {
-//            /* It doesn't exist yet */
-//            edgeMaskBitT = templateMaskedImage.getMask()->addMaskPlane("EDGE");
-//        }
-//        int edgeMaskBitI = scienceMaskedImage.getMask()->getMaskPlane("EDGE");
-//        if (edgeMaskBitI == -1) {
-//            /* It doesn't exist yet */
-//            edgeMaskBitI = scienceMaskedImage.getMask()->addMaskPlane("EDGE");
-//        }
-//        assert(edgeMaskBitT == edgeMaskBitI);
-
-
-
+        /* grab mask bits from the image to convolve, since that is what we'll be operating on */
+        int badMaskBit = templateMaskedImage.getMask()->getMaskPlane("BAD");
+        int edgeMaskBit = templateMaskedImage.getMask()->getMaskPlane("EDGE");
+        MaskT badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
+        
         /* Debugging */
 //        lsst::fw::MaskedPixelAccessor<ImageT, MaskT> rowAcc2(templateMaskedImage);
 //        for (unsigned int row = 0; row < templateMaskedImage.getRows(); ++row, rowAcc2.nextRow()) {
