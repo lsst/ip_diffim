@@ -33,7 +33,7 @@ int main( int argc, char** argv )
         t.restart();
 
         // Read in Policy
-        ifstream is("tests/ImageSubtract_policy.paf");
+        ifstream is("pipeline/ImageSubtractStageDictionary.paf");
         lsst::mwi::policy::Policy policy;
         lsst::mwi::policy::paf::PAFParser pp(policy);
         pp.parse(is);
