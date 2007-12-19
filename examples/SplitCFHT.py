@@ -22,13 +22,15 @@ nColPix = int(nColMaskedImage / nColSubexposures)
 extn = 0
 for row in range(nRowSubexposures):
     for col in range(nColSubexposures):
-        bbox = fw.BBox2i(row * nRowPix,
-                         col * nColPix,
-                         nRowPix - 1,
-                         nColPix - 1)
+        bbox = fw.BBox2i(col * nColPix,
+                         row * nRowPix,
+                         nColPix,
+                         nRowPix)
+
 
         outputExposure = inputExposure.getSubExposure(bbox)
+        outputImage = inputMaskedImage.getSubImage(bbox)
         outputFilename = '%s%d' % (inputExposureRoot, extn)
-        print extn, bbox.min().x(), bbox.max().x(), bbox.min().y(), bbox.max().y(), outputFilename
+        print extn, ':', bbox.min().x(), bbox.max().x(), bbox.min().y(), bbox.max().y(), outputFilename
         #outputExposure.writeFits(outputFilename)
         extn += 1
