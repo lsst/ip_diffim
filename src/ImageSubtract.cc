@@ -1153,6 +1153,9 @@ boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > lsst::imageproc::
         kernelColPos.clear();
         kernelRowPos.clear();
         nGood = 0;
+
+        backgroundMeas.clear();
+        backgroundVariances.clear(); 
         bgSum = 0.0;
         for (iDiffImContainer i = diffImContainerList.begin(); i != diffImContainerList.end(); ++i) {
             /* those attributs that you grab once for each container; position and background */
@@ -1172,6 +1175,8 @@ boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > lsst::imageproc::
             }
         }
         
+        /* NOTE - Sigma clip background here, same as kernel sum */
+
         if (nGood == 0) {
             throw lsst::mwi::exceptions::DomainError("No good footprints for spatial kernel and background fitting");
         }
