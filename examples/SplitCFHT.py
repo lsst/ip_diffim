@@ -1,7 +1,7 @@
 import lsst.fw.Core.fwLib as fw
 import sys, os, re
 
-TESTING = True
+TESTING = False
 
 # of the form /share/lsst9/DC2root/RUN0002/ipd/input/705310/01/705310p_01_img.fits
 inputExposureRoot = sys.argv[1]
@@ -19,8 +19,8 @@ if not TESTING:
     inputWCS = fw.WCS(inputMaskedImage.getImage().getMetaData())
     inputExposure = fw.ExposureF(inputMaskedImage, inputWCS)
 
-    nRowSubexposures = int(sys.argv[2]) # 4
-    nColSubexposures = int(sys.argv[3]) # 2
+    nRowSubexposures = 4 # int(sys.argv[2]) # 4
+    nColSubexposures = 2 # int(sys.argv[3]) # 2
     nRowMaskedImage = inputMaskedImage.getRows() # 4644
     nColMaskedImage = inputMaskedImage.getCols() # 2112
     
@@ -63,6 +63,7 @@ for row in range(nRowSubexposures):
 
         if not TESTING:
             outputExposure = inputExposure.getSubExposure(bbox)
-            outputExposure.writeFits(outputFilename)
+            #outputExposure = inputMaskedImage.getSubImage(bbox)
+            outputExposure.writeFits(outputExposureFile)
             
         extn += 1
