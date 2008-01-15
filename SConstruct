@@ -6,7 +6,7 @@ import glob, os.path
 import lsst.SConsUtils as scons
 
 env = scons.makeEnv("imageproc",
-                    r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/tickets/7/SConstruct $",
+                    r"$HeadURL$",
                     [["boost", "boost/version.hpp", "boost_filesystem:C++"],
                      ["boost", "boost/regex.hpp", "boost_regex:C++"],
                      ["vw", "vw/Core.h", "vw:C++"],
