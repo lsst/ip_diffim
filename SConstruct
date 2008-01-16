@@ -46,7 +46,7 @@ Alias("install", env.Install(env['prefix'], "include"))
 Alias("install", env.Install(env['prefix'], "lib"))
 Alias("install", env.Install(env['prefix'], "pipeline"))
 Alias("install", env.Install(env['prefix'] + "/bin", glob.glob("bin/*.py")))
-Alias("install", env.Install(env['prefix'] + "/bin", "examples/SplitCFHT.py"))
+Alias("install", env.Install(env['prefix'] + "/bin", "examples/SplitCFHT2.py"))
 Alias("install", env.InstallEups(env['prefix'] + "/ups", glob.glob("ups/*.table")))
 
 scons.CleanTree(r"*~ core *.so *.os *.o")
