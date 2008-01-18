@@ -2,11 +2,11 @@
 # Default Image Subtraction Policy File
 
 # Write intermediate FITS files? (boolean)
-debugIO: false
+debugIO: true
 
 # Size of the convolution kernel
-kernelRows: 15
-kernelCols: 15
+kernelRows: 11
+kernelCols: 11
 
 # Order of kernel spatial variation
 kernelSpatialOrder: 1
@@ -16,14 +16,17 @@ backgroundSpatialOrder: 1
 
 getCollectionOfFootprintsForPsfMatching: {
     # Minimum number of pixels in an acceptible Footprint
-    footprintDiffimNpixMin: 10
+    footprintDiffimNpixMin: 9
 
     # Grow footprint by this many pixels
-    footprintDiffimGrow: 30
+    footprintDiffimGrow: 20
+
+    # Maximum number of pixels in a Footprint, after growing
+    footprintDiffimNpixAfterGrowMax: 3000
 
     # Detection threshold; eventually put in sigmas
     # $FWDATA_DIR/SM/sme9_10_tmpl as template
-    footprintDetectionThreshold: 15000.0
+    footprintDetectionThreshold: 250.0
 
     # $FWDATA_DIR/SM/sme9_10_im as template
     #footprintDetectionThreshold: 5000.0
@@ -33,10 +36,10 @@ getCollectionOfFootprintsForPsfMatching: {
 
     # How do you change the detection threshold if minimumCleanFootprints not found
     # Make this shallow now for testing; don't want to get too many objects...
-    detectionThresholdScaling: 0.90
+    detectionThresholdScaling: 0.50
 
     # How low can you go
-    minimumDetectionThreshold: 1000.0
+    minimumDetectionThreshold: 125.0
 }
 
 computePsfMatchingKernelForMaskedImage: {
@@ -44,7 +47,7 @@ computePsfMatchingKernelForMaskedImage: {
     maximumFootprintResidualMean: 0.75
 
     # Maximum variance (residual/variance) for an acceptable Kernel; variance should be 1
-    maximumFootprintResidualVariance: 1.5
+    maximumFootprintResidualVariance: 2.0
 
     # Maximum number of sigma in kernel sum for good kernel
     maximumKernelSumNSigma : 3.0
@@ -77,7 +80,7 @@ computePcaKernelBasis: {
     maximumKernelResidualMean: 0.75
 
     # Maximum varaince of residuals when comparing each Kernel to its PCA-derived model
-    maximumKernelResidualVariance: 1.5
+    maximumKernelResidualVariance: 2.0
 }
 
 computeSpatiallyVaryingPsfMatchingKernel: {
@@ -88,5 +91,5 @@ computeSpatiallyVaryingPsfMatchingKernel: {
     maximumSpatialKernelResidualMean: 0.75
 
     # Maximum varaince of residuals when comparing each Kernel to its spatial model
-    maximumSpatialKernelResidualVariance: 1.5
+    maximumSpatialKernelResidualVariance: 2.0
 }

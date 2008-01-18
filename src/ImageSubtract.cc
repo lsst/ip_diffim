@@ -247,6 +247,10 @@ boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > lsst::imageproc::
                 kernelCount   += 1;
             }
         }
+        if (kernelCount == 0) {
+            throw lsst::mwi::exceptions::OutOfRange("No good kernels found");
+        }
+
         kernelSumVector.set_size(kernelCount, true); /* only keep data with entries */
         
         calculateVectorStatistics(kernelSumVector, kSumMean, kSumStdev);
@@ -566,6 +570,7 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::imageproc::getCollectionO
     // Parse the Policy
     unsigned int footprintDiffimNpixMin = policy.getInt("getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin");
     unsigned int footprintDiffimGrow = policy.getInt("getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow");
+    unsigned int footprintDiffimNpixAfterGrowMax = policy.getInt("getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixAfterGrowMax");
     double footprintDetectionThreshold = policy.getDouble("getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold");
     int minimumCleanFootprints = policy.getInt("getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints");
     double detectionThresholdScaling = policy.getDouble("getCollectionOfFootprintsForPsfMatching.detectionThresholdScaling");
@@ -584,7 +589,7 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::imageproc::getCollectionO
     std::vector<lsst::detection::Footprint::PtrType> footprintListOut;
 
     int nCleanFootprints = 0;
-    while ( (nCleanFootprints < minimumCleanFootprints) and (footprintDetectionThreshold > minimumDetectionThreshold) ) {
+    while ( (nCleanFootprints < minimumCleanFootprints) and (footprintDetectionThreshold >= minimumDetectionThreshold) ) {
         footprintListIn.clear();
         footprintListOut.clear();
         
@@ -620,6 +625,12 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::imageproc::getCollectionO
 
                 /* Create a new footprint with grow'd box */
                 lsst::detection::Footprint::PtrType fpGrow(new lsst::detection::Footprint(footprintBBox));
+                
+                /* footprint has too many pixels! */
+                if (static_cast<unsigned int>(fpGrow->getNpix()) > footprintDiffimNpixAfterGrowMax) {
+                    continue;
+                } 
+
                 footprintListOut.push_back(fpGrow);
                 
                 nCleanFootprints += 1;
@@ -707,14 +718,14 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::imageproc::getCollectionO
     footprintList.push_back(fp7);
     
     /* cosmic ray */
-    vw::BBox2i const region9(static_cast<int>(546.657-radius/2),
-                             static_cast<int>(285.079-radius/2),
-                             static_cast<int>(radius),
-                             static_cast<int>(radius));
-    lsst::detection::Footprint::PtrType fp9(
-        new lsst::detection::Footprint(region9)
-        );
-    footprintList.push_back(fp9);
+    //vw::BBox2i const region9(static_cast<int>(546.657-radius/2),
+    //static_cast<int>(285.079-radius/2),
+    //static_cast<int>(radius),
+    //static_cast<int>(radius));
+    //lsst::detection::Footprint::PtrType fp9(
+    //new lsst::detection::Footprint(region9)
+    //);
+    //footprintList.push_back(fp9);
     
     // OR
     //lsst::detection::Footprint *fp4 = new lsst::detection::Footprint(1, region4);
