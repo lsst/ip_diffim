@@ -1,14 +1,12 @@
 import lsst.dps.Stage
 import lsst.mwi.data as D
 import lsst.mwi.persistence as P
+import lsst.fw.Core.fwLib as FW
 
 class VisitMetadataStage(lsst.dps.Stage.Stage):
     def preprocess(self):
         print 'Python VisitMetadataStage preprocess'
         activeClipboard = self.inputQueue.getNextDataset()
-
-        inputDPName = _policy.getString("InputDataProperty")
-        outputDPName = _policy.getString("OutputDataProperty")
 
         inputDP = activeClipboard.get("triggerVisitEvent")
         outputDP = D.SupportFactory.createPropertyNode("visitMetadata")
@@ -21,21 +19,27 @@ class VisitMetadataStage(lsst.dps.Stage.Stage):
             inputDP.findUnique("FOVDec").getValueDouble()))
         outputDP.addProperty(D.createFloatDataProperty("equinox",
             inputDP.findUnique("equinox").getValueDouble()))
-        # \todo Add lookup function
         outputDP.addProperty(D.DataProperty("filterId",
-            lookup(inputDP.findUnique("filterName").getValueString())))
+            _lookup(inputDP.findUnique("filterName").getValueString())))
         outputDP.addProperty(D.DataProperty.createDateTimeDataProperty( \
             "dateObs", \
-            P.DateTime(inputDP.findUnique("visitTime").getValueDouble())
+            P.DateTime(inputDP.findUnique("visitTime").getValueDouble()) \
             ))
-        outputDP.addProperty(D.DataProperty.createFloatDataProperty(
+        outputDP.addProperty(D.DataProperty.createFloatDataProperty( \
             "expTime", inputDP.findUnique("exposureTime").getValueDouble()))
-        outputDP.addProperty(D.DataProperty.createFloatDataProperty(
+        outputDP.addProperty(D.DataProperty.createFloatDataProperty( \
             "airmass", inputDP.findUnique("airmass").getValueDouble()))
 
         activeClipboard.put("visitMetadata", outputDP)
         
         self.outputQueue.addDataset(activeClipboard)
+
+    def _lookup(filterName):
+        dbLocation = P.LogicalLocation( \
+                "mysql://lsst10.ncsa.uiuc.edu:3306/test")
+        filterDB = FW.Filter(dbLocation, filterName)
+        filterId = filterDB.getId()
+        return filterId
 
 # OutputStage Policy
 #
