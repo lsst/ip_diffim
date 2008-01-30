@@ -6,9 +6,9 @@ import lsst.fw.Core.fwLib as FW
 class VisitMetadataStage(lsst.dps.Stage.Stage):
     def preprocess(self):
         print 'Python VisitMetadataStage preprocess'
-        activeClipboard = self.inputQueue.getNextDataset()
+        self.activeClipboard = self.inputQueue.getNextDataset()
 
-        inputDP = activeClipboard.get("triggerVisitEvent")
+        inputDP = self.activeClipboard.get("triggerVisitEvent")
         outputDP = D.SupportFactory.createPropertyNode("visitMetadata")
 
         outputDP.addProperty(D.DataProperty("rawFPAExposureId",
@@ -20,7 +20,7 @@ class VisitMetadataStage(lsst.dps.Stage.Stage):
         outputDP.addProperty(D.DataProperty.createFloatDataProperty("equinox",
             inputDP.findUnique("equinox").getValueDouble()))
         outputDP.addProperty(D.DataProperty("filterId",
-            _lookup(inputDP.findUnique("filterName").getValueString())))
+            self._lookup(inputDP.findUnique("filterName").getValueString())))
         outputDP.addProperty(D.DataProperty.createDateTimeDataProperty( \
             "dateObs", \
             P.DateTime(inputDP.findUnique("visitTime").getValueDouble()) \
@@ -28,13 +28,13 @@ class VisitMetadataStage(lsst.dps.Stage.Stage):
         outputDP.addProperty(D.DataProperty.createFloatDataProperty( \
             "expTime", inputDP.findUnique("exposureTime").getValueDouble()))
         outputDP.addProperty(D.DataProperty.createFloatDataProperty( \
-            "airmass", inputDP.findUnique("airmass").getValueDouble()))
+            "airmass", inputDP.findUnique("airMass").getValueDouble()))
 
-        activeClipboard.put("visitMetadata", outputDP)
+        self.activeClipboard.put("visitMetadata", outputDP)
+
+	# Rely on postprocess() to put the activeClipboard on the outputQueue.
         
-        self.outputQueue.addDataset(activeClipboard)
-
-    def _lookup(filterName):
+    def _lookup(self, filterName):
         dbLocation = P.LogicalLocation( \
                 "mysql://lsst10.ncsa.uiuc.edu:3306/test")
         filterDB = FW.Filter(dbLocation, filterName)
