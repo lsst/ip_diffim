@@ -17,7 +17,7 @@ class VisitMetadataStage(lsst.dps.Stage.Stage):
             inputDP.findUnique("FOVRA").getValueDouble()))
         outputDP.addProperty(D.DataProperty("decl",
             inputDP.findUnique("FOVDec").getValueDouble()))
-        outputDP.addProperty(D.DatProperty.createFloatDataProperty("equinox",
+        outputDP.addProperty(D.DataProperty.createFloatDataProperty("equinox",
             inputDP.findUnique("equinox").getValueDouble()))
         outputDP.addProperty(D.DataProperty("filterId",
             _lookup(inputDP.findUnique("filterName").getValueString())))
