@@ -1,12 +1,12 @@
 // -*- lsst-c++ -*-
 /**
- * \file
+ * @file PCA.cc
  *
- * Implementation of PCA Methods
+ * @brief Implementation of PCA Methods
  *
- * \author Andrew Becker
+ * @author Andrew Becker, University of Washington
  *
- * \ingroup imageproc
+ * @ingroup imageproc
  */
 #include <algorithm>
 #include <iostream>
@@ -24,6 +24,23 @@
 using namespace std;
 //#define DEBUG_MATRIX 1
 
+/** 
+ * @brief Runs a Principal Component Analysis (PCA) on an input Matrix
+ *
+ * Is is assumed that the number of rows is equal to the number of measurements
+ * (e.g. pixels) while the number of columns equals the number of realizations
+ * of each measurement (e.g. PSFs or Kernels).  The data are "centered" if
+ * subtractMean = True by finding the mean of each row.
+ * 
+ * @return The "mean" feature
+ * @return The eigenFeatures
+ * @return The eigenvalues associated with these features
+ *
+ * @throw lsst::mwi::exceptions::InvalidParameter if the input matrices and
+ * vectors are mis-sized
+ *
+ * @ingroup imageproc
+ */
 template <typename aMatrixT, typename aVectorT>
 void lsst::imageproc::computePca(
     aVectorT &rowMean, ///< Ouput : Mean of rows
@@ -35,20 +52,14 @@ void lsst::imageproc::computePca(
     ) {
     double mean;
 
-    // Use LAPACK SVD
-    // http://www.netlib.org/lapack/lug/node32.html
-    // Suggests to me that we use DGESVD or DGESDD (preferred)
-    // Good, gesdd is used in vw/Math/LinearAlgebra.h
-
-    /* Note on the input data :
-
-       M is m x n (row x col)
-         m = number of measurement types (variables, pixels, etc)
-         n = number of realizations (stars, kernels, etc)
-
-         this code will subtract off mean of each row (mean of each measurement ensemble is zero) if requested
+    /* 
+       Currently we use LAPACK SVD
+          http://www.netlib.org/lapack/lug/node32.html
+          Suggests to me that we use DGESVD or DGESDD (preferred)
+       gesdd is used in vw/Math/LinearAlgebra.h
     */
-    // Check output sizes
+
+    /* Check output sizes */
     if (rowMean.size() != M.rows()) {
         throw lsst::mwi::exceptions::InvalidParameter("rowMean size not M.rows()");
     }
@@ -59,7 +70,7 @@ void lsst::imageproc::computePca(
         throw lsst::mwi::exceptions::InvalidParameter("eVec shape does not match M");
     }
 
-    // Subtract off row mean
+    /* Subtract off row mean */
     if (subtractMean) {
         for (unsigned int row = 0; row < M.rows(); ++row) {
             vw::math::Vector<double> mRow = vw::math::select_row(M, row);
@@ -71,11 +82,9 @@ void lsst::imageproc::computePca(
         }
     }
 
-    lsst::mwi::utils::Trace("lsst.imageproc.computePCA", 6, "Test1");
-
-    // All computations here are in double
-    // Cast to aMatrixT and aVectorT after computation
-    // This might be unncessarily inefficient
+    /* All computations here are in double */
+    /* Cast to aMatrixT and aVectorT after computation */
+    /* This might be unncessarily inefficient */
     vw::math::Matrix<double> u, vt;
     vw::math::Vector<double> s;
 #if defined(DEBUG_MATRIX)
@@ -91,8 +100,6 @@ void lsst::imageproc::computePca(
     std::cout<< "#s from PCA" << s << std::endl;
     std::cout<< "#vt from PCA" << vt << std::endl;
 #endif
-
-    lsst::mwi::utils::Trace("lsst.imageproc.computePCA", 6, "Test2");
 
     /* Note on the math :
 
@@ -130,15 +137,15 @@ void lsst::imageproc::computePca(
 
     */
 
-    // Have s represent the eigenvalues; they are already sorted by LAPACK
+    /* Have s represent the eigenvalues; they are already sorted by LAPACK */
     for (unsigned int i = 0; i < s.size(); ++i) {
         eVal[i] = s[i]*s[i];
     }
 
-    // NOTE : when using "svd" as opposed to "complete_svd"
-    //        u is the same shape as M
-    //        rows = number of measurements (pixels)
-    //        cols = number of realizations (stars)
+    /* NOTE : when using "svd" as opposed to "complete_svd" */
+    /*        u is the same shape as M */
+    /*        rows = number of measurements (pixels) */
+    /*        cols = number of realizations (stars) */
     for (unsigned int row = 0; row < eVec.rows(); ++row) {
         for (unsigned int col = 0; col < eVec.cols(); ++col) {
             eVec(row,col) = u(row, col);
@@ -146,10 +153,25 @@ void lsst::imageproc::computePca(
     }
 }
 
+/** 
+ * @brief Decompose data using a set of eigenFeatures.
+ *
+ * Takes the dot-product of an input data matrix with a matrix of orthonormal
+ * basis functions, yielding the coefficients in front of each basis function
+ * needed to recreate the input data.
+ * 
+ * @return Matrix of coefficients resulting from the dot-product of the input
+ * data with the input basis set.
+ *
+ * @throw lsst::mwi::exceptions::InvalidParameter if the input matrices are
+ * mis-sized
+ *
+ * @ingroup imageproc
+ */
 template <typename aMatrixT>
 void lsst::imageproc::decomposeMatrixUsingBasis(
     aMatrixT &coeff,    ///< Output : Fraction of each basis to reconstruct M from eVec in each row, shape M.cols() x M.rows()
-    aMatrixT const &M,  ///< Input : Mean-subtracted data matrix from which eVec was derived.  Rows = variables, columns = instances
+    aMatrixT const &M,  ///< Input : Mean-subtracted data matrix from which eVec was derived.  Nrows = Nvariables, Ncolumns = Ninstances
     aMatrixT const &eVec    ///< Input : Basis vectors in columns
     ) {
     if ((eVec.rows() != M.rows()) || (eVec.cols() != M.cols())) {
@@ -159,18 +181,40 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
         throw lsst::mwi::exceptions::InvalidParameter("coeff shape does not match M transposed");
     }
 
-    // We get all coefficients with a single matrix multiplication
+    /* We get all coefficients with a single matrix multiplication */
     coeff = vw::math::transpose(M) * eVec;
 }
 
+/** 
+ * @brief Decompose data using an incomplete set of eigenFeatures.
+ *
+ * Takes the dot-product of an input data matrix with a subset of the full set
+ * of orthonormal basis functions, yielding the coefficients in front of each
+ * basis function needed to approximate the input data.
+ * 
+ * @return Matrix of coefficients resulting from the dot-product of the input
+ * data with the input basis set.
+ *
+ * @throw lsst::mwi::exceptions::InvalidParameter if the input matrices are
+ * mis-sized
+ *
+ * @throw lsst::mwi::exceptions::InvalidParameter if the user requests more
+ * basis functions than are available
+ *
+ * @note This subroutine was created assuming that it would be faster than the
+ * full decomposeMatrixUsingBasis when the number of coefficients that you want
+ * is much smaller than the amount available
+ * 
+ * @ingroup imageproc
+ */
 template <typename aMatrixT>
 void lsst::imageproc::decomposeMatrixUsingBasis(
     aMatrixT &coeff, ///< Output : Fraction of each basis to reconstruct M from eVec in each row; shape M.cols() x at least nCoeff.
-    aMatrixT const &M,    ///< Input : Mean-subtracted data matrix from which eVec was derived.  Rows = variables, columns = instances.
+    aMatrixT const &M, ///< Input : Mean-subtracted data matrix from which eVec was derived.  Nrows = Nvariables, Ncolumns = Ninstances
     aMatrixT const &eVec, ///< Input : Basis vectors in columns; shape matches M
     int nCoeff      ///< Input : Number of coeffients to go to
     ) {
-    // Maybe more efficient when the number of coefficients you want is much smaller than the matrix
+
     if (nCoeff > static_cast<int>(eVec.cols())) {
         throw lsst::mwi::exceptions::InvalidParameter("nCoeff > eVec.cols()");
     }
@@ -181,7 +225,7 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
         throw lsst::mwi::exceptions::InvalidParameter("coeff.rows() not M.cols()");
     }
 
-    // Do object-by-object
+    /* Do object-by-object */
     for (unsigned int mi = 0; mi < M.cols(); ++mi) {
         vw::math::Vector<double> const mCol = vw::math::select_col(M, mi);
         for (int ei = 0; ei < nCoeff; ++ei) {
@@ -191,6 +235,25 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
     }
 }
 
+/** 
+ * @brief Approximate data using a (possibly incomplete) set of eigenFeatures.
+ *
+ * Uses an input set of orthonormal basis functions, and a set of coefficients
+ * derived from the dot product of these basis functions with input data, to
+ * approximate those data.  The number of coefficients used in reconstruction
+ * can be less than the number available.
+ * 
+ * @return Matrix of approximated features derived from the input basis
+ * functions and coefficeints
+ *
+ * @throw lsst::mwi::exceptions::InvalidParameter if the input matrices are
+ * mis-sized
+ *
+ * @throw lsst::mwi::exceptions::InvalidParameter if the user requests more
+ * basis functions than are available
+ *
+ * @ingroup imageproc
+ */
 template <typename aMatrixT>
 void lsst::imageproc::approximateMatrixUsingBasis(
     aMatrixT &M, ///< Output : Reconstructed input data; each object in columns
@@ -219,10 +282,11 @@ void lsst::imageproc::approximateMatrixUsingBasis(
     }
 }
 
-//
-// Explicit instantiation.  imageprocLib.i requests both float and double; do
-// we really need both?
-//
+/************************************************************************************************************/
+/* Explicit instantiations */
+
+/* imageprocLib.i requests both float and double; do we really need both? */
+
 template
 void lsst::imageproc::computePca(vw::math::Vector<float> &rowMean,
                                  vw::math::Vector<float> &eVal,

@@ -12,7 +12,7 @@ Import("env")
 #env.Program(["testSVD.cc"], LIBS=env.libs["vw"] + ["fw"])
 #env.Program(["testEigen.cc"], LIBS=env.libs["vw"] + ["fw"])
 # crunchy math test programs
-#env.Program(["invertMatrix.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
+env.Program(["invertMatrix.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
 #env.Program(["matrixMath.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
 
 # testing minuit
@@ -24,7 +24,7 @@ Import("env")
 # testing ImageSubtract.cc/.h
 #env.Program(["testImageSubtract0.cc"], LIBS=env.getlibs("imageproc"));
 
-env.Program(["testImageSubtract.cc"], LIBS=env.getlibs("imageproc"));  # object detection; the full deal
+#env.Program(["testImageSubtract.cc"], LIBS=env.getlibs("imageproc"));  # object detection; the full deal
 #env.Program(["testImageSubtract1.cc"], LIBS=env.getlibs("imageproc"));  # test that we recover delta function kernel
 #env.Program(["testImageSubtract2.cc"], LIBS=env.getlibs("imageproc"));  # add DC offset (background)
 #env.Program(["testImageSubtract3.cc"], LIBS=env.getlibs("imageproc"));  # convolve input image, no spatial variation

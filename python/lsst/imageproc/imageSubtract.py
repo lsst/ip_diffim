@@ -1,13 +1,11 @@
 #!/usr/bin/env python
-import os
-import pdb
-import sys
 import numpy as num
-import unittest
 
 import lsst.mwi.utils as mwiu
-import lsst.mwi.data as mwiData
+import lsst.mwi.exceptions as mwex
 import lsst.mwi.policy
+from lsst.mwi.logging import Log
+
 import lsst.fw.Core.fwLib as fw
 import lsst.detection.detectionLib as detection
 import imageprocLib
@@ -15,7 +13,75 @@ from computePsfMatchingKernelForMaskedImage import *
 
 __all__ = ['imageSubtract']
 
-useCCode = 0
+def getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve, policy):
+    # hack until I can append to Vector2i or grow Footprint
+    return imageprocLib.getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve, policy)
+                                                             
+    footprintDiffimNpixMin = policy.get('getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin');
+    footprintDiffimGrow = policy.get('getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow');
+    minimumCleanFootprints = policy.get('getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints');
+    footprintDetectionThresholdSigma = policy.get('getCollectionOfFootprintsForPsfMatching.footprintDetectionThresholdSigma');
+    detectionThresholdScalingSigma = policy.get('getCollectionOfFootprintsForPsfMatching.detectionThresholdScalingSigma');
+    minimumDetectionThresholdSigma = policy.get('getCollectionOfFootprintsForPsfMatching.minimumDetectionThresholdSigma');
+
+    badMaskBit = imageToConvolve.getMask().getPlaneBitMask('BAD')
+    badPixelMask = 1 << badMaskBit
+
+    varImg = imageToConvolve.getVariance()
+    noise = num.sqrt(fw.mean_channel_value(varImg))
+
+    nCleanFootprints = 0
+    while ( (nCleanFootprints < minimumCleanFootprints) and (footprintDetectionThresholdSigma >= minimumDetectionThresholdSigma) ):
+
+        mwiu.Trace('lsst.imageproc.getCollectionOfFootprintsForPsfMatching', 3,
+                   'thresholdSigma = %r; noise = %r; PixMin = %r' % (footprintDetectionThresholdSigma, noise, footprintDiffimNpixMin))
+        detectionSet = detection.DetectionSetF(imageToConvolve,
+                                               detection.Threshold(footprintDetectionThresholdSigma*noise, detection.Threshold.VALUE, True),
+                                               'DIFP',
+                                               footprintDiffimNpixMin)
+        
+        footprintListIn  = detectionSet.getFootprints()
+        footprintListOut = detection.FootprintContainerT()
+        
+        nCleanFootprints = 0
+        for footprintID, iFootprintPtr in enumerate(footprintListIn):
+            footprintBBox = iFootprintPtr.getBBox()
+
+            footprintGrow = footprintBBox.max()
+            print footprintGrow, footprintGrow.__dict__
+            footprintGrow[0] += footprintDiffimGrow
+            footprintGrow[1] += footprintDiffimGrow
+            footprintBBox.grow(footprintGrow)
+            
+            footprintGrow = footprintBBox.min()
+            footprintGrow[0] -= footprintDiffimGrow
+            footprintGrow[1] -= footprintDiffimGrow
+            footprintBBox.grow(footprintGrow)
+
+            try:
+                imageToConvolveFootprintPtr = imageToConvolve.getSubImage(footprintBBox);
+                imageToNotConvolveFootprintPtr = imageToNotConvolve.getSubImage(footprintBBox);
+            except wex.LsstExceptionStack, e:
+                continue
+
+            if ( lsst.imageproc.maskOk(imageToConvolve.getMask(), badPixelMask) and
+                 lsst.imageproc.maskOk(imageToNotConvolve.getMask(), badPixelMask) ):
+
+                footprintGrow = detection.FootprintPtrT(detection.Footprint(footprintBBox))
+                footprintListOut.push_back(fpGrow)
+                
+                nCleanFootprints += 1;
+            
+        mwiu.Trace('lsst.imageproc.getCollectionOfFootprintsForPsfMatching', 3,
+                   'Found %d clean footprints above threshold %.3f' % (footprintListOut.size(), footprintDetectionThresholdSigma*noise))
+        
+        footprintDetectionThresholdSigma -= detectionThresholdScalingSigma
+
+
+    return footprintListOut
+
+            
+        
 
 def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     psfMatchBasisKernelSet=None, footprintList=None):
@@ -58,6 +124,7 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
         | imageToConvolve.getMask().getPlaneBitMask('EDGE')
     edgeMaskBit = imageToConvolve.getMask().getMaskPlane('EDGE')
     debugIO = policy.get('debugIO', False)
+    switchConvolve = policy.get('switchConvolve', False)
     
     mwiu.Trace('lsst.imageproc.imageSubtract', 3,
         'kernelCols = %r; kernelRows = %r' % (kernelCols, kernelRows))
@@ -80,44 +147,29 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     
     # and function for background
     backgroundFunctionPtr = fw.Function2DPtr(fw.PolynomialFunction2D(backgroundSpatialOrder))
-    
-    ###########
-    #
-    # Get good footprints, if not already provided
-    #
+
+    # get Log 
+    diffImLog = Log(Log.getDefaultLog(), "imageproc.imageSubtract")
+
     if footprintList == None:
-        # set detection policy
-        footprintList = imageprocLib.getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve, policy)
-        # trace already in getCollectionOfFootprintsForPsfMatching
-        #mwiu.Trace('lsst.imageproc.imageSubtract', 3, 'Found %d footprints' % len(footprintList))
+        footprintList = getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve, policy)
     else:
         mwiu.Trace('lsst.imageproc.imageSubtract', 3, 'User supplied %d footprints' % len(footprintList))
-    
     mwiu.Trace('lsst.imageproc.imageSubtract', 4, "Computing psf-matching kernel")
 
-    if useCCode:
-        # use c-code
-        # create pointers to output kernel, spatial function and background function
+    if switchConvolve:
+        imageTmp = imageToConvolve
+        imageToConvolve = imageToNotConvolve
+        imageToNotConvolve = imageTmp
 
-        psfMatchKernelPtr = imageprocLib.computePsfMatchingKernelForMaskedImage(
-            kernelSpatialFunctionPtr,
-            backgroundFunctionPtr,
-            imageToConvolve,
-            imageToNotConvolve,
-            psfMatchBasisKernelSet,
-            footprintList,
-            policy,
-        )
-    else:
-        # use python code
-        psfMatchKernelPtr = computePsfMatchingKernelForMaskedImage(
-            kernelSpatialFunctionPtr,
-            backgroundFunctionPtr,
-            imageToConvolve,
-            imageToNotConvolve,
-            psfMatchBasisKernelSet,
-            footprintList,
-            policy,
+    psfMatchKernelPtr = computePsfMatchingKernelForMaskedImage(
+        kernelSpatialFunctionPtr,
+        backgroundFunctionPtr,
+        imageToConvolve,
+        imageToNotConvolve,
+        psfMatchBasisKernelSet,
+        footprintList,
+        policy,
         )
     
     #

@@ -1,15 +1,16 @@
 // -*- lsst-c++ -*-
+/**
+ * @file PCA.h
+ *
+ * @brief Implementation of Principal Component Analysis Math
+ *
+ * @author Andrew Becker, University of Washington
+ *
+ * @ingroup imageproc
+ */
+
 #ifndef LSST_IMAGEPROC_PCA_H
 #define LSST_IMAGEPROC_PCA_H
-/**
- * \file
- *
- * Implementation of Principal Component Analysis Math
- *
- * \author Andrew Becker
- *
- * \ingroup imageproc
- */
 
 #include <vw/Math/LinearAlgebra.h>
 #include <vw/Math/Matrix.h> 
@@ -53,6 +54,6 @@ namespace imageproc {
         );
 
 
-}} // lsst::imageproc
+}}
 
 #endif

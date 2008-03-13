@@ -29,8 +29,8 @@ int main(int argc, char** argv)
         }
     }
     
-    boost::numeric::ublas::matrix<double> I = boost::numeric::ublas::identity_matrix<double>(N, N);
-    m = m + N * I; // now m is not singular
+    //boost::numeric::ublas::matrix<double> I = boost::numeric::ublas::identity_matrix<double>(N, N);
+    //m = m + N * I; // now m is not singular
 
     vw::Matrix<double> Ivw(N,N);
     Ivw.set_identity();
@@ -43,6 +43,15 @@ int main(int argc, char** argv)
     //
     //
     t.restart(); 
+    vw::Matrix<double> Inv1 = vw::math::inverse(mvw);
+    time = t.elapsed(); 
+    cout << "Inverse " << time << "s" << endl; 
+    t.restart();
+    vw::Matrix<double> Inv2 = vw::math::pseudoinverse(mvw);
+    time = t.elapsed(); 
+    cout << "Pseudoinverse " << time << "s" << endl; 
+    return(1);
+
 
     // create a working copy of the input
     boost::numeric::ublas::matrix<double> A(m);

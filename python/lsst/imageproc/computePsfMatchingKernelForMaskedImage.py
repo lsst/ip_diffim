@@ -1,17 +1,14 @@
 #!/usr/bin/env python
-import os
-import pdb
-import sys
 import numpy
-import math
-import unittest
 
-import lsst.mwi.data as mwiData
 import lsst.mwi.policy
+import lsst.mwi.utils as mwiu
+import lsst.mwi.exceptions as mwex
+from lsst.mwi.logging import Log
+
 import lsst.fw.Core.fwLib as fw
 import lsst.detection.detectionLib as detection
-import imageprocLib as imageproc
-import lsst.mwi.utils as mwiu
+import imageprocLib as imageproc # relative import, since this is in __init__.py
 
 __all__ = ['computePsfMatchingKernelForMaskedImage']
 
@@ -59,6 +56,8 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
     kernelCols = policy.get('kernelCols')
     kernelRows = policy.get('kernelRows')
     debugIO = policy.get('debugIO', False)
+
+    diffImLog = Log(Log.getDefaultLog(), "imageproc.computePsfMatchingKernelForMaskedImage")
     
     if GetMaskPlanesFromPolicy:
         badMaskBit = policy.get('badMaskBit')
@@ -96,7 +95,7 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
         ))
     
     kImage = fw.ImageD(kernelCols, kernelRows)
-    diffImContainerList = imageproc.vectorDiffImContainer_D()
+    diffImContainerList = imageproc.vectorDiffImContainerD()
     for footprintID, iFootprintPtr in enumerate(footprintList):
         footprintBBox = iFootprintPtr.getBBox()
         mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 5,
@@ -104,8 +103,8 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
             footprintBBox.min().x(), footprintBBox.min().y(),
             footprintBBox.max().x(), footprintBBox.max().y()))
 
-        imageToConvolveStampPtr = imageToConvolve.getSubImage(footprintBBox)
-        imageToNotConvolveStampPtr  = imageToNotConvolve.getSubImage(footprintBBox)
+        imageToConvolveStampPtr    = imageToConvolve.getSubImage(footprintBBox)
+        imageToNotConvolveStampPtr = imageToNotConvolve.getSubImage(footprintBBox)
 
         if debugIO:
             imageToConvolveStampPtr.writeFits('tFits_%d' % (footprintID,))
@@ -122,98 +121,37 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
             fw.LinearCombinationKernelD(kernelBasisList, kernelCoeffList))
         
         # Structure holding information about this footprint and its fit to a kernel
-        diffImFootprintContainer = imageproc.DiffImContainer_D()
-        diffImFootprintContainer.id = footprintID
-        diffImFootprintContainer.isGood = True
+        diffImFootprintContainer                    = imageproc.DiffImContainerD()
+        diffImFootprintContainer.id                 = footprintID
+        
+        diffImFootprintContainer.setImageToNotConvolve(imageToNotConvolveStampPtr.get())
+        diffImFootprintContainer.setImageToConvolve(imageToConvolveStampPtr.get())
+        diffImFootprintContainer.isGood             = True
         diffImFootprintContainer.diffImFootprintPtr = iFootprintPtr
-        diffImFootprintContainer.diffImKernelPtr = footprintKernelPtr
-        diffImFootprintContainer.background = background
-        diffImFootprintContainer.kSum = footprintKernelPtr.computeImage(kImage, 0.0, 0.0, False)
 
         fpMin = footprintBBox.min()
         fpMax = footprintBBox.max()
         diffImFootprintContainer.colcNorm = (fpMin.x() + fpMax.x()) / 2.0
         diffImFootprintContainer.rowcNorm = (fpMin.y() + fpMax.y()) / 2.0
 
+        # Append to vectors collectively; might want to make this a method on a class to synchronize this
+        diffImFootprintContainer.addKernel(footprintKernelPtr,
+                                           imageproc.MaskedImageDiffimStats(),
+                                           background,
+                                           footprintKernelPtr.computeImage(kImage, 0.0, 0.0, False))
+
         mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 4,
-                   'Developing kernel %d at %d,%d -> %d,%d.  Background = %.3f' % (
+                   'Developing kernel %d at %d,%d -> %d,%d.  Kernel Sum = %.3f, Background = %.3f' % (
             diffImFootprintContainer.id,
             footprintBBox.min().x(), footprintBBox.min().y(),
             footprintBBox.max().x(), footprintBBox.max().y(),
-            diffImFootprintContainer.background,
+            diffImFootprintContainer.kernelSums[diffImFootprintContainer.nKernel],
+            diffImFootprintContainer.backgrounds[diffImFootprintContainer.nKernel],
             ))
 
-        # Calculate the residual of the subtracted image
-        convolvedImageStamp = fw.convolve(
-            imageToConvolveStampPtr.get(),
-            footprintKernelPtr.get(),
-            edgeMaskBit,
-            False,
-        )
+        # Calculate and fill in difference image stats
+        imageproc.computeDiffImStats(diffImFootprintContainer, diffImFootprintContainer.nKernel, policy)
 
-        # Add in background
-        convolvedImageStamp += background
-        if debugIO:
-            kImage.writeFits('kFits_%d.fits' % (footprintID,))
-            convolvedImageStamp.writeFits('cFits_%d' %  (footprintID,))
-        
-        
-        # Do actual subtraction
-        convolvedImageStamp -= imageToNotConvolveStampPtr.get()
-        convolvedImageStamp *= -1.0
-
-        if debugIO:
-            convolvedImageStamp.writeFits('dFits_%d' % (footprintID,))
-
-        # Calculate stats of the difference image
-        nGoodPixels, meanOfResiduals, varianceOfResiduals = imageproc.calculateMaskedImageResiduals(
-            convolvedImageStamp, badPixelMask)
-
-        diffImFootprintContainer.footprintResidualMean = meanOfResiduals
-        diffImFootprintContainer.footprintResidualVariance = varianceOfResiduals/nGoodPixels # per pixel
-        
-        if not numpy.isfinite(diffImFootprintContainer.footprintResidualMean) \
-            or not numpy.isfinite(diffImFootprintContainer.footprintResidualVariance):
-            diffImFootprintContainer.isGood = False
-            mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 4, 
-                       '# Kernel %d (kSum=%.3f), analysis of footprint failed : %.3f %.3f (%d pixels)' % (
-                diffImFootprintContainer.id,
-                diffImFootprintContainer.kSum,
-                diffImFootprintContainer.footprintResidualMean,
-                diffImFootprintContainer.footprintResidualVariance,
-                nGoodPixels,
-                ))
-            
-        elif math.fabs(diffImFootprintContainer.footprintResidualMean) > maximumFootprintResidualMean:
-            diffImFootprintContainer.isGood = False
-            mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 5, 
-                       '# Kernel %d (kSum=%.3f), bad mean residual of footprint : %.3f (%d pixels)' % (
-                diffImFootprintContainer.id,
-                diffImFootprintContainer.kSum,
-                diffImFootprintContainer.footprintResidualMean,
-                nGoodPixels,
-                ))
-            
-        elif diffImFootprintContainer.footprintResidualVariance > maximumFootprintResidualVariance:
-            diffImFootprintContainer.isGood = False
-            mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 4, 
-                       '# Kernel %d (kSum=%.3f), bad residual variance of footprint : %.3f (%d pixels)' % (
-                diffImFootprintContainer.id,
-                diffImFootprintContainer.kSum,
-                diffImFootprintContainer.footprintResidualVariance,
-                nGoodPixels,
-                ))
-
-        else:
-            mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 5, 
-                       'Kernel %d (kSum=%.3f), mean and variance of residuals in footprint : %.3f %.3f (%d pixels)' % (
-                diffImFootprintContainer.id,
-                diffImFootprintContainer.kSum,
-                diffImFootprintContainer.footprintResidualMean,
-                diffImFootprintContainer.footprintResidualVariance,
-                nGoodPixels,
-                ))
-            
         diffImContainerList.append(diffImFootprintContainer)
         
 
@@ -230,38 +168,58 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
         nGoodKernels = 0
         kMeanMean = 0.0
         kMeanVariance = 0.0
-        for ind, diffImContainer in enumerate(diffImContainerList):
-            if not diffImContainer.isGood:
-                continue
-            kernelSumVector[nGoodKernels] = diffImContainer.kSum
-            kMeanMean += diffImContainer.footprintResidualMean
-            kMeanVariance += diffImContainer.footprintResidualVariance
-            nGoodKernels += 1
+
+        for containerID in xrange(len(diffImContainerList)):
+            # for diffImContainer in diffImContainerList: # THIS DOES NOT WORK; NEITHER DOES ENUMERATE
             
-        kSumMean = kernelSumVector[0:nGoodKernels].mean()
-        kSumStdDev = kernelSumVector[0:nGoodKernels].std()
-        kMeanMean /= float(nGoodKernels)
+            if not diffImContainerList[containerID].isGood:
+                continue
+            whichKernel = diffImContainerList[containerID].nKernel
+            
+            kernelSumVector[nGoodKernels] = diffImContainerList[containerID].kernelSums[whichKernel]
+            kMeanMean     += diffImContainerList[containerID].getFootprintResidualMean()
+            kMeanVariance += diffImContainerList[containerID].getFootprintResidualVariance()
+            nGoodKernels  += 1
+
+        if nGoodKernels == 0:
+            raise mwex.LsstOutOfRange("No good kernels found")
+            
+        kSumMean       = kernelSumVector[:nGoodKernels+1].mean()
+        kSumStdDev     = kernelSumVector[:nGoodKernels+1].std()
+        kMeanMean     /= float(nGoodKernels)
         kMeanVariance /= float(nGoodKernels)
         
         # reject kernels with aberrent statistics
         numRejected = 0
-        for diffImContainer in diffImContainerList:
-            if not diffImContainer.isGood:
+        for containerID in xrange(len(diffImContainerList)):
+            if not diffImContainerList[containerID].isGood:
                 continue
-            if math.fabs(diffImContainer.kSum - kSumMean) > (kSumStdDev * maximumKernelSumNSigma):
-                diffImContainer.isGood = False
+            whichKernel = diffImContainerList[containerID].nKernel
+            
+            if numpy.fabs(diffImContainerList[containerID].kernelSums[whichKernel] - kSumMean) > (kSumStdDev * maximumKernelSumNSigma):
+                diffImContainerList[containerID].isGood = False
                 numRejected += 1
                 mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 5, 
                            '# Kernel %d (kSum=%.3f) REJECTED due to bad kernel sum (mean=%.3f, std=%.3f)' %
-                           (diffImContainer.id, diffImContainer.kSum, kSumMean, kSumStdDev))
+                           (diffImContainerList[containerID].id,
+                            diffImContainerList[containerID].kernelSums[whichKernel],
+                            kSumMean, kSumStdDev))
+                diffImLog.log(Log.INFO,
+                              '#Kernel %d (kSum=%.3f) REJECTED due to bad kernel sum (mean=%.3f, std=%.3f)' %
+                              (diffImContainerList[containerID].id,
+                               diffImContainerList[containerID].kernelSums[whichKernel],
+                               kSumMean, kSumStdDev))
 
         mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 4, 
                    'Iteration %d, rejected %d kernels : Kernel Sum = %0.3f (%0.3f); Average Mean Residual = %0.3f; Average Residual Variance = %0.3f' %
                    (iterNum, numRejected, kSumMean, kSumStdDev, kMeanMean, kMeanVariance))
+        diffImLog.log(Log.INFO,
+                      'Iteration %d, rejected %d kernels : Kernel Sum = %0.3f (%0.3f); Average Mean Residual = %0.3f; Average Residual Variance = %0.3f' %
+                      (iterNum, numRejected, kSumMean, kSumStdDev, kMeanMean, kMeanVariance))
 
         if numRejected == 0:
             # rejected all bad kernels; time to quit!
-            break;
+            break
     else:
         mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 3, 
                    'Detection of kernels with deviant kSums reached its limit of %d iterations' % (
@@ -279,5 +237,28 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
         kernelOutBasisList,
         policy,
     )
+
+    # Lets do some debugging here of the kernel sum; first from the good Footprints
+    kernelSums = []
+    for containerID in xrange(len(diffImContainerList)):
+        if not diffImContainerList[containerID].isGood:
+            continue
+        whichKernel = diffImContainerList[containerID].nKernel
+        kernelSums.append( diffImContainerList[containerID].kernelSums[whichKernel] )
+    kernelSumArray = numpy.array(kernelSums)
+    diffImLog.log(Log.INFO,
+                  'Final Kernel Sum from %d Footprints : %0.3f (%0.3f)' % 
+                  (len(kernelSumArray), kernelSumArray.mean(), kernelSumArray.std()))
+        
+        
+    # Next from the corners
+    kernelSums = []
+    for nCol in [0, imageToConvolve.getCols()]:
+        for nRow in [0, imageToConvolve.getRows()]:
+            kernelSums.append( kernelPtr.computeImage(kImage, nCol, nRow, False) )
+    kernelSumArray = numpy.array(kernelSums)
+    diffImLog.log(Log.INFO,
+                  'Final Kernel Sum from Image Corners : %0.3f (%0.3f)' % 
+                  (kernelSumArray.mean(), kernelSumArray.std()))
     
     return kernelPtr

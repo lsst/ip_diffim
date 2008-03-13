@@ -41,6 +41,8 @@ Notes:
     parser.add_option("-p", "--policy", default=defPolicyPath, help="policy file")
     parser.add_option("-d", "--debugIO", action="store_true", default=False,
         help="write diagnostic intermediate files")
+    parser.add_option("-s", "--switchConvolve", action="store_true", default=False,
+        help="switch which image is convolved; still detect on template")
     parser.add_option("-v", "--verbosity", type=int, default=defVerbosity,
         help="verbosity of diagnostic trace messages; 1 for just warnings, more for more information")
     (options, args) = parser.parse_args()
@@ -60,15 +62,17 @@ Notes:
     print "Output image:  ", outputPath
     print "Policy file:   ", policyPath
     
-    templateMaskedImage = fw.MaskedImageD()
+    templateMaskedImage = fw.MaskedImageF()
     templateMaskedImage.readFits(templatePath)
     
-    scienceMaskedImage  = fw.MaskedImageD()
+    scienceMaskedImage  = fw.MaskedImageF()
     scienceMaskedImage.readFits(sciencePath)
     
     policy = lsst.mwi.policy.Policy.createPolicy(policyPath)
     if options.debugIO:
         policy.set("debugIO", True)
+    if options.switchConvolve:
+        policy.set("switchConvolve", True)
     
     if options.verbosity > 0:
         print "Verbosity =", options.verbosity
