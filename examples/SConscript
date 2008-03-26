@@ -8,20 +8,22 @@ import lsst.tests
 
 import lsst.SConsUtils as scons         # scons 1.17 supports "env.ProductDir", but for now use scons.ProductDir
 dataDir = scons.ProductDir("fwData")
-args = dict([
-    ("CFHT2MaskedImage", "%s/871034p_1 %s/871034p_1_MI_unittest" % (dataDir, dataDir)),
-    ])
+args = {
+    "CFHT2MaskedImage" : "%s/871034p_1 %s/871034p_1_MI_unittest" % (dataDir, dataDir),
+}
 #
 # Tests
 #
-if dataDir:
-    ignoreList = [
-        "runImageSubtract.py",
-        "runWcsMatch.py",
+ignoreList = [
+    "runManyImageSubtract.py",
+    "runWcsMatch.py",
+    "SplitCFHT.py",
+    "SplitCFHT2.py",
     ]
-else:
+
+if not dataDir:
     print >> sys.stderr, "fwData is not set up; skipping tests requiring data"
-    ignoreList = args.keys()
+    ignoreList += args.keys()
 
 tests = lsst.tests.Control(env, args=args, ignoreList=ignoreList, verbose=True)
 tests.run("*.cc")

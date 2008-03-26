@@ -86,10 +86,16 @@ Notes:
     )
     differenceImage.writeFits(outputPath)
 
-if __name__ == "__main__":
+def run():
+    from lsst.mwi.logging import Log
+    Log.getDefaultLog()                 # leaks a DataProperty
+    
     memId0 = mwiData.Citizen_getNextMemId()
     main()
     # check for memory leaks
     if mwiData.Citizen_census(0, memId0) != 0:
         print mwiData.Citizen_census(0, memId0), "Objects leaked:"
         print mwiData.Citizen_census(mwiData.cout, memId0)
+
+if __name__ == "__main__":
+    run()

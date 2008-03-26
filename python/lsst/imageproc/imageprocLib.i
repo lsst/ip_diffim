@@ -40,34 +40,32 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DC2/imageproc/ticke
 /* ImageSubtract.h */
 
 %include "lsst/imageproc/ImageSubtract.h"
-%template(DiffImContainerD)                lsst::imageproc::DiffImContainer<float, lsst::fw::maskPixelType, double>;
-%template(vectorDiffImContainerD)          std::vector<lsst::imageproc::DiffImContainer<float, lsst::fw::maskPixelType, double> >;
+%template(DiffImContainerD)                lsst::imageproc::DiffImContainer<float, lsst::fw::maskPixelType>;
+%template(vectorDiffImContainerD)          std::vector<lsst::imageproc::DiffImContainer<float, lsst::fw::maskPixelType> >;
 
 %template(computeDiffImStats)
-    lsst::imageproc::computeDiffImStats<float, lsst::fw::maskPixelType, double>;
+    lsst::imageproc::computeDiffImStats<float, lsst::fw::maskPixelType>;
 %template(computeDiffImStats)
-    lsst::imageproc::computeDiffImStats<double, lsst::fw::maskPixelType, double>;
+    lsst::imageproc::computeDiffImStats<double, lsst::fw::maskPixelType>;
 
 %template(computePsfMatchingKernelForPostageStamp)
-    lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, lsst::fw::maskPixelType, double>;
+    lsst::imageproc::computePsfMatchingKernelForPostageStamp<float, lsst::fw::maskPixelType>;
 %template(computePsfMatchingKernelForPostageStamp)
-    lsst::imageproc::computePsfMatchingKernelForPostageStamp<double, lsst::fw::maskPixelType, double>;
+    lsst::imageproc::computePsfMatchingKernelForPostageStamp<double, lsst::fw::maskPixelType>;
 
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::imageproc::getCollectionOfFootprintsForPsfMatching<float, lsst::fw::maskPixelType>;
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::imageproc::getCollectionOfFootprintsForPsfMatching<double, lsst::fw::maskPixelType>;
 
-%template(computePcaKernelBasis)            lsst::imageproc::computePcaKernelBasis<float, lsst::fw::maskPixelType, double>;
-%template(computePcaKernelBasis)            lsst::imageproc::computePcaKernelBasis<double, lsst::fw::maskPixelType, double>;
+%template(computePcaKernelBasis)            lsst::imageproc::computePcaKernelBasis<float, lsst::fw::maskPixelType>;
+%template(computePcaKernelBasis)            lsst::imageproc::computePcaKernelBasis<double, lsst::fw::maskPixelType>;
 
 %template(computeSpatiallyVaryingPsfMatchingKernel)
-    lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel<float, lsst::fw::maskPixelType, double>;
+    lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel<float, lsst::fw::maskPixelType>;
 %template(computeSpatiallyVaryingPsfMatchingKernel)
-    lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel<double, lsst::fw::maskPixelType, double>;
+    lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel<double, lsst::fw::maskPixelType>;
 
-%template(generateDeltaFunctionKernelSetD)  lsst::imageproc::generateDeltaFunctionKernelSet<double>;
-%template(generateAlardLuptonKernelSetD)    lsst::imageproc::generateAlardLuptonKernelSet<double>;
 %template(maskOk)                           lsst::imageproc::maskOk<lsst::fw::maskPixelType>;
 
 %template(calculateMaskedImageResiduals)

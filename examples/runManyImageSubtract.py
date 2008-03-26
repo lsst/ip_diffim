@@ -84,10 +84,10 @@ Notes:
             differencePath = os.path.abspath(os.path.expandvars(differencePath))
             print "Compute %r = \n  %r - %r" % (differencePath, sciencePath, templatePath)
             
-            templateMaskedImage = fw.MaskedImageD()
+            templateMaskedImage = fw.MaskedImageF()
             templateMaskedImage.readFits(templatePath)
             
-            scienceMaskedImage  = fw.MaskedImageD()
+            scienceMaskedImage  = fw.MaskedImageF()
             scienceMaskedImage.readFits(sciencePath)
 
             if not options.trial:

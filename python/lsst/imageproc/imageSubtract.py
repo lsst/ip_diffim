@@ -140,7 +140,7 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     
     # create basis vectors
     if psfMatchBasisKernelSet == None:
-        psfMatchBasisKernelSet = imageprocLib.generateDeltaFunctionKernelSetD(kernelCols, kernelRows)
+        psfMatchBasisKernelSet = imageprocLib.generateDeltaFunctionKernelSet(kernelCols, kernelRows)
     
     # create function for kernel spatial variation
     kernelSpatialFunctionPtr = fw.Function2DPtr(fw.PolynomialFunction2D(kernelSpatialOrder))
@@ -181,7 +181,7 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     # diffIm -= imageToNotConvolve
     # diffIm *= -1
     #
-    if type(psfMatchKernelPtr.get()) == fw.LinearCombinationKernelD:
+    if type(psfMatchKernelPtr.get()) == fw.LinearCombinationKernel:
         mwiu.Trace('lsst.imageproc.imageSubtract', 4, "Psf-match using convolveLinear")
         differenceImage = fw.convolveLinear(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit)
     else:

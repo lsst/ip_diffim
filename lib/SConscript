@@ -1,9 +1,11 @@
 # -*- python -*-
 Import('env')
 
-env.SharedLibrary(env['eups_product'], map(lambda str: "../src/" + str,
+env.SharedLibraryIncomplete(env['eups_product'], map(lambda str: "../src/" + str,
                                            [
     "ImageSubtract.cc",
     "PCA.cc",
     "wcsMatch.cc",
-                                            ]), LIBS=env.getlibs("mwi fw boost wcslib detection"))
+                                            ])
+                            #, LIBS=env.getlibs("mwi fw boost wcslib detection")
+                            )

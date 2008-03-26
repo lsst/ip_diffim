@@ -96,11 +96,10 @@ int lsst::imageproc::wcsMatch(
     const int kernelRows    ///< kernel size - rows
     )
 {
-    typedef double KernelType;
     int numEdgePixels = 0;
 
     // Create remapping AnalyticKernel of desired type and size.
-    typedef typename lsst::fw::Kernel<KernelType>::KernelFunctionPtrType funcPtrType;
+    typedef typename lsst::fw::Kernel::KernelFunctionPtrType funcPtrType;
     funcPtrType akPtrFcn; ///< analytic kernel pointer function
 
     if (kernelType == "nearest") { 
@@ -118,11 +117,11 @@ int lsst::imageproc::wcsMatch(
     } else if (kernelType == "lanczos") { 
         // 2D Lanczos resampling kernel: radial version.
         int order = (std::min(kernelRows, kernelCols) - 1)/2; 
-        akPtrFcn = funcPtrType(new lsst::fw::function::LanczosFunction2<KernelType>(order));
+        akPtrFcn = funcPtrType(new lsst::fw::function::LanczosFunction2<lsst::fw::Kernel::PixelT>(order));
     } else if (kernelType == "lanczos_separable") { 
         // 2D Lanczos resampling kernel; separable version.
         int order = (std::min(kernelRows, kernelCols) - 1)/2;
-        akPtrFcn = funcPtrType(new lsst::fw::function::LanczosSeparableFunction2<KernelType>(order));
+        akPtrFcn = funcPtrType(new lsst::fw::function::LanczosSeparableFunction2<lsst::fw::Kernel::PixelT>(order));
     } else {
         throw lsst::mwi::exceptions::InvalidParameter(
             boost::format("Invalid kernelType %s") % kernelType);
@@ -132,7 +131,7 @@ int lsst::imageproc::wcsMatch(
             boost::format("kernelType %s not yet implemented") % kernelType);
     }
 
-    lsst::fw::AnalyticKernel<KernelType> remapKernel(akPtrFcn, kernelCols, kernelRows);
+    lsst::fw::AnalyticKernel remapKernel(akPtrFcn, kernelCols, kernelRows);
     lsst::mwi::utils::Trace("lsst.imageproc", 3,
         boost::format("Created analytic kernel of type=%s; cols=%d; rows=%d")
         % kernelType % kernelCols % kernelRows);
@@ -144,8 +143,8 @@ int lsst::imageproc::wcsMatch(
     int rowBorder1 = remapKernel.getRows() - 1 - rowBorder0;
 
     // Create a blank kernel image of the appropriate size and get the accessor to it.
-    lsst::fw::Image<KernelType> kImage(kernelCols, kernelRows);
-    typename vw::ImageView<KernelType>::pixel_accessor kAcc = kImage.origin();
+    lsst::fw::Image<lsst::fw::Kernel::PixelT> kImage(kernelCols, kernelRows);
+    typename vw::ImageView<lsst::fw::Kernel::PixelT>::pixel_accessor kAcc = kImage.origin();
 
     // Get the original MaskedImage and a pixel accessor to it.
     lsst::fw::MaskedImage<ImageT, MaskT> origMI = origExposure.getMaskedImage();
@@ -228,7 +227,7 @@ int lsst::imageproc::wcsMatch(
             double multFac = remapWcs.pixArea(remapPosColRow) / (origWcs.pixArea(origColRow) * kSum);
            
             // Apply remapping kernel to original MaskedImage to compute remapped pixel
-            lsst::fw::kernel::apply<ImageT, MaskT, KernelType>(
+            lsst::fw::kernel::apply<ImageT, MaskT>(
                 remapColAcc, origMiAcc, kAcc, kernelCols, kernelRows);
 
             // multiply the output from apply function by the computed gain here

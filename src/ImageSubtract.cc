@@ -145,12 +145,12 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::imageproc::getCollectionO
  *
  * \ingroup imageproc
  */
-template <typename ImageT, typename MaskT, typename KernelT>
+template <typename ImageT, typename MaskT>
 std::vector<double> lsst::imageproc::computePsfMatchingKernelForPostageStamp(
     double &background, ///< Difference in the backgrounds
     lsst::fw::MaskedImage<ImageT, MaskT> const &imageToConvolve, ///< Image to convolve
     lsst::fw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve, ///< Image to not convolve
-    std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelInBasisList, ///< Input kernel basis set
+    lsst::fw::KernelList<lsst::fw::Kernel> const &kernelInBasisList, ///< Input kernel basis set
     lsst::mwi::policy::Policy &policy ///< Policy directing the behavior
     ) { 
     
@@ -191,7 +191,7 @@ std::vector<double> lsst::imageproc::computePsfMatchingKernelForPostageStamp(
     typename std::vector<boost::shared_ptr<lsst::fw::MaskedImage<ImageT, MaskT> > >::iterator citer = convolvedImageList.begin();
     
     /* Iterator for input kernel basis */
-    typename std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator kiter = kernelInBasisList.begin();
+    std::vector<boost::shared_ptr<lsst::fw::Kernel> >::const_iterator kiter = kernelInBasisList.begin();
     /* Create C_ij in the formalism of Alard & Lupton */
     for (; kiter != kernelInBasisList.end(); ++kiter, ++citer) {
         
@@ -403,9 +403,9 @@ std::vector<double> lsst::imageproc::computePsfMatchingKernelForPostageStamp(
  *
  * @ingroup imageproc
  */
-template <typename ImageT, typename MaskT, typename KernelT>
-std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::computePcaKernelBasis(
-    std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT, KernelT> > &diffImContainerList, ///< List of input footprints
+template <typename ImageT, typename MaskT>
+lsst::fw::KernelList<lsst::fw::Kernel> lsst::imageproc::computePcaKernelBasis(
+    std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT> > &diffImContainerList, ///< List of input footprints
     lsst::mwi::policy::Policy &policy ///< Policy directing the behavior
     ) {
     
@@ -422,9 +422,9 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::com
     double imSum;
     
     /* Image accessor */
-    typedef typename vw::ImageView<KernelT>::pixel_accessor imageAccessorType;
+    typedef typename vw::ImageView<lsst::fw::Kernel::PixelT>::pixel_accessor imageAccessorType;
     /* Iterator over struct */
-    typedef typename std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT, KernelT> >::iterator iDiffImContainer;
+    typedef typename std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT> >::iterator iDiffImContainer;
     
     /* Matrix to invert.  Number of rows = number of pixels; number of columns = number of kernels */
     /* All calculations here are in double */
@@ -453,9 +453,9 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::com
     /*        and that this size is defined in the policy */ 
     unsigned int kernelRows = policy.getInt("kernelRows");
     unsigned int kernelCols = policy.getInt("kernelCols");
-    lsst::fw::Image<KernelT> kImage(kernelCols, kernelRows);
+    lsst::fw::Image<lsst::fw::Kernel::PixelT> kImage(kernelCols, kernelRows);
 
-    std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelPcaBasisList;
+    lsst::fw::KernelList<lsst::fw::Kernel> kernelPcaBasisList;
     
     /* Iterate over PCA inputs until all are good */
     while ( (nIter < maximumIteratonsPCA) and (nReject != 0) ) {
@@ -638,7 +638,7 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::com
         kernelPcaBasisList.clear();
         
         /* Turn the Mean Image into a Kernel */
-        lsst::fw::Image<KernelT> meanImage(nKCols, nKRows);
+        lsst::fw::Image<lsst::fw::Kernel::PixelT> meanImage(nKCols, nKRows);
         imageAccessorType imageAccessorCol(meanImage.origin());
         int mIdx = 0;
         for (unsigned int col = 0; col < nKCols; ++col) {
@@ -650,8 +650,8 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::com
             imageAccessorCol.next_col();
         }
         /* The mean image is the first member of kernelPCABasisList */
-        kernelPcaBasisList.push_back(boost::shared_ptr<lsst::fw::Kernel<KernelT> > 
-                                     (new lsst::fw::FixedKernel<KernelT>(meanImage)));
+        kernelPcaBasisList.push_back(boost::shared_ptr<lsst::fw::Kernel> 
+                                     (new lsst::fw::FixedKernel(meanImage)));
         if (debugIO) {
             meanImage.writeFits( (boost::format("mFits%d.fits") % nIter).str());
         }
@@ -659,7 +659,7 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::com
         /* Turn each eVec into an Image and then into a Kernel */
         /* Dont use all eVec.cols(); only the number of bases that you want */
         for (unsigned int ki = 0; ki < nCoeffToUse; ++ki) { 
-            lsst::fw::Image<KernelT> basisImage(nKCols, nKRows);
+            lsst::fw::Image<lsst::fw::Kernel::PixelT> basisImage(nKCols, nKRows);
             
             /* Not sure how to bulk load information into Image */
             int kIdx = 0;
@@ -676,8 +676,8 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::com
                 imageAccessorCol.next_col();
             }
             /* Add to kernel basis */
-            kernelPcaBasisList.push_back(boost::shared_ptr<lsst::fw::Kernel<KernelT> > 
-                                         (new lsst::fw::FixedKernel<KernelT>(basisImage)));
+            kernelPcaBasisList.push_back(boost::shared_ptr<lsst::fw::Kernel> 
+                                         (new lsst::fw::FixedKernel(basisImage)));
             if (debugIO) {
                 basisImage.writeFits( (boost::format("eFits%d_%d.fits") % nIter % ki).str() );
             }
@@ -700,8 +700,8 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::com
             }        
             
             /* Create a linear combination kernel from this  */
-            boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > pcaKernelPtr(
-                new lsst::fw::LinearCombinationKernel<KernelT>(kernelPcaBasisList, kernelCoefficients)
+            boost::shared_ptr<lsst::fw::LinearCombinationKernel> pcaKernelPtr(
+                new lsst::fw::LinearCombinationKernel(kernelPcaBasisList, kernelCoefficients)
                 );
             
             /* Append to vectors collectively */
@@ -748,12 +748,12 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::com
  *
  * @ingroup imageproc
  */
-template <typename ImageT, typename MaskT, typename KernelT>
-boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel(
+template <typename ImageT, typename MaskT>
+boost::shared_ptr<lsst::fw::LinearCombinationKernel> lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel(
     boost::shared_ptr<lsst::fw::function::Function2<double> > &kernelFunctionPtr, ///< Function for spatial variation of kernel
     boost::shared_ptr<lsst::fw::function::Function2<double> > &backgroundFunctionPtr, ///< Function for spatial variation of background
-    std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT, KernelT> > &diffImContainerList, ///< Information on each kernel
-    std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > const &kernelBasisList, ///< Basis kernel set
+    std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT> > &diffImContainerList, ///< Information on each kernel
+    lsst::fw::KernelList<lsst::fw::Kernel> const &kernelBasisList, ///< Basis kernel set
     lsst::mwi::policy::Policy &policy ///< Policy directing the behavior
     )
 {
@@ -761,9 +761,9 @@ boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > lsst::imageproc::
     unsigned int maximumIterationsSpatialFit = policy.getInt("computeSpatiallyVaryingPsfMatchingKernel.maximumIterationsSpatialFit");
     
     /* Container iterator */
-    typedef typename std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT, KernelT> >::iterator iDiffImContainer;
+    typedef typename std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT> >::iterator iDiffImContainer;
     /* Kernel iterator */
-    typedef typename std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > >::const_iterator iKernelPtr;
+    typedef typename std::vector<boost::shared_ptr<lsst::fw::Kernel> >::const_iterator iKernelPtr;
 
     Log spatialLog(Log::getDefaultLog(), "imageproc.computeSpatiallyVaryingPsfMatchingKernel");
 
@@ -796,12 +796,12 @@ boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > lsst::imageproc::
     /*        and that this size is defined in the policy */ 
     unsigned int kernelRows = policy.getInt("kernelRows");
     unsigned int kernelCols = policy.getInt("kernelCols");
-    lsst::fw::Image<KernelT> kImage(kernelCols, kernelRows);
-    lsst::fw::Image<KernelT> kSpatialImage(kernelCols, kernelRows);
+    lsst::fw::Image<lsst::fw::Kernel::PixelT> kImage(kernelCols, kernelRows);
+    lsst::fw::Image<lsst::fw::Kernel::PixelT> kSpatialImage(kernelCols, kernelRows);
     
     /* Set up the spatially varying kernel */
-    boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > spatiallyVaryingKernelPtr(
-        new lsst::fw::LinearCombinationKernel<KernelT>(kernelBasisList, kernelFunctionPtr));
+    boost::shared_ptr<lsst::fw::LinearCombinationKernel> spatiallyVaryingKernelPtr(
+        new lsst::fw::LinearCombinationKernel(kernelBasisList, kernelFunctionPtr));
     
     /* Iterate over inputs until both the kernel model and the background model converge */
     while ( (nIter < maximumIterationsSpatialFit) and (nReject != 0) ) {
@@ -983,9 +983,9 @@ boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > lsst::imageproc::
     return spatiallyVaryingKernelPtr;
 }
 
-template <typename ImageT, typename MaskT, typename KernelT>
+template <typename ImageT, typename MaskT>
 void lsst::imageproc::computeDiffImStats(
-    lsst::imageproc::DiffImContainer<ImageT, MaskT, KernelT> &diffImContainer,
+    lsst::imageproc::DiffImContainer<ImageT, MaskT> &diffImContainer,
     int const kernelID,
     lsst::mwi::policy::Policy &policy
     ) {
@@ -1013,7 +1013,7 @@ void lsst::imageproc::computeDiffImStats(
     bool debugIO = policy.getBool("debugIO", false);
     unsigned int kernelRows = policy.getInt("kernelRows");
     unsigned int kernelCols = policy.getInt("kernelCols");
-    lsst::fw::Image<KernelT> kImage(kernelCols, kernelRows);
+    lsst::fw::Image<lsst::fw::Kernel::PixelT> kImage(kernelCols, kernelRows);
 
     lsst::fw::MaskedImage<ImageT, MaskT>
         convolvedImageStamp = lsst::fw::kernel::convolve(*(diffImContainer.imageToConvolve),
@@ -1123,8 +1123,8 @@ void lsst::imageproc::computeDiffImStats(
  *
  * @ingroup imageproc
  */
-template <typename KernelT>
-std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::generateDeltaFunctionKernelSet(
+lsst::fw::KernelList<lsst::fw::Kernel>
+lsst::imageproc::generateDeltaFunctionKernelSet(
     unsigned int nCols, ///< Number of colunms in the basis kernels
     unsigned int nRows  ///< Number of rows in the basis kernels
     )
@@ -1134,7 +1134,7 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::gen
     }
     const int signedNCols = static_cast<int>(nCols);
     const int signedNRows = static_cast<int>(nRows);
-    std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelBasisList;
+    lsst::fw::KernelList<lsst::fw::Kernel> kernelBasisList;
     int colCtr = (signedNCols - 1) / 2;
     int rowCtr = (signedNRows - 1) / 2;
     for (int row = 0; row < signedNRows; ++row) {
@@ -1143,12 +1143,12 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::gen
         for (int col = 0; col < signedNCols; ++col) {
             double x = static_cast<double>(col - colCtr);
             
-            typename lsst::fw::Kernel<KernelT>::KernelFunctionPtrType kfuncPtr(
-                new lsst::fw::function::IntegerDeltaFunction2<KernelT>(x, y)
+            lsst::fw::Kernel::KernelFunctionPtrType kfuncPtr(
+                new lsst::fw::function::IntegerDeltaFunction2<lsst::fw::Kernel::PixelT>(x, y)
                 );
             
-            boost::shared_ptr<lsst::fw::Kernel<KernelT> > kernelPtr(
-                new lsst::fw::AnalyticKernel<KernelT>(kfuncPtr, nCols, nRows)
+            boost::shared_ptr<lsst::fw::Kernel> kernelPtr(
+                new lsst::fw::AnalyticKernel(kfuncPtr, nCols, nRows)
                 );
             
             kernelBasisList.push_back(kernelPtr);
@@ -1169,8 +1169,8 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::gen
  *
  * @ingroup imageproc
  */
-template <typename KernelT>
-std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::generateAlardLuptonKernelSet(
+lsst::fw::KernelList<lsst::fw::Kernel>
+lsst::imageproc::generateAlardLuptonKernelSet(
     unsigned int nRows, ///< Number of rows in the kernel basis
     unsigned int nCols, ///< Number of columns in the kernel basis
     std::vector<double> const &sigGauss, ///< Width of gaussians in basis; size = number of Gaussians
@@ -1181,7 +1181,8 @@ std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > lsst::imageproc::gen
         throw lsst::mwi::exceptions::DomainError("nRows and nCols must be positive");
     }
     throw lsst::mwi::exceptions::DomainError("Not implemented");
-    std::vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelBasisList;
+
+    lsst::fw::KernelList<lsst::fw::Kernel> kernelBasisList;
     return kernelBasisList;
 }
 
@@ -1375,21 +1376,19 @@ void lsst::imageproc::addFunction(
 /************************************************************************************************************/
 /* Explicit instantiations */
 
-typedef double kernelType;
-
 template
 std::vector<double> lsst::imageproc::computePsfMatchingKernelForPostageStamp(
     double &background,
     lsst::fw::MaskedImage<float, lsst::fw::maskPixelType> const &imageToConvolve,
     lsst::fw::MaskedImage<float, lsst::fw::maskPixelType> const &imageToNotConvolve,
-    std::vector<boost::shared_ptr<lsst::fw::Kernel<kernelType> > > const &kernelInBasisList,
+    lsst::fw::KernelList<lsst::fw::Kernel> const &kernelInBasisList,
     lsst::mwi::policy::Policy &policy);
 template
 std::vector<double> lsst::imageproc::computePsfMatchingKernelForPostageStamp(
     double &background,
     lsst::fw::MaskedImage<double, lsst::fw::maskPixelType> const &imageToConvolve,
     lsst::fw::MaskedImage<double, lsst::fw::maskPixelType> const &imageToNotConvolve,
-    std::vector<boost::shared_ptr<lsst::fw::Kernel<kernelType> > > const &kernelInBasisList,
+    lsst::fw::KernelList<lsst::fw::Kernel> const &kernelInBasisList,
     lsst::mwi::policy::Policy &policy);
 
 template
@@ -1404,39 +1403,28 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::imageproc::getCollectionO
     lsst::mwi::policy::Policy &policy);
 
 template 
-std::vector<boost::shared_ptr<lsst::fw::Kernel<kernelType> > > lsst::imageproc::computePcaKernelBasis(
-    std::vector<lsst::imageproc::DiffImContainer<float, lsst::fw::maskPixelType, kernelType> > &diffImContainerList,
+lsst::fw::KernelList<lsst::fw::Kernel> lsst::imageproc::computePcaKernelBasis(
+    std::vector<lsst::imageproc::DiffImContainer<float, lsst::fw::maskPixelType> > &diffImContainerList,
     lsst::mwi::policy::Policy &policy);
 template 
-std::vector<boost::shared_ptr<lsst::fw::Kernel<kernelType> > > lsst::imageproc::computePcaKernelBasis(
-    std::vector<lsst::imageproc::DiffImContainer<double, lsst::fw::maskPixelType, kernelType> > &diffImContainerList,
+lsst::fw::KernelList<lsst::fw::Kernel> lsst::imageproc::computePcaKernelBasis(
+    std::vector<lsst::imageproc::DiffImContainer<double, lsst::fw::maskPixelType> > &diffImContainerList,
     lsst::mwi::policy::Policy &policy);
 
 template 
-boost::shared_ptr<lsst::fw::LinearCombinationKernel<kernelType> > lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel(
+boost::shared_ptr<lsst::fw::LinearCombinationKernel> lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel(
     boost::shared_ptr<lsst::fw::function::Function2<double> > &kernelFunctionPtr,
     boost::shared_ptr<lsst::fw::function::Function2<double> > &backgroundFunctionPtr,
-    std::vector<lsst::imageproc::DiffImContainer<float, lsst::fw::maskPixelType, kernelType> > &diffImContainerList,
-    std::vector<boost::shared_ptr<lsst::fw::Kernel<kernelType> > > const &kernelBasisList,
+    std::vector<lsst::imageproc::DiffImContainer<float, lsst::fw::maskPixelType> > &diffImContainerList,
+    lsst::fw::KernelList<lsst::fw::Kernel> const &kernelBasisList,
     lsst::mwi::policy::Policy &policy);
 template 
-boost::shared_ptr<lsst::fw::LinearCombinationKernel<kernelType> > lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel(
+boost::shared_ptr<lsst::fw::LinearCombinationKernel> lsst::imageproc::computeSpatiallyVaryingPsfMatchingKernel(
     boost::shared_ptr<lsst::fw::function::Function2<double> > &kernelFunctionPtr,
     boost::shared_ptr<lsst::fw::function::Function2<double> > &backgroundFunctionPtr,
-    std::vector<lsst::imageproc::DiffImContainer<double, lsst::fw::maskPixelType, kernelType> > &diffImContainerList,
-    std::vector<boost::shared_ptr<lsst::fw::Kernel<kernelType> > > const &kernelBasisList,
+    std::vector<lsst::imageproc::DiffImContainer<double, lsst::fw::maskPixelType> > &diffImContainerList,
+    lsst::fw::KernelList<lsst::fw::Kernel> const &kernelBasisList,
     lsst::mwi::policy::Policy &policy);
-
-template
-std::vector<boost::shared_ptr<lsst::fw::Kernel<kernelType> > > lsst::imageproc::generateDeltaFunctionKernelSet(
-    unsigned int nCols,
-    unsigned int nRows);
-template
-std::vector<boost::shared_ptr<lsst::fw::Kernel<kernelType> > > lsst::imageproc::generateAlardLuptonKernelSet(
-    unsigned int nCols,
-    unsigned int nRows,
-    std::vector<double> const &sigGauss,
-    std::vector<double> const &degGauss);
 
 template
 bool lsst::imageproc::maskOk(

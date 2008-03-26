@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Test lsst.imageproc.imageprocLib.wcsMatch
 
@@ -34,7 +35,6 @@ InputSciMaskedImageName = "871034p_1_MI"
 SwarpedMaskedImageName = "small_MISwarp"
 RemappedMaskedImageName = "871034p_1_MIRemapped"
 
-currDir = os.path.abspath(os.path.dirname(__file__))
 inFilePathOrig = os.path.join(dataDir, InputOrigMaskedImageName)
 inFilePathSci = os.path.join(dataDir, InputSciMaskedImageName)
 inFilePathSwarp = os.path.join(dataDir, SwarpedMaskedImageName)
@@ -96,16 +96,16 @@ class wcsMatchTestCase(unittest.TestCase):
         and the remapped MaskedImage yield the same RA/Decl on the
         sky. 
         """
-        improc.wcsMatch(self.remapExposure, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows, self.threshold)
+        improc.wcsMatch(self.remapExposure, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows)
 
         # try the origin
         colRow = fw.Coord2D(0,0)
-        origRaDec = origWcs.colRowToRaDec(colRow)
-        remapWcs = remapExposure.getWcs()
+        origRaDec = self.origWcs.colRowToRaDec(colRow)
+        remapWcs = self.remapExposure.getWcs()
         remapRaDec = remapWcs.colRowToRaDec(colRow)
 
         self.assertAlmostEqual(origRaDec.x(), remapRaDec.x())
-        self.assertAlmostequal(origRaDec.y(), remapRaDec.y())
+        self.assertAlmostEqual(origRaDec.y(), remapRaDec.y())
 
         # try a random location
         colRow1 = fw.Coord2D(0,21)
@@ -113,7 +113,7 @@ class wcsMatchTestCase(unittest.TestCase):
         remapRaDec1 = remapWcs.colRowToRaDec(colRow1)
 
         self.assertAlmostEqual(origRaDec1.x(), remapRaDec1.x())
-        self.assertAlmostequal(origRaDec1.y(), remapRaDec1.y())
+        self.assertAlmostEqual(origRaDec1.y(), remapRaDec1.y())
 
 
     def xtestWcsMatchVoidSwarp(self):
@@ -128,7 +128,7 @@ class wcsMatchTestCase(unittest.TestCase):
         and the remapped MaskedImage yield the same RA/Decl on the
         sky.  
         """
-        improc.wcsMatch(self.remapExposure, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows, self.threshold)
+        improc.wcsMatch(self.remapExposure, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows)
 
         swarpMaskedImage = fw.MaskedImageD()
         swarpMaskedImage.readFits(inFilePathSwarp)
@@ -143,7 +143,7 @@ class wcsMatchTestCase(unittest.TestCase):
         remapRaDec = remapWcs.colRowToRaDec(colRow)
 
         self.assertAlmostEqual(swarpRaDec.x(), remapRaDec.x())
-        self.assertAlmostequal(swarpRaDec.y(), remapRaDec.y())
+        self.assertAlmostEqual(swarpRaDec.y(), remapRaDec.y())
 
         # try a random location
         colRow1 = fw.Coord2D(12,21)
@@ -151,7 +151,7 @@ class wcsMatchTestCase(unittest.TestCase):
         remapRaDec1 = remapWcs.colRowToRaDec(colRow1)
 
         self.assertAlmostEqual(swarpRaDec1.x(), remapRaDec1.x())
-        self.assertAlmostequal(swarpRaDec1.y(), remapRaDec1.y())
+        self.assertAlmostEqual(swarpRaDec1.y(), remapRaDec1.y())
 
                     
     def xtestWcsMatchOverloadEasy(self):
@@ -170,7 +170,8 @@ class wcsMatchTestCase(unittest.TestCase):
         remapCols = remapMaskedImage.getCols()
         remapRows = remapMaskedImage.getRows()
 
-        newRemapExposure = improc.wcsMatch(remapWcs, remapCols, remapRows, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows, self.threshold)
+        newRemapExposure = improc.wcsMatch(remapWcs, remapCols, remapRows, self.origExposure,
+                                           self.kernelType, self.kernelCols, self.kernelRows)
 
         # try the origin
         colRow = fw.Coord2D(0,0)
@@ -179,7 +180,7 @@ class wcsMatchTestCase(unittest.TestCase):
         newRemapRaDec = newRemapWcs.colRowToRaDec(colRow)
 
         self.assertAlmostEqual(origRaDec.x(), newRemapRaDec.x())
-        self.assertAlmostequal(origRaDec.y(), newRemapRaDec.y())
+        self.assertAlmostEqual(origRaDec.y(), newRemapRaDec.y())
 
         # try a random location
         colRow1 = fw.Coord2D(21,12)
@@ -187,7 +188,7 @@ class wcsMatchTestCase(unittest.TestCase):
         newRemapRaDec1 = newRemapWcs.colRowToRaDec(colRow1)
 
         self.assertAlmostEqual(origRaDec1.x(), newRemapRaDec1.x())
-        self.assertAlmostequal(origRaDec1.y(), newRemapRaDec1.y())
+        self.assertAlmostEqual(origRaDec1.y(), newRemapRaDec1.y())
 
 
     def xtestWcsMatchOverloadSwarp(self):
@@ -207,7 +208,7 @@ class wcsMatchTestCase(unittest.TestCase):
         remapCols = remapMaskedImage.getCols()
         remapRows = remapMaskedImage.getRows()
 
-        newRemapExposure = improc.wcsMatch(remapWcs, remapCols, remapRows, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows, self.threshold)
+        newRemapExposure = improc.wcsMatch(remapWcs, remapCols, remapRows, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows)
 
         swarpMaskedImage = fw.MaskedImageD()
         swarpMaskedImage.readFits(inFilePathSwarp)
@@ -222,7 +223,7 @@ class wcsMatchTestCase(unittest.TestCase):
         newRemapRaDec = newRemapWcs.colRowToRaDec(colRow)
 
         self.assertAlmostEqual(swarpRaDec.x(), newRemapRaDec.x())
-        self.assertAlmostequal(swarpRaDec.y(), newRemapRaDec.y())
+        self.assertAlmostEqual(swarpRaDec.y(), newRemapRaDec.y())
 
         # try a random location
         colRow1 = fw.Coord2D(12,21)
@@ -230,7 +231,7 @@ class wcsMatchTestCase(unittest.TestCase):
         newRemapRaDec1 = newRemapWcs.colRowToRaDec(colRow1)
 
         self.assertAlmostEqual(swarpRaDec1.x(), newRemapRaDec1.x())
-        self.assertAlmostequal(swarpRaDec1.y(), newRemapRaDec1.y())
+        self.assertAlmostEqual(swarpRaDec1.y(), newRemapRaDec1.y())
         
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -246,5 +247,9 @@ def suite():
 
     return unittest.TestSuite(suites)
 
+def run(exit=False):
+    """Run the tests"""
+    tests.run(suite(), exit)
+
 if __name__ == "__main__":
-    tests.run(suite())
+    run(True)

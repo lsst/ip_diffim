@@ -117,8 +117,8 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
             kernelBasisList,
             policy,
         )
-        footprintKernelPtr = fw.LinearCombinationKernelDPtr(
-            fw.LinearCombinationKernelD(kernelBasisList, kernelCoeffList))
+        footprintKernelPtr = fw.LinearCombinationKernelPtr(
+            fw.LinearCombinationKernel(kernelBasisList, kernelCoeffList))
         
         # Structure holding information about this footprint and its fit to a kernel
         diffImFootprintContainer                    = imageproc.DiffImContainerD()
