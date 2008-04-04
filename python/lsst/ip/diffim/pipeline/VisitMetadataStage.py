@@ -1,23 +1,23 @@
-import lsst.dps.Stage
-import lsst.mwi.data as D
-import lsst.mwi.persistence as P
-import lsst.fw.Core.fwLib as FW
+import lsst.pex.harness.Stage
+import lsst.daf.base as D
+import lsst.daf.persistence as P
+import lsst.afw.Core.fwLib as FW
 
-class VisitMetadataStage(lsst.dps.Stage.Stage):
+class VisitMetadataStage(lsst.pex.harness.Stage.Stage):
     def preprocess(self):
         print 'Python VisitMetadataStage preprocess'
         self.activeClipboard = self.inputQueue.getNextDataset()
 
         inputDP = self.activeClipboard.get("triggerVisitEvent")
 
-        visitDP = D.SupportFactory.createPropertyNode("visit2exposure")
+        visitDP = D.DataProperty.createPropertyNode("visit2exposure")
         visitDP.addProperty(D.DataProperty("visitId",
             inputDP.findUnique("visitId").getValueInt()))
         visitDP.addProperty(D.DataProperty.createInt64DataProperty(
             "exposureId", inputDP.findUnique("exposureId").getValueInt() << 1))
         self.activeClipboard.put("visit2exposure", visitDP)
 
-        outputDP = D.SupportFactory.createPropertyNode("rawFPAExposure")
+        outputDP = D.DataProperty.createPropertyNode("rawFPAExposure")
 
         outputDP.addProperty(D.DataProperty.createInt64DataProperty(
             "rawFPAExposureId",

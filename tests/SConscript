@@ -1,41 +1,41 @@
 # -*- python -*-
 Import("env")
 
-#env.Program(["lsstimageproc01.cc"], LIBS=env.libs["vw"] + ["fw"] + ["fitsio"])
+#env.Program(["lsstimageproc01.cc"], LIBS=env.libs["vw"] + ["afw"] + ["fitsio"])
 ## lsstimageproc02.cc is just pseudo-code
 
 # basic test programs
-#env.Program(["testCode.cc"], LIBS=env.getlibs("imageproc"))
-#env.Program(["testKernel.cc"], LIBS=env.libs["vw"] + ["fw"])
+#env.Program(["testCode.cc"], LIBS=env.getlibs("ip_diffim"))
+#env.Program(["testKernel.cc"], LIBS=env.libs["vw"] + ["afw"])
 
 # testing matrix math
-#env.Program(["testSVD.cc"], LIBS=env.libs["vw"] + ["fw"])
-#env.Program(["testEigen.cc"], LIBS=env.libs["vw"] + ["fw"])
+#env.Program(["testSVD.cc"], LIBS=env.libs["vw"] + ["afw"])
+#env.Program(["testEigen.cc"], LIBS=env.libs["vw"] + ["afw"])
 # crunchy math test programs
 if False:                               # fails to compile for RHL
-    env.Program(["invertMatrix.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
-#env.Program(["matrixMath.cc"], LIBS=env.libs["boost"] + ["fw"] + ["vw"])
+    env.Program(["invertMatrix.cc"], LIBS=env.libs["boost"] + ["afw"] + ["vw"])
+#env.Program(["matrixMath.cc"], LIBS=env.libs["boost"] + ["afw"] + ["vw"])
 
 # testing minuit
-#env.Program(["testMinuit.cc"], LIBS=env.libs["vw"] + ["fw"] + ["mwi"] + env.libs["minuit"])
+#env.Program(["testMinuit.cc"], LIBS=env.libs["vw"] + ["afw"] + ["daf_base"] + [pex_logging] + env.libs["minuit"])
 
-#env.Program(["testDetection.cc"], LIBS=env.getlibs("imageproc"));  # object detection
-#env.Program(["testDetection2.cc"], LIBS=env.getlibs("imageproc"));  # object detection
+#env.Program(["testDetection.cc"], LIBS=env.getlibs("ip_diffim"));  # object detection
+#env.Program(["testDetection2.cc"], LIBS=env.getlibs("ip_diffim"));  # object detection
 
 # testing ImageSubtract.cc/.h
-#env.Program(["testImageSubtract0.cc"], LIBS=env.getlibs("imageproc"));
+#env.Program(["testImageSubtract0.cc"], LIBS=env.getlibs("ip_diffim"));
 
-#env.Program(["testImageSubtract.cc"], LIBS=env.getlibs("imageproc"));  # object detection; the full deal
-#env.Program(["testImageSubtract1.cc"], LIBS=env.getlibs("imageproc"));  # test that we recover delta function kernel
-#env.Program(["testImageSubtract2.cc"], LIBS=env.getlibs("imageproc"));  # add DC offset (background)
-#env.Program(["testImageSubtract3.cc"], LIBS=env.getlibs("imageproc"));  # convolve input image, no spatial variation
-#env.Program(["testImageSubtract4.cc"], LIBS=env.getlibs("imageproc"));  #                     , spatial variation
-#env.Program(["testImageSubtract5.cc"], LIBS=env.getlibs("imageproc"));  # multiply the image
-#env.Program(["testImageSubtract6.cc"], LIBS=env.getlibs("imageproc"));  # multiply image, add bg, convolve
+#env.Program(["testImageSubtract.cc"], LIBS=env.getlibs("ip_diffim"));  # object detection; the full deal
+#env.Program(["testImageSubtract1.cc"], LIBS=env.getlibs("ip_diffim"));  # test that we recover delta function kernel
+#env.Program(["testImageSubtract2.cc"], LIBS=env.getlibs("ip_diffim"));  # add DC offset (background)
+#env.Program(["testImageSubtract3.cc"], LIBS=env.getlibs("ip_diffim"));  # convolve input image, no spatial variation
+#env.Program(["testImageSubtract4.cc"], LIBS=env.getlibs("ip_diffim"));  #                     , spatial variation
+#env.Program(["testImageSubtract5.cc"], LIBS=env.getlibs("ip_diffim"));  # multiply the image
+#env.Program(["testImageSubtract6.cc"], LIBS=env.getlibs("ip_diffim"));  # multiply image, add bg, convolve
 
 import lsst.tests
 
 tests = lsst.tests.Control(env, ignoreList=[])
 
 for target in tests.run("*.py"):
-    env.Depends(target, "../python/lsst/imageproc/_imageprocLib%s" % (env["LDMODULESUFFIX"]))
+    env.Depends(target, "../python/lsst/ip/diffim/_ip_diffimLib%s" % (env["LDMODULESUFFIX"]))

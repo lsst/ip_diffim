@@ -1,16 +1,16 @@
-import lsst.fw.Core.fwLib as fw
-import lsst.dps.Stage
-import lsst.imageproc
-#from lsst.imageproc.imageSubtract import imageSubtract
+import lsst.afw.Core.fwLib as afw
+import lsst.pex.harness.Stage
+import lsst.ip.diffim
+#from lsst.ip.diffim.imageSubtract import imageSubtract
 
 __all__ = ["ImageSubtractStage"]
 
-class ImageSubtractStage(lsst.dps.Stage.Stage):
+class ImageSubtractStage(lsst.pex.harness.Stage.Stage):
     def process(self):
         print 'Python ImageSubtractStage process : _rank %i stageId %d' % (self._rank, self.stageId)
         activeClipboard = self.inputQueue.getNextDataset()
 
-#        lsst.mwi.utils.Trace_setVerbosity("lsst.imageproc", 5)
+#        lsst.pex.logging.Trace_setVerbosity("lsst.ip.diffim", 5)
 
         ###########
         #
@@ -28,7 +28,7 @@ class ImageSubtractStage(lsst.dps.Stage.Stage):
 #        for key in activeClipboard.getKeys():
 #            print "* %s: %r" % (key, activeClipboard.get(key))
 
-        differenceImage, psfMatchingKernelPtr, backgroundFunctionPtr = lsst.imageproc.imageSubtract(
+        differenceImage, psfMatchingKernelPtr, backgroundFunctionPtr = lsst.ip.diffim.imageSubtract(
             imageToConvolve = templateMaskedImage,
             imageToNotConvolve = scienceMaskedImage,
             policy = self._policy,

@@ -12,20 +12,20 @@ import optparse
 import socket
 import time
 
-import lsst.mwi.data as mwiData
-import lsst.mwi.policy
-import lsst.mwi.utils
-import lsst.events
+import lsst.daf.base as dafBase
+import lsst.pex.policy
+import lsst.pex.logging
+import lsst.ctrl.events
 
 EventHost = "lsst8.ncsa.uiuc.edu"
 
 def sendEvent(templatePath, sciencePath, differencePath, eventTransmitter):
-    rootProperty = mwiData.SupportFactory.createPropertyNode("root");
+    rootProperty = dafBase.SupportFactory.createPropertyNode("root");
 
-    rootProperty.addProperty(mwiData.DataProperty("visitId", 1)) # this may be required
-    rootProperty.addProperty(mwiData.DataProperty("sciencePath", sciencePath))
-    rootProperty.addProperty(mwiData.DataProperty("templatePath", templatePath))
-    rootProperty.addProperty(mwiData.DataProperty("differencePath", differencePath))
+    rootProperty.addProperty(dafBase.DataProperty("visitId", 1)) # this may be required
+    rootProperty.addProperty(dafBase.DataProperty("sciencePath", sciencePath))
+    rootProperty.addProperty(dafBase.DataProperty("templatePath", templatePath))
+    rootProperty.addProperty(dafBase.DataProperty("differencePath", differencePath))
 
     eventTransmitter.publish("imageSubtractEventType", rootProperty)
 
@@ -66,7 +66,7 @@ Notes:
             return args[ind]
         return defValue
 
-    triggerEventTransmitter = lsst.events.EventTransmitter(EventHost, "triggerImageSubtraction")
+    triggerEventTransmitter = lsst.ctrl.events.EventTransmitter(EventHost, "triggerImageSubtraction")
 
     fileListPath = os.path.abspath(getArg(0, defFileList))
     print "File list:", fileListPath
@@ -101,6 +101,6 @@ if __name__ == "__main__":
     main()
     # check for memory leaks
     memId0 = 0
-    if mwiData.Citizen_census(0, memId0) != 0:
-        print mwiData.Citizen_census(0, memId0), "Objects leaked:"
-        print mwiData.Citizen_census(mwiData.cout, memId0)
+    if dafBase.Citizen_census(0, memId0) != 0:
+        print dafBase.Citizen_census(0, memId0), "Objects leaked:"
+        print dafBase.Citizen_census(dafBase.cout, memId0)

@@ -4,10 +4,10 @@ import sys
 import optparse
 
 import eups
-import lsst.mwi.data as mwiData
-import lsst.fw.Core.fwLib as fw
-import lsst.imageproc.imageprocLib
-import lsst.mwi.utils
+import lsst.daf.base as dafBase
+import lsst.afw.Core.afwLib as afw
+import lsst.ip.diffim.imageprocLib
+import lsst.pex.logging
 
 def main():
     defDataDir = os.environ.get("FWDATA_DIR", "")
@@ -54,17 +54,17 @@ def main():
     print "Remapping masked image  ", originalPath
     print "to match wcs and size of", remapPath
     
-    originalExposure = fw.ExposureD()
+    originalExposure = afw.ExposureD()
     originalExposure.readFits(originalPath)
     
-    remapExposure  = fw.ExposureD()
+    remapExposure  = afw.ExposureD()
     remapExposure.readFits(remapPath)
     
     if opt.verbosity > 0:
         print "Verbosity =", opt.verbosity
-        lsst.mwi.utils.Trace_setVerbosity("lsst.imageproc", opt.verbosity)
+        lsst.pex.logging.Trace_setVerbosity("lsst.ip.diffim", opt.verbosity)
     
-    numEdgePixels = lsst.imageproc.imageprocLib.wcsMatch(
+    numEdgePixels = lsst.ip.diffim.imageprocLib.wcsMatch(
         remapExposure, originalExposure, opt.kernelType, opt.kernelSize, opt.kernelSize)
     print "Remapped masked image has %s edge pixels" % (numEdgePixels)
     
@@ -72,9 +72,9 @@ def main():
     remapExposure.getMaskedImage().writeFits(outputPath)
 
 if __name__ == "__main__":
-    memId0 = mwiData.Citizen_getNextMemId()
+    memId0 = dafBase.Citizen_getNextMemId()
     main()
     # check for memory leaks
-    if mwiData.Citizen_census(0, memId0) != 0:
-        print mwiData.Citizen_census(0, memId0), "Objects leaked:"
-        print mwiData.Citizen_census(mwiData.cout, memId0)
+    if dafBase.Citizen_census(0, memId0) != 0:
+        print dafBase.Citizen_census(0, memId0), "Objects leaked:"
+        print dafBase.Citizen_census(dafBase.cout, memId0)

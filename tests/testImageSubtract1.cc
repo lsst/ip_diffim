@@ -2,17 +2,17 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include <lsst/fw/MaskedImage.h>
-#include <lsst/fw/Kernel.h>
-#include <lsst/fw/FunctionLibrary.h>
+#include <lsst/afw/MaskedImage.h>
+#include <lsst/afw/Kernel.h>
+#include <lsst/afw/FunctionLibrary.h>
 
-#include <lsst/mwi/data/Citizen.h>
-#include <lsst/mwi/exceptions/Exception.h>
-#include <lsst/mwi/utils/Trace.h>
-#include <lsst/mwi/policy/Policy.h>
-#include <lsst/mwi/policy/paf/PAFParser.h>
+#include <lsst/daf/base/Citizen.h>
+#include <lsst/pex/exceptions/Exception.h>
+#include <lsst/pex/logging/Trace.h>
+#include <lsst/pex/policy/Policy.h>
+#include <lsst/pex/policy/paf/PAFParser.h>
 
-#include <lsst/imageproc/ImageSubtract.h>
+#include <lsst/ip/diffim/ImageSubtract.h>
 
 #define DEBUG_IO 1
 
@@ -21,17 +21,17 @@ using namespace std;
 int main( int argc, char** argv )
 {
     {
-        lsst::mwi::utils::Trace::setVerbosity("lsst.imageproc", 4);
+        lsst::pex::logging::Trace::setVerbosity("lsst.ip.diffim", 4);
         
-        typedef lsst::fw::maskPixelType MaskT;
+        typedef lsst::afw::maskPixelType MaskT;
         typedef float ImageT; // have to make sure this jibes with the input data!
         typedef double KernelT;
         typedef double FuncT;
 
         // Read in Policy
         ifstream is("tests/ImageSubtract_policy.paf");
-        lsst::mwi::policy::Policy p;
-        lsst::mwi::policy::paf::PAFParser pp(p);
+        lsst::pex::policy::Policy p;
+        lsst::pex::policy::paf::PAFParser pp(p);
         pp.parse(is);
         is.close();
 
@@ -51,33 +51,33 @@ int main( int argc, char** argv )
             exit(1);
         }
         string inputImage = argv[1];
-        lsst::fw::MaskedImage<ImageT, MaskT> scienceMaskedImage;
+        lsst::afw::MaskedImage<ImageT, MaskT> scienceMaskedImage;
         scienceMaskedImage.readFits(inputImage);
 
-        lsst::fw::MaskedImage<ImageT, MaskT> templateMaskedImage;
+        lsst::afw::MaskedImage<ImageT, MaskT> templateMaskedImage;
         templateMaskedImage.readFits(inputImage);
         
         // Generate basis of delta functions for kernel
-        vector<boost::shared_ptr<lsst::fw::Kernel<KernelT> > > kernelBasisVec =
-            lsst::imageproc::generateDeltaFunctionKernelSet<KernelT>(kernelCols, kernelRows);
+        vector<boost::shared_ptr<lsst::afw::Kernel<KernelT> > > kernelBasisVec =
+            lsst::ip::diffim::generateDeltaFunctionKernelSet<KernelT>(kernelCols, kernelRows);
         
         // Function for spatially varying kernel.  Make null here for this test.
-        boost::shared_ptr<lsst::fw::function::Function2<FuncT> > kernelFunctionPtr(
-            new lsst::fw::function::PolynomialFunction2<FuncT>(kernelSpatialOrder)
+        boost::shared_ptr<lsst::afw::function::Function2<FuncT> > kernelFunctionPtr(
+            new lsst::afw::function::PolynomialFunction2<FuncT>(kernelSpatialOrder)
             );
         
         // Function for spatially varying background.  
-        boost::shared_ptr<lsst::fw::function::Function2<FuncT> > backgroundFunctionPtr(
-            new lsst::fw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
+        boost::shared_ptr<lsst::afw::function::Function2<FuncT> > backgroundFunctionPtr(
+            new lsst::afw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
             );
         
         // Use hard-coded positions for now
         vector<lsst::detection::Footprint::PtrType> footprintList =
-            lsst::imageproc::getCollectionOfMaskedImagesForPsfMatching();
+            lsst::ip::diffim::getCollectionOfMaskedImagesForPsfMatching();
         
         
-        boost::shared_ptr<lsst::fw::LinearCombinationKernel<KernelT> > kernelPtr =
-            lsst::imageproc::computePsfMatchingKernelForMaskedImage(
+        boost::shared_ptr<lsst::afw::LinearCombinationKernel<KernelT> > kernelPtr =
+            lsst::ip::diffim::computePsfMatchingKernelForMaskedImage(
                 kernelFunctionPtr, backgroundFunctionPtr,
                 templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintList, p);
     }

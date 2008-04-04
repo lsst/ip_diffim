@@ -1,8 +1,8 @@
-import lsst.dps.Stage
+import lsst.pex.harness.Stage
 
 __all__ = ["ImageCopyStage"]
 
-class ImageCopyStage(lsst.dps.Stage.Stage):
+class ImageCopyStage(lsst.pex.harness.Stage.Stage):
     """A simple stage to test running an image processing pipeline.
     
     This stage simply copies "inputImage" on input to "outputImage" on output

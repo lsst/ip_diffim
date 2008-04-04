@@ -1,4 +1,4 @@
-import lsst.fw.Core.fwLib as fw
+import lsst.afw.Core.afwLib as afw
 import sys, os, re, os.path
 import optparse
 
@@ -33,10 +33,10 @@ cl.add_option("-d", "--indir", type="string", action="store", dest="indir",
 def splitImage(inimg, outdir, baseimg, start=1):
 
     if not TESTING:
-        inputMaskedImage = fw.MaskedImageF()
+        inputMaskedImage = afw.MaskedImageF()
         inputMaskedImage.readFits(inimg)
-        inputWCS = fw.WCS(inputMaskedImage.getImage().getMetaData())
-        inputExposure = fw.ExposureF(inputMaskedImage, inputWCS)
+        inputWCS = afw.WCS(inputMaskedImage.getImage().getMetaData())
+        inputExposure = afw.ExposureF(inputMaskedImage, inputWCS)
 
         nRowSubexposures = 4 # int(sys.argv[2]) # 4
         nColSubexposures = 2 # int(sys.argv[3]) # 2
@@ -72,7 +72,7 @@ def splitImage(inimg, outdir, baseimg, start=1):
             out = os.path.join(out, "".join([baseimg,"_",extn]))
             print '# Writing', "".join([baseimg,"_",extn])
         
-            bbox = fw.BBox2i(col * nColPix,
+            bbox = afw.BBox2i(col * nColPix,
                              row * nRowPix,
                              nColPix,
                              nRowPix)

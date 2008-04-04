@@ -28,7 +28,7 @@ int main( int argc, char** argv )
     cout << endl << "COLS > ROWS" << endl;
     cout << M2 << endl;
 
-    lsst::imageproc::computePCA(M2, rowMean2, eVal2, eVec2);
+    lsst::ip::diffim::computePCA(M2, rowMean2, eVal2, eVec2);
     
     for (unsigned int i = 0; i < eVec2.cols(); i++) {
         cout << "Eval " << i << " : " << eVal2[i] << endl;
@@ -55,10 +55,10 @@ int main( int argc, char** argv )
         coeff2.set_size(colsN2, i);
 
         cout << " N coeff = " << i << endl;
-        lsst::imageproc::decomposeMatrixUsingBasis(M2, eVec2, i, coeff2);
+        lsst::ip::diffim::decomposeMatrixUsingBasis(M2, eVec2, i, coeff2);
         cout << " Coeff : " << endl;
         cout << "  " << coeff2 << endl;
-        lsst::imageproc::approximateMatrixUsingBasis(eVec2, coeff2, i, M2a);
+        lsst::ip::diffim::approximateMatrixUsingBasis(eVec2, coeff2, i, M2a);
         cout << " Out   : " << endl;
         cout << "  " << M2a << endl;
         cout << " Diff  : " << endl;
@@ -83,7 +83,7 @@ int main( int argc, char** argv )
     cout << endl << "ROWS > COLS" << endl;
     cout << M3 << endl;
 
-    lsst::imageproc::computePCA(M3, rowMean3, eVal3, eVec3);
+    lsst::ip::diffim::computePCA(M3, rowMean3, eVal3, eVec3);
     
     for (unsigned int i = 0; i < eVec3.cols(); i++) {
         cout << "Eval " << i << " : " << eVal3[i] << endl;
@@ -109,10 +109,10 @@ int main( int argc, char** argv )
         coeff3.set_size(colsN3, i);
 
         cout << " N coeff = " << i << endl;
-        lsst::imageproc::decomposeMatrixUsingBasis(M3, eVec3, i, coeff3);
+        lsst::ip::diffim::decomposeMatrixUsingBasis(M3, eVec3, i, coeff3);
         cout << " Coeff : " << endl;
         cout << "  " << coeff3 << endl;
-        lsst::imageproc::approximateMatrixUsingBasis(eVec3, coeff3, i, M3a);
+        lsst::ip::diffim::approximateMatrixUsingBasis(eVec3, coeff3, i, M3a);
         cout << " Out   : " << endl;
         cout << "  " << M3a << endl;
         cout << " Diff  : " << endl;

@@ -1,6 +1,6 @@
 // -*- lsst-c++ -*-
-#ifndef LSST_Imageproc_MaskPlanes_H
-#define LSST_Imageproc_MaskPlanes_H
+#ifndef LSST_Ip_Diffim_MaskPlanes_H
+#define LSST_Ip_Diffim_MaskPlanes_H
 
 #include <map>
 #include <string>
@@ -9,7 +9,8 @@ typedef std::map<std::string, int> strIntMap;
 typedef std::pair<std::string, int> strIntPair;
 
 namespace lsst {
-namespace imageproc {
+namespace ip {
+namespace diffim {
         
     strIntMap MaskPlanes;
     MaskPlanes.insert(strIntPair{"BAD",   0}); /* For non-LSST data, not entirely sure why data are bad */
@@ -19,5 +20,6 @@ namespace imageproc {
     MaskPlanes.insert(strIntPair{"EDGE",  4}); /* Pixel is too close to the edge of the image, e.g. during convolution */
 }
 }
+}
         
-#endif // !defined(LSST_Imageproc_MaskPlanes_H)
+#endif // !defined(LSST_Ip_Diffim_MaskPlanes_H)

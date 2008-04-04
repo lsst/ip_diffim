@@ -7,5 +7,5 @@ env.SharedLibraryIncomplete(env['eups_product'], map(lambda str: "../src/" + str
     "PCA.cc",
     "wcsMatch.cc",
                                             ])
-                            #, LIBS=env.getlibs("mwi fw boost wcslib detection")
+                            #, LIBS=env.getlibs("daf_base pex_policy afw boost wcslib detection")
                             )

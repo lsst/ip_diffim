@@ -1,10 +1,10 @@
 // -*- lsst-c++ -*-
-#include "lsst/fw/MaskedImage.h"
-#include "lsst/fw/Trace.h"
-#include "lsst/fw/DataProperty.h"
+#include "lsst/afw/MaskedImage.h"
+#include "lsst/pex/logging/Trace.h"
+#include "lsst/daf/base/DataProperty.h"
 
 using namespace std;
-using namespace lsst::fw;
+using namespace lsst::afw;
 
 template <typename ImagePixelT, typename MaskPixelT> 
 class synthesizeCfhtPixProcFunc : public PixelProcessingFunc<ImagePixelT, MaskPixelT> {

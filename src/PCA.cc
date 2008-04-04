@@ -6,20 +6,20 @@
  *
  * @author Andrew Becker, University of Washington
  *
- * @ingroup imageproc
+ * @ingroup diffim
  */
 #include <algorithm>
 #include <iostream>
 
-#include <lsst/mwi/utils/Trace.h>
-#include <lsst/mwi/exceptions.h>
+#include <lsst/pex/logging/Trace.h>
+#include <lsst/pex/exceptions.h>
 
 #include <vw/Math/Functions.h> 
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
 #include <vw/Math/LinearAlgebra.h> 
 
-#include "lsst/imageproc/PCA.h"
+#include "lsst/ip/diffim/PCA.h"
 
 using namespace std;
 //#define DEBUG_MATRIX 1
@@ -36,13 +36,13 @@ using namespace std;
  * @return The eigenFeatures
  * @return The eigenvalues associated with these features
  *
- * @throw lsst::mwi::exceptions::InvalidParameter if the input matrices and
+ * @throw lsst::pex::exceptions::InvalidParameter if the input matrices and
  * vectors are mis-sized
  *
- * @ingroup imageproc
+ * @ingroup diffim
  */
 template <typename aMatrixT, typename aVectorT>
-void lsst::imageproc::computePca(
+void lsst::ip::diffim::computePca(
     aVectorT &rowMean, ///< Ouput : Mean of rows
     aVectorT &eVal, ///< Output : Sorted Eigenvalues
     aMatrixT &eVec, ///< Output : Eigenvectors sorted by their eigenvalues
@@ -61,13 +61,13 @@ void lsst::imageproc::computePca(
 
     /* Check output sizes */
     if (rowMean.size() != M.rows()) {
-        throw lsst::mwi::exceptions::InvalidParameter("rowMean size not M.rows()");
+        throw lsst::pex::exceptions::InvalidParameter("rowMean size not M.rows()");
     }
     if (eVal.size() != M.cols()) {
-        throw lsst::mwi::exceptions::InvalidParameter("eVal size not M.cols()");
+        throw lsst::pex::exceptions::InvalidParameter("eVal size not M.cols()");
     }
     if ((eVec.rows() != M.rows()) || (eVec.cols() != M.cols())) {
-        throw lsst::mwi::exceptions::InvalidParameter("eVec shape does not match M");
+        throw lsst::pex::exceptions::InvalidParameter("eVec shape does not match M");
     }
 
     /* Subtract off row mean */
@@ -93,7 +93,7 @@ void lsst::imageproc::computePca(
     try {
         vw::math::svd(M, u, s, vt);
     } catch (std::exception e) {
-        throw lsst::mwi::exceptions::Runtime(std::string("in vw::math::complete_svd"));
+        throw lsst::pex::exceptions::Runtime(std::string("in vw::math::complete_svd"));
     }
 #if defined(DEBUG_MATRIX)
     std::cout<< "#u from PCA" << u << std::endl;
@@ -163,22 +163,22 @@ void lsst::imageproc::computePca(
  * @return Matrix of coefficients resulting from the dot-product of the input
  * data with the input basis set.
  *
- * @throw lsst::mwi::exceptions::InvalidParameter if the input matrices are
+ * @throw lsst::pex::exceptions::InvalidParameter if the input matrices are
  * mis-sized
  *
- * @ingroup imageproc
+ * @ingroup diffim
  */
 template <typename aMatrixT>
-void lsst::imageproc::decomposeMatrixUsingBasis(
+void lsst::ip::diffim::decomposeMatrixUsingBasis(
     aMatrixT &coeff,    ///< Output : Fraction of each basis to reconstruct M from eVec in each row, shape M.cols() x M.rows()
     aMatrixT const &M,  ///< Input : Mean-subtracted data matrix from which eVec was derived.  Nrows = Nvariables, Ncolumns = Ninstances
     aMatrixT const &eVec    ///< Input : Basis vectors in columns
     ) {
     if ((eVec.rows() != M.rows()) || (eVec.cols() != M.cols())) {
-        throw lsst::mwi::exceptions::InvalidParameter("eVec shape does not match M");
+        throw lsst::pex::exceptions::InvalidParameter("eVec shape does not match M");
     }
     if ((coeff.rows() != M.cols()) || (coeff.cols() != M.rows())) {
-        throw lsst::mwi::exceptions::InvalidParameter("coeff shape does not match M transposed");
+        throw lsst::pex::exceptions::InvalidParameter("coeff shape does not match M transposed");
     }
 
     /* We get all coefficients with a single matrix multiplication */
@@ -195,20 +195,20 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
  * @return Matrix of coefficients resulting from the dot-product of the input
  * data with the input basis set.
  *
- * @throw lsst::mwi::exceptions::InvalidParameter if the input matrices are
+ * @throw lsst::pex::exceptions::InvalidParameter if the input matrices are
  * mis-sized
  *
- * @throw lsst::mwi::exceptions::InvalidParameter if the user requests more
+ * @throw lsst::pex::exceptions::InvalidParameter if the user requests more
  * basis functions than are available
  *
  * @note This subroutine was created assuming that it would be faster than the
  * full decomposeMatrixUsingBasis when the number of coefficients that you want
  * is much smaller than the amount available
  * 
- * @ingroup imageproc
+ * @ingroup diffim
  */
 template <typename aMatrixT>
-void lsst::imageproc::decomposeMatrixUsingBasis(
+void lsst::ip::diffim::decomposeMatrixUsingBasis(
     aMatrixT &coeff, ///< Output : Fraction of each basis to reconstruct M from eVec in each row; shape M.cols() x at least nCoeff.
     aMatrixT const &M, ///< Input : Mean-subtracted data matrix from which eVec was derived.  Nrows = Nvariables, Ncolumns = Ninstances
     aMatrixT const &eVec, ///< Input : Basis vectors in columns; shape matches M
@@ -216,13 +216,13 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
     ) {
 
     if (nCoeff > static_cast<int>(eVec.cols())) {
-        throw lsst::mwi::exceptions::InvalidParameter("nCoeff > eVec.cols()");
+        throw lsst::pex::exceptions::InvalidParameter("nCoeff > eVec.cols()");
     }
     if ((eVec.rows() != M.rows()) || (eVec.cols() != M.cols())) {
-        throw lsst::mwi::exceptions::InvalidParameter("eVec shape does not match M");
+        throw lsst::pex::exceptions::InvalidParameter("eVec shape does not match M");
     }
     if ((coeff.rows() != M.cols())) {
-        throw lsst::mwi::exceptions::InvalidParameter("coeff.rows() not M.cols()");
+        throw lsst::pex::exceptions::InvalidParameter("coeff.rows() not M.cols()");
     }
 
     /* Do object-by-object */
@@ -246,16 +246,16 @@ void lsst::imageproc::decomposeMatrixUsingBasis(
  * @return Matrix of approximated features derived from the input basis
  * functions and coefficeints
  *
- * @throw lsst::mwi::exceptions::InvalidParameter if the input matrices are
+ * @throw lsst::pex::exceptions::InvalidParameter if the input matrices are
  * mis-sized
  *
- * @throw lsst::mwi::exceptions::InvalidParameter if the user requests more
+ * @throw lsst::pex::exceptions::InvalidParameter if the user requests more
  * basis functions than are available
  *
- * @ingroup imageproc
+ * @ingroup diffim
  */
 template <typename aMatrixT>
-void lsst::imageproc::approximateMatrixUsingBasis(
+void lsst::ip::diffim::approximateMatrixUsingBasis(
     aMatrixT &M, ///< Output : Reconstructed input data; each object in columns
     aMatrixT &eVec, ///< Input : Basis vectors in columns; shape matches M
     aMatrixT &coeff, ///< Input : Fraction of each basis to reconstruct M from eVec in each row;
@@ -263,13 +263,13 @@ void lsst::imageproc::approximateMatrixUsingBasis(
     int nCoeff ///< Input : How many coefficients to use
     ) {
     if (nCoeff > static_cast<int>(eVec.cols())) {
-        throw lsst::mwi::exceptions::InvalidParameter("nCoeff > eVec.cols()");
+        throw lsst::pex::exceptions::InvalidParameter("nCoeff > eVec.cols()");
     }
     if ((eVec.rows() != M.rows()) || (eVec.cols() != M.cols())) {
-        throw lsst::mwi::exceptions::InvalidParameter("eVec shape does not match M");
+        throw lsst::pex::exceptions::InvalidParameter("eVec shape does not match M");
     }
     if ((coeff.rows() != M.cols())) {
-        throw lsst::mwi::exceptions::InvalidParameter("coeff.rows() not M.cols()");
+        throw lsst::pex::exceptions::InvalidParameter("coeff.rows() not M.cols()");
     }
 
     vw::math::Vector<double> cVec(eVec.rows());
@@ -285,46 +285,46 @@ void lsst::imageproc::approximateMatrixUsingBasis(
 /************************************************************************************************************/
 /* Explicit instantiations */
 
-/* imageprocLib.i requests both float and double; do we really need both? */
+/* ip_diffimLib.i requests both float and double; do we really need both? */
 
 template
-void lsst::imageproc::computePca(vw::math::Vector<float> &rowMean,
+void lsst::ip::diffim::computePca(vw::math::Vector<float> &rowMean,
                                  vw::math::Vector<float> &eVal,
                                  vw::math::Matrix<float> &eVec,
                                  vw::math::Matrix<float> &M, bool subtractMean);
 template
-void lsst::imageproc::computePca(vw::math::Vector<double> &rowMean,
+void lsst::ip::diffim::computePca(vw::math::Vector<double> &rowMean,
                                  vw::math::Vector<double> &eVal,
                                  vw::math::Matrix<double> &eVec,
                                  vw::math::Matrix<double> &M, bool subtractMean);
 
 template
-void lsst::imageproc::decomposeMatrixUsingBasis(vw::math::Matrix<float> &coeff,
+void lsst::ip::diffim::decomposeMatrixUsingBasis(vw::math::Matrix<float> &coeff,
                                                 vw::math::Matrix<float> const &M,
                                                 vw::math::Matrix<float> const &eVec);
 template
-void lsst::imageproc::decomposeMatrixUsingBasis(vw::math::Matrix<double> &coeff,
+void lsst::ip::diffim::decomposeMatrixUsingBasis(vw::math::Matrix<double> &coeff,
                                                 vw::math::Matrix<double> const &M,
                                                 vw::math::Matrix<double> const &eVec);
 
 template
-void lsst::imageproc::decomposeMatrixUsingBasis(vw::math::Matrix<float> &coeff,
+void lsst::ip::diffim::decomposeMatrixUsingBasis(vw::math::Matrix<float> &coeff,
                                                 vw::math::Matrix<float> const &M,
                                                 vw::math::Matrix<float> const &eVec,
                                                 int nCoeff);
 template
-void lsst::imageproc::decomposeMatrixUsingBasis(vw::math::Matrix<double> &coeff,
+void lsst::ip::diffim::decomposeMatrixUsingBasis(vw::math::Matrix<double> &coeff,
                                                 vw::math::Matrix<double> const &M,
                                                 vw::math::Matrix<double> const &eVec,
                                                 int nCoeff);
 
 template
-void lsst::imageproc::approximateMatrixUsingBasis(vw::math::Matrix<float> &coeff,
+void lsst::ip::diffim::approximateMatrixUsingBasis(vw::math::Matrix<float> &coeff,
                                                   vw::math::Matrix<float> &M,
                                                   vw::math::Matrix<float> &eVec,
                                                   int nCoeff);
 template
-void lsst::imageproc::approximateMatrixUsingBasis(vw::math::Matrix<double> &coeff,
+void lsst::ip::diffim::approximateMatrixUsingBasis(vw::math::Matrix<double> &coeff,
                                                   vw::math::Matrix<double> &M,
                                                   vw::math::Matrix<double> &eVec,
                                                   int nCoeff);

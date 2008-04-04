@@ -8,10 +8,10 @@ import sys
 import optparse
 
 import eups
-import lsst.mwi.data as mwiData
-import lsst.fw.Core.fwLib as fw
-import lsst.mwi.utils
-import lsst.imageproc
+import lsst.daf.base as dafBase
+import lsst.afw.Core.afwLib as afw
+import lsst.pex.logging
+import lsst.ip.diffim
 
 def main():
     imageProcDir = eups.productDir("imageproc", "setup")
@@ -58,10 +58,10 @@ Notes:
 
     if options.verbosity > 0:
         print "Verbosity =", options.verbosity
-        lsst.mwi.utils.Trace_setVerbosity("lsst.imageproc", options.verbosity)
+        lsst.pex.logging.Trace_setVerbosity("lsst.ip.diffim", options.verbosity)
 
     policyPath = options.policy
-    policy = lsst.mwi.policy.Policy.createPolicy(policyPath)
+    policy = lsst.pex.policy.Policy.createPolicy(policyPath)
 
     with file(fileListPath, "rU") as fileList:    
         for lineNum, dataStr in enumerate(fileList):
@@ -84,14 +84,14 @@ Notes:
             differencePath = os.path.abspath(os.path.expandvars(differencePath))
             print "Compute %r = \n  %r - %r" % (differencePath, sciencePath, templatePath)
             
-            templateMaskedImage = fw.MaskedImageF()
+            templateMaskedImage = afw.MaskedImageF()
             templateMaskedImage.readFits(templatePath)
             
-            scienceMaskedImage  = fw.MaskedImageF()
+            scienceMaskedImage  = afw.MaskedImageF()
             scienceMaskedImage.readFits(sciencePath)
 
             if not options.trial:
-                differenceImage, psfMatchKernelPtr, backgroundFunctionPtr = lsst.imageproc.imageSubtract(
+                differenceImage, psfMatchKernelPtr, backgroundFunctionPtr = lsst.ip.diffim.imageSubtract(
                     imageToConvolve = templateMaskedImage,
                     imageToNotConvolve = scienceMaskedImage,
                     policy = policy,
@@ -99,9 +99,9 @@ Notes:
                 differenceImage.writeFits(differencePath)
 
 if __name__ == "__main__":
-    memId0 = mwiData.Citizen_getNextMemId()
+    memId0 = dafBase.Citizen_getNextMemId()
     main()
     # check for memory leaks
-    if mwiData.Citizen_census(0, memId0) != 0:
-        print mwiData.Citizen_census(0, memId0), "Objects leaked:"
-        print mwiData.Citizen_census(mwiData.cout, memId0)
+    if dafBase.Citizen_census(0, memId0) != 0:
+        print dafBase.Citizen_census(0, memId0), "Objects leaked:"
+        print dafBase.Citizen_census(dafBase.cout, memId0)

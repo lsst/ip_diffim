@@ -7,7 +7,7 @@ env.Program(["CFHT2MaskedImage.cc"], LIBS=env.getlibs("imageproc"))
 import lsst.tests
 
 import lsst.SConsUtils as scons         # scons 1.17 supports "env.ProductDir", but for now use scons.ProductDir
-dataDir = scons.ProductDir("fwData")
+dataDir = scons.ProductDir("afwdata")
 args = {
     "CFHT2MaskedImage" : "%s/871034p_1 %s/871034p_1_MI_unittest" % (dataDir, dataDir),
 }
@@ -22,10 +22,10 @@ ignoreList = [
     ]
 
 if not dataDir:
-    print >> sys.stderr, "fwData is not set up; skipping tests requiring data"
+    print >> sys.stderr, "afwdata is not set up; skipping tests requiring data"
     ignoreList += args.keys()
 
 tests = lsst.tests.Control(env, args=args, ignoreList=ignoreList, verbose=True)
 tests.run("*.cc")
 for target in tests.run("*.py"):
-    env.Depends(target, "../python/lsst/imageproc/_imageprocLib%s" % (env["LDMODULESUFFIX"]))
+    env.Depends(target, "../python/lsst/ip/diffim/_imageprocLib%s" % (env["LDMODULESUFFIX"]))

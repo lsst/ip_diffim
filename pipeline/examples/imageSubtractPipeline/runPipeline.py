@@ -10,12 +10,12 @@ import subprocess
 import socket
 
 import eups
-import lsst.mwi.data as mwiData
-import lsst.mwi.utils
-import lsst.dps.startPipeline
+import lsst.daf.base as dafBase
+import lsst.pex.logging
+import lsst.pex.harness.startPipeline
 
 def main():
-    defDataDir = eups.productDir("fwData", "setup") or "."
+    defDataDir = eups.productDir("afwdata", "setup") or "."
     imageProcDir = eups.productDir("imageproc", "setup")
     if imageProcDir == None:
         print "Error: imageproc not setup"
@@ -108,17 +108,17 @@ Notes:
     
     if options.verbosity > 0:
         print "Verbosity =", options.verbosity
-        lsst.mwi.utils.Trace_setVerbosity("lsst.imageproc", options.verbosity)
-    lsst.mwi.utils.Trace_setVerbosity("dps", 3)
+        lsst.pex.logging.Trace_setVerbosity("lsst.ip.diffim", options.verbosity)
+    lsst.pex.logging.Trace_setVerbosity("pex.harness", 3)
     
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
-    lsst.dps.startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "imageSubtractId")
+    lsst.pex.harness.startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "imageSubtractId")
 
 
 if __name__ == "__main__":
-    memId0 = mwiData.Citizen_getNextMemId()
+    memId0 = dafBase.Citizen_getNextMemId()
     main()
     # check for memory leaks
-    if mwiData.Citizen_census(0, memId0) != 0:
-        print mwiData.Citizen_census(0, memId0), "Objects leaked:"
-        print mwiData.Citizen_census(mwiData.cout, memId0)
+    if dafBase.Citizen_census(0, memId0) != 0:
+        print dafBase.Citizen_census(0, memId0), "Objects leaked:"
+        print dafBase.Citizen_census(dafBase.cout, memId0)

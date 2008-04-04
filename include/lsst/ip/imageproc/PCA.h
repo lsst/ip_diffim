@@ -9,15 +9,16 @@
  * @ingroup imageproc
  */
 
-#ifndef LSST_IMAGEPROC_PCA_H
-#define LSST_IMAGEPROC_PCA_H
+#ifndef LSST_IP_DIFFIM_PCA_H
+#define LSST_IP_DIFFIM_PCA_H
 
 #include <vw/Math/LinearAlgebra.h>
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/Vector.h> 
 
 namespace lsst {
-namespace imageproc {
+namespace ip {
+namespace diffim {
 
     using namespace std;
 
@@ -54,6 +55,6 @@ namespace imageproc {
         );
 
 
-}}
+}}}
 
 #endif

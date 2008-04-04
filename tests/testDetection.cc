@@ -1,12 +1,12 @@
-#include <lsst/mwi/utils/Trace.h>
-#include <lsst/mwi/data/Citizen.h>
-#include <lsst/fw/MaskedImage.h>
+#include <lsst/pex/logging/Trace.h>
+#include <lsst/daf/base/Citizen.h>
+#include <lsst/afw/MaskedImage.h>
 #include <lsst/detection/Footprint.h>
 
 using namespace std;
-using namespace lsst::fw;
+using namespace lsst::afw;
 
-typedef lsst::fw::maskPixelType MaskT;
+typedef lsst::afw::maskPixelType MaskT;
 typedef float ImageT;
 typedef double KernelT;
 typedef double FuncT;
@@ -14,14 +14,14 @@ typedef double FuncT;
 int main( int argc, char** argv )
 {
     {
-        lsst::mwi::utils::Trace::setDestination(cout);
-        lsst::mwi::utils::Trace::setVerbosity(".", 4);
+        lsst::pex::logging::Trace::setDestination(cout);
+        lsst::pex::logging::Trace::setVerbosity(".", 4);
 
         string templateImage = argv[1];
         MaskedImage<ImageT,MaskT> templateMaskedImage;
         try {
             templateMaskedImage.readFits(templateImage);
-        } catch (lsst::mwi::exceptions::ExceptionStack &e) {
+        } catch (lsst::pex::exceptions::ExceptionStack &e) {
             cerr << "Failed to open template image " << templateImage << ": " << e.what() << endl;
             return 1;
         }

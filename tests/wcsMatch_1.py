@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Test lsst.imageproc.imageprocLib.wcsMatch
+Test lsst.ip.diffim.ip_diffimLib.wcsMatch
 
 Author: Nicole M. Silvestri, University of Washington
 Contact: nms@astro.washington.edu
@@ -15,16 +15,16 @@ import unittest
 import numpy
 
 import eups
-import lsst.fw.Core.fwLib as fw
-import lsst.mwi.tests as tests
-import lsst.mwi.utils as mwiu
-import lsst.imageproc.imageprocLib as improc
+import lsst.afw.Core.fwLib as afw
+import lsst.tests as tests
+import lsst.pex.logging as logging
+import lsst.ip.diffim.ip_diffimLib as improc
 
 try:
     type(verbose)
 except NameError:
     verbose = 0
-    mwiu.Trace_setVerbosity("imageproc", verbose)
+    logging.Trace_setVerbosity("ip.diffim", verbose)
 
 dataDir = os.environ.get("FWDATA_DIR")
 if not dataDir:

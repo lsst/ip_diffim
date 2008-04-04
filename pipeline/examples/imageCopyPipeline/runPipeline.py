@@ -10,8 +10,8 @@ import shutil
 import subprocess
 import socket
 
-import lsst.mwi.data as mwiData
-import lsst.mwi.utils
+import lsst.daf.base as dafBase
+import lsst.pex.logging
 
 def main():
     defInDir = os.environ.get("FWDATA_DIR", "")
@@ -84,15 +84,15 @@ def main():
         ),
     )
 
-    lsst.mwi.utils.Trace_setVerbosity("dps", 3)
+    lsst.pex.logging.Trace_setVerbosity("pex.harness", 3)
     
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
     startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "copyPipelineId")
 
 if __name__ == "__main__":
-    memId0 = mwiData.Citizen_getNextMemId()
+    memId0 = dafBase.Citizen_getNextMemId()
     main()
     # check for memory leaks
-    if mwiData.Citizen_census(0, memId0) != 0:
-        print mwiData.Citizen_census(0, memId0), "Objects leaked:"
-        print mwiData.Citizen_census(mwiData.cout, memId0)
+    if dafBase.Citizen_census(0, memId0) != 0:
+        print dafBase.Citizen_census(0, memId0), "Objects leaked:"
+        print dafBase.Citizen_census(dafBase.cout, memId0)

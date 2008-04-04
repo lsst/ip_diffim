@@ -1,12 +1,12 @@
-#include <lsst/fw/MaskedImage.h>
-#include <lsst/fw/Kernel.h>
-#include <lsst/fw/KernelFunctions.h>
-#include <lsst/fw/FunctionLibrary.h>
-#include <lsst/mwi/data/Citizen.h>
+#include <lsst/afw/MaskedImage.h>
+#include <lsst/afw/Kernel.h>
+#include <lsst/afw/KernelFunctions.h>
+#include <lsst/afw/FunctionLibrary.h>
+#include <lsst/daf/base/Citizen.h>
 #include <boost/shared_ptr.hpp>
 
 using namespace std;
-using namespace lsst::fw;
+using namespace lsst::afw;
 
 // This is for debugging MaskedImage; has no testing other than it has to succeed
 
@@ -14,9 +14,9 @@ int main( int argc, char** argv )
 {
     // Cool, for Citizen!
     { 
-        lsst::mwi::utils::Trace::setVerbosity("lsst.imageproc", 4);
+        lsst::pex::logging::Trace::setVerbosity("lsst.ip.diffim", 4);
         
-        typedef lsst::fw::maskPixelType MaskT;
+        typedef lsst::afw::maskPixelType MaskT;
         typedef double ImageT; 
         typedef double KernelT;
         const KernelT CONVOLVE_THRESHOLD = 0;
@@ -27,7 +27,7 @@ int main( int argc, char** argv )
         scienceMaskedImage.readFits(inputImage);
         
         Kernel<KernelT>::KernelFunctionPtrType kfuncPtr(
-            new lsst::fw::function::IntegerDeltaFunction2<KernelT>(0, 0)
+            new lsst::afw::function::IntegerDeltaFunction2<KernelT>(0, 0)
             );
         
         boost::shared_ptr<Kernel<KernelT> > kernelPtr(
@@ -44,7 +44,7 @@ int main( int argc, char** argv )
         
         // Now Works
         MaskedImage<ImageT, MaskT>
-            convolvedStamp = lsst::fw::kernel::convolve(*stampPtr, *kernelPtr, CONVOLVE_THRESHOLD, EDGE_MASK_BIT);        
+            convolvedStamp = lsst::afw::kernel::convolve(*stampPtr, *kernelPtr, CONVOLVE_THRESHOLD, EDGE_MASK_BIT);        
         
         // Write out the stamp
         stampPtr->writeFits( "test0_stamp" );

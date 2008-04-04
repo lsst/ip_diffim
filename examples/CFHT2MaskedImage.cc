@@ -1,10 +1,10 @@
 // -*- lsst-c++ -*-
-#include "lsst/fw/MaskedImage.h"
-#include "lsst/mwi/utils/Trace.h"
-#include "lsst/mwi/data/DataProperty.h"
+#include "lsst/afw/MaskedImage.h"
+#include "lsst/pex/logging/Trace.h"
+#include "lsst/daf/base/DataProperty.h"
 
 using namespace std;
-using namespace lsst::fw;
+using namespace lsst::afw;
 
 template <typename ImagePixelT, typename MaskPixelT> 
 class synthesizeCfhtPixProcFunc : public PixelProcessingFunc<ImagePixelT, MaskPixelT> {
@@ -24,8 +24,8 @@ public:
         if (badMask == 0) {
             cout << "Warning: zerovalued mask plane not found" << endl;
         }
-        lsst::mwi::data::DataProperty::PtrType metaDataPtr = PixelProcessingFunc<ImagePixelT, MaskPixelT>::_imagePtr->getMetaData();
-        lsst::mwi::data::DataProperty::PtrType satPtr = metaDataPtr->findUnique("MAXLIN");
+        lsst::daf::base::DataProperty::PtrType metaDataPtr = PixelProcessingFunc<ImagePixelT, MaskPixelT>::_imagePtr->getMetaData();
+        lsst::daf::base::DataProperty::PtrType satPtr = metaDataPtr->findUnique("MAXLIN");
         satValue = boost::any_cast<const int>(satPtr->getValue());
         
         // Mask anything within 90% of saturation for now
@@ -76,7 +76,7 @@ int main( int argc, char** argv )
     Trace::setDestination(cout);
     Trace::setVerbosity(".", 0);
     
-    typedef lsst::fw::maskPixelType MaskPixelType;
+    typedef lsst::afw::maskPixelType MaskPixelType;
     typedef float32 ImagePixelType;
 
     string inputImage = argv[1];

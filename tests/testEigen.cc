@@ -1,6 +1,6 @@
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/LinearAlgebra.h> 
-#include <lsst/imageproc/PCA.h>
+#include <lsst/ip/diffim/PCA.h>
 #include <iostream>
 
 using namespace std;
@@ -69,7 +69,7 @@ int main( int argc, char** argv )
     vw::math::Matrix<ValueT> eVec(rowsN, colsN);
     vw::math::Vector<ValueT> eVal(colsN);
     vw::math::Vector<ValueT> colMean(colsN);
-    lsst::imageproc::computePCA(MMt, colMean, eVal, eVec, false);
+    lsst::ip::diffim::computePCA(MMt, colMean, eVal, eVec, false);
     
     vw::math::eigen(MMt, eVali, eVeci);
     

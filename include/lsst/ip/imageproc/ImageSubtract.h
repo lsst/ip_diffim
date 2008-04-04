@@ -14,17 +14,18 @@
 
 #include <vector>
 #include <boost/shared_ptr.hpp>
-#include <lsst/mwi/policy/Policy.h>
-#include <lsst/fw/Kernel.h>
-#include <lsst/fw/KernelFunctions.h>
-#include <lsst/fw/Mask.h>
-#include <lsst/fw/MaskedImage.h>
-#include <lsst/fw/Function.h>
+#include <lsst/pex/policy/Policy.h>
+#include <lsst/afw/Kernel.h>
+#include <lsst/afw/KernelFunctions.h>
+#include <lsst/afw/Mask.h>
+#include <lsst/afw/MaskedImage.h>
+#include <lsst/afw/Function.h>
 #include <lsst/detection/Footprint.h>
-#include <lsst/imageproc/PCA.h>
+#include <lsst/ip/diffim/PCA.h>
 
 namespace lsst {
-namespace imageproc {
+namespace ip {
+namespace diffim {
     
     /** @struct
      *
@@ -66,7 +67,7 @@ namespace imageproc {
         /* Running ID */
         int id;
         
-        typedef lsst::fw::MaskedImage<ImageT, MaskT> maskedImageType;
+        typedef lsst::afw::MaskedImage<ImageT, MaskT> maskedImageType;
         typedef boost::shared_ptr<maskedImageType> maskedImagePtrType;
 
         /* The Footprint assocated with the object we're building the kernels around */
@@ -82,7 +83,7 @@ namespace imageproc {
         /* Store the kernel at each stage of build */
         int nKernel;
         /* Vector of kernels : single image kernel, PCA model, spatial model */
-        std::vector<boost::shared_ptr<lsst::fw::LinearCombinationKernel> > kernelList;
+        std::vector<boost::shared_ptr<lsst::afw::LinearCombinationKernel> > kernelList;
         std::vector<lsst::imageproc::MaskedImageDiffimStats> diffimStats;
         std::vector<double> backgrounds;
         std::vector<double> kernelSums;
@@ -98,15 +99,15 @@ namespace imageproc {
         virtual ~DiffImContainer() {};
 
         /* These functions hack around a SWIG issue -- the swigged code thinks the mask type of */
-        /* DiffImContainerD.imageToNotConvolve's is boost::uint16_t, not lsst::fw::maskType */
-        /* (even though they are identical and it knows about lsst::fw::maskType everywhere else) */
+        /* DiffImContainerD.imageToNotConvolve's is boost::uint16_t, not lsst::afw::maskType */
+        /* (even though they are identical and it knows about lsst::afw::maskType everywhere else) */
         void setImageToNotConvolve(maskedImageType const &maskedImage) {
             this->imageToNotConvolve.reset(new maskedImageType(maskedImage));
         }
         void setImageToConvolve(maskedImageType const &maskedImage) {
             this->imageToConvolve.reset(new maskedImageType(maskedImage));
         }
-        void addKernel(boost::shared_ptr<lsst::fw::LinearCombinationKernel> newKernel,
+        void addKernel(boost::shared_ptr<lsst::afw::LinearCombinationKernel> newKernel,
                        lsst::imageproc::MaskedImageDiffimStats newStats,
                        double background,
                        double kernelSum) {
@@ -124,46 +125,46 @@ namespace imageproc {
     void computeDiffImStats(
         lsst::imageproc::DiffImContainer<ImageT, MaskT> &diffImContainer,
         int const kernelID,
-        lsst::mwi::policy::Policy &policy
+        lsst::pex::policy::Policy &policy
         );
 
     template <typename ImageT, typename MaskT>
     std::vector<lsst::detection::Footprint::PtrType> getCollectionOfFootprintsForPsfMatching(
-        lsst::fw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::fw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        lsst::mwi::policy::Policy &policy
+        lsst::afw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
+        lsst::afw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+        lsst::pex::policy::Policy &policy
         );
 
     template <typename ImageT, typename MaskT>
     std::vector<double> computePsfMatchingKernelForPostageStamp(
         double &background,
-        lsst::fw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::fw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        lsst::fw::KernelList<lsst::fw::Kernel> const &kernelInBasisList, ///< Input kernel basis set
-        lsst::mwi::policy::Policy &policy
+        lsst::afw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
+        lsst::afw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+        lsst::afw::KernelList<lsst::afw::Kernel> const &kernelInBasisList, ///< Input kernel basis set
+        lsst::pex::policy::Policy &policy
         );
     
     template <typename ImageT, typename MaskT>
-    lsst::fw::KernelList<lsst::fw::Kernel> computePcaKernelBasis(
+    lsst::afw::KernelList<lsst::afw::Kernel> computePcaKernelBasis(
         std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT> > &diffImContainerList,
-        lsst::mwi::policy::Policy &policy
+        lsst::pex::policy::Policy &policy
         );
 
     template <typename ImageT, typename MaskT>
-    boost::shared_ptr<lsst::fw::LinearCombinationKernel> computeSpatiallyVaryingPsfMatchingKernel(
-        boost::shared_ptr<lsst::fw::function::Function2<double> > &kernelFunctionPtr,
-        boost::shared_ptr<lsst::fw::function::Function2<double> > &backgroundFunctionPtr,
+    boost::shared_ptr<lsst::afw::LinearCombinationKernel> computeSpatiallyVaryingPsfMatchingKernel(
+        boost::shared_ptr<lsst::afw::function::Function2<double> > &kernelFunctionPtr,
+        boost::shared_ptr<lsst::afw::function::Function2<double> > &backgroundFunctionPtr,
         std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT> > &diffImContainerList,
-        lsst::fw::KernelList<lsst::fw::Kernel> const &kernelBasisList,
-        lsst::mwi::policy::Policy &policy
+        lsst::afw::KernelList<lsst::afw::Kernel> const &kernelBasisList,
+        lsst::pex::policy::Policy &policy
         );
 
-    lsst::fw::KernelList<lsst::fw::Kernel> generateDeltaFunctionKernelSet(
+    lsst::afw::KernelList<lsst::afw::Kernel> generateDeltaFunctionKernelSet(
         unsigned int nCols,
         unsigned int nRows
         );
 
-    lsst::fw::KernelList<lsst::fw::Kernel> generateAlardLuptonKernelSet(
+    lsst::afw::KernelList<lsst::afw::Kernel> generateAlardLuptonKernelSet(
         unsigned int nCols,
         unsigned int nRows,
         std::vector<double> const &sigGauss,
@@ -172,7 +173,7 @@ namespace imageproc {
 
     template <typename MaskT>
     bool maskOk(
-        lsst::fw::Mask<MaskT> const &inputMask,
+        lsst::afw::Mask<MaskT> const &inputMask,
         MaskT const badPixelMask
         );
 
@@ -181,7 +182,7 @@ namespace imageproc {
         int &nGoodPixels,
         double &meanOfResiduals,
         double &varianceOfResiduals,
-        lsst::fw::MaskedImage<ImageT, MaskT> const &inputImage,
+        lsst::afw::MaskedImage<ImageT, MaskT> const &inputImage,
         MaskT const badPixelMask
         );
 
@@ -190,7 +191,7 @@ namespace imageproc {
         int &nGoodPixels,
         double &meanOfResiduals,
         double &varianceOfResiduals,
-        lsst::fw::Image<ImageT> const &inputImage
+        lsst::afw::Image<ImageT> const &inputImage
         );
 
     template <typename VectorT>
@@ -202,10 +203,10 @@ namespace imageproc {
 
     template <typename PixelT, typename FunctionT>
     void addFunction(
-        lsst::fw::Image<PixelT> &image,
-        lsst::fw::function::Function2<FunctionT> const &function
+        lsst::afw::Image<PixelT> &image,
+        lsst::afw::function::Function2<FunctionT> const &function
         );
 
-}}
+}}}
 
 #endif

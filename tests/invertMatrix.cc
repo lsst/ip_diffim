@@ -8,7 +8,7 @@
 #include <boost/timer.hpp> 
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/LinearAlgebra.h> 
-#include <lsst/mwi/exceptions/Exception.h>
+#include <lsst/pex/exceptions/Exception.h>
 
 //using namespace boost::numeric;  // Watch namespace issues; make sure "invert" is VW and not boost
 using namespace std;
@@ -63,8 +63,8 @@ int main(int argc, char** argv)
     /*
     try {
         int res = lu_factorize(A, pm);
-        if( res != 0 ) throw lsst::mwi::exceptions::Runtime("LU factorization failed; singular matrix.  Get a better exception than this one!");
-    } catch (lsst::mwi::exceptions::Exceptionstack &e) {
+        if( res != 0 ) throw lsst::pex::exceptions::Runtime("LU factorization failed; singular matrix.  Get a better exception than this one!");
+    } catch (lsst::pex::exceptions::Exceptionstack &e) {
         cerr << "Caught exception: " << e.what() << "\n";
         return 1;
     }

@@ -3,7 +3,7 @@ import sys
 import os
 import subprocess
 import time
-import lsst.mwi.utils
+import lsst.pex.logging
 
 def startPipeline(nodeList, pipelinePolicy, runId):
     """Start pipeline execution
@@ -36,20 +36,20 @@ def startPipeline(nodeList, pipelinePolicy, runId):
     """
     nodeList = os.path.abspath(os.path.expandvars(nodeList))
     pipelineDir = os.path.dirname(nodeList)
-    lsst.mwi.utils.Trace("dps.startPipeline", 3, "pipelineDir=%s" % (pipelineDir,))
+    lsst.pex.logging.Trace("pex.harness.startPipeline", 3, "pipelineDir=%s" % (pipelineDir,))
 
     nnodes, nslices = parseNodeList(nodeList)
-    lsst.mwi.utils.Trace("dps.startPipeline", 3, "nnodes=%s; nslices=%s" % (nnodes, nslices))
+    lsst.pex.logging.Trace("pex.harness.startPipeline", 3, "nnodes=%s; nslices=%s" % (nnodes, nslices))
     
-    lsst.mwi.utils.Trace("dps.startPipeline", 3, "Running mpdboot")
+    lsst.pex.logging.Trace("pex.harness.startPipeline", 3, "Running mpdboot")
     subprocess.call(["mpdboot", "--totalnum=%s" % (nnodes,), "--file=%s" % (nodeList,), "--verbose"])
     
     time.sleep(3)
-    lsst.mwi.utils.Trace("dps.startPipeline", 3, "Running mpdtrace")
+    lsst.pex.logging.Trace("pex.harness.startPipeline", 3, "Running mpdtrace")
     subprocess.call(["mpdtrace", "-l"])
     time.sleep(2)
     
-    lsst.mwi.utils.Trace("dps.startPipeline", 3, "Running mpiexec")
+    lsst.pex.logging.Trace("pex.harness.startPipeline", 3, "Running mpiexec")
     subprocess.call(
         ["mpiexec", "-usize", str(nslices), "-machinefile", nodeList, "-np", "1",
         "runPipeline.py", pipelinePolicy, runId],
@@ -57,7 +57,7 @@ def startPipeline(nodeList, pipelinePolicy, runId):
     )
     
     time.sleep(1)    
-    lsst.mwi.utils.Trace("dps.startPipeline", 3, "Running mpdallexit")
+    lsst.pex.logging.Trace("pex.harness.startPipeline", 3, "Running mpdallexit")
     subprocess.call(["mpdallexit"])
 
 def parseNodeList(nodeList):

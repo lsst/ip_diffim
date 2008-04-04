@@ -5,7 +5,7 @@
 import glob, os.path
 import lsst.SConsUtils as scons
 
-env = scons.makeEnv("imageproc",
+env = scons.makeEnv("ip_diffim",
                     r"$HeadURL$",
                     [["boost", "boost/version.hpp", "boost_filesystem:C++"],
                      ["boost", "boost/regex.hpp", "boost_regex:C++"],
@@ -13,9 +13,10 @@ env = scons.makeEnv("imageproc",
                      ["vw", "vw/Core.h", "vwCore:C++"],
                      ["vw", "vw/Math.h", "vwMath:C++"],
                      ["lapack", None, "lapack", "dgesdd_"],
-                     ["mwi", "lsst/mwi/data.h", "mwi:C++"],
-                     #["dps", "lsst/dps/Stage.h", "dps:C++"],
-                     ["fw", "lsst/fw/MaskedImage.h", "fw"],
+                     ["daf_base", "lsst/daf/base/Citizen.h", "daf_base:C++"],
+                     ["daf_data", "lsst/daf/data.h", "daf_data:C++"],
+                     #["pex_harness", "lsst/pex/harness/Stage.h", "pex_harness:C++"],
+                     ["afw", "lsst/afw/MaskedImage.h", "fw"],
                      ["detection", "lsst/detection/Footprint.h", "detection"],
                      ["python", "Python.h"],
                      ["m", "math.h", "m", "sqrt"],
@@ -25,13 +26,13 @@ env = scons.makeEnv("imageproc",
                      ["minuit", "Minuit/FCNBase.h", "lcg_Minuit:C++"],
                      ])
 
-env.libs["imageproc"] = env.getlibs("boost vw wcslib fw cfitsio mwi minuit detection") + env.libs["imageproc"]
-env.libs["imageproc"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") fails as lapack isn't in eups
+env.libs["ip_diffim"] = env.getlibs("boost vw wcslib fw cfitsio daf_base daf_data pex_logging minuit detection") + env.libs["ip_diffim"]
+env.libs["ip_diffim"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") fails as lapack isn't in eups
 
 #
 # Build/install things
 #
-for d in Split("doc include/lsst/imageproc lib src tests examples"):
+for d in Split("doc include/lsst/ip/diffim lib src tests examples"):
     SConscript(os.path.join(d, "SConscript"))
 
 # python

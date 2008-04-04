@@ -1,7 +1,7 @@
 #include <lsst/detection/Footprint.h>
 
 using namespace std;
-using namespace lsst::fw;
+using namespace lsst::afw;
 
 int main( int argc, char** argv )
 {

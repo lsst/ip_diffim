@@ -1,9 +1,9 @@
 // -*- lsst-c++ -*-
-#include "lsst/fw/Trace.h"
-#include "lsst/fw/Kernel.h"
+#include "lsst/afw/Trace.h"
+#include "lsst/afw/Kernel.h"
 
 using namespace std;
-using namespace lsst::fw;
+using namespace lsst::afw;
 
 int main( int argc, char** argv )
 {

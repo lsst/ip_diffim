@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 import numpy
 
-import lsst.mwi.policy
-import lsst.mwi.utils as mwiu
-import lsst.mwi.exceptions as mwex
-from lsst.mwi.logging import Log
+import lsst.pex.policy
+import lsst.pex.logging as logging
+import lsst.pex.exceptions as pex_ex
+from lsst.pex.logging import Log
 
-import lsst.fw.Core.fwLib as fw
+import lsst.afw.Core.afwLib as afw
 import lsst.detection.detectionLib as detection
-import imageprocLib as imageproc # relative import, since this is in __init__.py
+import ip_diffimLib as ip_diffim # relative import, since this is in __init__.py
 
 __all__ = ['computePsfMatchingKernelForMaskedImage']
 
@@ -57,7 +57,7 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
     kernelRows = policy.get('kernelRows')
     debugIO = policy.get('debugIO', False)
 
-    diffImLog = Log(Log.getDefaultLog(), "imageproc.computePsfMatchingKernelForMaskedImage")
+    diffImLog = Log(Log.getDefaultLog(), "ip.diffim.computePsfMatchingKernelForMaskedImage")
     
     if GetMaskPlanesFromPolicy:
         badMaskBit = policy.get('badMaskBit')
@@ -73,7 +73,7 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
     if edgeMaskBit > 0:
         badPixelMask |= 1 << edgeMaskBit
 
-    mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 3, 
+    logging.Trace('lsst.ip.diffim.computePsfMatchingKernelForMaskedImage', 3, 
                """Policy:
    * maximumFootprintResidualMean=%r
    * maximumFootprintResidualVariance=%r
@@ -94,11 +94,11 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
         edgeMaskBit,
         ))
     
-    kImage = fw.ImageD(kernelCols, kernelRows)
-    diffImContainerList = imageproc.vectorDiffImContainerD()
+    kImage = afw.ImageD(kernelCols, kernelRows)
+    diffImContainerList = ip_diffim.vectorDiffImContainerD()
     for footprintID, iFootprintPtr in enumerate(footprintList):
         footprintBBox = iFootprintPtr.getBBox()
-        mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 5,
+        logging.Trace('lsst.ip.diffim.computePsfMatchingKernelForMaskedImage', 5,
             'Footprint %d = %d,%d -> %d,%d' % (footprintID,
             footprintBBox.min().x(), footprintBBox.min().y(),
             footprintBBox.max().x(), footprintBBox.max().y()))
@@ -111,17 +111,17 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
             imageToNotConvolveStampPtr.writeFits('sFits_%d' % (footprintID,))
         
         # Find best single kernel for this stamp
-        kernelCoeffList, background = imageproc.computePsfMatchingKernelForPostageStamp(
+        kernelCoeffList, background = ip_diffim.computePsfMatchingKernelForPostageStamp(
             imageToConvolveStampPtr.get(),
             imageToNotConvolveStampPtr.get(),
             kernelBasisList,
             policy,
         )
-        footprintKernelPtr = fw.LinearCombinationKernelPtr(
-            fw.LinearCombinationKernel(kernelBasisList, kernelCoeffList))
+        footprintKernelPtr = afw.LinearCombinationKernelPtr(
+            afw.LinearCombinationKernel(kernelBasisList, kernelCoeffList))
         
         # Structure holding information about this footprint and its fit to a kernel
-        diffImFootprintContainer                    = imageproc.DiffImContainerD()
+        diffImFootprintContainer                    = ip_diffim.DiffImContainerD()
         diffImFootprintContainer.id                 = footprintID
         
         diffImFootprintContainer.setImageToNotConvolve(imageToNotConvolveStampPtr.get())
@@ -136,11 +136,11 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
 
         # Append to vectors collectively; might want to make this a method on a class to synchronize this
         diffImFootprintContainer.addKernel(footprintKernelPtr,
-                                           imageproc.MaskedImageDiffimStats(),
+                                           ip_diffim.MaskedImageDiffimStats(),
                                            background,
                                            footprintKernelPtr.computeImage(kImage, 0.0, 0.0, False))
 
-        mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 4,
+        logging.Trace('lsst.ip.diffim.computePsfMatchingKernelForMaskedImage', 4,
                    'Developing kernel %d at %d,%d -> %d,%d.  Kernel Sum = %.3f, Background = %.3f' % (
             diffImFootprintContainer.id,
             footprintBBox.min().x(), footprintBBox.min().y(),
@@ -150,7 +150,7 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
             ))
 
         # Calculate and fill in difference image stats
-        imageproc.computeDiffImStats(diffImFootprintContainer, diffImFootprintContainer.nKernel, policy)
+        ip_diffim.computeDiffImStats(diffImFootprintContainer, diffImFootprintContainer.nKernel, policy)
 
         diffImContainerList.append(diffImFootprintContainer)
         
@@ -158,7 +158,7 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
     # Compare kernel sums; things that are bad (e.g. variable stars, moving objects, cosmic rays)
     # will have a kernel sum far from the mean; reject these.
 
-    mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 3,
+    logging.Trace('lsst.ip.diffim.computePsfMatchingKernelForMaskedImage', 3,
                'Rejecting kernels with deviant kSums');
 
     anyRejected = False
@@ -182,7 +182,7 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
             nGoodKernels  += 1
 
         if nGoodKernels == 0:
-            raise mwex.LsstOutOfRange("No good kernels found")
+            raise pex_ex.LsstOutOfRange("No good kernels found")
             
         kSumMean       = kernelSumVector[:nGoodKernels+1].mean()
         kSumStdDev     = kernelSumVector[:nGoodKernels+1].std()
@@ -199,7 +199,7 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
             if numpy.fabs(diffImContainerList[containerID].kernelSums[whichKernel] - kSumMean) > (kSumStdDev * maximumKernelSumNSigma):
                 diffImContainerList[containerID].isGood = False
                 numRejected += 1
-                mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 5, 
+                logging.Trace('lsst.ip.diffim.computePsfMatchingKernelForMaskedImage', 5, 
                            '# Kernel %d (kSum=%.3f) REJECTED due to bad kernel sum (mean=%.3f, std=%.3f)' %
                            (diffImContainerList[containerID].id,
                             diffImContainerList[containerID].kernelSums[whichKernel],
@@ -210,7 +210,7 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
                                diffImContainerList[containerID].kernelSums[whichKernel],
                                kSumMean, kSumStdDev))
 
-        mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 4, 
+        logging.Trace('lsst.ip.diffim.computePsfMatchingKernelForMaskedImage', 4, 
                    'Iteration %d, rejected %d kernels : Kernel Sum = %0.3f (%0.3f); Average Mean Residual = %0.3f; Average Residual Variance = %0.3f' %
                    (iterNum, numRejected, kSumMean, kSumStdDev, kMeanMean, kMeanVariance))
         diffImLog.log(Log.INFO,
@@ -221,16 +221,16 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
             # rejected all bad kernels; time to quit!
             break
     else:
-        mwiu.Trace('lsst.imageproc.computePsfMatchingKernelForMaskedImage', 3, 
+        logging.Trace('lsst.ip.diffim.computePsfMatchingKernelForMaskedImage', 3, 
                    'Detection of kernels with deviant kSums reached its limit of %d iterations' % (
             maximumIterationsKernelSum,
             ))
       
     # In the end we want to test if the kernelInBasisList is Delta Functions; if so, do PCA
     # For DC2 we just do it
-    kernelOutBasisList = imageproc.computePcaKernelBasis(diffImContainerList, policy)
+    kernelOutBasisList = ip_diffim.computePcaKernelBasis(diffImContainerList, policy)
     
-    kernelPtr = imageproc.computeSpatiallyVaryingPsfMatchingKernel(
+    kernelPtr = ip_diffim.computeSpatiallyVaryingPsfMatchingKernel(
         kernelFunctionPtr,
         backgroundFunctionPtr,
         diffImContainerList,

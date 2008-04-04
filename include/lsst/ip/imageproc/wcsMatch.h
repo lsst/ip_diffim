@@ -2,7 +2,7 @@
 /**
   * \file 
   *
-  * \ingroup imageproc
+  * \ingroup diffim
   *
   * \brief Implementation of the templated utility function, wcsMatch, for
   * Astrometric Image Remapping for the LSST.
@@ -23,35 +23,36 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include <lsst/fw/Exposure.h>
-#include <lsst/fw/WCS.h>
+#include <lsst/afw/Exposure.h>
+#include <lsst/afw/WCS.h>
 
 namespace lsst {
-namespace imageproc {
+namespace ip {
+namespace diffim {
        
     typedef boost::uint16_t maskPixelType;
 
     template<typename ImageT, typename MaskT> 
     int wcsMatch(
-        lsst::fw::Exposure<ImageT, MaskT> &remapExposure,
-        lsst::fw::Exposure<ImageT, MaskT> const &origExposure,
+        lsst::afw::Exposure<ImageT, MaskT> &remapExposure,
+        lsst::afw::Exposure<ImageT, MaskT> const &origExposure,
         std::string const kernelType, 
         int kernelCols, 
         int kernelRows
         );
 
     template<typename ImageT, typename MaskT> 
-    lsst::fw::Exposure<ImageT, MaskT> wcsMatch(
+    lsst::afw::Exposure<ImageT, MaskT> wcsMatch(
         int &numEdgePixels,
-        lsst::fw::WCS const &remapWcs,
+        lsst::afw::WCS const &remapWcs,
         int remapCols, 
         int remapRows, 
-        lsst::fw::Exposure<ImageT, MaskT> const &origExposure,
+        lsst::afw::Exposure<ImageT, MaskT> const &origExposure,
         std::string const kernelType, 
         int kernelCols, 
         int kernelRows
         );
        
-}} // namespace fw::lsst
+}}} // namespace diffim   ip   lsst
 
 #endif // !defined(LSST_FW_wcsMatch_H)

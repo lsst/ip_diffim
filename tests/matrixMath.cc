@@ -7,7 +7,7 @@
 #include <boost/numeric/ublas/lu.hpp>
 #include <boost/timer.hpp> 
 #include <vw/Math/Matrix.h> 
-#include "lsst/fw/Exception.h"
+#include "lsst/afw/Exception.h"
 
 using namespace boost::numeric;
 using namespace std;

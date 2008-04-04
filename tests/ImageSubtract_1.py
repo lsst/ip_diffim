@@ -4,38 +4,38 @@ import pdb
 import unittest
 import eups
 
-import lsst.mwi.policy
-import lsst.mwi.tests as tests
-import lsst.mwi.utils as mwiu
-import lsst.fw.Core.fwLib as fw
+import lsst.pex.policy
+import lsst.tests as tests
+import lsst.pex.logging as logging
+import lsst.afw.Core.afwLib as afw
 import lsst.detection.detectionLib as detection
-import lsst.imageproc.imageprocLib as imageproc
-import lsst.fw.Core.imageTestUtils as imTestUtils
+import lsst.ip.diffim.ip_diffimLib as diffim
+import lsst.afw.Core.imageTestUtils as imTestUtils
 
 try:
     type(verbosity)
 except NameError:
     verbosity = 0                       # increase to see trace
-mwiu.Trace_setVerbosity("lsst.fw", verbosity)
+logging.Trace_setVerbosity("lsst.afw", verbosity)
 
 try:
     type(debugIO)
 except NameError:
     debugIO = 0
 
-import lsst.fw.Display.ds9 as ds9
+import lsst.afw.Display.ds9 as ds9
 try:
     type(display)
 except NameError:
     display = False
 
 dataDir = os.environ.get("FWDATA_DIR", "")
-imageProcDir = eups.productDir("imageproc", "setup")
+imageProcDir = eups.productDir("ip_diffim", "setup")
 policyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
-policy = lsst.mwi.policy.Policy.createPolicy(policyPath)
+policy = lsst.pex.policy.Policy.createPolicy(policyPath)
 
 if not dataDir:
-    raise RuntimeError("Must set up fwData to run these tests")
+    raise RuntimeError("Must set up afwdata to run these tests")
 
 InputMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_1")
 TemplateMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_1_tmpl")
@@ -43,7 +43,7 @@ TemplateMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-79772
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 def initializeTestCases():
-    MaskedImage = fw.MaskedImageD       # the desired type of MaskedImage
+    MaskedImage = afw.MaskedImageD       # the desired type of MaskedImage
     templateMaskedImage2 = MaskedImage()
     templateMaskedImage2.readFits(TemplateMaskedImagePath)
 
@@ -58,21 +58,21 @@ def initializeTestCases():
     backgroundSpatialOrder = policy.get('backgroundSpatialOrder')
 
     # create basis vectors
-    kernelBasisList = imageproc.generateDeltaFunctionKernelSet(kernelCols, kernelRows)
+    kernelBasisList = diffim.generateDeltaFunctionKernelSet(kernelCols, kernelRows)
     
     # create output kernel pointer
-    kernelPtr = fw.LinearCombinationKernelPtr(fw.LinearCombinationKernel())
+    kernelPtr = afw.LinearCombinationKernelPtr(afw.LinearCombinationKernel())
     
     # and its function for spatial variation
-    kernelFunctionPtr = fw.Function2DPtr(fw.PolynomialFunction2D(kernelSpatialOrder))
+    kernelFunctionPtr = afw.Function2DPtr(afw.PolynomialFunction2D(kernelSpatialOrder))
     
     # and background function
-    backgroundFunctionPtr = fw.Function2DPtr(fw.PolynomialFunction2D(backgroundSpatialOrder))
+    backgroundFunctionPtr = afw.Function2DPtr(afw.PolynomialFunction2D(backgroundSpatialOrder))
     
     # make single good footprint at known object position in cal-53535-i-797722_1
     size = 40
     footprintList = detection.FootprintContainerT()
-    footprint = detection.FootprintPtrT(detection.Footprint( fw.BBox2i(366 - size/2,
+    footprint = detection.FootprintPtrT(detection.Footprint( afw.BBox2i(366 - size/2,
                                                                        364 - size/2,
                                                                        size,
                                                                        size) )
@@ -110,31 +110,31 @@ class ConvolveTestCase(unittest.TestCase):
         """Make sure that you recover a known convolution kernel"""
         kernelCols = policy.get('kernelCols')
         kernelRows = policy.get('kernelRows')
-        gaussFunctionPtr = fw.Function2DPtr(fw.GaussianFunction2D(sigmaX,sigmaY))
-        gaussKernel = fw.AnalyticKernel(gaussFunctionPtr, kernelCols, kernelRows)
-        convolvedScienceMaskedImage = fw.convolve(self.scienceMaskedImage, gaussKernel, 0, False)
+        gaussFunctionPtr = afw.Function2DPtr(afw.GaussianFunction2D(sigmaX,sigmaY))
+        gaussKernel = afw.AnalyticKernel(gaussFunctionPtr, kernelCols, kernelRows)
+        convolvedScienceMaskedImage = afw.convolve(self.scienceMaskedImage, gaussKernel, 0, False)
 
-        kImageIn  = fw.ImageD(kernelCols, kernelRows)
+        kImageIn  = afw.ImageD(kernelCols, kernelRows)
         kSumIn    = gaussKernel.computeImage(kImageIn, 0.0, 0.0, False)
         if debugIO:
             kImageIn.writeFits('kiFits.fits')
 
-        kImageOut = fw.ImageD(kernelCols, kernelRows)
+        kImageOut = afw.ImageD(kernelCols, kernelRows)
         
         for footprintID, iFootprintPtr in enumerate(self.footprintList):
             footprintBBox              = iFootprintPtr.getBBox()
             imageToConvolveStampPtr    = self.templateMaskedImage.getSubImage(footprintBBox)
             imageToNotConvolveStampPtr = convolvedScienceMaskedImage.getSubImage(footprintBBox)
             
-            kernelCoeffList, background = imageproc.computePsfMatchingKernelForPostageStamp(
+            kernelCoeffList, background = diffim.computePsfMatchingKernelForPostageStamp(
                 imageToConvolveStampPtr.get(),
                 imageToNotConvolveStampPtr.get(),
                 self.kernelBasisList,
                 policy
                 )
 
-            footprintKernelPtr = fw.LinearCombinationKernelPtr(
-                fw.LinearCombinationKernel(self.kernelBasisList, kernelCoeffList)
+            footprintKernelPtr = afw.LinearCombinationKernelPtr(
+                afw.LinearCombinationKernel(self.kernelBasisList, kernelCoeffList)
                 )
 
             kSumOut = footprintKernelPtr.computeImage(kImageOut, 0.0, 0.0, False)
@@ -196,7 +196,7 @@ class DeltaFunctionTestCase(unittest.TestCase):
         kernelCols = policy.get('kernelCols')
         kernelRows = policy.get('kernelRows')
 
-        kImage = fw.ImageD(kernelCols, kernelRows)
+        kImage = afw.ImageD(kernelCols, kernelRows)
         
         for footprintID, iFootprintPtr in enumerate(self.footprintList):
             footprintBBox              = iFootprintPtr.getBBox()
@@ -214,15 +214,15 @@ class DeltaFunctionTestCase(unittest.TestCase):
                 imageToConvolveStampPtr.writeFits('tFits_%d' % (footprintID,))
                 imageToNotConvolveStamp.writeFits('sFits_%d' % (footprintID,))
 
-            kernelCoeffList, background = imageproc.computePsfMatchingKernelForPostageStamp(
+            kernelCoeffList, background = diffim.computePsfMatchingKernelForPostageStamp(
                 imageToConvolveStampPtr.get(),
                 imageToNotConvolveStamp,
                 self.kernelBasisList,
                 policy
                 )
 
-            footprintKernelPtr = fw.LinearCombinationKernelPtr(
-                fw.LinearCombinationKernel(self.kernelBasisList, kernelCoeffList)
+            footprintKernelPtr = afw.LinearCombinationKernelPtr(
+                afw.LinearCombinationKernel(self.kernelBasisList, kernelCoeffList)
                 )
 
             kSum = footprintKernelPtr.computeImage(kImage, 0.0, 0.0, False)
@@ -281,11 +281,11 @@ class DeconvolveTestCase(unittest.TestCase):
         kernelCols = policy.get('kernelCols')
         kernelRows = policy.get('kernelRows')
 
-        kImageCPtr    = fw.ImageDPtr( fw.ImageD(kernelCols, kernelRows) )
-        kImageDPtr    = fw.ImageDPtr( fw.ImageD(kernelCols, kernelRows) )
+        kImageCPtr    = afw.ImageDPtr( afw.ImageD(kernelCols, kernelRows) )
+        kImageDPtr    = afw.ImageDPtr( afw.ImageD(kernelCols, kernelRows) )
 
         # hack to turn kernel image into maskedimage for convolution testing
-        kMaskPtr      = fw.MaskUPtr( fw.MaskU(kernelCols, kernelRows) )
+        kMaskPtr      = afw.MaskUPtr( afw.MaskU(kernelCols, kernelRows) )
         
         for footprintID, iFootprintPtr in enumerate(self.footprintList):
             footprintBBox              = iFootprintPtr.getBBox()
@@ -297,37 +297,37 @@ class DeconvolveTestCase(unittest.TestCase):
                 imageToNotConvolveStampPtr.writeFits('sFits_%d' % (footprintID,))
 
             # convolve
-            kernelCoeffListC, backgroundC = imageproc.computePsfMatchingKernelForPostageStamp(
+            kernelCoeffListC, backgroundC = diffim.computePsfMatchingKernelForPostageStamp(
                 imageToConvolveStampPtr.get(),
                 imageToNotConvolveStampPtr.get(),
                 self.kernelBasisList,
                 policy
                 )
-            footprintKernelPtrC = fw.LinearCombinationKernelPtr(
-                fw.LinearCombinationKernel(self.kernelBasisList, kernelCoeffListC)
+            footprintKernelPtrC = afw.LinearCombinationKernelPtr(
+                afw.LinearCombinationKernel(self.kernelBasisList, kernelCoeffListC)
                 )
             kSumC = footprintKernelPtrC.computeImage(kImageCPtr.get(), 0.0, 0.0, False)
-            kMaskedImageC = fw.MaskedImageD(kImageCPtr, kMaskPtr)
+            kMaskedImageC = afw.MaskedImageD(kImageCPtr, kMaskPtr)
             if debugIO:
                 kImageCPtr.writeFits('kFitsC_%d.fits' % (footprintID,))
                 kMaskedImageC.writeFits('kFitsMiC_%d' % (footprintID,))
             
             # deconvolve
-            kernelCoeffListD, backgroundD = imageproc.computePsfMatchingKernelForPostageStamp(
+            kernelCoeffListD, backgroundD = diffim.computePsfMatchingKernelForPostageStamp(
                 imageToNotConvolveStampPtr.get(),
                 imageToConvolveStampPtr.get(),
                 self.kernelBasisList,
                 policy
                 )
-            footprintKernelPtrD = fw.LinearCombinationKernelPtr(
-                fw.LinearCombinationKernel(self.kernelBasisList, kernelCoeffListD)
+            footprintKernelPtrD = afw.LinearCombinationKernelPtr(
+                afw.LinearCombinationKernel(self.kernelBasisList, kernelCoeffListD)
                 )
             kSumD = footprintKernelPtrD.computeImage(kImageDPtr.get(), 0.0, 0.0, False)
             if debugIO:
                 kImageDPtr.writeFits('kFitsD_%d.fits' % (footprintID,))
 
             # check that you get a delta function
-            testMaskedImage = fw.convolve(kMaskedImageC, footprintKernelPtrD.get(), 0, False)
+            testMaskedImage = afw.convolve(kMaskedImageC, footprintKernelPtrD.get(), 0, False)
             print testMaskedImage
             if debugIO:
                 testMaskedImage.writeFits('deltaFunc_%d' % (footprintID,))
