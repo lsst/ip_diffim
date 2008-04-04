@@ -6,7 +6,7 @@ import lsst.pex.exceptions as pex_ex
 import lsst.pex.policy
 from lsst.pex.logging import Log
 
-import lsst.afw.Core.fwLib as afw
+import lsst.afw.Core.afwLib as afw
 import lsst.detection.detectionLib as detection
 import ip_diffimLib
 from computePsfMatchingKernelForMaskedImage import *
@@ -149,7 +149,7 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     backgroundFunctionPtr = fw.Function2DPtr(fw.PolynomialFunction2D(backgroundSpatialOrder))
 
     # get Log 
-    diffImLog = Log(Log.getDefaultLog(), "imageproc.imageSubtract")
+    diffImLog = Log(Log.getDefaultLog(), "ip.diffim.imageSubtract")
 
     if footprintList == None:
         footprintList = getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve, policy)

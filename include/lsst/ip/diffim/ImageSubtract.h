@@ -6,7 +6,7 @@
  *
  * @author Andrew Becker, University of Washington
  *
- * @ingroup imageproc
+ * @ingroup diffim
  */
 
 #ifndef LSST_IMAGEPROC_IMAGESUBTRACT_H
@@ -31,7 +31,7 @@ namespace diffim {
      *
      * @brief Structure to store the summary statistics of a difference MaskedImage
      * 
-     * @ingroup imageproc
+     * @ingroup diffim
      */
     struct MaskedImageDiffimStats {
         double kernelResidual;
@@ -59,7 +59,7 @@ namespace diffim {
      * The class also contains a boolean member isGood that is set to False if
      * it fails statistical tests during the processing.
      * 
-     * @ingroup imageproc
+     * @ingroup diffim
      */
     template <typename ImageT, typename MaskT>
     class DiffImContainer {
@@ -84,7 +84,7 @@ namespace diffim {
         int nKernel;
         /* Vector of kernels : single image kernel, PCA model, spatial model */
         std::vector<boost::shared_ptr<lsst::afw::LinearCombinationKernel> > kernelList;
-        std::vector<lsst::imageproc::MaskedImageDiffimStats> diffimStats;
+        std::vector<lsst::ip::diffim::MaskedImageDiffimStats> diffimStats;
         std::vector<double> backgrounds;
         std::vector<double> kernelSums;
 
@@ -108,7 +108,7 @@ namespace diffim {
             this->imageToConvolve.reset(new maskedImageType(maskedImage));
         }
         void addKernel(boost::shared_ptr<lsst::afw::LinearCombinationKernel> newKernel,
-                       lsst::imageproc::MaskedImageDiffimStats newStats,
+                       lsst::ip::diffim::MaskedImageDiffimStats newStats,
                        double background,
                        double kernelSum) {
             this->kernelList.push_back(newKernel);
@@ -123,7 +123,7 @@ namespace diffim {
 
     template <typename ImageT, typename MaskT>
     void computeDiffImStats(
-        lsst::imageproc::DiffImContainer<ImageT, MaskT> &diffImContainer,
+        lsst::ip::diffim::DiffImContainer<ImageT, MaskT> &diffImContainer,
         int const kernelID,
         lsst::pex::policy::Policy &policy
         );
@@ -146,7 +146,7 @@ namespace diffim {
     
     template <typename ImageT, typename MaskT>
     lsst::afw::KernelList<lsst::afw::Kernel> computePcaKernelBasis(
-        std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT> > &diffImContainerList,
+        std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> > &diffImContainerList,
         lsst::pex::policy::Policy &policy
         );
 
@@ -154,7 +154,7 @@ namespace diffim {
     boost::shared_ptr<lsst::afw::LinearCombinationKernel> computeSpatiallyVaryingPsfMatchingKernel(
         boost::shared_ptr<lsst::afw::function::Function2<double> > &kernelFunctionPtr,
         boost::shared_ptr<lsst::afw::function::Function2<double> > &backgroundFunctionPtr,
-        std::vector<lsst::imageproc::DiffImContainer<ImageT, MaskT> > &diffImContainerList,
+        std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> > &diffImContainerList,
         lsst::afw::KernelList<lsst::afw::Kernel> const &kernelBasisList,
         lsst::pex::policy::Policy &policy
         );

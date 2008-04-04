@@ -15,7 +15,7 @@ import unittest
 import numpy
 
 import eups
-import lsst.afw.Core.fwLib as afw
+import lsst.afw.Core.afwLib as afw
 import lsst.tests as tests
 import lsst.pex.logging as logging
 import lsst.ip.diffim.ip_diffimLib as improc

@@ -1,4 +1,4 @@
-import lsst.afw.Core.fwLib as afw
+import lsst.afw.Core.afwLib as afw
 import lsst.pex.harness.Stage
 import lsst.ip.diffim
 #from lsst.ip.diffim.imageSubtract import imageSubtract

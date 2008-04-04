@@ -1,7 +1,7 @@
 import lsst.pex.harness.Stage
 import lsst.daf.base as D
 import lsst.daf.persistence as P
-import lsst.afw.Core.fwLib as FW
+import lsst.afw.Core.afwLib as FW
 
 class VisitMetadataStage(lsst.pex.harness.Stage.Stage):
     def preprocess(self):

@@ -14,9 +14,9 @@ import lsst.pex.logging
 import lsst.ip.diffim
 
 def main():
-    imageProcDir = eups.productDir("imageproc", "setup")
+    imageProcDir = eups.productDir("ip_diffim", "setup")
     if imageProcDir == None:
-        print "Error: imageproc not setup"
+        print "Error: ip_diffim not setup"
         sys.exit(1)
     moduleDir = os.path.dirname(os.path.abspath(__file__))
 

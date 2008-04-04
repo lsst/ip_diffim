@@ -13,9 +13,9 @@ import lsst.pex.logging
 
 def main():
     defDataDir = os.environ.get("FWDATA_DIR", "")
-    imageProcDir = eups.productDir("imageproc", "setup")
+    imageProcDir = eups.productDir("ip_diffim", "setup")
     if imageProcDir == None:
-        print "Error: imageproc not setup"
+        print "Error: ip_diffim not setup"
         sys.exit(1)
 
     defSciencePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_1")

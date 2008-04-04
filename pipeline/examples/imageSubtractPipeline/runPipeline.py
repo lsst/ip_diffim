@@ -16,9 +16,9 @@ import lsst.pex.harness.startPipeline
 
 def main():
     defDataDir = eups.productDir("afwdata", "setup") or "."
-    imageProcDir = eups.productDir("imageproc", "setup")
+    imageProcDir = eups.productDir("ip_diffim", "setup")
     if imageProcDir == None:
-        print "Error: imageproc not setup"
+        print "Error: ip_diffim not setup"
         sys.exit(1)
     pipelineDir = os.path.dirname(os.path.abspath(__file__))
     

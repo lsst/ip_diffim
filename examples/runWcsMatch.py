@@ -6,7 +6,7 @@ import optparse
 import eups
 import lsst.daf.base as dafBase
 import lsst.afw.Core.afwLib as afw
-import lsst.ip.diffim.imageprocLib
+import lsst.ip.diffim.ip_diffimLib
 import lsst.pex.logging
 
 def main():
@@ -64,7 +64,7 @@ def main():
         print "Verbosity =", opt.verbosity
         lsst.pex.logging.Trace_setVerbosity("lsst.ip.diffim", opt.verbosity)
     
-    numEdgePixels = lsst.ip.diffim.imageprocLib.wcsMatch(
+    numEdgePixels = lsst.ip.diffim.ip_diffimLib.wcsMatch(
         remapExposure, originalExposure, opt.kernelType, opt.kernelSize, opt.kernelSize)
     print "Remapped masked image has %s edge pixels" % (numEdgePixels)
     

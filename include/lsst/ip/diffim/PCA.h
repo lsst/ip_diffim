@@ -6,7 +6,7 @@
  *
  * @author Andrew Becker, University of Washington
  *
- * @ingroup imageproc
+ * @ingroup diffim
  */
 
 #ifndef LSST_IP_DIFFIM_PCA_H

@@ -18,7 +18,7 @@ def main():
     try:
         imageProcDir = os.environ["IMAGEPROC_DIR"]
     except KeyError:
-        print "Error: imageproc not setup"
+        print "Error: ip_diffim not setup"
         sys.exit(1)
     pipelineDir = os.path.dirname(os.path.abspath(__file__))
     sys.path += [os.path.dirname(pipelineDir)]
