@@ -6,9 +6,10 @@ import lsst.pex.logging as logging
 import lsst.pex.exceptions as pex_ex
 from lsst.pex.logging import Log
 
-import lsst.afw.Core.afwLib as afw
-import lsst.detection.detectionLib as detection
-import ip_diffimLib as ip_diffim # relative import, since this is in __init__.py
+import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath
+import lsst.detection as detection
+import diffimLib # relative import, since this is in __init__.py
 
 __all__ = ['computePsfMatchingKernelForMaskedImage']
 
@@ -94,8 +95,8 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
         edgeMaskBit,
         ))
     
-    kImage = afw.ImageD(kernelCols, kernelRows)
-    diffImContainerList = ip_diffim.vectorDiffImContainerD()
+    kImage = afwImage.ImageD(kernelCols, kernelRows)
+    diffImContainerList = diffimLib.vectorDiffImContainerD()
     for footprintID, iFootprintPtr in enumerate(footprintList):
         footprintBBox = iFootprintPtr.getBBox()
         logging.Trace('lsst.ip.diffim.computePsfMatchingKernelForMaskedImage', 5,
@@ -111,17 +112,17 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
             imageToNotConvolveStampPtr.writeFits('sFits_%d' % (footprintID,))
         
         # Find best single kernel for this stamp
-        kernelCoeffList, background = ip_diffim.computePsfMatchingKernelForPostageStamp(
+        kernelCoeffList, background = diffimLib.computePsfMatchingKernelForPostageStamp(
             imageToConvolveStampPtr.get(),
             imageToNotConvolveStampPtr.get(),
             kernelBasisList,
             policy,
         )
-        footprintKernelPtr = afw.LinearCombinationKernelPtr(
-            afw.LinearCombinationKernel(kernelBasisList, kernelCoeffList))
+        footprintKernelPtr = afwMath.LinearCombinationKernelPtr(
+            afwMath.LinearCombinationKernel(kernelBasisList, kernelCoeffList))
         
         # Structure holding information about this footprint and its fit to a kernel
-        diffImFootprintContainer                    = ip_diffim.DiffImContainerD()
+        diffImFootprintContainer                    = diffimLib.DiffImContainerD()
         diffImFootprintContainer.id                 = footprintID
         
         diffImFootprintContainer.setImageToNotConvolve(imageToNotConvolveStampPtr.get())
@@ -136,7 +137,7 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
 
         # Append to vectors collectively; might want to make this a method on a class to synchronize this
         diffImFootprintContainer.addKernel(footprintKernelPtr,
-                                           ip_diffim.MaskedImageDiffimStats(),
+                                           diffimLib.MaskedImageDiffimStats(),
                                            background,
                                            footprintKernelPtr.computeImage(kImage, 0.0, 0.0, False))
 
@@ -150,7 +151,7 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
             ))
 
         # Calculate and fill in difference image stats
-        ip_diffim.computeDiffImStats(diffImFootprintContainer, diffImFootprintContainer.nKernel, policy)
+        diffimLib.computeDiffImStats(diffImFootprintContainer, diffImFootprintContainer.nKernel, policy)
 
         diffImContainerList.append(diffImFootprintContainer)
         
@@ -228,9 +229,9 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
       
     # In the end we want to test if the kernelInBasisList is Delta Functions; if so, do PCA
     # For DC2 we just do it
-    kernelOutBasisList = ip_diffim.computePcaKernelBasis(diffImContainerList, policy)
+    kernelOutBasisList = diffimLib.computePcaKernelBasis(diffImContainerList, policy)
     
-    kernelPtr = ip_diffim.computeSpatiallyVaryingPsfMatchingKernel(
+    kernelPtr = diffimLib.computeSpatiallyVaryingPsfMatchingKernel(
         kernelFunctionPtr,
         backgroundFunctionPtr,
         diffImContainerList,
