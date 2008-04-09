@@ -4,5 +4,5 @@ import lsst.SConsUtils as scons
 
 env.CheckSwig("python", ilang="c++", includedProducts="afw daf_base pex_logging detection")
 
-env.LoadableModuleIncomplete("_ip_diffimLib", Split("ip_diffimLib.i"),
+env.LoadableModuleIncomplete("_diffimLib", Split("diffimLib.i"),
                              LIBS=env.getlibs("ip_diffim"))

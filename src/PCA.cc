@@ -285,7 +285,7 @@ void lsst::ip::diffim::approximateMatrixUsingBasis(
 /************************************************************************************************************/
 /* Explicit instantiations */
 
-/* ip_diffimLib.i requests both float and double; do we really need both? */
+/* diffimLib.i requests both float and double; do we really need both? */
 
 template
 void lsst::ip::diffim::computePca(vw::math::Vector<float> &rowMean,

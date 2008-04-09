@@ -1,12 +1,12 @@
 // -*- lsst-c++ -*-
-%define ip_diffimLib_DOCSTRING
+%define diffimLib_DOCSTRING
 "
-Python bindings for ip_diffim module
+Python bindings for lsst::ip::diffim code
 "
 %enddef
 
 %feature("autodoc", "1");
-%module(docstring=ip_diffimLib_DOCSTRING) ip_diffimLib
+%module(docstring=diffimLib_DOCSTRING) diffimLib
 
 // Everything we will need in the _wrap.cc file
 %{
@@ -28,7 +28,7 @@ Python bindings for ip_diffim module
 %apply double& OUTPUT { double& };
 
 %pythoncode %{
-def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/tickets/7/python/lsst/ip/diffim/ip_diffimLib.i $"):
+def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/tickets/7/python/lsst/ip/diffim/diffimLib.i $"):
     """Return a version given a HeadURL string; default: ip_diffim's version"""
     return guessSvnVersion(HeadURL)
 

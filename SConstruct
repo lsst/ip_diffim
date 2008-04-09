@@ -9,10 +9,10 @@ env = scons.makeEnv("ip_diffim",
                     r"$HeadURL$",
                     [["boost", "boost/version.hpp", "boost_filesystem:C++"],
                      ["boost", "boost/regex.hpp", "boost_regex:C++"],
-                     ["daf_base", "lsst/daf/base/Citizen.h", "daf_base:C++"],
-                     ["daf_persistence", "lsst/daf/persistence/Persistence.h", "daf_persistence:C++"],
-                     #["daf_data", "lsst/daf/data.h", "daf_data:C++"],
-                     ["afw", "lsst/afw/image/MaskedImage.h", "afw"],
+                     ["daf_base", "lsst/daf/base.h", "daf_base:C++"],
+                     ["daf_persistence", "lsst/daf/persistence.h", "daf_persistence:C++"],
+                     ["daf_data", "lsst/daf/data.h", "daf_data:C++"],
+                     ["afw", "lsst/afw/image.h", "afw"],
                      ["detection", "lsst/detection/Footprint.h", "detection"],
                      ["python", "Python.h"],
                      ["m", "math.h", "m", "sqrt"],
@@ -33,11 +33,7 @@ env.libs["ip_diffim"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") f
 #
 # Build/install things
 #
-for d in Split("doc include/lsst/ip/diffim lib src tests examples"):
-    SConscript(os.path.join(d, "SConscript"))
-
-# python
-for d in map(lambda str: os.path.join("python/lsst/%s" % env['eups_product'], str), Split(".")):
+for d in Split("doc include/lsst/ip/diffim lib src tests examples python/lsst/ip/diffim"):
     SConscript(os.path.join(d, "SConscript"))
 
 env['IgnoreFiles'] = r"(~$|\.pyc$|^\.svn$|\.o$)"
