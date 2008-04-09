@@ -27,8 +27,7 @@ namespace lsst {
 namespace ip {
 namespace diffim {
     
-    /** @struct
-     *
+    /**
      * @brief Structure to store the summary statistics of a difference MaskedImage
      * 
      * @ingroup diffim
@@ -40,8 +39,7 @@ namespace diffim {
         double footprintResidualVariance;
     };
 
-    /** @class
-     *
+    /**
      * @brief Class containing Image Subtraction information for a given
      * Footprint
      * 

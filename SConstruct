@@ -10,35 +10,26 @@ env = scons.makeEnv(
     r"$HeadURL$",
     [
         ["boost", "boost/version.hpp", "boost_filesystem:C++"],
-        ["boost", "boost/regex.hpp", "boost_regex:C++"],
-        ["boost", "boost/serialization/base_object.hpp", "boost_serialization:C++"],
-        ["vw", "vw/Core.h", "vw:C++"],
-        ["vw", "vw/Core.h", "vwCore:C++"],
         ["vw", "vw/Math.h", "vwMath:C++"],
-        ["vw", "vw/FileIO.h", "vwFileIO:C++"],
-        ["vw", "vw/Image.h", "vwImage:C++"],
         ["python", "Python.h"],
-        ["m", "math.h", "m", "sqrt"],
-        ["cfitsio", "fitsio.h", "m cfitsio", "ffopen"], # remove m once SConsUtils bug fixed
-        ["wcslib", "wcslib/wcs.h", "m wcs"], # remove m once SConsUtils bug fixed
-        ["xpa", "xpa.h", "xpa", "XPAPuts"],
-        ["minuit", "Minuit/FCNBase.h", "lcg_Minuit:C++"],
+#        ["m", "math.h", "m", "sqrt"], # appears to be optional
+        ["cfitsio", "fitsio.h", "m cfitsio", "ffopen"], # needed to link _diffimLib.so; remove m once SConsUtils bug fixed
+        ["wcslib", "wcslib/wcs.h", "m wcs"], # needed by afw; remove m once SConsUtils bug fixed
+        ["minuit", "Minuit/FCNBase.h", "lcg_Minuit:C++"], # needed by afw
         ["lapack", None, "lapack", "dgesdd_"],
         ["utils", "lsst/utils/Utils.h", "utils:C++"],
         ["daf_base", "lsst/daf/base.h", "daf_base:C++"],
         ["pex_exceptions", "lsst/pex/exceptions.h", "pex_exceptions:C++"],
         ["pex_logging", "lsst/pex/logging/Trace.h", "pex_logging:C++"],
-        ["security", "lsst/security/Security.h", "security:C++"],
+        ["security", "lsst/security/Security.h", "security:C++"], # needed by daf_data
         ["pex_policy", "lsst/pex/policy/Policy.h", "pex_policy:C++"],
-        ["daf_persistence", "lsst/daf/persistence.h", "daf_persistence:C++"],
-        ["daf_data", "lsst/daf/data.h", "daf_data:C++"],
+        ["daf_persistence", "lsst/daf/persistence.h", "daf_persistence:C++"], # needed by daf_data
+        ["daf_data", "lsst/daf/data.h", "daf_data:C++"], # needed by afw
         ["afw", "lsst/afw.h", "afw:C++"],
-        ["mpich2", "mpi.h", "mpich:C++"],
-        ["pex_harness", "lsst/pex/harness/Stage.h", "pex_harness:C++"],
         ["detection", "lsst/detection/Footprint.h", "detection"],
     ],
 )
-env.libs["ip_diffim"] = env.getlibs("boost vw lapack wcslib cfitsio daf_base daf_data daf_persistence pex_logging pex_exceptions pex_logging minuit afw detection")
+env.libs["ip_diffim"] = env.getlibs("boost vw lapack wcslib cfitsio daf_base pex_logging pex_exceptions daf_persistence daf_data pex_logging minuit afw detection")
 env.libs["ip_diffim"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") fails as lapack isn't in eups
 
 #
