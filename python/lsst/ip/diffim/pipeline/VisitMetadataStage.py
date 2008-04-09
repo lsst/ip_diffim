@@ -1,7 +1,7 @@
 import lsst.pex.harness.Stage
-import lsst.daf.base as D
-import lsst.daf.persistence as P
-import lsst.afw.Core.afwLib as FW
+import lsst.daf.base as dafBase
+import lsst.daf.persistence as dafPers
+import lsst.afw.image
 
 class VisitMetadataStage(lsst.pex.harness.Stage.Stage):
     def preprocess(self):
@@ -10,33 +10,33 @@ class VisitMetadataStage(lsst.pex.harness.Stage.Stage):
 
         inputDP = self.activeClipboard.get("triggerVisitEvent")
 
-        visitDP = D.DataProperty.createPropertyNode("visit2exposure")
-        visitDP.addProperty(D.DataProperty("visitId",
+        visitDP = dafBase.DataProperty.createPropertyNode("visit2exposure")
+        visitDP.addProperty(dafBase.DataProperty("visitId",
             inputDP.findUnique("visitId").getValueInt()))
-        visitDP.addProperty(D.DataProperty.createInt64DataProperty(
+        visitDP.addProperty(dafBase.DataProperty.createInt64DataProperty(
             "exposureId", inputDP.findUnique("exposureId").getValueInt() << 1))
         self.activeClipboard.put("visit2exposure", visitDP)
 
-        outputDP = D.DataProperty.createPropertyNode("rawFPAExposure")
+        outputDP = dafBase.DataProperty.createPropertyNode("rawFPAExposure")
 
-        outputDP.addProperty(D.DataProperty.createInt64DataProperty(
+        outputDP.addProperty(dafBase.DataProperty.createInt64DataProperty(
             "rawFPAExposureId",
             inputDP.findUnique("exposureId").getValueInt() << 1))
-        outputDP.addProperty(D.DataProperty("ra",
+        outputDP.addProperty(dafBase.DataProperty("ra",
             inputDP.findUnique("FOVRA").getValueDouble()))
-        outputDP.addProperty(D.DataProperty("decl",
+        outputDP.addProperty(dafBase.DataProperty("decl",
             inputDP.findUnique("FOVDec").getValueDouble()))
-        outputDP.addProperty(D.DataProperty.createFloatDataProperty("equinox",
+        outputDP.addProperty(dafBase.DataProperty.createFloatDataProperty("equinox",
             inputDP.findUnique("equinox").getValueDouble()))
-        outputDP.addProperty(D.DataProperty("filterId",
+        outputDP.addProperty(dafBase.DataProperty("filterId",
             self._lookup(inputDP.findUnique("filterName").getValueString())))
-        outputDP.addProperty(D.DataProperty.createDateTimeDataProperty(
+        outputDP.addProperty(dafBase.DataProperty.createDateTimeDataProperty(
             "dateObs",
-            P.DateTime(inputDP.findUnique("visitTime").getValueDouble())
+            dafPers.DateTime(inputDP.findUnique("visitTime").getValueDouble())
             ))
-        outputDP.addProperty(D.DataProperty.createFloatDataProperty(
+        outputDP.addProperty(dafBase.DataProperty.createFloatDataProperty(
             "expTime", inputDP.findUnique("exposureTime").getValueDouble()))
-        outputDP.addProperty(D.DataProperty.createFloatDataProperty(
+        outputDP.addProperty(dafBase.DataProperty.createFloatDataProperty(
             "airmass", inputDP.findUnique("airMass").getValueDouble()))
 
         self.activeClipboard.put("rawFPAExposure", outputDP)
@@ -44,8 +44,8 @@ class VisitMetadataStage(lsst.pex.harness.Stage.Stage):
 	# Rely on postprocess() to put the activeClipboard on the outputQueue.
         
     def _lookup(self, filterName):
-        dbLocation = P.LogicalLocation( \
+        dbLocation = dafPers.LogicalLocation( \
                 "mysql://lsst10.ncsa.uiuc.edu:3306/test")
-        filterDB = FW.Filter(dbLocation, filterName)
+        filterDB = lsst.afw.image.Filter(dbLocation, filterName)
         filterId = filterDB.getId()
         return filterId

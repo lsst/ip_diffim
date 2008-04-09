@@ -5,9 +5,9 @@ import optparse
 
 import eups
 import lsst.daf.base as dafBase
-import lsst.afw.Core.afwLib as afw
-import lsst.ip.diffim.ip_diffimLib
 import lsst.pex.logging
+import lsst.afw.image as afwImage
+import lsst.ip.diffim
 
 def main():
     defDataDir = os.environ.get("FWDATA_DIR", "")
@@ -54,17 +54,17 @@ def main():
     print "Remapping masked image  ", originalPath
     print "to match wcs and size of", remapPath
     
-    originalExposure = afw.ExposureD()
+    originalExposure = afwImage.ExposureD()
     originalExposure.readFits(originalPath)
     
-    remapExposure  = afw.ExposureD()
+    remapExposure  = afwImage.ExposureD()
     remapExposure.readFits(remapPath)
     
     if opt.verbosity > 0:
         print "Verbosity =", opt.verbosity
         lsst.pex.logging.Trace_setVerbosity("lsst.ip.diffim", opt.verbosity)
     
-    numEdgePixels = lsst.ip.diffim.ip_diffimLib.wcsMatch(
+    numEdgePixels = lsst.ip.diffim.wcsMatch(
         remapExposure, originalExposure, opt.kernelType, opt.kernelSize, opt.kernelSize)
     print "Remapped masked image has %s edge pixels" % (numEdgePixels)
     

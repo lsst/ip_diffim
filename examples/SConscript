@@ -2,14 +2,14 @@
 Import("env")
 import sys
 
-env.Program(["CFHT2MaskedImage.cc"], LIBS=env.getlibs("ip_diffim"))
+#env.Program(["CFHT2MaskedImage.cc"], LIBS=env.getlibs("ip_diffim"))
 
 import lsst.tests
 
 import lsst.SConsUtils as scons         # scons 1.17 supports "env.ProductDir", but for now use scons.ProductDir
 dataDir = scons.ProductDir("afwdata")
 args = {
-    "CFHT2MaskedImage" : "%s/871034p_1 %s/871034p_1_MI_unittest" % (dataDir, dataDir),
+#    "CFHT2MaskedImage" : "%s/871034p_1 %s/871034p_1_MI_unittest" % (dataDir, dataDir),
 }
 #
 # Tests

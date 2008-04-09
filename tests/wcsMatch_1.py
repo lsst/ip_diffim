@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Test lsst.ip.diffim.ip_diffimLib.wcsMatch
+Test lsst.ip.diffim.diffimLib.wcsMatch
 
 Author: Nicole M. Silvestri, University of Washington
 Contact: nms@astro.washington.edu
@@ -15,10 +15,10 @@ import unittest
 import numpy
 
 import eups
-import lsst.afw.Core.afwLib as afw
-import lsst.utils.tests as tests
+import lsst.afw.image as afwImage
+import lsst.utils.tests as utilsTests
 import lsst.pex.logging as logging
-import lsst.ip.diffim.ip_diffimLib as improc
+import lsst.ip.diffim as ipDiff
 
 try:
     type(verbose)
@@ -48,24 +48,24 @@ class wcsMatchTestCase(unittest.TestCase):
 
     def setUp(self):
         # setup original (template) MaskedImage and WCS
-        origMaskedImage = fw.MaskedImageD()
+        origMaskedImage = afwImage.MaskedImageD()
         origMaskedImage.readFits(inFilePathOrig)
-        self.origWcs = fw.WCS(origMaskedImage.getImage().getMetaData())
+        self.origWcs = afwImage.WCS(origMaskedImage.getImage().getMetaData())
         origCols = origMaskedImage.getCols()
         origRows = origMaskedImage.getRows()
 
         # setup science MaskedImage and WCS. The science WCS will
         # serve as the remapped WCS       
-        sciMaskedImage = fw.MaskedImageD()
+        sciMaskedImage = afwImage.MaskedImageD()
         sciMaskedImage.readFits(inFilePathSci)
-        self.sciWcs = fw.WCS(sciMaskedImage.getImage().getMetaData())
+        self.sciWcs = afwImage.WCS(sciMaskedImage.getImage().getMetaData())
 
         # setup the remapped and original Exposure.  The remapped
         # MaskedImage is 1/2 kernel width larger than the original
         # Exposure's MaskedImage 
-        remapMaskedImage = fw.MaskedImageD(origCols + 1,origRows + 1)
-        self.origExposure = fw.ExposureD(origMaskedImage, self.origWcs)
-        self.remapExposure = fw.ExposureD(remapMaskedImage, self.sciWcs)
+        remapMaskedImage = afwImage.MaskedImageD(origCols + 1,origRows + 1)
+        self.origExposure = afwImage.ExposureD(origMaskedImage, self.origWcs)
+        self.remapExposure = afwImage.ExposureD(remapMaskedImage, self.sciWcs)
 
         # input parameters to generate the analytic remapping kernel
         self.kernelType = "lanczos"
@@ -96,10 +96,10 @@ class wcsMatchTestCase(unittest.TestCase):
         and the remapped MaskedImage yield the same RA/Decl on the
         sky. 
         """
-        improc.wcsMatch(self.remapExposure, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows)
+        ipDiff.wcsMatch(self.remapExposure, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows)
 
         # try the origin
-        colRow = fw.Coord2D(0,0)
+        colRow = afwImage.Coord2D(0,0)
         origRaDec = self.origWcs.colRowToRaDec(colRow)
         remapWcs = self.remapExposure.getWcs()
         remapRaDec = remapWcs.colRowToRaDec(colRow)
@@ -108,7 +108,7 @@ class wcsMatchTestCase(unittest.TestCase):
         self.assertAlmostEqual(origRaDec.y(), remapRaDec.y())
 
         # try a random location
-        colRow1 = fw.Coord2D(0,21)
+        colRow1 = afwImage.Coord2D(0,21)
         origRaDec1 = self.origWcs.colRowToRaDec(colRow1)
         remapRaDec1 = remapWcs.colRowToRaDec(colRow1)
 
@@ -128,17 +128,17 @@ class wcsMatchTestCase(unittest.TestCase):
         and the remapped MaskedImage yield the same RA/Decl on the
         sky.  
         """
-        improc.wcsMatch(self.remapExposure, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows)
+        ipDiff.wcsMatch(self.remapExposure, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows)
 
-        swarpMaskedImage = fw.MaskedImageD()
+        swarpMaskedImage = afwImage.MaskedImageD()
         swarpMaskedImage.readFits(inFilePathSwarp)
-        swarpWcs = fw.WCS(swarpMaskedImage.getImage().getMetaData())
+        swarpWcs = afwImage.WCS(swarpMaskedImage.getImage().getMetaData())
 
         remapWcs = remapExposure.getWcs()
         remapRaDec = remapWcs.colRowToRaDec(colRow)
 
         # try the origin
-        colRow = fw.Coord2D(0,0)
+        colRow = afwImage.Coord2D(0,0)
         swarpRaDec = swarpWcs.colRowToRaDec(colRow)
         remapRaDec = remapWcs.colRowToRaDec(colRow)
 
@@ -146,7 +146,7 @@ class wcsMatchTestCase(unittest.TestCase):
         self.assertAlmostEqual(swarpRaDec.y(), remapRaDec.y())
 
         # try a random location
-        colRow1 = fw.Coord2D(12,21)
+        colRow1 = afwImage.Coord2D(12,21)
         swarpRaDec1 = swarpWcs.colRowToRaDec(colRow1)
         remapRaDec1 = remapWcs.colRowToRaDec(colRow1)
 
@@ -170,11 +170,11 @@ class wcsMatchTestCase(unittest.TestCase):
         remapCols = remapMaskedImage.getCols()
         remapRows = remapMaskedImage.getRows()
 
-        newRemapExposure = improc.wcsMatch(remapWcs, remapCols, remapRows, self.origExposure,
+        newRemapExposure = ipDiff.wcsMatch(remapWcs, remapCols, remapRows, self.origExposure,
                                            self.kernelType, self.kernelCols, self.kernelRows)
 
         # try the origin
-        colRow = fw.Coord2D(0,0)
+        colRow = afwImage.Coord2D(0,0)
         origRaDec = origWcs.colRowToRaDec(colRow)
         newRemapWcs = newRemapExposure.getWcs()
         newRemapRaDec = newRemapWcs.colRowToRaDec(colRow)
@@ -183,7 +183,7 @@ class wcsMatchTestCase(unittest.TestCase):
         self.assertAlmostEqual(origRaDec.y(), newRemapRaDec.y())
 
         # try a random location
-        colRow1 = fw.Coord2D(21,12)
+        colRow1 = afwImage.Coord2D(21,12)
         origRaDec1 = origWcs.colRowToRaDec(colRow1)
         newRemapRaDec1 = newRemapWcs.colRowToRaDec(colRow1)
 
@@ -208,17 +208,17 @@ class wcsMatchTestCase(unittest.TestCase):
         remapCols = remapMaskedImage.getCols()
         remapRows = remapMaskedImage.getRows()
 
-        newRemapExposure = improc.wcsMatch(remapWcs, remapCols, remapRows, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows)
+        newRemapExposure = ipDiff.wcsMatch(remapWcs, remapCols, remapRows, self.origExposure, self.kernelType, self.kernelCols, self.kernelRows)
 
-        swarpMaskedImage = fw.MaskedImageD()
+        swarpMaskedImage = afwImage.MaskedImageD()
         swarpMaskedImage.readFits(inFilePathSwarp)
-        swarpWcs = fw.WCS(swarpMaskedImage.getImage().getMetaData())
+        swarpWcs = afwImage.WCS(swarpMaskedImage.getImage().getMetaData())
 
         newRemapWcs = newRemapExposure.getWcs()
         newRemapRaDec = newRemapWcs.colRowToRaDec(colRow)
 
         # try the origin
-        colRow = fw.Coord2D(0,0)
+        colRow = afwImage.Coord2D(0,0)
         swarpRaDec = swarpWcs.colRowToRaDec(colRow)
         newRemapRaDec = newRemapWcs.colRowToRaDec(colRow)
 
@@ -226,7 +226,7 @@ class wcsMatchTestCase(unittest.TestCase):
         self.assertAlmostEqual(swarpRaDec.y(), newRemapRaDec.y())
 
         # try a random location
-        colRow1 = fw.Coord2D(12,21)
+        colRow1 = afwImage.Coord2D(12,21)
         swarpRaDec1 = swarpWcs.colRowToRaDec(colRow1)
         newRemapRaDec1 = newRemapWcs.colRowToRaDec(colRow1)
 
@@ -239,17 +239,17 @@ def suite():
     """
     Returns a suite containing all the test cases in this module.
     """
-    tests.init()
+    utilsTests.init()
 
     suites = []
     suites += unittest.makeSuite(wcsMatchTestCase)
-    suites += unittest.makeSuite(tests.MemoryTestCase)
+    suites += unittest.makeSuite(utilsTests.MemoryTestCase)
 
     return unittest.TestSuite(suites)
 
 def run(exit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    utilsTests.run(suite(), exit)
 
 if __name__ == "__main__":
     run(True)

@@ -7,7 +7,7 @@ import optparse
 
 import eups
 import lsst.daf.base as dafBase
-import lsst.afw.Core.afwLib as afw
+import lsst.afw.image as afwImage
 import lsst.ip.diffim
 import lsst.pex.logging
 
@@ -62,10 +62,10 @@ Notes:
     print "Output image:  ", outputPath
     print "Policy file:   ", policyPath
     
-    templateMaskedImage = afw.MaskedImageF()
+    templateMaskedImage = afwImage.MaskedImageF()
     templateMaskedImage.readFits(templatePath)
     
-    scienceMaskedImage  = afw.MaskedImageF()
+    scienceMaskedImage  = afwImage.MaskedImageF()
     scienceMaskedImage.readFits(sciencePath)
     
     policy = lsst.pex.policy.Policy.createPolicy(policyPath)

@@ -9,7 +9,7 @@ import optparse
 
 import eups
 import lsst.daf.base as dafBase
-import lsst.afw.Core.afwLib as afw
+import lsst.afw.image as afwImage
 import lsst.pex.logging
 import lsst.ip.diffim
 
@@ -84,10 +84,10 @@ Notes:
             differencePath = os.path.abspath(os.path.expandvars(differencePath))
             print "Compute %r = \n  %r - %r" % (differencePath, sciencePath, templatePath)
             
-            templateMaskedImage = afw.MaskedImageF()
+            templateMaskedImage = afwImage.MaskedImageF()
             templateMaskedImage.readFits(templatePath)
             
-            scienceMaskedImage  = afw.MaskedImageF()
+            scienceMaskedImage  = afwImage.MaskedImageF()
             scienceMaskedImage.readFits(sciencePath)
 
             if not options.trial:

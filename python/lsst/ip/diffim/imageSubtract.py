@@ -1,21 +1,18 @@
 #!/usr/bin/env python
 import numpy as num
 
-import lsst.pex.logging as logging
-import lsst.pex.exceptions as pex_ex
+import lsst.pex.logging as pexLog
 import lsst.pex.policy
-from lsst.pex.logging import Log
-
-import lsst.afw.Core.afwLib as afw
+import lsst.afw.math as afwMath
 import lsst.detection.detectionLib as detection
-import ip_diffimLib
+import diffimLib
 from computePsfMatchingKernelForMaskedImage import *
 
 __all__ = ['imageSubtract']
 
 def getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve, policy):
     # hack until I can append to Vector2i or grow Footprint
-    return ip_diffimLib.getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve, policy)
+    return diffimLib.getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve, policy)
                                                              
     footprintDiffimNpixMin = policy.get('getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin');
     footprintDiffimGrow = policy.get('getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow');
@@ -28,12 +25,12 @@ def getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve,
     badPixelMask = 1 << badMaskBit
 
     varImg = imageToConvolve.getVariance()
-    noise = num.sqrt(fw.mean_channel_value(varImg))
+    noise = num.sqrt(afwMath.mean_channel_value(varImg))
 
     nCleanFootprints = 0
     while ( (nCleanFootprints < minimumCleanFootprints) and (footprintDetectionThresholdSigma >= minimumDetectionThresholdSigma) ):
 
-        logging.Trace('lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching', 3,
+        pexLog.Trace('lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching', 3,
                    'thresholdSigma = %r; noise = %r; PixMin = %r' % (footprintDetectionThresholdSigma, noise, footprintDiffimNpixMin))
         detectionSet = detection.DetectionSetF(imageToConvolve,
                                                detection.Threshold(footprintDetectionThresholdSigma*noise, detection.Threshold.VALUE, True),
@@ -72,7 +69,7 @@ def getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve,
                 
                 nCleanFootprints += 1;
             
-        logging.Trace('lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching', 3,
+        pexLog.Trace('lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching', 3,
                    'Found %d clean footprints above threshold %.3f' % (footprintListOut.size(), footprintDetectionThresholdSigma*noise))
         
         footprintDetectionThresholdSigma -= detectionThresholdScalingSigma
@@ -99,8 +96,8 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     but for now that step must already have been performed.
     
     Inputs:
-    - imageToConvolve: an lsst.afw.MaskedImage(x)
-    - imageToConvolve: an lsst.afw.MaskedImage(x)
+    - imageToConvolve: an lsst.afw.image.MaskedImage(X)
+    - imageToConvolve: an lsst.afw.image.MaskedImage(X)
     - policy: the policy; required elements are...?
     - psfMatchBasisKernelSet: a sequence of kernel basis vectors; if omitted then a delta function kernel is used.
     - footprintList: a squence of detection footprints to use for computing
@@ -126,11 +123,11 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     debugIO = policy.get('debugIO', False)
     switchConvolve = policy.get('switchConvolve', False)
     
-    logging.Trace('lsst.ip.diffim.imageSubtract', 3,
+    pexLog.Trace('lsst.ip.diffim.imageSubtract', 3,
         'kernelCols = %r; kernelRows = %r' % (kernelCols, kernelRows))
-    logging.Trace('lsst.ip.diffim.imageSubtract', 3,
+    pexLog.Trace('lsst.ip.diffim.imageSubtract', 3,
         'kernelSpatialOrder = %r; backgroundSpatialOrder = %r' % (kernelSpatialOrder, backgroundSpatialOrder))
-    logging.Trace('lsst.ip.diffim.imageSubtract', 3,
+    pexLog.Trace('lsst.ip.diffim.imageSubtract', 3,
         'edgeMaskBit = %r; badPixelMask = %r' % (edgeMaskBit, badPixelMask))
 
     ###########
@@ -140,22 +137,22 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     
     # create basis vectors
     if psfMatchBasisKernelSet == None:
-        psfMatchBasisKernelSet = ip_diffimLib.generateDeltaFunctionKernelSet(kernelCols, kernelRows)
+        psfMatchBasisKernelSet = diffimLib.generateDeltaFunctionKernelSet(kernelCols, kernelRows)
     
     # create function for kernel spatial variation
-    kernelSpatialFunctionPtr = fw.Function2DPtr(fw.PolynomialFunction2D(kernelSpatialOrder))
+    kernelSpatialFunctionPtr = afwMath.Function2DPtr(afwMath.PolynomialFunction2D(kernelSpatialOrder))
     
     # and function for background
-    backgroundFunctionPtr = fw.Function2DPtr(fw.PolynomialFunction2D(backgroundSpatialOrder))
+    backgroundFunctionPtr = afwMath.Function2DPtr(afwMath.PolynomialFunction2D(backgroundSpatialOrder))
 
     # get Log 
-    diffImLog = Log(Log.getDefaultLog(), "ip.diffim.imageSubtract")
+    diffImLog = pexLog.Log(pexLog.Log.getDefaultLog(), "ip.diffim.imageSubtract")
 
     if footprintList == None:
         footprintList = getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve, policy)
     else:
-        logging.Trace('lsst.ip.diffim.imageSubtract', 3, 'User supplied %d footprints' % len(footprintList))
-    logging.Trace('lsst.ip.diffim.imageSubtract', 4, "Computing psf-matching kernel")
+        pexLog.Trace('lsst.ip.diffim.imageSubtract', 3, 'User supplied %d footprints' % len(footprintList))
+    pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Computing psf-matching kernel")
 
     if switchConvolve:
         imageTmp = imageToConvolve
@@ -181,22 +178,22 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     # diffIm -= imageToNotConvolve
     # diffIm *= -1
     #
-    if type(psfMatchKernelPtr.get()) == fw.LinearCombinationKernel:
-        logging.Trace('lsst.ip.diffim.imageSubtract', 4, "Psf-match using convolveLinear")
-        differenceImage = fw.convolveLinear(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit)
+    if type(psfMatchKernelPtr.get()) == afwMath.LinearCombinationKernel:
+        pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Psf-match using convolveLinear")
+        differenceImage = afwMath.convolveLinear(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit)
     else:
-        logging.Trace('lsst.ip.diffim.imageSubtract', 4, "Psf-match using convolve")
-        differenceImage = fw.convolve(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit, False)
+        pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Psf-match using convolve")
+        differenceImage = afwMath.convolve(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit, False)
 
-    logging.Trace('lsst.ip.diffim.imageSubtract', 4, "Add background")
-    ip_diffimLib.addFunction(differenceImage.getImage().get(), backgroundFunctionPtr.get())
-    logging.Trace('lsst.ip.diffim.imageSubtract', 4, "Subtract imageToNotConvolve")
+    pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Add background")
+    diffimLib.addFunction(differenceImage.getImage().get(), backgroundFunctionPtr.get())
+    pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Subtract imageToNotConvolve")
     differenceImage      -= imageToNotConvolve
     differenceImage      *= -1.0
 
     # Find quality metrics
-    nGoodPixels, meanOfResiduals, varianceOfResiduals = ip_diffimLib.calculateMaskedImageResiduals(differenceImage, badPixelMask)
-    logging.Trace('lsst.ip.diffim.imageSubtract', 3, 'Mean and variance of residuals in difference image : %.3f %.3f (%d pixels)' %
+    nGoodPixels, meanOfResiduals, varianceOfResiduals = diffimLib.calculateMaskedImageResiduals(differenceImage, badPixelMask)
+    pexLog.Trace('lsst.ip.diffim.imageSubtract', 3, 'Mean and variance of residuals in difference image : %.3f %.3f (%d pixels)' %
                (meanOfResiduals, varianceOfResiduals, nGoodPixels))
     
     if debugIO:

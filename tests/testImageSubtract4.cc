@@ -2,9 +2,9 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include <lsst/afw/MaskedImage.h>
-#include <lsst/afw/Kernel.h>
-#include <lsst/afw/FunctionLibrary.h>
+#include <lsst/afw/image/MaskedImage.h>
+#include <lsst/afw/math/Kernel.h>
+#include <lsst/afw/math/FunctionLibrary.h>
 
 #include <lsst/daf/base/Citizen.h>
 #include <lsst/pex/exceptions/Exception.h>
@@ -24,7 +24,7 @@ int main( int argc, char** argv )
     {
         lsst::pex::loggin::Trace::setVerbosity("lsst.ip.diffim", 4);
         
-        typedef lsst::afw::maskPixelType MaskT;
+        typedef lsst::afw::image::maskPixelType MaskT;
         typedef float ImageT; // have to make sure this jibes with the input data!
         typedef double KernelT;
         typedef double FuncT;
@@ -69,11 +69,11 @@ int main( int argc, char** argv )
         double minSigma = 0.1;
         double maxSigma = 3.0;
         
-        lsst::afw::Kernel<KernelT>::KernelFunctionPtrType gaussFuncPtr(
-            new lsst::afw::function::GaussianFunction2<FuncT>(sigmaX, sigmaY));
-        lsst::afw::Kernel<KernelT>::SpatialFunctionPtrType polyFuncPtr(
-            new lsst::afw::function::PolynomialFunction2<double>(polyOrder));
-        lsst::afw::AnalyticKernel<KernelT> gaussSpVarKernel(
+        lsst::afw::math::Kernel<KernelT>::KernelFunctionPtrType gaussFuncPtr(
+            new lsst::afw::math::GaussianFunction2<FuncT>(sigmaX, sigmaY));
+        lsst::afw::math::Kernel<KernelT>::SpatialFunctionPtrType polyFuncPtr(
+            new lsst::afw::math::PolynomialFunction2<double>(polyOrder));
+        lsst::afw::math::AnalyticKernel<KernelT> gaussSpVarKernel(
             gaussFuncPtr, kernelCols, kernelRows, polyFuncPtr);
         
         // Get copy of spatial parameters (all zeros), set and feed back to the kernel
@@ -90,8 +90,8 @@ int main( int argc, char** argv )
         
         // Convolved science image
         lsst::pex::loggin::Trace("testImageSubtract4", 2, "Convolving input image for testing");
-        lsst::afw::MaskedImage<ImageT, MaskT> convolvedScienceMaskedImage =
-            lsst::afw::kernel::convolve(scienceMaskedImage, gaussSpVarKernel, convolveThreshold, edgeMaskBit, false);
+        lsst::afw::image::MaskedImage<ImageT, MaskT> convolvedScienceMaskedImage =
+            lsst::afw::math::convolve(scienceMaskedImage, gaussSpVarKernel, convolveThreshold, edgeMaskBit, false);
         
         convolvedScienceMaskedImage.writeFits( (boost::format("%s_test4") % inputImage).str() );
         
@@ -103,27 +103,27 @@ int main( int argc, char** argv )
         // Give it less power than the Fcn we convolved the image with, see what happens
         // OVERRIDE POLICY HERE
         kernelSpatialOrder = polyOrder;
-        boost::shared_ptr<lsst::afw::function::Function2<FuncT> > kernelFunctionPtr(
-            new lsst::afw::function::PolynomialFunction2<FuncT>(kernelSpatialOrder)
+        boost::shared_ptr<lsst::afw::math::Function2<FuncT> > kernelFunctionPtr(
+            new lsst::afw::math::PolynomialFunction2<FuncT>(kernelSpatialOrder)
             );
         
         // Function for spatially varying background.  
-        boost::shared_ptr<lsst::afw::function::Function2<FuncT> > backgroundFunctionPtr(
-            new lsst::afw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
+        boost::shared_ptr<lsst::afw::math::Function2<FuncT> > backgroundFunctionPtr(
+            new lsst::afw::math::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
             );
 
         // Use hard-coded positions for now
         vector<lsst::detection::Footprint::PtrType> footprintList =
             lsst::ip::diffim::getCollectionOfMaskedImagesForPsfMatching();
 
-        boost::shared_ptr<lsst::afw::LinearCombinationKernel<KernelT> > kernelPtr =
+        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel<KernelT> > kernelPtr =
             lsst::ip::diffim::computePsfMatchingKernelForMaskedImage(
                 kernelFunctionPtr, backgroundFunctionPtr, templateMaskedImage, convolvedScienceMaskedImage,
                 kernelBasisVec, footprintList, p);
         
-        lsst::afw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage(templateMaskedImage.getCols(), 
+        lsst::afw::image::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage(templateMaskedImage.getCols(), 
                                                                           templateMaskedImage.getRows());
-        lsst::afw::kernel::convolveLinear(convolvedTemplateMaskedImage, templateMaskedImage, *kernelPtr, edgeMaskBit);
+        lsst::afw::math::convolveLinear(convolvedTemplateMaskedImage, templateMaskedImage, *kernelPtr, edgeMaskBit);
         
         convolvedScienceMaskedImage -= convolvedTemplateMaskedImage;
         convolvedScienceMaskedImage.writeFits( (boost::format("%s_diff4") % inputImage).str() );

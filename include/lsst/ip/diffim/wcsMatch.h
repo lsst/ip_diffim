@@ -16,15 +16,15 @@
   * LSST Legalese here...
   */
 
-#ifndef LSST_FW_wcsMatch_H
-#define LSST_FW_wcsMatch_H
+#ifndef LSST_IP_DIFFIM_WCSMATCH_H
+#define LSST_IP_DIFFIM_WCSMATCH_H
 
 #include <string>
 
 #include <boost/shared_ptr.hpp>
 
-#include <lsst/afw/Exposure.h>
-#include <lsst/afw/WCS.h>
+#include <lsst/afw/image/Exposure.h>
+#include <lsst/afw/image/Wcs.h>
 
 namespace lsst {
 namespace ip {
@@ -34,20 +34,20 @@ namespace diffim {
 
     template<typename ImageT, typename MaskT> 
     int wcsMatch(
-        lsst::afw::Exposure<ImageT, MaskT> &remapExposure,
-        lsst::afw::Exposure<ImageT, MaskT> const &origExposure,
+        lsst::afw::image::Exposure<ImageT, MaskT> &remapExposure,
+        lsst::afw::image::Exposure<ImageT, MaskT> const &origExposure,
         std::string const kernelType, 
         int kernelCols, 
         int kernelRows
         );
 
     template<typename ImageT, typename MaskT> 
-    lsst::afw::Exposure<ImageT, MaskT> wcsMatch(
+    lsst::afw::image::Exposure<ImageT, MaskT> wcsMatch(
         int &numEdgePixels,
-        lsst::afw::WCS const &remapWcs,
+        lsst::afw::image::Wcs const &remapWcs,
         int remapCols, 
         int remapRows, 
-        lsst::afw::Exposure<ImageT, MaskT> const &origExposure,
+        lsst::afw::image::Exposure<ImageT, MaskT> const &origExposure,
         std::string const kernelType, 
         int kernelCols, 
         int kernelRows
@@ -55,4 +55,4 @@ namespace diffim {
        
 }}} // namespace diffim   ip   lsst
 
-#endif // !defined(LSST_FW_wcsMatch_H)
+#endif // !defined(LSST_IP_DIFFIM_WCSMATCH_H)

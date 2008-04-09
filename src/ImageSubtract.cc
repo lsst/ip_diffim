@@ -22,9 +22,9 @@
 #include <lsst/pex/logging/Trace.h>
 #include <lsst/pex/logging/Log.h>
 
-#include <lsst/afw/FunctionLibrary.h>
-#include <lsst/afw/PixelAccessors.h>
-#include <lsst/afw/minimize.h>
+#include <lsst/afw/math/FunctionLibrary.h>
+#include <lsst/afw/image/PixelAccessors.h>
+#include <lsst/afw/math/minimize.h>
 
 #include "lsst/ip/diffim/PCA.h"
 #include "lsst/ip/diffim/ImageSubtract.h"
@@ -53,8 +53,8 @@ using lsst::pex::logging::Rec;
  */
 template <typename ImageT, typename MaskT>
 std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::MaskedImage<ImageT, MaskT> const &imageToConvolve, ///< Template image; is convolved
-    lsst::afw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve, ///< Science image; is not convolved
+    lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve, ///< Template image; is convolved
+    lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve, ///< Science image; is not convolved
     lsst::pex::policy::Policy &policy ///< Policy directing the behavior
     ) {
     
@@ -71,8 +71,8 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollection
     MaskT badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
 
     /* Reusable view of each Footprint */
-    typename lsst::afw::MaskedImage<ImageT, MaskT>::MaskedImagePtrT imageToConvolveFootprintPtr;
-    typename lsst::afw::MaskedImage<ImageT, MaskT>::MaskedImagePtrT imageToNotConvolveFootprintPtr;
+    typename lsst::afw::image::MaskedImage<ImageT, MaskT>::MaskedImagePtrT imageToConvolveFootprintPtr;
+    typename lsst::afw::image::MaskedImage<ImageT, MaskT>::MaskedImagePtrT imageToNotConvolveFootprintPtr;
 
     /* Reusable list of Footprints */
     std::vector<lsst::detection::Footprint::PtrType> footprintListIn;
@@ -98,7 +98,7 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollection
             } 
 
             /* grab the BBox and grow it; this will eventually be overridden by a grow method on Footprint */
-            BBox2i footprintBBox = (*i)->getBBox();
+            vw::BBox2i footprintBBox = (*i)->getBBox();
             footprintBBox.grow(footprintBBox.max() + vw::Vector2i(footprintDiffimGrow,footprintDiffimGrow));
             footprintBBox.grow(footprintBBox.min() - vw::Vector2i(footprintDiffimGrow,footprintDiffimGrow));
 
@@ -148,9 +148,9 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollection
 template <typename ImageT, typename MaskT>
 std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
     double &background, ///< Difference in the backgrounds
-    lsst::afw::MaskedImage<ImageT, MaskT> const &imageToConvolve, ///< Image to convolve
-    lsst::afw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve, ///< Image to not convolve
-    lsst::afw::KernelList<lsst::fw::Kernel> const &kernelInBasisList, ///< Input kernel basis set
+    lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve, ///< Image to convolve
+    lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve, ///< Image to not convolve
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList, ///< Input kernel basis set
     lsst::pex::policy::Policy &policy ///< Policy directing the behavior
     ) { 
     
@@ -186,12 +186,12 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
     
     /* convolve creates a MaskedImage, push it onto the back of the Vector */
     /* need to use shared pointers because MaskedImage copy does not work */
-    std::vector<boost::shared_ptr<lsst::afw::MaskedImage<ImageT, MaskT> > > convolvedImageList(nKernelParameters);
+    std::vector<boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > > convolvedImageList(nKernelParameters);
     /* and an iterator over this */
-    typename std::vector<boost::shared_ptr<lsst::afw::MaskedImage<ImageT, MaskT> > >::iterator citer = convolvedImageList.begin();
+    typename std::vector<boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > >::iterator citer = convolvedImageList.begin();
     
     /* Iterator for input kernel basis */
-    std::vector<boost::shared_ptr<lsst::afw::Kernel> >::const_iterator kiter = kernelInBasisList.begin();
+    std::vector<boost::shared_ptr<lsst::afw::math::Kernel> >::const_iterator kiter = kernelInBasisList.begin();
     /* Create C_ij in the formalism of Alard & Lupton */
     for (; kiter != kernelInBasisList.end(); ++kiter, ++citer) {
         
@@ -201,9 +201,9 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
         /* NOTE : we could also *precompute* the entire template image convolved with these functions */
         /*        and save them somewhere to avoid this step each time.  however, our paradigm is to */
         /*        compute whatever is needed on the fly.  hence this step here. */
-        boost::shared_ptr<lsst::afw::MaskedImage<ImageT, MaskT> > imagePtr(
-            new lsst::afw::MaskedImage<ImageT, MaskT>
-            (lsst::afw::kernel::convolve(imageToConvolve, **kiter, edgeMaskBit, false))
+        boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > imagePtr(
+            new lsst::afw::image::MaskedImage<ImageT, MaskT>
+            (lsst::afw::math::convolve(imageToConvolve, **kiter, edgeMaskBit, false))
             );
         
         lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForPostageStamp",
@@ -231,14 +231,14 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
     
     /* An accessor for each convolution plane */
     /* NOTE : MaskedPixelAccessor has no empty constructor, therefore we need to push_back() */
-    std::vector<lsst::afw::MaskedPixelAccessor<ImageT, MaskT> > convolvedAccessorRowList;
+    std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> > convolvedAccessorRowList;
     for (citer = convolvedImageList.begin(); citer != convolvedImageList.end(); ++citer) {
-        convolvedAccessorRowList.push_back(lsst::afw::MaskedPixelAccessor<ImageT, MaskT>(**citer));
+        convolvedAccessorRowList.push_back(lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT>(**citer));
     }
     
     /* An accessor for each input image; address rows and cols separately */
-    lsst::afw::MaskedPixelAccessor<ImageT, MaskT> imageToConvolveRow(imageToConvolve);
-    lsst::afw::MaskedPixelAccessor<ImageT, MaskT> imageToNotConvolveRow(imageToNotConvolve);
+    lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> imageToConvolveRow(imageToConvolve);
+    lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> imageToNotConvolveRow(imageToNotConvolve);
     
     /* Take into account buffer for kernel images */
     imageToConvolveRow.advance(startCol, startRow);
@@ -250,11 +250,11 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
     for (unsigned int row = startRow; row < endRow; ++row) {
         
         /* An accessor for each convolution plane */
-        std::vector<lsst::afw::MaskedPixelAccessor<ImageT, MaskT> > convolvedAccessorColList = convolvedAccessorRowList;
+        std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> > convolvedAccessorColList = convolvedAccessorRowList;
         
         /* An accessor for each input image; places the col accessor at the correct row */
-        lsst::afw::MaskedPixelAccessor<ImageT, MaskT> imageToConvolveCol = imageToConvolveRow;
-        lsst::afw::MaskedPixelAccessor<ImageT, MaskT> imageToNotConvolveCol = imageToNotConvolveRow;
+        lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> imageToConvolveCol = imageToConvolveRow;
+        lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> imageToNotConvolveCol = imageToNotConvolveRow;
         
         for (unsigned int col = startCol; col < endCol; ++col) {
             
@@ -274,7 +274,7 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
                                         row, col, ncCamera, ncVariance, ncMask);
             
             /* kernel index i */
-            typename std::vector<lsst::afw::MaskedPixelAccessor<ImageT, MaskT> >::iterator
+            typename std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> >::iterator
                 kiteri = convolvedAccessorColList.begin();
             
             for (int kidxi = 0; kiteri != convolvedAccessorColList.end(); ++kiteri, ++kidxi) {
@@ -287,7 +287,7 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
                                             kidxi, cdCamerai, cdVariancei, cdMaski);
                 
                 /* kernel index j  */
-                typename std::vector<lsst::afw::MaskedPixelAccessor<ImageT, MaskT> >::iterator kiterj = kiteri;
+                typename std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> >::iterator kiterj = kiteri;
                 for (int kidxj = kidxi; kiterj != convolvedAccessorColList.end(); ++kiterj, ++kidxj) {
                     ImageT cdCameraj   = *kiterj->image;
                     
@@ -404,7 +404,7 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
  * @ingroup diffim
  */
 template <typename ImageT, typename MaskT>
-lsst::afw::KernelList<lsst::fw::Kernel> lsst::ip::diffim::computePcaKernelBasis(
+lsst::afw::math::KernelList<lsst::afw::math::Kernel> lsst::ip::diffim::computePcaKernelBasis(
     std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> > &diffImContainerList, ///< List of input footprints
     lsst::pex::policy::Policy &policy ///< Policy directing the behavior
     ) {
@@ -422,7 +422,7 @@ lsst::afw::KernelList<lsst::fw::Kernel> lsst::ip::diffim::computePcaKernelBasis(
     double imSum;
     
     /* Image accessor */
-    typedef typename vw::ImageView<lsst::afw::Kernel::PixelT>::pixel_accessor imageAccessorType;
+    typedef typename vw::ImageView<lsst::afw::math::Kernel::PixelT>::pixel_accessor imageAccessorType;
     /* Iterator over struct */
     typedef typename std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> >::iterator iDiffImContainer;
     
@@ -453,9 +453,9 @@ lsst::afw::KernelList<lsst::fw::Kernel> lsst::ip::diffim::computePcaKernelBasis(
     /*        and that this size is defined in the policy */ 
     unsigned int kernelRows = policy.getInt("kernelRows");
     unsigned int kernelCols = policy.getInt("kernelCols");
-    lsst::afw::Image<lsst::fw::Kernel::PixelT> kImage(kernelCols, kernelRows);
+    lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> kImage(kernelCols, kernelRows);
 
-    lsst::afw::KernelList<lsst::fw::Kernel> kernelPcaBasisList;
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> kernelPcaBasisList;
     
     /* Iterate over PCA inputs until all are good */
     while ( (nIter < maximumIteratonsPCA) and (nReject != 0) ) {
@@ -638,7 +638,7 @@ lsst::afw::KernelList<lsst::fw::Kernel> lsst::ip::diffim::computePcaKernelBasis(
         kernelPcaBasisList.clear();
         
         /* Turn the Mean Image into a Kernel */
-        lsst::afw::Image<lsst::fw::Kernel::PixelT> meanImage(nKCols, nKRows);
+        lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> meanImage(nKCols, nKRows);
         imageAccessorType imageAccessorCol(meanImage.origin());
         int mIdx = 0;
         for (unsigned int col = 0; col < nKCols; ++col) {
@@ -650,8 +650,8 @@ lsst::afw::KernelList<lsst::fw::Kernel> lsst::ip::diffim::computePcaKernelBasis(
             imageAccessorCol.next_col();
         }
         /* The mean image is the first member of kernelPCABasisList */
-        kernelPcaBasisList.push_back(boost::shared_ptr<lsst::afw::Kernel> 
-                                     (new lsst::afw::FixedKernel(meanImage)));
+        kernelPcaBasisList.push_back(boost::shared_ptr<lsst::afw::math::Kernel> 
+                                     (new lsst::afw::math::FixedKernel(meanImage)));
         if (debugIO) {
             meanImage.writeFits( (boost::format("mFits%d.fits") % nIter).str());
         }
@@ -659,7 +659,7 @@ lsst::afw::KernelList<lsst::fw::Kernel> lsst::ip::diffim::computePcaKernelBasis(
         /* Turn each eVec into an Image and then into a Kernel */
         /* Dont use all eVec.cols(); only the number of bases that you want */
         for (unsigned int ki = 0; ki < nCoeffToUse; ++ki) { 
-            lsst::afw::Image<lsst::fw::Kernel::PixelT> basisImage(nKCols, nKRows);
+            lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> basisImage(nKCols, nKRows);
             
             /* Not sure how to bulk load information into Image */
             int kIdx = 0;
@@ -676,8 +676,8 @@ lsst::afw::KernelList<lsst::fw::Kernel> lsst::ip::diffim::computePcaKernelBasis(
                 imageAccessorCol.next_col();
             }
             /* Add to kernel basis */
-            kernelPcaBasisList.push_back(boost::shared_ptr<lsst::afw::Kernel> 
-                                         (new lsst::afw::FixedKernel(basisImage)));
+            kernelPcaBasisList.push_back(boost::shared_ptr<lsst::afw::math::Kernel> 
+                                         (new lsst::afw::math::FixedKernel(basisImage)));
             if (debugIO) {
                 basisImage.writeFits( (boost::format("eFits%d_%d.fits") % nIter % ki).str() );
             }
@@ -700,8 +700,8 @@ lsst::afw::KernelList<lsst::fw::Kernel> lsst::ip::diffim::computePcaKernelBasis(
             }        
             
             /* Create a linear combination kernel from this  */
-            boost::shared_ptr<lsst::afw::LinearCombinationKernel> pcaKernelPtr(
-                new lsst::afw::LinearCombinationKernel(kernelPcaBasisList, kernelCoefficients)
+            boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> pcaKernelPtr(
+                new lsst::afw::math::LinearCombinationKernel(kernelPcaBasisList, kernelCoefficients)
                 );
             
             /* Append to vectors collectively */
@@ -749,11 +749,11 @@ lsst::afw::KernelList<lsst::fw::Kernel> lsst::ip::diffim::computePcaKernelBasis(
  * @ingroup diffim
  */
 template <typename ImageT, typename MaskT>
-boost::shared_ptr<lsst::afw::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
-    boost::shared_ptr<lsst::afw::function::Function2<double> > &kernelFunctionPtr, ///< Function for spatial variation of kernel
-    boost::shared_ptr<lsst::afw::function::Function2<double> > &backgroundFunctionPtr, ///< Function for spatial variation of background
+boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
+    boost::shared_ptr<lsst::afw::math::Function2<double> > &kernelFunctionPtr, ///< Function for spatial variation of kernel
+    boost::shared_ptr<lsst::afw::math::Function2<double> > &backgroundFunctionPtr, ///< Function for spatial variation of background
     std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> > &diffImContainerList, ///< Information on each kernel
-    lsst::afw::KernelList<lsst::fw::Kernel> const &kernelBasisList, ///< Basis kernel set
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelBasisList, ///< Basis kernel set
     lsst::pex::policy::Policy &policy ///< Policy directing the behavior
     )
 {
@@ -763,7 +763,7 @@ boost::shared_ptr<lsst::afw::LinearCombinationKernel> lsst::ip::diffim::computeS
     /* Container iterator */
     typedef typename std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> >::iterator iDiffImContainer;
     /* Kernel iterator */
-    typedef typename std::vector<boost::shared_ptr<lsst::afw::Kernel> >::const_iterator iKernelPtr;
+    typedef typename std::vector<boost::shared_ptr<lsst::afw::math::Kernel> >::const_iterator iKernelPtr;
 
     Log spatialLog(Log::getDefaultLog(), "ip.diffim.computeSpatiallyVaryingPsfMatchingKernel");
 
@@ -796,12 +796,12 @@ boost::shared_ptr<lsst::afw::LinearCombinationKernel> lsst::ip::diffim::computeS
     /*        and that this size is defined in the policy */ 
     unsigned int kernelRows = policy.getInt("kernelRows");
     unsigned int kernelCols = policy.getInt("kernelCols");
-    lsst::afw::Image<lsst::fw::Kernel::PixelT> kImage(kernelCols, kernelRows);
-    lsst::afw::Image<lsst::fw::Kernel::PixelT> kSpatialImage(kernelCols, kernelRows);
+    lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> kImage(kernelCols, kernelRows);
+    lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> kSpatialImage(kernelCols, kernelRows);
     
     /* Set up the spatially varying kernel */
-    boost::shared_ptr<lsst::afw::LinearCombinationKernel> spatiallyVaryingKernelPtr(
-        new lsst::afw::LinearCombinationKernel(kernelBasisList, kernelFunctionPtr));
+    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatiallyVaryingKernelPtr(
+        new lsst::afw::math::LinearCombinationKernel(kernelBasisList, kernelFunctionPtr));
     
     /* Iterate over inputs until both the kernel model and the background model converge */
     while ( (nIter < maximumIterationsSpatialFit) and (nReject != 0) ) {
@@ -883,7 +883,7 @@ boost::shared_ptr<lsst::afw::LinearCombinationKernel> lsst::ip::diffim::computeS
             std::fill(kernelStepsize.begin(), kernelStepsize.end(), 0.02);  /* assume order 2% contribution from eigenkernels */
             
             /* Run minimization */
-            lsst::afw::function::FitResults kernelFit = lsst::fw::function::minimize(
+            lsst::afw::math::FitResults kernelFit = lsst::afw::math::minimize(
                 kernelFunctionPtr,
                 kernelParams,
                 kernelStepsize,
@@ -927,7 +927,7 @@ boost::shared_ptr<lsst::afw::LinearCombinationKernel> lsst::ip::diffim::computeS
         backgroundStepsize[0] = 0.1 * backgroundParameters[0];
         
         /* Run minimization */
-        lsst::afw::function::FitResults backgroundFit = lsst::fw::function::minimize(
+        lsst::afw::math::FitResults backgroundFit = lsst::afw::math::minimize(
             backgroundFunctionPtr,
             backgroundParameters,
             backgroundStepsize,
@@ -1013,13 +1013,14 @@ void lsst::ip::diffim::computeDiffImStats(
     bool debugIO = policy.getBool("debugIO", false);
     unsigned int kernelRows = policy.getInt("kernelRows");
     unsigned int kernelCols = policy.getInt("kernelCols");
-    lsst::afw::Image<lsst::fw::Kernel::PixelT> kImage(kernelCols, kernelRows);
+    lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> kImage(kernelCols, kernelRows);
 
-    lsst::afw::MaskedImage<ImageT, MaskT>
-        convolvedImageStamp = lsst::afw::kernel::convolve(*(diffImContainer.imageToConvolve),
-                                                         *(diffImContainer.kernelList[kernelID]),
-                                                         edgeMaskBit, 
-                                                         false);
+    lsst::afw::image::MaskedImage<ImageT, MaskT>
+        convolvedImageStamp = lsst::afw::math::convolve(
+            *(diffImContainer.imageToConvolve),
+            *(diffImContainer.kernelList[kernelID]),
+            edgeMaskBit, 
+            false);
     
     /* Add in background */
     convolvedImageStamp += diffImContainer.backgrounds[kernelID];
@@ -1123,7 +1124,7 @@ void lsst::ip::diffim::computeDiffImStats(
  *
  * @ingroup diffim
  */
-lsst::afw::KernelList<lsst::fw::Kernel>
+lsst::afw::math::KernelList<lsst::afw::math::Kernel>
 lsst::ip::diffim::generateDeltaFunctionKernelSet(
     unsigned int nCols, ///< Number of colunms in the basis kernels
     unsigned int nRows  ///< Number of rows in the basis kernels
@@ -1134,7 +1135,7 @@ lsst::ip::diffim::generateDeltaFunctionKernelSet(
     }
     const int signedNCols = static_cast<int>(nCols);
     const int signedNRows = static_cast<int>(nRows);
-    lsst::afw::KernelList<lsst::fw::Kernel> kernelBasisList;
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> kernelBasisList;
     int colCtr = (signedNCols - 1) / 2;
     int rowCtr = (signedNRows - 1) / 2;
     for (int row = 0; row < signedNRows; ++row) {
@@ -1143,12 +1144,12 @@ lsst::ip::diffim::generateDeltaFunctionKernelSet(
         for (int col = 0; col < signedNCols; ++col) {
             double x = static_cast<double>(col - colCtr);
             
-            lsst::afw::Kernel::KernelFunctionPtrType kfuncPtr(
-                new lsst::afw::function::IntegerDeltaFunction2<lsst::fw::Kernel::PixelT>(x, y)
+            lsst::afw::math::Kernel::KernelFunctionPtrType kfuncPtr(
+                new lsst::afw::math::IntegerDeltaFunction2<lsst::afw::math::Kernel::PixelT>(x, y)
                 );
             
-            boost::shared_ptr<lsst::afw::Kernel> kernelPtr(
-                new lsst::afw::AnalyticKernel(kfuncPtr, nCols, nRows)
+            boost::shared_ptr<lsst::afw::math::Kernel> kernelPtr(
+                new lsst::afw::math::AnalyticKernel(kfuncPtr, nCols, nRows)
                 );
             
             kernelBasisList.push_back(kernelPtr);
@@ -1169,7 +1170,7 @@ lsst::ip::diffim::generateDeltaFunctionKernelSet(
  *
  * @ingroup diffim
  */
-lsst::afw::KernelList<lsst::fw::Kernel>
+lsst::afw::math::KernelList<lsst::afw::math::Kernel>
 lsst::ip::diffim::generateAlardLuptonKernelSet(
     unsigned int nRows, ///< Number of rows in the kernel basis
     unsigned int nCols, ///< Number of columns in the kernel basis
@@ -1182,7 +1183,7 @@ lsst::ip::diffim::generateAlardLuptonKernelSet(
     }
     throw lsst::pex::exceptions::DomainError("Not implemented");
 
-    lsst::afw::KernelList<lsst::fw::Kernel> kernelBasisList;
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> kernelBasisList;
     return kernelBasisList;
 }
 
@@ -1195,13 +1196,13 @@ lsst::ip::diffim::generateAlardLuptonKernelSet(
  */
 template <typename MaskT>
 bool lsst::ip::diffim::maskOk(
-    lsst::afw::Mask<MaskT> const &inputMask,
+    lsst::afw::image::Mask<MaskT> const &inputMask,
     MaskT const badPixelMask ///< Mask value for bad data
     )
 {
-    typename lsst::afw::Mask<MaskT>::pixel_accessor rowAcc = inputMask.origin();
+    typename lsst::afw::image::Mask<MaskT>::pixel_accessor rowAcc = inputMask.origin();
     for (unsigned int row = 0; row < inputMask.getRows(); ++row, rowAcc.next_row()) {
-        typename lsst::afw::Mask<MaskT>::pixel_accessor colAcc = rowAcc;
+        typename lsst::afw::image::Mask<MaskT>::pixel_accessor colAcc = rowAcc;
         for (unsigned int col = 0; col < inputMask.getCols(); ++col, colAcc.next_col()) {
             /*std::cout << "MASK " << (*colAcc) << " " << badPixelMask << " " << ((*colAcc) & badPixelMask) << std::endl; */
             
@@ -1232,16 +1233,16 @@ void lsst::ip::diffim::calculateMaskedImageResiduals(
     int &nGoodPixels, ///< Number of good pixels in the image
     double &meanOfResiduals, ///< Mean residual/variance; ideally 0
     double &varianceOfResiduals, ///< Average variance of residual/variance; ideally 1
-    lsst::afw::MaskedImage<ImageT, MaskT> const &inputImage, ///< Input image to be analyzed
+    lsst::afw::image::MaskedImage<ImageT, MaskT> const &inputImage, ///< Input image to be analyzed
     MaskT const badPixelMask ///< Mask for bad data
     ) {
     
     double x2Sum=0.0, xSum=0.0;
     
     nGoodPixels = 0;
-    lsst::afw::MaskedPixelAccessor<ImageT, MaskT> rowAcc(inputImage);
+    lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> rowAcc(inputImage);
     for (unsigned int row = 0; row < inputImage.getRows(); ++row, rowAcc.nextRow()) {
-        lsst::afw::MaskedPixelAccessor<ImageT, MaskT> colAcc = rowAcc;
+        lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> colAcc = rowAcc;
         for (unsigned int col = 0; col < inputImage.getCols(); ++col, colAcc.nextCol()) {
             if (((*colAcc.mask) & badPixelMask) == 0) {
                 xSum  += (*colAcc.image) / sqrt(*colAcc.variance);
@@ -1279,7 +1280,7 @@ void lsst::ip::diffim::calculateImageResiduals(
     int &nGoodPixels, ///< Number of good pixels in the image
     double &meanOfResiduals, ///< Mean residual; nan if nGoodPixels < 1
     double &varianceOfResiduals, ///< Average variance of residual; nan if nGoodPixels < 2
-    lsst::afw::Image<ImageT> const &inputImage ///< Input image to be analyzed
+    lsst::afw::image::Image<ImageT> const &inputImage ///< Input image to be analyzed
     ) {
     
     double x2Sum=0.0, xSum=0.0, wSum=0.0;
@@ -1356,10 +1357,10 @@ void lsst::ip::diffim::calculateVectorStatistics(
  */
 template <typename PixelT, typename FunctionT>
 void lsst::ip::diffim::addFunction(
-    lsst::afw::Image<PixelT> &image, ///< image
-    lsst::afw::function::Function2<FunctionT> const &function ///< 2-d function
+    lsst::afw::image::Image<PixelT> &image, ///< image
+    lsst::afw::math::Function2<FunctionT> const &function ///< 2-d function
 ) {
-    typedef typename lsst::afw::Image<PixelT>::pixel_accessor imageAccessorType;
+    typedef typename lsst::afw::image::Image<PixelT>::pixel_accessor imageAccessorType;
     unsigned int numCols = image.getCols();
     unsigned int numRows = image.getRows();
     imageAccessorType imRow = image.origin();
@@ -1379,94 +1380,107 @@ void lsst::ip::diffim::addFunction(
 template
 std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
     double &background,
-    lsst::afw::MaskedImage<float, lsst::fw::maskPixelType> const &imageToConvolve,
-    lsst::afw::MaskedImage<float, lsst::fw::maskPixelType> const &imageToNotConvolve,
-    lsst::afw::KernelList<lsst::fw::Kernel> const &kernelInBasisList,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
     lsst::pex::policy::Policy &policy);
+
 template
 std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
     double &background,
-    lsst::afw::MaskedImage<double, lsst::fw::maskPixelType> const &imageToConvolve,
-    lsst::afw::MaskedImage<double, lsst::fw::maskPixelType> const &imageToNotConvolve,
-    lsst::afw::KernelList<lsst::fw::Kernel> const &kernelInBasisList,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
     lsst::pex::policy::Policy &policy);
 
 template
 std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::MaskedImage<float, lsst::fw::maskPixelType> const &imageToConvolve,
-    lsst::afw::MaskedImage<float, lsst::fw::maskPixelType> const &imageToNotConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
     lsst::pex::policy::Policy &policy);
+
 template
 std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::MaskedImage<double, lsst::fw::maskPixelType> const &imageToConvolve,
-    lsst::afw::MaskedImage<double, lsst::fw::maskPixelType> const &imageToNotConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
     lsst::pex::policy::Policy &policy);
 
 template 
-lsst::afw::KernelList<lsst::fw::Kernel> lsst::ip::diffim::computePcaKernelBasis(
-    std::vector<lsst::ip::diffim::DiffImContainer<float, lsst::afw::maskPixelType> > &diffImContainerList,
-    lsst::pex::policy::Policy &policy);
-template 
-lsst::afw::KernelList<lsst::fw::Kernel> lsst::ip::diffim::computePcaKernelBasis(
-    std::vector<lsst::ip::diffim::DiffImContainer<double, lsst::afw::maskPixelType> > &diffImContainerList,
+lsst::afw::math::KernelList<lsst::afw::math::Kernel> lsst::ip::diffim::computePcaKernelBasis(
+    std::vector<lsst::ip::diffim::DiffImContainer<float, lsst::afw::image::maskPixelType> > &diffImContainerList,
     lsst::pex::policy::Policy &policy);
 
 template 
-boost::shared_ptr<lsst::afw::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
-    boost::shared_ptr<lsst::afw::function::Function2<double> > &kernelFunctionPtr,
-    boost::shared_ptr<lsst::afw::function::Function2<double> > &backgroundFunctionPtr,
-    std::vector<lsst::ip::diffim::DiffImContainer<float, lsst::afw::maskPixelType> > &diffImContainerList,
-    lsst::afw::KernelList<lsst::fw::Kernel> const &kernelBasisList,
+lsst::afw::math::KernelList<lsst::afw::math::Kernel> lsst::ip::diffim::computePcaKernelBasis(
+    std::vector<lsst::ip::diffim::DiffImContainer<double, lsst::afw::image::maskPixelType> > &diffImContainerList,
+    lsst::pex::policy::Policy &policy);
+
+template 
+boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
+    boost::shared_ptr<lsst::afw::math::Function2<double> > &kernelFunctionPtr,
+    boost::shared_ptr<lsst::afw::math::Function2<double> > &backgroundFunctionPtr,
+    std::vector<lsst::ip::diffim::DiffImContainer<float, lsst::afw::image::maskPixelType> > &diffImContainerList,
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelBasisList,
     lsst::pex::policy::Policy &policy);
 template 
-boost::shared_ptr<lsst::afw::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
-    boost::shared_ptr<lsst::afw::function::Function2<double> > &kernelFunctionPtr,
-    boost::shared_ptr<lsst::afw::function::Function2<double> > &backgroundFunctionPtr,
-    std::vector<lsst::ip::diffim::DiffImContainer<double, lsst::afw::maskPixelType> > &diffImContainerList,
-    lsst::afw::KernelList<lsst::fw::Kernel> const &kernelBasisList,
+boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
+    boost::shared_ptr<lsst::afw::math::Function2<double> > &kernelFunctionPtr,
+    boost::shared_ptr<lsst::afw::math::Function2<double> > &backgroundFunctionPtr,
+    std::vector<lsst::ip::diffim::DiffImContainer<double, lsst::afw::image::maskPixelType> > &diffImContainerList,
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelBasisList,
     lsst::pex::policy::Policy &policy);
 
 template
 bool lsst::ip::diffim::maskOk(
-    lsst::afw::Mask<lsst::fw::maskPixelType> const &inputMask,
-    lsst::afw::maskPixelType const badPixelMask);
+    lsst::afw::image::Mask<lsst::afw::image::maskPixelType> const &inputMask,
+    lsst::afw::image::maskPixelType const badPixelMask);
 
 template
 void lsst::ip::diffim::calculateMaskedImageResiduals(
     int &nGoodPixels,
     double &meanOfResiduals,
     double &varianceOfResiduals,
-    lsst::afw::MaskedImage<float, lsst::fw::maskPixelType> const &inputImage,
-    lsst::afw::maskPixelType const badPixelMask);
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &inputImage,
+    lsst::afw::image::maskPixelType const badPixelMask);
+
 template
 void lsst::ip::diffim::calculateMaskedImageResiduals(
     int &nGoodPixels,
     double &meanOfResiduals,
     double &varianceOfResiduals,
-    lsst::afw::MaskedImage<double, lsst::fw::maskPixelType> const &inputImage,
-    lsst::afw::maskPixelType const badPixelMask);
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &inputImage,
+    lsst::afw::image::maskPixelType const badPixelMask);
 
 template
-void lsst::ip::diffim::calculateImageResiduals(int &nGoodPixels,
-                                              double &meanOfResiduals,
-                                              double &varianceOfResiduals,
-                                              lsst::afw::Image<float> const &inputImage);
-template
-void lsst::ip::diffim::calculateImageResiduals(int &nGoodPixels,
-                                              double &meanOfResiduals,
-                                              double &varianceOfResiduals,
-                                              lsst::afw::Image<double> const &inputImage);
-
+void lsst::ip::diffim::calculateImageResiduals(
+    int &nGoodPixels,
+    double &meanOfResiduals,
+    double &varianceOfResiduals,
+    lsst::afw::image::Image<float> const &inputImage);
 
 template
-void lsst::ip::diffim::addFunction(lsst::afw::Image<float>&,
-                                  lsst::afw::function::Function2<float> const&);
+void lsst::ip::diffim::calculateImageResiduals(
+    int &nGoodPixels,
+    double &meanOfResiduals,
+    double &varianceOfResiduals,
+    lsst::afw::image::Image<double> const &inputImage);
+
 template
-void lsst::ip::diffim::addFunction(lsst::afw::Image<float>&,
-                                  lsst::afw::function::Function2<double> const&);
+void lsst::ip::diffim::addFunction(
+    lsst::afw::image::Image<float>&,
+    lsst::afw::math::Function2<float> const&);
+
 template
-void lsst::ip::diffim::addFunction(lsst::afw::Image<double>&,
-                                  lsst::afw::function::Function2<float> const&);
+void lsst::ip::diffim::addFunction(
+    lsst::afw::image::Image<float>&,
+    lsst::afw::math::Function2<double> const&);
+
 template
-void lsst::ip::diffim::addFunction(lsst::afw::Image<double>&,
-                                  lsst::afw::function::Function2<double> const&);
+void lsst::ip::diffim::addFunction(
+    lsst::afw::image::Image<double>&,
+    lsst::afw::math::Function2<float> const&);
+
+template
+void lsst::ip::diffim::addFunction(
+    lsst::afw::image::Image<double>&,
+    lsst::afw::math::Function2<double> const&);

@@ -19,7 +19,7 @@ Python bindings for lsst::ip::diffim code
 
 // Everything whose bindings we will have to know about
 %include "lsst/p_lsstSwig.i"             // this needs to go first otherwise i do not know about e.g. boost
-%include "lsst/afw/Core/lsstImageTypes.i"     // vw and Image/Mask types and typedefs
+%include "lsst/afw/image/lsstImageTypes.i"     // vw and Image/Mask types and typedefs
 %include "lsst/detection/detectionLib.i"     // need otherwise FootprintContainerT not known about
 
 // handle C++ arguments that should be outputs in python
@@ -40,38 +40,38 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 /* ImageSubtract.h */
 
 %include "lsst/ip/diffim/ImageSubtract.h"
-%template(DiffImContainerD)                lsst::ip::diffim::DiffImContainer<float, lsst::afw::maskPixelType>;
-%template(vectorDiffImContainerD)          std::vector<lsst::ip::diffim::DiffImContainer<float, lsst::afw::maskPixelType> >;
+%template(DiffImContainerD)                lsst::ip::diffim::DiffImContainer<float, lsst::afw::image::maskPixelType>;
+%template(vectorDiffImContainerD)          std::vector<lsst::ip::diffim::DiffImContainer<float, lsst::afw::image::maskPixelType> >;
 
 %template(computeDiffImStats)
-    lsst::ip::diffim::computeDiffImStats<float, lsst::afw::maskPixelType>;
+    lsst::ip::diffim::computeDiffImStats<float, lsst::afw::image::maskPixelType>;
 %template(computeDiffImStats)
-    lsst::ip::diffim::computeDiffImStats<double, lsst::afw::maskPixelType>;
+    lsst::ip::diffim::computeDiffImStats<double, lsst::afw::image::maskPixelType>;
 
 %template(computePsfMatchingKernelForPostageStamp)
-    lsst::ip::diffim::computePsfMatchingKernelForPostageStamp<float, lsst::afw::maskPixelType>;
+    lsst::ip::diffim::computePsfMatchingKernelForPostageStamp<float, lsst::afw::image::maskPixelType>;
 %template(computePsfMatchingKernelForPostageStamp)
-    lsst::ip::diffim::computePsfMatchingKernelForPostageStamp<double, lsst::afw::maskPixelType>;
+    lsst::ip::diffim::computePsfMatchingKernelForPostageStamp<double, lsst::afw::image::maskPixelType>;
 
 %template(getCollectionOfFootprintsForPsfMatching)
-    lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float, lsst::afw::maskPixelType>;
+    lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float, lsst::afw::image::maskPixelType>;
 %template(getCollectionOfFootprintsForPsfMatching)
-    lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double, lsst::afw::maskPixelType>;
+    lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double, lsst::afw::image::maskPixelType>;
 
-%template(computePcaKernelBasis)            lsst::ip::diffim::computePcaKernelBasis<float, lsst::afw::maskPixelType>;
-%template(computePcaKernelBasis)            lsst::ip::diffim::computePcaKernelBasis<double, lsst::afw::maskPixelType>;
+%template(computePcaKernelBasis)            lsst::ip::diffim::computePcaKernelBasis<float, lsst::afw::image::maskPixelType>;
+%template(computePcaKernelBasis)            lsst::ip::diffim::computePcaKernelBasis<double, lsst::afw::image::maskPixelType>;
 
 %template(computeSpatiallyVaryingPsfMatchingKernel)
-    lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel<float, lsst::afw::maskPixelType>;
+    lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel<float, lsst::afw::image::maskPixelType>;
 %template(computeSpatiallyVaryingPsfMatchingKernel)
-    lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel<double, lsst::afw::maskPixelType>;
+    lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel<double, lsst::afw::image::maskPixelType>;
 
-%template(maskOk)                           lsst::ip::diffim::maskOk<lsst::afw::maskPixelType>;
+%template(maskOk)                           lsst::ip::diffim::maskOk<lsst::afw::image::maskPixelType>;
 
 %template(calculateMaskedImageResiduals)
-    lsst::ip::diffim::calculateMaskedImageResiduals<float, lsst::afw::maskPixelType>;
+    lsst::ip::diffim::calculateMaskedImageResiduals<float, lsst::afw::image::maskPixelType>;
 %template(calculateMaskedImageResiduals)
-    lsst::ip::diffim::calculateMaskedImageResiduals<double, lsst::afw::maskPixelType>;
+    lsst::ip::diffim::calculateMaskedImageResiduals<double, lsst::afw::image::maskPixelType>;
 
 %template(calculateImageResiduals)          lsst::ip::diffim::calculateImageResiduals<float>;
 %template(calculateImageResiduals)          lsst::ip::diffim::calculateImageResiduals<double>;
@@ -97,9 +97,9 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 /*******************/
 /* WCSMatch.h */
 %include "lsst/ip/diffim/wcsMatch.h"
-%template(wcsMatch)    lsst::ip::diffim::wcsMatch<boost::uint16_t, lsst::afw::maskPixelType>;
-%template(wcsMatch)    lsst::ip::diffim::wcsMatch<float, lsst::afw::maskPixelType>;
-%template(wcsMatch)    lsst::ip::diffim::wcsMatch<double, lsst::afw::maskPixelType>;
+%template(wcsMatch)    lsst::ip::diffim::wcsMatch<boost::uint16_t, lsst::afw::image::maskPixelType>;
+%template(wcsMatch)    lsst::ip::diffim::wcsMatch<float, lsst::afw::image::maskPixelType>;
+%template(wcsMatch)    lsst::ip::diffim::wcsMatch<double, lsst::afw::image::maskPixelType>;
 
 /******************************************************************************/
 // Local Variables: ***

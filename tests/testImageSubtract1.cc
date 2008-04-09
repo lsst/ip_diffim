@@ -2,9 +2,9 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include <lsst/afw/MaskedImage.h>
-#include <lsst/afw/Kernel.h>
-#include <lsst/afw/FunctionLibrary.h>
+#include <lsst/afw/image/MaskedImage.h>
+#include <lsst/afw/math/Kernel.h>
+#include <lsst/afw/math/FunctionLibrary.h>
 
 #include <lsst/daf/base/Citizen.h>
 #include <lsst/pex/exceptions/Exception.h>
@@ -23,7 +23,7 @@ int main( int argc, char** argv )
     {
         lsst::pex::logging::Trace::setVerbosity("lsst.ip.diffim", 4);
         
-        typedef lsst::afw::maskPixelType MaskT;
+        typedef lsst::afw::image::maskPixelType MaskT;
         typedef float ImageT; // have to make sure this jibes with the input data!
         typedef double KernelT;
         typedef double FuncT;
@@ -51,24 +51,24 @@ int main( int argc, char** argv )
             exit(1);
         }
         string inputImage = argv[1];
-        lsst::afw::MaskedImage<ImageT, MaskT> scienceMaskedImage;
+        lsst::afw::image::MaskedImage<ImageT, MaskT> scienceMaskedImage;
         scienceMaskedImage.readFits(inputImage);
 
-        lsst::afw::MaskedImage<ImageT, MaskT> templateMaskedImage;
+        lsst::afw::image::MaskedImage<ImageT, MaskT> templateMaskedImage;
         templateMaskedImage.readFits(inputImage);
         
         // Generate basis of delta functions for kernel
-        vector<boost::shared_ptr<lsst::afw::Kernel<KernelT> > > kernelBasisVec =
+        vector<boost::shared_ptr<lsst::afw::math::Kernel<KernelT> > > kernelBasisVec =
             lsst::ip::diffim::generateDeltaFunctionKernelSet<KernelT>(kernelCols, kernelRows);
         
         // Function for spatially varying kernel.  Make null here for this test.
-        boost::shared_ptr<lsst::afw::function::Function2<FuncT> > kernelFunctionPtr(
-            new lsst::afw::function::PolynomialFunction2<FuncT>(kernelSpatialOrder)
+        boost::shared_ptr<lsst::afw::math::Function2<FuncT> > kernelFunctionPtr(
+            new lsst::afw::math::PolynomialFunction2<FuncT>(kernelSpatialOrder)
             );
         
         // Function for spatially varying background.  
-        boost::shared_ptr<lsst::afw::function::Function2<FuncT> > backgroundFunctionPtr(
-            new lsst::afw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
+        boost::shared_ptr<lsst::afw::math::Function2<FuncT> > backgroundFunctionPtr(
+            new lsst::afw::math::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
             );
         
         // Use hard-coded positions for now
@@ -76,7 +76,7 @@ int main( int argc, char** argv )
             lsst::ip::diffim::getCollectionOfMaskedImagesForPsfMatching();
         
         
-        boost::shared_ptr<lsst::afw::LinearCombinationKernel<KernelT> > kernelPtr =
+        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel<KernelT> > kernelPtr =
             lsst::ip::diffim::computePsfMatchingKernelForMaskedImage(
                 kernelFunctionPtr, backgroundFunctionPtr,
                 templateMaskedImage, scienceMaskedImage, kernelBasisVec, footprintList, p);

@@ -1,5 +1,8 @@
-import lsst.afw.Core.afwLib as afw
-import sys, os, re
+import os
+import re
+import sys
+
+import lsst.afw.image as afwImage
 
 TESTING = False
 
@@ -14,10 +17,10 @@ inputExposureID   = inputExposureDirs[-3]
 inputExposureBase = '/'.join(inputExposureDirs[:-3])
 
 if not TESTING:
-    inputMaskedImage = afw.MaskedImageF()
+    inputMaskedImage = afwImage.MaskedImageF()
     inputMaskedImage.readFits(inputExposureRoot)
-    inputWCS = afw.WCS(inputMaskedImage.getImage().getMetaData())
-    inputExposure = afw.ExposureF(inputMaskedImage, inputWCS)
+    inputWCS = afwImage.WCS(inputMaskedImage.getImage().getMetaData())
+    inputExposure = afwImage.ExposureF(inputMaskedImage, inputWCS)
 
     nRowSubexposures = 4 # int(sys.argv[2]) # 4
     nColSubexposures = 2 # int(sys.argv[3]) # 2
@@ -56,7 +59,7 @@ for row in range(nRowSubexposures):
         outputExposureFile = os.path.join(outputExposureAmp, outputExposureFile)
         print '# Writing', outputExposureFile
         
-        bbox = afw.BBox2i(col * nColPix,
+        bbox = afwImage.BBox2i(col * nColPix,
                          row * nRowPix,
                          nColPix,
                          nRowPix)

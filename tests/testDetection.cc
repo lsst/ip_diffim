@@ -1,12 +1,11 @@
 #include <lsst/pex/logging/Trace.h>
 #include <lsst/daf/base/Citizen.h>
-#include <lsst/afw/MaskedImage.h>
+#include <lsst/afw/image/MaskedImage.h>
 #include <lsst/detection/Footprint.h>
 
 using namespace std;
-using namespace lsst::afw;
 
-typedef lsst::afw::maskPixelType MaskT;
+typedef lsst::afw::image::maskPixelType MaskT;
 typedef float ImageT;
 typedef double KernelT;
 typedef double FuncT;
@@ -18,7 +17,7 @@ int main( int argc, char** argv )
         lsst::pex::logging::Trace::setVerbosity(".", 4);
 
         string templateImage = argv[1];
-        MaskedImage<ImageT,MaskT> templateMaskedImage;
+        lsst::afw::image::MaskedImage<ImageT,MaskT> templateMaskedImage;
         try {
             templateMaskedImage.readFits(templateImage);
         } catch (lsst::pex::exceptions::ExceptionStack &e) {

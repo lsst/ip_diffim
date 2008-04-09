@@ -15,11 +15,11 @@
 #include <vector>
 #include <boost/shared_ptr.hpp>
 #include <lsst/pex/policy/Policy.h>
-#include <lsst/afw/Kernel.h>
-#include <lsst/afw/KernelFunctions.h>
-#include <lsst/afw/Mask.h>
-#include <lsst/afw/MaskedImage.h>
-#include <lsst/afw/Function.h>
+#include <lsst/afw/math/Kernel.h>
+#include <lsst/afw/math/KernelFunctions.h>
+#include <lsst/afw/image/Mask.h>
+#include <lsst/afw/image/MaskedImage.h>
+#include <lsst/afw/math/Function.h>
 #include <lsst/detection/Footprint.h>
 #include <lsst/ip/diffim/PCA.h>
 
@@ -67,7 +67,7 @@ namespace diffim {
         /* Running ID */
         int id;
         
-        typedef lsst::afw::MaskedImage<ImageT, MaskT> maskedImageType;
+        typedef lsst::afw::image::MaskedImage<ImageT, MaskT> maskedImageType;
         typedef boost::shared_ptr<maskedImageType> maskedImagePtrType;
 
         /* The Footprint assocated with the object we're building the kernels around */
@@ -83,7 +83,7 @@ namespace diffim {
         /* Store the kernel at each stage of build */
         int nKernel;
         /* Vector of kernels : single image kernel, PCA model, spatial model */
-        std::vector<boost::shared_ptr<lsst::afw::LinearCombinationKernel> > kernelList;
+        std::vector<boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> > kernelList;
         std::vector<lsst::ip::diffim::MaskedImageDiffimStats> diffimStats;
         std::vector<double> backgrounds;
         std::vector<double> kernelSums;
@@ -107,7 +107,7 @@ namespace diffim {
         void setImageToConvolve(maskedImageType const &maskedImage) {
             this->imageToConvolve.reset(new maskedImageType(maskedImage));
         }
-        void addKernel(boost::shared_ptr<lsst::afw::LinearCombinationKernel> newKernel,
+        void addKernel(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> newKernel,
                        lsst::ip::diffim::MaskedImageDiffimStats newStats,
                        double background,
                        double kernelSum) {
@@ -130,41 +130,41 @@ namespace diffim {
 
     template <typename ImageT, typename MaskT>
     std::vector<lsst::detection::Footprint::PtrType> getCollectionOfFootprintsForPsfMatching(
-        lsst::afw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
         lsst::pex::policy::Policy &policy
         );
 
     template <typename ImageT, typename MaskT>
     std::vector<double> computePsfMatchingKernelForPostageStamp(
         double &background,
-        lsst::afw::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        lsst::afw::KernelList<lsst::afw::Kernel> const &kernelInBasisList, ///< Input kernel basis set
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList, ///< Input kernel basis set
         lsst::pex::policy::Policy &policy
         );
     
     template <typename ImageT, typename MaskT>
-    lsst::afw::KernelList<lsst::afw::Kernel> computePcaKernelBasis(
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> computePcaKernelBasis(
         std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> > &diffImContainerList,
         lsst::pex::policy::Policy &policy
         );
 
     template <typename ImageT, typename MaskT>
-    boost::shared_ptr<lsst::afw::LinearCombinationKernel> computeSpatiallyVaryingPsfMatchingKernel(
-        boost::shared_ptr<lsst::afw::function::Function2<double> > &kernelFunctionPtr,
-        boost::shared_ptr<lsst::afw::function::Function2<double> > &backgroundFunctionPtr,
+    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> computeSpatiallyVaryingPsfMatchingKernel(
+        boost::shared_ptr<lsst::afw::math::Function2<double> > &kernelFunctionPtr,
+        boost::shared_ptr<lsst::afw::math::Function2<double> > &backgroundFunctionPtr,
         std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> > &diffImContainerList,
-        lsst::afw::KernelList<lsst::afw::Kernel> const &kernelBasisList,
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelBasisList,
         lsst::pex::policy::Policy &policy
         );
 
-    lsst::afw::KernelList<lsst::afw::Kernel> generateDeltaFunctionKernelSet(
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateDeltaFunctionKernelSet(
         unsigned int nCols,
         unsigned int nRows
         );
 
-    lsst::afw::KernelList<lsst::afw::Kernel> generateAlardLuptonKernelSet(
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateAlardLuptonKernelSet(
         unsigned int nCols,
         unsigned int nRows,
         std::vector<double> const &sigGauss,
@@ -173,7 +173,7 @@ namespace diffim {
 
     template <typename MaskT>
     bool maskOk(
-        lsst::afw::Mask<MaskT> const &inputMask,
+        lsst::afw::image::Mask<MaskT> const &inputMask,
         MaskT const badPixelMask
         );
 
@@ -182,7 +182,7 @@ namespace diffim {
         int &nGoodPixels,
         double &meanOfResiduals,
         double &varianceOfResiduals,
-        lsst::afw::MaskedImage<ImageT, MaskT> const &inputImage,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &inputImage,
         MaskT const badPixelMask
         );
 
@@ -191,7 +191,7 @@ namespace diffim {
         int &nGoodPixels,
         double &meanOfResiduals,
         double &varianceOfResiduals,
-        lsst::afw::Image<ImageT> const &inputImage
+        lsst::afw::image::Image<ImageT> const &inputImage
         );
 
     template <typename VectorT>
@@ -203,8 +203,8 @@ namespace diffim {
 
     template <typename PixelT, typename FunctionT>
     void addFunction(
-        lsst::afw::Image<PixelT> &image,
-        lsst::afw::function::Function2<FunctionT> const &function
+        lsst::afw::image::Image<PixelT> &image,
+        lsst::afw::math::Function2<FunctionT> const &function
         );
 
 }}}

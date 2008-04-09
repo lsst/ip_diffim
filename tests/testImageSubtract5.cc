@@ -2,9 +2,9 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include <lsst/afw/MaskedImage.h>
-#include <lsst/afw/Kernel.h>
-#include <lsst/afw/FunctionLibrary.h>
+#include <lsst/afw/image/MaskedImage.h>
+#include <lsst/afw/math/Kernel.h>
+#include <lsst/afw/math/FunctionLibrary.h>
 
 #include <lsst/daf/base/Citizen.h>
 #include <lsst/pex/exceptions/Exception.h>
@@ -24,7 +24,7 @@ int main( int argc, char** argv )
     {
         lsst::pex::logging::Trace::setVerbosity("lsst.ip.diffim", 4);
         
-        typedef lsst::afw::maskPixelType MaskT;
+        typedef lsst::afw::image::maskPixelType MaskT;
         typedef float ImageT; // have to make sure this jibes with the input data!
         typedef double KernelT;
         typedef double FuncT;
@@ -63,17 +63,17 @@ int main( int argc, char** argv )
         templateMaskedImage.readFits(inputImage);
         
         // Generate basis of delta functions for kernel
-        vector<boost::shared_ptr<lsst::afw::Kernel<KernelT> > > kernelBasisVec =
+        vector<boost::shared_ptr<lsst::afw::math::Kernel<KernelT> > > kernelBasisVec =
             lsst::ip::diffim::generateDeltaFunctionKernelSet<KernelT>(kernelCols, kernelRows);
         
         // Function for spatially varying kernel.  Make null here for this test.
-        boost::shared_ptr<lsst::afw::function::Function2<FuncT> > kernelFunctionPtr(
-            new lsst::afw::function::PolynomialFunction2<FuncT>(kernelSpatialOrder)
+        boost::shared_ptr<lsst::afw::math::Function2<FuncT> > kernelFunctionPtr(
+            new lsst::afw::math::PolynomialFunction2<FuncT>(kernelSpatialOrder)
             );
         
         // Function for spatially varying background.  
-        boost::shared_ptr<lsst::afw::function::Function2<FuncT> > backgroundFunctionPtr(
-            new lsst::afw::function::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
+        boost::shared_ptr<lsst::afw::math::Function2<FuncT> > backgroundFunctionPtr(
+            new lsst::afw::math::PolynomialFunction2<FuncT>(backgroundSpatialOrder)
             );
 
         scienceMaskedImage *= scaleFactor;
@@ -82,19 +82,19 @@ int main( int argc, char** argv )
         vector<lsst::detection::Footprint::PtrType> footprintList =
             lsst::ip::diffim::getCollectionOfMaskedImagesForPsfMatching();
         
-        boost::shared_ptr<lsst::afw::LinearCombinationKernel<KernelT> > kernelPtr =
+        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel<KernelT> > kernelPtr =
             lsst::ip::diffim::computePsfMatchingKernelForMaskedImage(
                 kernelFunctionPtr, backgroundFunctionPtr, templateMaskedImage, scienceMaskedImage,
                 kernelBasisVec, footprintList, p);
         
-        lsst::afw::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage(templateMaskedImage.getCols(), 
+        lsst::afw::image::MaskedImage<ImageT, MaskT> convolvedTemplateMaskedImage(templateMaskedImage.getCols(), 
                                                                           templateMaskedImage.getRows());
-        lsst::afw::kernel::convolveLinear(convolvedTemplateMaskedImage, templateMaskedImage, *kernelPtr, edgeMaskBit);
+        lsst::afw::math::convolveLinear(convolvedTemplateMaskedImage, templateMaskedImage, *kernelPtr, edgeMaskBit);
 
         // Add background
-        lsst::afw::MaskedPixelAccessor<ImageT, MaskT> accessorCol(convolvedTemplateMaskedImage);
+        lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> accessorCol(convolvedTemplateMaskedImage);
         for (unsigned int col = 0; col < convolvedTemplateMaskedImage.getCols(); ++col) {
-            lsst::afw::MaskedPixelAccessor<ImageT, MaskT> accessorRow = accessorCol;
+            lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> accessorRow = accessorCol;
             for (unsigned int row = 0; row < convolvedTemplateMaskedImage.getRows(); ++row) {
                 *accessorRow.image += (*backgroundFunctionPtr)(col, row);
                 accessorRow.nextRow();

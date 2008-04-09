@@ -1,6 +1,6 @@
 // -*- lsst-c++ -*-
 #include "lsst/afw/Trace.h"
-#include "lsst/afw/Kernel.h"
+#include "lsst/afw/math/Kernel.h"
 
 using namespace std;
 using namespace lsst::afw;

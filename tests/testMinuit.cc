@@ -1,5 +1,5 @@
 #include <lsst/afw/MinimizerFunctionBase.h>
-#include <lsst/afw/FunctionLibrary.h>
+#include <lsst/afw/math/FunctionLibrary.h>
 #include <Minuit/FunctionMinimum.h>
 #include <Minuit/MnMigrad.h>
 #include <Minuit/MnMinos.h>
@@ -15,13 +15,13 @@ int main( int argc, char** argv )
     const unsigned int npts = 10;
     vector<double> params(order+1);
 
-    boost::shared_ptr<lsst::afw::function::Chebyshev1Function1<funcType> > chebyFuncPtr(
-        new lsst::afw::function::Chebyshev1Function1<funcType>(order)
+    boost::shared_ptr<lsst::afw::math::Chebyshev1Function1<funcType> > chebyFuncPtr(
+        new lsst::afw::math::Chebyshev1Function1<funcType>(order)
         );
 
     const unsigned int polyorder = 0;
-    boost::shared_ptr<lsst::afw::function::PolynomialFunction1<funcType> > polyFuncPtr(
-        new lsst::afw::function::PolynomialFunction1<funcType>(polyorder)
+    boost::shared_ptr<lsst::afw::math::PolynomialFunction1<funcType> > polyFuncPtr(
+        new lsst::afw::math::PolynomialFunction1<funcType>(polyorder)
         );
 
     params[0] = 0;
@@ -50,7 +50,7 @@ int main( int argc, char** argv )
 
 
     double def = 1.0;
-    lsst::afw::function::MinimizerFunctionBase1<funcType> myFcn(measurements, variances, positions, def, chebyFuncPtr);
+    lsst::afw::math::MinimizerFunctionBase1<funcType> myFcn(measurements, variances, positions, def, chebyFuncPtr);
 
     // Initialize paramters
     // Name; value; uncertainty
@@ -94,7 +94,7 @@ int main( int argc, char** argv )
         positions[i] = x;
     }
     def = 1.0;
-    lsst::afw::function::MinimizerFunctionBase1<funcType> myFcn2(measurements, variances, positions, def, polyFuncPtr);
+    lsst::afw::math::MinimizerFunctionBase1<funcType> myFcn2(measurements, variances, positions, def, polyFuncPtr);
 
     MnMigrad migrad2(myFcn2, upar2);
     FunctionMinimum min2 = migrad2();

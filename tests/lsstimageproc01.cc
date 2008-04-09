@@ -1,10 +1,9 @@
 // -*- lsst-c++ -*-
-#include "lsst/afw/MaskedImage.h"
-#include "lsst/pex/logging/Trace.h"
 #include "lsst/daf/base/DataProperty.h"
+#include "lsst/pex/logging/Trace.h"
+#include "lsst/afw/image/MaskedImage.h"
 
 using namespace std;
-using namespace lsst::afw;
 
 template <typename ImagePixelT, typename MaskPixelT> 
 class synthesizeCfhtPixProcFunc : public PixelProcessingFunc<ImagePixelT, MaskPixelT> {
@@ -13,7 +12,7 @@ public:
     typedef PixelLocator<MaskPixelT> MaskIteratorT;
     typedef typename PixelChannelType<MaskPixelT>::type MaskChannelT;
     
-    synthesizeCfhtPixProcFunc(MaskedImage<ImagePixelT, MaskPixelT>& m) : PixelProcessingFunc<ImagePixelT, MaskPixelT>(m), initCount(0) {}
+    synthesizeCfhtPixProcFunc(lsst::afw::image::MaskedImage<ImagePixelT, MaskPixelT>& m) : PixelProcessingFunc<ImagePixelT, MaskPixelT>(m), initCount(0) {}
     
     void init() {
         PixelProcessingFunc<ImagePixelT, MaskPixelT>::_maskPtr->getPlaneBitMask("saturated", satBit);
@@ -76,7 +75,7 @@ int main( int argc, char** argv )
     string templateInputImage = argv[3];
     string templateOutputImage = argv[4];
 
-    MaskedImage<ImagePixelType,MaskPixelType> cfhtScienceMaskedImage;
+    lsst::afw::image::MaskedImage<ImagePixelType,MaskPixelType> cfhtScienceMaskedImage;
     cfhtScienceMaskedImage.readFits(scienceInputImage);
     cfhtScienceMaskedImage.getMask()->addMaskPlane("saturated");
     cfhtScienceMaskedImage.getMask()->addMaskPlane("zerovalued");
@@ -88,7 +87,7 @@ int main( int argc, char** argv )
     cout << "Set " << maskScienceFunc.getBadCount() << " bad mask bits in " << scienceInputImage << endl;
     cfhtScienceMaskedImage.writeFits(scienceOutputImage);
     
-    MaskedImage<ImagePixelType,MaskPixelType> cfhtTemplateMaskedImage;
+    lsst::afw::image::MaskedImage<ImagePixelType,MaskPixelType> cfhtTemplateMaskedImage;
     cfhtTemplateMaskedImage.readFits(templateInputImage);
     cfhtTemplateMaskedImage.getMask()->addMaskPlane("saturated");
     cfhtTemplateMaskedImage.getMask()->addMaskPlane("zerovalued");
