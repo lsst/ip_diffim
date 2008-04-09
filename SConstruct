@@ -32,7 +32,7 @@ env = scons.makeEnv(
         ["pex_policy", "lsst/pex/policy/Policy.h", "pex_policy:C++"],
         ["daf_persistence", "lsst/daf/persistence.h", "daf_persistence:C++"],
         ["daf_data", "lsst/daf/data.h", "daf_data:C++"],
-        ["afw", "lsst/afw/afw.h", "afw:C++"],
+        ["afw", "lsst/afw.h", "afw:C++"],
         ["mpich2", "mpi.h", "mpich:C++"],
         ["pex_harness", "lsst/pex/harness/Stage.h", "pex_harness:C++"],
         ["detection", "lsst/detection/Footprint.h", "detection"],
@@ -44,7 +44,7 @@ env.libs["ip_diffim"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") f
 #
 # Build/install things
 #
-for d in Split("doc include/lsst/ip/diffim lib src tests examples python/lsst/ip/diffim"):
+for d in Split("doc include/lsst/ip/diffim lib python/lsst/ip/diffim tests examples"):
     SConscript(os.path.join(d, "SConscript"))
 
 env['IgnoreFiles'] = r"(~$|\.pyc$|^\.svn$|\.o$)"

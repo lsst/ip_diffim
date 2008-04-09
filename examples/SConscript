@@ -28,4 +28,4 @@ if not dataDir:
 tests = lsst.tests.Control(env, args=args, ignoreList=ignoreList, verbose=True)
 tests.run("*.cc")
 for target in tests.run("*.py"):
-    env.Depends(target, "../python/lsst/ip/diffim/_ip_diffimLib%s" % (env["LDMODULESUFFIX"]))
+    env.Depends(target, "../python/lsst/ip/diffim/_diffimLib%s" % (env["LDMODULESUFFIX"]))

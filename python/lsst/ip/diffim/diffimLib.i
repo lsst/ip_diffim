@@ -18,7 +18,7 @@ Python bindings for lsst::ip::diffim code
 %}
 
 // Everything whose bindings we will have to know about
-%include "lsst/utils/p_lsstSwig.i"             // this needs to go first otherwise i do not know about e.g. boost
+%include "lsst/p_lsstSwig.i"             // this needs to go first otherwise i do not know about e.g. boost
 %include "lsst/afw/Core/lsstImageTypes.i"     // vw and Image/Mask types and typedefs
 %include "lsst/detection/detectionLib.i"     // need otherwise FootprintContainerT not known about
 

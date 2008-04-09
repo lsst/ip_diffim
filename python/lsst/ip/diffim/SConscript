@@ -2,7 +2,6 @@
 Import("env")
 import lsst.SConsUtils as scons
 
-env.CheckSwig("python", ilang="c++", includedProducts="afw daf_base pex_logging detection")
+env.CheckSwig("python", ilang="c++", includedProducts="afw daf_base pex_exceptions pex_policy pex_logging daf_persistence daf_data detection")
 
-env.LoadableModuleIncomplete("_diffimLib", Split("diffimLib.i"),
-                             LIBS=env.getlibs("ip_diffim"))
+env.LoadableModuleIncomplete("_diffimLib", Split("diffimLib.i"), LIBS=env.getlibs("ip_diffim"))
