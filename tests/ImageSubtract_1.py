@@ -5,7 +5,7 @@ import unittest
 import eups
 
 import lsst.pex.policy
-import lsst.tests as tests
+import lsst.utils.tests as tests
 import lsst.pex.logging as logging
 import lsst.afw.Core.afwLib as afw
 import lsst.detection.detectionLib as detection

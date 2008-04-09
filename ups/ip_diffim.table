@@ -1,4 +1,11 @@
+setupRequired(daf_base)
+setupRequired(pex_logging)
+setupRequired(pex_exceptions)
+setupRequired(daf_data)
+setupRequired(daf_persistence)
+setupRequired(afw)
 setupRequired(detection)
+
 setupOptional(pex_harness)
 
 envPrepend(DYLD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
