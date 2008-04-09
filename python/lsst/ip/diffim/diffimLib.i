@@ -17,10 +17,14 @@ Python bindings for lsst::ip::diffim code
 %init %{
 %}
 
+namespace boost {
+    class bad_any_cast; // remove warning: Nothing known about 'boost::bad_any_cast'
+}
+
 // Everything whose bindings we will have to know about
-%include "lsst/p_lsstSwig.i"             // this needs to go first otherwise i do not know about e.g. boost
-%include "lsst/afw/image/lsstImageTypes.i"     // vw and Image/Mask types and typedefs
-%include "lsst/detection/detectionLib.i"     // need otherwise FootprintContainerT not known about
+%include "lsst/p_lsstSwig.i"    // this needs to go first otherwise i do not know about e.g. boost
+%include "lsst/afw/image/lsstImageTypes.i"  // vw and Image/Mask types and typedefs
+%include "lsst/detection/detectionLib.i"    // need for FootprintContainerT
 
 // handle C++ arguments that should be outputs in python
 %apply int& OUTPUT { int& };

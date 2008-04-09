@@ -22,9 +22,8 @@
 #include <lsst/pex/logging/Trace.h>
 #include <lsst/pex/logging/Log.h>
 
-#include <lsst/afw/math/FunctionLibrary.h>
-#include <lsst/afw/image/PixelAccessors.h>
-#include <lsst/afw/math/minimize.h>
+#include <lsst/afw/image.h>
+#include <lsst/afw/math.h>
 
 #include "lsst/ip/diffim/PCA.h"
 #include "lsst/ip/diffim/ImageSubtract.h"

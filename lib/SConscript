@@ -1,11 +1,14 @@
 # -*- python -*-
 Import('env')
 
-env.SharedLibraryIncomplete(env['eups_product'], map(lambda str: "../src/" + str,
-                                           [
-    "ImageSubtract.cc",
-    "PCA.cc",
-    "wcsMatch.cc",
-                                            ])
-                            #, LIBS=env.getlibs("daf_base pex_policy afw boost wcslib detection")
-                            )
+prodName = env['eups_product']
+
+env.SharedLibraryIncomplete(
+    prodName,
+    ["../src/" + s for s in (
+        "ImageSubtract.cc",
+        "PCA.cc",
+        "wcsMatch.cc",
+    )],
+    LIBS=[x for x in env.getlibs(prodName) if x != prodName]
+)
