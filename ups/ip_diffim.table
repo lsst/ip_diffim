@@ -1,7 +1,7 @@
 setupRequired(daf_base)
 setupRequired(pex_logging)
 setupRequired(pex_exceptions)
-setupRequired(daf_data)
+setupRequired(pex_policy)
 setupRequired(daf_persistence)
 setupRequired(afw)
 setupRequired(detection)

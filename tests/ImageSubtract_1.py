@@ -30,13 +30,12 @@ try:
 except NameError:
     display = False
 
-dataDir = os.environ.get("FWDATA_DIR", "")
+dataDir = eups.productDir("afwdata")
+if not dataDir:
+    raise RuntimeError("Must set up afwdata to run these tests")
 imageProcDir = eups.productDir("ip_diffim", "setup")
 policyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
 policy = lsst.pex.policy.Policy.createPolicy(policyPath)
-
-if not dataDir:
-    raise RuntimeError("Must set up afwdata to run these tests")
 
 InputMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_1")
 TemplateMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_1_tmpl")

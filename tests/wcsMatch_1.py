@@ -26,9 +26,9 @@ except NameError:
     verbose = 0
     logging.Trace_setVerbosity("ip.diffim", verbose)
 
-dataDir = os.environ.get("FWDATA_DIR")
+dataDir = eups.productDir("afwdata")
 if not dataDir:
-    raise RuntimeError("Must set up fwData to run these tests")
+    raise RuntimeError("Must set up afwdata to run these tests")
 
 InputOrigMaskedImageName = "871034p_1_MI"
 InputSciMaskedImageName = "871034p_1_MI"
@@ -50,7 +50,7 @@ class wcsMatchTestCase(unittest.TestCase):
         # setup original (template) MaskedImage and WCS
         origMaskedImage = afwImage.MaskedImageD()
         origMaskedImage.readFits(inFilePathOrig)
-        self.origWcs = afwImage.WCS(origMaskedImage.getImage().getMetaData())
+        self.origWcs = afwImage.Wcs(origMaskedImage.getImage().getMetaData())
         origCols = origMaskedImage.getCols()
         origRows = origMaskedImage.getRows()
 
@@ -58,7 +58,7 @@ class wcsMatchTestCase(unittest.TestCase):
         # serve as the remapped WCS       
         sciMaskedImage = afwImage.MaskedImageD()
         sciMaskedImage.readFits(inFilePathSci)
-        self.sciWcs = afwImage.WCS(sciMaskedImage.getImage().getMetaData())
+        self.sciWcs = afwImage.Wcs(sciMaskedImage.getImage().getMetaData())
 
         # setup the remapped and original Exposure.  The remapped
         # MaskedImage is 1/2 kernel width larger than the original
@@ -132,7 +132,7 @@ class wcsMatchTestCase(unittest.TestCase):
 
         swarpMaskedImage = afwImage.MaskedImageD()
         swarpMaskedImage.readFits(inFilePathSwarp)
-        swarpWcs = afwImage.WCS(swarpMaskedImage.getImage().getMetaData())
+        swarpWcs = afwImage.Wcs(swarpMaskedImage.getImage().getMetaData())
 
         remapWcs = remapExposure.getWcs()
         remapRaDec = remapWcs.colRowToRaDec(colRow)
@@ -212,7 +212,7 @@ class wcsMatchTestCase(unittest.TestCase):
 
         swarpMaskedImage = afwImage.MaskedImageD()
         swarpMaskedImage.readFits(inFilePathSwarp)
-        swarpWcs = afwImage.WCS(swarpMaskedImage.getImage().getMetaData())
+        swarpWcs = afwImage.Wcs(swarpMaskedImage.getImage().getMetaData())
 
         newRemapWcs = newRemapExposure.getWcs()
         newRemapRaDec = newRemapWcs.colRowToRaDec(colRow)
