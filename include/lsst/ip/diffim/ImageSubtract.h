@@ -1,6 +1,6 @@
 // -*- lsst-c++ -*-
 /**
- * @file ImageSubtract.h
+ * @file
  *
  * @brief Implementation of Image Subtraction
  *
@@ -13,7 +13,9 @@
 #define LSST_IMAGEPROC_IMAGESUBTRACT_H
 
 #include <vector>
+
 #include <boost/shared_ptr.hpp>
+
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/afw/math/Kernel.h>
 #include <lsst/afw/math/KernelFunctions.h>
@@ -21,7 +23,7 @@
 #include <lsst/afw/image/MaskedImage.h>
 #include <lsst/afw/math/Function.h>
 #include <lsst/detection/Footprint.h>
-#include <lsst/ip/diffim/PCA.h>
+#include <lsst/ip/diffim/Pca.h>
 
 namespace lsst {
 namespace ip {

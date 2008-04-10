@@ -3,18 +3,20 @@
 """
 from __future__ import with_statement
 
-import os
-import sys
 import optparse
+import os
 import shutil
-import subprocess
 import socket
+import subprocess
+import sys
+
+import eups
 
 import lsst.daf.base as dafBase
 import lsst.pex.logging
 
 def main():
-    defInDir = os.environ.get("FWDATA_DIR", "")
+    defInDir = eups.productDir("afwdata")
     try:
         imageProcDir = os.environ["IMAGEPROC_DIR"]
     except KeyError:

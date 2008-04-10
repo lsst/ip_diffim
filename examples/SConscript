@@ -12,6 +12,7 @@ args = {
 # Tests
 #
 ignoreList = [
+    "runImageSubtract.py",
     "runManyImageSubtract.py",
     "runWcsMatch.py",
     "SplitCFHT.py",

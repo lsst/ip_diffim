@@ -1,6 +1,6 @@
 // -*- lsst-c++ -*-
 /**
- * @file ImageSubtract.cc
+ * @file
  *
  * @brief Implementation of image subtraction functions declared in ImageSubtract.h
  *
@@ -18,14 +18,12 @@
 #include <vw/Math/LinearAlgebra.h> 
 
 #define LSST_MAX_TRACE 5                // NOTE -  trace statements >= 6 can ENTIRELY kill the run time
+#include <lsst/afw/image.h>
+#include <lsst/afw/math.h>
 #include <lsst/pex/exceptions/Exception.h>
 #include <lsst/pex/logging/Trace.h>
 #include <lsst/pex/logging/Log.h>
-
-#include <lsst/afw/image.h>
-#include <lsst/afw/math.h>
-
-#include "lsst/ip/diffim/PCA.h"
+#include "lsst/ip/diffim/Pca.h"
 #include "lsst/ip/diffim/ImageSubtract.h"
 
 #define DEBUG_MATRIX 0

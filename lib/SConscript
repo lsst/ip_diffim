@@ -7,7 +7,7 @@ env.SharedLibraryIncomplete(
     prodName,
     ["../src/" + s for s in (
         "ImageSubtract.cc",
-        "PCA.cc",
+        "Pca.cc",
         "wcsMatch.cc",
     )],
     LIBS=[x for x in env.getlibs(prodName) if x != prodName]

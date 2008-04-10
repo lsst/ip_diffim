@@ -1,6 +1,6 @@
 // -*- lsst-c++ -*-
 /**
- * @file PCA.cc
+ * @file
  *
  * @brief Implementation of PCA Methods
  *
@@ -19,7 +19,7 @@
 #include <vw/Math/Vector.h> 
 #include <vw/Math/LinearAlgebra.h> 
 
-#include "lsst/ip/diffim/PCA.h"
+#include "lsst/ip/diffim/Pca.h"
 
 using namespace std;
 //#define DEBUG_MATRIX 1

@@ -33,7 +33,9 @@ except NameError:
 dataDir = eups.productDir("afwdata")
 if not dataDir:
     raise RuntimeError("Must set up afwdata to run these tests")
-imageProcDir = eups.productDir("ip_diffim", "setup")
+imageProcDir = eups.productDir("ip_diffim")
+if not imageProcDir:
+    raise RuntimeError("Could not get path to ip_diffim")
 policyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
 policy = lsst.pex.policy.Policy.createPolicy(policyPath)
 

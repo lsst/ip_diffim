@@ -1,6 +1,6 @@
 // -*- lsst-c++ -*-
 /**
- * @file PCA.h
+ * @file
  *
  * @brief Implementation of Principal Component Analysis Math
  *
@@ -12,9 +12,7 @@
 #ifndef LSST_IP_DIFFIM_PCA_H
 #define LSST_IP_DIFFIM_PCA_H
 
-#include <vw/Math/LinearAlgebra.h>
-#include <vw/Math/Matrix.h> 
-#include <vw/Math/Vector.h> 
+#include <vw/Math.h>
 
 namespace lsst {
 namespace ip {

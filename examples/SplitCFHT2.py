@@ -38,7 +38,7 @@ def splitImage(inimg, outdir, baseimg, start=1):
     if not TESTING:
         inputMaskedImage = afwImage.MaskedImageF()
         inputMaskedImage.readFits(inimg)
-        inputWCS = afwImage.WCS(inputMaskedImage.getImage().getMetaData())
+        inputWCS = afwImage.Wcs(inputMaskedImage.getImage().getMetaData())
         inputExposure = afwImage.ExposureF(inputMaskedImage, inputWCS)
 
         nRowSubexposures = 4 # int(sys.argv[2]) # 4

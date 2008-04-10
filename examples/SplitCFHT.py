@@ -19,7 +19,7 @@ inputExposureBase = '/'.join(inputExposureDirs[:-3])
 if not TESTING:
     inputMaskedImage = afwImage.MaskedImageF()
     inputMaskedImage.readFits(inputExposureRoot)
-    inputWCS = afwImage.WCS(inputMaskedImage.getImage().getMetaData())
+    inputWCS = afwImage.Wcs(inputMaskedImage.getImage().getMetaData())
     inputExposure = afwImage.ExposureF(inputMaskedImage, inputWCS)
 
     nRowSubexposures = 4 # int(sys.argv[2]) # 4

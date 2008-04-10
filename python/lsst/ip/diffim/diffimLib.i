@@ -86,9 +86,9 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 
 /* ImageSubtract.h */
 /*******************/
-/* PCA.h */
+/* Pca.h */
 
-%include "lsst/ip/diffim/PCA.h"
+%include "lsst/ip/diffim/Pca.h"
 %template(computePca)                    lsst::ip::diffim::computePca<vw::math::Matrix<float>, vw::math::Vector<float> >;
 %template(computePca)                    lsst::ip::diffim::computePca<vw::math::Matrix<double>, vw::math::Vector<double> >;
 %template(decomposeMatrixUsingBasis)     lsst::ip::diffim::decomposeMatrixUsingBasis<vw::math::Matrix<float> >;
@@ -96,7 +96,7 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 %template(approximateMatrixUsingBasis)   lsst::ip::diffim::approximateMatrixUsingBasis<vw::math::Matrix<float> >;
 %template(approximateMatrixUsingBasis)   lsst::ip::diffim::approximateMatrixUsingBasis<vw::math::Matrix<double> >;
 
-/* PCA.h */
+/* Pca.h */
 
 /*******************/
 /* WCSMatch.h */

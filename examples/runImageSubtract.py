@@ -1,21 +1,22 @@
 #!/usr/bin/env python
 """Subtract one pair of images.
 """
+import optparse
 import os
 import sys
-import optparse
 
 import eups
-import lsst.daf.base as dafBase
+
 import lsst.afw.image as afwImage
+import lsst.daf.base as dafBase
 import lsst.ip.diffim
 import lsst.pex.logging
 
 def main():
-    defDataDir = os.environ.get("FWDATA_DIR", "")
-    imageProcDir = eups.productDir("ip_diffim", "setup")
+    defDataDir = eups.productDir("afwdata") or ""
+    imageProcDir = eups.productDir("ip_diffim")
     if imageProcDir == None:
-        print "Error: ip_diffim not setup"
+        print "Error: could not set up ip_diffim"
         sys.exit(1)
 
     defSciencePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_1")

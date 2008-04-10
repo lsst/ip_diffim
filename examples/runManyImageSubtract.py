@@ -16,7 +16,7 @@ import lsst.ip.diffim
 def main():
     imageProcDir = eups.productDir("ip_diffim", "setup")
     if imageProcDir == None:
-        print "Error: ip_diffim not setup"
+        print "Error: could not set up ip_diffim"
         sys.exit(1)
     moduleDir = os.path.dirname(os.path.abspath(__file__))
 

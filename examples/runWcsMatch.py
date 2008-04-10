@@ -1,16 +1,17 @@
 #!/usr/bin/env python
+import optparse
 import os
 import sys
-import optparse
 
 import eups
-import lsst.daf.base as dafBase
-import lsst.pex.logging
+
 import lsst.afw.image as afwImage
+import lsst.daf.base as dafBase
 import lsst.ip.diffim
+import lsst.pex.logging
 
 def main():
-    defDataDir = os.environ.get("FWDATA_DIR", "")
+    defDataDir = eups.productDir("afwdata") or ""
     
     defSciencePath = os.path.join(defDataDir, "871034p_1_MI")
     defTemplatePath = os.path.join(defDataDir, "871034p_1_MI")
