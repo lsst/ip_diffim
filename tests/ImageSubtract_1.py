@@ -11,7 +11,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.detection.detectionLib as detection
 import lsst.ip.diffim as ipDiff
-import lsst.afw.imageTestUtils as imTestUtils
+import lsst.afw.image.testUtils as imageTest
 
 try:
     type(verbosity)
@@ -43,7 +43,7 @@ TemplateMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-79772
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 def initializeTestCases():
-    MaskedImage = afw.MaskedImageD       # the desired type of MaskedImage
+    MaskedImage = afwImage.MaskedImageD       # the desired type of MaskedImage
     templateMaskedImage2 = MaskedImage()
     templateMaskedImage2.readFits(TemplateMaskedImagePath)
 
@@ -204,11 +204,11 @@ class DeltaFunctionTestCase(unittest.TestCase):
 
             imageToNotConvolveStampPtr = self.scienceMaskedImage.getSubImage(footprintBBox)
             # this is a bit of a hack to deal with -= and *= problems with swigged masked images
-            imageArray, varianceArray, maskArray = imTestUtils.arraysFromMaskedImage(imageToNotConvolveStampPtr.get())
+            imageArray, varianceArray, maskArray = imageTest.arraysFromMaskedImage(imageToNotConvolveStampPtr.get())
             imageArray += bg
             imageArray *= scaling
             varianceArray *= scaling**2
-            imageToNotConvolveStamp = imTestUtils.maskedImageFromArrays( (imageArray, varianceArray, maskArray) )
+            imageToNotConvolveStamp = imageTest.maskedImageFromArrays( (imageArray, varianceArray, maskArray) )
 
             if debugIO:
                 imageToConvolveStampPtr.writeFits('tFits_%d' % (footprintID,))
