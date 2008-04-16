@@ -22,7 +22,7 @@ import lsst.ctrl.events
 EventHost = "lsst8.ncsa.uiuc.edu"
 
 def sendEvent(templatePath, sciencePath, differencePath, eventTransmitter):
-    rootProperty = dafBase.SupportFactory.createPropertyNode("root");
+    rootProperty = dafBase.DataProperty.createPropertyNode("root");
 
     rootProperty.addProperty(dafBase.DataProperty("visitId", 1)) # this may be required
     rootProperty.addProperty(dafBase.DataProperty("sciencePath", sciencePath))

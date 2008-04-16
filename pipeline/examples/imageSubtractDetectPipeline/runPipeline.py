@@ -95,7 +95,7 @@ to feed images to the image subtraction pipeline.
 Control-C the pipeline when it is done (or you have had enough).
 """
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
-    lsst.pex.harness.startPipeline.startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "runId")
+    lsst.pex.harness.startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "runId")
 
 if __name__ == "__main__":
     memId0 = dafBase.Citizen_getNextMemId()
