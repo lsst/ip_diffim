@@ -16,15 +16,15 @@ import lsst.pex.harness.startPipeline
 
 def main():
     defDataDir = eups.productDir("afwdata", "setup") or "."
-    imageProcDir = eups.productDir("ip_diffim", "setup")
-    if imageProcDir == None:
+    packageDir = eups.productDir("ip_diffim", "setup")
+    if packageDir == None:
         print "Error: ip_diffim not setup"
         sys.exit(1)
     pipelineDir = os.path.dirname(os.path.abspath(__file__))
     
     defSciencePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_1")
     defTemplatePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_1_tmpl")
-    defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
+    defPolicyPath = os.path.join(packageDir, "pipeline", "ImageSubtractStageDictionary.paf")
     defOutputPath = "diffImage"
     defVerbosity = 0
     

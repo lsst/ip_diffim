@@ -15,13 +15,13 @@ import lsst.pex.logging
 import lsst.pex.harness.startPipeline
 
 def main():
-    imageProcDir = eups.productDir("ip_diffim", "setup")
-    if imageProcDir == None:
+    packageDir = eups.productDir("ip_diffim", "setup")
+    if packageDir == None:
         print "Error: ip_diffim not setup"
         sys.exit(1)
     pipelineDir = os.path.dirname(os.path.abspath(__file__))
 
-    defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
+    defPolicyPath = os.path.join(packageDir, "pipeline", "ImageSubtractStageDictionary.paf")
     defVerbosity = 0
     
     usage = """usage: %%prog [options]

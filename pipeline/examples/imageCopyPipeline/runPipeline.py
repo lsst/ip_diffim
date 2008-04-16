@@ -17,9 +17,8 @@ import lsst.pex.logging
 
 def main():
     defInDir = eups.productDir("afwdata")
-    try:
-        imageProcDir = os.environ["IMAGEPROC_DIR"]
-    except KeyError:
+    packageDir = eups.productDir("ip_diffim", "setup")
+    if packageDir == None:
         print "Error: ip_diffim not setup"
         sys.exit(1)
     pipelineDir = os.path.dirname(os.path.abspath(__file__))
@@ -47,6 +46,8 @@ def main():
     
     inputImagePath = os.path.abspath(getArg(0, defInputPath))
     outputImagePath = os.path.abspath(getArg(3, defOutputPath))
+    
+    print "Copying: %r\n     to: %r" % (inputImagePath, outputImagePath)
     
     def copyTemplatedConfigFile(templateName, templateDict):
         """Read a templated configuration file, fill it in and write it out.
@@ -86,6 +87,7 @@ def main():
         ),
     )
 
+    lsst.pex.logging.Trace_setVerbosity("ip.diffim", 3)
     lsst.pex.logging.Trace_setVerbosity("pex.harness", 3)
     
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
