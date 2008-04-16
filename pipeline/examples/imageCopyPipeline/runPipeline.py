@@ -14,6 +14,7 @@ import eups
 
 import lsst.daf.base as dafBase
 import lsst.pex.logging
+import lsst.pex.harness.startPipeline
 
 def main():
     defInDir = eups.productDir("afwdata")
@@ -22,8 +23,6 @@ def main():
         print "Error: ip_diffim not setup"
         sys.exit(1)
     pipelineDir = os.path.dirname(os.path.abspath(__file__))
-    sys.path += [os.path.dirname(pipelineDir)]
-    import startPipeline
     
     defInputPath = os.path.join(defInDir, "871034p_1_MI")
     defOutputPath = "imageCopy"
@@ -88,10 +87,10 @@ def main():
     )
 
     lsst.pex.logging.Trace_setVerbosity("ip.diffim", 3)
-    lsst.pex.logging.Trace_setVerbosity("pex.harness", 3)
+    lsst.pex.logging.Trace_setVerbosity("pex.harness", 1)
     
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
-    startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "copyPipelineId")
+    lsst.pex.harness.startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "copyPipelineId")
 
 if __name__ == "__main__":
     memId0 = dafBase.Citizen_getNextMemId()

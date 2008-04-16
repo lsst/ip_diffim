@@ -109,7 +109,7 @@ Notes:
     if options.verbosity > 0:
         print "Verbosity =", options.verbosity
         lsst.pex.logging.Trace_setVerbosity("lsst.ip.diffim", options.verbosity)
-    lsst.pex.logging.Trace_setVerbosity("pex.harness", 3)
+    lsst.pex.logging.Trace_setVerbosity("pex.harness", 1)
     
     nodeList = os.path.join(pipelineDir, "nodelist.scr")
     lsst.pex.harness.startPipeline.startPipeline(nodeList, "pipeline_policy.paf", "imageSubtractId")

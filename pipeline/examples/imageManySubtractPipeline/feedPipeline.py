@@ -12,6 +12,8 @@ import optparse
 import socket
 import time
 
+import eups
+
 import lsst.daf.base as dafBase
 import lsst.pex.policy
 import lsst.pex.logging
@@ -31,9 +33,8 @@ def sendEvent(templatePath, sciencePath, differencePath, eventTransmitter):
 
 
 def main():
-    try:
-        imageProcDir = os.environ["IMAGEPROC_DIR"]
-    except KeyError:
+    packageDir = eups.productDir("ip_diffim", "setup")
+    if packageDir == None:
         print "Error: ip_diffim not setup"
         sys.exit(1)
     pipelineDir = os.path.dirname(os.path.abspath(__file__))
