@@ -11,20 +11,22 @@ class ImageCopyStage(lsst.pex.harness.Stage.Stage):
     The image can be of any type that has getCols and getRows methods.
     """
     def process(self):
-        pexLog.Trace("ip.diffim.imageCopy", 3,
+        log = pexLog.Log(pexLog.Log.getDefaultLog(), "ip.diffim.imageCopy")
+
+        log.log(pexLog.Log.INFO,
             "ImageCopyStage process: _rank %i stageId %d" % (self._rank, self.stageId))
         
         activeClipboard = self.inputQueue.getNextDataset()
 
         inputImage = activeClipboard.get('InputImage')
         
-        pexLog.Trace("ip.diffim.imageCopy", 3,
+        log.log(pexLog.Log.INFO,
             "ImageCopyStage read image from clipboard as InputImage; cols=%r, rows=%r" % \
                 (inputImage.getCols(), inputImage.getRows()))
 
         activeClipboard.put('OutputImage', inputImage)
 
-        pexLog.Trace("ip.diffim.imageCopy", 3,
+        log.log(pexLog.Log.INFO,
             "ImageCopyStage wrote image to clipboard as OutputImage")
 
         self.outputQueue.addDataset(activeClipboard)
