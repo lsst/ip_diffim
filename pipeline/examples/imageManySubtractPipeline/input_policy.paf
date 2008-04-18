@@ -2,7 +2,7 @@ AdditionalData: "sciencePath=triggerImageSubtraction.sciencePath" "templatePath=
 InputItems: {
     ScienceExposure: {
         Type: "ExposureF"
-        PythonType: "lsst.afw.Core.afwLib.ExposureF"
+        PythonType: "lsst.afw.image.ExposureF"
         StoragePolicy: {
             Storage: "FitsStorage"
             Location: "%{sciencePath}"
@@ -10,7 +10,7 @@ InputItems: {
     },
     TemplateExposure: {
         Type: "ExposureF"
-        PythonType: "lsst.afw.Core.afwLib.ExposureF"
+        PythonType: "lsst.afw.image.ExposureF"
         StoragePolicy: {
             Storage: "FitsStorage"
             Location: "%{templatePath}"

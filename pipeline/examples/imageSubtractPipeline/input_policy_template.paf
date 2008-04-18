@@ -1,7 +1,7 @@
 InputItems: {
     ScienceExposure: {
         Type: "ExposureF"
-        PythonType: "lsst.afw.Core.afwLib.ExposureF"
+        PythonType: "lsst.afw.image.ExposureF"
         StoragePolicy: {
             Storage: "FitsStorage"
             Location: "%(scienceExposurePath)s"
@@ -9,7 +9,7 @@ InputItems: {
     },
     TemplateExposure: {
         Type: "ExposureF"
-        PythonType: "lsst.afw.Core.afwLib.ExposureF"
+        PythonType: "lsst.afw.image.ExposureF"
         StoragePolicy: {
             Storage: "FitsStorage"
             Location: "%(templateExposurePath)s"
