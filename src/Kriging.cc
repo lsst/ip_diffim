@@ -2,7 +2,7 @@
 /**
  * @file
  *
- * @brief Implementation of Kriging and support functions
+ * @brief Implementation of Kriging and support functions; currently wrapper around gstat
  *
  * @author Andrew Becker, University of Washington
  *
@@ -11,6 +11,7 @@
 
 #include <vario.h>  
 #include <glvars.h>
+#include <data.h>
 
 using namespace std;
 
@@ -22,7 +23,100 @@ lsst::ip::diffim::Variogram::Variogram()
     init_variogram(v);
 }
 
-lsst::ip::diffim::Variogram::fillVariogram() {
+lsst::ip::diffim::Variogram::fillVariogram(std::vector<double> x, 
+                                           std::vector<double> y,
+                                           std::vector<double> z,
+                                           std::vector<double> values,
+                                           std::vector<double> variance) {
+    /* data.c : read_table */
+    static DPOINT current;
+    static int sizeof_currentX = 0;
+    int colmax = 0;
+
+    d = init_one_data(d);
+    d->minX = d->maxX = 0.0; 
+    d->minY = d->maxY = 0.0;
+    d->minZ = d->maxZ = 0.0;
+
+    d->colnx = 1;
+    d->colny = 2;
+    d->colnz = 3;
+    d->colnvalue = 4;
+    d->colnvariance = 5;
+
+
+    current.u.stratum = 0;
+    if (sizeof_currentX == 0)
+        current.X = NULL;
+    colmax = MAX(d->colnx, MAX(d->colny, MAX(d->colnz, d->colnvalue)));
+    colmax = MAX(colmax, MAX(d->colnvariance, d->colns));
+    colmax = MAX(colmax, d->coln_id);
+
+    if (d->colnx > 0)
+        d->mode = d->mode | X_BIT_SET;
+    if (d->colny > 0)
+        d->mode = d->mode | Y_BIT_SET;
+    if (d->colnz > 0)
+        d->mode = d->mode | Z_BIT_SET;
+    if (d->colns > 0) 
+        d->mode = d->mode | S_BIT_SET;
+    if (d->colnvalue > 0) 
+        d->mode = d->mode | V_BIT_SET;
+    setup_polynomial_X(d);
+    
+    /* pretend we read in from ascii table with x y z value */
+    d->type = data_types[DATA_ASCII_TABLE];
+
+    /* do this by hand? */
+    mk_var_names(d);
+
+    d->n_list = d->n_max = 0; 
+    SET_POINT(&current);
+
+    if (d->n_X > sizeof_currentX) { /* and therefore > 0: */
+        if (sizeof_currentX == 0)
+            current.X = (double *) emalloc(d->n_X * sizeof(double));
+        else
+            current.X = (double *) erealloc(current.X, d->n_X * sizeof(double));
+        sizeof_currentX = d->n_X;
+    }
+
+    /* data.c : read_data_line */
+    for (int i = 0; i < x.size(); i++) {
+        current->x = x[i];
+        current->y = y[i];
+        current->z = z[i];
+        current->attr = values[i];
+        current->variance = variance[i];
+        
+        if (d->n_list == 0) {
+            d->minX = d->maxX = current->x; 
+            d->minY = d->maxY = current->y; 
+            d->minZ = d->maxZ = current->z; 
+            d->minvariance = d->maxvariance = current->variance;
+            d->minstratum = d->maxstratum = current->u.stratum;
+        } else {
+            d->minX = MIN(d->minX, current->x); 
+            d->maxX = MAX(d->maxX, current->x);
+            d->minY = MIN(d->minY, current->y); 
+            d->maxY = MAX(d->maxY, current->y); 
+            d->minZ = MIN(d->minZ, current->z); 
+            d->maxZ = MAX(d->maxZ, current->z);
+            d->minvariance = MIN(d->minvariance, current->variance);
+            d->maxvariance = MAX(d->maxvariance, current->variance);
+            d->minstratum = MIN(d->minstratum, current->u.stratum);
+            d->maxstratum = MAX(d->maxstratum, current->u.stratum);
+        }
+
+        push_point(d, &current);
+    }
+    /* data.c : read_gstat_data */
+    set_norm_fns(d);
+    transform_data(d); 
+    average_duplicates(d);
+    calc_data_mean_std(d);
+    correct_strata(d);
+
 }
 
 lsst::ip::diffim::Variogram::calcVariogram() {

@@ -44,10 +44,14 @@ namespace diffim{
         virtual ~Variogram() {};
 
         /* gstat objects */
-        VARIOGRAM *vp = NULL;
+        VARIOGRAM *v = NULL;
         DATA **d = NULL, *d1 = NULL, *d2 = NULL;
 
-        fillVariogram();
+        fillVariogram(std::vector<double> x, 
+                      std::vector<double> y,
+                      std::vector<double> z,
+                      std::vector<double> values,
+                      std::vector<double> variance);
         calcVariogram();
         doVariogram(int nvars, METHOD m);
     }
@@ -62,8 +66,6 @@ namespace diffim{
 
         Variogram *getVariogram(int i);
 
-    private:
-        
     };
 } //namespace lsst
 } //namespace ip
