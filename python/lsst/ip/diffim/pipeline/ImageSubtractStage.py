@@ -26,7 +26,7 @@ class ImageSubtractStage(lsst.pex.harness.Stage.Stage):
 #        for key in activeClipboard.getKeys():
 #            print "* %s: %r" % (key, activeClipboard.get(key))
 
-        differenceImage, psfMatchingKernelPtr, backgroundFunctionPtr = lsst.ip.diffim.imageSubtract(
+        differenceImage, psfMatchingKernelPtr, backgroundFunction = lsst.ip.diffim.imageSubtract(
             imageToConvolve = templateMaskedImage,
             imageToNotConvolve = scienceMaskedImage,
             policy = self._policy,
@@ -50,6 +50,6 @@ class ImageSubtractStage(lsst.pex.harness.Stage.Stage):
         #
         activeClipboard.put('DifferenceExposure', differenceExposure)
         activeClipboard.put('PsfMatchKernel', psfMatchingKernelPtr)
-        activeClipboard.put('BackgroundModel', backgroundFunctionPtr)
+        activeClipboard.put('BackgroundModel', backgroundFunction)
         
         self.outputQueue.addDataset(activeClipboard)
