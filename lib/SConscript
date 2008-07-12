@@ -6,9 +6,10 @@ prodName = env['eups_product']
 env.SharedLibraryIncomplete(
     prodName,
     ["../src/" + s for s in (
-        "ImageSubtract.cc",
-        "Pca.cc",
-        "wcsMatch.cc",
+#        "ImageSubtract.cc",
+#        "Pca.cc",
+#        "wcsMatch.cc",
+    "Kriging.cc",
     )],
     LIBS=[x for x in env.getlibs(prodName) if x != prodName]
 )

@@ -9,32 +9,44 @@
  * @ingroup diffim
  */
 
+/*
+#include <defs.h>
+#include <utils.h>
+#include <data.h>
 #include <vario.h>  
 #include <glvars.h>
-#include <data.h>
+*/
+#include <lsst/ip/diffim/Kriging.h>
 
 using namespace std;
 
 lsst::ip::diffim::Variogram::Variogram()
     :    
-    lsst::mwi::data::LsstBase(typeid(this)) {
+    lsst::daf::data::LsstBase(typeid(this)) {
+
+    /* VARIOGRAM */
+    v  = NULL;
+    /* DATA */
+    *d = NULL;
+    d1 = NULL;
+    d2 = NULL;
     
     /* vario.c */
     init_variogram(v);
 }
 
-lsst::ip::diffim::Variogram::fillVariogram(std::vector<double> x, 
-                                           std::vector<double> y,
-                                           std::vector<double> z,
-                                           std::vector<double> values,
-                                           std::vector<double> variance) {
+void lsst::ip::diffim::Variogram::fillVariogram(std::vector<double> x, 
+                                                std::vector<double> y,
+                                                std::vector<double> z,
+                                                std::vector<double> values,
+                                                std::vector<double> variance) {
     /* data.c : read_table */
     static DPOINT current;
     static int sizeof_currentX = 0;
     int colmax = 0;
 
-    d = init_one_data(d);
-    d->minX = d->maxX = 0.0; 
+    *d = init_one_data(*d);
+    *d.minX = *d.maxX = 0.0; 
     d->minY = d->maxY = 0.0;
     d->minZ = d->maxZ = 0.0;
 
@@ -119,7 +131,7 @@ lsst::ip::diffim::Variogram::fillVariogram(std::vector<double> x,
 
 }
 
-lsst::ip::diffim::Variogram::calcVariogram() {
+void lsst::ip::diffim::Variogram::calcVariogram() {
     /* sem.c */
     assert(v);
     
@@ -202,7 +214,7 @@ lsst::ip::diffim::Variogram::calcVariogram() {
 }
 
 
-lsst::ip::diffim::Variogram::doVariogram(int nvars, METHOD m) {
+void lsst::ip::diffim::Variogram::doVariogram(int nvars, METHOD m) {
     if (nvars == 0)
         return;
     
@@ -230,10 +242,9 @@ lsst::ip::diffim::Variogram::doVariogram(int nvars, METHOD m) {
     }
 }
 
+/*
 lsst::ip::diffim::Variogram::SpatialInterpolator()
     :    
     lsst::mwi::data::LsstBase(typeid(this))
 {}
-
-
-
+*/

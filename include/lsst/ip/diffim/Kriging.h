@@ -10,8 +10,13 @@
  *
  * \ingroup diffim
  */
+#include <defs.h>
+#include <utils.h>
+#include <data.h>
 #include <vario.h>  
 #include <glvars.h>
+
+#include "lsst/daf/data/LsstBase.h"
 
 namespace lsst{
 namespace ip{
@@ -38,25 +43,29 @@ namespace diffim{
 //        TEST       /* does nothing really */
 //    } METHOD;
     
-    class Variogram : public lsst::mwi::data::LsstBase {
+    class Variogram : public lsst::daf::data::LsstBase {
     public:
         explicit Variogram();
         virtual ~Variogram() {};
 
         /* gstat objects */
-        VARIOGRAM *v = NULL;
-        DATA **d = NULL, *d1 = NULL, *d2 = NULL;
+        VARIOGRAM *v;
+        DATA **d, *d1, *d2;
 
-        fillVariogram(std::vector<double> x, 
-                      std::vector<double> y,
-                      std::vector<double> z,
-                      std::vector<double> values,
-                      std::vector<double> variance);
-        calcVariogram();
-        doVariogram(int nvars, METHOD m);
-    }
+        void fillVariogram(std::vector<double> x, 
+                           std::vector<double> y,
+                           std::vector<double> z,
+                           std::vector<double> values,
+                           std::vector<double> variance);
+        void calcVariogram();
+        void doVariogram(int nvars, METHOD m);
+
+    private:
+
+    };
     
-    class SpatialInterpolator : public lsst::mwi::data::LsstBase {
+    /*
+    class SpatialInterpolator : public lsst::daf::data::LsstBase {
     public:
         explicit SpatialInteroplator();
         virtual ~SpatialInterpolator() {};
@@ -66,8 +75,13 @@ namespace diffim{
 
         Variogram *getVariogram(int i);
 
+    private:
+
     };
+    */
+    
 } //namespace lsst
 } //namespace ip
 } //namespace diffim
         
+#endif // !defined(LSST_AFW_MATH_MINIMIZE_H)
