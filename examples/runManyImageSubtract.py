@@ -91,7 +91,7 @@ Notes:
             scienceMaskedImage.readFits(sciencePath)
 
             if not options.trial:
-                differenceImage, psfMatchKernelPtr, backgroundFunctionPtr = lsst.ip.diffim.imageSubtract(
+                differenceImage, psfMatchKernelPtr, backgroundFunction = lsst.ip.diffim.imageSubtract(
                     imageToConvolve = templateMaskedImage,
                     imageToNotConvolve = scienceMaskedImage,
                     policy = policy,

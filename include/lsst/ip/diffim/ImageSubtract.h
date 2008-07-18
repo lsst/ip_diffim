@@ -152,8 +152,8 @@ namespace diffim {
 
     template <typename ImageT, typename MaskT>
     boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> computeSpatiallyVaryingPsfMatchingKernel(
-        boost::shared_ptr<lsst::afw::math::Function2<double> > &kernelFunctionPtr,
-        boost::shared_ptr<lsst::afw::math::Function2<double> > &backgroundFunctionPtr,
+        lsst::afw::math::Function2<double> &kernelFunction,
+        lsst::afw::math::Function2<double> &backgroundFunction,
         std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> > &diffImContainerList,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelBasisList,
         lsst::pex::policy::Policy &policy

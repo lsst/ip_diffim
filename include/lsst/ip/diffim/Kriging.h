@@ -18,6 +18,12 @@
 
 #include "lsst/daf/data/LsstBase.h"
 
+/** sem.c **/
+static SAMPLE_VGM *semivariogram(DATA *a, SAMPLE_VGM *ev);
+static SAMPLE_VGM *cross_variogram(DATA *a, DATA *b, SAMPLE_VGM *ev);
+static SAMPLE_VGM *covariogram(DATA *a, SAMPLE_VGM *ev);
+static SAMPLE_VGM *cross_covariogram(DATA *a, DATA *b, SAMPLE_VGM *ev);
+
 namespace lsst{
 namespace ip{
 namespace diffim{
@@ -45,23 +51,29 @@ namespace diffim{
     
     class Variogram : public lsst::daf::data::LsstBase {
     public:
-        explicit Variogram();
+        explicit Variogram(int nVars);
         virtual ~Variogram() {};
 
-        /* gstat objects */
-        VARIOGRAM *v;
-        DATA **d, *d1, *d2;
-
-        void fillVariogram(std::vector<double> x, 
-                           std::vector<double> y,
-                           std::vector<double> z,
-                           std::vector<double> values,
-                           std::vector<double> variance);
-        void calcVariogram();
-        void doVariogram(int nvars, METHOD m);
+        void fillData(int plane,
+                      std::vector<double> x, 
+                      std::vector<double> y,
+                      std::vector<double> z,
+                      std::vector<double> values,
+                      std::vector<double> variance);
+        //int calcVariogram();
+        //void doVariogram(int nvars, METHOD m);
 
     private:
+        /* gstat objects */
+        VARIOGRAM **vgm;
+        DATA **data;
 
+        static void transform_data(DATA *d);
+        static void mk_var_names(DATA *d);
+        static int average_duplicates(DATA *d);
+        static void calc_data_mean_std(DATA *d);
+        static void correct_strata(DATA *d);
+        static void ev2map(VARIOGRAM *v);
     };
     
     /*
