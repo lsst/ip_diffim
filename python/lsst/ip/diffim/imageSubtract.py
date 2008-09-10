@@ -180,10 +180,10 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     #
     if type(psfMatchKernelPtr.get()) == afwMath.LinearCombinationKernel:
         pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Psf-match using convolveLinear")
-        differenceImage = afwMath.convolveLinear(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit)
+        differenceImage = afwMath.convolveLinearNew(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit)
     else:
         pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Psf-match using convolve")
-        differenceImage = afwMath.convolve(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit, False)
+        differenceImage = afwMath.convolveNew(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit, False)
 
     pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Add background")
     diffimLib.addFunction(differenceImage.getImage().get(), backgroundFunction)

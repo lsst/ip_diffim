@@ -200,7 +200,7 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
         /*        compute whatever is needed on the fly.  hence this step here. */
         boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > imagePtr(
             new lsst::afw::image::MaskedImage<ImageT, MaskT>
-            (lsst::afw::math::convolve(imageToConvolve, **kiter, edgeMaskBit, false))
+            (lsst::afw::math::convolveNew(imageToConvolve, **kiter, edgeMaskBit, false))
             );
         
         lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForPostageStamp",
@@ -1013,7 +1013,7 @@ void lsst::ip::diffim::computeDiffImStats(
     lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> kImage(kernelCols, kernelRows);
 
     lsst::afw::image::MaskedImage<ImageT, MaskT>
-        convolvedImageStamp = lsst::afw::math::convolve(
+        convolvedImageStamp = lsst::afw::math::convolveNew(
             *(diffImContainer.imageToConvolve),
             *(diffImContainer.kernelList[kernelID]),
             edgeMaskBit, 
