@@ -27,8 +27,6 @@ env = scons.makeEnv(
         ["daf_data", "lsst/daf/data.h", "daf_data:C++"], # needed by afw
         ["afw", "lsst/afw.h", "afw:C++"],
         ["detection", "lsst/detection/Footprint.h", "detection"],
-        # Ticket 354
-        ["gstat", "data.h", "gstat"],
     ],
 )
 env.libs["ip_diffim"] = env.getlibs("boost vw lapack wcslib cfitsio utils daf_base pex_logging pex_exceptions pex_logging daf_persistence daf_data pex_policy minuit afw detection") + env.libs["ip_diffim"]

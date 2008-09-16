@@ -114,7 +114,7 @@ class ConvolveTestCase(unittest.TestCase):
         kernelRows = policy.get('kernelRows')
         gaussFunction = afwMath.GaussianFunction2D(sigmaX,sigmaY)
         gaussKernel = afwMath.AnalyticKernel(gaussFunction, kernelCols, kernelRows)
-        convolvedScienceMaskedImage = afwMath.convolve(self.scienceMaskedImage, gaussKernel, 0, False)
+        convolvedScienceMaskedImage = afwMath.convolveNew(self.scienceMaskedImage, gaussKernel, 0, False)
 
         kImageIn  = afwImage.ImageD(kernelCols, kernelRows)
         kSumIn    = gaussKernel.computeImage(kImageIn, 0.0, 0.0, False)
@@ -329,7 +329,7 @@ class DeconvolveTestCase(unittest.TestCase):
                 kImageDPtr.writeFits('kFitsD_%d.fits' % (footprintID,))
 
             # check that you get a delta function
-            testMaskedImage = afwMath.convolve(kMaskedImageC, footprintKernelPtrD.get(), 0, False)
+            testMaskedImage = afwMath.convolveNew(kMaskedImageC, footprintKernelPtrD.get(), 0, False)
             print testMaskedImage
             if debugIO:
                 testMaskedImage.writeFits('deltaFunc_%d' % (footprintID,))

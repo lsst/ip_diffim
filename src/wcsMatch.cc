@@ -219,8 +219,7 @@ int lsst::ip::diffim::wcsMatch(
             double multFac = remapWcs.pixArea(remapPosColRow) / (origWcs.pixArea(origColRow) * kSum);
            
             // Apply remapping kernel to original MaskedImage to compute remapped pixel
-            lsst::afw::math::apply<ImageT, MaskT>(
-                remapColAcc, origMiAcc, kAcc, kernelCols, kernelRows);
+            lsst::afw::math::apply(remapColAcc, origMiAcc, kAcc, kernelCols, kernelRows);
 
             // multiply the output from apply function by the computed gain here
             *remapColAcc.image *= static_cast<ImageT>(multFac);
