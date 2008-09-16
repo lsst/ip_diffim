@@ -11,6 +11,29 @@ import lsst.ip.diffim as ipDiffim
 from lsst.pex.logging import Log
 from lsst.pex.policy import Policy
 
+# Temporary functions until we formalize this in the build system somewhere
+def vectorToImageD(inputVector, nCols, nRows):
+    assert len(inputVector) == nCols * nRows
+    outputImage = afwImage.ImageD(nCols, nRows)
+    nVec = 0
+    for nCol in range(nCols):
+        for nRow in range(nRows):
+            outputImage.setValue(nCol, nRow, inputVector[nVec])
+            nVec += 1
+    return outputImage
+
+def imageToVector(inputImage):
+    nCols = inputImage.getCols()
+    nRows = inputImage.getRows()
+    outputVector = numpy.zeros(nCols * nRows)
+    nVec = 0    
+    for nCol in range(nCols):
+        for nRow in range(nRows):
+            outputVector[nVec] = inputImage.getValue(nCol, nRow)
+            nVec += 1
+    return outputVector
+
+
 def fitSpatialFunction(spatialFunction, values, variances, col, row, policy):
     nSigmaSq = policy.get('afwMath.minimize.nSigmaSq')
     stepsize = policy.get('afwMath.minimize.stepsize')
@@ -156,7 +179,7 @@ def fitPca(differenceImageFootprintInformationList, policy):
     M = numpy.zeros(kernelCols*kernelRows, nFootprint)
     for i in range(nFootprint):
         singleKernelImage  = goodDifiList[i].getSingleKernel().getImage()
-        singleKernelVector = afwMath.imageToVector(singleKernelImage, kernelCols, kernelRows)
+        singleKernelVector = imageToVector(singleKernelImage)
         M[:,i]             = singleKernelVector
         
     # do the PCA
@@ -172,8 +195,8 @@ def fitPca(differenceImageFootprintInformationList, policy):
         approxVectorList[i] = meanM.copy()
         
         # calculate approximate statistics
-        approxImage         = afwMath.vectorToImage(approxImageList[i],
-                                                    kernelCols, kernelRows)
+        approxImage         = afwMath.vectorToImageD(approxImageList[i],
+                                                     kernelCols, kernelRows)
         approxKernelPtr     = afwMath.KernelPtr( afwMath.Kernel(approxImage) )
         approxStatistics    = goodDifiList[i].computeImageStatistics(approxKernelPtr,
                                                                      goodDifiList[i].getSingleBackground())
@@ -188,7 +211,7 @@ def fitPca(differenceImageFootprintInformationList, policy):
     # kernel with eigenKernels
     for i in range(nFootprint):
         singleKernelImage   = goodDifiList[i].getSingleKernel().getImage()
-        singleKernelVector  = afwMath.imageToVector(singleKernelImage, kernelCols, kernelRows)
+        singleKernelVector  = imageToVector(singleKernelImage)
 
         # subtract off mean for dot products        
         singleKernelVector -= meanM  
@@ -202,8 +225,8 @@ def fitPca(differenceImageFootprintInformationList, policy):
             approxVectorList[i]      += eContribution
             
             # calculate approximate statistics
-            approxImage          = afwMath.vectorToImage(approxImageList[i],
-                                                         kernelCols, kernelRows)
+            approxImage          = afwMath.vectorToImageD(approxImageList[i],
+                                                          kernelCols, kernelRows)
             approxKernel         = afwMath.KernelPtr( afwMath.Kernel(approxImage) )
             approxStatistics     = goodDifiList[i].computeImageStatistics(approxKernelPtr,
                                                                           goodDifiList[i].getSingleBackground())
@@ -284,15 +307,15 @@ def fitSpatialPca(differenceImageFootprintInformationList, eVec, eCoefficients, 
             approxKrigingVectorList[i]  += coeffKrigingValue  * eVec[nCoeff,:]
 
             # calculate approximate statistics
-            approxFunctionImage          = afwMath.vectorToImage(approxFunctionVectorList[i],
-                                                                 kernelCols, kernelRows)
+            approxFunctionImage          = afwMath.vectorToImageD(approxFunctionVectorList[i],
+                                                                  kernelCols, kernelRows)
             approxFunctionKernelPtr      = afwMath.KernelPtr( afwMath.Kernel(approxFunctionImage) )
             approxFunctionStatistics     = goodDifiList[i].computeImageStatistics(approxFunctionKernelPtr,
                                                                                   backgroundFunctionValue)
             
             
-            approxKrigingImage           = afwMath.vectorToImage(approxKrigingVectorList[i],
-                                                                 kernelCols, kernelRows)
+            approxKrigingImage           = afwMath.vectorToImageD(approxKrigingVectorList[i],
+                                                                  kernelCols, kernelRows)
             approxKrigingKernelPtr       = afwMath.KernelPtr( afwMath.Kernel(approxKrigingImage) )
             approxKrigingStatistics      = goodDifiList[i].computeImageStatistics(approxKrigingKernel,
                                                                                   backgroundKrigingValue)
