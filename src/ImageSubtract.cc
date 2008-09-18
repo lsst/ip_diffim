@@ -32,6 +32,107 @@ using lsst::pex::logging::Log;
 using lsst::pex::logging::Rec;
 
 /** 
+ * @brief Generate a basis set of delta function Kernels.
+ *
+ * Generates a vector of Kernels sized nCols * nRows, where each Kernel has
+ * a unique pixel set to value 1.0 with the other pixels valued 0.0.  This
+ * is the "delta function" basis set.
+ * 
+ * @return Vector of orthonormal delta function Kernels.
+ *
+ * @throw lsst::pex::exceptions::DomainError if nRows or nCols not positive
+ *
+ * @ingroup diffim
+ */
+lsst::afw::math::KernelList<lsst::afw::math::Kernel>
+lsst::ip::diffim::generateDeltaFunctionKernelSet(
+    unsigned int nCols, ///< Number of colunms in the basis kernels
+    unsigned int nRows  ///< Number of rows in the basis kernels
+    )
+{
+    if ((nCols < 1) || (nRows < 1)) {
+        throw lsst::pex::exceptions::DomainError("nRows and nCols must be positive");
+    }
+    const int signedNCols = static_cast<int>(nCols);
+    const int signedNRows = static_cast<int>(nRows);
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> kernelBasisList;
+    for (int row = 0; row < signedNRows; ++row) {
+        for (int col = 0; col < signedNCols; ++col) {
+            boost::shared_ptr<lsst::afw::math::Kernel> kernelPtr(
+                new lsst::afw::math::DeltaFunctionKernel(col, row, nCols, nRows)
+                );
+            
+            kernelBasisList.push_back(kernelPtr);
+        }
+    }
+    return kernelBasisList;
+}
+
+/** 
+ * @brief Generate an Alard-Lupton basis set of Kernels.
+ *
+ * Not implemented.
+ * 
+ * @return Vector of Alard-Lupton Kernels.
+ *
+ * @throw lsst::pex::exceptions::DomainError if nRows or nCols not positive
+ * @throw lsst::pex::exceptions::DomainError until implemented
+ *
+ * @ingroup diffim
+ */
+lsst::afw::math::KernelList<lsst::afw::math::Kernel>
+lsst::ip::diffim::generateAlardLuptonKernelSet(
+    unsigned int nRows, ///< Number of rows in the kernel basis
+    unsigned int nCols, ///< Number of columns in the kernel basis
+    std::vector<double> const &sigGauss, ///< Width of gaussians in basis; size = number of Gaussians
+    std::vector<double> const &degGauss  ///< Degree of spatial variation within each Gaussian; size = sigGauss.size()
+    )
+{
+    if ((nCols < 1) || (nRows < 1)) {
+        throw lsst::pex::exceptions::DomainError("nRows and nCols must be positive");
+    }
+    throw lsst::pex::exceptions::DomainError("Not implemented");
+
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> kernelBasisList;
+    return kernelBasisList;
+}
+
+/** 
+ * @brief Implement fundamental difference imaging step of convolution and
+ * subtraction
+ *
+ * @return Difference image
+ *
+ * @ingroup diffim
+ */
+template <typename ImageT, typename MaskT>
+lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> convolutionKernel,
+    double background,
+    lsst::pex::policy::Policy &policy
+    ) {
+
+    int edgeMaskBit = imageToConvolve->getMask()->getMaskPlane("EDGE");
+    lsst::afw::image::MaskedImage<ImageT, MaskT>
+        convolvedMaskedImage = lsst::afw::math::convolveNew(
+            *(imageToConvolve),
+            *(convolutionKernel),
+            edgeMaskBit, 
+            false);
+    
+    /* Add in background */
+    convolvedMaskedImage += background;
+
+    /* Do actual subtraction */
+    convolvedMaskedImage -= *(imageToNotConvolve);
+    convolvedMaskedImage *= -1.0;
+    
+    return convolvedMaskedImage;
+}
+
+/** 
  * @brief Runs Detection on a single image for significant peaks, and checks
  * returned Footprints for Masked pixels.
  *
@@ -143,7 +244,7 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollection
  * \ingroup diffim
  */
 template <typename ImageT, typename MaskT>
-std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
+std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
     double &background, ///< Difference in the backgrounds
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve, ///< Image to convolve
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve, ///< Image to not convolve
@@ -380,801 +481,6 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
 }
 
 /** 
- * @brief Computes a orthonormal Kernel basis from an ensemble of input
- * Kernels.
- *
- * Accepts a vector of input DiffImContainers.  The good Kernels associated
- * with each container are used to build an orthornormal basis using a
- * Karhunen Loeve transform, implemented using Principal Component Analysis.
- *
- * Each input Kernel is decomposed using a subset of these basis Kernels
- * (yielding Kernel Model 2).  This approximate Kernel and associated
- * difference image statistics are added to the container.  The containers
- * associated with poor subtractions have the isGood flag set to False.  The
- * process iterates until no containers are rejected.  The final basis set
- * is returned as a vector of Kernels.
- *
- * @return Vector of eigenKernels resulting from the PCA analysis.
- *
- * @throw lsst::pex::exceptions::Runtime if no good kernels
- *
- * @ingroup diffim
- */
-template <typename ImageT, typename MaskT>
-lsst::afw::math::KernelList<lsst::afw::math::Kernel> lsst::ip::diffim::computePcaKernelBasis(
-    std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> > &diffImContainerList, ///< List of input footprints
-    lsst::pex::policy::Policy &policy ///< Policy directing the behavior
-    ) {
-    
-    /* Parse the Policy */
-    unsigned int minimumNumberOfBases = policy.getInt("computePcaKernelBasis.minimumNumberOfBases");
-    unsigned int maximumNumberOfBases = policy.getInt("computePcaKernelBasis.maximumNumberOfBases");
-    double maximumFractionOfEigenvalues = policy.getDouble("computePcaKernelBasis.maximumFractionOfEigenvalues");
-    double minimumAcceptibleEigenvalue = policy.getDouble("computePcaKernelBasis.minimumAcceptibleEigenvalue");
-    unsigned int maximumIteratonsPCA = policy.getInt("computePcaKernelBasis.maximumIteratonsPCA");
-    /*double maximumKernelResidualMean = policy.getDouble("computePcaKernelBasis.maximumKernelResidualMean"); */
-    /*double maximumKernelResidualVariance = policy.getDouble("computePcaKernelBasis.maximumKernelResidualVariance"); */
-    bool debugIO = policy.getBool("debugIO", false);
-
-    double imSum;
-    
-    /* Image accessor */
-    typedef typename vw::ImageView<lsst::afw::math::Kernel::PixelT>::pixel_accessor imageAccessorType;
-    /* Iterator over struct */
-    typedef typename std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> >::iterator iDiffImContainer;
-    
-    /* Matrix to invert.  Number of rows = number of pixels; number of columns = number of kernels */
-    /* All calculations here are in double */
-    /* Assigment of matrix sizes is rows, cols */
-    vw::math::Matrix<double> M;
-    vw::math::Matrix<double> eVec;
-    vw::math::Vector<double> eVal;
-    vw::math::Vector<double> mMean;
-    vw::math::Matrix<double> kernelCoefficientMatrix;
-
-    Log pcaLog(Log::getDefaultLog(), "ip.diffim.computePcaKernelBasis");
-
-    /* Initialize for while loop */
-    unsigned int nIter = 0;
-    unsigned int nReject = 1;
-    unsigned int nGood = 0;
-    unsigned int nKCols = 0, nKRows = 0;
-    unsigned int nPixels;
-    unsigned int nCoeffToUse;
-    lsst::pex::logging::TTrace<3>("lsst.ip.diffim.computePcaKernelBasis", " ");
-    lsst::pex::logging::TTrace<3>("lsst.ip.diffim.computePcaKernelBasis", 
-                                "Entering subroutine computePcaKernelBasis");
-    
-    /* Reuse */
-    /* NOTE - this assumes that all kernels are the same size */
-    /*        and that this size is defined in the policy */ 
-    unsigned int kernelRows = policy.getInt("kernelRows");
-    unsigned int kernelCols = policy.getInt("kernelCols");
-    lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> kImage(kernelCols, kernelRows);
-
-    lsst::afw::math::KernelList<lsst::afw::math::Kernel> kernelPcaBasisList;
-    
-    /* Iterate over PCA inputs until all are good */
-    while ( (nIter < maximumIteratonsPCA) and (nReject != 0) ) {
-        
-        nGood = 0;
-        for (iDiffImContainer i = diffImContainerList.begin(); i != diffImContainerList.end(); ++i) {
-            if ((*i).isGood == true) {
-                nGood += 1;
-                if (nKCols == 0) {
-                    nKCols = (*i).kernelList[(*i).nKernel]->getCols();
-                }
-                if (nKRows == 0) {
-                    nKRows = (*i).kernelList[(*i).nKernel]->getRows();
-                }
-            }
-        }
-        
-        if (nGood == 0) {
-            throw lsst::pex::exceptions::DomainError("No good kernels for PCA");
-        }
-        else {
-            lsst::pex::logging::TTrace<4>("lsst.ip.diffim.computePcaKernelBasis", 
-                                        "PCA Iteration %d : Using %d kernels", nIter, nGood);
-
-            pcaLog.log(Log::INFO, boost::format("PCA Iteration %d : Using %d kernels") % nIter % nGood);
-        }
-
-        /* nGood can only decrement; make sure you don't ask for more bases than you have input kernels */
-        if (nGood < minimumNumberOfBases) {
-            minimumNumberOfBases = nGood;
-            maximumNumberOfBases = nGood;
-        }
-        if (nGood < maximumNumberOfBases) {
-            maximumNumberOfBases = nGood;
-        }
-        
-        
-
-        
-        nPixels = nKCols * nKRows;
-        M.set_size(nPixels, nGood);
-        eVec.set_size(nPixels, nGood);
-        eVal.set_size(nGood);
-        mMean.set_size(nPixels);
-        
-        /* fill up matrix for PCA */
-        int ki = 0;
-        for (iDiffImContainer i = diffImContainerList.begin(); i != diffImContainerList.end(); ++i) {
-            if ((*i).isGood == false) {
-                continue;
-            }
-
-            /* Note we ALWAYS compute the PCA using the first kernel image */
-            (*i).kernelList[0]->computeImage(kImage, imSum, false);
-
-            /* insanity checking */
-            assert(nKRows == kImage.getRows());
-            assert(nKCols == kImage.getCols());
-            
-            int mIdx = 0;
-            imageAccessorType imageAccessorCol(kImage.origin());
-            for (unsigned int col = 0; col < nKCols; ++col, imageAccessorCol.next_col()) {
-                
-                imageAccessorType imageAccessorRow(imageAccessorCol);
-                for (unsigned int row = 0; row < nKRows; ++row, ++mIdx, imageAccessorRow.next_row()) {
-
-                    /*
-                      NOTE : 
-                        arguments to matrix-related functions are given in row,col
-                        arguments to image-related functions are given in col,row
-                      HOWEVER :
-                        it doesn't matter which order we put the kernel elements into the PCA
-                        since they are not correlated 
-                        as long as we do the same thing when extracting the components
-                      UNLESS :
-                        we want to put in some weighting/regularlization into the PCA
-                        not sure if that is even possible...
-                    */
-
-                    M(mIdx, ki) = *imageAccessorRow;
-                }
-            }
-            
-            /* only increment when you have a good footprint */
-            ki += 1;
-        }
-        
-       
-        /* M is mean-subtracted if subtractMean = true */
-        /* Eigencomponents in columns of eVec */
-        lsst::pex::logging::TTrace<4>("lsst.ip.diffim.computePcaKernelBasis", "Computing pricipal components");
-        lsst::ip::diffim::computePca(mMean, eVal, eVec, M, true);
-        lsst::pex::logging::TTrace<4>("lsst.ip.diffim.computePcaKernelBasis", "Computed pricipal components");
-
-        /* This is probably as inefficient as you can get, but I'm no boost expert */
-        boost::format eValueFormatter("Eigenvalues :");
-        for (unsigned int i = 0; i < eVal.size(); ++i) {
-            eValueFormatter = boost::format("%s %.3f") % eValueFormatter.str() % eVal[i];
-        }
-        lsst::pex::logging::TTrace<4>("lsst.ip.diffim.computePcaKernelBasis", eValueFormatter.str());
-        pcaLog.log(Log::INFO, eValueFormatter.str());
-        
-        nCoeffToUse = minimumNumberOfBases;
-        /* Potentially override with larger number if the spectrum of eigenvalues requires it */
-        double evalSum = 0.0;
-        for (unsigned int i = 0; i < eVal.size(); ++i) {
-            evalSum += eVal[i];
-        }
-        double evalFrac = 0.0;
-        for (unsigned int i = 0; i < nCoeffToUse; ++i) {
-            evalFrac += eVal[i] / evalSum;
-            if (eVal[i] < minimumAcceptibleEigenvalue) {
-                lsst::pex::logging::TTrace<1>("lsst.ip.diffim.computePcaKernelBasis", 
-                                            "WARNING : Using eigenvector whose eigenvalue (%.3e) is smaller than acceptible (%.3e)",
-                                            eVal[i], minimumAcceptibleEigenvalue);
-            }
-            
-        }
-        if (evalFrac < maximumFractionOfEigenvalues) {
-            for (; ( (nCoeffToUse < eVal.size()) && (nCoeffToUse < maximumNumberOfBases) ); ++nCoeffToUse) {
-                evalFrac += eVal[nCoeffToUse] / evalSum;
-                if (eVal[nCoeffToUse] < minimumAcceptibleEigenvalue) {
-                    lsst::pex::logging::TTrace<1>("lsst.ip.diffim.computePcaKernelBasis", 
-                                                "WARNING : Using eigenvector whose eigenvalue (%.3e) is smaller than acceptible (%.3e)",
-                                                eVal[nCoeffToUse], minimumAcceptibleEigenvalue);
-                }
-                if (evalFrac > maximumFractionOfEigenvalues) {
-                    break;
-                }
-            }
-        }
-        lsst::pex::logging::TTrace<4>("lsst.ip.diffim.computePcaKernelBasis", 
-                                    "Using %d basis functions (plus mean) representing %.5f of the variance",
-                                    nCoeffToUse, evalFrac);
-        pcaLog.log(Log::INFO, boost::format("Using %d basis functions (plus mean) representing %.5f of the variance") % nCoeffToUse % evalFrac);
-        
-        /* We now have the basis functions determined */
-        /* Next determine the coefficients that go in front of all of the individual kernels */
-
-        /* 
-           Note on matrix sizes; row x col 
-           M    = nPix  x nGood
-           eVec = nPix  x nGood
-           coeff= nGood x nToUse
-
-           inside decomposeMatrixUsingBasis :
-              grab each column of M, representing each individual kernel (length nPix)
-              then grab each column of eVec, representing each basis (length nPix)
-              take their dot product, stuffing the results into coeff (length 1)
-              do the latter only up to nToUse
-              thus coeff is number of individual kernels by number of bases to use
-        */
-        kernelCoefficientMatrix.set_size(nGood, nCoeffToUse);
-        lsst::ip::diffim::decomposeMatrixUsingBasis(kernelCoefficientMatrix, M, eVec, nCoeffToUse);
-        
-        /* We next do quality control here; we reconstruct the input kernels with the truncated basis function set */
-        /* Remember that M is mean-subtracted already */
-        /* 
-           Note on matrix sizes; row x col
-           approxM = nPix x nGood (same as M)
-           eVec    = nPix x nGood
-           coeff   = nGood x nToUse
-
-           inside approximateMatrixUsingBasis :
-              create a temporary vector of length nPix
-              for each column of approxM i, representing a reconstructed kernel (length nPix)
-                 set temporary vector equal to zero
-                 for each column of eVec j, representing each basis up to nToUse (length nPix)
-                 grab coefficient i,j and multiply by eVec j and add it to temporary vector
-                 put the result in column of approxM
-        */
-        vw::math::Matrix<double> approxM(nPixels, nGood); 
-        lsst::ip::diffim::approximateMatrixUsingBasis(approxM, eVec, kernelCoefficientMatrix, nCoeffToUse);
-        
-#if DEBUG_MATRIX
-        std::cout << "EigenKernel coefficients : " << kernelCoefficientMatrix << std::endl;
-#endif
-
-        /* Reset basis list */
-        kernelPcaBasisList.clear();
-        
-        /* Turn the Mean Image into a Kernel */
-        lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> meanImage(nKCols, nKRows);
-        imageAccessorType imageAccessorCol(meanImage.origin());
-        int mIdx = 0;
-        for (unsigned int col = 0; col < nKCols; ++col) {
-            imageAccessorType imageAccessorRow(imageAccessorCol);
-            for (unsigned int row = 0; row < nKRows; ++row, ++mIdx) {
-                *imageAccessorRow = mMean(mIdx);
-                imageAccessorRow.next_row();
-            }
-            imageAccessorCol.next_col();
-        }
-        /* The mean image is the first member of kernelPCABasisList */
-        kernelPcaBasisList.push_back(boost::shared_ptr<lsst::afw::math::Kernel> 
-                                     (new lsst::afw::math::FixedKernel(meanImage)));
-        if (debugIO) {
-            meanImage.writeFits( (boost::format("mFits%d.fits") % nIter).str());
-        }
-        
-        /* Turn each eVec into an Image and then into a Kernel */
-        /* Dont use all eVec.cols(); only the number of bases that you want */
-        for (unsigned int ki = 0; ki < nCoeffToUse; ++ki) { 
-            lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> basisImage(nKCols, nKRows);
-            
-            /* Not sure how to bulk load information into Image */
-            int kIdx = 0;
-            
-            imageAccessorType imageAccessorCol(basisImage.origin());
-            for (unsigned int col = 0; col < nKCols; ++col) {
-                
-                imageAccessorType imageAccessorRow(imageAccessorCol);
-                for (unsigned int row = 0; row < nKRows; ++row, ++kIdx) {
-                    
-                    *imageAccessorRow = eVec(kIdx, ki);
-                    imageAccessorRow.next_row();
-                }
-                imageAccessorCol.next_col();
-            }
-            /* Add to kernel basis */
-            kernelPcaBasisList.push_back(boost::shared_ptr<lsst::afw::math::Kernel> 
-                                         (new lsst::afw::math::FixedKernel(basisImage)));
-            if (debugIO) {
-                basisImage.writeFits( (boost::format("eFits%d_%d.fits") % nIter % ki).str() );
-            }
-        }
-        
-        nReject = 0;
-        unsigned int iKernel = 0;
-        for (iDiffImContainer i = diffImContainerList.begin(); i != diffImContainerList.end(); ++i) {
-            if ((*i).isGood == false) {
-                continue;
-            }
-
-            /* Calculate kernel from PCA model */
-            std::vector<double> kernelCoefficients;
-            
-            /* Mean image */
-            kernelCoefficients.push_back(1); 
-            for (unsigned int jKernel = 0; jKernel < nCoeffToUse; ++jKernel) {
-                kernelCoefficients.push_back(kernelCoefficientMatrix(iKernel,jKernel));
-            }        
-            
-            /* Create a linear combination kernel from this  */
-            boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> pcaKernelPtr(
-                new lsst::afw::math::LinearCombinationKernel(kernelPcaBasisList, kernelCoefficients)
-                );
-            
-            /* Append to vectors collectively */
-            /* NOTE HERE - You will get one kernel for each iteration */
-            (*i).kernelList.push_back( pcaKernelPtr );
-            (*i).diffimStats.push_back( lsst::ip::diffim::MaskedImageDiffimStats() );
-            (*i).backgrounds.push_back( (*i).backgrounds[(*i).nKernel] );   /* This did not change here */
-            pcaKernelPtr->computeImage(kImage, imSum, false);
-            (*i).kernelSums.push_back( imSum );
-            (*i).nKernel += 1;
-
-            /* Calculate image stats */
-            lsst::ip::diffim::computeDiffImStats((*i), (*i).nKernel, policy);
-            if ( (*i).isGood == false ) {
-                nReject += 1;
-            }
-            
-            /* only increment for the good footprints */
-            iKernel += 1;
-            
-        }
-
-        nIter += 1;
-    } /* End of iteration */
-    
-    
-    return kernelPcaBasisList;
-}
-
-/** 
- * @brief Compute spatially varying convolution Kernel and differential
- * background model.
- *
- * Accepts a vector of input DiffImContainers, as well as Functions for the
- * spatial variation of each basis Kernel and the differential Background.
- *
- * The Kernels associated with each container are assumed to be
- * LinearCombination Kernels built from the same basis set.  The
- * coefficients for each basis Kernel are used to fit a spatially varying
- * Function for that Kernel.  A Function is also fit to the background.  The
- * spatially varying Kernel is returned.
- *
- * @return Spatially varying convolution Kernel.
- *
- * @ingroup diffim
- */
-template <typename ImageT, typename MaskT>
-boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
-    lsst::afw::math::Function2<double> &kernelFunction, ///< Function for spatial variation of kernel
-    lsst::afw::math::Function2<double> &backgroundFunction, ///< Function for spatial variation of background
-    std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> > &diffImContainerList, ///< Information on each kernel
-    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelBasisList, ///< Basis kernel set
-    lsst::pex::policy::Policy &policy ///< Policy directing the behavior
-    )
-{
-    /* Parse the Policy */
-    unsigned int maximumIterationsSpatialFit = policy.getInt("computeSpatiallyVaryingPsfMatchingKernel.maximumIterationsSpatialFit");
-    
-    /* Container iterator */
-    typedef typename std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> >::iterator iDiffImContainer;
-    /* Kernel iterator */
-    typedef typename std::vector<boost::shared_ptr<lsst::afw::math::Kernel> >::const_iterator iKernelPtr;
-
-    Log spatialLog(Log::getDefaultLog(), "ip.diffim.computeSpatiallyVaryingPsfMatchingKernel");
-
-    /* Initialize for while loop */
-    unsigned int nIter = 0;
-    unsigned int nReject = 1;
-    unsigned int nGood = diffImContainerList.size();
-    unsigned int nKernel = kernelBasisList.size();
-    unsigned int nKernelParameters = kernelFunction.getNParameters();
-    unsigned int nBgParameters = backgroundFunction.getNParameters();
-    
-    lsst::pex::logging::TTrace<3>("lsst.ip.diffim.computeSpatiallyVaryingPsfMatchingKernel", 
-                            "Entering subroutine computeSpatiallyVaryingPsfMatchingKernel");
-
-    /* for the kernel fit */
-    std::vector<double> kernelMeas;
-    std::vector<double> kernelVariances;
-    std::vector<double> kernelColPos;
-    std::vector<double> kernelRowPos;
-    double nSigmaSq = 1.0;
-
-    /* for the background fit */
-    std::vector<double> backgroundMeas;
-    std::vector<double> backgroundVariances;
-
-    double bgSum = 0.0;
-    double imSum = 0.0;
-    
-    /* NOTE - this assumes that all kernels are the same size */
-    /*        and that this size is defined in the policy */ 
-    unsigned int kernelRows = policy.getInt("kernelRows");
-    unsigned int kernelCols = policy.getInt("kernelCols");
-    lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> kImage(kernelCols, kernelRows);
-    lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> kSpatialImage(kernelCols, kernelRows);
-    
-    /* Set up the spatially varying kernel */
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatiallyVaryingKernelPtr(
-        new lsst::afw::math::LinearCombinationKernel(kernelBasisList, kernelFunction));
-    
-    /* Iterate over inputs until both the kernel model and the background model converge */
-    while ( (nIter < maximumIterationsSpatialFit) and (nReject != 0) ) {
-        /* Start out clean, nothing rejected yet */
-        nReject = 0;
-
-        /* Set up fit to kernel */
-        kernelColPos.clear();
-        kernelRowPos.clear();
-        nGood = 0;
-
-        backgroundMeas.clear();
-        backgroundVariances.clear(); 
-        bgSum = 0.0;
-        for (iDiffImContainer i = diffImContainerList.begin(); i != diffImContainerList.end(); ++i) {
-            /* those attributs that you grab once for each container; position and background */
-            if ((*i).isGood == true) {
-                kernelColPos.push_back((*i).colcNorm);
-                kernelRowPos.push_back((*i).rowcNorm);
-
-                bgSum += (*i).backgrounds[(*i).nKernel];
-                backgroundMeas.push_back((*i).backgrounds[(*i).nKernel]);
-                backgroundVariances.push_back((*i).diffimStats[(*i).nKernel].footprintResidualVariance);   /* approximation */
-
-                lsst::pex::logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForMaskedImage", 
-                                            "Background %d at %.3f %.3f = %.3f",
-                                            (*i).id, (*i).colcNorm, (*i).rowcNorm, (*i).backgrounds[(*i).nKernel]);
-
-                nGood += 1;
-            }
-        }
-        
-        /* NOTE - Sigma clip background here, same as kernel sum? */
-
-        if (nGood == 0) {
-            throw lsst::pex::exceptions::DomainError("No good footprints for spatial kernel and background fitting");
-        }
-        
-        /* ******************************** */
-        /* ******************************** */
-        /* Fit for spatially varying kernel */
-
-        std::vector<std::vector<double> > fitParameters = spatiallyVaryingKernelPtr->getSpatialParameters();
-        assert(fitParameters.size() == nKernel);
-        assert(fitParameters[0].size() == nKernelParameters);
-        
-        /* The first kernel is the mean, which is constant across the image */
-        fitParameters[0][0] = 1.0;
-        for (unsigned int i = 1; i < nKernelParameters; ++i) {
-            fitParameters[0][i] = 0.0;
-        }
-
-        /* For each kernel, grab each footprint's constraint on it, and fit for the spatial variation of those constraints */
-        unsigned int nk = 1;
-        for (iKernelPtr ik = (kernelBasisList.begin()+1); ik != kernelBasisList.end(); ++nk, ++ik) {
-            
-            boost::format spatialFitFormatter("Measurements of kernel PC%d :");
-            spatialFitFormatter % nk;
-            
-            kernelMeas.clear();
-            kernelVariances.clear();
-            for (iDiffImContainer id = diffImContainerList.begin(); id != diffImContainerList.end(); ++id) {
-                if ((*id).isGood == true) {
-                    /* inefficient; would be nice to have a method to grab only parameter i */
-                    std::vector<double> kernelParameters = (*id).kernelList[(*id).nKernel]->getKernelParameters(); 
-                    kernelMeas.push_back(kernelParameters[nk]);
-
-                    kernelVariances.push_back((*id).diffimStats[(*id).nKernel].footprintResidualVariance); /* approximation */
-                    spatialFitFormatter = boost::format("%s %.3f") % spatialFitFormatter.str() % kernelParameters[nk];
-                }
-            }
-            lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computeSpatiallyVaryingPsfMatchingKernel",
-                                        spatialFitFormatter.str());
-            
-            /* NOTE - if we have fewer measurements than kernelFunction.getNParameters(), we should do something about it */
-            std::vector<double> kernelParams(nKernelParameters);
-            std::vector<double> kernelStepsize(nKernelParameters);
-            std::fill(kernelParams.begin(), kernelParams.end(), 0.0);         /* start at value zero */
-            std::fill(kernelStepsize.begin(), kernelStepsize.end(), 0.02);  /* assume order 2% contribution from eigenkernels */
-            
-            /* Run minimization */
-            lsst::afw::math::FitResults kernelFit = lsst::afw::math::minimize(
-                kernelFunction,
-                kernelParams,
-                kernelStepsize,
-                kernelMeas,
-                kernelVariances,
-                kernelColPos,
-                kernelRowPos,
-                nSigmaSq
-                );
-
-            /* Results of spatial fit for this particular kernel */
-            for (unsigned int i = 0; i < kernelFit.parameterList.size(); ++i) {
-                fitParameters[nk][i] = kernelFit.parameterList[i];
-                lsst::pex::logging::TTrace<4>("lsst.ip.diffim.computeSpatiallyVaryingPsfMatchingKernel", 
-                                            "Fit to kernel PC%d, spatial parameter %d : %.3f (%.3f,%.3f)",
-                                            nk, i, kernelFit.parameterList[i], kernelFit.parameterErrorList[i].first,
-                                            kernelFit.parameterErrorList[i].second);
-                spatialLog.log(Log::INFO,
-                               boost::format("Iteration %d, Fit to Kernel PC%d, Spatial Parameter %d : %.3f (%.3f,%.3f)") %
-                               nIter % nk % i % 
-                               kernelFit.parameterList[i] % 
-                               kernelFit.parameterErrorList[i].first % 
-                               kernelFit.parameterErrorList[i].second);
-            }
-        }
-        /* After all kernels are fit, fill the spatially varying kernel parameters */
-        spatiallyVaryingKernelPtr->setSpatialParameters(fitParameters);
-
-        /* Fit for spatially varying kernel */
-        /* ******************************** */
-        /* ******************************** */
-        /* Fit for spatially varying background */
-        
-        /* Initialize fit parameters at average background; higher order terms initially zero */
-        std::vector<double> backgroundParameters(nBgParameters);
-        std::vector<double> backgroundStepsize(nBgParameters);
-        std::fill(backgroundParameters.begin(), backgroundParameters.end(), 0.0);
-        std::fill(backgroundStepsize.begin(), backgroundStepsize.end(), 1);
-        /* Initialize constant term at average, with 10% step size */
-        backgroundParameters[0] = bgSum / nGood; 
-        backgroundStepsize[0] = 0.1 * backgroundParameters[0];
-        
-        /* Run minimization */
-        lsst::afw::math::FitResults backgroundFit = lsst::afw::math::minimize(
-            backgroundFunction,
-            backgroundParameters,
-            backgroundStepsize,
-            backgroundMeas,
-            backgroundVariances,
-            kernelColPos,
-            kernelRowPos,
-            nSigmaSq
-            );
-        backgroundFunction.setParameters(backgroundFit.parameterList);
-        
-        /* Debugging information */
-        for (unsigned int i = 0; i < backgroundFit.parameterList.size(); ++i) {
-            lsst::pex::logging::TTrace<4>("lsst.ip.diffim.computePsfMatchingKernelForMaskedImage", 
-                                        "Fit Background Parameter %d : %.3f (%.3f,%.3f)\n",
-                                        i, backgroundFit.parameterList[i], backgroundFit.parameterErrorList[i].first,
-                                        backgroundFit.parameterErrorList[i].second);
-            spatialLog.log(Log::INFO,
-                           boost::format("Iteration %d, Fit to Background Parameter %d : %.3f (%.3f,%.3f)") %
-                           nIter % i % backgroundFit.parameterList[i] %
-                           backgroundFit.parameterErrorList[i].first %
-                           backgroundFit.parameterErrorList[i].second);
-        }
-        
-        /* Fit for spatially varying background */
-        /* ******************************** */
-        /* ******************************** */
-        /* Check each footprint's actual kernel with the spatial model */
-
-        for (iDiffImContainer i = diffImContainerList.begin(); i != diffImContainerList.end(); ++i) {
-            if ((*i).isGood == false) {
-                continue;
-            }
-          
-            (*i).kernelList.push_back( spatiallyVaryingKernelPtr );
-            (*i).diffimStats.push_back( lsst::ip::diffim::MaskedImageDiffimStats() );
-            (*i).backgrounds.push_back( backgroundFunction((*i).colcNorm, (*i).rowcNorm) );
-            spatiallyVaryingKernelPtr->computeImage(kSpatialImage, imSum, false, (*i).colcNorm, (*i).rowcNorm);
-            (*i).kernelSums.push_back( imSum );
-            (*i).nKernel += 1;
-
-            /* Calculate image stats */
-            lsst::ip::diffim::computeDiffImStats((*i), (*i).nKernel, policy);
-            if ( (*i).isGood == false ) {
-                nReject += 1;
-            }
-        }
-
-        /* End of the loop */
-        nIter += 1;
-
-    }
-    return spatiallyVaryingKernelPtr;
-}
-
-template <typename ImageT, typename MaskT>
-void lsst::ip::diffim::computeDiffImStats(
-    lsst::ip::diffim::DiffImContainer<ImageT, MaskT> &diffImContainer,
-    int const kernelID,
-    lsst::pex::policy::Policy &policy
-    ) {
-
-    double imSum;
-    double meanOfResiduals = 0.0;
-    double varianceOfResiduals = 0.0;
-    int nGoodPixels = 0;
-
-    Log statsLog(Log::getDefaultLog(), "ip.diffim.computeDiffImStats");
-
-    double maximumFootprintResidualMean = policy.getDouble("computeDiffImStats.maximumFootprintResidualMean");
-    double maximumFootprintResidualVariance = policy.getDouble("computeDiffImStats.maximumFootprintResidualVariance");
-
-    if ( (kernelID <= -1) || (kernelID > diffImContainer.nKernel) ) {
-        throw lsst::pex::exceptions::DomainError("Request for non-existent kernel");
-    }
-
-    int edgeMaskBit = diffImContainer.imageToConvolve->getMask()->getMaskPlane("EDGE");
-    int badMaskBit  = diffImContainer.imageToConvolve->getMask()->getMaskPlane("BAD");
-    MaskT edgePixelMask = (edgeMaskBit < 0) ? 0 : (1 << edgeMaskBit);
-    MaskT badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
-    badPixelMask |= edgePixelMask;
-
-    bool debugIO = policy.getBool("debugIO", false);
-    unsigned int kernelRows = policy.getInt("kernelRows");
-    unsigned int kernelCols = policy.getInt("kernelCols");
-    lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> kImage(kernelCols, kernelRows);
-
-    lsst::afw::image::MaskedImage<ImageT, MaskT>
-        convolvedImageStamp = lsst::afw::math::convolveNew(
-            *(diffImContainer.imageToConvolve),
-            *(diffImContainer.kernelList[kernelID]),
-            edgeMaskBit, 
-            false);
-    
-    /* Add in background */
-    convolvedImageStamp += diffImContainer.backgrounds[kernelID];
-    if (debugIO) {
-        convolvedImageStamp.writeFits( (boost::format("cFits%d_%d") % kernelID % diffImContainer.id).str() );
-    }
-    
-    /* Do actual subtraction */
-    convolvedImageStamp -= *(diffImContainer.imageToNotConvolve);
-    convolvedImageStamp *= -1.0;
-    if (debugIO) {
-        convolvedImageStamp.writeFits( (boost::format("dFits%d_%d") % kernelID % diffImContainer.id).str() );
-    }
-    
-    /* calculate stats in the difference image */
-    lsst::ip::diffim::calculateMaskedImageResiduals(nGoodPixels, meanOfResiduals, varianceOfResiduals, convolvedImageStamp, badPixelMask);
-    diffImContainer.diffimStats[kernelID].footprintResidualMean = meanOfResiduals;
-    diffImContainer.diffimStats[kernelID].footprintResidualVariance = varianceOfResiduals;
-
-    if (!(std::isfinite(diffImContainer.diffimStats[kernelID].footprintResidualMean)) || 
-        !(std::isfinite(diffImContainer.diffimStats[kernelID].footprintResidualVariance))) {
-        lsst::pex::logging::TTrace<2>("lsst.ip.diffim.computeDiffImStats", 
-                                    "# Kernel %d (kSum=%.3f), analysis of footprint failed : %.3f %.3f (%d pixels)",
-                                    diffImContainer.id,
-                                    diffImContainer.kernelSums[kernelID],
-                                    diffImContainer.diffimStats[kernelID].footprintResidualMean,
-                                    diffImContainer.diffimStats[kernelID].footprintResidualVariance, 
-                                    nGoodPixels);
-
-        diffImContainer.isGood = false;
-    }
-    else if (fabs(diffImContainer.diffimStats[kernelID].footprintResidualMean) > maximumFootprintResidualMean) {
-        lsst::pex::logging::TTrace<2>("lsst.ip.diffim.computeDiffImStats", 
-                                    "# Kernel %d (kSum=%.3f), bad mean residual of footprint : %.3f (%d pixels)",
-                                    diffImContainer.id,
-                                    diffImContainer.kernelSums[kernelID],
-                                    diffImContainer.diffimStats[kernelID].footprintResidualMean,
-                                    nGoodPixels);
-
-        diffImContainer.isGood = false;
-    }
-    else if (diffImContainer.diffimStats[kernelID].footprintResidualVariance > maximumFootprintResidualVariance) {
-        lsst::pex::logging::TTrace<2>("lsst.ip.diffim.computeDiffImStats", 
-                                    "# Kernel %d (kSum=%.3f), bad residual variance of footprint : %.3f (%d pixels)",
-                                    diffImContainer.id,
-                                    diffImContainer.kernelSums[kernelID],
-                                    diffImContainer.diffimStats[kernelID].footprintResidualVariance,
-                                    nGoodPixels);
-
-        diffImContainer.isGood = false;
-    }
-    else {
-        lsst::pex::logging::TTrace<5>("lsst.ip.diffim.computeDiffImStats", 
-                                    "Kernel %d (kSum=%.3f), mean and variance of residuals in footprint : %.3f %.3f (%d pixels)",
-                                    diffImContainer.id,
-                                    diffImContainer.kernelSums[kernelID],
-                                    diffImContainer.diffimStats[kernelID].footprintResidualMean,
-                                    diffImContainer.diffimStats[kernelID].footprintResidualVariance,
-                                    nGoodPixels);
-    }
-    if (diffImContainer.isGood == false) {
-        statsLog.log(Log::INFO, 
-                     boost::format("#Kernel %d (kSum=%.3f), mean and variance of residuals in footprint : %.3f %.3f (%d pixels)") %
-                     diffImContainer.id %
-                     diffImContainer.kernelSums[kernelID] %
-                     diffImContainer.diffimStats[kernelID].footprintResidualMean %
-                     diffImContainer.diffimStats[kernelID].footprintResidualVariance %
-                     nGoodPixels);
-    }
-    else {
-        statsLog.log(Log::INFO, 
-                     boost::format("Kernel %d (kSum=%.3f), mean and variance of residuals in footprint : %.3f %.3f (%d pixels)") %
-                     diffImContainer.id %
-                     diffImContainer.kernelSums[kernelID] %
-                     diffImContainer.diffimStats[kernelID].footprintResidualMean %
-                     diffImContainer.diffimStats[kernelID].footprintResidualVariance %
-                     nGoodPixels);
-    }
-
-    if (debugIO) {
-        diffImContainer.kernelList[kernelID]->computeImage(kImage, imSum, false);
-        if (diffImContainer.isGood == true) {
-            kImage.writeFits( (boost::format("kFits%dG_%d.fits") % kernelID % diffImContainer.id).str() );
-        }
-        else {
-            kImage.writeFits( (boost::format("kFits%dB_%d.fits") % kernelID % diffImContainer.id).str() );
-        }
-    }
-}
-
-/** 
- * @brief Generate a basis set of delta function Kernels.
- *
- * Generates a vector of Kernels sized nCols * nRows, where each Kernel has
- * a unique pixel set to value 1.0 with the other pixels valued 0.0.  This
- * is the "delta function" basis set.
- * 
- * @return Vector of orthonormal delta function Kernels.
- *
- * @throw lsst::pex::exceptions::DomainError if nRows or nCols not positive
- *
- * @ingroup diffim
- */
-lsst::afw::math::KernelList<lsst::afw::math::Kernel>
-lsst::ip::diffim::generateDeltaFunctionKernelSet(
-    unsigned int nCols, ///< Number of colunms in the basis kernels
-    unsigned int nRows  ///< Number of rows in the basis kernels
-    )
-{
-    if ((nCols < 1) || (nRows < 1)) {
-        throw lsst::pex::exceptions::DomainError("nRows and nCols must be positive");
-    }
-    const int signedNCols = static_cast<int>(nCols);
-    const int signedNRows = static_cast<int>(nRows);
-    lsst::afw::math::KernelList<lsst::afw::math::Kernel> kernelBasisList;
-    for (int row = 0; row < signedNRows; ++row) {
-        for (int col = 0; col < signedNCols; ++col) {
-            boost::shared_ptr<lsst::afw::math::Kernel> kernelPtr(
-                new lsst::afw::math::DeltaFunctionKernel(col, row, nCols, nRows)
-                );
-            
-            kernelBasisList.push_back(kernelPtr);
-        }
-    }
-    return kernelBasisList;
-}
-
-/** 
- * @brief Generate an Alard-Lupton basis set of Kernels.
- *
- * Not implemented.
- * 
- * @return Vector of Alard-Lupton Kernels.
- *
- * @throw lsst::pex::exceptions::DomainError if nRows or nCols not positive
- * @throw lsst::pex::exceptions::DomainError until implemented
- *
- * @ingroup diffim
- */
-lsst::afw::math::KernelList<lsst::afw::math::Kernel>
-lsst::ip::diffim::generateAlardLuptonKernelSet(
-    unsigned int nRows, ///< Number of rows in the kernel basis
-    unsigned int nCols, ///< Number of columns in the kernel basis
-    std::vector<double> const &sigGauss, ///< Width of gaussians in basis; size = number of Gaussians
-    std::vector<double> const &degGauss  ///< Degree of spatial variation within each Gaussian; size = sigGauss.size()
-    )
-{
-    if ((nCols < 1) || (nRows < 1)) {
-        throw lsst::pex::exceptions::DomainError("nRows and nCols must be positive");
-    }
-    throw lsst::pex::exceptions::DomainError("Not implemented");
-
-    lsst::afw::math::KernelList<lsst::afw::math::Kernel> kernelBasisList;
-    return kernelBasisList;
-}
-
-/** 
  * @brief Checks a Mask image to see if a particular Mask plane is set.
  *
  * @return True if the mask is *not* set, False if it is.
@@ -1216,10 +522,10 @@ bool lsst::ip::diffim::maskOk(
  * @ingroup diffim
  */
 template <typename ImageT, typename MaskT>
-void lsst::ip::diffim::calculateMaskedImageResiduals(
+void lsst::ip::diffim::calculateMaskedImageStatistics(
     int &nGoodPixels, ///< Number of good pixels in the image
-    double &meanOfResiduals, ///< Mean residual/variance; ideally 0
-    double &varianceOfResiduals, ///< Average variance of residual/variance; ideally 1
+    double &mean, ///< Mean value/variance; ideally 0 in a difference image
+    double &variance, ///< Average variance of value/variance; ideally 1 in a difference image
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &inputImage, ///< Input image to be analyzed
     MaskT const badPixelMask ///< Mask for bad data
     ) {
@@ -1241,15 +547,15 @@ void lsst::ip::diffim::calculateMaskedImageResiduals(
     }
     
     if (nGoodPixels > 0) {
-        meanOfResiduals = xSum / nGoodPixels;
+        mean = xSum / nGoodPixels;
     } else {
-        meanOfResiduals = std::numeric_limits<double>::quiet_NaN();
+        mean = std::numeric_limits<double>::quiet_NaN();
     }
     if (nGoodPixels > 1) {
-        varianceOfResiduals  = x2Sum / nGoodPixels - meanOfResiduals*meanOfResiduals;
-        varianceOfResiduals *= nGoodPixels / (nGoodPixels - 1);
+        variance  = x2Sum / nGoodPixels - mean*mean;
+        variance *= nGoodPixels / (nGoodPixels - 1);
     } else {
-        varianceOfResiduals = std::numeric_limits<double>::quiet_NaN();
+        variance = std::numeric_limits<double>::quiet_NaN();
     }
     
 }
@@ -1263,10 +569,10 @@ void lsst::ip::diffim::calculateMaskedImageResiduals(
  * @ingroup diffim
  */
 template <typename ImageT>
-void lsst::ip::diffim::calculateImageResiduals(
+void lsst::ip::diffim::calculateImageStatistics(
     int &nGoodPixels, ///< Number of good pixels in the image
-    double &meanOfResiduals, ///< Mean residual; nan if nGoodPixels < 1
-    double &varianceOfResiduals, ///< Average variance of residual; nan if nGoodPixels < 2
+    double &mean, ///< Mean value; nan if nGoodPixels < 1
+    double &variance, ///< Variance of values; nan if nGoodPixels < 2
     lsst::afw::image::Image<ImageT> const &inputImage ///< Input image to be analyzed
     ) {
     
@@ -1290,16 +596,16 @@ void lsst::ip::diffim::calculateImageResiduals(
     }
     
     if (nGoodPixels > 0) {
-        meanOfResiduals = xSum / wSum;
+        mean = xSum / wSum;
     } else {
-        meanOfResiduals = std::numeric_limits<double>::quiet_NaN();
+        mean = std::numeric_limits<double>::quiet_NaN();
     }
     if (nGoodPixels > 1) {
-        varianceOfResiduals  = x2Sum / wSum - meanOfResiduals*meanOfResiduals;
-        varianceOfResiduals *= nGoodPixels / (nGoodPixels - 1);
-        varianceOfResiduals /= nGoodPixels;
+        variance  = x2Sum / wSum - mean*mean;
+        variance *= nGoodPixels / (nGoodPixels - 1);
+        variance /= nGoodPixels;
     } else {
-        varianceOfResiduals = std::numeric_limits<double>::quiet_NaN();
+        variance = std::numeric_limits<double>::quiet_NaN();
     }
 }
 
@@ -1343,7 +649,7 @@ void lsst::ip::diffim::calculateVectorStatistics(
  * @ingroup diffim
  */
 template <typename PixelT, typename FunctionT>
-void lsst::ip::diffim::addFunction(
+void lsst::ip::diffim::addFunctionToImage(
     lsst::afw::image::Image<PixelT> &image, ///< image
     lsst::afw::math::Function2<FunctionT> const &function ///< 2-d function
 ) {
@@ -1365,7 +671,7 @@ void lsst::ip::diffim::addFunction(
 /* Explicit instantiations */
 
 template
-std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
+std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
     double &background,
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
@@ -1373,7 +679,7 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
     lsst::pex::policy::Policy &policy);
 
 template
-std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
+std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
     double &background,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
@@ -1390,31 +696,6 @@ template
 std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching(
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
-    lsst::pex::policy::Policy &policy);
-
-template 
-lsst::afw::math::KernelList<lsst::afw::math::Kernel> lsst::ip::diffim::computePcaKernelBasis(
-    std::vector<lsst::ip::diffim::DiffImContainer<float, lsst::afw::image::maskPixelType> > &diffImContainerList,
-    lsst::pex::policy::Policy &policy);
-
-template 
-lsst::afw::math::KernelList<lsst::afw::math::Kernel> lsst::ip::diffim::computePcaKernelBasis(
-    std::vector<lsst::ip::diffim::DiffImContainer<double, lsst::afw::image::maskPixelType> > &diffImContainerList,
-    lsst::pex::policy::Policy &policy);
-
-template 
-boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
-    lsst::afw::math::Function2<double> &kernelFunction,
-    lsst::afw::math::Function2<double> &backgroundFunction,
-    std::vector<lsst::ip::diffim::DiffImContainer<float, lsst::afw::image::maskPixelType> > &diffImContainerList,
-    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelBasisList,
-    lsst::pex::policy::Policy &policy);
-template 
-boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
-    lsst::afw::math::Function2<double> &kernelFunction,
-    lsst::afw::math::Function2<double> &backgroundFunction,
-    std::vector<lsst::ip::diffim::DiffImContainer<double, lsst::afw::image::maskPixelType> > &diffImContainerList,
-    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelBasisList,
     lsst::pex::policy::Policy &policy);
 
 template
@@ -1423,51 +704,51 @@ bool lsst::ip::diffim::maskOk(
     lsst::afw::image::maskPixelType const badPixelMask);
 
 template
-void lsst::ip::diffim::calculateMaskedImageResiduals(
+void lsst::ip::diffim::calculateMaskedImageStatistics(
     int &nGoodPixels,
-    double &meanOfResiduals,
-    double &varianceOfResiduals,
+    double &mean,
+    double &variance,
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &inputImage,
     lsst::afw::image::maskPixelType const badPixelMask);
 
 template
-void lsst::ip::diffim::calculateMaskedImageResiduals(
+void lsst::ip::diffim::calculateMaskedImageStatistics(
     int &nGoodPixels,
-    double &meanOfResiduals,
-    double &varianceOfResiduals,
+    double &mean,
+    double &variance,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &inputImage,
     lsst::afw::image::maskPixelType const badPixelMask);
 
 template
-void lsst::ip::diffim::calculateImageResiduals(
+void lsst::ip::diffim::calculateImageStatistics(
     int &nGoodPixels,
-    double &meanOfResiduals,
-    double &varianceOfResiduals,
+    double &mean,
+    double &variance,
     lsst::afw::image::Image<float> const &inputImage);
 
 template
-void lsst::ip::diffim::calculateImageResiduals(
+void lsst::ip::diffim::calculateImageStatistics(
     int &nGoodPixels,
-    double &meanOfResiduals,
-    double &varianceOfResiduals,
+    double &mean,
+    double &variance,
     lsst::afw::image::Image<double> const &inputImage);
 
 template
-void lsst::ip::diffim::addFunction(
+void lsst::ip::diffim::addFunctionToImage(
     lsst::afw::image::Image<float>&,
     lsst::afw::math::Function2<float> const&);
 
 template
-void lsst::ip::diffim::addFunction(
+void lsst::ip::diffim::addFunctionToImage(
     lsst::afw::image::Image<float>&,
     lsst::afw::math::Function2<double> const&);
 
 template
-void lsst::ip::diffim::addFunction(
+void lsst::ip::diffim::addFunctionToImage(
     lsst::afw::image::Image<double>&,
     lsst::afw::math::Function2<float> const&);
 
 template
-void lsst::ip::diffim::addFunction(
+void lsst::ip::diffim::addFunctionToImage(
     lsst::afw::image::Image<double>&,
     lsst::afw::math::Function2<double> const&);

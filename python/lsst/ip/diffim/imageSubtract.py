@@ -242,6 +242,7 @@ def rejectKernelOutliers(difiList, policy):
         diffImLog.log(Log.INFO,
                       'Kernel Sum Iteration %d, rejected %d kernels : Kernel Sum = %0.3f (%0.3f)' %
                       (nIter, numRejected, ksumMean, ksumStd)
+                      )
 
         if numRejected == 0:
             break

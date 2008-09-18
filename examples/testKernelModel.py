@@ -9,6 +9,7 @@ import lsst.daf.base as dafBase
 import lsst.ip.diffim as ipDiffim
 
 from lsst.pex.logging import Log
+from lsst.pex.logging import Trace
 from lsst.pex.policy import Policy
 
 # Temporary functions until we formalize this in the build system somewhere
@@ -393,7 +394,7 @@ Notes:
     
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
-        lsst.pex.logging.Trace_setVerbosity('lsst.ip.diffim', options.verbosity)
+        Trace_setVerbosity('lsst.ip.diffim', options.verbosity)
 
     print 'foo'
     kernelBasisList = ipDiffim.generateDeltaFunctionKernelSet(kernelCols,
@@ -413,10 +414,10 @@ Notes:
         fpMin = footprintBBox.min()
         fpMax = footprintBBox.max()
         
-        logging.Trace('lsst.ip.diffim.computePsfMatchingKernelForMaskedImage', 5,
-                      'Footprint %d = %d,%d -> %d,%d' % (footprintID,
-                                                         footprintBBox.min().x(), footprintBBox.min().y(),
-                                                         footprintBBox.max().x(), footprintBBox.max().y()))
+        Trace('lsst.ip.diffim.computePsfMatchingKernelForMaskedImage', 5,
+              'Footprint %d = %d,%d -> %d,%d' % (footprintID,
+                                                 footprintBBox.min().x(), footprintBBox.min().y(),
+                                                 footprintBBox.max().x(), footprintBBox.max().y()))
         templateStampPtr = templateMaskedImage.getSubImage(footprintBBox)
         imageStampPtr = scienceMaskedImage.getSubImage(footprintBBox)
 
