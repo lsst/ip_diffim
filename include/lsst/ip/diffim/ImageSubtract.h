@@ -23,7 +23,6 @@
 #include <lsst/afw/image/MaskedImage.h>
 #include <lsst/afw/math/Function.h>
 #include <lsst/detection/Footprint.h>
-#include <lsst/ip/diffim/Pca.h>
 
 namespace lsst {
 namespace ip {

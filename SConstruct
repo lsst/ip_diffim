@@ -35,8 +35,7 @@ env.libs["ip_diffim"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") f
 #
 # Build/install things
 #
-#for d in Split("doc include/lsst/ip/diffim lib python/lsst/ip/diffim tests examples"):
-for d in Split("doc include/lsst/ip/diffim lib tests examples"):
+for d in Split("doc include/lsst/ip/diffim lib python/lsst/ip/diffim tests examples"):
     SConscript(os.path.join(d, "SConscript"))
 
 env['IgnoreFiles'] = r"(~$|\.pyc$|^\.svn$|\.o$)"

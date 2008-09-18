@@ -12,6 +12,7 @@ Python bindings for lsst::ip::diffim code
 %{
 #include <lsst/ip/diffim/ImageSubtract.h>
 #include <lsst/ip/diffim/wcsMatch.h>
+#include <lsst/ip/diffim/Pca.h>
 %}
 
 %init %{
@@ -44,45 +45,34 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 /* ImageSubtract.h */
 
 %include "lsst/ip/diffim/ImageSubtract.h"
-%template(DiffImContainerD)                lsst::ip::diffim::DiffImContainer<float, lsst::afw::image::maskPixelType>;
-%template(vectorDiffImContainerD)          std::vector<lsst::ip::diffim::DiffImContainer<float, lsst::afw::image::maskPixelType> >;
+%template(DifferenceImageFootprintInformationD)  
+    lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>;
+%template(vectorDifferenceImageFootprintInformationD)          
+    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType> >;
 
-%template(computeDiffImStats)
-    lsst::ip::diffim::computeDiffImStats<float, lsst::afw::image::maskPixelType>;
-%template(computeDiffImStats)
-    lsst::ip::diffim::computeDiffImStats<double, lsst::afw::image::maskPixelType>;
-
-%template(computePsfMatchingKernelForPostageStamp)
-    lsst::ip::diffim::computePsfMatchingKernelForPostageStamp<float, lsst::afw::image::maskPixelType>;
-%template(computePsfMatchingKernelForPostageStamp)
-    lsst::ip::diffim::computePsfMatchingKernelForPostageStamp<double, lsst::afw::image::maskPixelType>;
+%template(computePsfMatchingKernelForFootprint)
+    lsst::ip::diffim::computePsfMatchingKernelForFootprint<float, lsst::afw::image::maskPixelType>;
+%template(computePsfMatchingKernelForFootprint)
+    lsst::ip::diffim::computePsfMatchingKernelForFootprint<double, lsst::afw::image::maskPixelType>;
 
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float, lsst::afw::image::maskPixelType>;
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double, lsst::afw::image::maskPixelType>;
 
-%template(computePcaKernelBasis)            lsst::ip::diffim::computePcaKernelBasis<float, lsst::afw::image::maskPixelType>;
-%template(computePcaKernelBasis)            lsst::ip::diffim::computePcaKernelBasis<double, lsst::afw::image::maskPixelType>;
-
-%template(computeSpatiallyVaryingPsfMatchingKernel)
-    lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel<float, lsst::afw::image::maskPixelType>;
-%template(computeSpatiallyVaryingPsfMatchingKernel)
-    lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel<double, lsst::afw::image::maskPixelType>;
-
 %template(maskOk)                           lsst::ip::diffim::maskOk<lsst::afw::image::maskPixelType>;
 
-%template(calculateMaskedImageResiduals)
-    lsst::ip::diffim::calculateMaskedImageResiduals<float, lsst::afw::image::maskPixelType>;
-%template(calculateMaskedImageResiduals)
-    lsst::ip::diffim::calculateMaskedImageResiduals<double, lsst::afw::image::maskPixelType>;
+%template(calculateMaskedImageStatistics)
+    lsst::ip::diffim::calculateMaskedImageStatistics<float, lsst::afw::image::maskPixelType>;
+%template(calculateMaskedStatistics)
+    lsst::ip::diffim::calculateMaskedImageStatistics<double, lsst::afw::image::maskPixelType>;
 
-%template(calculateImageResiduals)          lsst::ip::diffim::calculateImageResiduals<float>;
-%template(calculateImageResiduals)          lsst::ip::diffim::calculateImageResiduals<double>;
-%template(addFunction)                      lsst::ip::diffim::addFunction<double, double>;
-%template(addFunction)                      lsst::ip::diffim::addFunction<float, double>;
-%template(addFunction)                      lsst::ip::diffim::addFunction<double, float>;
-%template(addFunction)                      lsst::ip::diffim::addFunction<float, float>;
+%template(calculateImageStatistics)         lsst::ip::diffim::calculateImageStatistics<float>;
+%template(calculateImageStatistics)         lsst::ip::diffim::calculateImageStatistics<double>;
+%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, double>;
+%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, double>;
+%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, float>;
+%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, float>;
 
 /* ImageSubtract.h */
 /*******************/
