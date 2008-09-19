@@ -45,10 +45,18 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 /* ImageSubtract.h */
 
 %include "lsst/ip/diffim/ImageSubtract.h"
-%template(DifferenceImageFootprintInformationD)  
+
+/* classes */
+%template(DifferenceImageFootprintInformationF)  
     lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>;
-%template(vectorDifferenceImageFootprintInformationD)          
+%template(vectorDifferenceImageFootprintInformationF)          
     std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType> >;
+
+/* subroutines */
+%template(convolveAndSubtract)
+    lsst::ip::diffim::convolveAndSubtract<float, lsst::afw::image::maskPixelType>;
+%template(convolveAndSubtract)
+    lsst::ip::diffim::convolveAndSubtract<double, lsst::afw::image::maskPixelType>;
 
 %template(computePsfMatchingKernelForFootprint)
     lsst::ip::diffim::computePsfMatchingKernelForFootprint<float, lsst::afw::image::maskPixelType>;

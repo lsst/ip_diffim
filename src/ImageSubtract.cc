@@ -31,6 +31,77 @@
 using lsst::pex::logging::Log;
 using lsst::pex::logging::Rec;
 
+
+//
+// Constructors
+//
+
+template <typename ImageT, typename MaskT>
+DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics() :
+    lsst::daf::data::LsstBase(typeid(this)),
+    _residualMean(0),
+    _residualVariance(0)
+{
+}
+
+template <typename ImageT, typename MaskT>
+DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics(
+    const lsst::afw::image::MaskedImage<ImageT, MaskT> differenceMaskedImage) :
+    lsst::daf::data::LsstBase(typeid(this)),
+    _residualMean(0),
+    _residualVariance(0),
+{
+    int nGood;
+    double mean, variance;
+    int badMaskBit = differenceMaskedImage.getMask()->getMaskPlane("BAD");
+    MaskT badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
+
+    calculateMaskedImageStatistics(&nGood, &mean, &variance, differenceMaskedImage, badPixelMask);
+    residualMean = mean;
+    residualVariance = variance;
+}
+        
+template <typename ImageT, typename MaskT>
+DifferenceImageFootprintInformation<ImageT, MaskT>::DifferenceImageFootprintInformation() :
+    lsst::daf::data::LsstBase(typeid(this)),
+    _colcNorm(0),
+    _rowcNorm(0),
+    _footprintPtr( new lsst::detection::Footprint),
+    _imageToNotConvolvePtr( new lsst::afw::image::MaskedImage<ImageT, MaskT>),
+    _imageToConvolvePtr( new lsst::afw::image::MaskedImage<ImageT, MaskT>),
+    _singleKernelPtr( new lsst::afw::math::Kernel),
+    _singleKernelSum(0),
+    _singleBackground(0),
+    _singleKernelStatsPtr( ??? ),
+    _isGood(True)
+{
+}
+    
+//
+// Public Member Functions
+//
+
+template <typename ImageT, typename MaskT>
+DifferenceImageStatistics 
+DifferenceImageFootprintInformation<ImageT, MaskT>::computeImageStatistics(
+    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> kernelPtr,
+    double background,
+    ) {
+
+    differenceMaskedImage = convolveAndSubtract( *(imageToConvolvePtr),
+                                                 *(imageToNotConvolvePtr),
+                                                 kernelPtr,
+                                                 background );
+                                                 
+    return DifferenceImageStatistics(differenceMaskedImage);
+}
+
+
+//
+// Subroutines
+//
+
+
 /** 
  * @brief Generate a basis set of delta function Kernels.
  *
@@ -109,16 +180,15 @@ template <typename ImageT, typename MaskT>
 lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> convolutionKernel,
-    double background,
-    lsst::pex::policy::Policy &policy
+    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+    double background
     ) {
 
-    int edgeMaskBit = imageToConvolve->getMask()->getMaskPlane("EDGE");
+    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
     lsst::afw::image::MaskedImage<ImageT, MaskT>
         convolvedMaskedImage = lsst::afw::math::convolveNew(
-            *(imageToConvolve),
-            *(convolutionKernel),
+            imageToConvolve,
+            *(convolutionKernelPtr),
             edgeMaskBit, 
             false);
     
@@ -126,7 +196,7 @@ lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtra
     convolvedMaskedImage += background;
 
     /* Do actual subtraction */
-    convolvedMaskedImage -= *(imageToNotConvolve);
+    convolvedMaskedImage -= imageToNotConvolve;
     convolvedMaskedImage *= -1.0;
     
     return convolvedMaskedImage;
@@ -669,6 +739,20 @@ void lsst::ip::diffim::addFunctionToImage(
 
 /************************************************************************************************************/
 /* Explicit instantiations */
+
+template 
+lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
+    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+    double background);
+
+template 
+lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
+    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+    double background);
 
 template
 std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(

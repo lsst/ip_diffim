@@ -19,7 +19,7 @@ def vectorToImageD(inputVector, nCols, nRows):
     nVec = 0
     for nCol in range(nCols):
         for nRow in range(nRows):
-            outputImage.setValue(nCol, nRow, inputVector[nVec])
+            outputImage.set(nCol, nRow, inputVector[nVec])
             nVec += 1
     return outputImage
 
@@ -30,7 +30,7 @@ def imageToVector(inputImage):
     nVec = 0    
     for nCol in range(nCols):
         for nRow in range(nRows):
-            outputVector[nVec] = inputImage.getValue(nCol, nRow)
+            outputVector[nVec] = inputImage.get(nCol, nRow)
             nVec += 1
     return outputVector
 
@@ -96,7 +96,7 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
             kernelValues = numpy.zeros(nFootprint)
             for i in range(nFootprint):
                 singleKernel       = goodDifiList[i].getSingleKernel()
-                kernelValues[i]    = singleKernel.getImage().getValue(kCol, kRow)
+                kernelValues[i]    = singleKernel.getImage().get(kCol, kRow)
                     
             # initialize vectors, one per good kernel
             #######
@@ -156,8 +156,8 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
                 functionValue   = functionList[i].eval(footprintExposureCol[i], footprintExposureRow[i])
                 krigingValue    = krigingList[i].eval(footprintExposureCol[i],  footprintExposureRow[i])
                 
-                kFunctionImage.setValue(kCol, kRow, functionValue)
-                kKrigingImage.setValue(kCol, kRow, krigingValue)
+                kFunctionImage.set(kCol, kRow, functionValue)
+                kKrigingImage.set(kCol, kRow, krigingValue)
     
         functionKernelPtr = afwMath.KernelPtr( afwMath.Kernel(kFunctionImage) )
         krigingKernelPtr  = afwMath.KernelPtr( afwMath.Kernel(kKrigingImage) )

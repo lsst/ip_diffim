@@ -33,17 +33,21 @@ namespace diffim {
      * 
      * @ingroup diffim
      */
-    class DifferenceImageStatistics {
+    template <typename ImageT, typename MaskT>
+    class DifferenceImageStatistics : public lsst::daf::base::Persistable,
+                                      public lsst::daf::data::LsstBase {
     public:
-        explicit DifferenceImageStatistics() {};
+        DifferenceImageStatistics();
+        DifferenceImageStatistics(const lsst::afw::image::MaskedImage<ImageT, MaskT> differenceMaskedImage);
+
         virtual ~DifferenceImageStatistics() {};
-        void setFootprintResidualMean(double mean) {footprintResidualMean = mean;}
-        void setFootprintResidualVariance(double variance) {footprintResidualVariance = variance;}
-        double getFootprintResidualMean() {return footprintResidualMean;}
-        double getFootprintResidualVariance() {return footprintResidualVariance;}
+        void setResidualMean(double mean) {residualMean = mean;}
+        void setResidualVariance(double variance) {residualVariance = variance;}
+        double getResidualMean() {return residualMean;}
+        double getResidualVariance() {return residualVariance;}
     private:
-        double footprintResidualMean;
-        double footprintResidualVariance;
+        double residualMean;
+        double residualVariance;
     };
 
     /**
@@ -60,12 +64,13 @@ namespace diffim {
      * @ingroup diffim
      */
     template <typename ImageT, typename MaskT>
-    class DifferenceImageFootprintInformation {
+    class DifferenceImageFootprintInformation : public lsst::daf::base::Persistable,
+                                                public lsst::daf::data::LsstBase {
     public:
         typedef lsst::afw::image::MaskedImage<ImageT, MaskT> maskedImageType;
         typedef boost::shared_ptr<maskedImageType> maskedImagePtrType;
 
-        explicit DifferenceImageFootprintInformation() {};
+        DifferenceImageFootprintInformation();
         virtual ~DifferenceImageFootprintInformation() {};
 
         void setColcNorm(double colc) {colcNorm = colc;};
@@ -94,8 +99,11 @@ namespace diffim {
         void setSingleStats(DifferenceImageStatistics stats) {singleKernelStats = stats;};
         DifferenceImageStatistics getSingleStats() {return singleKernelStats;};
 
-        DifferenceImageStatistics computeImageStatistics(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> kernel,
+        DifferenceImageStatistics computeImageStatistics(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> kernelPtr,
                                                          double background);
+
+        void setStatus(bool status) {isGood = status;};
+        bool getStatus() {return isGood;};
 
     private:
         /* position of the Footprint in the image, -1 to 1 */
@@ -113,7 +121,9 @@ namespace diffim {
         boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> singleKernelPtr;
         double singleKernelSum;
         double singleBackground;
-        DifferenceImageStatistics singleKernelStats;
+        DifferenceImageStatistics singleKernelStatsPtr;
+
+        bool isGood;
     };
 
 
@@ -135,9 +145,8 @@ namespace diffim {
     lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> convolutionKernel,
-        double background,
-        lsst::pex::policy::Policy &policy
+        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+        double background
         );
 
     template <typename ImageT, typename MaskT>
