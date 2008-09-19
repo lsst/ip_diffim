@@ -441,20 +441,16 @@ Notes:
         deconvKernelPtr = afwMath.LinearCombinationKernelPtr(
             afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelCoeffList))
         
-        convDifi   = ipDiffim.DiffImContainerD()
+        convDifi   = ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, templateStampPtr, imageStampPtr)
         convDifi.setId(footprintID)
-        convDifi.setConvolveMI(templateStampPtr.get())
-        convDifi.setNotConvolveMI(imageStampPtr.get())
         convDifi.setColcNorm( 0.5 * (fpMin.x() + fpMax.x()) ) # or can i use footprint.center or something?
         convDifi.setRowcNorm( 0.5 * (fpMin.y() + fpMax.y()) ) 
         convDifi.setSingleKernel( convKernelPtr )
         convDifi.setSingleBackground( convBackground )
         convolveDifiList.append(convDifi)
 
-        deconvDifi = ipDiffim.DiffImContainerD()
+        deconvDifi = ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, imageStampPtr, templateStampPtr)
         deconvDifi.setId(footprintID)
-        deconvDifi.setConvolveMI(imageStampPtr.get())
-        deconvDifi.setNotConvolveMI(templateStampPtr.get())
         deconvDifi.setColcNorm( 0.5 * (fpMin.x() + fpMax.x()) )
         deconvDifi.setRowcNorm( 0.5 * (fpMin.y() + fpMax.y()) ) 
         deconvDifi.setSingleKernel( deconvKernelPtr )

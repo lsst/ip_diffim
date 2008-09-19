@@ -46,10 +46,11 @@ DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics() :
 
 template <typename ImageT, typename MaskT>
 DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics(
-    const lsst::afw::image::MaskedImage<ImageT, MaskT> differenceMaskedImage) :
+    const lsst::afw::image::MaskedImage<ImageT, MaskT> differenceMaskedImage
+    ) :
     lsst::daf::data::LsstBase(typeid(this)),
     _residualMean(0),
-    _residualVariance(0),
+    _residualVariance(0)
 {
     int nGood;
     double mean, variance;
@@ -57,22 +58,27 @@ DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics(
     MaskT badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
 
     calculateMaskedImageStatistics(&nGood, &mean, &variance, differenceMaskedImage, badPixelMask);
-    residualMean = mean;
-    residualVariance = variance;
+    _residualMean = mean;
+    _residualVariance = variance;
 }
         
 template <typename ImageT, typename MaskT>
-DifferenceImageFootprintInformation<ImageT, MaskT>::DifferenceImageFootprintInformation() :
+DifferenceImageFootprintInformation<ImageT, MaskT>::DifferenceImageFootprintInformation(
+    lsst::detection::Footprint::PtrType footprintPtr,
+    maskedImagePtrType imageToConvolvePtr,
+    maskedImagePtrType imageToNotConvolvePtr
+    ) :
     lsst::daf::data::LsstBase(typeid(this)),
+    _id(-1),
     _colcNorm(0),
     _rowcNorm(0),
-    _footprintPtr( new lsst::detection::Footprint),
-    _imageToNotConvolvePtr( new lsst::afw::image::MaskedImage<ImageT, MaskT>),
-    _imageToConvolvePtr( new lsst::afw::image::MaskedImage<ImageT, MaskT>),
-    _singleKernelPtr( new lsst::afw::math::Kernel),
+    _footprintPtr(footprintPtr),
+    _imageToConvolvePtr(imageToConvolvePtr),
+    _imageToNotConvolvePtr(imageToNotConvolvePtr),
+    _singleKernelPtr(),
     _singleKernelSum(0),
     _singleBackground(0),
-    _singleKernelStatsPtr( ??? ),
+    _singleKernelStats(),
     _isGood(True)
 {
 }

@@ -41,13 +41,13 @@ namespace diffim {
         DifferenceImageStatistics(const lsst::afw::image::MaskedImage<ImageT, MaskT> differenceMaskedImage);
 
         virtual ~DifferenceImageStatistics() {};
-        void setResidualMean(double mean) {residualMean = mean;}
-        void setResidualVariance(double variance) {residualVariance = variance;}
-        double getResidualMean() {return residualMean;}
-        double getResidualVariance() {return residualVariance;}
+        void setResidualMean(double mean) {_residualMean = mean;}
+        void setResidualVariance(double variance) {_residualVariance = variance;}
+        double getResidualMean() {return _residualMean;}
+        double getResidualVariance() {return _residualVariance;}
     private:
-        double residualMean;
-        double residualVariance;
+        double _residualMean;
+        double _residualVariance;
     };
 
     /**
@@ -70,60 +70,71 @@ namespace diffim {
         typedef lsst::afw::image::MaskedImage<ImageT, MaskT> maskedImageType;
         typedef boost::shared_ptr<maskedImageType> maskedImagePtrType;
 
-        DifferenceImageFootprintInformation();
-        virtual ~DifferenceImageFootprintInformation() {};
+        /* No empty constructor */
+        //DifferenceImageFootprintInformation();
 
-        void setColcNorm(double colc) {colcNorm = colc;};
-        void setRowcNorm(double rowc) {rowcNorm = rowc;};
-        double getColcNorm() {return colcNorm;};
-        double getRowcNorm() {return rowcNorm;};
+        DifferenceImageFootprintInformation(lsst::detection::Footprint::PtrType footprintPtr,
+                                            maskedImagePtrType imageToConvolvePtr,
+                                            maskedImagePtrType imageToNotConvolvePtr);
+        virtual ~DifferenceImageFootprintInformation();
 
-        void setFootprintPtr(lsst::detection::Footprint::PtrType ptr) {footprintPtr = ptr;};
-        lsst::detection::Footprint::PtrType getFootprintPtr() {return footprintPtr;};
+        void setID(int id) {_id = id;};
+        int getID() {return _id;};
+        void setColcNorm(double colc) {_colcNorm = colc;};
+        void setRowcNorm(double rowc) {_rowcNorm = rowc;};
+        double getColcNorm() {return _colcNorm;};
+        double getRowcNorm() {return _rowcNorm;};
 
-        void setImageToNotConvolvePtr(maskedImagePtrType ptr) {imageToNotConvolvePtr = ptr;};
-        maskedImagePtrType getImageToNotConvolvePtr() {return imageToNotConvolvePtr;};
+        /* put this functionality in the constructor */
+        /*
+        void setFootprintPtr(lsst::detection::Footprint::PtrType ptr) {_footprintPtr = ptr;};
+        void setImageToNotConvolvePtr(maskedImagePtrType ptr) {_imageToNotConvolvePtr = ptr;};
+        void setImageToConvolvePtr(maskedImagePtrType ptr) {_imageToConvolvePtr = ptr;};
+        */
+        lsst::detection::Footprint::PtrType getFootprintPtr() {return _footprintPtr;};
+        maskedImagePtrType getImageToNotConvolvePtr() {return _imageToNotConvolvePtr;};
+        maskedImagePtrType getImageToConvolvePtr() {return _imageToConvolvePtr;};
 
-        void setImageToConvolvePtr(maskedImagePtrType ptr) {imageToConvolvePtr = ptr;};
-        maskedImagePtrType getImageToConvolvePtr() {return imageToConvolvePtr;};
+        void setSingleKernelPtr(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> ptr) {_singleKernelPtr = ptr;};
+        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> getSingleKernelPtr() {return _singleKernelPtr;};
 
-        void setSingleKernelPtr(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> ptr) {singleKernelPtr = ptr;};
-        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> getSingleKernelPtr() {return singleKernelPtr;};
+        void setSingleKernelSum(double kernelSum) {_singleKernelSum = kernelSum;};
+        double getSingleKernelSum() {return _singleKernelSum;};
 
-        void setSingleKernelSum(double kernelSum) {singleKernelSum = kernelSum;};
-        double getSingleKernelSum() {return singleKernelSum;};
+        void setSingleBackground(double background) {singleBackground = _background;};
+        double getSingleBackground() {return _singleBackground;};
 
-        void setSingleBackground(double background) {singleBackground = background;};
-        double getSingleBackground() {return singleBackground;};
-
-        void setSingleStats(DifferenceImageStatistics stats) {singleKernelStats = stats;};
-        DifferenceImageStatistics getSingleStats() {return singleKernelStats;};
+        void setSingleStats(DifferenceImageStatistics stats) {_singleKernelStats = stats;};
+        DifferenceImageStatistics getSingleStats() {return _singleKernelStats;};
 
         DifferenceImageStatistics computeImageStatistics(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> kernelPtr,
                                                          double background);
 
-        void setStatus(bool status) {isGood = status;};
-        bool getStatus() {return isGood;};
+        void setStatus(bool status) {_isGood = status;};
+        bool getStatus() {return _isGood;};
 
     private:
+        /* running ID */
+        int _id;
+
         /* position of the Footprint in the image, -1 to 1 */
-        double colcNorm;
-        double rowcNorm;
+        double _colcNorm;
+        double _rowcNorm;
 
         /* footprint assocated with the object we're building the kernels around */
-        lsst::detection::Footprint::PtrType footprintPtr;
+        lsst::detection::Footprint::PtrType _footprintPtr;
 
         /* subimages associated with the Footprint */
-        maskedImagePtrType imageToNotConvolvePtr; /* Typically the science image */
-        maskedImagePtrType imageToConvolvePtr;    /* Typically the template image */
+        maskedImagePtrType _imageToConvolvePtr;    /* Typically the template image */
+        maskedImagePtrType _imageToNotConvolvePtr; /* Typically the science image */
 
         /* results from individual kernel fit */
-        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> singleKernelPtr;
-        double singleKernelSum;
-        double singleBackground;
-        DifferenceImageStatistics singleKernelStatsPtr;
+        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> _singleKernelPtr;
+        double _singleKernelSum;
+        double _singleBackground;
+        DifferenceImageStatistics _singleKernelStats;
 
-        bool isGood;
+        bool _isGood;
     };
 
 
