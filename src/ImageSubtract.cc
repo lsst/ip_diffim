@@ -37,7 +37,7 @@ using lsst::pex::logging::Rec;
 //
 
 template <typename ImageT, typename MaskT>
-DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics() :
+lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics() :
     lsst::daf::data::LsstBase(typeid(this)),
     _residualMean(0),
     _residualVariance(0)
@@ -45,7 +45,7 @@ DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics() :
 }
 
 template <typename ImageT, typename MaskT>
-DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics(
+lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics(
     const lsst::afw::image::MaskedImage<ImageT, MaskT> differenceMaskedImage
     ) :
     lsst::daf::data::LsstBase(typeid(this)),
@@ -57,13 +57,13 @@ DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics(
     int badMaskBit = differenceMaskedImage.getMask()->getMaskPlane("BAD");
     MaskT badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
 
-    calculateMaskedImageStatistics(&nGood, &mean, &variance, differenceMaskedImage, badPixelMask);
+    lsst::ip::diffim::calculateMaskedImageStatistics(nGood, mean, variance, differenceMaskedImage, badPixelMask);
     _residualMean = mean;
     _residualVariance = variance;
 }
         
 template <typename ImageT, typename MaskT>
-DifferenceImageFootprintInformation<ImageT, MaskT>::DifferenceImageFootprintInformation(
+lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::DifferenceImageFootprintInformation(
     lsst::detection::Footprint::PtrType footprintPtr,
     maskedImagePtrType imageToConvolvePtr,
     maskedImagePtrType imageToNotConvolvePtr
@@ -79,7 +79,7 @@ DifferenceImageFootprintInformation<ImageT, MaskT>::DifferenceImageFootprintInfo
     _singleKernelSum(0),
     _singleBackground(0),
     _singleKernelStats(),
-    _isGood(True)
+    _isGood(true)
 {
 }
     
@@ -88,18 +88,19 @@ DifferenceImageFootprintInformation<ImageT, MaskT>::DifferenceImageFootprintInfo
 //
 
 template <typename ImageT, typename MaskT>
-DifferenceImageStatistics 
-DifferenceImageFootprintInformation<ImageT, MaskT>::computeImageStatistics(
+lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT> 
+lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::computeImageStatistics(
     boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> kernelPtr,
-    double background,
+    double background
     ) {
 
-    differenceMaskedImage = convolveAndSubtract( *(imageToConvolvePtr),
-                                                 *(imageToNotConvolvePtr),
-                                                 kernelPtr,
-                                                 background );
-                                                 
-    return DifferenceImageStatistics(differenceMaskedImage);
+    lsst::afw::image::MaskedImage<ImageT, MaskT> differenceMaskedImage = convolveAndSubtract( *(_imageToConvolvePtr),
+                                                                                              *(_imageToNotConvolvePtr),
+                                                                                              kernelPtr,
+                                                                                              background );
+    lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT> diffimStats = 
+        lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>(differenceMaskedImage);
+    return diffimStats;
 }
 
 
@@ -107,6 +108,22 @@ DifferenceImageFootprintInformation<ImageT, MaskT>::computeImageStatistics(
 // Subroutines
 //
 
+template <typename ImageT, typename MaskT>
+typename lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::difiListT
+lsst::ip::diffim::getGoodFootprints( 
+    typename DifferenceImageFootprintInformation<ImageT,MaskT>::difiListT & difiList 
+    )
+{
+    typename DifferenceImageFootprintInformation<ImageT,MaskT>::difiListT goodList();
+    for (typename DifferenceImageFootprintInformation<ImageT,MaskT>::difiListT::iterator i = difiList.begin(); 
+         i != difiList.end(); ++i) {
+        if ((*i)->getStatus() == true) {
+            goodList.push_back((*i));
+        }
+    }
+    return goodList;
+}
+    
 
 /** 
  * @brief Generate a basis set of delta function Kernels.
@@ -745,6 +762,23 @@ void lsst::ip::diffim::addFunctionToImage(
 
 /************************************************************************************************************/
 /* Explicit instantiations */
+
+template class lsst::ip::diffim::DifferenceImageStatistics<float, lsst::afw::image::maskPixelType>;
+template class lsst::ip::diffim::DifferenceImageStatistics<double, lsst::afw::image::maskPixelType>;
+template class lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>;
+template class lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>;
+
+//template 
+//std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::PtrType>
+//lsst::ip::diffim::getGoodFootprints( 
+//    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::PtrType> & difiList 
+//    );
+
+template 
+lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::difiListT
+lsst::ip::diffim::getGoodFootprints( 
+    lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::difiListT & difiList 
+    );
 
 template 
 lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(

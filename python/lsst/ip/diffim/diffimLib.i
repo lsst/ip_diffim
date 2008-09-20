@@ -47,12 +47,28 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 %include "lsst/ip/diffim/ImageSubtract.h"
 
 /* classes */
+%template(DifferenceImageStatisticsF)
+    lsst::ip::diffim::DifferenceImageStatistics<float, lsst::afw::image::maskPixelType>;
+
 %template(DifferenceImageFootprintInformationF)  
     lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>;
-%template(vectorDifferenceImageFootprintInformationF)          
-    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType> >;
+
+%boost_shared_ptr(DifiPtrF, 
+                  lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>);
+%boost_shared_ptr(DifiPtrD, 
+                  lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>);
+
+%template(DifiListF) 
+    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::PtrType>;
+%template(DifiListD) 
+    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>::PtrType>;
 
 /* subroutines */
+%template(getGoodFootprints)
+    lsst::ip::diffim::getGoodFootprints<float, lsst::afw::image::maskPixelType>;
+%template(getGoodFootprints)
+    lsst::ip::diffim::getGoodFootprints<double, lsst::afw::image::maskPixelType>;
+
 %template(convolveAndSubtract)
     lsst::ip::diffim::convolveAndSubtract<float, lsst::afw::image::maskPixelType>;
 %template(convolveAndSubtract)

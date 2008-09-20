@@ -67,6 +67,9 @@ namespace diffim {
     class DifferenceImageFootprintInformation : public lsst::daf::base::Persistable,
                                                 public lsst::daf::data::LsstBase {
     public:
+        typedef boost::shared_ptr<DifferenceImageFootprintInformation<ImageT, MaskT> > PtrType;
+        typedef std::vector<typename DifferenceImageFootprintInformation<ImageT, MaskT>::PtrType> difiListT;
+
         typedef lsst::afw::image::MaskedImage<ImageT, MaskT> maskedImageType;
         typedef boost::shared_ptr<maskedImageType> maskedImagePtrType;
 
@@ -76,7 +79,7 @@ namespace diffim {
         DifferenceImageFootprintInformation(lsst::detection::Footprint::PtrType footprintPtr,
                                             maskedImagePtrType imageToConvolvePtr,
                                             maskedImagePtrType imageToNotConvolvePtr);
-        virtual ~DifferenceImageFootprintInformation();
+        virtual ~DifferenceImageFootprintInformation() {};
 
         void setID(int id) {_id = id;};
         int getID() {return _id;};
@@ -101,14 +104,14 @@ namespace diffim {
         void setSingleKernelSum(double kernelSum) {_singleKernelSum = kernelSum;};
         double getSingleKernelSum() {return _singleKernelSum;};
 
-        void setSingleBackground(double background) {singleBackground = _background;};
+        void setSingleBackground(double background) {_singleBackground = background;};
         double getSingleBackground() {return _singleBackground;};
 
-        void setSingleStats(DifferenceImageStatistics stats) {_singleKernelStats = stats;};
-        DifferenceImageStatistics getSingleStats() {return _singleKernelStats;};
+        void setSingleStats(DifferenceImageStatistics<ImageT, MaskT> stats) {_singleKernelStats = stats;};
+        DifferenceImageStatistics<ImageT, MaskT> getSingleStats() {return _singleKernelStats;};
 
-        DifferenceImageStatistics computeImageStatistics(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> kernelPtr,
-                                                         double background);
+        DifferenceImageStatistics<ImageT, MaskT> computeImageStatistics(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> kernelPtr,
+                                                                        double background);
 
         void setStatus(bool status) {_isGood = status;};
         bool getStatus() {return _isGood;};
@@ -132,14 +135,19 @@ namespace diffim {
         boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> _singleKernelPtr;
         double _singleKernelSum;
         double _singleBackground;
-        DifferenceImageStatistics _singleKernelStats;
+        DifferenceImageStatistics<ImageT, MaskT> _singleKernelStats;
 
         bool _isGood;
     };
-
-
-
-
+    
+    template <typename ImageT, typename MaskT>
+    typename DifferenceImageFootprintInformation<ImageT, MaskT>::difiListT
+    getGoodFootprints( typename DifferenceImageFootprintInformation<ImageT,MaskT>::difiListT & difiList );
+                                                                     
+    //    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::difiPtrType> getGoodFootprints(
+    //         std::vector<DifferenceImageFootprintInformation<ImageT, MaskT>::difiPtrType> &difiList
+    //        );
+    
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateDeltaFunctionKernelSet(
         unsigned int nCols,
         unsigned int nRows
