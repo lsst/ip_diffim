@@ -29,7 +29,7 @@ env = scons.makeEnv(
         ["detection", "lsst/detection/Footprint.h", "detection"],
     ],
 )
-env.libs["ip_diffim"] = env.getlibs("boost vw lapack wcslib cfitsio utils daf_base pex_logging pex_exceptions pex_logging daf_persistence daf_data pex_policy minuit afw detection") + env.libs["ip_diffim"]
+env.libs["ip_diffim"] += env.getlibs("boost vw lapack wcslib cfitsio utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy security minuit afw detection")
 env.libs["ip_diffim"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") fails as lapack isn't in eups
 
 #
@@ -40,12 +40,15 @@ for d in Split("doc include/lsst/ip/diffim lib python/lsst/ip/diffim tests examp
 
 env['IgnoreFiles'] = r"(~$|\.pyc$|^\.svn$|\.o$)"
 
-Alias("install", env.Install(env['prefix'], "python"))
-Alias("install", env.Install(env['prefix'], "include"))
-Alias("install", env.Install(env['prefix'], "lib"))
-Alias("install", env.Install(env['prefix'], "pipeline"))
-Alias("install", env.Install(env['prefix'] + "/bin", glob.glob("bin/*.py")))
-Alias("install", env.InstallEups(env['prefix'] + "/ups", glob.glob("ups/*.table")))
+Alias("install", [
+    env.Install(env['prefix'], "python"),
+    env.Install(env['prefix'], "include"),
+    env.Install(env['prefix'], "lib"),
+    env.Install(env['prefix'], "pipeline"),
+    env.Install(env['prefix'] + "/bin", glob.glob("bin/*.py")),
+    env.InstallAs(os.path.join(env['prefix'], "doc", "doxygen"), os.path.join("doc", "htmlDir")),
+    env.InstallEups(os.path.join(env['prefix'], "ups"), glob.glob(os.path.join("ups", "*.table")))
+])
 
 scons.CleanTree(r"*~ core *.so *.os *.o")
 

@@ -18,12 +18,12 @@ int main() {
         ); 
     
     Difi difi(fpPtr, miPtr, miPtr);
-    Difi::PtrType difiPtr (new Difi(fpPtr, miPtr, miPtr));
+    Difi::Ptr difiPtr (new Difi(fpPtr, miPtr, miPtr));
 
-    std::vector<Difi::PtrType> difiList;
+    Difi::DifiList difiList;
     difiList.push_back(difiPtr);
 
-    Difi::PtrType difiList2 = getGoodFootprints(difiList);
+    Difi::DifiList difiList2 = getGoodFootprints(difiList);
 
     return 0;
 }

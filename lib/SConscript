@@ -1,14 +1,13 @@
 # -*- python -*-
 Import('env')
+import glob
 
 prodName = env['eups_product']
 
+srcFiles = glob.glob("../src/*.cc")
+
 env.SharedLibraryIncomplete(
     prodName,
-    ["../src/" + s for s in (
-        "ImageSubtract.cc",
-        "Pca.cc",
-        "wcsMatch.cc",
-    )],
+    srcFiles,
     LIBS=[x for x in env.getlibs(prodName) if x != prodName]
 )

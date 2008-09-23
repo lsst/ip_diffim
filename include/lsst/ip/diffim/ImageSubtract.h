@@ -67,18 +67,18 @@ namespace diffim {
     class DifferenceImageFootprintInformation : public lsst::daf::base::Persistable,
                                                 public lsst::daf::data::LsstBase {
     public:
-        typedef boost::shared_ptr<DifferenceImageFootprintInformation<ImageT, MaskT> > PtrType;
-        typedef std::vector<typename DifferenceImageFootprintInformation<ImageT, MaskT>::PtrType> difiListT;
+        typedef boost::shared_ptr<DifferenceImageFootprintInformation<ImageT, MaskT> > Ptr;
+        typedef std::vector<typename DifferenceImageFootprintInformation<ImageT, MaskT>::Ptr> DifiList;
 
-        typedef lsst::afw::image::MaskedImage<ImageT, MaskT> maskedImageType;
-        typedef boost::shared_ptr<maskedImageType> maskedImagePtrType;
+        typedef lsst::afw::image::MaskedImage<ImageT, MaskT> MaskedImage;
+        typedef boost::shared_ptr<MaskedImage> MaskedImagePtr;
 
         /* No empty constructor */
         //DifferenceImageFootprintInformation();
 
         DifferenceImageFootprintInformation(lsst::detection::Footprint::PtrType footprintPtr,
-                                            maskedImagePtrType imageToConvolvePtr,
-                                            maskedImagePtrType imageToNotConvolvePtr);
+                                            MaskedImagePtr imageToConvolvePtr,
+                                            MaskedImagePtr imageToNotConvolvePtr);
         virtual ~DifferenceImageFootprintInformation() {};
 
         void setID(int id) {_id = id;};
@@ -91,12 +91,12 @@ namespace diffim {
         /* put this functionality in the constructor */
         /*
         void setFootprintPtr(lsst::detection::Footprint::PtrType ptr) {_footprintPtr = ptr;};
-        void setImageToNotConvolvePtr(maskedImagePtrType ptr) {_imageToNotConvolvePtr = ptr;};
-        void setImageToConvolvePtr(maskedImagePtrType ptr) {_imageToConvolvePtr = ptr;};
+        void setImageToNotConvolvePtr(MaskedImagePtr ptr) {_imageToNotConvolvePtr = ptr;};
+        void setImageToConvolvePtr(MaskedImagePtr ptr) {_imageToConvolvePtr = ptr;};
         */
         lsst::detection::Footprint::PtrType getFootprintPtr() {return _footprintPtr;};
-        maskedImagePtrType getImageToNotConvolvePtr() {return _imageToNotConvolvePtr;};
-        maskedImagePtrType getImageToConvolvePtr() {return _imageToConvolvePtr;};
+        MaskedImagePtr getImageToNotConvolvePtr() {return _imageToNotConvolvePtr;};
+        MaskedImagePtr getImageToConvolvePtr() {return _imageToConvolvePtr;};
 
         void setSingleKernelPtr(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> ptr) {_singleKernelPtr = ptr;};
         boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> getSingleKernelPtr() {return _singleKernelPtr;};
@@ -128,8 +128,8 @@ namespace diffim {
         lsst::detection::Footprint::PtrType _footprintPtr;
 
         /* subimages associated with the Footprint */
-        maskedImagePtrType _imageToConvolvePtr;    /* Typically the template image */
-        maskedImagePtrType _imageToNotConvolvePtr; /* Typically the science image */
+        MaskedImagePtr _imageToConvolvePtr;    /* Typically the template image */
+        MaskedImagePtr _imageToNotConvolvePtr; /* Typically the science image */
 
         /* results from individual kernel fit */
         boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> _singleKernelPtr;
@@ -141,8 +141,8 @@ namespace diffim {
     };
     
     template <typename ImageT, typename MaskT>
-    typename DifferenceImageFootprintInformation<ImageT, MaskT>::difiListT
-    getGoodFootprints( typename DifferenceImageFootprintInformation<ImageT, MaskT>::difiListT & difiList );
+    typename DifferenceImageFootprintInformation<ImageT, MaskT>::DifiList
+    getGoodFootprints(std::vector<boost::shared_ptr<DifferenceImageFootprintInformation<ImageT, MaskT> > > & difiList );
                                                                      
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateDeltaFunctionKernelSet(
         unsigned int nCols,
