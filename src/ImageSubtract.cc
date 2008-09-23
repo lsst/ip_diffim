@@ -771,6 +771,12 @@ lsst::ip::diffim::getGoodFootprints(
     );
 
 template 
+lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>::DifiList
+lsst::ip::diffim::getGoodFootprints( 
+    std::vector<boost::shared_ptr<DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType> > > &difiList
+    );
+
+template 
 lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
