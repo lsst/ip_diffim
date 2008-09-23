@@ -75,11 +75,11 @@ lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::Difference
     _footprintPtr(footprintPtr),
     _imageToConvolvePtr(imageToConvolvePtr),
     _imageToNotConvolvePtr(imageToNotConvolvePtr),
-    _singleKernelPtr(),
+    _singleKernelPtr(), // start off NULL
     _singleKernelSum(0),
     _singleBackground(0),
-    _singleKernelStats(),
-    _isGood(true)
+    _singleKernelStats( lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>() ),
+    _isGood(false)
 {
 }
     
@@ -769,16 +769,10 @@ template class lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst
 template class lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>;
 
 //template 
-//std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::PtrType>
+//lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::difiListT
 //lsst::ip::diffim::getGoodFootprints( 
-//    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::PtrType> & difiList 
+//    lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::difiListT &difiList 
 //    );
-
-template 
-lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::difiListT
-lsst::ip::diffim::getGoodFootprints( 
-    lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::difiListT & difiList 
-    );
 
 template 
 lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(

@@ -142,12 +142,8 @@ namespace diffim {
     
     template <typename ImageT, typename MaskT>
     typename DifferenceImageFootprintInformation<ImageT, MaskT>::difiListT
-    getGoodFootprints( typename DifferenceImageFootprintInformation<ImageT,MaskT>::difiListT & difiList );
+    getGoodFootprints( typename DifferenceImageFootprintInformation<ImageT, MaskT>::difiListT & difiList );
                                                                      
-    //    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::difiPtrType> getGoodFootprints(
-    //         std::vector<DifferenceImageFootprintInformation<ImageT, MaskT>::difiPtrType> &difiList
-    //        );
-    
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateDeltaFunctionKernelSet(
         unsigned int nCols,
         unsigned int nRows

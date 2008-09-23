@@ -356,8 +356,6 @@ Notes:
     parser.add_option('-p', '--policy', default=defPolicyPath, help='policy file')
     parser.add_option('-d', '--debugIO', action='store_true', default=False,
         help='write diagnostic intermediate files')
-    parser.add_option('-s', '--switchConvolve', action='store_true', default=False,
-        help='switch which image is convolved; still detect on template')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
         help='verbosity of diagnostic trace messages; 1 for just warnings, more for more information')
     (options, args) = parser.parse_args()
@@ -386,8 +384,6 @@ Notes:
     policy = Policy.createPolicy(policyPath)
     if options.debugIO:
         policy.set('debugIO', True)
-    if options.switchConvolve:
-        policy.set('switchConvolve', True)
 
     kernelCols = policy.get('kernelCols')
     kernelRows = policy.get('kernelRows')
@@ -396,15 +392,15 @@ Notes:
         print 'Verbosity =', options.verbosity
         Trace_setVerbosity('lsst.ip.diffim', options.verbosity)
 
-    print 'foo'
     kernelBasisList = ipDiffim.generateDeltaFunctionKernelSet(kernelCols,
                                                               kernelRows)
-    print 'foo'
+
+    # lets just get a couple for debugging and speed
+    policy.set('getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints', 5)
+    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThresholdSigma', 100)
     footprintList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                                      scienceMaskedImage,
                                                                      policy)
-    print 'foo'
-
     kImage = afwImage.ImageD(kernelCols, kernelRows)
     
     convolveDifiList   = ipDiffim.DifiListD()
@@ -414,7 +410,7 @@ Notes:
         fpMin = footprintBBox.min()
         fpMax = footprintBBox.max()
         
-        Trace('lsst.ip.diffim.computePsfMatchingKernelForMaskedImage', 5,
+        Trace('lsst.ip.diffim.computePsfMatchingKernelForFootprint', 5,
               'Footprint %d = %d,%d -> %d,%d' % (footprintID,
                                                  footprintBBox.min().x(), footprintBBox.min().y(),
                                                  footprintBBox.max().x(), footprintBBox.max().y()))
@@ -422,7 +418,7 @@ Notes:
         imageStampPtr = scienceMaskedImage.getSubImage(footprintBBox)
 
         # Assuming the template is better seeing, find convolution kernel
-        convKernelCoeffList, convBackground = ipDiffim.computePsfMatchingKernelForPostageStamp(
+        convKernelCoeffList, convBackground = ipDiffim.computePsfMatchingKernelForFootprint(
             templateStampPtr.get(),
             imageStampPtr.get(),
             kernelBasisList,
@@ -432,7 +428,7 @@ Notes:
             afwMath.LinearCombinationKernel(kernelBasisList, convKernelCoeffList))
 
         # Assuming the template is better seeing, find deconvolution kernel
-        deconvKernelCoeffList, deconvBackground = ipDiffim.computePsfMatchingKernelForPostageStamp(
+        deconvKernelCoeffList, deconvBackground = ipDiffim.computePsfMatchingKernelForFootprint(
             imageStampPtr.get(),
             templateStampPtr.get(),
             kernelBasisList,
@@ -440,6 +436,10 @@ Notes:
         )
         deconvKernelPtr = afwMath.LinearCombinationKernelPtr(
             afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelCoeffList))
+
+        print type(iFootprintPtr)
+        print type(templateStampPtr)
+        print type(imageStampPtr)
         
         convDifi   = ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, templateStampPtr, imageStampPtr)
         convDifi.setId(footprintID)
@@ -447,6 +447,7 @@ Notes:
         convDifi.setRowcNorm( 0.5 * (fpMin.y() + fpMax.y()) ) 
         convDifi.setSingleKernel( convKernelPtr )
         convDifi.setSingleBackground( convBackground )
+        convDifi.setStatus( True )
         convolveDifiList.append(convDifi)
 
         deconvDifi = ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, imageStampPtr, templateStampPtr)
@@ -455,6 +456,7 @@ Notes:
         deconvDifi.setRowcNorm( 0.5 * (fpMin.y() + fpMax.y()) ) 
         deconvDifi.setSingleKernel( deconvKernelPtr )
         deconvDifi.setSingleBackground( deconvBackground )
+        deconvDifi.setStatus( True )
         deconvolveDifiList.append(deconvDifi)
 
     ipDiffim.rejectKernelOutliers(convolveDifiList, policy)
