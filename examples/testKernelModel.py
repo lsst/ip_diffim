@@ -1,5 +1,5 @@
 import sys, os, optparse
-import numpy
+import numpy, pylab
 import eups
 
 # python
@@ -13,13 +13,13 @@ from lsst.pex.logging import Trace
 from lsst.pex.policy import Policy
 
 # Temporary functions until we formalize this in the build system somewhere
-def vectorToImageD(inputVector, nCols, nRows):
+def vectorToImage(inputVector, nCols, nRows):
     assert len(inputVector) == nCols * nRows
     outputImage = afwImage.ImageD(nCols, nRows)
     nVec = 0
     for nCol in range(nCols):
         for nRow in range(nRows):
-            outputImage.set(nCol, nRow, inputVector[nVec])
+            outputImage.setVal(nCol, nRow, inputVector[nVec])
             nVec += 1
     return outputImage
 
@@ -30,9 +30,58 @@ def imageToVector(inputImage):
     nVec = 0    
     for nCol in range(nCols):
         for nRow in range(nRows):
-            outputVector[nVec] = inputImage.get(nCol, nRow)
+            outputVector[nVec] = inputImage.getVal(nCol, nRow)
             nVec += 1
     return outputVector
+
+def imageToMatrix(inputImage):
+    nCols = inputImage.getCols()
+    nRows = inputImage.getRows()
+    outputMatrix = numpy.zeros((nCols,nRows))
+    for nCol in range(nCols):
+        for nRow in range(nRows):
+            outputMatrix[nCol,nRow] = inputImage.getVal(nCol, nRow)
+    return outputMatrix
+
+def sigmaHistograms(convInfo, deconvInfo):
+    # set up plotting windows
+    # left, bottom, width, height
+    cim0  = [0.10, 0.675, 0.125, 0.125]
+    cim1  = [0.25, 0.675, 0.125, 0.125]
+    cim2  = [0.40, 0.675, 0.125, 0.125]
+    chis  = [0.55, 0.550, 0.350, 0.350]
+
+    dcim0 = [0.10, 0.225, 0.125, 0.125]
+    dcim1 = [0.25, 0.225, 0.125, 0.125]
+    dcim2 = [0.40, 0.225, 0.125, 0.125]
+    dchis = [0.55, 0.100, 0.350, 0.350]
+
+    bins   = numpy.arange(-5.0, +5.0, 0.5)
+    theory = []
+    for b in bins:
+        theory.append( numpy.exp( -0.5 * b**2 ) / numpy.sqrt(2. * numpy.pi) )
+
+    sp_cim0 = pylab.axes(cim0)
+    sp_cim0.imshow( convInfo[0], cmap=pylab.cm.gray )
+    sp_cim1 = pylab.axes(cim1)
+    sp_cim1.imshow( convInfo[1], cmap=pylab.cm.gray )
+    sp_cim2 = pylab.axes(cim2)
+    sp_cim2.imshow( convInfo[2], cmap=pylab.cm.gray )
+    sp_chis = pylab.axes(chis)
+    sp_chis.hist(convInfo[3], bins=bins, normed=True)
+    sp_chis.plot(bins, theory, 'r-')
+
+    sp_dcim0 = pylab.axes(dcim0)
+    sp_dcim0.imshow( deconvInfo[0] )
+    sp_dcim1 = pylab.axes(dcim1)
+    sp_dcim1.imshow( deconvInfo[1] )
+    sp_dcim2 = pylab.axes(dcim2)
+    sp_dcim2.imshow( deconvInfo[2] )
+    sp_dchis = pylab.axes(dchis)
+    sp_dchis.hist(deconvInfo[3], bins=bins, normed=True)
+    sp_dchis.plot(bins, theory, 'r-')
+
+    pylab.show()
 
 
 def fitSpatialFunction(spatialFunction, values, variances, col, row, policy):
@@ -196,8 +245,8 @@ def fitPca(differenceImageFootprintInformationList, policy):
         approxVectorList[i] = meanM.copy()
         
         # calculate approximate statistics
-        approxImage         = vectorToImageD(approxImageList[i],
-                                             kernelCols, kernelRows)
+        approxImage         = vectorToImage(approxImageList[i],
+                                            kernelCols, kernelRows)
         approxKernelPtr     = afwMath.KernelPtr( afwMath.Kernel(approxImage) )
         approxStatistics    = goodDifiList[i].computeImageStatistics(approxKernelPtr,
                                                                      goodDifiList[i].getSingleBackground())
@@ -226,8 +275,8 @@ def fitPca(differenceImageFootprintInformationList, policy):
             approxVectorList[i]      += eContribution
             
             # calculate approximate statistics
-            approxImage          = vectorToImageD(approxImageList[i],
-                                                  kernelCols, kernelRows)
+            approxImage          = vectorToImage(approxImageList[i],
+                                                 kernelCols, kernelRows)
             approxKernel         = afwMath.KernelPtr( afwMath.Kernel(approxImage) )
             approxStatistics     = goodDifiList[i].computeImageStatistics(approxKernelPtr,
                                                                           goodDifiList[i].getSingleBackground())
@@ -308,15 +357,15 @@ def fitSpatialPca(differenceImageFootprintInformationList, eVec, eCoefficients, 
             approxKrigingVectorList[i]  += coeffKrigingValue  * eVec[nCoeff,:]
 
             # calculate approximate statistics
-            approxFunctionImage          = vectorToImageD(approxFunctionVectorList[i],
-                                                          kernelCols, kernelRows)
+            approxFunctionImage          = vectorToImage(approxFunctionVectorList[i],
+                                                         kernelCols, kernelRows)
             approxFunctionKernelPtr      = afwMath.KernelPtr( afwMath.Kernel(approxFunctionImage) )
             approxFunctionStatistics     = goodDifiList[i].computeImageStatistics(approxFunctionKernelPtr,
                                                                                   backgroundFunctionValue)
             
             
-            approxKrigingImage           = vectorToImageD(approxKrigingVectorList[i],
-                                                          kernelCols, kernelRows)
+            approxKrigingImage           = vectorToImage(approxKrigingVectorList[i],
+                                                         kernelCols, kernelRows)
             approxKrigingKernelPtr       = afwMath.KernelPtr( afwMath.Kernel(approxKrigingImage) )
             approxKrigingStatistics      = goodDifiList[i].computeImageStatistics(approxKrigingKernel,
                                                                                   backgroundKrigingValue)
@@ -397,7 +446,7 @@ Notes:
 
     # lets just get a couple for debugging and speed
     policy.set('getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints', 5)
-    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThresholdSigma', 100)
+    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 5000.)
     footprintList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                                      scienceMaskedImage,
                                                                      policy)
@@ -437,9 +486,29 @@ Notes:
         deconvKernelPtr = afwMath.LinearCombinationKernelPtr(
             afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelCoeffList))
 
-        print type(iFootprintPtr)
-        print type(templateStampPtr)
-        print type(imageStampPtr)
+        convDiffIm   = ipDiffim.convolveAndSubtract(templateStampPtr.get(), imageStampPtr.get(), convKernelPtr, convBackground)
+        convData     = imageToVector(convDiffIm.getImage())
+        convVariance = imageToVector(convDiffIm.getVariance())
+        convMask     = imageToVector(convDiffIm.getMask())
+        convIdx      = numpy.where(convMask == 0)
+        convSigma    = convData[convIdx] / numpy.sqrt(convVariance[convIdx])
+        
+        deconvDiffIm   = ipDiffim.convolveAndSubtract(imageStampPtr.get(), templateStampPtr.get(), deconvKernelPtr, deconvBackground)
+        deconvData     = imageToVector(deconvDiffIm.getImage())
+        deconvVariance = imageToVector(deconvDiffIm.getVariance())
+        deconvMask     = imageToVector(deconvDiffIm.getMask())
+        deconvIdx      = numpy.where(deconvMask == 0)
+        deconvSigma    = deconvData[deconvIdx] / numpy.sqrt(deconvVariance[deconvIdx])
+
+        convInfo     = (imageToMatrix(templateStampPtr.getImage()),
+                        imageToMatrix(imageStampPtr.getImage()),
+                        imageToMatrix(convKernelPtr.computeNewImage(False)[0]),
+                        convSigma)
+        deconvInfo   = (imageToMatrix(imageStampPtr.getImage()),
+                        imageToMatrix(templateStampPtr.getImage()),
+                        imageToMatrix(deconvKernelPtr.computeNewImage(False)[0]),
+                        deconvSigma)
+        sigmaHistograms(convInfo, deconvInfo)
         
         convDifi   = ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, templateStampPtr, imageStampPtr)
         convDifi.setId(footprintID)
