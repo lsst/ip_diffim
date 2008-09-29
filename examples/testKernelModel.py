@@ -1,5 +1,6 @@
 import sys, os, optparse
-import numpy, pylab
+import numpy
+import plotKernel
 import eups
 
 # python
@@ -43,45 +44,6 @@ def imageToMatrix(inputImage):
             outputMatrix[nCol,nRow] = inputImage.getVal(nCol, nRow)
     return outputMatrix
 
-def sigmaHistograms(convInfo, deconvInfo):
-    # set up plotting windows
-    # left, bottom, width, height
-    cim0  = [0.10, 0.675, 0.125, 0.125]
-    cim1  = [0.25, 0.675, 0.125, 0.125]
-    cim2  = [0.40, 0.675, 0.125, 0.125]
-    chis  = [0.55, 0.550, 0.350, 0.350]
-
-    dcim0 = [0.10, 0.225, 0.125, 0.125]
-    dcim1 = [0.25, 0.225, 0.125, 0.125]
-    dcim2 = [0.40, 0.225, 0.125, 0.125]
-    dchis = [0.55, 0.100, 0.350, 0.350]
-
-    bins   = numpy.arange(-5.0, +5.0, 0.5)
-    theory = []
-    for b in bins:
-        theory.append( numpy.exp( -0.5 * b**2 ) / numpy.sqrt(2. * numpy.pi) )
-
-    sp_cim0 = pylab.axes(cim0)
-    sp_cim0.imshow( convInfo[0], cmap=pylab.cm.gray )
-    sp_cim1 = pylab.axes(cim1)
-    sp_cim1.imshow( convInfo[1], cmap=pylab.cm.gray )
-    sp_cim2 = pylab.axes(cim2)
-    sp_cim2.imshow( convInfo[2], cmap=pylab.cm.gray )
-    sp_chis = pylab.axes(chis)
-    sp_chis.hist(convInfo[3], bins=bins, normed=True)
-    sp_chis.plot(bins, theory, 'r-')
-
-    sp_dcim0 = pylab.axes(dcim0)
-    sp_dcim0.imshow( deconvInfo[0] )
-    sp_dcim1 = pylab.axes(dcim1)
-    sp_dcim1.imshow( deconvInfo[1] )
-    sp_dcim2 = pylab.axes(dcim2)
-    sp_dcim2.imshow( deconvInfo[2] )
-    sp_dchis = pylab.axes(dchis)
-    sp_dchis.hist(deconvInfo[3], bins=bins, normed=True)
-    sp_dchis.plot(bins, theory, 'r-')
-
-    pylab.show()
 
 
 def fitSpatialFunction(spatialFunction, values, variances, col, row, policy):
@@ -452,8 +414,8 @@ Notes:
                                                                      policy)
     kImage = afwImage.ImageD(kernelCols, kernelRows)
     
-    convolveDifiList   = ipDiffim.DifiListD()
-    deconvolveDifiList = ipDiffim.DifiListD()
+    convolveDifiList   = ipDiffim.DifiListF()
+    deconvolveDifiList = ipDiffim.DifiListF()
     for footprintID, iFootprintPtr in enumerate(footprintList):
         footprintBBox = iFootprintPtr.getBBox()
         fpMin = footprintBBox.min()
@@ -502,13 +464,17 @@ Notes:
 
         convInfo     = (imageToMatrix(templateStampPtr.getImage()),
                         imageToMatrix(imageStampPtr.getImage()),
+                        imageToMatrix(convDiffIm.getImage()),
                         imageToMatrix(convKernelPtr.computeNewImage(False)[0]),
                         convSigma)
         deconvInfo   = (imageToMatrix(imageStampPtr.getImage()),
                         imageToMatrix(templateStampPtr.getImage()),
+                        imageToMatrix(deconvDiffIm.getImage()),
                         imageToMatrix(deconvKernelPtr.computeNewImage(False)[0]),
                         deconvSigma)
-        sigmaHistograms(convInfo, deconvInfo)
+        plotKernel.sigmaHistograms(convInfo, deconvInfo)
+
+        print type(iFootprintPtr), type(templateStampPtr), type(imageStampPtr)
         
         convDifi   = ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, templateStampPtr, imageStampPtr)
         convDifi.setId(footprintID)

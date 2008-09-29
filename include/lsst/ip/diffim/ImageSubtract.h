@@ -70,8 +70,10 @@ namespace diffim {
         typedef boost::shared_ptr<DifferenceImageFootprintInformation<ImageT, MaskT> > Ptr;
         typedef std::vector<typename DifferenceImageFootprintInformation<ImageT, MaskT>::Ptr> DifiList;
 
+        // or boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> >
         typedef lsst::afw::image::MaskedImage<ImageT, MaskT> MaskedImage;
         typedef boost::shared_ptr<MaskedImage> MaskedImagePtr;
+
 
         /* No empty constructor */
         //DifferenceImageFootprintInformation();
