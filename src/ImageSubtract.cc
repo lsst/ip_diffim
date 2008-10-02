@@ -54,10 +54,29 @@ lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStati
     MaskT badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
 
     lsst::ip::diffim::calculateMaskedImageStatistics(nGood, mean, variance, differenceMaskedImage, badPixelMask);
-    _residualMean = mean;
-    _residualVariance = variance;
+    this->_residualMean = mean;
+    this->_residualVariance = variance;
 }
-        
+
+/* empty constructor 
+template <typename ImageT, typename MaskT>
+lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::DifferenceImageFootprintInformation() :
+    lsst::daf::data::LsstBase(typeid(this)),
+    _id(-1),
+    _colcNorm(0),
+    _rowcNorm(0),
+    _footprintPtr(),
+    _imageToConvolvePtr(),
+    _imageToNotConvolvePtr(),
+    _singleKernelPtr(), // start off NULL
+    _singleKernelSum(0),
+    _singleBackground(0),
+    _singleKernelStats( lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>() ),
+    _isGood(false)
+{
+}
+*/
+
 template <typename ImageT, typename MaskT>
 lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::DifferenceImageFootprintInformation(
     lsst::detection::Footprint::PtrType footprintPtr,

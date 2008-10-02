@@ -16,7 +16,7 @@ from lsst.pex.policy import Policy
 # Temporary functions until we formalize this in the build system somewhere
 def vectorToImage(inputVector, nCols, nRows):
     assert len(inputVector) == nCols * nRows
-    outputImage = afwImage.ImageD(nCols, nRows)
+    outputImage = afwImage.ImageF(nCols, nRows)
     nVec = 0
     for nCol in range(nCols):
         for nRow in range(nRows):
@@ -44,6 +44,54 @@ def imageToMatrix(inputImage):
             outputMatrix[nCol,nRow] = inputImage.getVal(nCol, nRow)
     return outputMatrix
 
+def rejectKernelOutliers(difiList, policy):
+    # Compare kernel sums; things that are bad (e.g. variable stars, moving objects, cosmic rays)
+    # will have a kernel sum far from the mean; reject these.
+    maxOutlierIterations = policy.get('lsst.ip.diffim.rejectKernelOutliers').get('maxOutlierIterations')
+    maxOutlierSigma      = policy.get('lsst.ip.diffim.rejectKernelOutliers').get('maxOutlierSigma')
+
+    # So are we using pexLog.Trace or pexLog.Log
+    logging.Trace('lsst.ip.diffim.rejectKernelOutliers', 3,
+                  'Rejecting kernels with deviant kSums');
+    
+    for nIter in xrange(maxOutlierIterations):
+        goodDifiList = difiList.getGoodFootprints()
+        nFootprint   = len(goodDifiList)
+
+        if nFootprint == 0:
+            raise pex_ex.LsstOutOfRange('No good kernels found')
+
+        ksumVector    = afwMath.Vector(nFootprint)
+        for i in range(nFootprint):
+            ksumVector[i] = goodDifiList[i].getSingleKernel().getKernelSum()
+
+        ksumMean = ksumVector.mean()
+        ksumStd  = ksumVector.std()
+
+        # reject kernels with aberrent statistics
+        numRejected = 0
+        for i in range(nFootprint):
+            if afwMath.fabs( (ksumVector[i]-ksumMean)/ksumStd ) > maxOutlierSigma:
+                goodDifiList[i].setIsGood(False)
+                numRejected += 1
+
+                diffImLog.log(Log.INFO,
+                              '# Kernel %d (kSum=%.3f) REJECTED due to bad kernel sum (mean=%.3f, std=%.3f)' %
+                              (goodDifiList[i].getID(), ksumVector[i], ksumMean, ksumStd)
+                              )
+                
+        diffImLog.log(Log.INFO,
+                      'Kernel Sum Iteration %d, rejected %d kernels : Kernel Sum = %0.3f (%0.3f)' %
+                      (nIter, numRejected, ksumMean, ksumStd)
+                      )
+
+        if numRejected == 0:
+            break
+
+    if nIter == (maxOutlierIterations-1) and numRejected != 0:
+        diffImLog.log(Log.WARN,
+                      'Detection of kernels with deviant kSums reached its limit of %d iterations'
+                      (maxOutlierIterations))
 
 
 def fitSpatialFunction(spatialFunction, values, variances, col, row, policy):
@@ -152,8 +200,8 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
     # new kernel, then difference image, the calculate difference
     # image stats
     for i in range(nFootprint):
-        kFunctionImage  = afwImage.ImageD(kernelCols, kernelRows)
-        kKrigingImage   = afwImage.ImageD(kernelCols, kernelRows)
+        kFunctionImage  = afwImage.ImageF(kernelCols, kernelRows)
+        kKrigingImage   = afwImage.ImageF(kernelCols, kernelRows)
 
         functionBackgroundValue = backgroundFunctionFit.eval(footprintExposureCol[i], footprintExposureRow[i])
         krigingBackgroundValue  = backgroundKrigingFit.eval(footprintExposureCol[i], footprintExposureRow[i])
@@ -201,7 +249,7 @@ def fitPca(differenceImageFootprintInformationList, policy):
     ipDiffim.computePca(meanM, eVal, eVec, M, True)
 
     # the values of the PCA-approximated kernels
-    approxVectorList = VectorListD(nFootprint)
+    approxVectorList = VectorListF(nFootprint)
     for i in range(nFootprint):
         # start with the mean kernel
         approxVectorList[i] = meanM.copy()
@@ -286,8 +334,8 @@ def fitSpatialPca(differenceImageFootprintInformationList, eVec, eCoefficients, 
                                        footprintExposureRow)
 
     # the values of the spatially-approximated kernels
-    approxFunctionVectorList = VectorListD(nFootprint)
-    approxKrigingVectorList  = VectorListD(nFootprint)
+    approxFunctionVectorList = VectorListF(nFootprint)
+    approxKrigingVectorList  = VectorListF(nFootprint)
     for i in range(nFootprint):
         # start with the mean kernel
         approxFunctionVectorList[i] = meanM.copy()
@@ -401,21 +449,21 @@ Notes:
     
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
-        Trace_setVerbosity('lsst.ip.diffim', options.verbosity)
+        Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
     kernelBasisList = ipDiffim.generateDeltaFunctionKernelSet(kernelCols,
                                                               kernelRows)
 
     # lets just get a couple for debugging and speed
     policy.set('getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints', 5)
-    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 5000.)
+    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 6350.)
     footprintList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                                      scienceMaskedImage,
                                                                      policy)
     kImage = afwImage.ImageD(kernelCols, kernelRows)
     
-    convolveDifiList   = ipDiffim.DifiListF()
-    deconvolveDifiList = ipDiffim.DifiListF()
+    convolveDifiPtrList   = ipDiffim.DifiPtrListF()
+    deconvolveDifiPtrList = ipDiffim.DifiPtrListF()
     for footprintID, iFootprintPtr in enumerate(footprintList):
         footprintBBox = iFootprintPtr.getBBox()
         fpMin = footprintBBox.min()
@@ -449,6 +497,10 @@ Notes:
             afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelCoeffList))
 
         convDiffIm   = ipDiffim.convolveAndSubtract(templateStampPtr.get(), imageStampPtr.get(), convKernelPtr, convBackground)
+        print type(convDiffIm), dir(convDiffIm)
+        foo = convDiffIm.getImage().get()
+        print foo
+        
         convData     = imageToVector(convDiffIm.getImage())
         convVariance = imageToVector(convDiffIm.getVariance())
         convMask     = imageToVector(convDiffIm.getMask())
@@ -472,40 +524,43 @@ Notes:
                         imageToMatrix(deconvDiffIm.getImage()),
                         imageToMatrix(deconvKernelPtr.computeNewImage(False)[0]),
                         deconvSigma)
-        plotKernel.sigmaHistograms(convInfo, deconvInfo)
+        if False:
+            plotKernel.sigmaHistograms(convInfo, deconvInfo)
 
-        print type(iFootprintPtr), type(templateStampPtr), type(imageStampPtr)
-        
-        convDifi   = ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, templateStampPtr, imageStampPtr)
-        convDifi.setId(footprintID)
-        convDifi.setColcNorm( 0.5 * (fpMin.x() + fpMax.x()) ) # or can i use footprint.center or something?
-        convDifi.setRowcNorm( 0.5 * (fpMin.y() + fpMax.y()) ) 
-        convDifi.setSingleKernel( convKernelPtr )
-        convDifi.setSingleBackground( convBackground )
-        convDifi.setStatus( True )
-        convolveDifiList.append(convDifi)
+        convDifiPtr   = ipDiffim.DifiPtrF(
+            ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, templateStampPtr, imageStampPtr)
+            ) 
+        convDifiPtr.setID(footprintID)
+        convDifiPtr.setColcNorm( 0.5 * (fpMin.x() + fpMax.x()) ) # or can i use footprint.center or something?
+        convDifiPtr.setRowcNorm( 0.5 * (fpMin.y() + fpMax.y()) ) 
+        convDifiPtr.setSingleKernelPtr( convKernelPtr )
+        convDifiPtr.setSingleBackground( convBackground )
+        convDifiPtr.setStatus( True )
+        convolveDifiPtrList.append(convDifiPtr)
 
-        deconvDifi = ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, imageStampPtr, templateStampPtr)
-        deconvDifi.setId(footprintID)
-        deconvDifi.setColcNorm( 0.5 * (fpMin.x() + fpMax.x()) )
-        deconvDifi.setRowcNorm( 0.5 * (fpMin.y() + fpMax.y()) ) 
-        deconvDifi.setSingleKernel( deconvKernelPtr )
-        deconvDifi.setSingleBackground( deconvBackground )
-        deconvDifi.setStatus( True )
-        deconvolveDifiList.append(deconvDifi)
+        deconvDifiPtr = ipDiffim.DifiPtrF(
+            ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, imageStampPtr, templateStampPtr)
+            )
+        deconvDifiPtr.setID(footprintID)
+        deconvDifiPtr.setColcNorm( 0.5 * (fpMin.x() + fpMax.x()) )
+        deconvDifiPtr.setRowcNorm( 0.5 * (fpMin.y() + fpMax.y()) ) 
+        deconvDifiPtr.setSingleKernelPtr( deconvKernelPtr )
+        deconvDifiPtr.setSingleBackground( deconvBackground )
+        deconvDifiPtr.setStatus( True )
+        deconvolveDifiPtrList.append(deconvDifiPtr)
 
-    ipDiffim.rejectKernelOutliers(convolveDifiList, policy)
-    ipDiffim.rejectKernelOutliers(deconvolveDifiList, policy)
+    rejectKernelOutliers(convolveDifiPtrList, policy)
+    rejectKernelOutliers(deconvolveDifiPtrList, policy)
 
     # now we get to the good stuff!
-    convResiduals1   = fitPerPixel(convolveDifiList, policy)
-    deconvResiduals1 = fitPerPixel(deconvolveDifiList, policy)
+    convResiduals1   = fitPerPixel(convolveDifiPtrList, policy)
+    deconvResiduals1 = fitPerPixel(deconvolveDifiPtrList, policy)
 
-    convEVec, convECoeffs     = fitPca(convolveDifiList, policy)
-    deconvEVec, deconvECoeffs = fitPca(deconvolveDifiList, policy)
+    convEVec, convECoeffs     = fitPca(convolveDifiPtrList, policy)
+    deconvEVec, deconvECoeffs = fitPca(deconvolveDifiPtrList, policy)
 
-    convResiduals2   = fitSpatialPca(convolveDifiList, convEVec, convECoeffs, policy)
-    deconvResiduals2 = fitSpatialPca(deconvolveDifiList, deconvEVec, deconvECoeffs, policy)
+    convResiduals2   = fitSpatialPca(convolveDifiPtrList, convEVec, convECoeffs, policy)
+    deconvResiduals2 = fitSpatialPca(deconvolveDifiPtrList, deconvEVec, deconvECoeffs, policy)
 
 def run():
     Log.getDefaultLog()                 # leaks a DataProperty

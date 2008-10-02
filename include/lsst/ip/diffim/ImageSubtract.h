@@ -71,9 +71,10 @@ namespace diffim {
         typedef std::vector<typename DifferenceImageFootprintInformation<ImageT, MaskT>::Ptr> DifiList;
 
         // or boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> >
-        typedef lsst::afw::image::MaskedImage<ImageT, MaskT> MaskedImage;
-        typedef boost::shared_ptr<MaskedImage> MaskedImagePtr;
-
+        /* SWIG DOES NOT LIKE BELOW */
+        //typedef lsst::afw::image::MaskedImage<ImageT, MaskT> MaskedImage;
+        //typedef boost::shared_ptr<MaskedImage> MaskedImagePtr;
+        typedef boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > MaskedImagePtr; 
 
         /* No empty constructor */
         //DifferenceImageFootprintInformation();
@@ -91,11 +92,10 @@ namespace diffim {
         double getRowcNorm() {return _rowcNorm;};
 
         /* put this functionality in the constructor */
-        /*
-        void setFootprintPtr(lsst::detection::Footprint::PtrType ptr) {_footprintPtr = ptr;};
-        void setImageToNotConvolvePtr(MaskedImagePtr ptr) {_imageToNotConvolvePtr = ptr;};
-        void setImageToConvolvePtr(MaskedImagePtr ptr) {_imageToConvolvePtr = ptr;};
-        */
+        //void setFootprintPtr(lsst::detection::Footprint::PtrType ptr) {_footprintPtr = ptr;};
+        //void setImageToNotConvolvePtr(MaskedImagePtr ptr) {_imageToNotConvolvePtr = ptr;};
+        //void setImageToConvolvePtr(MaskedImagePtr ptr) {_imageToConvolvePtr = ptr;};
+
         lsst::detection::Footprint::PtrType getFootprintPtr() {return _footprintPtr;};
         MaskedImagePtr getImageToNotConvolvePtr() {return _imageToNotConvolvePtr;};
         MaskedImagePtr getImageToConvolvePtr() {return _imageToConvolvePtr;};

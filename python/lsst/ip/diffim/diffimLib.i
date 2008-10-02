@@ -8,26 +8,36 @@ Python bindings for lsst::ip::diffim code
 %feature("autodoc", "1");
 %module(docstring=diffimLib_DOCSTRING) diffimLib
 
-// Everything we will need in the _wrap.cc file
+/* Everything needed in the _wrap.cc file */
 %{
 #include <lsst/ip/diffim/ImageSubtract.h>
 #include <lsst/ip/diffim/wcsMatch.h>
 #include <lsst/ip/diffim/Pca.h>
 %}
 
+/* Remove warnings */
+/* Nothing known about 'boost::bad_any_cast' */
+namespace boost {
+    class bad_any_cast; 
+}
+
 %init %{
 %}
 
-namespace boost {
-    class bad_any_cast; // remove warning: Nothing known about 'boost::bad_any_cast'
-}
-
-// Everything whose bindings we will have to know about
-%include "lsst/p_lsstSwig.i"    // this needs to go first otherwise i do not know about e.g. boost
+/* Everything whose bindings are needed in the wrapper */
+%include "lsst/p_lsstSwig.i"                // this needs to go first otherwise i do not know about e.g. boost
 %include "lsst/afw/image/lsstImageTypes.i"  // vw and Image/Mask types and typedefs
 %include "lsst/detection/detectionLib.i"    // need for FootprintContainerT
 
-// handle C++ arguments that should be outputs in python
+/* "import" external header files that have typedefs and class definitions we need */
+%import "lsst/afw/image/MaskedImage.h"
+/* I REALLY SHOULD NOT NEED THIS! */
+%template(MaskedImageF) lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType>;
+
+/* instead this should work, but it doesn't... */
+ //%import "lsst/afw/image/imageLib.i" 
+
+/* handle C++ arguments that should be outputs in python */
 %apply int& OUTPUT { int& };
 %apply float& OUTPUT { float& };
 %apply double& OUTPUT { double& };
@@ -39,7 +49,8 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 
 %}
 
-// Here you give the names of the functions you want to Swig
+/* Here you give the names of the functions you want to wrap */
+/* "include" your header files here */
 
 /*******************/
 /* ImageSubtract.h */
@@ -52,16 +63,10 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 
 %template(DifferenceImageFootprintInformationF)  
     lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>;
-
 %boost_shared_ptr(DifiPtrF, 
                   lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>);
-%boost_shared_ptr(DifiPtrD, 
-                  lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>);
-
-%template(DifiListF)
+%template(DifiPtrListF)
     std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::Ptr>;
-%template(DifiListD)
-    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>::Ptr>;
 
 /* subroutines */
 %template(getGoodFootprints)
