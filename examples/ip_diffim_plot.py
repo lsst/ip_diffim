@@ -11,6 +11,29 @@ def scaleImageForDisplay_nonlinear(indata, nonlinearity=2.0):
 def scaleImageForDisplay_log10(indata):
     return numpy.log10(indata)
 
+def plotBackground(backgroundFunction, cols, rows, nbins=100):
+    print backgroundFunction.toString()
+    background = numpy.zeros((nbins,nbins))
+    for yi in range(nbins):
+        yidx = -1 + yi * 0.5 / nbins
+
+        for xi in range(nbins):
+            xidx = -1 + xi * 0.5 / nbins
+
+            background[yi][xi] = backgroundFunction(xidx, yidx)
+
+    sp_bg = pylab.subplot(111)
+    im = sp_bg.imshow(background,
+                      cmap=pylab.cm.jet,
+                      origin='lower',
+                      aspect=2.0,
+                      extent=[-1, 1, -1, 1])
+    sp_bg.plot(cols, rows, 'kx')
+    sp_bg.axhline(y=0, c='k', linestyle='--')
+    sp_bg.axvline(x=0, c='k', linestyle='--')
+    pylab.colorbar(im)
+    pylab.show()
+
 def sigmaHistograms(convInfo, deconvInfo, fontsize=10):
     pylab.clf()
     

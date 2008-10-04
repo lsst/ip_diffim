@@ -6,7 +6,7 @@ Python bindings for lsst::ip::diffim code
 %enddef
 
 %feature("autodoc", "1");
-%module(docstring=diffimLib_DOCSTRING) diffimLib
+%module(docstring=diffimLib_DOCSTRING, package="lsst.ip.diffim") diffimLib
 
 /* Everything needed in the _wrap.cc file */
 %{
@@ -29,13 +29,8 @@ namespace boost {
 %include "lsst/afw/image/lsstImageTypes.i"  // vw and Image/Mask types and typedefs
 %include "lsst/detection/detectionLib.i"    // need for FootprintContainerT
 
-/* "import" external header files that have typedefs and class definitions we need */
-%import "lsst/afw/image/MaskedImage.h"
-/* I REALLY SHOULD NOT NEED THIS! */
-%template(MaskedImageF) lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType>;
-
-/* instead this should work, but it doesn't... */
- //%import "lsst/afw/image/imageLib.i" 
+/* Everything whose bindings we need to know about but not wrap, e.g. MaskedImageF */
+%import "lsst/afw/image/imageLib.i" 
 
 /* handle C++ arguments that should be outputs in python */
 %apply int& OUTPUT { int& };

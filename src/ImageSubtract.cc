@@ -91,7 +91,6 @@ lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::Difference
     _imageToConvolvePtr(imageToConvolvePtr),
     _imageToNotConvolvePtr(imageToNotConvolvePtr),
     _singleKernelPtr(), // start off NULL
-    _singleKernelSum(0),
     _singleBackground(0),
     _singleKernelStats( lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>() ),
     _isGood(false)

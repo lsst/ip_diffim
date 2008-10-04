@@ -1,6 +1,6 @@
 import sys, os, optparse
 import numpy
-import plotKernel
+import ip_diffim_plot
 import eups
 
 # python
@@ -13,7 +13,12 @@ from lsst.pex.logging import Log
 from lsst.pex.logging import Trace
 from lsst.pex.policy import Policy
 
+DOKRIGING = False
+
 # Temporary functions until we formalize this in the build system somewhere
+
+### NOTE THESE ARE ALSO IN lsst.afw.image.testUtils
+### Which to use?
 def vectorToImage(inputVector, nCols, nRows):
     assert len(inputVector) == nCols * nRows
     outputImage = afwImage.ImageF(nCols, nRows)
@@ -47,23 +52,24 @@ def imageToMatrix(inputImage):
 def rejectKernelOutliers(difiList, policy):
     # Compare kernel sums; things that are bad (e.g. variable stars, moving objects, cosmic rays)
     # will have a kernel sum far from the mean; reject these.
+    
     maxOutlierIterations = policy.get('lsst.ip.diffim.rejectKernelOutliers').get('maxOutlierIterations')
     maxOutlierSigma      = policy.get('lsst.ip.diffim.rejectKernelOutliers').get('maxOutlierSigma')
 
     # So are we using pexLog.Trace or pexLog.Log
-    logging.Trace('lsst.ip.diffim.rejectKernelOutliers', 3,
-                  'Rejecting kernels with deviant kSums');
+    Trace('lsst.ip.diffim.rejectKernelOutliers', 3,
+          'Rejecting kernels with deviant kSums');
     
     for nIter in xrange(maxOutlierIterations):
-        goodDifiList = difiList.getGoodFootprints()
+        goodDifiList = ipDiffim.getGoodFootprints(difiList)
         nFootprint   = len(goodDifiList)
 
         if nFootprint == 0:
             raise pex_ex.LsstOutOfRange('No good kernels found')
 
-        ksumVector    = afwMath.Vector(nFootprint)
+        ksumVector    = numpy.zeros(nFootprint)
         for i in range(nFootprint):
-            ksumVector[i] = goodDifiList[i].getSingleKernel().getKernelSum()
+            ksumVector[i] = goodDifiList[i].getSingleKernelPtr().computeNewImage(False)[1]
 
         ksumMean = ksumVector.mean()
         ksumStd  = ksumVector.std()
@@ -71,32 +77,44 @@ def rejectKernelOutliers(difiList, policy):
         # reject kernels with aberrent statistics
         numRejected = 0
         for i in range(nFootprint):
-            if afwMath.fabs( (ksumVector[i]-ksumMean)/ksumStd ) > maxOutlierSigma:
+            if numpy.fabs( (ksumVector[i]-ksumMean)/ksumStd ) > maxOutlierSigma:
                 goodDifiList[i].setIsGood(False)
                 numRejected += 1
 
-                diffImLog.log(Log.INFO,
-                              '# Kernel %d (kSum=%.3f) REJECTED due to bad kernel sum (mean=%.3f, std=%.3f)' %
-                              (goodDifiList[i].getID(), ksumVector[i], ksumMean, ksumStd)
-                              )
-                
-        diffImLog.log(Log.INFO,
-                      'Kernel Sum Iteration %d, rejected %d kernels : Kernel Sum = %0.3f (%0.3f)' %
-                      (nIter, numRejected, ksumMean, ksumStd)
+                Trace('lsst.ip.diffim.rejectKernelOutliers', 5,
+                      '# Kernel %d (kSum=%.3f) REJECTED due to bad kernel sum (mean=%.3f, std=%.3f)' %
+                      (goodDifiList[i].getID(), ksumVector[i], ksumMean, ksumStd)
                       )
+                
+        Trace('lsst.ip.diffim.rejectKernelOutliers', 3,
+              'Kernel Sum Iteration %d, rejected %d kernels : Kernel Sum = %0.3f (%0.3f)' %
+              (nIter, numRejected, ksumMean, ksumStd)
+              )
 
         if numRejected == 0:
             break
 
     if nIter == (maxOutlierIterations-1) and numRejected != 0:
-        diffImLog.log(Log.WARN,
-                      'Detection of kernels with deviant kSums reached its limit of %d iterations'
-                      (maxOutlierIterations))
+        Trace('lsst.ip.diffim.rejectKernelOutliers', 1,
+              'Detection of kernels with deviant kSums reached its limit of %d iterations'
+              (maxOutlierIterations)
+              )
 
+
+    # final loop to report values
+    goodDifiList = ipDiffim.getGoodFootprints(difiList)
+    nFootprint   = len(goodDifiList)
+    ksumVector   = numpy.zeros(nFootprint)
+    for i in range(nFootprint):
+        ksumVector[i] = goodDifiList[i].getSingleKernelPtr().computeNewImage(False)[1]
+    ksumMean = ksumVector.mean()
+    ksumStd  = ksumVector.std()
+    Trace('lsst.ip.diffim.rejectKernelOutliers', 5,
+          'Kernel Sum : %0.3f +/- %0.3f, %d kernels' % (ksumMean, ksumStd, nFootprint));
 
 def fitSpatialFunction(spatialFunction, values, variances, col, row, policy):
-    nSigmaSq = policy.get('afwMath.minimize.nSigmaSq')
-    stepsize = policy.get('afwMath.minimize.stepsize')
+    nSigmaSq = policy.get('lsst.afw.math.minimize.nSigmaSq')
+    stepsize = policy.get('lsst.afw.math.minimize.stepsize')
 
     # initialize fit parameters
     nParameters   = spatialFunction.getNParameters()
@@ -112,24 +130,27 @@ def fitSpatialFunction(spatialFunction, values, variances, col, row, policy):
                                      col,
                                      row,
                                      nSigmaSq)
+    if not spatialFit.isValid:
+        # throw exception
+        pass
+
     return spatialFit
     
 
 def fitKriging(values, variances, col, row, policy):
-    import sgems
-    
     return
 
+
 def fitPerPixel(differenceImageFootprintInformationList, policy):
-    kernelSpatialOrder     = policy.get('kernelSpatialOrder')
-    kernelSpatialFunction  = afwMath.PolynomialFunction2D(kernelSpatialOrder)
-    backgroundSpatialOrder = policy.get('backgroundSpatialOrder')
-    backgroundFunction     = afwMath.PolynomialFunction2D(backgroundSpatialOrder)
-    kernelCols             = policy.get('kernelCols')
-    kernelRows             = policy.get('kernelRows')
+    kernelSpatialOrder        = policy.get('kernelSpatialOrder')
+    kernelSpatialFunction     = afwMath.PolynomialFunction2D(kernelSpatialOrder)
+    backgroundSpatialOrder    = policy.get('backgroundSpatialOrder')
+    backgroundSpatialFunction = afwMath.PolynomialFunction2D(backgroundSpatialOrder)
+    kernelCols                = policy.get('kernelCols')
+    kernelRows                = policy.get('kernelRows')
 
     # how many good footprints are we dealing with here
-    goodDifiList = ipDiffim.getGoodFootprints()
+    goodDifiList = ipDiffim.getGoodFootprints(differenceImageFootprintInformationList)
     nFootprint   = len(goodDifiList)
 
     # common to all spatial fits
@@ -140,45 +161,8 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
     for i in range(nFootprint):
         footprintExposureCol[i] = goodDifiList[i].getColcNorm()
         footprintExposureRow[i] = goodDifiList[i].getRowcNorm()
-        footprintVariances[i]   = goodDifiList[i].getSingleStats().getFootprintResidualVariance()
-    
-    # fit each pixel
-    functionFitList = []
-    krigingFitList  = []
-    
-    for kCol in range(kernelCols):
-        for kRow in range(kernelRows):
+        footprintVariances[i]   = goodDifiList[i].getSingleStats().getResidualVariance()
 
-            #######
-            # initialize vectors, one per good kernel
-            
-            kernelValues = numpy.zeros(nFootprint)
-            for i in range(nFootprint):
-                singleKernel       = goodDifiList[i].getSingleKernel()
-                kernelValues[i]    = singleKernel.getImage().get(kCol, kRow)
-                    
-            # initialize vectors, one per good kernel
-            #######
-            # do the various fitting techniques here
-
-            functionFit = fitSpatialFunction(kernelSpatialFunction,
-                                             kernelValues,
-                                             footprintVariances,
-                                             footprintExposureCol,
-                                             footprintExposureRow)
-            
-            krigingFit  = fitKriging(kernelValues,
-                                     footprintVariances,
-                                     footprintExposureCol,
-                                     footprintExposureRow)
-
-            functionFitList.append(functionFit)
-            krigingFitList.append(krigingFit)
-
-            # anything else?
-            
-            # do the various fitting techniques here
-            #######
 
     # fit the background
     backgroundValues    = numpy.zeros(nFootprint)
@@ -189,22 +173,86 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
                                                backgroundValues,
                                                footprintVariances,
                                                footprintExposureCol,
-                                               footprintExposureRow)
-    backgroundKrigingFit  = fitKriging(backgroundValues,
-                                       footprintVariances,
-                                       footprintExposureCol,
-                                       footprintExposureRow)
+                                               footprintExposureRow,
+                                               policy)
+    backgroundSpatialFunction.setParameters(backgroundFunctionFit.parameterList)
 
+    # plot background!
+    if True:
+        print footprintExposureCol
+        print footprintExposureRow
+        print backgroundValues
+        print footprintVariances
+        
+        ip_diffim_plot.plotBackground(backgroundSpatialFunction, footprintExposureCol, footprintExposureRow)
+        
+    
+    if DOKRIGING:
+        backgroundKrigingFit  = fitKriging(backgroundValues,
+                                           footprintVariances,
+                                           footprintExposureCol,
+                                           footprintExposureRow,
+                                           policy)
+
+
+    
+    # fit each pixel
+    functionFitList = []
+    if DOKRIGING:
+        krigingFitList  = []
+    
+    # pre-calculate each kernel's image
+    # A VECTOR OF IMAGES IS NOT DEFINED IN IMAGELIB.i
+    # for now calculate inside the loop below
+    
+    for kCol in range(kernelCols):
+        for kRow in range(kernelRows):
+
+            #######
+            # initialize vectors, one per good kernel
+            
+            kernelValues = numpy.zeros(nFootprint)
+            for i in range(nFootprint):
+                singleKernelPtr    = goodDifiList[i].getSingleKernelPtr()
+                kernelValues[i]    = singleKernelPtr.computeNewImage(False)[0].getVal(kCol, kRow)
+                    
+            # initialize vectors, one per good kernel
+            #######
+            # do the various fitting techniques here
+
+            functionFit = fitSpatialFunction(kernelSpatialFunction,
+                                             kernelValues,
+                                             footprintVariances,
+                                             footprintExposureCol,
+                                             footprintExposureRow,
+                                             policy)
+            kernelSpatialFunction.setParameters(functionFit.parameterList)
+            functionFitList.append(kernelSpatialFunction)
+
+            if DOKRIGING:
+                krigingFit  = fitKriging(kernelValues,
+                                         footprintVariances,
+                                         footprintExposureCol,
+                                         footprintExposureRow,
+                                         policy)
+                krigingFitList.append(krigingFit)
+
+
+            # anything else?
+            
+            # do the various fitting techniques here
+            #######
 
     # evaluate all the fits at the positions of the objects, create a
     # new kernel, then difference image, the calculate difference
     # image stats
     for i in range(nFootprint):
         kFunctionImage  = afwImage.ImageF(kernelCols, kernelRows)
-        kKrigingImage   = afwImage.ImageF(kernelCols, kernelRows)
-
-        functionBackgroundValue = backgroundFunctionFit.eval(footprintExposureCol[i], footprintExposureRow[i])
-        krigingBackgroundValue  = backgroundKrigingFit.eval(footprintExposureCol[i], footprintExposureRow[i])
+        functionBackgroundValue = backgroundSpatialFunction(footprintExposureCol[i], footprintExposureRow[i])
+        
+        if DOKRIGING:
+            kKrigingImage   = afwImage.ImageF(kernelCols, kernelRows)
+            krigingBackgroundValue  = backgroundKrigingFit.eval(footprintExposureCol[i], footprintExposureRow[i])
 
         # the *very* slow way to do this is to create a
         # LinearCombinationKernel that is of size kernelCols x
@@ -212,17 +260,21 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
         # *not* do that for now...
         for kCol in range(kernelCols):
             for kRow in range(kernelRows):
-                functionValue   = functionList[i].eval(footprintExposureCol[i], footprintExposureRow[i])
-                krigingValue    = krigingList[i].eval(footprintExposureCol[i],  footprintExposureRow[i])
-                
+                functionValue   = functionFitList[i](footprintExposureCol[i], footprintExposureRow[i])
                 kFunctionImage.set(kCol, kRow, functionValue)
-                kKrigingImage.set(kCol, kRow, krigingValue)
+                
+                if DOKRIGING:
+                    krigingValue    = krigingList[i].eval(footprintExposureCol[i],  footprintExposureRow[i])
+                    kKrigingImage.set(kCol, kRow, krigingValue)
+                
     
-        functionKernelPtr = afwMath.KernelPtr( afwMath.Kernel(kFunctionImage) )
-        krigingKernelPtr  = afwMath.KernelPtr( afwMath.Kernel(kKrigingImage) )
-
+        functionKernelPtr = afwMath.KernelPtr( afwMath.FixedKernel(kFunctionImage) )
         functionStatistics = goodDifiList[i].computeImageStatistics(functionKernelPtr, functionBackgroundValue)
-        krigingStatistics  = goodDifiList[i].computeImageStatistics(krigingKernelPtr,  krigingBackgroundValue)
+        
+        if DOKRIGING:
+            krigingKernelPtr  = afwMath.KernelPtr( afwMath.FixedKernel(kKrigingImage) )
+            krigingStatistics  = goodDifiList[i].computeImageStatistics(krigingKernelPtr,  krigingBackgroundValue)
+
 
 
 
@@ -232,13 +284,13 @@ def fitPca(differenceImageFootprintInformationList, policy):
     kernelRows = policy.get('kernelRows')
     
     # how many good footprints are we dealing with here
-    goodDifiList = ipDiffim.getGoodFootprints()
+    goodDifiList = ipDiffim.getGoodFootprints(differenceImageFootprintInformationList)
     nFootprint   = len(goodDifiList)
 
     # matrix to invert
     M = numpy.zeros(kernelCols*kernelRows, nFootprint)
     for i in range(nFootprint):
-        singleKernelImage  = goodDifiList[i].getSingleKernel().getImage()
+        singleKernelImage  = goodDifiList[i].getSingleKernelPtr().computeNewImage(False)[0]
         singleKernelVector = imageToVector(singleKernelImage)
         M[:,i]             = singleKernelVector
         
@@ -257,7 +309,7 @@ def fitPca(differenceImageFootprintInformationList, policy):
         # calculate approximate statistics
         approxImage         = vectorToImage(approxImageList[i],
                                             kernelCols, kernelRows)
-        approxKernelPtr     = afwMath.KernelPtr( afwMath.Kernel(approxImage) )
+        approxKernelPtr     = afwMath.KernelPtr( afwMath.FixedKernel(approxImage) )
         approxStatistics    = goodDifiList[i].computeImageStatistics(approxKernelPtr,
                                                                      goodDifiList[i].getSingleBackground())
         
@@ -270,7 +322,7 @@ def fitPca(differenceImageFootprintInformationList, policy):
     # now iterate over all footprints and increment the approximate
     # kernel with eigenKernels
     for i in range(nFootprint):
-        singleKernelImage   = goodDifiList[i].getSingleKernel().getImage()
+        singleKernelImage   = goodDifiList[i].getSingleKernelPtr().computeNewImage(False)[0]
         singleKernelVector  = imageToVector(singleKernelImage)
 
         # subtract off mean for dot products        
@@ -287,7 +339,7 @@ def fitPca(differenceImageFootprintInformationList, policy):
             # calculate approximate statistics
             approxImage          = vectorToImage(approxImageList[i],
                                                  kernelCols, kernelRows)
-            approxKernel         = afwMath.KernelPtr( afwMath.Kernel(approxImage) )
+            approxKernel         = afwMath.KernelPtr( afwMath.FixedKernel(approxImage) )
             approxStatistics     = goodDifiList[i].computeImageStatistics(approxKernelPtr,
                                                                           goodDifiList[i].getSingleBackground())
 
@@ -305,7 +357,7 @@ def fitSpatialPca(differenceImageFootprintInformationList, eVec, eCoefficients, 
     kernelRows = policy.get('kernelRows')
 
     # how many good footprints are we dealing with here
-    goodDifiList  = ipDiffim.getGoodFootprints()
+    goodDifiList  = ipDiffim.getGoodFootprints(differenceImageFootprintInformationList)
     nFootprint    = len(goodDifiList)
     nCoefficients = nFootprint
 
@@ -316,7 +368,7 @@ def fitSpatialPca(differenceImageFootprintInformationList, eVec, eCoefficients, 
     for i in range(nFootprint):
         footprintExposureCol[i] = goodDifiList[i].getColcNorm()
         footprintExposureRow[i] = goodDifiList[i].getRowcNorm()
-        footprintVariances[i]   = goodDifiList[i].getSingleStats().getFootprintResidualVariance()
+        footprintVariances[i]   = goodDifiList[i].getSingleStats().getResidualVariance()
 
     # we need to fit for the background first
     backgroundValues = numpy.zeros(nFootprint)
@@ -328,18 +380,23 @@ def fitSpatialPca(differenceImageFootprintInformationList, eVec, eCoefficients, 
                                                footprintVariances,
                                                footprintExposureCol,
                                                footprintExposureRow)
-    backgroundKrigingFit  = fitKriging(backgroundValues,
-                                       footprintVariances,
-                                       footprintExposureCol,
-                                       footprintExposureRow)
+    backgroundSpatialFunction.setParameters(backgroundFunctionFit.parameterList)
+    
+    if DOKRIGING:
+        backgroundKrigingFit  = fitKriging(backgroundValues,
+                                           footprintVariances,
+                                           footprintExposureCol,
+                                           footprintExposureRow)
 
     # the values of the spatially-approximated kernels
     approxFunctionVectorList = VectorListF(nFootprint)
-    approxKrigingVectorList  = VectorListF(nFootprint)
+    if DOKRIGING:
+        approxKrigingVectorList  = VectorListF(nFootprint)
     for i in range(nFootprint):
         # start with the mean kernel
         approxFunctionVectorList[i] = meanM.copy()
-        approxKrigingVectorList[i]  = meanM.copy()
+        if DOKRIGING:
+            approxKrigingVectorList[i]  = meanM.copy()
 
     
     # lets first fit for spatial variation in each coefficient/kernel
@@ -351,34 +408,37 @@ def fitSpatialPca(differenceImageFootprintInformationList, eVec, eCoefficients, 
                                               footprintVariances,
                                               footprintExposureCol,
                                               footprintExposureRow)
-        coeffKrigingFit  = fitKriging(coefficients,
-                                      footprintVariances,
-                                      footprintExposureCol,
-                                      footprintExposureRow)
+        kernelSpatialFunction.setParameters(coeffFunctionFit.parameterList)
+        
+        if DOKRIGING:
+            coeffKrigingFit  = fitKriging(coefficients,
+                                          footprintVariances,
+                                          footprintExposureCol,
+                                          footprintExposureRow)
         
     
         for i in range(nFootprints):
-            backgroundFunctionValue = backgroundFunctionFit.eval(footprintExposureCol[i], footprintExposureRow[i])
-            backgroundKrigingValue  = backgroundKrigingFit.eval(footprintExposureCol[i], footprintExposureRow[i])
-            coeffFunctionValue      = coeffFunctionFit.eval(footprintExposureCol[i], footprintExposureRow[i])
-            coeffKrigingValue       = coeffKrigingFit.eval(footprintExposureCol[i], footprintExposureRow[i])
-
+            backgroundFunctionValue      = backgroundSpatialFunction(footprintExposureCol[i], footprintExposureRow[i])
+            coeffFunctionValue           = kernelSpatialFunction(footprintExposureCol[i], footprintExposureRow[i])
             approxFunctionVectorList[i] += coeffFunctionValue * eVec[nCoeff,:]
-            approxKrigingVectorList[i]  += coeffKrigingValue  * eVec[nCoeff,:]
-
+            
             # calculate approximate statistics
             approxFunctionImage          = vectorToImage(approxFunctionVectorList[i],
                                                          kernelCols, kernelRows)
-            approxFunctionKernelPtr      = afwMath.KernelPtr( afwMath.Kernel(approxFunctionImage) )
+            approxFunctionKernelPtr      = afwMath.KernelPtr( afwMath.FixedKernel(approxFunctionImage) )
             approxFunctionStatistics     = goodDifiList[i].computeImageStatistics(approxFunctionKernelPtr,
                                                                                   backgroundFunctionValue)
-            
-            
-            approxKrigingImage           = vectorToImage(approxKrigingVectorList[i],
-                                                         kernelCols, kernelRows)
-            approxKrigingKernelPtr       = afwMath.KernelPtr( afwMath.Kernel(approxKrigingImage) )
-            approxKrigingStatistics      = goodDifiList[i].computeImageStatistics(approxKrigingKernel,
-                                                                                  backgroundKrigingValue)
+            if DOKRIGING:
+                backgroundKrigingValue       = backgroundKrigingFit.eval(footprintExposureCol[i], footprintExposureRow[i])
+                coeffKrigingValue            = coeffKrigingFit.eval(footprintExposureCol[i], footprintExposureRow[i])
+                approxKrigingVectorList[i]  += coeffKrigingValue  * eVec[nCoeff,:]
+
+                # calculate approximate statistics
+                approxKrigingImage           = vectorToImage(approxKrigingVectorList[i],
+                                                             kernelCols, kernelRows)
+                approxKrigingKernelPtr       = afwMath.KernelPtr( afwMath.FixedKernel(approxKrigingImage) )
+                approxKrigingStatistics      = goodDifiList[i].computeImageStatistics(approxKrigingKernel,
+                                                                                      backgroundKrigingValue)
             
 
 ##################
@@ -439,7 +499,7 @@ Notes:
     
     scienceMaskedImage  = afwImage.MaskedImageF()
     scienceMaskedImage.readFits(sciencePath)
-    
+
     policy = Policy.createPolicy(policyPath)
     if options.debugIO:
         policy.set('debugIO', True)
@@ -453,10 +513,10 @@ Notes:
 
     kernelBasisList = ipDiffim.generateDeltaFunctionKernelSet(kernelCols,
                                                               kernelRows)
-
     # lets just get a couple for debugging and speed
     policy.set('getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints', 5)
     policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 6350.)
+
     footprintList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                                      scienceMaskedImage,
                                                                      policy)
@@ -497,9 +557,6 @@ Notes:
             afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelCoeffList))
 
         convDiffIm   = ipDiffim.convolveAndSubtract(templateStampPtr.get(), imageStampPtr.get(), convKernelPtr, convBackground)
-        print type(convDiffIm), dir(convDiffIm)
-        foo = convDiffIm.getImage().get()
-        print foo
         
         convData     = imageToVector(convDiffIm.getImage())
         convVariance = imageToVector(convDiffIm.getVariance())
@@ -525,16 +582,19 @@ Notes:
                         imageToMatrix(deconvKernelPtr.computeNewImage(False)[0]),
                         deconvSigma)
         if False:
-            plotKernel.sigmaHistograms(convInfo, deconvInfo)
+            ip_diffim_plot.sigmaHistograms(convInfo, deconvInfo)
 
         convDifiPtr   = ipDiffim.DifiPtrF(
             ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, templateStampPtr, imageStampPtr)
             ) 
         convDifiPtr.setID(footprintID)
-        convDifiPtr.setColcNorm( 0.5 * (fpMin.x() + fpMax.x()) ) # or can i use footprint.center or something?
-        convDifiPtr.setRowcNorm( 0.5 * (fpMin.y() + fpMax.y()) ) 
+        convDifiPtr.setColcNorm( float(fpMin.x() + fpMax.x()) / templateMaskedImage.getCols() - 1.0 )
+        convDifiPtr.setRowcNorm( float(fpMin.y() + fpMax.y()) / templateMaskedImage.getRows() - 1.0 ) 
         convDifiPtr.setSingleKernelPtr( convKernelPtr )
         convDifiPtr.setSingleBackground( convBackground )
+        convDifiPtr.setSingleStats(
+            convDifiPtr.computeImageStatistics(convKernelPtr, convBackground)
+            )
         convDifiPtr.setStatus( True )
         convolveDifiPtrList.append(convDifiPtr)
 
@@ -542,10 +602,13 @@ Notes:
             ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, imageStampPtr, templateStampPtr)
             )
         deconvDifiPtr.setID(footprintID)
-        deconvDifiPtr.setColcNorm( 0.5 * (fpMin.x() + fpMax.x()) )
-        deconvDifiPtr.setRowcNorm( 0.5 * (fpMin.y() + fpMax.y()) ) 
+        deconvDifiPtr.setColcNorm( float(fpMin.x() + fpMax.x()) / templateMaskedImage.getCols() - 1.0 )
+        deconvDifiPtr.setRowcNorm( float(fpMin.y() + fpMax.y()) / templateMaskedImage.getRows() - 1.0 ) 
         deconvDifiPtr.setSingleKernelPtr( deconvKernelPtr )
         deconvDifiPtr.setSingleBackground( deconvBackground )
+        deconvDifiPtr.setSingleStats(
+            deconvDifiPtr.computeImageStatistics(deconvKernelPtr, deconvBackground)
+            )
         deconvDifiPtr.setStatus( True )
         deconvolveDifiPtrList.append(deconvDifiPtr)
 

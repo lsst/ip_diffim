@@ -86,3 +86,27 @@ computeSpatiallyVaryingPsfMatchingKernel: {
     # Maximum iterations for spatial fit to Kernel basis coefficients
     maximumIterationsSpatialFit: 5
 }
+
+
+######### Restructuring to have full package path
+
+lsst: {
+    ip: {
+        diffim: {
+            rejectKernelOutliers: {
+                maxOutlierIterations: 5
+                maxOutlierSigma: 5.0
+            }
+        }
+    }
+
+    afw: {
+        math: {
+            minimize: {
+                nSigmaSq: 1.0
+                stepsize: 0.1
+            }
+        }
+    }
+}
+           

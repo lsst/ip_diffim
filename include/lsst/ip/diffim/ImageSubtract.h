@@ -103,9 +103,6 @@ namespace diffim {
         void setSingleKernelPtr(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> ptr) {_singleKernelPtr = ptr;};
         boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> getSingleKernelPtr() {return _singleKernelPtr;};
 
-        void setSingleKernelSum(double kernelSum) {_singleKernelSum = kernelSum;};
-        double getSingleKernelSum() {return _singleKernelSum;};
-
         void setSingleBackground(double background) {_singleBackground = background;};
         double getSingleBackground() {return _singleBackground;};
 
@@ -135,7 +132,6 @@ namespace diffim {
 
         /* results from individual kernel fit */
         boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> _singleKernelPtr;
-        double _singleKernelSum;
         double _singleBackground;
         DifferenceImageStatistics<ImageT, MaskT> _singleKernelStats;
 
