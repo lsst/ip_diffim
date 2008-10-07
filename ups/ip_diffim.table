@@ -5,6 +5,7 @@ setupRequired(pex_policy)
 setupRequired(daf_persistence)
 setupRequired(afw)
 setupRequired(detection)
+setupRequired(swig 1.3.36a)
 
 setupOptional(pex_harness)
 setupOptional(afwdata)
