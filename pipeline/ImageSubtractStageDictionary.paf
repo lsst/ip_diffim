@@ -2,7 +2,8 @@
 # Default Image Subtraction Policy File
 
 # Write intermediate FITS files? (boolean)
-debugIO: true
+debugIO: false
+debugPlot: true
 
 # Size of the convolution kernel
 kernelRows: 19
@@ -87,6 +88,13 @@ computeSpatiallyVaryingPsfMatchingKernel: {
     maximumIterationsSpatialFit: 5
 }
 
+SDQA: {
+    # Maximum average of (residual/noise) for an acceptable Kernel; mean should be 0
+    maximumFootprintResidualMean: 1.0
+
+    # Maximum standard deviation of (residual/noise) for an acceptable Kernel; variance should be 1
+    maximumFootprintResidualStd: 2.0
+}
 
 ######### Restructuring to have full package path
 

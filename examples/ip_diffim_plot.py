@@ -11,7 +11,7 @@ def scaleImageForDisplay_nonlinear(indata, nonlinearity=2.0):
 def scaleImageForDisplay_log10(indata):
     return numpy.log10(indata)
 
-def plotBackground(backgroundFunction, cols, rows, nbins=100):
+def plotBackground( (backgroundFunction, cols, rows), nbins=100, outfile=None):
     print backgroundFunction.toString()
     
     pylab.figure()
@@ -30,12 +30,16 @@ def plotBackground(backgroundFunction, cols, rows, nbins=100):
                       origin='lower',
                       aspect=2.0,
                       extent=[-1, 1, -1, 1])
-    sp_bg.plot(cols, rows, 'kx')
+    sp_bg.plot(cols, rows, 'kx') # actual constraints
     sp_bg.axhline(y=0, c='k', linestyle='--')
     sp_bg.axvline(x=0, c='k', linestyle='--')
     pylab.colorbar(im)
 
-def eigenKernelPlot(convInfo, deconvInfo, fontsize=10):
+    if outfile != None:
+        pylab.savefig(outfile)
+        
+
+def eigenKernelPlot(convInfo, deconvInfo, fontsize=10, outfile=None):
     pylab.figure()
     
     ckm   = [0.050, 0.725, 0.150, 0.150]
@@ -144,7 +148,13 @@ def eigenKernelPlot(convInfo, deconvInfo, fontsize=10):
                sp_dck5.get_xticklabels()+sp_dck5.get_yticklabels(), visible=False)
     pylab.setp(sp_dcspec.get_xticklabels()+sp_dcspec.get_yticklabels(), fontsize=fontsize)
 
-def sigmaHistograms(convInfo, deconvInfo, fontsize=10):
+    if outfile != None:
+        pylab.savefig(outfile)
+
+
+
+def sigmaHistograms(convInfo, deconvInfo, title, fontsize=10, outfile=None):
+    pylab.figure()
     
     # info lists have
     # template image, science image, difference image (in sigma), kernel, sigmas
@@ -190,8 +200,9 @@ def sigmaHistograms(convInfo, deconvInfo, fontsize=10):
     sp_chis = pylab.axes(chis)
     sp_chis.hist(convInfo[4], bins=bins, normed=True)
     sp_chis.plot(bins, theory, 'r-')
-    sp_chis.set_xlabel('Sigma', fontsize=fontsize+1, weight='bold')
-    sp_chis.set_ylabel('Fraction', fontsize=fontsize+1, weight='bold')
+    sp_chis.set_xlabel('Sigma', fontsize=fontsize, weight='bold')
+    sp_chis.set_ylabel('Fraction', fontsize=fontsize, weight='bold')
+    sp_chis.set_title('%s : %.3f +/- %.3f' % (title, convInfo[4].mean(), convInfo[4].std()), fontsize=fontsize+1, weight='bold')
 
     pylab.setp(sp_cim0.get_xticklabels()+sp_cim0.get_yticklabels()+
                sp_cim1.get_xticklabels()+sp_cim1.get_yticklabels()+
@@ -222,8 +233,9 @@ def sigmaHistograms(convInfo, deconvInfo, fontsize=10):
     sp_dchis = pylab.axes(dchis)
     sp_dchis.hist(deconvInfo[4], bins=bins, normed=True)
     sp_dchis.plot(bins, theory, 'r-')
-    sp_dchis.set_xlabel('Sigma', fontsize=fontsize+1, weight='bold')
-    sp_dchis.set_ylabel('Fraction', fontsize=fontsize+1, weight='bold')
+    sp_dchis.set_xlabel('Sigma', fontsize=fontsize, weight='bold')
+    sp_dchis.set_ylabel('Fraction', fontsize=fontsize, weight='bold')
+    sp_dchis.set_title('%.3f +/- %.3f' % (deconvInfo[4].mean(), deconvInfo[4].std()), fontsize=fontsize+1, weight='bold')
 
     pylab.setp(sp_dcim0.get_xticklabels()+sp_dcim0.get_yticklabels()+
                sp_dcim1.get_xticklabels()+sp_dcim1.get_yticklabels()+
@@ -231,3 +243,5 @@ def sigmaHistograms(convInfo, deconvInfo, fontsize=10):
                sp_dcker.get_xticklabels()+sp_dcker.get_yticklabels(), visible=False)
     pylab.setp(sp_dchis.get_xticklabels()+sp_dchis.get_yticklabels(), fontsize=fontsize)
 
+    if outfile != None:
+        pylab.savefig(outfile)

@@ -42,12 +42,14 @@ namespace diffim {
 
         virtual ~DifferenceImageStatistics() {};
         void setResidualMean(double mean) {_residualMean = mean;}
-        void setResidualVariance(double variance) {_residualVariance = variance;}
+        void setResidualStd(double std) {_residualStd = std;}
         double getResidualMean() {return _residualMean;}
-        double getResidualVariance() {return _residualVariance;}
+        double getResidualStd() {return _residualStd;}
+
+        bool evaluateQuality(lsst::pex::policy::Policy &policy);
     private:
         double _residualMean;
-        double _residualVariance;
+        double _residualStd;
     };
 
     /**
@@ -70,14 +72,10 @@ namespace diffim {
         typedef boost::shared_ptr<DifferenceImageFootprintInformation<ImageT, MaskT> > Ptr;
         typedef std::vector<typename DifferenceImageFootprintInformation<ImageT, MaskT>::Ptr> DifiList;
 
-        // or boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> >
         /* SWIG DOES NOT LIKE BELOW */
         //typedef lsst::afw::image::MaskedImage<ImageT, MaskT> MaskedImage;
         //typedef boost::shared_ptr<MaskedImage> MaskedImagePtr;
         typedef boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > MaskedImagePtr; 
-
-        /* No empty constructor */
-        //DifferenceImageFootprintInformation();
 
         DifferenceImageFootprintInformation(lsst::detection::Footprint::PtrType footprintPtr,
                                             MaskedImagePtr imageToConvolvePtr,
@@ -90,11 +88,6 @@ namespace diffim {
         void setRowcNorm(double rowc) {_rowcNorm = rowc;};
         double getColcNorm() {return _colcNorm;};
         double getRowcNorm() {return _rowcNorm;};
-
-        /* put this functionality in the constructor */
-        //void setFootprintPtr(lsst::detection::Footprint::PtrType ptr) {_footprintPtr = ptr;};
-        //void setImageToNotConvolvePtr(MaskedImagePtr ptr) {_imageToNotConvolvePtr = ptr;};
-        //void setImageToConvolvePtr(MaskedImagePtr ptr) {_imageToConvolvePtr = ptr;};
 
         lsst::detection::Footprint::PtrType getFootprintPtr() {return _footprintPtr;};
         MaskedImagePtr getImageToNotConvolvePtr() {return _imageToNotConvolvePtr;};
@@ -141,7 +134,12 @@ namespace diffim {
     template <typename ImageT, typename MaskT>
     typename DifferenceImageFootprintInformation<ImageT, MaskT>::DifiList
     getGoodFootprints(std::vector<boost::shared_ptr<DifferenceImageFootprintInformation<ImageT, MaskT> > > & difiList );
-                                                                     
+
+    template <typename ImageT, typename MaskT>
+    bool evaluateDiffimQuality(boost::shared_ptr<DifferenceImageFootprintInformation<ImageT, MaskT> > & difiPtr, 
+                               lsst::pex::policy::Policy &policy
+        );
+    
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateDeltaFunctionKernelSet(
         unsigned int nCols,
         unsigned int nRows
@@ -191,6 +189,14 @@ namespace diffim {
         double &variance,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &inputImage,
         MaskT const badPixelMask
+        );
+
+    template <typename ImageT, typename MaskT>
+    void calculateMaskedImageStatistics(
+        int &nGoodPixels,
+        double &mean,
+        double &variance,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &inputImage
         );
 
     template <typename ImageT>

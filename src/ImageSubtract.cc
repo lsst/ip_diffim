@@ -36,7 +36,7 @@ template <typename ImageT, typename MaskT>
 lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics() :
     lsst::daf::data::LsstBase(typeid(this)),
     _residualMean(0),
-    _residualVariance(0)
+    _residualStd(0)
 {
 }
 
@@ -46,36 +46,15 @@ lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStati
     ) :
     lsst::daf::data::LsstBase(typeid(this)),
     _residualMean(0),
-    _residualVariance(0)
+    _residualStd(0)
 {
     int nGood;
     double mean, variance;
-    int badMaskBit = differenceMaskedImage.getMask()->getMaskPlane("BAD");
-    MaskT badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
 
-    lsst::ip::diffim::calculateMaskedImageStatistics(nGood, mean, variance, differenceMaskedImage, badPixelMask);
+    lsst::ip::diffim::calculateMaskedImageStatistics(nGood, mean, variance, differenceMaskedImage);
     this->_residualMean = mean;
-    this->_residualVariance = variance;
+    this->_residualStd  = sqrt(variance);
 }
-
-/* empty constructor 
-template <typename ImageT, typename MaskT>
-lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::DifferenceImageFootprintInformation() :
-    lsst::daf::data::LsstBase(typeid(this)),
-    _id(-1),
-    _colcNorm(0),
-    _rowcNorm(0),
-    _footprintPtr(),
-    _imageToConvolvePtr(),
-    _imageToNotConvolvePtr(),
-    _singleKernelPtr(), // start off NULL
-    _singleKernelSum(0),
-    _singleBackground(0),
-    _singleKernelStats( lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>() ),
-    _isGood(false)
-{
-}
-*/
 
 template <typename ImageT, typename MaskT>
 lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::DifferenceImageFootprintInformation(
@@ -100,6 +79,17 @@ lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::Difference
 //
 // Public Member Functions
 //
+
+template <typename ImageT, typename MaskT>
+bool lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>::evaluateQuality(
+    lsst::pex::policy::Policy &policy
+    ) {
+    double maxResidualMean = policy.getDouble("SDQA.maximumFootprintResidualMean");
+    double maxResidualStd  = policy.getDouble("SDQA.maximumFootprintResidualStd");
+    if ( (this->getResidualMean()) > maxResidualMean ) return false;
+    if ( (this->getResidualStd()) > maxResidualStd ) return false;
+    return true;
+}
 
 template <typename ImageT, typename MaskT>
 lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT> 
@@ -138,7 +128,6 @@ lsst::ip::diffim::getGoodFootprints(
     return goodList;
 }
     
-
 /** 
  * @brief Generate a basis set of delta function Kernels.
  *
@@ -370,7 +359,7 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
     double time;
     t.restart();
 
-    lsst::pex::logging::TTrace<3>("lsst.ip.diffim.computePsfMatchingKernelForPostageStamp", 
+    lsst::pex::logging::TTrace<4>("lsst.ip.diffim.computePsfMatchingKernelForPostageStamp", 
                                 "Entering subroutine computePsfMatchingKernelForPostageStamp");
     
     /* We assume that each kernel in the Set has 1 parameter you fit for */
@@ -615,8 +604,8 @@ bool lsst::ip::diffim::maskOk(
 }
 
 /** 
- * @brief Calculates mean and variance of values (normalized by the sqrt of
- * the image variance) in a MaskedImage
+ * @brief Calculates mean and unbiased variance of values (normalized by the
+ * sqrt of the image variance) in a MaskedImage
  *
  * The pixel values in the image portion are normalized by the sqrt of the
  * variance.  The mean and variance of this distribution are calculated.  If
@@ -645,6 +634,54 @@ void lsst::ip::diffim::calculateMaskedImageStatistics(
         lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> colAcc = rowAcc;
         for (unsigned int col = 0; col < inputImage.getCols(); ++col, colAcc.nextCol()) {
             if (((*colAcc.mask) & badPixelMask) == 0) {
+                xSum  += (*colAcc.image) / sqrt(*colAcc.variance);
+                x2Sum += (*colAcc.image) * (*colAcc.image) / (*colAcc.variance);
+
+                nGoodPixels += 1;
+            }
+        }
+    }
+    
+    if (nGoodPixels > 0) {
+        mean = xSum / nGoodPixels;
+    } else {
+        mean = std::numeric_limits<double>::quiet_NaN();
+    }
+    if (nGoodPixels > 1) {
+        variance  = x2Sum / nGoodPixels - mean*mean;
+        variance *= nGoodPixels / (nGoodPixels - 1);
+    } else {
+        variance = std::numeric_limits<double>::quiet_NaN();
+    }
+    
+}
+
+/** 
+ * @brief Calculates mean and unbiased variance of values (normalized by the
+ * sqrt of the image variance) in a MaskedImage.  This version does not look for
+ * particular mask bits, instead requiring Mask == 0.
+ *
+ * @return Number of unmasked pixels in the image, and the mean and variance
+ * of the residuals divided by the sqrt(variance).
+ *
+ * @ingroup diffim
+ */
+template <typename ImageT, typename MaskT>
+void lsst::ip::diffim::calculateMaskedImageStatistics(
+    int &nGoodPixels, ///< Number of good pixels in the image
+    double &mean, ///< Mean value/variance; ideally 0 in a difference image
+    double &variance, ///< Average variance of value/variance; ideally 1 in a difference image
+    lsst::afw::image::MaskedImage<ImageT, MaskT> const &inputImage ///< Input image to be analyzed
+    ) {
+    
+    double x2Sum=0.0, xSum=0.0;
+    
+    nGoodPixels = 0;
+    lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> rowAcc(inputImage);
+    for (unsigned int row = 0; row < inputImage.getRows(); ++row, rowAcc.nextRow()) {
+        lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> colAcc = rowAcc;
+        for (unsigned int col = 0; col < inputImage.getCols(); ++col, colAcc.nextCol()) {
+            if ((*colAcc.mask) == 0) {
                 xSum  += (*colAcc.image) / sqrt(*colAcc.variance);
                 x2Sum += (*colAcc.image) * (*colAcc.image) / (*colAcc.variance);
 
