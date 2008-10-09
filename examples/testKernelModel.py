@@ -607,29 +607,81 @@ Notes:
         templateStampPtr = templateMaskedImage.getSubImage(footprintBBox)
         imageStampPtr = scienceMaskedImage.getSubImage(footprintBBox)
 
+        # initial estimate of the variance per pixel
+        subtractedStamp  = afwImage.MaskedImageF(templateStampPtr.getCols(), templateStampPtr.getRows())
+        subtractedStamp += imageStampPtr.get()
+        subtractedStamp -= templateStampPtr.get()
+
         # Assuming the template is better seeing, find convolution kernel
-        convKernelCoeffList, convBackground = ipDiffim.computePsfMatchingKernelForFootprint(
+        convKernelSolution1, convKernelError1 = ipDiffim.computePsfMatchingKernelForFootprint2(
             templateStampPtr.get(),
             imageStampPtr.get(),
+            subtractedStamp,
             kernelBasisList,
-            policy,
+            policy
         )
-        convKernelPtr = afwMath.LinearCombinationKernelPtr(
-            afwMath.LinearCombinationKernel(kernelBasisList, convKernelCoeffList)
+        convKernelPtr1 = afwMath.LinearCombinationKernelPtr(
+            afwMath.LinearCombinationKernel(kernelBasisList, convKernelSolution1[:-1])
             )
-        convDiffIm    = ipDiffim.convolveAndSubtract(templateStampPtr.get(), imageStampPtr.get(), convKernelPtr, convBackground)
+        convKernelErrorPtr1 = afwMath.LinearCombinationKernelPtr(
+            afwMath.LinearCombinationKernel(kernelBasisList, convKernelError1[:-1])
+            )
+        convDiffIm1    = ipDiffim.convolveAndSubtract(templateStampPtr.get(), imageStampPtr.get(), convKernelPtr1, convBackground1)
+        #
+        #### NOW REDO THIS USING A BETTER ESTIMATE OF THE VARIANCE FROM THE SUBTRACTED IMAGE!
+        #
+        convKernelSolution2, convKernelError2 = ipDiffim.computePsfMatchingKernelForFootprint2(
+            templateStampPtr.get(),
+            imageStampPtr.get(),
+            convDiffIm1,
+            kernelBasisList,
+            policy
+        )
+        convKernelPtr2 = afwMath.LinearCombinationKernelPtr(
+            afwMath.LinearCombinationKernel(kernelBasisList, convKernelSolution2[:-1])
+            )
+        convKernelErrorPtr2 = afwMath.LinearCombinationKernelPtr(
+            afwMath.LinearCombinationKernel(kernelBasisList, convKernelError2[:-1])
+            )
+        convDiffIm2    = ipDiffim.convolveAndSubtract(templateStampPtr.get(), imageStampPtr.get(), convKernelPtr2, convBackground2)
+        # Things tend to converge after an single iteration, so just do this once.
+
+        
 
         # Assuming the template is better seeing, find deconvolution kernel
-        deconvKernelCoeffList, deconvBackground = ipDiffim.computePsfMatchingKernelForFootprint(
+        deconvKernelSolution1, deconvKernelError1 = ipDiffim.computePsfMatchingKernelForFootprint2(
             imageStampPtr.get(),
             templateStampPtr.get(),
+            subtractedStamp,
+            kernelBasisList,
+            policy
+        )
+        deconvKernelPtr1 = afwMath.LinearCombinationKernelPtr(
+            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelSolution1[:-1])
+            )
+        deconvKernelErrorPtr1 = afwMath.LinearCombinationKernelPtr(
+            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelError1[:-1])
+            )
+        deconvDiffIm1    = ipDiffim.convolveAndSubtract(imageStampPtr.get(), templateStampPtr.get(), deconvKernelPtr1, deconvBackground1)
+        #
+        #### NOW REDO THIS USING A BETTER ESTIMATE OF THE VARIANCE FROM THE SUBTRACTED IMAGE!
+        #
+        deconvKernelSolution2, deconvKernelError2 = ipDiffim.computePsfMatchingKernelForFootprint2(
+            imageStampPtr.get(),
+            templateStampPtr.get(),
+            deconvDiffIm1,
             kernelBasisList,
             policy,
         )
-        deconvKernelPtr = afwMath.LinearCombinationKernelPtr(
-            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelCoeffList)
+        deconvKernelPtr2 = afwMath.LinearCombinationKernelPtr(
+            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelSolution2[:-1])
             )
-        deconvDiffIm    = ipDiffim.convolveAndSubtract(imageStampPtr.get(), templateStampPtr.get(), deconvKernelPtr, deconvBackground)
+        deconvKernelErrorPtr2 = afwMath.LinearCombinationKernelPtr(
+            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelError2[:-1])
+            )
+        deconvDiffIm2    = ipDiffim.convolveAndSubtract(imageStampPtr.get(), templateStampPtr.get(), deconvKernelPtr2, deconvBackground2)
+        # Things tend to converge after an single iteration, so just do this once.
+
 
         if policy.get('debugIO') == True:
             imageStampPtr.writeFits('iFoot_%d' % (footprintID))
@@ -638,47 +690,76 @@ Notes:
             convKernelPtr.computeNewImage(False)[0].writeFits('cKernel_%d.fits' % (footprintID))
             deconvKernelPtr.computeNewImage(False)[0].writeFits('dcKernel_%d.fits' % (footprintID))
 
-            convDiffIm.writeFits('cDiff_%d' % (footprintID))
-            deconvDiffIm.writeFits('dcDiff_%d' % (footprintID))
+            convDiffIm2.writeFits('cDiff_%d' % (footprintID))
+            deconvDiffIm2.writeFits('dcDiff_%d' % (footprintID))
 
-            cSigma = imageToMatrix(convDiffIm.getImage()) / numpy.sqrt(imageToMatrix(convDiffIm.getVariance()))
+            cSigma = imageToMatrix(convDiffIm2.getImage()) / numpy.sqrt(imageToMatrix(convDiffIm2.getVariance()))
             cSigma = matrixToImage(cSigma)
             cSigma.writeFits('cSig_%d.fits' % (footprintID))
 
-            dcSigma = imageToMatrix(deconvDiffIm.getImage()) / numpy.sqrt(imageToMatrix(deconvDiffIm.getVariance()))
+            dcSigma = imageToMatrix(deconvDiffIm2.getImage()) / numpy.sqrt(imageToMatrix(deconvDiffIm2.getVariance()))
             dcSigma = matrixToImage(dcSigma)
             dcSigma.writeFits('dcSig_%d.fits' % (footprintID))
             
         
         if policy.get('debugPlot') == True:
-            convData     = imageToVector(convDiffIm.getImage())
-            convVariance = imageToVector(convDiffIm.getVariance())
-            convMask     = imageToVector(convDiffIm.getMask())
+            convData     = imageToVector(convDiffIm1.getImage())
+            convVariance = imageToVector(convDiffIm1.getVariance())
+            convMask     = imageToVector(convDiffIm1.getMask())
             convIdx      = numpy.where(convMask == 0)
             convSigma    = convData[convIdx] / numpy.sqrt(convVariance[convIdx])
-            Trace('lsst.ip.diffim', 7,
+            Trace('lsst.ip.diffim', 5,
                   'Kernel %d : Python diffim residuals = %.2f +/- %.2f sigma' % (footprintID, convSigma.mean(), convSigma.std()))
            
-            deconvData     = imageToVector(deconvDiffIm.getImage())
-            deconvVariance = imageToVector(deconvDiffIm.getVariance())
-            deconvMask     = imageToVector(deconvDiffIm.getMask())
+            deconvData     = imageToVector(deconvDiffIm1.getImage())
+            deconvVariance = imageToVector(deconvDiffIm1.getVariance())
+            deconvMask     = imageToVector(deconvDiffIm1.getMask())
             deconvIdx      = numpy.where(deconvMask == 0)
             deconvSigma    = deconvData[deconvIdx] / numpy.sqrt(deconvVariance[deconvIdx])
-            Trace('lsst.ip.diffim', 7,
+            Trace('lsst.ip.diffim', 5,
                   'Kernel %d : Python diffim residuals = %.2f +/- %.2f sigma' % (footprintID, deconvSigma.mean(), deconvSigma.std()))
             
             convInfo     = (imageToMatrix(templateStampPtr.getImage()),
                             imageToMatrix(imageStampPtr.getImage()),
-                            imageToMatrix(convDiffIm.getImage()) / numpy.sqrt(imageToMatrix(convDiffIm.getVariance())),
-                            imageToMatrix(convKernelPtr.computeNewImage(False)[0]),
+                            imageToMatrix(convDiffIm1.getImage()) / numpy.sqrt(imageToMatrix(convDiffIm1.getVariance())),
+                            imageToMatrix(convKernelPtr1.computeNewImage(False)[0]),
                             convSigma)
             deconvInfo   = (imageToMatrix(imageStampPtr.getImage()),
                             imageToMatrix(templateStampPtr.getImage()),
-                            imageToMatrix(deconvDiffIm.getImage()) / numpy.sqrt(imageToMatrix(deconvDiffIm.getVariance())),
-                            imageToMatrix(deconvKernelPtr.computeNewImage(False)[0]),
+                            imageToMatrix(deconvDiffIm1.getImage()) / numpy.sqrt(imageToMatrix(deconvDiffIm1.getVariance())),
+                            imageToMatrix(deconvKernelPtr1.computeNewImage(False)[0]),
                             deconvSigma)
-            ip_diffim_plot.sigmaHistograms(convInfo, deconvInfo, title='Kernel %d' % (footprintID), outfile='Kernel_%d.ps' % (footprintID) )
-            
+            ip_diffim_plot.sigmaHistograms(convInfo, deconvInfo, title='Kernel %d' % (footprintID), outfile='Kernel_%da.ps' % (footprintID) )
+
+            #
+            #### NOW REDO THIS USING A BETTER ESTIMATE OF THE VARIANCE FROM THE SUBTRACTED IMAGE!
+            #
+            convData     = imageToVector(convDiffIm2.getImage())
+            convVariance = imageToVector(convDiffIm2.getVariance())
+            convMask     = imageToVector(convDiffIm2.getMask())
+            convIdx      = numpy.where(convMask == 0)
+            convSigma    = convData[convIdx] / numpy.sqrt(convVariance[convIdx])
+            Trace('lsst.ip.diffim', 5,
+                  'Kernel %d : Python diffim residuals 2 = %.2f +/- %.2f sigma' % (footprintID, convSigma.mean(), convSigma.std()))
+            deconvData     = imageToVector(deconvDiffIm2.getImage())
+            deconvVariance = imageToVector(deconvDiffIm2.getVariance())
+            deconvMask     = imageToVector(deconvDiffIm2.getMask())
+            deconvIdx      = numpy.where(deconvMask == 0)
+            deconvSigma    = deconvData[deconvIdx] / numpy.sqrt(deconvVariance[deconvIdx])
+            Trace('lsst.ip.diffim', 5,
+                  'Kernel %d : Python diffim residuals 2 = %.2f +/- %.2f sigma' % (footprintID, deconvSigma.mean(), deconvSigma.std()))
+            convInfo     = (imageToMatrix(templateStampPtr.getImage()),
+                            imageToMatrix(imageStampPtr.getImage()),
+                            imageToMatrix(convDiffIm2.getImage()) / numpy.sqrt(imageToMatrix(convDiffIm2.getVariance())),
+                            imageToMatrix(convKernelPtr2.computeNewImage(False)[0]),
+                            convSigma)
+            deconvInfo   = (imageToMatrix(imageStampPtr.getImage()),
+                            imageToMatrix(templateStampPtr.getImage()),
+                            imageToMatrix(deconvDiffIm2.getImage()) / numpy.sqrt(imageToMatrix(deconvDiffIm2.getVariance())),
+                            imageToMatrix(deconvKernelPtr2.computeNewImage(False)[0]),
+                            deconvSigma)
+            ip_diffim_plot.sigmaHistograms(convInfo, deconvInfo, title='Kernel %d' % (footprintID), outfile='Kernel_%db.ps' % (footprintID) )
+
 
         convDifiPtr   = ipDiffim.DifiPtrF(
             ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, templateStampPtr, imageStampPtr)
@@ -686,10 +767,12 @@ Notes:
         convDifiPtr.setID(footprintID)
         convDifiPtr.setColcNorm( float(fpMin.x() + fpMax.x()) / templateMaskedImage.getCols() - 1.0 )
         convDifiPtr.setRowcNorm( float(fpMin.y() + fpMax.y()) / templateMaskedImage.getRows() - 1.0 ) 
-        convDifiPtr.setSingleKernelPtr( convKernelPtr )
-        convDifiPtr.setSingleBackground( convBackground )
+        convDifiPtr.setSingleKernelPtr( convKernelPtr2 )
+        convDifiPtr.setSingleKernelErrorPtr(convKernelErrorPtr2 )
+        convDifiPtr.setSingleBackground( convKernelSolution2[-1] )
+        convDifiPtr.setSingleBackgroundError( convKernelError2[-1] )
         convDifiPtr.setSingleStats(
-            convDifiPtr.computeImageStatistics(convKernelPtr, convBackground)
+            convDifiPtr.computeImageStatistics(convKernelPtr2, convBackground2)
             )
         convDifiPtr.setStatus( convDifiPtr.getSingleStats().evaluateQuality(policy) )
         convolveDifiPtrList.append(convDifiPtr)
@@ -706,16 +789,20 @@ Notes:
             convDifiPtr.getSingleStats().getResidualStd()
             ))
 
+        #
+
         deconvDifiPtr = ipDiffim.DifiPtrF(
             ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, imageStampPtr, templateStampPtr)
             )
         deconvDifiPtr.setID(footprintID)
         deconvDifiPtr.setColcNorm( float(fpMin.x() + fpMax.x()) / templateMaskedImage.getCols() - 1.0 )
         deconvDifiPtr.setRowcNorm( float(fpMin.y() + fpMax.y()) / templateMaskedImage.getRows() - 1.0 ) 
-        deconvDifiPtr.setSingleKernelPtr( deconvKernelPtr )
-        deconvDifiPtr.setSingleBackground( deconvBackground )
+        deconvDifiPtr.setSingleKernelPtr( deconvKernelPtr2 )
+        deconvDifiPtr.setSingleKernelErrorPtr( deconvKernelErrorPtr2 )
+        deconvDifiPtr.setSingleBackground( deconvKernelSolution2[-1] )
+        deconvDifiPtr.setSingleBackgroundError( deconvKernelError2[-1] )
         deconvDifiPtr.setSingleStats(
-            deconvDifiPtr.computeImageStatistics(deconvKernelPtr, deconvBackground)
+            deconvDifiPtr.computeImageStatistics(deconvKernelPtr2, deconvBackground2)
             )
         deconvDifiPtr.setStatus( deconvDifiPtr.getSingleStats().evaluateQuality(policy) )
         deconvolveDifiPtrList.append(deconvDifiPtr)

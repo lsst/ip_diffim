@@ -95,9 +95,13 @@ namespace diffim {
 
         void setSingleKernelPtr(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> ptr) {_singleKernelPtr = ptr;};
         boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> getSingleKernelPtr() {return _singleKernelPtr;};
+        void setSingleKernelErrorPtr(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> ptr) {_singleKernelErrorPtr = ptr;};
+        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> getSingleKernelErrorPtr() {return _singleKernelErrorPtr;};
 
         void setSingleBackground(double background) {_singleBackground = background;};
         double getSingleBackground() {return _singleBackground;};
+        void setSingleBackgroundError(double backgroundError) {_singleBackgroundError = backgroundError;};
+        double getSingleBackgroundError() {return _singleBackgroundError;};
 
         void setSingleStats(DifferenceImageStatistics<ImageT, MaskT> stats) {_singleKernelStats = stats;};
         DifferenceImageStatistics<ImageT, MaskT> getSingleStats() {return _singleKernelStats;};
@@ -125,7 +129,9 @@ namespace diffim {
 
         /* results from individual kernel fit */
         boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> _singleKernelPtr;
+        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> _singleKernelErrorPtr;
         double _singleBackground;
+        double _singleBackgroundError;
         DifferenceImageStatistics<ImageT, MaskT> _singleKernelStats;
 
         bool _isGood;
@@ -173,6 +179,17 @@ namespace diffim {
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList, ///< Input kernel basis set
+        lsst::pex::policy::Policy &policy
+        );
+
+    template <typename ImageT, typename MaskT>
+    void computePsfMatchingKernelForFootprint2(
+        std::vector<double> &kernelSolution,
+        std::vector<double> &kernelError,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &varianceImage,
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
         lsst::pex::policy::Policy &policy
         );
 

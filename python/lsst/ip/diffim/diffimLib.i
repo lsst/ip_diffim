@@ -79,6 +79,13 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 %template(computePsfMatchingKernelForFootprint)
     lsst::ip::diffim::computePsfMatchingKernelForFootprint<double, lsst::afw::image::maskPixelType>;
 
+%apply std::vector<double> &OUTPUT { std::vector<double> & };
+%template(computePsfMatchingKernelForFootprint2)
+    lsst::ip::diffim::computePsfMatchingKernelForFootprint2<float, lsst::afw::image::maskPixelType>;
+%template(computePsfMatchingKernelForFootprint2)
+    lsst::ip::diffim::computePsfMatchingKernelForFootprint2<double, lsst::afw::image::maskPixelType>;
+%clear std::vector<double> &OUTPUT;
+
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float, lsst::afw::image::maskPixelType>;
 %template(getCollectionOfFootprintsForPsfMatching)
