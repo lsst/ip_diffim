@@ -94,7 +94,7 @@ bool lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>::evaluateQuality
 template <typename ImageT, typename MaskT>
 lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT> 
 lsst::ip::diffim::DifferenceImageFootprintInformation<ImageT, MaskT>::computeImageStatistics(
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> kernelPtr,
+    boost::shared_ptr<lsst::afw::math::Kernel> kernelPtr,
     double background
     ) {
 
@@ -206,7 +206,7 @@ template <typename ImageT, typename MaskT>
 lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+    boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
     double background
     ) {
 
@@ -1100,14 +1100,14 @@ template
 lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+    boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
     double background);
 
 template 
 lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+    boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
     double background);
 
 template

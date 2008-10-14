@@ -93,10 +93,10 @@ namespace diffim {
         MaskedImagePtr getImageToNotConvolvePtr() {return _imageToNotConvolvePtr;};
         MaskedImagePtr getImageToConvolvePtr() {return _imageToConvolvePtr;};
 
-        void setSingleKernelPtr(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> ptr) {_singleKernelPtr = ptr;};
-        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> getSingleKernelPtr() {return _singleKernelPtr;};
-        void setSingleKernelErrorPtr(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> ptr) {_singleKernelErrorPtr = ptr;};
-        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> getSingleKernelErrorPtr() {return _singleKernelErrorPtr;};
+        void setSingleKernelPtr(boost::shared_ptr<lsst::afw::math::Kernel> ptr) {_singleKernelPtr = ptr;};
+        boost::shared_ptr<lsst::afw::math::Kernel> getSingleKernelPtr() {return _singleKernelPtr;};
+        void setSingleKernelErrorPtr(boost::shared_ptr<lsst::afw::math::Kernel> ptr) {_singleKernelErrorPtr = ptr;};
+        boost::shared_ptr<lsst::afw::math::Kernel> getSingleKernelErrorPtr() {return _singleKernelErrorPtr;};
 
         void setSingleBackground(double background) {_singleBackground = background;};
         double getSingleBackground() {return _singleBackground;};
@@ -106,7 +106,7 @@ namespace diffim {
         void setSingleStats(DifferenceImageStatistics<ImageT, MaskT> stats) {_singleKernelStats = stats;};
         DifferenceImageStatistics<ImageT, MaskT> getSingleStats() {return _singleKernelStats;};
 
-        DifferenceImageStatistics<ImageT, MaskT> computeImageStatistics(boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> kernelPtr,
+        DifferenceImageStatistics<ImageT, MaskT> computeImageStatistics(boost::shared_ptr<lsst::afw::math::Kernel> kernelPtr,
                                                                         double background);
 
         void setStatus(bool status) {_isGood = status;};
@@ -128,8 +128,8 @@ namespace diffim {
         MaskedImagePtr _imageToNotConvolvePtr; /* Typically the science image */
 
         /* results from individual kernel fit */
-        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> _singleKernelPtr;
-        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> _singleKernelErrorPtr;
+        boost::shared_ptr<lsst::afw::math::Kernel> _singleKernelPtr;
+        boost::shared_ptr<lsst::afw::math::Kernel> _singleKernelErrorPtr;
         double _singleBackground;
         double _singleBackgroundError;
         DifferenceImageStatistics<ImageT, MaskT> _singleKernelStats;
@@ -162,7 +162,7 @@ namespace diffim {
     lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+        boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
         double background
         );
 
