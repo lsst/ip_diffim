@@ -128,7 +128,7 @@ class ConvolveTestCase(unittest.TestCase):
             imageToConvolveStampPtr    = self.templateMaskedImage.getSubImage(footprintBBox)
             imageToNotConvolveStampPtr = convolvedScienceMaskedImage.getSubImage(footprintBBox)
             
-            kernelCoeffList, background = ipDiff.computePsfMatchingKernelForPostageStamp(
+            kernelCoeffList, background = ipDiff.computePsfMatchingKernelForFootprint(
                 imageToConvolveStampPtr.get(),
                 imageToNotConvolveStampPtr.get(),
                 self.kernelBasisList,
@@ -216,7 +216,7 @@ class DeltaFunctionTestCase(unittest.TestCase):
                 imageToConvolveStampPtr.writeFits('tFits_%d' % (footprintID,))
                 imageToNotConvolveStamp.writeFits('sFits_%d' % (footprintID,))
 
-            kernelCoeffList, background = ipDiff.computePsfMatchingKernelForPostageStamp(
+            kernelCoeffList, background = ipDiff.computePsfMatchingKernelForFootprint(
                 imageToConvolveStampPtr.get(),
                 imageToNotConvolveStamp,
                 self.kernelBasisList,
@@ -299,7 +299,7 @@ class DeconvolveTestCase(unittest.TestCase):
                 imageToNotConvolveStampPtr.writeFits('sFits_%d' % (footprintID,))
 
             # convolve
-            kernelCoeffListC, backgroundC = ipDiff.computePsfMatchingKernelForPostageStamp(
+            kernelCoeffListC, backgroundC = ipDiff.computePsfMatchingKernelForFootprint(
                 imageToConvolveStampPtr.get(),
                 imageToNotConvolveStampPtr.get(),
                 self.kernelBasisList,
@@ -315,7 +315,7 @@ class DeconvolveTestCase(unittest.TestCase):
                 kMaskedImageC.writeFits('kFitsMiC_%d' % (footprintID,))
             
             # deconvolve
-            kernelCoeffListD, backgroundD = ipDiff.computePsfMatchingKernelForPostageStamp(
+            kernelCoeffListD, backgroundD = ipDiff.computePsfMatchingKernelForFootprint(
                 imageToNotConvolveStampPtr.get(),
                 imageToConvolveStampPtr.get(),
                 self.kernelBasisList,
@@ -360,7 +360,7 @@ def suite():
 
     suites = []
     suites += unittest.makeSuite(ConvolveTestCase)
-    #suites += unittest.makeSuite(DeltaFunctionTestCase)
+    suites += unittest.makeSuite(DeltaFunctionTestCase)
     #suites += unittest.makeSuite(DeconvolveTestCase) # TBD
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
