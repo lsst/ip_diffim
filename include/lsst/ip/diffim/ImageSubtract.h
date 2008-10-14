@@ -183,9 +183,7 @@ namespace diffim {
         );
 
     template <typename ImageT, typename MaskT>
-    void computePsfMatchingKernelForFootprint2(
-        std::vector<double> &kernelSolution,
-        std::vector<double> &kernelError,
+    std::vector<std::pair<double,double> > computePsfMatchingKernelForFootprint2(
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &varianceImage,

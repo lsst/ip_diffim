@@ -54,6 +54,34 @@ def vectorToImage(arr, nCols, nRows):
             n += 1
     return im
 
+def vectorToKernelPtr(arr, nCols, nRows):
+    # need imageD for FixedKernels
+    assert len(arr) == nCols * nRows
+    im = afwImage.ImageD(nCols, nRows)
+    n  = 0
+    for row in range(im.getRows()):
+        for col in range(im.getCols()):
+            im.set(col, row, arr[n])
+            n += 1
+    return afwMath.KernelPtr( afwMath.FixedKernel(im) ) 
+
+def vectorPairToVectors(vectorPair):
+    kernelVector = afwMath.vectorD()
+    kernelErrorVector = afwMath.vectorD()
+    for i in range(vectorPair.size()-1):
+        #print i, vectorPair[i][0], vectorPair[i][1]
+        kernelVector.push_back(vectorPair[i][0])
+        kernelErrorVector.push_back(vectorPair[i][1])
+
+    background = vectorPair.back()[0]
+    backgroundError = vectorPair.back()[1]
+    #print 'B', background, backgroundError
+    return kernelVector, kernelErrorVector, background, backgroundError
+    
+        
+        
+        
+
 def rejectKernelOutliers(difiList, policy):
     # Compare kernel sums; things that are bad (e.g. variable stars, moving objects, cosmic rays)
     # will have a kernel sum far from the mean; reject these.
@@ -161,22 +189,22 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
     # common to all spatial fits
     footprintExposureCol  = numpy.zeros(nFootprint)
     footprintExposureRow  = numpy.zeros(nFootprint)
-    footprintStd          = numpy.zeros(nFootprint)
     
     for i in range(nFootprint):
         footprintExposureCol[i] = goodDifiList[i].getColcNorm()
         footprintExposureRow[i] = goodDifiList[i].getRowcNorm()
-        footprintStd[i]         = goodDifiList[i].getSingleStats().getResidualStd()
 
 
     # fit the background
     backgroundValues    = numpy.zeros(nFootprint)
+    backgroundErrors    = numpy.zeros(nFootprint)
     for i in range(nFootprint):
         backgroundValues[i] = goodDifiList[i].getSingleBackground()
+        backgroundErrors[i] = goodDifiList[i].getSingleBackgroundError()
 
     backgroundFunctionFit = fitSpatialFunction(backgroundSpatialFunction,
                                                backgroundValues,
-                                               footprintStd,
+                                               backgroundErrors,
                                                footprintExposureCol,
                                                footprintExposureRow,
                                                policy)
@@ -192,9 +220,13 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
         
     return backgroundSpatialFunction, footprintExposureCol, footprintExposureRow
 
+
+# BELOW ALSO NEED TO WRAP IN ERRORS ON THE KERNEL PARAMETERS
+
+
     if DOKRIGING:
         backgroundKrigingFit  = fitKriging(backgroundValues,
-                                           footprintStd,
+                                           backgroundErrors,
                                            footprintExposureCol,
                                            footprintExposureRow,
                                            policy)
@@ -252,11 +284,11 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
     # new kernel, then difference image, the calculate difference
     # image stats
     for i in range(nFootprint):
-        kFunctionImage  = afwImage.ImageF(kernelCols, kernelRows)
+        kFunctionImage  = afwImage.ImageD(kernelCols, kernelRows)
         functionBackgroundValue = backgroundSpatialFunction(footprintExposureCol[i], footprintExposureRow[i])
         
         if DOKRIGING:
-            kKrigingImage   = afwImage.ImageF(kernelCols, kernelRows)
+            kKrigingImage   = afwImage.ImageD(kernelCols, kernelRows)
             krigingBackgroundValue  = backgroundKrigingFit.eval(footprintExposureCol[i], footprintExposureRow[i])
 
         # the *very* slow way to do this is to create a
@@ -376,20 +408,18 @@ def fitPca(differenceImageFootprintInformationList, policy):
         kModel   = meanM.copy()
 
         # Calculate statistics using approximated Kernel
-        approxImage         = vectorToImage(kModel, kernelCols, kernelRows)
-        #approxKernelPtr     = afwMath.KernelPtr( afwMath.FixedKernel(approxImage) )
-        #approxStatistics    = goodDifiList[i].computeImageStatistics(approxKernelPtr,
-        #                                                             goodDifiList[i].getSingleBackground())
+        approxKernelPtr     = vectorToKernelPtr(kModel, kernelCols, kernelRows)
+        approxStatistics    = goodDifiList[i].computeImageStatistics(approxKernelPtr,
+                                                                     goodDifiList[i].getSingleBackground())
 
         eContrib = U * eCoeff[i]
         for nKernel in range(eContrib.shape[1]):
             kModel += eContrib[:,nKernel]
 
             # Calculate statistics ...
-            approxImage         = vectorToImage(kModel, kernelCols, kernelRows)
-            #approxKernelPtr     = afwMath.KernelPtr( afwMath.FixedKernel(approxImage) )
-            #approxStatistics    = goodDifiList[i].computeImageStatistics(approxKernelPtr,
-            #                                                             goodDifiList[i].getSingleBackground())
+            approxKernelPtr     = vectorToKernelPtr(kModel, kernelCols, kernelRows)
+            approxStatistics    = goodDifiList[i].computeImageStatistics(approxKernelPtr,
+                                                                         goodDifiList[i].getSingleBackground())
             
 
     # Turn into Kernels
@@ -493,9 +523,8 @@ def fitSpatialPca(differenceImageFootprintInformationList, eVec, eCoefficients, 
             approxFunctionVectorList[i] += coeffFunctionValue * eVec[nCoeff,:]
             
             # calculate approximate statistics
-            approxFunctionImage          = vectorToImage(approxFunctionVectorList[i],
-                                                         kernelCols, kernelRows)
-            approxFunctionKernelPtr      = afwMath.KernelPtr( afwMath.FixedKernel(approxFunctionImage) )
+            approxFunctionKernelPtr      = vectorToKernelPtr(approxFunctionVectorList[i],
+                                                             kernelCols, kernelRows)
             approxFunctionStatistics     = goodDifiList[i].computeImageStatistics(approxFunctionKernelPtr,
                                                                                   backgroundFunctionValue)
             if DOKRIGING:
@@ -504,9 +533,8 @@ def fitSpatialPca(differenceImageFootprintInformationList, eVec, eCoefficients, 
                 approxKrigingVectorList[i]  += coeffKrigingValue  * eVec[nCoeff,:]
 
                 # calculate approximate statistics
-                approxKrigingImage           = vectorToImage(approxKrigingVectorList[i],
-                                                             kernelCols, kernelRows)
-                approxKrigingKernelPtr       = afwMath.KernelPtr( afwMath.FixedKernel(approxKrigingImage) )
+                approxKrigingKernelPtr       = vectorToKernelPtr(approxKrigingVectorList[i],
+                                                                 kernelCols, kernelRows)
                 approxKrigingStatistics      = goodDifiList[i].computeImageStatistics(approxKrigingKernel,
                                                                                       backgroundKrigingValue)
             
@@ -613,35 +641,37 @@ Notes:
         subtractedStamp -= templateStampPtr.get()
 
         # Assuming the template is better seeing, find convolution kernel
-        convKernelSolution1, convKernelError1 = ipDiffim.computePsfMatchingKernelForFootprint2(
+        convKernelVectorPair1 = ipDiffim.computePsfMatchingKernelForFootprint2(
             templateStampPtr.get(),
             imageStampPtr.get(),
             subtractedStamp,
             kernelBasisList,
             policy
         )
+        convKernelVector1, convKernelErrorVector1, convBackground1, convBackgroundError1 = vectorPairToVectors(convKernelVectorPair1)
         convKernelPtr1 = afwMath.LinearCombinationKernelPtr(
-            afwMath.LinearCombinationKernel(kernelBasisList, convKernelSolution1[:-1])
+            afwMath.LinearCombinationKernel(kernelBasisList, convKernelVector1)
             )
         convKernelErrorPtr1 = afwMath.LinearCombinationKernelPtr(
-            afwMath.LinearCombinationKernel(kernelBasisList, convKernelError1[:-1])
+            afwMath.LinearCombinationKernel(kernelBasisList, convKernelErrorVector1)
             )
         convDiffIm1    = ipDiffim.convolveAndSubtract(templateStampPtr.get(), imageStampPtr.get(), convKernelPtr1, convBackground1)
         #
         #### NOW REDO THIS USING A BETTER ESTIMATE OF THE VARIANCE FROM THE SUBTRACTED IMAGE!
         #
-        convKernelSolution2, convKernelError2 = ipDiffim.computePsfMatchingKernelForFootprint2(
+        convKernelVectorPair2 = ipDiffim.computePsfMatchingKernelForFootprint2(
             templateStampPtr.get(),
             imageStampPtr.get(),
             convDiffIm1,
             kernelBasisList,
             policy
         )
+        convKernelVector2, convKernelErrorVector2, convBackground2, convBackgroundError2 = vectorPairToVectors(convKernelVectorPair2)
         convKernelPtr2 = afwMath.LinearCombinationKernelPtr(
-            afwMath.LinearCombinationKernel(kernelBasisList, convKernelSolution2[:-1])
+            afwMath.LinearCombinationKernel(kernelBasisList, convKernelVector2)
             )
         convKernelErrorPtr2 = afwMath.LinearCombinationKernelPtr(
-            afwMath.LinearCombinationKernel(kernelBasisList, convKernelError2[:-1])
+            afwMath.LinearCombinationKernel(kernelBasisList, convKernelErrorVector2)
             )
         convDiffIm2    = ipDiffim.convolveAndSubtract(templateStampPtr.get(), imageStampPtr.get(), convKernelPtr2, convBackground2)
         # Things tend to converge after an single iteration, so just do this once.
@@ -649,59 +679,42 @@ Notes:
         
 
         # Assuming the template is better seeing, find deconvolution kernel
-        deconvKernelSolution1, deconvKernelError1 = ipDiffim.computePsfMatchingKernelForFootprint2(
+        deconvKernelVectorPair1 = ipDiffim.computePsfMatchingKernelForFootprint2(
             imageStampPtr.get(),
             templateStampPtr.get(),
             subtractedStamp,
             kernelBasisList,
             policy
         )
+        deconvKernelVector1, deconvKernelErrorVector1, deconvBackground1, deconvBackgroundError1 = vectorPairToVectors(deconvKernelVectorPair1)
         deconvKernelPtr1 = afwMath.LinearCombinationKernelPtr(
-            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelSolution1[:-1])
+            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelVector1)
             )
         deconvKernelErrorPtr1 = afwMath.LinearCombinationKernelPtr(
-            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelError1[:-1])
+            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelErrorVector1)
             )
         deconvDiffIm1    = ipDiffim.convolveAndSubtract(imageStampPtr.get(), templateStampPtr.get(), deconvKernelPtr1, deconvBackground1)
         #
         #### NOW REDO THIS USING A BETTER ESTIMATE OF THE VARIANCE FROM THE SUBTRACTED IMAGE!
         #
-        deconvKernelSolution2, deconvKernelError2 = ipDiffim.computePsfMatchingKernelForFootprint2(
+        deconvKernelVectorPair2 = ipDiffim.computePsfMatchingKernelForFootprint2(
             imageStampPtr.get(),
             templateStampPtr.get(),
             deconvDiffIm1,
             kernelBasisList,
             policy,
         )
+        deconvKernelVector2, deconvKernelErrorVector2, deconvBackground2, deconvBackgroundError2 = vectorPairToVectors(deconvKernelVectorPair2)
         deconvKernelPtr2 = afwMath.LinearCombinationKernelPtr(
-            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelSolution2[:-1])
+            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelVector2)
             )
         deconvKernelErrorPtr2 = afwMath.LinearCombinationKernelPtr(
-            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelError2[:-1])
+            afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelErrorVector2)
             )
         deconvDiffIm2    = ipDiffim.convolveAndSubtract(imageStampPtr.get(), templateStampPtr.get(), deconvKernelPtr2, deconvBackground2)
         # Things tend to converge after an single iteration, so just do this once.
 
 
-        if policy.get('debugIO') == True:
-            imageStampPtr.writeFits('iFoot_%d' % (footprintID))
-            templateStampPtr.writeFits('tFoot_%d' % (footprintID))
-
-            convKernelPtr.computeNewImage(False)[0].writeFits('cKernel_%d.fits' % (footprintID))
-            deconvKernelPtr.computeNewImage(False)[0].writeFits('dcKernel_%d.fits' % (footprintID))
-
-            convDiffIm2.writeFits('cDiff_%d' % (footprintID))
-            deconvDiffIm2.writeFits('dcDiff_%d' % (footprintID))
-
-            cSigma = imageToMatrix(convDiffIm2.getImage()) / numpy.sqrt(imageToMatrix(convDiffIm2.getVariance()))
-            cSigma = matrixToImage(cSigma)
-            cSigma.writeFits('cSig_%d.fits' % (footprintID))
-
-            dcSigma = imageToMatrix(deconvDiffIm2.getImage()) / numpy.sqrt(imageToMatrix(deconvDiffIm2.getVariance()))
-            dcSigma = matrixToImage(dcSigma)
-            dcSigma.writeFits('dcSig_%d.fits' % (footprintID))
-            
-        
         if policy.get('debugPlot') == True:
             convData     = imageToVector(convDiffIm1.getImage())
             convVariance = imageToVector(convDiffIm1.getVariance())
@@ -768,9 +781,9 @@ Notes:
         convDifiPtr.setColcNorm( float(fpMin.x() + fpMax.x()) / templateMaskedImage.getCols() - 1.0 )
         convDifiPtr.setRowcNorm( float(fpMin.y() + fpMax.y()) / templateMaskedImage.getRows() - 1.0 ) 
         convDifiPtr.setSingleKernelPtr( convKernelPtr2 )
-        convDifiPtr.setSingleKernelErrorPtr(convKernelErrorPtr2 )
-        convDifiPtr.setSingleBackground( convKernelSolution2[-1] )
-        convDifiPtr.setSingleBackgroundError( convKernelError2[-1] )
+        convDifiPtr.setSingleKernelErrorPtr( convKernelErrorPtr2 )
+        convDifiPtr.setSingleBackground( convBackground2  )
+        convDifiPtr.setSingleBackgroundError( convBackgroundError2 )
         convDifiPtr.setSingleStats(
             convDifiPtr.computeImageStatistics(convKernelPtr2, convBackground2)
             )
@@ -799,8 +812,8 @@ Notes:
         deconvDifiPtr.setRowcNorm( float(fpMin.y() + fpMax.y()) / templateMaskedImage.getRows() - 1.0 ) 
         deconvDifiPtr.setSingleKernelPtr( deconvKernelPtr2 )
         deconvDifiPtr.setSingleKernelErrorPtr( deconvKernelErrorPtr2 )
-        deconvDifiPtr.setSingleBackground( deconvKernelSolution2[-1] )
-        deconvDifiPtr.setSingleBackgroundError( deconvKernelError2[-1] )
+        deconvDifiPtr.setSingleBackground( deconvBackground2 )
+        deconvDifiPtr.setSingleBackgroundError( deconvBackgroundError2 )
         deconvDifiPtr.setSingleStats(
             deconvDifiPtr.computeImageStatistics(deconvKernelPtr2, deconvBackground2)
             )
@@ -819,6 +832,38 @@ Notes:
             deconvDifiPtr.getSingleStats().getResidualStd()
             ))
 
+        if policy.get('debugIO') == True:
+            imageStampPtr.writeFits('iFoot_%d' % (footprintID))
+            templateStampPtr.writeFits('tFoot_%d' % (footprintID))
+
+            ckp = convKernelPtr2.computeNewImage(False)[0]
+            #cmd = ckp.getMetadata()
+            #cmd.addProperty(dafBase.DataProperty('CONV', 'Template'))
+            #cmd.addProperty(dafBase.DataProperty('MSIG', convDifiPtr.getSingleStats().getResidualMean()))
+            #cmd.addProperty(dafBase.DataProperty('VSIG', convDifiPtr.getSingleStats().getResidualStd()))
+            #ckp.setMetadata(cmd)
+            ckp.writeFits('cKernel_%d.fits' % (footprintID))
+            
+            dckp = deconvKernelPtr2.computeNewImage(False)[0]
+            #dcmd = dckp.getMetadata()
+            #dcmd.addProperty(dafBase.DataProperty('CONV', 'Template'))
+            #dcmd.addProperty(dafBase.DataProperty('MSIG', deconvDifiPtr.getSingleStats().getResidualMean()))
+            #dcmd.addProperty(dafBase.DataProperty('VSIG', deconvDifiPtr.getSingleStats().getResidualStd()))
+            #dckp.setMetadata(dcmd)
+            dckp.writeFits('dcKernel_%d.fits' % (footprintID))
+
+            convDiffIm2.writeFits('cDiff_%d' % (footprintID))
+            deconvDiffIm2.writeFits('dcDiff_%d' % (footprintID))
+
+            cSigma = imageToMatrix(convDiffIm2.getImage()) / numpy.sqrt(imageToMatrix(convDiffIm2.getVariance()))
+            cSigma = matrixToImage(cSigma)
+            cSigma.writeFits('cSig_%d.fits' % (footprintID))
+
+            dcSigma = imageToMatrix(deconvDiffIm2.getImage()) / numpy.sqrt(imageToMatrix(deconvDiffIm2.getVariance()))
+            dcSigma = matrixToImage(dcSigma)
+            dcSigma.writeFits('dcSig_%d.fits' % (footprintID))
+            
+        
     rejectKernelOutliers(convolveDifiPtrList, policy)
     rejectKernelOutliers(deconvolveDifiPtrList, policy)
 

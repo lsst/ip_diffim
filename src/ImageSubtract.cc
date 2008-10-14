@@ -593,9 +593,7 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
  * \ingroup diffim
  */
 template <typename ImageT, typename MaskT>
-void lsst::ip::diffim::computePsfMatchingKernelForFootprint2(
-    std::vector<double> &kernelSolution,
-    std::vector<double> &kernelError,
+std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKernelForFootprint2(
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve, ///< Image to convolve
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve, ///< Image to not convolve
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &varianceImage, ///< Model of variance per pixel
@@ -727,25 +725,32 @@ void lsst::ip::diffim::computePsfMatchingKernelForFootprint2(
             
             for (int kidxi = 0; kiteri != convolvedAccessorColList.end(); ++kiteri, ++kidxi) {
                 ImageT cdCamerai   = *kiteri->image;
-                
+
+                /* NOTE - Commenting in these additional pixel accesses yields
+                 * an additional second of run-time per kernel with opt=1 at 2.8
+                 * GHz*/
+
+                /* ignore unnecessary pixel accesses 
                 ImageT cdVariancei = *kiteri->variance;
                 MaskT  cdMaski     = *kiteri->mask;
                 lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
                                             "Accessing convolved image %d : %.3f %.3f %d",
                                             kidxi, cdCamerai, cdVariancei, cdMaski);
-                
+                */
+
                 /* kernel index j  */
                 typename std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> >::iterator kiterj = kiteri;
                 for (int kidxj = kidxi; kiterj != convolvedAccessorColList.end(); ++kiterj, ++kidxj) {
                     ImageT cdCameraj   = *kiterj->image;
-                    
-                    /* NOTE - These inner trace statements can ENTIRELY kill the run time */
+
+                    /* ignore unnecessary pixel accesses 
                     ImageT cdVariancej = *kiterj->variance;
                     MaskT  cdMaskj     = *kiterj->mask;
                     lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
                                                 "Accessing convolved image %d : %.3f %.3f %d",
                                                 kidxj, cdCameraj, cdVariancej, cdMaskj);
-                    
+                    */
+
                     M[kidxi][kidxj] += cdCamerai * cdCameraj * iVariance;
                 } 
                 
@@ -799,25 +804,24 @@ void lsst::ip::diffim::computePsfMatchingKernelForFootprint2(
     lsst::pex::logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
                                 "Total compute time before matrix inversions : %.2f s", time);
 
-    /* Invert using SVD and Pseudoinverse */
-    vw::math::Matrix<double> Minv;
-    Minv = vw::math::pseudoinverse(M);
-    /*Minv = vw::math::inverse(M); */
+    /* Invert using SVD and Pseudoinverse : This is a full second slower per
+     * kernel than vw::math::least_squares, compiled at opt=1 at 2.8 GHz.
 
-    /* I think that the diagonal elements of Minv are the variances on the
-     * solution; that is, their uncertainty is the sqrt of the diagonal
-     * elements */
-    
-#if DEBUG_MATRIX
-    std::cout << "Minv : " << Minv << std::endl;
-#endif
-    
-    /* Solve for x in Mx = B */
-    vw::math::Vector<double> Soln = Minv * B;
-    
+     vw::math::Matrix<double> Minv = vw::math::pseudoinverse(M);
+     vw::math::Vector<double> Soln = Minv * B;
+    */
+
+    /* Invert using VW's internal method */
+    vw::math::Vector<double> Soln = vw::math::least_squares(M, B);
+
+    /* Additional gymnastics to get the parameter uncertainties */
+    vw::math::Matrix<double> Mt = vw::math::transpose(M);
+    vw::math::Matrix<double> MtM = Mt * M;
+    vw::math::Matrix<double> Error = vw::math::pseudoinverse(MtM);
+
 #if DEBUG_MATRIX
     for (int kidxi=0; kidxi < nParameters; ++kidxi) {
-        std::cout << "Par " << kidxi << " : " << Soln[kidxi] << " +/- " << sqrt(Minv[kidxi][kidxi]) << std::endl;
+        std::cout << "Par " << kidxi << " : " << Soln[kidxi] << " +/- " << sqrt(Error[kidxi][kidxi]) << std::endl;
     }
 #endif
     
@@ -826,17 +830,15 @@ void lsst::ip::diffim::computePsfMatchingKernelForFootprint2(
                                 "Total compute time after matrix inversions : %.2f s", time);
 
     /* Translate from VW std::vectors to std::vectors */
-    kernelSolution.resize(nKernelParameters);
-    kernelError.resize(nKernelParameters);
-
+    std::vector<std::pair<double,double> > kernelSolution;
     for (int ki = 0; ki < nParameters; ++ki) {
-        kernelSolution[ki] = Soln[ki];
-        kernelError[ki] = sqrt(Minv[ki][ki]);
+        kernelSolution.push_back(std::make_pair<double,double>( Soln[ki], sqrt(Error[ki][ki]) ));
     }
 
     lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
                                 "Leaving subroutine computePsfMatchingKernelForFootprint");
-
+    
+    return kernelSolution;
 }
 
 /** 
@@ -1125,9 +1127,7 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
     lsst::pex::policy::Policy &policy);
 
 template
-void lsst::ip::diffim::computePsfMatchingKernelForFootprint2(
-    std::vector<double> &kernelSolution,
-    std::vector<double> &kernelError,
+std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKernelForFootprint2(
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &varianceImage,
@@ -1135,9 +1135,7 @@ void lsst::ip::diffim::computePsfMatchingKernelForFootprint2(
     lsst::pex::policy::Policy &policy);
 
 template
-void lsst::ip::diffim::computePsfMatchingKernelForFootprint2(
-    std::vector<double> &kernelSolution,
-    std::vector<double> &kernelError,
+std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKernelForFootprint2(
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &varianceImage,

@@ -2,7 +2,7 @@
 # Default Image Subtraction Policy File
 
 # Write intermediate FITS files? (boolean)
-debugIO: false
+debugIO: true
 debugPlot: true
 
 # Size of the convolution kernel
