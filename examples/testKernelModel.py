@@ -613,8 +613,8 @@ Notes:
                                                               kernelRows)
     # lets just get a couple for debugging and speed
     policy.set('getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints', 5)
-    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 6350.)
-    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 1000.)
+    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 6350.)
+    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 1000.)
 
     footprintList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                                      scienceMaskedImage,
@@ -649,10 +649,10 @@ Notes:
             policy
         )
         convKernelVector1, convKernelErrorVector1, convBackground1, convBackgroundError1 = vectorPairToVectors(convKernelVectorPair1)
-        convKernelPtr1 = afwMath.LinearCombinationKernelPtr(
+        convKernelPtr1 = afwMath.KernelPtr(
             afwMath.LinearCombinationKernel(kernelBasisList, convKernelVector1)
             )
-        convKernelErrorPtr1 = afwMath.LinearCombinationKernelPtr(
+        convKernelErrorPtr1 = afwMath.KernelPtr(
             afwMath.LinearCombinationKernel(kernelBasisList, convKernelErrorVector1)
             )
         convDiffIm1    = ipDiffim.convolveAndSubtract(templateStampPtr.get(), imageStampPtr.get(), convKernelPtr1, convBackground1)
@@ -667,10 +667,10 @@ Notes:
             policy
         )
         convKernelVector2, convKernelErrorVector2, convBackground2, convBackgroundError2 = vectorPairToVectors(convKernelVectorPair2)
-        convKernelPtr2 = afwMath.LinearCombinationKernelPtr(
+        convKernelPtr2 = afwMath.KernelPtr(
             afwMath.LinearCombinationKernel(kernelBasisList, convKernelVector2)
             )
-        convKernelErrorPtr2 = afwMath.LinearCombinationKernelPtr(
+        convKernelErrorPtr2 = afwMath.KernelPtr(
             afwMath.LinearCombinationKernel(kernelBasisList, convKernelErrorVector2)
             )
         convDiffIm2    = ipDiffim.convolveAndSubtract(templateStampPtr.get(), imageStampPtr.get(), convKernelPtr2, convBackground2)
@@ -687,10 +687,10 @@ Notes:
             policy
         )
         deconvKernelVector1, deconvKernelErrorVector1, deconvBackground1, deconvBackgroundError1 = vectorPairToVectors(deconvKernelVectorPair1)
-        deconvKernelPtr1 = afwMath.LinearCombinationKernelPtr(
+        deconvKernelPtr1 = afwMath.KernelPtr(
             afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelVector1)
             )
-        deconvKernelErrorPtr1 = afwMath.LinearCombinationKernelPtr(
+        deconvKernelErrorPtr1 = afwMath.KernelPtr(
             afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelErrorVector1)
             )
         deconvDiffIm1    = ipDiffim.convolveAndSubtract(imageStampPtr.get(), templateStampPtr.get(), deconvKernelPtr1, deconvBackground1)
@@ -705,10 +705,10 @@ Notes:
             policy,
         )
         deconvKernelVector2, deconvKernelErrorVector2, deconvBackground2, deconvBackgroundError2 = vectorPairToVectors(deconvKernelVectorPair2)
-        deconvKernelPtr2 = afwMath.LinearCombinationKernelPtr(
+        deconvKernelPtr2 = afwMath.KernelPtr(
             afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelVector2)
             )
-        deconvKernelErrorPtr2 = afwMath.LinearCombinationKernelPtr(
+        deconvKernelErrorPtr2 = afwMath.KernelPtr(
             afwMath.LinearCombinationKernel(kernelBasisList, deconvKernelErrorVector2)
             )
         deconvDiffIm2    = ipDiffim.convolveAndSubtract(imageStampPtr.get(), templateStampPtr.get(), deconvKernelPtr2, deconvBackground2)
