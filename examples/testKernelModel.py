@@ -613,9 +613,9 @@ Notes:
                                                               kernelRows)
     # lets just get a couple for debugging and speed
     policy.set('getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints', 5)
-    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 6350.)
-    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 1000.)
-
+    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 6350.)
+    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 1000.)
+    
     footprintList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                                      scienceMaskedImage,
                                                                      policy)

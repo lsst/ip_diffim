@@ -292,10 +292,20 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollection
             } 
 
             /* grab the BBox and grow it; this will eventually be overridden by a grow method on Footprint */
+
+            /* this caused a gcc -O2 error; will leave in for some future programmer's amusement */
+            /*
             vw::BBox2i footprintBBox = (*i)->getBBox();
             footprintBBox.grow(footprintBBox.max() + vw::Vector2i(footprintDiffimGrow,footprintDiffimGrow));
             footprintBBox.grow(footprintBBox.min() - vw::Vector2i(footprintDiffimGrow,footprintDiffimGrow));
+            */
 
+            /* the workaround provided by Serge */
+            vw::BBox2i const & bb = (*i)->getBBox();
+            vw::Vector2i const minVec(bb.min().x() - footprintDiffimGrow, bb.min().y() - footprintDiffimGrow);
+            vw::Vector2i const maxVec(bb.max().x() + footprintDiffimGrow, bb.max().y() + footprintDiffimGrow);
+            vw::BBox2i const footprintBBox(minVec, maxVec);
+            
             /* grab a subimage; there is an exception if its e.g. too close to the image */
             try {
                 imageToConvolveFootprintPtr = imageToConvolve.getSubImage(footprintBBox);
