@@ -54,6 +54,13 @@ def vectorToImage(arr, nCols, nRows):
             n += 1
     return im
 
+def matrixToKernelPtr(arr):
+    im = afwImage.ImageD(arr.shape[0], arr.shape[1])
+    for row in range(im.getRows()):
+        for col in range(im.getCols()):
+            im.set(col, row, arr[col, row])
+    return afwMath.KernelPtr( afwMath.FixedKernel(im) ) 
+
 def vectorToKernelPtr(arr, nCols, nRows):
     # need imageD for FixedKernels
     assert len(arr) == nCols * nRows
@@ -172,6 +179,103 @@ def fitSpatialFunction(spatialFunction, values, errors, col, row, policy):
 
 def fitKriging(values, errors, col, row, policy):
     return
+
+
+def fitPca(differenceImageFootprintInformationList, policy):
+    kernelCols = policy.get('kernelCols')
+    kernelRows = policy.get('kernelRows')
+    
+    # how many good footprints are we dealing with here
+    goodDifiList = ipDiffim.getGoodFootprints(differenceImageFootprintInformationList)
+    nFootprint   = len(goodDifiList)
+
+    # matrix to invert
+    M = numpy.zeros((kernelCols*kernelRows, nFootprint))
+    for i in range(nFootprint):
+        singleKernelImage  = goodDifiList[i].getSingleKernelPtr().computeNewImage(False)[0]
+        singleKernelVector = imageToVector(singleKernelImage)
+        M[:,i]             = singleKernelVector
+        
+    # do the PCA
+    #meanM = numpy.zeros((kernelCols*kernelRows))
+    #eVal  = numpy.zeros((nFootprint))
+    #eVec  = numpy.zeros((kernelCols*kernelRows, nFootprint))
+    # unfortunately, this depends on vw::math.
+    # ipDiffim.computePca(meanM, eVal, eVec, M, True)
+    # do it in python for now...
+
+    # Structure of numpy arrays :
+    #   numpy.zeros( (2,3) )
+    #   array([[ 0.,  0.,  0.],
+    #          [ 0.,  0.,  0.]])
+    # The first dimension is rows, second is columns
+
+    # We are going to put the features down a given row; the instances
+    # one in each column.  We need to subtract off the Mean feature -
+    # array.mean(0) returns the mean for each column; array.mean(1)
+    # returns the mean for each row.  Therefore the mean Kernel is
+    # M.mean(1).
+    meanM = M.mean(1)
+
+    # Subtract off the mean Kernel from each column.
+    M    -= meanM[:,numpy.newaxis]
+
+    # def svd(a, full_matrices=1, compute_uv=1):
+    #
+    #    """Singular Value Decomposition.
+    #
+    #    Factorizes the matrix a into two unitary matrices U and Vh and
+    #    an 1d-array s of singular values (real, non-negative) such that
+    #    a == U S Vh  if S is an suitably shaped matrix of zeros whose
+    #    main diagonal is s.
+    #
+    #    Parameters
+    #    ----------
+    #    a : array-like, shape (M, N)
+    #        Matrix to decompose
+    #    full_matrices : boolean
+    #        If true,  U, Vh are shaped  (M,M), (N,N)
+    #        If false, the shapes are    (M,K), (K,N) where K = min(M,N)
+    #    compute_uv : boolean
+    #        Whether to compute U and Vh in addition to s
+    #
+    #    Returns
+    #    -------
+    #    U:  array, shape (M,M) or (M,K) depending on full_matrices
+    #    s:  array, shape (K,)
+    #        The singular values, sorted so that s[i] >= s[i+1]
+    #        K = min(M, N)
+    #    Vh: array, shape (N,N) or (K,N) depending on full_matrices
+    #
+    # 
+
+    # A given eigenfeature of M will be down a row of U; the different
+    # eigenfeatures are in the columns of U.  I.e the primary
+    # eigenfeature is U[:,0].
+    #
+    # The eigenvalues correspond to s**2 and are already sorted
+    U,s,Vh = numpy.linalg.svd( M, full_matrices=0 )
+    eVal   = s**2
+
+    # Find the contribution of each eigenKernel to each Kernel.
+    # Simple dot product, transpose of M dot the eigenCoeff matrix.
+    # The contribution of eigenKernel X to Kernel Y is in eCoeff[Y,X].
+    #
+    # I.e. M[:,X] = numpy.sum(U * eCoeff[X], 1)
+    eCoeff = numpy.dot(M.T, U)
+    for i in range(nFootprint):
+        residual = numpy.sum(U * eCoeff[i], 1) - M[:,i]
+        assert(numpy.sum(residual) < 1e-10)
+
+    # Turn into Kernels
+    meanKernelPtr    = vectorToKernelPtr( meanM, kernelCols, kernelRows )
+
+    eKernelPtrVector = afwMath.VectorKernel()
+    for i in range(U.shape[1]):
+        eKernelPtr   = vectorToKernelPtr( U[:,i], kernelCols, kernelRows )
+        eKernelPtrVector.append(eKernelPtr)
+
+    return meanKernelPtr, eKernelPtrVector, eVal, eCoeff
 
 
 def fitPerPixel(differenceImageFootprintInformationList, policy):
@@ -316,134 +420,6 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
 
 
 
-def fitPca(differenceImageFootprintInformationList, policy):
-    kernelCols = policy.get('kernelCols')
-    kernelRows = policy.get('kernelRows')
-    
-    # how many good footprints are we dealing with here
-    goodDifiList = ipDiffim.getGoodFootprints(differenceImageFootprintInformationList)
-    nFootprint   = len(goodDifiList)
-
-    # matrix to invert
-    M = numpy.zeros((kernelCols*kernelRows, nFootprint))
-    for i in range(nFootprint):
-        singleKernelImage  = goodDifiList[i].getSingleKernelPtr().computeNewImage(False)[0]
-        singleKernelVector = imageToVector(singleKernelImage)
-        M[:,i]             = singleKernelVector
-        
-    # do the PCA
-    #meanM = numpy.zeros((kernelCols*kernelRows))
-    #eVal  = numpy.zeros((nFootprint))
-    #eVec  = numpy.zeros((kernelCols*kernelRows, nFootprint))
-    # unfortunately, this depends on vw::math.
-    # ipDiffim.computePca(meanM, eVal, eVec, M, True)
-    # do it in python for now...
-
-    # Structure of numpy arrays :
-    #   numpy.zeros( (2,3) )
-    #   array([[ 0.,  0.,  0.],
-    #          [ 0.,  0.,  0.]])
-    # The first dimension is rows, second is columns
-
-    # We are going to put the features down a given row; the instances
-    # one in each column.  We need to subtract off the Mean feature -
-    # array.mean(0) returns the mean for each column; array.mean(1)
-    # returns the mean for each row.  Therefore the mean Kernel is
-    # M.mean(1).
-    meanM = M.mean(1)
-
-    # Subtract off the mean Kernel from each column.
-    M    -= meanM[:,numpy.newaxis]
-
-    # def svd(a, full_matrices=1, compute_uv=1):
-    #
-    #    """Singular Value Decomposition.
-    #
-    #    Factorizes the matrix a into two unitary matrices U and Vh and
-    #    an 1d-array s of singular values (real, non-negative) such that
-    #    a == U S Vh  if S is an suitably shaped matrix of zeros whose
-    #    main diagonal is s.
-    #
-    #    Parameters
-    #    ----------
-    #    a : array-like, shape (M, N)
-    #        Matrix to decompose
-    #    full_matrices : boolean
-    #        If true,  U, Vh are shaped  (M,M), (N,N)
-    #        If false, the shapes are    (M,K), (K,N) where K = min(M,N)
-    #    compute_uv : boolean
-    #        Whether to compute U and Vh in addition to s
-    #
-    #    Returns
-    #    -------
-    #    U:  array, shape (M,M) or (M,K) depending on full_matrices
-    #    s:  array, shape (K,)
-    #        The singular values, sorted so that s[i] >= s[i+1]
-    #        K = min(M, N)
-    #    Vh: array, shape (N,N) or (K,N) depending on full_matrices
-    #
-    # 
-
-    # A given eigenfeature of M will be down a row of U; the different
-    # eigenfeatures are in the columns of U.  I.e the primary
-    # eigenfeature is U[:,0].
-    #
-    # The eigenvalues correspond to s**2 and are already sorted
-    U,s,Vh = numpy.linalg.svd( M, full_matrices=0 )
-    eVal   = s**2
-
-    # Find the contribution of each eigenKernel to each Kernel.
-    # Simple dot product, transpose of M dot the eigenCoeff matrix.
-    # The contribution of eigenKernel X to Kernel Y is in eCoeff[Y,X].
-    #
-    # I.e. M[:,X] = numpy.sum(U * eCoeff[X], 1)
-    eCoeff = numpy.dot(M.T, U)
-    for i in range(nFootprint):
-        residual = numpy.sum(U * eCoeff[i], 1) - M[:,i]
-        assert(numpy.sum(residual) < 1e-10)
-    
-    # Now make PCA-approximations of each Kernel, and watch how the
-    # diffim residuals decrease as a function of # of eigenKernels.
-    for i in range(nFootprint):
-        kModel   = meanM.copy()
-
-        # Calculate statistics using approximated Kernel
-        approxKernelPtr     = vectorToKernelPtr(kModel, kernelCols, kernelRows)
-        approxStatistics    = goodDifiList[i].computeImageStatistics(approxKernelPtr,
-                                                                     goodDifiList[i].getSingleBackground())
-
-        eContrib = U * eCoeff[i]
-        for nKernel in range(eContrib.shape[1]):
-            kModel += eContrib[:,nKernel]
-
-            # Calculate statistics ...
-            approxKernelPtr     = vectorToKernelPtr(kModel, kernelCols, kernelRows)
-            approxStatistics    = goodDifiList[i].computeImageStatistics(approxKernelPtr,
-                                                                         goodDifiList[i].getSingleBackground())
-            
-
-    # Turn into Kernels
-    #eKernelPtrVector = afwMath.VectorKernel()
-    #mKernelImage     = vectorToImage( meanM, kernelCols, kernelRows )
-    #mKernelPtr       = afwMath.KernelPtr( afwMath.FixedKernel(mKernelImage) )
-    #eKernelPtrVector.append(mKernelPtr)
-    #for i in range(U.shape[1]):
-    #    eKernelImage = vectorToImage( U[:,i], kernelCols, kernelRows )
-    #    eKernelPtr   = afwMath.KernelPtr( afwMath.FixedKernel(eKernelImage) )
-    #    #eKernelPtrVector.append(eKernelPtr)
-
-    # return eKernelPtrVector, eVal, eCoeff
-
-    # HACK UNTIL I CAN MAKE FIXEDKERNELS
-    info = ( imageToMatrix( vectorToImage( meanM, kernelCols, kernelRows ) ),
-             imageToMatrix( vectorToImage( U[:,0], kernelCols, kernelRows ) ),
-             imageToMatrix( vectorToImage( U[:,1], kernelCols, kernelRows ) ),
-             imageToMatrix( vectorToImage( U[:,2], kernelCols, kernelRows ) ),
-             imageToMatrix( vectorToImage( U[:,3], kernelCols, kernelRows ) ),
-             imageToMatrix( vectorToImage( U[:,4], kernelCols, kernelRows ) ),
-             eVal )
-
-    return info
     
 
 
@@ -613,8 +589,9 @@ Notes:
                                                               kernelRows)
     # lets just get a couple for debugging and speed
     policy.set('getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints', 5)
-    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 6350.)
-    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 1000.)
+    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 6350.)  # gets 5
+    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 5000.)  # gets 12
+    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 1000.) # gets full test suite
     
     footprintList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                                      scienceMaskedImage,
@@ -635,7 +612,7 @@ Notes:
         templateStampPtr = templateMaskedImage.getSubImage(footprintBBox)
         imageStampPtr = scienceMaskedImage.getSubImage(footprintBBox)
 
-        # initial estimate of the variance per pixel
+        # initial estimate of the variance per pixel, straight subtraction
         subtractedStamp  = afwImage.MaskedImageF(templateStampPtr.getCols(), templateStampPtr.getRows())
         subtractedStamp += imageStampPtr.get()
         subtractedStamp -= templateStampPtr.get()
@@ -868,15 +845,34 @@ Notes:
     rejectKernelOutliers(deconvolveDifiPtrList, policy)
 
     # now we get to the good stuff!
-    # HACK UNTIL I CAN MAKE FIXEDKERNELS
-    #convEKernel,   convEVals,   convECoeffs   = fitPca(convolveDifiPtrList, policy)
-    #deconvEKernel, deconvEVals, deconvECoeffs = fitPca(deconvolveDifiPtrList, policy)
-
-    convInfo   = fitPca(convolveDifiPtrList, policy)
-    deconvInfo = fitPca(deconvolveDifiPtrList, policy)
+    convMKernel,   convEKernels,   convEVals,   convECoeffs   = fitPca(convolveDifiPtrList, policy)
+    deconvMKernel, deconvEKernels, deconvEVals, deconvECoeffs = fitPca(deconvolveDifiPtrList, policy)
 
     if policy.get('debugPlot') == True:
-        ip_diffim_plot.eigenKernelPlot(convInfo, deconvInfo, outfile='EKernel.ps')
+        ip_diffim_plot.eigenKernelPlot( (convMKernel,   convEKernel,   convEVals),
+                                        (deconvMKernel, deconvEKernel, deconvEVals),
+                                        outfile='EKernel.ps'
+                                        )
+
+        goodDifiList = ipDiffim.getGoodFootprints(convolveDifiPtrList)
+        nFootprint   = len(goodDifiList)
+        for i in range(nFootprint):
+            ip_diffim_plot.approxKernelPlot(goodDifiList[i],
+                                            (convMKernel, convEKernel),
+                                            title='Kernel %d conv' % (i),
+                                            outfile='PCA_Kc_%d.ps' % (i)
+                                        )
+
+        goodDifiList = ipDiffim.getGoodFootprints(deconvolveDifiPtrList)
+        nFootprint   = len(goodDifiList)
+        for i in range(nFootprint):
+            ip_diffim_plot.approxKernelPlot(goodDifiList[i],
+                                            (deconvMKernel, deconvEKernel),
+                                            title='Kernel %d dconv' % (i),
+                                            outfile='PCA_Kdc_%d.ps' % (i)
+                                        )
+        
+    return
 
     # foo for plotting
     fooconvResiduals1   = fitPerPixel(convolveDifiPtrList, policy)
