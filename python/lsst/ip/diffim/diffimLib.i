@@ -55,6 +55,8 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 /* classes */
 %template(DifferenceImageStatisticsF)
     lsst::ip::diffim::DifferenceImageStatistics<float, lsst::afw::image::maskPixelType>;
+%template(DifferenceImageStatisticsD)
+    lsst::ip::diffim::DifferenceImageStatistics<double, lsst::afw::image::maskPixelType>;
 
 %template(DifferenceImageFootprintInformationF)  
     lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>;
@@ -62,6 +64,13 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
                   lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>);
 %template(DifiPtrListF)
     std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::Ptr>;
+
+%template(DifferenceImageFootprintInformationD)  
+    lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>;
+%boost_shared_ptr(DifiPtrD, 
+                  lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>);
+%template(DifiPtrListD)
+    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>::Ptr>;
 
 /* subroutines */
 %template(getGoodFootprints)

@@ -1,4 +1,6 @@
 import numpy, pylab
+import lsst.ip.diffim.diffimTools as ipDiffimTools
+
 
 # Helper routines
 def scaleImageTo8Bit(indata):
@@ -44,12 +46,12 @@ def plotBackground( (backgroundFunction, cols, rows), nbins=100, outfile=None):
 def makeApproxKernelPlot(difi, kernelInfo, title):
     meanKernel, eigenKernels = kernelInfo
 
-    meanImage = imageToMatrix( meanKernel.computeNewImage(False)[0] )
+    meanImage = ipDiffimTools.imageToMatrix( meanKernel.computeNewImage(False)[0] )
     eigenImages = []
     for i in range(len(eigenKernels)):
-        eigenImages.append( imageToMatrix( eigenKernels[i].computeNewImage(False)[0] ) )
+        eigenImages.append( ipDiffimTools.imageToMatrix( eigenKernels[i].computeNewImage(False)[0] ) )
 
-    originalImage = imageToMatrix( difi.getSingleKernelPtr().computeNewImage(False)[0] )
+    originalImage = ipDiffimTools.imageToMatrix( difi.getSingleKernelPtr().computeNewImage(False)[0] )
     
     # Now make PCA-approximations of each Kernel, and watch how the
     # diffim residuals decrease as a function of # of eigenKernels.
@@ -59,7 +61,7 @@ def makeApproxKernelPlot(difi, kernelInfo, title):
     # Calculate statistics using approximated Kernel
     kModel = meanImage.copy()
 
-    approxKernelPtr = matrixToKernelPtr(kModel)
+    approxKernelPtr = ipDiffimTools.matrixToKernelPtr(kModel)
     kResid = num.sum( num.abs( kModel - originalImage )**2 )
     kResids.append( (kModel, kResid) )
     
@@ -75,7 +77,7 @@ def makeApproxKernelPlot(difi, kernelInfo, title):
         approxStatistics.getResidualMean(),
         approxStatistics.getResidualStd()
         ))
-    dResids.append( ( imageToMatrix(approxDiffim),
+    dResids.append( ( ipDiffimTools.imageToMatrix(approxDiffim),
                       approxStatistics.getResidualMean(),
                       approxStatistics.getResidualStd() )
                     )
@@ -85,7 +87,7 @@ def makeApproxKernelPlot(difi, kernelInfo, title):
         eCoeff  = num.ravel( (originalImage - meanImage) ).T * num.ravel( eigenImages[nKernel] )
         kModel += eCoeff * eigenImages[nKernel]
 
-        approxKernelPtr = matrixToKernelPtr(kModel)
+        approxKernelPtr = ipDiffimTools.matrixToKernelPtr(kModel)
         kResid = num.sum( num.abs( kModel - originalImage )**2 )
         kResids.append( (kModel, kResid) )
         
@@ -101,7 +103,7 @@ def makeApproxKernelPlot(difi, kernelInfo, title):
             approxStatistics.getResidualMean(),
             approxStatistics.getResidualStd()
             ))
-        dResids.append( ( imageToMatrix(approxDiffim),
+        dResids.append( ( ipDiffimTools.imageToMatrix(approxDiffim),
                           approxStatistics.getResidualMean(),
                           approxStatistics.getResidualStd() )
                         )
@@ -262,32 +264,32 @@ def eigenKernelPlot(convInfo, deconvInfo, fontsize=10, outfile=None):
     #
 
     sp_ckm = pylab.axes(ckm)
-    sp_ckm.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( convMKernel.computeNewImage(False)[0] ) ), 
+    sp_ckm.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( convMKernel.computeNewImage(False)[0] ) ), 
                    cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_ckm.set_title('Mean', fontsize=fontsize, weight='bold')
 
     sp_ck1 = pylab.axes(ck1)
-    sp_ck1.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( convEKernel[0].computeNewImage(False)[0] ) ),
+    sp_ck1.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( convEKernel[0].computeNewImage(False)[0] ) ),
                    cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_ck1.set_title('PK1', fontsize=fontsize, weight='bold')
 
     sp_ck2 = pylab.axes(ck2)
-    sp_ck2.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( convEKernel[1].computeNewImage(False)[0] ) ),
+    sp_ck2.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( convEKernel[1].computeNewImage(False)[0] ) ),
                    cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_ck2.set_title('PK2', fontsize=fontsize, weight='bold')
 
     sp_ck3 = pylab.axes(ck3)
-    sp_ck3.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( convEKernel[2].computeNewImage(False)[0] ) ),
+    sp_ck3.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( convEKernel[2].computeNewImage(False)[0] ) ),
                    cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_ck3.set_xlabel('PK3', fontsize=fontsize, weight='bold')
 
     sp_ck4 = pylab.axes(ck4)
-    sp_ck4.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( convEKernel[3].computeNewImage(False)[0] ) ),
+    sp_ck4.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( convEKernel[3].computeNewImage(False)[0] ) ),
                    cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_ck4.set_xlabel('PK4', fontsize=fontsize, weight='bold')
 
     sp_ck5 = pylab.axes(ck5)
-    sp_ck5.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( convEKernel[4].computeNewImage(False)[0] ) ),
+    sp_ck5.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( convEKernel[4].computeNewImage(False)[0] ) ),
                    cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_ck5.set_xlabel('PK5', fontsize=fontsize, weight='bold')
 
@@ -313,32 +315,32 @@ def eigenKernelPlot(convInfo, deconvInfo, fontsize=10, outfile=None):
     #
 
     sp_dckm = pylab.axes(dckm)
-    sp_dckm.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( deconvMKernel.computeNewImage(False)[0] ) ),
+    sp_dckm.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( deconvMKernel.computeNewImage(False)[0] ) ),
                     cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_dckm.set_title('Mean', fontsize=fontsize, weight='bold')
 
     sp_dck1 = pylab.axes(dck1)
-    sp_dck1.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( deconvEKernel[0].computeNewImage(False)[0] ) ),
+    sp_dck1.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( deconvEKernel[0].computeNewImage(False)[0] ) ),
                     cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_dck1.set_title('PK1', fontsize=fontsize, weight='bold')
 
     sp_dck2 = pylab.axes(dck2)
-    sp_dck2.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( deconvEKernel[1].computeNewImage(False)[0] ) ),
+    sp_dck2.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( deconvEKernel[1].computeNewImage(False)[0] ) ),
                     cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_dck2.set_title('PK2', fontsize=fontsize, weight='bold')
 
     sp_dck3 = pylab.axes(dck3)
-    sp_dck3.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( deconvEKernel[2].computeNewImage(False)[0] ) ),
+    sp_dck3.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( deconvEKernel[2].computeNewImage(False)[0] ) ),
                     cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_dck3.set_xlabel('PK3', fontsize=fontsize, weight='bold')
 
     sp_dck4 = pylab.axes(dck4)
-    sp_dck4.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( deconvEKernel[3].computeNewImage(False)[0] ) ),
+    sp_dck4.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( deconvEKernel[3].computeNewImage(False)[0] ) ),
                     cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_dck4.set_xlabel('PK4', fontsize=fontsize, weight='bold')
 
     sp_dck5 = pylab.axes(dck5)
-    sp_dck5.imshow( scaleImageForDisplay_nonlinear( imageToMatrix( deconvEKernel[4].computeNewImage(False)[0] ) ),
+    sp_dck5.imshow( scaleImageForDisplay_nonlinear( ipDiffimTools.imageToMatrix( deconvEKernel[4].computeNewImage(False)[0] ) ),
                     cmap=pylab.cm.gray, extent=None, aspect='equal', interpolation='sinc' )
     sp_dck5.set_xlabel('PK5', fontsize=fontsize, weight='bold')
 

@@ -196,7 +196,7 @@ lsst::ip::diffim::generateAlardLuptonKernelSet(
 
 /** 
  * @brief Implement fundamental difference imaging step of convolution and
- * subtraction
+ * subtraction : D = I - (K.x.T + bg)
  *
  * @return Difference image
  *
@@ -819,7 +819,7 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
 
      vw::math::Matrix<double> Minv = vw::math::pseudoinverse(M);
      vw::math::Vector<double> Soln = Minv * B;
-    */
+     */     
 
     /* Invert using VW's internal method */
     vw::math::Vector<double> Soln = vw::math::least_squares(M, B);
@@ -828,6 +828,16 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
     vw::math::Matrix<double> Mt = vw::math::transpose(M);
     vw::math::Matrix<double> MtM = Mt * M;
     vw::math::Matrix<double> Error = vw::math::pseudoinverse(MtM);
+
+    /*
+      NOTE : for any real kernels I have looked at, these solutions have agreed
+      exactly.  However, when designing the testDeconvolve unit test with
+      hand-built gaussians as objects and non-realistic noise, the solutions did
+      *NOT* agree.
+
+      std::cout << "Soln : " << Soln << std::endl;
+      std::cout << "Soln2 : " << Soln2 << std::endl;
+    */
 
 #if DEBUG_MATRIX
     for (int kidxi=0; kidxi < nParameters; ++kidxi) {

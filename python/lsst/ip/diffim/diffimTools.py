@@ -1,4 +1,6 @@
 import numpy
+import lsst.afw.math as afwMath
+import lsst.afw.image as afwImage
 
 # Temporary functions until we formalize this in the build system somewhere
 ### NOTE THESE ARE ALSO IN lsst.afw.image.testUtils

@@ -3,7 +3,7 @@
 
 # Write intermediate FITS files? (boolean)
 debugIO: true
-debugPlot: true
+debugPlot: false
 
 # Size of the convolution kernel
 kernelRows: 19
@@ -90,10 +90,10 @@ computeSpatiallyVaryingPsfMatchingKernel: {
 
 SDQA: {
     # Maximum average of (residual/noise) for an acceptable Kernel; mean should be 0
-    maximumFootprintResidualMean: 1000.0 # 1.0
+    maximumFootprintResidualMean: 1.0
 
     # Maximum standard deviation of (residual/noise) for an acceptable Kernel; variance should be 1
-    maximumFootprintResidualStd: 1000.0 # 2.0
+    maximumFootprintResidualStd: 2.0
 }
 
 ######### Restructuring to have full package path
