@@ -207,6 +207,12 @@ namespace diffim {
         lsst::afw::math::Function2<FunctionT> const &function
         );
 
+    template <typename PixelT, typename FunctionT>
+    void subtractFunction(
+        lsst::afw::image::Image<PixelT> &image,
+        lsst::afw::math::Function2<FunctionT> const &function
+        );
+
 }}}
 
 #endif

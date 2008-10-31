@@ -83,6 +83,10 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 %template(addFunction)                      lsst::ip::diffim::addFunction<float, double>;
 %template(addFunction)                      lsst::ip::diffim::addFunction<double, float>;
 %template(addFunction)                      lsst::ip::diffim::addFunction<float, float>;
+%template(subtractFunction)                 lsst::ip::diffim::subtractFunction<double, double>;
+%template(subtractFunction)                 lsst::ip::diffim::subtractFunction<float, double>;
+%template(subtractFunction)                 lsst::ip::diffim::subtractFunction<double, float>;
+%template(subtractFunction)                 lsst::ip::diffim::subtractFunction<float, float>;
 
 /* ImageSubtract.h */
 /*******************/

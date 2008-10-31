@@ -1338,7 +1338,7 @@ void lsst::ip::diffim::calculateVectorStatistics(
 }
 
 /** 
- * @brief Adds a Function to an Image
+ * @brief Add a Function to an Image
  *
  * @ingroup diffim
  */
@@ -1357,6 +1357,30 @@ void lsst::ip::diffim::addFunction(
         for (unsigned int col = 0; col < numCols; ++col, imCol.next_col()) {
             double colPos = lsst::afw::image::positionToIndex(col);
             *imCol += static_cast<PixelT>(function(colPos, rowPos));
+        }
+    }
+}
+
+/** 
+ * @brief Subtract a Function from an Image
+ *
+ * @ingroup diffim
+ */
+template <typename PixelT, typename FunctionT>
+void lsst::ip::diffim::subtractFunction(
+    lsst::afw::image::Image<PixelT> &image, ///< image
+    lsst::afw::math::Function2<FunctionT> const &function ///< 2-d function
+) {
+    typedef typename lsst::afw::image::Image<PixelT>::pixel_accessor imageAccessorType;
+    unsigned int numCols = image.getCols();
+    unsigned int numRows = image.getRows();
+    imageAccessorType imRow = image.origin();
+    for (unsigned int row = 0; row < numRows; ++row, imRow.next_row()) {
+        imageAccessorType imCol = imRow;
+        double rowPos = lsst::afw::image::positionToIndex(row);
+        for (unsigned int col = 0; col < numCols; ++col, imCol.next_col()) {
+            double colPos = lsst::afw::image::positionToIndex(col);
+            *imCol -= static_cast<PixelT>(function(colPos, rowPos));
         }
     }
 }
