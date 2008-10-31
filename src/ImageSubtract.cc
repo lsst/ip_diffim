@@ -1495,3 +1495,23 @@ template
 void lsst::ip::diffim::addFunction(
     lsst::afw::image::Image<double>&,
     lsst::afw::math::Function2<double> const&);
+
+template
+void lsst::ip::diffim::subtractFunction(
+    lsst::afw::image::Image<float>&,
+    lsst::afw::math::Function2<float> const&);
+
+template
+void lsst::ip::diffim::subtractFunction(
+    lsst::afw::image::Image<float>&,
+    lsst::afw::math::Function2<double> const&);
+
+template
+void lsst::ip::diffim::subtractFunction(
+    lsst::afw::image::Image<double>&,
+    lsst::afw::math::Function2<float> const&);
+
+template
+void lsst::ip::diffim::subtractFunction(
+    lsst::afw::image::Image<double>&,
+    lsst::afw::math::Function2<double> const&);
