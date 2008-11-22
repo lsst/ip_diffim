@@ -3,7 +3,7 @@
 
 # Write intermediate FITS files? (boolean)
 debugIO: true
-debugPlot: false
+debugPlot: true
 
 # Size of the convolution kernel
 kernelRows: 19
@@ -15,6 +15,7 @@ kernelSpatialOrder: 1
 # Order of background spatial variation
 backgroundSpatialOrder: 1
 
+# dont use for testKernel
 computeDiffImStats: {
     # Maximum sum (residual/variance) for an acceptable Kernel; mean should be 0
     maximumFootprintResidualMean: 0.75
@@ -93,7 +94,7 @@ SDQA: {
     maximumFootprintResidualMean: 1.0
 
     # Maximum standard deviation of (residual/noise) for an acceptable Kernel; variance should be 1
-    maximumFootprintResidualStd: 2.0
+    maximumFootprintResidualStd: 6.0 # 2.0
 }
 
 ######### Restructuring to have full package path

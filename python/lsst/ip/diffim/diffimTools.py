@@ -60,11 +60,9 @@ def vectorPairToVectors(vectorPair):
     kernelVector = afwMath.vectorD()
     kernelErrorVector = afwMath.vectorD()
     for i in range(vectorPair.size()-1):
-        #print i, vectorPair[i][0], vectorPair[i][1]
         kernelVector.push_back(vectorPair[i][0])
         kernelErrorVector.push_back(vectorPair[i][1])
 
     background = vectorPair.back()[0]
     backgroundError = vectorPair.back()[1]
-    #print 'B', background, backgroundError
     return kernelVector, kernelErrorVector, background, backgroundError

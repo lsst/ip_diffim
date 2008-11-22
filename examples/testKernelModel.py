@@ -3,6 +3,8 @@ import numpy
 import eups
 import pylab
 
+import pdb
+
 # python
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -11,6 +13,7 @@ import lsst.ip.diffim as ipDiffim
 
 import lsst.ip.diffim.diffimPlot as ipDiffimPlot
 import lsst.ip.diffim.diffimTools as ipDiffimTools
+import lsst.ip.diffim.diffimDebug as ipDiffimDebug
 
 from lsst.pex.logging import Log
 from lsst.pex.logging import Trace
@@ -82,6 +85,7 @@ def rejectKernelOutliers(difiList, policy):
     Trace('lsst.ip.diffim.rejectKernelOutliers', 5,
           'Kernel Sum : %0.3f +/- %0.3f, %d kernels' % (ksumMean, ksumStd, nFootprint));
 
+
 def fitSpatialFunction(spatialFunction, values, errors, col, row, policy):
     nSigmaSq = policy.get('lsst.afw.math.minimize.nSigmaSq')
     stepsize = policy.get('lsst.afw.math.minimize.stepsize')
@@ -111,7 +115,7 @@ def fitKriging(values, errors, col, row, policy):
     return
 
 
-def fitPca(differenceImageFootprintInformationList, policy):
+def runPca(differenceImageFootprintInformationList, policy):
     kernelCols = policy.get('kernelCols')
     kernelRows = policy.get('kernelRows')
     
@@ -199,7 +203,6 @@ def fitPca(differenceImageFootprintInformationList, policy):
 
     # Turn into Kernels
     meanKernelPtr    = ipDiffimTools.vectorToKernelPtr( meanM, kernelCols, kernelRows )
-
     eKernelPtrVector = afwMath.VectorKernel()
     for i in range(U.shape[1]):
         eKernelPtr   = ipDiffimTools.vectorToKernelPtr( U[:,i], kernelCols, kernelRows )
@@ -208,11 +211,9 @@ def fitPca(differenceImageFootprintInformationList, policy):
     return meanKernelPtr, eKernelPtrVector, eVal, eCoeff
 
 
-def fitPerPixel(differenceImageFootprintInformationList, policy):
+def fitPerPixel(differenceImageFootprintInformationList, label, policy):
     kernelSpatialOrder        = policy.get('kernelSpatialOrder')
-    kernelSpatialFunction     = afwMath.PolynomialFunction2D(kernelSpatialOrder)
     backgroundSpatialOrder    = policy.get('backgroundSpatialOrder')
-    backgroundSpatialFunction = afwMath.PolynomialFunction2D(backgroundSpatialOrder)
     kernelCols                = policy.get('kernelCols')
     kernelRows                = policy.get('kernelRows')
 
@@ -234,38 +235,20 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
         backgroundValues[i] = goodDifiList[i].getSingleBackground()
         backgroundErrors[i] = goodDifiList[i].getSingleBackgroundError()
 
+    backgroundSpatialFunction = afwMath.PolynomialFunction2D(backgroundSpatialOrder)
     backgroundFunctionFit = fitSpatialFunction(backgroundSpatialFunction,
                                                backgroundValues,
                                                backgroundErrors,
                                                footprintExposureCol,
                                                footprintExposureRow,
                                                policy)
+    Trace('lsst.ip.diffim', 5,
+          'Spatial %d background fit parameters : %s' % (label, ' '.join([('%10.3e' % (x)) for x in backgroundFunctionFit.parameterList])))
     backgroundSpatialFunction.setParameters(backgroundFunctionFit.parameterList)
     
-    return backgroundSpatialFunction, footprintExposureCol, footprintExposureRow
-
-
-# BELOW ALSO NEED TO WRAP IN ERRORS ON THE KERNEL PARAMETERS
-
-
-    if DOKRIGING:
-        backgroundKrigingFit  = fitKriging(backgroundValues,
-                                           backgroundErrors,
-                                           footprintExposureCol,
-                                           footprintExposureRow,
-                                           policy)
-
-
-    
     # fit each pixel
+    j = 0
     functionFitList = []
-    if DOKRIGING:
-        krigingFitList  = []
-    
-    # pre-calculate each kernel's image
-    # A VECTOR OF IMAGES IS NOT DEFINED IN IMAGELIB.i
-    # for now calculate inside the loop below
-    
     for kCol in range(kernelCols):
         for kRow in range(kernelRows):
 
@@ -273,168 +256,149 @@ def fitPerPixel(differenceImageFootprintInformationList, policy):
             # initialize vectors, one per good kernel
             
             kernelValues = numpy.zeros(nFootprint)
+            kernelErrors = numpy.zeros(nFootprint)
             for i in range(nFootprint):
-                singleKernelPtr    = goodDifiList[i].getSingleKernelPtr()
-                kernelValues[i]    = singleKernelPtr.computeNewImage(False)[0].getVal(kCol, kRow)
+                singleKernelPtr      = goodDifiList[i].getSingleKernelPtr()
+                singleKernelErrorPtr = goodDifiList[i].getSingleKernelErrorPtr()
+                kernelValues[i]      = singleKernelPtr.computeNewImage(False)[0].getVal(kCol, kRow)
+                kernelErrors[i]      = singleKernelErrorPtr.computeNewImage(False)[0].getVal(kCol, kRow)
                     
             # initialize vectors, one per good kernel
             #######
             # do the various fitting techniques here
-
+            kernelSpatialFunction = afwMath.PolynomialFunction2D(kernelSpatialOrder)
             functionFit = fitSpatialFunction(kernelSpatialFunction,
                                              kernelValues,
-                                             footprintStd,
+                                             kernelErrors,
                                              footprintExposureCol,
                                              footprintExposureRow,
                                              policy)
+            Trace('lsst.ip.diffim', 5,
+                  'Kernel %s spatial pixel %d fit parameters : %s' % (label, j, ' '.join([('%10.3e' % (x)) for x in functionFit.parameterList])))
             kernelSpatialFunction.setParameters(functionFit.parameterList)
             functionFitList.append(kernelSpatialFunction)
 
-            if DOKRIGING:
-                krigingFit  = fitKriging(kernelValues,
-                                         footprintStd,
-                                         footprintExposureCol,
-                                         footprintExposureRow,
-                                         policy)
-                krigingFitList.append(krigingFit)
-
-
-            # anything else?
-            
+            j += 1
             # do the various fitting techniques here
             #######
 
-    # evaluate all the fits at the positions of the objects, create a
+    # Evaluate all the fits at the positions of the objects, create a
     # new kernel, then difference image, the calculate difference
     # image stats
     for i in range(nFootprint):
-        kFunctionImage  = afwImage.ImageD(kernelCols, kernelRows)
+        kFunctionImage          = afwImage.ImageD(kernelCols, kernelRows)
         functionBackgroundValue = backgroundSpatialFunction(footprintExposureCol[i], footprintExposureRow[i])
-        
-        if DOKRIGING:
-            kKrigingImage   = afwImage.ImageD(kernelCols, kernelRows)
-            krigingBackgroundValue  = backgroundKrigingFit.eval(footprintExposureCol[i], footprintExposureRow[i])
 
-        # the *very* slow way to do this is to create a
-        # LinearCombinationKernel that is of size kernelCols x
-        # kernelRows and have a Function for each one of these.  Lets
-        # *not* do that for now...
+        j = 0
         for kCol in range(kernelCols):
             for kRow in range(kernelRows):
-                functionValue   = functionFitList[i](footprintExposureCol[i], footprintExposureRow[i])
+                functionValue   = functionFitList[j](footprintExposureCol[i], footprintExposureRow[i])
                 kFunctionImage.set(kCol, kRow, functionValue)
-                
-                if DOKRIGING:
-                    krigingValue    = krigingList[i].eval(footprintExposureCol[i],  footprintExposureRow[i])
-                    kKrigingImage.set(kCol, kRow, krigingValue)
-                
+                j += 1
+
+        if policy.get('debugIO') == True:
+            kFunctionImage.writeFits('SKernel_%s%d.fits' % (label, goodDifiList[i].getID()))
     
-        functionKernelPtr = afwMath.KernelPtr( afwMath.FixedKernel(kFunctionImage) )
-        functionStatistics = goodDifiList[i].computeImageStatistics(functionKernelPtr, functionBackgroundValue)
-        
-        if DOKRIGING:
-            krigingKernelPtr  = afwMath.KernelPtr( afwMath.FixedKernel(kKrigingImage) )
-            krigingStatistics  = goodDifiList[i].computeImageStatistics(krigingKernelPtr,  krigingBackgroundValue)
-
-
-
-
-
+        functionKernelPtr  = afwMath.KernelPtr( afwMath.FixedKernel(kFunctionImage) )
+        spatialDiffIm      = ipDiffim.convolveAndSubtract(goodDifiList[i].getImageToConvolvePtr().get(),
+                                                          goodDifiList[i].getImageToNotConvolvePtr().get(),
+                                                          functionKernelPtr,
+                                                          functionBackgroundValue)
+        diffImStatistics   = ipDiffim.DifferenceImageStatisticsF(spatialDiffIm)
+                                                     
+        if policy.get('debugPlot') == True:
+            ipDiffimDebug.plotDiffImQuality1(spatialDiffIm,
+                                             functionKernelPtr,
+                                             goodDifiList[i].getImageToConvolvePtr().get(),
+                                             goodDifiList[i].getImageToNotConvolvePtr().get(),
+                                             'Spatial %s kernel %d' % (label, goodDifiList[i].getID()),
+                                             'SKernel_%s%d.ps' % (label, goodDifiList[i].getID())
+                                             )
     
 
 
 
-def fitSpatialPca(differenceImageFootprintInformationList, eVec, eCoefficients, policy):
+def fitSpatialPca(differenceImageFootprintInformationList, label, mKernel, eKernels, eCoeffs, policy):
     kernelSpatialOrder     = policy.get('kernelSpatialOrder')
-    kernelSpatialFunction  = afwMath.PolynomialFunction2D(kernelSpatialOrder)
     backgroundSpatialOrder = policy.get('backgroundSpatialOrder')
-    backgroundFunction     = afwMath.PolynomialFunction2D(backgroundSpatialOrder)
-    kernelCols = policy.get('kernelCols')
-    kernelRows = policy.get('kernelRows')
+    kernelCols             = policy.get('kernelCols')
+    kernelRows             = policy.get('kernelRows')
 
     # how many good footprints are we dealing with here
     goodDifiList  = ipDiffim.getGoodFootprints(differenceImageFootprintInformationList)
     nFootprint    = len(goodDifiList)
-    nCoefficients = nFootprint
+    nCoefficient  = nFootprint
 
     # common to all spatial fits
     footprintExposureCol  = numpy.zeros(nFootprint)
     footprintExposureRow  = numpy.zeros(nFootprint)
-    footprintStd          = numpy.zeros(nFootprint)
     for i in range(nFootprint):
         footprintExposureCol[i] = goodDifiList[i].getColcNorm()
         footprintExposureRow[i] = goodDifiList[i].getRowcNorm()
-        footprintStd[i]         = goodDifiList[i].getSingleStats().getResidualStd()
 
-    # we need to fit for the background first
+    # fit the background
     backgroundValues = numpy.zeros(nFootprint)
+    backgroundErrors = numpy.zeros(nFootprint)
     for i in range(nFootprint):
         backgroundValues[i] = goodDifiList[i].getSingleBackground()
+        backgroundErrors[i] = goodDifiList[i].getSingleBackgroundError()
 
+    backgroundSpatialFunction = afwMath.PolynomialFunction2D(backgroundSpatialOrder)
     backgroundFunctionFit = fitSpatialFunction(backgroundSpatialFunction,
                                                backgroundValues,
-                                               footprintStd,
+                                               backgroundErrors,
                                                footprintExposureCol,
-                                               footprintExposureRow)
+                                               footprintExposureRow,
+                                               policy)
+    Trace('lsst.ip.diffim', 5,
+          'Spatial PCA %s background fit parameters : %s' % (label, ' '.join([('%10.3e' % (x)) for x in backgroundFunctionFit.parameterList])))
     backgroundSpatialFunction.setParameters(backgroundFunctionFit.parameterList)
-    
-    if DOKRIGING:
-        backgroundKrigingFit  = fitKriging(backgroundValues,
-                                           footprintStd,
-                                           footprintExposureCol,
-                                           footprintExposureRow)
 
-    # the values of the spatially-approximated kernels
-    approxFunctionVectorList = VectorListF(nFootprint)
-    if DOKRIGING:
-        approxKrigingVectorList  = VectorListF(nFootprint)
-    for i in range(nFootprint):
-        # start with the mean kernel
-        approxFunctionVectorList[i] = meanM.copy()
-        if DOKRIGING:
-            approxKrigingVectorList[i]  = meanM.copy()
-
-    
-    # lets first fit for spatial variation in each coefficient/kernel
-    for nCoeff in range(nCoefficients):
-        coefficients = eCoefficients[nCoeff,:]
-
+    # fit spatial variation of each eigenkernel
+    functionFitList = []
+    for i in range(nCoefficient):
+        coefficients = eCoeffs[i,:]
+        # NOTE TO SELF : WHAT TO DO ABOUT THEIR UNCERTAINTY?
+        # THIS IS A HACK TO GET THINGS MOVING
+        uncertainties = numpy.sqrt( numpy.abs(coefficients) )
+        
+        kernelSpatialFunction = afwMath.PolynomialFunction2D(kernelSpatialOrder)
         coeffFunctionFit = fitSpatialFunction(kernelSpatialFunction,
                                               coefficients,
-                                              footprintStd,
+                                              uncertainties,
                                               footprintExposureCol,
-                                              footprintExposureRow)
+                                              footprintExposureRow,
+                                              policy)
+        Trace('lsst.ip.diffim', 5,
+              'Kernel %s spatial PCA %d fit parameters : %s' % (label, i, ' '.join([('%10.3e' % (x)) for x in coeffFunctionFit.parameterList])))
         kernelSpatialFunction.setParameters(coeffFunctionFit.parameterList)
+        functionFitList.append(kernelSpatialFunction)
         
-        if DOKRIGING:
-            coeffKrigingFit  = fitKriging(coefficients,
-                                          footprintStd,
-                                          footprintExposureCol,
-                                          footprintExposureRow)
+    # now see how well this approximates the diffim
+    for i in range(nFootprint):
+        backgroundValue   = backgroundSpatialFunction(footprintExposureCol[i], footprintExposureRow[i])
+        approxKernelImage = mKernel.copy()
         
-    
-        for i in range(nFootprints):
-            backgroundFunctionValue      = backgroundSpatialFunction(footprintExposureCol[i], footprintExposureRow[i])
-            coeffFunctionValue           = kernelSpatialFunction(footprintExposureCol[i], footprintExposureRow[i])
-            approxFunctionVectorList[i] += coeffFunctionValue * eVec[nCoeff,:]
-            
-            # calculate approximate statistics
-            approxFunctionKernelPtr      = ipDiffimTools.vectorToKernelPtr(approxFunctionVectorList[i],
-                                                                           kernelCols, kernelRows)
-            approxFunctionStatistics     = goodDifiList[i].computeImageStatistics(approxFunctionKernelPtr,
-                                                                                  backgroundFunctionValue)
-            if DOKRIGING:
-                backgroundKrigingValue       = backgroundKrigingFit.eval(footprintExposureCol[i], footprintExposureRow[i])
-                coeffKrigingValue            = coeffKrigingFit.eval(footprintExposureCol[i], footprintExposureRow[i])
-                approxKrigingVectorList[i]  += coeffKrigingValue  * eVec[nCoeff,:]
+        for j in range(nCoefficient):
+            coeffFunctionValue = kernelSpatialFunction[j](footprintExposureCol[i], footprintExposureRow[i])
+            approxKernelImage += coeffFunctionValue * eKernels[j,:]
+            approxKernelPtr    = ipDiffimTools.vectorToKernelPtr(approxKernelImage, kernelCols, kernelRows)
 
-                # calculate approximate statistics
-                approxKrigingKernelPtr       = ipDiffimTools.vectorToKernelPtr(approxKrigingVectorList[i],
-                                                                               kernelCols, kernelRows)
-                approxKrigingStatistics      = goodDifiList[i].computeImageStatistics(approxKrigingKernel,
-                                                                                      backgroundKrigingValue)
+            spatialDiffIm      = ipDiffim.convolveAndSubtract(goodDifiList[i].getImageToConvolvePtr().get(),
+                                                              goodDifiList[i].getImageToNotConvolvePtr().get(),
+                                                              approxKernelPtr,
+                                                              backgroundValue)
+            diffImStatistics   = ipDiffim.DifferenceImageStatisticsF(spatialDiffIm)
             
-
+            if policy.get('debugPlot') == True:
+                ipDiffimDebug.plotDiffImQuality1(spatialDiffIm,
+                                                 approxKernelPtr,
+                                                 goodDifiList[i].getImageToConvolvePtr().get(),
+                                                 goodDifiList[i].getImageToNotConvolvePtr().get(),
+                                                 'PCA %s kernel_%d ek_%d' % (label, goodDifiList[i].getID(), j),
+                                                 'PKernel_%s%d_%d.ps' % (label, goodDifiList[i].getID(), j)
+                                                 )
+                
 ##################
 ##################
 ##################
@@ -510,9 +474,9 @@ Notes:
     # lets just get a couple for debugging and speed
     policy.set('getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints', 5)
     #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 6350.)  # gets 5
-    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 5000.)  # gets 12
+    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 5000.)  # gets 12
     #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 1000.) # gets full test suite
-    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 250.) # gets a lot
+    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 250.) # gets a lot
     
     footprintList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                                      scienceMaskedImage,
@@ -531,7 +495,7 @@ Notes:
                                                  footprintBBox.min().x(), footprintBBox.min().y(),
                                                  footprintBBox.max().x(), footprintBBox.max().y()))
         templateStampPtr = templateMaskedImage.getSubImage(footprintBBox)
-        imageStampPtr = scienceMaskedImage.getSubImage(footprintBBox)
+        imageStampPtr    = scienceMaskedImage.getSubImage(footprintBBox)
 
         # initial estimate of the variance per pixel, straight subtraction
         subtractedStamp  = afwImage.MaskedImageF(templateStampPtr.getCols(), templateStampPtr.getRows())
@@ -613,65 +577,7 @@ Notes:
         # Things tend to converge after an single iteration, so just do this once.
 
 
-        if policy.get('debugPlot') == True:
-            convData     = ipDiffimTools.imageToVector(convDiffIm1.getImage())
-            convVariance = ipDiffimTools.imageToVector(convDiffIm1.getVariance())
-            convMask     = ipDiffimTools.imageToVector(convDiffIm1.getMask())
-            convIdx      = numpy.where(convMask == 0)
-            convSigma    = convData[convIdx] / numpy.sqrt(convVariance[convIdx])
-            Trace('lsst.ip.diffim', 5,
-                  'Kernel %d : Python diffim residuals = %.2f +/- %.2f sigma' % (footprintID, convSigma.mean(), convSigma.std()))
-           
-            deconvData     = ipDiffimTools.imageToVector(deconvDiffIm1.getImage())
-            deconvVariance = ipDiffimTools.imageToVector(deconvDiffIm1.getVariance())
-            deconvMask     = ipDiffimTools.imageToVector(deconvDiffIm1.getMask())
-            deconvIdx      = numpy.where(deconvMask == 0)
-            deconvSigma    = deconvData[deconvIdx] / numpy.sqrt(deconvVariance[deconvIdx])
-            Trace('lsst.ip.diffim', 5,
-                  'Kernel %d : Python diffim residuals = %.2f +/- %.2f sigma' % (footprintID, deconvSigma.mean(), deconvSigma.std()))
-            
-            convInfo     = (ipDiffimTools.imageToMatrix(templateStampPtr.getImage()),
-                            ipDiffimTools.imageToMatrix(imageStampPtr.getImage()),
-                            ipDiffimTools.imageToMatrix(convDiffIm1.getImage()) / numpy.sqrt(ipDiffimTools.imageToMatrix(convDiffIm1.getVariance())),
-                            ipDiffimTools.imageToMatrix(convKernelPtr1.computeNewImage(False)[0]),
-                            convSigma)
-            deconvInfo   = (ipDiffimTools.imageToMatrix(imageStampPtr.getImage()),
-                            ipDiffimTools.imageToMatrix(templateStampPtr.getImage()),
-                            ipDiffimTools.imageToMatrix(deconvDiffIm1.getImage()) / numpy.sqrt(ipDiffimTools.imageToMatrix(deconvDiffIm1.getVariance())),
-                            ipDiffimTools.imageToMatrix(deconvKernelPtr1.computeNewImage(False)[0]),
-                            deconvSigma)
-            ipDiffimPlot.sigmaHistograms(convInfo, deconvInfo, title='Kernel %d' % (footprintID), outfile='Kernel_%da.ps' % (footprintID) )
-
-            #
-            #### NOW REDO THIS USING A BETTER ESTIMATE OF THE VARIANCE FROM THE SUBTRACTED IMAGE!
-            #
-            convData     = ipDiffimTools.imageToVector(convDiffIm2.getImage())
-            convVariance = ipDiffimTools.imageToVector(convDiffIm2.getVariance())
-            convMask     = ipDiffimTools.imageToVector(convDiffIm2.getMask())
-            convIdx      = numpy.where(convMask == 0)
-            convSigma    = convData[convIdx] / numpy.sqrt(convVariance[convIdx])
-            Trace('lsst.ip.diffim', 5,
-                  'Kernel %d : Python diffim residuals 2 = %.2f +/- %.2f sigma' % (footprintID, convSigma.mean(), convSigma.std()))
-            deconvData     = ipDiffimTools.imageToVector(deconvDiffIm2.getImage())
-            deconvVariance = ipDiffimTools.imageToVector(deconvDiffIm2.getVariance())
-            deconvMask     = ipDiffimTools.imageToVector(deconvDiffIm2.getMask())
-            deconvIdx      = numpy.where(deconvMask == 0)
-            deconvSigma    = deconvData[deconvIdx] / numpy.sqrt(deconvVariance[deconvIdx])
-            Trace('lsst.ip.diffim', 5,
-                  'Kernel %d : Python diffim residuals 2 = %.2f +/- %.2f sigma' % (footprintID, deconvSigma.mean(), deconvSigma.std()))
-            convInfo     = (ipDiffimTools.imageToMatrix(templateStampPtr.getImage()),
-                            ipDiffimTools.imageToMatrix(imageStampPtr.getImage()),
-                            ipDiffimTools.imageToMatrix(convDiffIm2.getImage()) / numpy.sqrt(ipDiffimTools.imageToMatrix(convDiffIm2.getVariance())),
-                            ipDiffimTools.imageToMatrix(convKernelPtr2.computeNewImage(False)[0]),
-                            convSigma)
-            deconvInfo   = (ipDiffimTools.imageToMatrix(imageStampPtr.getImage()),
-                            ipDiffimTools.imageToMatrix(templateStampPtr.getImage()),
-                            ipDiffimTools.imageToMatrix(deconvDiffIm2.getImage()) / numpy.sqrt(ipDiffimTools.imageToMatrix(deconvDiffIm2.getVariance())),
-                            ipDiffimTools.imageToMatrix(deconvKernelPtr2.computeNewImage(False)[0]),
-                            deconvSigma)
-            ipDiffimPlot.sigmaHistograms(convInfo, deconvInfo, title='Kernel %d' % (footprintID), outfile='Kernel_%db.ps' % (footprintID) )
-
-
+        # Create and fill Difi
         convDifiPtr   = ipDiffim.DifiPtrF(
             ipDiffim.DifferenceImageFootprintInformationF(iFootprintPtr, templateStampPtr, imageStampPtr)
             ) 
@@ -686,7 +592,6 @@ Notes:
             convDifiPtr.computeImageStatistics(convKernelPtr2, convBackground2)
             )
         convDifiPtr.setStatus( convDifiPtr.getSingleStats().evaluateQuality(policy) )
-        convolveDifiPtrList.append(convDifiPtr)
         if convDifiPtr.getStatus() == True:
             prefix = ''
         else:
@@ -699,6 +604,7 @@ Notes:
             convDifiPtr.getSingleStats().getResidualMean(),
             convDifiPtr.getSingleStats().getResidualStd()
             ))
+        convolveDifiPtrList.append(convDifiPtr)
 
         #
 
@@ -716,7 +622,6 @@ Notes:
             deconvDifiPtr.computeImageStatistics(deconvKernelPtr2, deconvBackground2)
             )
         deconvDifiPtr.setStatus( deconvDifiPtr.getSingleStats().evaluateQuality(policy) )
-        deconvolveDifiPtrList.append(deconvDifiPtr)
         if deconvDifiPtr.getStatus() == True:
             prefix = ''
         else:
@@ -729,86 +634,72 @@ Notes:
             deconvDifiPtr.getSingleStats().getResidualMean(),
             deconvDifiPtr.getSingleStats().getResidualStd()
             ))
+        deconvolveDifiPtrList.append(deconvDifiPtr)
+
+        # Debugging information that is once per kernel
+        if policy.get('debugPlot') == True:
+            ipDiffimDebug.plotDiffImQuality2(footprintID, 1,
+                                             convDiffIm1, convKernelPtr1, templateStampPtr, imageStampPtr, 
+                                             deconvDiffIm1, deconvKernelPtr1, imageStampPtr, templateStampPtr)
+            ipDiffimDebug.plotDiffImQuality2(footprintID, 2,
+                                             convDiffIm2, convKernelPtr2, templateStampPtr, imageStampPtr, 
+                                             deconvDiffIm2, deconvKernelPtr2, imageStampPtr, templateStampPtr)
 
         if policy.get('debugIO') == True:
-            imageStampPtr.writeFits('iFoot_%d' % (footprintID))
-            templateStampPtr.writeFits('tFoot_%d' % (footprintID))
-
-            ckp,cks = convKernelPtr2.computeNewImage(False)
-            cmd = ckp.getMetaData()
-            cmd.addProperty(dafBase.DataProperty('CONV', 'Template'))
-            cmd.addProperty(dafBase.DataProperty('MSIG', convDifiPtr.getSingleStats().getResidualMean()))
-            cmd.addProperty(dafBase.DataProperty('VSIG', convDifiPtr.getSingleStats().getResidualStd()))
-            cmd.addProperty(dafBase.DataProperty('KSUM', cks))
-            ckp.setMetadata(cmd)
-            ckp.writeFits('cKernel_%d.fits' % (footprintID))
+            ipDiffimDebug.writeDiffImages(footprintID,
+                                          templateStampPtr, imageStampPtr,
+                                          convDifiPtr, convDiffIm2, convKernelPtr2,
+                                          deconvDifiPtr, deconvDiffIm2, deconvKernelPtr2)
             
-            dckp,dcks = deconvKernelPtr2.computeNewImage(False)
-            dcmd = dckp.getMetaData()
-            dcmd.addProperty(dafBase.DataProperty('CONV', 'Template'))
-            dcmd.addProperty(dafBase.DataProperty('MSIG', deconvDifiPtr.getSingleStats().getResidualMean()))
-            dcmd.addProperty(dafBase.DataProperty('VSIG', deconvDifiPtr.getSingleStats().getResidualStd()))
-            dcmd.addProperty(dafBase.DataProperty('KSUM', dcks))
-            dckp.setMetadata(dcmd)
-            dckp.writeFits('dcKernel_%d.fits' % (footprintID))
-
-            convDiffIm2.writeFits('cDiff_%d' % (footprintID))
-            deconvDiffIm2.writeFits('dcDiff_%d' % (footprintID))
-
-            cSigma = ipDiffimTools.imageToMatrix(convDiffIm2.getImage()) / numpy.sqrt(ipDiffimTools.imageToMatrix(convDiffIm2.getVariance()))
-            cSigma = ipDiffimTools.matrixToImage(cSigma)
-            cSigma.writeFits('cSig_%d.fits' % (footprintID))
-
-            dcSigma = ipDiffimTools.imageToMatrix(deconvDiffIm2.getImage()) / numpy.sqrt(ipDiffimTools.imageToMatrix(deconvDiffIm2.getVariance()))
-            dcSigma = ipDiffimTools.matrixToImage(dcSigma)
-            dcSigma.writeFits('dcSig_%d.fits' % (footprintID))
-            
-        
     rejectKernelOutliers(convolveDifiPtrList, policy)
     rejectKernelOutliers(deconvolveDifiPtrList, policy)
 
     # now we get to the good stuff!
-    convMKernel,   convEKernels,   convEVals,   convECoeffs   = fitPca(convolveDifiPtrList, policy)
-    deconvMKernel, deconvEKernels, deconvEVals, deconvECoeffs = fitPca(deconvolveDifiPtrList, policy)
+    convMKernel,   convEKernels,   convEVals,   convECoeffs   = runPca(convolveDifiPtrList, policy)
+    deconvMKernel, deconvEKernels, deconvEVals, deconvECoeffs = runPca(deconvolveDifiPtrList, policy)
 
+    Trace('lsst.ip.diffim', 5,
+          'EigenValues 1 : %s' % (' '.join([str(x) for x in convEVals])))
+    Trace('lsst.ip.diffim', 5,
+          'EigenValues 2 : %s' % (' '.join([str(x) for x in deconvEVals])))
+    
     if policy.get('debugPlot') == True:
-        ipDiffimPlot.eigenKernelPlot( (convMKernel,   convEKernel,   convEVals),
-                                        (deconvMKernel, deconvEKernel, deconvEVals),
-                                        outfile='EKernel.ps'
-                                        )
+        ipDiffimPlot.eigenKernelPlot( (convMKernel,   convEKernels,   convEVals),
+                                      (deconvMKernel, deconvEKernels, deconvEVals),
+                                      outfile='EKernel.ps'
+                                      )
 
         goodDifiList = ipDiffim.getGoodFootprints(convolveDifiPtrList)
         nFootprint   = len(goodDifiList)
         for i in range(nFootprint):
             ipDiffimPlot.approxKernelPlot(goodDifiList[i],
-                                            (convMKernel, convEKernel),
-                                            title='Kernel %d conv' % (i),
-                                            outfile='PCA_Kc_%d.ps' % (i)
-                                        )
+                                          (convMKernel, convEKernels),
+                                          title='Kernel %d conv' % (goodDifiList[i].getID()),
+                                          outfile='PCA_Kc_%d.ps' % (goodDifiList[i].getID())
+                                          )
 
         goodDifiList = ipDiffim.getGoodFootprints(deconvolveDifiPtrList)
         nFootprint   = len(goodDifiList)
         for i in range(nFootprint):
             ipDiffimPlot.approxKernelPlot(goodDifiList[i],
-                                            (deconvMKernel, deconvEKernel),
-                                            title='Kernel %d dconv' % (i),
-                                            outfile='PCA_Kdc_%d.ps' % (i)
-                                        )
+                                          (deconvMKernel, deconvEKernels),
+                                          title='Kernel %d dconv' % (goodDifiList[i].getID()),
+                                          outfile='PCA_Kdc_%d.ps' % (goodDifiList[i].getID())
+                                          )
         
-    return
 
-    # foo for plotting
-    convResiduals1   = fitPerPixel(convolveDifiPtrList, policy)
-    deconvResiduals1 = fitPerPixel(deconvolveDifiPtrList, policy)
+    convResiduals2   = fitSpatialPca(convolveDifiPtrList, 'conv', convMKernel, convEKernels, convECoeffs, policy)
+    deconvResiduals2 = fitSpatialPca(deconvolveDifiPtrList, 'deconv', deconvMKernel, deconvEKernels, deconvECoeffs, policy)
+
+    convResiduals1   = fitPerPixel(convolveDifiPtrList, 'conv', policy)
+    deconvResiduals1 = fitPerPixel(deconvolveDifiPtrList, 'deconc', policy)
+
+
+    return
+    
     if policy.get('debugPlot') == True:
         ipDiffimPlot.plotBackground(convResiduals1, outfile='cBackground.ps')
         ipDiffimPlot.plotBackground(deconvResiduals1, outfile='dcBackground.ps')
-
-    #convResiduals2   = fitSpatialPca(convolveDifiPtrList, convEVec, convECoeffs, policy)
-    #deconvResiduals2 = fitSpatialPca(deconvolveDifiPtrList, deconvEVec, deconvECoeffs, policy)
-
-    if policy.get('debugPlot') == True:
-        pylab.show()
 
 
 def run():

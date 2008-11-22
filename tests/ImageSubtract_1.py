@@ -21,6 +21,7 @@ except NameError:
     verbosity = 0                       # increase to see trace
 logging.Trace_setVerbosity("lsst.afw", verbosity)
 
+debugIO = 1
 try:
     type(debugIO)
 except NameError:
