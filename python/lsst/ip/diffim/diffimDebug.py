@@ -4,10 +4,13 @@ import numpy
 from lsst.pex.logging import Trace
 import lsst.daf.base as dafBase
 
-def plotDiffImQuality1(diffIm, kernel, template, image, label, outfile=None):
-    data     = ipDiffimTools.imageToMatrix(diffIm.getImage())
-    variance = ipDiffimTools.imageToMatrix(diffIm.getVariance())
-    mask     = ipDiffimTools.imageToMatrix(diffIm.getMask())
+def plotDiffImQuality1(difi, diffim, kernel, label, outfile=None):
+    template = difi.getImageToConvolvePtr().get()
+    image    = difi.getImageToNotConvolvePtr().get()
+
+    data     = ipDiffimTools.imageToMatrix(diffim.getImage())
+    variance = ipDiffimTools.imageToMatrix(diffim.getVariance())
+    mask     = ipDiffimTools.imageToMatrix(diffim.getMask())
     idx      = numpy.where(mask == 0)
     sigma    = numpy.ravel( data[idx] / numpy.sqrt(variance[idx]) )
     Trace('lsst.ip.diffim', 5,
