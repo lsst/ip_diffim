@@ -44,12 +44,8 @@
  * * bilinear:
  *   Good for undersampled data fast (not yet implemented)
  *   Kernel size must be 3x3
- * * lanczos: 2-d radial Lanczos function:
- *   Accurate but slow. Not sure if this version or the separable version is best.
- *   f(rad) = sinc(pi rad) sinc(pi rad / n)
- *   with n = (min(kernelRows, kernelCols) - 1)/2
- * * lanczos_separable: 2-d separable Lanczos function:
- *   Accurate but slow. Not sure if this version or the radial version is best.
+ * * lanczos: 2-d Lanczos function:
+ *   Accurate but slow.
  *   (x, y) = sinc(pi x') sinc(pi x' / n) sinc(pi y') sinc(pi y' / n)
  *   with n = (min(kernelRows, kernelCols) - 1)/2
  *
@@ -99,8 +95,8 @@ int lsst::ip::diffim::wcsMatch(
     int numEdgePixels = 0;
 
     // Create remapping AnalyticKernel of desired type and size.
-    typedef typename lsst::afw::math::Kernel::KernelFunctionPtrType funcPtrType;
-    funcPtrType akPtrFcn; ///< analytic kernel pointer function
+    typedef typename lsst::afw::math::AnalyticKernel::KernelFunctionPtr FunctionPtr;
+    FunctionPtr akPtrFcn; ///< analytic kernel pointer function
 
     if (kernelType == "nearest") { 
         // Nearest Neighbor Interpolation. Not yet implemented.
@@ -115,13 +111,9 @@ int lsst::ip::diffim::wcsMatch(
                 boost::format("Kernel size must be 3x3 for kernelType %s") % kernelType);
         }
     } else if (kernelType == "lanczos") { 
-        // 2D Lanczos resampling kernel: radial version.
-        int order = (std::min(kernelRows, kernelCols) - 1)/2; 
-        akPtrFcn = funcPtrType(new lsst::afw::math::LanczosFunction2<lsst::afw::math::Kernel::PixelT>(order));
-    } else if (kernelType == "lanczos_separable") { 
-        // 2D Lanczos resampling kernel; separable version.
+        // 2D Lanczos resampling kernel
         int order = (std::min(kernelRows, kernelCols) - 1)/2;
-        akPtrFcn = funcPtrType(new lsst::afw::math::LanczosSeparableFunction2<lsst::afw::math::Kernel::PixelT>(order));
+        akPtrFcn = FunctionPtr(new lsst::afw::math::LanczosFunction2<lsst::afw::math::Kernel::PixelT>(order));
     } else {
         throw lsst::pex::exceptions::InvalidParameter(
             boost::format("Invalid kernelType %s") % kernelType);
@@ -131,7 +123,7 @@ int lsst::ip::diffim::wcsMatch(
             boost::format("kernelType %s not yet implemented") % kernelType);
     }
 
-    lsst::afw::math::AnalyticKernel remapKernel(akPtrFcn, kernelCols, kernelRows);
+    lsst::afw::math::AnalyticKernel remapKernel(*akPtrFcn, kernelCols, kernelRows);
     lsst::pex::logging::Trace("lsst.ip.diffim", 3,
         boost::format("Created analytic kernel of type=%s; cols=%d; rows=%d")
         % kernelType % kernelCols % kernelRows);
@@ -221,14 +213,13 @@ int lsst::ip::diffim::wcsMatch(
             // Compute new kernel image based on fractional pixel position
             remapKernel.setKernelParameters(fracOrigPix); 
             double kSum;
-            remapKernel.computeImage(kImage, kSum, 0.0, 0.0, false);
+            remapKernel.computeImage(kImage, kSum, false);
             
             // Determine the intensity multipler due to relative pixel scale and kernel sum
             double multFac = remapWcs.pixArea(remapPosColRow) / (origWcs.pixArea(origColRow) * kSum);
            
             // Apply remapping kernel to original MaskedImage to compute remapped pixel
-            lsst::afw::math::apply<ImageT, MaskT>(
-                remapColAcc, origMiAcc, kAcc, kernelCols, kernelRows);
+            lsst::afw::math::apply(remapColAcc, origMiAcc, kAcc, kernelCols, kernelRows);
 
             // multiply the output from apply function by the computed gain here
             *remapColAcc.image *= static_cast<ImageT>(multFac);

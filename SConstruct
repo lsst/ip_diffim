@@ -7,7 +7,7 @@ import lsst.SConsUtils as scons
 
 env = scons.makeEnv(
     "ip_diffim",
-    r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/tags/3.0.1/SConstruct $",
+    r"$HeadURL$",
     [
         ["boost", "boost/version.hpp", "boost_filesystem:C++"],
         ["vw", "vw/Math.h", "vwMath:C++"],
@@ -16,6 +16,7 @@ env = scons.makeEnv(
         ["cfitsio", "fitsio.h", "m cfitsio", "ffopen"], # needed to link _diffimLib.so; remove m once SConsUtils bug fixed
         ["wcslib", "wcslib/wcs.h", "m wcs"], # needed by afw; remove m once SConsUtils bug fixed
         ["minuit", "Minuit/FCNBase.h", "lcg_Minuit:C++"], # needed by afw
+        ["lapack", None, "lapack", "dgesdd_"],
         ["utils", "lsst/utils/Utils.h", "utils:C++"],
         ["daf_base", "lsst/daf/base.h", "daf_base:C++"],
         ["pex_exceptions", "lsst/pex/exceptions.h", "pex_exceptions:C++"],
@@ -28,7 +29,8 @@ env = scons.makeEnv(
         ["detection", "lsst/detection/Footprint.h", "detection"],
     ],
 )
-env.libs["ip_diffim"] = env.getlibs("boost vw wcslib cfitsio utils daf_base pex_logging pex_exceptions pex_logging daf_persistence daf_data pex_policy minuit afw detection") + env.libs["ip_diffim"]
+env.libs["ip_diffim"] = env.getlibs("boost vw lapack wcslib cfitsio utils daf_base pex_logging pex_exceptions pex_logging daf_persistence daf_data pex_policy minuit afw detection") + env.libs["ip_diffim"]
+env.libs["ip_diffim"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") fails as lapack isn't in eups
 
 #
 # Build/install things

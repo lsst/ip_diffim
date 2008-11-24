@@ -80,7 +80,7 @@ Notes:
         lsst.pex.logging.Trace_setVerbosity("lsst.ip.diffim", options.verbosity)
     
     # compute difference image
-    differenceImage, psfMatchKernelPtr, backgroundFunctionPtr = lsst.ip.diffim.imageSubtract(
+    differenceImage, psfMatchKernelPtr, backgroundFunction = lsst.ip.diffim.imageSubtract(
         imageToConvolve = templateMaskedImage,
         imageToNotConvolve = scienceMaskedImage,
         policy = policy,

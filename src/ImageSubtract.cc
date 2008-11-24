@@ -200,7 +200,7 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForPostageStamp(
         /*        compute whatever is needed on the fly.  hence this step here. */
         boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > imagePtr(
             new lsst::afw::image::MaskedImage<ImageT, MaskT>
-            (lsst::afw::math::convolve(imageToConvolve, **kiter, edgeMaskBit, false))
+            (lsst::afw::math::convolveNew(imageToConvolve, **kiter, edgeMaskBit, false))
             );
         
         lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForPostageStamp",
@@ -506,7 +506,7 @@ lsst::afw::math::KernelList<lsst::afw::math::Kernel> lsst::ip::diffim::computePc
             }
 
             /* Note we ALWAYS compute the PCA using the first kernel image */
-            (*i).kernelList[0]->computeImage(kImage, imSum, 0.0, 0.0, false);
+            (*i).kernelList[0]->computeImage(kImage, imSum, false);
 
             /* insanity checking */
             assert(nKRows == kImage.getRows());
@@ -706,7 +706,7 @@ lsst::afw::math::KernelList<lsst::afw::math::Kernel> lsst::ip::diffim::computePc
             (*i).kernelList.push_back( pcaKernelPtr );
             (*i).diffimStats.push_back( lsst::ip::diffim::MaskedImageDiffimStats() );
             (*i).backgrounds.push_back( (*i).backgrounds[(*i).nKernel] );   /* This did not change here */
-            pcaKernelPtr->computeImage(kImage, imSum, 0.0, 0.0, false);
+            pcaKernelPtr->computeImage(kImage, imSum, false);
             (*i).kernelSums.push_back( imSum );
             (*i).nKernel += 1;
 
@@ -747,8 +747,8 @@ lsst::afw::math::KernelList<lsst::afw::math::Kernel> lsst::ip::diffim::computePc
  */
 template <typename ImageT, typename MaskT>
 boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
-    boost::shared_ptr<lsst::afw::math::Function2<double> > &kernelFunctionPtr, ///< Function for spatial variation of kernel
-    boost::shared_ptr<lsst::afw::math::Function2<double> > &backgroundFunctionPtr, ///< Function for spatial variation of background
+    lsst::afw::math::Function2<double> &kernelFunction, ///< Function for spatial variation of kernel
+    lsst::afw::math::Function2<double> &backgroundFunction, ///< Function for spatial variation of background
     std::vector<lsst::ip::diffim::DiffImContainer<ImageT, MaskT> > &diffImContainerList, ///< Information on each kernel
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelBasisList, ///< Basis kernel set
     lsst::pex::policy::Policy &policy ///< Policy directing the behavior
@@ -769,8 +769,8 @@ boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::co
     unsigned int nReject = 1;
     unsigned int nGood = diffImContainerList.size();
     unsigned int nKernel = kernelBasisList.size();
-    unsigned int nKernelParameters = kernelFunctionPtr->getNParameters();
-    unsigned int nBgParameters = backgroundFunctionPtr->getNParameters();
+    unsigned int nKernelParameters = kernelFunction.getNParameters();
+    unsigned int nBgParameters = backgroundFunction.getNParameters();
     
     lsst::pex::logging::TTrace<3>("lsst.ip.diffim.computeSpatiallyVaryingPsfMatchingKernel", 
                             "Entering subroutine computeSpatiallyVaryingPsfMatchingKernel");
@@ -798,7 +798,7 @@ boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::co
     
     /* Set up the spatially varying kernel */
     boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatiallyVaryingKernelPtr(
-        new lsst::afw::math::LinearCombinationKernel(kernelBasisList, kernelFunctionPtr));
+        new lsst::afw::math::LinearCombinationKernel(kernelBasisList, kernelFunction));
     
     /* Iterate over inputs until both the kernel model and the background model converge */
     while ( (nIter < maximumIterationsSpatialFit) and (nReject != 0) ) {
@@ -873,7 +873,7 @@ boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::co
             lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computeSpatiallyVaryingPsfMatchingKernel",
                                         spatialFitFormatter.str());
             
-            /* NOTE - if we have fewer measurements than kernelFunctionPtr->getNParameters(), we should do something about it */
+            /* NOTE - if we have fewer measurements than kernelFunction.getNParameters(), we should do something about it */
             std::vector<double> kernelParams(nKernelParameters);
             std::vector<double> kernelStepsize(nKernelParameters);
             std::fill(kernelParams.begin(), kernelParams.end(), 0.0);         /* start at value zero */
@@ -881,7 +881,7 @@ boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::co
             
             /* Run minimization */
             lsst::afw::math::FitResults kernelFit = lsst::afw::math::minimize(
-                kernelFunctionPtr,
+                kernelFunction,
                 kernelParams,
                 kernelStepsize,
                 kernelMeas,
@@ -925,7 +925,7 @@ boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::co
         
         /* Run minimization */
         lsst::afw::math::FitResults backgroundFit = lsst::afw::math::minimize(
-            backgroundFunctionPtr,
+            backgroundFunction,
             backgroundParameters,
             backgroundStepsize,
             backgroundMeas,
@@ -934,7 +934,7 @@ boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::co
             kernelRowPos,
             nSigmaSq
             );
-        backgroundFunctionPtr->setParameters(backgroundFit.parameterList);
+        backgroundFunction.setParameters(backgroundFit.parameterList);
         
         /* Debugging information */
         for (unsigned int i = 0; i < backgroundFit.parameterList.size(); ++i) {
@@ -961,8 +961,8 @@ boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::co
           
             (*i).kernelList.push_back( spatiallyVaryingKernelPtr );
             (*i).diffimStats.push_back( lsst::ip::diffim::MaskedImageDiffimStats() );
-            (*i).backgrounds.push_back( (*backgroundFunctionPtr)((*i).colcNorm, (*i).rowcNorm) );
-            spatiallyVaryingKernelPtr->computeImage(kSpatialImage, imSum, (*i).colcNorm, (*i).rowcNorm, false);
+            (*i).backgrounds.push_back( backgroundFunction((*i).colcNorm, (*i).rowcNorm) );
+            spatiallyVaryingKernelPtr->computeImage(kSpatialImage, imSum, false, (*i).colcNorm, (*i).rowcNorm);
             (*i).kernelSums.push_back( imSum );
             (*i).nKernel += 1;
 
@@ -1013,7 +1013,7 @@ void lsst::ip::diffim::computeDiffImStats(
     lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> kImage(kernelCols, kernelRows);
 
     lsst::afw::image::MaskedImage<ImageT, MaskT>
-        convolvedImageStamp = lsst::afw::math::convolve(
+        convolvedImageStamp = lsst::afw::math::convolveNew(
             *(diffImContainer.imageToConvolve),
             *(diffImContainer.kernelList[kernelID]),
             edgeMaskBit, 
@@ -1098,7 +1098,7 @@ void lsst::ip::diffim::computeDiffImStats(
     }
 
     if (debugIO) {
-        diffImContainer.kernelList[kernelID]->computeImage(kImage, imSum, 0.0, 0.0, false);
+        diffImContainer.kernelList[kernelID]->computeImage(kImage, imSum, false);
         if (diffImContainer.isGood == true) {
             kImage.writeFits( (boost::format("kFits%dG_%d.fits") % kernelID % diffImContainer.id).str() );
         }
@@ -1133,20 +1133,10 @@ lsst::ip::diffim::generateDeltaFunctionKernelSet(
     const int signedNCols = static_cast<int>(nCols);
     const int signedNRows = static_cast<int>(nRows);
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> kernelBasisList;
-    int colCtr = (signedNCols - 1) / 2;
-    int rowCtr = (signedNRows - 1) / 2;
     for (int row = 0; row < signedNRows; ++row) {
-        double y = static_cast<double>(row - rowCtr);
-        
         for (int col = 0; col < signedNCols; ++col) {
-            double x = static_cast<double>(col - colCtr);
-            
-            lsst::afw::math::Kernel::KernelFunctionPtrType kfuncPtr(
-                new lsst::afw::math::IntegerDeltaFunction2<lsst::afw::math::Kernel::PixelT>(x, y)
-                );
-            
             boost::shared_ptr<lsst::afw::math::Kernel> kernelPtr(
-                new lsst::afw::math::AnalyticKernel(kfuncPtr, nCols, nRows)
+                new lsst::afw::math::DeltaFunctionKernel(col, row, nCols, nRows)
                 );
             
             kernelBasisList.push_back(kernelPtr);
@@ -1348,7 +1338,7 @@ void lsst::ip::diffim::calculateVectorStatistics(
 }
 
 /** 
- * @brief Adds a Function to an Image
+ * @brief Add a Function to an Image
  *
  * @ingroup diffim
  */
@@ -1367,6 +1357,30 @@ void lsst::ip::diffim::addFunction(
         for (unsigned int col = 0; col < numCols; ++col, imCol.next_col()) {
             double colPos = lsst::afw::image::positionToIndex(col);
             *imCol += static_cast<PixelT>(function(colPos, rowPos));
+        }
+    }
+}
+
+/** 
+ * @brief Subtract a Function from an Image
+ *
+ * @ingroup diffim
+ */
+template <typename PixelT, typename FunctionT>
+void lsst::ip::diffim::subtractFunction(
+    lsst::afw::image::Image<PixelT> &image, ///< image
+    lsst::afw::math::Function2<FunctionT> const &function ///< 2-d function
+) {
+    typedef typename lsst::afw::image::Image<PixelT>::pixel_accessor imageAccessorType;
+    unsigned int numCols = image.getCols();
+    unsigned int numRows = image.getRows();
+    imageAccessorType imRow = image.origin();
+    for (unsigned int row = 0; row < numRows; ++row, imRow.next_row()) {
+        imageAccessorType imCol = imRow;
+        double rowPos = lsst::afw::image::positionToIndex(row);
+        for (unsigned int col = 0; col < numCols; ++col, imCol.next_col()) {
+            double colPos = lsst::afw::image::positionToIndex(col);
+            *imCol -= static_cast<PixelT>(function(colPos, rowPos));
         }
     }
 }
@@ -1414,15 +1428,15 @@ lsst::afw::math::KernelList<lsst::afw::math::Kernel> lsst::ip::diffim::computePc
 
 template 
 boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
-    boost::shared_ptr<lsst::afw::math::Function2<double> > &kernelFunctionPtr,
-    boost::shared_ptr<lsst::afw::math::Function2<double> > &backgroundFunctionPtr,
+    lsst::afw::math::Function2<double> &kernelFunction,
+    lsst::afw::math::Function2<double> &backgroundFunction,
     std::vector<lsst::ip::diffim::DiffImContainer<float, lsst::afw::image::maskPixelType> > &diffImContainerList,
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelBasisList,
     lsst::pex::policy::Policy &policy);
 template 
 boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel(
-    boost::shared_ptr<lsst::afw::math::Function2<double> > &kernelFunctionPtr,
-    boost::shared_ptr<lsst::afw::math::Function2<double> > &backgroundFunctionPtr,
+    lsst::afw::math::Function2<double> &kernelFunction,
+    lsst::afw::math::Function2<double> &backgroundFunction,
     std::vector<lsst::ip::diffim::DiffImContainer<double, lsst::afw::image::maskPixelType> > &diffImContainerList,
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelBasisList,
     lsst::pex::policy::Policy &policy);
@@ -1479,5 +1493,25 @@ void lsst::ip::diffim::addFunction(
 
 template
 void lsst::ip::diffim::addFunction(
+    lsst::afw::image::Image<double>&,
+    lsst::afw::math::Function2<double> const&);
+
+template
+void lsst::ip::diffim::subtractFunction(
+    lsst::afw::image::Image<float>&,
+    lsst::afw::math::Function2<float> const&);
+
+template
+void lsst::ip::diffim::subtractFunction(
+    lsst::afw::image::Image<float>&,
+    lsst::afw::math::Function2<double> const&);
+
+template
+void lsst::ip::diffim::subtractFunction(
+    lsst::afw::image::Image<double>&,
+    lsst::afw::math::Function2<float> const&);
+
+template
+void lsst::ip::diffim::subtractFunction(
     lsst::afw::image::Image<double>&,
     lsst::afw::math::Function2<double> const&);

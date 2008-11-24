@@ -107,7 +107,7 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     Returns:
     - differenceMaskedImage: the difference masked image (Idiff in the equation above)
     - psfMatchKernelPtr: pointer to psf matching kernel (Kpsf in the equation above)
-    - backgroundFunctionPtr: pointer to function representation of the background (B in the equation above)
+    - backgroundFunction: function representation of the background (B in the equation above)
     """
     ###########
     #
@@ -140,10 +140,10 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
         psfMatchBasisKernelSet = diffimLib.generateDeltaFunctionKernelSet(kernelCols, kernelRows)
     
     # create function for kernel spatial variation
-    kernelSpatialFunctionPtr = afwMath.Function2DPtr(afwMath.PolynomialFunction2D(kernelSpatialOrder))
+    kernelSpatialFunction = afwMath.PolynomialFunction2D(kernelSpatialOrder)
     
     # and function for background
-    backgroundFunctionPtr = afwMath.Function2DPtr(afwMath.PolynomialFunction2D(backgroundSpatialOrder))
+    backgroundFunction = afwMath.PolynomialFunction2D(backgroundSpatialOrder)
 
     # get Log 
     diffImLog = pexLog.Log(pexLog.Log.getDefaultLog(), "ip.diffim.imageSubtract")
@@ -160,8 +160,8 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
         imageToNotConvolve = imageTmp
 
     psfMatchKernelPtr = computePsfMatchingKernelForMaskedImage(
-        kernelSpatialFunctionPtr,
-        backgroundFunctionPtr,
+        kernelSpatialFunction,
+        backgroundFunction,
         imageToConvolve,
         imageToNotConvolve,
         psfMatchBasisKernelSet,
@@ -180,13 +180,13 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     #
     if type(psfMatchKernelPtr.get()) == afwMath.LinearCombinationKernel:
         pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Psf-match using convolveLinear")
-        differenceImage = afwMath.convolveLinear(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit)
+        differenceImage = afwMath.convolveLinearNew(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit)
     else:
         pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Psf-match using convolve")
-        differenceImage = afwMath.convolve(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit, False)
+        differenceImage = afwMath.convolveNew(imageToConvolve, psfMatchKernelPtr.get(), edgeMaskBit, False)
 
     pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Add background")
-    diffimLib.addFunction(differenceImage.getImage().get(), backgroundFunctionPtr.get())
+    diffimLib.addFunction(differenceImage.getImage().get(), backgroundFunction)
     pexLog.Trace('lsst.ip.diffim.imageSubtract', 4, "Subtract imageToNotConvolve")
     differenceImage      -= imageToNotConvolve
     differenceImage      *= -1.0
@@ -199,4 +199,4 @@ def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
     if debugIO:
         differenceImage.writeFits('diFits')
 
-    return (differenceImage, psfMatchKernelPtr, backgroundFunctionPtr)
+    return (differenceImage, psfMatchKernelPtr, backgroundFunction)

@@ -15,7 +15,7 @@ __all__ = ['computePsfMatchingKernelForMaskedImage']
 
 GetMaskPlanesFromPolicy = False
 
-def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunctionPtr,
+def computePsfMatchingKernelForMaskedImage(kernelFunction, backgroundFunction,
     imageToConvolve, imageToNotConvolve, kernelBasisList, footprintList, policy):
     """Compute spatially varying PSF matching kernel for image subtraction.
 
@@ -27,9 +27,9 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
     The difference image is (Inc + B - Ic.conv.K)
     
     In/Out:
-    - kernelFunctionPtr: shared pointer to function for spatial variation of kernel;
+    - kernelFunction: function for spatial variation of kernel;
         the parameters are computed by this function
-    - backgroundFunctionPtr: shared pointer to function for spatial variation of background;
+    - backgroundFunction: function for spatial variation of background;
         the parameters are computed by this function
     
     Inputs:
@@ -232,8 +232,8 @@ def computePsfMatchingKernelForMaskedImage(kernelFunctionPtr, backgroundFunction
     kernelOutBasisList = diffimLib.computePcaKernelBasis(diffImContainerList, policy)
     
     kernelPtr = diffimLib.computeSpatiallyVaryingPsfMatchingKernel(
-        kernelFunctionPtr,
-        backgroundFunctionPtr,
+        kernelFunction,
+        backgroundFunction,
         diffImContainerList,
         kernelOutBasisList,
         policy,

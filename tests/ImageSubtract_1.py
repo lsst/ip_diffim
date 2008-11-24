@@ -66,10 +66,10 @@ def initializeTestCases():
     kernelPtr = afwMath.LinearCombinationKernelPtr(afwMath.LinearCombinationKernel())
     
     # and its function for spatial variation
-    kernelFunctionPtr = afwMath.Function2DPtr(afwMath.PolynomialFunction2D(kernelSpatialOrder))
+    kernelFunction = afwMath.PolynomialFunction2D(kernelSpatialOrder)
     
     # and background function
-    backgroundFunctionPtr = afwMath.Function2DPtr(afwMath.PolynomialFunction2D(backgroundSpatialOrder))
+    backgroundFunction = afwMath.PolynomialFunction2D(backgroundSpatialOrder)
     
     # make single good footprint at known object position in cal-53535-i-797722_1
     size = 40
@@ -81,7 +81,7 @@ def initializeTestCases():
                                         )
     footprintList.push_back(footprint)
 
-    return templateMaskedImage2, templateMaskedImage, scienceMaskedImage, kernelBasisList, kernelPtr, kernelFunctionPtr, backgroundFunctionPtr, footprintList
+    return templateMaskedImage2, templateMaskedImage, scienceMaskedImage, kernelBasisList, kernelPtr, kernelFunction, backgroundFunction, footprintList
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -94,8 +94,8 @@ class ConvolveTestCase(unittest.TestCase):
         self.scienceMaskedImage    = testObjects[2]
         self.kernelBasisList       = testObjects[3]
         self.kernelPtr             = testObjects[4]
-        self.kernelFunctionPtr     = testObjects[5]
-        self.backgroundFunctionPtr = testObjects[6]
+        self.kernelFunction        = testObjects[5]
+        self.backgroundFunction    = testObjects[6]
         self.footprintList         = testObjects[7]
                
     def tearDown(self):
@@ -104,17 +104,17 @@ class ConvolveTestCase(unittest.TestCase):
         del self.scienceMaskedImage    
         del self.kernelBasisList        
         del self.kernelPtr             
-        del self.kernelFunctionPtr     
-        del self.backgroundFunctionPtr 
+        del self.kernelFunction     
+        del self.backgroundFunction 
         del self.footprintList         
 
     def testConvolve(self, sigmaX=2, sigmaY=3):
         """Make sure that you recover a known convolution kernel"""
         kernelCols = policy.get('kernelCols')
         kernelRows = policy.get('kernelRows')
-        gaussFunctionPtr = afwMath.Function2DPtr(afwMath.GaussianFunction2D(sigmaX,sigmaY))
-        gaussKernel = afwMath.AnalyticKernel(gaussFunctionPtr, kernelCols, kernelRows)
-        convolvedScienceMaskedImage = afwMath.convolve(self.scienceMaskedImage, gaussKernel, 0, False)
+        gaussFunction = afwMath.GaussianFunction2D(sigmaX,sigmaY)
+        gaussKernel = afwMath.AnalyticKernel(gaussFunction, kernelCols, kernelRows)
+        convolvedScienceMaskedImage = afwMath.convolveNew(self.scienceMaskedImage, gaussKernel, 0, False)
 
         kImageIn  = afwImage.ImageD(kernelCols, kernelRows)
         kSumIn    = gaussKernel.computeImage(kImageIn, 0.0, 0.0, False)
@@ -178,8 +178,8 @@ class DeltaFunctionTestCase(unittest.TestCase):
         self.scienceMaskedImage    = testObjects[2]
         self.kernelBasisList       = testObjects[3]
         self.kernelPtr             = testObjects[4]
-        self.kernelFunctionPtr     = testObjects[5]
-        self.backgroundFunctionPtr = testObjects[6]
+        self.kernelFunction        = testObjects[5]
+        self.backgroundFunction    = testObjects[6]
         self.footprintList         = testObjects[7]
                
     def tearDown(self):
@@ -188,8 +188,8 @@ class DeltaFunctionTestCase(unittest.TestCase):
         del self.scienceMaskedImage    
         del self.kernelBasisList        
         del self.kernelPtr             
-        del self.kernelFunctionPtr     
-        del self.backgroundFunctionPtr 
+        del self.kernelFunction     
+        del self.backgroundFunction 
         del self.footprintList         
 
     def testDeltaFunction(self, bg=0.0, scaling=1.0):
@@ -264,8 +264,8 @@ class DeconvolveTestCase(unittest.TestCase):
         self.scienceMaskedImage    = testObjects[2]
         self.kernelBasisList       = testObjects[3]
         self.kernelPtr             = testObjects[4]
-        self.kernelFunctionPtr     = testObjects[5]
-        self.backgroundFunctionPtr = testObjects[6]
+        self.kernelFunction        = testObjects[5]
+        self.backgroundFunction    = testObjects[6]
         self.footprintList         = testObjects[7]
                
     def tearDown(self):
@@ -274,8 +274,8 @@ class DeconvolveTestCase(unittest.TestCase):
         del self.scienceMaskedImage    
         del self.kernelBasisList        
         del self.kernelPtr             
-        del self.kernelFunctionPtr     
-        del self.backgroundFunctionPtr 
+        del self.kernelFunction     
+        del self.backgroundFunction 
         del self.footprintList         
 
     def testDeconvolve(self):
@@ -329,7 +329,7 @@ class DeconvolveTestCase(unittest.TestCase):
                 kImageDPtr.writeFits('kFitsD_%d.fits' % (footprintID,))
 
             # check that you get a delta function
-            testMaskedImage = afwMath.convolve(kMaskedImageC, footprintKernelPtrD.get(), 0, False)
+            testMaskedImage = afwMath.convolveNew(kMaskedImageC, footprintKernelPtrD.get(), 0, False)
             print testMaskedImage
             if debugIO:
                 testMaskedImage.writeFits('deltaFunc_%d' % (footprintID,))
