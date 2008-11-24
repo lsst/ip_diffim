@@ -1,0 +1,10 @@
+AdditionalData: "differencePath=triggerImageSubtraction.differencePath"
+OutputItems: {
+    DifferenceExposure: {
+        Required: true
+        StoragePolicy: {
+            Storage: "FitsStorage"
+            Location: "%{differencePath}"
+        }
+    }
+}

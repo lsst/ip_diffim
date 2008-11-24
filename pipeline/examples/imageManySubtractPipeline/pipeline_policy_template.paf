@@ -1,0 +1,3 @@
+appStages: "lsst.pex.harness.IOStage.InputStage" "lsst.ip.diffim.pipeline.ImageSubtractStage" "lsst.pex.harness.IOStage.OutputStage"
+eventTopics: "triggerImageSubtraction" "None" "None"
+stagePolicies: "input_policy.paf" "%(imageSubtractPolicyPath)s" "output_policy.paf"

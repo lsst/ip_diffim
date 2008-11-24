@@ -1,0 +1,4 @@
+executionMode: "oneloop"
+appStages: "lsst.pex.harness.IOStage.InputStage" "lsst.ip.diffim.pipeline.ImageSubtractStage" "lsst.pex.harness.IOStage.OutputStage"
+eventTopics: "None" "None" "None"
+stagePolicies: "input_policy.paf" "%(imageSubtractPolicyPath)s" "output_policy.paf"

@@ -1,0 +1,10 @@
+InputItems: {
+    InputImage: {
+        Type: "MaskedImageF"
+        PythonType: "lsst.afw.image.MaskedImageF"
+        StoragePolicy: {
+            Storage: "FitsStorage"
+            Location: "%(inputImagePath)s"
+        }
+    }
+}

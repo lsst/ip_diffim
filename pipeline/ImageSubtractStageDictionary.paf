@@ -1,0 +1,88 @@
+#<?cfg paf policy ?>
+# Default Image Subtraction Policy File
+
+# Write intermediate FITS files? (boolean)
+debugIO: true
+
+# Size of the convolution kernel
+kernelRows: 19
+kernelCols: 19
+
+# Order of kernel spatial variation
+kernelSpatialOrder: 1
+
+# Order of background spatial variation
+backgroundSpatialOrder: 1
+
+computeDiffImStats: {
+    # Maximum sum (residual/variance) for an acceptable Kernel; mean should be 0
+    maximumFootprintResidualMean: 0.75
+
+    # Maximum variance (residual/variance) for an acceptable Kernel; variance should be 1
+    maximumFootprintResidualVariance: 2.0
+}
+
+
+getCollectionOfFootprintsForPsfMatching: {
+    # Minimum number of pixels in an acceptible Footprint
+    footprintDiffimNpixMin: 9
+
+    # Grow footprint by this many pixels
+    footprintDiffimGrow: 20
+
+    # Maximum number of pixels in a Footprint, after growing
+    footprintDiffimNpixAfterGrowMax: 3000
+
+    # Minimum number of clean candidates
+    minimumCleanFootprints: 50
+
+    # Threshold in sigma now
+    footprintDetectionThresholdSigma: 20.0
+
+    # How do you change the detection threshold if minimumCleanFootprints not found
+    # Make this shallow now for testing; don't want to get too many objects...
+    detectionThresholdScalingSigma: 5.0
+
+    # How low can you go
+    minimumDetectionThresholdSigma: 5.0
+
+    # Back compatibility for signal based vs. sigma based detection
+    footprintDetectionThreshold: 250.0
+    detectionThresholdScaling: 0.50
+    minimumDetectionThreshold: 125.0
+}
+
+computePsfMatchingKernelForMaskedImage: {
+    # Maximum number of sigma in kernel sum for good kernel
+    maximumKernelSumNSigma : 3.0
+
+    # Maximum number of iterations for sigma clipping
+    maximumIterationsKernelSum : 5
+}
+
+computePsfMatchingKernelForPostageStamp: {
+    # Empty
+}
+
+computePcaKernelBasis: {
+    # Minimum number of basis functions to use, after mean
+    minimumNumberOfBases: 3
+
+    # Maximum number of basis functions to use, after mean
+    maximumNumberOfBases: 7
+    
+    # Use enough basis function to model this much of the variance
+    maximumFractionOfEigenvalues: 0.99
+    
+    # Don't use bases whose eigenvalues are this small or smaller
+    minimumAcceptibleEigenvalue: 0.01
+
+    # Maximum number of iterations while doing PCA
+    maximumIteratonsPCA: 5
+
+}
+
+computeSpatiallyVaryingPsfMatchingKernel: {
+    # Maximum iterations for spatial fit to Kernel basis coefficients
+    maximumIterationsSpatialFit: 5
+}

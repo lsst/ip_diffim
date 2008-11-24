@@ -1,0 +1,18 @@
+#<?cfg paf policy ?>
+OutputItems: {
+   DiaSources: {
+       Required: true
+       StoragePolicy: {
+           Storage: "BoostStorage"
+           Location: "DiaSources.%{runId}.%{sliceId+1}"
+       }
+   }
+}
+Persistence: {
+   Formatter: {
+       DiaSourceVector: {
+           GenerateIds: false
+       }
+   }
+}
+
