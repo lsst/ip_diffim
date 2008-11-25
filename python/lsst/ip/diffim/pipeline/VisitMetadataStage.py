@@ -32,7 +32,7 @@ class VisitMetadataStage(lsst.pex.harness.Stage.Stage):
             self._lookup(inputDP.findUnique("filterName").getValueString())))
         outputDP.addProperty(dafBase.DataProperty.createDateTimeDataProperty(
             "dateObs",
-            dafPers.DateTime(inputDP.findUnique("visitTime").getValueDouble())
+            dafBase.DateTime(inputDP.findUnique("visitTime").getValueDouble())
             ))
         outputDP.addProperty(dafBase.DataProperty.createFloatDataProperty(
             "expTime", inputDP.findUnique("exposureTime").getValueDouble()))
