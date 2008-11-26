@@ -304,7 +304,12 @@ def fitPerPixel(differenceImageFootprintInformationList, label, policy):
                                               goodDifiList[i].getImageToNotConvolvePtr().get(),
                                               kernelPtr, bgValue)
         diffImStats = ipDiffim.DifferenceImageStatisticsF(diffIm)
-                                                     
+
+        Trace('lsst.ip.diffim', 5,
+              'Spatial %s kernel %d : Diffim residuals = %.2f +/- %.2f sigma' % (label,goodDifiList[i].getID(),
+                                                                                 diffImStats.getResidualMean(), diffImStats.getResidualStd()))
+        
+        
         if policy.get('debugPlot') == True:
             ipDiffimDebug.plotDiffImQuality1(goodDifiList[i],
                                              diffIm,
@@ -388,12 +393,17 @@ def fitSpatialPca(differenceImageFootprintInformationList, label, mKernel, eKern
                                                         goodDifiList[i].getImageToNotConvolvePtr().get(),
                                                         kernelPtr, bgValue)
             diffImStats  = ipDiffim.DifferenceImageStatisticsF(diffIm)
+
+            Trace('lsst.ip.diffim', 5,
+                  'Spatial %s kernel %d ek%d : Diffim residuals = %.2f +/- %.2f sigma' % (label,goodDifiList[i].getID(), npc,
+                                                                                          diffImStats.getResidualMean(), diffImStats.getResidualStd()))
+            
             
             if policy.get('debugPlot') == True:
                 ipDiffimDebug.plotDiffImQuality1(goodDifiList[i],
                                                  diffIm,
                                                  kernelPtr,
-                                                 label = 'PCA %s kernel_%d ek_%d' % (label, goodDifiList[i].getID(), npc),
+                                                 label = 'PCA %s kernel%d ek%d' % (label, goodDifiList[i].getID(), npc),
                                                  outfile = 'PKernel_%s%d_%d.ps' % (label, goodDifiList[i].getID(), npc)
                                                  )
                 
@@ -507,6 +517,31 @@ Notes:
             policy
         )
         cKernelVec1, cKernelErrorVec1, cBg1, cBgError1 = ipDiffimTools.vectorPairToVectors(convVP1)
+        #print cKernelVec1[0], cKernelVec1[1], cKernelVec1[2]
+        #print cKernelErrorVec1[0], cKernelErrorVec1[1], cKernelErrorVec1[2]
+        #print cBg1, cBgError1
+        
+        #foo = ipDiffim.computePsfMatchingKernelForFootprintGSL(
+        #    templatePtr.get(),
+        #    imagePtr.get(),
+        #    diffIm0,
+        #    kBasisList,
+        #    policy
+        #)
+        #cKernelVec1, cKernelErrorVec1, cBg1, cBgError1 = ipDiffimTools.vectorPairToVectors(foo)
+        #print cKernelVec1[0], cKernelVec1[1], cKernelVec1[2]
+        #print cKernelErrorVec1[0], cKernelErrorVec1[1], cKernelErrorVec1[2]
+        #print cBg1, cBgError1
+
+        #sys.exit(1)
+
+
+
+
+
+
+        
+        cKernelVec1, cKernelErrorVec1, cBg1, cBgError1 = ipDiffimTools.vectorPairToVectors(convVP1)
         cKernelPtr1 = afwMath.KernelPtr(
             afwMath.LinearCombinationKernel(kBasisList, cKernelVec1)
             )
@@ -536,7 +571,7 @@ Notes:
 
         
 
-        # Assuming the template is better seeing, find deconvolution kernel
+        # Assuming the template is worse seeing, find deconvolution kernel
         deconvVP1 = ipDiffim.computePsfMatchingKernelForFootprint2(
             imagePtr.get(),
             templatePtr.get(),
@@ -593,7 +628,7 @@ Notes:
         else:
             prefix = '#'
         Trace('lsst.ip.diffim', 5,
-              '%sKernel %d : Kernel Sum = %.2f, Diffim residuals = %.2f +/- %.2f sigma' % (
+              '%sKernel %d : Conv Kernel Sum = %.2f, Diffim residuals = %.2f +/- %.2f sigma' % (
             prefix,
             cDifiPtr.getID(),
             cDifiPtr.getSingleKernelPtr().computeNewImage(False)[1],
@@ -623,7 +658,7 @@ Notes:
         else:
             prefix = '#'
         Trace('lsst.ip.diffim', 5,
-              '%sKernel %d : Kernel Sum = %.2f, Diffim residuals = %.2f +/- %.2f sigma' % (
+              '%sKernel %d : Deconv Kernel Sum = %.2f, Diffim residuals = %.2f +/- %.2f sigma' % (
             prefix,
             dDifiPtr.getID(),
             dDifiPtr.getSingleKernelPtr().computeNewImage(False)[1],
@@ -646,7 +681,7 @@ Notes:
                                           templatePtr, imagePtr,
                                           cDifiPtr, cDiffIm2, cKernelPtr2,
                                           dDifiPtr, dDiffIm2, dKernelPtr2)
-            
+
     rejectKernelOutliers(cDifiPtrList, policy)
     rejectKernelOutliers(dDifiPtrList, policy)
 

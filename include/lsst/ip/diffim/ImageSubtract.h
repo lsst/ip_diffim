@@ -191,6 +191,15 @@ namespace diffim {
         lsst::pex::policy::Policy &policy
         );
 
+    template <typename ImageT, typename MaskT>
+    std::vector<std::pair<double,double> > computePsfMatchingKernelForFootprintGSL(
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &varianceImage,
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
+        lsst::pex::policy::Policy &policy
+        );
+
     template <typename MaskT>
     bool maskOk(
         lsst::afw::image::Mask<MaskT> const &inputMask,

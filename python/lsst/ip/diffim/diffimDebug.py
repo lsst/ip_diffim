@@ -13,8 +13,6 @@ def plotDiffImQuality1(difi, diffim, kernel, label, outfile=None):
     mask     = ipDiffimTools.imageToMatrix(diffim.getMask())
     idx      = numpy.where(mask == 0)
     sigma    = numpy.ravel( data[idx] / numpy.sqrt(variance[idx]) )
-    Trace('lsst.ip.diffim', 5,
-          '%s : Python diffim residuals = %.2f +/- %.2f sigma' % (label, sigma.mean(), sigma.std()))
 
     info     = (ipDiffimTools.imageToMatrix(template.getImage()),
                 ipDiffimTools.imageToMatrix(image.getImage()),
@@ -36,16 +34,12 @@ def plotDiffImQuality2(id, iteration,
     cMask     = ipDiffimTools.imageToMatrix(cDiffIm.getMask())
     cIdx      = numpy.where(cMask == 0)
     cSigma    = numpy.ravel( cData[cIdx] / numpy.sqrt(cVariance[cIdx]) )
-    Trace('lsst.ip.diffim', 5,
-          'Kernel %d : Python diffim residuals = %.2f +/- %.2f sigma' % (id, cSigma.mean(), cSigma.std()))
    
     dData     = ipDiffimTools.imageToMatrix(dDiffIm.getImage())
     dVariance = ipDiffimTools.imageToMatrix(dDiffIm.getVariance())
     dMask     = ipDiffimTools.imageToMatrix(dDiffIm.getMask())
     dIdx      = numpy.where(dMask == 0)
     dSigma    = numpy.ravel( dData[dIdx] / numpy.sqrt(dVariance[dIdx]) )
-    Trace('lsst.ip.diffim', 5,
-          'Kernel %d : Python diffim residuals = %.2f +/- %.2f sigma' % (id, dSigma.mean(), dSigma.std()))
     
     cInfo     = (ipDiffimTools.imageToMatrix(cTemplate.getImage()),
                  ipDiffimTools.imageToMatrix(cImage.getImage()),
@@ -72,17 +66,25 @@ def writeDiffImages(id,
     ckp,cks = cKernel.computeNewImage(False)
     cmd = ckp.getMetaData()
     cmd.addProperty(dafBase.DataProperty('CONV', 'Template'))
+    cmd.addProperty(dafBase.DataProperty('KCOL', cDifi.getColcNorm()))
+    cmd.addProperty(dafBase.DataProperty('KROW', cDifi.getRowcNorm()))
     cmd.addProperty(dafBase.DataProperty('MSIG', cDifi.getSingleStats().getResidualMean()))
     cmd.addProperty(dafBase.DataProperty('VSIG', cDifi.getSingleStats().getResidualStd()))
+    cmd.addProperty(dafBase.DataProperty('BG', cDifi.getSingleBackground()))
+    cmd.addProperty(dafBase.DataProperty('KQUALITY', cDifi.getStatus()))
     cmd.addProperty(dafBase.DataProperty('KSUM', cks))
     ckp.setMetadata(cmd)
     ckp.writeFits('cKernel_%d.fits' % (id))
     
     dkp,dks = dKernel.computeNewImage(False)
     dmd = dkp.getMetaData()
-    dmd.addProperty(dafBase.DataProperty('CONV', 'Template'))
+    dmd.addProperty(dafBase.DataProperty('CONV', 'Image'))
+    dmd.addProperty(dafBase.DataProperty('KCOL', dDifi.getColcNorm()))
+    dmd.addProperty(dafBase.DataProperty('KROW', dDifi.getRowcNorm()))
     dmd.addProperty(dafBase.DataProperty('MSIG', dDifi.getSingleStats().getResidualMean()))
     dmd.addProperty(dafBase.DataProperty('VSIG', dDifi.getSingleStats().getResidualStd()))
+    dmd.addProperty(dafBase.DataProperty('BG', dDifi.getSingleBackground()))
+    dmd.addProperty(dafBase.DataProperty('KQUALITY', dDifi.getStatus()))
     dmd.addProperty(dafBase.DataProperty('KSUM', dks))
     dkp.setMetadata(dmd)
     dkp.writeFits('dKernel_%d.fits' % (id))

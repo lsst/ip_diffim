@@ -17,6 +17,13 @@
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/LinearAlgebra.h> 
 
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_multifit.h>
+#include <gsl/gsl_machine.h>
+#include <gsl/gsl_blas.h>
+#include <gsl/gsl_linalg.h>
+
 #define LSST_MAX_TRACE 5                // NOTE -  trace statements >= 6 can ENTIRELY kill the run time
 #include <lsst/afw/image.h>
 #include <lsst/afw/math.h>
@@ -861,6 +868,379 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
     return kernelSolution;
 }
 
+
+/** 
+ * \brief Computes a single Kernel (Model 1) around a single subimage.
+ *
+ * Accepts two MaskedImages, generally subimages of a larger image, one of which
+ * is to be convolved to match the other.  The output Kernel is generated using
+ * an input list of basis Kernels by finding the coefficients in front of each
+ * basis.  This version accepts an input variance image, and uses GSL for the
+ * matrices.
+ *
+ * \return Vector of coefficients representing the relative contribution of
+ * each input basis function.
+ *
+ * \return Differential background offset between the two images
+ *
+ * \ingroup diffim
+ */
+template <typename ImageT, typename MaskT>
+std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKernelForFootprintGSL(
+    lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve, ///< Image to convolve
+    lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve, ///< Image to not convolve
+    lsst::afw::image::MaskedImage<ImageT, MaskT> const &varianceImage, ///< Model of variance per pixel
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList, ///< Input kernel basis set
+    lsst::pex::policy::Policy &policy ///< Policy directing the behavior
+    ) { 
+    
+    /* grab mask bits from the image to convolve, since that is what we'll be operating on */
+    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
+    
+    int nKernelParameters = 0;
+    int nBackgroundParameters = 0;
+    int nParameters = 0;
+
+    boost::timer t;
+    double time;
+    t.restart();
+
+    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                "Entering subroutine computePsfMatchingKernelForFootprint");
+    
+    /* We assume that each kernel in the Set has 1 parameter you fit for */
+    nKernelParameters = kernelInBasisList.size();
+    /* Or, we just assume that across a single kernel, background 0th order.  This quite makes sense. */
+    nBackgroundParameters = 1;
+    /* Total number of parameters */
+    nParameters = nKernelParameters + nBackgroundParameters;
+
+    gsl_vector *B = gsl_vector_alloc (nParameters);
+    gsl_matrix *M = gsl_matrix_alloc (nParameters, nParameters);
+    
+    gsl_vector_set_zero(B);
+    gsl_matrix_set_zero(M);
+    
+    /* convolve creates a MaskedImage, push it onto the back of the Vector */
+    /* need to use shared pointers because MaskedImage copy does not work */
+    std::vector<boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > > convolvedImageList(nKernelParameters);
+    /* and an iterator over this */
+    typename std::vector<boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > >::iterator citer = convolvedImageList.begin();
+    
+    /* Iterator for input kernel basis */
+    std::vector<boost::shared_ptr<lsst::afw::math::Kernel> >::const_iterator kiter = kernelInBasisList.begin();
+    /* Create C_ij in the formalism of Alard & Lupton */
+    for (; kiter != kernelInBasisList.end(); ++kiter, ++citer) {
+        
+        lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                    "Convolving an Object with Basis");
+        
+        /* NOTE : we could also *precompute* the entire template image convolved with these functions */
+        /*        and save them somewhere to avoid this step each time.  however, our paradigm is to */
+        /*        compute whatever is needed on the fly.  hence this step here. */
+        boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > imagePtr(
+            new lsst::afw::image::MaskedImage<ImageT, MaskT>
+            (lsst::afw::math::convolveNew(imageToConvolve, **kiter, edgeMaskBit, false))
+            );
+        
+        lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                    "Convolved an Object with Basis");
+        
+        *citer = imagePtr;
+        
+    } 
+    
+    /* NOTE ABOUT CONVOLUTION : */
+    /* getCtrCol:getCtrRow pixels are masked on the left:bottom side */
+    /* getCols()-getCtrCol():getRows()-getCtrRow() masked on right/top side */
+    /* */
+    /* The convolved image and the input image are by default the same size, so */
+    /* we offset our initial pixel references by the same amount */
+    kiter = kernelInBasisList.begin();
+    citer = convolvedImageList.begin();
+    unsigned int startCol = (*kiter)->getCtrCol();
+    unsigned int startRow = (*kiter)->getCtrRow();
+    /* NOTE - I determined I needed this +1 by eye */
+    unsigned int endCol   = (*citer)->getCols() - ((*kiter)->getCols() - (*kiter)->getCtrCol()) + 1;
+    unsigned int endRow   = (*citer)->getRows() - ((*kiter)->getRows() - (*kiter)->getCtrRow()) + 1;
+    /* NOTE - we need to enforce that the input images are large enough */
+    /* How about some multiple of the PSF FWHM?  Or second moments? */
+    
+    /* An accessor for each convolution plane */
+    /* NOTE : MaskedPixelAccessor has no empty constructor, therefore we need to push_back() */
+    std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> > convolvedAccessorRowList;
+    for (citer = convolvedImageList.begin(); citer != convolvedImageList.end(); ++citer) {
+        convolvedAccessorRowList.push_back(lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT>(**citer));
+    }
+    
+    /* An accessor for each input image; address rows and cols separately */
+    lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> imageToConvolveRow(imageToConvolve);
+    lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> imageToNotConvolveRow(imageToNotConvolve);
+    lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> varianceRow(varianceImage);
+    
+    /* Take into account buffer for kernel images */
+    imageToConvolveRow.advance(startCol, startRow);
+    imageToNotConvolveRow.advance(startCol, startRow);
+    varianceRow.advance(startCol, startRow);
+
+    for (int ki = 0; ki < nKernelParameters; ++ki) {
+        convolvedAccessorRowList[ki].advance(startCol, startRow);
+    }
+
+    for (unsigned int row = startRow; row < endRow; ++row) {
+        
+        /* An accessor for each convolution plane */
+        std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> > convolvedAccessorColList = convolvedAccessorRowList;
+        
+        /* An accessor for each input image; places the col accessor at the correct row */
+        lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> imageToConvolveCol = imageToConvolveRow;
+        lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> imageToNotConvolveCol = imageToNotConvolveRow;
+        lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> varianceCol = varianceRow;
+
+        for (unsigned int col = startCol; col < endCol; ++col) {
+            
+            ImageT ncCamera   = *imageToNotConvolveCol.image;
+            ImageT ncVariance = *imageToNotConvolveCol.variance;
+            MaskT  ncMask     = *imageToNotConvolveCol.mask;
+            
+            ImageT iVariance  = 1.0 / *varianceCol.variance;
+            
+            lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                        "Accessing image row %d col %d : %.3f %.3f %d",
+                                        row, col, ncCamera, ncVariance, ncMask);
+            
+            /* kernel index i */
+            typename std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> >::iterator
+                kiteri = convolvedAccessorColList.begin();
+            
+            for (int kidxi = 0; kiteri != convolvedAccessorColList.end(); ++kiteri, ++kidxi) {
+                ImageT cdCamerai   = *kiteri->image;
+
+                /* NOTE - Commenting in these additional pixel accesses yields
+                 * an additional second of run-time per kernel with opt=1 at 2.8
+                 * GHz*/
+
+                /* ignore unnecessary pixel accesses 
+                ImageT cdVariancei = *kiteri->variance;
+                MaskT  cdMaski     = *kiteri->mask;
+                lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                            "Accessing convolved image %d : %.3f %.3f %d",
+                                            kidxi, cdCamerai, cdVariancei, cdMaski);
+                */
+
+                /* kernel index j  */
+                typename std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> >::iterator kiterj = kiteri;
+                for (int kidxj = kidxi; kiterj != convolvedAccessorColList.end(); ++kiterj, ++kidxj) {
+                    ImageT cdCameraj   = *kiterj->image;
+
+                    /* ignore unnecessary pixel accesses 
+                    ImageT cdVariancej = *kiterj->variance;
+                    MaskT  cdMaskj     = *kiterj->mask;
+                    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                                "Accessing convolved image %d : %.3f %.3f %d",
+                                                kidxj, cdCameraj, cdVariancej, cdMaskj);
+                    */
+
+                    gsl_matrix_set(M, kidxi, kidxj, 
+                                   gsl_matrix_get(M, kidxi, kidxj) + cdCamerai * cdCameraj * iVariance);
+                } 
+             
+                gsl_vector_set(B, kidxi,
+                               gsl_vector_get(B, kidxi) + ncCamera * cdCamerai * iVariance);
+                
+                /* Constant background term; effectively j=kidxj+1 */
+                gsl_matrix_set(M, kidxi, nParameters-1, 
+                               gsl_matrix_get(M, kidxi, nParameters-1) + cdCamerai * iVariance);
+            } 
+            
+            /* Background term; effectively i=kidxi+1 */
+            gsl_vector_set(B, nParameters-1,
+                           gsl_vector_get(B, nParameters-1) + ncCamera * iVariance);
+
+            gsl_matrix_set(M, nParameters-1, nParameters-1, 
+                           gsl_matrix_get(M, nParameters-1, nParameters-1) + 1.0 * iVariance);
+            
+            lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                        "Background terms : %.3f %.3f",
+                                          gsl_vector_get(B, nParameters-1), 
+                                          gsl_matrix_get(M, nParameters-1, nParameters-1));
+            
+            /* Step each accessor in column */
+            imageToConvolveCol.nextCol();
+            imageToNotConvolveCol.nextCol();
+            varianceCol.nextCol();
+            for (int ki = 0; ki < nKernelParameters; ++ki) {
+                convolvedAccessorColList[ki].nextCol();
+            }             
+            
+        } /* col */
+        
+        /* Step each accessor in row */
+        imageToConvolveRow.nextRow();
+        imageToNotConvolveRow.nextRow();
+        varianceRow.nextRow();
+        for (int ki = 0; ki < nKernelParameters; ++ki) {
+            convolvedAccessorRowList[ki].nextRow();
+        }
+        
+    } /* row */
+
+    /* NOTE: If we are going to regularize the solution to M, this is the place to do it */
+    
+    /* Fill in rest of M */
+    for (int kidxi=0; kidxi < nParameters; ++kidxi) 
+        for (int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) 
+            gsl_matrix_set(M, kidxj, kidxi,
+                           gsl_matrix_get(M, kidxi, kidxj));
+    
+#if DEBUG_MATRIX
+    std::cout << "B : " << B << std::endl;
+    std::cout << "M : " << M << std::endl;
+#endif
+
+    time = t.elapsed();
+    lsst::pex::logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                "Total compute time before matrix inversions : %.2f s", time);
+
+    /* temporary matrices */
+    //gsl_matrix *V    = gsl_matrix_alloc (nParameters, nParameters);
+    //gsl_vector *S    = gsl_vector_alloc (nParameters);
+    //gsl_vector *work = gsl_vector_alloc (nParameters);
+
+    //gsl_matrix *MtM = gsl_matrix_alloc (nParameters, nParameters);
+    //gsl_blas_dgemm(CblasTrans, CblasNoTrans,
+    //1.0, M, M, 
+    //0.0, MtM);
+
+    
+    gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc (nParameters, nParameters);
+    gsl_vector *X                       = gsl_vector_alloc (nParameters);
+    gsl_matrix *Cov                     = gsl_matrix_alloc (nParameters, nParameters);
+    double chi2;
+    size_t rank;
+    /* This has too much other computation in there; take only what I need 
+       gsl_multifit_linear_svd(M, B, GSL_DBL_EPSILON, &rank, X, Cov, &chi2, work);
+    */
+    gsl_matrix *A   = work->A;
+    gsl_matrix *Q   = work->Q;
+    gsl_matrix *QSI = work->QSI;
+    gsl_vector *S   = work->S;
+    gsl_vector *xt  = work->xt;
+    gsl_vector *D   = work->D;
+    gsl_matrix_memcpy (A, M);
+    gsl_linalg_balance_columns (A, D);
+    gsl_linalg_SV_decomp_mod (A, QSI, Q, S, xt);
+    gsl_blas_dgemv (CblasTrans, 1.0, A, B, 0.0, xt);
+    gsl_matrix_memcpy (QSI, Q);
+    {
+        double alpha0 = gsl_vector_get (S, 0);
+        size_t p_eff = 0;
+
+        const size_t n = M->size1;
+        const size_t p = M->size2;
+
+        for (size_t j = 0; j < p; j++)
+        {
+            gsl_vector_view column = gsl_matrix_column (QSI, j);
+            double alpha = gsl_vector_get (S, j);
+            
+            if (alpha <= GSL_DBL_EPSILON * alpha0) {
+                alpha = 0.0;
+            } else {
+                alpha = 1.0 / alpha;
+                p_eff++;
+            }
+            
+            gsl_vector_scale (&column.vector, alpha);
+        }
+        
+        rank = p_eff;
+    }
+    gsl_vector_set_zero (X);
+    gsl_blas_dgemv (CblasNoTrans, 1.0, QSI, xt, 0.0, X);
+    gsl_vector_div (X, D);
+    gsl_multifit_linear_free(work);
+
+
+    //gsl_linalg_SV_decomp(MtM, V, S, work); /* MtM -> U */
+    //gsl_matrix * VT = gsl_matrix_alloc (nParameters, nParameters);
+    //gsl_matrix_transpose_memcpy (VT, V);
+
+    //gsl_matrix *Si   = gsl_matrix_alloc (nParameters, nParameters);
+    //for (int i = 0; i < nParametrs; i++)
+    //if (gsl_vector_get (S, i) > MIN_EIGVENVALUE)
+    //gsl_matrix_set (Si, i, i, 1.0 / gsl_vector_get (S, i));
+
+    //gsl_matrix * VSi = gsl_matrix_alloc (nParameters, nParameters);
+    //gsl_blas_dgemm (CblasNoTrans, CblasNoTrans,
+    //1.0, V, Si,
+    //0.0, VSi);
+
+    //gsl_matrix * pinv = gsl_matrix_alloc (nParameters, nParameters);
+    //gsl_blas_dgemm (CblasTrans, CblasNoTrans,
+    //1.0, MtM, VSi,
+    //0.0, pinv);
+    
+    /* get solution using SVD */
+    //gsl_vector *X    = gsl_vector_alloc (nParameters);
+    //gsl_linalg_SV_decomp(M, V, S, work); /* M -> U */
+    //gsl_vector_free(work);
+    //gsl_linalg_SV_solve(M, V, S, B, X);  /* Solution in X */
+
+    /* OR, Using LU Decomposition */
+    /*
+    gsl_permutation *P = gsl_permutation_alloc (nParameters);
+    int s;
+    gsl_linalg_LU_decomp (M, p, &s);  // M -> LU
+    gsl_linalg_LU_solve (M, p, B, X);
+    */
+        
+
+
+
+    /* Invert using VW's internal method */
+    //vw::math::Vector<double> Soln = vw::math::least_squares(M, B);
+
+    /* Additional gymnastics to get the parameter uncertainties */
+     //vw::math::Matrix<double> Mt = vw::math::transpose(M);
+     //vw::math::Matrix<double> MtM = Mt * M;
+     //vw::math::Matrix<double> Error = vw::math::pseudoinverse(MtM);
+
+    /*
+      NOTE : for any real kernels I have looked at, these solutions have agreed
+      exactly.  However, when designing the testDeconvolve unit test with
+      hand-built gaussians as objects and non-realistic noise, the solutions did
+      *NOT* agree.
+
+      std::cout << "Soln : " << Soln << std::endl;
+      std::cout << "Soln2 : " << Soln2 << std::endl;
+    */
+
+    std::cout << "Chi2 = " << chi2 << std::endl;
+#if DEBUG_MATRIX
+    std::cout << "Chi2 = " << chi2 << std::endl;
+    gsl_vector_fprintf(std::cout, X, '%.3f');
+    gsl_matrix_fprintf(std::cout, Cov, '%.3f');
+#endif
+    
+    time = t.elapsed();
+    lsst::pex::logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                "Total compute time after matrix inversions : %.2f s", time);
+
+    /* Translate into vector pair */
+    std::vector<std::pair<double,double> > kernelSolution;
+    for (int ki = 0; ki < nParameters; ++ki) {
+        kernelSolution.push_back(std::make_pair<double,double>( gsl_vector_get(X, ki),
+                                                                gsl_matrix_get(Cov, ki, ki)));
+        //sqrt(gsl_matrix_get(Cov, ki, ki)) ));
+    }
+
+    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                "Leaving subroutine computePsfMatchingKernelForFootprint");
+    
+    return kernelSolution;
+}
+
 /** 
  * @brief Checks a Mask image to see if a particular Mask plane is set.
  *
@@ -1156,6 +1536,22 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
 
 template
 std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKernelForFootprint2(
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &varianceImage,
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
+    lsst::pex::policy::Policy &policy);
+
+template
+std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKernelForFootprintGSL(
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &varianceImage,
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
+    lsst::pex::policy::Policy &policy);
+
+template
+std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKernelForFootprintGSL(
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &varianceImage,

@@ -27,9 +27,10 @@ env = scons.makeEnv(
         ["daf_data", "lsst/daf/data.h", "daf_data:C++"], # needed by afw
         ["afw", "lsst/afw.h", "afw:C++"],
         ["detection", "lsst/detection/Footprint.h", "detection"],
+        ["gsl", "gsl/gsl_matrix.h", "gslcblas gsl"],
     ],
 )
-env.libs["ip_diffim"] += env.getlibs("boost vw lapack wcslib cfitsio utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy security minuit afw detection")
+env.libs["ip_diffim"] += env.getlibs("boost vw lapack wcslib cfitsio utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy security minuit afw detection gsl")
 env.libs["ip_diffim"] += ["lapack"]     # bug in scons 1.16; getlibs("lapack") fails as lapack isn't in eups
 
 #
