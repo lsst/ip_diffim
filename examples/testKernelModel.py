@@ -483,8 +483,8 @@ Notes:
     policy.set('getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints', 5)
     #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 6350.)  # gets 5
     #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 5000.)  # gets 12
-    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 1000.) # gets full test suite
-    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 250.) # gets a lot
+    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 1000.) # gets full test suite
+    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 250.) # gets a lot
     
     fpList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                               scienceMaskedImage,
