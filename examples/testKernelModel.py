@@ -484,7 +484,8 @@ Notes:
     #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 6350.)  # gets 5
     #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 5000.)  # gets 12
     #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 1000.) # gets full test suite
-    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 250.) # gets a lot
+    #policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 250.) # gets a lot
+    policy.set('getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold', 2500.)
     
     fpList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                               scienceMaskedImage,
@@ -542,6 +543,9 @@ Notes:
 
         
         cKernelVec1, cKernelErrorVec1, cBg1, cBgError1 = ipDiffimTools.vectorPairToVectors(convVP1)
+        for i in range(cKernelVec1.size()):
+            print i, cKernelVec1[i]
+            
         cKernelPtr1 = afwMath.KernelPtr(
             afwMath.LinearCombinationKernel(kBasisList, cKernelVec1)
             )

@@ -8,6 +8,7 @@ setupOptional(pex_harness)
 setupOptional(afwdata)
 
 setupRequired(matplotlib)
+setupRequired(gsl)
 
 setupRequired(afw 666)
 setupRequired(detection 666)

@@ -58,19 +58,74 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 %template(DifferenceImageStatisticsD)
     lsst::ip::diffim::DifferenceImageStatistics<double, lsst::afw::image::maskPixelType>;
 
+/* */ 
+/* */ 
+
 %template(DifferenceImageFootprintInformationF)  
     lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>;
-%boost_shared_ptr(DifiPtrF, 
-                  lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>);
-%template(DifiPtrListF)
-    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::Ptr>;
-
 %template(DifferenceImageFootprintInformationD)  
     lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>;
+
+%boost_shared_ptr(DifiPtrF, 
+                  lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>);
 %boost_shared_ptr(DifiPtrD, 
                   lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>);
+
+%template(DifiPtrListF)
+    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::Ptr>;
 %template(DifiPtrListD)
     std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>::Ptr>;
+
+/* */ 
+/* cell stuff */
+/* */ 
+
+%template(KernelModelQaF)  
+    lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>;
+%template(KernelModelQaD)  
+    lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>;
+
+%boost_shared_ptr(KernelModelQaPtrF, 
+                  lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>);
+%boost_shared_ptr(KernelModelQaPtrD, 
+                  lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>);
+
+%template(KernelModelQaPtrListF)
+    std::vector<lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>::Ptr>;
+%template(KernelModelQaPtrListD)
+    std::vector<lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>::Ptr>;
+
+/* */ 
+/* */ 
+
+%template(SpatialModelCellFK)  
+    lsst::ip::diffim::SpatialModelCell<float, 
+                                       lsst::afw::image::maskPixelType, 
+                                       lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>::Ptr>;
+%template(SpatialModelCellDK)  
+    lsst::ip::diffim::SpatialModelCell<double, 
+                                       lsst::afw::image::maskPixelType, 
+                                       lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>::Ptr>;
+
+%boost_shared_ptr(SpatialModelCellPtrFK, 
+                  lsst::ip::diffim::SpatialModelCell<float, 
+                  lsst::afw::image::maskPixelType, 
+                  lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>::Ptr>);
+%boost_shared_ptr(SpatialModelCellPtrDK, 
+                  lsst::ip::diffim::SpatialModelCell<double, 
+                  lsst::afw::image::maskPixelType, 
+                  lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>::Ptr>);
+
+%template(SpatialModelCellPtrListFK)
+    std::vector<lsst::ip::diffim::SpatialModelCell<float, 
+                                                   lsst::afw::image::maskPixelType, 
+                                                   lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>::Ptr>::Ptr>;
+%template(SpatialModelCellPtrListDK)
+    std::vector<lsst::ip::diffim::SpatialModelCell<double, 
+                                                   lsst::afw::image::maskPixelType, 
+                                                   lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>::Ptr>::Ptr>;
+/* */ 
+/* */ 
 
 /* subroutines */
 %template(getGoodFootprints)

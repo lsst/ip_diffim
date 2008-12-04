@@ -13,6 +13,7 @@
 #define LSST_IMAGEPROC_IMAGESUBTRACT_H
 
 #include <vector>
+#include <string>
 
 #include <boost/shared_ptr.hpp>
 
@@ -244,6 +245,187 @@ namespace diffim {
         lsst::afw::math::Function2<FunctionT> const &function
         );
 
+
+    /* This will replace difi */
+    template <typename ImageT, typename MaskT>
+    class KernelModelQa {
+    public: 
+        typedef boost::shared_ptr<KernelModelQa<ImageT, MaskT> > Ptr;
+        typedef std::vector<typename KernelModelQa<ImageT, MaskT>::Ptr> KernelModelQaList;
+        typedef boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > MaskedImagePtr; 
+
+        //KernelModelQa(){;};
+        virtual ~KernelModelQa() {};
+
+        KernelModelQa(lsst::detection::Footprint::PtrType fpPtr,
+                      MaskedImagePtr miToConvolveParentPtr,
+                      MaskedImagePtr miToNotConvolveParentPtr,
+                      lsst::afw::math::KernelList<lsst::afw::math::Kernel> kBasisList,
+                      lsst::pex::policy::Policy &policy,
+                      bool build=false
+            );
+
+        void setID(int id) {_id = id;};
+        int getID() {return _id;};
+
+        void setColcNorm(double colc) {_colcNorm = colc;};
+        double getColcNorm() {return _colcNorm;};
+
+        void setRowcNorm(double rowc) {_rowcNorm = rowc;};
+        double getRowcNorm() {return _rowcNorm;};
+
+        void setFootprintPtr(lsst::detection::Footprint::PtrType fpPtr) {_fpPtr = fpPtr;};
+        lsst::detection::Footprint::PtrType getFootprintPtr() {return _fpPtr;};
+
+        void setMiToConvolvePtr(MaskedImagePtr miPtr) {_miToConvolvePtr = miPtr;};
+        MaskedImagePtr getMiToConvolvePtr() {return _miToConvolvePtr;};
+
+        void setMiToNotConvolvePtr(MaskedImagePtr miPtr) {_miToNotConvolvePtr = miPtr;};
+        MaskedImagePtr getMiToNotConvolvePtr() {return _miToNotConvolvePtr;};
+
+        void setKernelPtr(boost::shared_ptr<lsst::afw::math::Kernel> kPtr) {_kPtr = kPtr;};
+        boost::shared_ptr<lsst::afw::math::Kernel> getKernelPtr() {return _kPtr;};
+
+        void setKernelErrPtr(boost::shared_ptr<lsst::afw::math::Kernel> kPtr) {_kErrPtr = kPtr;};
+        boost::shared_ptr<lsst::afw::math::Kernel> getKernelErrPtr() {return _kErrPtr;};
+
+        void setKernelSum(double kSum) {_kSum = kSum;};
+        double getKernelSum() {return _kSum;};
+
+        void setBg(double bg) {_bg = bg;};
+        double getBg() {return _bg;};
+
+        void setBgErr(double bgErr) {_bgErr = bgErr;};
+        double getBgErr() {return _bgErr;};
+
+        /* Ideally this stuff below will be replaced by SDQA metrics */
+        void setStats(DifferenceImageStatistics<ImageT, MaskT> kStats) {_kStats = kStats;};
+        DifferenceImageStatistics<ImageT, MaskT> getStats() {return _kStats;};
+
+        /* Using a different kernel and background, compute stats for this Footprint */
+        //DifferenceImageStatistics<ImageT, MaskT> computeImageStats(boost::shared_ptr<lsst::afw::math::Kernel> kPtr,
+        //double bg);
+
+        void setQaStatus(bool status) {_isGood = status;};
+        bool getQaStatus() {return _isGood;};
+        bool isGood() {return _isGood;};
+
+        void setBuildStatus(bool built) {_isBuilt = built;};
+        bool getBuildStatus() {return _isBuilt;};
+
+        /* actually execute building the Kernel; method needed for SpatialModelCell */
+        bool buildModel();
+
+        /* Requirement to be used with SpatialModelCell */
+        double returnRating();
+
+    private: 
+        /* objects needed to build itself; only initializable from constructor */
+        MaskedImagePtr _miToConvolveParentPtr;    /* Typically the template image */
+        MaskedImagePtr _miToNotConvolveParentPtr; /* Typically the template image */
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> _kBasisList;
+        lsst::pex::policy::Policy _policy;
+
+        /* running ID */
+        int _id;
+
+        /* position of the Footprint in the image, -1 to 1 */
+        double _colcNorm;
+        double _rowcNorm;
+
+        /* footprint assocated with the object we're building the kernels around */
+        lsst::detection::Footprint::PtrType _fpPtr;
+
+        /* subimages associated with the Footprint */
+        MaskedImagePtr _miToConvolvePtr;    /* Typically the template image */
+        MaskedImagePtr _miToNotConvolvePtr; /* Typically the science image */
+
+        /* results from individual kernel fit */
+        double _kSum;
+        boost::shared_ptr<lsst::afw::math::Kernel> _kPtr;
+        boost::shared_ptr<lsst::afw::math::Kernel> _kErrPtr;
+        double _bg;
+        double _bgErr;
+
+        /* SdqaRating _rating; */
+        /* Until we are merged with SDQA, use DifferenceImageStatistics class */
+        DifferenceImageStatistics<ImageT, MaskT> _kStats;
+
+        /* Is built */
+        bool _isBuilt;
+
+        /* Is usable */
+        bool _isGood;
+    };
+
+
+    template <typename ImageT, typename MaskT, class ModelT>
+    class SpatialModelCell: public lsst::daf::base::Persistable,
+                            public lsst::daf::data::LsstBase {
+        
+    public:
+        typedef boost::shared_ptr<SpatialModelCell<ImageT, MaskT, ModelT> > Ptr;
+        typedef std::vector<typename SpatialModelCell<ImageT, MaskT, ModelT>::Ptr> SpatialModelCellList;
+
+        SpatialModelCell(std::string label,
+                         std::vector<lsst::detection::Footprint::PtrType> fpPtrList, 
+                         std::vector<ModelT> modelPtrList);
+        SpatialModelCell(std::string label, int colC, int rowC, 
+                         std::vector<lsst::detection::Footprint::PtrType> fpPtrList,
+                         std::vector<ModelT> modelPtrList);
+        virtual ~SpatialModelCell() {};
+
+        lsst::detection::Footprint::PtrType getCurrentFootprint() {return _fpPtrList[_currentID];};
+        ModelT                              getCurrentModel() {return _modelPtrList[_currentID];};
+
+        lsst::detection::Footprint::PtrType getFootprint(int i);
+        ModelT                              getModel(int i);
+
+        std::vector<lsst::detection::Footprint::PtrType> getFootprints() {return _fpPtrList;};
+        std::vector<ModelT>                              getModels() {return _modelPtrList;};
+
+        void selectBestModel(bool fix); /* select best model based upon QA assesment; optionally fix this for the Cell */
+
+        int  getNModels() {return _nModels;};
+
+        int  getCurrentID() {return _currentID;};
+        void setCurrentID(int id);      /* choose a particular entry */
+
+        void setLabel(std::string label) {_label = label;};
+        std::string getLabel() {return _label;};
+
+        bool increment();               /* go to the next one in the list; call ModelT's buildModel() method */
+        bool isUsable();
+        bool isFixed() {return _modelIsFixed;};
+
+    private:
+        void _orderFootprints();        /* based upon brightness/proximity */
+
+        std::string _label;
+
+        /* optional : position of the grid point */
+        int _colC;
+        int _rowC;
+
+        /* synchronized lists of footprints and models */
+        std::vector<lsst::detection::Footprint::PtrType> _fpPtrList;
+        std::vector<ModelT>                           _modelPtrList;
+
+        /* number of entries; len(_fpPtrList) */
+        int _nModels;
+
+        /* which entry we are using; 0 <= _currentID < _nModels */
+        /* -1 at initilization */
+        int _currentID;
+
+        /* we are using _currentID no matter what */
+        bool _modelIsFixed;
+
+    };
+
 }}}
 
 #endif
+
+
+

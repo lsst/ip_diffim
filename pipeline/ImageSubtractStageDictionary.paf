@@ -1,121 +1,103 @@
 #<?cfg paf policy ?>
 # Default Image Subtraction Policy File
 
+######
 # Write intermediate FITS files? (boolean)
 debugIO: false
 debugPlot: false
 
+######
 # Size of the convolution kernel
 kernelRows: 19
 kernelCols: 19
 
+######
 # Order of kernel spatial variation
 kernelSpatialOrder: 1
 
+######
 # Order of background spatial variation
 backgroundSpatialOrder: 1
 
-# dont use for testKernel
-computeDiffImStats: {
-    # Maximum sum (residual/variance) for an acceptable Kernel; mean should be 0
-    maximumFootprintResidualMean: 0.75
+######
+# Chops up the image into cells
+#
+#   segmentMaskedImage:
+#
+nSegmentCol: 10
+nSegmentRow: 10
+iterateKernel: false
 
-    # Maximum variance (residual/variance) for an acceptable Kernel; variance should be 1
-    maximumFootprintResidualVariance: 2.0
-}
+######
+# Rejects objects with deviant Kernel Sums
+#
+#   rejectKernelOutliers:
+#
+maxOutlierIterations: 5
+maxOutlierSigma: 3.0
 
+######
+# Rejects objects with bad difference image quality
+#
+#   DifferenceImageStatistics.evaluateQuality
+#
 
-getCollectionOfFootprintsForPsfMatching: {
-    # Minimum number of pixels in an acceptible Footprint
-    footprintDiffimNpixMin: 9
+# Maximum average of (residual/noise) for an acceptable Kernel; mean should be 0
+maximumFootprintResidualMean: 1.0
 
-    # Grow footprint by this many pixels
-    footprintDiffimGrow: 20
+# Maximum standard deviation of (residual/noise) for an acceptable Kernel; variance should be 1
+maximumFootprintResidualStd: 2.0 
 
-    # Maximum number of pixels in a Footprint, after growing
-    footprintDiffimNpixAfterGrowMax: 3000
+######
+# Uses detection to find good objects for difference imaging
+#
+#   getCollectionOfFootprintsForPsfMatching
+#
 
-    # Minimum number of clean candidates
-    minimumCleanFootprints: 50
+# Minimum number of pixels in an acceptible Footprint
+footprintDiffimNpixMin: 9
 
-    # Threshold in sigma now
-    footprintDetectionThresholdSigma: 20.0
+# Grow footprint by this many pixels
+footprintDiffimGrow: 20
 
-    # How do you change the detection threshold if minimumCleanFootprints not found
-    # Make this shallow now for testing; don't want to get too many objects...
-    detectionThresholdScalingSigma: 5.0
+# Maximum number of pixels in a Footprint, after growing
+footprintDiffimNpixAfterGrowMax: 3000
 
-    # How low can you go
-    minimumDetectionThresholdSigma: 5.0
+# Minimum number of clean candidates
+minimumCleanFootprints: 50
 
-    # Back compatibility for signal based vs. sigma based detection
-    footprintDetectionThreshold: 250.0
-    detectionThresholdScaling: 0.50
-    minimumDetectionThreshold: 125.0
-}
+# Threshold in sigma now
+footprintDetectionThresholdSigma: 20.0
 
-computePsfMatchingKernelForMaskedImage: {
-    # Maximum number of sigma in kernel sum for good kernel
-    maximumKernelSumNSigma : 3.0
+# How do you change the detection threshold if minimumCleanFootprints not found
+# Make this shallow now for testing; don't want to get too many objects...
+detectionThresholdScalingSigma: 5.0
 
-    # Maximum number of iterations for sigma clipping
-    maximumIterationsKernelSum : 5
-}
+# How low can you go
+minimumDetectionThresholdSigma: 5.0
 
-computePsfMatchingKernelForPostageStamp: {
-    # Empty
-}
+# Back compatibility for signal based vs. sigma based detection
+footprintDetectionThreshold: 250.0
+detectionThresholdScaling: 0.50
+minimumDetectionThreshold: 125.0
 
-computePcaKernelBasis: {
-    # Minimum number of basis functions to use, after mean
-    minimumNumberOfBases: 3
+######
+# Controls MINUIT fitting
+#
+#   fitFunction
+#
 
-    # Maximum number of basis functions to use, after mean
-    maximumNumberOfBases: 7
-    
-    # Use enough basis function to model this much of the variance
-    maximumFractionOfEigenvalues: 0.99
-    
-    # Don't use bases whose eigenvalues are this small or smaller
-    minimumAcceptibleEigenvalue: 0.01
+# (How many sigma)**2 the errors correspond to
+nSigmaSq : 1.0
 
-    # Maximum number of iterations while doing PCA
-    maximumIteratonsPCA: 5
+# Controls stepsize when initializing parameters
+stepsize : 0.1
 
-}
+######
+# Controls Clipping out of Bad Kernel
+#
+#   
+#
 
-computeSpatiallyVaryingPsfMatchingKernel: {
-    # Maximum iterations for spatial fit to Kernel basis coefficients
-    maximumIterationsSpatialFit: 5
-}
-
-SDQA: {
-    # Maximum average of (residual/noise) for an acceptable Kernel; mean should be 0
-    maximumFootprintResidualMean: 1.0
-
-    # Maximum standard deviation of (residual/noise) for an acceptable Kernel; variance should be 1
-    maximumFootprintResidualStd: 2.0 # 6.0 
-}
-
-######### Restructuring to have full package path
-
-lsst: {
-    ip: {
-        diffim: {
-            rejectKernelOutliers: {
-                maxOutlierIterations: 5
-                maxOutlierSigma: 5.0
-            }
-        }
-    }
-
-    afw: {
-        math: {
-            minimize: {
-                nSigmaSq: 1.0
-                stepsize: 0.1
-            }
-        }
-    }
-}
-           
+# How many iterations until you move on
+maxSpatialIterations: 1

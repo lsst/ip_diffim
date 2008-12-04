@@ -91,8 +91,8 @@ template <typename ImageT, typename MaskT>
 bool lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>::evaluateQuality(
     lsst::pex::policy::Policy &policy
     ) {
-    double maxResidualMean = policy.getDouble("SDQA.maximumFootprintResidualMean");
-    double maxResidualStd  = policy.getDouble("SDQA.maximumFootprintResidualStd");
+    double maxResidualMean = policy.getDouble("maximumFootprintResidualMean");
+    double maxResidualStd  = policy.getDouble("maximumFootprintResidualStd");
     if ( (this->getResidualMean()) > maxResidualMean ) return false;
     if ( (this->getResidualStd()) > maxResidualStd ) return false;
     return true;
@@ -260,12 +260,12 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollection
     ) {
     
     /* Parse the Policy */
-    unsigned int footprintDiffimNpixMin = policy.getInt("getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin");
-    unsigned int footprintDiffimGrow = policy.getInt("getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow");
-    int minimumCleanFootprints = policy.getInt("getCollectionOfFootprintsForPsfMatching.minimumCleanFootprints");
-    double footprintDetectionThreshold = policy.getDouble("getCollectionOfFootprintsForPsfMatching.footprintDetectionThreshold");
-    double detectionThresholdScaling = policy.getDouble("getCollectionOfFootprintsForPsfMatching.detectionThresholdScaling");
-    double minimumDetectionThreshold = policy.getDouble("getCollectionOfFootprintsForPsfMatching.minimumDetectionThreshold");
+    unsigned int footprintDiffimNpixMin = policy.getInt("footprintDiffimNpixMin");
+    unsigned int footprintDiffimGrow = policy.getInt("footprintDiffimGrow");
+    int minimumCleanFootprints = policy.getInt("minimumCleanFootprints");
+    double footprintDetectionThreshold = policy.getDouble("footprintDetectionThreshold");
+    double detectionThresholdScaling = policy.getDouble("detectionThresholdScaling");
+    double minimumDetectionThreshold = policy.getDouble("minimumDetectionThreshold");
 
     /* grab mask bits from the image to convolve, since that is what we'll be operating on */
     int badMaskBit = imageToConvolve.getMask()->getMaskPlane("BAD");
@@ -376,8 +376,8 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
     double time;
     t.restart();
 
-    lsst::pex::logging::TTrace<4>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Entering subroutine computePsfMatchingKernelForFootprint");
+    lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                  "Entering subroutine computePsfMatchingKernelForFootprint");
     
     /* We assume that each kernel in the Set has 1 parameter you fit for */
     nKernelParameters = kernelInBasisList.size();
@@ -406,8 +406,8 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
     /* Create C_ij in the formalism of Alard & Lupton */
     for (; kiter != kernelInBasisList.end(); ++kiter, ++citer) {
         
-        lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                                    "Convolving an Object with Basis");
+        lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                      "Convolving an Object with Basis");
         
         /* NOTE : we could also *precompute* the entire template image convolved with these functions */
         /*        and save them somewhere to avoid this step each time.  however, our paradigm is to */
@@ -417,8 +417,8 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
             (lsst::afw::math::convolveNew(imageToConvolve, **kiter, edgeMaskBit, false))
             );
         
-        lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                                    "Convolved an Object with Basis");
+        lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                      "Convolved an Object with Basis");
         
         *citer = imagePtr;
         
@@ -480,9 +480,9 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
             /* the basis?  For now, use the average of the input varianes. */
             ImageT iVariance  = 1.0 / (cVariance + ncVariance);
             
-            lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                                        "Accessing image row %d col %d : %.3f %.3f %d",
-                                        row, col, ncCamera, ncVariance, ncMask);
+            lsst::pex::logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                          "Accessing image row %d col %d : %.3f %.3f %d",
+                                          row, col, ncCamera, ncVariance, ncMask);
             
             /* kernel index i */
             typename std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> >::iterator
@@ -493,9 +493,9 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
                 
                 ImageT cdVariancei = *kiteri->variance;
                 MaskT  cdMaski     = *kiteri->mask;
-                lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                                            "Accessing convolved image %d : %.3f %.3f %d",
-                                            kidxi, cdCamerai, cdVariancei, cdMaski);
+                lsst::pex::logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                              "Accessing convolved image %d : %.3f %.3f %d",
+                                              kidxi, cdCamerai, cdVariancei, cdMaski);
                 
                 /* kernel index j  */
                 typename std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> >::iterator kiterj = kiteri;
@@ -505,9 +505,9 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
                     /* NOTE - These inner trace statements can ENTIRELY kill the run time */
                     ImageT cdVariancej = *kiterj->variance;
                     MaskT  cdMaskj     = *kiterj->mask;
-                    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                                                "Accessing convolved image %d : %.3f %.3f %d",
-                                                kidxj, cdCameraj, cdVariancej, cdMaskj);
+                    lsst::pex::logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                                  "Accessing convolved image %d : %.3f %.3f %d",
+                                                  kidxj, cdCameraj, cdVariancej, cdMaskj);
                     
                     M[kidxi][kidxj] += cdCamerai * cdCameraj * iVariance;
                 } 
@@ -522,9 +522,9 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
             B[nParameters-1] += ncCamera * iVariance;
             M[nParameters-1][nParameters-1] += 1.0 * iVariance;
             
-            lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                        "Background terms : %.3f %.3f",
-                                        B[nParameters-1], M[nParameters-1][nParameters-1]);
+            lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                          "Background terms : %.3f %.3f",
+                                          B[nParameters-1], M[nParameters-1][nParameters-1]);
             
             /* Step each accessor in column */
             imageToConvolveCol.nextCol();
@@ -558,7 +558,7 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
 
     time = t.elapsed();
     lsst::pex::logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Total compute time before matrix inversions : %.2f s", time);
+                                  "Total compute time before matrix inversions : %.2f s", time);
 
     /* Invert using SVD and Pseudoinverse */
     vw::math::Matrix<double> Minv;
@@ -578,7 +578,7 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
     
     time = t.elapsed();
     lsst::pex::logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Total compute time after matrix inversions : %.2f s", time);
+                                  "Total compute time after matrix inversions : %.2f s", time);
 
     /* Translate from VW std::vectors to std std::vectors */
     std::vector<double> kernelCoeffs(kernelInBasisList.size());
@@ -587,8 +587,8 @@ std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint(
     }
     background = Soln[nParameters-1];
 
-    lsst::pex::logging::TTrace<3>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Leaving subroutine computePsfMatchingKernelForFootprint");
+    lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                  "Leaving subroutine computePsfMatchingKernelForFootprint");
 
     return kernelCoeffs;
 }
@@ -629,8 +629,8 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
     double time;
     t.restart();
 
-    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Entering subroutine computePsfMatchingKernelForFootprint");
+    lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                  "Entering subroutine computePsfMatchingKernelForFootprint");
     
     /* We assume that each kernel in the Set has 1 parameter you fit for */
     nKernelParameters = kernelInBasisList.size();
@@ -659,8 +659,8 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
     /* Create C_ij in the formalism of Alard & Lupton */
     for (; kiter != kernelInBasisList.end(); ++kiter, ++citer) {
         
-        lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                                    "Convolving an Object with Basis");
+        lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                      "Convolving an Object with Basis");
         
         /* NOTE : we could also *precompute* the entire template image convolved with these functions */
         /*        and save them somewhere to avoid this step each time.  however, our paradigm is to */
@@ -670,8 +670,8 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
             (lsst::afw::math::convolveNew(imageToConvolve, **kiter, edgeMaskBit, false))
             );
         
-        lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                                    "Convolved an Object with Basis");
+        lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                      "Convolved an Object with Basis");
         
         *citer = imagePtr;
         
@@ -732,9 +732,9 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
             
             ImageT iVariance  = 1.0 / *varianceCol.variance;
             
-            lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                                        "Accessing image row %d col %d : %.3f %.3f %d",
-                                        row, col, ncCamera, ncVariance, ncMask);
+            lsst::pex::logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                          "Accessing image row %d col %d : %.3f %.3f %d",
+                                          row, col, ncCamera, ncVariance, ncMask);
             
             /* kernel index i */
             typename std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> >::iterator
@@ -750,7 +750,7 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
                 /* ignore unnecessary pixel accesses 
                 ImageT cdVariancei = *kiteri->variance;
                 MaskT  cdMaski     = *kiteri->mask;
-                lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                lsst::pex::logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
                                             "Accessing convolved image %d : %.3f %.3f %d",
                                             kidxi, cdCamerai, cdVariancei, cdMaski);
                 */
@@ -763,7 +763,7 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
                     /* ignore unnecessary pixel accesses 
                     ImageT cdVariancej = *kiterj->variance;
                     MaskT  cdMaskj     = *kiterj->mask;
-                    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                    lsst::pex::logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
                                                 "Accessing convolved image %d : %.3f %.3f %d",
                                                 kidxj, cdCameraj, cdVariancej, cdMaskj);
                     */
@@ -781,9 +781,9 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
             B[nParameters-1] += ncCamera * iVariance;
             M[nParameters-1][nParameters-1] += 1.0 * iVariance;
             
-            lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                        "Background terms : %.3f %.3f",
-                                        B[nParameters-1], M[nParameters-1][nParameters-1]);
+            lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                          "Background terms : %.3f %.3f",
+                                          B[nParameters-1], M[nParameters-1][nParameters-1]);
             
             /* Step each accessor in column */
             imageToConvolveCol.nextCol();
@@ -819,7 +819,7 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
 
     time = t.elapsed();
     lsst::pex::logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Total compute time before matrix inversions : %.2f s", time);
+                                  "Total compute time before matrix inversions : %.2f s", time);
 
     /* Invert using SVD and Pseudoinverse : This is a full second slower per
      * kernel than vw::math::least_squares, compiled at opt=1 at 2.8 GHz.
@@ -854,16 +854,28 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
     
     time = t.elapsed();
     lsst::pex::logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Total compute time after matrix inversions : %.2f s", time);
+                                  "Total compute time after matrix inversions : %.2f s", time);
 
     /* Translate from VW std::vectors to std::vectors */
     std::vector<std::pair<double,double> > kernelSolution;
     for (int ki = 0; ki < nParameters; ++ki) {
+        if (std::isnan(Soln[ki])) {
+            throw lsst::pex::exceptions::DomainError("Unable to determine kernel solution (nan)");
+        }
+        if (std::isnan(Error[ki][ki])) {
+            throw lsst::pex::exceptions::DomainError("Unable to determine kernel uncertainty (nan)");
+        }
+        if (Error[ki][ki] < 0.0) {
+            /* Should this really be an exception, or should I instead
+               assign a large uncertainty instead? */
+            throw lsst::pex::exceptions::DomainError(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % Error[ki][ki]);
+        }
+
         kernelSolution.push_back(std::make_pair<double,double>( Soln[ki], sqrt(Error[ki][ki]) ));
     }
 
-    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Leaving subroutine computePsfMatchingKernelForFootprint");
+    lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                  "Leaving subroutine computePsfMatchingKernelForFootprint");
     
     return kernelSolution;
 }
@@ -905,8 +917,8 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
     double time;
     t.restart();
 
-    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Entering subroutine computePsfMatchingKernelForFootprint");
+    lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                  "Entering subroutine computePsfMatchingKernelForFootprint");
     
     /* We assume that each kernel in the Set has 1 parameter you fit for */
     nKernelParameters = kernelInBasisList.size();
@@ -932,8 +944,8 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
     /* Create C_ij in the formalism of Alard & Lupton */
     for (; kiter != kernelInBasisList.end(); ++kiter, ++citer) {
         
-        lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                                    "Convolving an Object with Basis");
+        lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                      "Convolving an Object with Basis");
         
         /* NOTE : we could also *precompute* the entire template image convolved with these functions */
         /*        and save them somewhere to avoid this step each time.  however, our paradigm is to */
@@ -943,8 +955,8 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
             (lsst::afw::math::convolveNew(imageToConvolve, **kiter, edgeMaskBit, false))
             );
         
-        lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                                    "Convolved an Object with Basis");
+        lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                                      "Convolved an Object with Basis");
         
         *citer = imagePtr;
         
@@ -1006,8 +1018,8 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
             ImageT iVariance  = 1.0 / *varianceCol.variance;
             
             lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                                        "Accessing image row %d col %d : %.3f %.3f %d",
-                                        row, col, ncCamera, ncVariance, ncMask);
+                                          "Accessing image row %d col %d : %.3f %.3f %d",
+                                          row, col, ncCamera, ncVariance, ncMask);
             
             /* kernel index i */
             typename std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> >::iterator
@@ -1023,7 +1035,7 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
                 /* ignore unnecessary pixel accesses 
                 ImageT cdVariancei = *kiteri->variance;
                 MaskT  cdMaski     = *kiteri->mask;
-                lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                lsst::pex::logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
                                             "Accessing convolved image %d : %.3f %.3f %d",
                                             kidxi, cdCamerai, cdVariancei, cdMaski);
                 */
@@ -1036,7 +1048,7 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
                     /* ignore unnecessary pixel accesses 
                     ImageT cdVariancej = *kiterj->variance;
                     MaskT  cdMaskj     = *kiterj->mask;
-                    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                    lsst::pex::logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
                                                 "Accessing convolved image %d : %.3f %.3f %d",
                                                 kidxj, cdCameraj, cdVariancej, cdMaskj);
                     */
@@ -1060,8 +1072,8 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
             gsl_matrix_set(M, nParameters-1, nParameters-1, 
                            gsl_matrix_get(M, nParameters-1, nParameters-1) + 1.0 * iVariance);
             
-            lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                        "Background terms : %.3f %.3f",
+            lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                          "Background terms : %.3f %.3f",
                                           gsl_vector_get(B, nParameters-1), 
                                           gsl_matrix_get(M, nParameters-1, nParameters-1));
             
@@ -1100,7 +1112,7 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
 
     time = t.elapsed();
     lsst::pex::logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Total compute time before matrix inversions : %.2f s", time);
+                                  "Total compute time before matrix inversions : %.2f s", time);
 
     /* temporary matrices */
     //gsl_matrix *V    = gsl_matrix_alloc (nParameters, nParameters);
@@ -1136,7 +1148,6 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
         double alpha0 = gsl_vector_get (S, 0);
         size_t p_eff = 0;
 
-        const size_t n = M->size1;
         const size_t p = M->size2;
 
         for (size_t j = 0; j < p; j++)
@@ -1216,16 +1227,15 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
       std::cout << "Soln2 : " << Soln2 << std::endl;
     */
 
-    std::cout << "Chi2 = " << chi2 << std::endl;
 #if DEBUG_MATRIX
     std::cout << "Chi2 = " << chi2 << std::endl;
-    gsl_vector_fprintf(std::cout, X, '%.3f');
-    gsl_matrix_fprintf(std::cout, Cov, '%.3f');
+    //gsl_vector_fprintf(std::cout, X, '%.3f');
+    //gsl_matrix_fprintf(std::cout, Cov, '%.3f');
 #endif
     
     time = t.elapsed();
     lsst::pex::logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Total compute time after matrix inversions : %.2f s", time);
+                                  "Total compute time after matrix inversions : %.2f s", time);
 
     /* Translate into vector pair */
     std::vector<std::pair<double,double> > kernelSolution;
@@ -1235,8 +1245,8 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
         //sqrt(gsl_matrix_get(Cov, ki, ki)) ));
     }
 
-    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                                "Leaving subroutine computePsfMatchingKernelForFootprint");
+    lsst::pex::logging::TTrace<6>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                                  "Leaving subroutine computePsfMatchingKernelForFootprint");
     
     return kernelSolution;
 }
@@ -1624,3 +1634,375 @@ template
 void lsst::ip::diffim::addFunctionToImage(
     lsst::afw::image::Image<double>&,
     lsst::afw::math::Function2<double> const&);
+
+
+
+/* SpatialModelCell stuff*/
+/* SpatialModelCell stuff*/
+/* SpatialModelCell stuff*/
+/* SpatialModelCell stuff*/
+/* SpatialModelCell stuff*/
+/* SpatialModelCell stuff*/
+/* SpatialModelCell stuff*/
+/* SpatialModelCell stuff*/
+
+template <typename ImageT, typename MaskT>
+lsst::ip::diffim::KernelModelQa<ImageT, MaskT>::KernelModelQa(
+    lsst::detection::Footprint::PtrType fpPtr,
+    MaskedImagePtr miToConvolveParentPtr,
+    MaskedImagePtr miToNotConvolveParentPtr,
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> kBasisList,
+    lsst::pex::policy::Policy &policy,
+    bool build
+    ) :
+    _miToConvolveParentPtr(miToConvolveParentPtr),
+    _miToNotConvolveParentPtr(miToNotConvolveParentPtr),
+    _kBasisList(kBasisList),
+    _policy(policy),
+    _fpPtr(fpPtr),
+    _isBuilt(false),
+    _isGood(false)
+{
+    if (build == true) {
+        this->buildModel();
+    }
+}
+
+template <typename ImageT, typename MaskT>
+bool lsst::ip::diffim::KernelModelQa<ImageT, MaskT>::buildModel() {
+
+    typedef lsst::afw::image::Image<double>::pixel_accessor pixelAccessor;
+
+    if (this->_isBuilt == true) {
+        return false;
+    }
+
+    /* fill in information on position in the image */
+    vw::BBox2i   fpBBox = this->_fpPtr->getBBox();
+    vw::Vector2i fpMin  = fpBBox.min();
+    vw::Vector2i fpMax  = fpBBox.max();
+    this->_colcNorm = float(fpMin.x() + fpMax.x()) / this->_miToConvolveParentPtr->getCols() - 1.0;
+    this->_rowcNorm = float(fpMin.y() + fpMax.y()) / this->_miToConvolveParentPtr->getRows() - 1.0; 
+
+    lsst::pex::logging::TTrace<4>("lsst.ip.diffim.KernelModelQa.buildModel",
+                                  "Footprint = %d,%d -> %d,%d",
+                                  fpBBox.min().x(), fpBBox.min().y(),
+                                  fpBBox.max().x(), fpBBox.max().y());
+
+    /* fill in information on the actual pixels used */
+    MaskedImagePtr miToConvolvePtr    = this->_miToConvolveParentPtr->getSubImage(fpBBox);
+    MaskedImagePtr miToNotConvolvePtr = this->_miToNotConvolveParentPtr->getSubImage(fpBBox);
+    this->_miToConvolvePtr = miToConvolvePtr;
+    this->_miToNotConvolvePtr = miToNotConvolvePtr;
+
+    /* estimate of the variance for first kernel pass */
+    lsst::afw::image::MaskedImage<ImageT, MaskT> varEstimate = 
+        lsst::afw::image::MaskedImage<ImageT, MaskT>(this->_miToConvolvePtr->getCols(), 
+                                                     this->_miToConvolvePtr->getRows());
+    varEstimate += *(this->_miToNotConvolvePtr);
+    varEstimate -= *(this->_miToConvolvePtr);
+    
+    std::vector<std::pair<double,double> > kSolution;
+    try {
+        kSolution = computePsfMatchingKernelForFootprint2(*(this->_miToConvolvePtr), 
+                                                          *(this->_miToNotConvolvePtr), 
+                                                          varEstimate, this->_kBasisList, this->_policy);
+    } catch (lsst::pex::exceptions::ExceptionStack &e) {
+        this->_isGood = false;
+        return false;
+    }
+
+    /* Create fixed Kernel and KernelError from solution */
+    unsigned int kCols = this->_policy.getInt("kernelCols");
+    unsigned int kRows = this->_policy.getInt("kernelRows");
+    vector<double> kValues(kCols*kRows);
+    vector<double> kErrValues(kCols*kRows);
+    for (unsigned int row = 0, idx = 0; row < kRows; row++) {
+        for (unsigned int col = 0; col < kCols; col++, idx++) {
+            kValues[idx]    = kSolution[idx].first;
+            kErrValues[idx] = kSolution[idx].second;
+        }
+    }
+    boost::shared_ptr<lsst::afw::math::Kernel> kPtr (
+        new lsst::afw::math::LinearCombinationKernel(this->_kBasisList, kValues)
+        );
+    boost::shared_ptr<lsst::afw::math::Kernel> kErrPtr (
+        new lsst::afw::math::LinearCombinationKernel(this->_kBasisList, kErrValues)
+        );
+    
+    double kSum = 0.;
+    lsst::afw::image::Image<double> kImage = 
+        lsst::afw::image::Image<double>(kCols, kRows);
+    kImage = kPtr->computeNewImage(kSum, false);
+
+    /* Find estimate of Background and Background Error */
+    double bg    = kSolution[kCols*kRows].first;
+    double bgErr = kSolution[kCols*kRows].second;
+
+    lsst::afw::image::MaskedImage<ImageT, MaskT> diffIm = convolveAndSubtract( *(this->_miToConvolvePtr),
+                                                                               *(this->_miToNotConvolvePtr),
+                                                                               kPtr, bg);
+    lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT> kStats1 = 
+        lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>(diffIm);
+
+    lsst::pex::logging::TTrace<6>("lsst.ip.diffim.KernelModelQa.buildModel",
+                                  "Kernel1 : Kernel Sum = %.3f; Diffim residuals = %.2f +/- %.2f sigma",
+                                  kSum, 
+                                  kStats1.getResidualMean(),
+                                  kStats1.getResidualStd());
+
+    bool iterateKernel = this->_policy.getBool("iterateKernel");
+    if (iterateKernel) {
+        try {
+            try {
+                kSolution = computePsfMatchingKernelForFootprint2(*(this->_miToConvolvePtr), 
+                                                                  *(this->_miToNotConvolvePtr), 
+                                                                  diffIm, this->_kBasisList, this->_policy);
+            } catch (lsst::pex::exceptions::ExceptionStack &e) {
+                throw;
+            }
+            
+            /* If computePsfMatchingKernelForFootprint2 does not return an
+             * exception we continue on here 
+             */
+            std::fill(kValues.begin(), kValues.end(), 0.);
+            std::fill(kErrValues.begin(), kErrValues.end(), 0.);
+            for (unsigned int row = 0, idx = 0; row < kRows; row++) {
+                for (unsigned int col = 0; col < kCols; col++, idx++) {
+                    kValues[idx]    = kSolution[idx].first;
+                    kErrValues[idx] = kSolution[idx].second;
+                }
+            }
+            boost::shared_ptr<lsst::afw::math::Kernel> kPtr (
+                new lsst::afw::math::LinearCombinationKernel(this->_kBasisList, kValues)
+                );
+            boost::shared_ptr<lsst::afw::math::Kernel> kErrPtr (
+                new lsst::afw::math::LinearCombinationKernel(this->_kBasisList, kErrValues)
+                );
+            kSum    = 0.;
+            kImage  = kPtr->computeNewImage(kSum, false);
+            bg      = kSolution[kCols*kRows].first;
+            bgErr   = kSolution[kCols*kRows].second;
+            
+            diffIm  = convolveAndSubtract( *(this->_miToConvolvePtr),
+                                           *(this->_miToNotConvolvePtr),
+                                           kPtr, bg);
+
+            lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT> kStats2 = 
+                lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>(diffIm);
+            lsst::pex::logging::TTrace<6>("lsst.ip.diffim.KernelModelQa.buildModel",
+                                          "Kernel2 : Kernel Sum = %.3f; Diffim residuals = %.2f +/- %.2f sigma",
+                                          kSum, 
+                                          kStats2.getResidualMean(),
+                                          kStats2.getResidualStd());
+            
+        } catch (lsst::pex::exceptions::ExceptionStack &e) {
+            /* Use the first solution */
+            ;
+        }
+    }
+        
+    this->_kPtr    = kPtr;
+    this->_kErrPtr = kErrPtr;
+    this->_kSum    = kSum;
+    this->_bg      = bg;
+    this->_bgErr   = bgErr;
+
+    lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT> kStats = 
+        lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>(diffIm);
+
+    this->_kStats  = kStats;
+    this->_isGood  = kStats.evaluateQuality(this->_policy);
+    lsst::pex::logging::TTrace<4>("lsst.ip.diffim.KernelModelQa.buildModel",
+                                  "Kernel : Kernel Sum = %.3f; Diffim residuals = %.2f +/- %.2f sigma",
+                                  this->_kSum, 
+                                  this->_kStats.getResidualMean(),
+                                  this->_kStats.getResidualStd());
+
+    this->_isBuilt = true;
+
+    /* Should this return the Quality of what was built, or just the fact that
+     * it was built? */
+
+    /* Screw it; if it builds a bad instance, let the other code know */
+    return this->_isGood;
+}
+
+template <typename ImageT, typename MaskT>
+double lsst::ip::diffim::KernelModelQa<ImageT, MaskT>::returnRating() {
+    return this->_kStats.getResidualMean();
+}
+
+template <typename ImageT, typename MaskT, class ModelT>
+lsst::ip::diffim::SpatialModelCell<ImageT, MaskT, ModelT>::SpatialModelCell(
+    std::string label,
+    std::vector<lsst::detection::Footprint::PtrType> fpPtrList,
+    std::vector<ModelT> modelPtrList) :
+    lsst::daf::data::LsstBase(typeid(this)),
+    _label(label),
+    _colC(0),
+    _rowC(0),
+    _fpPtrList(fpPtrList),
+    _modelPtrList(modelPtrList),
+    _nModels(fpPtrList.size()),
+    _currentID(-1),
+    _modelIsFixed(false)
+{
+    if (!(fpPtrList.size() == modelPtrList.size())) {
+        throw lsst::pex::exceptions::DomainError("SpatialModelCell : footprint list and model list are not the same size");
+    }
+    lsst::pex::logging::TTrace<5>("lsst.ip.diffim.SpatialModelCell.SpatialModelCell", 
+                                  "%s : %d Footprints found", this->_label.c_str(), this->_nModels);
+    this->_orderFootprints();
+    this->increment();
+}
+
+template <typename ImageT, typename MaskT, class ModelT>
+lsst::ip::diffim::SpatialModelCell<ImageT, MaskT, ModelT>::SpatialModelCell(
+    std::string label,
+    int colC, int rowC, 
+    std::vector<lsst::detection::Footprint::PtrType> fpPtrList,
+    std::vector<ModelT> modelPtrList) :
+    lsst::daf::data::LsstBase(typeid(this)),
+    _label(label),
+    _colC(colC),
+    _rowC(rowC),
+    _fpPtrList(fpPtrList),
+    _modelPtrList(modelPtrList),
+    _nModels(fpPtrList.size()),
+    _currentID(-1),
+    _modelIsFixed(false)
+{
+    if (!(fpPtrList.size() == modelPtrList.size())) {
+        throw lsst::pex::exceptions::DomainError("SpatialModelCell : footprint list and model list are not the same size");
+    }
+    lsst::pex::logging::TTrace<3>("lsst.ip.diffim.SpatialModelCell.SpatialModelCell", 
+                                  "%s : %d Footprints found", this->_label.c_str(), this->_nModels);
+    this->_orderFootprints();
+    this->increment();
+}
+    
+template <typename ImageT, typename MaskT, class ModelT>
+void lsst::ip::diffim::SpatialModelCell<ImageT, MaskT, ModelT>::_orderFootprints() {
+    /* do something with this->_fpPtrList; make sure _modelPtrList is updated also */
+    for (int i = 0; i < this->_nModels; i++) {
+        this->_modelPtrList[i]->setID(i);
+    }
+}
+
+template <typename ImageT, typename MaskT, class ModelT>
+void lsst::ip::diffim::SpatialModelCell<ImageT, MaskT, ModelT>::selectBestModel(bool fix) {
+    /* For now just choose the first statistically acceptable one */
+
+    /* HOWEVER, WATCH OUT BECAUSE YOU SET ISGOOD BY HAND WHEN ITS BAD */
+    /* NEED TO REVERT TO THE RAW QUALITY NUMBERS HERE */
+
+    /* PERHAPS THE CALLING CODE COULD JUST SAY "ITERATE" INSTEAD OF MARKING AS
+       BAD AND THEN ITERATING */
+
+    bool found = false;
+    for (int i = 0; i < this->_nModels; i++) {
+        if (this->_modelPtrList[i]->isGood()) {
+            this->_currentID = i;
+            found = true;
+            break;
+        }
+    }
+    if (found == false) {
+        /* There are no good models! */
+        this->_currentID    = -1;
+        this->_modelIsFixed = true;
+        lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelCell.selectBestModel", 
+                                      "%s : Locking with no good models", this->_label.c_str());
+    }
+    else {
+        this->_modelIsFixed = fix;
+    }
+}
+
+template <typename ImageT, typename MaskT, class ModelT>
+bool lsst::ip::diffim::SpatialModelCell<ImageT, MaskT, ModelT>::isUsable() {
+    /* I should make this less indirect, but if my _currentID == -1 and
+       modelIsFixed == true this is unusable */
+
+    if ( (this->_currentID == -1) && (this->_modelIsFixed) ) {
+        return false;
+    }
+    return true;
+}
+
+template <typename ImageT, typename MaskT, class ModelT>
+lsst::detection::Footprint::PtrType lsst::ip::diffim::SpatialModelCell<ImageT, MaskT, ModelT>::getFootprint(int i) {
+    if ( (i < 0) || (i >= this->_nModels) ) {
+        throw lsst::pex::exceptions::DomainError("Index out of range");
+    }        
+    return this->_fpPtrList[i];
+}
+
+template <typename ImageT, typename MaskT, class ModelT>
+ModelT lsst::ip::diffim::SpatialModelCell<ImageT, MaskT, ModelT>::getModel(int i) {
+    if ( (i < 0) || (i >= this->_nModels) ) {
+        throw lsst::pex::exceptions::DomainError("Index out of range");
+    }        
+    return this->_modelPtrList[i];
+}
+
+template <typename ImageT, typename MaskT, class ModelT>
+bool lsst::ip::diffim::SpatialModelCell<ImageT, MaskT, ModelT>::increment() {
+    /* If the Cell has a fixed Kernel */
+    if (this->_modelIsFixed) {
+        return false;
+    }
+
+    if (this->_currentID == -1) {
+        /* Its the first time through */
+
+        if ((this->_nModels) == 0) {
+            /* There are 0 Footprints */
+            this->_modelIsFixed = true;
+            return false;
+        }
+        else {
+            /* There are at least 1 */
+            this->setCurrentID(0);
+            return true;
+        }            
+    }
+    else {
+        if ( (this->_currentID) == ((this->_nModels) - 1) ) {
+            /* You are at the last one */
+            this->selectBestModel(true);
+            return false;
+        }
+        else {
+            /* Standard increment */
+            this->setCurrentID(this->_currentID + 1);
+            return true;
+        }
+    }
+}
+
+template <typename ImageT, typename MaskT, class ModelT>
+void lsst::ip::diffim::SpatialModelCell<ImageT, MaskT, ModelT>::setCurrentID(int id) {
+    if ( (id < 0) || (id >= this->_nModels) ) {
+        throw lsst::pex::exceptions::DomainError("Index out of range");
+    }        
+
+    this->_currentID = id;
+    lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelCell.setCurrentID", 
+                                  "%s : Footprint %d / %d", this->_label.c_str(), this->_currentID+1, this->_nModels);
+
+    /* If the model does not build for some reason, move on to the next
+     * option */
+    if (! (this->_modelPtrList[this->_currentID]->buildModel()) ) 
+        this->increment();
+}
+
+
+template class lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>;
+template class lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>;
+
+template class lsst::ip::diffim::SpatialModelCell<float, lsst::afw::image::maskPixelType, 
+                                                  lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>::Ptr >;
+template class lsst::ip::diffim::SpatialModelCell<double, lsst::afw::image::maskPixelType, 
+                                                  lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>::Ptr >;
