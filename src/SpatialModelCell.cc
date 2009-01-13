@@ -10,6 +10,7 @@
  */
 
 #include <lsst/ip/diffim/SpatialModelCell.h>
+#include <lsst/ip/diffim/SpatialModelKernel.h>
 #include <lsst/pex/exceptions/Exception.h>
 #include <lsst/pex/logging/Trace.h>
 
@@ -32,7 +33,7 @@ SpatialModelCell<ImageT, MaskT, ModelT>::SpatialModelCell(
     _currentID(-1),
     _modelIsFixed(false)
 {
-    this->_SpatialModelCell(label, 0, 0, fpPtrList, modelPtrList);
+    SpatialModelCell(label, 0, 0, fpPtrList, modelPtrList);
 }
 
 template <typename ImageT, typename MaskT, class ModelT>
@@ -70,7 +71,7 @@ void SpatialModelCell<ImageT, MaskT, ModelT>::_orderFootprints() {
         this->_modelPtrList[i]->setID(i);
     }
     // Initialize first model
-    this->increment();
+    this->incrementModel();
 }
 
 /** Select best model; if no good models, set Cell as fixed with ID=-1.
@@ -135,7 +136,7 @@ ModelT SpatialModelCell<ImageT, MaskT, ModelT>::getModel(int i) {
  * @note  Method setCurrentID() actually builds the model
  */
 template <typename ImageT, typename MaskT, class ModelT>
-bool SpatialModelCell<ImageT, MaskT, ModelT>::increment() {
+bool SpatialModelCell<ImageT, MaskT, ModelT>::incrementModel() {
     /* If the Cell has a fixed Kernel */
     if (this->_modelIsFixed) {
         return false;
@@ -182,14 +183,10 @@ void SpatialModelCell<ImageT, MaskT, ModelT>::setCurrentID(int id) {
     // If the model does not build for some reason, move on to the next model
     if (! (this->_modelPtrList[this->_currentID]->isBuilt()) )
         if (! (this->_modelPtrList[this->_currentID]->buildModel()) ) 
-            this->increment();
+            this->incrementModel();
 }
 
 // Explicit instantiations
-template class SpatialModelCell<float, lsst::afw::image::maskPixelType, 
-                                lsst::ip::diffim::SpatialModelBase<float, lsst::afw::image::maskPixelType>::Ptr >;
-template class SpatialModelCell<double, lsst::afw::image::maskPixelType, 
-                                lsst::ip::diffim::SpatialModelBase<double, lsst::afw::image::maskPixelType>::Ptr >;
 template class SpatialModelCell<float, lsst::afw::image::maskPixelType, 
                                 lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>::Ptr >;
 template class SpatialModelCell<double, lsst::afw::image::maskPixelType, 

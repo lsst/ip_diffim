@@ -10,6 +10,10 @@ Python bindings for lsst::ip::diffim code
 
 /* Everything needed in the _wrap.cc file */
 %{
+#include <lsst/ip/diffim/SpatialModelCell.h>
+#include <lsst/ip/diffim/SpatialModelBase.h>
+#include <lsst/ip/diffim/SpatialModelKernel.h>
+
 #include <lsst/ip/diffim/ImageSubtract.h>
 #include <lsst/ip/diffim/wcsMatch.h>
 #include <lsst/ip/diffim/Pca.h>
@@ -58,81 +62,62 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 %template(DifferenceImageStatisticsD)
     lsst::ip::diffim::DifferenceImageStatistics<double, lsst::afw::image::maskPixelType>;
 
-/* */ 
-/* */ 
+/*******************/
+/* Spatial Model   */
 
-%template(DifferenceImageFootprintInformationF)  
-    lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>;
-%template(DifferenceImageFootprintInformationD)  
-    lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>;
-
-%boost_shared_ptr(DifiPtrF, 
-                  lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>);
-%boost_shared_ptr(DifiPtrD, 
-                  lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>);
-
-%template(DifiPtrListF)
-    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<float, lsst::afw::image::maskPixelType>::Ptr>;
-%template(DifiPtrListD)
-    std::vector<lsst::ip::diffim::DifferenceImageFootprintInformation<double, lsst::afw::image::maskPixelType>::Ptr>;
-
-/* */ 
-/* cell stuff */
-/* */ 
-
-%template(KernelModelQaF)  
-    lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>;
-%template(KernelModelQaD)  
-    lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>;
-
-%boost_shared_ptr(KernelModelQaPtrF, 
-                  lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>);
-%boost_shared_ptr(KernelModelQaPtrD, 
-                  lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>);
-
-%template(KernelModelQaPtrListF)
-    std::vector<lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>::Ptr>;
-%template(KernelModelQaPtrListD)
-    std::vector<lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>::Ptr>;
-
-/* */ 
-/* */ 
+%include "lsst/ip/diffim/SpatialModelCell.h"
+%include "lsst/ip/diffim/SpatialModelBase.h"
+%include "lsst/ip/diffim/SpatialModelKernel.h"
 
 %template(SpatialModelCellFK)  
     lsst::ip::diffim::SpatialModelCell<float, 
                                        lsst::afw::image::maskPixelType, 
-                                       lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>::Ptr>;
+                                       lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>::Ptr>;
 %template(SpatialModelCellDK)  
     lsst::ip::diffim::SpatialModelCell<double, 
                                        lsst::afw::image::maskPixelType, 
-                                       lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>::Ptr>;
+                                       lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>::Ptr>;
 
 %boost_shared_ptr(SpatialModelCellPtrFK, 
                   lsst::ip::diffim::SpatialModelCell<float, 
                   lsst::afw::image::maskPixelType, 
-                  lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>::Ptr>);
+                  lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>::Ptr>);
 %boost_shared_ptr(SpatialModelCellPtrDK, 
                   lsst::ip::diffim::SpatialModelCell<double, 
                   lsst::afw::image::maskPixelType, 
-                  lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>::Ptr>);
+                  lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>::Ptr>);
 
 %template(SpatialModelCellPtrListFK)
     std::vector<lsst::ip::diffim::SpatialModelCell<float, 
                                                    lsst::afw::image::maskPixelType, 
-                                                   lsst::ip::diffim::KernelModelQa<float, lsst::afw::image::maskPixelType>::Ptr>::Ptr>;
+                                                   lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>::Ptr>::Ptr>;
 %template(SpatialModelCellPtrListDK)
     std::vector<lsst::ip::diffim::SpatialModelCell<double, 
                                                    lsst::afw::image::maskPixelType, 
-                                                   lsst::ip::diffim::KernelModelQa<double, lsst::afw::image::maskPixelType>::Ptr>::Ptr>;
+                                                   lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>::Ptr>::Ptr>;
 /* */ 
 /* */ 
+
+%template(SpatialModelKernelF)  
+    lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>;
+%template(SpatialModelKernelD)  
+    lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>;
+
+%boost_shared_ptr(SpatialModelKernelPtrF, 
+                  lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>);
+%boost_shared_ptr(SpatialModelKernelPtrD, 
+                  lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>);
+
+%template(SpatialModelKernelPtrListF)
+    std::vector<lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>::Ptr>;
+%template(SpatialModelKernelPtrListD)
+    std::vector<lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>::Ptr>;
+
+/* */ 
+/* */ 
+
 
 /* subroutines */
-%template(getGoodFootprints)
-    lsst::ip::diffim::getGoodFootprints<float, lsst::afw::image::maskPixelType>;
-%template(getGoodFootprints)
-    lsst::ip::diffim::getGoodFootprints<double, lsst::afw::image::maskPixelType>;
-
 %template(convolveAndSubtract)
     lsst::ip::diffim::convolveAndSubtract<float, lsst::afw::image::maskPixelType>;
 %template(convolveAndSubtract)
@@ -142,11 +127,6 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
     lsst::ip::diffim::computePsfMatchingKernelForFootprint<float, lsst::afw::image::maskPixelType>;
 %template(computePsfMatchingKernelForFootprint)
     lsst::ip::diffim::computePsfMatchingKernelForFootprint<double, lsst::afw::image::maskPixelType>;
-
-%template(computePsfMatchingKernelForFootprint2)
-    lsst::ip::diffim::computePsfMatchingKernelForFootprint2<float, lsst::afw::image::maskPixelType>;
-%template(computePsfMatchingKernelForFootprint2)
-    lsst::ip::diffim::computePsfMatchingKernelForFootprint2<double, lsst::afw::image::maskPixelType>;
 
 %template(computePsfMatchingKernelForFootprintGSL)
     lsst::ip::diffim::computePsfMatchingKernelForFootprintGSL<float, lsst::afw::image::maskPixelType>;

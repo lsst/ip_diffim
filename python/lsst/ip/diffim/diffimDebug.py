@@ -55,48 +55,28 @@ def plotDiffImQuality2(id, iteration,
     ipDiffimPlot.plotSigmaHistograms( (cInfo, dInfo), title='Kernel %d' % (id), outfile='Kernel_%d_%d.ps' % (id, iteration) )
 
 
-def writeDiffImages(id,
-                    tStamp, iStamp,
-                    cDifi, cDiffIm, cKernel, 
-                    dDifi, dDiffIm, dKernel):
+def writeDiffImages(prefix, id, kModel):
     
-    iStamp.writeFits('iFoot_%d' % (id))
-    tStamp.writeFits('tFoot_%d' % (id))
+    kModel.getMiToNotConvolvePtr().writeFits('iFoot_%s_%s' % (prefix, id))
+    kModel.getMiToConvolvePtr().writeFits('tFoot_%s_%s' % (prefix, id))
     
-    ckp,cks = cKernel.computeNewImage(False)
+    ckp,cks = kModel.getKernelPtr().computeNewImage(False)
     cmd = ckp.getMetaData()
     cmd.addProperty(dafBase.DataProperty('CONV', 'Template'))
-    cmd.addProperty(dafBase.DataProperty('KCOL', cDifi.getColcNorm()))
-    cmd.addProperty(dafBase.DataProperty('KROW', cDifi.getRowcNorm()))
-    cmd.addProperty(dafBase.DataProperty('MSIG', cDifi.getSingleStats().getResidualMean()))
-    cmd.addProperty(dafBase.DataProperty('VSIG', cDifi.getSingleStats().getResidualStd()))
-    cmd.addProperty(dafBase.DataProperty('BG', cDifi.getSingleBackground()))
-    cmd.addProperty(dafBase.DataProperty('KQUALITY', cDifi.getStatus()))
+    cmd.addProperty(dafBase.DataProperty('KCOL', kModel.getColcNorm()))
+    cmd.addProperty(dafBase.DataProperty('KROW', kModel.getRowcNorm()))
+    cmd.addProperty(dafBase.DataProperty('MSIG', kModel.getStats().getResidualMean()))
+    cmd.addProperty(dafBase.DataProperty('VSIG', kModel.getStats().getResidualStd()))
+    cmd.addProperty(dafBase.DataProperty('BG',   kModel.getBackground()))
+    cmd.addProperty(dafBase.DataProperty('KQUALITY', kModel.getQaStatus()))
     cmd.addProperty(dafBase.DataProperty('KSUM', cks))
     ckp.setMetadata(cmd)
-    ckp.writeFits('cKernel_%d.fits' % (id))
+    ckp.writeFits('kernel_%s_%s.fits' % (prefix, id))
     
-    dkp,dks = dKernel.computeNewImage(False)
-    dmd = dkp.getMetaData()
-    dmd.addProperty(dafBase.DataProperty('CONV', 'Image'))
-    dmd.addProperty(dafBase.DataProperty('KCOL', dDifi.getColcNorm()))
-    dmd.addProperty(dafBase.DataProperty('KROW', dDifi.getRowcNorm()))
-    dmd.addProperty(dafBase.DataProperty('MSIG', dDifi.getSingleStats().getResidualMean()))
-    dmd.addProperty(dafBase.DataProperty('VSIG', dDifi.getSingleStats().getResidualStd()))
-    dmd.addProperty(dafBase.DataProperty('BG', dDifi.getSingleBackground()))
-    dmd.addProperty(dafBase.DataProperty('KQUALITY', dDifi.getStatus()))
-    dmd.addProperty(dafBase.DataProperty('KSUM', dks))
-    dkp.setMetadata(dmd)
-    dkp.writeFits('dKernel_%d.fits' % (id))
+    diffIm = ipDiffim.convolveAndSubtract(kModel.getMiToConvolvePtr().get(),
+                                          kModel.getMiToNotConvolvePtr().get(),
+                                          kModel.getKernelPtr(),
+                                          kModel.getBackground())
     
-    cDiffIm.writeFits('cDiff_%d' % (id))
-    dDiffIm.writeFits('dDiff_%d' % (id))
     
-    #cSigma = ipDiffimTools.imageToMatrix(convDiffIm2.getImage()) / numpy.sqrt(ipDiffimTools.imageToMatrix(convDiffIm2.getVariance()))
-    #cSigma = ipDiffimTools.matrixToImage(cSigma)
-    #cSigma.writeFits('cSig_%d.fits' % (footprintID))
-    
-    #dcSigma = ipDiffimTools.imageToMatrix(deconvDiffIm2.getImage()) / numpy.sqrt(ipDiffimTools.imageToMatrix(deconvDiffIm2.getVariance()))
-    #dcSigma = ipDiffimTools.matrixToImage(dcSigma)
-    #dcSigma.writeFits('dcSig_%d.fits' % (footprintID))
-    
+    diffIm.writeFits('diff_%s_%s' % (prefix, id))

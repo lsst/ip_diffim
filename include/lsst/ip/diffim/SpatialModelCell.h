@@ -25,7 +25,7 @@ namespace lsst {
 namespace ip {
 namespace diffim {
 
-    /** @class
+    /** 
      * 
      * @brief Class to ensure constraints for spatial modeling
      * 

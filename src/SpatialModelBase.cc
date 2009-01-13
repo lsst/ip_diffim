@@ -9,6 +9,7 @@
  * @ingroup ip_diffim
  */
 
+#include <lsst/afw/image/Mask.h>
 #include <lsst/ip/diffim/SpatialModelBase.h>
 
 namespace lsst {
@@ -21,7 +22,7 @@ namespace diffim {
  */
 template <typename ImageT, typename MaskT>
 bool SpatialModelBase<ImageT, MaskT>::buildModel() {
-    ;
+    return false;
 }
 
 /** Return quality of the model
@@ -32,7 +33,7 @@ bool SpatialModelBase<ImageT, MaskT>::buildModel() {
  */
 template <typename ImageT, typename MaskT>
 double SpatialModelBase<ImageT, MaskT>::returnSdqaRating() {
-    ;
+    return 0.0;
 }
 
 // Explicit instantiations

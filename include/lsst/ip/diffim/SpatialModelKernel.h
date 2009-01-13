@@ -26,7 +26,7 @@ namespace lsst {
 namespace ip {
 namespace diffim {
 
-    /** @class
+    /** 
      * 
      * @brief Class derived from SpatialModelBase for spatial Kernel fitting
      * 

@@ -14,6 +14,7 @@ from lsst.pex.policy import Policy
 import lsst.pex.exceptions as Exceptions
 
 import lsst.ip.diffim.diffimTools as ipDiffimTools
+import lsst.ip.diffim.diffimDebug as ipDiffimDebug
 
 import pdb
 
@@ -617,7 +618,8 @@ def segmentMaskedImage(fpList,
                        templateMaskedImage,
                        scienceMaskedImage,
                        kBasisList,
-                       policy):
+                       policy,
+                       cFlag='c'):
 
     
     templateMaskedImagePtr = afwImage.MaskedImageFPtr(templateMaskedImage)
@@ -659,7 +661,10 @@ def segmentMaskedImage(fpList,
                     modelPtrList.push_back( ipDiffim.KernelModelQaPtrF (
                         ipDiffim.KernelModelQaF(fpPtr, templateMaskedImagePtr, scienceMaskedImagePtr, kBasisList, policy, False)
                         ))
-
+                    
+                    if policy.get('debugIO'):
+                        ipDiffimDebug.writeDiffImages(cFlag, '%d_%d' % (cellCount, fpID), modelPtrList[-1])
+                        
             label = 'Cell %d' % cellCount
             spatialCellPtr    = ipDiffim.SpatialModelCellPtrFK(
                 ipDiffim.SpatialModelCellFK(label, colCenter, rowCenter, fpPtrList, modelPtrList)
@@ -866,7 +871,7 @@ Notes:
     
     # lets just get a couple for debugging and speed
     policy.set('minimumCleanFootprints', 5)
-    policy.set('footprintDetectionThreshold', 250.)
+    policy.set('footprintDetectionThreshold', 5.)
 
     # if you are convolving the template
     #policy.set('iterateKernel', False)
@@ -879,9 +884,10 @@ Notes:
 
     # LOOP 1 : convolution vs deconvolution
     Trace('lsst.ip.diffim', 1, 'SC List 1')
-    spatialCellsC = segmentMaskedImage(fpList, templateMaskedImage, scienceMaskedImage, kBasisList, policy)
+    spatialCellsC = segmentMaskedImage(fpList, templateMaskedImage, scienceMaskedImage, kBasisList, policy, cFlag='c')
     Trace('lsst.ip.diffim', 1, 'SC List 2')
-    spatialCellsD = segmentMaskedImage(fpList, scienceMaskedImage, templateMaskedImage, kBasisList, policy)
+    spatialCellsD = segmentMaskedImage(fpList, scienceMaskedImage, templateMaskedImage, kBasisList, policy, cFlag='d')
+    sys.exit(1)
 
     spatialTesting(spatialCellsC, kBasisList, policy, 0)
     spatialTesting(spatialCellsD, kBasisList, policy, 1)

@@ -32,7 +32,7 @@ SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel(
     _policy(policy),
     _fpPtr(fpPtr)
 {
-    // Protected methods of base class initialize private base class variables
+    // Methods of base class to initialize private base class variables
     this->setBuildStatus(false);
     this->setSdqaStatus(false);
 

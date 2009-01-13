@@ -29,7 +29,7 @@ namespace lsst {
 namespace ip {
 namespace diffim {
     
-    /** @class
+    /** 
      * 
      * @brief Class to store the summary statistics of a difference MaskedImage
      * 

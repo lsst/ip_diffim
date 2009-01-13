@@ -2,7 +2,7 @@
 import sys
 Import("env")
 
-env.Program("difi", ["difi.cc"], LIBS=env.getlibs("ip_diffim"))
+# env.Program("difi", ["difi.cc"], LIBS=env.getlibs("ip_diffim"))
 
 
 #

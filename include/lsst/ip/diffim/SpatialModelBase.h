@@ -18,7 +18,7 @@ namespace lsst {
 namespace ip {
 namespace diffim {
 
-    /** @class
+    /** 
      * 
      * @brief Base class for members of SpatialModelCell _modelPtrList
      * 
@@ -49,7 +49,6 @@ namespace diffim {
          */
         virtual ~SpatialModelBase() {;};
 
-    protected:
         /** Set col centroid of Model; range -1 to 1
          *
          * @param colc  Column center
