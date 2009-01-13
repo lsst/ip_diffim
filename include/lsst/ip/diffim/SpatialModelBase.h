@@ -32,6 +32,9 @@ namespace diffim {
      *
      * Derived members of this class need to know how to build themselves from
      * their own member variables, implmented in the buildModel() method.
+     *
+     * An abstract class.  Derived classes gain access to private variables
+     * through the protected methods.
      */
     template <typename ImageT, typename MaskT>
     class SpatialModelBase {
@@ -46,6 +49,7 @@ namespace diffim {
          */
         virtual ~SpatialModelBase() {;};
 
+    protected:
         /** Set col centroid of Model; range -1 to 1
          *
          * @param colc  Column center
@@ -67,16 +71,30 @@ namespace diffim {
         double getRowcNorm() {return _rowcNorm;};
 
         /** Execute the time-consuming process of building the local model
+         * 
+         * Virtual function that must be overridden by derived class
          */
-        bool buildModel();
+        virtual bool buildModel() = 0;
 
         /** Return Sdqa rating
+         * 
+         * Virtual function that must be overridden by derived class
          */
-        double returnSdqaRating();
+        virtual double returnSdqaRating() = 0;
+
+        /** Set its build status
+         *
+         * @param status  Boolean status of build
+         */
+        void setBuildStatus(bool built) {_isBuilt = built;};
 
         /** Get its build status
          */
         bool getBuildStatus() {return _isBuilt;};
+
+        /** Get its build status
+         */
+        bool isBuilt() {return _isBuilt;};
 
         /** Set its Sdqa status
          * 
@@ -93,12 +111,6 @@ namespace diffim {
         bool isGood() {return _isGood;};
 
     private: 
-        /** Set its build status
-         *
-         * @param status  Boolean status of build
-         */
-        void _setBuildStatus(bool built) {_isBuilt = built;};
-
         double _colcNorm; ///< Effective col position of model in overall image
         double _rowcNorm; ///< Effective col position of model in overall image
 

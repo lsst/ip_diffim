@@ -18,7 +18,9 @@
 #include <lsst/afw/math/KernelFunctions.h>
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/detection/Footprint.h>
+
 #include <lsst/ip/diffim/SpatialModelBase.h>
+#include <lsst/ip/diffim/ImageSubtract.h>
 
 namespace lsst {
 namespace ip {
@@ -41,7 +43,7 @@ namespace diffim {
      * @see lsst/ip/diffim/SpatialModelBase.h for base class
      */    
     template <typename ImageT, typename MaskT>
-    class SpatialModelKernel : lsst::ip::diffim::SpatialModelBase {
+    class SpatialModelKernel : public SpatialModelBase<ImageT, MaskT> {
     public: 
         typedef boost::shared_ptr<SpatialModelKernel<ImageT, MaskT> > Ptr;
         typedef std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> SpatialModelKernelPtrList;
@@ -71,6 +73,17 @@ namespace diffim {
          */
         virtual ~SpatialModelKernel() {};
 
+        /** Execute the time-consuming process of building the local model
+         * 
+         * Overrides virtual function of base class
+         */
+        bool buildModel();
+
+        /** Return Sdqa rating
+         * 
+         * Overrides virtual function of base class
+         */
+        double returnSdqaRating();
 
         /** Set running ID
          *

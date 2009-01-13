@@ -114,22 +114,6 @@ namespace diffim {
     
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
      *
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param kernelInBasisList  Input kernel basis set
-     * @param policy  Policy for operations; in particular object detection
-     */    
-    template <typename ImageT, typename MaskT>
-    std::vector<double> computePsfMatchingKernelForFootprint(
-        double &background,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
-        lsst::pex::policy::Policy &policy
-        );
-
-    /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
-     *
      * @note This version uses an input MaskedImage as an estimate of the variance
      *
      * @param imageToConvolve  MaskedImage to convolve with Kernel
@@ -137,14 +121,23 @@ namespace diffim {
      * @param varianceImage  Estimate of diffim variance
      * @param kernelInBasisList  Input kernel basis set
      * @param policy  Policy for operations; in particular object detection
+     *
+     * @param kernelPtr  Pointer to resulting PSF matching kernel
+     * @param kernelErrorPtr  Uncertainty on PSF matching kernel
+     * @param background  Differential background
+     * @param backgroundError  Uncertainty on differential background
      */    
     template <typename ImageT, typename MaskT>
-    std::vector<std::pair<double,double> > computePsfMatchingKernelForFootprint2(
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &varianceImage,
+    void computePsfMatchingKernelForFootprint(
+        lsst::afw::image::MaskedImage<ImageT, MaskT>         const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT>         const &imageToNotConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT>         const &varianceImage,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
-        lsst::pex::policy::Policy &policy
+        lsst::pex::policy::Policy                  &policy,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
+        double                                     &background,
+        double                                     &backgroundError
         );
 
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
@@ -163,6 +156,22 @@ namespace diffim {
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &varianceImage,
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
+        lsst::pex::policy::Policy &policy
+        );
+
+    /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
+     *
+     * @param imageToConvolve  MaskedImage to convolve with Kernel
+     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
+     * @param kernelInBasisList  Input kernel basis set
+     * @param policy  Policy for operations; in particular object detection
+     */    
+    template <typename ImageT, typename MaskT>
+    std::vector<double> computePsfMatchingKernelForFootprint_Legacy(
+        double &background,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
         lsst::pex::policy::Policy &policy
         );
