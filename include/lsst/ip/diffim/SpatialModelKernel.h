@@ -43,7 +43,7 @@ namespace diffim {
      * @see lsst/ip/diffim/SpatialModelBase.h for base class
      */    
     template <typename ImageT, typename MaskT>
-    class SpatialModelKernel : public SpatialModelBase<ImageT, MaskT> {
+    class SpatialModelKernel : public SpatialModelBase {
     public: 
         typedef boost::shared_ptr<SpatialModelKernel<ImageT, MaskT> > Ptr;
         typedef std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> SpatialModelKernelPtrList;
@@ -51,7 +51,7 @@ namespace diffim {
 
         /** Empty constructor
          */
-        SpatialModelKernel(){;};
+        SpatialModelKernel();
 
         /** Constructor
          *

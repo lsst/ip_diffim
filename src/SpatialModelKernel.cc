@@ -17,6 +17,11 @@ namespace ip {
 namespace diffim {
     
 template <typename ImageT, typename MaskT>
+SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel() :
+    lsst::ip::diffim::SpatialModelBase()
+{;}
+
+template <typename ImageT, typename MaskT>
 SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel(
     lsst::detection::Footprint::PtrType fpPtr,
     MaskedImagePtr miToConvolveParentPtr,
@@ -25,17 +30,13 @@ SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel(
     lsst::pex::policy::Policy &policy,
     bool build
     ) :
-    lsst::ip::diffim::SpatialModelBase<ImageT, MaskT>(),
+    lsst::ip::diffim::SpatialModelBase(),
     _miToConvolveParentPtr(miToConvolveParentPtr),
     _miToNotConvolveParentPtr(miToNotConvolveParentPtr),
     _kBasisList(kBasisList),
     _policy(policy),
     _fpPtr(fpPtr)
 {
-    // Methods of base class to initialize private base class variables
-    this->setBuildStatus(false);
-    this->setSdqaStatus(false);
-
     if (build == true) {
         this->buildModel();
     }
