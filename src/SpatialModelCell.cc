@@ -9,10 +9,15 @@
  * @ingroup ip_diffim
  */
 
-#include <lsst/ip/diffim/SpatialModelCell.h>
-#include <lsst/ip/diffim/SpatialModelKernel.h>
+#include <lsst/afw/image/Mask.h>
+#include <lsst/afw/image/Image.h>
+
 #include <lsst/pex/exceptions/Exception.h>
 #include <lsst/pex/logging/Trace.h>
+#include <lsst/daf/data/LsstBase.h>
+
+#include <lsst/ip/diffim/SpatialModelCell.h>
+#include <lsst/ip/diffim/SpatialModelKernel.h>
 
 namespace lsst {
 namespace ip {

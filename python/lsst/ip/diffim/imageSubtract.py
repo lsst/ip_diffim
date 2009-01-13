@@ -10,7 +10,20 @@ from computePsfMatchingKernelForMaskedImage import *
 
 __all__ = ['imageSubtract']
 
-def getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve, policy):
+# Helper functions for LSST image subtraction
+
+
+
+
+
+#############
+#############
+#############
+#############
+#############
+
+
+def getCollectionOfFootprintsForPsfMatching_deprecated(imageToConvolve, imageToNotConvolve, policy):
     # hack until I can append to Vector2i or grow Footprint
     return diffimLib.getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve, policy)
                                                              
@@ -80,7 +93,7 @@ def getCollectionOfFootprintsForPsfMatching(imageToConvolve, imageToNotConvolve,
             
         
 
-def imageSubtract(imageToConvolve, imageToNotConvolve, policy,
+def imageSubtract_deprecated(imageToConvolve, imageToNotConvolve, policy,
     psfMatchBasisKernelSet=None, footprintList=None):
     """Subtract two masked images after psf-matching them.
     

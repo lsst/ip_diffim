@@ -25,7 +25,7 @@
 #include <gsl/gsl_linalg.h>
 
 // NOTE -  trace statements >= 6 can ENTIRELY kill the run time
-#define LSST_MAX_TRACE 5                
+#define LSST_MAX_TRACE 5
 
 #include <lsst/afw/image.h>
 #include <lsst/afw/math.h>

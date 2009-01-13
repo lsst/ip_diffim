@@ -6,6 +6,9 @@
 debugIO: false
 debugPlot: false
 
+# Testing for spatial kernel model
+spatialKernelTesting: false
+
 ######
 # Size of the convolution kernel
 kernelRows: 19

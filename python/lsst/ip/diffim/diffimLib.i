@@ -62,8 +62,8 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 %template(DifferenceImageStatisticsD)
     lsst::ip::diffim::DifferenceImageStatistics<double, lsst::afw::image::maskPixelType>;
 
-/*******************/
-/* Spatial Model   */
+/********************/
+/* Spatial Modeling */
 
 %include "lsst/ip/diffim/SpatialModelCell.h"
 %include "lsst/ip/diffim/SpatialModelBase.h"

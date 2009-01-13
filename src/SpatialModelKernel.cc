@@ -9,6 +9,13 @@
  * @ingroup ip_diffim
  */
 
+#include <lsst/afw/image/Mask.h>
+#include <lsst/afw/image/Image.h>
+#include <lsst/afw/math/Kernel.h>
+
+#include <lsst/pex/policy/Policy.h>
+#include <lsst/pex/logging/Trace.h>
+
 #include <lsst/ip/diffim/SpatialModelBase.h>
 #include <lsst/ip/diffim/SpatialModelKernel.h>
 
