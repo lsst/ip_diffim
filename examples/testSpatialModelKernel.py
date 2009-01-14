@@ -214,8 +214,8 @@ Notes:
     kBasisList = ipDiffim.generateDeltaFunctionKernelSet(kCols, kRows)
     
     # lets just get a couple for debugging and speed
-    policy.set('minimumCleanFootprints', 5)
-    policy.set('footprintDetectionThreshold', 5.)
+    #policy.set('minimumCleanFootprints', 5)
+    #policy.set('footprintDetectionThreshold', 5.)
 
     # if you are convolving the template
     # policy.set('iterateKernel', False)

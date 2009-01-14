@@ -36,9 +36,10 @@ namespace diffim {
      * An abstract class.  Derived classes gain access to private variables
      * through the protected methods.
      */
+    template <typename ImageT, typename MaskT>
     class SpatialModelBase {
     public: 
-        typedef boost::shared_ptr<SpatialModelBase> Ptr;
+        typedef boost::shared_ptr<SpatialModelBase<ImageT, MaskT> > Ptr;
 
         /** Empty constructor
          */
@@ -82,7 +83,7 @@ namespace diffim {
 
         /** Set its build status
          *
-         * @param status  Boolean status of build
+         * @param built  Boolean status of build
          */
         void setBuildStatus(bool built) {_isBuilt = built;};
 
@@ -108,12 +109,24 @@ namespace diffim {
          */
         bool isGood() {return _isGood;};
 
+        /** Set running ID
+         *
+         * @param id  integer that represents the id
+         */
+        void setID(int id) {_id = id;};
+
+        /** Get running ID
+         */
+        int getID() {return _id;};
+
+
     private: 
+        int _id;          ///< Running ID
+        bool _isBuilt;    ///< Model has been built
+        bool _isGood;     ///< Passes local and/or Sdqa requirments
         double _colcNorm; ///< Effective col position of model in overall image
         double _rowcNorm; ///< Effective col position of model in overall image
 
-        bool _isBuilt;    ///< Model has been built
-        bool _isGood;     ///< Passes local and/or Sdqa requirments
 
     }; // end of class
 

@@ -21,6 +21,9 @@
 #include <lsst/daf/base/Persistable.h>
 #include <lsst/daf/data/LsstBase.h>
 
+#include <lsst/ip/diffim/SpatialModelBase.h>
+#include <lsst/ip/diffim/SpatialModelKernel.h>
+
 namespace lsst {
 namespace ip {
 namespace diffim {
@@ -37,14 +40,17 @@ namespace diffim {
      * instances in a list are rejected from the spatial model, the best one
      * will be used.
      */
-    template <typename ImageT, typename MaskT, class ModelT>
+    template <typename ImageT, typename MaskT>
     class SpatialModelCell: public lsst::daf::base::Persistable,
                             public lsst::daf::data::LsstBase {
         
     public:
-        typedef boost::shared_ptr<SpatialModelCell<ImageT, MaskT, ModelT> > Ptr;
-        typedef std::vector<typename SpatialModelCell<ImageT, MaskT, ModelT>::Ptr> SpatialModelCellList;
+        typedef boost::shared_ptr<SpatialModelCell<ImageT, MaskT> > Ptr;
+        typedef std::vector<typename SpatialModelCell<ImageT, MaskT>::Ptr> SpatialModelCellList;
 
+        typedef typename SpatialModelKernel<ImageT, MaskT>::Ptr SpatialModel;
+        //typedef std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> ModelPtrList;
+        
         /** Constructor
          *
          * @param label  string representing "name" of cell
@@ -53,8 +59,8 @@ namespace diffim {
          */
         SpatialModelCell(std::string label,
                          std::vector<lsst::detection::Footprint::PtrType> fpPtrList, 
-                         std::vector<ModelT> modelPtrList);
-
+                         std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList);
+        
         /** Constructor
          *
          * @param label  string representing "name" of cell
@@ -65,7 +71,7 @@ namespace diffim {
          */
         SpatialModelCell(std::string label, int colC, int rowC, 
                          std::vector<lsst::detection::Footprint::PtrType> fpPtrList,
-                         std::vector<ModelT> modelPtrList);
+                         std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList);
 
         /** Destructor
          */
@@ -77,7 +83,7 @@ namespace diffim {
         
         /** Get current model
          */
-        ModelT getCurrentModel() {return _modelPtrList[_currentID];};
+        SpatialModel getCurrentModel() {return _modelPtrList[_currentID];};
 
         /** Get footprint in list
          * 
@@ -89,7 +95,7 @@ namespace diffim {
          * 
          * @param i  index of model you want to retrieve
          */
-        ModelT getModel(int i);
+        SpatialModel getModel(int i);
 
         /** Get vector of all footprints
          */
@@ -97,7 +103,7 @@ namespace diffim {
 
         /** Get vector of all models
          */
-        std::vector<ModelT> getModels() {return _modelPtrList;};
+        std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> getModels() {return _modelPtrList;};
 
         /** Get number of models
          */
@@ -146,16 +152,16 @@ namespace diffim {
          */
         void _orderFootprints();
 
-        std::string _label;       ///< Name of cell for logging/trace
-        int _colC;                ///< Effective col position of cell in overall image
-        int _rowC;                ///< Effective row position of cell in overall image
+        std::string _label;         ///< Name of cell for logging/trace
+        int _colC;                  ///< Effective col position of cell in overall image
+        int _rowC;                  ///< Effective row position of cell in overall image
 
-        std::vector<lsst::detection::Footprint::PtrType> _fpPtrList; ///< List of footprints in cell
-        std::vector<ModelT> _modelPtrList; ///< List of models associated with the footprints
+        std::vector<lsst::detection::Footprint::PtrType>  _fpPtrList; ///< List of footprints in cell
+        std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> _modelPtrList; ///< List of models associated with the footprints
 
-        int _nModels;             ///< Number of entries; len(_fpPtrList)
-        int _currentID;           ///< Which entry is being used; 0 <= _currentID < _nModels
-        bool _modelIsFixed;       ///< Use model _currentID no matter what
+        int _nModels;               ///< Number of entries; len(_fpPtrList)
+        int _currentID;             ///< Which entry is being used; 0 <= _currentID < _nModels
+        bool _modelIsFixed;         ///< Use model _currentID no matter what
 
     }; // end of class
  

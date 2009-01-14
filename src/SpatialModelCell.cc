@@ -17,17 +17,18 @@
 #include <lsst/daf/data/LsstBase.h>
 
 #include <lsst/ip/diffim/SpatialModelCell.h>
+#include <lsst/ip/diffim/SpatialModelBase.h>
 #include <lsst/ip/diffim/SpatialModelKernel.h>
 
 namespace lsst {
 namespace ip {
 namespace diffim {
 
-template <typename ImageT, typename MaskT, class ModelT>
-SpatialModelCell<ImageT, MaskT, ModelT>::SpatialModelCell(
-    std::string                                      label,
-    std::vector<lsst::detection::Footprint::PtrType> fpPtrList,
-    std::vector<ModelT>                              modelPtrList) :
+template <typename ImageT, typename MaskT>
+SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
+    std::string                                       label,
+    std::vector<lsst::detection::Footprint::PtrType>  fpPtrList,
+    std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList) :
     lsst::daf::data::LsstBase(typeid(this)),
     _label(label),
     _colC(0),
@@ -41,13 +42,13 @@ SpatialModelCell<ImageT, MaskT, ModelT>::SpatialModelCell(
     SpatialModelCell(label, 0, 0, fpPtrList, modelPtrList);
 }
 
-template <typename ImageT, typename MaskT, class ModelT>
-SpatialModelCell<ImageT, MaskT, ModelT>::SpatialModelCell(
-    std::string                                      label,
-    int                                              colC, 
-    int                                              rowC, 
-    std::vector<lsst::detection::Footprint::PtrType> fpPtrList,
-    std::vector<ModelT>                              modelPtrList) :
+template <typename ImageT, typename MaskT>
+SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
+    std::string                                       label,
+    int                                               colC, 
+    int                                               rowC, 
+    std::vector<lsst::detection::Footprint::PtrType>  fpPtrList,
+    std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList) :
     lsst::daf::data::LsstBase(typeid(this)),
     _label(label),
     _colC(colC),
@@ -70,8 +71,8 @@ SpatialModelCell<ImageT, MaskT, ModelT>::SpatialModelCell(
  *
  * @note Synchronously modify fpPtrList and modelPtrList
  */
-template <typename ImageT, typename MaskT, class ModelT>
-void SpatialModelCell<ImageT, MaskT, ModelT>::_orderFootprints() {
+template <typename ImageT, typename MaskT>
+void SpatialModelCell<ImageT, MaskT>::_orderFootprints() {
     for (int i = 0; i < this->_nModels; i++) {
         this->_modelPtrList[i]->setID(i);
     }
@@ -87,8 +88,8 @@ void SpatialModelCell<ImageT, MaskT, ModelT>::_orderFootprints() {
  * @note Optionally, if all models are *really* bad (this needs to
  * defined) set Cell as fixed with ID=-1
  */
-template <typename ImageT, typename MaskT, class ModelT>
-void SpatialModelCell<ImageT, MaskT, ModelT>::selectBestModel(bool fix) {
+template <typename ImageT, typename MaskT>
+void SpatialModelCell<ImageT, MaskT>::selectBestModel(bool fix) {
     bool found = false;
     for (int i = 0; i < this->_nModels; i++) {
         if (this->_modelPtrList[i]->isGood()) {
@@ -112,24 +113,24 @@ void SpatialModelCell<ImageT, MaskT, ModelT>::selectBestModel(bool fix) {
  * @note On the condition the cell is "fixed" and has "currentID =
  * -1", the cell is not usable.
  */
-template <typename ImageT, typename MaskT, class ModelT>
-bool SpatialModelCell<ImageT, MaskT, ModelT>::isUsable() {
+template <typename ImageT, typename MaskT>
+bool SpatialModelCell<ImageT, MaskT>::isUsable() {
     if ( (this->_currentID == -1) && (this->_modelIsFixed) ) {
         return false;
     }
     return true;
 }
 
-template <typename ImageT, typename MaskT, class ModelT>
-lsst::detection::Footprint::PtrType SpatialModelCell<ImageT, MaskT, ModelT>::getFootprint(int i) {
+template <typename ImageT, typename MaskT>
+lsst::detection::Footprint::PtrType SpatialModelCell<ImageT, MaskT>::getFootprint(int i) {
     if ( (i < 0) || (i >= this->_nModels) ) {
         throw lsst::pex::exceptions::DomainError("Index out of range");
     }        
     return this->_fpPtrList[i];
 }
 
-template <typename ImageT, typename MaskT, class ModelT>
-ModelT SpatialModelCell<ImageT, MaskT, ModelT>::getModel(int i) {
+template <typename ImageT, typename MaskT>
+typename SpatialModelCell<ImageT, MaskT>::SpatialModel SpatialModelCell<ImageT, MaskT>::getModel(int i) {
     if ( (i < 0) || (i >= this->_nModels) ) {
         throw lsst::pex::exceptions::DomainError("Index out of range");
     }        
@@ -140,8 +141,8 @@ ModelT SpatialModelCell<ImageT, MaskT, ModelT>::getModel(int i) {
  *
  * @note  Method setCurrentID() actually builds the model
  */
-template <typename ImageT, typename MaskT, class ModelT>
-bool SpatialModelCell<ImageT, MaskT, ModelT>::incrementModel() {
+template <typename ImageT, typename MaskT>
+bool SpatialModelCell<ImageT, MaskT>::incrementModel() {
     /* If the Cell has a fixed Kernel */
     if (this->_modelIsFixed) {
         return false;
@@ -175,8 +176,8 @@ bool SpatialModelCell<ImageT, MaskT, ModelT>::incrementModel() {
     }
 }
 
-template <typename ImageT, typename MaskT, class ModelT>
-void SpatialModelCell<ImageT, MaskT, ModelT>::setCurrentID(int id) {
+template <typename ImageT, typename MaskT>
+void SpatialModelCell<ImageT, MaskT>::setCurrentID(int id) {
     if ( (id < 0) || (id >= this->_nModels) ) {
         throw lsst::pex::exceptions::DomainError("Index out of range");
     }        
@@ -192,10 +193,8 @@ void SpatialModelCell<ImageT, MaskT, ModelT>::setCurrentID(int id) {
 }
 
 // Explicit instantiations
-template class SpatialModelCell<float, lsst::afw::image::maskPixelType, 
-                                lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>::Ptr >;
-template class SpatialModelCell<double, lsst::afw::image::maskPixelType, 
-                                lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>::Ptr >;
+template class SpatialModelCell<float,  lsst::afw::image::maskPixelType>;
+template class SpatialModelCell<double, lsst::afw::image::maskPixelType>;
 
 }}} // end of namespace lsst::ip::diffim
 

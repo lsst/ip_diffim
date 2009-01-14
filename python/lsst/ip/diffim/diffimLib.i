@@ -69,47 +69,66 @@ def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/ticke
 %include "lsst/ip/diffim/SpatialModelBase.h"
 %include "lsst/ip/diffim/SpatialModelKernel.h"
 
-%template(SpatialModelCellFK)  
-    lsst::ip::diffim::SpatialModelCell<float, 
-                                       lsst::afw::image::maskPixelType, 
-                                       lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>::Ptr>;
-%template(SpatialModelCellDK)  
-    lsst::ip::diffim::SpatialModelCell<double, 
-                                       lsst::afw::image::maskPixelType, 
-                                       lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>::Ptr>;
+%template(SpatialModelCellF)  
+    lsst::ip::diffim::SpatialModelCell<float,  lsst::afw::image::maskPixelType>;
+%template(SpatialModelCellD)  
+    lsst::ip::diffim::SpatialModelCell<double, lsst::afw::image::maskPixelType>;
 
-%boost_shared_ptr(SpatialModelCellPtrFK, 
-                  lsst::ip::diffim::SpatialModelCell<float, 
-                  lsst::afw::image::maskPixelType, 
-                  lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>::Ptr>);
-%boost_shared_ptr(SpatialModelCellPtrDK, 
-                  lsst::ip::diffim::SpatialModelCell<double, 
-                  lsst::afw::image::maskPixelType, 
-                  lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>::Ptr>);
+%boost_shared_ptr(SpatialModelCellPtrF, 
+                  lsst::ip::diffim::SpatialModelCell<float,  lsst::afw::image::maskPixelType>);
+%boost_shared_ptr(SpatialModelCellPtrD, 
+                  lsst::ip::diffim::SpatialModelCell<double, lsst::afw::image::maskPixelType>);
 
-%template(SpatialModelCellPtrListFK)
-    std::vector<lsst::ip::diffim::SpatialModelCell<float, 
-                                                   lsst::afw::image::maskPixelType, 
-                                                   lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>::Ptr>::Ptr>;
-%template(SpatialModelCellPtrListDK)
-    std::vector<lsst::ip::diffim::SpatialModelCell<double, 
-                                                   lsst::afw::image::maskPixelType, 
-                                                   lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>::Ptr>::Ptr>;
+%template(SpatialModelCellPtrListF)
+    std::vector<lsst::ip::diffim::SpatialModelCell<float,  lsst::afw::image::maskPixelType>::Ptr>;
+%template(SpatialModelCellPtrListD)
+    std::vector<lsst::ip::diffim::SpatialModelCell<double, lsst::afw::image::maskPixelType>::Ptr>;
+
+/* SpatialModelCell::SpatialModel typedefs SpatialModelBase class; put a pointer
+ * to derived class in these objects */
+/*
+%template(SpatialModelBaseF)  
+    lsst::ip::diffim::SpatialModelBase<float,  lsst::afw::image::maskPixelType>;
+%template(SpatialModelBaseD)  
+    lsst::ip::diffim::SpatialModelBase<double, lsst::afw::image::maskPixelType>;
+*/
+
+/* This SWIGs */
+%boost_shared_ptr(SpatialModelPtrF,
+                  lsst::ip::diffim::SpatialModelBase<float,  lsst::afw::image::maskPixelType>);
+%boost_shared_ptr(SpatialModelPtrD,
+                  lsst::ip::diffim::SpatialModelBase<double, lsst::afw::image::maskPixelType>);
+/* This does not SWIG
+%template(SpatialModelPtrF)
+    lsst::ip::diffim::SpatialModelCell<float,  lsst::afw::image::maskPixelType>::SpatialModel;
+%template(SpatialModelPtrD)
+    lsst::ip::diffim::SpatialModelCell<double, lsst::afw::image::maskPixelType>::SpatialModel;
+*/
+
+%template(SpatialModelPtrListF)
+    std::vector<lsst::ip::diffim::SpatialModelBase<float,  lsst::afw::image::maskPixelType>::Ptr>;
+%template(SpatialModelPtrListD)
+    std::vector<lsst::ip::diffim::SpatialModelBase<double, lsst::afw::image::maskPixelType>::Ptr>;
+
 /* */ 
 /* */ 
 
 %template(SpatialModelKernelF)  
-    lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>;
+    lsst::ip::diffim::SpatialModelKernel<float,  lsst::afw::image::maskPixelType>;
 %template(SpatialModelKernelD)  
     lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>;
 
+/*
+Comment out unless these are needed; typically they are wrapped in SpatialModelPtrF/D
+*/
+
 %boost_shared_ptr(SpatialModelKernelPtrF, 
-                  lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>);
+                  lsst::ip::diffim::SpatialModelKernel<float,  lsst::afw::image::maskPixelType>);
 %boost_shared_ptr(SpatialModelKernelPtrD, 
                   lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>);
 
 %template(SpatialModelKernelPtrListF)
-    std::vector<lsst::ip::diffim::SpatialModelKernel<float, lsst::afw::image::maskPixelType>::Ptr>;
+    std::vector<lsst::ip::diffim::SpatialModelKernel<float,  lsst::afw::image::maskPixelType>::Ptr>;
 %template(SpatialModelKernelPtrListD)
     std::vector<lsst::ip::diffim::SpatialModelKernel<double, lsst::afw::image::maskPixelType>::Ptr>;
 

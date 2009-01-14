@@ -67,7 +67,7 @@ footprintDiffimGrow: 20
 footprintDiffimNpixAfterGrowMax: 3000
 
 # Minimum number of clean candidates
-minimumCleanFootprints: 50
+minimumCleanFootprints: 10
 
 # Threshold in sigma now
 footprintDetectionThresholdSigma: 20.0
@@ -80,7 +80,7 @@ detectionThresholdScalingSigma: 5.0
 minimumDetectionThresholdSigma: 5.0
 
 # Back compatibility for signal based vs. sigma based detection
-footprintDetectionThreshold: 250.0
+footprintDetectionThreshold: 2500.0
 detectionThresholdScaling: 0.50
 minimumDetectionThreshold: 125.0
 

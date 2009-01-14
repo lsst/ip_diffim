@@ -239,6 +239,10 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollection
         
         /* get the footprints */
         footprintListIn = detectionSet.getFootprints();
+
+        lsst::pex::logging::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                                      "Found %d total footprints above threshold %.3f",
+                                      footprintListIn.size(), footprintDetectionThreshold);
         
         nCleanFootprints = 0;
         for (std::vector<lsst::detection::Footprint::PtrType>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
@@ -257,10 +261,10 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollection
             */
 
             /* the workaround provided by Serge */
-            vw::BBox2i const & bb = (*i)->getBBox();
+            vw::BBox2i   const & bb = (*i)->getBBox();
             vw::Vector2i const minVec(bb.min().x() - footprintDiffimGrow, bb.min().y() - footprintDiffimGrow);
             vw::Vector2i const maxVec(bb.max().x() + footprintDiffimGrow, bb.max().y() + footprintDiffimGrow);
-            vw::BBox2i const footprintBBox(minVec, maxVec);
+            vw::BBox2i   const footprintBBox(minVec, maxVec);
             
             /* grab a subimage; there is an exception if its e.g. too close to the image */
             try {

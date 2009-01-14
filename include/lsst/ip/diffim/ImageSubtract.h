@@ -56,6 +56,49 @@ namespace diffim {
         double _residualStd;
     };
 
+    /** Uses a functor to iterate over the Mask image pixels
+     *
+     * @ingroup diffim
+     *
+     * @note Will replace maskOK subroutine.  Use this as an example to sort
+     * through footprints for the "best" ones for difference imaging.
+     *
+     * @note Need up update detection first
+     * 
+     * Example usage : 
+     *  FindSetBits<image::Mask<image::MaskPixel> > count(mask); 
+     *  count.reset(); 
+     *  count.apply(footprint); 
+     *  nSet = count.getBits();
+     * 
+     */
+
+    /*
+    template <typename MaskT>
+    class FindSetBits : public lsst::detection::FootprintFunctor<MaskT> {
+    public:
+        FindSetBits(MaskT const& mask) : 
+            lsst::detection::FootprintFunctor<MaskT>(mask), _bits(0) {;}
+        
+        void operator()(typename MaskT::xy_locator loc, ///< locator pointing at the pixel
+                        int x,                          ///< column-position of pixel
+                        int y                           ///< row-position of pixel
+                        ) {
+            _bits |= *loc;
+        }
+        
+        // Return the bits set
+        typename MaskT::Pixel getBits() const { return _bits; }
+
+        // Clear the accumulator
+        void reset() { _bits = 0; }
+
+    private:
+        typename MaskT::Pixel _bits;
+    };
+    */
+
+
     /** Build a set of Delta Function basis kernels
      *
      * @param nCols  Number of rows in the set
@@ -162,6 +205,7 @@ namespace diffim {
 
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
      *
+     * @param background  Differential background value
      * @param imageToConvolve  MaskedImage to convolve with Kernel
      * @param imageToNotConvolve  MaskedImage to subtract convolved template from
      * @param kernelInBasisList  Input kernel basis set

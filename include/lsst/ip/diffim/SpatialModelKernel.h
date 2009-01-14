@@ -43,7 +43,7 @@ namespace diffim {
      * @see lsst/ip/diffim/SpatialModelBase.h for base class
      */    
     template <typename ImageT, typename MaskT>
-    class SpatialModelKernel : public SpatialModelBase {
+    class SpatialModelKernel : public SpatialModelBase<ImageT, MaskT> {
     public: 
         typedef boost::shared_ptr<SpatialModelKernel<ImageT, MaskT> > Ptr;
         typedef std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> SpatialModelKernelPtrList;
@@ -84,15 +84,6 @@ namespace diffim {
          * Overrides virtual function of base class
          */
         double returnSdqaRating();
-
-        /** Set running ID
-         *
-         * @param id  integer that represents the id
-         */
-        void setID(int id) {_id = id;};
-        /** Get running ID
-         */
-        int getID() {return _id;};
 
         /** Set Footprint pointer for the Kernel model
          *
@@ -159,7 +150,7 @@ namespace diffim {
 
         /** Set uncertainty in the differential background determination
          *
-         * @param bg  Uncertainty in background 
+         * @param bgErr  Uncertainty in background 
          */
         void setBgErr(double bgErr) {_bgErr = bgErr;};
         /** Get uncertainty in the differential background determination
@@ -185,7 +176,6 @@ namespace diffim {
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> _kBasisList; ///< List of basis functions for Kernel
         lsst::pex::policy::Policy _policy;          ///< Policy file for operations
 
-        int _id;                                    ///< Running ID
         lsst::detection::Footprint::PtrType _fpPtr; ///< Footprint containing pixels used to build Kernel
         MaskedImagePtr _miToConvolvePtr;            ///< Subimage of _miToConvolveParentPtr
         MaskedImagePtr _miToNotConvolvePtr;         ///< Subimage of _miToNotConvolveParentPtr

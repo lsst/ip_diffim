@@ -25,7 +25,7 @@ namespace diffim {
     
 template <typename ImageT, typename MaskT>
 SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel() :
-    lsst::ip::diffim::SpatialModelBase()
+    lsst::ip::diffim::SpatialModelBase<ImageT, MaskT>()
 {;}
 
 template <typename ImageT, typename MaskT>
@@ -37,7 +37,7 @@ SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel(
     lsst::pex::policy::Policy &policy,
     bool build
     ) :
-    lsst::ip::diffim::SpatialModelBase(),
+    lsst::ip::diffim::SpatialModelBase<ImageT, MaskT>(),
     _miToConvolveParentPtr(miToConvolveParentPtr),
     _miToNotConvolveParentPtr(miToNotConvolveParentPtr),
     _kBasisList(kBasisList),
@@ -187,7 +187,7 @@ double SpatialModelKernel<ImageT, MaskT>::returnSdqaRating() {
 }
 
 // Explicit instantiations
-template class SpatialModelKernel<float, lsst::afw::image::maskPixelType>;
+template class SpatialModelKernel<float,  lsst::afw::image::maskPixelType>;
 template class SpatialModelKernel<double, lsst::afw::image::maskPixelType>;
 
 }}} // end of namespace lsst::ip::diffim
