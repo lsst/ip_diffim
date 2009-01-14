@@ -3,7 +3,7 @@
 
 ######
 # Write intermediate FITS files? (boolean)
-debugIO: false
+debugIO: true
 debugPlot: false
 
 # Testing for spatial kernel model

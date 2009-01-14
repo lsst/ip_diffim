@@ -42,7 +42,7 @@ namespace diffim {
      *
      * @see lsst/ip/diffim/SpatialModelBase.h for base class
      */    
-    template <typename ImageT, typename MaskT>
+    template <typename ImageT, typename MaskT = lsst::afw::image::maskPixelType>
     class SpatialModelKernel : public SpatialModelBase<ImageT, MaskT> {
     public: 
         typedef boost::shared_ptr<SpatialModelKernel<ImageT, MaskT> > Ptr;

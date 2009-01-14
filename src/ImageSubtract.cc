@@ -553,16 +553,16 @@ void lsst::ip::diffim::computePsfMatchingKernelForFootprint(
     );
     
     // Estimate of Background and Background Error */
-    if (std::isnan(kError[nParameters][nParameters])) {
+    if (std::isnan(kError[nParameters-1][nParameters-1])) {
         throw lsst::pex::exceptions::DomainError("Unable to determine background uncertainty (nan)");
     }
-    if (kError[nParameters][nParameters] < 0.0) {
+    if (kError[nParameters-1][nParameters-1] < 0.0) {
         throw lsst::pex::exceptions::DomainError(
-            boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % kError[nParameters][nParameters]
+            boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % kError[nParameters-1][nParameters-1]
             );
     }
-    background      = kSolution[nParameters];
-    backgroundError = sqrt(kError[nParameters][nParameters]);
+    background      = kSolution[nParameters-1];
+    backgroundError = sqrt(kError[nParameters-1][nParameters-1]);
 }
 
 

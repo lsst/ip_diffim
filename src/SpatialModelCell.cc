@@ -14,7 +14,6 @@
 
 #include <lsst/pex/exceptions/Exception.h>
 #include <lsst/pex/logging/Trace.h>
-#include <lsst/daf/data/LsstBase.h>
 
 #include <lsst/ip/diffim/SpatialModelCell.h>
 #include <lsst/ip/diffim/SpatialModelBase.h>
@@ -29,7 +28,6 @@ SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
     std::string                                       label,
     std::vector<lsst::detection::Footprint::PtrType>  fpPtrList,
     std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList) :
-    lsst::daf::data::LsstBase(typeid(this)),
     _label(label),
     _colC(0),
     _rowC(0),
@@ -49,7 +47,6 @@ SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
     int                                               rowC, 
     std::vector<lsst::detection::Footprint::PtrType>  fpPtrList,
     std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList) :
-    lsst::daf::data::LsstBase(typeid(this)),
     _label(label),
     _colC(colC),
     _rowC(rowC),

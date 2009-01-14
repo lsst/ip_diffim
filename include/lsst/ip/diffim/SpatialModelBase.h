@@ -14,6 +14,8 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <lsst/afw/image/Mask.h>
+
 namespace lsst {
 namespace ip {
 namespace diffim {
@@ -36,7 +38,7 @@ namespace diffim {
      * An abstract class.  Derived classes gain access to private variables
      * through the protected methods.
      */
-    template <typename ImageT, typename MaskT>
+    template <typename ImageT, typename MaskT = lsst::afw::image::maskPixelType>
     class SpatialModelBase {
     public: 
         typedef boost::shared_ptr<SpatialModelBase<ImageT, MaskT> > Ptr;

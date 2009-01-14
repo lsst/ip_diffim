@@ -2,6 +2,7 @@ import lsst.ip.diffim.diffimPlot as ipDiffimPlot
 import numpy
 from lsst.pex.logging import Trace
 import lsst.daf.base as dafBase
+import pdb
 
 def plotDiffImQuality1(difi, diffim, kernel, label, outfile=None):
     template = difi.getImageToConvolvePtr().get()
@@ -55,9 +56,13 @@ def plotDiffImQuality2(id, iteration,
 
 
 def writeDiffImages(prefix, id, kModel):
+    pdb.set_trace()
     
-    kModel.getMiToNotConvolvePtr().writeFits('iFoot_%s_%s' % (prefix, id))
+    if not kModel.isBuilt():
+        kModel.buildModel()
+        
     kModel.getMiToConvolvePtr().writeFits('tFoot_%s_%s' % (prefix, id))
+    kModel.getMiToNotConvolvePtr().writeFits('iFoot_%s_%s' % (prefix, id))
     
     ckp,cks = kModel.getKernelPtr().computeNewImage(False)
     cmd = ckp.getMetaData()
@@ -76,7 +81,6 @@ def writeDiffImages(prefix, id, kModel):
                                           kModel.getMiToNotConvolvePtr().get(),
                                           kModel.getKernelPtr(),
                                           kModel.getBackground())
-    
     
     diffIm.writeFits('diff_%s_%s' % (prefix, id))
 

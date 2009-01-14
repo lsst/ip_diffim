@@ -12,6 +12,7 @@
 #include <lsst/afw/image/Mask.h>
 #include <lsst/afw/image/Image.h>
 #include <lsst/afw/math/Kernel.h>
+#include <lsst/daf/base.h>
 
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/pex/logging/Trace.h>
@@ -97,6 +98,10 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
                                              background, backgroundError);
     } catch (lsst::pex::exceptions::ExceptionStack &e) {
         this->setSdqaStatus(false);
+        lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
+                                      "Exception caught from computePsfMatchingKernelForFootprint"); 
+        lsst::pex::logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
+                                      e.what());
         return false;
     }
 
@@ -116,9 +121,9 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
     lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT> kStats = 
         lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>(diffIm);
 
-    lsst::pex::logging::TTrace<6>("lsst.ip.diffim.SpatialModelKernel.buildModel",
-                                  "Kernel pass 1 : Kernel Sum = %.3f; Diffim residuals = %.2f +/- %.2f sigma",
-                                  kSum, 
+    lsst::pex::logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
+                                  "Kernel pass 1 : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
+                                  kSum, background, backgroundError,
                                   kStats.getResidualMean(),
                                   kStats.getResidualStd());
 
@@ -135,7 +140,6 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
                                                      kernelPtr, kernelErrorPtr,
                                                      background, backgroundError);
             } catch (lsst::pex::exceptions::ExceptionStack &e) {
-                // Exit to first solution
                 throw;
             }
             
@@ -147,15 +151,17 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
                                            background);
 
             kStats = lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>(diffIm);
-            lsst::pex::logging::TTrace<6>("lsst.ip.diffim.SpatialModelKernel.buildModel",
-                                          "Kernel pass 2 : Kernel Sum = %.3f; Diffim residuals = %.2f +/- %.2f sigma",
-                                          kSum, 
+            lsst::pex::logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
+                                          "Kernel pass 2 : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
+                                          kSum, background, backgroundError,
                                           kStats.getResidualMean(),
                                           kStats.getResidualStd());
             
         } catch (lsst::pex::exceptions::ExceptionStack &e) {
-            // Use the first solution
-            ;
+            lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
+                                          "Exception caught from computePsfMatchingKernelForFootprint, reverting to first solution");
+            lsst::pex::logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
+                                          e.what());
         }
     }
         
@@ -171,8 +177,8 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
     this->setBuildStatus(true);
 
     lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
-                                  "Kernel : Kernel Sum = %.3f; Diffim residuals = %.2f +/- %.2f sigma",
-                                  this->_kSum, 
+                                  "Kernel : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
+                                  this->_kSum, background, backgroundError,
                                   this->_kStats.getResidualMean(),
                                   this->_kStats.getResidualStd());
 

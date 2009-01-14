@@ -17,9 +17,8 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <lsst/afw/image/Mask.h>
 #include <lsst/detection/Footprint.h>
-#include <lsst/daf/base/Persistable.h>
-#include <lsst/daf/data/LsstBase.h>
 
 #include <lsst/ip/diffim/SpatialModelBase.h>
 #include <lsst/ip/diffim/SpatialModelKernel.h>
@@ -40,9 +39,8 @@ namespace diffim {
      * instances in a list are rejected from the spatial model, the best one
      * will be used.
      */
-    template <typename ImageT, typename MaskT>
-    class SpatialModelCell: public lsst::daf::base::Persistable,
-                            public lsst::daf::data::LsstBase {
+    template <typename ImageT, typename MaskT = lsst::afw::image::maskPixelType>
+    class SpatialModelCell {
         
     public:
         typedef boost::shared_ptr<SpatialModelCell<ImageT, MaskT> > Ptr;

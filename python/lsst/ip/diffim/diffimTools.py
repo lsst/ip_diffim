@@ -131,6 +131,8 @@ def createSpatialModelKernelCells(fpList,
             rowMax    = min(templateMaskedImage.getRows(), (row+1)*nSegmentRowPix)
             rowCenter = int( 0.5 * (rowMin + rowMax) )
 
+            label     = 'c%d' % cellCount
+
             fpPtrList         = detection.FootprintContainerT()
             modelPtrList      = ipDiffim.SpatialModelKernelPtrListF()
 
@@ -157,14 +159,11 @@ def createSpatialModelKernelCells(fpList,
                         )
 
                     if policy.get('debugIO'):
-                        ipDiffimDebug.writeDiffImages(cFlag, '%d_%d' % (cellCount, fpID), modelPtr)
+                        ipDiffimDebug.writeDiffImages(cFlag, '%s_%d' % (label, fpID), modelPtr)
                         
                     modelPtrList.push_back( modelPtr )
                     
-            label = 'c%d' % cellCount
 
-            #pdb.set_trace()
-            
             spatialCellPtr    = ipDiffim.SpatialModelCellPtrF(
                 ipDiffim.SpatialModelCellF(label, colCenter, rowCenter, fpPtrList, modelPtrList)
                 )
