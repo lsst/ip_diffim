@@ -80,7 +80,15 @@ def version(HeadURL = r"$HeadURL$"):
 /******************************************************************************/
 
 %import "lsst/afw/image/imageLib.i" 
+//%import "lsst/afw/image/mask.i" 
 %lsst_exceptions();
+
+/*
+%include "lsst/afw/image/LsstImageTypes.h"
+%include "image.i"
+%include "mask.i"
+%include "maskedImage.i"
+*/
 
 /******************************************************************************/
 
