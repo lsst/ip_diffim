@@ -31,6 +31,7 @@ SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
     std::cout << "CAW 1" << std::endl;
 }
 
+/*
 template <typename ImageT, typename MaskT>
 SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
     ModelPtrList modelPtrList) :
@@ -38,6 +39,7 @@ SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
 {
     std::cout << "CAW 2" << std::endl;
 }
+*/
 
 /* */
 
@@ -208,8 +210,8 @@ void SpatialModelCell<ImageT, MaskT>::setCurrentID(int id) {
 }
 
 // Explicit instantiations
-template class SpatialModelCell<float,  lsst::afw::image::maskPixelType>;
-template class SpatialModelCell<double, lsst::afw::image::maskPixelType>;
+template class SpatialModelCell<float>;
+template class SpatialModelCell<double>;
 
 }}} // end of namespace lsst::ip::diffim
 

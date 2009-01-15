@@ -46,8 +46,9 @@ namespace diffim {
         typedef boost::shared_ptr<SpatialModelCell<ImageT, MaskT> > Ptr;
         typedef std::vector<typename SpatialModelCell<ImageT, MaskT>::Ptr> SpatialModelCellList;
 
-        typedef typename SpatialModelBase<ImageT, MaskT>::Ptr SpatialModel;
-        typedef std::vector<typename SpatialModelBase<ImageT, MaskT>::Ptr> ModelPtrList;
+        typedef typename SpatialModelKernel<ImageT, MaskT>::Ptr SpatialModel;
+        typedef std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> ModelPtrList;
+
         typedef std::vector<lsst::detection::Footprint::PtrType> FpPtrList;
         
         /** Constructor
@@ -72,9 +73,9 @@ namespace diffim {
                          FpPtrList fpPtrList,
                          ModelPtrList modelPtrList);
 
-        SpatialModelCell(ModelPtrList modelPtrList);
+        //SpatialModelCell(ModelPtrList modelPtrList);
         SpatialModelCell(std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList);
-
+        
         /** Destructor
          */
         virtual ~SpatialModelCell() {;};

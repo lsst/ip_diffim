@@ -15,8 +15,8 @@ Python bindings for lsst::ip::diffim code
 #pragma SWIG nowarn=314                 // print is a python keyword (--> _print)
 #pragma SWIG nowarn=362                 // operator=  ignored
 
- // Remove warnings
- // Nothing known about 'boost::bad_any_cast'
+// Remove warnings
+// Nothing known about 'boost::bad_any_cast'
 namespace boost {
     class bad_any_cast; 
 }
@@ -27,13 +27,9 @@ namespace boost {
 %apply double& OUTPUT { double& };
 
 %{
-#include <lsst/ip/diffim/SpatialModelCell.h>
-#include <lsst/ip/diffim/SpatialModelBase.h>
-#include <lsst/ip/diffim/SpatialModelKernel.h>
-
-#include <lsst/ip/diffim/ImageSubtract.h>
-#include <lsst/ip/diffim/wcsMatch.h>
-#include <lsst/ip/diffim/Pca.h>
+#include <boost/shared_ptr.hpp>
+#include <lsst/detection/Footprint.h>
+#include <lsst/pex/policy/Policy.h>
 %}
 
 /*
@@ -51,6 +47,8 @@ namespace boost {
 %include "lsst/daf/base/persistenceMacros.i"
 %include "lsst/afw/image/lsstImageTypes.i"
 %include "lsst/detection/detectionLib.i"
+
+
 
 %pythoncode %{
 import lsst.utils
@@ -79,16 +77,8 @@ def version(HeadURL = r"$HeadURL$"):
 
 /******************************************************************************/
 
-%import "lsst/afw/image/imageLib.i" 
-//%import "lsst/afw/image/mask.i" 
+%import  "lsst/afw/image/imageLib.i" 
 %lsst_exceptions();
-
-/*
-%include "lsst/afw/image/LsstImageTypes.h"
-%include "image.i"
-%include "mask.i"
-%include "maskedImage.i"
-*/
 
 /******************************************************************************/
 
@@ -152,8 +142,8 @@ SWIG_SHARED_PTR(SpatialModelBaseD, lsst::ip::diffim::SpatialModelBase<double>);
 %template(SpatialModelBaseF) lsst::ip::diffim::SpatialModelBase<float>;
 %template(SpatialModelBaseD) lsst::ip::diffim::SpatialModelBase<double>;
 
-%template(VectorSpatialModelBaseF) std::vector<lsst::ip::diffim::SpatialModelBase<float>* >;
-%template(VectorSpatialModelBaseD) std::vector<lsst::ip::diffim::SpatialModelBase<double>* >;
+%template(VectorSpatialModelBaseF) std::vector<lsst::ip::diffim::SpatialModelBase<float>::Ptr >;
+%template(VectorSpatialModelBaseD) std::vector<lsst::ip::diffim::SpatialModelBase<double>::Ptr >;
 
 /******************************************************************************/
 
@@ -173,8 +163,8 @@ SWIG_SHARED_PTR_DERIVED(SpatialModelKernelD,
 %template(SpatialModelKernelF) lsst::ip::diffim::SpatialModelKernel<float>;
 %template(SpatialModelKernelD) lsst::ip::diffim::SpatialModelKernel<double>;
 
-%template(VectorSpatialModelKernelF) std::vector<lsst::ip::diffim::SpatialModelKernel<float>* >;
-%template(VectorSpatialModelKernelD) std::vector<lsst::ip::diffim::SpatialModelKernel<double>* >;
+%template(VectorSpatialModelKernelF) std::vector<lsst::ip::diffim::SpatialModelKernel<float>::Ptr >;
+%template(VectorSpatialModelKernelD) std::vector<lsst::ip::diffim::SpatialModelKernel<double>::Ptr >;
 
 /******************************************************************************/
 
@@ -190,8 +180,8 @@ SWIG_SHARED_PTR(SpatialModelCellD, lsst::ip::diffim::SpatialModelCell<double>);
 %template(SpatialModelCellF) lsst::ip::diffim::SpatialModelCell<float>;
 %template(SpatialModelCellD) lsst::ip::diffim::SpatialModelCell<double>;
 
-%template(VectorSpatialModelCellF) std::vector<lsst::ip::diffim::SpatialModelCell<float>* >;
-%template(VectorSpatialModelCellD) std::vector<lsst::ip::diffim::SpatialModelCell<double>* >;
+%template(VectorSpatialModelCellF) std::vector<lsst::ip::diffim::SpatialModelCell<float>::Ptr >;
+%template(VectorSpatialModelCellD) std::vector<lsst::ip::diffim::SpatialModelCell<double>::Ptr >;
 
 /******************************************************************************/
 
