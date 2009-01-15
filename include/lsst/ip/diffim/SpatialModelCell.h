@@ -46,8 +46,9 @@ namespace diffim {
         typedef boost::shared_ptr<SpatialModelCell<ImageT, MaskT> > Ptr;
         typedef std::vector<typename SpatialModelCell<ImageT, MaskT>::Ptr> SpatialModelCellList;
 
-        typedef typename SpatialModelKernel<ImageT, MaskT>::Ptr SpatialModel;
-        //typedef std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> ModelPtrList;
+        typedef typename SpatialModelBase<ImageT, MaskT>::Ptr SpatialModel;
+        typedef std::vector<typename SpatialModelBase<ImageT, MaskT>::Ptr> ModelPtrList;
+        typedef std::vector<lsst::detection::Footprint::PtrType> FpPtrList;
         
         /** Constructor
          *
@@ -56,8 +57,8 @@ namespace diffim {
          * @param modelPtrList  vector of pointers to models of the function you are fitting for
          */
         SpatialModelCell(std::string label,
-                         std::vector<lsst::detection::Footprint::PtrType> fpPtrList, 
-                         std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList);
+                         FpPtrList fpPtrList, 
+                         ModelPtrList modelPtrList);
         
         /** Constructor
          *
@@ -68,8 +69,11 @@ namespace diffim {
          * @param modelPtrList  vector of pointers to models of the function you are fitting for
          */
         SpatialModelCell(std::string label, int colC, int rowC, 
-                         std::vector<lsst::detection::Footprint::PtrType> fpPtrList,
-                         std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList);
+                         FpPtrList fpPtrList,
+                         ModelPtrList modelPtrList);
+
+        SpatialModelCell(ModelPtrList modelPtrList);
+        SpatialModelCell(std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList);
 
         /** Destructor
          */
@@ -97,11 +101,11 @@ namespace diffim {
 
         /** Get vector of all footprints
          */
-        std::vector<lsst::detection::Footprint::PtrType> getFootprints() {return _fpPtrList;};
+        FpPtrList getFootprints() {return _fpPtrList;};
 
         /** Get vector of all models
          */
-        std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> getModels() {return _modelPtrList;};
+        ModelPtrList getModels() {return _modelPtrList;};
 
         /** Get number of models
          */
@@ -154,8 +158,8 @@ namespace diffim {
         int _colC;                  ///< Effective col position of cell in overall image
         int _rowC;                  ///< Effective row position of cell in overall image
 
-        std::vector<lsst::detection::Footprint::PtrType>  _fpPtrList; ///< List of footprints in cell
-        std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> _modelPtrList; ///< List of models associated with the footprints
+        FpPtrList _fpPtrList;       ///< List of footprints in cell
+        ModelPtrList _modelPtrList; ///< List of models associated with the footprints
 
         int _nModels;               ///< Number of entries; len(_fpPtrList)
         int _currentID;             ///< Which entry is being used; 0 <= _currentID < _nModels

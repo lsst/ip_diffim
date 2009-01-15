@@ -38,8 +38,7 @@ namespace diffim {
      * @note This class will be deprecated as soon as Sdqa classes are implemented
      */
     template <typename ImageT, typename MaskT>
-    class DifferenceImageStatistics : public lsst::daf::base::Persistable,
-                                      public lsst::daf::data::LsstBase {
+    class DifferenceImageStatistics {
     public:
         DifferenceImageStatistics();
         DifferenceImageStatistics(const lsst::afw::image::MaskedImage<ImageT, MaskT> differenceMaskedImage);

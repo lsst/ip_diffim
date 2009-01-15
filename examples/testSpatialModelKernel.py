@@ -221,7 +221,7 @@ Notes:
     # policy.set('iterateKernel', False)
     # if you are convolving the image
     # policy.set('iterateKernel', True)
-    
+
     fpList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                               scienceMaskedImage,
                                                               policy)

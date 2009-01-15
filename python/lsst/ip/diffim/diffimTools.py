@@ -118,7 +118,7 @@ def createSpatialModelKernelCells(fpList,
     nSegmentColPix = int( templateMaskedImage.getCols() / nSegmentCol )
     nSegmentRowPix = int( templateMaskedImage.getRows() / nSegmentRow )
 
-    spatialCellPtrs = ipDiffim.SpatialModelCellPtrListF()
+    spatialCells   = ipDiffim.VectorSpatialModelCellF()
     
     cellCount = 0
     for col in range(nSegmentCol):
@@ -133,8 +133,8 @@ def createSpatialModelKernelCells(fpList,
 
             label     = 'c%d' % cellCount
 
-            fpPtrList         = detection.FootprintContainerT()
-            modelPtrList      = ipDiffim.SpatialModelKernelPtrListF()
+            fpPtrList = detection.FootprintContainerT()
+            modelList = ipDiffim.VectorSpatialModelBaseF()
 
             # This is a bit blunt and could be more clever
             # Should never really have a loop within a loop within a loop
@@ -149,31 +149,28 @@ def createSpatialModelKernelCells(fpList,
                 if (fpColC >= colMin) and (fpColC < colMax) and (fpRowC >= rowMin) and (fpRowC < rowMax):
                     fpPtrList.push_back(fpPtr)
                     
-                    modelPtr = ipDiffim.SpatialModelKernelPtrF (
-                        ipDiffim.SpatialModelKernelF(fpPtr,
-                                                     templateMaskedImagePtr,
-                                                     scienceMaskedImagePtr,
-                                                     kBasisList,
-                                                     policy,
-                                                     False)
-                        )
+                    model = ipDiffim.SpatialModelKernelF(fpPtr,
+                                                         templateMaskedImagePtr,
+                                                         scienceMaskedImagePtr,
+                                                         kBasisList,
+                                                         policy,
+                                                         False)
 
                     if policy.get('debugIO'):
-                        ipDiffimDebug.writeDiffImages(cFlag, '%s_%d' % (label, fpID), modelPtr)
+                        ipDiffimDebug.writeDiffImages(cFlag, '%s_%d' % (label, fpID), model)
                         
-                    modelPtrList.push_back( modelPtr )
+                    modelList.push_back( model )
                     
 
-            spatialCellPtr    = ipDiffim.SpatialModelCellPtrF(
-                ipDiffim.SpatialModelCellF(label, colCenter, rowCenter, fpPtrList, modelPtrList)
-                )
-            spatialCellPtrs.push_back(spatialCellPtr)
+            pdb.set_trace()
+            spatialCell = ipDiffim.SpatialModelCellF(label, colCenter, rowCenter, fpPtrList, modelList)
+            spatialCells.push_back(spatialCell)
 
             # Formatting to the screen 
             Trace('lsst.ip.diffim.createSpatialModelKernelCells', 2, '')
 
             cellCount += 1
 
-    return spatialCellPtrs
+    return spatialCells
 
 

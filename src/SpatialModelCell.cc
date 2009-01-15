@@ -25,9 +25,27 @@ namespace diffim {
 
 template <typename ImageT, typename MaskT>
 SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
-    std::string                                       label,
-    std::vector<lsst::detection::Footprint::PtrType>  fpPtrList,
     std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList) :
+    _label()
+{
+    std::cout << "CAW 1" << std::endl;
+}
+
+template <typename ImageT, typename MaskT>
+SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
+    ModelPtrList modelPtrList) :
+    _label()
+{
+    std::cout << "CAW 2" << std::endl;
+}
+
+/* */
+
+template <typename ImageT, typename MaskT>
+SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
+    std::string  label,
+    FpPtrList    fpPtrList,
+    ModelPtrList modelPtrList) :
     _label(label),
     _colC(0),
     _rowC(0),
@@ -42,11 +60,11 @@ SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
 
 template <typename ImageT, typename MaskT>
 SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
-    std::string                                       label,
-    int                                               colC, 
-    int                                               rowC, 
-    std::vector<lsst::detection::Footprint::PtrType>  fpPtrList,
-    std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> modelPtrList) :
+    std::string  label,
+    int          colC, 
+    int          rowC, 
+    FpPtrList    fpPtrList,
+    ModelPtrList modelPtrList) :
     _label(label),
     _colC(colC),
     _rowC(rowC),
@@ -140,7 +158,7 @@ typename SpatialModelCell<ImageT, MaskT>::SpatialModel SpatialModelCell<ImageT, 
  */
 template <typename ImageT, typename MaskT>
 bool SpatialModelCell<ImageT, MaskT>::incrementModel() {
-    /* If the Cell has a fixed Kernel */
+    /* If the Cell has a fixed Model */
     if (this->_modelIsFixed) {
         return false;
     }

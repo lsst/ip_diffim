@@ -43,9 +43,8 @@
 
 template <typename ImageT, typename MaskT>
 lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics() :
-    lsst::daf::data::LsstBase(typeid(this)),
-    _residualMean(0),
-    _residualStd(0)
+    _residualMean(0.),
+    _residualStd(0.)
 {
 }
 
@@ -53,9 +52,8 @@ template <typename ImageT, typename MaskT>
 lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>::DifferenceImageStatistics(
     const lsst::afw::image::MaskedImage<ImageT, MaskT> differenceMaskedImage
     ) :
-    lsst::daf::data::LsstBase(typeid(this)),
-    _residualMean(0),
-    _residualStd(0)
+    _residualMean(0.),
+    _residualStd(0.)
 {
     int nGood;
     double mean, variance;

@@ -36,12 +36,14 @@ namespace boost {
 #include <lsst/ip/diffim/Pca.h>
 %}
 
+/*
 %inline %{
 namespace boost {
     typedef unsigned short uint16_t;
     namespace mpl { }
 }
 %}
+*/
 
 /******************************************************************************/
 
@@ -134,8 +136,8 @@ def version(HeadURL = r"$HeadURL$"):
 #include "lsst/ip/diffim/SpatialModelBase.h"
 %}
 
-SWIG_SHARED_PTR(SpatialModelBasePtrF, lsst::ip::diffim::SpatialModelBase<float>);
-SWIG_SHARED_PTR(SpatialModelBasePtrD, lsst::ip::diffim::SpatialModelBase<double>);
+SWIG_SHARED_PTR(SpatialModelBaseF, lsst::ip::diffim::SpatialModelBase<float>);
+SWIG_SHARED_PTR(SpatialModelBaseD, lsst::ip::diffim::SpatialModelBase<double>);
 
 %include "lsst/ip/diffim/SpatialModelBase.h"
 
@@ -151,10 +153,10 @@ SWIG_SHARED_PTR(SpatialModelBasePtrD, lsst::ip::diffim::SpatialModelBase<double>
 #include "lsst/ip/diffim/SpatialModelKernel.h"
 %}
 
-SWIG_SHARED_PTR_DERIVED(SpatialModelKernelPtrF, 
+SWIG_SHARED_PTR_DERIVED(SpatialModelKernelF, 
                         lsst::ip::diffim::SpatialModelBase<float>,
                         lsst::ip::diffim::SpatialModelKernel<float>);
-SWIG_SHARED_PTR_DERIVED(SpatialModelKernelPtrD, 
+SWIG_SHARED_PTR_DERIVED(SpatialModelKernelD, 
                         lsst::ip::diffim::SpatialModelBase<double>,
                         lsst::ip::diffim::SpatialModelKernel<double>);
 
@@ -172,8 +174,8 @@ SWIG_SHARED_PTR_DERIVED(SpatialModelKernelPtrD,
 #include "lsst/ip/diffim/SpatialModelCell.h"
 %}
 
-SWIG_SHARED_PTR(SpatialModelCellPtrF, lsst::ip::diffim::SpatialModelCell<float>);
-SWIG_SHARED_PTR(SpatialModelCellPtrD, lsst::ip::diffim::SpatialModelCell<double>);
+SWIG_SHARED_PTR(SpatialModelCellF, lsst::ip::diffim::SpatialModelCell<float>);
+SWIG_SHARED_PTR(SpatialModelCellD, lsst::ip::diffim::SpatialModelCell<double>);
 
 %include "lsst/ip/diffim/SpatialModelCell.h"
 
@@ -210,4 +212,4 @@ SWIG_SHARED_PTR(SpatialModelCellPtrD, lsst::ip::diffim::SpatialModelCell<double>
 %template(wcsMatch)    lsst::ip::diffim::wcsMatch<float,           lsst::afw::image::maskPixelType>;
 %template(wcsMatch)    lsst::ip::diffim::wcsMatch<double,          lsst::afw::image::maskPixelType>;
 
-
+/******************************************************************************/
