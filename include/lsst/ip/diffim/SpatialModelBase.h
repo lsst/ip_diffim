@@ -38,7 +38,7 @@ namespace diffim {
      * An abstract class.  Derived classes gain access to private variables
      * through the protected methods.
      */
-    template <typename ImageT, typename MaskT = lsst::afw::image::maskPixelType>
+    template <typename ImageT, typename MaskT>
     class SpatialModelBase {
     public: 
         typedef boost::shared_ptr<SpatialModelBase<ImageT, MaskT> > Ptr;

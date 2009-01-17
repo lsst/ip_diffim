@@ -42,11 +42,11 @@ namespace diffim {
      *
      * @see lsst/ip/diffim/SpatialModelBase.h for base class
      */    
-    template <typename ImageT, typename MaskT = lsst::afw::image::maskPixelType>
+    template <typename ImageT, typename MaskT>
     class SpatialModelKernel : public SpatialModelBase<ImageT, MaskT> {
     public: 
         typedef boost::shared_ptr<SpatialModelKernel<ImageT, MaskT> > Ptr;
-        typedef std::vector<typename SpatialModelKernel<ImageT, MaskT>::Ptr> SpatialModelKernelPtrList;
+        typedef std::vector<Ptr> SpatialModelKernelPtrList;
         typedef boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > MaskedImagePtr; 
 
         /** Empty constructor
@@ -156,6 +156,24 @@ namespace diffim {
         /** Get uncertainty in the differential background determination
          */
         double getBgErr() {return _bgErr;};
+
+        /** Set differential background value associated with the Kernel
+         *
+         * @param bg  Background value
+         */
+        void setBackground(double bg) {_bg = bg;};
+        /** Get differential background value associated with the Kernel
+         */
+        double getBackground() {return _bg;};
+
+        /** Set uncertainty in the differential background determination
+         *
+         * @param bgErr  Uncertainty in background 
+         */
+        void setBackgroundErr(double bgErr) {_bgErr = bgErr;};
+        /** Get uncertainty in the differential background determination
+         */
+        double getBackgroundErr() {return _bgErr;};
 
         /** Set class instance associated with residuals in the derived difference image
          *

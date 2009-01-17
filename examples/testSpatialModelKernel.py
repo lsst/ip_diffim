@@ -222,6 +222,11 @@ Notes:
     # if you are convolving the image
     # policy.set('iterateKernel', True)
 
+    # NOTE : if you get a runtime error like
+    # Wrong number of arguments for overloaded function 'getCollectionOfFootprintsForPsfMatching'.
+    # this is because Swig gets confused over the type of mask
+    # In particular this line in diffimLib.i causes the problems :
+    # typedef unsigned short boost::uint16_t;
     fpList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
                                                               scienceMaskedImage,
                                                               policy)

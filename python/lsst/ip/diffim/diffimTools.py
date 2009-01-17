@@ -134,7 +134,11 @@ def createSpatialModelKernelCells(fpList,
             label     = 'c%d' % cellCount
 
             fpPtrList = detection.FootprintContainerT()
-            modelList = ipDiffim.VectorSpatialModelBaseF()
+
+            # NOTE : ideally we want this to be a vector of the base
+            # class, not derived class.  Swig is making this difficult
+            # right now tho.
+            modelList = ipDiffim.VectorSpatialModelKernelF()
 
             # This is a bit blunt and could be more clever
             # Should never really have a loop within a loop within a loop
@@ -162,7 +166,6 @@ def createSpatialModelKernelCells(fpList,
                     modelList.push_back( model )
                     
 
-            pdb.set_trace()
             spatialCell = ipDiffim.SpatialModelCellF(label, colCenter, rowCenter, fpPtrList, modelList)
             spatialCells.push_back(spatialCell)
 

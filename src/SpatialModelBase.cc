@@ -28,7 +28,7 @@ SpatialModelBase<ImageT, MaskT>::SpatialModelBase() :
 {;}
 
 // Explicit instantiations
-template class SpatialModelBase<float>;
-template class SpatialModelBase<double>;
+template class SpatialModelBase<float, lsst::afw::image::maskPixelType>;
+template class SpatialModelBase<double, lsst::afw::image::maskPixelType>;
 
 }}} // end of namespace lsst::ip::diffim

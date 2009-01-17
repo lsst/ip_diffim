@@ -193,8 +193,8 @@ double SpatialModelKernel<ImageT, MaskT>::returnSdqaRating() {
 }
 
 // Explicit instantiations
-template class SpatialModelKernel<float>;
-template class SpatialModelKernel<double>;
+template class SpatialModelKernel<float, lsst::afw::image::maskPixelType>;
+template class SpatialModelKernel<double, lsst::afw::image::maskPixelType>;
 
 }}} // end of namespace lsst::ip::diffim
 
