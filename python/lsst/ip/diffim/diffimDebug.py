@@ -1,3 +1,4 @@
+import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimPlot as ipDiffimPlot
 import numpy
 from lsst.pex.logging import Trace
@@ -56,10 +57,14 @@ def plotDiffImQuality2(id, iteration,
 
 
 def writeDiffImages(prefix, id, kModel):
-    pdb.set_trace()
     
     if not kModel.isBuilt():
         kModel.buildModel()
+    if not kModel.getSdqaStatus():
+        # I need to be careful here; since I am debuggin I want to
+        # look at everything except for when there was a kernel
+        # exception.
+        return
         
     kModel.getMiToConvolvePtr().writeFits('tFoot_%s_%s' % (prefix, id))
     kModel.getMiToNotConvolvePtr().writeFits('iFoot_%s_%s' % (prefix, id))
@@ -72,7 +77,7 @@ def writeDiffImages(prefix, id, kModel):
     cmd.addProperty(dafBase.DataProperty('MSIG', kModel.getStats().getResidualMean()))
     cmd.addProperty(dafBase.DataProperty('VSIG', kModel.getStats().getResidualStd()))
     cmd.addProperty(dafBase.DataProperty('BG',   kModel.getBackground()))
-    cmd.addProperty(dafBase.DataProperty('KQUALITY', kModel.getQaStatus()))
+    cmd.addProperty(dafBase.DataProperty('KQUALITY', kModel.getSdqaStatus()))
     cmd.addProperty(dafBase.DataProperty('KSUM', cks))
     ckp.setMetadata(cmd)
     ckp.writeFits('kernel_%s_%s.fits' % (prefix, id))

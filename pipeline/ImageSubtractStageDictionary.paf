@@ -7,7 +7,7 @@ debugIO: true
 debugPlot: false
 
 # Testing for spatial kernel model
-spatialKernelTesting: false
+spatialKernelTesting: true
 
 ######
 # Size of the convolution kernel

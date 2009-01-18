@@ -248,8 +248,8 @@ Notes:
                                                                 cFlag='d')
 
     if policy.get('spatialKernelTesting') == True:
-        spatialTesting(spatialCellsC, kBasisList, policy, 0)
-        spatialTesting(spatialCellsD, kBasisList, policy, 1)
+        spatialKernelTesting(spatialCellsC, kBasisList, policy, 0)
+        spatialKernelTesting(spatialCellsD, kBasisList, policy, 1)
 
     return
 
