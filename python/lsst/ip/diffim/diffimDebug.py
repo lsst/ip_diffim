@@ -1,3 +1,5 @@
+import lsst.afw.math  as afwMath
+import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimPlot as ipDiffimPlot
 import numpy

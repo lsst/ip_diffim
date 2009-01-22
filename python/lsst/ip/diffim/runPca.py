@@ -1,5 +1,6 @@
 import numpy
 import lsst.pex.exceptions as Exceptions
+from   lsst.pex.logging import Trace
 
 def runPca(M, policy):
     if type(M) != numpy.ndarray:
@@ -58,8 +59,12 @@ def runPca(M, policy):
     U,s,Vh = numpy.linalg.svd( M, full_matrices=0 )
     eVal   = s**2
 
-    Trace('lsst.ip.diffim.modelPca', 5,
+    Trace('lsst.ip.diffim.runPca', 5,
           'EigenValues : %s' % (' '.join([('%10.3e' % (x)) for x in eVal])))
+    eSum  = numpy.cumsum(eVal)
+    eSum /= eSum[-1]
+    Trace('lsst.ip.diffim.runPca', 5,
+          'EigenFraction : %s' % (' '.join([('%10.3e' % (x)) for x in eSum])))
 
     # Find the contribution of each eigenKernel to each Kernel.
     # Simple dot product, transpose of M dot the eigenCoeff matrix.
@@ -69,7 +74,7 @@ def runPca(M, policy):
     eCoeff = numpy.dot(M.T, U)
 
     # This should probably be moved to a unit test
-    for i in range(nCells):
+    for i in range(M.shape[1]):
         residual = numpy.sum(U * eCoeff[i], 1) - M[:,i]
         assert(numpy.sum(residual) < 1e-10)
 

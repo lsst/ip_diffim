@@ -39,7 +39,7 @@ def rejectKernelSumOutliers(spatialCells, policy):
     # Compare kernel sums; things that are bad (e.g. variable stars,
     # moving objects, cosmic rays) will have a kernel sum far from the
     # mean; reject these.
-    
+
     maxOutlierIterations = policy.get('maxOutlierIterations')
     maxOutlierSigma      = policy.get('maxOutlierSigma')
 
@@ -55,7 +55,7 @@ def rejectKernelSumOutliers(spatialCells, policy):
             if not scPtr.isUsable():
                 continue
             # Is the contained model usable?
-            if scPtr.getCurrentModel().getQaStatus():
+            if scPtr.getCurrentModel().getSdqaStatus():
                 kSumList.append( scPtr.getCurrentModel().getKernelSum() )
                 idList.append( scID )
 
@@ -79,7 +79,7 @@ def rejectKernelSumOutliers(spatialCells, policy):
                        kSumArray[idx], kSumMean, kSumStd))
                 
                 # Set it as fully bad, since its original model is aberrant
-                spatialCells[ idList[idx] ].getCurrentModel().setQaStatus(False)
+                spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)
 
                 # Move to the next footprint in the cell
                 spatialCells[ idList[idx] ].increment()

@@ -36,7 +36,7 @@ def spatialModelByPixel(spatialCells, policy):
         if not scPtr.isUsable():
             continue
         # Is the contained model usable?
-        if scPtr.getCurrentModel().getQaStatus():
+        if scPtr.getCurrentModel().getSdqaStatus():
             idList.append( scID )
             
     nCells = len(idList)
@@ -56,8 +56,8 @@ def spatialModelByPixel(spatialCells, policy):
         bgErrors[idx] = spatialCells[ idList[idx] ].getCurrentModel().getBgErr()
 
     bgFunction = afwMath.PolynomialFunction2D(bgSpatialOrder)
-    bgFit      = fitFunction(bgFunction, bgValues, bgErrors,
-                             cCol, cRow, policy)
+    bgFit      = ipDiffimTools.fitFunction(bgFunction, bgValues, bgErrors,
+                                           cCol, cRow, policy)
     bgFunction.setParameters(bgFit.parameterList)
     
     Trace('lsst.ip.diffim.spatialModelByPixel', 5,
@@ -97,8 +97,8 @@ def spatialModelByPixel(spatialCells, policy):
             # do the various fitting techniques here
 
             pFunction = afwMath.PolynomialFunction2D(kSpatialOrder)
-            pFit      = fitFunction(pFunction, pValues, pErrors,
-                                    cCol, cRow, policy)
+            pFit      = ipDiffimTools.fitFunction(pFunction, pValues, pErrors,
+                                                  cCol, cRow, policy)
             pFunction.setParameters(pFit.parameterList)
             
             Trace('lsst.ip.diffim.spatialModelByPixel', 5,
@@ -125,7 +125,7 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
         if not scPtr.isUsable():
             continue
         # Is the contained model usable?
-        if scPtr.getCurrentModel().getQaStatus():
+        if scPtr.getCurrentModel().getSdqaStatus():
             idList.append( scID )
             
     nCells = len(idList)
@@ -201,7 +201,7 @@ def evaluateModelByPixel_deprecated(spatialCells, bgFunction, pFunctionList, pol
         if not scPtr.isUsable():
             continue
         # Is the contained model usable?
-        if scPtr.getCurrentModel().getQaStatus():
+        if scPtr.getCurrentModel().getSdqaStatus():
             idList.append( scID )
             
     nCells = len(idList)
@@ -278,7 +278,7 @@ def evaluateModelByPixel_deprecated(spatialCells, bgFunction, pFunctionList, pol
 ################
 ################
 
-def spatialModelKernelPca(spatialCells, policy):
+def spatialModelKernelPca(spatialCells, policy, id):
     from lsst.ip.diffim.runPca import runPca
 
     kCols = policy.get('kernelCols')
@@ -290,7 +290,7 @@ def spatialModelKernelPca(spatialCells, policy):
         if not scPtr.isUsable():
             continue
         # Is the contained model usable?
-        if scPtr.getCurrentModel().getQaStatus():
+        if scPtr.getCurrentModel().getSdqaStatus():
             idList.append( scID )
             
     nCells = len(idList)
@@ -299,23 +299,23 @@ def spatialModelKernelPca(spatialCells, policy):
     M = numpy.zeros((kCols*kRows, nCells))
     for idx in range(nCells):
         kernelImage  = spatialCells[ idList[idx] ].getCurrentModel().getKernelPtr().computeNewImage(False)[0]
-        M[:,idx]     = ipDiffimTools.imageToVector(kernelImage)
+        M[:,idx]     = ipDiffimDebug.imageToVector(kernelImage)
 
     # Call numpy Pca
     meanM, U, eVal, eCoeff = runPca(M, policy)
 
     # Turn principal components into Kernels
-    mKernelPtr       = ipDiffimTools.vectorToKernelPtr( meanM, kCols, kRows )
+    mKernelPtr       = ipDiffimDebug.vectorToKernelPtr( meanM, kCols, kRows )
     if policy.get('debugIO'):
-        ipDiffimTools.vectorToImage(meanM, kCols, kRows).writeFits('mKernel.fits')
+        ipDiffimDebug.vectorToImage(meanM, kCols, kRows).writeFits('mKernel%s.fits' % (id))
 
     eKernelPtrVector = afwMath.VectorKernel()
     for i in range(U.shape[1]):
-        eKernelPtr   = ipDiffimTools.vectorToKernelPtr( U[:,i], kCols, kRows )
+        eKernelPtr   = ipDiffimDebug.vectorToKernelPtr( U[:,i], kCols, kRows )
         eKernelPtrVector.append(eKernelPtr)
 
         if policy.get('debugIO'):
-            ipDiffimTools.vectorToImage(U[:,i], kCols, kRows).writeFits('eKernel_%d.fits' % (i))
+            ipDiffimDebug.vectorToImage(U[:,i], kCols, kRows).writeFits('eKernel%s_%d.fits' % (id, i))
             
     return mKernelPtr, eKernelPtrVector, eVal, eCoeff
     
@@ -332,7 +332,7 @@ def spatialModelByPca(spatialCells, eCoeffs, neVal, policy):
         if not scPtr.isUsable():
             continue
         # Is the contained model usable?
-        if scPtr.getCurrentModel().getQaStatus():
+        if scPtr.getCurrentModel().getSdqaStatus():
             idList.append( scID )
             
     nCells = len(idList)
@@ -353,8 +353,8 @@ def spatialModelByPca(spatialCells, eCoeffs, neVal, policy):
         bgErrors[idx] = spatialCells[ idList[idx] ].getCurrentModel().getBgErr()
 
     bgFunction = afwMath.PolynomialFunction2D(bgSpatialOrder)
-    bgFit      = fitFunction(bgFunction, bgValues, bgErrors,
-                             cCol, cRow, policy)
+    bgFit      = ipDiffimTools.fitFunction(bgFunction, bgValues, bgErrors,
+                                           cCol, cRow, policy)
     bgFunction.setParameters(bgFit.parameterList)
     
     Trace('lsst.ip.diffim.spatialModelByPca', 5,
@@ -371,12 +371,12 @@ def spatialModelByPca(spatialCells, eCoeffs, neVal, policy):
         errors = numpy.sqrt( numpy.abs(coeffs) )
         
         eFunction = afwMath.PolynomialFunction2D(kSpatialOrder)
-        eFit = fitFunction(eFunction,
-                           coeffs,
-                           errors,
-                           cCol,
-                           cRow,
-                           policy)
+        eFit = ipDiffimTools.fitFunction(eFunction,
+                                         coeffs,
+                                         errors,
+                                         cCol,
+                                         cRow,
+                                         policy)
         eFunction.setParameters(eFit.parameterList)
         
         Trace('lsst.ip.diffim.spatialModelByPca', 5,
@@ -395,7 +395,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
         if not scPtr.isUsable():
             continue
         # Is the contained model usable?
-        if scPtr.getCurrentModel().getQaStatus():
+        if scPtr.getCurrentModel().getSdqaStatus():
             idList.append( scID )
             
     nCells = len(idList)

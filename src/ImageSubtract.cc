@@ -34,6 +34,7 @@
 #include <lsst/pex/logging/Log.h>
 #include <lsst/ip/diffim/Pca.h>
 #include <lsst/ip/diffim/ImageSubtract.h>
+#include <lsst/detection/Footprint.h>
 
 #define DEBUG_MATRIX 0
 
@@ -269,6 +270,10 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollection
                 imageToConvolveFootprintPtr = imageToConvolve.getSubImage(footprintBBox);
                 imageToNotConvolveFootprintPtr = imageToNotConvolve.getSubImage(footprintBBox);
             } catch (lsst::pex::exceptions::ExceptionStack &e) {
+                lsst::pex::logging::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
+                                              "Exception caught extracting Footprint");
+                lsst::pex::logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
+                                              e.what());
                 continue;
             }
             

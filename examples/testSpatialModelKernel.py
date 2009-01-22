@@ -17,7 +17,7 @@ import lsst.pex.exceptions as Exceptions
 # Python code
 import lsst.ip.diffim.diffimTools as ipDiffimTools
 import lsst.ip.diffim.diffimDebug as ipDiffimDebug
-import lsst.ip.diffim.spatialModelKernelFit as spatialModelKernelFit
+from lsst.ip.diffim.spatialModelKernelFit import * 
 
 # For degugging needs
 import pdb
@@ -89,7 +89,7 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
         while (nRejected != 0) and (nIter < maxSpatialIterations):
             
             # Run the PCA
-            mKernelPtr, eKernelPtrVector, eVal, eCoeff = modelPca(spatialCells, policy)
+            mKernelPtr, eKernelPtrVector, eVal, eCoeff = spatialModelKernelPca(spatialCells, policy, scID)
             
             # Here we make a decision on how many eigenComponents to use based
             # on eVal, etc
