@@ -80,7 +80,7 @@ detectionThresholdScalingSigma: 5.0
 minimumDetectionThresholdSigma: 5.0
 
 # Back compatibility for signal based vs. sigma based detection
-footprintDetectionThreshold: 5000.0
+footprintDetectionThreshold: 1000.0
 detectionThresholdScaling: 0.50
 minimumDetectionThreshold: 125.0
 

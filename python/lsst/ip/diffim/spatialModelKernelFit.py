@@ -118,6 +118,7 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
     kRows          = policy.get('kernelRows')
 
     nRejected = 0
+    nGood     = 0
     
     idList   = []
     for scID, scPtr in enumerate(spatialCells):
@@ -160,7 +161,7 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
                 # This is only bad in the context of the spatial model
                 # May be needed in the future
                 #
-                # spatialCells[ idList[idx] ].getCurrentModel().setQaStatus(False)                
+                # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)                
                 spatialCells[ idList[idx] ].increment()
                 nRejected += 1
 
@@ -168,13 +169,17 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
             else:
                 label = 'Poor'
         else:
-            label = 'OK'
+            nGood += 1
+            label  = 'OK'
 
-        Trace('lsst.ip.diffim.evaluateModelByPixel2', 5,
+        Trace('lsst.ip.diffim.evaluateModelByPixel', 5,
               '%s Kernel %d : %s Spatial residuals = %.2f +/- %.2f sigma' %
               (spatialCells[ idList[idx] ].getLabel(),
                spatialCells[ idList[idx] ].getCurrentModel().getID(),
                label, diffImStats.getResidualMean(), diffImStats.getResidualStd()))
+
+    Trace('lsst.ip.diffim.evaluateModelByPixel', 3,
+          'Spatial model by pixel : %d / %d Kernels acceptable' % (nGood, nCells))
 
 #        if policy.get('debugPlot') == True:
 #            ipDiffimDebug.plotDiffImQuality1(goodDifiList[i],
@@ -245,7 +250,7 @@ def evaluateModelByPixel_deprecated(spatialCells, bgFunction, pFunctionList, pol
                 # This is only bad in the context of the spatial model
                 # May be needed in the future
                 #
-                # spatialCells[ idList[idx] ].getCurrentModel().setQaStatus(False)                
+                # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)                
                 spatialCells[ idList[idx] ].increment()
                 nRejected += 1
 
@@ -305,19 +310,19 @@ def spatialModelKernelPca(spatialCells, policy, id):
     meanM, U, eVal, eCoeff = runPca(M, policy)
 
     # Turn principal components into Kernels
-    mKernelPtr       = ipDiffimDebug.vectorToKernelPtr( meanM, kCols, kRows )
+    mKernel       = ipDiffimDebug.vectorToKernelPtr( meanM, kCols, kRows )
     if policy.get('debugIO'):
         ipDiffimDebug.vectorToImage(meanM, kCols, kRows).writeFits('mKernel%s.fits' % (id))
 
-    eKernelPtrVector = afwMath.VectorKernel()
+    eKernelVector = afwMath.VectorKernel()
     for i in range(U.shape[1]):
-        eKernelPtr   = ipDiffimDebug.vectorToKernelPtr( U[:,i], kCols, kRows )
-        eKernelPtrVector.append(eKernelPtr)
+        eKernel   = ipDiffimDebug.vectorToKernelPtr( U[:,i], kCols, kRows )
+        eKernelVector.append(eKernel)
 
         if policy.get('debugIO'):
             ipDiffimDebug.vectorToImage(U[:,i], kCols, kRows).writeFits('eKernel%s_%d.fits' % (id, i))
             
-    return mKernelPtr, eKernelPtrVector, eVal, eCoeff
+    return mKernel, eKernelVector, eVal, eCoeff
     
 
 def spatialModelByPca(spatialCells, eCoeffs, neVal, policy):
@@ -388,7 +393,8 @@ def spatialModelByPca(spatialCells, eCoeffs, neVal, policy):
 
 def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
     nRejected = 0
-
+    nGood     = 0
+    
     idList   = []
     for scID, scPtr in enumerate(spatialCells):
         # Is the cell usable at all?
@@ -425,7 +431,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
                 # This is only bad in the context of the spatial model
                 # May be needed in the future
                 #
-                # spatialCells[ idList[idx] ].getCurrentModel().setQaStatus(False)                
+                # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)                
                 spatialCells[ idList[idx] ].increment()
                 nRejected += 1
 
@@ -433,6 +439,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
             else:
                 label = 'Poor'
         else:
+            nGood += 1
             label = 'OK'
 
         Trace('lsst.ip.diffim.evaluateModelByPca', 5,
@@ -441,4 +448,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
                spatialCells[ idList[idx] ].getCurrentModel().getID(),
                label, diffImStats.getResidualMean(), diffImStats.getResidualStd()))
         
+    Trace('lsst.ip.diffim.evaluateModelByPca', 3,
+          'Spatial model by PCA : %d / %d Kernels acceptable' % (nGood, nCells))
+
     return nRejected

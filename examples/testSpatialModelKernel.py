@@ -38,6 +38,10 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
         Trace('lsst.ip.diffim', 2,
               'LOOP %d FAILED; no good kernels' % (scID))
         return
+
+    fitList = {}
+    fitList['spatial'] = {}
+    fitList['pca']     = {}
     
     # LOOP 2 : spatial order
     for order in range(3):
@@ -72,13 +76,15 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
             for p in range(kCols*kRows):
                 kParams[p] = pFunctionList[p].getParameters()
             # Create spatially varying kernel pointer
-            sKernelPtr = afwMath.LinearCombinationKernel(kBasisList, sKernelFunc)
-            sKernelPtr.setSpatialParameters(kParams)
+            sKernel = afwMath.LinearCombinationKernel(kBasisList, sKernelFunc)
+            sKernel.setSpatialParameters(kParams)
             
             nRejected  = evaluateModelByPixel(spatialCells,
-                                              bgFunction, sKernelPtr, 
+                                              bgFunction, sKernel, 
                                               policy, reject=False)
             nIter += 1
+
+        fitList['spatial'][order] = (bgFunction, pFunctionList)
 
         #############
         # PCA fit
@@ -89,7 +95,7 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
         while (nRejected != 0) and (nIter < maxSpatialIterations):
             
             # Run the PCA
-            mKernelPtr, eKernelPtrVector, eVal, eCoeff = spatialModelKernelPca(spatialCells, policy, scID)
+            mKernel, eKernelVector, eVal, eCoeff = spatialModelKernelPca(spatialCells, policy, scID)
             
             # Here we make a decision on how many eigenComponents to use based
             # on eVal, etc
@@ -115,10 +121,10 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
                 # Build LinearCombinationKernel for only neVal components
                 # Start with mean Kernel image
                 eKernelBases = afwMath.KernelListD()
-                eKernelBases.push_back(mKernelPtr)
+                eKernelBases.push_back(mKernel)
                 # Append eigenKernel images
                 for ek in range(neVal):
-                    eKernelBases.push_back(eKernelPtrVector[ek])
+                    eKernelBases.push_back(eKernelVector[ek])
                     
                 # Mean kernel has no spatial variation
                 eKernelFunc   = afwMath.PolynomialFunction2D(kSpatialOrder)
@@ -129,15 +135,18 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
                     kParams[ek+1] = eFunctionList[ek].getParameters()
     
                 # Create spatially varying eigenKernel pointer
-                eKernelPtr = afwMath.LinearCombinationKernel(eKernelBases, eKernelFunc)
-                eKernelPtr.setSpatialParameters(kParams)
+                eKernel = afwMath.LinearCombinationKernel(eKernelBases, eKernelFunc)
+                eKernel.setSpatialParameters(kParams)
         
                 # Evaluate quality of spatial fit
-                nRejected = evaluateModelByPca(spatialCells, bgFunction, eKernelPtr,
+                nRejected = evaluateModelByPca(spatialCells, bgFunction, eKernel,
                                                policy, reject=False)
-            
+                
+                fitList['pca'][neVal] = (bgFunction, eKernel)
+                
             nIter += 1
 
+    return fitList
   
 ################
 ################
@@ -248,8 +257,17 @@ Notes:
                                                                 cFlag='d')
 
     if policy.get('spatialKernelTesting') == True:
-        spatialKernelTesting(spatialCellsC, kBasisList, policy, 0)
-        spatialKernelTesting(spatialCellsD, kBasisList, policy, 1)
+        fitListC = spatialKernelTesting(spatialCellsC, kBasisList, policy, 0)
+        for key1 in fitListC.keys():
+            for key2 in fitListC[key1].keys():
+                background, kernel = fitListC[key1][key2]
+                diffIm.writeFits('diffImC_%s_%d' % (key1, key2))
+        
+        fitListD = spatialKernelTesting(spatialCellsD, kBasisList, policy, 1)
+        for key1 in fitListD.keys():
+            for key2 in fitListD[key1].keys():
+                background, kernel = fitListD[key1][key2]
+                diffIm.writeFits('diffImD_%s_%d' % (key1, key2))
 
     return
 

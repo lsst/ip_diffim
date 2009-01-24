@@ -84,6 +84,11 @@ def version(HeadURL = r"$HeadURL$"):
 %template(convolveAndSubtract)
     lsst::ip::diffim::convolveAndSubtract<double, lsst::afw::image::maskPixelType>;
 
+%template(convolveAndSubtract)
+    lsst::ip::diffim::convolveAndSubtract<float, lsst::afw::image::maskPixelType, double>;
+%template(convolveAndSubtract)
+    lsst::ip::diffim::convolveAndSubtract<double, lsst::afw::image::maskPixelType, double>;
+
 %template(computePsfMatchingKernelForFootprint)
     lsst::ip::diffim::computePsfMatchingKernelForFootprint<float, lsst::afw::image::maskPixelType>;
 %template(computePsfMatchingKernelForFootprint)
