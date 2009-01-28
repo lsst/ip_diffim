@@ -148,11 +148,11 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
         #if policy.get('debugIO'):
         #    sImage.writeFits('skImage_%d.fits' % (idx))
             
-        kPtr    = afwMath.KernelPtr( afwMath.FixedKernel(sImage) )
+        kernel  = afwMath.FixedKernel(sImage)
         # Create difference image using Kernel model
         diffIm  = ipDiffim.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr().get(),
                                                spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr().get(),
-                                               kPtr, bgValue)
+                                               kernel, bgValue)
 
         # Find quality of difference image
         diffImStats = ipDiffim.DifferenceImageStatisticsF(diffIm)
@@ -162,7 +162,7 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
                 # May be needed in the future
                 #
                 # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)                
-                spatialCells[ idList[idx] ].increment()
+                spatialCells[ idList[idx] ].incrementModel()
                 nRejected += 1
 
                 label = 'Rejected:'
@@ -232,7 +232,7 @@ def evaluateModelByPixel_deprecated(spatialCells, bgFunction, pFunctionList, pol
                 pValue = pFunctionList[np](cCol[idx], cRow[idx])
                 kImage.set(kCol, kRow, pValue)
                 np += 1
-        kPtr = afwMath.KernelPtr( afwMath.FixedKernel(kImage) )
+        kernel = afwMath.FixedKernel(kImage)
 
         #if policy.get('debugIO'):
         #    kImage.writeFits('skImage1_%d.fits' % (idx))
@@ -241,7 +241,7 @@ def evaluateModelByPixel_deprecated(spatialCells, bgFunction, pFunctionList, pol
         # Create difference image using Kernel model
         diffIm = ipDiffim.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr().get(),
                                               spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr().get(),
-                                              kPtr, bgValue)
+                                              kernel, bgValue)
 
         # Find quality of difference image
         diffImStats = ipDiffim.DifferenceImageStatisticsF(diffIm)
@@ -251,7 +251,7 @@ def evaluateModelByPixel_deprecated(spatialCells, bgFunction, pFunctionList, pol
                 # May be needed in the future
                 #
                 # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)                
-                spatialCells[ idList[idx] ].increment()
+                spatialCells[ idList[idx] ].incrementModel()
                 nRejected += 1
 
                 label = 'Rejected:'
@@ -419,10 +419,10 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
     for idx in range(nCells):
         bgValue = bgFunction(cCol[idx], cRow[idx])
         sImage  = eKernel.computeNewImage(False, cCol[idx], cRow[idx])[0]
-        kPtr    = afwMath.KernelPtr( afwMath.FixedKernel(sImage) )
+        kernel  = afwMath.FixedKernel(sImage)
         diffIm  = ipDiffim.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr().get(),
                                                spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr().get(),
-                                               kPtr, bgValue)
+                                               kernel, bgValue)
 
         # Find quality of difference image
         diffImStats = ipDiffim.DifferenceImageStatisticsF(diffIm)
@@ -432,7 +432,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
                 # May be needed in the future
                 #
                 # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)                
-                spatialCells[ idList[idx] ].increment()
+                spatialCells[ idList[idx] ].incrementModel()
                 nRejected += 1
 
                 label = 'Rejected:'

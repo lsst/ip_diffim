@@ -4,6 +4,9 @@ setupRequired(pex_exceptions)
 setupRequired(pex_policy)
 setupRequired(daf_persistence)
 
+setupRequired(python)
+setupRequired(pyfits)
+
 setupOptional(pex_harness)
 setupOptional(afwdata)
 

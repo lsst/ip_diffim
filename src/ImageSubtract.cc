@@ -162,7 +162,7 @@ template <typename ImageT, typename MaskT>
 lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
+    lsst::afw::math::Kernel const &convolutionKernel,
     double background
     ) {
 
@@ -173,7 +173,7 @@ lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtra
     lsst::afw::image::MaskedImage<ImageT, MaskT>
         convolvedMaskedImage = lsst::afw::math::convolveNew(
             imageToConvolve,
-            *(convolutionKernelPtr),
+            convolutionKernel,
             edgeMaskBit, 
             false);
     
@@ -199,7 +199,7 @@ template <typename ImageT, typename MaskT>
 lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+    lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
     double background
     ) {
 
@@ -210,7 +210,7 @@ lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtra
     lsst::afw::image::MaskedImage<ImageT, MaskT>
         convolvedMaskedImage = lsst::afw::math::convolveLinearNew(
             imageToConvolve,
-            *(convolutionKernelPtr),
+            convolutionKernel,
             edgeMaskBit);
     
     /* Add in background */
@@ -235,8 +235,8 @@ template <typename ImageT, typename MaskT, typename FunctionT>
 lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
-    boost::shared_ptr<lsst::afw::math::Function2<FunctionT> > backgroundFunction
+    lsst::afw::math::Kernel const &convolutionKernel,
+    lsst::afw::math::Function2<FunctionT> const &backgroundFunction
     ) {
 
     lsst::pex::logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
@@ -246,12 +246,12 @@ lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtra
     lsst::afw::image::MaskedImage<ImageT, MaskT>
         convolvedMaskedImage = lsst::afw::math::convolveNew(
             imageToConvolve,
-            *(convolutionKernelPtr),
+            convolutionKernel,
             edgeMaskBit, 
             false);
     
     /* Add in background */
-    addFunctionToImage(*(convolvedMaskedImage.getImage()), *(backgroundFunction));
+    addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
 
     /* Do actual subtraction */
     convolvedMaskedImage -= imageToNotConvolve;
@@ -272,8 +272,8 @@ template <typename ImageT, typename MaskT, typename FunctionT>
 lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
-    boost::shared_ptr<lsst::afw::math::Function2<FunctionT> > backgroundFunction
+    lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
+    lsst::afw::math::Function2<FunctionT> const &backgroundFunction
     ) {
 
     lsst::pex::logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
@@ -283,11 +283,11 @@ lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtra
     lsst::afw::image::MaskedImage<ImageT, MaskT>
         convolvedMaskedImage = lsst::afw::math::convolveLinearNew(
             imageToConvolve,
-            *(convolutionKernelPtr),
+            convolutionKernel,
             edgeMaskBit);
     
     /* Add in background */
-    addFunctionToImage(*(convolvedMaskedImage.getImage()), *(backgroundFunction));
+    addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
 
     /* Do actual subtraction */
     convolvedMaskedImage -= imageToNotConvolve;
@@ -295,6 +295,7 @@ lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtra
     
     return convolvedMaskedImage;
 }
+
 
 /** 
  * @brief Runs Detection on a single image for significant peaks, and checks
@@ -1491,28 +1492,28 @@ template
 lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
+    lsst::afw::math::Kernel const &convolutionKernel,
     double background);
 
 template 
 lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
+    lsst::afw::math::Kernel const &convolutionKernel,
     double background);
 
 template 
 lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+    lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
     double background);
 
 template 
 lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+    lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
     double background);
 
 /* */
@@ -1521,31 +1522,32 @@ template
 lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
-    boost::shared_ptr<lsst::afw::math::Function2<double> > backgroundFunction);
+    lsst::afw::math::Kernel const &convolutionKernel,
+    lsst::afw::math::Function2<double> const &backgroundFunction);
 
 template 
 lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
-    boost::shared_ptr<lsst::afw::math::Function2<double> > backgroundFunction);
+    lsst::afw::math::Kernel const &convolutionKernel,
+    lsst::afw::math::Function2<double> const &backgroundFunction);
 
 
 template 
 lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
-    boost::shared_ptr<lsst::afw::math::Function2<double> > backgroundFunction);
+    lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
+    lsst::afw::math::Function2<double> const &backgroundFunction);
 
 
 template 
 lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> lsst::ip::diffim::convolveAndSubtract(
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToConvolve,
     lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixelType> const &imageToNotConvolve,
-    boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
-    boost::shared_ptr<lsst::afw::math::Function2<double> > backgroundFunction);
+    lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
+    lsst::afw::math::Function2<double> const &backgroundFunction);
+
 
 /* */
 

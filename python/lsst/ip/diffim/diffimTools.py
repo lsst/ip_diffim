@@ -78,11 +78,11 @@ def rejectKernelSumOutliers(spatialCells, policy):
                        spatialCells[ idList[idx] ].getCurrentModel().getID(),
                        kSumArray[idx], kSumMean, kSumStd))
                 
-                # Set it as fully bad, since its original model is aberrant
+                # Set it as fully bad, since its base model is aberrant
                 spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)
 
                 # Move to the next footprint in the cell
-                spatialCells[ idList[idx] ].increment()
+                spatialCells[ idList[idx] ].incrementModel()
                 nRejected += 1
                 
         Trace('lsst.ip.diffim.rejectKernelSumOutliers', 4,

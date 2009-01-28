@@ -3,11 +3,12 @@
 
 ######
 # Write intermediate FITS files? (boolean)
-debugIO: true
+debugIO: false
 debugPlot: false
 
 # Testing for spatial kernel model
 spatialKernelTesting: true
+spatialKernelRejection: true
 
 ######
 # Size of the convolution kernel

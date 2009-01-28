@@ -116,7 +116,7 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
     // Create difference image and calculate associated statistics
     lsst::afw::image::MaskedImage<ImageT, MaskT> diffIm = convolveAndSubtract( *(this->_miToConvolvePtr),
                                                                                *(this->_miToNotConvolvePtr),
-                                                                               kernelPtr, 
+                                                                               *(kernelPtr), 
                                                                                background);
     lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT> kStats = 
         lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>(diffIm);
@@ -147,7 +147,7 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
             kImage  = kernelPtr->computeNewImage(kSum, false);
             diffIm  = convolveAndSubtract( *(this->_miToConvolvePtr),
                                            *(this->_miToNotConvolvePtr),
-                                           kernelPtr, 
+                                           *(kernelPtr), 
                                            background);
 
             kStats = lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>(diffIm);

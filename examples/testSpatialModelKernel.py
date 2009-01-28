@@ -31,6 +31,7 @@ import pdb
 def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
     kCols = policy.get('kernelCols')
     kRows = policy.get('kernelRows')
+    rejectKernels = policy.get('spatialKernelRejection')
     
     try:
         ipDiffimTools.rejectKernelSumOutliers(spatialCells, policy)
@@ -39,9 +40,13 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
               'LOOP %d FAILED; no good kernels' % (scID))
         return
 
-    fitList = {}
-    fitList['spatial'] = {}
-    fitList['pca']     = {}
+    bgList            = {}
+    bgList['spatial'] = []
+    bgList['pca']     = []
+
+    kList             = {}
+    kList['spatial']  = afwMath.KernelListD()
+    kList['pca']      = afwMath.KernelListD()
     
     # LOOP 2 : spatial order
     for order in range(3):
@@ -81,11 +86,15 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
             
             nRejected  = evaluateModelByPixel(spatialCells,
                                               bgFunction, sKernel, 
-                                              policy, reject=False)
+                                              policy, reject=rejectKernels)
             nIter += 1
 
-        fitList['spatial'][order] = (bgFunction, pFunctionList)
-
+        # In future versions of the code, there will be no need to make pointers like this.
+        kPtr  = afwMath.KernelPtr(sKernel)
+        bgPtr = afwMath.Function2DPtr(bgFunction)
+        kList['spatial'].push_back( kPtr )
+        bgList['spatial'].append( bgPtr )
+        
         #############
         # PCA fit
         nRejected = 1
@@ -140,13 +149,17 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
         
                 # Evaluate quality of spatial fit
                 nRejected = evaluateModelByPca(spatialCells, bgFunction, eKernel,
-                                               policy, reject=False)
-                
-                fitList['pca'][neVal] = (bgFunction, eKernel)
+                                               policy, reject=rejectKernels)
                 
             nIter += 1
 
-    return fitList
+        # In future versions of the code, there will be no need to make pointers like this.
+        kPtr  = afwMath.KernelPtr(eKernel)
+        bgPtr = afwMath.Function2DPtr(bgFunction)
+        kList['pca'].push_back( kPtr )
+        bgList['pca'].append( bgPtr )
+                
+    return bgList, kList
   
 ################
 ################
@@ -248,6 +261,24 @@ Notes:
                                                                 kBasisList,
                                                                 policy,
                                                                 cFlag='c')
+    if policy.get('spatialKernelTesting') == True:
+        bgListC, kListC = spatialKernelTesting(spatialCellsC, kBasisList, policy, 0)
+        for key1 in bgListC.keys():
+            for key2 in range(len(bgListC[key1])):
+                background = bgListC[key1][key2]
+                kernel     = kListC[key1][key2]
+                
+                diffIm = ipDiffim.convolveAndSubtract(
+                    templateMaskedImage,
+                    scienceMaskedImage,
+                    kernel,
+                    background)
+                diffIm.writeFits('diffImC_%s_%d' % (key1, key2))
+
+    #
+    ###
+    #
+
     Trace('lsst.ip.diffim', 1, 'SC List 2')
     spatialCellsD = ipDiffimTools.createSpatialModelKernelCells(fpList,
                                                                 scienceMaskedImage,
@@ -255,18 +286,18 @@ Notes:
                                                                 kBasisList,
                                                                 policy,
                                                                 cFlag='d')
-
     if policy.get('spatialKernelTesting') == True:
-        fitListC = spatialKernelTesting(spatialCellsC, kBasisList, policy, 0)
-        for key1 in fitListC.keys():
-            for key2 in fitListC[key1].keys():
-                background, kernel = fitListC[key1][key2]
-                diffIm.writeFits('diffImC_%s_%d' % (key1, key2))
-        
-        fitListD = spatialKernelTesting(spatialCellsD, kBasisList, policy, 1)
+        bgListD, kListD = spatialKernelTesting(spatialCellsD, kBasisList, policy, 1)
         for key1 in fitListD.keys():
-            for key2 in fitListD[key1].keys():
-                background, kernel = fitListD[key1][key2]
+            for key2 in range(len(bgListD[key1])):
+                background = bgListD[key1][key2]
+                kernel     = kListD[key1][key2]
+
+                diffIm = ipDiffim.convolveAndSubtract(
+                    scienceMaskedImage,
+                    templateMaskedImage,
+                    kernel,
+                    background)
                 diffIm.writeFits('diffImD_%s_%d' % (key1, key2))
 
     return

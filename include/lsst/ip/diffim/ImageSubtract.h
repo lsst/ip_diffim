@@ -128,22 +128,7 @@ namespace diffim {
      *
      * @note D = I - (K.x.T + bg)
      * 
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param convolutionKernelPtr  PSF-matching Kernel used for convolution
-     * @param background  Differential background value
-     */    
-    template <typename ImageT, typename MaskT>
-    lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
-        double background
-        );
-
-    /** Execute fundamental task of convolving template and subtracting it from science image
-     *
-     * @note D = I - (K.x.T + bg)
+     * @note This is a specialization for LinearCombinationKernels
      * 
      * @param imageToConvolve  MaskedImage to convolve with Kernel
      * @param imageToNotConvolve  MaskedImage to subtract convolved template from
@@ -154,8 +139,44 @@ namespace diffim {
     lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
+        lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
         double background
+        );
+
+    /** Execute fundamental task of convolving template and subtracting it from science image
+     *
+     * @note D = I - (K.x.T + bg)
+     * 
+     * @param imageToConvolve  MaskedImage to convolve with Kernel
+     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
+     * @param convolutionKernelPtr  PSF-matching Kernel used for convolution
+     * @param background  Differential background value
+     */    
+    template <typename ImageT, typename MaskT>
+    lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+        lsst::afw::math::Kernel const &convolutionKernel,
+        double background
+        );
+
+    /** Execute fundamental task of convolving template and subtracting it from science image
+     *
+     * @note D = I - (K.x.T + bg)
+     * 
+     * @note This is a specialization for LinearCombinationKernels
+     * 
+     * @param imageToConvolve  MaskedImage to convolve with Kernel
+     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
+     * @param convolutionKernelPtr  PSF-matching LinearCombinationKernel used for convolution
+     * @param background  Differential background function
+     */    
+    template <typename ImageT, typename MaskT, typename FunctionT>
+    lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+        lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
+        lsst::afw::math::Function2<FunctionT> const &backgroundFunction
         );
 
     /** Execute fundamental task of convolving template and subtracting it from science image
@@ -171,25 +192,8 @@ namespace diffim {
     lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        boost::shared_ptr<lsst::afw::math::Kernel> const &convolutionKernelPtr,
-        boost::shared_ptr<lsst::afw::math::Function2<FunctionT> > backgroundFunction
-        );
-
-    /** Execute fundamental task of convolving template and subtracting it from science image
-     *
-     * @note D = I - (K.x.T + bg)
-     * 
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param convolutionKernelPtr  PSF-matching LinearCombinationKernel used for convolution
-     * @param background  Differential background function
-     */    
-    template <typename ImageT, typename MaskT, typename FunctionT>
-    lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        boost::shared_ptr<lsst::afw::math::LinearCombinationKernel> const &convolutionKernelPtr,
-        boost::shared_ptr<lsst::afw::math::Function2<FunctionT> > backgroundFunction
+        lsst::afw::math::Kernel const &convolutionKernel,
+        lsst::afw::math::Function2<FunctionT> const &backgroundFunction
         );
 
     /** Search through images for Footprints with no masked pixels
