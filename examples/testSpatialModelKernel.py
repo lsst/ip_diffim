@@ -45,8 +45,8 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
     bgList['pca']     = []
 
     kList             = {}
-    kList['spatial']  = afwMath.KernelListD()
-    kList['pca']      = afwMath.KernelListD()
+    kList['spatial']  = []
+    kList['pca']      = []
     
     # LOOP 2 : spatial order
     for order in range(3):
@@ -90,10 +90,8 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
             nIter += 1
 
         # In future versions of the code, there will be no need to make pointers like this.
-        kPtr  = afwMath.KernelPtr(sKernel)
-        bgPtr = afwMath.Function2DPtr(bgFunction)
-        kList['spatial'].push_back( kPtr )
-        bgList['spatial'].append( bgPtr )
+        kList['spatial'].append( sKernel )
+        bgList['spatial'].append( bgFunction )
         
         #############
         # PCA fit
@@ -153,11 +151,10 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
                 
             nIter += 1
 
+        # NOTE to self : you get the "final" PCA kernel here with all elements
         # In future versions of the code, there will be no need to make pointers like this.
-        kPtr  = afwMath.KernelPtr(eKernel)
-        bgPtr = afwMath.Function2DPtr(bgFunction)
-        kList['pca'].push_back( kPtr )
-        bgList['pca'].append( bgPtr )
+        kList['pca'].append( eKernel )
+        bgList['pca'].append( bgFunction )
                 
     return bgList, kList
   
@@ -267,7 +264,7 @@ Notes:
             for key2 in range(len(bgListC[key1])):
                 background = bgListC[key1][key2]
                 kernel     = kListC[key1][key2]
-                
+
                 diffIm = ipDiffim.convolveAndSubtract(
                     templateMaskedImage,
                     scienceMaskedImage,

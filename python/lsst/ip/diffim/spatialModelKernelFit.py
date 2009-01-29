@@ -161,7 +161,7 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
                 # This is only bad in the context of the spatial model
                 # May be needed in the future
                 #
-                # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)                
+                # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)
                 spatialCells[ idList[idx] ].incrementModel()
                 nRejected += 1
 
