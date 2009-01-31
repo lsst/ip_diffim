@@ -23,7 +23,7 @@
 #include <lsst/afw/image/Mask.h>
 #include <lsst/afw/image/MaskedImage.h>
 #include <lsst/afw/math/Function.h>
-#include <lsst/detection/Footprint.h>
+#include <lsst/afw/detection/Footprint.h>
 
 namespace lsst {
 namespace ip {
@@ -203,7 +203,7 @@ namespace diffim {
      * @param policy  Policy for operations; in particular object detection
      */    
     template <typename ImageT, typename MaskT>
-    std::vector<lsst::detection::Footprint::PtrType> getCollectionOfFootprintsForPsfMatching(
+    std::vector<lsst::afw::detection::Footprint::PtrType> getCollectionOfFootprintsForPsfMatching(
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
         lsst::pex::policy::Policy &policy
@@ -235,26 +235,6 @@ namespace diffim {
         boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
         double                                     &background,
         double                                     &backgroundError
-        );
-
-    /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
-     *
-     * @note This version uses an input MaskedImage as an estimate of the
-     * variance, as well as GSL for the matrix math.
-     *
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param varianceImage  Estimate of diffim variance
-     * @param kernelInBasisList  Input kernel basis set
-     * @param policy  Policy for operations; in particular object detection
-     */    
-    template <typename ImageT, typename MaskT>
-    std::vector<std::pair<double,double> > computePsfMatchingKernelForFootprintGSL(
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &varianceImage,
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
-        lsst::pex::policy::Policy &policy
         );
 
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
@@ -340,21 +320,6 @@ namespace diffim {
         double &mean,
         double &variance,
         lsst::afw::image::Image<ImageT> const &inputImage
-        );
-
-    /** Calculate statistics of a Vector
-     *
-     * @note This should eventually be replaced by afw::math functions
-     *
-     * @param inputVector  Input data
-     * @param mean  Returned mean of values
-     * @param variance  Returned variance of values
-     */
-    template <typename VectorT>
-    void calculateVectorStatistics(
-        vw::Vector<VectorT> const &inputVector,
-        double &mean,
-        double &variance
         );
 
     /** Add a spatially varying function to an Image
