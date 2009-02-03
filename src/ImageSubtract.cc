@@ -27,12 +27,13 @@
 #include <lsst/pex/exceptions/Exception.h>
 #include <lsst/pex/logging/Trace.h>
 #include <lsst/pex/logging/Log.h>
-#include <lsst/ip/diffim/Pca.h>
 #include <lsst/ip/diffim/ImageSubtract.h>
 #include <lsst/afw/detection/Footprint.h>
-#include <lsst/afw/math/ConvolveMaskedImage.h>
+#include <lsst/afw/math/ConvolveImage.h>
 
 #define DEBUG_MATRIX 0
+
+namespace pexExcept = lsst::pex::exceptions; 
 
 //
 // Constructors
@@ -94,22 +95,20 @@ bool lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>::evaluateQuality
  */
 lsst::afw::math::KernelList<lsst::afw::math::Kernel>
 lsst::ip::diffim::generateDeltaFunctionKernelSet(
-    unsigned int nCols, 
-    unsigned int nRows  
+    unsigned int width, 
+    unsigned int height  
     )
 {
-    if ((nCols < 1) || (nRows < 1)) {
-        throw lsst::pex::exceptions::DomainError("nRows and nCols must be positive");
+    if ((width < 1) || (height < 1)) {
+        throw LSST_EXCEPT(pexExcept::Exception, "nRows and nCols must be positive");
     }
-    const int signedNCols = static_cast<int>(nCols);
-    const int signedNRows = static_cast<int>(nRows);
+    const int signedWidth = static_cast<int>(width);
+    const int signedHeight = static_cast<int>(height);
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> kernelBasisList;
-    for (int row = 0; row < signedNRows; ++row) {
-        for (int col = 0; col < signedNCols; ++col) {
-            boost::shared_ptr<lsst::afw::math::Kernel> kernelPtr(
-                new lsst::afw::math::DeltaFunctionKernel(col, row, nCols, nRows)
-                );
-            
+    for (int row = 0; row < signedHeight; ++row) {
+        for (int col = 0; col < signedWidth; ++col) {
+            boost::shared_ptr<lsst::afw::math::Kernel> 
+                kernelPtr( new lsst::afw::math::DeltaFunctionKernel(width, height, lsst::afw::image::PointI(col,row) ) );
             kernelBasisList.push_back(kernelPtr);
         }
     }
@@ -137,9 +136,9 @@ lsst::ip::diffim::generateAlardLuptonKernelSet(
     )
 {
     if ((nCols < 1) || (nRows < 1)) {
-        throw lsst::pex::exceptions::DomainError("nRows and nCols must be positive");
+        throw LSST_EXCEPT(pexExcept::Exception, "nRows and nCols must be positive");
     }
-    throw lsst::pex::exceptions::DomainError("Not implemented");
+    throw LSST_EXCEPT(pexExcept::Exception, "Not implemented");
 
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> kernelBasisList;
     return kernelBasisList;
@@ -165,12 +164,12 @@ lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtra
                                   "Convolving using convolveNew");
 
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
-    lsst::afw::image::MaskedImage<ImageT, MaskT>
-        convolvedMaskedImage = lsst::afw::math::convolveNew(
-            imageToConvolve,
-            convolutionKernel,
-            edgeMaskBit, 
-            false);
+    lsst::afw::image::MaskedImage<ImageT, MaskT> convolvedMaskedImage();
+    lsst::afw::math::convolve(convolvedMaskedImage,
+                              imageToConvolve,
+                              convolutionKernel,
+                              false,
+                              edgeMaskBit);
     
     /* Add in background */
     convolvedMaskedImage += background;
@@ -202,11 +201,11 @@ lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtra
                                   "Convolving using convolveLinearNew");
 
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
-    lsst::afw::image::MaskedImage<ImageT, MaskT>
-        convolvedMaskedImage = lsst::afw::math::convolveLinearNew(
-            imageToConvolve,
-            convolutionKernel,
-            edgeMaskBit);
+    lsst::afw::image::MaskedImage<ImageT, MaskT> convolvedMaskedImage();
+    lsst::afw::math::convolveLinear(convolvedMaskedImage,
+                                    imageToConvolve,
+                                    convolutionKernel,
+                                    edgeMaskBit);
     
     /* Add in background */
     convolvedMaskedImage += background;
@@ -238,12 +237,12 @@ lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtra
                                   "Convolving using convolveNew and spatially varying background");
 
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
-    lsst::afw::image::MaskedImage<ImageT, MaskT>
-        convolvedMaskedImage = lsst::afw::math::convolveNew(
-            imageToConvolve,
-            convolutionKernel,
-            edgeMaskBit, 
-            false);
+    lsst::afw::image::MaskedImage<ImageT, MaskT> convolvedMaskedImage();
+    lsst::afw::math::convolve(convolvedMaskedImage
+                              imageToConvolve,
+                              convolutionKernel,
+                              false
+                              edgeMaskBit);
     
     /* Add in background */
     addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
@@ -275,11 +274,11 @@ lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtra
                                   "Convolving using convolveLinearNew and spatially varying background");
 
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
-    lsst::afw::image::MaskedImage<ImageT, MaskT>
-        convolvedMaskedImage = lsst::afw::math::convolveLinearNew(
-            imageToConvolve,
-            convolutionKernel,
-            edgeMaskBit);
+    lsst::afw::image::MaskedImage<ImageT, MaskT> convolvedMaskedImage();
+    lsst::afw::math::convolveLinear(convolvedMaskedImage,
+                                    imageToConvolve,
+                                    convolutionKernel,
+                                    edgeMaskBit);
     
     /* Add in background */
     addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
@@ -310,7 +309,7 @@ lsst::afw::image::MaskedImage<ImageT, MaskT> lsst::ip::diffim::convolveAndSubtra
  * @ingroup diffim
  */
 template <typename ImageT, typename MaskT>
-std::vector<lsst::afw::detection::Footprint::PtrType> lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching(
+std::vector<lsst::afw::detection::Footprint::Ptr> lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching(
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,    
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve, 
     lsst::pex::policy::Policy &policy                                       
@@ -333,8 +332,8 @@ std::vector<lsst::afw::detection::Footprint::PtrType> lsst::ip::diffim::getColle
     typename lsst::afw::image::MaskedImage<ImageT, MaskT>::MaskedImagePtrT imageToNotConvolveFootprintPtr;
     
     // Reusable list of Footprints
-    std::vector<lsst::afw::detection::Footprint::PtrType> footprintListIn;
-    std::vector<lsst::afw::detection::Footprint::PtrType> footprintListOut;
+    std::vector<lsst::afw::detection::Footprint::Ptr> footprintListIn;
+    std::vector<lsst::afw::detection::Footprint::Ptr> footprintListOut;
 
     int nCleanFootprints = 0;
     while ( (nCleanFootprints < minimumCleanFootprints) and (footprintDetectionThreshold > minimumDetectionThreshold) ) {
@@ -342,8 +341,9 @@ std::vector<lsst::afw::detection::Footprint::PtrType> lsst::ip::diffim::getColle
         footprintListOut.clear();
         
         /* Find detections */
-        lsst::detection::DetectionSet<ImageT, MaskT> 
-            detectionSet(imageToConvolve, lsst::afw::detection::Threshold(footprintDetectionThreshold, lsst::detection::Threshold::VALUE));
+        lsst::afw::detection::DetectionSet<ImageT, MaskT> 
+            detectionSet(imageToConvolve, lsst::afw::detection::Threshold(footprintDetectionThreshold, 
+                                                                          lsst::afw::detection::Threshold::VALUE));
         
         /* get the footprints */
         footprintListIn = detectionSet.getFootprints();
@@ -353,7 +353,7 @@ std::vector<lsst::afw::detection::Footprint::PtrType> lsst::ip::diffim::getColle
                                       footprintListIn.size(), footprintDetectionThreshold);
         
         nCleanFootprints = 0;
-        for (std::vector<lsst::afw::detection::Footprint::PtrType>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
+        for (std::vector<lsst::afw::detection::Footprint::Ptr>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
             /* footprint has not enough pixels */
             if (static_cast<unsigned int>((*i)->getNpix()) < footprintDiffimNpixMin) {
                 continue;
@@ -368,7 +368,7 @@ std::vector<lsst::afw::detection::Footprint::PtrType> lsst::ip::diffim::getColle
             try {
                 imageToConvolveFootprintPtr = imageToConvolve.getSubImage(fpBBox);
                 imageToNotConvolveFootprintPtr = imageToNotConvolve.getSubImage(fpBBox);
-            } catch (lsst::pex::exceptions::ExceptionStack &e) {
+            } catch (pexExcept::Exception& e) {
                 lsst::pex::logging::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
                                               "Exception caught extracting Footprint");
                 lsst::pex::logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
@@ -466,11 +466,11 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
     
     kiter = kernelInBasisList.begin();
     citer = convolvedImageList.begin();
-    unsigned int startCol = (*kiter)->getCtrCol();
-    unsigned int startRow = (*kiter)->getCtrRow();
+    unsigned int startCol = (*kiter)->getCtrX();
+    unsigned int startRow = (*kiter)->getCtrY();
 
-    unsigned int endCol   = (*citer)->getCols() - ((*kiter)->getCols() - (*kiter)->getCtrCol()) + 1;
-    unsigned int endRow   = (*citer)->getRows() - ((*kiter)->getRows() - (*kiter)->getCtrRow()) + 1;
+    unsigned int endCol   = (*citer)->getWidth()  - ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
+    unsigned int endRow   = (*citer)->getHeight() - ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
     
     std::vector<lsst::afw::image::MaskedPixelAccessor<ImageT, MaskT> > convolvedAccessorRowList;
     for (citer = convolvedImageList.begin(); citer != convolvedImageList.end(); ++citer) {
@@ -641,15 +641,16 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
             
             // Insanity checking
             if (std::isnan( gsl_vector_get(X,idx) )) {
-                throw lsst::pex::exceptions::DomainError("Unable to determine kernel solution (nan)");
+                throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution (nan)");
             }
             if (std::isnan( gsl_matrix_get(Cov, idx, idx) )) {
-                throw lsst::pex::exceptions::DomainError("Unable to determine kernel uncertainty (nan)");
+                throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel uncertainty (nan)");
             }
             if (gsl_matrix_get(Cov, idx, idx) < 0.0) {
-                throw lsst::pex::exceptions::DomainError(
-                    boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % gsl_matrix_get(Cov, idx, idx)
-                    );
+                throw LSST_EXCEPT(pexExcept::Exception,
+                                  boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                                  gsl_matrix_get(Cov, idx, idx)
+                                  );
             }
 
             kValues[idx]    = gsl_vector_get(X, idx)
@@ -665,13 +666,13 @@ std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKerne
     
     // Estimate of Background and Background Error */
     if (std::isnan( gsl_matrix_get(Cov, nParameters-1, nParameters-1) )) {
-        throw lsst::pex::exceptions::DomainError("Unable to determine kernel uncertainty (nan)");
+        throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel uncertainty (nan)");
     }
     if (gsl_matrix_get(Cov, nParameters-1, nParameters-1) < 0.0) {
-        throw lsst::pex::exceptions::DomainError(
-            boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
-            gsl_matrix_get(Cov, nParameters-1, nParameters-1) 
-            );
+        throw LSST_EXCEPT(pexExcept::Exception, 
+                          boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                          gsl_matrix_get(Cov, nParameters-1, nParameters-1) 
+                          );
     }
 
     background      = gsl_vector_get(X, nParameters-1);
@@ -881,68 +882,68 @@ void lsst::ip::diffim::addFunctionToImage(
 
 // Explicit instantiations
 
-template class lsst::ip::diffim::DifferenceImageStatistics<float, lsst::afw::image::maskPixel>;
-template class lsst::ip::diffim::DifferenceImageStatistics<double, lsst::afw::image::maskPixel>;
+template class lsst::ip::diffim::DifferenceImageStatistics<float, lsst::afw::image::MaskPixel>;
+template class lsst::ip::diffim::DifferenceImageStatistics<double, lsst::afw::image::MaskPixel>;
 
 /* */
 
 template 
-lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> lsst::ip::diffim::convolveAndSubtract(
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> lsst::ip::diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::afw::math::Kernel const &convolutionKernel,
     double background);
 
 template 
-lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> lsst::ip::diffim::convolveAndSubtract(
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> lsst::ip::diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::afw::math::Kernel const &convolutionKernel,
     double background);
 
 template 
-lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> lsst::ip::diffim::convolveAndSubtract(
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> lsst::ip::diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
     double background);
 
 template 
-lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> lsst::ip::diffim::convolveAndSubtract(
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> lsst::ip::diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
     double background);
 
 /* */
 
 template 
-lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> lsst::ip::diffim::convolveAndSubtract(
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> lsst::ip::diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::afw::math::Kernel const &convolutionKernel,
     lsst::afw::math::Function2<double> const &backgroundFunction);
 
 template 
-lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> lsst::ip::diffim::convolveAndSubtract(
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> lsst::ip::diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::afw::math::Kernel const &convolutionKernel,
     lsst::afw::math::Function2<double> const &backgroundFunction);
 
 
 template 
-lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> lsst::ip::diffim::convolveAndSubtract(
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> lsst::ip::diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
     lsst::afw::math::Function2<double> const &backgroundFunction);
 
 
 template 
-lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> lsst::ip::diffim::convolveAndSubtract(
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> lsst::ip::diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
     lsst::afw::math::Function2<double> const &backgroundFunction);
 
@@ -952,24 +953,24 @@ lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> lsst::ip::dif
 template
 std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint_Legacy(
     double &background,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
     lsst::pex::policy::Policy &policy);
 
 template
 std::vector<double> lsst::ip::diffim::computePsfMatchingKernelForFootprint_Legacy(
     double &background,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
     lsst::pex::policy::Policy &policy);
 
 template
 void lsst::ip::diffim::computePsfMatchingKernelForFootprint(
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToNotConvolve,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &varianceImage,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &varianceImage,
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
     lsst::pex::policy::Policy                  &policy,
     boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
@@ -979,9 +980,9 @@ void lsst::ip::diffim::computePsfMatchingKernelForFootprint(
 
 template
 void lsst::ip::diffim::computePsfMatchingKernelForFootprint(
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToNotConvolve,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &varianceImage,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &varianceImage,
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
     lsst::pex::policy::Policy                  &policy,
     boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
@@ -991,52 +992,52 @@ void lsst::ip::diffim::computePsfMatchingKernelForFootprint(
 
 template
 std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKernelForFootprintGSL(
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToNotConvolve,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &varianceImage,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &varianceImage,
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
     lsst::pex::policy::Policy &policy);
 
 template
 std::vector<std::pair<double,double> > lsst::ip::diffim::computePsfMatchingKernelForFootprintGSL(
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToNotConvolve,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &varianceImage,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &varianceImage,
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
     lsst::pex::policy::Policy &policy);
 
 template
-std::vector<lsst::afw::detection::Footprint::PtrType> lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+std::vector<lsst::afw::detection::Footprint::Ptr> lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching(
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::pex::policy::Policy &policy);
 
 template
-std::vector<lsst::afw::detection::Footprint::PtrType> lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &imageToNotConvolve,
+std::vector<lsst::afw::detection::Footprint::Ptr> lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching(
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &imageToNotConvolve,
     lsst::pex::policy::Policy &policy);
 
 template
 bool lsst::ip::diffim::maskOk(
-    lsst::afw::image::Mask<lsst::afw::image::maskPixel> const &inputMask,
-    lsst::afw::image::maskPixel const badPixelMask);
+    lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const &inputMask,
+    lsst::afw::image::MaskPixel const badPixelMask);
 
 template
 void lsst::ip::diffim::calculateMaskedImageStatistics(
     int &nGoodPixels,
     double &mean,
     double &variance,
-    lsst::afw::image::MaskedImage<float, lsst::afw::image::maskPixel> const &inputImage,
-    lsst::afw::image::maskPixel const badPixelMask);
+    lsst::afw::image::MaskedImage<float, lsst::afw::image::MaskPixel> const &inputImage,
+    lsst::afw::image::MaskPixel const badPixelMask);
 
 template
 void lsst::ip::diffim::calculateMaskedImageStatistics(
     int &nGoodPixels,
     double &mean,
     double &variance,
-    lsst::afw::image::MaskedImage<double, lsst::afw::image::maskPixel> const &inputImage,
-    lsst::afw::image::maskPixel const badPixelMask);
+    lsst::afw::image::MaskedImage<double, lsst::afw::image::MaskPixel> const &inputImage,
+    lsst::afw::image::MaskPixel const badPixelMask);
 
 template
 void lsst::ip::diffim::calculateImageStatistics(
@@ -1311,15 +1312,16 @@ void lsst::ip::diffim::computePsfMatchingKernelForFootprint(
             
             // Insanity checking
             if (std::isnan(kSolution[idx])) {
-                throw lsst::pex::exceptions::DomainError("Unable to determine kernel solution (nan)");
+                throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution (nan)");
             }
             if (std::isnan(kError[idx][idx])) {
-                throw lsst::pex::exceptions::DomainError("Unable to determine kernel uncertainty (nan)");
+                throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel uncertainty (nan)");
             }
             if (kError[idx][idx] < 0.0) {
-                throw lsst::pex::exceptions::DomainError(
-                    boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % kError[idx][idx]
-                    );
+                throw LSST_EXCEPT(pexExcept::Exception
+                                  boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                                  kError[idx][idx]
+                                  );
             }
 
             kValues[idx]    = kSolution[idx];
@@ -1335,12 +1337,13 @@ void lsst::ip::diffim::computePsfMatchingKernelForFootprint(
     
     // Estimate of Background and Background Error */
     if (std::isnan(kError[nParameters-1][nParameters-1])) {
-        throw lsst::pex::exceptions::DomainError("Unable to determine background uncertainty (nan)");
+        throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine background uncertainty (nan)");
     }
     if (kError[nParameters-1][nParameters-1] < 0.0) {
-        throw lsst::pex::exceptions::DomainError(
-            boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % kError[nParameters-1][nParameters-1]
-            );
+        throw LSST_EXCEPT(pexExcept::Exception,
+                          boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % 
+                          kError[nParameters-1][nParameters-1]
+                          );
     }
     background      = kSolution[nParameters-1];
     backgroundError = sqrt(kError[nParameters-1][nParameters-1]);

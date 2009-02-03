@@ -11,6 +11,7 @@
 
 #include <lsst/afw/image/Mask.h>
 #include <lsst/afw/image/Image.h>
+#include <lsst/afw/detection/Footprint.h>
 
 #include <lsst/pex/exceptions/Exception.h>
 #include <lsst/pex/logging/Trace.h>
@@ -138,7 +139,7 @@ bool SpatialModelCell<ImageT, MaskT>::isUsable() {
 }
 
 template <typename ImageT, typename MaskT>
-lsst::detection::Footprint::PtrType SpatialModelCell<ImageT, MaskT>::getFootprint(int i) {
+lsst::afw::detection::Footprint::Ptr SpatialModelCell<ImageT, MaskT>::getFootprint(int i) {
     if ( (i < 0) || (i >= this->_nModels) ) {
         throw lsst::pex::exceptions::DomainError("Index out of range");
     }        

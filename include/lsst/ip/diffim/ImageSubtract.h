@@ -104,8 +104,8 @@ namespace diffim {
      * @param nRows  Number of columns in the set
      */    
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateDeltaFunctionKernelSet(
-        unsigned int nCols,
-        unsigned int nRows
+        unsigned int width,
+        unsigned int height
         );
 
     /** Build a set of Alard/Lupton basis kernels
@@ -118,8 +118,8 @@ namespace diffim {
      * @param degGauss  Local spatial variation of bases
      */    
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateAlardLuptonKernelSet(
-        unsigned int nCols,
-        unsigned int nRows,
+        unsigned int width,
+        unsigned int height,
         std::vector<double> const &sigGauss,
         std::vector<double> const &degGauss
         );
@@ -203,7 +203,7 @@ namespace diffim {
      * @param policy  Policy for operations; in particular object detection
      */    
     template <typename ImageT, typename MaskT>
-    std::vector<lsst::afw::detection::Footprint::PtrType> getCollectionOfFootprintsForPsfMatching(
+    std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
         lsst::pex::policy::Policy &policy

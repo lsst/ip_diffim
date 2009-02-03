@@ -17,7 +17,7 @@
 #include <lsst/afw/math/Kernel.h>
 #include <lsst/afw/math/KernelFunctions.h>
 #include <lsst/pex/policy/Policy.h>
-#include <lsst/detection/Footprint.h>
+#include <lsst/afw/detection/Footprint.h>
 
 #include <lsst/ip/diffim/SpatialModelBase.h>
 #include <lsst/ip/diffim/ImageSubtract.h>
@@ -62,7 +62,7 @@ namespace diffim {
          * @param policy  Policy for operations
          * @param build  Build upon construction?  Default is false.
          */
-        SpatialModelKernel(lsst::detection::Footprint::PtrType fpPtr,
+        SpatialModelKernel(lsst::afw::detection::Footprint::Ptr fpPtr,
                            MaskedImagePtr miToConvolveParentPtr,
                            MaskedImagePtr miToNotConvolveParentPtr,
                            lsst::afw::math::KernelList<lsst::afw::math::Kernel> kBasisList,
@@ -89,10 +89,10 @@ namespace diffim {
          *
          * @param fpPtr  pointer to Footprint
          */
-        void setFootprintPtr(lsst::detection::Footprint::PtrType fpPtr) {_fpPtr = fpPtr;};
+        void setFootprintPtr(lsst::afw::detection::Footprint::Ptr fpPtr) {_fpPtr = fpPtr;};
         /** Get Footprint pointer for the Kernel model
          */
-        lsst::detection::Footprint::PtrType getFootprintPtr() {return _fpPtr;};
+        lsst::afw::detection::Footprint::Ptr getFootprintPtr() {return _fpPtr;};
 
         /** Set template's MaskedImage pointer for the Kernel model
          *
@@ -194,7 +194,7 @@ namespace diffim {
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> _kBasisList; ///< List of basis functions for Kernel
         lsst::pex::policy::Policy _policy;          ///< Policy file for operations
 
-        lsst::detection::Footprint::PtrType _fpPtr; ///< Footprint containing pixels used to build Kernel
+        lsst::afw::detection::Footprint::Ptr _fpPtr; ///< Footprint containing pixels used to build Kernel
         MaskedImagePtr _miToConvolvePtr;            ///< Subimage of _miToConvolveParentPtr
         MaskedImagePtr _miToNotConvolvePtr;         ///< Subimage of _miToNotConvolveParentPtr
 

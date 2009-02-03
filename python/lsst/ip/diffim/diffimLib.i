@@ -173,6 +173,7 @@ SWIG_SHARED_PTR(SpatialModelCellD, lsst::ip::diffim::SpatialModelCell<double, ls
 
 /******************************************************************************/
 
+/*
 %{
 #include "lsst/ip/diffim/Pca.h"
 %}
@@ -185,6 +186,7 @@ SWIG_SHARED_PTR(SpatialModelCellD, lsst::ip::diffim::SpatialModelCell<double, ls
 %template(decomposeMatrixUsingBasis)     lsst::ip::diffim::decomposeMatrixUsingBasis<vw::math::Matrix<double> >;
 %template(approximateMatrixUsingBasis)   lsst::ip::diffim::approximateMatrixUsingBasis<vw::math::Matrix<float> >;
 %template(approximateMatrixUsingBasis)   lsst::ip::diffim::approximateMatrixUsingBasis<vw::math::Matrix<double> >;
+*/
 
 /******************************************************************************/
 

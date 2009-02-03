@@ -12,6 +12,7 @@
 #include <lsst/afw/image/Mask.h>
 #include <lsst/afw/image/Image.h>
 #include <lsst/afw/math/Kernel.h>
+#include <lsst/afw/detection/Footprint.h>
 #include <lsst/daf/base.h>
 
 #include <lsst/pex/policy/Policy.h>
@@ -19,6 +20,8 @@
 
 #include <lsst/ip/diffim/SpatialModelBase.h>
 #include <lsst/ip/diffim/SpatialModelKernel.h>
+
+namespace pexExcept = lsst::pex::exceptions; 
 
 namespace lsst {
 namespace ip {
@@ -31,7 +34,7 @@ SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel() :
 
 template <typename ImageT, typename MaskT>
 SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel(
-    lsst::detection::Footprint::PtrType fpPtr,
+    lsst::afw::detection::Footprint::Ptr fpPtr,
     MaskedImagePtr miToConvolveParentPtr,
     MaskedImagePtr miToNotConvolveParentPtr,
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> kBasisList,
@@ -53,34 +56,35 @@ SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel(
 template <typename ImageT, typename MaskT>
 bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
 
-    typedef lsst::afw::image::Image<double>::pixel_accessor pixelAccessor;
-
     if (this->getBuildStatus() == true) {
         return false;
     }
 
     // fill in information on position in the image
-    vw::BBox2i   fpBBox = this->_fpPtr->getBBox();
-    vw::Vector2i fpMin  = fpBBox.min();
-    vw::Vector2i fpMax  = fpBBox.max();
-    this->setColcNorm(float(fpMin.x() + fpMax.x()) / this->_miToConvolveParentPtr->getCols() - 1.0);
-    this->setRowcNorm(float(fpMin.y() + fpMax.y()) / this->_miToConvolveParentPtr->getRows() - 1.0);
+    lsst::afw::image::BBox fpBBox = this->_fpPtr->getBBox();
+    this->setColcNorm(float(fpBBox.getX0() + fpBBox.getX1()) / this->_miToConvolveParentPtr->getWidth() - 1.0);
+    this->setRowcNorm(float(fpBBox.getY0() + fpBBox.getY1()) / this->_miToConvolveParentPtr->getHeight() - 1.0);
 
     lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                                   "Footprint = %d,%d -> %d,%d",
-                                  fpBBox.min().x(), fpBBox.min().y(),
-                                  fpBBox.max().x(), fpBBox.max().y());
+                                  fpBBox.getX0(), fpBBox.getY0(),
+                                  fpBBox.getX1(), fpBBox.getY1());
 
     // Fill in information on the actual pixels used
-    MaskedImagePtr miToConvolvePtr    = this->_miToConvolveParentPtr->getSubImage(fpBBox);
-    MaskedImagePtr miToNotConvolvePtr = this->_miToNotConvolveParentPtr->getSubImage(fpBBox);
+    MaskedImagePtr miToConvolvePtr    = MaskedImagePtr ( 
+        new lsst::afw::image::MaskedImage<ImageT, MaskT>(*(this->_miToConvolveParentPtr), fpBBox)
+        );
+
+    MaskedImagePtr miToNotConvolvePtr = MaskedImagePtr ( 
+        new lsst::afw::image::MaskedImage<ImageT, MaskT>(*(this->_miToNotConvolveParentPtr), fpBBox)
+        );
     this->_miToConvolvePtr = miToConvolvePtr;
     this->_miToNotConvolvePtr = miToNotConvolvePtr;
 
     // Estimate of the variance for first kernel pass
     lsst::afw::image::MaskedImage<ImageT, MaskT> varEstimate = 
-        lsst::afw::image::MaskedImage<ImageT, MaskT>(this->_miToConvolvePtr->getCols(), 
-                                                     this->_miToConvolvePtr->getRows());
+        lsst::afw::image::MaskedImage<ImageT, MaskT>(this->_miToConvolvePtr->getWidth(), 
+                                                     this->_miToConvolvePtr->getHeight());
     varEstimate += *(this->_miToNotConvolvePtr);
     varEstimate -= *(this->_miToConvolvePtr);
     
@@ -96,7 +100,7 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
                                              this->_policy, 
                                              kernelPtr, kernelErrorPtr,
                                              background, backgroundError);
-    } catch (lsst::pex::exceptions::ExceptionStack &e) {
+    } catch (pexExcept::Exception& e) {
         this->setSdqaStatus(false);
         lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                                       "Exception caught from computePsfMatchingKernelForFootprint"); 
@@ -109,9 +113,8 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
     double kSum = 0.;
     unsigned int kCols = this->_policy.getInt("kernelCols");
     unsigned int kRows = this->_policy.getInt("kernelRows");
-    lsst::afw::image::Image<double> kImage = 
-        lsst::afw::image::Image<double>(kCols, kRows);
-    kImage = kernelPtr->computeNewImage(kSum, false);
+    lsst::afw::image::Image<double> kImage(kCols, kRows);
+    kSum = kernelPtr->computeImage(kImage, false);
 
     // Create difference image and calculate associated statistics
     lsst::afw::image::MaskedImage<ImageT, MaskT> diffIm = convolveAndSubtract( *(this->_miToConvolvePtr),
@@ -139,12 +142,12 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
                                                      this->_policy, 
                                                      kernelPtr, kernelErrorPtr,
                                                      background, backgroundError);
-            } catch (lsst::pex::exceptions::ExceptionStack &e) {
+            } catch (pexExcept::Exception& e) {
                 throw;
             }
             
             kSum    = 0.;
-            kImage  = kernelPtr->computeNewImage(kSum, false);
+            kSum = kernelPtr->computeImage(kImage, false);
             diffIm  = convolveAndSubtract( *(this->_miToConvolvePtr),
                                            *(this->_miToNotConvolvePtr),
                                            *(kernelPtr), 
@@ -157,7 +160,7 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
                                           kStats.getResidualMean(),
                                           kStats.getResidualStd());
             
-        } catch (lsst::pex::exceptions::ExceptionStack &e) {
+        } catch (pexExcept::Exception& e) {
             lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                                           "Exception caught from computePsfMatchingKernelForFootprint, reverting to first solution");
             lsst::pex::logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
@@ -193,8 +196,8 @@ double SpatialModelKernel<ImageT, MaskT>::returnSdqaRating() {
 }
 
 // Explicit instantiations
-template class SpatialModelKernel<float, lsst::afw::image::maskPixelType>;
-template class SpatialModelKernel<double, lsst::afw::image::maskPixelType>;
+template class SpatialModelKernel<float, lsst::afw::image::MaskPixel>;
+template class SpatialModelKernel<double, lsst::afw::image::MaskPixel>;
 
 }}} // end of namespace lsst::ip::diffim
 

@@ -18,7 +18,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include <lsst/afw/image/Mask.h>
-#include <lsst/detection/Footprint.h>
+#include <lsst/afw/detection/Footprint.h>
 
 #include <lsst/ip/diffim/SpatialModelBase.h>
 #include <lsst/ip/diffim/SpatialModelKernel.h>
@@ -55,7 +55,7 @@ namespace diffim {
         typedef typename SpatialModelKernel<ImageT, MaskT>::Ptr SpatialModel;
         typedef std::vector<SpatialModel> ModelPtrList;
 
-        typedef std::vector<lsst::detection::Footprint::PtrType> FpPtrList;
+        typedef std::vector<lsst::afw::detection::Footprint::Ptr> FpPtrList;
         
         /** Constructor
          *
@@ -88,7 +88,7 @@ namespace diffim {
 
         /** Get current footprint
          */
-        lsst::detection::Footprint::PtrType getCurrentFootprint() {return _fpPtrList[_currentID];};
+        lsst::afw::detection::Footprint::Ptr getCurrentFootprint() {return _fpPtrList[_currentID];};
         
         /** Get current model
          */
@@ -98,7 +98,7 @@ namespace diffim {
          * 
          * @param i  index of footprint you want to retrieve
          */
-        lsst::detection::Footprint::PtrType getFootprint(int i);
+        lsst::afw::detection::Footprint::Ptr getFootprint(int i);
 
         /** Get model in list
          * 
