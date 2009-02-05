@@ -37,11 +37,11 @@ namespace diffim {
      *
      * @note This class will be deprecated as soon as Sdqa classes are implemented
      */
-    template <typename ImageT, typename MaskT>
+    template <typename ImageT>
     class DifferenceImageStatistics {
     public:
         DifferenceImageStatistics();
-        DifferenceImageStatistics(const lsst::afw::image::MaskedImage<ImageT, MaskT> differenceMaskedImage);
+        DifferenceImageStatistics(const lsst::afw::image::MaskedImage<ImageT> differenceMaskedImage);
 
         virtual ~DifferenceImageStatistics() {};
         void setResidualMean(double mean) {_residualMean = mean;}
@@ -62,8 +62,6 @@ namespace diffim {
      * @note Will replace maskOK subroutine.  Use this as an example to sort
      * through footprints for the "best" ones for difference imaging.
      *
-     * @note Need up update detection first
-     * 
      * Example usage : 
      *  FindSetBits<image::Mask<image::MaskPixel> > count(mask); 
      *  count.reset(); 
@@ -71,31 +69,28 @@ namespace diffim {
      *  nSet = count.getBits();
      * 
      */
-
-    /*
     template <typename MaskT>
-    class FindSetBits : public lsst::detection::FootprintFunctor<MaskT> {
+    class FindSetBits : public lsst::afw::detection::FootprintFunctor<MaskT> {
     public:
         FindSetBits(MaskT const& mask) : 
-            lsst::detection::FootprintFunctor<MaskT>(mask), _bits(0) {;}
+            lsst::afw::detection::FootprintFunctor<MaskT>(mask), _bits(0) {;}
         
         void operator()(typename MaskT::xy_locator loc, ///< locator pointing at the pixel
                         int x,                          ///< column-position of pixel
                         int y                           ///< row-position of pixel
-                        ) {
+            ) {
             _bits |= *loc;
         }
         
         // Return the bits set
         typename MaskT::Pixel getBits() const { return _bits; }
-
+        
         // Clear the accumulator
         void reset() { _bits = 0; }
-
+        
     private:
         typename MaskT::Pixel _bits;
     };
-    */
 
 
     /** Build a set of Delta Function basis kernels
@@ -135,10 +130,10 @@ namespace diffim {
      * @param convolutionKernelPtr  PSF-matching LinearCombinationKernelKernel used for convolution
      * @param background  Differential background value
      */    
-    template <typename ImageT, typename MaskT>
-    lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+    template <typename ImageT>
+    lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
+        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
         double background
         );
@@ -152,10 +147,10 @@ namespace diffim {
      * @param convolutionKernelPtr  PSF-matching Kernel used for convolution
      * @param background  Differential background value
      */    
-    template <typename ImageT, typename MaskT>
-    lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+    template <typename ImageT>
+    lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
+        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::afw::math::Kernel const &convolutionKernel,
         double background
         );
@@ -171,10 +166,10 @@ namespace diffim {
      * @param convolutionKernelPtr  PSF-matching LinearCombinationKernel used for convolution
      * @param background  Differential background function
      */    
-    template <typename ImageT, typename MaskT, typename FunctionT>
-    lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+    template <typename ImageT, typename FunctionT>
+    lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
+        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
         lsst::afw::math::Function2<FunctionT> const &backgroundFunction
         );
@@ -188,10 +183,10 @@ namespace diffim {
      * @param convolutionKernelPtr  PSF-matching Kernel used for convolution
      * @param background  Differential background function
      */    
-    template <typename ImageT, typename MaskT, typename FunctionT>
-    lsst::afw::image::MaskedImage<ImageT, MaskT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+    template <typename ImageT, typename FunctionT>
+    lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
+        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::afw::math::Kernel const &convolutionKernel,
         lsst::afw::math::Function2<FunctionT> const &backgroundFunction
         );
@@ -202,10 +197,10 @@ namespace diffim {
      * @param imageToNotConvolve  MaskedImage to subtract convolved template from
      * @param policy  Policy for operations; in particular object detection
      */    
-    template <typename ImageT, typename MaskT>
-    std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+    template <typename ImageT>
+    std::vector<lsst::afw::detection::Footprint> getCollectionOfFootprintsForPsfMatching(
+        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::pex::policy::Policy &policy
         );
     
@@ -224,11 +219,11 @@ namespace diffim {
      * @param background  Differential background
      * @param backgroundError  Uncertainty on differential background
      */    
-    template <typename ImageT, typename MaskT>
+    template <typename ImageT>
     void computePsfMatchingKernelForFootprint(
-        lsst::afw::image::MaskedImage<ImageT, MaskT>         const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT>         const &imageToNotConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT>         const &varianceImage,
+        lsst::afw::image::MaskedImage<ImageT>         const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT>         const &imageToNotConvolve,
+        lsst::afw::image::MaskedImage<ImageT>         const &varianceImage,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
         lsst::pex::policy::Policy                  &policy,
         boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
@@ -245,24 +240,13 @@ namespace diffim {
      * @param kernelInBasisList  Input kernel basis set
      * @param policy  Policy for operations; in particular object detection
      */    
-    template <typename ImageT, typename MaskT>
+    template <typename ImageT>
     std::vector<double> computePsfMatchingKernelForFootprint_Legacy(
         double &background,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
         lsst::pex::policy::Policy &policy
-        );
-
-    /** Searches through Mask for bit badPixelMask
-     *
-     * @param inputMask  Input Mask to search through
-     * @param badPixelMask  Mask bit to search for
-     */
-    template <typename MaskT>
-    bool maskOk(
-        lsst::afw::image::Mask<MaskT> const &inputMask,
-        MaskT const badPixelMask
         );
 
     /** Calculate pixel statistics of a MaskedImage
@@ -282,7 +266,7 @@ namespace diffim {
         int &nGoodPixels,
         double &mean,
         double &variance,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &inputImage,
+        lsst::afw::image::MaskedImage<ImageT> const &inputImage,
         MaskT const badPixelMask
         );
 
@@ -297,29 +281,12 @@ namespace diffim {
      * @param variance  Returned variance of pixel values
      * @param inputImage  MaskedImage to calculate statistics for
      */
-    template <typename ImageT, typename MaskT>
+    template <typename ImageT>
     void calculateMaskedImageStatistics(
         int &nGoodPixels,
         double &mean,
         double &variance,
-        lsst::afw::image::MaskedImage<ImageT, MaskT> const &inputImage
-        );
-
-    /** Calculate pixel statistics of an Image
-     *
-     * @note This should eventually be replaced by afw::math functions
-     *
-     * @param nGoodPixels  Returned number of pixels in the calculation
-     * @param mean  Returned mean of pixel values
-     * @param variance  Returned variance of pixel values
-     * @param inputImage  Image to calculate statistics for
-     */
-    template <typename ImageT>
-    void calculateImageStatistics(
-        int &nGoodPixels,
-        double &mean,
-        double &variance,
-        lsst::afw::image::Image<ImageT> const &inputImage
+        lsst::afw::image::MaskedImage<ImageT> const &inputImage
         );
 
     /** Add a spatially varying function to an Image
