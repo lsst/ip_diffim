@@ -54,7 +54,12 @@ std::vector<lsst::detection::Footprint::PtrType> lsst::ip::diffim::getCollection
     lsst::afw::image::MaskedImage<ImageT, MaskT> const &imageToNotConvolve, ///< Science image; is not convolved
     lsst::pex::policy::Policy &policy ///< Policy directing the behavior
     ) {
-    
+
+    // This is a hack to prevent what appears to be a memory problem from
+    // disabling this function.  This was added to get DC2 pipelines running
+    // under the DC3 stack.  
+    std::cerr.good();
+
     /* Parse the Policy */
     unsigned int footprintDiffimNpixMin = policy.getInt("getCollectionOfFootprintsForPsfMatching.footprintDiffimNpixMin");
     unsigned int footprintDiffimGrow = policy.getInt("getCollectionOfFootprintsForPsfMatching.footprintDiffimGrow");
