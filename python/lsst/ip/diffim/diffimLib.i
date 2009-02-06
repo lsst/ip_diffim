@@ -41,7 +41,6 @@ namespace boost {
 
 %include "lsst/p_lsstSwig.i"
 %include "lsst/daf/base/persistenceMacros.i"
-%include "lsst/detection/detectionLib.i"
 
 %import  "lsst/afw/image/imageLib.i" 
 
@@ -105,11 +104,9 @@ def version(HeadURL = r"$HeadURL$"):
 
 %template(calculateMaskedImageStatistics)
     lsst::ip::diffim::calculateMaskedImageStatistics<float>;
-%template(calculateMaskedStatistics)
+%template(calculateMaskedImageStatistics)
     lsst::ip::diffim::calculateMaskedImageStatistics<double>;
 
-%template(calculateImageStatistics)         lsst::ip::diffim::calculateImageStatistics<float>;
-%template(calculateImageStatistics)         lsst::ip::diffim::calculateImageStatistics<double>;
 %template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, double>;
 %template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, double>;
 %template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, float>;
