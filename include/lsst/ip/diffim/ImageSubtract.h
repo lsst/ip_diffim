@@ -98,7 +98,7 @@ namespace diffim {
      *
      * @ingroup diffim
      *
-     * @note Count the total flux within the footprint
+     * @note Count the total flux within the footprint, excluding masked pixels
      * 
      * @note Still needs a background model to correct for
      *
@@ -107,23 +107,70 @@ namespace diffim {
     class FindCounts : public lsst::afw::detection::FootprintFunctor<ImageT> {
     public:
         FindCounts(lsst::afw::image::MaskedImage<ImageT> const &mimage) : 
-            lsst::afw::detection::FootprintFunctor<ImageT>(mimage), _counts(0.0) {;}
+            lsst::afw::detection::FootprintFunctor<ImageT>(mimage), _counts(0.) {;}
         
         void operator()(typename ImageT::xy_locator loc, ///< locator pointing at the pixel
                         int x,                           ///< column-position of pixel
                         int y                            ///< row-position of pixel
             ) {
-            _counts += *loc;
+            if (*loc.mask() == 0)
+                _counts += *loc.image();
         }
         
         // Return the total counts
         double getCounts() const { return _counts; }
         
         // Clear the accumulator
-        void reset() { _counts = 0; }
+        void reset() { _counts = 0.; }
         
     private:
-        typename ImageT::Pixel _counts;
+        double _counts;
+    };
+
+    /** Uses a functor to calculate difference image statistics
+     *
+     * @ingroup diffim
+     *
+     * @note Find mean and unbiased variance of pixel residuals in units of
+     * sqrt(variance)
+     * 
+     */
+    template <typename ImageT>
+    class ImageStatistics : public lsst::afw::detection::FootprintFunctor<ImageT> {
+    public:
+        ImageStatistics(lsst::afw::image::MaskedImage<ImageT> const &mimage) : 
+            lsst::afw::detection::FootprintFunctor<ImageT>(mimage), 
+            _xsum(0.), _x2sum(0.), _npix(0) {;}
+        
+        void operator()(typename ImageT::xy_locator loc, ///< locator pointing at the pixel
+                        int x,                           ///< column-position of pixel
+                        int y                            ///< row-position of pixel
+            ) {
+            if (*loc.mask() == 0) {
+                _xsum  += *loc.image() / sqrt(*loc.variance());
+                _x2sum += *loc.image() * *loc.image() / *loc.variance();
+                _npix  += 1;
+            }
+        }
+        
+        // Mean of distribution
+        double getMean() const { 
+            return (_npix > 0) ? _xsum/_npix : std::numeric_limits<double>::quiet_NaN(); 
+        }
+        // RMS of distribution 
+        double getVariance() const { 
+            return (_npix > 1) ? (_x2sum/_npix - getMean()*getMean()) * _npix/(_npix-1.) : std::numeric_limits<double>::quiet_NaN(); 
+        }
+        // Return the total counts
+        double getNpix() const { return _npix; }
+        
+        // Clear the accumulator
+        void reset() { _xsum = _x2sum = 0.; _npix = 0;}
+        
+    private:
+        double _xsum;
+        double _x2sum;
+        int    _npix;
     };
 
 
