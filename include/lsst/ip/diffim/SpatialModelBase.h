@@ -38,10 +38,10 @@ namespace diffim {
      * An abstract class.  Derived classes gain access to private variables
      * through the protected methods.
      */
-    template <typename ImageT, typename MaskT>
+    template <typename ImageT>
     class SpatialModelBase {
     public: 
-        typedef boost::shared_ptr<SpatialModelBase<ImageT, MaskT> > Ptr;
+        typedef boost::shared_ptr<SpatialModelBase<ImageT> > Ptr;
 
         /** Empty constructor
          */

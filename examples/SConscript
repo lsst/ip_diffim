@@ -2,7 +2,7 @@
 import sys
 Import("env")
 
-env.Program("smc", ["smc.cc"], LIBS=env.getlibs("ip_diffim"))
+# env.Program("smc", ["smc.cc"], LIBS=env.getlibs("ip_diffim"))
 
 
 #

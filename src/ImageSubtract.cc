@@ -159,7 +159,8 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     image::MaskedImage<ImageT> const &imageToConvolve,
     image::MaskedImage<ImageT> const &imageToNotConvolve,
     math::Kernel const &convolutionKernel,
-    double background
+    double background,
+    bool invert
     ) {
     
     logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
@@ -177,8 +178,11 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     convolvedMaskedImage += background;
     
     /* Do actual subtraction */
-    convolvedMaskedImage -= imageToNotConvolve;
-    convolvedMaskedImage *= -1.0;
+    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
+
+    /* Invert */
+    if (invert)
+        convolvedMaskedImage *= -1.0;
     
     return convolvedMaskedImage;
 }
@@ -196,7 +200,8 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     image::MaskedImage<ImageT> const &imageToConvolve,
     image::MaskedImage<ImageT> const &imageToNotConvolve,
     math::LinearCombinationKernel const &convolutionKernel,
-    double background
+    double background,
+    bool invert
     ) {
     
     logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
@@ -213,8 +218,11 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     convolvedMaskedImage += background;
     
     /* Do actual subtraction */
-    convolvedMaskedImage -= imageToNotConvolve;
-    convolvedMaskedImage *= -1.0;
+    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
+
+    /* Invert */
+    if (invert)
+        convolvedMaskedImage *= -1.0;
     
     return convolvedMaskedImage;
 }
@@ -232,7 +240,8 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     image::MaskedImage<ImageT> const &imageToConvolve,
     image::MaskedImage<ImageT> const &imageToNotConvolve,
     math::Kernel const &convolutionKernel,
-    math::Function2<FunctionT> const &backgroundFunction
+    math::Function2<FunctionT> const &backgroundFunction,
+    bool invert
     ) {
     
     logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
@@ -250,8 +259,11 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
     
     /* Do actual subtraction */
-    convolvedMaskedImage -= imageToNotConvolve;
-    convolvedMaskedImage *= -1.0;
+    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
+
+    /* Invert */
+    if (invert)
+        convolvedMaskedImage *= -1.0;
     
     return convolvedMaskedImage;
 }
@@ -269,7 +281,8 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     image::MaskedImage<ImageT> const &imageToConvolve,
     image::MaskedImage<ImageT> const &imageToNotConvolve,
     math::LinearCombinationKernel const &convolutionKernel,
-    math::Function2<FunctionT> const &backgroundFunction
+    math::Function2<FunctionT> const &backgroundFunction,
+    bool invert
     ) {
     
     logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
@@ -286,8 +299,11 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
     
     /* Do actual subtraction */
-    convolvedMaskedImage -= imageToNotConvolve;
-    convolvedMaskedImage *= -1.0;
+    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
+
+    /* Invert */
+    if (invert)
+        convolvedMaskedImage *= -1.0;
     
     return convolvedMaskedImage;
 }
@@ -311,7 +327,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  * @ingroup diffim
  */
 template <typename ImageT>
-std::vector<lsst::afw::detection::Footprint> diffim::getCollectionOfFootprintsForPsfMatching(
+std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
     image::MaskedImage<ImageT> const &imageToConvolve,    
     image::MaskedImage<ImageT> const &imageToNotConvolve, 
     lsst::pex::policy::Policy &policy                                       
@@ -326,17 +342,18 @@ std::vector<lsst::afw::detection::Footprint> diffim::getCollectionOfFootprintsFo
     double minimumDetectionThreshold    = policy.getDouble("minimumDetectionThreshold");
     
     // Grab mask bits from the image to convolve, since that is what we'll be operating on
-    int badMaskBit = imageToConvolve.getMask()->getMaskPlane("BAD");
-    image::MaskPixel badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
+    // Overridden now that we use the FootprintFunctor to look for any masked pixels
+    // int badMaskBit = imageToConvolve.getMask()->getMaskPlane("BAD");
+    // image::MaskPixel badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
     
     // List of Footprints
     std::vector<lsst::afw::detection::Footprint::Ptr> footprintListIn;
-    std::vector<lsst::afw::detection::Footprint> footprintListOut;
+    std::vector<lsst::afw::detection::Footprint::Ptr> footprintListOut;
 
     // Functors to search through the images for bad pixels within candidate footprints
-    diffim::FindSetBits<image::Mask<image::MaskPixel> > itcFunctor(imageToConvolve.getMask()); 
-    diffim::FindSetBits<image::Mask<image::MaskPixel> > itncFunctor(imageToNotConvolve.getMask()); 
-    
+    diffim::FindSetBits<image::Mask<image::MaskPixel> > itcFunctor(*(imageToConvolve.getMask())); 
+    diffim::FindSetBits<image::Mask<image::MaskPixel> > itncFunctor(*(imageToNotConvolve.getMask())); 
+ 
     int nCleanFootprints = 0;
     while ( (nCleanFootprints < minimumCleanFootprints) and (footprintDetectionThreshold > minimumDetectionThreshold) ) {
         footprintListIn.clear();
@@ -362,23 +379,23 @@ std::vector<lsst::afw::detection::Footprint> diffim::getCollectionOfFootprintsFo
             } 
             
             // Grow the footprint
-            lsst::afw::detection::Footprint fpGrow = 
+            lsst::afw::detection::Footprint::Ptr fpGrow = 
                 lsst::afw::detection::growFootprint(*i, footprintDiffimGrow);
 
             // Search for bad pixels within the footprint
             itcFunctor.reset();
-            itcFunctor.apply(fpGrow);
+            itcFunctor.apply(*fpGrow);
             if (itcFunctor.getBits() > 0) {
                 continue;
             }
             itncFunctor.reset();
-            itncFunctor.apply(fpGrow);
+            itncFunctor.apply(*fpGrow);
             if (itncFunctor.getBits() > 0) {
                 continue;
             }
 
             // Grab a subimage; there is an exception if its e.g. too close to the image */
-            image::BBox fpBBox = fpGrow.getBBox();
+            image::BBox fpBBox = (*fpGrow).getBBox();
             try {
                 lsst::afw::image::MaskedImage<ImageT> subImageToConvolve(imageToConvolve, fpBBox);
                 lsst::afw::image::MaskedImage<ImageT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
@@ -474,7 +491,7 @@ void diffim::computePsfMatchingKernelForFootprint(
                        **kiter,
                        false,
                        edgeMaskBit);
-        boost::shared_ptr<image::MaskedImage<ImageT> > imagePtr(image);
+        boost::shared_ptr<image::MaskedImage<ImageT> > imagePtr( new image::MaskedImage<ImageT>(image) );
         *citer = imagePtr;
     } 
     
@@ -515,7 +532,7 @@ void diffim::computePsfMatchingKernelForFootprint(
 
     std::vector<xy_locator> convolvedLocatorList;
     for (citer = convolvedImageList.begin(); citer != convolvedImageList.end(); ++citer) {
-        convolvedLocatorList.push_back( **citer.xy_at(startCol,startRow) );
+        convolvedLocatorList.push_back( (**citer).xy_at(startCol,startRow) );
     }
     xy_locator imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
     xy_locator imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
@@ -541,14 +558,14 @@ void diffim::computePsfMatchingKernelForFootprint(
                 kiterE = convolvedLocatorList.end();
 
             for (int kidxi = 0; kiteri != kiterE; ++kiteri, ++kidxi) {
-                ImageT cdImagei = (*kiteri)->image();
+                ImageT cdImagei = (*kiteri).image();
                 
                 // kernel index j
                 typename std::vector<xy_locator>::iterator 
                     kiterj = kiteri;
 
                 for (int kidxj = kidxi; kiterj != kiterE; ++kiterj, ++kidxj) {
-                    ImageT cdImagej = (*kiterj)->image();
+                    ImageT cdImagej = (*kiterj).image();
                     
                     *gsl_matrix_ptr(M, kidxi, kidxj) += cdImagei * cdImagej * iVariance;
                 } 
@@ -672,9 +689,9 @@ void diffim::computePsfMatchingKernelForFootprint(
             }
             if (gsl_matrix_get(Cov, idx, idx) < 0.0) {
                 throw LSST_EXCEPT(exceptions::Exception,
-                                  boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
-                                  gsl_matrix_get(Cov, idx, idx)
-                                  );
+                                  str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                                      gsl_matrix_get(Cov, idx, idx)
+                                      ));
             }
             
             kValues[idx]    = gsl_vector_get(X, idx);
@@ -692,9 +709,9 @@ void diffim::computePsfMatchingKernelForFootprint(
     }
     if (gsl_matrix_get(Cov, nParameters-1, nParameters-1) < 0.0) {
         throw LSST_EXCEPT(exceptions::Exception, 
-                          boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
-                          gsl_matrix_get(Cov, nParameters-1, nParameters-1) 
-                          );
+                          str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                              gsl_matrix_get(Cov, nParameters-1, nParameters-1) 
+                              ));
     }
     background      = gsl_vector_get(X, nParameters-1);
     backgroundError = sqrt(gsl_matrix_get(Cov, nParameters-1, nParameters-1));
@@ -803,32 +820,28 @@ void diffim::calculateMaskedImageStatistics(
 /** 
  * @brief Adds a Function to an Image
  *
+ * @note MAJOR NOTE; I need to check if my scaling of the image range from -1 to
+ * 1 gets messed up here.  ACB.
+ *
  * @ingroup diffim
  */
-template <typename PixelT, typename FunctionT>
+template <typename ImageT, typename FunctionT>
 void diffim::addFunctionToImage(
-    image::Image<PixelT> &image,
+    image::Image<ImageT> &image,
     math::Function2<FunctionT> const &function
     ) {
 
     // Set the pixels row by row, to avoid repeated checks for end-of-row
     for (int y = 0; y != image.getHeight(); ++y) {
+        double yPos = image::positionToIndex(y);
+        
+        int x = 0;
         for (typename image::Image<ImageT>::x_iterator ptr = image.row_begin(y); 
-             ptr != image.row_end(y); ++ptr) {
+             ptr != image.row_end(y); ++ptr, ++x) {
+            
+            double xPos = image::positionToIndex(x);
+            *ptr += static_cast<ImageT>(function(xPos, yPos));
 
-        }
-    }
-
-    typedef typename image::Image<PixelT>::pixel_accessor imageAccessorType;
-    unsigned int numCols = image.getCols();
-    unsigned int numRows = image.getRows();
-    imageAccessorType imRow = image.origin();
-    for (unsigned int row = 0; row < numRows; ++row, imRow.next_row()) {
-        imageAccessorType imCol = imRow;
-        double rowPos = image::positionToIndex(row);
-        for (unsigned int col = 0; col < numCols; ++col, imCol.next_col()) {
-            double colPos = image::positionToIndex(col);
-            *imCol += static_cast<PixelT>(function(colPos, rowPos));
         }
     }
 }
@@ -838,35 +851,7 @@ void diffim::addFunctionToImage(
 template class diffim::DifferenceImageStatistics<float>;
 template class diffim::DifferenceImageStatistics<double>;
 
-/* */
-
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const &imageToConvolve,
-    image::MaskedImage<float> const &imageToNotConvolve,
-    math::Kernel const &convolutionKernel,
-    double background);
-
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const &imageToConvolve,
-    image::MaskedImage<double> const &imageToNotConvolve,
-    math::Kernel const &convolutionKernel,
-    double background);
-
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const &imageToConvolve,
-    image::MaskedImage<float> const &imageToNotConvolve,
-    math::LinearCombinationKernel const &convolutionKernel,
-    double background);
-
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const &imageToConvolve,
-    image::MaskedImage<double> const &imageToNotConvolve,
-    math::LinearCombinationKernel const &convolutionKernel,
-    double background);
+// template class diffim::FindSetBits<image::MaskPixel>;
 
 /* */
 
@@ -875,14 +860,50 @@ image::MaskedImage<float> diffim::convolveAndSubtract(
     image::MaskedImage<float> const &imageToConvolve,
     image::MaskedImage<float> const &imageToNotConvolve,
     math::Kernel const &convolutionKernel,
-    math::Function2<double> const &backgroundFunction);
+    double background,
+    bool invert);
 
 template 
 image::MaskedImage<double> diffim::convolveAndSubtract(
     image::MaskedImage<double> const &imageToConvolve,
     image::MaskedImage<double> const &imageToNotConvolve,
     math::Kernel const &convolutionKernel,
-    math::Function2<double> const &backgroundFunction);
+    double background,
+    bool invert);
+
+template 
+image::MaskedImage<float> diffim::convolveAndSubtract(
+    image::MaskedImage<float> const &imageToConvolve,
+    image::MaskedImage<float> const &imageToNotConvolve,
+    math::LinearCombinationKernel const &convolutionKernel,
+    double background,
+    bool invert);
+
+template 
+image::MaskedImage<double> diffim::convolveAndSubtract(
+    image::MaskedImage<double> const &imageToConvolve,
+    image::MaskedImage<double> const &imageToNotConvolve,
+    math::LinearCombinationKernel const &convolutionKernel,
+    double background,
+    bool invert);
+
+/* */
+
+template 
+image::MaskedImage<float> diffim::convolveAndSubtract(
+    image::MaskedImage<float> const &imageToConvolve,
+    image::MaskedImage<float> const &imageToNotConvolve,
+    math::Kernel const &convolutionKernel,
+    math::Function2<double> const &backgroundFunction,
+    bool invert);
+
+template 
+image::MaskedImage<double> diffim::convolveAndSubtract(
+    image::MaskedImage<double> const &imageToConvolve,
+    image::MaskedImage<double> const &imageToNotConvolve,
+    math::Kernel const &convolutionKernel,
+    math::Function2<double> const &backgroundFunction,
+    bool invert);
 
 
 template 
@@ -890,7 +911,8 @@ image::MaskedImage<float> diffim::convolveAndSubtract(
     image::MaskedImage<float> const &imageToConvolve,
     image::MaskedImage<float> const &imageToNotConvolve,
     math::LinearCombinationKernel const &convolutionKernel,
-    math::Function2<double> const &backgroundFunction);
+    math::Function2<double> const &backgroundFunction,
+    bool invert);
 
 
 template 
@@ -898,7 +920,8 @@ image::MaskedImage<double> diffim::convolveAndSubtract(
     image::MaskedImage<double> const &imageToConvolve,
     image::MaskedImage<double> const &imageToNotConvolve,
     math::LinearCombinationKernel const &convolutionKernel,
-    math::Function2<double> const &backgroundFunction);
+    math::Function2<double> const &backgroundFunction,
+    bool invert);
 
 
 /* */
@@ -928,13 +951,13 @@ void diffim::computePsfMatchingKernelForFootprint(
     double                          &backgroundError);
 
 template
-std::vector<lsst::afw::detection::Footprint> diffim::getCollectionOfFootprintsForPsfMatching(
+std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
     image::MaskedImage<float> const &imageToConvolve,
     image::MaskedImage<float> const &imageToNotConvolve,
     lsst::pex::policy::Policy &policy);
 
 template
-std::vector<lsst::afw::detection::Footprint> diffim::getCollectionOfFootprintsForPsfMatching(
+std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
     image::MaskedImage<double> const &imageToConvolve,
     image::MaskedImage<double> const &imageToNotConvolve,
     lsst::pex::policy::Policy &policy);
@@ -1221,9 +1244,9 @@ void diffim::computePsfMatchingKernelForFootprint(
             }
             if (kError[idx][idx] < 0.0) {
                 throw LSST_EXCEPT(exceptions::Exception
-                                  boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
-                                  kError[idx][idx]
-                                  );
+                                  str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                                      kError[idx][idx]
+                                      ));
             }
             
             kValues[idx]    = kSolution[idx];
@@ -1243,9 +1266,9 @@ void diffim::computePsfMatchingKernelForFootprint(
     }
     if (kError[nParameters-1][nParameters-1] < 0.0) {
         throw LSST_EXCEPT(exceptions::Exception,
-                          boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % 
-                          kError[nParameters-1][nParameters-1]
-                          );
+                          str(boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % 
+                              kError[nParameters-1][nParameters-1]
+                              ));
     }
     background      = kSolution[nParameters-1];
     backgroundError = sqrt(kError[nParameters-1][nParameters-1]);

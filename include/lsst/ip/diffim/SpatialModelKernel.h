@@ -42,12 +42,12 @@ namespace diffim {
      *
      * @see lsst/ip/diffim/SpatialModelBase.h for base class
      */    
-    template <typename ImageT, typename MaskT>
-    class SpatialModelKernel : public SpatialModelBase<ImageT, MaskT> {
+    template <typename ImageT>
+    class SpatialModelKernel : public SpatialModelBase<ImageT> {
     public: 
-        typedef boost::shared_ptr<SpatialModelKernel<ImageT, MaskT> > Ptr;
+        typedef boost::shared_ptr<SpatialModelKernel<ImageT> > Ptr;
         typedef std::vector<Ptr> SpatialModelKernelPtrList;
-        typedef boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT, MaskT> > MaskedImagePtr; 
+        typedef boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT> > MaskedImagePtr; 
 
         /** Empty constructor
          */
@@ -181,10 +181,10 @@ namespace diffim {
          *
          * @note Ideally will be replaced by Sdqa
          */
-        void setStats(DifferenceImageStatistics<ImageT, MaskT> kStats) {_kStats = kStats;};
+        void setStats(DifferenceImageStatistics<ImageT> kStats) {_kStats = kStats;};
         /** Get class instance associated with residuals in the derived difference image
          */
-        DifferenceImageStatistics<ImageT, MaskT> getStats() {return _kStats;};
+        DifferenceImageStatistics<ImageT> getStats() {return _kStats;};
 
     private: 
         /** Objects needed to build itself; only initializable during construction
@@ -195,8 +195,8 @@ namespace diffim {
         lsst::pex::policy::Policy _policy;          ///< Policy file for operations
 
         lsst::afw::detection::Footprint::Ptr _fpPtr; ///< Footprint containing pixels used to build Kernel
-        MaskedImagePtr _miToConvolvePtr;            ///< Subimage of _miToConvolveParentPtr
-        MaskedImagePtr _miToNotConvolvePtr;         ///< Subimage of _miToNotConvolveParentPtr
+        MaskedImagePtr _miToConvolvePtr;             ///< Subimage of _miToConvolveParentPtr
+        MaskedImagePtr _miToNotConvolvePtr;          ///< Subimage of _miToNotConvolveParentPtr
 
         /** Results from single Kernel model
          */
@@ -205,7 +205,7 @@ namespace diffim {
         double _kSum;                                        ///< Kernel sum
         double _bg;                                          ///< Differential background value
         double _bgErr;                                       ///< Uncertainty in background
-        DifferenceImageStatistics<ImageT, MaskT> _kStats;    ///< Home-grown statistics; placeholder for Sdqa
+        DifferenceImageStatistics<ImageT> _kStats;           ///< Home-grown statistics; placeholder for Sdqa
 
     }; // end of class
 

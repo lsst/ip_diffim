@@ -27,13 +27,13 @@ namespace lsst {
 namespace ip {
 namespace diffim {
     
-template <typename ImageT, typename MaskT>
-SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel() :
-    lsst::ip::diffim::SpatialModelBase<ImageT, MaskT>()
+template <typename ImageT>
+SpatialModelKernel<ImageT>::SpatialModelKernel() :
+    lsst::ip::diffim::SpatialModelBase<ImageT>()
 {;}
 
-template <typename ImageT, typename MaskT>
-SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel(
+template <typename ImageT>
+SpatialModelKernel<ImageT>::SpatialModelKernel(
     lsst::afw::detection::Footprint::Ptr fpPtr,
     MaskedImagePtr miToConvolveParentPtr,
     MaskedImagePtr miToNotConvolveParentPtr,
@@ -41,7 +41,7 @@ SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel(
     lsst::pex::policy::Policy &policy,
     bool build
     ) :
-    lsst::ip::diffim::SpatialModelBase<ImageT, MaskT>(),
+    lsst::ip::diffim::SpatialModelBase<ImageT>(),
     _miToConvolveParentPtr(miToConvolveParentPtr),
     _miToNotConvolveParentPtr(miToNotConvolveParentPtr),
     _kBasisList(kBasisList),
@@ -53,8 +53,8 @@ SpatialModelKernel<ImageT, MaskT>::SpatialModelKernel(
     }
 }
 
-template <typename ImageT, typename MaskT>
-bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
+template <typename ImageT>
+bool SpatialModelKernel<ImageT>::buildModel() {
 
     if (this->getBuildStatus() == true) {
         return false;
@@ -72,19 +72,19 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
 
     // Fill in information on the actual pixels used
     MaskedImagePtr miToConvolvePtr    = MaskedImagePtr ( 
-        new lsst::afw::image::MaskedImage<ImageT, MaskT>(*(this->_miToConvolveParentPtr), fpBBox)
+        new lsst::afw::image::MaskedImage<ImageT>(*(this->_miToConvolveParentPtr), fpBBox)
         );
 
     MaskedImagePtr miToNotConvolvePtr = MaskedImagePtr ( 
-        new lsst::afw::image::MaskedImage<ImageT, MaskT>(*(this->_miToNotConvolveParentPtr), fpBBox)
+        new lsst::afw::image::MaskedImage<ImageT>(*(this->_miToNotConvolveParentPtr), fpBBox)
         );
     this->_miToConvolvePtr = miToConvolvePtr;
     this->_miToNotConvolvePtr = miToNotConvolvePtr;
 
     // Estimate of the variance for first kernel pass
-    lsst::afw::image::MaskedImage<ImageT, MaskT> varEstimate = 
-        lsst::afw::image::MaskedImage<ImageT, MaskT>(this->_miToConvolvePtr->getWidth(), 
-                                                     this->_miToConvolvePtr->getHeight());
+    lsst::afw::image::MaskedImage<ImageT> varEstimate = 
+        lsst::afw::image::MaskedImage<ImageT>(this->_miToConvolvePtr->getDimensions());
+
     varEstimate += *(this->_miToNotConvolvePtr);
     varEstimate -= *(this->_miToConvolvePtr);
     
@@ -117,12 +117,12 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
     kSum = kernelPtr->computeImage(kImage, false);
 
     // Create difference image and calculate associated statistics
-    lsst::afw::image::MaskedImage<ImageT, MaskT> diffIm = convolveAndSubtract( *(this->_miToConvolvePtr),
+    lsst::afw::image::MaskedImage<ImageT> diffIm = convolveAndSubtract( *(this->_miToConvolvePtr),
                                                                                *(this->_miToNotConvolvePtr),
                                                                                *(kernelPtr), 
                                                                                background);
-    lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT> kStats = 
-        lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>(diffIm);
+    lsst::ip::diffim::DifferenceImageStatistics<ImageT> kStats = 
+        lsst::ip::diffim::DifferenceImageStatistics<ImageT>(diffIm);
 
     lsst::pex::logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                                   "Kernel pass 1 : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
@@ -153,7 +153,7 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
                                            *(kernelPtr), 
                                            background);
 
-            kStats = lsst::ip::diffim::DifferenceImageStatistics<ImageT, MaskT>(diffIm);
+            kStats = lsst::ip::diffim::DifferenceImageStatistics<ImageT>(diffIm);
             lsst::pex::logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                                           "Kernel pass 2 : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
                                           kSum, background, backgroundError,
@@ -190,14 +190,14 @@ bool SpatialModelKernel<ImageT, MaskT>::buildModel() {
     return this->getSdqaStatus();
 }
 
-template <typename ImageT, typename MaskT>
-double SpatialModelKernel<ImageT, MaskT>::returnSdqaRating() {
+template <typename ImageT>
+double SpatialModelKernel<ImageT>::returnSdqaRating() {
     return this->_kStats.getResidualMean();
 }
 
 // Explicit instantiations
-template class SpatialModelKernel<float, lsst::afw::image::MaskPixel>;
-template class SpatialModelKernel<double, lsst::afw::image::MaskPixel>;
+template class SpatialModelKernel<float>;
+template class SpatialModelKernel<double>;
 
 }}} // end of namespace lsst::ip::diffim
 

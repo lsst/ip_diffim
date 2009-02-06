@@ -39,11 +39,11 @@ namespace diffim {
      * instances in a list are rejected from the spatial model, the best one
      * will be used.
      */
-    template <typename ImageT, typename MaskT>
+    template <typename ImageT>
     class SpatialModelCell {
         
     public:
-        typedef boost::shared_ptr<SpatialModelCell<ImageT, MaskT> > Ptr;
+        typedef boost::shared_ptr<SpatialModelCell<ImageT> > Ptr;
         typedef std::vector<Ptr> SpatialModelCellList;
         
         /** Typedefs 
@@ -52,7 +52,7 @@ namespace diffim {
          * instead of SpatialModelKernel (derived class) but I'm having problems
          * with SWIG.
          */
-        typedef typename SpatialModelKernel<ImageT, MaskT>::Ptr SpatialModel;
+        typedef typename SpatialModelKernel<ImageT>::Ptr SpatialModel;
         typedef std::vector<SpatialModel> ModelPtrList;
 
         typedef std::vector<lsst::afw::detection::Footprint::Ptr> FpPtrList;
@@ -79,9 +79,6 @@ namespace diffim {
                          FpPtrList fpPtrList,
                          ModelPtrList modelPtrList);
 
-        //SpatialModelCell(ModelPtrList modelPtrList);
-        SpatialModelCell(ModelPtrList modelPtrList);
-        
         /** Destructor
          */
         virtual ~SpatialModelCell() {;};

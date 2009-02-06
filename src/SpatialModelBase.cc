@@ -18,8 +18,8 @@ namespace lsst {
 namespace ip {
 namespace diffim {
     
-template <typename ImageT, typename MaskT>
-SpatialModelBase<ImageT, MaskT>::SpatialModelBase() :
+template <typename ImageT>
+SpatialModelBase<ImageT>::SpatialModelBase() :
     _id(-1),
     _isBuilt(false),
     _isGood(false),
@@ -28,7 +28,7 @@ SpatialModelBase<ImageT, MaskT>::SpatialModelBase() :
 {;}
 
 // Explicit instantiations
-template class SpatialModelBase<float, lsst::afw::image::MaskPixel>;
-template class SpatialModelBase<double, lsst::afw::image::MaskPixel>;
+template class SpatialModelBase<float>;
+template class SpatialModelBase<double>;
 
 }}} // end of namespace lsst::ip::diffim

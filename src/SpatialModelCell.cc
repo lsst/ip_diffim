@@ -24,27 +24,8 @@ namespace lsst {
 namespace ip {
 namespace diffim {
 
-template <typename ImageT, typename MaskT>
-SpatialModelCell<ImageT, MaskT>::SpatialModelCell(ModelPtrList modelPtrList) :
-    _label()
-{
-    std::cout << "CAW 1" << std::endl;
-}
-
-/*
-template <typename ImageT, typename MaskT>
-SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
-    ModelPtrList modelPtrList) :
-    _label()
-{
-    std::cout << "CAW 2" << std::endl;
-}
-*/
-
-/* */
-
-template <typename ImageT, typename MaskT>
-SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
+template <typename ImageT>
+SpatialModelCell<ImageT>::SpatialModelCell(
     std::string  label,
     FpPtrList    fpPtrList,
     ModelPtrList modelPtrList) :
@@ -60,8 +41,8 @@ SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
     SpatialModelCell(label, 0, 0, fpPtrList, modelPtrList);
 }
 
-template <typename ImageT, typename MaskT>
-SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
+template <typename ImageT>
+SpatialModelCell<ImageT>::SpatialModelCell(
     std::string  label,
     int          colC, 
     int          rowC, 
@@ -77,7 +58,8 @@ SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
     _modelIsFixed(false)
 {
     if (!(fpPtrList.size() == modelPtrList.size())) {
-        throw lsst::pex::exceptions::DomainError("SpatialModelCell : footprint list and model list are not the same size");
+        throw LSST_EXCEPT(lsst::pex::exceptions::Exception,
+                          "SpatialModelCell : footprint list and model list are not the same size");
     }
     lsst::pex::logging::TTrace<3>("lsst.ip.diffim.SpatialModelCell.SpatialModelCell", 
                                   "Cell %s : created with %d models", this->_label.c_str(), this->_nModels);
@@ -88,8 +70,8 @@ SpatialModelCell<ImageT, MaskT>::SpatialModelCell(
  *
  * @note Synchronously modify fpPtrList and modelPtrList
  */
-template <typename ImageT, typename MaskT>
-void SpatialModelCell<ImageT, MaskT>::_orderFootprints() {
+template <typename ImageT>
+void SpatialModelCell<ImageT>::_orderFootprints() {
     for (int i = 0; i < this->_nModels; i++) {
         this->_modelPtrList[i]->setID(i);
     }
@@ -105,8 +87,8 @@ void SpatialModelCell<ImageT, MaskT>::_orderFootprints() {
  * @note Optionally, if all models are *really* bad (this needs to
  * defined) set Cell as fixed with ID=-1
  */
-template <typename ImageT, typename MaskT>
-void SpatialModelCell<ImageT, MaskT>::selectBestModel(bool fix) {
+template <typename ImageT>
+void SpatialModelCell<ImageT>::selectBestModel(bool fix) {
     bool found = false;
     for (int i = 0; i < this->_nModels; i++) {
         if (this->_modelPtrList[i]->isGood()) {
@@ -130,26 +112,28 @@ void SpatialModelCell<ImageT, MaskT>::selectBestModel(bool fix) {
  * @note On the condition the cell is "fixed" and has "currentID =
  * -1", the cell is not usable.
  */
-template <typename ImageT, typename MaskT>
-bool SpatialModelCell<ImageT, MaskT>::isUsable() {
+template <typename ImageT>
+bool SpatialModelCell<ImageT>::isUsable() {
     if ( (this->_currentID == -1) && (this->_modelIsFixed) ) {
         return false;
     }
     return true;
 }
 
-template <typename ImageT, typename MaskT>
-lsst::afw::detection::Footprint::Ptr SpatialModelCell<ImageT, MaskT>::getFootprint(int i) {
+template <typename ImageT>
+lsst::afw::detection::Footprint::Ptr SpatialModelCell<ImageT>::getFootprint(int i) {
     if ( (i < 0) || (i >= this->_nModels) ) {
-        throw lsst::pex::exceptions::DomainError("Index out of range");
+        throw LSST_EXCEPT(lsst::pex::exceptions::Exception, 
+                          "Index out of range");
     }        
     return this->_fpPtrList[i];
 }
 
-template <typename ImageT, typename MaskT>
-typename SpatialModelCell<ImageT, MaskT>::SpatialModel SpatialModelCell<ImageT, MaskT>::getModel(int i) {
+template <typename ImageT>
+typename SpatialModelCell<ImageT>::SpatialModel SpatialModelCell<ImageT>::getModel(int i) {
     if ( (i < 0) || (i >= this->_nModels) ) {
-        throw lsst::pex::exceptions::DomainError("Index out of range");
+        throw LSST_EXCEPT(lsst::pex::exceptions::Exception, 
+                          "Index out of range");
     }        
     return this->_modelPtrList[i];
 }
@@ -158,8 +142,8 @@ typename SpatialModelCell<ImageT, MaskT>::SpatialModel SpatialModelCell<ImageT, 
  *
  * @note  Method setCurrentID() actually builds the model
  */
-template <typename ImageT, typename MaskT>
-bool SpatialModelCell<ImageT, MaskT>::incrementModel() {
+template <typename ImageT>
+bool SpatialModelCell<ImageT>::incrementModel() {
     /* If the Cell has a fixed Model */
     if (this->_modelIsFixed) {
         return false;
@@ -193,10 +177,11 @@ bool SpatialModelCell<ImageT, MaskT>::incrementModel() {
     }
 }
 
-template <typename ImageT, typename MaskT>
-void SpatialModelCell<ImageT, MaskT>::setCurrentID(int id) {
+template <typename ImageT>
+void SpatialModelCell<ImageT>::setCurrentID(int id) {
     if ( (id < 0) || (id >= this->_nModels) ) {
-        throw lsst::pex::exceptions::DomainError("Index out of range");
+        throw LSST_EXCEPT(lsst::pex::exceptions::Exception, 
+                          "Index out of range");
     }        
 
     this->_currentID = id;
@@ -210,8 +195,8 @@ void SpatialModelCell<ImageT, MaskT>::setCurrentID(int id) {
 }
 
 // Explicit instantiations
-template class SpatialModelCell<float, lsst::afw::image::maskPixelType>;
-template class SpatialModelCell<double, lsst::afw::image::maskPixelType>;
+template class SpatialModelCell<float>;
+template class SpatialModelCell<double>;
 
 }}} // end of namespace lsst::ip::diffim
 

@@ -59,8 +59,10 @@ namespace diffim {
      *
      * @ingroup diffim
      *
-     * @note Will replace maskOK subroutine.  Use this as an example to sort
-     * through footprints for the "best" ones for difference imaging.
+     * @note Search through a footprint for any set mask fits.
+     * 
+     * @note May need to modify this as our mask planes evolve to include
+     * non-bad mask information
      *
      * Example usage : 
      *  FindSetBits<image::Mask<image::MaskPixel> > count(mask); 
@@ -122,6 +124,8 @@ namespace diffim {
     /** Execute fundamental task of convolving template and subtracting it from science image
      *
      * @note D = I - (K.x.T + bg)
+     *
+     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
      * 
      * @note This is a specialization for LinearCombinationKernels
      * 
@@ -129,35 +133,43 @@ namespace diffim {
      * @param imageToNotConvolve  MaskedImage to subtract convolved template from
      * @param convolutionKernelPtr  PSF-matching LinearCombinationKernelKernel used for convolution
      * @param background  Differential background value
+     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
      */    
     template <typename ImageT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
-        double background
+        double background, 
+        bool invert=true
         );
 
     /** Execute fundamental task of convolving template and subtracting it from science image
      *
      * @note D = I - (K.x.T + bg)
      * 
+     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
+     * 
      * @param imageToConvolve  MaskedImage to convolve with Kernel
      * @param imageToNotConvolve  MaskedImage to subtract convolved template from
      * @param convolutionKernelPtr  PSF-matching Kernel used for convolution
      * @param background  Differential background value
+     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
      */    
     template <typename ImageT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::afw::math::Kernel const &convolutionKernel,
-        double background
+        double background,
+        bool invert=true
         );
 
     /** Execute fundamental task of convolving template and subtracting it from science image
      *
      * @note D = I - (K.x.T + bg)
+     * 
+     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
      * 
      * @note This is a specialization for LinearCombinationKernels
      * 
@@ -165,30 +177,36 @@ namespace diffim {
      * @param imageToNotConvolve  MaskedImage to subtract convolved template from
      * @param convolutionKernelPtr  PSF-matching LinearCombinationKernel used for convolution
      * @param background  Differential background function
+     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
      */    
     template <typename ImageT, typename FunctionT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
-        lsst::afw::math::Function2<FunctionT> const &backgroundFunction
+        lsst::afw::math::Function2<FunctionT> const &backgroundFunction,
+        bool invert=true
         );
 
     /** Execute fundamental task of convolving template and subtracting it from science image
      *
      * @note D = I - (K.x.T + bg)
      * 
+     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
+     * 
      * @param imageToConvolve  MaskedImage to convolve with Kernel
      * @param imageToNotConvolve  MaskedImage to subtract convolved template from
      * @param convolutionKernelPtr  PSF-matching Kernel used for convolution
      * @param background  Differential background function
+     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
      */    
     template <typename ImageT, typename FunctionT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::afw::math::Kernel const &convolutionKernel,
-        lsst::afw::math::Function2<FunctionT> const &backgroundFunction
+        lsst::afw::math::Function2<FunctionT> const &backgroundFunction,
+        bool invert=true
         );
 
     /** Search through images for Footprints with no masked pixels
@@ -198,7 +216,7 @@ namespace diffim {
      * @param policy  Policy for operations; in particular object detection
      */    
     template <typename ImageT>
-    std::vector<lsst::afw::detection::Footprint> getCollectionOfFootprintsForPsfMatching(
+    std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
         lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::pex::policy::Policy &policy
@@ -296,9 +314,9 @@ namespace diffim {
      * @param image Image to add function to
      * @param function  Function added to image
      */
-    template <typename PixelT, typename FunctionT>
+    template <typename ImageT, typename FunctionT>
     void addFunctionToImage(
-        lsst::afw::image::Image<PixelT> &image,
+        lsst::afw::image::Image<ImageT> &image,
         lsst::afw::math::Function2<FunctionT> const &function
         );
 
