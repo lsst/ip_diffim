@@ -9,7 +9,7 @@ import lsst.utils.tests as tests
 import lsst.pex.logging as logging
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.detection.detectionLib as detection
+import lsst.afw.detection as detection
 import lsst.ip.diffim as ipDiff
 import lsst.afw.image.testUtils as imageTest
 

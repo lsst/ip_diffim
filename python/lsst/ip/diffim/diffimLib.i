@@ -33,6 +33,7 @@ namespace boost {
 #include <lsst/afw/image.h>
 #include <lsst/afw/math.h>
 #include <lsst/afw/detection.h>
+#include <lsst/afw/math/ConvolveImage.h>
 
 #include <lsst/pex/policy/Policy.h>
 %}

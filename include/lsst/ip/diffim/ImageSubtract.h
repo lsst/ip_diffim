@@ -55,7 +55,7 @@ namespace diffim {
         double _residualStd;
     };
 
-    /** Uses a functor to iterate over the Mask image pixels
+    /** Uses a functor to accumulate Mask bits
      *
      * @ingroup diffim
      *
@@ -92,6 +92,38 @@ namespace diffim {
         
     private:
         typename MaskT::Pixel _bits;
+    };
+
+    /** Uses a functor to sum over the MaskedImage pixels
+     *
+     * @ingroup diffim
+     *
+     * @note Count the total flux within the footprint
+     * 
+     * @note Still needs a background model to correct for
+     *
+     */
+    template <typename ImageT>
+    class FindCounts : public lsst::afw::detection::FootprintFunctor<ImageT> {
+    public:
+        FindCounts(lsst::afw::image::MaskedImage<ImageT> const &mimage) : 
+            lsst::afw::detection::FootprintFunctor<ImageT>(mimage), _counts(0.0) {;}
+        
+        void operator()(typename ImageT::xy_locator loc, ///< locator pointing at the pixel
+                        int x,                           ///< column-position of pixel
+                        int y                            ///< row-position of pixel
+            ) {
+            _counts += *loc;
+        }
+        
+        // Return the total counts
+        double getCounts() const { return _counts; }
+        
+        // Clear the accumulator
+        void reset() { _counts = 0; }
+        
+    private:
+        typename ImageT::Pixel _counts;
     };
 
 
