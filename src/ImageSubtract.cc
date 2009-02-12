@@ -44,50 +44,9 @@ namespace diffim     = lsst::ip::diffim;
 // Constructors
 //
 
-template <typename ImageT>
-diffim::DifferenceImageStatistics<ImageT>::DifferenceImageStatistics() :
-    _residualMean(0.),
-    _residualStd(0.)
-{
-}
-
-template <typename ImageT>
-diffim::DifferenceImageStatistics<ImageT>::DifferenceImageStatistics(
-    const image::MaskedImage<ImageT> differenceMaskedImage
-    ) :
-    _residualMean(0.),
-    _residualStd(0.)
-{
-    int nGood;
-    double mean, variance;
-    
-    diffim::calculateMaskedImageStatistics(nGood, mean, variance, differenceMaskedImage);
-
-    /* Note - compare this functor to the extant subroutine */
-    //diffim::ImageStatistics<image::MaskedImage<ImageT> > imstat(differenceMaskedImage);
-    //lsst::afw::detection::Footprint fp(image::PointI(0,0), differenceMaskedImage.getDimensions());
-    //imstat.apply(fp);
-    //std::cout << " stat1 " << mean << " " << variance << std::endl;
-    //std::cout << " stat2 " << imstat.getMean() << " " << imstat.getVariance() << std::endl;
-
-    this->_residualMean = mean;
-    this->_residualStd  = sqrt(variance);
-}
-
 //
 // Public Member Functions
 //
-
-template <typename ImageT>
-bool diffim::DifferenceImageStatistics<ImageT>::evaluateQuality(
-    lsst::pex::policy::Policy &policy
-    ) {
-    double maxResidualMean = policy.getDouble("maximumFootprintResidualMean");
-    double maxResidualStd  = policy.getDouble("maximumFootprintResidualStd");
-    if ( fabs(this->getResidualMean()) > maxResidualMean ) return false;
-    if ( fabs(this->getResidualStd()) > maxResidualStd ) return false;
-    return true;
-}
 
 //
 // Subroutines
@@ -394,19 +353,19 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
                 continue;
             } 
             
-            logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+            logging::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                                "Footprint in : %d,%d -> %d,%d",
                                (*i)->getBBox().getX0(), (*i)->getBBox().getX1(), 
                                (*i)->getBBox().getY0(), (*i)->getBBox().getY1());
 
-            logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+            logging::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                                "Grow by : %d", footprintDiffimGrow);
 
             // Grow the footprint
             lsst::afw::detection::Footprint::Ptr fpGrow = 
                 lsst::afw::detection::growFootprint(*i, footprintDiffimGrow);
             
-            logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+            logging::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                                "Footprint out : %d,%d -> %d,%d",
                                (*fpGrow).getBBox().getX0(), (*fpGrow).getBBox().getX1(), 
                                (*fpGrow).getBBox().getY0(), (*fpGrow).getBBox().getY1());
@@ -466,12 +425,12 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
  *
  * @ingroup diffim
  */
-template <typename ImageT>
+template <typename ImageT, typename VarT>
 void diffim::computePsfMatchingKernelForFootprint(
     image::MaskedImage<ImageT>         const &imageToConvolve,    
     image::MaskedImage<ImageT>         const &imageToNotConvolve, 
-    image::MaskedImage<ImageT>         const &varianceImage,      
-    math::KernelList<math::Kernel>            const &kernelInBasisList,  
+    image::Image<VarT>                 const &varianceImage,      
+    math::KernelList<math::Kernel>     const &kernelInBasisList,  
     lsst::pex::policy::Policy       &policy,
     boost::shared_ptr<math::Kernel> &kernelPtr,
     boost::shared_ptr<math::Kernel> &kernelErrorPtr,
@@ -480,6 +439,7 @@ void diffim::computePsfMatchingKernelForFootprint(
     ) { 
 
     typedef typename image::MaskedImage<ImageT>::xy_locator xy_locator;
+    typedef typename image::Image<VarT>::xy_locator xyi_locator;
 
     // grab mask bits from the image to convolve, since that is what we'll be operating on
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
@@ -563,9 +523,9 @@ void diffim::computePsfMatchingKernelForFootprint(
     for (citer = convolvedImageList.begin(); citer != convolvedImageList.end(); ++citer) {
         convolvedLocatorList.push_back( (**citer).xy_at(startCol,startRow) );
     }
-    xy_locator imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
-    xy_locator imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
-    xy_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
+    xy_locator  imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
+    xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
+    xyi_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
 
     for (unsigned int row = startRow; row < endRow; ++row) {
         
@@ -574,7 +534,7 @@ void diffim::computePsfMatchingKernelForFootprint(
             ImageT ncImage          = imageToNotConvolveLocator.image();
             ImageT ncVariance       = imageToNotConvolveLocator.variance();
             image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
-            ImageT iVariance        = 1.0 / varianceLocator.variance();
+            double iVariance        = 1.0 / *varianceLocator;
             
             logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
                                "Accessing image row %d col %d : %.3f %.3f %d",
@@ -896,9 +856,6 @@ void covariance(gsl_matrix * dest, const gsl_matrix * src) {
 
 // Explicit instantiations
 
-template class diffim::DifferenceImageStatistics<float>;
-template class diffim::DifferenceImageStatistics<double>;
-
 template class diffim::FindSetBits<image::Mask<> >;
 
 template class diffim::FindCounts<image::MaskedImage<float> >;
@@ -980,11 +937,12 @@ image::MaskedImage<double> diffim::convolveAndSubtract(
 
 /* */
 
+/* variance are always float i think */
 template
 void diffim::computePsfMatchingKernelForFootprint(
     image::MaskedImage<float> const &imageToConvolve,
     image::MaskedImage<float> const &imageToNotConvolve,
-    image::MaskedImage<float> const &varianceImage,
+    image::Image<float>       const &varianceImage,
     math::KernelList<math::Kernel> const &kernelInBasisList,
     lsst::pex::policy::Policy       &policy,
     boost::shared_ptr<math::Kernel> &kernelPtr,
@@ -996,7 +954,7 @@ template
 void diffim::computePsfMatchingKernelForFootprint(
     image::MaskedImage<double> const &imageToConvolve,
     image::MaskedImage<double> const &imageToNotConvolve,
-    image::MaskedImage<double> const &varianceImage,
+    image::Image<float>        const &varianceImage,
     math::KernelList<math::Kernel> const &kernelInBasisList,
     lsst::pex::policy::Policy       &policy,
     boost::shared_ptr<math::Kernel> &kernelPtr,
@@ -1074,7 +1032,7 @@ template <typename ImageT, typename MaskT>
 void diffim::computePsfMatchingKernelForFootprint(
     image::MaskedImage<ImageT, MaskT>         const &imageToConvolve,    
     image::MaskedImage<ImageT, MaskT>         const &imageToNotConvolve, 
-    image::MaskedImage<ImageT, MaskT>         const &varianceImage,      
+    image::Image<ImageT, MaskT>               const &varianceImage,      
     math::KernelList<math::Kernel> const &kernelInBasisList,  
     lsst::pex::policy::Policy                  &policy,
     boost::shared_ptr<math::Kernel> &kernelPtr,

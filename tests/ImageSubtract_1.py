@@ -46,7 +46,7 @@ InputMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_1
 TemplateMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_1_tmpl")
 
 # the desired type of MaskedImage
-MaskedImage = afwImage.MaskedImageD
+MaskedImage = afwImage.MaskedImageF
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -114,8 +114,13 @@ class ConvolveTestCase(unittest.TestCase):
         kernelCols = policy.get('kernelCols')
         kernelRows = policy.get('kernelRows')
         gaussFunction = afwMath.GaussianFunction2D(sigmaX,sigmaY)
-        gaussKernel = afwMath.AnalyticKernel(gaussFunction, kernelCols, kernelRows)
-        convolvedScienceMaskedImage = afwMath.convolveNew(self.scienceMaskedImage, gaussKernel, 0, False)
+        gaussKernel   = afwMath.AnalyticKernel(kernelCols, kernelRows, gaussFunction)
+        convolvedScienceMaskedImage = MaskedImage( self.scienceMaskedImage.getDimensions() )
+        afwMath.convolve(convolvedScienceMaskedImage,
+                         self.scienceMaskedImage,
+                         gaussKernel,
+                         False,
+                         0)
 
         kImageIn  = afwImage.ImageD(kernelCols, kernelRows)
         kSumIn    = gaussKernel.computeImage(kImageIn, 0.0, 0.0, False)
@@ -125,26 +130,29 @@ class ConvolveTestCase(unittest.TestCase):
         kImageOut = afwImage.ImageD(kernelCols, kernelRows)
         
         for footprintID, iFootprintPtr in enumerate(self.footprintList):
-            footprintBBox              = iFootprintPtr.getBBox()
-            imageToConvolveStampPtr    = MaskedImage(self.templateMaskedImage, footprintBBox)
-            imageToNotConvolveStampPtr = MaskedImage(convolvedScienceMaskedImage, footprintBBox)
-            
-            kernelCoeffList, background = ipDiff.computePsfMatchingKernelForFootprint(
-                imageToConvolveStampPtr.get(),
-                imageToNotConvolveStampPtr.get(),
+            footprintBBox           = iFootprintPtr.getBBox()
+            imageToConvolveStamp    = MaskedImage(self.templateMaskedImage, footprintBBox)
+            imageToNotConvolveStamp = MaskedImage(convolvedScienceMaskedImage, footprintBBox)
+
+            varEstimate             = (imageToConvolveStamp - imageToNotConvolveStamp)
+            kernel                  = afwImage.ImageD(kernelCols, kernelRows)
+            kernelError             = afwImage.ImageD(kernelCols, kernelRows)
+           
+            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
+                imageToConvolveStamp,
+                imageToNotConvolveStamp,
+                varEstimate,
                 self.kernelBasisList,
-                policy
+                policy,
+                kernel, kernelError
                 )
 
-            footprintKernelPtr = afwMath.LinearCombinationKernelPtr(
-                afwMath.LinearCombinationKernel(self.kernelBasisList, kernelCoeffList)
-                )
-
-            kSumOut = footprintKernelPtr.computeImage(kImageOut, 0.0, 0.0, False)
+            footprintKernel = afwMath.LinearCombinationKernel(self.kernelBasisList, kernelCoeffList)
+            kSumOut         = footprintKernel.computeImage(kImageOut, 0.0, 0.0, False)
 
             if debugIO:
-                imageToConvolveStampPtr.writeFits('tFits_%d' % (footprintID,))
-                imageToNotConvolveStampPtr.writeFits('sFits_%d' % (footprintID,))
+                imageToConvolveStamp.writeFits('tFits_%d' % (footprintID,))
+                imageToNotConvolveStamp.writeFits('sFits_%d' % (footprintID,))
                 kImageOut.writeFits('koFits_%d.fits' % (footprintID,))
             if display:
                 ds9.mtv(kImageIn, frame=0)
@@ -152,15 +160,15 @@ class ConvolveTestCase(unittest.TestCase):
 
             # make sure it matches the known kernel
             # N.b. background test fails with floating point images 
-            for i in range(kImageOut.getCols()):
-                for j in range(kImageOut.getRows()):
+            tol = 2e-4
+            for i in range(kImageOut.getWidth()):
+                for j in range(kImageOut.getHeight()):
                     if False:
-                        tol = 2e-4
-                        self.assertEqual(math.fabs(kImageIn.getVal(i,j) - kImageOut.getVal(i,j)) < tol, True,
+                        self.assertEqual(math.fabs(kImageIn.get(i,j) - kImageOut.get(i,j)) < tol, True,
                                          "K(%d,%d): |%g - %g| < %g" %
-                                         (i, j, kImageIn.getVal(i,j), kImageOut.getVal(i,j), tol))
+                                         (i, j, kImageIn.get(i,j), kImageOut.get(i,j), tol))
                     else:
-                        self.assertAlmostEqual(kImageIn.getVal(i,j), kImageOut.getVal(i,j))                        
+                        self.assertAlmostEqual(kImageIn.get(i,j), kImageOut.get(i,j))                        
 
             # make sure that the background is zero
             self.assertAlmostEqual(background, 0.0)
@@ -202,43 +210,45 @@ class DeltaFunctionTestCase(unittest.TestCase):
         kImage = afwImage.ImageD(kernelCols, kernelRows)
         
         for footprintID, iFootprintPtr in enumerate(self.footprintList):
-            footprintBBox              = iFootprintPtr.getBBox()
-            imageToConvolveStampPtr    = MaskedImage(self.templateMaskedImage, footprintBBox)
-
-            imageToNotConvolveStampPtr = MaskedImage(self.scienceMaskedImage, footprintBBox)
+            footprintBBox           = iFootprintPtr.getBBox()
+            imageToConvolveStamp    = MaskedImage(self.templateMaskedImage, footprintBBox)
+            imageToNotConvolveStamp = MaskedImage(self.scienceMaskedImage,  footprintBBox)
+            
             # this is a bit of a hack to deal with -= and *= problems with swigged masked images
-            imageArray, varianceArray, maskArray = imageTest.arraysFromMaskedImage(imageToNotConvolveStampPtr.get())
+            imageArray, varianceArray, maskArray = imageTest.arraysFromMaskedImage(imageToNotConvolveStamp)
             imageArray += bg
             imageArray *= scaling
             varianceArray *= scaling**2
             imageToNotConvolveStamp = imageTest.maskedImageFromArrays( (imageArray, varianceArray, maskArray) )
 
             if debugIO:
-                imageToConvolveStampPtr.writeFits('tFits_%d' % (footprintID,))
+                imageToConvolveStamp.writeFits('tFits_%d' % (footprintID,))
                 imageToNotConvolveStamp.writeFits('sFits_%d' % (footprintID,))
 
-            kernelCoeffList, background = ipDiff.computePsfMatchingKernelForFootprint(
-                imageToConvolveStampPtr.get(),
+            kernel                  = afwImage.ImageD(kernelCols, kernelRows)
+            kernelError             = afwImage.ImageD(kernelCols, kernelRows)
+            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
+                imageToConvolveStamp,
                 imageToNotConvolveStamp,
+                varEstimate,
                 self.kernelBasisList,
-                policy
+                policy,
+                kernel, kernelError
                 )
 
-            footprintKernelPtr = afwMath.LinearCombinationKernelPtr(
-                afwMath.LinearCombinationKernel(self.kernelBasisList, kernelCoeffList)
-                )
-
-            kSum = footprintKernelPtr.computeImage(kImage, 0.0, 0.0, False)
+            footprintKernel = afwMath.LinearCombinationKernel(self.kernelBasisList, kernelCoeffList)
+            kSum            = footprintKernel.computeImage(kImage, 0.0, 0.0, False)
+            
             if debugIO:
                 kImage.writeFits('kFits_%d.fits' % (footprintID,))
 
             # make sure its a delta function
-            for i in range(kImage.getCols()):
-                for j in range(kImage.getRows()):
-                    if i==j and i==kImage.getCols()/2:
-                        self.assertAlmostEqual(kImage.getVal(i,j), scaling)
+            for i in range(kImage.getWidth()):
+                for j in range(kImage.getHeight()):
+                    if i==j and i==kImage.getWidth()/2:
+                        self.assertAlmostEqual(kImage.get(i,j), scaling)
                     else:
-                        self.assertAlmostEqual(kImage.getVal(i,j), 0.0)
+                        self.assertAlmostEqual(kImage.get(i,j), 0.0)
 
             # make sure that the background is zero
             self.assertAlmostEqual(background, bg, places=6)
@@ -313,57 +323,54 @@ class DeconvolveTestCase(unittest.TestCase):
             maskedImage2.writeFits('MI2a')
 
         goodData = afwImage.BBox2i(scale*kernelCols/2+1, scale*kernelRows/2+1, scale*kernelCols, scale*kernelRows)
-        maskedSubImage1Ptr = MaskedImage(maskedImage1, goodData)
-        maskedSubImage2Ptr = MaskedImage(maskedImage2, goodData)
-        kMaskPtr           = afwImage.MaskUPtr( afwImage.MaskU(kernelCols, kernelRows) )
+        maskedSubImage1 = MaskedImage(maskedImage1, goodData)
+        maskedSubImage2 = MaskedImage(maskedImage2, goodData)
+        kMask           = afwImage.MaskU(kernelCols, kernelRows)
         
-        emptyStamp  = afwImage.MaskedImageD(maskedSubImage1Ptr.getCols(), maskedSubImage1Ptr.getRows())
-        emptyStamp += maskedSubImage1Ptr.get()
-        emptyStamp -= maskedSubImage2Ptr.get()
+        emptyStamp  = afwImage.MaskedImageD(maskedSubImage1.getWidth(), maskedSubImage1.getHeight())
+        emptyStamp += maskedSubImage1.get()
+        emptyStamp -= maskedSubImage2.get()
 
         if debugIO:
-            maskedSubImage1Ptr.writeFits('MI1b')
-            maskedSubImage2Ptr.writeFits('MI2b')
+            maskedSubImage1.writeFits('MI1b')
+            maskedSubImage2.writeFits('MI2b')
 
         # convolve one way
         vectorPair1 = ipDiff.computePsfMatchingKernelForFootprint2(
-            maskedSubImage1Ptr.get(), maskedSubImage2Ptr.get(),
+            maskedSubImage1.get(), maskedSubImage2.get(),
             emptyStamp, self.kernelBasisList, policy
             )
         kernelVector1, kernelErrorVector1, background1, backgroundError1 = ipDiffimTools.vectorPairToVectors(vectorPair1)
-        kernelPtr1 = afwMath.KernelPtr(
-            afwMath.LinearCombinationKernel(self.kernelBasisList, kernelVector1)
-            )
-        diffIm1 = ipDiff.convolveAndSubtract(maskedSubImage1Ptr.get(),
-                                             maskedSubImage2Ptr.get(),
-                                             kernelPtr1,
+        kernel1 = afwMath.LinearCombinationKernel(self.kernelBasisList, kernelVector1)
+        diffIm1 = ipDiff.convolveAndSubtract(maskedSubImage1,
+                                             maskedSubImage2,
+                                             kernel1,
                                              background1)
-        kImage1Ptr    = afwImage.ImageDPtr( afwImage.ImageD(kernelCols, kernelRows) )
-        kSum1 = kernelPtr1.computeImage(kImage1Ptr.get(), 0.0, 0.0, False)
-        kMaskedImage1 = afwImage.MaskedImageD(kImage1Ptr, kMaskPtr)
+        
+        kImage1 = afwImage.ImageD(kernelCols, kernelRows)
+        kSum1   = kernel1.computeImage(kImage1, 0.0, 0.0, False)
+        kMaskedImage1 = afwImage.MaskedImageD(kImage1, kMask)
         if debugIO:
-            kImage1Ptr.writeFits('kFits1.fits')
+            kImage1.writeFits('kFits1.fits')
             kMaskedImage1.writeFits('kFits1_Mi')
                                     
 
         # convolve the other way
         vectorPair2 = ipDiff.computePsfMatchingKernelForFootprint2(
-            maskedSubImage2Ptr.get(), maskedSubImage1Ptr.get(),
+            maskedSubImage2, maskedSubImage1,
             emptyStamp, self.kernelBasisList, policy
             )
         kernelVector2, kernelErrorVector2, background2, backgroundError2 = ipDiffimTools.vectorPairToVectors(vectorPair2)
-        kernelPtr2 = afwMath.KernelPtr(
-            afwMath.LinearCombinationKernel(self.kernelBasisList, kernelVector2)
-            )
-        diffIm2 = ipDiff.convolveAndSubtract(maskedSubImage2Ptr.get(),
-                                             maskedSubImage1Ptr.get(),
-                                             kernelPtr2,
+        kernel2 = afwMath.LinearCombinationKernel(self.kernelBasisList, kernelVector2)
+        diffIm2 = ipDiff.convolveAndSubtract(maskedSubImage2,
+                                             maskedSubImage1,
+                                             kernel2,
                                              background2)
-        kImage2Ptr    = afwImage.ImageDPtr( afwImage.ImageD(kernelCols, kernelRows) )
-        kSum2 = kernelPtr2.computeImage(kImage2Ptr.get(), 0.0, 0.0, False)
-        kMaskedImage2 = afwImage.MaskedImageD(kImage2Ptr, kMaskPtr)
+        kImage2 = afwImage.ImageD(kernelCols, kernelRows)
+        kSum2   = kernel2.computeImage(kImage2, 0.0, 0.0, False)
+        kMaskedImage2 = afwImage.MaskedImageD(kImage2, kMask)
         if debugIO:
-            kImage2Ptr.writeFits('kFits2.fits')
+            kImage2.writeFits('kFits2.fits')
             kMaskedImage2.writeFits('kFits2_Mi')
 
         # check difference images
@@ -377,17 +384,17 @@ class DeconvolveTestCase(unittest.TestCase):
             diffIm2.writeFits('DI2')
         
         # check that you get a delta function
-        testConv12  = afwMath.convolveNew(kMaskedImage1, kernelPtr2.get(), 0, False)
-        testConv21  = afwMath.convolveNew(kMaskedImage2, kernelPtr1.get(), 0, False)
+        testConv12  = afwMath.convolveNew(kMaskedImage1, kernel2.get(), 0, False)
+        testConv21  = afwMath.convolveNew(kMaskedImage2, kernel1.get(), 0, False)
         testImage12 = testConv12.getImage()
         testImage21 = testConv21.getImage()
         # normalize to sum = 1.0
         sum12 = 0.0
         sum21 = 0.0
-        for i in range(testImage12.getCols()):
-            for j in range(testImage12.getRows()):
-                sum12 += testImage12.getVal(i,j)
-                sum21 += testImage21.getVal(i,j)
+        for i in range(testImage12.getWidth()):
+            for j in range(testImage12.getHeight()):
+                sum12 += testImage12.get(i,j)
+                sum21 += testImage21.get(i,j)
                 
         testConv12 /= sum12
         testConv21 /= sum21
@@ -399,14 +406,14 @@ class DeconvolveTestCase(unittest.TestCase):
         testImage12 = testConv12.getImage()
         testImage21 = testConv21.getImage()
         # In practice these are close but not exact due to noise
-        for i in range(testImage12.getCols()):
-            for j in range(testImage12.getRows()):
-                if i==j and i==testImage12.getCols()/2:
-                    self.assertAlmostEqual(testImage12.getVal(i,j), 1.0, places=2)
-                    self.assertAlmostEqual(testImage21.getVal(i,j), 1.0, places=2)
+        for i in range(testImage12.getWidth()):
+            for j in range(testImage12.getHeight()):
+                if i==j and i==testImage12.getWidth()/2:
+                    self.assertAlmostEqual(testImage12.get(i,j), 1.0, places=2)
+                    self.assertAlmostEqual(testImage21.get(i,j), 1.0, places=2)
                 else:
-                    self.assertAlmostEqual(testImage12.getVal(i,j), 0.0, places=2)
-                    self.assertAlmostEqual(testImage21.getVal(i,j), 0.0, places=2)
+                    self.assertAlmostEqual(testImage12.get(i,j), 0.0, places=2)
+                    self.assertAlmostEqual(testImage21.get(i,j), 0.0, places=2)
                 
             
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -441,9 +448,9 @@ class ConvolveAndSubtractTestCase(unittest.TestCase):
         kernelCols = policy.get('kernelCols')
         kernelRows = policy.get('kernelRows')
         
-        footprintBBox              = self.footprintList[0].getBBox()
-        imageToConvolveStampPtr    = MaskedImage(self.templateMaskedImage, footprintBBox)
-        imageToNotConvolveStampPtr = MaskedImage(self.scienceMaskedImage, footprintBBox)
+        footprintBBox           = self.footprintList[0].getBBox()
+        imageToConvolveStamp    = MaskedImage(self.templateMaskedImage, footprintBBox)
+        imageToNotConvolveStamp = MaskedImage(self.scienceMaskedImage, footprintBBox)
 
         
         kernel1 = afwMath.LinearCombinationKernel()
@@ -455,8 +462,8 @@ class ConvolveAndSubtractTestCase(unittest.TestCase):
             diffIm = ipDiff.convolveAndSubtract(
                 #self.scienceMaskedImage,
                 #self.templateMaskedImage,
-                imageToConvolveStampPtr,
-                imageToNotConvolveStampPtr,
+                imageToConvolveStamp,
+                imageToNotConvolveStamp,
                 kernel1,
                 self.backgroundFunction)
         except Exception, e:
@@ -469,8 +476,8 @@ class ConvolveAndSubtractTestCase(unittest.TestCase):
             diffIm = ipDiff.convolveAndSubtract(
                 #self.scienceMaskedImage,
                 #self.templateMaskedImage,
-                imageToConvolveStampPtr,
-                imageToNotConvolveStampPtr,
+                imageToConvolveStamp,
+                imageToNotConvolveStamp,
                 kernel2,
                 self.backgroundFunction)
         except:
@@ -486,11 +493,11 @@ def suite():
     tests.init()
 
     suites = []
-    #suites += unittest.makeSuite(ConvolveTestCase)
+    suites += unittest.makeSuite(ConvolveTestCase)
     #suites += unittest.makeSuite(DeltaFunctionTestCase)
     #suites += unittest.makeSuite(DeconvolveTestCase)
     #
-    suites += unittest.makeSuite(ConvolveAndSubtractTestCase)
+   # suites += unittest.makeSuite(ConvolveAndSubtractTestCase)
     #
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)

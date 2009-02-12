@@ -79,11 +79,6 @@ def version(HeadURL = r"$HeadURL$"):
 
 %include "lsst/ip/diffim/ImageSubtract.h"
 
-%template(DifferenceImageStatisticsF)
-    lsst::ip::diffim::DifferenceImageStatistics<float>;
-%template(DifferenceImageStatisticsD)
-    lsst::ip::diffim::DifferenceImageStatistics<double>;
-
 /*
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<> >;
@@ -110,19 +105,14 @@ def version(HeadURL = r"$HeadURL$"):
     lsst::ip::diffim::convolveAndSubtract<double, double>;
 
 %template(computePsfMatchingKernelForFootprint)
-    lsst::ip::diffim::computePsfMatchingKernelForFootprint<float>;
+    lsst::ip::diffim::computePsfMatchingKernelForFootprint<float, float>;
 %template(computePsfMatchingKernelForFootprint)
-    lsst::ip::diffim::computePsfMatchingKernelForFootprint<double>;
+    lsst::ip::diffim::computePsfMatchingKernelForFootprint<double, float>;
 
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double>;
-
-%template(calculateMaskedImageStatistics)
-    lsst::ip::diffim::calculateMaskedImageStatistics<float>;
-%template(calculateMaskedImageStatistics)
-    lsst::ip::diffim::calculateMaskedImageStatistics<double>;
 
 %template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, double>;
 %template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, double>;

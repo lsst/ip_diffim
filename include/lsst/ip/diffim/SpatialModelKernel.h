@@ -83,7 +83,7 @@ namespace diffim {
          * 
          * Overrides virtual function of base class
          */
-        double returnSdqaRating();
+        double returnSdqaRating(lsst::pex::policy::Policy &policy);
 
         /** Set Footprint pointer for the Kernel model
          *
@@ -177,14 +177,16 @@ namespace diffim {
 
         /** Set class instance associated with residuals in the derived difference image
          *
-         * @param kStats  Instance of DifferenceImageStatistics class
+         * @param kStats  Pointer to instance of FootprintFunctor ImageStatistics class
          *
          * @note Ideally will be replaced by Sdqa
+         *
+         * @note Has to be a pointer since there is no empty constructor of FootprintFunctor
          */
-        void setStats(DifferenceImageStatistics<ImageT> kStats) {_kStats = kStats;};
+        void setStats(boost::shared_ptr<ImageStatistics<lsst::afw::image::MaskedImage<ImageT> > > kStats) {_kStats = kStats;};
         /** Get class instance associated with residuals in the derived difference image
          */
-        DifferenceImageStatistics<ImageT> getStats() {return _kStats;};
+        boost::shared_ptr<ImageStatistics<lsst::afw::image::MaskedImage<ImageT> > > getStats() {return _kStats;};
 
     private: 
         /** Objects needed to build itself; only initializable during construction
@@ -205,7 +207,8 @@ namespace diffim {
         double _kSum;                                        ///< Kernel sum
         double _bg;                                          ///< Differential background value
         double _bgErr;                                       ///< Uncertainty in background
-        DifferenceImageStatistics<ImageT> _kStats;           ///< Home-grown statistics; placeholder for Sdqa
+        boost::shared_ptr<ImageStatistics<lsst::afw::image::MaskedImage<ImageT> > > _kStats; 
+                                                             ///< Home-grown statistics; placeholder for Sdqa
 
     }; // end of class
 

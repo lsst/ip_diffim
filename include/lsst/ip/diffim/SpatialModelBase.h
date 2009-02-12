@@ -15,6 +15,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include <lsst/afw/image/Mask.h>
+#include <lsst/pex/policy/Policy.h>
 
 namespace lsst {
 namespace ip {
@@ -81,7 +82,7 @@ namespace diffim {
          * 
          * Virtual function that must be overridden by derived class
          */
-        virtual double returnSdqaRating() = 0;
+        virtual double returnSdqaRating(lsst::pex::policy::Policy &policy2) = 0;
 
         /** Set its build status
          *

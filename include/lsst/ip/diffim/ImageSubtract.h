@@ -31,32 +31,6 @@ namespace lsst {
 namespace ip {
 namespace diffim {
     
-    /** 
-     * 
-     * @brief Class to store the summary statistics of a difference MaskedImage
-     * 
-     * @ingroup ip_diffim
-     *
-     * @note This class will be deprecated as soon as Sdqa classes are implemented
-     */
-    template <typename ImageT>
-    class DifferenceImageStatistics {
-    public:
-        DifferenceImageStatistics();
-        DifferenceImageStatistics(const lsst::afw::image::MaskedImage<ImageT> differenceMaskedImage);
-
-        virtual ~DifferenceImageStatistics() {};
-        void setResidualMean(double mean) {_residualMean = mean;}
-        void setResidualStd(double std) {_residualStd = std;}
-        double getResidualMean() {return _residualMean;}
-        double getResidualStd() {return _residualStd;}
-
-        bool evaluateQuality(lsst::pex::policy::Policy &policy);
-    private:
-        double _residualMean;
-        double _residualStd;
-    };
-
     /** Uses a functor to accumulate Mask bits
      *
      * @ingroup diffim
@@ -167,7 +141,14 @@ namespace diffim {
         }
         // Return the number of good pixels
         double getNpix() const { return _npix; }
-        
+
+        // Return Sdqa rating
+        bool evaluateQuality(lsst::pex::policy::Policy &policy) {
+            if ( fabs(getMean())     > policy.getDouble("maximumFootprintResidualMean") ) return false;
+            if ( sqrt(getVariance()) > policy.getDouble("maximumFootprintResidualStd")  ) return false;
+            return true;
+        }           
+
         // Clear the accumulators
         void reset() { _xsum = _x2sum = 0.; _npix = 0;}
         
@@ -320,11 +301,11 @@ namespace diffim {
      * @param background  Differential background
      * @param backgroundError  Uncertainty on differential background
      */    
-    template <typename ImageT>
+    template <typename ImageT, typename VarT>
     void computePsfMatchingKernelForFootprint(
         lsst::afw::image::MaskedImage<ImageT>         const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT>         const &imageToNotConvolve,
-        lsst::afw::image::MaskedImage<ImageT>         const &varianceImage,
+        lsst::afw::image::Image<VarT>                 const &varianceImage,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
         lsst::pex::policy::Policy                  &policy,
         boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
