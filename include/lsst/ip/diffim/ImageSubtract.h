@@ -17,6 +17,8 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <gsl/gsl_matrix.h>
+
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/afw/math/Kernel.h>
 #include <lsst/afw/math/KernelFunctions.h>
@@ -106,15 +108,15 @@ namespace diffim {
     template <typename ImageT>
     class FindCounts : public lsst::afw::detection::FootprintFunctor<ImageT> {
     public:
-        FindCounts(lsst::afw::image::MaskedImage<ImageT> const &mimage) : 
+        FindCounts(ImageT const &mimage) : 
             lsst::afw::detection::FootprintFunctor<ImageT>(mimage), _counts(0.) {;}
         
         void operator()(typename ImageT::xy_locator loc, ///< locator pointing at the pixel
                         int x,                           ///< column-position of pixel
                         int y                            ///< row-position of pixel
             ) {
-            if (*loc.mask() == 0)
-                _counts += *loc.image();
+            if ((*loc).mask() == 0)
+                _counts += (*loc).image();
         }
         
         // Return the total counts
@@ -131,6 +133,8 @@ namespace diffim {
      *
      * @ingroup diffim
      *
+     * @note Looks like this is (almost) implemented in lsst/afw/math/Statistics.h
+     * 
      * @note Find mean and unbiased variance of pixel residuals in units of
      * sqrt(variance)
      * 
@@ -138,7 +142,7 @@ namespace diffim {
     template <typename ImageT>
     class ImageStatistics : public lsst::afw::detection::FootprintFunctor<ImageT> {
     public:
-        ImageStatistics(lsst::afw::image::MaskedImage<ImageT> const &mimage) : 
+        ImageStatistics(ImageT const &mimage) : 
             lsst::afw::detection::FootprintFunctor<ImageT>(mimage), 
             _xsum(0.), _x2sum(0.), _npix(0) {;}
         
@@ -146,9 +150,9 @@ namespace diffim {
                         int x,                           ///< column-position of pixel
                         int y                            ///< row-position of pixel
             ) {
-            if (*loc.mask() == 0) {
-                _xsum  += *loc.image() / sqrt(*loc.variance());
-                _x2sum += *loc.image() * *loc.image() / *loc.variance();
+            if ((*loc).mask() == 0) {
+                _xsum  += (*loc).image() / sqrt((*loc).variance());
+                _x2sum += (*loc).image() * (*loc).image() / (*loc).variance();
                 _npix  += 1;
             }
         }
@@ -157,14 +161,14 @@ namespace diffim {
         double getMean() const { 
             return (_npix > 0) ? _xsum/_npix : std::numeric_limits<double>::quiet_NaN(); 
         }
-        // RMS of distribution 
+        // Variance of distribution 
         double getVariance() const { 
-            return (_npix > 1) ? (_x2sum/_npix - getMean()*getMean()) * _npix/(_npix-1.) : std::numeric_limits<double>::quiet_NaN(); 
+            return (_npix > 1) ? (_x2sum/_npix - _xsum/_npix * _xsum/_npix) * _npix/(_npix-1.) : std::numeric_limits<double>::quiet_NaN(); 
         }
-        // Return the total counts
+        // Return the number of good pixels
         double getNpix() const { return _npix; }
         
-        // Clear the accumulator
+        // Clear the accumulators
         void reset() { _xsum = _x2sum = 0.; _npix = 0;}
         
     private:
@@ -329,6 +333,22 @@ namespace diffim {
         double                                     &backgroundError
         );
 
+    /** Add a spatially varying function to an Image
+     *
+     * @note Typically used to add a background Function to an Image
+     *
+     * @param image Image to add function to
+     * @param function  Function added to image
+     */
+    template <typename ImageT, typename FunctionT>
+    void addFunctionToImage(
+        lsst::afw::image::Image<ImageT> &image,
+        lsst::afw::math::Function2<FunctionT> const &function
+        );
+
+
+    // BELOW ARE LESS USEFUL / DEPRECATED PIECES OF CODE
+
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
      *
      * @param background  Differential background value
@@ -386,19 +406,20 @@ namespace diffim {
         lsst::afw::image::MaskedImage<ImageT> const &inputImage
         );
 
-    /** Add a spatially varying function to an Image
-     *
-     * @note Typically used to add a background Function to an Image
-     *
-     * @param image Image to add function to
-     * @param function  Function added to image
-     */
-    template <typename ImageT, typename FunctionT>
-    void addFunctionToImage(
-        lsst::afw::image::Image<ImageT> &image,
-        lsst::afw::math::Function2<FunctionT> const &function
-        );
 
+    /** Compute pseudoInverse using GSL
+     *
+     * @param dest Inverted matrix
+     * @param src Matrix to be inverted
+     */
+    // void pseudoInverse(gsl_matrix * dest, const gsl_matrix * src);
+
+    /** Compute matrix covariance using GSL
+     *
+     * @param dest Output matrix holding the data covariance
+     * @param src Input matrix holding the data
+     */
+    // void covariance(gsl_matrix * dest, const gsl_matrix * src);
 
 }}}
 

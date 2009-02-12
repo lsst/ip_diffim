@@ -66,7 +66,7 @@ namespace diffim {
         SpatialModelCell(std::string label,
                          FpPtrList fpPtrList, 
                          ModelPtrList modelPtrList);
-        
+
         /** Constructor
          *
          * @param label  string representing "name" of cell

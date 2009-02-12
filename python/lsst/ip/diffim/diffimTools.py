@@ -1,6 +1,6 @@
 import numpy
 import lsst.ip.diffim as ipDiffim
-import lsst.detection as detection
+import lsst.afw.detection as detection
 import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
 import lsst.pex.exceptions as Exceptions
@@ -101,7 +101,7 @@ def rejectKernelSumOutliers(spatialCells, policy):
           'Kernel Sum : %0.3f +/- %0.3f, %d kernels' % (kSumMean, kSumStd, nCells))
 
 
-def createSpatialModelKernelCells(fpList,
+def createSpatialModelKernelCells(fpInList,
                                   templateMaskedImage,
                                   scienceMaskedImage,
                                   kBasisList,
@@ -109,31 +109,27 @@ def createSpatialModelKernelCells(fpList,
                                   cFlag='c'):
 
     
-    templateMaskedImagePtr = afwImage.MaskedImageFPtr(templateMaskedImage)
-    scienceMaskedImagePtr  = afwImage.MaskedImageFPtr(scienceMaskedImage)
-    
     nSegmentCol = policy.get('nSegmentCol')
     nSegmentRow = policy.get('nSegmentRow')
 
-    nSegmentColPix = int( templateMaskedImage.getCols() / nSegmentCol )
-    nSegmentRowPix = int( templateMaskedImage.getRows() / nSegmentRow )
+    nSegmentColPix = int( templateMaskedImage.getWidth() / nSegmentCol )
+    nSegmentRowPix = int( templateMaskedImage.getHeight() / nSegmentRow )
 
     spatialCells   = ipDiffim.VectorSpatialModelCellF()
     
     cellCount = 0
     for col in range(nSegmentCol):
         colMin    = max(0, col*nSegmentColPix)
-        colMax    = min(templateMaskedImage.getCols(), (col+1)*nSegmentColPix)
+        colMax    = min(templateMaskedImage.getWidth(), (col+1)*nSegmentColPix)
         colCenter = int( 0.5 * (colMin + colMax) )
         
         for row in range(nSegmentRow):
-            rowMin    = max(0, row*nSegmentRowPix)
-            rowMax    = min(templateMaskedImage.getRows(), (row+1)*nSegmentRowPix)
-            rowCenter = int( 0.5 * (rowMin + rowMax) )
+            rowMin     = max(0, row*nSegmentRowPix)
+            rowMax     = min(templateMaskedImage.getHeight(), (row+1)*nSegmentRowPix)
+            rowCenter  = int( 0.5 * (rowMin + rowMax) )
+            label      = 'c%d' % cellCount
 
-            label     = 'c%d' % cellCount
-
-            fpPtrList = detection.FootprintContainerT()
+            fpCellList = detection.FootprintContainerT()
 
             # NOTE : ideally we want this to be a vector of the base
             # class, not derived class.  Swig is making this difficult
@@ -143,19 +139,17 @@ def createSpatialModelKernelCells(fpList,
             # This is a bit blunt and could be more clever
             # Should never really have a loop within a loop within a loop
             # But we will not have *that many* Footprints...
-            for fpID, fpPtr in enumerate(fpList):
+            for fpID, fpPtr in enumerate(fpInList):
                 fpBBox = fpPtr.getBBox()
-                fpMin  = fpBBox.min()
-                fpMax  = fpBBox.max()
-                fpColC = 0.5 * (fpMin.x() + fpMax.x())
-                fpRowC = 0.5 * (fpMin.y() + fpMax.y())
+                fpColC = 0.5 * (fpBBox.getX0() + fpBBox.getX1())
+                fpRowC = 0.5 * (fpBBox.getY0() + fpBBox.getY1())
 
                 if (fpColC >= colMin) and (fpColC < colMax) and (fpRowC >= rowMin) and (fpRowC < rowMax):
-                    fpPtrList.push_back(fpPtr)
+                    fpCellList.push_back(fpPtr)
                     
                     model = ipDiffim.SpatialModelKernelF(fpPtr,
-                                                         templateMaskedImagePtr,
-                                                         scienceMaskedImagePtr,
+                                                         templateMaskedImage,
+                                                         scienceMaskedImage,
                                                          kBasisList,
                                                          policy,
                                                          False)
@@ -165,8 +159,7 @@ def createSpatialModelKernelCells(fpList,
                         
                     modelList.push_back( model )
                     
-
-            spatialCell = ipDiffim.SpatialModelCellF(label, colCenter, rowCenter, fpPtrList, modelList)
+            spatialCell = ipDiffim.SpatialModelCellF(label, colCenter, rowCenter, fpCellList, modelList)
             spatialCells.push_back(spatialCell)
 
             # Formatting to the screen 

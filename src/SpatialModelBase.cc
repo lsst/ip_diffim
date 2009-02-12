@@ -23,8 +23,8 @@ SpatialModelBase<ImageT>::SpatialModelBase() :
     _id(-1),
     _isBuilt(false),
     _isGood(false),
-    _colcNorm(0.0),
-    _rowcNorm(0.0)
+    _colc(0.0),
+    _rowc(0.0)
 {;}
 
 // Explicit instantiations

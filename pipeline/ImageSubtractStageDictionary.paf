@@ -61,6 +61,9 @@ maximumFootprintResidualStd: 2.0
 # Minimum number of pixels in an acceptible Footprint
 footprintDiffimNpixMin: 9
 
+# Maximum number of pixels in an acceptible Footprint
+footprintDiffimNpixMax: 500
+
 # Grow footprint by this many pixels
 footprintDiffimGrow: 20
 

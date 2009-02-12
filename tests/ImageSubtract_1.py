@@ -45,29 +45,26 @@ policy = lsst.pex.policy.Policy.createPolicy(policyPath)
 InputMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_1")
 TemplateMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_1_tmpl")
 
+# the desired type of MaskedImage
+MaskedImage = afwImage.MaskedImageD
+
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 def initializeTestCases():
-    MaskedImage = afwImage.MaskedImageD       # the desired type of MaskedImage
-
-    templateMaskedImage2 = MaskedImage()
-    templateMaskedImage2.readFits(TemplateMaskedImagePath)
-
-    templateMaskedImage = MaskedImage()
-    templateMaskedImage.readFits(InputMaskedImagePath)
-    scienceMaskedImage = MaskedImage()
-    scienceMaskedImage.readFits(InputMaskedImagePath)
+    templateMaskedImage2 = MaskedImage(TemplateMaskedImagePath)
+    templateMaskedImage  = MaskedImage(InputMaskedImagePath)
+    scienceMaskedImage   = MaskedImage(InputMaskedImagePath)
     
     kernelCols = policy.get('kernelCols')
     kernelRows = policy.get('kernelRows')
-    kernelSpatialOrder = policy.get('kernelSpatialOrder')
+    kernelSpatialOrder     = policy.get('kernelSpatialOrder')
     backgroundSpatialOrder = policy.get('backgroundSpatialOrder')
 
     # create basis vectors
     kernelBasisList = ipDiff.generateDeltaFunctionKernelSet(kernelCols, kernelRows)
     
     # create output kernel pointer
-    kernelPtr = afwMath.LinearCombinationKernelPtr(afwMath.LinearCombinationKernel())
+    kernelPtr = afwMath.LinearCombinationKernel()
     
     # and its function for spatial variation
     kernelFunction = afwMath.PolynomialFunction2D(kernelSpatialOrder)
@@ -78,11 +75,11 @@ def initializeTestCases():
     # make single good footprint at known object position in cal-53535-i-797722_1
     size = 40
     footprintList = detection.FootprintContainerT()
-    footprint = detection.FootprintPtrT(detection.Footprint( afwImage.BBox2i(366 - size/2,
-                                                                             364 - size/2,
-                                                                             size,
-                                                                             size) )
-                                        )
+    footprint     = detection.Footprint( afwImage.BBox(afwImage.PointI(366 - size/2,
+                                                                       364 - size/2),
+                                                       size,
+                                                       size) )
+    
     footprintList.push_back(footprint)
 
     return templateMaskedImage2, templateMaskedImage, scienceMaskedImage, kernelBasisList, kernelPtr, kernelFunction, backgroundFunction, footprintList
@@ -129,8 +126,8 @@ class ConvolveTestCase(unittest.TestCase):
         
         for footprintID, iFootprintPtr in enumerate(self.footprintList):
             footprintBBox              = iFootprintPtr.getBBox()
-            imageToConvolveStampPtr    = self.templateMaskedImage.getSubImage(footprintBBox)
-            imageToNotConvolveStampPtr = convolvedScienceMaskedImage.getSubImage(footprintBBox)
+            imageToConvolveStampPtr    = MaskedImage(self.templateMaskedImage, footprintBBox)
+            imageToNotConvolveStampPtr = MaskedImage(convolvedScienceMaskedImage, footprintBBox)
             
             kernelCoeffList, background = ipDiff.computePsfMatchingKernelForFootprint(
                 imageToConvolveStampPtr.get(),
@@ -206,9 +203,9 @@ class DeltaFunctionTestCase(unittest.TestCase):
         
         for footprintID, iFootprintPtr in enumerate(self.footprintList):
             footprintBBox              = iFootprintPtr.getBBox()
-            imageToConvolveStampPtr    = self.templateMaskedImage.getSubImage(footprintBBox)
+            imageToConvolveStampPtr    = MaskedImage(self.templateMaskedImage, footprintBBox)
 
-            imageToNotConvolveStampPtr = self.scienceMaskedImage.getSubImage(footprintBBox)
+            imageToNotConvolveStampPtr = MaskedImage(self.scienceMaskedImage, footprintBBox)
             # this is a bit of a hack to deal with -= and *= problems with swigged masked images
             imageArray, varianceArray, maskArray = imageTest.arraysFromMaskedImage(imageToNotConvolveStampPtr.get())
             imageArray += bg
@@ -316,8 +313,8 @@ class DeconvolveTestCase(unittest.TestCase):
             maskedImage2.writeFits('MI2a')
 
         goodData = afwImage.BBox2i(scale*kernelCols/2+1, scale*kernelRows/2+1, scale*kernelCols, scale*kernelRows)
-        maskedSubImage1Ptr = maskedImage1.getSubImage(goodData)
-        maskedSubImage2Ptr = maskedImage2.getSubImage(goodData)
+        maskedSubImage1Ptr = MaskedImage(maskedImage1, goodData)
+        maskedSubImage2Ptr = MaskedImage(maskedImage2, goodData)
         kMaskPtr           = afwImage.MaskUPtr( afwImage.MaskU(kernelCols, kernelRows) )
         
         emptyStamp  = afwImage.MaskedImageD(maskedSubImage1Ptr.getCols(), maskedSubImage1Ptr.getRows())
@@ -445,8 +442,8 @@ class ConvolveAndSubtractTestCase(unittest.TestCase):
         kernelRows = policy.get('kernelRows')
         
         footprintBBox              = self.footprintList[0].getBBox()
-        imageToConvolveStampPtr    = self.templateMaskedImage.getSubImage(footprintBBox)
-        imageToNotConvolveStampPtr = self.scienceMaskedImage.getSubImage(footprintBBox)
+        imageToConvolveStampPtr    = MaskedImage(self.templateMaskedImage, footprintBBox)
+        imageToNotConvolveStampPtr = MaskedImage(self.scienceMaskedImage, footprintBBox)
 
         
         kernel1 = afwMath.LinearCombinationKernel()
@@ -456,8 +453,10 @@ class ConvolveAndSubtractTestCase(unittest.TestCase):
         
         try:
             diffIm = ipDiff.convolveAndSubtract(
-                self.scienceMaskedImage,
-                self.templateMaskedImage,
+                #self.scienceMaskedImage,
+                #self.templateMaskedImage,
+                imageToConvolveStampPtr,
+                imageToNotConvolveStampPtr,
                 kernel1,
                 self.backgroundFunction)
         except Exception, e:
@@ -468,8 +467,10 @@ class ConvolveAndSubtractTestCase(unittest.TestCase):
 
         try:
             diffIm = ipDiff.convolveAndSubtract(
-                self.scienceMaskedImage,
-                self.templateMaskedImage,
+                #self.scienceMaskedImage,
+                #self.templateMaskedImage,
+                imageToConvolveStampPtr,
+                imageToNotConvolveStampPtr,
                 kernel2,
                 self.backgroundFunction)
         except:
@@ -499,4 +500,5 @@ def run(exit=False):
     tests.run(suite(), exit)
 
 if __name__ == "__main__":
+    """Tests the functionality of the code"""
     run(True)

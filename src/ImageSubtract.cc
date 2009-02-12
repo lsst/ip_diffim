@@ -17,6 +17,7 @@
 #include <gsl/gsl_multifit.h>
 #include <gsl/gsl_machine.h>
 #include <gsl/gsl_blas.h>
+#include <gsl/gsl_cblas.h>
 #include <gsl/gsl_linalg.h>
 
 // NOTE -  trace statements >= 6 can ENTIRELY kill the run time
@@ -61,6 +62,14 @@ diffim::DifferenceImageStatistics<ImageT>::DifferenceImageStatistics(
     double mean, variance;
     
     diffim::calculateMaskedImageStatistics(nGood, mean, variance, differenceMaskedImage);
+
+    /* Note - compare this functor to the extant subroutine */
+    //diffim::ImageStatistics<image::MaskedImage<ImageT> > imstat(differenceMaskedImage);
+    //lsst::afw::detection::Footprint fp(image::PointI(0,0), differenceMaskedImage.getDimensions());
+    //imstat.apply(fp);
+    //std::cout << " stat1 " << mean << " " << variance << std::endl;
+    //std::cout << " stat2 " << imstat.getMean() << " " << imstat.getVariance() << std::endl;
+
     this->_residualMean = mean;
     this->_residualStd  = sqrt(variance);
 }
@@ -335,6 +344,7 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     
     // Parse the Policy
     unsigned int footprintDiffimNpixMin = policy.getInt("footprintDiffimNpixMin");
+    unsigned int footprintDiffimNpixMax = policy.getInt("footprintDiffimNpixMax");
     unsigned int footprintDiffimGrow    = policy.getInt("footprintDiffimGrow");
     int minimumCleanFootprints          = policy.getInt("minimumCleanFootprints");
     double footprintDetectionThreshold  = policy.getDouble("footprintDetectionThreshold");
@@ -373,14 +383,33 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         // Iterate over footprints, look for "good" ones
         nCleanFootprints = 0;
         for (std::vector<lsst::afw::detection::Footprint::Ptr>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
+
             // footprint has not enough pixels 
             if (static_cast<unsigned int>((*i)->getNpix()) < footprintDiffimNpixMin) {
                 continue;
+            }
+            
+            // footprint has too many
+            if (static_cast<unsigned int>((*i)->getNpix()) > footprintDiffimNpixMax) {
+                continue;
             } 
             
+            logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                               "Footprint in : %d,%d -> %d,%d",
+                               (*i)->getBBox().getX0(), (*i)->getBBox().getX1(), 
+                               (*i)->getBBox().getY0(), (*i)->getBBox().getY1());
+
+            logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                               "Grow by : %d", footprintDiffimGrow);
+
             // Grow the footprint
             lsst::afw::detection::Footprint::Ptr fpGrow = 
                 lsst::afw::detection::growFootprint(*i, footprintDiffimGrow);
+            
+            logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                               "Footprint out : %d,%d -> %d,%d",
+                               (*fpGrow).getBBox().getX0(), (*fpGrow).getBBox().getX1(), 
+                               (*fpGrow).getBBox().getY0(), (*fpGrow).getBBox().getY1());
 
             // Search for bad pixels within the footprint
             itcFunctor.reset();
@@ -623,11 +652,11 @@ void diffim::computePsfMatchingKernelForFootprint(
     gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc (nParameters, nParameters);
     gsl_vector *X                       = gsl_vector_alloc (nParameters);
     gsl_matrix *Cov                     = gsl_matrix_alloc (nParameters, nParameters);
-    //double chi2;
+    double chi2;
     size_t rank;
-    /* This has too much other computation in there; take only what I need 
-       gsl_multifit_linear_svd(M, B, GSL_DBL_EPSILON, &rank, X, Cov, &chi2, work);
-    */
+    gsl_multifit_linear_svd(M, B, GSL_DBL_EPSILON, &rank, X, Cov, &chi2, work);
+
+    /* guts of gsl_multifit_linear_svd
     gsl_matrix *A   = work->A;
     gsl_matrix *Q   = work->Q;
     gsl_matrix *QSI = work->QSI;
@@ -666,7 +695,7 @@ void diffim::computePsfMatchingKernelForFootprint(
     gsl_blas_dgemv (CblasNoTrans, 1.0, QSI, xt, 0.0, X);
     gsl_vector_div (X, D);
     gsl_multifit_linear_free(work);
-    
+    */
     
     time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
@@ -846,12 +875,37 @@ void diffim::addFunctionToImage(
     }
 }
 
+// GSL 
+/*
+void pseudoInverse(gsl_matrix * dest, const gsl_matrix * src) {
+    
+}
+
+void covariance(gsl_matrix * dest, const gsl_matrix * src) {
+    gsl_matrix *trans = gsl_matrix_alloc (src.size2, src.size1);
+    gsl_matrix_transpose_memcpy(trans, src);
+    // is this a bad idea? 
+    dest = gsl_matrix_alloc (src.size1, src.size2);
+    cblas_sgemm (CblasRowMajor, 
+                 CblasNoTrans, CblasNoTrans, 2, 2, 3,
+                 1.0, trans, nParameters, src, nParameters, 0.0, dest, nParameters);
+
+    
+}
+*/
+
 // Explicit instantiations
 
 template class diffim::DifferenceImageStatistics<float>;
 template class diffim::DifferenceImageStatistics<double>;
 
-// template class diffim::FindSetBits<image::MaskPixel>;
+template class diffim::FindSetBits<image::Mask<> >;
+
+template class diffim::FindCounts<image::MaskedImage<float> >;
+template class diffim::FindCounts<image::MaskedImage<double> >;
+
+template class diffim::ImageStatistics<image::MaskedImage<float> >;
+template class diffim::ImageStatistics<image::MaskedImage<double> >;
 
 /* */
 

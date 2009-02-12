@@ -7,7 +7,6 @@ import lsst.afw.image as afwImage
 import lsst.daf.base as dafBase
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
-import lsst.detection as detection
 
 from lsst.pex.logging import Log
 from lsst.pex.logging import Trace
@@ -213,11 +212,8 @@ Notes:
     print 'Output image:  ', outputPath
     print 'Policy file:   ', policyPath
     
-    templateMaskedImage = afwImage.MaskedImageF()
-    templateMaskedImage.readFits(templatePath)
-    
-    scienceMaskedImage  = afwImage.MaskedImageF()
-    scienceMaskedImage.readFits(sciencePath)
+    templateMaskedImage = afwImage.MaskedImageF(templatePath)
+    scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
 
     policy = Policy.createPolicy(policyPath)
     if options.debugIO:
@@ -259,18 +255,22 @@ Notes:
                                                                 policy,
                                                                 cFlag='c')
     if policy.get('spatialKernelTesting') == True:
-        bgListC, kListC = spatialKernelTesting(spatialCellsC, kBasisList, policy, 0)
-        for key1 in bgListC.keys():
-            for key2 in range(len(bgListC[key1])):
-                background = bgListC[key1][key2]
-                kernel     = kListC[key1][key2]
-
-                diffIm = ipDiffim.convolveAndSubtract(
-                    templateMaskedImage,
-                    scienceMaskedImage,
-                    kernel,
-                    background)
-                diffIm.writeFits('diffImC_%s_%d' % (key1, key2))
+        resultsC = spatialKernelTesting(spatialCellsC, kBasisList, policy, 0)
+        if resultsC == None:
+            Trace('lsst.ip.diffim', 3, 'Spatial testing failed')
+        else:
+            bgListC, kListC = resultsC
+            for key1 in bgListC.keys():
+                for key2 in range(len(bgListC[key1])):
+                    background = bgListC[key1][key2]
+                    kernel     = kListC[key1][key2]
+    
+                    diffIm = ipDiffim.convolveAndSubtract(
+                        templateMaskedImage,
+                        scienceMaskedImage,
+                        kernel,
+                        background)
+                    diffIm.writeFits('diffImC_%s_%d' % (key1, key2))
 
     #
     ###
@@ -284,19 +284,23 @@ Notes:
                                                                 policy,
                                                                 cFlag='d')
     if policy.get('spatialKernelTesting') == True:
-        bgListD, kListD = spatialKernelTesting(spatialCellsD, kBasisList, policy, 1)
-        for key1 in fitListD.keys():
-            for key2 in range(len(bgListD[key1])):
-                background = bgListD[key1][key2]
-                kernel     = kListD[key1][key2]
-
-                diffIm = ipDiffim.convolveAndSubtract(
-                    scienceMaskedImage,
-                    templateMaskedImage,
-                    kernel,
-                    background)
-                diffIm.writeFits('diffImD_%s_%d' % (key1, key2))
-
+        resultsD = spatialKernelTesting(spatialCellsD, kBasisList, policy, 1)
+        if resultsD == None:
+            Trace('lsst.ip.diffim', 3, 'Spatial testing failed')
+        else:
+            bgListD, kListD = resultsD
+            for key1 in fitListD.keys():
+                for key2 in range(len(bgListD[key1])):
+                    background = bgListD[key1][key2]
+                    kernel     = kListD[key1][key2]
+    
+                    diffIm = ipDiffim.convolveAndSubtract(
+                        scienceMaskedImage,
+                        templateMaskedImage,
+                        kernel,
+                        background)
+                    diffIm.writeFits('diffImD_%s_%d' % (key1, key2))
+    
     return
 
 

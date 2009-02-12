@@ -62,8 +62,15 @@ bool SpatialModelKernel<ImageT>::buildModel() {
 
     // fill in information on position in the image
     lsst::afw::image::BBox fpBBox = this->_fpPtr->getBBox();
-    this->setColcNorm(float(fpBBox.getX0() + fpBBox.getX1()) / this->_miToConvolveParentPtr->getWidth() - 1.0);
-    this->setRowcNorm(float(fpBBox.getY0() + fpBBox.getY1()) / this->_miToConvolveParentPtr->getHeight() - 1.0);
+
+    // NOTE : since we can't remap pixel range to go from -1 to 1 in convolve(),
+    // we have to use the actual pixel value here.  Not optimal.
+
+    // this->setColc(float(fpBBox.getX0() + fpBBox.getX1()) / this->_miToConvolveParentPtr->getWidth() - 1.0);
+    // this->setRowc(float(fpBBox.getY0() + fpBBox.getY1()) / this->_miToConvolveParentPtr->getHeight() - 1.0);
+
+    this->setColc(0.5 * float(fpBBox.getX0() + fpBBox.getX1()));
+    this->setRowc(0.5 * float(fpBBox.getY0() + fpBBox.getY1()));
 
     lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                                   "Footprint = %d,%d -> %d,%d",

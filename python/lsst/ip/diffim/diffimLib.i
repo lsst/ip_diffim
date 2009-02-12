@@ -42,8 +42,9 @@ namespace boost {
 
 %include "lsst/p_lsstSwig.i"
 %include "lsst/daf/base/persistenceMacros.i"
-
 %import  "lsst/afw/image/imageLib.i" 
+%import  "lsst/afw/detection/detectionLib.i"
+%import  "lsst/afw/math/kernelLib.i"
 
 %lsst_exceptions();
 
@@ -61,7 +62,7 @@ def version(HeadURL = r"$HeadURL$"):
         return version_svn
     else:
         try:
-            version_eups = eups.setup("afw")
+            version_eups = eups.setup("ip_diffim")
         except AttributeError:
             return version_svn
 
@@ -82,6 +83,21 @@ def version(HeadURL = r"$HeadURL$"):
     lsst::ip::diffim::DifferenceImageStatistics<float>;
 %template(DifferenceImageStatisticsD)
     lsst::ip::diffim::DifferenceImageStatistics<double>;
+
+/*
+%template(FindSetBitsU)
+    lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<> >;
+
+%template(FindCountsF)
+    lsst::ip::diffim::FindCounts<lsst::afw::image::MaskedImage<float> >;
+%template(FindCountsD)
+    lsst::ip::diffim::FindCounts<lsst::afw::image::MaskedImage<double> >;
+
+%template(ImageStatisticsF)
+    lsst::ip::diffim::ImageStatistics<lsst::afw::image::MaskedImage<float> >;
+%template(ImageStatisticsD)
+    lsst::ip::diffim::ImageStatistics<lsst::afw::image::MaskedImage<double> >;
+*/
 
 %template(convolveAndSubtract)
     lsst::ip::diffim::convolveAndSubtract<float>;

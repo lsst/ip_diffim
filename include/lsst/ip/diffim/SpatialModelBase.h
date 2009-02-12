@@ -55,21 +55,21 @@ namespace diffim {
          *
          * @param colc  Column center
          */
-        void setColcNorm(double colc) {_colcNorm = colc;};
+        void setColc(double colc) {_colc = colc;};
 
         /** Get col centroid of Model; range -1 to 1
          */
-        double getColcNorm() {return _colcNorm;};
+        double getColc() {return _colc;};
 
         /** Set row centroid of Model; range -1 to 1
          *
          * @param rowc  Row center
          */
-        void setRowcNorm(double rowc) {_rowcNorm = rowc;};
+        void setRowc(double rowc) {_rowc = rowc;};
 
         /** Get row centroid of Model; range -1 to 1
          */
-        double getRowcNorm() {return _rowcNorm;};
+        double getRowc() {return _rowc;};
 
         /** Execute the time-consuming process of building the local model
          * 
@@ -126,8 +126,8 @@ namespace diffim {
         int _id;          ///< Running ID
         bool _isBuilt;    ///< Model has been built
         bool _isGood;     ///< Passes local and/or Sdqa requirments
-        double _colcNorm; ///< Effective col position of model in overall image
-        double _rowcNorm; ///< Effective col position of model in overall image
+        double _colc;     ///< Effective col position of model in overall image
+        double _rowc;     ///< Effective col position of model in overall image
 
 
     }; // end of class

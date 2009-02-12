@@ -6,7 +6,6 @@ import lsst.afw.image as afwImage
 import lsst.daf.base  as dafBase
 import lsst.afw.math  as afwMath
 import lsst.ip.diffim as ipDiffim
-import lsst.detection as detection
 
 from   lsst.pex.logging import Log
 from   lsst.pex.logging import Trace
