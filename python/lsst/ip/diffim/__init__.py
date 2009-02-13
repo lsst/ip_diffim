@@ -5,6 +5,6 @@ from diffimLib import *
 from diffimTools import *
 from spatialKernelFit import *
 
-# optional
-# from diffimDebug import *
-# from diffimPlot import *
+# second tier, ask for them by name
+import diffimDebug 
+import diffimPlot

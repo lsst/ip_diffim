@@ -13,11 +13,6 @@ from lsst.pex.logging import Trace
 from lsst.pex.policy import Policy
 import lsst.pex.exceptions as Exceptions
 
-# Python code
-import lsst.ip.diffim.diffimTools as ipDiffimTools
-import lsst.ip.diffim.diffimDebug as ipDiffimDebug
-from lsst.ip.diffim.spatialModelKernelFit import * 
-
 # For degugging needs
 import pdb
 
@@ -33,7 +28,7 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
     rejectKernels = policy.get('spatialKernelRejection')
     
     try:
-        ipDiffimTools.rejectKernelSumOutliers(spatialCells, policy)
+        ipDiffim.rejectKernelSumOutliers(spatialCells, policy)
     except:
         Trace('lsst.ip.diffim', 2,
               'LOOP %d FAILED; no good kernels' % (scID))
@@ -248,12 +243,12 @@ Notes:
 
     # LOOP 1 : convolution vs deconvolution
     Trace('lsst.ip.diffim', 1, 'SC List 1')
-    spatialCellsC = ipDiffimTools.createSpatialModelKernelCells(fpList,
-                                                                templateMaskedImage,
-                                                                scienceMaskedImage,
-                                                                kBasisList,
-                                                                policy,
-                                                                cFlag='c')
+    spatialCellsC = ipDiffim.createSpatialModelKernelCells(fpList,
+                                                           templateMaskedImage,
+                                                           scienceMaskedImage,
+                                                           kBasisList,
+                                                           policy,
+                                                           cFlag='c')
     if policy.get('spatialKernelTesting') == True:
         resultsC = spatialKernelTesting(spatialCellsC, kBasisList, policy, 0)
         if resultsC == None:
@@ -277,12 +272,12 @@ Notes:
     #
 
     Trace('lsst.ip.diffim', 1, 'SC List 2')
-    spatialCellsD = ipDiffimTools.createSpatialModelKernelCells(fpList,
-                                                                scienceMaskedImage,
-                                                                templateMaskedImage,
-                                                                kBasisList,
-                                                                policy,
-                                                                cFlag='d')
+    spatialCellsD = ipDiffim.createSpatialModelKernelCells(fpList,
+                                                           scienceMaskedImage,
+                                                           templateMaskedImage,
+                                                           kBasisList,
+                                                           policy,
+                                                           cFlag='d')
     if policy.get('spatialKernelTesting') == True:
         resultsD = spatialKernelTesting(spatialCellsD, kBasisList, policy, 1)
         if resultsD == None:
