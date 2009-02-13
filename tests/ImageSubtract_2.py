@@ -8,6 +8,7 @@ import pdb
 import eups
 import lsst.pex.policy
 import lsst.utils.tests as tests
+import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
 import lsst.afw.detection as afwDetection
 import lsst.ip.diffim as ipDiffim
@@ -113,41 +114,33 @@ class ImageStatisticsUT(unittest.TestCase):
         assert(count.getVariance() == (imageData[idx]/varianceData[idx]).std())
         
 class generateDeltaFunctionKernelSetUT(unittest.TestCase):
-    def testSquare(self):
-        ks1 = ipDiffim.generateDeltaFunctionKernelSet(10, 10)
+    """Test case for generateDeltaFunctionKernelSet"""
+    def doit(self, width=10, height=10):
+        ks1 = ipDiffim.generateDeltaFunctionKernelSet(width, height)
         nk  = 0
-        for i in range(10):
-            for j in range(10):
+        for rowi in range(height):
+            for colj in range(width):
                 kernel = ks1[nk]
-                ksum, kimage = kernel.computeImage(False)
+                kimage = afwImage.ImageD(kernel.getDimensions())
+                ksum   = kernel.computeImage(kimage, False)
                 assert (ksum == 1.)
 
-                for k in range(10):
-                    for l in range(10):
-                        if (i == k) and (j == l):
-                            assert(kimage.get() == 1.)
+                for rowk in range(height):
+                    for coll in range(width):
+                        if (rowi == rowk) and (colj == coll):
+                            assert(kimage.get(coll, rowk) == 1.)
                         else:
-                            assert(kimage.get() == 0.)
+                            assert(kimage.get(coll, rowk) == 0.)
                 nk += 1
+
+    def testSquare(self):
+        self.doit(10, 10)
 
     def testNonSquare(self):
-        ks2 = ipDiffim.generateDeltaFunctionKernelSet(7, 10)
-        nk  = 0
-        for i in range(7):
-            for j in range(10):
-                kernel = ks2[nk]
-                ksum, kimage = kernel.computeImage(False)
-                assert (ksum == 1.)
-
-                for k in range(7):
-                    for l in range(10):
-                        if (i == k) and (j == l):
-                            assert(kimage.get() == 1.)
-                        else:
-                            assert(kimage.get() == 0.)
-                nk += 1
-
+        self.doit(7, 10)
+        
 class testgenerateAlardLuptonKernelSetUT(unittest.TestCase):
+    """Not implemented in code so an empty unit test"""
     def testDefault(self):
         pass
 
