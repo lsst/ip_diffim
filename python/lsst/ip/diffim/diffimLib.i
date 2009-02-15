@@ -35,6 +35,9 @@ namespace boost {
 #include <lsst/afw/detection.h>
 #include <lsst/afw/math/ConvolveImage.h>
 
+#include <Eigen/Cholesky>
+#include <Eigen/Core>
+
 #include <lsst/pex/policy/Policy.h>
 %}
 
@@ -108,6 +111,11 @@ def version(HeadURL = r"$HeadURL$"):
     lsst::ip::diffim::computePsfMatchingKernelForFootprint<float, float>;
 %template(computePsfMatchingKernelForFootprint)
     lsst::ip::diffim::computePsfMatchingKernelForFootprint<double, float>;
+
+%template(computePsfMatchingKernelForFootprintEigen)
+    lsst::ip::diffim::computePsfMatchingKernelForFootprintEigen<float, float>;
+%template(computePsfMatchingKernelForFootprintEigen)
+    lsst::ip::diffim::computePsfMatchingKernelForFootprintEigen<double, float>;
 
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;

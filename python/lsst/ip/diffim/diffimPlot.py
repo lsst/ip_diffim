@@ -1,8 +1,9 @@
 import numpy, pylab
-import lsst.ip.diffim as ipDiffim
-from lsst.ip.diffim.diffimDebug import * 
 from lsst.pex.logging import Trace
 
+# relative imports, since these are in __init__.py
+import diffimLib 
+import diffimDebug
 
 # Helper routines
 def scaleImageTo8Bit(indata):

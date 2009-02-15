@@ -1,11 +1,14 @@
 import numpy
-import lsst.ip.diffim as ipDiffim
 import lsst.afw.detection as detection
 import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
 import lsst.pex.exceptions as Exceptions
 from   lsst.pex.logging import Trace
-import lsst.ip.diffim.diffimDebug as ipDiffimDebug
+
+# relative imports, since these are in __init__.py
+import diffimLib 
+import diffimDebug
+
 import pdb
 
 #######
@@ -115,7 +118,7 @@ def createSpatialModelKernelCells(fpInList,
     nSegmentColPix = int( templateMaskedImage.getWidth() / nSegmentCol )
     nSegmentRowPix = int( templateMaskedImage.getHeight() / nSegmentRow )
 
-    spatialCells   = ipDiffim.VectorSpatialModelCellF()
+    spatialCells   = diffimLib.VectorSpatialModelCellF()
     
     cellCount = 0
     for col in range(nSegmentCol):
@@ -134,7 +137,7 @@ def createSpatialModelKernelCells(fpInList,
             # NOTE : ideally we want this to be a vector of the base
             # class, not derived class.  Swig is making this difficult
             # right now tho.
-            modelList = ipDiffim.VectorSpatialModelKernelF()
+            modelList = diffimLib.VectorSpatialModelKernelF()
 
             # This is a bit blunt and could be more clever
             # Should never really have a loop within a loop within a loop
@@ -147,19 +150,19 @@ def createSpatialModelKernelCells(fpInList,
                 if (fpColC >= colMin) and (fpColC < colMax) and (fpRowC >= rowMin) and (fpRowC < rowMax):
                     fpCellList.push_back(fpPtr)
                     
-                    model = ipDiffim.SpatialModelKernelF(fpPtr,
-                                                         templateMaskedImage,
-                                                         scienceMaskedImage,
-                                                         kBasisList,
-                                                         policy,
-                                                         False)
+                    model = diffimLib.SpatialModelKernelF(fpPtr,
+                                                          templateMaskedImage,
+                                                          scienceMaskedImage,
+                                                          kBasisList,
+                                                          policy,
+                                                          False)
 
                     if policy.get('debugIO'):
                         ipDiffimDebug.writeDiffImages(cFlag, '%s_%d' % (label, fpID), model)
                         
                     modelList.push_back( model )
                     
-            spatialCell = ipDiffim.SpatialModelCellF(label, colCenter, rowCenter, fpCellList, modelList)
+            spatialCell = diffimLib.SpatialModelCellF(label, colCenter, rowCenter, fpCellList, modelList)
             spatialCells.push_back(spatialCell)
 
             # Formatting to the screen 

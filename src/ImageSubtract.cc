@@ -20,6 +20,9 @@
 #include <gsl/gsl_cblas.h>
 #include <gsl/gsl_linalg.h>
 
+#include <Eigen/Cholesky>
+#include <Eigen/Core>
+
 // NOTE -  trace statements >= 6 can ENTIRELY kill the run time
 #define LSST_MAX_TRACE 5
 
@@ -707,6 +710,272 @@ void diffim::computePsfMatchingKernelForFootprint(
     
 }
 
+
+/** 
+ * @brief Computes a single Kernel (Model 1) around a single subimage.
+ *
+ * Accepts two MaskedImages, generally subimages of a larger image, one of which
+ * is to be convolved to match the other.  The output Kernel is generated using
+ * an input list of basis Kernels by finding the coefficients in front of each
+ * basis.  This version accepts an input variance image, and uses Eigen for the
+ * matrices.
+ *
+ * @return Vector of coefficients representing the relative contribution of
+ * each input basis function.
+ *
+ * @return Differential background offset between the two images
+ *
+ * @ingroup diffim
+ */
+template <typename ImageT, typename VarT>
+void diffim::computePsfMatchingKernelForFootprintEigen(
+    image::MaskedImage<ImageT>         const &imageToConvolve,    
+    image::MaskedImage<ImageT>         const &imageToNotConvolve, 
+    image::Image<VarT>                 const &varianceImage,      
+    math::KernelList<math::Kernel>     const &kernelInBasisList,  
+    lsst::pex::policy::Policy       &policy,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
+    double                          &background,
+    double                          &backgroundError
+    ) { 
+
+    typedef typename image::MaskedImage<ImageT>::xy_locator xy_locator;
+    typedef typename image::Image<VarT>::xy_locator xyi_locator;
+
+    // grab mask bits from the image to convolve, since that is what we'll be operating on
+    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
+    
+    int nKernelParameters = 0;
+    int nBackgroundParameters = 0;
+    int nParameters = 0;
+    
+    boost::timer t;
+    double time;
+    t.restart();
+    
+    nKernelParameters     = kernelInBasisList.size();
+    nBackgroundParameters = 1;
+    nParameters           = nKernelParameters + nBackgroundParameters;
+
+    Eigen::MatrixXd M     = Eigen::MatrixXd::Zero(nParameters, nParameters);
+    Eigen::VectorXd B     = Eigen::VectorXd::Zero(nParameters);
+    
+    std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > > convolvedImageList(nKernelParameters);
+    typename std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > >::iterator 
+        citer = convolvedImageList.begin();
+    std::vector<boost::shared_ptr<math::Kernel> >::const_iterator 
+        kiter = kernelInBasisList.begin();
+    
+    // Create C_ij in the formalism of Alard & Lupton */
+    for (; kiter != kernelInBasisList.end(); ++kiter, ++citer) {
+        
+        /* NOTE : we could also *precompute* the entire template image convolved with these functions */
+        /*        and save them somewhere to avoid this step each time.  however, our paradigm is to */
+        /*        compute whatever is needed on the fly.  hence this step here. */
+        image::MaskedImage<ImageT> image(imageToConvolve.getDimensions());
+        math::convolve(image,
+                       imageToConvolve,
+                       **kiter,
+                       false,
+                       edgeMaskBit);
+        boost::shared_ptr<image::MaskedImage<ImageT> > imagePtr( new image::MaskedImage<ImageT>(image) );
+        *citer = imagePtr;
+    } 
+    
+    kiter = kernelInBasisList.begin();
+    citer = convolvedImageList.begin();
+
+    // Ignore buffers around edge of convolved images :
+    //
+    // If the kernel has width 5, it has center pixel 2.  The first good pixel
+    // is the (5-2)=3rd pixel, which is array index 2, and ends up being the
+    // index of the central pixel.
+    //
+    // You also have a buffer of unusable pixels on the other side, numbered
+    // width-center-1.  The last good usable pixel is N-width+center+1.
+
+    // Example : the kernel is width = 5, center = 2
+    //
+    //     ---|---|-c-|---|---|
+    //          
+    //           the image is width = N
+    //           convolve this with the kernel, and you get
+    //
+    //    |-x-|-x-|-g-|---|---| ... |---|---|-g-|-x-|-x-|
+    //
+    //           g = first/last good pixel
+    //           x = bad
+    // 
+    //           the first good pixel is the array index that has the value "center", 2
+    //           the last good pixel has array index N-(5-2)+1
+    //           eg. if N = 100, you want to use up to index 97
+    //               100-3+1 = 98, and the loops use i < 98, meaning the last
+    //               index you address is 97.
+   
+    unsigned int startCol = (*kiter)->getCtrX();
+    unsigned int startRow = (*kiter)->getCtrY();
+    unsigned int endCol   = (*citer)->getWidth()  - ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
+    unsigned int endRow   = (*citer)->getHeight() - ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
+
+    std::vector<xy_locator> convolvedLocatorList;
+    for (citer = convolvedImageList.begin(); citer != convolvedImageList.end(); ++citer) {
+        convolvedLocatorList.push_back( (**citer).xy_at(startCol,startRow) );
+    }
+    xy_locator  imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
+    xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
+    xyi_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
+
+    for (unsigned int row = startRow; row < endRow; ++row) {
+        
+        for (unsigned int col = startCol; col < endCol; ++col) {
+            
+            ImageT ncImage          = imageToNotConvolveLocator.image();
+            ImageT ncVariance       = imageToNotConvolveLocator.variance();
+            image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
+            double iVariance        = 1.0 / *varianceLocator;
+            
+            logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                               "Accessing image row %d col %d : %.3f %.3f %d",
+                               row, col, ncImage, ncVariance, ncMask);
+            
+            // kernel index i
+            typename std::vector<xy_locator>::iterator 
+                kiteri = convolvedLocatorList.begin();
+            typename std::vector<xy_locator>::iterator 
+                kiterE = convolvedLocatorList.end();
+
+            for (int kidxi = 0; kiteri != kiterE; ++kiteri, ++kidxi) {
+                ImageT cdImagei = (*kiteri).image();
+                
+                // kernel index j
+                typename std::vector<xy_locator>::iterator 
+                    kiterj = kiteri;
+
+                for (int kidxj = kidxi; kiterj != kiterE; ++kiterj, ++kidxj) {
+                    ImageT cdImagej = (*kiterj).image();
+                    
+                    M(kidxi, kidxj) += cdImagei * cdImagej * iVariance;
+                } 
+                
+                B(kidxi) += ncImage * cdImagei * iVariance;
+                
+                // Constant background term; effectively j=kidxj+1 */
+                M(kidxi, nParameters-1) += cdImagei * iVariance;
+            } 
+            
+            // Background term; effectively i=kidxi+1 
+            B(nParameters-1)                += ncImage * iVariance;
+            M(nParameters-1, nParameters-1) += 1.0 * iVariance;
+            
+            logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                               "Background terms : %.3f %.3f",
+                               B(nParameters-1), 
+                               M(nParameters-1, nParameters-1));
+            
+            // Step each accessor in column
+            ++imageToConvolveLocator.x();
+            ++imageToNotConvolveLocator.x();
+            ++varianceLocator.x();
+            for (int ki = 0; ki < nKernelParameters; ++ki) {
+                ++convolvedLocatorList[ki].x();
+            }             
+            
+        } // col
+        
+        // Step each accessor in row
+        ++imageToConvolveLocator.y();
+        ++imageToNotConvolveLocator.y();
+        ++varianceLocator.y();
+        for (int ki = 0; ki < nKernelParameters; ++ki) {
+            ++convolvedLocatorList[ki].y();
+        }
+        
+    } // row
+
+    
+    /** @note If we are going to regularize the solution to M, this is the place
+     * to do it 
+     */
+    
+    // Fill in rest of M
+    for (int kidxi=0; kidxi < nParameters; ++kidxi) 
+        for (int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) 
+            M(kidxj, kidxi) = M(kidxi, kidxj);
+    
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                       "Total compute time before matrix inversions : %.2f s", time);
+
+    // To use Cholesky decomposition, the matrix needs to be symmetric (M is, by
+    // design) and positive definite.  
+    //
+    // Eventually put a check in here to make sure its positive definite
+    //
+    Eigen::VectorXd Soln;
+    if (!( M.ldlt().solve(B, &Soln) )) {
+        throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel solution via Cholesky LDL^T");
+    }
+    
+    // Estimate of parameter uncertainties comes from the inverse of the
+    // covariance matrix.  Use Cholesky decomposition again.
+    //
+    // Cov       =  L L^t
+    // Cov^(-1)  = (L L^t)^(-1)
+    //           =  (L^T)^-1 L^(-1)
+    Eigen::MatrixXd             Cov    = M * M.transpose();
+    Eigen::LLT<Eigen::MatrixXd> llt    = Cov.llt();
+    Eigen::MatrixXd             Error2 = llt.matrixL().transpose().inverse() * llt.matrixL().inverse();
+    
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
+                       "Total compute time after matrix inversions : %.2f s", time);
+    
+    // Translate from Eigen vectors into LSST classes
+    unsigned int kCols = policy.getInt("kernelCols");
+    unsigned int kRows = policy.getInt("kernelRows");
+    std::vector<double> kValues(kCols*kRows);
+    std::vector<double> kErrValues(kCols*kRows);
+    for (unsigned int row = 0, idx = 0; row < kRows; row++) {
+        for (unsigned int col = 0; col < kCols; col++, idx++) {
+            
+            // Insanity checking
+            if (std::isnan( Soln(idx) )) {
+                throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel solution (nan)");
+            }
+            if (std::isnan( Error2(idx, idx) )) {
+                throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel uncertainty (nan)");
+            }
+            if (Error2(idx, idx) < 0.0) {
+                throw LSST_EXCEPT(exceptions::Exception,
+                                  str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                                      Error2(idx, idx)
+                                      ));
+            }
+            
+            kValues[idx]    = Soln(idx);
+            kErrValues[idx] = sqrt(Error2(idx, idx));
+        }
+    }
+    kernelPtr = boost::shared_ptr<math::Kernel> 
+        (new math::LinearCombinationKernel(kernelInBasisList, kValues));
+    kernelErrorPtr = boost::shared_ptr<math::Kernel> 
+        (new math::LinearCombinationKernel(kernelInBasisList, kErrValues));
+    
+    // Estimate of Background and Background Error */
+    if (std::isnan( Error2(nParameters-1, nParameters-1) )) {
+        throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel uncertainty (nan)");
+    }
+    if (Error2(nParameters-1, nParameters-1) < 0.0) {
+        throw LSST_EXCEPT(exceptions::Exception, 
+                          str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                              Error2(nParameters-1, nParameters-1) 
+                              ));
+    }
+    background      = Soln(nParameters-1);
+    backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
+}
+
 /** 
  * @brief Calculates mean and unbiased variance of values (normalized by the
  * sqrt of the image variance) in a MaskedImage
@@ -952,6 +1221,30 @@ void diffim::computePsfMatchingKernelForFootprint(
 
 template
 void diffim::computePsfMatchingKernelForFootprint(
+    image::MaskedImage<double> const &imageToConvolve,
+    image::MaskedImage<double> const &imageToNotConvolve,
+    image::Image<float>        const &varianceImage,
+    math::KernelList<math::Kernel> const &kernelInBasisList,
+    lsst::pex::policy::Policy       &policy,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
+    double                          &background,
+    double                          &backgroundError);
+
+template
+void diffim::computePsfMatchingKernelForFootprintEigen(
+    image::MaskedImage<float> const &imageToConvolve,
+    image::MaskedImage<float> const &imageToNotConvolve,
+    image::Image<float>       const &varianceImage,
+    math::KernelList<math::Kernel> const &kernelInBasisList,
+    lsst::pex::policy::Policy       &policy,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
+    double                          &background,
+    double                          &backgroundError);
+
+template
+void diffim::computePsfMatchingKernelForFootprintEigen(
     image::MaskedImage<double> const &imageToConvolve,
     image::MaskedImage<double> const &imageToNotConvolve,
     image::Image<float>        const &varianceImage,

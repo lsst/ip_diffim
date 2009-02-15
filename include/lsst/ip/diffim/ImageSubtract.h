@@ -17,8 +17,6 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include <gsl/gsl_matrix.h>
-
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/afw/math/Kernel.h>
 #include <lsst/afw/math/KernelFunctions.h>
@@ -288,8 +286,6 @@ namespace diffim {
     
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
      *
-     * @note This version uses an input MaskedImage as an estimate of the variance
-     *
      * @param imageToConvolve  MaskedImage to convolve with Kernel
      * @param imageToNotConvolve  MaskedImage to subtract convolved template from
      * @param varianceImage  Estimate of diffim variance
@@ -303,6 +299,34 @@ namespace diffim {
      */    
     template <typename ImageT, typename VarT>
     void computePsfMatchingKernelForFootprint(
+        lsst::afw::image::MaskedImage<ImageT>         const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT>         const &imageToNotConvolve,
+        lsst::afw::image::Image<VarT>                 const &varianceImage,
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
+        lsst::pex::policy::Policy                  &policy,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
+        double                                     &background,
+        double                                     &backgroundError
+        );
+
+    /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
+     *
+     * @note This version uses Eigen
+     *
+     * @param imageToConvolve  MaskedImage to convolve with Kernel
+     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
+     * @param varianceImage  Estimate of diffim variance
+     * @param kernelInBasisList  Input kernel basis set
+     * @param policy  Policy for operations; in particular object detection
+     *
+     * @param kernelPtr  Pointer to resulting PSF matching kernel
+     * @param kernelErrorPtr  Uncertainty on PSF matching kernel
+     * @param background  Differential background
+     * @param backgroundError  Uncertainty on differential background
+     */    
+    template <typename ImageT, typename VarT>
+    void computePsfMatchingKernelForFootprintEigen(
         lsst::afw::image::MaskedImage<ImageT>         const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT>         const &imageToNotConvolve,
         lsst::afw::image::Image<VarT>                 const &varianceImage,
@@ -386,21 +410,6 @@ namespace diffim {
         double &variance,
         lsst::afw::image::MaskedImage<ImageT> const &inputImage
         );
-
-
-    /** Compute pseudoInverse using GSL
-     *
-     * @param dest Inverted matrix
-     * @param src Matrix to be inverted
-     */
-    // void pseudoInverse(gsl_matrix * dest, const gsl_matrix * src);
-
-    /** Compute matrix covariance using GSL
-     *
-     * @param dest Output matrix holding the data covariance
-     * @param src Input matrix holding the data
-     */
-    // void covariance(gsl_matrix * dest, const gsl_matrix * src);
 
 }}}
 

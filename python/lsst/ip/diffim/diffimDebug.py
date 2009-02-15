@@ -1,10 +1,14 @@
 import lsst.afw.math  as afwMath
 import lsst.afw.image as afwImage
-import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimPlot as ipDiffimPlot
 import numpy
 from lsst.pex.logging import Trace
 import lsst.daf.base as dafBase
+
+# relative imports, since these are in __init__.py
+import diffimLib 
+import diffimDebug
+import diffimPlot 
+
 import pdb
 
 def plotDiffImQuality1(difi, diffim, kernel, label, outfile=None):
