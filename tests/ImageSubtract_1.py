@@ -140,14 +140,6 @@ class ConvolveTestCase(unittest.TestCase):
             kernel                  = afwMath.LinearCombinationKernel()
             kernelError             = afwMath.LinearCombinationKernel()
             
-            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintEigen(
-                imageToConvolveStamp,
-                imageToNotConvolveStamp,
-                varEstimate.getVariance(),
-                self.kernelBasisList,
-                policy,
-                kernel, kernelError
-                )
             background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
                 imageToConvolveStamp,
                 imageToNotConvolveStamp,
@@ -156,15 +148,8 @@ class ConvolveTestCase(unittest.TestCase):
                 policy,
                 kernel, kernelError
                 )
-            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintVW(
-                imageToConvolveStamp,
-                imageToNotConvolveStamp,
-                varEstimate.getVariance(),
-                self.kernelBasisList,
-                policy,
-                kernel, kernelError
-                )
 
+            pdb.set_trace()
             print kernel.getDimensions()
             print kImageOut.getDimensions()
             kSumOut = kernel.computeImage(kImageOut, 0.0, 0.0, False)

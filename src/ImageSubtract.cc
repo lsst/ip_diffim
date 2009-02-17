@@ -666,7 +666,9 @@ void diffim::computePsfMatchingKernelForFootprint(
     gsl_vector_div (X, D);
     gsl_multifit_linear_free(work);
     */
-    gsl_vector_fprintf(stdout,X,"%f");
+    //gsl_matrix_fprintf(stdout,M,"%f");
+    //gsl_vector_fprintf(stdout,B,"%f");
+    //gsl_vector_fprintf(stdout,X,"%f");
 
     time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
@@ -915,7 +917,7 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
     logging::TTrace<5>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
                        "Total compute time before matrix inversions : %.2f s", time);
 
-    std::cout << "B eigen : " << B << std::endl;
+    //std::cout << "B eigen : " << B << std::endl;
 
     // To use Cholesky decomposition, the matrix needs to be symmetric (M is, by
     // design) and positive definite.  
@@ -954,7 +956,7 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
             }
         }
     }
-    std::cout << "Soln eigen : " << Soln << std::endl;
+    //std::cout << "Soln eigen : " << Soln << std::endl;
 
     // Estimate of parameter uncertainties comes from the inverse of the
     // covariance matrix.  Use Cholesky decomposition again.
@@ -1163,7 +1165,7 @@ void diffim::computePsfMatchingKernelForFootprintVW(
                     kiterj = kiteri;
 
                 for (int kidxj = kidxi; kiterj != kiterE; ++kiterj, ++kidxj) {
-                    ImageT cdImagej = (*kiterj).image();
+                    ImageT cdImagej    = (*kiterj).image();
                     M[kidxi][kidxj]   += cdImagei * cdImagej * iVariance;
                 } 
                 
@@ -1206,8 +1208,6 @@ void diffim::computePsfMatchingKernelForFootprintVW(
      * to do it 
      */
     
-    std::cout << "B vw : " << B << std::endl;
-
     // Fill in rest of M
     for (int kidxi=0; kidxi < nParameters; ++kidxi) 
         for (int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) 
@@ -1220,7 +1220,9 @@ void diffim::computePsfMatchingKernelForFootprintVW(
     // Invert using VW's internal method
     vw::math::Vector<double> Soln      = vw::math::least_squares(M, B);
 
-    std::cout << "Soln vw : " << Soln << std::endl;
+    //std::cout << "M vw : " << M << std::endl;
+    //std::cout << "B vw : " << B << std::endl;
+    //std::cout << "Soln vw : " << Soln << std::endl;
     
     // Additional gymnastics to get the parameter uncertainties
     vw::math::Matrix<double> Mt        = vw::math::transpose(M);
