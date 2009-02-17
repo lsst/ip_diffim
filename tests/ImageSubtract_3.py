@@ -14,6 +14,12 @@ import lsst.ip.diffim     as ipDiffim
 import lsst.ip.diffim.diffimTools as ipDiffimTools
 import lsst.ip.diffim.runPca      as runPca
 
+try:
+    type(verbosity)
+except NameError:
+    verbosity = 5
+logging.Trace.setVerbosity('lsst.ip.diffim', verbosity)
+
 ipDiffimDir = eups.productDir("ip_diffim")
 if not ipDiffimDir:
     raise RuntimeError("Could not get path to ip_diffim")

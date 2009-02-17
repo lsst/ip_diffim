@@ -13,6 +13,12 @@ import lsst.afw.image as afwImage
 import lsst.afw.detection as afwDetection
 import lsst.ip.diffim as ipDiffim
 
+try:
+    type(verbosity)
+except NameError:
+    verbosity = 5
+logging.Trace.setVerbosity('lsst.ip.diffim', verbosity)
+
 ipDiffimDir = eups.productDir("ip_diffim")
 if not ipDiffimDir:
     raise RuntimeError("Could not get path to ip_diffim")

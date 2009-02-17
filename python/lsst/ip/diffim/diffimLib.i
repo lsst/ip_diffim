@@ -37,6 +37,13 @@ namespace boost {
 
 #include <Eigen/Cholesky>
 #include <Eigen/Core>
+#include <Eigen/LU>
+#include <Eigen/QR>
+
+#include <vw/Math/Functions.h> 
+#include <vw/Math/Vector.h> 
+#include <vw/Math/Matrix.h> 
+#include <vw/Math/LinearAlgebra.h> 
 
 #include <lsst/pex/policy/Policy.h>
 %}
@@ -116,6 +123,11 @@ def version(HeadURL = r"$HeadURL$"):
     lsst::ip::diffim::computePsfMatchingKernelForFootprintEigen<float, float>;
 %template(computePsfMatchingKernelForFootprintEigen)
     lsst::ip::diffim::computePsfMatchingKernelForFootprintEigen<double, float>;
+
+%template(computePsfMatchingKernelForFootprintVW)
+    lsst::ip::diffim::computePsfMatchingKernelForFootprintVW<float, float>;
+%template(computePsfMatchingKernelForFootprintVW)
+    lsst::ip::diffim::computePsfMatchingKernelForFootprintVW<double, float>;
 
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;

@@ -338,6 +338,34 @@ namespace diffim {
         double                                     &backgroundError
         );
 
+    /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
+     *
+     * @note This version uses VW
+     *
+     * @param imageToConvolve  MaskedImage to convolve with Kernel
+     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
+     * @param varianceImage  Estimate of diffim variance
+     * @param kernelInBasisList  Input kernel basis set
+     * @param policy  Policy for operations; in particular object detection
+     *
+     * @param kernelPtr  Pointer to resulting PSF matching kernel
+     * @param kernelErrorPtr  Uncertainty on PSF matching kernel
+     * @param background  Differential background
+     * @param backgroundError  Uncertainty on differential background
+     */    
+    template <typename ImageT, typename VarT>
+    void computePsfMatchingKernelForFootprintVW(
+        lsst::afw::image::MaskedImage<ImageT>         const &imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT>         const &imageToNotConvolve,
+        lsst::afw::image::Image<VarT>                 const &varianceImage,
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
+        lsst::pex::policy::Policy                  &policy,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
+        double                                     &background,
+        double                                     &backgroundError
+        );
+
     /** Add a spatially varying function to an Image
      *
      * @note Typically used to add a background Function to an Image
@@ -369,46 +397,6 @@ namespace diffim {
         lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
         lsst::pex::policy::Policy &policy
-        );
-
-    /** Calculate pixel statistics of a MaskedImage
-     *
-     * @note Typically run on a difference image
-     *
-     * @note This should eventually be replaced by afw::math functions
-     *
-     * @param nGoodPixels  Returned number of pixels in the calculation
-     * @param mean  Returned mean of pixel values
-     * @param variance  Returned variance of pixel values
-     * @param inputImage  MaskedImage to calculate statistics for
-     * @param badPixelMask  Mask bit to ignore
-     */
-    template <typename ImageT, typename MaskT>
-    void calculateMaskedImageStatistics(
-        int &nGoodPixels,
-        double &mean,
-        double &variance,
-        lsst::afw::image::MaskedImage<ImageT> const &inputImage,
-        MaskT const badPixelMask
-        );
-
-    /** Calculate pixel statistics of a MaskedImage
-     *
-     * @note Typically run on a difference image; this version ignores Mask values
-     *
-     * @note This should eventually be replaced by afw::math functions
-     *
-     * @param nGoodPixels  Returned number of pixels in the calculation
-     * @param mean  Returned mean of pixel values
-     * @param variance  Returned variance of pixel values
-     * @param inputImage  MaskedImage to calculate statistics for
-     */
-    template <typename ImageT>
-    void calculateMaskedImageStatistics(
-        int &nGoodPixels,
-        double &mean,
-        double &variance,
-        lsst::afw::image::MaskedImage<ImageT> const &inputImage
         );
 
 }}}

@@ -18,8 +18,8 @@ import lsst.ip.diffim.diffimTools as ipDiffimTools
 try:
     type(verbosity)
 except NameError:
-    verbosity = 0                       # increase to see trace
-logging.Trace_setVerbosity("lsst.afw", verbosity)
+    verbosity = 5
+logging.Trace.setVerbosity('lsst.ip.diffim', verbosity)
 
 debugIO = 1
 try:
@@ -134,21 +134,40 @@ class ConvolveTestCase(unittest.TestCase):
             imageToConvolveStamp    = MaskedImage(self.templateMaskedImage, footprintBBox)
             imageToNotConvolveStamp = MaskedImage(convolvedScienceMaskedImage, footprintBBox)
 
-            varEstimate             = (imageToConvolveStamp - imageToNotConvolveStamp)
-            kernel                  = afwImage.ImageD(kernelCols, kernelRows)
-            kernelError             = afwImage.ImageD(kernelCols, kernelRows)
-           
+            varEstimate             = MaskedImage(self.templateMaskedImage, footprintBBox)
+            varEstimate            -= imageToNotConvolveStamp
+            
+            kernel                  = afwMath.LinearCombinationKernel()
+            kernelError             = afwMath.LinearCombinationKernel()
+            
+            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintEigen(
+                imageToConvolveStamp,
+                imageToNotConvolveStamp,
+                varEstimate.getVariance(),
+                self.kernelBasisList,
+                policy,
+                kernel, kernelError
+                )
             background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
                 imageToConvolveStamp,
                 imageToNotConvolveStamp,
-                varEstimate,
+                varEstimate.getVariance(),
+                self.kernelBasisList,
+                policy,
+                kernel, kernelError
+                )
+            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintVW(
+                imageToConvolveStamp,
+                imageToNotConvolveStamp,
+                varEstimate.getVariance(),
                 self.kernelBasisList,
                 policy,
                 kernel, kernelError
                 )
 
-            footprintKernel = afwMath.LinearCombinationKernel(self.kernelBasisList, kernelCoeffList)
-            kSumOut         = footprintKernel.computeImage(kImageOut, 0.0, 0.0, False)
+            print kernel.getDimensions()
+            print kImageOut.getDimensions()
+            kSumOut = kernel.computeImage(kImageOut, 0.0, 0.0, False)
 
             if debugIO:
                 imageToConvolveStamp.writeFits('tFits_%d' % (footprintID,))
@@ -215,29 +234,33 @@ class DeltaFunctionTestCase(unittest.TestCase):
             imageToNotConvolveStamp = MaskedImage(self.scienceMaskedImage,  footprintBBox)
             
             # this is a bit of a hack to deal with -= and *= problems with swigged masked images
-            imageArray, varianceArray, maskArray = imageTest.arraysFromMaskedImage(imageToNotConvolveStamp)
-            imageArray += bg
-            imageArray *= scaling
-            varianceArray *= scaling**2
-            imageToNotConvolveStamp = imageTest.maskedImageFromArrays( (imageArray, varianceArray, maskArray) )
+            #imageArray, varianceArray, maskArray = imageTest.arraysFromMaskedImage(imageToNotConvolveStamp)
+            #imageArray    += bg
+            #imageArray    *= scaling
+            #varianceArray *= scaling**2
+            #imageToNotConvolveStamp = imageTest.maskedImageFromArrays( (imageArray, varianceArray, maskArray) )
+            imageToNotConvolveStamp += bg
+            imageToNotConvolveStamp *= scaling
 
             if debugIO:
                 imageToConvolveStamp.writeFits('tFits_%d' % (footprintID,))
                 imageToNotConvolveStamp.writeFits('sFits_%d' % (footprintID,))
 
-            kernel                  = afwImage.ImageD(kernelCols, kernelRows)
-            kernelError             = afwImage.ImageD(kernelCols, kernelRows)
+            kernel                  = afwMath.LinearCombinationKernel()
+            kernelError             = afwMath.LinearCombinationKernel()
+
             background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
                 imageToConvolveStamp,
                 imageToNotConvolveStamp,
-                varEstimate,
+                varEstimate.getVariance(),
                 self.kernelBasisList,
                 policy,
                 kernel, kernelError
                 )
 
-            footprintKernel = afwMath.LinearCombinationKernel(self.kernelBasisList, kernelCoeffList)
-            kSum            = footprintKernel.computeImage(kImage, 0.0, 0.0, False)
+            print kernel.getDimensions()
+            print kImage.getDimensions()
+            kSum = kernel.computeImage(kImage, 0.0, 0.0, False)
             
             if debugIO:
                 kImage.writeFits('kFits_%d.fits' % (footprintID,))
