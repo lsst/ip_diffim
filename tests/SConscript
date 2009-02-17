@@ -3,6 +3,8 @@ Import("env")
 
 import lsst.tests
 
+#env.Program(["testLocators.cc"], LIBS=env.getlibs("afw"))
+
 tests = lsst.tests.Control(env, ignoreList=[])
 
 for target in tests.run("*.py"):

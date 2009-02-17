@@ -437,15 +437,15 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
  */
 template <typename ImageT, typename VarT>
 void diffim::computePsfMatchingKernelForFootprint(
+    double                          &background,
+    double                          &backgroundError,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
     image::MaskedImage<ImageT>         const &imageToConvolve,    
     image::MaskedImage<ImageT>         const &imageToNotConvolve, 
     image::Image<VarT>                 const &varianceImage,      
     math::KernelList<math::Kernel>     const &kernelInBasisList,  
-    lsst::pex::policy::Policy       &policy,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    double                          &background,
-    double                          &backgroundError
+    lsst::pex::policy::Policy       &policy
     ) { 
 
     typedef typename image::MaskedImage<ImageT>::xy_locator xy_locator;
@@ -537,6 +537,15 @@ void diffim::computePsfMatchingKernelForFootprint(
     xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
     xyi_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
 
+    // Unit test ImageSubtract_1.py should show
+    // Image range : 9 9 -> 31 31 : 2804.000000 2798.191162
+    logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                       "Image range : %d %d -> %d %d : %f %f",
+                       startCol, startRow, endCol, endRow, 
+                       imageToConvolveLocator.image(), 
+                       imageToNotConvolveLocator.image());
+
+    std::pair<int, int> rowStep = std::make_pair(static_cast<int>(-(endCol-startCol)), 1);
     for (unsigned int row = startRow; row < endRow; ++row) {
         
         for (unsigned int col = startCol; col < endCol; ++col) {
@@ -546,25 +555,38 @@ void diffim::computePsfMatchingKernelForFootprint(
             image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
             double iVariance        = 1.0 / *varianceLocator;
             
+            // Unit test ImageSubtract_1.py should show
+            // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
+            // Accessing image row 9 col 10 : 2805.171 23.459 0 1774.878662
+            // ...
+            // Accessing image row 9 col 30 : 2793.281 23.359 0 1779.194946
+            // Accessing image row 10 col 9 : 2802.968 23.464 0 1770.467163
+            // ...
             logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                               "Accessing image row %d col %d : %.3f %.3f %d",
-                               row, col, ncImage, ncVariance, ncMask);
+                               "Accessing image row %d col %d : %.3f %.3f %d %f",
+                               row, col, ncImage, ncVariance, ncMask, 1.0 * *varianceLocator);
             
             // kernel index i
             typename std::vector<xy_locator>::iterator 
-                kiteri = convolvedLocatorList.begin();
+                citeri = convolvedLocatorList.begin();
             typename std::vector<xy_locator>::iterator 
-                kiterE = convolvedLocatorList.end();
+                citerE = convolvedLocatorList.end();
 
-            for (int kidxi = 0; kiteri != kiterE; ++kiteri, ++kidxi) {
-                ImageT cdImagei = (*kiteri).image();
+            for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
+                ImageT           cdImagei = (*citeri).image();
+                image::MaskPixel cdMaski  = (*citeri).mask();
+                if (cdMaski != 0) {
+                    throw LSST_EXCEPT(exceptions::Exception, 
+                                      str(boost::format("Accessing invalid pixel (%d) in computePsfMatchingKernelForFootprint") % 
+                                          kidxi));
+                }                
                 
                 // kernel index j
                 typename std::vector<xy_locator>::iterator 
-                    kiterj = kiteri;
+                    citerj = citeri;
 
-                for (int kidxj = kidxi; kiterj != kiterE; ++kiterj, ++kidxj) {
-                    ImageT cdImagej = (*kiterj).image();
+                for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
+                    ImageT cdImagej = (*citerj).image();
                     
                     *gsl_matrix_ptr(M, kidxi, kidxj) += cdImagei * cdImagej * iVariance;
                 } 
@@ -579,11 +601,6 @@ void diffim::computePsfMatchingKernelForFootprint(
             *gsl_vector_ptr(B, nParameters-1)                += ncImage * iVariance;
             *gsl_matrix_ptr(M, nParameters-1, nParameters-1) += 1.0 * iVariance;
             
-            logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                               "Background terms : %.3f %.3f",
-                               gsl_vector_get(B, nParameters-1), 
-                               gsl_matrix_get(M, nParameters-1, nParameters-1));
-            
             // Step each accessor in column
             ++imageToConvolveLocator.x();
             ++imageToNotConvolveLocator.x();
@@ -594,12 +611,15 @@ void diffim::computePsfMatchingKernelForFootprint(
             
         } // col
         
-        // Step each accessor in row
-        ++imageToConvolveLocator.y();
-        ++imageToNotConvolveLocator.y();
-        ++varianceLocator.y();
+        // Get to next row, first col
+        imageToConvolveLocator    += rowStep;
+        imageToNotConvolveLocator += rowStep;
+
+        // HACK UNTIL Ticket #647 FIXED
+        varianceLocator            = varianceImage.xy_at(startCol, row+1);
+
         for (int ki = 0; ki < nKernelParameters; ++ki) {
-            ++convolvedLocatorList[ki].y();
+            convolvedLocatorList[ki] += rowStep;
         }
         
     } // row
@@ -625,6 +645,10 @@ void diffim::computePsfMatchingKernelForFootprint(
     double chi2;
     size_t rank;
     gsl_multifit_linear_svd(M, B, GSL_DBL_EPSILON, &rank, X, Cov, &chi2, work);
+
+    std::cout << "Soln GSL ";
+    gsl_vector_fprintf(stdout, X, "%f");
+    return;
 
     /* guts of gsl_multifit_linear_svd
     gsl_matrix *A   = work->A;
@@ -739,15 +763,15 @@ void diffim::computePsfMatchingKernelForFootprint(
  */
 template <typename ImageT, typename VarT>
 void diffim::computePsfMatchingKernelForFootprintEigen(
+    double                          &background,
+    double                          &backgroundError,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
     image::MaskedImage<ImageT>         const &imageToConvolve,    
     image::MaskedImage<ImageT>         const &imageToNotConvolve, 
     image::Image<VarT>                 const &varianceImage,      
     math::KernelList<math::Kernel>     const &kernelInBasisList,  
-    lsst::pex::policy::Policy       &policy,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    double                          &background,
-    double                          &backgroundError
+    lsst::pex::policy::Policy       &policy
     ) { 
 
     typedef typename image::MaskedImage<ImageT>::xy_locator xy_locator;
@@ -836,6 +860,15 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
     xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
     xyi_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
 
+    // Unit test ImageSubtract_1.py should show
+    // Image range : 9 9 -> 31 31 : 2804.000000 2798.191162
+    logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                       "Image range : %d %d -> %d %d : %f %f",
+                       startCol, startRow, endCol, endRow, 
+                       imageToConvolveLocator.image(), 
+                       imageToNotConvolveLocator.image());
+
+    std::pair<int, int> rowStep = std::make_pair(static_cast<int>(-(endCol-startCol)), 1);
     for (unsigned int row = startRow; row < endRow; ++row) {
         
         for (unsigned int col = startCol; col < endCol; ++col) {
@@ -845,25 +878,38 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
             image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
             double iVariance        = 1.0 / *varianceLocator;
             
+            // Unit test ImageSubtract_1.py should show
+            // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
+            // Accessing image row 9 col 10 : 2805.171 23.459 0 1774.878662
+            // ...
+            // Accessing image row 9 col 30 : 2793.281 23.359 0 1779.194946
+            // Accessing image row 10 col 9 : 2802.968 23.464 0 1770.467163
+            // ...
             logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                               "Accessing image row %d col %d : %.3f %.3f %d",
-                               row, col, ncImage, ncVariance, ncMask);
+                               "Accessing image row %d col %d : %.3f %.3f %d %f",
+                               row, col, ncImage, ncVariance, ncMask, 1.0 * *varianceLocator);
             
             // kernel index i
             typename std::vector<xy_locator>::iterator 
-                kiteri = convolvedLocatorList.begin();
+                citeri = convolvedLocatorList.begin();
             typename std::vector<xy_locator>::iterator 
-                kiterE = convolvedLocatorList.end();
+                citerE = convolvedLocatorList.end();
 
-            for (int kidxi = 0; kiteri != kiterE; ++kiteri, ++kidxi) {
-                ImageT cdImagei = (*kiteri).image();
+            for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
+                ImageT           cdImagei = (*citeri).image();
+                image::MaskPixel cdMaski  = (*citeri).mask();
+                if (cdMaski != 0) {
+                    throw LSST_EXCEPT(exceptions::Exception, 
+                                      str(boost::format("Accessing invalid pixel (%d) in computePsfMatchingKernelForFootprint") % 
+                                          kidxi));
+                }                
                 
                 // kernel index j
                 typename std::vector<xy_locator>::iterator 
-                    kiterj = kiteri;
+                    citerj = citeri;
 
-                for (int kidxj = kidxi; kiterj != kiterE; ++kiterj, ++kidxj) {
-                    ImageT cdImagej = (*kiterj).image();
+                for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
+                    ImageT cdImagej = (*citerj).image();
                     
                     M(kidxi, kidxj) += cdImagei * cdImagej * iVariance;
                 } 
@@ -878,11 +924,6 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
             B(nParameters-1)                += ncImage * iVariance;
             M(nParameters-1, nParameters-1) += 1.0 * iVariance;
             
-            logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                               "Background terms (eigen) : %.3f %.3f",
-                               B(nParameters-1), 
-                               M(nParameters-1, nParameters-1));
-            
             // Step each accessor in column
             ++imageToConvolveLocator.x();
             ++imageToNotConvolveLocator.x();
@@ -893,12 +934,15 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
             
         } // col
         
-        // Step each accessor in row
-        ++imageToConvolveLocator.y();
-        ++imageToNotConvolveLocator.y();
-        ++varianceLocator.y();
+        // Get to next row, first col
+        imageToConvolveLocator    += rowStep;
+        imageToNotConvolveLocator += rowStep;
+
+        // HACK UNTIL Ticket #647 FIXED
+        varianceLocator            = varianceImage.xy_at(startCol, row+1);
+
         for (int ki = 0; ki < nKernelParameters; ++ki) {
-            ++convolvedLocatorList[ki].y();
+            convolvedLocatorList[ki] += rowStep;
         }
         
     } // row
@@ -938,7 +982,7 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
                 try {
                     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(M);
                     Eigen::MatrixXd const& R = eVecValues.eigenvectors();
-                    Eigen::VectorXd eValues = eVecValues.eigenvalues();
+                    Eigen::VectorXd eValues  = eVecValues.eigenvalues();
                     
                     for (int i = 0; i != eValues.rows(); ++i) {
                         if (eValues(i) != 0.0) {
@@ -956,7 +1000,8 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
             }
         }
     }
-    //std::cout << "Soln eigen : " << Soln << std::endl;
+    std::cout << "Soln eigen : " << Soln << std::endl;
+    return;
 
     // Estimate of parameter uncertainties comes from the inverse of the
     // covariance matrix.  Use Cholesky decomposition again.
@@ -1035,15 +1080,15 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
  */
 template <typename ImageT, typename VarT>
 void diffim::computePsfMatchingKernelForFootprintVW(
+    double                          &background,
+    double                          &backgroundError,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
     image::MaskedImage<ImageT>         const &imageToConvolve,    
     image::MaskedImage<ImageT>         const &imageToNotConvolve, 
     image::Image<VarT>                 const &varianceImage,      
     math::KernelList<math::Kernel>     const &kernelInBasisList,  
-    lsst::pex::policy::Policy       &policy,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    double                          &background,
-    double                          &backgroundError
+    lsst::pex::policy::Policy       &policy
     ) { 
 
     typedef typename image::MaskedImage<ImageT>::xy_locator xy_locator;
@@ -1059,7 +1104,7 @@ void diffim::computePsfMatchingKernelForFootprintVW(
     boost::timer t;
     double time;
     t.restart();
-    
+
     nKernelParameters     = kernelInBasisList.size();
     nBackgroundParameters = 1;
     nParameters           = nKernelParameters + nBackgroundParameters;
@@ -1080,7 +1125,7 @@ void diffim::computePsfMatchingKernelForFootprintVW(
         kiter = kernelInBasisList.begin();
     
     // Create C_ij in the formalism of Alard & Lupton */
-    for (; kiter != kernelInBasisList.end(); ++kiter, ++citer) {
+    for (int idx=0; kiter != kernelInBasisList.end(); ++kiter, ++citer, ++idx) {
         
         /* NOTE : we could also *precompute* the entire template image convolved with these functions */
         /*        and save them somewhere to avoid this step each time.  however, our paradigm is to */
@@ -1091,6 +1136,7 @@ void diffim::computePsfMatchingKernelForFootprintVW(
                        **kiter,
                        false,
                        edgeMaskBit);
+        // image.writeFits(str(boost::format("c%d") % idx));
         boost::shared_ptr<image::MaskedImage<ImageT> > imagePtr( new image::MaskedImage<ImageT>(image) );
         *citer = imagePtr;
     } 
@@ -1138,6 +1184,15 @@ void diffim::computePsfMatchingKernelForFootprintVW(
     xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
     xyi_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
 
+    // Unit test ImageSubtract_1.py should show
+    // Image range : 9 9 -> 31 31 : 2804.000000 2798.191162
+    logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
+                       "Image range : %d %d -> %d %d : %f %f",
+                       startCol, startRow, endCol, endRow, 
+                       imageToConvolveLocator.image(), 
+                       imageToNotConvolveLocator.image());
+
+    std::pair<int, int> rowStep = std::make_pair(static_cast<int>(-(endCol-startCol)), 1);
     for (unsigned int row = startRow; row < endRow; ++row) {
         
         for (unsigned int col = startCol; col < endCol; ++col) {
@@ -1147,25 +1202,38 @@ void diffim::computePsfMatchingKernelForFootprintVW(
             image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
             double iVariance        = 1.0 / *varianceLocator;
             
+            // Unit test ImageSubtract_1.py should show
+            // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
+            // Accessing image row 9 col 10 : 2805.171 23.459 0 1774.878662
+            // ...
+            // Accessing image row 9 col 30 : 2793.281 23.359 0 1779.194946
+            // Accessing image row 10 col 9 : 2802.968 23.464 0 1770.467163
+            // ...
             logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint",
-                               "Accessing image row %d col %d : %.3f %.3f %d",
-                               row, col, ncImage, ncVariance, ncMask);
+                               "Accessing image row %d col %d : %.3f %.3f %d %f",
+                               row, col, ncImage, ncVariance, ncMask, 1.0 * *varianceLocator);
             
             // kernel index i
             typename std::vector<xy_locator>::iterator 
-                kiteri = convolvedLocatorList.begin();
+                citeri = convolvedLocatorList.begin();
             typename std::vector<xy_locator>::iterator 
-                kiterE = convolvedLocatorList.end();
+                citerE = convolvedLocatorList.end();
 
-            for (int kidxi = 0; kiteri != kiterE; ++kiteri, ++kidxi) {
-                ImageT cdImagei = (*kiteri).image();
+            for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
+                ImageT           cdImagei = (*citeri).image();
+                image::MaskPixel cdMaski  = (*citeri).mask();
+                if (cdMaski != 0) {
+                    throw LSST_EXCEPT(exceptions::Exception, 
+                                      str(boost::format("Accessing invalid pixel (%d) in computePsfMatchingKernelForFootprint") % 
+                                          kidxi));
+                }                
                 
                 // kernel index j
                 typename std::vector<xy_locator>::iterator 
-                    kiterj = kiteri;
+                    citerj = citeri;
 
-                for (int kidxj = kidxi; kiterj != kiterE; ++kiterj, ++kidxj) {
-                    ImageT cdImagej    = (*kiterj).image();
+                for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
+                    ImageT cdImagej    = (*citerj).image();
                     M[kidxi][kidxj]   += cdImagei * cdImagej * iVariance;
                 } 
                 
@@ -1179,10 +1247,6 @@ void diffim::computePsfMatchingKernelForFootprintVW(
             B[nParameters-1]                += ncImage * iVariance;
             M[nParameters-1][nParameters-1] += 1.0 * iVariance;
             
-            logging::TTrace<8>("lsst.ip.diffim.computePsfMatchingKernelForFootprint", 
-                               "Background terms (vw) : %.3f %.3f",
-                               B[nParameters-1], M[nParameters-1][nParameters-1]);
-            
             // Step each accessor in column
             ++imageToConvolveLocator.x();
             ++imageToNotConvolveLocator.x();
@@ -1192,13 +1256,16 @@ void diffim::computePsfMatchingKernelForFootprintVW(
             }             
             
         } // col
-        
-        // Step each accessor in row
-        ++imageToConvolveLocator.y();
-        ++imageToNotConvolveLocator.y();
-        ++varianceLocator.y();
+
+        // Get to next row, first col
+        imageToConvolveLocator    += rowStep;
+        imageToNotConvolveLocator += rowStep;
+
+        // HACK UNTIL Ticket #647 FIXED
+        varianceLocator            = varianceImage.xy_at(startCol, row+1);
+
         for (int ki = 0; ki < nKernelParameters; ++ki) {
-            ++convolvedLocatorList[ki].y();
+            convolvedLocatorList[ki] += rowStep;
         }
         
     } // row
@@ -1222,7 +1289,8 @@ void diffim::computePsfMatchingKernelForFootprintVW(
 
     //std::cout << "M vw : " << M << std::endl;
     //std::cout << "B vw : " << B << std::endl;
-    //std::cout << "Soln vw : " << Soln << std::endl;
+    std::cout << "Soln vw : " << Soln << std::endl;
+    return;
     
     // Additional gymnastics to get the parameter uncertainties
     vw::math::Matrix<double> Mt        = vw::math::transpose(M);
@@ -1412,75 +1480,75 @@ image::MaskedImage<double> diffim::convolveAndSubtract(
 /* variance are always float i think */
 template
 void diffim::computePsfMatchingKernelForFootprint(
+    double                          &background,
+    double                          &backgroundError,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
     image::MaskedImage<float> const &imageToConvolve,
     image::MaskedImage<float> const &imageToNotConvolve,
     image::Image<float>       const &varianceImage,
     math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    double                          &background,
-    double                          &backgroundError);
+    lsst::pex::policy::Policy       &policy);
 
 template
 void diffim::computePsfMatchingKernelForFootprint(
+    double                          &background,
+    double                          &backgroundError,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
     image::MaskedImage<double> const &imageToConvolve,
     image::MaskedImage<double> const &imageToNotConvolve,
     image::Image<float>        const &varianceImage,
     math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    double                          &background,
-    double                          &backgroundError);
+    lsst::pex::policy::Policy       &policy);
 
 template
 void diffim::computePsfMatchingKernelForFootprintEigen(
+    double                          &background,
+    double                          &backgroundError,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
     image::MaskedImage<float> const &imageToConvolve,
     image::MaskedImage<float> const &imageToNotConvolve,
     image::Image<float>       const &varianceImage,
     math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    double                          &background,
-    double                          &backgroundError);
+    lsst::pex::policy::Policy       &policy);
 
 template
 void diffim::computePsfMatchingKernelForFootprintEigen(
+    double                          &background,
+    double                          &backgroundError,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
     image::MaskedImage<double> const &imageToConvolve,
     image::MaskedImage<double> const &imageToNotConvolve,
     image::Image<float>        const &varianceImage,
     math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    double                          &background,
-    double                          &backgroundError);
+    lsst::pex::policy::Policy       &policy);
 
 template
 void diffim::computePsfMatchingKernelForFootprintVW(
+    double                          &background,
+    double                          &backgroundError,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
     image::MaskedImage<float> const &imageToConvolve,
     image::MaskedImage<float> const &imageToNotConvolve,
     image::Image<float>       const &varianceImage,
     math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    double                          &background,
-    double                          &backgroundError);
+    lsst::pex::policy::Policy       &policy);
 
 template
 void diffim::computePsfMatchingKernelForFootprintVW(
+    double                          &background,
+    double                          &backgroundError,
+    boost::shared_ptr<math::Kernel> &kernelPtr,
+    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
     image::MaskedImage<double> const &imageToConvolve,
     image::MaskedImage<double> const &imageToNotConvolve,
     image::Image<float>        const &varianceImage,
     math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    double                          &background,
-    double                          &backgroundError);
+    lsst::pex::policy::Policy       &policy);
 
 template
 std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
@@ -1627,7 +1695,7 @@ void diffim::computePsfMatchingKernelForFootprint(
         
         for (unsigned int col = startCol; col < endCol; ++col) {
             
-            ImageT ncImage   = *imageToNotConvolveCol.image;
+            ImageT ncImage    = *imageToNotConvolveCol.image;
             ImageT ncVariance = *imageToNotConvolveCol.variance;
             MaskT  ncMask     = *imageToNotConvolveCol.mask;
             

@@ -89,14 +89,13 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     MaskedImagePtr miToNotConvolvePtr = MaskedImagePtr ( 
         new image::MaskedImage<ImageT>(*(this->_miToNotConvolveParentPtr), fpBBox)
         );
-    this->_miToConvolvePtr = miToConvolvePtr;
+    this->_miToConvolvePtr    = miToConvolvePtr;
     this->_miToNotConvolvePtr = miToNotConvolvePtr;
 
     // Estimate of the variance for first kernel pass
+    // Third argument is for a deep copy, so -= does not modify the original pixels
     image::MaskedImage<ImageT> varEstimate = 
-        image::MaskedImage<ImageT>(this->_miToConvolvePtr->getDimensions());
-
-    varEstimate += *(this->_miToNotConvolvePtr);
+        image::MaskedImage<ImageT>(*(this->_miToNotConvolveParentPtr), fpBBox, true);
     varEstimate -= *(this->_miToConvolvePtr);
     
     boost::shared_ptr<math::Kernel> kernelPtr;
@@ -104,13 +103,13 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     double                          background;
     double                          backgroundError;
     try {
-        computePsfMatchingKernelForFootprint(*(this->_miToConvolvePtr), 
+        computePsfMatchingKernelForFootprint(background, backgroundError,
+                                             kernelPtr, kernelErrorPtr,
+                                             *(this->_miToConvolvePtr), 
                                              *(this->_miToNotConvolvePtr), 
                                              *(varEstimate.getVariance()), 
                                              this->_kBasisList, 
-                                             this->_policy, 
-                                             kernelPtr, kernelErrorPtr,
-                                             background, backgroundError);
+                                             this->_policy);
     } catch (exceptions::Exception& e) {
         this->setSdqaStatus(false);
         logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
@@ -129,10 +128,10 @@ bool SpatialModelKernel<ImageT>::buildModel() {
 
     // Create difference image and calculate associated statistics
     image::MaskedImage<ImageT> diffIm = convolveAndSubtract( *(this->_miToConvolvePtr),
-                                                                               *(this->_miToNotConvolvePtr),
-                                                                               *(kernelPtr), 
-                                                                               background);
-
+                                                             *(this->_miToNotConvolvePtr),
+                                                             *(kernelPtr), 
+                                                             background);
+    
     boost::shared_ptr<diffim::ImageStatistics<image::MaskedImage<ImageT> > > kStats = 
         boost::shared_ptr<diffim::ImageStatistics<image::MaskedImage<ImageT> > > (
             new diffim::ImageStatistics<image::MaskedImage<ImageT> >(diffIm)
@@ -157,13 +156,13 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     if (iterateKernel) {
         try {
             try {
-                computePsfMatchingKernelForFootprint(*(this->_miToConvolvePtr), 
+                computePsfMatchingKernelForFootprint(background, backgroundError,
+                                                     kernelPtr, kernelErrorPtr,
+                                                     *(this->_miToConvolvePtr), 
                                                      *(this->_miToNotConvolvePtr), 
                                                      *(diffIm.getVariance()),
                                                      this->_kBasisList, 
-                                                     this->_policy, 
-                                                     kernelPtr, kernelErrorPtr,
-                                                     background, backgroundError);
+                                                     this->_policy);
             } catch (exceptions::Exception& e) {
                 throw;
             }

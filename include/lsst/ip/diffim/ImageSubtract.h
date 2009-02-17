@@ -299,15 +299,15 @@ namespace diffim {
      */    
     template <typename ImageT, typename VarT>
     void computePsfMatchingKernelForFootprint(
+        double                                     &background,
+        double                                     &backgroundError,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
         lsst::afw::image::MaskedImage<ImageT>         const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT>         const &imageToNotConvolve,
         lsst::afw::image::Image<VarT>                 const &varianceImage,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
-        lsst::pex::policy::Policy                  &policy,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
-        double                                     &background,
-        double                                     &backgroundError
+        lsst::pex::policy::Policy                  &policy
         );
 
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
@@ -327,15 +327,15 @@ namespace diffim {
      */    
     template <typename ImageT, typename VarT>
     void computePsfMatchingKernelForFootprintEigen(
+        double                                     &background,
+        double                                     &backgroundError,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
         lsst::afw::image::MaskedImage<ImageT>         const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT>         const &imageToNotConvolve,
         lsst::afw::image::Image<VarT>                 const &varianceImage,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
-        lsst::pex::policy::Policy                  &policy,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
-        double                                     &background,
-        double                                     &backgroundError
+        lsst::pex::policy::Policy                  &policy
         );
 
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
@@ -355,15 +355,15 @@ namespace diffim {
      */    
     template <typename ImageT, typename VarT>
     void computePsfMatchingKernelForFootprintVW(
+        double                                     &background,
+        double                                     &backgroundError,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
+        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
         lsst::afw::image::MaskedImage<ImageT>         const &imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT>         const &imageToNotConvolve,
         lsst::afw::image::Image<VarT>                 const &varianceImage,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
-        lsst::pex::policy::Policy                  &policy,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
-        double                                     &background,
-        double                                     &backgroundError
+        lsst::pex::policy::Policy                  &policy
         );
 
     /** Add a spatially varying function to an Image

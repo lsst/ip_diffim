@@ -128,25 +128,44 @@ class ConvolveTestCase(unittest.TestCase):
             kImageIn.writeFits('kiFits.fits')
 
         kImageOut = afwImage.ImageD(kernelCols, kernelRows)
-        
         for footprintID, iFootprintPtr in enumerate(self.footprintList):
             footprintBBox           = iFootprintPtr.getBBox()
             imageToConvolveStamp    = MaskedImage(self.templateMaskedImage, footprintBBox)
             imageToNotConvolveStamp = MaskedImage(convolvedScienceMaskedImage, footprintBBox)
 
-            varEstimate             = MaskedImage(self.templateMaskedImage, footprintBBox)
+            # NOTE : need a copy() of the data, otherwise -= modifies templateMaskedImage
+            #      : third argument is "deep copy"
+            varEstimate             = MaskedImage(self.templateMaskedImage, footprintBBox, True)
             varEstimate            -= imageToNotConvolveStamp
             
             kernel                  = afwMath.LinearCombinationKernel()
             kernelError             = afwMath.LinearCombinationKernel()
-            
-            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
+
+            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintVW(
+                kernel, kernelError,
                 imageToConvolveStamp,
                 imageToNotConvolveStamp,
                 varEstimate.getVariance(),
                 self.kernelBasisList,
-                policy,
-                kernel, kernelError
+                policy
+                )
+            
+            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
+                kernel, kernelError,
+                imageToConvolveStamp,
+                imageToNotConvolveStamp,
+                varEstimate.getVariance(),
+                self.kernelBasisList,
+                policy
+                )
+            
+            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintEigen(
+                kernel, kernelError,
+                imageToConvolveStamp,
+                imageToNotConvolveStamp,
+                varEstimate.getVariance(),
+                self.kernelBasisList,
+                policy
                 )
 
             pdb.set_trace()
