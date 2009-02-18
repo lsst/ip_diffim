@@ -18,6 +18,7 @@
 #include <lsst/afw/math/KernelFunctions.h>
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/afw/detection/Footprint.h>
+#include <lsst/sdqa/SdqaRating.h>
 
 #include <lsst/ip/diffim/SpatialModelBase.h>
 #include <lsst/ip/diffim/ImageSubtract.h>

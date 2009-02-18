@@ -87,11 +87,12 @@ def version(HeadURL = r"$HeadURL$"):
 #include "lsst/ip/diffim/ImageSubtract.h"
 %}
 
+%apply boost::shared_ptr<lsst::afw::math::Kernel>& OUTPUT { boost::shared_ptr<lsst::afw::math::Kernel>& };
 %include "lsst/ip/diffim/ImageSubtract.h"
 
 /*
 %template(FindSetBitsU)
-    lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<> >;
+%    lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask>;
 
 %template(FindCountsF)
     lsst::ip::diffim::FindCounts<lsst::afw::image::MaskedImage<float> >;
@@ -128,6 +129,7 @@ def version(HeadURL = r"$HeadURL$"):
     lsst::ip::diffim::computePsfMatchingKernelForFootprintVW<float, float>;
 %template(computePsfMatchingKernelForFootprintVW)
     lsst::ip::diffim::computePsfMatchingKernelForFootprintVW<double, float>;
+%clear boost::shared_ptr<lsst::afw::math::Kernel>& OUTPUT;
 
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;

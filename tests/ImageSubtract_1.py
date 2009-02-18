@@ -42,8 +42,8 @@ if not imageProcDir:
 policyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
 policy = lsst.pex.policy.Policy.createPolicy(policyPath)
 
-InputMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_1")
-TemplateMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_1_tmpl")
+InputMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_small_1")
+TemplateMaskedImagePath = os.path.join(dataDir, "CFHT", "D4", "cal-53535-i-797722_small_1_tmpl")
 
 # the desired type of MaskedImage
 MaskedImage = afwImage.MaskedImageF
@@ -72,11 +72,11 @@ def initializeTestCases():
     # and background function
     backgroundFunction = afwMath.PolynomialFunction2D(backgroundSpatialOrder)
     
-    # make single good footprint at known object position in cal-53535-i-797722_1
+    # make single good footprint at known object position in cal-53535-i-797722_small_1
     size = 40
     footprintList = detection.FootprintContainerT()
-    footprint     = detection.Footprint( afwImage.BBox(afwImage.PointI(366 - size/2,
-                                                                       364 - size/2),
+    footprint     = detection.Footprint( afwImage.BBox(afwImage.PointI(128 - size/2,
+                                                                       128 - size/2),
                                                        size,
                                                        size) )
     
@@ -127,6 +127,8 @@ class ConvolveTestCase(unittest.TestCase):
         if debugIO:
             kImageIn.writeFits('kiFits.fits')
 
+        kValuesIn = numpy.zeros(kernelCols*kernelRows)
+
         kImageOut = afwImage.ImageD(kernelCols, kernelRows)
         for footprintID, iFootprintPtr in enumerate(self.footprintList):
             footprintBBox           = iFootprintPtr.getBBox()
@@ -138,6 +140,8 @@ class ConvolveTestCase(unittest.TestCase):
             varEstimate             = MaskedImage(self.templateMaskedImage, footprintBBox, True)
             varEstimate            -= imageToNotConvolveStamp
             
+            #kernel                  = afwMath.LinearCombinationKernel(self.kernelBasisList, kValuesIn)
+            #kernelError             = afwMath.LinearCombinationKernel(self.kernelBasisList, kValuesIn)
             kernel                  = afwMath.LinearCombinationKernel()
             kernelError             = afwMath.LinearCombinationKernel()
 
@@ -149,6 +153,7 @@ class ConvolveTestCase(unittest.TestCase):
                 self.kernelBasisList,
                 policy
                 )
+            print kernel.toString()
             
             background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
                 kernel, kernelError,
@@ -158,7 +163,8 @@ class ConvolveTestCase(unittest.TestCase):
                 self.kernelBasisList,
                 policy
                 )
-            
+            print kernel.toString()
+           
             background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintEigen(
                 kernel, kernelError,
                 imageToConvolveStamp,
@@ -167,6 +173,7 @@ class ConvolveTestCase(unittest.TestCase):
                 self.kernelBasisList,
                 policy
                 )
+            print kernel.toString()
 
             pdb.set_trace()
             print kernel.getDimensions()

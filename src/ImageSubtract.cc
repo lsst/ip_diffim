@@ -646,9 +646,9 @@ void diffim::computePsfMatchingKernelForFootprint(
     size_t rank;
     gsl_multifit_linear_svd(M, B, GSL_DBL_EPSILON, &rank, X, Cov, &chi2, work);
 
-    std::cout << "Soln GSL ";
-    gsl_vector_fprintf(stdout, X, "%f");
-    return;
+    //std::cout << "Soln GSL ";
+    //gsl_vector_fprintf(stdout, X, "%f");
+    //return;
 
     /* guts of gsl_multifit_linear_svd
     gsl_matrix *A   = work->A;
@@ -728,6 +728,8 @@ void diffim::computePsfMatchingKernelForFootprint(
         (new math::LinearCombinationKernel(kernelInBasisList, kValues));
     kernelErrorPtr = boost::shared_ptr<math::Kernel> 
         (new math::LinearCombinationKernel(kernelInBasisList, kErrValues));
+    //kernelPtr.reset( new math::LinearCombinationKernel(kernelInBasisList, kValues) );
+    //kernelErrorPtr.reset( new math::LinearCombinationKernel(kernelInBasisList, kErrValues) );
     
     // Estimate of Background and Background Error */
     if (std::isnan( gsl_matrix_get(Cov, nParameters-1, nParameters-1) )) {
@@ -1000,16 +1002,16 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
             }
         }
     }
-    std::cout << "Soln eigen : " << Soln << std::endl;
-    return;
+    //std::cout << "Soln eigen : " << Soln << std::endl;
+    //return;
 
     // Estimate of parameter uncertainties comes from the inverse of the
-    // covariance matrix.  Use Cholesky decomposition again.
-    //
+    // covariance matrix (noise spectrum).  Use Cholesky decomposition again.
+    // Cholkesy:
     // Cov       =  L L^t
     // Cov^(-1)  = (L L^t)^(-1)
-    //           =  (L^T)^-1 L^(-1)
-    Eigen::MatrixXd             Cov    = M * M.transpose();
+    //           = (L^T)^-1 L^(-1)
+    Eigen::MatrixXd             Cov    = M.transpose() * M;
     Eigen::LLT<Eigen::MatrixXd> llt    = Cov.llt();
     Eigen::MatrixXd             Error2 = llt.matrixL().transpose().inverse() * llt.matrixL().inverse();
     
@@ -1043,10 +1045,12 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
             kErrValues[idx] = sqrt(Error2(idx, idx));
         }
     }
-    kernelPtr = boost::shared_ptr<math::Kernel> 
-        (new math::LinearCombinationKernel(kernelInBasisList, kValues));
-    kernelErrorPtr = boost::shared_ptr<math::Kernel> 
-        (new math::LinearCombinationKernel(kernelInBasisList, kErrValues));
+    //kernelPtr = boost::shared_ptr<math::Kernel> 
+    //(new math::LinearCombinationKernel(kernelInBasisList, kValues));
+    //kernelErrorPtr = boost::shared_ptr<math::Kernel> 
+    //(new math::LinearCombinationKernel(kernelInBasisList, kErrValues));
+    kernelPtr.reset( new math::LinearCombinationKernel(kernelInBasisList, kValues) );
+    kernelErrorPtr.reset( new math::LinearCombinationKernel(kernelInBasisList, kErrValues) );
     
     // Estimate of Background and Background Error */
     if (std::isnan( Error2(nParameters-1, nParameters-1) )) {
@@ -1289,8 +1293,8 @@ void diffim::computePsfMatchingKernelForFootprintVW(
 
     //std::cout << "M vw : " << M << std::endl;
     //std::cout << "B vw : " << B << std::endl;
-    std::cout << "Soln vw : " << Soln << std::endl;
-    return;
+    //std::cout << "Soln vw : " << Soln << std::endl;
+    //return;
     
     // Additional gymnastics to get the parameter uncertainties
     vw::math::Matrix<double> Mt        = vw::math::transpose(M);
@@ -1327,10 +1331,13 @@ void diffim::computePsfMatchingKernelForFootprintVW(
             kErrValues[idx] = sqrt(Error2[idx][idx]);
         }
     }
-    kernelPtr = boost::shared_ptr<math::Kernel> 
-        (new math::LinearCombinationKernel(kernelInBasisList, kValues));
-    kernelErrorPtr = boost::shared_ptr<math::Kernel> 
-        (new math::LinearCombinationKernel(kernelInBasisList, kErrValues));
+    //kernelPtr = boost::shared_ptr<math::Kernel> 
+    //(new math::LinearCombinationKernel(kernelInBasisList, kValues));
+    //kernelErrorPtr = boost::shared_ptr<math::Kernel> 
+    //(new math::LinearCombinationKernel(kernelInBasisList, kErrValues));
+    kernelPtr.reset( new math::LinearCombinationKernel(kernelInBasisList, kValues) );
+    kernelErrorPtr.reset( new math::LinearCombinationKernel(kernelInBasisList, kErrValues) );
+    
     
     // Estimate of Background and Background Error */
     if (std::isnan( Error2[nParameters-1][nParameters-1] )) {

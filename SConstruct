@@ -31,6 +31,7 @@ env = scons.makeEnv(
         ["afw", "lsst/afw.h", "afw:C++"],
         ["gsl", "gsl/gsl_matrix.h", "gslcblas gsl"],
         ["eigen", "Eigen/Core.h"],
+        ["sdqa", "lsst/sdqa/SdqaMetric.h", "sdqa:C++"],
         ["vw", "vw/Math.h", "vwMath:C++"],
         ["lapack", None, "lapack", "dgesdd_"],
         ],
@@ -38,7 +39,7 @@ env = scons.makeEnv(
 #
 # Libraries needed to link libraries/executables
 #
-env.libs["ip_diffim"] += env.getlibs("boost wcslib cfitsio minuit utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy security afw gsl eigen vw lapack")
+env.libs["ip_diffim"] += env.getlibs("boost wcslib cfitsio minuit utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy security afw gsl eigen sdqa vw lapack")
 #
 # Build/install things
 #
