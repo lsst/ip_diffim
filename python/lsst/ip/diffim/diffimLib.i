@@ -89,6 +89,21 @@ def version(HeadURL = r"$HeadURL$"):
 
 %include "lsst/ip/diffim/ImageSubtract.h"
 
+%template(PsfMatchingFunctorF)
+    lsst::ip::diffim::PsfMatchingFunctor<float, float>;
+%template(PsfMatchingFunctorD)
+    lsst::ip::diffim::PsfMatchingFunctor<double, float>;
+
+%template(PsfMatchingFunctorGslF)
+    lsst::ip::diffim::PsfMatchingFunctorGsl<float, float>;
+%template(PsfMatchingFunctorGslD)
+    lsst::ip::diffim::PsfMatchingFunctorGsl<double, float>;
+
+%template(PsfMatchingFunctorVwF)
+    lsst::ip::diffim::PsfMatchingFunctorVw<float, float>;
+%template(PsfMatchingFunctorVwD)
+    lsst::ip::diffim::PsfMatchingFunctorVw<double, float>;
+
 /*
 %template(FindSetBitsU)
 %    lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask>;

@@ -33,12 +33,12 @@
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/LinearAlgebra.h> 
 
+#include <lsst/ip/diffim/ImageSubtract.h>
 #include <lsst/afw/image.h>
 #include <lsst/afw/math.h>
 #include <lsst/pex/exceptions/Exception.h>
 #include <lsst/pex/logging/Trace.h>
 #include <lsst/pex/logging/Log.h>
-#include <lsst/ip/diffim/ImageSubtract.h>
 #include <lsst/afw/detection/Footprint.h>
 #include <lsst/afw/math/ConvolveImage.h>
 
@@ -56,44 +56,32 @@ namespace diffim     = lsst::ip::diffim;
 template <typename ImageT, typename VarT>
 diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
     math::KernelList<lsst::afw::math::Kernel> const& basisList
-    ):
+    ) :
     _basisList(basisList),
     _background(0.),
     _backgroundError(0.),
-    _kernel( ),
-    _kernelError( )
+    _kernel(boost::shared_ptr<lsst::afw::math::Kernel>()),
+    _kernelError(boost::shared_ptr<lsst::afw::math::Kernel>())
 {;}
-
-template <typename ImageT, typename VarT>
-diffim::PsfMatchingFunctorGsl<ImageT, VarT>::PsfMatchingFunctorGsl(
-    math::KernelList<lsst::afw::math::Kernel> const& basisList
-    ) :
-    diffim::PsfMatchingFunctor<ImageT, VarT>(basisList)
-{;}
-
-template <typename ImageT, typename VarT>
-diffim::PsfMatchingFunctorVW<ImageT, VarT>::PsfMatchingFunctorVW(
-    math::KernelList<lsst::afw::math::Kernel> const& basisList
-    ) :
-    diffim::PsfMatchingFunctor<ImageT, VarT>(basisList)
-{;}
-
 
 //
 // Public Member Functions
 //
 
-diffim::PsfMatchingFunctor<ImageT, VarT>::reset() {
-    this->background      = 0.;
-    this->backgroundError = 0.;
-    this->kernel.reset( );
-    this->kernelError.reset( );
+template <typename ImageT, typename VarT>
+void diffim::PsfMatchingFunctor<ImageT, VarT>::reset() {
+    /* HEY , FOR SOME REASON THE KERNEL RESET DOES NOT WORK AND SEG FAULTS */
+    //this->_background      = 0.;
+    //this->_backgroundError = 0.;
+    //this->_kernel.reset();
+    //this->_kernelError.reset();
 }
 
-diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
+template <typename ImageT, typename VarT>
+void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
     lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-    lsst::afw::image::Image<VarT>         const &varianceImage,
+    lsst::afw::image::Image<VarT>         const &varianceEstimate,
     lsst::pex::policy::Policy             const &policy
     ) {
     
@@ -118,7 +106,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     typename std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > >::iterator 
         citer = convolvedImageList.begin();
     std::vector<boost::shared_ptr<math::Kernel> >::const_iterator 
-        kiter = basisList.begin();
+        kiter = this->_basisList.begin();
     
     // Create C_ij in the formalism of Alard & Lupton */
     for (; kiter != this->_basisList.end(); ++kiter, ++citer) {
@@ -136,7 +124,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         *citer = imagePtr;
     } 
     
-    kiter = basisList.begin();
+    kiter = this->_basisList.begin();
     citer = convolvedImageList.begin();
 
     // Ignore buffers around edge of convolved images :
@@ -177,7 +165,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     }
     xy_locator  imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
     xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
-    xyi_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
+    xyi_locator varianceLocator           = varianceEstimate.xy_at(startCol, startRow);
 
     // Unit test ImageSubtract_1.py should show
     // Image range : 9 9 -> 31 31 : 2804.000000 2798.191162
@@ -255,7 +243,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         imageToNotConvolveLocator += rowStep;
 
         // HACK UNTIL Ticket #647 FIXED
-        varianceLocator            = varianceImage.xy_at(startCol, row+1);
+        varianceLocator            = varianceEstimate.xy_at(startCol, row+1);
 
         for (int ki = 0; ki < nKernelParameters; ++ki) {
             convolvedLocatorList[ki] += rowStep;
@@ -377,10 +365,11 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
 }
 
 
-diffim::PsfMatchingFunctor<ImageT, VarT>::applyGsl(
+template <typename ImageT, typename VarT>
+void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
     lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
     lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-    lsst::afw::image::Image<VarT>         const &varianceImage,
+    lsst::afw::image::Image<VarT>         const &varianceEstimate,
     lsst::pex::policy::Policy             const &policy
     ) {
     
@@ -407,7 +396,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::applyGsl(
     typename std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > >::iterator 
         citer = convolvedImageList.begin();
     std::vector<boost::shared_ptr<math::Kernel> >::const_iterator 
-        kiter = basisList.begin();
+        kiter = this->_basisList.begin();
     
     // Create C_ij in the formalism of Alard & Lupton */
     for (; kiter != this->_basisList.end(); ++kiter, ++citer) {
@@ -425,7 +414,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::applyGsl(
         *citer = imagePtr;
     } 
     
-    kiter = basisList.begin();
+    kiter = this->_basisList.begin();
     citer = convolvedImageList.begin();
 
     // Ignore buffers around edge of convolved images :
@@ -466,7 +455,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::applyGsl(
     }
     xy_locator  imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
     xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
-    xyi_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
+    xyi_locator varianceLocator           = varianceEstimate.xy_at(startCol, startRow);
 
     // Unit test ImageSubtract_1.py should show
     // Image range : 9 9 -> 31 31 : 2804.000000 2798.191162
@@ -544,7 +533,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::applyGsl(
         imageToNotConvolveLocator += rowStep;
 
         // HACK UNTIL Ticket #647 FIXED
-        varianceLocator            = varianceImage.xy_at(startCol, row+1);
+        varianceLocator            = varianceEstimate.xy_at(startCol, row+1);
 
         for (int ki = 0; ki < nKernelParameters; ++ki) {
             convolvedLocatorList[ki] += rowStep;
@@ -622,10 +611,11 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::applyGsl(
 }
 
 
-diffim::PsfMatchingFunctor<ImageT, VarT>::applyVW(
+template <typename ImageT, typename VarT>
+void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
     lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
     lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-    lsst::afw::image::Image<VarT>         const &varianceImage,
+    lsst::afw::image::Image<VarT>         const &varianceEstimate,
     lsst::pex::policy::Policy             const &policy
     ) {
     
@@ -656,7 +646,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::applyVW(
     typename std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > >::iterator 
         citer = convolvedImageList.begin();
     std::vector<boost::shared_ptr<math::Kernel> >::const_iterator 
-        kiter = basisList.begin();
+        kiter = this->_basisList.begin();
     
     // Create C_ij in the formalism of Alard & Lupton */
     for (; kiter != this->_basisList.end(); ++kiter, ++citer) {
@@ -674,7 +664,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::applyVW(
         *citer = imagePtr;
     } 
     
-    kiter = basisList.begin();
+    kiter = this->_basisList.begin();
     citer = convolvedImageList.begin();
 
     // Ignore buffers around edge of convolved images :
@@ -715,7 +705,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::applyVW(
     }
     xy_locator  imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
     xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
-    xyi_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
+    xyi_locator varianceLocator           = varianceEstimate.xy_at(startCol, startRow);
 
     // Unit test ImageSubtract_1.py should show
     // Image range : 9 9 -> 31 31 : 2804.000000 2798.191162
@@ -793,7 +783,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::applyVW(
         imageToNotConvolveLocator += rowStep;
 
         // HACK UNTIL Ticket #647 FIXED
-        varianceLocator            = varianceImage.xy_at(startCol, row+1);
+        varianceLocator            = varianceEstimate.xy_at(startCol, row+1);
 
         for (int ki = 0; ki < nKernelParameters; ++ki) {
             convolvedLocatorList[ki] += rowStep;
@@ -2215,6 +2205,13 @@ void covariance(gsl_matrix * dest, const gsl_matrix * src) {
 */
 
 // Explicit instantiations
+
+template class diffim::PsfMatchingFunctor<float, float>;
+template class diffim::PsfMatchingFunctor<double, float>;
+template class diffim::PsfMatchingFunctorGsl<float, float>;
+template class diffim::PsfMatchingFunctorGsl<double, float>;
+template class diffim::PsfMatchingFunctorVw<float, float>;
+template class diffim::PsfMatchingFunctorVw<double, float>;
 
 template class diffim::FindSetBits<image::Mask<> >;
 

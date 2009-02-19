@@ -82,7 +82,7 @@ namespace diffim {
          * 
          * Virtual function that must be overridden by derived class
          */
-        virtual double returnSdqaRating(lsst::pex::policy::Policy &policy2) = 0;
+        virtual double returnSdqaRating(lsst::pex::policy::Policy &policy) = 0;
 
         /** Set its build status
          *

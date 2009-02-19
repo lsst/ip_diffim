@@ -145,39 +145,60 @@ class ConvolveTestCase(unittest.TestCase):
             kernel                  = afwMath.LinearCombinationKernel()
             kernelError             = afwMath.LinearCombinationKernel()
 
-            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintVW(
-                kernel, kernelError,
-                imageToConvolveStamp,
-                imageToNotConvolveStamp,
-                varEstimate.getVariance(),
-                self.kernelBasisList,
-                policy
-                )
-            print kernel.toString()
-            
-            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
-                kernel, kernelError,
-                imageToConvolveStamp,
-                imageToNotConvolveStamp,
-                varEstimate.getVariance(),
-                self.kernelBasisList,
-                policy
-                )
-            print kernel.toString()
-           
-            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintEigen(
-                kernel, kernelError,
-                imageToConvolveStamp,
-                imageToNotConvolveStamp,
-                varEstimate.getVariance(),
-                self.kernelBasisList,
-                policy
-                )
-            print kernel.toString()
+            kFunctor1 = ipDiff.PsfMatchingFunctorF(self.kernelBasisList)
+            kFunctor2 = ipDiff.PsfMatchingFunctorGslF(self.kernelBasisList)
+            kFunctor3 = ipDiff.PsfMatchingFunctorVwF(self.kernelBasisList)
 
-            pdb.set_trace()
-            print kernel.getDimensions()
-            print kImageOut.getDimensions()
+            kFunctor1.apply(imageToConvolveStamp,
+                            imageToNotConvolveStamp,
+                            varEstimate.getVariance(),
+                            policy)
+
+            kFunctor2.apply(imageToConvolveStamp,
+                            imageToNotConvolveStamp,
+                            varEstimate.getVariance(),
+                            policy)
+
+            kFunctor3.apply(imageToConvolveStamp,
+                            imageToNotConvolveStamp,
+                            varEstimate.getVariance(),
+                            policy)
+
+
+#            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintVW(
+#                kernel, kernelError,
+#                imageToConvolveStamp,
+#                imageToNotConvolveStamp,
+#                varEstimate.getVariance(),
+#                self.kernelBasisList,
+#                policy
+#                )
+#            print kernel.toString()
+            
+#            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
+#                kernel, kernelError,
+#                imageToConvolveStamp,
+#                imageToNotConvolveStamp,
+#                varEstimate.getVariance(),
+#                self.kernelBasisList,
+#                policy
+#                )
+#            print kernel.toString()
+           
+#            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintEigen(
+#                kernel, kernelError,
+#                imageToConvolveStamp,
+#                imageToNotConvolveStamp,
+#                varEstimate.getVariance(),
+#                self.kernelBasisList,
+#                policy
+#                )
+#            print kernel.toString()
+
+#            pdb.set_trace()
+#            print kernel.getDimensions()
+#            print kImageOut.getDimensions()
+            kernel = kFunctor1.getKernel()
             kSumOut = kernel.computeImage(kImageOut, 0.0, 0.0, False)
 
             if debugIO:
