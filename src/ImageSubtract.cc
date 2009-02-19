@@ -53,10 +53,823 @@ namespace diffim     = lsst::ip::diffim;
 //
 // Constructors
 //
+template <typename ImageT, typename VarT>
+diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
+    math::KernelList<lsst::afw::math::Kernel> const& basisList
+    ):
+    _basisList(basisList),
+    _background(0.),
+    _backgroundError(0.),
+    _kernel( ),
+    _kernelError( )
+{;}
+
+template <typename ImageT, typename VarT>
+diffim::PsfMatchingFunctorGsl<ImageT, VarT>::PsfMatchingFunctorGsl(
+    math::KernelList<lsst::afw::math::Kernel> const& basisList
+    ) :
+    diffim::PsfMatchingFunctor<ImageT, VarT>(basisList)
+{;}
+
+template <typename ImageT, typename VarT>
+diffim::PsfMatchingFunctorVW<ImageT, VarT>::PsfMatchingFunctorVW(
+    math::KernelList<lsst::afw::math::Kernel> const& basisList
+    ) :
+    diffim::PsfMatchingFunctor<ImageT, VarT>(basisList)
+{;}
+
 
 //
 // Public Member Functions
 //
+
+diffim::PsfMatchingFunctor<ImageT, VarT>::reset() {
+    this->background      = 0.;
+    this->backgroundError = 0.;
+    this->kernel.reset( );
+    this->kernelError.reset( );
+}
+
+diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
+    lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
+    lsst::afw::image::Image<VarT>         const &varianceImage,
+    lsst::pex::policy::Policy             const &policy
+    ) {
+    
+    // Make sure you do not overwrite anyone else's kernels
+    this->reset();
+
+    // grab mask bits from the image to convolve, since that is what we'll be operating on
+    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
+    
+    int nKernelParameters     = this->_basisList.size();
+    int nBackgroundParameters = 1;
+    int nParameters           = nKernelParameters + nBackgroundParameters;
+    
+    boost::timer t;
+    double time;
+    t.restart();
+    
+    Eigen::MatrixXd M = Eigen::MatrixXd::Zero(nParameters, nParameters);
+    Eigen::VectorXd B = Eigen::VectorXd::Zero(nParameters);
+    
+    std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > > convolvedImageList(nKernelParameters);
+    typename std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > >::iterator 
+        citer = convolvedImageList.begin();
+    std::vector<boost::shared_ptr<math::Kernel> >::const_iterator 
+        kiter = basisList.begin();
+    
+    // Create C_ij in the formalism of Alard & Lupton */
+    for (; kiter != this->_basisList.end(); ++kiter, ++citer) {
+        
+        /* NOTE : we could also *precompute* the entire template image convolved with these functions */
+        /*        and save them somewhere to avoid this step each time.  however, our paradigm is to */
+        /*        compute whatever is needed on the fly.  hence this step here. */
+        image::MaskedImage<ImageT> image(imageToConvolve.getDimensions());
+        math::convolve(image,
+                       imageToConvolve,
+                       **kiter,
+                       false,
+                       edgeMaskBit);
+        boost::shared_ptr<image::MaskedImage<ImageT> > imagePtr( new image::MaskedImage<ImageT>(image) );
+        *citer = imagePtr;
+    } 
+    
+    kiter = basisList.begin();
+    citer = convolvedImageList.begin();
+
+    // Ignore buffers around edge of convolved images :
+    //
+    // If the kernel has width 5, it has center pixel 2.  The first good pixel
+    // is the (5-2)=3rd pixel, which is array index 2, and ends up being the
+    // index of the central pixel.
+    //
+    // You also have a buffer of unusable pixels on the other side, numbered
+    // width-center-1.  The last good usable pixel is N-width+center+1.
+
+    // Example : the kernel is width = 5, center = 2
+    //
+    //     ---|---|-c-|---|---|
+    //          
+    //           the image is width = N
+    //           convolve this with the kernel, and you get
+    //
+    //    |-x-|-x-|-g-|---|---| ... |---|---|-g-|-x-|-x-|
+    //
+    //           g = first/last good pixel
+    //           x = bad
+    // 
+    //           the first good pixel is the array index that has the value "center", 2
+    //           the last good pixel has array index N-(5-2)+1
+    //           eg. if N = 100, you want to use up to index 97
+    //               100-3+1 = 98, and the loops use i < 98, meaning the last
+    //               index you address is 97.
+   
+    unsigned int startCol = (*kiter)->getCtrX();
+    unsigned int startRow = (*kiter)->getCtrY();
+    unsigned int endCol   = (*citer)->getWidth()  - ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
+    unsigned int endRow   = (*citer)->getHeight() - ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
+
+    std::vector<xy_locator> convolvedLocatorList;
+    for (citer = convolvedImageList.begin(); citer != convolvedImageList.end(); ++citer) {
+        convolvedLocatorList.push_back( (**citer).xy_at(startCol,startRow) );
+    }
+    xy_locator  imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
+    xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
+    xyi_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
+
+    // Unit test ImageSubtract_1.py should show
+    // Image range : 9 9 -> 31 31 : 2804.000000 2798.191162
+    logging::TTrace<8>("lsst.ip.diffim.PsfMatchingFunctor.apply",
+                       "Image range : %d %d -> %d %d : %f %f",
+                       startCol, startRow, endCol, endRow, 
+                       imageToConvolveLocator.image(), 
+                       imageToNotConvolveLocator.image());
+
+    std::pair<int, int> rowStep = std::make_pair(static_cast<int>(-(endCol-startCol)), 1);
+    for (unsigned int row = startRow; row < endRow; ++row) {
+        
+        for (unsigned int col = startCol; col < endCol; ++col) {
+            
+            ImageT ncImage          = imageToNotConvolveLocator.image();
+            ImageT ncVariance       = imageToNotConvolveLocator.variance();
+            image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
+            double iVariance        = 1.0 / *varianceLocator;
+            
+            // Unit test ImageSubtract_1.py should show
+            // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
+            // Accessing image row 9 col 10 : 2805.171 23.459 0 1774.878662
+            // ...
+            // Accessing image row 9 col 30 : 2793.281 23.359 0 1779.194946
+            // Accessing image row 10 col 9 : 2802.968 23.464 0 1770.467163
+            // ...
+            logging::TTrace<8>("lsst.ip.diffim.PsfMatchingFunctor.apply",
+                               "Accessing image row %d col %d : %.3f %.3f %d %f",
+                               row, col, ncImage, ncVariance, ncMask, 1.0 * *varianceLocator);
+            
+            // kernel index i
+            typename std::vector<xy_locator>::iterator 
+                citeri = convolvedLocatorList.begin();
+            typename std::vector<xy_locator>::iterator 
+                citerE = convolvedLocatorList.end();
+            for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
+                ImageT           cdImagei = (*citeri).image();
+                image::MaskPixel cdMaski  = (*citeri).mask();
+                if (cdMaski != 0) {
+                    throw LSST_EXCEPT(exceptions::Exception, 
+                                      str(boost::format("Accessing invalid pixel (%d) in PsfMatchingFunctor::apply") % 
+                                          kidxi));
+                }                
+                
+                // kernel index j
+                typename std::vector<xy_locator>::iterator 
+                    citerj = citeri;
+                for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
+                    ImageT cdImagej  = (*citerj).image();
+                    M(kidxi, kidxj) += cdImagei * cdImagej * iVariance;
+                } 
+                
+                B(kidxi) += ncImage * cdImagei * iVariance;
+                
+                // Constant background term; effectively j=kidxj+1 */
+                M(kidxi, nParameters-1) += cdImagei * iVariance;
+            } 
+            
+            // Background term; effectively i=kidxi+1 
+            B(nParameters-1)                += ncImage * iVariance;
+            M(nParameters-1, nParameters-1) += 1.0 * iVariance;
+            
+            // Step each accessor in column
+            ++imageToConvolveLocator.x();
+            ++imageToNotConvolveLocator.x();
+            ++varianceLocator.x();
+            for (int ki = 0; ki < nKernelParameters; ++ki) {
+                ++convolvedLocatorList[ki].x();
+            }             
+            
+        } // col
+        
+        // Get to next row, first col
+        imageToConvolveLocator    += rowStep;
+        imageToNotConvolveLocator += rowStep;
+
+        // HACK UNTIL Ticket #647 FIXED
+        varianceLocator            = varianceImage.xy_at(startCol, row+1);
+
+        for (int ki = 0; ki < nKernelParameters; ++ki) {
+            convolvedLocatorList[ki] += rowStep;
+        }
+        
+    } // row
+
+    
+    /** @note If we are going to regularize the solution to M, this is the place
+     * to do it 
+     */
+    
+    // Fill in rest of M
+    for (int kidxi=0; kidxi < nParameters; ++kidxi) 
+        for (int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) 
+            M(kidxj, kidxi) = M(kidxi, kidxj);
+    
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                       "Total compute time before matrix inversions : %.2f s", time);
+
+    //std::cout << "B eigen : " << B << std::endl;
+
+    // To use Cholesky decomposition, the matrix needs to be symmetric (M is, by
+    // design) and positive definite.  
+    //
+    // Eventually put a check in here to make sure its positive definite
+    //
+    Eigen::VectorXd Soln = Eigen::VectorXd::Zero(nParameters);;
+    if (!( M.ldlt().solve(B, &Soln) )) {
+        logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                           "Unable to determine kernel via Cholesky LDL^T");
+        if (!( M.llt().solve(B, &Soln) )) {
+            logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                               "Unable to determine kernel via Cholesky LL^T");
+            if (!( M.lu().solve(B, &Soln) )) {
+                logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                                   "Unable to determine kernel via LU");
+                // LAST RESORT
+                try {
+                    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(M);
+                    Eigen::MatrixXd const& R = eVecValues.eigenvectors();
+                    Eigen::VectorXd eValues  = eVecValues.eigenvalues();
+                    
+                    for (int i = 0; i != eValues.rows(); ++i) {
+                        if (eValues(i) != 0.0) {
+                            eValues(i) = 1.0/eValues(i);
+                        }
+                    }
+                    
+                    Soln = R*eValues.asDiagonal()*R.transpose()*B;
+                } catch (exceptions::Exception& e) {
+                    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                                       "Unable to determine kernel via eigen-values");
+                    
+                    throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel solution in PsfMatchingFunctor::apply");
+                }
+            }
+        }
+    }
+    //std::cout << "Soln eigen : " << Soln << std::endl;
+    //return;
+
+    // Estimate of parameter uncertainties comes from the inverse of the
+    // covariance matrix (noise spectrum).  Use Cholesky decomposition again.
+    // Cholkesy:
+    // Cov       =  L L^t
+    // Cov^(-1)  = (L L^t)^(-1)
+    //           = (L^T)^-1 L^(-1)
+    Eigen::MatrixXd             Cov    = M.transpose() * M;
+    Eigen::LLT<Eigen::MatrixXd> llt    = Cov.llt();
+    Eigen::MatrixXd             Error2 = llt.matrixL().transpose().inverse() * llt.matrixL().inverse();
+    
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                       "Total compute time after matrix inversions : %.2f s", time);
+    
+    // Translate from Eigen vectors into LSST classes
+    unsigned int kCols = policy.getInt("kernelCols");
+    unsigned int kRows = policy.getInt("kernelRows");
+    std::vector<double> kValues(kCols*kRows);
+    std::vector<double> kErrValues(kCols*kRows);
+    for (unsigned int row = 0, idx = 0; row < kRows; row++) {
+        for (unsigned int col = 0; col < kCols; col++, idx++) {
+            
+            // Insanity checking
+            if (std::isnan( Soln(idx) )) {
+                throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel solution (nan)");
+            }
+            if (std::isnan( Error2(idx, idx) )) {
+                throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel uncertainty (nan)");
+            }
+            if (Error2(idx, idx) < 0.0) {
+                throw LSST_EXCEPT(exceptions::Exception,
+                                  str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                                      Error2(idx, idx)
+                                      ));
+            }
+            
+            kValues[idx]    = Soln(idx);
+            kErrValues[idx] = sqrt(Error2(idx, idx));
+        }
+    }
+    this->_kernel.reset( new math::LinearCombinationKernel(this->_basisList, kValues) );
+    this->_kernelError.reset( new math::LinearCombinationKernel(this->_basisList, kErrValues) );
+    
+    // Estimate of Background and Background Error */
+    if (std::isnan( Error2(nParameters-1, nParameters-1) )) {
+        throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel uncertainty (nan)");
+    }
+    if (Error2(nParameters-1, nParameters-1) < 0.0) {
+        throw LSST_EXCEPT(exceptions::Exception, 
+                          str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                              Error2(nParameters-1, nParameters-1) 
+                              ));
+    }
+    this->_background      = Soln(nParameters-1);
+    this->_backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
+}
+
+
+diffim::PsfMatchingFunctor<ImageT, VarT>::applyGsl(
+    lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
+    lsst::afw::image::Image<VarT>         const &varianceImage,
+    lsst::pex::policy::Policy             const &policy
+    ) {
+    
+    // Make sure you do not overwrite anyone else's kernels
+    this->reset();
+
+    // grab mask bits from the image to convolve, since that is what we'll be operating on
+    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
+    
+    int nKernelParameters     = this->_basisList.size();
+    int nBackgroundParameters = 1;
+    int nParameters           = nKernelParameters + nBackgroundParameters;
+    
+    boost::timer t;
+    double time;
+    t.restart();
+    
+    gsl_vector *B = gsl_vector_alloc (nParameters);
+    gsl_matrix *M = gsl_matrix_alloc (nParameters, nParameters);
+    gsl_vector_set_zero(B);
+    gsl_matrix_set_zero(M);
+    
+    std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > > convolvedImageList(nKernelParameters);
+    typename std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > >::iterator 
+        citer = convolvedImageList.begin();
+    std::vector<boost::shared_ptr<math::Kernel> >::const_iterator 
+        kiter = basisList.begin();
+    
+    // Create C_ij in the formalism of Alard & Lupton */
+    for (; kiter != this->_basisList.end(); ++kiter, ++citer) {
+        
+        /* NOTE : we could also *precompute* the entire template image convolved with these functions */
+        /*        and save them somewhere to avoid this step each time.  however, our paradigm is to */
+        /*        compute whatever is needed on the fly.  hence this step here. */
+        image::MaskedImage<ImageT> image(imageToConvolve.getDimensions());
+        math::convolve(image,
+                       imageToConvolve,
+                       **kiter,
+                       false,
+                       edgeMaskBit);
+        boost::shared_ptr<image::MaskedImage<ImageT> > imagePtr( new image::MaskedImage<ImageT>(image) );
+        *citer = imagePtr;
+    } 
+    
+    kiter = basisList.begin();
+    citer = convolvedImageList.begin();
+
+    // Ignore buffers around edge of convolved images :
+    //
+    // If the kernel has width 5, it has center pixel 2.  The first good pixel
+    // is the (5-2)=3rd pixel, which is array index 2, and ends up being the
+    // index of the central pixel.
+    //
+    // You also have a buffer of unusable pixels on the other side, numbered
+    // width-center-1.  The last good usable pixel is N-width+center+1.
+
+    // Example : the kernel is width = 5, center = 2
+    //
+    //     ---|---|-c-|---|---|
+    //          
+    //           the image is width = N
+    //           convolve this with the kernel, and you get
+    //
+    //    |-x-|-x-|-g-|---|---| ... |---|---|-g-|-x-|-x-|
+    //
+    //           g = first/last good pixel
+    //           x = bad
+    // 
+    //           the first good pixel is the array index that has the value "center", 2
+    //           the last good pixel has array index N-(5-2)+1
+    //           eg. if N = 100, you want to use up to index 97
+    //               100-3+1 = 98, and the loops use i < 98, meaning the last
+    //               index you address is 97.
+   
+    unsigned int startCol = (*kiter)->getCtrX();
+    unsigned int startRow = (*kiter)->getCtrY();
+    unsigned int endCol   = (*citer)->getWidth()  - ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
+    unsigned int endRow   = (*citer)->getHeight() - ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
+
+    std::vector<xy_locator> convolvedLocatorList;
+    for (citer = convolvedImageList.begin(); citer != convolvedImageList.end(); ++citer) {
+        convolvedLocatorList.push_back( (**citer).xy_at(startCol,startRow) );
+    }
+    xy_locator  imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
+    xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
+    xyi_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
+
+    // Unit test ImageSubtract_1.py should show
+    // Image range : 9 9 -> 31 31 : 2804.000000 2798.191162
+    logging::TTrace<8>("lsst.ip.diffim.PsfMatchingFunctor.applyGsl",
+                       "Image range : %d %d -> %d %d : %f %f",
+                       startCol, startRow, endCol, endRow, 
+                       imageToConvolveLocator.image(), 
+                       imageToNotConvolveLocator.image());
+
+    std::pair<int, int> rowStep = std::make_pair(static_cast<int>(-(endCol-startCol)), 1);
+    for (unsigned int row = startRow; row < endRow; ++row) {
+        
+        for (unsigned int col = startCol; col < endCol; ++col) {
+            
+            ImageT ncImage          = imageToNotConvolveLocator.image();
+            ImageT ncVariance       = imageToNotConvolveLocator.variance();
+            image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
+            double iVariance        = 1.0 / *varianceLocator;
+            
+            // Unit test ImageSubtract_1.py should show
+            // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
+            // Accessing image row 9 col 10 : 2805.171 23.459 0 1774.878662
+            // ...
+            // Accessing image row 9 col 30 : 2793.281 23.359 0 1779.194946
+            // Accessing image row 10 col 9 : 2802.968 23.464 0 1770.467163
+            // ...
+            logging::TTrace<8>("lsst.ip.diffim.PsfMatchingFunctor.applyGsl",
+                               "Accessing image row %d col %d : %.3f %.3f %d %f",
+                               row, col, ncImage, ncVariance, ncMask, 1.0 * *varianceLocator);
+            
+            // kernel index i
+            typename std::vector<xy_locator>::iterator 
+                citeri = convolvedLocatorList.begin();
+            typename std::vector<xy_locator>::iterator 
+                citerE = convolvedLocatorList.end();
+            for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
+                ImageT           cdImagei = (*citeri).image();
+                image::MaskPixel cdMaski  = (*citeri).mask();
+                if (cdMaski != 0) {
+                    throw LSST_EXCEPT(exceptions::Exception, 
+                                      str(boost::format("Accessing invalid pixel (%d) in PsfMatchingFunctor::applyGsl") % 
+                                          kidxi));
+                }                
+                
+                // kernel index j
+                typename std::vector<xy_locator>::iterator 
+                    citerj = citeri;
+                for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
+                    ImageT cdImagej  = (*citerj).image();
+                    *gsl_matrix_ptr(M, kidxi, kidxj) += cdImagei * cdImagej * iVariance;
+                } 
+                
+                *gsl_vector_ptr(B, kidxi) += ncImage * cdImagei * iVariance;
+                
+                // Constant background term; effectively j=kidxj+1 */
+                *gsl_matrix_ptr(M, kidxi, nParameters-1) += cdImagei * iVariance;
+            } 
+            
+            // Background term; effectively i=kidxi+1 
+            *gsl_vector_ptr(B, nParameters-1)                += ncImage * iVariance;
+            *gsl_matrix_ptr(M, nParameters-1, nParameters-1) += 1.0 * iVariance;
+            
+            // Step each accessor in column
+            ++imageToConvolveLocator.x();
+            ++imageToNotConvolveLocator.x();
+            ++varianceLocator.x();
+            for (int ki = 0; ki < nKernelParameters; ++ki) {
+                ++convolvedLocatorList[ki].x();
+            }             
+            
+        } // col
+        
+        // Get to next row, first col
+        imageToConvolveLocator    += rowStep;
+        imageToNotConvolveLocator += rowStep;
+
+        // HACK UNTIL Ticket #647 FIXED
+        varianceLocator            = varianceImage.xy_at(startCol, row+1);
+
+        for (int ki = 0; ki < nKernelParameters; ++ki) {
+            convolvedLocatorList[ki] += rowStep;
+        }
+        
+    } // row
+
+    
+    /** @note If we are going to regularize the solution to M, this is the place
+     * to do it 
+     */
+    
+    // Fill in rest of M
+    for (int kidxi=0; kidxi < nParameters; ++kidxi) 
+        for (int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) 
+            gsl_matrix_set(M, kidxj, kidxi,
+                           gsl_matrix_get(M, kidxi, kidxj));
+    
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.applyGsl", 
+                       "Total compute time before matrix inversions : %.2f s", time);
+
+    gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc (nParameters, nParameters);
+    gsl_vector *Soln                    = gsl_vector_alloc (nParameters);
+    gsl_matrix *Error2                  = gsl_matrix_alloc (nParameters, nParameters);
+    double chi2;
+    size_t rank;
+    gsl_multifit_linear_svd(M, B, GSL_DBL_EPSILON, &rank, Soln, Error2, &chi2, work);
+
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.applyGsl", 
+                       "Total compute time after matrix inversions : %.2f s", time);
+    
+    // Translate from Gsl vectors into LSST classes
+    unsigned int kCols = policy.getInt("kernelCols");
+    unsigned int kRows = policy.getInt("kernelRows");
+    std::vector<double> kValues(kCols*kRows);
+    std::vector<double> kErrValues(kCols*kRows);
+    for (unsigned int row = 0, idx = 0; row < kRows; row++) {
+        for (unsigned int col = 0; col < kCols; col++, idx++) {
+            
+            // Insanity checking
+            if (std::isnan( gsl_vector_get(Soln,idx) )) {
+                throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel solution (nan)");
+            }
+            if (std::isnan( gsl_matrix_get(Error2, idx, idx) )) {
+                throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel uncertainty (nan)");
+            }
+            if (gsl_matrix_get(Error2, idx, idx) < 0.0) {
+                throw LSST_EXCEPT(exceptions::Exception,
+                                  str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                                      gsl_matrix_get(Error2, idx, idx)
+                                      ));
+            }
+
+            kValues[idx]    = gsl_vector_get(Soln, idx);
+            kErrValues[idx] = sqrt(gsl_matrix_get(Error2, idx, idx));
+        }
+    }
+    this->_kernel.reset( new math::LinearCombinationKernel(this->_basisList, kValues) );
+    this->_kernelError.reset( new math::LinearCombinationKernel(this->_basisList, kErrValues) );
+    
+    // Estimate of Background and Background Error */
+    if (std::isnan( gsl_matrix_get(Error2, nParameters-1, nParameters-1) )) {
+        throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel uncertainty (nan)");
+    }
+    if (gsl_matrix_get(Error2, nParameters-1, nParameters-1) < 0.0) {
+        throw LSST_EXCEPT(exceptions::Exception, 
+                          str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                              gsl_matrix_get(Error2, nParameters-1, nParameters-1) 
+                              ));
+    }
+    this->_background      = gsl_vector_get(Soln, nParameters-1);
+    this->_backgroundError = sqrt(gsl_matrix_get(Error2, nParameters-1, nParameters-1));
+}
+
+
+diffim::PsfMatchingFunctor<ImageT, VarT>::applyVW(
+    lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
+    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
+    lsst::afw::image::Image<VarT>         const &varianceImage,
+    lsst::pex::policy::Policy             const &policy
+    ) {
+    
+    // Make sure you do not overwrite anyone else's kernels
+    this->reset();
+
+    // grab mask bits from the image to convolve, since that is what we'll be operating on
+    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
+    
+    int nKernelParameters     = this->_basisList.size();
+    int nBackgroundParameters = 1;
+    int nParameters           = nKernelParameters + nBackgroundParameters;
+    
+    boost::timer t;
+    double time;
+    t.restart();
+    
+    vw::math::Vector<double> B(nParameters);
+    vw::math::Matrix<double> M(nParameters, nParameters);
+    for (unsigned int i = nParameters; i--;) {
+        B(i) = 0;
+        for (unsigned int j = nParameters; j--;) {
+            M(i,j) = 0;
+        }
+    }
+    
+    std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > > convolvedImageList(nKernelParameters);
+    typename std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > >::iterator 
+        citer = convolvedImageList.begin();
+    std::vector<boost::shared_ptr<math::Kernel> >::const_iterator 
+        kiter = basisList.begin();
+    
+    // Create C_ij in the formalism of Alard & Lupton */
+    for (; kiter != this->_basisList.end(); ++kiter, ++citer) {
+        
+        /* NOTE : we could also *precompute* the entire template image convolved with these functions */
+        /*        and save them somewhere to avoid this step each time.  however, our paradigm is to */
+        /*        compute whatever is needed on the fly.  hence this step here. */
+        image::MaskedImage<ImageT> image(imageToConvolve.getDimensions());
+        math::convolve(image,
+                       imageToConvolve,
+                       **kiter,
+                       false,
+                       edgeMaskBit);
+        boost::shared_ptr<image::MaskedImage<ImageT> > imagePtr( new image::MaskedImage<ImageT>(image) );
+        *citer = imagePtr;
+    } 
+    
+    kiter = basisList.begin();
+    citer = convolvedImageList.begin();
+
+    // Ignore buffers around edge of convolved images :
+    //
+    // If the kernel has width 5, it has center pixel 2.  The first good pixel
+    // is the (5-2)=3rd pixel, which is array index 2, and ends up being the
+    // index of the central pixel.
+    //
+    // You also have a buffer of unusable pixels on the other side, numbered
+    // width-center-1.  The last good usable pixel is N-width+center+1.
+
+    // Example : the kernel is width = 5, center = 2
+    //
+    //     ---|---|-c-|---|---|
+    //          
+    //           the image is width = N
+    //           convolve this with the kernel, and you get
+    //
+    //    |-x-|-x-|-g-|---|---| ... |---|---|-g-|-x-|-x-|
+    //
+    //           g = first/last good pixel
+    //           x = bad
+    // 
+    //           the first good pixel is the array index that has the value "center", 2
+    //           the last good pixel has array index N-(5-2)+1
+    //           eg. if N = 100, you want to use up to index 97
+    //               100-3+1 = 98, and the loops use i < 98, meaning the last
+    //               index you address is 97.
+   
+    unsigned int startCol = (*kiter)->getCtrX();
+    unsigned int startRow = (*kiter)->getCtrY();
+    unsigned int endCol   = (*citer)->getWidth()  - ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
+    unsigned int endRow   = (*citer)->getHeight() - ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
+
+    std::vector<xy_locator> convolvedLocatorList;
+    for (citer = convolvedImageList.begin(); citer != convolvedImageList.end(); ++citer) {
+        convolvedLocatorList.push_back( (**citer).xy_at(startCol,startRow) );
+    }
+    xy_locator  imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
+    xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
+    xyi_locator varianceLocator           = varianceImage.xy_at(startCol, startRow);
+
+    // Unit test ImageSubtract_1.py should show
+    // Image range : 9 9 -> 31 31 : 2804.000000 2798.191162
+    logging::TTrace<8>("lsst.ip.diffim.PsfMatchingFunctor.applyVW",
+                       "Image range : %d %d -> %d %d : %f %f",
+                       startCol, startRow, endCol, endRow, 
+                       imageToConvolveLocator.image(), 
+                       imageToNotConvolveLocator.image());
+
+    std::pair<int, int> rowStep = std::make_pair(static_cast<int>(-(endCol-startCol)), 1);
+    for (unsigned int row = startRow; row < endRow; ++row) {
+        
+        for (unsigned int col = startCol; col < endCol; ++col) {
+            
+            ImageT ncImage          = imageToNotConvolveLocator.image();
+            ImageT ncVariance       = imageToNotConvolveLocator.variance();
+            image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
+            double iVariance        = 1.0 / *varianceLocator;
+            
+            // Unit test ImageSubtract_1.py should show
+            // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
+            // Accessing image row 9 col 10 : 2805.171 23.459 0 1774.878662
+            // ...
+            // Accessing image row 9 col 30 : 2793.281 23.359 0 1779.194946
+            // Accessing image row 10 col 9 : 2802.968 23.464 0 1770.467163
+            // ...
+            logging::TTrace<8>("lsst.ip.diffim.PsfMatchingFunctor.applyVW",
+                               "Accessing image row %d col %d : %.3f %.3f %d %f",
+                               row, col, ncImage, ncVariance, ncMask, 1.0 * *varianceLocator);
+            
+            // kernel index i
+            typename std::vector<xy_locator>::iterator 
+                citeri = convolvedLocatorList.begin();
+            typename std::vector<xy_locator>::iterator 
+                citerE = convolvedLocatorList.end();
+            for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
+                ImageT           cdImagei = (*citeri).image();
+                image::MaskPixel cdMaski  = (*citeri).mask();
+                if (cdMaski != 0) {
+                    throw LSST_EXCEPT(exceptions::Exception, 
+                                      str(boost::format("Accessing invalid pixel (%d) in PsfMatchingFunctor::applyVW") % 
+                                          kidxi));
+                }                
+                
+                // kernel index j
+                typename std::vector<xy_locator>::iterator 
+                    citerj = citeri;
+                for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
+                    ImageT cdImagej  = (*citerj).image();
+                    M[kidxi][kidxj]   += cdImagei * cdImagej * iVariance;
+                } 
+                
+                B[kidxi] += ncImage * cdImagei * iVariance;
+                
+                // Constant background term; effectively j=kidxj+1 */
+                M[kidxi][nParameters-1] += cdImagei * iVariance;
+            } 
+            
+            // Background term; effectively i=kidxi+1 
+            B[nParameters-1]                += ncImage * iVariance;
+            M[nParameters-1][nParameters-1] += 1.0 * iVariance;
+            
+            // Step each accessor in column
+            ++imageToConvolveLocator.x();
+            ++imageToNotConvolveLocator.x();
+            ++varianceLocator.x();
+            for (int ki = 0; ki < nKernelParameters; ++ki) {
+                ++convolvedLocatorList[ki].x();
+            }             
+            
+        } // col
+        
+        // Get to next row, first col
+        imageToConvolveLocator    += rowStep;
+        imageToNotConvolveLocator += rowStep;
+
+        // HACK UNTIL Ticket #647 FIXED
+        varianceLocator            = varianceImage.xy_at(startCol, row+1);
+
+        for (int ki = 0; ki < nKernelParameters; ++ki) {
+            convolvedLocatorList[ki] += rowStep;
+        }
+        
+    } // row
+
+    
+    /** @note If we are going to regularize the solution to M, this is the place
+     * to do it 
+     */
+    
+    // Fill in rest of M
+    for (int kidxi=0; kidxi < nParameters; ++kidxi) 
+        for (int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) 
+            M[kidxj][kidxi] = M[kidxi][kidxj];
+    
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.applyVW", 
+                       "Total compute time before matrix inversions : %.2f s", time);
+
+    // Invert using VW's internal method
+    vw::math::Vector<double> Soln      = vw::math::least_squares(M, B);
+
+    // Additional gymnastics to get the parameter uncertainties
+    vw::math::Matrix<double> Mt        = vw::math::transpose(M);
+    vw::math::Matrix<double> MtM       = Mt * M;
+    vw::math::Matrix<double> Error2    = vw::math::pseudoinverse(MtM);
+
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.applyVW", 
+                       "Total compute time after matrix inversions : %.2f s", time);
+    
+    // Translate from VW vectors into LSST classes
+    unsigned int kCols = policy.getInt("kernelCols");
+    unsigned int kRows = policy.getInt("kernelRows");
+    std::vector<double> kValues(kCols*kRows);
+    std::vector<double> kErrValues(kCols*kRows);
+    for (unsigned int row = 0, idx = 0; row < kRows; row++) {
+        for (unsigned int col = 0; col < kCols; col++, idx++) {
+            
+            // Insanity checking
+            if (std::isnan( Soln[idx] )) {
+                throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel solution (nan)");
+            }
+            if (std::isnan( Error2[idx][idx] )) {
+                throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel uncertainty (nan)");
+            }
+            if (Error2[idx][idx] < 0.0) {
+                throw LSST_EXCEPT(exceptions::Exception,
+                                  str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                                      Error2[idx][idx]
+                                      ));
+            }
+            
+            kValues[idx]    = Soln[idx];
+            kErrValues[idx] = sqrt(Error2[idx][idx]);
+        }
+    }
+    this->_kernel.reset( new math::LinearCombinationKernel(this->_basisList, kValues) );
+    this->_kernelError.reset( new math::LinearCombinationKernel(this->_basisList, kErrValues) );
+    
+    // Estimate of Background and Background Error */
+    if (std::isnan( Error2[nParameters-1][nParameters-1] )) {
+        throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel uncertainty (nan)");
+    }
+    if (Error2[nParameters-1][nParameters-1] < 0.0) {
+        throw LSST_EXCEPT(exceptions::Exception, 
+                          str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                              Error2[nParameters-1][nParameters-1] 
+                              ));
+    }
+    this->_background      = Soln[nParameters-1];
+    this->_backgroundError = sqrt(Error2[nParameters-1][nParameters-1]);
+}
+
 
 //
 // Subroutines

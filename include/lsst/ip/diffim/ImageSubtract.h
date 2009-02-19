@@ -284,6 +284,53 @@ namespace diffim {
         lsst::pex::policy::Policy &policy
         );
     
+    template <typename ImageT, typename VarT>
+    class PsfMatchingFunctor {
+    public:
+        PsfMatchingFunctor(
+            lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList
+            );
+        virtual ~PsfMatchingFunctor();
+
+        double getBackground()                   const { return _background; }
+        double getBackgroundError()              const { return _backgroundError; }
+        boost::shared_ptr<lsst::afw::math::Kernel> getKernel()      const { return _kernel; }
+        boost::shared_ptr<lsst::afw::math::Kernel> getKernelError() const { return _kernelError; }
+
+        virtual void reset();
+        virtual void apply(
+            lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
+            lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
+            lsst::afw::image::Image<VarT>         const &varianceEstimate,
+            lsst::pex::policy::Policy             const &policy
+            );
+
+    private:
+        typedef typename image::MaskedImage<ImageT>::xy_locator xy_locator;
+        typedef typename image::Image<VarT>::xy_locator         xyi_locator;
+
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& _basisList
+        double _background;
+        double _backgroundError;
+        boost::shared_ptr<lsst::afw::math::Kernel>& _kernel;
+        boost::shared_ptr<lsst::afw::math::Kernel>& _kernelError;
+    };
+    
+    
+    template <typename ImageT, typename VarT>
+    class PsfMatchingFunctorGsl : public PsfMatchingFunctor<ImageT, VarT> {
+    public:
+        PsfMatchingFunctorGsl(lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList) :
+            PsfMatchingFunctor<ImageT, VarT>(basisList) {;}
+    };
+
+    template <typename ImageT, typename VarT>
+    class PsfMatchingFunctorVW : public PsfMatchingFunctor<ImageT, VarT> {
+    public:
+        PsfMatchingFunctorVW(lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList) :
+            PsfMatchingFunctor<ImageT, VarT>(basisList) {;}
+    };
+
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
      *
      * @param imageToConvolve  MaskedImage to convolve with Kernel

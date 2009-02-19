@@ -87,7 +87,6 @@ def version(HeadURL = r"$HeadURL$"):
 #include "lsst/ip/diffim/ImageSubtract.h"
 %}
 
-%apply boost::shared_ptr<lsst::afw::math::Kernel>& OUTPUT { boost::shared_ptr<lsst::afw::math::Kernel>& };
 %include "lsst/ip/diffim/ImageSubtract.h"
 
 /*
@@ -129,7 +128,6 @@ def version(HeadURL = r"$HeadURL$"):
     lsst::ip::diffim::computePsfMatchingKernelForFootprintVW<float, float>;
 %template(computePsfMatchingKernelForFootprintVW)
     lsst::ip::diffim::computePsfMatchingKernelForFootprintVW<double, float>;
-%clear boost::shared_ptr<lsst::afw::math::Kernel>& OUTPUT;
 
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;
