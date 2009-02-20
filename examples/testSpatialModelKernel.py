@@ -222,6 +222,7 @@ Notes:
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
     kBasisList = ipDiffim.generateDeltaFunctionKernelSet(kCols, kRows)
+    kFunctor   = ipDiffim.PsfMatchingFunctorF(kBasisList)
     
     # lets just get a couple for debugging and speed
     #policy.set('minimumCleanFootprints', 5)
@@ -246,7 +247,7 @@ Notes:
     spatialCellsC = ipDiffim.createSpatialModelKernelCells(fpList,
                                                            templateMaskedImage,
                                                            scienceMaskedImage,
-                                                           kBasisList,
+                                                           kFunctor,
                                                            policy,
                                                            cFlag='c')
     if policy.get('spatialKernelTesting') == True:
@@ -275,7 +276,7 @@ Notes:
     spatialCellsD = ipDiffim.createSpatialModelKernelCells(fpList,
                                                            scienceMaskedImage,
                                                            templateMaskedImage,
-                                                           kBasisList,
+                                                           kFunctor,
                                                            policy,
                                                            cFlag='d')
     if policy.get('spatialKernelTesting') == True:

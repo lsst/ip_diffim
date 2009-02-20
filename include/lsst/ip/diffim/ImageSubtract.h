@@ -141,7 +141,7 @@ namespace diffim {
         double getNpix() const { return _npix; }
 
         // Return Sdqa rating
-        bool evaluateQuality(lsst::pex::policy::Policy &policy) {
+        bool evaluateQuality(lsst::pex::policy::Policy const &policy) {
             if ( fabs(getMean())     > policy.getDouble("maximumFootprintResidualMean") ) return false;
             if ( sqrt(getVariance()) > policy.getDouble("maximumFootprintResidualStd")  ) return false;
             return true;
@@ -291,7 +291,7 @@ namespace diffim {
      * @ingroup diffim
      * 
      */
-    template <typename ImageT, typename VarT>
+    template <typename ImageT, typename VarT=lsst::afw::image::VariancePixel>
     class PsfMatchingFunctor {
     public:
         typedef typename lsst::afw::image::MaskedImage<ImageT>::xy_locator xy_locator;
@@ -353,14 +353,14 @@ namespace diffim {
      * @param imageToNotConvolve  MaskedImage to subtract convolved template from
      * @param policy  Policy for operations; in particular object detection
      */    
-    template <typename ImageT, typename VarT>
-    class PsfMatchingFunctorGsl : public PsfMatchingFunctor<ImageT, VarT> {
+    template <typename ImageT, typename VarT=lsst::afw::image::VariancePixel>
+    class PsfMatchingFunctorGsl : public PsfMatchingFunctor<ImageT> {
     public:
         typedef typename lsst::afw::image::MaskedImage<ImageT>::xy_locator xy_locator;
         typedef typename lsst::afw::image::Image<VarT>::xy_locator         xyi_locator;
 
         PsfMatchingFunctorGsl(lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList) :
-            PsfMatchingFunctor<ImageT, VarT>(basisList) {;}
+            PsfMatchingFunctor<ImageT>(basisList) {;}
         virtual ~PsfMatchingFunctorGsl() {};
         void apply(
             lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
@@ -378,14 +378,14 @@ namespace diffim {
      * @param imageToNotConvolve  MaskedImage to subtract convolved template from
      * @param policy  Policy for operations; in particular object detection
      */    
-    template <typename ImageT, typename VarT>
-    class PsfMatchingFunctorVw : public PsfMatchingFunctor<ImageT, VarT> {
+    template <typename ImageT, typename VarT=lsst::afw::image::VariancePixel>
+    class PsfMatchingFunctorVw : public PsfMatchingFunctor<ImageT> {
     public:
         typedef typename lsst::afw::image::MaskedImage<ImageT>::xy_locator xy_locator;
         typedef typename lsst::afw::image::Image<VarT>::xy_locator         xyi_locator;
 
         PsfMatchingFunctorVw(lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList) :
-            PsfMatchingFunctor<ImageT, VarT>(basisList) {;}
+            PsfMatchingFunctor<ImageT>(basisList) {;}
         virtual ~PsfMatchingFunctorVw() {};
         void apply(
             lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,

@@ -129,7 +129,9 @@ class ConvolveTestCase(unittest.TestCase):
 
         kValuesIn = numpy.zeros(kernelCols*kernelRows)
 
-        kImageOut = afwImage.ImageD(kernelCols, kernelRows)
+        kImageOut      = afwImage.ImageD(kernelCols, kernelRows)
+        kFunctor       = ipDiff.PsfMatchingFunctorVwF(self.kernelBasisList)
+            
         for footprintID, iFootprintPtr in enumerate(self.footprintList):
             footprintBBox           = iFootprintPtr.getBBox()
             imageToConvolveStamp    = MaskedImage(self.templateMaskedImage, footprintBBox)
@@ -140,66 +142,22 @@ class ConvolveTestCase(unittest.TestCase):
             varEstimate             = MaskedImage(self.templateMaskedImage, footprintBBox, True)
             varEstimate            -= imageToNotConvolveStamp
             
-            #kernel                  = afwMath.LinearCombinationKernel(self.kernelBasisList, kValuesIn)
-            #kernelError             = afwMath.LinearCombinationKernel(self.kernelBasisList, kValuesIn)
-            kernel                  = afwMath.LinearCombinationKernel()
-            kernelError             = afwMath.LinearCombinationKernel()
+            kFunctor.apply(imageToConvolveStamp,
+                           imageToNotConvolveStamp,
+                           varEstimate.getVariance(),
+                           policy)
 
-            kFunctor1 = ipDiff.PsfMatchingFunctorF(self.kernelBasisList)
-            kFunctor2 = ipDiff.PsfMatchingFunctorGslF(self.kernelBasisList)
-            kFunctor3 = ipDiff.PsfMatchingFunctorVwF(self.kernelBasisList)
-
-            kFunctor1.apply(imageToConvolveStamp,
-                            imageToNotConvolveStamp,
-                            varEstimate.getVariance(),
-                            policy)
-
-            kFunctor2.apply(imageToConvolveStamp,
-                            imageToNotConvolveStamp,
-                            varEstimate.getVariance(),
-                            policy)
-
-            kFunctor3.apply(imageToConvolveStamp,
-                            imageToNotConvolveStamp,
-                            varEstimate.getVariance(),
-                            policy)
-
-
-#            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintVW(
-#                kernel, kernelError,
-#                imageToConvolveStamp,
-#                imageToNotConvolveStamp,
-#                varEstimate.getVariance(),
-#                self.kernelBasisList,
-#                policy
-#                )
-#            print kernel.toString()
-            
-#            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
-#                kernel, kernelError,
-#                imageToConvolveStamp,
-#                imageToNotConvolveStamp,
-#                varEstimate.getVariance(),
-#                self.kernelBasisList,
-#                policy
-#                )
-#            print kernel.toString()
-           
-#            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprintEigen(
-#                kernel, kernelError,
-#                imageToConvolveStamp,
-#                imageToNotConvolveStamp,
-#                varEstimate.getVariance(),
-#                self.kernelBasisList,
-#                policy
-#                )
-#            print kernel.toString()
-
-#            pdb.set_trace()
-#            print kernel.getDimensions()
-#            print kImageOut.getDimensions()
-            kernel = kFunctor1.getKernel()
-            kSumOut = kernel.computeImage(kImageOut, 0.0, 0.0, False)
+            # iterate?
+            diffIm1     = ipDiff.convolveAndSubtract(imageToConvolveStamp,
+                                                     imageToNotConvolveStamp,
+                                                     kFunctor.getKernel(),
+                                                     kFunctor.getBackground())
+            kFunctor.apply(imageToConvolveStamp,
+                           imageToNotConvolveStamp,
+                           diffIm1.getVariance(),
+                           policy)
+            kernel      = kFunctor.getKernel()
+            kSumOut     = kernel.computeImage(kImageOut, 0.0, 0.0, False)
 
             if debugIO:
                 imageToConvolveStamp.writeFits('tFits_%d' % (footprintID,))
@@ -209,22 +167,19 @@ class ConvolveTestCase(unittest.TestCase):
                 ds9.mtv(kImageIn, frame=0)
                 ds9.mtv(kImageOut, frame=1)
 
-            # make sure it matches the known kernel
-            # N.b. background test fails with floating point images 
-            tol = 2e-4
+            # Make sure it matches the input kernel
             for i in range(kImageOut.getWidth()):
                 for j in range(kImageOut.getHeight()):
-                    if False:
-                        self.assertEqual(math.fabs(kImageIn.get(i,j) - kImageOut.get(i,j)) < tol, True,
-                                         "K(%d,%d): |%g - %g| < %g" %
-                                         (i, j, kImageIn.get(i,j), kImageOut.get(i,j), tol))
-                    else:
-                        self.assertAlmostEqual(kImageIn.get(i,j), kImageOut.get(i,j))                        
+                    print i, j, kImageIn.get(i,j), kImageOut.get(i,j)
+                    self.assertAlmostEqual(kImageIn.get(i,j), kImageOut.get(i,j), 3,
+                                           "K(%d,%d): |%g - %g| = %g" %
+                                           (i, j, kImageIn.get(i,j), kImageOut.get(i,j),
+                                            abs(kImageIn.get(i,j)-kImageOut.get(i,j))))
 
-            # make sure that the background is zero
-            self.assertAlmostEqual(background, 0.0)
+            # Make sure that the background is zero
+            self.assertAlmostEqual(kFunctor.getBackground(), 0.0)
 
-            # make sure that the kSum is scaling
+            # Make sure that the kSum is scaling
             self.assertAlmostEqual(kSumIn, kSumOut)
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -254,59 +209,42 @@ class DeltaFunctionTestCase(unittest.TestCase):
 
     def testDeltaFunction(self, bg=0.0, scaling=1.0):
         """Make sure that the output kernels are delta functions"""
-
         kernelCols = policy.get('kernelCols')
         kernelRows = policy.get('kernelRows')
 
-        kImage = afwImage.ImageD(kernelCols, kernelRows)
-        
+        kImage   = afwImage.ImageD(kernelCols, kernelRows)
+        kFunctor = ipDiff.PsfMatchingFunctorGslF(self.kernelBasisList)
+
         for footprintID, iFootprintPtr in enumerate(self.footprintList):
-            footprintBBox           = iFootprintPtr.getBBox()
-            imageToConvolveStamp    = MaskedImage(self.templateMaskedImage, footprintBBox)
-            imageToNotConvolveStamp = MaskedImage(self.scienceMaskedImage,  footprintBBox)
+            footprintBBox            = iFootprintPtr.getBBox()
+            imageToConvolveStamp     = MaskedImage(self.templateMaskedImage, footprintBBox)
+            imageToNotConvolveStamp  = MaskedImage(self.scienceMaskedImage,  footprintBBox)
             
-            # this is a bit of a hack to deal with -= and *= problems with swigged masked images
-            #imageArray, varianceArray, maskArray = imageTest.arraysFromMaskedImage(imageToNotConvolveStamp)
-            #imageArray    += bg
-            #imageArray    *= scaling
-            #varianceArray *= scaling**2
-            #imageToNotConvolveStamp = imageTest.maskedImageFromArrays( (imageArray, varianceArray, maskArray) )
             imageToNotConvolveStamp += bg
             imageToNotConvolveStamp *= scaling
 
-            if debugIO:
-                imageToConvolveStamp.writeFits('tFits_%d' % (footprintID,))
-                imageToNotConvolveStamp.writeFits('sFits_%d' % (footprintID,))
+            # NOTE : need a copy() of the data, otherwise -= modifies templateMaskedImage
+            #      : third argument is "deep copy"
+            varEstimate             = MaskedImage(self.templateMaskedImage, footprintBBox, True)
+            varEstimate            -= imageToNotConvolveStamp
 
-            kernel                  = afwMath.LinearCombinationKernel()
-            kernelError             = afwMath.LinearCombinationKernel()
-
-            background, backgroundError = ipDiff.computePsfMatchingKernelForFootprint(
-                imageToConvolveStamp,
-                imageToNotConvolveStamp,
-                varEstimate.getVariance(),
-                self.kernelBasisList,
-                policy,
-                kernel, kernelError
-                )
-
-            print kernel.getDimensions()
-            print kImage.getDimensions()
-            kSum = kernel.computeImage(kImage, 0.0, 0.0, False)
-            
-            if debugIO:
-                kImage.writeFits('kFits_%d.fits' % (footprintID,))
+            kFunctor.apply(imageToConvolveStamp,
+                           imageToNotConvolveStamp,
+                           varEstimate.getVariance(),
+                           policy)
+            kernel = kFunctor.getKernel()
+            kSum   = kernel.computeImage(kImage, 0.0, 0.0, False)
 
             # make sure its a delta function
             for i in range(kImage.getWidth()):
                 for j in range(kImage.getHeight()):
                     if i==j and i==kImage.getWidth()/2:
-                        self.assertAlmostEqual(kImage.get(i,j), scaling)
+                        self.assertAlmostEqual(kImage.get(i,j), scaling, 3)
                     else:
-                        self.assertAlmostEqual(kImage.get(i,j), 0.0)
+                        self.assertAlmostEqual(kImage.get(i,j), 0.0, 3)
 
             # make sure that the background is zero
-            self.assertAlmostEqual(background, bg, places=6)
+            self.assertAlmostEqual(kFunctor.getBackground(), bg, places=6)
 
             # make sure that the kSum is scaling
             self.assertAlmostEqual(kSum, scaling)
@@ -548,8 +486,8 @@ def suite():
     tests.init()
 
     suites = []
-    suites += unittest.makeSuite(ConvolveTestCase)
-    #suites += unittest.makeSuite(DeltaFunctionTestCase)
+    #suites += unittest.makeSuite(ConvolveTestCase)
+    suites += unittest.makeSuite(DeltaFunctionTestCase)
     #suites += unittest.makeSuite(DeconvolveTestCase)
     #
    # suites += unittest.makeSuite(ConvolveAndSubtractTestCase)

@@ -52,22 +52,24 @@ namespace diffim {
 
         /** Empty constructor
          */
-        SpatialModelKernel();
+        //SpatialModelKernel();
 
         /** Constructor
          *
+         * @note Kenrel needs to carry around pointer to the parent image
+         * 
          * @param fpPtr  Pointer to footprint of pixels used to build Kernel
          * @param miToConvolveParentPtr  Pointer to parent template image
          * @param miToNotConvolveParentPtr  Pointer to parent science image
-         * @param kBasisList  Basis list used to model the Kernel
+         * @param kernelFunctor  Functor to build the PSF Mathching Kernel
          * @param policy  Policy for operations
          * @param build  Build upon construction?  Default is false.
          */
-        SpatialModelKernel(lsst::afw::detection::Footprint::Ptr fpPtr,
-                           MaskedImagePtr miToConvolveParentPtr,
-                           MaskedImagePtr miToNotConvolveParentPtr,
-                           lsst::afw::math::KernelList<lsst::afw::math::Kernel> kBasisList,
-                           lsst::pex::policy::Policy &policy,
+        SpatialModelKernel(lsst::afw::detection::Footprint::Ptr const &fpPtr,
+                           MaskedImagePtr const &miToConvolvePtr,
+                           MaskedImagePtr const &miToNotConvolvePtr,
+                           boost::shared_ptr<PsfMatchingFunctor<ImageT> > const &kernelFunctor,
+                           lsst::pex::policy::Policy const &policy,
                            bool build=false);
 
         /** Destructor
@@ -86,32 +88,18 @@ namespace diffim {
          */
         double returnSdqaRating(lsst::pex::policy::Policy &policy);
 
-        /** Set Footprint pointer for the Kernel model
-         *
-         * @param fpPtr  pointer to Footprint
-         */
-        void setFootprintPtr(lsst::afw::detection::Footprint::Ptr fpPtr) {_fpPtr = fpPtr;};
         /** Get Footprint pointer for the Kernel model
          */
-        lsst::afw::detection::Footprint::Ptr getFootprintPtr() {return _fpPtr;};
+        lsst::afw::detection::Footprint::Ptr getFootprintPtr() const {return _fpPtr;};
 
-        /** Set template's MaskedImage pointer for the Kernel model
-         *
-         * @param miPtr  pointer to the MaskedImage the Kernel will convolve
-         */
-        void setMiToConvolvePtr(MaskedImagePtr miPtr) {_miToConvolvePtr = miPtr;};
         /** Get template's MaskedImage pointer for the Kernel model
          */
-        MaskedImagePtr getMiToConvolvePtr() {return _miToConvolvePtr;};
+        MaskedImagePtr getMiToConvolvePtr() const {return _miToConvolvePtr;};
 
-        /** Set image's MaskedImage pointer for the Kernel model
-         *
-         * @param miPtr  pointer to the MaskedImage the Kernel will match the Template to
-         */
-        void setMiToNotConvolvePtr(MaskedImagePtr miPtr) {_miToNotConvolvePtr = miPtr;};
         /** Get image's MaskedImage pointer for the Kernel model
          */
-        MaskedImagePtr getMiToNotConvolvePtr() {return _miToNotConvolvePtr;};
+        MaskedImagePtr getMiToNotConvolvePtr() const {return _miToNotConvolvePtr;};
+
 
         /** Set Kernel pointer associated with the Footprint; the core of this Model
          *
@@ -192,14 +180,11 @@ namespace diffim {
     private: 
         /** Objects needed to build itself; only initializable during construction
          */
-        MaskedImagePtr _miToConvolveParentPtr;      ///< Parent image; typically template image
-        MaskedImagePtr _miToNotConvolveParentPtr;   ///< Parent image; typically science image
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> _kBasisList; ///< List of basis functions for Kernel
-        lsst::pex::policy::Policy _policy;          ///< Policy file for operations
-
-        lsst::afw::detection::Footprint::Ptr _fpPtr; ///< Footprint containing pixels used to build Kernel
-        MaskedImagePtr _miToConvolvePtr;             ///< Subimage of _miToConvolveParentPtr
-        MaskedImagePtr _miToNotConvolvePtr;          ///< Subimage of _miToNotConvolveParentPtr
+        lsst::afw::detection::Footprint::Ptr const &_fpPtr; ///< Footprint containing pixels used to build Kernel
+        MaskedImagePtr const &_miToConvolvePtr;             ///< Subimage around which you build kernel
+        MaskedImagePtr const &_miToNotConvolvePtr;          ///< Subimage around which you build kernel
+        boost::shared_ptr<PsfMatchingFunctor<ImageT> > const &_kFunctor; ///< Functor to build PSF matching kernel
+        lsst::pex::policy::Policy const &_policy;           ///< Policy file for operations
 
         /** Results from single Kernel model
          */

@@ -74,24 +74,28 @@ def writeDiffImages(prefix, id, kModel):
         
     kModel.getMiToConvolvePtr().writeFits('tFoot_%s_%s' % (prefix, id))
     kModel.getMiToNotConvolvePtr().writeFits('iFoot_%s_%s' % (prefix, id))
+
+    cki = afwImage.ImageD(kModel.getKernelPtr().getDimensions())
+    cks = kModel.getKernelPtr().computeImage(cki, False)
+    cmd = cki.getMetadata()
+    if cmd == None:
+        cmd = dafBase.PropertySet()
+
+    cmd.setString('CONV', 'Template')
+    cmd.setFloat('KCOL', kModel.getColc())
+    cmd.setFloat('KROW', kModel.getRowc())
+    cmd.setFloat('MSIG', kModel.getStats().getMean())
+    cmd.setFloat('VSIG', kModel.getStats().getVariance())
+    cmd.setFloat('BG',   kModel.getBackground())
+    cmd.setFloat('KSUM', cks)
+    cmd.setBool('KQUALITY', kModel.getSdqaStatus())
+    cki.setMetadata(cmd)
+    cki.writeFits('kernel_%s_%s.fits' % (prefix, id))
     
-    ckp,cks = kModel.getKernelPtr().computeNewImage(False)
-    cmd = ckp.getMetaData()
-    cmd.addProperty(dafBase.DataProperty('CONV', 'Template'))
-    cmd.addProperty(dafBase.DataProperty('KCOL', kModel.getColcNorm()))
-    cmd.addProperty(dafBase.DataProperty('KROW', kModel.getRowcNorm()))
-    cmd.addProperty(dafBase.DataProperty('MSIG', kModel.getStats().getResidualMean()))
-    cmd.addProperty(dafBase.DataProperty('VSIG', kModel.getStats().getResidualStd()))
-    cmd.addProperty(dafBase.DataProperty('BG',   kModel.getBackground()))
-    cmd.addProperty(dafBase.DataProperty('KQUALITY', kModel.getSdqaStatus()))
-    cmd.addProperty(dafBase.DataProperty('KSUM', cks))
-    ckp.setMetadata(cmd)
-    ckp.writeFits('kernel_%s_%s.fits' % (prefix, id))
-    
-    diffIm = ipDiffim.convolveAndSubtract(kModel.getMiToConvolvePtr().get(),
-                                          kModel.getMiToNotConvolvePtr().get(),
-                                          kModel.getKernelPtr(),
-                                          kModel.getBackground())
+    diffIm = diffimLib.convolveAndSubtract(kModel.getMiToConvolvePtr(),
+                                           kModel.getMiToNotConvolvePtr(),
+                                           kModel.getKernelPtr(),
+                                           kModel.getBackground())
     
     diffIm.writeFits('diff_%s_%s' % (prefix, id))
 

@@ -107,11 +107,10 @@ def rejectKernelSumOutliers(spatialCells, policy):
 def createSpatialModelKernelCells(fpInList,
                                   templateMaskedImage,
                                   scienceMaskedImage,
-                                  kBasisList,
+                                  kFunctor,
                                   policy,
                                   cFlag='c'):
 
-    
     nSegmentCol = policy.get('nSegmentCol')
     nSegmentRow = policy.get('nSegmentRow')
 
@@ -143,25 +142,28 @@ def createSpatialModelKernelCells(fpInList,
             # Should never really have a loop within a loop within a loop
             # But we will not have *that many* Footprints...
             for fpID, fpPtr in enumerate(fpInList):
+                
                 fpBBox = fpPtr.getBBox()
                 fpColC = 0.5 * (fpBBox.getX0() + fpBBox.getX1())
                 fpRowC = 0.5 * (fpBBox.getY0() + fpBBox.getY1())
 
                 if (fpColC >= colMin) and (fpColC < colMax) and (fpRowC >= rowMin) and (fpRowC < rowMax):
                     fpCellList.push_back(fpPtr)
-                    
+
+                    tSubImage = afwImage.MaskedImageF(templateMaskedImage, fpBBox)
+                    iSubimage = afwImage.MaskedImageF(scienceMaskedImage, fpBBox)
                     model = diffimLib.SpatialModelKernelF(fpPtr,
-                                                          templateMaskedImage,
-                                                          scienceMaskedImage,
-                                                          kBasisList,
+                                                          tSubImage,
+                                                          iSubimage,
+                                                          kFunctor,
                                                           policy,
                                                           False)
 
                     if policy.get('debugIO'):
-                        ipDiffimDebug.writeDiffImages(cFlag, '%s_%d' % (label, fpID), model)
+                        diffimDebug.writeDiffImages(cFlag, '%s_%d' % (label, fpID), model)
                         
                     modelList.push_back( model )
-                    
+
             spatialCell = diffimLib.SpatialModelCellF(label, colCenter, rowCenter, fpCellList, modelList)
             spatialCells.push_back(spatialCell)
 

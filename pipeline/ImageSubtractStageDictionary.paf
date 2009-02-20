@@ -16,6 +16,10 @@ kernelRows: 19
 kernelCols: 19
 
 ######
+# Remake kernel using better variance estimate?
+iterateKernel: false
+
+######
 # Order of kernel spatial variation
 kernelSpatialOrder: 1
 
@@ -30,7 +34,6 @@ backgroundSpatialOrder: 1
 #
 nSegmentCol: 10
 nSegmentRow: 10
-iterateKernel: true
 
 ######
 # Rejects objects with deviant Kernel Sums

@@ -22,6 +22,7 @@
 #include <lsst/ip/diffim/SpatialModelKernel.h>
 
 namespace exceptions = lsst::pex::exceptions; 
+namespace policy     = lsst::pex::policy; 
 namespace logging    = lsst::pex::logging; 
 namespace image      = lsst::afw::image;
 namespace math       = lsst::afw::math;
@@ -31,26 +32,46 @@ namespace lsst {
 namespace ip {
 namespace diffim {
     
+/*
 template <typename ImageT>
 SpatialModelKernel<ImageT>::SpatialModelKernel() :
-    lsst::ip::diffim::SpatialModelBase<ImageT>()
+    lsst::ip::diffim::SpatialModelBase<ImageT>(),
+    _fpPtr(lsst::afw::detection::Footprint::Ptr()),
+    _miToConvolvePtr(MaskedImagePtr()),
+    _miToNotConvolvePtr(MaskedImagePtr()),
+    _kFunctor(boost::shared_ptr<PsfMatchingFunctor<ImageT> >()),
+    _policy(),
+    _kPtr(boost::shared_ptr<lsst::afw::math::Kernel>()),
+    _kErrPtr(boost::shared_ptr<lsst::afw::math::Kernel>()),
+    _kSum(0.),
+    _bg(0.),
+    _bgErr(0.),
+    _kStats(boost::shared_ptr<ImageStatistics<lsst::afw::image::MaskedImage<ImageT> > >())
+
 {;}
+*/
 
 template <typename ImageT>
 SpatialModelKernel<ImageT>::SpatialModelKernel(
-    lsst::afw::detection::Footprint::Ptr fpPtr,
-    MaskedImagePtr miToConvolveParentPtr,
-    MaskedImagePtr miToNotConvolveParentPtr,
-    lsst::afw::math::KernelList<lsst::afw::math::Kernel> kBasisList,
-    lsst::pex::policy::Policy &policy,
+    detection::Footprint::Ptr const &fpPtr,
+    MaskedImagePtr const &miToConvolvePtr,
+    MaskedImagePtr const &miToNotConvolvePtr,
+    boost::shared_ptr<PsfMatchingFunctor<ImageT> > const &kFunctor,
+    policy::Policy const &policy,
     bool build
     ) :
-    lsst::ip::diffim::SpatialModelBase<ImageT>(),
-    _miToConvolveParentPtr(miToConvolveParentPtr),
-    _miToNotConvolveParentPtr(miToNotConvolveParentPtr),
-    _kBasisList(kBasisList),
+    diffim::SpatialModelBase<ImageT>(),
+    _fpPtr(fpPtr),
+    _miToConvolvePtr(miToConvolvePtr),
+    _miToNotConvolvePtr(miToNotConvolvePtr),
+    _kFunctor(kFunctor),
     _policy(policy),
-    _fpPtr(fpPtr)
+    _kPtr(boost::shared_ptr<math::Kernel>()),
+    _kErrPtr(boost::shared_ptr<math::Kernel>()),
+    _kSum(0.),
+    _bg(0.),
+    _bgErr(0.),
+    _kStats(boost::shared_ptr<ImageStatistics<image::MaskedImage<ImageT> > >())
 {
     if (build == true) {
         this->buildModel();
@@ -69,10 +90,8 @@ bool SpatialModelKernel<ImageT>::buildModel() {
 
     // NOTE : since we can't remap pixel range to go from -1 to 1 in convolve(),
     // we have to use the actual pixel value here.  Not optimal.
-
     // this->setColc(float(fpBBox.getX0() + fpBBox.getX1()) / this->_miToConvolveParentPtr->getWidth() - 1.0);
     // this->setRowc(float(fpBBox.getY0() + fpBBox.getY1()) / this->_miToConvolveParentPtr->getHeight() - 1.0);
-
     this->setColc(0.5 * float(fpBBox.getX0() + fpBBox.getX1()));
     this->setRowc(0.5 * float(fpBBox.getY0() + fpBBox.getY1()));
 
@@ -81,35 +100,18 @@ bool SpatialModelKernel<ImageT>::buildModel() {
                        fpBBox.getX0(), fpBBox.getY0(),
                        fpBBox.getX1(), fpBBox.getY1());
 
-    // Fill in information on the actual pixels used
-    MaskedImagePtr miToConvolvePtr    = MaskedImagePtr ( 
-        new image::MaskedImage<ImageT>(*(this->_miToConvolveParentPtr), fpBBox)
-        );
-
-    MaskedImagePtr miToNotConvolvePtr = MaskedImagePtr ( 
-        new image::MaskedImage<ImageT>(*(this->_miToNotConvolveParentPtr), fpBBox)
-        );
-    this->_miToConvolvePtr    = miToConvolvePtr;
-    this->_miToNotConvolvePtr = miToNotConvolvePtr;
-
     // Estimate of the variance for first kernel pass
-    // Third argument is for a deep copy, so -= does not modify the original pixels
+    // True argument is for a deep copy, so -= does not modify the original pixels
     image::MaskedImage<ImageT> varEstimate = 
-        image::MaskedImage<ImageT>(*(this->_miToNotConvolveParentPtr), fpBBox, true);
+        image::MaskedImage<ImageT>(*(this->_miToNotConvolvePtr), true);
     varEstimate -= *(this->_miToConvolvePtr);
     
-    boost::shared_ptr<math::Kernel> kernelPtr;
-    boost::shared_ptr<math::Kernel> kernelErrorPtr;
-    double                          background;
-    double                          backgroundError;
+
     try {
-        computePsfMatchingKernelForFootprint(background, backgroundError,
-                                             kernelPtr, kernelErrorPtr,
-                                             *(this->_miToConvolvePtr), 
-                                             *(this->_miToNotConvolvePtr), 
-                                             *(varEstimate.getVariance()), 
-                                             this->_kBasisList, 
-                                             this->_policy);
+        this->_kFunctor->apply(*(this->_miToConvolvePtr), 
+                               *(this->_miToNotConvolvePtr),
+                               *(varEstimate.getVariance()),
+                               this->_policy);
     } catch (exceptions::Exception& e) {
         this->setSdqaStatus(false);
         logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
@@ -118,6 +120,10 @@ bool SpatialModelKernel<ImageT>::buildModel() {
                            e.what());
         return false;
     }
+    boost::shared_ptr<math::Kernel> kernelPtr       = this->_kFunctor->getKernel();
+    boost::shared_ptr<math::Kernel> kernelErrorPtr  = this->_kFunctor->getKernelError();
+    double                          background      = this->_kFunctor->getBackground();
+    double                          backgroundError = this->_kFunctor->getBackgroundError();
 
     // Compute kernel sum
     double kSum = 0.;
@@ -131,12 +137,12 @@ bool SpatialModelKernel<ImageT>::buildModel() {
                                                              *(this->_miToNotConvolvePtr),
                                                              *(kernelPtr), 
                                                              background);
-    
+
+    // Find statistics of difference image 
     boost::shared_ptr<diffim::ImageStatistics<image::MaskedImage<ImageT> > > kStats = 
         boost::shared_ptr<diffim::ImageStatistics<image::MaskedImage<ImageT> > > (
             new diffim::ImageStatistics<image::MaskedImage<ImageT> >(diffIm)
             );
-
     detection::Footprint fp(
         image::BBox(image::PointI(0,0), 
                     diffIm.getWidth(),
@@ -144,7 +150,6 @@ bool SpatialModelKernel<ImageT>::buildModel() {
             )
         );
     (*kStats).apply(fp);
-
     logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                        "Kernel pass 1 : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
                        kSum, background, backgroundError,
@@ -156,19 +161,20 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     if (iterateKernel) {
         try {
             try {
-                computePsfMatchingKernelForFootprint(background, backgroundError,
-                                                     kernelPtr, kernelErrorPtr,
-                                                     *(this->_miToConvolvePtr), 
-                                                     *(this->_miToNotConvolvePtr), 
-                                                     *(diffIm.getVariance()),
-                                                     this->_kBasisList, 
-                                                     this->_policy);
+                this->_kFunctor->apply(*(this->_miToConvolvePtr), 
+                                       *(this->_miToNotConvolvePtr),
+                                       *(diffIm.getVariance()),
+                                       this->_policy);
             } catch (exceptions::Exception& e) {
                 throw;
             }
+            kernelPtr       = this->_kFunctor->getKernel();
+            kernelErrorPtr  = this->_kFunctor->getKernelError();
+            background      = this->_kFunctor->getBackground();
+            backgroundError = this->_kFunctor->getBackgroundError();
             
             kSum    = 0.;
-            kSum = kernelPtr->computeImage(kImage, false);
+            kSum    = kernelPtr->computeImage(kImage, false);
             diffIm  = convolveAndSubtract( *(this->_miToConvolvePtr),
                                            *(this->_miToNotConvolvePtr),
                                            *(kernelPtr), 

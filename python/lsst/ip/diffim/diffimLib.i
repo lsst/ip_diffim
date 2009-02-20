@@ -54,6 +54,7 @@ namespace boost {
 %include "lsst/daf/base/persistenceMacros.i"
 %import  "lsst/afw/image/imageLib.i" 
 %import  "lsst/afw/detection/detectionLib.i"
+%import  "lsst/afw/detection/footprints.i"
 %import  "lsst/afw/math/kernelLib.i"
 
 %lsst_exceptions();
@@ -87,26 +88,39 @@ def version(HeadURL = r"$HeadURL$"):
 #include "lsst/ip/diffim/ImageSubtract.h"
 %}
 
+SWIG_SHARED_PTR(PsfMatchingFunctorF, lsst::ip::diffim::PsfMatchingFunctor<float>);
+SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double>);
+
+SWIG_SHARED_PTR(PsfMatchingFunctorGslF, lsst::ip::diffim::PsfMatchingFunctorGsl<float>);
+SWIG_SHARED_PTR(PsfMatchingFunctorGslD, lsst::ip::diffim::PsfMatchingFunctorGsl<double>);
+
+SWIG_SHARED_PTR(PsfMatchingFunctorVwF, lsst::ip::diffim::PsfMatchingFunctorVw<float>);
+SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<double>);
+
 %include "lsst/ip/diffim/ImageSubtract.h"
 
 %template(PsfMatchingFunctorF)
-    lsst::ip::diffim::PsfMatchingFunctor<float, float>;
+    lsst::ip::diffim::PsfMatchingFunctor<float>;
 %template(PsfMatchingFunctorD)
-    lsst::ip::diffim::PsfMatchingFunctor<double, float>;
+    lsst::ip::diffim::PsfMatchingFunctor<double>;
 
 %template(PsfMatchingFunctorGslF)
-    lsst::ip::diffim::PsfMatchingFunctorGsl<float, float>;
+    lsst::ip::diffim::PsfMatchingFunctorGsl<float>;
 %template(PsfMatchingFunctorGslD)
-    lsst::ip::diffim::PsfMatchingFunctorGsl<double, float>;
+    lsst::ip::diffim::PsfMatchingFunctorGsl<double>;
 
 %template(PsfMatchingFunctorVwF)
-    lsst::ip::diffim::PsfMatchingFunctorVw<float, float>;
+    lsst::ip::diffim::PsfMatchingFunctorVw<float>;
 %template(PsfMatchingFunctorVwD)
-    lsst::ip::diffim::PsfMatchingFunctorVw<double, float>;
+    lsst::ip::diffim::PsfMatchingFunctorVw<double>;
 
 /*
+%ignore lsst::ip::diffim::FindSetBits::operator();
+%ignore lsst::ip::diffim::FindCounts::operator();
+%ignore lsst::ip::diffim::ImageStatistics::operator();
+
 %template(FindSetBitsU)
-%    lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask>;
+    lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
 
 %template(FindCountsF)
     lsst::ip::diffim::FindCounts<lsst::afw::image::MaskedImage<float> >;
