@@ -79,10 +79,10 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::reset() {
 
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
-    lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-    lsst::afw::image::Image<VarT>         const &varianceEstimate,
-    lsst::pex::policy::Policy             const &policy
+    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+    lsst::afw::image::Image<VarT>         const& varianceEstimate,
+    lsst::pex::policy::Policy             const& policy
     ) {
     
     // Make sure you do not overwrite anyone else's kernels
@@ -367,10 +367,10 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
 
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
-    lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-    lsst::afw::image::Image<VarT>         const &varianceEstimate,
-    lsst::pex::policy::Policy             const &policy
+    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+    lsst::afw::image::Image<VarT>         const& varianceEstimate,
+    lsst::pex::policy::Policy             const& policy
     ) {
     
     // Make sure you do not overwrite anyone else's kernels
@@ -613,10 +613,10 @@ void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
 
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
-    lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-    lsst::afw::image::Image<VarT>         const &varianceEstimate,
-    lsst::pex::policy::Policy             const &policy
+    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+    lsst::afw::image::Image<VarT>         const& varianceEstimate,
+    lsst::pex::policy::Policy             const& policy
     ) {
     
     // Make sure you do not overwrite anyone else's kernels
@@ -915,8 +915,8 @@ math::KernelList<math::Kernel>
 diffim::generateAlardLuptonKernelSet(
     unsigned int nRows, 
     unsigned int nCols, 
-    std::vector<double> const &sigGauss, 
-    std::vector<double> const &degGauss  
+    std::vector<double> const& sigGauss, 
+    std::vector<double> const& degGauss  
     ) {
     if ((nCols < 1) || (nRows < 1)) {
         throw LSST_EXCEPT(exceptions::Exception, "nRows and nCols must be positive");
@@ -937,9 +937,9 @@ diffim::generateAlardLuptonKernelSet(
  */
 template <typename ImageT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const &imageToConvolve,
-    image::MaskedImage<ImageT> const &imageToNotConvolve,
-    math::Kernel const &convolutionKernel,
+    image::MaskedImage<ImageT> const& imageToConvolve,
+    image::MaskedImage<ImageT> const& imageToNotConvolve,
+    math::Kernel const& convolutionKernel,
     double background,
     bool invert
     ) {
@@ -978,9 +978,9 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  */
 template <typename ImageT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const &imageToConvolve,
-    image::MaskedImage<ImageT> const &imageToNotConvolve,
-    math::LinearCombinationKernel const &convolutionKernel,
+    image::MaskedImage<ImageT> const& imageToConvolve,
+    image::MaskedImage<ImageT> const& imageToNotConvolve,
+    math::LinearCombinationKernel const& convolutionKernel,
     double background,
     bool invert
     ) {
@@ -1018,10 +1018,10 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  */
 template <typename ImageT, typename FunctionT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const &imageToConvolve,
-    image::MaskedImage<ImageT> const &imageToNotConvolve,
-    math::Kernel const &convolutionKernel,
-    math::Function2<FunctionT> const &backgroundFunction,
+    image::MaskedImage<ImageT> const& imageToConvolve,
+    image::MaskedImage<ImageT> const& imageToNotConvolve,
+    math::Kernel const& convolutionKernel,
+    math::Function2<FunctionT> const& backgroundFunction,
     bool invert
     ) {
     
@@ -1059,10 +1059,10 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  */
 template <typename ImageT, typename FunctionT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const &imageToConvolve,
-    image::MaskedImage<ImageT> const &imageToNotConvolve,
-    math::LinearCombinationKernel const &convolutionKernel,
-    math::Function2<FunctionT> const &backgroundFunction,
+    image::MaskedImage<ImageT> const& imageToConvolve,
+    image::MaskedImage<ImageT> const& imageToNotConvolve,
+    math::LinearCombinationKernel const& convolutionKernel,
+    math::Function2<FunctionT> const& backgroundFunction,
     bool invert
     ) {
     
@@ -1109,9 +1109,9 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  */
 template <typename ImageT>
 std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<ImageT> const &imageToConvolve,    
-    image::MaskedImage<ImageT> const &imageToNotConvolve, 
-    lsst::pex::policy::Policy &policy                                       
+    image::MaskedImage<ImageT> const& imageToConvolve,    
+    image::MaskedImage<ImageT> const& imageToNotConvolve, 
+    lsst::pex::policy::Policy  const& policy                                       
     ) {
     
     // Parse the Policy
@@ -1244,11 +1244,11 @@ void diffim::computePsfMatchingKernelForFootprint(
     double                          &backgroundError,
     boost::shared_ptr<math::Kernel> &kernelPtr,
     boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<ImageT>         const &imageToConvolve,    
-    image::MaskedImage<ImageT>         const &imageToNotConvolve, 
-    image::Image<VarT>                 const &varianceImage,      
-    math::KernelList<math::Kernel>     const &kernelInBasisList,  
-    lsst::pex::policy::Policy       &policy
+    image::MaskedImage<ImageT>         const& imageToConvolve,    
+    image::MaskedImage<ImageT>         const& imageToNotConvolve, 
+    image::Image<VarT>                 const& varianceImage,      
+    math::KernelList<math::Kernel>     const& kernelInBasisList,  
+    lsst::pex::policy::Policy          const& policy
     ) { 
 
     typedef typename image::MaskedImage<ImageT>::xy_locator xy_locator;
@@ -1572,11 +1572,11 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
     double                          &backgroundError,
     boost::shared_ptr<math::Kernel> &kernelPtr,
     boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<ImageT>         const &imageToConvolve,    
-    image::MaskedImage<ImageT>         const &imageToNotConvolve, 
-    image::Image<VarT>                 const &varianceImage,      
-    math::KernelList<math::Kernel>     const &kernelInBasisList,  
-    lsst::pex::policy::Policy       &policy
+    image::MaskedImage<ImageT>         const& imageToConvolve,    
+    image::MaskedImage<ImageT>         const& imageToNotConvolve, 
+    image::Image<VarT>                 const& varianceImage,      
+    math::KernelList<math::Kernel>     const& kernelInBasisList,  
+    lsst::pex::policy::Policy          const& policy
     ) { 
 
     typedef typename image::MaskedImage<ImageT>::xy_locator xy_locator;
@@ -1891,11 +1891,11 @@ void diffim::computePsfMatchingKernelForFootprintVW(
     double                          &backgroundError,
     boost::shared_ptr<math::Kernel> &kernelPtr,
     boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<ImageT>         const &imageToConvolve,    
-    image::MaskedImage<ImageT>         const &imageToNotConvolve, 
-    image::Image<VarT>                 const &varianceImage,      
-    math::KernelList<math::Kernel>     const &kernelInBasisList,  
-    lsst::pex::policy::Policy       &policy
+    image::MaskedImage<ImageT>         const& imageToConvolve,    
+    image::MaskedImage<ImageT>         const& imageToNotConvolve, 
+    image::Image<VarT>                 const& varianceImage,      
+    math::KernelList<math::Kernel>     const& kernelInBasisList,  
+    lsst::pex::policy::Policy          const& policy
     ) { 
 
     typedef typename image::MaskedImage<ImageT>::xy_locator xy_locator;
@@ -2167,7 +2167,7 @@ void diffim::computePsfMatchingKernelForFootprintVW(
 template <typename ImageT, typename FunctionT>
 void diffim::addFunctionToImage(
     image::Image<ImageT> &image,
-    math::Function2<FunctionT> const &function
+    math::Function2<FunctionT> const& function
     ) {
 
     // Set the pixels row by row, to avoid repeated checks for end-of-row
@@ -2225,33 +2225,33 @@ template class diffim::ImageStatistics<image::MaskedImage<double> >;
 
 template 
 image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const &imageToConvolve,
-    image::MaskedImage<float> const &imageToNotConvolve,
-    math::Kernel const &convolutionKernel,
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    math::Kernel const& convolutionKernel,
     double background,
     bool invert);
 
 template 
 image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const &imageToConvolve,
-    image::MaskedImage<double> const &imageToNotConvolve,
-    math::Kernel const &convolutionKernel,
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    math::Kernel const& convolutionKernel,
     double background,
     bool invert);
 
 template 
 image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const &imageToConvolve,
-    image::MaskedImage<float> const &imageToNotConvolve,
-    math::LinearCombinationKernel const &convolutionKernel,
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    math::LinearCombinationKernel const& convolutionKernel,
     double background,
     bool invert);
 
 template 
 image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const &imageToConvolve,
-    image::MaskedImage<double> const &imageToNotConvolve,
-    math::LinearCombinationKernel const &convolutionKernel,
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    math::LinearCombinationKernel const& convolutionKernel,
     double background,
     bool invert);
 
@@ -2259,36 +2259,36 @@ image::MaskedImage<double> diffim::convolveAndSubtract(
 
 template 
 image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const &imageToConvolve,
-    image::MaskedImage<float> const &imageToNotConvolve,
-    math::Kernel const &convolutionKernel,
-    math::Function2<double> const &backgroundFunction,
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    math::Kernel const& convolutionKernel,
+    math::Function2<double> const& backgroundFunction,
     bool invert);
 
 template 
 image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const &imageToConvolve,
-    image::MaskedImage<double> const &imageToNotConvolve,
-    math::Kernel const &convolutionKernel,
-    math::Function2<double> const &backgroundFunction,
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    math::Kernel const& convolutionKernel,
+    math::Function2<double> const& backgroundFunction,
     bool invert);
 
 
 template 
 image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const &imageToConvolve,
-    image::MaskedImage<float> const &imageToNotConvolve,
-    math::LinearCombinationKernel const &convolutionKernel,
-    math::Function2<double> const &backgroundFunction,
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    math::LinearCombinationKernel const& convolutionKernel,
+    math::Function2<double> const& backgroundFunction,
     bool invert);
 
 
 template 
 image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const &imageToConvolve,
-    image::MaskedImage<double> const &imageToNotConvolve,
-    math::LinearCombinationKernel const &convolutionKernel,
-    math::Function2<double> const &backgroundFunction,
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    math::LinearCombinationKernel const& convolutionKernel,
+    math::Function2<double> const& backgroundFunction,
     bool invert);
 
 
@@ -2301,11 +2301,11 @@ void diffim::computePsfMatchingKernelForFootprint(
     double                          &backgroundError,
     boost::shared_ptr<math::Kernel> &kernelPtr,
     boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<float> const &imageToConvolve,
-    image::MaskedImage<float> const &imageToNotConvolve,
-    image::Image<float>       const &varianceImage,
-    math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy);
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    image::Image<float>       const& varianceImage,
+    math::KernelList<math::Kernel> const& kernelInBasisList,
+    lsst::pex::policy::Policy      const& policy);
 
 template
 void diffim::computePsfMatchingKernelForFootprint(
@@ -2313,11 +2313,11 @@ void diffim::computePsfMatchingKernelForFootprint(
     double                          &backgroundError,
     boost::shared_ptr<math::Kernel> &kernelPtr,
     boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<double> const &imageToConvolve,
-    image::MaskedImage<double> const &imageToNotConvolve,
-    image::Image<float>        const &varianceImage,
-    math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy);
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    image::Image<float>        const& varianceImage,
+    math::KernelList<math::Kernel> const& kernelInBasisList,
+    lsst::pex::policy::Policy      const& policy);
 
 template
 void diffim::computePsfMatchingKernelForFootprintEigen(
@@ -2325,11 +2325,11 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
     double                          &backgroundError,
     boost::shared_ptr<math::Kernel> &kernelPtr,
     boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<float> const &imageToConvolve,
-    image::MaskedImage<float> const &imageToNotConvolve,
-    image::Image<float>       const &varianceImage,
-    math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy);
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    image::Image<float>       const& varianceImage,
+    math::KernelList<math::Kernel> const& kernelInBasisList,
+    lsst::pex::policy::Policy      const& policy);
 
 template
 void diffim::computePsfMatchingKernelForFootprintEigen(
@@ -2337,11 +2337,11 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
     double                          &backgroundError,
     boost::shared_ptr<math::Kernel> &kernelPtr,
     boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<double> const &imageToConvolve,
-    image::MaskedImage<double> const &imageToNotConvolve,
-    image::Image<float>        const &varianceImage,
-    math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy);
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    image::Image<float>        const& varianceImage,
+    math::KernelList<math::Kernel> const& kernelInBasisList,
+    lsst::pex::policy::Policy      const& policy);
 
 template
 void diffim::computePsfMatchingKernelForFootprintVW(
@@ -2349,11 +2349,11 @@ void diffim::computePsfMatchingKernelForFootprintVW(
     double                          &backgroundError,
     boost::shared_ptr<math::Kernel> &kernelPtr,
     boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<float> const &imageToConvolve,
-    image::MaskedImage<float> const &imageToNotConvolve,
-    image::Image<float>       const &varianceImage,
-    math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy);
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    image::Image<float>       const& varianceImage,
+    math::KernelList<math::Kernel> const& kernelInBasisList,
+    lsst::pex::policy::Policy      const& policy);
 
 template
 void diffim::computePsfMatchingKernelForFootprintVW(
@@ -2361,23 +2361,23 @@ void diffim::computePsfMatchingKernelForFootprintVW(
     double                          &backgroundError,
     boost::shared_ptr<math::Kernel> &kernelPtr,
     boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<double> const &imageToConvolve,
-    image::MaskedImage<double> const &imageToNotConvolve,
-    image::Image<float>        const &varianceImage,
-    math::KernelList<math::Kernel> const &kernelInBasisList,
-    lsst::pex::policy::Policy       &policy);
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    image::Image<float>        const& varianceImage,
+    math::KernelList<math::Kernel> const& kernelInBasisList,
+    lsst::pex::policy::Policy      const& policy);
 
 template
 std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<float> const &imageToConvolve,
-    image::MaskedImage<float> const &imageToNotConvolve,
-    lsst::pex::policy::Policy &policy);
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    lsst::pex::policy::Policy const& policy);
 
 template
 std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<double> const &imageToConvolve,
-    image::MaskedImage<double> const &imageToNotConvolve,
-    lsst::pex::policy::Policy &policy);
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    lsst::pex::policy::Policy  const& policy);
 
 template
 void diffim::addFunctionToImage(

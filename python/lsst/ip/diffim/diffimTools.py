@@ -137,8 +137,10 @@ def createSpatialModelKernelCells(fpInList,
             # class, not derived class.  Swig is making this difficult
             # right now tho.
             modelList = diffimLib.VectorSpatialModelKernelF()
+            # Seems to work now!
+            #modelList = diffimLib.VectorSpatialModelBaseF()
 
-            # This is a bit blunt and could be more clever
+            # This is a bit dumb and could be more clever
             # Should never really have a loop within a loop within a loop
             # But we will not have *that many* Footprints...
             for fpID, fpPtr in enumerate(fpInList):
@@ -158,12 +160,20 @@ def createSpatialModelKernelCells(fpInList,
                                                           kFunctor,
                                                           policy,
                                                           False)
-
+                    print 'caw0', tSubImage
+                    foo = model.getMiToConvolvePtr()
+                    print 'caw1', foo
+                    
                     if policy.get('debugIO'):
                         diffimDebug.writeDiffImages(cFlag, '%s_%d' % (label, fpID), model)
                         
                     modelList.push_back( model )
 
+            for i in range(modelList.size()):
+                m   = modelList[i]
+                foo = m.getMiToConvolvePtr()
+                print 'caw2', foo
+                
             spatialCell = diffimLib.SpatialModelCellF(label, colCenter, rowCenter, fpCellList, modelList)
             spatialCells.push_back(spatialCell)
 

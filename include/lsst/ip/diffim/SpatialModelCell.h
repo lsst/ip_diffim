@@ -47,11 +47,8 @@ namespace diffim {
         typedef std::vector<Ptr> SpatialModelCellList;
         
         /** Typedefs 
-         * 
-         * @note I would like to have this use SpatialModelBase (base class)
-         * instead of SpatialModelKernel (derived class) but I'm having problems
-         * with SWIG.
          */
+        //typedef typename SpatialModelBase<ImageT>::Ptr SpatialModel;
         typedef typename SpatialModelKernel<ImageT>::Ptr SpatialModel;
         typedef std::vector<SpatialModel> ModelPtrList;
 

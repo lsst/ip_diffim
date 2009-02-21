@@ -80,7 +80,7 @@ namespace diffim {
     template <typename ImageT>
     class FindCounts : public lsst::afw::detection::FootprintFunctor<ImageT> {
     public:
-        FindCounts(ImageT const &mimage) : 
+        FindCounts(ImageT const& mimage) : 
             lsst::afw::detection::FootprintFunctor<ImageT>(mimage), _counts(0.) {;}
         
         void operator()(typename ImageT::xy_locator loc, ///< locator pointing at the pixel
@@ -114,7 +114,7 @@ namespace diffim {
     template <typename ImageT>
     class ImageStatistics : public lsst::afw::detection::FootprintFunctor<ImageT> {
     public:
-        ImageStatistics(ImageT const &mimage) : 
+        ImageStatistics(ImageT const& mimage) : 
             lsst::afw::detection::FootprintFunctor<ImageT>(mimage), 
             _xsum(0.), _x2sum(0.), _npix(0) {;}
         
@@ -141,7 +141,7 @@ namespace diffim {
         double getNpix() const { return _npix; }
 
         // Return Sdqa rating
-        bool evaluateQuality(lsst::pex::policy::Policy const &policy) {
+        bool evaluateQuality(lsst::pex::policy::Policy const& policy) {
             if ( fabs(getMean())     > policy.getDouble("maximumFootprintResidualMean") ) return false;
             if ( sqrt(getVariance()) > policy.getDouble("maximumFootprintResidualStd")  ) return false;
             return true;
@@ -179,8 +179,8 @@ namespace diffim {
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateAlardLuptonKernelSet(
         unsigned int width,
         unsigned int height,
-        std::vector<double> const &sigGauss,
-        std::vector<double> const &degGauss
+        std::vector<double> const& sigGauss,
+        std::vector<double> const& degGauss
         );
 
     /** Execute fundamental task of convolving template and subtracting it from science image
@@ -199,9 +199,9 @@ namespace diffim {
      */    
     template <typename ImageT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-        lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
+        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+        lsst::afw::math::LinearCombinationKernel const& convolutionKernel,
         double background, 
         bool invert=true
         );
@@ -220,9 +220,9 @@ namespace diffim {
      */    
     template <typename ImageT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-        lsst::afw::math::Kernel const &convolutionKernel,
+        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+        lsst::afw::math::Kernel const& convolutionKernel,
         double background,
         bool invert=true
         );
@@ -243,10 +243,10 @@ namespace diffim {
      */    
     template <typename ImageT, typename FunctionT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-        lsst::afw::math::LinearCombinationKernel const &convolutionKernel,
-        lsst::afw::math::Function2<FunctionT> const &backgroundFunction,
+        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+        lsst::afw::math::LinearCombinationKernel const& convolutionKernel,
+        lsst::afw::math::Function2<FunctionT> const& backgroundFunction,
         bool invert=true
         );
 
@@ -264,10 +264,10 @@ namespace diffim {
      */    
     template <typename ImageT, typename FunctionT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-        lsst::afw::math::Kernel const &convolutionKernel,
-        lsst::afw::math::Function2<FunctionT> const &backgroundFunction,
+        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+        lsst::afw::math::Kernel const& convolutionKernel,
+        lsst::afw::math::Function2<FunctionT> const& backgroundFunction,
         bool invert=true
         );
 
@@ -281,9 +281,9 @@ namespace diffim {
      */    
     template <typename ImageT>
     std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-        lsst::pex::policy::Policy &policy
+        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+        lsst::pex::policy::Policy const& policy
         );
     
     /** Functor to create PSF Matching Kernel
@@ -330,10 +330,10 @@ namespace diffim {
          * @param policy Policy file
          */
         void apply(
-            lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-            lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-            lsst::afw::image::Image<VarT>         const &varianceEstimate,
-            lsst::pex::policy::Policy             const &policy
+            lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+            lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+            lsst::afw::image::Image<VarT>         const& varianceEstimate,
+            lsst::pex::policy::Policy             const& policy
             );
 
     protected:
@@ -363,10 +363,10 @@ namespace diffim {
             PsfMatchingFunctor<ImageT>(basisList) {;}
         virtual ~PsfMatchingFunctorGsl() {};
         void apply(
-            lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-            lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-            lsst::afw::image::Image<VarT>         const &varianceEstimate,
-            lsst::pex::policy::Policy             const &policy
+            lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+            lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+            lsst::afw::image::Image<VarT>         const& varianceEstimate,
+            lsst::pex::policy::Policy             const& policy
             );
     };
 
@@ -388,10 +388,10 @@ namespace diffim {
             PsfMatchingFunctor<ImageT>(basisList) {;}
         virtual ~PsfMatchingFunctorVw() {};
         void apply(
-            lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-            lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-            lsst::afw::image::Image<VarT>         const &varianceEstimate,
-            lsst::pex::policy::Policy             const &policy
+            lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+            lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+            lsst::afw::image::Image<VarT>         const& varianceEstimate,
+            lsst::pex::policy::Policy             const& policy
             );
     };
 
@@ -414,11 +414,11 @@ namespace diffim {
         double                                     &backgroundError,
         boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
         boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
-        lsst::afw::image::MaskedImage<ImageT>         const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT>         const &imageToNotConvolve,
-        lsst::afw::image::Image<VarT>                 const &varianceImage,
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
-        lsst::pex::policy::Policy                  &policy
+        lsst::afw::image::MaskedImage<ImageT>         const& imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT>         const& imageToNotConvolve,
+        lsst::afw::image::Image<VarT>                 const& varianceImage,
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& kernelInBasisList,
+        lsst::pex::policy::Policy                     const& policy
         );
 
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
@@ -442,11 +442,11 @@ namespace diffim {
         double                                     &backgroundError,
         boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
         boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
-        lsst::afw::image::MaskedImage<ImageT>         const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT>         const &imageToNotConvolve,
-        lsst::afw::image::Image<VarT>                 const &varianceImage,
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
-        lsst::pex::policy::Policy                  &policy
+        lsst::afw::image::MaskedImage<ImageT>         const& imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT>         const& imageToNotConvolve,
+        lsst::afw::image::Image<VarT>                 const& varianceImage,
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& kernelInBasisList,
+        lsst::pex::policy::Policy                     const& policy
         );
 
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
@@ -470,11 +470,11 @@ namespace diffim {
         double                                     &backgroundError,
         boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
         boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
-        lsst::afw::image::MaskedImage<ImageT>         const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT>         const &imageToNotConvolve,
-        lsst::afw::image::Image<VarT>                 const &varianceImage,
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
-        lsst::pex::policy::Policy                  &policy
+        lsst::afw::image::MaskedImage<ImageT>         const& imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT>         const& imageToNotConvolve,
+        lsst::afw::image::Image<VarT>                 const& varianceImage,
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& kernelInBasisList,
+        lsst::pex::policy::Policy                     const& policy 
         );
 
     /** Add a spatially varying function to an Image
@@ -487,7 +487,7 @@ namespace diffim {
     template <typename ImageT, typename FunctionT>
     void addFunctionToImage(
         lsst::afw::image::Image<ImageT> &image,
-        lsst::afw::math::Function2<FunctionT> const &function
+        lsst::afw::math::Function2<FunctionT> const& function
         );
 
 
@@ -504,10 +504,10 @@ namespace diffim {
     template <typename ImageT>
     std::vector<double> computePsfMatchingKernelForFootprint_Legacy(
         double &background,
-        lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve,
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const &kernelInBasisList,
-        lsst::pex::policy::Policy &policy
+        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& kernelInBasisList,
+        lsst::pex::policy::Policy const& policy
         );
 
 }}}

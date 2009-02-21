@@ -18,7 +18,6 @@
 
 #include <lsst/ip/diffim/SpatialModelCell.h>
 #include <lsst/ip/diffim/SpatialModelBase.h>
-#include <lsst/ip/diffim/SpatialModelKernel.h>
 
 namespace lsst {
 namespace ip {
@@ -63,20 +62,25 @@ SpatialModelCell<ImageT>::SpatialModelCell(
     }
     lsst::pex::logging::TTrace<3>("lsst.ip.diffim.SpatialModelCell.SpatialModelCell", 
                                   "Cell %s : created with %d models", this->_label.c_str(), this->_nModels);
-    this->_orderFootprints();
+
+    std::cout << "CAW A" << fpPtrList.size() << " " << _fpPtrList.size() << std::endl;
+    std::cout << "CAW B" << modelPtrList.size() << " " << _modelPtrList.size() << std::endl;
+
+    for (int i = 0; i < this->_nModels; i++) {
+        std::cout << "CAW " << i << std::endl;
+        this->_modelPtrList[i]->buildModel();
+    }
+    //this->_orderFootprints();
+    //this->incrementModel();
 }
 
-/** Order footprints; currently this just sets their IDs 
+/** Order footprints; currently this doesn't do anything
  *
  * @note Synchronously modify fpPtrList and modelPtrList
  */
 template <typename ImageT>
 void SpatialModelCell<ImageT>::_orderFootprints() {
-    for (int i = 0; i < this->_nModels; i++) {
-        this->_modelPtrList[i]->setID(i);
-    }
-    // Initialize first model
-    this->incrementModel();
+    ;
 }
 
 /** Select best model; if no good models, set Cell as fixed with ID=-1.

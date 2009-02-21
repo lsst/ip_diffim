@@ -8,6 +8,12 @@ Python bindings for lsst::ip::diffim code
 %feature("autodoc", "1");
 %module(docstring=diffimLib_DOCSTRING, package="lsst.ip.diffim") diffimLib
 
+// Avoid Swig bug exposed in Ticket 640
+// http://dev.lsstcorp.org/trac/ticket/640
+%ignore lsst::ip::diffim::FindSetBits::operator();
+%ignore lsst::ip::diffim::FindCounts::operator();
+%ignore lsst::ip::diffim::ImageStatistics::operator();
+
 // Reference for this file is at http://dev.lsstcorp.org/trac/wiki/SwigFAQ 
 // Nice practical example is at http://dev.lsstcorp.org/trac/browser/DMS/afw/trunk/python/lsst/afw/image/imageLib.i 
 
@@ -54,7 +60,6 @@ namespace boost {
 %include "lsst/daf/base/persistenceMacros.i"
 %import  "lsst/afw/image/imageLib.i" 
 %import  "lsst/afw/detection/detectionLib.i"
-%import  "lsst/afw/detection/footprints.i"
 %import  "lsst/afw/math/kernelLib.i"
 
 %lsst_exceptions();
@@ -114,11 +119,6 @@ SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<do
 %template(PsfMatchingFunctorVwD)
     lsst::ip::diffim::PsfMatchingFunctorVw<double>;
 
-/*
-%ignore lsst::ip::diffim::FindSetBits::operator();
-%ignore lsst::ip::diffim::FindCounts::operator();
-%ignore lsst::ip::diffim::ImageStatistics::operator();
-
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
 
@@ -131,7 +131,6 @@ SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<do
     lsst::ip::diffim::ImageStatistics<lsst::afw::image::MaskedImage<float> >;
 %template(ImageStatisticsD)
     lsst::ip::diffim::ImageStatistics<lsst::afw::image::MaskedImage<double> >;
-*/
 
 %template(convolveAndSubtract)
     lsst::ip::diffim::convolveAndSubtract<float>;

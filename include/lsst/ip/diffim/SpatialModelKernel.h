@@ -90,15 +90,15 @@ namespace diffim {
 
         /** Get Footprint pointer for the Kernel model
          */
-        lsst::afw::detection::Footprint::Ptr getFootprintPtr() const {return _fpPtr;};
+        lsst::afw::detection::Footprint::Ptr const& getFootprintPtr() const {return _fpPtr;};
 
         /** Get template's MaskedImage pointer for the Kernel model
          */
-        MaskedImagePtr getMiToConvolvePtr() const {return _miToConvolvePtr;};
+        MaskedImagePtr const& getMiToConvolvePtr() const {return _miToConvolvePtr;};
 
         /** Get image's MaskedImage pointer for the Kernel model
          */
-        MaskedImagePtr getMiToNotConvolvePtr() const {return _miToNotConvolvePtr;};
+        MaskedImagePtr const& getMiToNotConvolvePtr() const {return _miToNotConvolvePtr;};
 
 
         /** Set Kernel pointer associated with the Footprint; the core of this Model
@@ -180,11 +180,11 @@ namespace diffim {
     private: 
         /** Objects needed to build itself; only initializable during construction
          */
-        lsst::afw::detection::Footprint::Ptr const &_fpPtr; ///< Footprint containing pixels used to build Kernel
-        MaskedImagePtr const &_miToConvolvePtr;             ///< Subimage around which you build kernel
-        MaskedImagePtr const &_miToNotConvolvePtr;          ///< Subimage around which you build kernel
-        boost::shared_ptr<PsfMatchingFunctor<ImageT> > const &_kFunctor; ///< Functor to build PSF matching kernel
-        lsst::pex::policy::Policy const &_policy;           ///< Policy file for operations
+        lsst::afw::detection::Footprint::Ptr const& _fpPtr; ///< Footprint containing pixels used to build Kernel
+        MaskedImagePtr const& _miToConvolvePtr;             ///< Subimage around which you build kernel
+        MaskedImagePtr const& _miToNotConvolvePtr;          ///< Subimage around which you build kernel
+        boost::shared_ptr<PsfMatchingFunctor<ImageT> > const& _kFunctor; ///< Functor to build PSF matching kernel
+        lsst::pex::policy::Policy const& _policy;           ///< Policy file for operations
 
         /** Results from single Kernel model
          */

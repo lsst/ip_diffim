@@ -81,6 +81,14 @@ SpatialModelKernel<ImageT>::SpatialModelKernel(
 template <typename ImageT>
 bool SpatialModelKernel<ImageT>::buildModel() {
 
+    logging::TTrace<1>("lsst.ip.diffim.PsfMatchingFunctor.apply",
+                       "CAW B");
+    image::MaskedImage<ImageT> foo = *(this->_miToConvolvePtr);
+    image::Image<ImageT> foo2      = *(foo.getImage());
+    typename lsst::afw::image::Image<ImageT>::xy_locator loc = foo2.xy_at(1, 1);
+    logging::TTrace<1>("lsst.ip.diffim.PsfMatchingFunctor.apply",
+                       "CAW B %f", 1.0 * *loc);
+
     if (this->getBuildStatus() == true) {
         return false;
     }
