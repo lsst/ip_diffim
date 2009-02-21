@@ -158,6 +158,22 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
 ################
 ################
 
+def subtractMaskedImage(templateMaskedImage, scienceMaskedImage, policy, fpList=None):
+    # Make sure they are the EXACT same dimensions in pixels
+    assert (templateMaskedImage.getDimensions() == scienceMaskedImage.getDimensions())
+    
+    kCols = policy.get('kernelCols')
+    kRows = policy.get('kernelRows')
+
+    kBasisList = ipDiffim.generateDeltaFunctionKernelSet(kCols, kRows)
+    kFunctor   = ipDiffim.PsfMatchingFunctorF(kBasisList)
+
+    if fpList == None:
+        # Need to find own footprints
+        fpList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
+                                                                  scienceMaskedImage,
+                                                                  policy)
+
 def main():
     defDataDir = eups.productDir('afwdata') or ''
     imageProcDir = eups.productDir('ip_diffim')
@@ -165,11 +181,11 @@ def main():
         print 'Error: could not set up ip_diffim'
         sys.exit(1)
 
-    defSciencePath = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1')
+    defSciencePath  = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1')
     defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1_tmpl')
-    defPolicyPath = os.path.join(imageProcDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-    defOutputPath = 'diffImage'
-    defVerbosity = 0
+    defPolicyPath   = os.path.join(imageProcDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
+    defOutputPath   = 'diffImage'
+    defVerbosity    = 0
     
     usage = """usage: %%prog [options] [scienceImage [templateImage [outputImage]]]]
 
@@ -197,10 +213,10 @@ Notes:
             return args[ind]
         return defValue
     
-    sciencePath = getArg(0, defSciencePath)
+    sciencePath  = getArg(0, defSciencePath)
     templatePath = getArg(1, defTemplatePath)
-    outputPath = getArg(2, defOutputPath)
-    policyPath = options.policy
+    outputPath   = getArg(2, defOutputPath)
+    policyPath   = options.policy
     
     print 'Science image: ', sciencePath
     print 'Template image:', templatePath
@@ -209,38 +225,16 @@ Notes:
     
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
-
     policy = Policy.createPolicy(policyPath)
+    
     if options.debugIO:
         policy.set('debugIO', True)
 
-    kCols = policy.get('kernelCols')
-    kRows = policy.get('kernelRows')
-    
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
-    kBasisList = ipDiffim.generateDeltaFunctionKernelSet(kCols, kRows)
-    kFunctor   = ipDiffim.PsfMatchingFunctorF(kBasisList)
     
-    # lets just get a couple for debugging and speed
-    #policy.set('minimumCleanFootprints', 5)
-    #policy.set('footprintDetectionThreshold', 5.)
-
-    # if you are convolving the template
-    # policy.set('iterateKernel', False)
-    # if you are convolving the image
-    # policy.set('iterateKernel', True)
-
-    # NOTE : if you get a runtime error like
-    # Wrong number of arguments for overloaded function 'getCollectionOfFootprintsForPsfMatching'.
-    # this is because Swig gets confused over the type of mask
-    # In particular this line in diffimLib.i causes the problems :
-    # typedef unsigned short boost::uint16_t;
-    fpList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
-                                                              scienceMaskedImage,
-                                                              policy)
 
     # LOOP 1 : convolution vs deconvolution
     Trace('lsst.ip.diffim', 1, 'SC List 1')
