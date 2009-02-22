@@ -2,164 +2,20 @@ import eups
 import sys, os, optparse
 import numpy
 
-# SWIGged interfaces
-import lsst.afw.image as afwImage
 import lsst.daf.base as dafBase
-import lsst.afw.math as afwMath
+import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
 
-from lsst.pex.logging import Log
 from lsst.pex.logging import Trace
+from lsst.pex.logging import Log
 from lsst.pex.policy import Policy
-import lsst.pex.exceptions as Exceptions
 
 # For degugging needs
 import pdb
 
-################
-################
-#####  Main fitting loop
-################
-################
-
-def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
-    kCols = policy.get('kernelCols')
-    kRows = policy.get('kernelRows')
-    rejectKernels = policy.get('spatialKernelRejection')
-    
-    try:
-        ipDiffim.rejectKernelSumOutliers(spatialCells, policy)
-    except:
-        Trace('lsst.ip.diffim', 2,
-              'LOOP %d FAILED; no good kernels' % (scID))
-        return
-
-    bgList            = {}
-    bgList['spatial'] = []
-    bgList['pca']     = []
-
-    kList             = {}
-    kList['spatial']  = []
-    kList['pca']      = []
-    
-    # LOOP 2 : spatial order
-    for order in range(3):
-        policy.set('kernelSpatialOrder', order)
-        policy.set('backgroundSpatialOrder', order)
-        
-        kSpatialOrder  = policy.get('kernelSpatialOrder')
-        bgSpatialOrder = policy.get('backgroundSpatialOrder')
-        
-        Trace('lsst.ip.diffim', 1,
-              'LOOP %d %d' % (scID, order))
-        
-        #############
-        # Pixel-by-pixel fit
-        maxSpatialIterations = policy.get('maxSpatialIterations')
-        nRejected = 1
-        nIter     = 0
-        
-        # LOOP 3 : spatial pixel sigma clipping
-        while (nRejected != 0) and (nIter < maxSpatialIterations):
-        
-            # do spatial fit here pixel by pixel
-            bgFunction, pFunctionList = spatialModelByPixel(spatialCells, policy)
-
-            # ideally...
-            # sKernelPtr = afwMath.LinearCombinationKernel(kBasisList, pFunctionList)
-            #
-            # instead
-            # try to build a spatial kernel with a function per pixel
-            sKernelFunc  = afwMath.PolynomialFunction2D(kSpatialOrder)
-            kParams      = numpy.zeros( (kCols*kRows, sKernelFunc.getNParameters()) )
-            for p in range(kCols*kRows):
-                kParams[p] = pFunctionList[p].getParameters()
-            # Create spatially varying kernel pointer
-            sKernel = afwMath.LinearCombinationKernel(kBasisList, sKernelFunc)
-            sKernel.setSpatialParameters(kParams)
-            
-            nRejected  = evaluateModelByPixel(spatialCells,
-                                              bgFunction, sKernel, 
-                                              policy, reject=rejectKernels)
-            nIter += 1
-
-        # In future versions of the code, there will be no need to make pointers like this.
-        kList['spatial'].append( sKernel )
-        bgList['spatial'].append( bgFunction )
-        
-        #############
-        # PCA fit
-        nRejected = 1
-        nIter     = 0
-        
-        # LOOP 4a : PCA sigma clipping
-        while (nRejected != 0) and (nIter < maxSpatialIterations):
-            
-            # Run the PCA
-            mKernel, eKernelVector, eVal, eCoeff = spatialModelKernelPca(spatialCells, policy, scID)
-            
-            # Here we make a decision on how many eigenComponents to use based
-            # on eVal, etc
-            #
-            # While we are testing, check them all
-            
-            # Find spatial variation of only those components
-            # Remove this line after being done testing
-            # We fit them all first
-            bgFunction, eFunctionList = spatialModelByPca(spatialCells, eCoeff, len(eVal), policy)
-    
-            # LOOP 4b : Number of principal components
-            for neVal in range( len(eVal) ):
-            
-                Trace('lsst.ip.diffim', 3,
-                      'Using varying eigenkernels : N = %d' % (neVal))
-                
-                # Find spatial variation of only those components
-                # Comment this back in when we are not testing
-                #
-                # bgFunction, eFunctionList = spatialModelByPca(spatialCells, eCoeff, neVal, policy)
-            
-                # Build LinearCombinationKernel for only neVal components
-                # Start with mean Kernel image
-                eKernelBases = afwMath.KernelListD()
-                eKernelBases.push_back(mKernel)
-                # Append eigenKernel images
-                for ek in range(neVal):
-                    eKernelBases.push_back(eKernelVector[ek])
-                    
-                # Mean kernel has no spatial variation
-                eKernelFunc   = afwMath.PolynomialFunction2D(kSpatialOrder)
-                kParams       = numpy.zeros( (neVal+1, eKernelFunc.getNParameters()) )
-                kParams[0][0] = 1.0
-                # Add already-fit-for spatial variation of eigenKernels
-                for ek in range(neVal):
-                    kParams[ek+1] = eFunctionList[ek].getParameters()
-    
-                # Create spatially varying eigenKernel pointer
-                eKernel = afwMath.LinearCombinationKernel(eKernelBases, eKernelFunc)
-                eKernel.setSpatialParameters(kParams)
-        
-                # Evaluate quality of spatial fit
-                nRejected = evaluateModelByPca(spatialCells, bgFunction, eKernel,
-                                               policy, reject=rejectKernels)
-                
-            nIter += 1
-
-        # NOTE to self : you get the "final" PCA kernel here with all elements
-        # In future versions of the code, there will be no need to make pointers like this.
-        kList['pca'].append( eKernel )
-        bgList['pca'].append( bgFunction )
-                
-    return bgList, kList
-  
-################
-################
-#####  o  ######
-################
-################
-
 def subtractMaskedImage(templateMaskedImage, scienceMaskedImage, policy, fpList=None):
     # Make sure they are the EXACT same dimensions in pixels
+    # This is non-negotiable
     assert (templateMaskedImage.getDimensions() == scienceMaskedImage.getDimensions())
     
     kCols = policy.get('kernelCols')
@@ -174,6 +30,145 @@ def subtractMaskedImage(templateMaskedImage, scienceMaskedImage, policy, fpList=
                                                                   scienceMaskedImage,
                                                                   policy)
 
+    # Set up grid for spatial model
+    spatialCells = ipDiffim.createSpatialModelKernelCells(templateMaskedImage,
+                                                          scienceMaskedImage,
+                                                          fpList,
+                                                          kFunctor,
+                                                          policy)
+
+    # Set up fitting loop 
+    maxSpatialIterations = policy.getInt('maxSpatialIterations')
+    rejectKernels        = policy.getBool('spatialKernelRejection')
+    nRejected = -1
+    nIter     =  0
+    
+    # And fit spatial kernel model
+    if policy.get('spatialKernelModel') == 'pca':
+        # Fit spatial variation of principal components
+
+        minPrincipalComponents = policy.getInt('minPrincipalComponents')
+        maxPrincipalComponents = policy.getInt('maxPrincipalComponents')
+        fracEigenVal           = policy.getFloat('fracEigenVal')
+        
+        while (nRejected != 0) and (nIter < maxSpatialIterations):
+            # Run the PCA
+            mKernel, eKernelVector, eVal, eCoeff = spatialModelKernelPca(spatialCells, policy)
+
+            # Make the decision on how many components to use
+            eFrac  = num.cumsum(eVal)
+            eFrac /= eFrac[-1]
+            nEval  = len(num.where(eFrac > fracEigenVal))
+            nEval  = min(minPrincipalComponents, len(eKernelVector))
+            nEval  = min(nEval, maxPrincipalComponents)
+            nEval  = max(nEval, minPrincipalComponents)
+
+            # do spatial fit here by Principal Component
+            sKernel, bgFunction = spatialModelByPca(spatialCells, eCoeff, nEval, policy)
+
+            # Evaluate quality of spatial fit
+            nRejected = evaluateModelByPca(spatialCells, bgFunction, sKernel,
+                                           policy, reject=rejectKernels)
+                
+            nIter += 1
+
+    elif policy.get('spatialKernelModel') == 'pixel':
+        # Fit function to each pixel
+
+        while (nRejected != 0) and (nIter < maxSpatialIterations):
+            # do spatial fit here pixel by pixel
+            sKernel, bgFunction = spatialModelByPixel(spatialCells, policy)
+            # and check quality
+            nRejected  = evaluateModelByPixel(spatialCells,
+                                              bgFunction, sKernel, 
+                                              policy, reject=rejectKernels)
+            nIter += 1
+        
+    else:
+        # All that is supported
+        # Throw exception!
+        pass
+
+    differenceMaskedImage = ipDiffim.convolveAndSubtract(templateMaskedimage,
+                                                         scienceMaskedImage,
+                                                         sKernel,
+                                                         bgFunction)
+    # Do something about this eventually
+    Sdqa = None
+
+    # What kind of metadata do we add here to MaskedImage?
+    
+    return differenceMaskedImage, sKernel, bgFunction, SdqaList
+
+def testingLoop(templateMaskedImage, scienceMaskedImage, policy, fpList=None):
+
+    kCols = policy.get('kernelCols')
+    kRows = policy.get('kernelRows')
+
+    kBasisList = ipDiffim.generateDeltaFunctionKernelSet(kCols, kRows)
+    kFunctor   = ipDiffim.PsfMatchingFunctorF(kBasisList)
+
+    if fpList == None:
+        # Need to find own footprints
+        fpList = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
+                                                                  scienceMaskedImage,
+                                                                  policy)
+    # LOOP 1 : convolution vs deconvolution
+    Trace('lsst.ip.diffim', 1, 'SC List 1')
+    spatialCellsC = ipDiffim.createSpatialModelKernelCells(templateMaskedImage,
+                                                           scienceMaskedImage,
+                                                           fpList,
+                                                           kFunctor,
+                                                           policy,
+                                                           cFlag='c')
+    resultsC = spatialKernelTesting(spatialCellsC, kBasisList, policy, 0)
+    if resultsC == None:
+        Trace('lsst.ip.diffim', 3, 'Spatial testing failed')
+    else:
+        bgListC, kListC = resultsC
+        for key1 in bgListC.keys():
+            for key2 in range(len(bgListC[key1])):
+                background = bgListC[key1][key2]
+                kernel     = kListC[key1][key2]
+    
+                diffIm = ipDiffim.convolveAndSubtract(
+                    templateMaskedImage,
+                    scienceMaskedImage,
+                    kernel,
+                    background)
+                diffIm.writeFits('diffImC_%s_%d' % (key1, key2))
+
+    #
+    ###
+    #
+
+    Trace('lsst.ip.diffim', 1, 'SC List 2')
+    spatialCellsD = ipDiffim.createSpatialModelKernelCells(scienceMaskedImage,
+                                                           templateMaskedImage,
+                                                           fpList,
+                                                           kFunctor,
+                                                           policy,
+                                                           cFlag='d')
+    resultsD = spatialKernelTesting(spatialCellsD, kBasisList, policy, 1)
+    if resultsD == None:
+        Trace('lsst.ip.diffim', 3, 'Spatial testing failed')
+    else:
+        bgListD, kListD = resultsD
+        for key1 in fitListD.keys():
+            for key2 in range(len(bgListD[key1])):
+                background = bgListD[key1][key2]
+                kernel     = kListD[key1][key2]
+    
+                diffIm = ipDiffim.convolveAndSubtract(
+                    scienceMaskedImage,
+                    templateMaskedImage,
+                    kernel,
+                    background)
+                diffIm.writeFits('diffImD_%s_%d' % (key1, key2))
+    
+    return
+
+    
 def main():
     defDataDir = eups.productDir('afwdata') or ''
     imageProcDir = eups.productDir('ip_diffim')
@@ -225,7 +220,7 @@ Notes:
     
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
-    policy = Policy.createPolicy(policyPath)
+    policy              = Policy.createPolicy(policyPath)
     
     if options.debugIO:
         policy.set('debugIO', True)
@@ -234,64 +229,11 @@ Notes:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
-    
-
-    # LOOP 1 : convolution vs deconvolution
-    Trace('lsst.ip.diffim', 1, 'SC List 1')
-    spatialCellsC = ipDiffim.createSpatialModelKernelCells(fpList,
-                                                           templateMaskedImage,
-                                                           scienceMaskedImage,
-                                                           kFunctor,
-                                                           policy,
-                                                           cFlag='c')
     if policy.get('spatialKernelTesting') == True:
-        resultsC = spatialKernelTesting(spatialCellsC, kBasisList, policy, 0)
-        if resultsC == None:
-            Trace('lsst.ip.diffim', 3, 'Spatial testing failed')
-        else:
-            bgListC, kListC = resultsC
-            for key1 in bgListC.keys():
-                for key2 in range(len(bgListC[key1])):
-                    background = bgListC[key1][key2]
-                    kernel     = kListC[key1][key2]
+        testingLoop(templateMaskedImage, scienceMaskedImage, policy)
+    else:
+        subtractMaskedImage(templateMaskedImage, scienceMaskedImage, policy)
     
-                    diffIm = ipDiffim.convolveAndSubtract(
-                        templateMaskedImage,
-                        scienceMaskedImage,
-                        kernel,
-                        background)
-                    diffIm.writeFits('diffImC_%s_%d' % (key1, key2))
-
-    #
-    ###
-    #
-
-    Trace('lsst.ip.diffim', 1, 'SC List 2')
-    spatialCellsD = ipDiffim.createSpatialModelKernelCells(fpList,
-                                                           scienceMaskedImage,
-                                                           templateMaskedImage,
-                                                           kFunctor,
-                                                           policy,
-                                                           cFlag='d')
-    if policy.get('spatialKernelTesting') == True:
-        resultsD = spatialKernelTesting(spatialCellsD, kBasisList, policy, 1)
-        if resultsD == None:
-            Trace('lsst.ip.diffim', 3, 'Spatial testing failed')
-        else:
-            bgListD, kListD = resultsD
-            for key1 in fitListD.keys():
-                for key2 in range(len(bgListD[key1])):
-                    background = bgListD[key1][key2]
-                    kernel     = kListD[key1][key2]
-    
-                    diffIm = ipDiffim.convolveAndSubtract(
-                        scienceMaskedImage,
-                        templateMaskedImage,
-                        kernel,
-                        background)
-                    diffIm.writeFits('diffImD_%s_%d' % (key1, key2))
-    
-    return
 
 
 def run():

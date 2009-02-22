@@ -89,6 +89,21 @@ def version(HeadURL = r"$HeadURL$"):
 
 %}
 
+///////////////////////////
+
+%{
+#include "lsst/ip/diffim/Debug.h"
+%}
+
+SWIG_SHARED_PTR(DebugF, lsst::ip::diffim::Debug<float>);
+
+%include "lsst/ip/diffim/Debug.h"
+
+%template(DebugF) lsst::ip::diffim::Debug<float>;
+%template(VectorDebugF) std::vector<lsst::ip::diffim::Debug<float>::Ptr >;
+
+///////////////////////////
+
 %{
 #include "lsst/ip/diffim/ImageSubtract.h"
 %}

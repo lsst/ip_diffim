@@ -7,8 +7,11 @@ debugIO: false
 debugPlot: false
 
 # Testing for spatial kernel model
-spatialKernelTesting: true
+spatialKernelTesting: false
 spatialKernelRejection: true
+
+# Spatial function applied to : 'pca' or 'pixel' only
+spatialKernelModel: 'pca'
 
 ######
 # Size of the convolution kernel
@@ -70,9 +73,6 @@ footprintDiffimNpixMax: 500
 # Grow footprint by this many pixels
 footprintDiffimGrow: 20
 
-# Maximum number of pixels in a Footprint, after growing
-footprintDiffimNpixAfterGrowMax: 3000
-
 # Minimum number of clean candidates
 minimumCleanFootprints: 10
 
@@ -104,10 +104,23 @@ nSigmaSq : 1.0
 stepsize : 0.1
 
 ######
-# Controls Clipping out of Bad Kernel
-#
-#   
+# Controls Clipping out of Bad Kernels
 #
 
 # How many iterations until you move on
-maxSpatialIterations: 1
+maxSpatialIterations: 3
+
+######
+# How many principal components?
+#
+# pca
+# 
+
+# How many (min)
+minPrincipalComponents: 3
+
+# How many (max)
+minPrincipalComponents: 20
+
+# How many (max)
+fracEigenVal : 0.95

@@ -108,8 +108,17 @@ def spatialModelByPixel(spatialCells, policy):
             
             # do the various fitting techniques here
             #######
-
-    return bgFunction, pFunctionList
+            
+    # Turn list of pixel functions into spatially varying kernel
+    sKernelFunc  = afwMath.PolynomialFunction2D(kSpatialOrder)
+    kParams      = numpy.zeros( (kCols*kRows, sKernelFunc.getNParameters()) )
+    for p in range(kCols*kRows):
+        kParams[p] = pFunctionList[p].getParameters()
+    # Create spatially varying kernel pointer
+    sKernel = afwMath.LinearCombinationKernel(kBasisList, sKernelFunc)
+    sKernel.setSpatialParameters(kParams)
+    
+    return sKernel, bgFunction, 
 
 
 def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True):
@@ -324,7 +333,7 @@ def spatialModelKernelPca(spatialCells, policy, id):
     return mKernel, eKernelVector, eVal, eCoeff
     
 
-def spatialModelByPca(spatialCells, eCoeffs, neVal, policy):
+def spatialModelByPca(spatialCells, eCoeffs, nEVal, policy, makeKernel=True):
     kSpatialOrder  = policy.get('kernelSpatialOrder')
     bgSpatialOrder = policy.get('backgroundSpatialOrder')
     kCols          = policy.get('kernelCols')
@@ -340,7 +349,6 @@ def spatialModelByPca(spatialCells, eCoeffs, neVal, policy):
             idList.append( scID )
             
     nCells = len(idList)
-    nCoeff = neVal
 
     # common to all spatial fits; position of constraints
     cCol = numpy.zeros(nCells)
@@ -366,7 +374,7 @@ def spatialModelByPca(spatialCells, eCoeffs, neVal, policy):
 
     # Fit spatial variation of each eigenkernel
     eFunctionList = []
-    for nc in range(nCoeff):
+    for nc in range(nEVal):
         # The contribution of eigenKernel X to Kernel Y is in eCoeff[Y,X].
         coeffs = eCoeffs[:,nc]
 
@@ -387,7 +395,32 @@ def spatialModelByPca(spatialCells, eCoeffs, neVal, policy):
               'eigenKernel %d fit parameters : %s' % (nc, ' '.join([('%10.3e' % (x)) for x in eFit.parameterList])))
         eFunctionList.append(eFunction)
 
-    return bgFunction, eFunctionList
+    if makeKernel:
+        # Build LinearCombinationKernel
+        eKernelBases = afwMath.KernelListD()
+
+        # Start with mean Kernel image
+        eKernelBases.push_back(mKernel)
+        # And append eigenKernel images
+        for ek in range(nEVal):
+            eKernelBases.push_back(eKernelVector[ek])
+                    
+        # Mean kernel has no spatial variation
+        eKernelFunc   = afwMath.PolynomialFunction2D(kSpatialOrder)
+        kParams       = numpy.zeros( (nEVal+1, eKernelFunc.getNParameters()) )
+        kParams[0][0] = 1.0
+        # Add already-fit-for spatial variation of eigenKernels
+        for ek in range(nEVal):
+            kParams[ek+1] = eFunctionList[ek].getParameters()
+    
+        # Create spatially varying eigenKernel pointer
+        eKernel = afwMath.LinearCombinationKernel(eKernelBases, eKernelFunc)
+        eKernel.setSpatialParameters(kParams)
+        
+        return eKernel, bgFunction
+    else:
+        # for spatial testing
+        return eFunctionList, bgFunction
 
 
 def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
@@ -451,3 +484,127 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
           'Spatial model by PCA : %d / %d Kernels acceptable' % (nGood, nCells))
 
     return nRejected
+
+################
+################
+#####  Testing loop
+################
+################
+
+def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
+    kCols = policy.get('kernelCols')
+    kRows = policy.get('kernelRows')
+    rejectKernels = policy.get('spatialKernelRejection')
+    
+    try:
+        ipDiffim.rejectKernelSumOutliers(spatialCells, policy)
+    except:
+        Trace('lsst.ip.diffim', 2,
+              'LOOP %d FAILED; no good kernels' % (scID))
+        return
+
+    bgList            = {}
+    bgList['spatial'] = []
+    bgList['pca']     = []
+
+    kList             = {}
+    kList['spatial']  = []
+    kList['pca']      = []
+    
+    # LOOP 2 : spatial order
+    for order in range(3):
+        policy.set('kernelSpatialOrder', order)
+        policy.set('backgroundSpatialOrder', order)
+        
+        kSpatialOrder  = policy.get('kernelSpatialOrder')
+        bgSpatialOrder = policy.get('backgroundSpatialOrder')
+        
+        Trace('lsst.ip.diffim', 1,
+              'LOOP %d %d' % (scID, order))
+        
+        #############
+        # Pixel-by-pixel fit
+        maxSpatialIterations = policy.get('maxSpatialIterations')
+        nRejected = 1
+        nIter     = 0
+        
+        # LOOP 3 : spatial pixel sigma clipping
+        while (nRejected != 0) and (nIter < maxSpatialIterations):
+        
+            # do spatial fit here pixel by pixel
+            sKernel, bgFunction = spatialModelByPixel(spatialCells, policy)
+
+            # and check quality
+            nRejected  = evaluateModelByPixel(spatialCells,
+                                              bgFunction, sKernel, 
+                                              policy, reject=rejectKernels)
+            nIter += 1
+
+        # In future versions of the code, there will be no need to make pointers like this.
+        kList['spatial'].append( sKernel )
+        bgList['spatial'].append( bgFunction )
+        
+        #############
+        # PCA fit
+        nRejected = 1
+        nIter     = 0
+        
+        # LOOP 4a : PCA sigma clipping
+        while (nRejected != 0) and (nIter < maxSpatialIterations):
+            
+            # Run the PCA
+            mKernel, eKernelVector, eVal, eCoeff = spatialModelKernelPca(spatialCells, policy, scID)
+            
+            # Here we make a decision on how many eigenComponents to use based
+            # on eVal, etc
+            #
+            # While we are testing, check them all
+            
+            # Find spatial variation of only those components
+            # Remove this line after being done testing
+            # We fit them all first
+            bgFunction, eFunctionList = spatialModelByPca(spatialCells, eCoeff, len(eVal), policy, False)
+    
+            # LOOP 4b : Number of principal components
+            for neVal in range( len(eVal) ):
+            
+                Trace('lsst.ip.diffim', 3,
+                      'Using varying eigenkernels : N = %d' % (neVal))
+                
+                # Find spatial variation of only those components
+                # Comment this back in when we are not testing
+                #
+                # bgFunction, eFunctionList = spatialModelByPca(spatialCells, eCoeff, neVal, policy)
+            
+                # Build LinearCombinationKernel for only neVal components
+                # Start with mean Kernel image
+                eKernelBases = afwMath.KernelListD()
+                eKernelBases.push_back(mKernel)
+                # Append eigenKernel images
+                for ek in range(neVal):
+                    eKernelBases.push_back(eKernelVector[ek])
+                    
+                # Mean kernel has no spatial variation
+                eKernelFunc   = afwMath.PolynomialFunction2D(kSpatialOrder)
+                kParams       = numpy.zeros( (neVal+1, eKernelFunc.getNParameters()) )
+                kParams[0][0] = 1.0
+                # Add already-fit-for spatial variation of eigenKernels
+                for ek in range(neVal):
+                    kParams[ek+1] = eFunctionList[ek].getParameters()
+    
+                # Create spatially varying eigenKernel pointer
+                eKernel = afwMath.LinearCombinationKernel(eKernelBases, eKernelFunc)
+                eKernel.setSpatialParameters(kParams)
+        
+                # Evaluate quality of spatial fit
+                nRejected = evaluateModelByPca(spatialCells, bgFunction, eKernel,
+                                               policy, reject=rejectKernels)
+                
+            nIter += 1
+
+        # NOTE to self : you get the "final" PCA kernel here with all elements
+        # In future versions of the code, there will be no need to make pointers like this.
+        kList['pca'].append( eKernel )
+        bgList['pca'].append( bgFunction )
+                
+    return bgList, kList

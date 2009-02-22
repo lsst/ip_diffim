@@ -2,6 +2,8 @@ import eups
 import sys, os, optparse
 import numpy
 
+from subtractMaskedImage import subtractMaskedImage
+
 def subtractExposure(templateExposure, scienceExposure, policy):
     # Make sure they end up the same dimensions on the sky
     templateWcs      = templateExposure.getWcs() 
@@ -16,21 +18,25 @@ def subtractExposure(templateExposure, scienceExposure, policy):
                                              templateExposure.getWidth())
     scienceLimit     = scienceWcs.xyToRaDec(scienceExposure.getHeight()
                                             scienceExposure.getWidth())
+    # Within some tolerance; do we have sky distance methods?
     assert(templateLimit[0]  == scienceLimit[0])
     assert(templateLimit[1]  == scienceLimit[1])
 
     # Make sure they end up the EXACT same dimensions in pixels
+    # This is non-negotiable
     assert (templateExposure.getDimensions() == scienceExposure.getDimensions())
 
     # Subtract their MaskedImages
-    differenceMaskedImage, kernel, background = subtractMaskedImage(templateExposure.getMaskedImage(),
-                                                                    scienceExposure.getMaskedImage(),
-                                                                    policy)
+    differenceMaskedImage, spatialKernel, backgroundModel, SdqaList = subtractMaskedImage(templateExposure.getMaskedImage(),
+                                                                                          scienceExposure.getMaskedImage(),
+                                                                                          policy)
     # Note : we assume that the Template is warped to the science image's WCS
     #      : meaning that the scienceWcs is the correct one to store in the diffim
     differenceExposure = afwImage.ExposureF(differenceMaskedImage, scienceWcs)
+
+    # What kind of metadata do we add here to Exposure?
     
-    return differenceExposure, kernel, background
+    return differenceExposure, spatialKernel, backgroundModel, SdqaList
 
 
 def main():
@@ -80,13 +86,22 @@ Notes:
     print 'Science exposure: ', sciencePath
     print 'Template exposure:', templatePath
     print 'Output exposure:  ', outputPath
-    print 'Policy file:   ',    policyPath
+    print 'Policy file:      ', policyPath
     
     templateExposure = afwImage.ExposureF(templatePath)
     scienceExposure  = afwImage.ExposureF(sciencePath)
     policy           = Policy.createPolicy(policyPath)
 
-    differenceExposure, kernel, background = subtractExpoure(templateExposure, scienceExposure, policy)
+    if options.debugIO:
+        policy.set('debugIO', True)
+
+    if options.verbosity > 0:
+        print 'Verbosity =', options.verbosity
+        Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
+
+    differenceExposure, spatialKernel, backgroundModel, SdqaList = subtractExpoure(templateExposure,
+                                                                                   scienceExposure,
+                                                                                   policy)
     differenceExposure.writeFits(outputPath)
 
 def run():

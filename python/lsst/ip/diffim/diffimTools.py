@@ -104,9 +104,9 @@ def rejectKernelSumOutliers(spatialCells, policy):
           'Kernel Sum : %0.3f +/- %0.3f, %d kernels' % (kSumMean, kSumStd, nCells))
 
 
-def createSpatialModelKernelCells(fpInList,
-                                  templateMaskedImage,
+def createSpatialModelKernelCells(templateMaskedImage,
                                   scienceMaskedImage,
+                                  fpInList,
                                   kFunctor,
                                   policy,
                                   cFlag='c'):

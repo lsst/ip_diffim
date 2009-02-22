@@ -56,7 +56,7 @@ namespace diffim {
 
         /** Constructor
          *
-         * @note Kenrel needs to carry around pointer to the parent image
+         * @note Kernel needs to carry around pointer to the parent image
          * 
          * @param fpPtr  Pointer to footprint of pixels used to build Kernel
          * @param miToConvolveParentPtr  Pointer to parent template image
@@ -65,11 +65,11 @@ namespace diffim {
          * @param policy  Policy for operations
          * @param build  Build upon construction?  Default is false.
          */
-        SpatialModelKernel(lsst::afw::detection::Footprint::Ptr const &fpPtr,
-                           MaskedImagePtr const &miToConvolvePtr,
-                           MaskedImagePtr const &miToNotConvolvePtr,
-                           boost::shared_ptr<PsfMatchingFunctor<ImageT> > const &kernelFunctor,
-                           lsst::pex::policy::Policy const &policy,
+        SpatialModelKernel(lsst::afw::detection::Footprint::Ptr const& fpPtr,
+                           MaskedImagePtr const& miToConvolvePtr,
+                           MaskedImagePtr const& miToNotConvolvePtr,
+                           boost::shared_ptr<PsfMatchingFunctor<ImageT> > const& kernelFunctor,
+                           lsst::pex::policy::Policy const& policy,
                            bool build=false);
 
         /** Destructor
@@ -108,7 +108,7 @@ namespace diffim {
         void setKernelPtr(boost::shared_ptr<lsst::afw::math::Kernel> kPtr) {_kPtr = kPtr;};
         /** Get Kernel pointer associated with the Footprint
          */
-        boost::shared_ptr<lsst::afw::math::Kernel> getKernelPtr() {return _kPtr;};
+        boost::shared_ptr<lsst::afw::math::Kernel> const& getKernelPtr() const {return _kPtr;};
 
         /** Set pointer associated with the uncertainty in the Kernel
          *
