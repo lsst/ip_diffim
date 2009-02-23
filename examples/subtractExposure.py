@@ -2,6 +2,13 @@ import eups
 import sys, os, optparse
 import numpy
 
+import lsst.daf.base as dafBase
+import lsst.afw.image as afwImage
+
+from lsst.pex.logging import Trace
+from lsst.pex.policy import Policy
+from lsst.pex.logging import Log
+
 from subtractMaskedImage import subtractMaskedImage
 
 def subtractExposure(templateExposure, scienceExposure, policy):
@@ -9,26 +16,32 @@ def subtractExposure(templateExposure, scienceExposure, policy):
     templateWcs      = templateExposure.getWcs() 
     scienceWcs       = scienceExposure.getWcs()
 
-    templateOrign    = templateWcs.xyToRaDec(0,0)
-    scienceOrign     = scienceWcs.xyToRaDec(0,0)
-    assert(templateOrigin[0] == scienceOrigin[0])
-    assert(templateOrigin[1] == scienceOrigin[1])
+    templateMaskedImage = templateExposure.getMaskedImage()
+    scienceMaskedImage  = scienceExposure.getMaskedImage()
 
-    templateLimit    = templateWcs.xyToRaDec(templateExposure.getHeight()
-                                             templateExposure.getWidth())
-    scienceLimit     = scienceWcs.xyToRaDec(scienceExposure.getHeight()
-                                            scienceExposure.getWidth())
+    templateOrigin   = templateWcs.xyToRaDec(0,0)
+    scienceOrigin    = scienceWcs.xyToRaDec(0,0)
     # Within some tolerance; do we have sky distance methods?
-    assert(templateLimit[0]  == scienceLimit[0])
-    assert(templateLimit[1]  == scienceLimit[1])
+    #assert(templateOrigin[0] == scienceOrigin[0])
+    #assert(templateOrigin[1] == scienceOrigin[1])
+    assert(templateOrigin == scienceOrigin)
+
+    templateLimit    = templateWcs.xyToRaDec(templateMaskedImage.getHeight(),
+                                             templateMaskedImage.getWidth())
+    scienceLimit     = scienceWcs.xyToRaDec(scienceMaskedImage.getHeight(),
+                                            scienceMaskedImage.getWidth())
+    # Within some tolerance; do we have sky distance methods?
+    #assert(templateLimit[0]  == scienceLimit[0])
+    #assert(templateLimit[1]  == scienceLimit[1])
+    assert(templateLimit  == scienceLimit)
 
     # Make sure they end up the EXACT same dimensions in pixels
     # This is non-negotiable
-    assert (templateExposure.getDimensions() == scienceExposure.getDimensions())
+    assert (templateMaskedImage.getDimensions() == scienceMaskedImage.getDimensions())
 
     # Subtract their MaskedImages
-    differenceMaskedImage, spatialKernel, backgroundModel, SdqaList = subtractMaskedImage(templateExposure.getMaskedImage(),
-                                                                                          scienceExposure.getMaskedImage(),
+    differenceMaskedImage, spatialKernel, backgroundModel, SdqaList = subtractMaskedImage(templateMaskedImage,
+                                                                                          scienceMaskedImage,
                                                                                           policy)
     # Note : we assume that the Template is warped to the science image's WCS
     #      : meaning that the scienceWcs is the correct one to store in the diffim
@@ -99,9 +112,9 @@ Notes:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
-    differenceExposure, spatialKernel, backgroundModel, SdqaList = subtractExpoure(templateExposure,
-                                                                                   scienceExposure,
-                                                                                   policy)
+    differenceExposure, spatialKernel, backgroundModel, SdqaList = subtractExposure(templateExposure,
+                                                                                    scienceExposure,
+                                                                                    policy)
     differenceExposure.writeFits(outputPath)
 
 def run():
