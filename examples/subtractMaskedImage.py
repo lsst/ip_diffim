@@ -7,6 +7,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.image.testUtils as imTestUtils
 import lsst.ip.diffim as ipDiffim
+import lsst.sdqa as sdqa
 
 from lsst.pex.logging import Trace
 from lsst.pex.logging import Log
