@@ -65,31 +65,30 @@ maximumFootprintResidualStd: 2.0
 #
 
 # Minimum number of pixels in an acceptible Footprint
-footprintDiffimNpixMin: 9
+fpNpixMin: 9
 
 # Maximum number of pixels in an acceptible Footprint
-footprintDiffimNpixMax: 500
+fpNpixMax: 500
 
 # Grow footprint by this many pixels
-footprintDiffimGrow: 20
+fpGrowPix: 20
 
 # Minimum number of clean candidates
-minimumCleanFootprints: 10
+minCleanFp: 10
 
 # Threshold in sigma now
-footprintDetectionThresholdSigma: 20.0
+detThresholdSigma: 50.0
 
 # How do you change the detection threshold if minimumCleanFootprints not found
-# Make this shallow now for testing; don't want to get too many objects...
-detectionThresholdScalingSigma: 5.0
+detThresholdScaling: 0.5
 
 # How low can you go
-minimumDetectionThresholdSigma: 5.0
+detThresholdMin: 5.0
 
 # Back compatibility for signal based vs. sigma based detection
-footprintDetectionThreshold: 1000.0
-detectionThresholdScaling: 0.50
-minimumDetectionThreshold: 125.0
+#footprintDetectionThreshold: 1000.0
+#detectionThresholdScaling: 0.50
+#minimumDetectionThreshold: 125.0
 
 ######
 # Controls MINUIT fitting

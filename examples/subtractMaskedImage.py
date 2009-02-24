@@ -74,9 +74,9 @@ def subtractMaskedImage(templateMaskedImage, scienceMaskedImage, policy, fpList=
                                                              policy)
 
             # Evaluate quality of spatial fit
-            nRejected = ipDiffim.evaluateModelByPca(spatialCells,
-                                                    bgFunction, sKernel,
-                                                    policy, reject=rejectKernels)
+            nRejected, sdqaList = ipDiffim.evaluateModelByPca(spatialCells,
+                                                              bgFunction, sKernel,
+                                                              policy, reject=rejectKernels)
                 
             nIter += 1
 
@@ -85,11 +85,11 @@ def subtractMaskedImage(templateMaskedImage, scienceMaskedImage, policy, fpList=
 
         while (nRejected != 0) and (nIter < maxSpatialIterations):
             # do spatial fit here pixel by pixel
-            sKernel, bgFunction = ipDiffim.spatialModelByPixel(spatialCells, policy)
+            sKernel, bgFunction = ipDiffim.spatialModelByPixel(spatialCells, kBasisList, policy)
             # and check quality
-            nRejected  = ipDiffim.evaluateModelByPixel(spatialCells,
-                                                       bgFunction, sKernel, 
-                                                       policy, reject=rejectKernels)
+            nRejected, sdqaList  = ipDiffim.evaluateModelByPixel(spatialCells,
+                                                                 bgFunction, sKernel, 
+                                                                 policy, reject=rejectKernels)
             nIter += 1
         
     else:
@@ -101,16 +101,16 @@ def subtractMaskedImage(templateMaskedImage, scienceMaskedImage, policy, fpList=
                                                          scienceMaskedImage,
                                                          sKernel,
                                                          bgFunction)
-    # Do something about this eventually
-    Sdqa = None
-
     #
-    # Lets do some Sdqa here
+    # Lets do some more Sdqa here
     #
+    imStats = ipDiffim.ImageStatisticsF()
+    imStats.apply(differenceMaskedImage)
+    sdqaList.append( sdqa.SdqaRating("ip_diffim.residuals",
+                                     imStats.getMean(), imStats.getRms(), sdqa.SdqaRating.AMP) ) 
     
-    # Check kernel sum in each good Cell
 
-    #   ... and in the corners
+    # Check kernel sum in the corners
     kSums  = []
     kImage = afwImage.ImageD(sKernel.getDimensions())
     for nRow in [0, templateMaskedImage.getHeight()]:
@@ -120,10 +120,12 @@ def subtractMaskedImage(templateMaskedImage, scienceMaskedImage, policy, fpList=
     Trace('lsst.ip.diffim.subtractMaskedImage', 3, 
           'Final Kernel Sum from Image Corners : %0.3f (%0.3f)' % 
           (kSumArray.mean(), kSumArray.std()))
+    sdqaList.append( sdqa.SdqaRating("ip_diffim.kernelSum",
+                                     kSumArray.mean(), kSumArray.std(), sdqa.SdqaRating.AMP) ) 
 
     # What kind of metadata do we add here to MaskedImage?
     
-    return differenceMaskedImage, sKernel, bgFunction, SdqaList
+    return differenceMaskedImage, sKernel, bgFunction, sdqaList
 
 def testingLoop(templateMaskedImage, scienceMaskedImage, policy, fpList=None):
 
@@ -257,7 +259,10 @@ Notes:
     if policy.get('spatialKernelTesting') == True:
         testingLoop(templateMaskedImage, scienceMaskedImage, policy)
     else:
-        subtractMaskedImage(templateMaskedImage, scienceMaskedImage, policy)
+        differenceMaskedImage, sKernel, bgFunction, sdqaList =  subtractMaskedImage(templateMaskedImage,
+                                                                                    scienceMaskedImage,
+                                                                                    policy)
+    differenceMaskedImage.writeFits(outputPath)
     
 
 

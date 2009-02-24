@@ -5,6 +5,7 @@ import numpy
 import lsst.afw.image as afwImage
 import lsst.daf.base  as dafBase
 import lsst.afw.math  as afwMath
+import lsst.sdqa as sdqa
 
 from   lsst.pex.logging import Log
 from   lsst.pex.logging import Trace
@@ -23,7 +24,7 @@ import pdb
 ################
 ################
 
-def spatialModelByPixel(spatialCells, policy):
+def spatialModelByPixel(spatialCells, kBasisList, policy):
     kSpatialOrder  = policy.get('kernelSpatialOrder')
     bgSpatialOrder = policy.get('backgroundSpatialOrder')
     kCols          = policy.get('kernelCols')
@@ -96,8 +97,8 @@ def spatialModelByPixel(spatialCells, policy):
             pValues = numpy.zeros(nCells)
             pErrors = numpy.zeros(nCells)
             for idx in range(nCells):
-                pValues[idx] = kImages[idx].getVal(kCol, kRow)
-                pErrors[idx] = kErrImages[idx].getVal(kCol, kRow)
+                pValues[idx] = kImages[idx].get(kCol, kRow)
+                pErrors[idx] = kErrImages[idx].get(kCol, kRow)
                     
             # initialize vectors, one per good kernel
             #######
@@ -159,14 +160,15 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
     # image stats
     imStats = diffimLib.ImageStatisticsF()
 
+    sdqaList = []
     for idx in range(nCells):
         bgValue = bgFunction(cCol[idx], cRow[idx])
         sImage  = afwImage.ImageD(sKernel.getDimensions())
         sKernel.computeImage(sImage, False, cCol[idx], cRow[idx])
         kernel  = afwMath.FixedKernel(sImage)
-        diffIm  = diffim.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr(),
-                                             spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr(),
-                                             kernel, bgValue)
+        diffIm  = diffimLib.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr(),
+                                                spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr(),
+                                                kernel, bgValue)
 
         # Find quality of difference image
         imStats.apply(diffIm)
@@ -185,12 +187,14 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
         else:
             nGood += 1
             label  = 'OK'
+            sdqaList.append( sdqa.SdqaRating("ip_diffim.footprint%d_residuals" % (idList[idx]),
+                                             imStats.getMean(), imStats.getRms(), sdqa.SdqaRating.AMP) ) 
 
         Trace('lsst.ip.diffim.evaluateModelByPixel', 5,
               '%s Kernel %d : %s Spatial residuals = %.2f +/- %.2f sigma' %
               (spatialCells[ idList[idx] ].getLabel(),
                spatialCells[ idList[idx] ].getCurrentModel().getID(),
-               label, imStats.getResidualMean(), imStats.getResidualStd()))
+               label, imStats.getMean(), imStats.getRms()))
 
     Trace('lsst.ip.diffim.evaluateModelByPixel', 3,
           'Spatial model by pixel : %d / %d Kernels acceptable' % (nGood, nCells))
@@ -203,7 +207,7 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
 #                                             outfile='SKernel_%s%d.ps' % (label, goodDifiList[i].getID())
 #                                             )
 
-    return nRejected
+    return nRejected, sdqaList
 
 def evaluateModelByPixel_deprecated(spatialCells, bgFunction, pFunctionList, policy, reject=True):
     # This version makes a kernel image pixel-by-pixel.  Instead make
@@ -459,6 +463,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
     # image stats
     imStats = diffimLib.ImageStatisticsF()
 
+    sdqaList = []
     for idx in range(nCells):
         bgValue = bgFunction(cCol[idx], cRow[idx])
         eImage  = afwImage.ImageD(eKernel.getDimensions())
@@ -485,6 +490,8 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
         else:
             nGood += 1
             label = 'OK'
+            sdqaList.append( sdqa.SdqaRating("ip_diffim.footprint%d_residuals" % (idList[idx]),
+                                             imStats.getMean(), imStats.getRms(), sdqa.SdqaRating.AMP) ) 
 
         Trace('lsst.ip.diffim.evaluateModelByPca', 5,
               '%s Kernel %d : %s Pca residuals = %.2f +/- %.2f sigma' %
@@ -495,7 +502,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
     Trace('lsst.ip.diffim.evaluateModelByPca', 3,
           'Spatial model by PCA : %d / %d Kernels acceptable' % (nGood, nCells))
 
-    return nRejected
+    return nRejected, sdqaList
 
 ################
 ################
@@ -544,7 +551,7 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
         while (nRejected != 0) and (nIter < maxSpatialIterations):
         
             # do spatial fit here pixel by pixel
-            sKernel, bgFunction = spatialModelByPixel(spatialCells, policy)
+            sKernel, bgFunction = spatialModelByPixel(spatialCells, kBasisList, policy)
 
             # and check quality
             nRejected  = evaluateModelByPixel(spatialCells,

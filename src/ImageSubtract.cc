@@ -1115,13 +1115,13 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     ) {
     
     // Parse the Policy
-    unsigned int footprintDiffimNpixMin = policy.getInt("footprintDiffimNpixMin");
-    unsigned int footprintDiffimNpixMax = policy.getInt("footprintDiffimNpixMax");
-    unsigned int footprintDiffimGrow    = policy.getInt("footprintDiffimGrow");
-    int minimumCleanFootprints          = policy.getInt("minimumCleanFootprints");
-    double footprintDetectionThreshold  = policy.getDouble("footprintDetectionThreshold");
-    double detectionThresholdScaling    = policy.getDouble("detectionThresholdScaling");
-    double minimumDetectionThreshold    = policy.getDouble("minimumDetectionThreshold");
+    unsigned int fpNpixMin      = policy.getInt("fpNpixMin");
+    unsigned int fpNpixMax      = policy.getInt("fpNpixMax");
+    unsigned int fpGrowPix      = policy.getInt("fpGrowPix");
+    int minCleanFp              = policy.getInt("minCleanFp");
+    double detThreshold         = policy.getDouble("detThresholdSigma");
+    double detThresholdScaling  = policy.getDouble("detThresholdScaling");
+    double detThresholdMin      = policy.getDouble("detThresholdMin");
     
     // Grab mask bits from the image to convolve, since that is what we'll be operating on
     // Overridden now that we use the FootprintFunctor to look for any masked pixels
@@ -1136,33 +1136,35 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     diffim::FindSetBits<image::Mask<image::MaskPixel> > itcFunctor(*(imageToConvolve.getMask())); 
     diffim::FindSetBits<image::Mask<image::MaskPixel> > itncFunctor(*(imageToNotConvolve.getMask())); 
  
-    int nCleanFootprints = 0;
-    while ( (nCleanFootprints < minimumCleanFootprints) and (footprintDetectionThreshold > minimumDetectionThreshold) ) {
+    int nCleanFp = 0;
+    while ( (nCleanFp < minCleanFp) and (detThreshold > detThresholdMin) ) {
         footprintListIn.clear();
         footprintListOut.clear();
         
         // Find detections
         lsst::afw::detection::DetectionSet<ImageT> 
-            detectionSet(imageToConvolve, lsst::afw::detection::Threshold(footprintDetectionThreshold, 
-                                                                          lsst::afw::detection::Threshold::VALUE));
+            //detectionSet(imageToConvolve, lsst::afw::detection::Threshold(footprintDetectionThreshold, 
+            //lsst::afw::detection::Threshold::VALUE));
+            detectionSet(imageToConvolve, lsst::afw::detection::Threshold(detThreshold, 
+                                                                          lsst::afw::detection::Threshold::STDEV));
         
         // Get the associated footprints
         footprintListIn = detectionSet.getFootprints();
         logging::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                           "Found %d total footprints above threshold %.3f",
-                           footprintListIn.size(), footprintDetectionThreshold);
+                           "Found %d total footprints above threshold %.3f sigma",
+                           footprintListIn.size(), detThreshold);
 
         // Iterate over footprints, look for "good" ones
-        nCleanFootprints = 0;
+        nCleanFp = 0;
         for (std::vector<lsst::afw::detection::Footprint::Ptr>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
 
             // footprint has not enough pixels 
-            if (static_cast<unsigned int>((*i)->getNpix()) < footprintDiffimNpixMin) {
+            if (static_cast<unsigned int>((*i)->getNpix()) < fpNpixMin) {
                 continue;
             }
             
             // footprint has too many
-            if (static_cast<unsigned int>((*i)->getNpix()) > footprintDiffimNpixMax) {
+            if (static_cast<unsigned int>((*i)->getNpix()) > fpNpixMax) {
                 continue;
             } 
             
@@ -1172,11 +1174,11 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
                                (*i)->getBBox().getY0(), (*i)->getBBox().getY1());
 
             logging::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                               "Grow by : %d", footprintDiffimGrow);
+                               "Grow by : %d pixels", fpGrowPix);
 
             // Grow the footprint
             lsst::afw::detection::Footprint::Ptr fpGrow = 
-                lsst::afw::detection::growFootprint(*i, footprintDiffimGrow);
+                lsst::afw::detection::growFootprint(*i, fpGrowPix);
             
             logging::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                                "Footprint out : %d,%d -> %d,%d",
@@ -1210,14 +1212,14 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 
             // If we get this far, we have a clean footprint
             footprintListOut.push_back(fpGrow);
-            nCleanFootprints += 1;
+            nCleanFp += 1;
         }
         
-        footprintDetectionThreshold *= detectionThresholdScaling;
+        detThreshold *= detThresholdScaling;
     }
     logging::TTrace<3>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                        "Found %d clean footprints above threshold %.3f",
-                       footprintListOut.size(), footprintDetectionThreshold/detectionThresholdScaling);
+                       footprintListOut.size(), detThreshold/detThresholdScaling);
     
     return footprintListOut;
 }

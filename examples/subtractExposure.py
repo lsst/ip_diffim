@@ -40,16 +40,14 @@ def subtractExposure(templateExposure, scienceExposure, policy):
     assert (templateMaskedImage.getDimensions() == scienceMaskedImage.getDimensions())
 
     # Subtract their MaskedImages
-    differenceMaskedImage, spatialKernel, backgroundModel, SdqaList = subtractMaskedImage(templateMaskedImage,
+    differenceMaskedImage, spatialKernel, backgroundModel, sdqaList = subtractMaskedImage(templateMaskedImage,
                                                                                           scienceMaskedImage,
                                                                                           policy)
     # Note : we assume that the Template is warped to the science image's WCS
     #      : meaning that the scienceWcs is the correct one to store in the diffim
     differenceExposure = afwImage.ExposureF(differenceMaskedImage, scienceWcs)
 
-    # What kind of metadata do we add here to Exposure?
-    
-    return differenceExposure, spatialKernel, backgroundModel, SdqaList
+    return differenceExposure, spatialKernel, backgroundModel, sdqaList
 
 
 def main():
@@ -112,7 +110,7 @@ Notes:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
-    differenceExposure, spatialKernel, backgroundModel, SdqaList = subtractExposure(templateExposure,
+    differenceExposure, spatialKernel, backgroundModel, sdqaList = subtractExposure(templateExposure,
                                                                                     scienceExposure,
                                                                                     policy)
     differenceExposure.writeFits(outputPath)
