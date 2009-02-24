@@ -203,19 +203,6 @@ namespace diffim {
 
     }; // end of class
 
-    /**
-     * @brief Class for sorting spatial models based on their cell rating
-     */
-    template <typename ImageT>
-    class cmpSpatialModels {
-    public:
-        bool operator() (boost::shared_ptr<SpatialModelKernel<ImageT> > sm1,
-                         boost::shared_ptr<SpatialModelKernel<ImageT> > sm2) const
-            {
-                return (sm1->returnCellRating() < sm2->returnCellRating());
-            }
-    }; 
-
 
 }}}
 

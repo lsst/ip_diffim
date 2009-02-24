@@ -20,7 +20,6 @@
 #include <lsst/afw/image/Mask.h>
 
 #include <lsst/ip/diffim/SpatialModelBase.h>
-#include <lsst/ip/diffim/SpatialModelKernel.h>
 
 namespace lsst {
 namespace ip {
@@ -47,8 +46,7 @@ namespace diffim {
         
         /** Typedefs 
          */
-        //typedef typename SpatialModelBase<ImageT>::Ptr SpatialModel;
-        typedef typename SpatialModelKernel<ImageT>::Ptr SpatialModel;
+        typedef typename SpatialModelBase<ImageT>::Ptr SpatialModel;
         typedef std::vector<SpatialModel> ModelPtrList;
 
         /** Constructor

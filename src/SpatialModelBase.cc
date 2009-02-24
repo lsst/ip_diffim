@@ -31,4 +31,7 @@ SpatialModelBase<ImageT>::SpatialModelBase() :
 template class SpatialModelBase<float>;
 template class SpatialModelBase<double>;
 
+template class cmpSpatialModels<float>;
+template class cmpSpatialModels<double>;
+
 }}} // end of namespace lsst::ip::diffim

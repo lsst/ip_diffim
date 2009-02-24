@@ -19,7 +19,6 @@
 
 #include <lsst/ip/diffim/SpatialModelCell.h>
 #include <lsst/ip/diffim/SpatialModelBase.h>
-#include <lsst/ip/diffim/SpatialModelKernel.h>
 
 namespace lsst {
 namespace ip {
@@ -77,10 +76,13 @@ void SpatialModelCell<ImageT>::_orderModels() {
  * 
  * @note Optionally, if all models are *really* bad (this needs to
  * defined) set Cell as fixed with ID=-1
+ *
+ * @note For now lets just make it bad
  */
 template <typename ImageT>
 void SpatialModelCell<ImageT>::selectBestModel(bool fix) {
     bool found = false;
+    /*
     for (int i = 0; i < this->_nModels; i++) {
         if (this->_modelPtrList[i]->isGood()) {
             this->setCurrentID(i);
@@ -89,6 +91,7 @@ void SpatialModelCell<ImageT>::selectBestModel(bool fix) {
             break;
         }
     }
+    */
 
     if (found == false) {
         this->_currentID    = -1;

@@ -230,8 +230,5 @@ double SpatialModelKernel<ImageT>::returnCellRating() {
 template class SpatialModelKernel<float>;
 template class SpatialModelKernel<double>;
 
-template class cmpSpatialModels<float>;
-template class cmpSpatialModels<double>;
-
 }}} // end of namespace lsst::ip::diffim
 

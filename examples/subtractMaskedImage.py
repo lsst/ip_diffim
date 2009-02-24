@@ -61,10 +61,12 @@ def subtractMaskedImage(templateMaskedImage, scienceMaskedImage, policy, fpList=
             # Make the decision on how many components to use
             eFrac  = numpy.cumsum(eVal)
             eFrac /= eFrac[-1]
-            nEval  = len(numpy.where(eFrac > fracEigenVal))
-            nEval  = min(minPrincipalComponents, len(eKernelVector))
+            nEval  = len(numpy.where(eFrac < fracEigenVal)[0])
+            print 'A', nEval
             nEval  = min(nEval, maxPrincipalComponents)
+            print 'B', nEval
             nEval  = max(nEval, minPrincipalComponents)
+            print 'C', nEval
 
             # do spatial fit here by Principal Component
             sKernel, bgFunction = ipDiffim.spatialModelByPca(spatialCells,

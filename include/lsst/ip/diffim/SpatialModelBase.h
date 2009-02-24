@@ -140,6 +140,19 @@ namespace diffim {
 
     }; // end of class
     
+    /**
+     * @brief Class for sorting spatial models based on their cell rating
+     */
+    template <typename ImageT>
+    class cmpSpatialModels {
+    public:
+        bool operator() (boost::shared_ptr<SpatialModelBase<ImageT> > sm1,
+                         boost::shared_ptr<SpatialModelBase<ImageT> > sm2) const
+            {
+                return (sm1->returnCellRating() < sm2->returnCellRating());
+            }
+    }; 
+
 }}}
 
 #endif // LSST_IP_DIFFIM_SPATIALMODELBASE_H

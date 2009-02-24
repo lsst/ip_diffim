@@ -944,7 +944,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     bool invert
     ) {
     
-    logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
+    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
                        "Convolving using convolve");
     
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
@@ -985,7 +985,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     bool invert
     ) {
     
-    logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
+    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
                        "Convolving using convolveLinear");
     
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
@@ -1025,7 +1025,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     bool invert
     ) {
     
-    logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
+    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
                        "Convolving using convolve and spatially varying background");
     
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
@@ -1066,7 +1066,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     bool invert
     ) {
     
-    logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
+    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
                        "Convolving using convolveLinear and spatially varying background");
     
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");

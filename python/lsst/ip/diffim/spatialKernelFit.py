@@ -172,14 +172,11 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
 
         # Find quality of difference image
         imStats.apply(diffIm)
+        rejected = False
         if (imStats.evaluateQuality(policy) == False):
             if (reject == True):
-                # This is only bad in the context of the spatial model
-                # May be needed in the future
-                #
-                # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)
-                spatialCells[ idList[idx] ].incrementModel()
                 nRejected += 1
+                rejected   = True
 
                 label = 'Rejected:'
             else:
@@ -195,6 +192,14 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
               (spatialCells[ idList[idx] ].getLabel(),
                spatialCells[ idList[idx] ].getCurrentModel().getID(),
                label, imStats.getMean(), imStats.getRms()))
+        # So the trace statements are in a reasonable order
+        if rejected:
+            # This is only bad in the context of the spatial model
+            # May be needed in the future
+            #
+            # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)
+            spatialCells[ idList[idx] ].incrementModel()
+            
 
     Trace('lsst.ip.diffim.evaluateModelByPixel', 3,
           'Spatial model by pixel : %d / %d Kernels acceptable' % (nGood, nCells))
@@ -208,92 +213,6 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
 #                                             )
 
     return nRejected, sdqaList
-
-def evaluateModelByPixel_deprecated(spatialCells, bgFunction, pFunctionList, policy, reject=True):
-    # This version makes a kernel image pixel-by-pixel.  Instead make
-    # a spatially varying LinearCombinationKernel.
-    
-    kCols          = policy.get('kernelCols')
-    kRows          = policy.get('kernelRows')
-
-    nRejected = 0
-    
-    idList   = []
-    for scID, scPtr in enumerate(spatialCells):
-        # Is the cell usable at all?
-        if not scPtr.isUsable():
-            continue
-        # Is the contained model usable?
-        if scPtr.getCurrentModel().getSdqaStatus():
-            idList.append( scID )
-            
-    nCells = len(idList)
-
-    # common to all spatial fits; position of constraints
-    cCol = numpy.zeros(nCells)
-    cRow = numpy.zeros(nCells)
-    for idx in range(nCells):
-        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColc()
-        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowc()
-    
-    # Evaluate all the fits at the positions of the objects, create a
-    # new kernel, then difference image, the calculate difference
-    # image stats
-    for idx in range(nCells):
-        bgValue = bgFunction(cCol[idx], cRow[idx])
-
-        # Create image representing Kernel, and then a Fixed Kernel from it
-        np = 0
-        kImage  = afwImage.ImageD(kCols, kRows)
-        for kRow in range(kRows):
-            for kCol in range(kCols):
-                pValue = pFunctionList[np](cCol[idx], cRow[idx])
-                kImage.set(kCol, kRow, pValue)
-                np += 1
-        kernel = afwMath.FixedKernel(kImage)
-
-        #if policy.get('debugIO'):
-        #    kImage.writeFits('skImage1_%d.fits' % (idx))
-        #    spatialCells[ idList[idx] ].getCurrentModel().getKernelPtr().computeNewImage(False)[0].writeFits('kImage_%d.fits' % (idx))
-        
-        # Create difference image using Kernel model
-        diffIm = diffimLib.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr(),
-                                               spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr(),
-                                               kernel, bgValue)
-
-        # Find quality of difference image
-        diffImStats = diffimLib.DifferenceImageStatisticsF(diffIm)
-        if (diffImStats.evaluateQuality(policy) == False):
-            if (reject == True):
-                # This is only bad in the context of the spatial model
-                # May be needed in the future
-                #
-                # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)                
-                spatialCells[ idList[idx] ].incrementModel()
-                nRejected += 1
-
-                label = 'Rejected:'
-            else:
-                label = 'Poor'
-        else:
-            label = 'OK'
-
-        Trace('lsst.ip.diffim.evaluateModelByPixel', 5,
-              '%s Kernel %d : %s Spatial residuals = %.2f +/- %.2f sigma' %
-              (spatialCells[ idList[idx] ].getLabel(),
-               spatialCells[ idList[idx] ].getCurrentModel().getID(),
-               label, diffImStats.getResidualMean(), diffImStats.getResidualStd()))
-
-#        if policy.get('debugPlot') == True:
-#            ipDiffimDebug.plotDiffImQuality1(goodDifiList[i],
-#                                             diffIm,
-#                                             kernelPtr,
-#                                             label='Spatial %s kernel %d' % (label, goodDifiList[i].getID()),
-#                                             outfile='SKernel_%s%d.ps' % (label, goodDifiList[i].getID())
-#                                             )
-
-    return nRejected
-
 
 ################
 ################
@@ -475,14 +394,11 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
 
         # Find quality of difference image
         imStats.apply(diffIm)
+        rejected = False
         if (imStats.evaluateQuality(policy) == False):
             if (reject == True):
-                # This is only bad in the context of the spatial model
-                # May be needed in the future
-                #
-                # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)                
-                spatialCells[ idList[idx] ].incrementModel()
                 nRejected += 1
+                rejected   = True
 
                 label = 'Rejected:'
             else:
@@ -498,6 +414,13 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
               (spatialCells[ idList[idx] ].getLabel(),
                spatialCells[ idList[idx] ].getCurrentModel().getID(),
                label, imStats.getMean(), imStats.getRms()))
+        # So the trace statements are in a reasonable order
+        if rejected:
+            # This is only bad in the context of the spatial model
+            # May be needed in the future
+            #
+            # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)
+            spatialCells[ idList[idx] ].incrementModel()
         
     Trace('lsst.ip.diffim.evaluateModelByPca', 3,
           'Spatial model by PCA : %d / %d Kernels acceptable' % (nGood, nCells))
