@@ -72,30 +72,36 @@ namespace diffim {
      *
      * @ingroup diffim
      *
-     * @note Count the total flux within the footprint, excluding masked pixels
+     * @note Count the total flux within the image, excluding masked pixels
      * 
      * @note Still needs a background model to correct for
      *
      */
     template <typename ImageT>
-    class FindCounts : public lsst::afw::detection::FootprintFunctor<ImageT> {
+    class FindCounts {
     public:
-        FindCounts(ImageT const& mimage) : 
-            lsst::afw::detection::FootprintFunctor<ImageT>(mimage), _counts(0.) {;}
-        
-        void operator()(typename ImageT::xy_locator loc, ///< locator pointing at the pixel
-                        int x,                           ///< column-position of pixel
-                        int y                            ///< row-position of pixel
-            ) {
-            if ((*loc).mask() == 0)
-                _counts += (*loc).image();
-        }
-        
-        // Return the total counts
-        double getCounts() const { return _counts; }
-        
+        typedef typename lsst::afw::image::MaskedImage<ImageT>::x_iterator x_iterator;
+        FindCounts() : 
+            _counts(0.) {} ;
+        virtual ~FindCounts() {};
+
         // Clear the accumulator
         void reset() { _counts = 0.; }
+
+        // Count pixels
+        void apply(lsst::afw::image::MaskedImage<ImageT> const& image) {
+            reset();
+            for (int y = 0; y != image.getHeight(); ++y) {
+                for (x_iterator ptr = image.row_begin(y); ptr != image.row_end(y); ++ptr) {
+                    if ((*ptr).mask() == 0) {
+                        _counts += (*ptr).image();
+                    }
+                }
+            }
+        }
+
+        // Return the total counts
+        double getCounts() const { return _counts; }
         
     private:
         double _counts;
@@ -112,20 +118,28 @@ namespace diffim {
      * 
      */
     template <typename ImageT>
-    class ImageStatistics : public lsst::afw::detection::FootprintFunctor<ImageT> {
+    class ImageStatistics {
     public:
-        ImageStatistics(ImageT const& mimage) : 
-            lsst::afw::detection::FootprintFunctor<ImageT>(mimage), 
-            _xsum(0.), _x2sum(0.), _npix(0) {;}
-        
-        void operator()(typename ImageT::xy_locator loc, ///< locator pointing at the pixel
-                        int x,                           ///< column-position of pixel
-                        int y                            ///< row-position of pixel
-            ) {
-            if ((*loc).mask() == 0) {
-                _xsum  += (*loc).image() / sqrt((*loc).variance());
-                _x2sum += (*loc).image() * (*loc).image() / (*loc).variance();
-                _npix  += 1;
+        typedef typename lsst::afw::image::MaskedImage<ImageT>::x_iterator x_iterator;
+
+        ImageStatistics() : 
+            _xsum(0.), _x2sum(0.), _npix(0) {} ;
+        virtual ~ImageStatistics() {} ;
+
+        // Clear the accumulators
+        void reset() { _xsum = _x2sum = 0.; _npix = 0;}
+
+        // Work your magic
+        void apply(lsst::afw::image::MaskedImage<ImageT> const& image) {
+            reset();
+            for (int y = 0; y != image.getHeight(); ++y) {
+                for (x_iterator ptr = image.row_begin(y); ptr != image.row_end(y); ++ptr) {
+                    if ((*ptr).mask() == 0) {
+                        _xsum  += (*ptr).image() / sqrt((*ptr).variance());
+                        _x2sum += (*ptr).image() * (*ptr).image() / (*ptr).variance();
+                        _npix  += 1;
+                    }
+                }
             }
         }
         
@@ -137,18 +151,19 @@ namespace diffim {
         double getVariance() const { 
             return (_npix > 1) ? (_x2sum/_npix - _xsum/_npix * _xsum/_npix) * _npix/(_npix-1.) : std::numeric_limits<double>::quiet_NaN(); 
         }
+        // RMS
+        double getRms() const { 
+            return sqrt(getVariance());
+        }
         // Return the number of good pixels
         double getNpix() const { return _npix; }
 
         // Return Sdqa rating
         bool evaluateQuality(lsst::pex::policy::Policy const& policy) {
             if ( fabs(getMean())     > policy.getDouble("maximumFootprintResidualMean") ) return false;
-            if ( sqrt(getVariance()) > policy.getDouble("maximumFootprintResidualStd")  ) return false;
+            if ( getRms()            > policy.getDouble("maximumFootprintResidualStd")  ) return false;
             return true;
         }           
-
-        // Clear the accumulators
-        void reset() { _xsum = _x2sum = 0.; _npix = 0;}
         
     private:
         double _xsum;
@@ -337,7 +352,7 @@ namespace diffim {
             );
 
     protected:
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& _basisList; ///< List of Kernel basis functions
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> _basisList;        ///< List of Kernel basis functions
         double _background;                                                     ///< Differenaitl background estimate
         double _backgroundError;                                                ///< Uncertainty on background
         boost::shared_ptr<lsst::afw::math::Kernel> _kernel;                     ///< PSF matching kernel

@@ -18,7 +18,6 @@
 #include <boost/shared_ptr.hpp>
 
 #include <lsst/afw/image/Mask.h>
-#include <lsst/afw/detection/Footprint.h>
 
 #include <lsst/ip/diffim/SpatialModelBase.h>
 #include <lsst/ip/diffim/SpatialModelKernel.h>
@@ -52,16 +51,12 @@ namespace diffim {
         typedef typename SpatialModelKernel<ImageT>::Ptr SpatialModel;
         typedef std::vector<SpatialModel> ModelPtrList;
 
-        typedef std::vector<lsst::afw::detection::Footprint::Ptr> FpPtrList;
-        
         /** Constructor
          *
          * @param label  string representing "name" of cell
-         * @param fpPtrList  vector of pointers to footprints within the cell
          * @param modelPtrList  vector of pointers to models of the function you are fitting for
          */
         SpatialModelCell(std::string label,
-                         FpPtrList fpPtrList, 
                          ModelPtrList modelPtrList);
 
         /** Constructor
@@ -69,40 +64,24 @@ namespace diffim {
          * @param label  string representing "name" of cell
          * @param colC  effective location of column center of cell within overall MaskedImage
          * @param rowC  effective location of row center of cell within overall MaskedImage
-         * @param fpPtrList  vector of pointers to footprints within the cell
          * @param modelPtrList  vector of pointers to models of the function you are fitting for
          */
         SpatialModelCell(std::string label, int colC, int rowC, 
-                         FpPtrList fpPtrList,
                          ModelPtrList modelPtrList);
 
         /** Destructor
          */
         virtual ~SpatialModelCell() {;};
 
-        /** Get current footprint
-         */
-        lsst::afw::detection::Footprint::Ptr getCurrentFootprint() {return _fpPtrList[_currentID];};
-        
         /** Get current model
          */
         SpatialModel getCurrentModel() {return _modelPtrList[_currentID];};
-
-        /** Get footprint in list
-         * 
-         * @param i  index of footprint you want to retrieve
-         */
-        lsst::afw::detection::Footprint::Ptr getFootprint(int i);
 
         /** Get model in list
          * 
          * @param i  index of model you want to retrieve
          */
         SpatialModel getModel(int i);
-
-        /** Get vector of all footprints
-         */
-        FpPtrList getFootprints() {return _fpPtrList;};
 
         /** Get vector of all models
          */
@@ -151,23 +130,22 @@ namespace diffim {
         bool isFixed() {return _modelIsFixed;};
 
     private:
-        /** @todo Implement method _orderFootprints
+        /** @todo Implement method _orderModels
          */
-        void _orderFootprints();
+        void _orderModels();
 
         std::string _label;         ///< Name of cell for logging/trace
         int _colC;                  ///< Effective col position of cell in overall image
         int _rowC;                  ///< Effective row position of cell in overall image
 
-        FpPtrList _fpPtrList;       ///< List of footprints in cell
-        ModelPtrList _modelPtrList; ///< List of models associated with the footprints
+        ModelPtrList _modelPtrList; ///< List of models associated with the cell
 
-        int _nModels;               ///< Number of entries; len(_fpPtrList)
+        int _nModels;               ///< Number of entries; len(_modelPtrList)
         int _currentID;             ///< Which entry is being used; 0 <= _currentID < _nModels
         bool _modelIsFixed;         ///< Use model _currentID no matter what
 
     }; // end of class
- 
+
 }}}
 
 #endif // LSST_IP_DIFFIM_SPATIALMODELCELL_H

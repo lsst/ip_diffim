@@ -88,6 +88,12 @@ namespace diffim {
          */
         double returnSdqaRating(lsst::pex::policy::Policy &policy);
 
+        /** Return Cell rating
+         * 
+         * Overrides virtual function of base class
+         */
+        double returnCellRating();
+
         /** Get Footprint pointer for the Kernel model
          */
         lsst::afw::detection::Footprint::Ptr const& getFootprintPtr() const {return _fpPtr;};
@@ -166,25 +172,25 @@ namespace diffim {
 
         /** Set class instance associated with residuals in the derived difference image
          *
-         * @param kStats  Pointer to instance of FootprintFunctor ImageStatistics class
+         * @param kStats  Pointer to instance of ImageStatistics class
          *
          * @note Ideally will be replaced by Sdqa
          *
          * @note Has to be a pointer since there is no empty constructor of FootprintFunctor
          */
-        void setStats(boost::shared_ptr<ImageStatistics<lsst::afw::image::MaskedImage<ImageT> > > kStats) {_kStats = kStats;};
+        void setStats(boost::shared_ptr<ImageStatistics<ImageT> > kStats) {_kStats = kStats;};
         /** Get class instance associated with residuals in the derived difference image
          */
-        boost::shared_ptr<ImageStatistics<lsst::afw::image::MaskedImage<ImageT> > > getStats() {return _kStats;};
+        boost::shared_ptr<ImageStatistics<ImageT> > getStats() {return _kStats;};
 
     private: 
         /** Objects needed to build itself; only initializable during construction
          */
-        lsst::afw::detection::Footprint::Ptr const& _fpPtr; ///< Footprint containing pixels used to build Kernel
-        MaskedImagePtr const& _miToConvolvePtr;             ///< Subimage around which you build kernel
-        MaskedImagePtr const& _miToNotConvolvePtr;          ///< Subimage around which you build kernel
-        boost::shared_ptr<PsfMatchingFunctor<ImageT> > const& _kFunctor; ///< Functor to build PSF matching kernel
-        lsst::pex::policy::Policy const& _policy;           ///< Policy file for operations
+        lsst::afw::detection::Footprint::Ptr _fpPtr; ///< Footprint containing pixels used to build Kernel
+        MaskedImagePtr _miToConvolvePtr;             ///< Subimage around which you build kernel
+        MaskedImagePtr _miToNotConvolvePtr;          ///< Subimage around which you build kernel
+        boost::shared_ptr<PsfMatchingFunctor<ImageT> > _kFunctor; ///< Functor to build PSF matching kernel
+        lsst::pex::policy::Policy _policy;           ///< Policy file for operations
 
         /** Results from single Kernel model
          */
@@ -193,10 +199,23 @@ namespace diffim {
         double _kSum;                                        ///< Kernel sum
         double _bg;                                          ///< Differential background value
         double _bgErr;                                       ///< Uncertainty in background
-        boost::shared_ptr<ImageStatistics<lsst::afw::image::MaskedImage<ImageT> > > _kStats; 
-                                                             ///< Home-grown statistics; placeholder for Sdqa
+        boost::shared_ptr<ImageStatistics<ImageT> > _kStats; ///< Home-grown statistics; placeholder for Sdqa
 
     }; // end of class
+
+    /**
+     * @brief Class for sorting spatial models based on their cell rating
+     */
+    template <typename ImageT>
+    class cmpSpatialModels {
+    public:
+        bool operator() (boost::shared_ptr<SpatialModelKernel<ImageT> > sm1,
+                         boost::shared_ptr<SpatialModelKernel<ImageT> > sm2) const
+            {
+                return (sm1->returnCellRating() < sm2->returnCellRating());
+            }
+    }; 
+
 
 }}}
 

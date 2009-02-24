@@ -5,6 +5,9 @@ import lsst.afw.image as afwImage
 import lsst.pex.exceptions as Exceptions
 from   lsst.pex.logging import Trace
 
+# for DM <-> numpy conversions
+import lsst.afw.image.testUtils as imTestUtils
+
 # relative imports, since these are in __init__.py
 import diffimLib 
 import diffimDebug
@@ -131,8 +134,6 @@ def createSpatialModelKernelCells(templateMaskedImage,
             rowCenter  = int( 0.5 * (rowMin + rowMax) )
             label      = 'c%d' % cellCount
 
-            fpCellList = detection.FootprintContainerT()
-
             # NOTE : ideally we want this to be a vector of the base
             # class, not derived class.  Swig is making this difficult
             # right now tho.
@@ -150,7 +151,6 @@ def createSpatialModelKernelCells(templateMaskedImage,
                 fpRowC = 0.5 * (fpBBox.getY0() + fpBBox.getY1())
 
                 if (fpColC >= colMin) and (fpColC < colMax) and (fpRowC >= rowMin) and (fpRowC < rowMax):
-                    fpCellList.push_back(fpPtr)
 
                     tSubImage = afwImage.MaskedImageF(templateMaskedImage, fpBBox)
                     iSubimage = afwImage.MaskedImageF(scienceMaskedImage, fpBBox)
@@ -160,21 +160,12 @@ def createSpatialModelKernelCells(templateMaskedImage,
                                                           kFunctor,
                                                           policy,
                                                           False)
-                    print 'caw0', tSubImage
-                    foo = model.getMiToConvolvePtr()
-                    print 'caw1', foo
-                    
                     if policy.get('debugIO'):
                         diffimDebug.writeDiffImages(cFlag, '%s_%d' % (label, fpID), model)
                         
                     modelList.push_back( model )
 
-            for i in range(modelList.size()):
-                m   = modelList[i]
-                foo = m.getMiToConvolvePtr()
-                print 'caw2', foo
-                
-            spatialCell = diffimLib.SpatialModelCellF(label, colCenter, rowCenter, fpCellList, modelList)
+            spatialCell = diffimLib.SpatialModelCellF(label, colCenter, rowCenter, modelList)
             spatialCells.push_back(spatialCell)
 
             # Formatting to the screen 
@@ -262,3 +253,28 @@ def runPca(M, policy):
         assert(numpy.sum(residual) < 1e-10)
 
     return meanM, U, eVal, eCoeff
+
+
+#######
+# Expansions of functionality found in imTestUtils
+#######
+
+def vectorFromImage(im, dtype=float):
+    vec = numpy.zeros(im.getWidth()*im.getHeight(), dtype=dtype)
+    idx = 0
+    for row in range(im.getHeight()):
+        for col in range(im.getWidth()):
+            vec[idx] = im.get(col, row)
+            idx     += 1
+    return vec
+
+def imageFromVector(vec, width, height, retType=afwImage.ImageF):
+    im  = retType(width, height)
+    idx = 0
+    for row in range(height):
+        for col in range(width):
+            # need to cast numpy.float64 as float
+            im.set(col, row, float(vec[idx]))
+            idx     += 1
+    return im
+

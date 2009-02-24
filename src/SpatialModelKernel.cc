@@ -66,12 +66,12 @@ SpatialModelKernel<ImageT>::SpatialModelKernel(
     _miToNotConvolvePtr(miToNotConvolvePtr),
     _kFunctor(kFunctor),
     _policy(policy),
-    _kPtr(boost::shared_ptr<math::Kernel>()),
-    _kErrPtr(boost::shared_ptr<math::Kernel>()),
+    _kPtr(),
+    _kErrPtr(),
     _kSum(0.),
     _bg(0.),
     _bgErr(0.),
-    _kStats(boost::shared_ptr<ImageStatistics<image::MaskedImage<ImageT> > >())
+    _kStats()
 {
     if (build == true) {
         this->buildModel();
@@ -80,14 +80,6 @@ SpatialModelKernel<ImageT>::SpatialModelKernel(
 
 template <typename ImageT>
 bool SpatialModelKernel<ImageT>::buildModel() {
-
-    logging::TTrace<1>("lsst.ip.diffim.PsfMatchingFunctor.apply",
-                       "CAW B");
-    image::MaskedImage<ImageT> foo = *(this->_miToConvolvePtr);
-    image::Image<ImageT> foo2      = *(foo.getImage());
-    typename lsst::afw::image::Image<ImageT>::xy_locator loc = foo2.xy_at(1, 1);
-    logging::TTrace<1>("lsst.ip.diffim.PsfMatchingFunctor.apply",
-                       "CAW B %f", 1.0 * *loc);
 
     if (this->getBuildStatus() == true) {
         return false;
@@ -147,22 +139,16 @@ bool SpatialModelKernel<ImageT>::buildModel() {
                                                              background);
 
     // Find statistics of difference image 
-    boost::shared_ptr<diffim::ImageStatistics<image::MaskedImage<ImageT> > > kStats = 
-        boost::shared_ptr<diffim::ImageStatistics<image::MaskedImage<ImageT> > > (
-            new diffim::ImageStatistics<image::MaskedImage<ImageT> >(diffIm)
+    boost::shared_ptr<diffim::ImageStatistics<ImageT> > kStats = 
+        boost::shared_ptr<diffim::ImageStatistics<ImageT> > (
+            new diffim::ImageStatistics<ImageT>()
             );
-    detection::Footprint fp(
-        image::BBox(image::PointI(0,0), 
-                    diffIm.getWidth(),
-                    diffIm.getHeight()
-            )
-        );
-    (*kStats).apply(fp);
+    (*kStats).apply(diffIm);
     logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                        "Kernel pass 1 : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
                        kSum, background, backgroundError,
                        (*kStats).getMean(),
-                       sqrt((*kStats).getVariance()));
+                       (*kStats).getRms());
 
     // A second pass with a better variance estimate from first difference image
     bool iterateKernel = this->_policy.getBool("iterateKernel");
@@ -188,18 +174,14 @@ bool SpatialModelKernel<ImageT>::buildModel() {
                                            *(kernelPtr), 
                                            background);
 
-            // Reset image
-            kStats = 
-                boost::shared_ptr<diffim::ImageStatistics<image::MaskedImage<ImageT> > > (
-                    new diffim::ImageStatistics<image::MaskedImage<ImageT> >(diffIm)
-                    );
-            (*kStats).apply(fp);
+            // Reset the image its looking at
+            (*kStats).apply(diffIm);
 
             logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                                "Kernel pass 2 : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
                                kSum, background, backgroundError,
                                (*kStats).getMean(),
-                               sqrt((*kStats).getVariance()));
+                               (*kStats).getRms());
             
         } catch (exceptions::Exception& e) {
             logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
@@ -224,7 +206,7 @@ bool SpatialModelKernel<ImageT>::buildModel() {
                        "Kernel : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
                        this->_kSum, background, backgroundError,
                        this->_kStats->getMean(),
-                       sqrt(this->_kStats->getVariance()));
+                       this->_kStats->getRms());
 
 
     // Return quality of the kernel
@@ -236,9 +218,20 @@ double SpatialModelKernel<ImageT>::returnSdqaRating(lsst::pex::policy::Policy &p
     return this->_kStats->evaluateQuality(policy);
 }
 
+template <typename ImageT>
+double SpatialModelKernel<ImageT>::returnCellRating() {
+    // Currently, just check the total flux in the template image
+    FindCounts<ImageT> counter;
+    counter.apply(*(this->_miToConvolvePtr));
+    return counter.getCounts();
+}
+
 // Explicit instantiations
 template class SpatialModelKernel<float>;
 template class SpatialModelKernel<double>;
+
+template class cmpSpatialModels<float>;
+template class cmpSpatialModels<double>;
 
 }}} // end of namespace lsst::ip::diffim
 

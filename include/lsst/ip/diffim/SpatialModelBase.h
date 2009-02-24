@@ -84,6 +84,13 @@ namespace diffim {
          */
         virtual double returnSdqaRating(lsst::pex::policy::Policy &policy) = 0;
 
+        /** Return Cell rating
+         * 
+         * Virtual function that must be overridden by derived class; allows it
+         * to be ranked within its cell.
+         */
+        virtual double returnCellRating() = 0;
+
         /** Set its build status
          *
          * @param built  Boolean status of build
@@ -132,7 +139,7 @@ namespace diffim {
 
 
     }; // end of class
-
+    
 }}}
 
 #endif // LSST_IP_DIFFIM_SPATIALMODELBASE_H

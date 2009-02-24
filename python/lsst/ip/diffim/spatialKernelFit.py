@@ -44,8 +44,8 @@ def spatialModelByPixel(spatialCells, policy):
     cCol = numpy.zeros(nCells)
     cRow = numpy.zeros(nCells)
     for idx in range(nCells):
-        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColcNorm()
-        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowcNorm()
+        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColc()
+        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowc()
 
     # fit the background
     bgValues = numpy.zeros(nCells)
@@ -72,8 +72,16 @@ def spatialModelByPixel(spatialCells, policy):
     for idx in range(nCells):
         kPtr    = spatialCells[ idList[idx] ].getCurrentModel().getKernelPtr()
         kErrPtr = spatialCells[ idList[idx] ].getCurrentModel().getKernelErrPtr()
-        kImages.append( kPtr.computeNewImage(False)[0] )
-        kErrImages.append( kErrPtr.computeNewImage(False)[0] )
+
+        # pretty sure kernels are double
+        kImage    = afwImage.ImageD(kPtr.getDimensions())
+        kErrImage = afwImage.ImageD(kErrPtr.getDimensions())
+
+        kPtr.computeImage(kImage, False)
+        kErrPtr.computeImage(kErrImage, False)
+        
+        kImages.append( kImage )
+        kErrImages.append( kErrImage )
     
     
     np = 0
@@ -143,28 +151,26 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
     cCol = numpy.zeros(nCells)
     cRow = numpy.zeros(nCells)
     for idx in range(nCells):
-        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColcNorm()
-        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowcNorm()
+        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColc()
+        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowc()
     
     # Evaluate all the fits at the positions of the objects, create a
     # new kernel, then difference image, the calculate difference
     # image stats
+    imStats = diffimLib.ImageStatisticsF()
+
     for idx in range(nCells):
         bgValue = bgFunction(cCol[idx], cRow[idx])
-        sImage  = sKernel.computeNewImage(False, cCol[idx], cRow[idx])[0]
-
-        #if policy.get('debugIO'):
-        #    sImage.writeFits('skImage_%d.fits' % (idx))
-            
+        sImage  = afwImage.ImageD(sKernel.getDimensions())
+        sKernel.computeImage(sImage, False, cCol[idx], cRow[idx])
         kernel  = afwMath.FixedKernel(sImage)
-        # Create difference image using Kernel model
-        diffIm  = diffim.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr().get(),
-                                             spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr().get(),
+        diffIm  = diffim.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr(),
+                                             spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr(),
                                              kernel, bgValue)
 
         # Find quality of difference image
-        diffImStats = diffimLib.DifferenceImageStatisticsF(diffIm)
-        if (diffImStats.evaluateQuality(policy) == False):
+        imStats.apply(diffIm)
+        if (imStats.evaluateQuality(policy) == False):
             if (reject == True):
                 # This is only bad in the context of the spatial model
                 # May be needed in the future
@@ -184,7 +190,7 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
               '%s Kernel %d : %s Spatial residuals = %.2f +/- %.2f sigma' %
               (spatialCells[ idList[idx] ].getLabel(),
                spatialCells[ idList[idx] ].getCurrentModel().getID(),
-               label, diffImStats.getResidualMean(), diffImStats.getResidualStd()))
+               label, imStats.getResidualMean(), imStats.getResidualStd()))
 
     Trace('lsst.ip.diffim.evaluateModelByPixel', 3,
           'Spatial model by pixel : %d / %d Kernels acceptable' % (nGood, nCells))
@@ -223,8 +229,8 @@ def evaluateModelByPixel_deprecated(spatialCells, bgFunction, pFunctionList, pol
     cCol = numpy.zeros(nCells)
     cRow = numpy.zeros(nCells)
     for idx in range(nCells):
-        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColcNorm()
-        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowcNorm()
+        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColc()
+        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowc()
     
     # Evaluate all the fits at the positions of the objects, create a
     # new kernel, then difference image, the calculate difference
@@ -247,8 +253,8 @@ def evaluateModelByPixel_deprecated(spatialCells, bgFunction, pFunctionList, pol
         #    spatialCells[ idList[idx] ].getCurrentModel().getKernelPtr().computeNewImage(False)[0].writeFits('kImage_%d.fits' % (idx))
         
         # Create difference image using Kernel model
-        diffIm = diffimLib.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr().get(),
-                                               spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr().get(),
+        diffIm = diffimLib.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr(),
+                                               spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr(),
                                                kernel, bgValue)
 
         # Find quality of difference image
@@ -291,8 +297,7 @@ def evaluateModelByPixel_deprecated(spatialCells, bgFunction, pFunctionList, pol
 ################
 ################
 
-def spatialModelKernelPca(spatialCells, policy, id):
-    from lsst.ip.diffim.runPca import runPca
+def spatialModelKernelPca(spatialCells, policy, id=''):
 
     kCols = policy.get('kernelCols')
     kRows = policy.get('kernelRows')
@@ -311,29 +316,33 @@ def spatialModelKernelPca(spatialCells, policy, id):
     # matrix to invert
     M = numpy.zeros((kCols*kRows, nCells))
     for idx in range(nCells):
-        kernelImage  = spatialCells[ idList[idx] ].getCurrentModel().getKernelPtr().computeNewImage(False)[0]
-        M[:,idx]     = diffimTools.imageToVector(kernelImage)
+        kPtr         = spatialCells[ idList[idx] ].getCurrentModel().getKernelPtr()
+        kImage       = afwImage.ImageD(kPtr.getDimensions())
+        kPtr.computeImage(kImage, False)
+        M[:,idx]     = diffimTools.vectorFromImage(kImage)
 
     # Call numpy Pca
-    meanM, U, eVal, eCoeff = runPca(M, policy)
+    meanM, U, eVal, eCoeff = diffimTools.runPca(M, policy)
 
-    # Turn principal components into Kernels
-    mKernel       = diffimTools.vectorToKernelPtr( meanM, kCols, kRows )
+    # Turn principal components into Kernels (which are double)
+    mImage  = diffimTools.imageFromVector(meanM, kCols, kRows, retType=afwImage.ImageD)
+    mKernel = afwMath.FixedKernel(mImage)
     if policy.get('debugIO'):
-        diffimTools.vectorToImage(meanM, kCols, kRows).writeFits('mKernel%s.fits' % (id))
+        mImage.writeFits('mKernel%s.fits' % (id))
 
     eKernelVector = afwMath.VectorKernel()
     for i in range(U.shape[1]):
-        eKernel   = diffimTools.vectorToKernelPtr( U[:,i], kCols, kRows )
+        eImage  = diffimTools.imageFromVector(U[:,i], kCols, kRows, retType=afwImage.ImageD)
+        eKernel = afwMath.FixedKernel(eImage)
         eKernelVector.append(eKernel)
 
         if policy.get('debugIO'):
-            diffimTools.vectorToImage(U[:,i], kCols, kRows).writeFits('eKernel%s_%d.fits' % (id, i))
+            eImage.writeFits('eKernel%s_%d.fits' % (id, i))
             
     return mKernel, eKernelVector, eVal, eCoeff
     
 
-def spatialModelByPca(spatialCells, eCoeffs, nEVal, policy, makeKernel=True):
+def spatialModelByPca(spatialCells, mKernel, eKernelVector, eCoeffs, nEVal, policy, makeKernel=True):
     kSpatialOrder  = policy.get('kernelSpatialOrder')
     bgSpatialOrder = policy.get('backgroundSpatialOrder')
     kCols          = policy.get('kernelCols')
@@ -354,8 +363,8 @@ def spatialModelByPca(spatialCells, eCoeffs, nEVal, policy, makeKernel=True):
     cCol = numpy.zeros(nCells)
     cRow = numpy.zeros(nCells)
     for idx in range(nCells):
-        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColcNorm()
-        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowcNorm()
+        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColc()
+        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowc()
 
     # fit the background
     bgValues = numpy.zeros(nCells)
@@ -442,23 +451,26 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
     cCol = numpy.zeros(nCells)
     cRow = numpy.zeros(nCells)
     for idx in range(nCells):
-        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColcNorm()
-        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowcNorm()
+        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColc()
+        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowc()
 
     # Evaluate all the fits at the positions of the objects, create a
     # new kernel, then difference image, the calculate difference
     # image stats
+    imStats = diffimLib.ImageStatisticsF()
+
     for idx in range(nCells):
         bgValue = bgFunction(cCol[idx], cRow[idx])
-        sImage  = eKernel.computeNewImage(False, cCol[idx], cRow[idx])[0]
-        kernel  = afwMath.FixedKernel(sImage)
-        diffIm  = diffimLib.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr().get(),
-                                                spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr().get(),
+        eImage  = afwImage.ImageD(eKernel.getDimensions())
+        eKernel.computeImage(eImage, False, cCol[idx], cRow[idx])
+        kernel  = afwMath.FixedKernel(eImage)
+        diffIm  = diffimLib.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr(),
+                                                spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr(),
                                                 kernel, bgValue)
 
         # Find quality of difference image
-        diffImStats = diffimLib.DifferenceImageStatisticsF(diffIm)
-        if (diffImStats.evaluateQuality(policy) == False):
+        imStats.apply(diffIm)
+        if (imStats.evaluateQuality(policy) == False):
             if (reject == True):
                 # This is only bad in the context of the spatial model
                 # May be needed in the future
@@ -478,7 +490,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
               '%s Kernel %d : %s Pca residuals = %.2f +/- %.2f sigma' %
               (spatialCells[ idList[idx] ].getLabel(),
                spatialCells[ idList[idx] ].getCurrentModel().getID(),
-               label, diffImStats.getResidualMean(), diffImStats.getResidualStd()))
+               label, imStats.getMean(), imStats.getRms()))
         
     Trace('lsst.ip.diffim.evaluateModelByPca', 3,
           'Spatial model by PCA : %d / %d Kernels acceptable' % (nGood, nCells))

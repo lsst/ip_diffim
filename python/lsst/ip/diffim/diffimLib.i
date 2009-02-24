@@ -62,6 +62,9 @@ namespace boost {
 %import  "lsst/afw/detection/detectionLib.i"
 %import  "lsst/afw/math/kernelLib.i"
 
+/* so SWIG knows that PolynomialFunction2D is derived from Function2 */
+%import  "lsst/afw/math/functionLib.i"  
+
 %lsst_exceptions();
 
 %pythoncode %{
@@ -138,14 +141,14 @@ SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<do
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
 
 %template(FindCountsF)
-    lsst::ip::diffim::FindCounts<lsst::afw::image::MaskedImage<float> >;
+    lsst::ip::diffim::FindCounts<float>;
 %template(FindCountsD)
-    lsst::ip::diffim::FindCounts<lsst::afw::image::MaskedImage<double> >;
+    lsst::ip::diffim::FindCounts<double>;
 
 %template(ImageStatisticsF)
-    lsst::ip::diffim::ImageStatistics<lsst::afw::image::MaskedImage<float> >;
+    lsst::ip::diffim::ImageStatistics<float>;
 %template(ImageStatisticsD)
-    lsst::ip::diffim::ImageStatistics<lsst::afw::image::MaskedImage<double> >;
+    lsst::ip::diffim::ImageStatistics<double>;
 
 %template(convolveAndSubtract)
     lsst::ip::diffim::convolveAndSubtract<float>;

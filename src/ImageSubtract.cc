@@ -2215,11 +2215,11 @@ template class diffim::PsfMatchingFunctorVw<double, float>;
 
 template class diffim::FindSetBits<image::Mask<> >;
 
-template class diffim::FindCounts<image::MaskedImage<float> >;
-template class diffim::FindCounts<image::MaskedImage<double> >;
+template class diffim::FindCounts<float>;
+template class diffim::FindCounts<double>;
 
-template class diffim::ImageStatistics<image::MaskedImage<float> >;
-template class diffim::ImageStatistics<image::MaskedImage<double> >;
+template class diffim::ImageStatistics<float>;
+template class diffim::ImageStatistics<double>;
 
 /* */
 

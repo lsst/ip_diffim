@@ -9,15 +9,17 @@
  * @ingroup ip_diffim
  */
 
+#include <algorithm>
+
 #include <lsst/afw/image/Mask.h>
 #include <lsst/afw/image/Image.h>
-#include <lsst/afw/detection/Footprint.h>
 
 #include <lsst/pex/exceptions/Exception.h>
 #include <lsst/pex/logging/Trace.h>
 
 #include <lsst/ip/diffim/SpatialModelCell.h>
 #include <lsst/ip/diffim/SpatialModelBase.h>
+#include <lsst/ip/diffim/SpatialModelKernel.h>
 
 namespace lsst {
 namespace ip {
@@ -26,18 +28,16 @@ namespace diffim {
 template <typename ImageT>
 SpatialModelCell<ImageT>::SpatialModelCell(
     std::string  label,
-    FpPtrList    fpPtrList,
     ModelPtrList modelPtrList) :
     _label(label),
     _colC(0),
     _rowC(0),
-    _fpPtrList(fpPtrList),
     _modelPtrList(modelPtrList),
-    _nModels(fpPtrList.size()),
+    _nModels(modelPtrList.size()),
     _currentID(-1),
     _modelIsFixed(false)
 {
-    SpatialModelCell(label, 0, 0, fpPtrList, modelPtrList);
+    SpatialModelCell(label, 0, 0, modelPtrList);
 }
 
 template <typename ImageT>
@@ -45,42 +45,29 @@ SpatialModelCell<ImageT>::SpatialModelCell(
     std::string  label,
     int          colC, 
     int          rowC, 
-    FpPtrList    fpPtrList,
     ModelPtrList modelPtrList) :
     _label(label),
     _colC(colC),
     _rowC(rowC),
-    _fpPtrList(fpPtrList),
     _modelPtrList(modelPtrList),
-    _nModels(fpPtrList.size()),
+    _nModels(modelPtrList.size()),
     _currentID(-1),
     _modelIsFixed(false)
 {
-    if (!(fpPtrList.size() == modelPtrList.size())) {
-        throw LSST_EXCEPT(lsst::pex::exceptions::Exception,
-                          "SpatialModelCell : footprint list and model list are not the same size");
-    }
     lsst::pex::logging::TTrace<3>("lsst.ip.diffim.SpatialModelCell.SpatialModelCell", 
                                   "Cell %s : created with %d models", this->_label.c_str(), this->_nModels);
 
-    std::cout << "CAW A" << fpPtrList.size() << " " << _fpPtrList.size() << std::endl;
-    std::cout << "CAW B" << modelPtrList.size() << " " << _modelPtrList.size() << std::endl;
-
-    for (int i = 0; i < this->_nModels; i++) {
-        std::cout << "CAW " << i << std::endl;
-        this->_modelPtrList[i]->buildModel();
-    }
-    //this->_orderFootprints();
-    //this->incrementModel();
+    this->_orderModels();
+    this->incrementModel();
 }
 
-/** Order footprints; currently this doesn't do anything
+/** Order models
  *
- * @note Synchronously modify fpPtrList and modelPtrList
  */
 template <typename ImageT>
-void SpatialModelCell<ImageT>::_orderFootprints() {
-    ;
+void SpatialModelCell<ImageT>::_orderModels() {
+    sort (this->_modelPtrList.begin(), this->_modelPtrList.end(), cmpSpatialModels<ImageT>());
+    reverse(this->_modelPtrList.begin(), this->_modelPtrList.end());
 }
 
 /** Select best model; if no good models, set Cell as fixed with ID=-1.
@@ -125,15 +112,6 @@ bool SpatialModelCell<ImageT>::isUsable() {
 }
 
 template <typename ImageT>
-lsst::afw::detection::Footprint::Ptr SpatialModelCell<ImageT>::getFootprint(int i) {
-    if ( (i < 0) || (i >= this->_nModels) ) {
-        throw LSST_EXCEPT(lsst::pex::exceptions::Exception, 
-                          "Index out of range");
-    }        
-    return this->_fpPtrList[i];
-}
-
-template <typename ImageT>
 typename SpatialModelCell<ImageT>::SpatialModel SpatialModelCell<ImageT>::getModel(int i) {
     if ( (i < 0) || (i >= this->_nModels) ) {
         throw LSST_EXCEPT(lsst::pex::exceptions::Exception, 
@@ -157,7 +135,7 @@ bool SpatialModelCell<ImageT>::incrementModel() {
         /* Its the first time through */
 
         if ((this->_nModels) == 0) {
-            /* There are 0 Footprints */
+            /* There are 0 Models */
             this->_modelIsFixed = true;
             return false;
         }
@@ -190,7 +168,7 @@ void SpatialModelCell<ImageT>::setCurrentID(int id) {
 
     this->_currentID = id;
     lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelCell.setCurrentID", 
-                                  "Cell %s : Building Footprint %d / %d", this->_label.c_str(), this->_currentID+1, this->_nModels);
+                                  "Cell %s : Building Model %d / %d", this->_label.c_str(), this->_currentID+1, this->_nModels);
 
     // If the model does not build for some reason, move on to the next model
     if (! (this->_modelPtrList[this->_currentID]->isBuilt()) )
