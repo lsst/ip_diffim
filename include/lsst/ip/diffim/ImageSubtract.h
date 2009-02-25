@@ -410,6 +410,25 @@ namespace diffim {
             );
     };
 
+    /** Add a spatially varying function to an Image
+     *
+     * @note Typically used to add a background Function to an Image
+     *
+     * @param image Image to add function to
+     * @param function  Function added to image
+     */
+    template <typename ImageT, typename FunctionT>
+    void addFunctionToImage(
+        lsst::afw::image::Image<ImageT> &image,
+        lsst::afw::math::Function2<FunctionT> const& function
+        );
+
+
+
+    // BELOW ARE LESS USEFUL / DEPRECATED PIECES OF CODE
+
+
+
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
      *
      * @param imageToConvolve  MaskedImage to convolve with Kernel
@@ -492,21 +511,6 @@ namespace diffim {
         lsst::pex::policy::Policy                     const& policy 
         );
 
-    /** Add a spatially varying function to an Image
-     *
-     * @note Typically used to add a background Function to an Image
-     *
-     * @param image Image to add function to
-     * @param function  Function added to image
-     */
-    template <typename ImageT, typename FunctionT>
-    void addFunctionToImage(
-        lsst::afw::image::Image<ImageT> &image,
-        lsst::afw::math::Function2<FunctionT> const& function
-        );
-
-
-    // BELOW ARE LESS USEFUL / DEPRECATED PIECES OF CODE
 
     /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
      *

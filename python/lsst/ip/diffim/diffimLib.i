@@ -145,21 +145,6 @@ SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<do
 %template(convolveAndSubtract)
     lsst::ip::diffim::convolveAndSubtract<double, double>;
 
-%template(computePsfMatchingKernelForFootprint)
-    lsst::ip::diffim::computePsfMatchingKernelForFootprint<float, float>;
-%template(computePsfMatchingKernelForFootprint)
-    lsst::ip::diffim::computePsfMatchingKernelForFootprint<double, float>;
-
-%template(computePsfMatchingKernelForFootprintEigen)
-    lsst::ip::diffim::computePsfMatchingKernelForFootprintEigen<float, float>;
-%template(computePsfMatchingKernelForFootprintEigen)
-    lsst::ip::diffim::computePsfMatchingKernelForFootprintEigen<double, float>;
-
-%template(computePsfMatchingKernelForFootprintVW)
-    lsst::ip::diffim::computePsfMatchingKernelForFootprintVW<float, float>;
-%template(computePsfMatchingKernelForFootprintVW)
-    lsst::ip::diffim::computePsfMatchingKernelForFootprintVW<double, float>;
-
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;
 %template(getCollectionOfFootprintsForPsfMatching)

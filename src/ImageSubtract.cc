@@ -1225,6 +1225,179 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 }
 
 /** 
+ * @brief Adds a Function to an Image
+ *
+ * @note MAJOR NOTE; I need to check if my scaling of the image range from -1 to
+ * 1 gets messed up here.  ACB.
+ *
+ * @ingroup diffim
+ */
+template <typename ImageT, typename FunctionT>
+void diffim::addFunctionToImage(
+    image::Image<ImageT> &image,
+    math::Function2<FunctionT> const& function
+    ) {
+
+    // Set the pixels row by row, to avoid repeated checks for end-of-row
+    for (int y = 0; y != image.getHeight(); ++y) {
+        double yPos = image::positionToIndex(y);
+        
+        int x = 0;
+        for (typename image::Image<ImageT>::x_iterator ptr = image.row_begin(y); 
+             ptr != image.row_end(y); ++ptr, ++x) {
+            
+            double xPos = image::positionToIndex(x);
+            *ptr += static_cast<ImageT>(function(xPos, yPos));
+
+        }
+    }
+}
+
+// GSL 
+/*
+void pseudoInverse(gsl_matrix * dest, const gsl_matrix * src) {
+    
+}
+
+void covariance(gsl_matrix * dest, const gsl_matrix * src) {
+    gsl_matrix *trans = gsl_matrix_alloc (src.size2, src.size1);
+    gsl_matrix_transpose_memcpy(trans, src);
+    // is this a bad idea? 
+    dest = gsl_matrix_alloc (src.size1, src.size2);
+    cblas_sgemm (CblasRowMajor, 
+                 CblasNoTrans, CblasNoTrans, 2, 2, 3,
+                 1.0, trans, nParameters, src, nParameters, 0.0, dest, nParameters);
+
+    
+}
+*/
+
+// Explicit instantiations
+
+template class diffim::PsfMatchingFunctor<float, float>;
+template class diffim::PsfMatchingFunctor<double, float>;
+template class diffim::PsfMatchingFunctorGsl<float, float>;
+template class diffim::PsfMatchingFunctorGsl<double, float>;
+template class diffim::PsfMatchingFunctorVw<float, float>;
+template class diffim::PsfMatchingFunctorVw<double, float>;
+
+template class diffim::FindSetBits<image::Mask<> >;
+
+template class diffim::FindCounts<float>;
+template class diffim::FindCounts<double>;
+
+template class diffim::ImageStatistics<float>;
+template class diffim::ImageStatistics<double>;
+
+/* */
+
+template 
+image::MaskedImage<float> diffim::convolveAndSubtract(
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    math::Kernel const& convolutionKernel,
+    double background,
+    bool invert);
+
+template 
+image::MaskedImage<double> diffim::convolveAndSubtract(
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    math::Kernel const& convolutionKernel,
+    double background,
+    bool invert);
+
+template 
+image::MaskedImage<float> diffim::convolveAndSubtract(
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    math::LinearCombinationKernel const& convolutionKernel,
+    double background,
+    bool invert);
+
+template 
+image::MaskedImage<double> diffim::convolveAndSubtract(
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    math::LinearCombinationKernel const& convolutionKernel,
+    double background,
+    bool invert);
+
+/* */
+
+template 
+image::MaskedImage<float> diffim::convolveAndSubtract(
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    math::Kernel const& convolutionKernel,
+    math::Function2<double> const& backgroundFunction,
+    bool invert);
+
+template 
+image::MaskedImage<double> diffim::convolveAndSubtract(
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    math::Kernel const& convolutionKernel,
+    math::Function2<double> const& backgroundFunction,
+    bool invert);
+
+
+template 
+image::MaskedImage<float> diffim::convolveAndSubtract(
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    math::LinearCombinationKernel const& convolutionKernel,
+    math::Function2<double> const& backgroundFunction,
+    bool invert);
+
+
+template 
+image::MaskedImage<double> diffim::convolveAndSubtract(
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    math::LinearCombinationKernel const& convolutionKernel,
+    math::Function2<double> const& backgroundFunction,
+    bool invert);
+
+
+/* */
+
+template
+std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
+    image::MaskedImage<float> const& imageToConvolve,
+    image::MaskedImage<float> const& imageToNotConvolve,
+    lsst::pex::policy::Policy const& policy);
+
+template
+std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
+    image::MaskedImage<double> const& imageToConvolve,
+    image::MaskedImage<double> const& imageToNotConvolve,
+    lsst::pex::policy::Policy  const& policy);
+
+template
+void diffim::addFunctionToImage(
+    image::Image<float>&,
+    math::Function2<float> const&);
+
+template
+void diffim::addFunctionToImage(
+    image::Image<float>&,
+    math::Function2<double> const&);
+
+template
+void diffim::addFunctionToImage(
+    image::Image<double>&,
+    math::Function2<float> const&);
+
+template
+void diffim::addFunctionToImage(
+    image::Image<double>&,
+    math::Function2<double> const&);
+
+
+
+#if false
+/** 
  * @brief Computes a single Kernel (Model 1) around a single subimage.
  *
  * Accepts two MaskedImages, generally subimages of a larger image, one of which
@@ -2158,252 +2331,6 @@ void diffim::computePsfMatchingKernelForFootprintVW(
     backgroundError = sqrt(Error2[nParameters-1][nParameters-1]);
 }
 
-/** 
- * @brief Adds a Function to an Image
- *
- * @note MAJOR NOTE; I need to check if my scaling of the image range from -1 to
- * 1 gets messed up here.  ACB.
- *
- * @ingroup diffim
- */
-template <typename ImageT, typename FunctionT>
-void diffim::addFunctionToImage(
-    image::Image<ImageT> &image,
-    math::Function2<FunctionT> const& function
-    ) {
-
-    // Set the pixels row by row, to avoid repeated checks for end-of-row
-    for (int y = 0; y != image.getHeight(); ++y) {
-        double yPos = image::positionToIndex(y);
-        
-        int x = 0;
-        for (typename image::Image<ImageT>::x_iterator ptr = image.row_begin(y); 
-             ptr != image.row_end(y); ++ptr, ++x) {
-            
-            double xPos = image::positionToIndex(x);
-            *ptr += static_cast<ImageT>(function(xPos, yPos));
-
-        }
-    }
-}
-
-// GSL 
-/*
-void pseudoInverse(gsl_matrix * dest, const gsl_matrix * src) {
-    
-}
-
-void covariance(gsl_matrix * dest, const gsl_matrix * src) {
-    gsl_matrix *trans = gsl_matrix_alloc (src.size2, src.size1);
-    gsl_matrix_transpose_memcpy(trans, src);
-    // is this a bad idea? 
-    dest = gsl_matrix_alloc (src.size1, src.size2);
-    cblas_sgemm (CblasRowMajor, 
-                 CblasNoTrans, CblasNoTrans, 2, 2, 3,
-                 1.0, trans, nParameters, src, nParameters, 0.0, dest, nParameters);
-
-    
-}
-*/
-
-// Explicit instantiations
-
-template class diffim::PsfMatchingFunctor<float, float>;
-template class diffim::PsfMatchingFunctor<double, float>;
-template class diffim::PsfMatchingFunctorGsl<float, float>;
-template class diffim::PsfMatchingFunctorGsl<double, float>;
-template class diffim::PsfMatchingFunctorVw<float, float>;
-template class diffim::PsfMatchingFunctorVw<double, float>;
-
-template class diffim::FindSetBits<image::Mask<> >;
-
-template class diffim::FindCounts<float>;
-template class diffim::FindCounts<double>;
-
-template class diffim::ImageStatistics<float>;
-template class diffim::ImageStatistics<double>;
-
-/* */
-
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    math::Kernel const& convolutionKernel,
-    double background,
-    bool invert);
-
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    math::Kernel const& convolutionKernel,
-    double background,
-    bool invert);
-
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    double background,
-    bool invert);
-
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    double background,
-    bool invert);
-
-/* */
-
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    math::Kernel const& convolutionKernel,
-    math::Function2<double> const& backgroundFunction,
-    bool invert);
-
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    math::Kernel const& convolutionKernel,
-    math::Function2<double> const& backgroundFunction,
-    bool invert);
-
-
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    math::Function2<double> const& backgroundFunction,
-    bool invert);
-
-
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    math::Function2<double> const& backgroundFunction,
-    bool invert);
-
-
-/* */
-
-/* variance are always float i think */
-template
-void diffim::computePsfMatchingKernelForFootprint(
-    double                          &background,
-    double                          &backgroundError,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    image::Image<float>       const& varianceImage,
-    math::KernelList<math::Kernel> const& kernelInBasisList,
-    lsst::pex::policy::Policy      const& policy);
-
-template
-void diffim::computePsfMatchingKernelForFootprint(
-    double                          &background,
-    double                          &backgroundError,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    image::Image<float>        const& varianceImage,
-    math::KernelList<math::Kernel> const& kernelInBasisList,
-    lsst::pex::policy::Policy      const& policy);
-
-template
-void diffim::computePsfMatchingKernelForFootprintEigen(
-    double                          &background,
-    double                          &backgroundError,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    image::Image<float>       const& varianceImage,
-    math::KernelList<math::Kernel> const& kernelInBasisList,
-    lsst::pex::policy::Policy      const& policy);
-
-template
-void diffim::computePsfMatchingKernelForFootprintEigen(
-    double                          &background,
-    double                          &backgroundError,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    image::Image<float>        const& varianceImage,
-    math::KernelList<math::Kernel> const& kernelInBasisList,
-    lsst::pex::policy::Policy      const& policy);
-
-template
-void diffim::computePsfMatchingKernelForFootprintVW(
-    double                          &background,
-    double                          &backgroundError,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    image::Image<float>       const& varianceImage,
-    math::KernelList<math::Kernel> const& kernelInBasisList,
-    lsst::pex::policy::Policy      const& policy);
-
-template
-void diffim::computePsfMatchingKernelForFootprintVW(
-    double                          &background,
-    double                          &backgroundError,
-    boost::shared_ptr<math::Kernel> &kernelPtr,
-    boost::shared_ptr<math::Kernel> &kernelErrorPtr,
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    image::Image<float>        const& varianceImage,
-    math::KernelList<math::Kernel> const& kernelInBasisList,
-    lsst::pex::policy::Policy      const& policy);
-
-template
-std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    lsst::pex::policy::Policy const& policy);
-
-template
-std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    lsst::pex::policy::Policy  const& policy);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<float>&,
-    math::Function2<float> const&);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<float>&,
-    math::Function2<double> const&);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<double>&,
-    math::Function2<float> const&);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<double>&,
-    math::Function2<double> const&);
-
-
-
-#if false
 /** 
  * @brief Computes a single Kernel (Model 1) around a single subimage.
  *
