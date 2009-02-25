@@ -49,10 +49,6 @@ namespace diffim {
         typedef std::vector<Ptr> SpatialModelKernelPtrList;
         typedef boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT> > MaskedImagePtr; 
 
-        /** Empty constructor
-         */
-        //SpatialModelKernel();
-
         /** Constructor
          *
          * @param fpPtr  Pointer to footprint of pixels used to build Kernel

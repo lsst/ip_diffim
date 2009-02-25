@@ -31,25 +31,6 @@ namespace lsst {
 namespace ip {
 namespace diffim {
     
-/*
-template <typename ImageT>
-SpatialModelKernel<ImageT>::SpatialModelKernel() :
-    lsst::ip::diffim::SpatialModelBase<ImageT>(),
-    _fpPtr(lsst::afw::detection::Footprint::Ptr()),
-    _miToConvolvePtr(MaskedImagePtr()),
-    _miToNotConvolvePtr(MaskedImagePtr()),
-    _kFunctor(boost::shared_ptr<PsfMatchingFunctor<ImageT> >()),
-    _policy(),
-    _kPtr(boost::shared_ptr<lsst::afw::math::Kernel>()),
-    _kErrPtr(boost::shared_ptr<lsst::afw::math::Kernel>()),
-    _kSum(0.),
-    _bg(0.),
-    _bgErr(0.),
-    _kStats(boost::shared_ptr<ImageStatistics<lsst::afw::image::MaskedImage<ImageT> > >())
-
-{;}
-*/
-
 template <typename ImageT>
 SpatialModelKernel<ImageT>::SpatialModelKernel(
     detection::Footprint::Ptr const &fpPtr,
