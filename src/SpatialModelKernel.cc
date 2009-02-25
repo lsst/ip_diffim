@@ -18,7 +18,6 @@
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/pex/logging/Trace.h>
 
-#include <lsst/ip/diffim/SpatialModelBase.h>
 #include <lsst/ip/diffim/SpatialModelKernel.h>
 
 namespace exceptions = lsst::pex::exceptions; 
@@ -60,18 +59,21 @@ SpatialModelKernel<ImageT>::SpatialModelKernel(
     policy::Policy const &policy,
     bool build
     ) :
-    diffim::SpatialModelBase<ImageT>(),
     _fpPtr(fpPtr),
     _miToConvolvePtr(miToConvolvePtr),
     _miToNotConvolvePtr(miToNotConvolvePtr),
     _kFunctor(kFunctor),
     _policy(policy),
+    _colc(0.),
+    _rowc(0.),
     _kPtr(),
     _kErrPtr(),
     _kSum(0.),
     _bg(0.),
     _bgErr(0.),
-    _kStats()
+    _kStats(),
+    _isBuilt(false),
+    _isGood(false)
 {
     if (build == true) {
         this->buildModel();
@@ -81,7 +83,7 @@ SpatialModelKernel<ImageT>::SpatialModelKernel(
 template <typename ImageT>
 bool SpatialModelKernel<ImageT>::buildModel() {
 
-    if (this->getBuildStatus() == true) {
+    if (this->isBuilt() == true) {
         return false;
     }
 
@@ -113,7 +115,7 @@ bool SpatialModelKernel<ImageT>::buildModel() {
                                *(varEstimate.getVariance()),
                                this->_policy);
     } catch (exceptions::Exception& e) {
-        this->setSdqaStatus(false);
+        this->setStatus(false);
         logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                            "Exception caught from computePsfMatchingKernelForFootprint"); 
         logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
@@ -199,7 +201,7 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     this->_bgErr   = backgroundError;
     this->_kStats  = kStats;
     // Updates for base class
-    this->setSdqaStatus((*kStats).evaluateQuality(this->_policy));
+    this->setStatus((*kStats).evaluateQuality(this->_policy));
     this->setBuildStatus(true);
 
     logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
@@ -210,12 +212,7 @@ bool SpatialModelKernel<ImageT>::buildModel() {
 
 
     // Return quality of the kernel
-    return this->getSdqaStatus();
-}
-
-template <typename ImageT>
-double SpatialModelKernel<ImageT>::returnSdqaRating(lsst::pex::policy::Policy &policy) {
-    return this->_kStats->evaluateQuality(policy);
+    return this->getStatus();
 }
 
 template <typename ImageT>

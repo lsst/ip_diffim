@@ -35,8 +35,8 @@ backgroundSpatialOrder: 1
 #
 #   segmentMaskedImage:
 #
-nSegmentCol: 10
-nSegmentRow: 10
+nSegmentCol: 2
+nSegmentRow: 2
 
 ######
 # Rejects objects with deviant Kernel Sums

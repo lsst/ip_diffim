@@ -19,8 +19,6 @@
 
 #include <lsst/afw/image/Mask.h>
 
-#include <lsst/ip/diffim/SpatialModelBase.h>
-
 namespace lsst {
 namespace ip {
 namespace diffim {
@@ -31,22 +29,32 @@ namespace diffim {
      * 
      * A given MaskedImage will be divided up into cells, with each cell
      * represented by an instance of this class.  Each cell itself contains a
-     * list of instances of classes derived from SpatialModelBase.  One member
-     * from each cell will be fit for a spatial model.  In case of a poor fit,
-     * the next SpatialModelBase instance in the list will be fit for.  If all
+     * list of instances of classes on which this is templated.  One class
+     * member from each cell will be fit for a spatial model.  In case of a poor
+     * fit, the next class instance in the list will be fit for.  If all
      * instances in a list are rejected from the spatial model, the best one
      * will be used.
+     *
+     * Requirements on the class needed by SpatialModelCell are :
+     * 
+     * Method : double returnCellRating()
+     *     A way to rank the object w.r.t. other instances of the class
+     *       **before** construction of the model.  E.g. total flux.
+     * 
+     * Method : bool isBuilt()
+     *     Has the model been build yet?
+     *     
+     * Method : bool buildModel()
+     *     Build the model.
      */
-    template <typename ImageT>
+    template <typename ClassT>
     class SpatialModelCell {
         
     public:
-        typedef boost::shared_ptr<SpatialModelCell<ImageT> > Ptr;
+        typedef boost::shared_ptr<SpatialModelCell<ClassT> > Ptr;
         typedef std::vector<Ptr> SpatialModelCellList;
-        
-        /** Typedefs 
-         */
-        typedef typename SpatialModelBase<ImageT>::Ptr SpatialModel;
+
+        typedef boost::shared_ptr<ClassT> SpatialModel;
         typedef std::vector<SpatialModel> ModelPtrList;
 
         /** Constructor
@@ -73,7 +81,7 @@ namespace diffim {
 
         /** Get current model
          */
-        SpatialModel getCurrentModel() {return _modelPtrList[_currentID];};
+        SpatialModel getCurrentModel() {return _modelPtrList[_currentId];};
 
         /** Get model in list
          * 
@@ -97,13 +105,13 @@ namespace diffim {
 
         /** Get index of current model
          */
-        int  getCurrentID() {return _currentID;};
+        int  getCurrentId() {return _currentId;};
 
         /** Set index of current model
          *
          * @param id  index to use; will build model if not built
          */
-        void setCurrentID(int id);
+        void setCurrentId(int id);
 
         /** Set label
          *
@@ -128,10 +136,6 @@ namespace diffim {
         bool isFixed() {return _modelIsFixed;};
 
     private:
-        /** @todo Implement method _orderModels
-         */
-        void _orderModels();
-
         std::string _label;         ///< Name of cell for logging/trace
         int _colC;                  ///< Effective col position of cell in overall image
         int _rowC;                  ///< Effective row position of cell in overall image
@@ -139,10 +143,26 @@ namespace diffim {
         ModelPtrList _modelPtrList; ///< List of models associated with the cell
 
         int _nModels;               ///< Number of entries; len(_modelPtrList)
-        int _currentID;             ///< Which entry is being used; 0 <= _currentID < _nModels
-        bool _modelIsFixed;         ///< Use model _currentID no matter what
+        int _currentId;             ///< Which entry is being used; 0 <= _currentId < _nModels
+        bool _modelIsFixed;         ///< Use model _currentId no matter what
+
+        void _orderModels();        ///< Orders the models
 
     }; // end of class
+
+    /**
+     * @brief Class for sorting spatial models based on their cell rating
+     */
+    template <typename ClassT>
+    class cmpSpatialModels {
+    public:
+        bool operator() (boost::shared_ptr<ClassT> sm1,
+                         boost::shared_ptr<ClassT> sm2) const
+            {
+                return (sm1->returnCellRating() < sm2->returnCellRating());
+            }
+    }; 
+
 
 }}}
 

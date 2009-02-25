@@ -188,23 +188,6 @@ SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<do
 /******************************************************************************/
 
 %{
-#include "lsst/ip/diffim/SpatialModelBase.h"
-%}
-
-SWIG_SHARED_PTR(SpatialModelBaseF, lsst::ip::diffim::SpatialModelBase<float>);
-SWIG_SHARED_PTR(SpatialModelBaseD, lsst::ip::diffim::SpatialModelBase<double>);
-
-%include "lsst/ip/diffim/SpatialModelBase.h"
-
-%template(SpatialModelBaseF) lsst::ip::diffim::SpatialModelBase<float>;
-%template(SpatialModelBaseD) lsst::ip::diffim::SpatialModelBase<double>;
-
-%template(VectorSpatialModelBaseF) std::vector<lsst::ip::diffim::SpatialModelBase<float>::Ptr >;
-%template(VectorSpatialModelBaseD) std::vector<lsst::ip::diffim::SpatialModelBase<double>::Ptr >;
-
-/******************************************************************************/
-
-%{
 #include "lsst/ip/diffim/SpatialModelKernel.h"
 %}
 
@@ -226,16 +209,16 @@ SWIG_SHARED_PTR(SpatialModelKernelD, lsst::ip::diffim::SpatialModelKernel<double
 #include "lsst/ip/diffim/SpatialModelCell.h"
 %}
 
-SWIG_SHARED_PTR(SpatialModelCellF, lsst::ip::diffim::SpatialModelCell<float>);
-SWIG_SHARED_PTR(SpatialModelCellD, lsst::ip::diffim::SpatialModelCell<double>);
+SWIG_SHARED_PTR(SpatialModelCellF, lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >);
+SWIG_SHARED_PTR(SpatialModelCellD, lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >);
 
 %include "lsst/ip/diffim/SpatialModelCell.h"
 
-%template(SpatialModelCellF) lsst::ip::diffim::SpatialModelCell<float>;
-%template(SpatialModelCellD) lsst::ip::diffim::SpatialModelCell<double>;
+%template(SpatialModelCellF) lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >;
+%template(SpatialModelCellD) lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >;
 
-%template(VectorSpatialModelCellF) std::vector<lsst::ip::diffim::SpatialModelCell<float>::Ptr >;
-%template(VectorSpatialModelCellD) std::vector<lsst::ip::diffim::SpatialModelCell<double>::Ptr >;
+%template(VectorSpatialModelCellF) std::vector<lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >::Ptr >;
+%template(VectorSpatialModelCellD) std::vector<lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >::Ptr >;
 
 /******************************************************************************/
 

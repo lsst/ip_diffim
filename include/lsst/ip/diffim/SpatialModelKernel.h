@@ -2,7 +2,7 @@
 /**
  * @file
  *
- * @brief Class derived from SpatialModelBase for spatial Kernel fitting
+ * @brief Class used by SpatialModelCell for spatial Kernel fitting
  *
  * @author Andrew Becker, University of Washington
  *
@@ -20,7 +20,6 @@
 #include <lsst/afw/detection/Footprint.h>
 #include <lsst/sdqa/SdqaRating.h>
 
-#include <lsst/ip/diffim/SpatialModelBase.h>
 #include <lsst/ip/diffim/ImageSubtract.h>
 
 namespace lsst {
@@ -29,22 +28,22 @@ namespace diffim {
 
     /** 
      * 
-     * @brief Class derived from SpatialModelBase for spatial Kernel fitting
+     * @brief Class used by SpatialModelCell for spatial Kernel fitting
      * 
-     * Derived class of SpatialModelBase.  A Kernel model is built for a given
-     * Footprint within a MaskedImage.  An ensemble of Kernels, distributed
-     * evenly across the image using SpatialModelCell, is used to fit for a
-     * spatial function.  If this Kernel is a poor fit to the spatial function,
-     * another member of SpatialModelCell will be used instead.
+     * A Kernel model is built for a given Footprint within a MaskedImage.  An
+     * ensemble of Kernels, distributed evenly across the image using
+     * SpatialModelCell, is used to fit for a spatial function.  If this Kernel
+     * is a poor fit to the spatial function, another member of SpatialModelCell
+     * will be used instead.
      *
      * This class needs to know how to build itself, meaning it requires the
      * basis functions used to create the Kernel, as well as the input images
      * that it is to compare.
      *
-     * @see lsst/ip/diffim/SpatialModelBase.h for base class
+     * @see lsst/ip/diffim/SpatialModelCell.h for required methods
      */    
     template <typename ImageT>
-    class SpatialModelKernel : public SpatialModelBase<ImageT> {
+    class SpatialModelKernel {
     public: 
         typedef boost::shared_ptr<SpatialModelKernel<ImageT> > Ptr;
         typedef std::vector<Ptr> SpatialModelKernelPtrList;
@@ -56,11 +55,9 @@ namespace diffim {
 
         /** Constructor
          *
-         * @note Kernel needs to carry around pointer to the parent image
-         * 
          * @param fpPtr  Pointer to footprint of pixels used to build Kernel
-         * @param miToConvolveParentPtr  Pointer to parent template image
-         * @param miToNotConvolveParentPtr  Pointer to parent science image
+         * @param miToConvolvePtr  Pointer to template image
+         * @param miToNotConvolvePtr  Pointer to science image
          * @param kernelFunctor  Functor to build the PSF Mathching Kernel
          * @param policy  Policy for operations
          * @param build  Build upon construction?  Default is false.
@@ -76,23 +73,92 @@ namespace diffim {
          */
         virtual ~SpatialModelKernel() {};
 
+
+        /****
+           Methods required for SpatialModelCell 
+        */
+
         /** Execute the time-consuming process of building the local model
          * 
-         * Overrides virtual function of base class
+         * @note Required method for use by SpatialModelCell
          */
         bool buildModel();
 
-        /** Return Sdqa rating
-         * 
-         * Overrides virtual function of base class
-         */
-        double returnSdqaRating(lsst::pex::policy::Policy &policy);
-
         /** Return Cell rating
          * 
-         * Overrides virtual function of base class
+         * @note Required method for use by SpatialModelCell
          */
         double returnCellRating();
+
+        /** Get its build status
+         * 
+         * @note Required method for use by SpatialModelCell
+         */
+        bool isBuilt() {return _isBuilt;};
+
+
+        /****
+         Build status 
+        */
+
+        /** Set its build status
+         *
+         * @param built  Boolean status of build
+         */
+        void setBuildStatus(bool built) {_isBuilt = built;};
+
+        /** Get its build status
+         */
+        bool getBuildStatus() {return _isBuilt;};
+
+
+        /****
+           Quality status
+        */
+
+        /** Set its quality status
+         *
+         * @param built  Boolean status of build
+         */
+        void setStatus(bool status) {_isGood = status;};
+
+        /** Get its quality status
+         */
+        bool getStatus() {return _isGood;};
+
+        /** Get its quailty status
+         */
+        bool isGood() {return _isGood;};
+
+
+        /****
+           Position on the image
+        */
+
+        /** Set col centroid of Model; range -1 to 1
+         *
+         * @param colc  Column center
+         */
+        void setColc(double colc) {_colc = colc;};
+
+        /** Get col centroid of Model; range -1 to 1
+         */
+        double getColc() {return _colc;};
+
+        /** Set row centroid of Model; range -1 to 1
+         *
+         * @param rowc  Row center
+         */
+        void setRowc(double rowc) {_rowc = rowc;};
+
+        /** Get row centroid of Model; range -1 to 1
+         */
+        double getRowc() {return _rowc;};
+
+
+        /****
+           Getters/setters
+        */
 
         /** Get Footprint pointer for the Kernel model
          */
@@ -105,7 +171,6 @@ namespace diffim {
         /** Get image's MaskedImage pointer for the Kernel model
          */
         MaskedImagePtr const& getMiToNotConvolvePtr() const {return _miToNotConvolvePtr;};
-
 
         /** Set Kernel pointer associated with the Footprint; the core of this Model
          *
@@ -192,7 +257,10 @@ namespace diffim {
         boost::shared_ptr<PsfMatchingFunctor<ImageT> > _kFunctor; ///< Functor to build PSF matching kernel
         lsst::pex::policy::Policy _policy;           ///< Policy file for operations
 
-        /** Results from single Kernel model
+        double _colc;     ///< Effective col position of model in overall image
+        double _rowc;     ///< Effective col position of model in overall image
+
+        /** Results from single Kernel fit
          */
         boost::shared_ptr<lsst::afw::math::Kernel> _kPtr;    ///< Kernel
         boost::shared_ptr<lsst::afw::math::Kernel> _kErrPtr; ///< Uncertainty in Kernel
@@ -200,6 +268,12 @@ namespace diffim {
         double _bg;                                          ///< Differential background value
         double _bgErr;                                       ///< Uncertainty in background
         boost::shared_ptr<ImageStatistics<ImageT> > _kStats; ///< Home-grown statistics; placeholder for Sdqa
+
+        /** Status of model
+         */
+        bool _isBuilt;    ///< Model has been built
+        bool _isGood;     ///< Passes local and/or Sdqa requirments
+
 
     }; // end of class
 

@@ -18,14 +18,14 @@
 #include <lsst/pex/logging/Trace.h>
 
 #include <lsst/ip/diffim/SpatialModelCell.h>
-#include <lsst/ip/diffim/SpatialModelBase.h>
+#include <lsst/ip/diffim/SpatialModelKernel.h>
 
 namespace lsst {
 namespace ip {
 namespace diffim {
 
-template <typename ImageT>
-SpatialModelCell<ImageT>::SpatialModelCell(
+template <typename ClassT>
+SpatialModelCell<ClassT>::SpatialModelCell(
     std::string  label,
     ModelPtrList modelPtrList) :
     _label(label),
@@ -33,14 +33,14 @@ SpatialModelCell<ImageT>::SpatialModelCell(
     _rowC(0),
     _modelPtrList(modelPtrList),
     _nModels(modelPtrList.size()),
-    _currentID(-1),
+    _currentId(-1),
     _modelIsFixed(false)
 {
     SpatialModelCell(label, 0, 0, modelPtrList);
 }
 
-template <typename ImageT>
-SpatialModelCell<ImageT>::SpatialModelCell(
+template <typename ClassT>
+SpatialModelCell<ClassT>::SpatialModelCell(
     std::string  label,
     int          colC, 
     int          rowC, 
@@ -50,7 +50,7 @@ SpatialModelCell<ImageT>::SpatialModelCell(
     _rowC(rowC),
     _modelPtrList(modelPtrList),
     _nModels(modelPtrList.size()),
-    _currentID(-1),
+    _currentId(-1),
     _modelIsFixed(false)
 {
     lsst::pex::logging::TTrace<3>("lsst.ip.diffim.SpatialModelCell.SpatialModelCell", 
@@ -63,29 +63,29 @@ SpatialModelCell<ImageT>::SpatialModelCell(
 /** Order models
  *
  */
-template <typename ImageT>
-void SpatialModelCell<ImageT>::_orderModels() {
-    sort (this->_modelPtrList.begin(), this->_modelPtrList.end(), cmpSpatialModels<ImageT>());
+template <typename ClassT>
+void SpatialModelCell<ClassT>::_orderModels() {
+    sort (this->_modelPtrList.begin(), this->_modelPtrList.end(), cmpSpatialModels<ClassT>());
     reverse(this->_modelPtrList.begin(), this->_modelPtrList.end());
 }
 
-/** Select best model; if no good models, set Cell as fixed with ID=-1.
+/** Select best model; if no good models, set Cell as fixed with Id=-1.
  *
  * @note Currently this does *not* use Sdqa objects, but it will.  It
  * only selects the first "good" model.
  * 
  * @note Optionally, if all models are *really* bad (this needs to
- * defined) set Cell as fixed with ID=-1
+ * defined) set Cell as fixed with Id=-1
  *
  * @note For now lets just make it bad
  */
-template <typename ImageT>
-void SpatialModelCell<ImageT>::selectBestModel(bool fix) {
+template <typename ClassT>
+void SpatialModelCell<ClassT>::selectBestModel(bool fix) {
     bool found = false;
     /*
     for (int i = 0; i < this->_nModels; i++) {
         if (this->_modelPtrList[i]->isGood()) {
-            this->setCurrentID(i);
+            this->setCurrentId(i);
             this->_modelIsFixed = fix;
             found = true;
             break;
@@ -94,7 +94,7 @@ void SpatialModelCell<ImageT>::selectBestModel(bool fix) {
     */
 
     if (found == false) {
-        this->_currentID    = -1;
+        this->_currentId    = -1;
         this->_modelIsFixed = true;
         lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelCell.selectBestModel", 
                                       "Cell %s : Locking with no good models", this->_label.c_str());
@@ -103,19 +103,19 @@ void SpatialModelCell<ImageT>::selectBestModel(bool fix) {
 
 /** Determine if cell has a usable model
  *
- * @note On the condition the cell is "fixed" and has "currentID =
+ * @note On the condition the cell is "fixed" and has "currentId =
  * -1", the cell is not usable.
  */
-template <typename ImageT>
-bool SpatialModelCell<ImageT>::isUsable() {
-    if ( (this->_currentID == -1) && (this->_modelIsFixed) ) {
+template <typename ClassT>
+bool SpatialModelCell<ClassT>::isUsable() {
+    if ( (this->_currentId == -1) && (this->_modelIsFixed) ) {
         return false;
     }
     return true;
 }
 
-template <typename ImageT>
-typename SpatialModelCell<ImageT>::SpatialModel SpatialModelCell<ImageT>::getModel(int i) {
+template <typename ClassT>
+typename SpatialModelCell<ClassT>::SpatialModel SpatialModelCell<ClassT>::getModel(int i) {
     if ( (i < 0) || (i >= this->_nModels) ) {
         throw LSST_EXCEPT(lsst::pex::exceptions::Exception, 
                           "Index out of range");
@@ -125,16 +125,16 @@ typename SpatialModelCell<ImageT>::SpatialModel SpatialModelCell<ImageT>::getMod
 
 /** Move to the next model in the list
  *
- * @note  Method setCurrentID() actually builds the model
+ * @note  Method setCurrentId() actually builds the model
  */
-template <typename ImageT>
-bool SpatialModelCell<ImageT>::incrementModel() {
+template <typename ClassT>
+bool SpatialModelCell<ClassT>::incrementModel() {
     /* If the Cell has a fixed Model */
     if (this->_modelIsFixed) {
         return false;
     }
 
-    if (this->_currentID == -1) {
+    if (this->_currentId == -1) {
         /* Its the first time through */
 
         if ((this->_nModels) == 0) {
@@ -144,44 +144,47 @@ bool SpatialModelCell<ImageT>::incrementModel() {
         }
         else {
             /* There are at least 1 */
-            this->setCurrentID(0);
+            this->setCurrentId(0);
             return true;
         }            
     }
     else {
-        if ( (this->_currentID) == ((this->_nModels) - 1) ) {
+        if ( (this->_currentId) == ((this->_nModels) - 1) ) {
             /* You are at the last one */
             this->selectBestModel(true);
             return false;
         }
         else {
             /* Standard increment */
-            this->setCurrentID(this->_currentID + 1);
+            this->setCurrentId(this->_currentId + 1);
             return true;
         }
     }
 }
 
-template <typename ImageT>
-void SpatialModelCell<ImageT>::setCurrentID(int id) {
+template <typename ClassT>
+void SpatialModelCell<ClassT>::setCurrentId(int id) {
     if ( (id < 0) || (id >= this->_nModels) ) {
         throw LSST_EXCEPT(lsst::pex::exceptions::Exception, 
                           "Index out of range");
     }        
 
-    this->_currentID = id;
-    lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelCell.setCurrentID", 
-                                  "Cell %s : Building Model %d / %d", this->_label.c_str(), this->_currentID+1, this->_nModels);
+    this->_currentId = id;
+    lsst::pex::logging::TTrace<4>("lsst.ip.diffim.SpatialModelCell.setCurrentId", 
+                                  "Cell %s : Building Model %d / %d", this->_label.c_str(), this->_currentId+1, this->_nModels);
 
     // If the model does not build for some reason, move on to the next model
-    if (! (this->_modelPtrList[this->_currentID]->isBuilt()) )
-        if (! (this->_modelPtrList[this->_currentID]->buildModel()) ) 
+    if (! (this->_modelPtrList[this->_currentId]->isBuilt()) )
+        if (! (this->_modelPtrList[this->_currentId]->buildModel()) ) 
             this->incrementModel();
 }
 
 // Explicit instantiations
-template class SpatialModelCell<float>;
-template class SpatialModelCell<double>;
+template class SpatialModelCell<SpatialModelKernel<float> >;
+template class SpatialModelCell<SpatialModelKernel<double> >;
+
+template class cmpSpatialModels<SpatialModelKernel<float> >;
+template class cmpSpatialModels<SpatialModelKernel<double> >;
 
 }}} // end of namespace lsst::ip::diffim
 

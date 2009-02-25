@@ -36,7 +36,7 @@ def spatialModelByPixel(spatialCells, kBasisList, policy):
         if not scPtr.isUsable():
             continue
         # Is the contained model usable?
-        if scPtr.getCurrentModel().getSdqaStatus():
+        if scPtr.getCurrentModel().getStatus():
             idList.append( scID )
             
     nCells = len(idList)
@@ -143,7 +143,7 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
         if not scPtr.isUsable():
             continue
         # Is the contained model usable?
-        if scPtr.getCurrentModel().getSdqaStatus():
+        if scPtr.getCurrentModel().getStatus():
             idList.append( scID )
             
     nCells = len(idList)
@@ -190,27 +190,19 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
         Trace('lsst.ip.diffim.evaluateModelByPixel', 5,
               '%s Kernel %d : %s Spatial residuals = %.2f +/- %.2f sigma' %
               (spatialCells[ idList[idx] ].getLabel(),
-               spatialCells[ idList[idx] ].getCurrentModel().getID(),
+               spatialCells[ idList[idx] ].getCurrentId(),
                label, imStats.getMean(), imStats.getRms()))
         # So the trace statements are in a reasonable order
         if rejected:
             # This is only bad in the context of the spatial model
             # May be needed in the future
             #
-            # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)
+            # spatialCells[ idList[idx] ].getCurrentModel().setStatus(False)
             spatialCells[ idList[idx] ].incrementModel()
             
 
     Trace('lsst.ip.diffim.evaluateModelByPixel', 3,
           'Spatial model by pixel : %d / %d Kernels acceptable' % (nGood, nCells))
-
-#        if policy.get('debugPlot') == True:
-#            ipDiffimDebug.plotDiffImQuality1(goodDifiList[i],
-#                                             diffIm,
-#                                             kernelPtr,
-#                                             label='Spatial %s kernel %d' % (label, goodDifiList[i].getID()),
-#                                             outfile='SKernel_%s%d.ps' % (label, goodDifiList[i].getID())
-#                                             )
 
     return nRejected, sdqaList
 
@@ -231,7 +223,7 @@ def spatialModelKernelPca(spatialCells, policy, id=''):
         if not scPtr.isUsable():
             continue
         # Is the contained model usable?
-        if scPtr.getCurrentModel().getSdqaStatus():
+        if scPtr.getCurrentModel().getStatus():
             idList.append( scID )
             
     nCells = len(idList)
@@ -277,7 +269,7 @@ def spatialModelByPca(spatialCells, mKernel, eKernelVector, eCoeffs, nEVal, poli
         if not scPtr.isUsable():
             continue
         # Is the contained model usable?
-        if scPtr.getCurrentModel().getSdqaStatus():
+        if scPtr.getCurrentModel().getStatus():
             idList.append( scID )
             
     nCells = len(idList)
@@ -365,7 +357,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
         if not scPtr.isUsable():
             continue
         # Is the contained model usable?
-        if scPtr.getCurrentModel().getSdqaStatus():
+        if scPtr.getCurrentModel().getStatus():
             idList.append( scID )
             
     nCells = len(idList)
@@ -412,14 +404,14 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
         Trace('lsst.ip.diffim.evaluateModelByPca', 5,
               '%s Kernel %d : %s Pca residuals = %.2f +/- %.2f sigma' %
               (spatialCells[ idList[idx] ].getLabel(),
-               spatialCells[ idList[idx] ].getCurrentModel().getID(),
+               spatialCells[ idList[idx] ].getCurrentId(),
                label, imStats.getMean(), imStats.getRms()))
         # So the trace statements are in a reasonable order
         if rejected:
             # This is only bad in the context of the spatial model
             # May be needed in the future
             #
-            # spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)
+            # spatialCells[ idList[idx] ].getCurrentModel().setStatus(False)
             spatialCells[ idList[idx] ].incrementModel()
         
     Trace('lsst.ip.diffim.evaluateModelByPca', 3,

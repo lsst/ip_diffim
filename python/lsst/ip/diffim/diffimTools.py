@@ -134,12 +134,7 @@ def createSpatialModelKernelCells(templateMaskedImage,
             rowCenter  = int( 0.5 * (rowMin + rowMax) )
             label      = 'c%d' % cellCount
 
-            # NOTE : ideally we want this to be a vector of the base
-            # class, not derived class.  Swig is making this difficult
-            # right now tho.
-            #modelList = diffimLib.VectorSpatialModelKernelF()
-            # Seems to work now!
-            modelList = diffimLib.VectorSpatialModelBaseF()
+            modelList = diffimLib.VectorSpatialModelKernelF()
 
             # This is a bit dumb and could be more clever
             # Should never really have a loop within a loop within a loop
