@@ -128,7 +128,12 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         boost::shared_ptr<image::MaskedImage<ImageT> > imagePtr( new image::MaskedImage<ImageT>(image) );
         *citer = imagePtr;
     } 
-    
+
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                       "Total compute time to do basis convolutions : %.2f s", time);
+    t.restart();
+     
     kiter = this->_basisList.begin();
     citer = convolvedImageList.begin();
 
@@ -255,7 +260,6 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         }
         
     } // row
-
     
     /** @note If we are going to regularize the solution to M, this is the place
      * to do it 
@@ -268,7 +272,8 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     
     time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                       "Total compute time before matrix inversions : %.2f s", time);
+                       "Total compute time to step through pixels : %.2f s", time);
+    t.restart();
 
     //std::cout << "B eigen : " << B << std::endl;
 
@@ -324,7 +329,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     
     time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                       "Total compute time after matrix inversions : %.2f s", time);
+                       "Total compute time to do matrix math : %.2f s", time);
     
     // Translate from Eigen vectors into LSST classes
     unsigned int kCols = policy.getInt("kernelCols");
@@ -418,6 +423,11 @@ void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
         boost::shared_ptr<image::MaskedImage<ImageT> > imagePtr( new image::MaskedImage<ImageT>(image) );
         *citer = imagePtr;
     } 
+
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctorGsl.apply", 
+                       "Total compute time to do basis convolutions : %.2f s", time);
+    t.restart();
     
     kiter = this->_basisList.begin();
     citer = convolvedImageList.begin();
@@ -558,8 +568,9 @@ void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
                            gsl_matrix_get(M, kidxi, kidxj));
     
     time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.applyGsl", 
-                       "Total compute time before matrix inversions : %.2f s", time);
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctorGsl.apply", 
+                       "Total compute time to step through pixels : %.2f s", time);
+    t.restart();
 
     gsl_multifit_linear_workspace *work = gsl_multifit_linear_alloc (nParameters, nParameters);
     gsl_vector *Soln                    = gsl_vector_alloc (nParameters);
@@ -569,8 +580,8 @@ void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
     gsl_multifit_linear_svd(M, B, GSL_DBL_EPSILON, &rank, Soln, Error2, &chi2, work);
 
     time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.applyGsl", 
-                       "Total compute time after matrix inversions : %.2f s", time);
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctorGsl.apply", 
+                       "Total compute time to do matrix math : %.2f s", time);
     
     // Translate from Gsl vectors into LSST classes
     unsigned int kCols = policy.getInt("kernelCols");
@@ -669,6 +680,11 @@ void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
         *citer = imagePtr;
     } 
     
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctorVw.apply", 
+                       "Total compute time to do basis convolutions : %.2f s", time);
+    t.restart();
+
     kiter = this->_basisList.begin();
     citer = convolvedImageList.begin();
 
@@ -807,8 +823,9 @@ void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
             M[kidxj][kidxi] = M[kidxi][kidxj];
     
     time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.applyVW", 
-                       "Total compute time before matrix inversions : %.2f s", time);
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctorVw.apply", 
+                       "Total compute time to step through pixels : %.2f s", time);
+    t.restart();
 
     // Invert using VW's internal method
     vw::math::Vector<double> Soln      = vw::math::least_squares(M, B);
@@ -819,8 +836,8 @@ void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
     vw::math::Matrix<double> Error2    = vw::math::pseudoinverse(MtM);
 
     time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.applyVW", 
-                       "Total compute time after matrix inversions : %.2f s", time);
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctorVw.apply", 
+                       "Total compute time to do matrix math : %.2f s", time);
     
     // Translate from VW vectors into LSST classes
     unsigned int kCols = policy.getInt("kernelCols");
@@ -1257,25 +1274,6 @@ void diffim::addFunctionToImage(
         }
     }
 }
-
-// GSL 
-/*
-void pseudoInverse(gsl_matrix * dest, const gsl_matrix * src) {
-    
-}
-
-void covariance(gsl_matrix * dest, const gsl_matrix * src) {
-    gsl_matrix *trans = gsl_matrix_alloc (src.size2, src.size1);
-    gsl_matrix_transpose_memcpy(trans, src);
-    // is this a bad idea? 
-    dest = gsl_matrix_alloc (src.size1, src.size2);
-    cblas_sgemm (CblasRowMajor, 
-                 CblasNoTrans, CblasNoTrans, 2, 2, 3,
-                 1.0, trans, nParameters, src, nParameters, 0.0, dest, nParameters);
-
-    
-}
-*/
 
 // Explicit instantiations
 

@@ -62,11 +62,8 @@ def subtractMaskedImage(templateMaskedImage, scienceMaskedImage, policy, fpList=
             eFrac  = numpy.cumsum(eVal)
             eFrac /= eFrac[-1]
             nEval  = len(numpy.where(eFrac < fracEigenVal)[0])
-            print 'A', nEval
             nEval  = min(nEval, maxPrincipalComponents)
-            print 'B', nEval
             nEval  = max(nEval, minPrincipalComponents)
-            print 'C', nEval
 
             # do spatial fit here by Principal Component
             sKernel, bgFunction = ipDiffim.spatialModelByPca(spatialCells,
@@ -200,7 +197,10 @@ def testingLoop(templateMaskedImage, scienceMaskedImage, policy, fpList=None):
 
     
 def main():
-    defDataDir = eups.productDir('afwdata') or ''
+    defDataDir = eups.productDir('afwdata') 
+    if defDataDir == None:
+        print 'Error: afwdata not set up'
+        sys.exit(1)
     imageProcDir = eups.productDir('ip_diffim')
     if imageProcDir == None:
         print 'Error: could not set up ip_diffim'
@@ -247,7 +247,7 @@ Notes:
     print 'Template image:', templatePath
     print 'Output image:  ', outputPath
     print 'Policy file:   ', policyPath
-    
+
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
     policy              = Policy.createPolicy(policyPath)
