@@ -28,10 +28,15 @@
 // NOTE -  trace statements >= 6 can ENTIRELY kill the run time
 // #define LSST_MAX_TRACE 5
 
+#if !defined(USE_VW)
+#   define USE_VW 0
+#endif
+#if USE_VW
 #include <vw/Math/Functions.h> 
 #include <vw/Math/Vector.h> 
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/LinearAlgebra.h> 
+#endif
 
 #include <lsst/ip/diffim/ImageSubtract.h>
 #include <lsst/afw/image.h>
@@ -610,7 +615,7 @@ void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
     this->_backgroundError = sqrt(gsl_matrix_get(Error2, nParameters-1, nParameters-1));
 }
 
-
+#if USE_VW
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
     lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
@@ -859,7 +864,7 @@ void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
     this->_background      = Soln[nParameters-1];
     this->_backgroundError = sqrt(Error2[nParameters-1][nParameters-1]);
 }
-
+#endif
 
 //
 // Subroutines
@@ -1278,8 +1283,10 @@ template class diffim::PsfMatchingFunctor<float, float>;
 template class diffim::PsfMatchingFunctor<double, float>;
 template class diffim::PsfMatchingFunctorGsl<float, float>;
 template class diffim::PsfMatchingFunctorGsl<double, float>;
+#if USE_VW
 template class diffim::PsfMatchingFunctorVw<float, float>;
 template class diffim::PsfMatchingFunctorVw<double, float>;
+#endif
 
 template class diffim::FindSetBits<image::Mask<> >;
 
@@ -2044,6 +2051,7 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
     backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
 }
 
+#if USE_VW
 /** 
  * @brief Computes a single Kernel (Model 1) around a single subimage.
  *
@@ -2330,6 +2338,7 @@ void diffim::computePsfMatchingKernelForFootprintVW(
     background      = Soln[nParameters-1];
     backgroundError = sqrt(Error2[nParameters-1][nParameters-1]);
 }
+#endif
 
 /** 
  * @brief Computes a single Kernel (Model 1) around a single subimage.

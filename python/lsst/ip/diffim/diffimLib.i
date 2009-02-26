@@ -46,10 +46,15 @@ namespace boost {
 #include <Eigen/LU>
 #include <Eigen/QR>
 
+#if !defined(USE_VW)
+#   define USE_VW 0
+#endif
+#if USE_VW
 #include <vw/Math/Functions.h> 
 #include <vw/Math/Vector.h> 
 #include <vw/Math/Matrix.h> 
 #include <vw/Math/LinearAlgebra.h> 
+#endif
 
 #include <lsst/pex/policy/Policy.h>
 %}
@@ -102,8 +107,10 @@ SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double
 SWIG_SHARED_PTR(PsfMatchingFunctorGslF, lsst::ip::diffim::PsfMatchingFunctorGsl<float>);
 SWIG_SHARED_PTR(PsfMatchingFunctorGslD, lsst::ip::diffim::PsfMatchingFunctorGsl<double>);
 
+#if USE_VW
 SWIG_SHARED_PTR(PsfMatchingFunctorVwF, lsst::ip::diffim::PsfMatchingFunctorVw<float>);
 SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<double>);
+#endif
 
 %include "lsst/ip/diffim/ImageSubtract.h"
 
@@ -117,10 +124,12 @@ SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<do
 %template(PsfMatchingFunctorGslD)
     lsst::ip::diffim::PsfMatchingFunctorGsl<double>;
 
+#if USE_VW
 %template(PsfMatchingFunctorVwF)
     lsst::ip::diffim::PsfMatchingFunctorVw<float>;
 %template(PsfMatchingFunctorVwD)
     lsst::ip::diffim::PsfMatchingFunctorVw<double>;
+#endif
 
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
