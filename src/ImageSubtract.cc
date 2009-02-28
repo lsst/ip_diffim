@@ -318,7 +318,16 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     //return;
 
     // Estimate of parameter uncertainties comes from the inverse of the
-    // covariance matrix (noise spectrum).  Use Cholesky decomposition again.
+    // covariance matrix (noise spectrum).  
+    // N.R. 15.4.8 to 15.4.15
+    // 
+    // Since this is a linear problem no need to use Fisher matrix
+    // N.R. 15.5.8
+
+    // Although I might be able to take advantage of the solution above.
+    // Since this now works and is not the rate limiting step, keep as-is for DC3a.
+
+    // Use Cholesky decomposition again.
     // Cholkesy:
     // Cov       =  L L^t
     // Cov^(-1)  = (L L^t)^(-1)
