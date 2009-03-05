@@ -6,110 +6,216 @@ Python bindings for lsst::ip::diffim code
 %enddef
 
 %feature("autodoc", "1");
-%module(docstring=diffimLib_DOCSTRING) diffimLib
+%module(docstring=diffimLib_DOCSTRING, package="lsst.ip.diffim") diffimLib
 
-// Everything we will need in the _wrap.cc file
-%{
-#include <lsst/ip/diffim/ImageSubtract.h>
-#include <lsst/ip/diffim/wcsMatch.h>
-%}
+// Avoid Swig bug exposed in Ticket 640
+// http://dev.lsstcorp.org/trac/ticket/640
+%ignore lsst::ip::diffim::FindSetBits::operator();
+%ignore lsst::ip::diffim::FindCounts::operator();
+%ignore lsst::ip::diffim::ImageStatistics::operator();
 
-%init %{
-%}
+// Reference for this file is at http://dev.lsstcorp.org/trac/wiki/SwigFAQ 
+// Nice practical example is at http://dev.lsstcorp.org/trac/browser/DMS/afw/trunk/python/lsst/afw/image/imageLib.i 
 
+// Suppress swig complaints
+#pragma SWIG nowarn=314                 // print is a python keyword (--> _print)
+#pragma SWIG nowarn=362                 // operator=  ignored
+
+// Remove warnings
+// Nothing known about 'boost::bad_any_cast'
 namespace boost {
-    class bad_any_cast; // remove warning: Nothing known about 'boost::bad_any_cast'
+    class bad_any_cast; 
+    //typedef unsigned short boost::uint16_t;
 }
 
-// Everything whose bindings we will have to know about
-%include "lsst/p_lsstSwig.i"    // this needs to go first otherwise i do not know about e.g. boost
-%include "lsst/afw/image/lsstImageTypes.i"  // vw and Image/Mask types and typedefs
-%include "lsst/detection/detectionLib.i"    // need for FootprintContainerT
-
-// handle C++ arguments that should be outputs in python
+/* handle C++ arguments that should be outputs in python */
 %apply int& OUTPUT { int& };
 %apply float& OUTPUT { float& };
 %apply double& OUTPUT { double& };
 
+%{
+#include <boost/shared_ptr.hpp>
+
+#include <lsst/afw/image.h>
+#include <lsst/afw/math.h>
+#include <lsst/afw/detection.h>
+#include <lsst/afw/math/ConvolveImage.h>
+
+#include <Eigen/Cholesky>
+#include <Eigen/Core>
+#include <Eigen/LU>
+#include <Eigen/QR>
+
+#if !defined(USE_VW)
+#   define USE_VW 0
+#endif
+#if USE_VW
+#include <vw/Math/Functions.h> 
+#include <vw/Math/Vector.h> 
+#include <vw/Math/Matrix.h> 
+#include <vw/Math/LinearAlgebra.h> 
+#endif
+
+#include <lsst/pex/policy/Policy.h>
+%}
+
+/******************************************************************************/
+
+%include "lsst/p_lsstSwig.i"
+%include "lsst/daf/base/persistenceMacros.i"
+%import  "lsst/afw/image/imageLib.i" 
+%import  "lsst/afw/detection/detectionLib.i"
+%import  "lsst/afw/math/kernelLib.i"
+
+/* so SWIG knows that PolynomialFunction2D is derived from Function2 */
+%import  "lsst/afw/math/functionLib.i"  
+
+%lsst_exceptions();
+
 %pythoncode %{
-def version(HeadURL = r"$HeadURL: svn+ssh://svn.lsstcorp.org/DMS/ip/diffim/tickets/7/python/lsst/ip/diffim/diffimLib.i $"):
-    """Return a version given a HeadURL string; default: ip_diffim's version"""
-    return guessSvnVersion(HeadURL)
+import lsst.utils
+
+def version(HeadURL = r"$HeadURL$"):
+    """Return a version given a HeadURL string. If a different version is setup, return that too"""
+
+    version_svn = lsst.utils.guessSvnVersion(HeadURL)
+
+    try:
+        import eups
+    except ImportError:
+        return version_svn
+    else:
+        try:
+            version_eups = eups.setup("ip_diffim")
+        except AttributeError:
+            return version_svn
+
+    if version_eups == version_svn:
+        return version_svn
+    else:
+        return "%s (setup: %s)" % (version_svn, version_eups)
 
 %}
 
-// Here you give the names of the functions you want to Swig
+%{
+#include "lsst/ip/diffim/ImageSubtract.h"
+%}
 
-/*******************/
-/* ImageSubtract.h */
+SWIG_SHARED_PTR(PsfMatchingFunctorF, lsst::ip::diffim::PsfMatchingFunctor<float>);
+SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double>);
+
+SWIG_SHARED_PTR(PsfMatchingFunctorGslF, lsst::ip::diffim::PsfMatchingFunctorGsl<float>);
+SWIG_SHARED_PTR(PsfMatchingFunctorGslD, lsst::ip::diffim::PsfMatchingFunctorGsl<double>);
+
+#if USE_VW
+SWIG_SHARED_PTR(PsfMatchingFunctorVwF, lsst::ip::diffim::PsfMatchingFunctorVw<float>);
+SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<double>);
+#endif
 
 %include "lsst/ip/diffim/ImageSubtract.h"
-%template(DiffImContainerD)                lsst::ip::diffim::DiffImContainer<float, lsst::afw::image::maskPixelType>;
-%template(vectorDiffImContainerD)          std::vector<lsst::ip::diffim::DiffImContainer<float, lsst::afw::image::maskPixelType> >;
 
-%template(computeDiffImStats)
-    lsst::ip::diffim::computeDiffImStats<float, lsst::afw::image::maskPixelType>;
-%template(computeDiffImStats)
-    lsst::ip::diffim::computeDiffImStats<double, lsst::afw::image::maskPixelType>;
+%template(PsfMatchingFunctorF)
+    lsst::ip::diffim::PsfMatchingFunctor<float>;
+%template(PsfMatchingFunctorD)
+    lsst::ip::diffim::PsfMatchingFunctor<double>;
 
-%template(computePsfMatchingKernelForPostageStamp)
-    lsst::ip::diffim::computePsfMatchingKernelForPostageStamp<float, lsst::afw::image::maskPixelType>;
-%template(computePsfMatchingKernelForPostageStamp)
-    lsst::ip::diffim::computePsfMatchingKernelForPostageStamp<double, lsst::afw::image::maskPixelType>;
+%template(PsfMatchingFunctorGslF)
+    lsst::ip::diffim::PsfMatchingFunctorGsl<float>;
+%template(PsfMatchingFunctorGslD)
+    lsst::ip::diffim::PsfMatchingFunctorGsl<double>;
+
+#if USE_VW
+%template(PsfMatchingFunctorVwF)
+    lsst::ip::diffim::PsfMatchingFunctorVw<float>;
+%template(PsfMatchingFunctorVwD)
+    lsst::ip::diffim::PsfMatchingFunctorVw<double>;
+#endif
+
+%template(FindSetBitsU)
+    lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
+
+%template(FindCountsF)
+    lsst::ip::diffim::FindCounts<float>;
+%template(FindCountsD)
+    lsst::ip::diffim::FindCounts<double>;
+
+%template(ImageStatisticsF)
+    lsst::ip::diffim::ImageStatistics<float>;
+%template(ImageStatisticsD)
+    lsst::ip::diffim::ImageStatistics<double>;
+
+%template(convolveAndSubtract)
+    lsst::ip::diffim::convolveAndSubtract<float>;
+%template(convolveAndSubtract)
+    lsst::ip::diffim::convolveAndSubtract<double>;
+
+%template(convolveAndSubtract)
+    lsst::ip::diffim::convolveAndSubtract<float, double>;
+%template(convolveAndSubtract)
+    lsst::ip::diffim::convolveAndSubtract<double, double>;
 
 %template(getCollectionOfFootprintsForPsfMatching)
-    lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float, lsst::afw::image::maskPixelType>;
+    lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;
 %template(getCollectionOfFootprintsForPsfMatching)
-    lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double, lsst::afw::image::maskPixelType>;
+    lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double>;
 
-%template(computePcaKernelBasis)            lsst::ip::diffim::computePcaKernelBasis<float, lsst::afw::image::maskPixelType>;
-%template(computePcaKernelBasis)            lsst::ip::diffim::computePcaKernelBasis<double, lsst::afw::image::maskPixelType>;
+%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, double>;
+%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, double>;
+%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, float>;
+%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, float>;
 
-%template(computeSpatiallyVaryingPsfMatchingKernel)
-    lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel<float, lsst::afw::image::maskPixelType>;
-%template(computeSpatiallyVaryingPsfMatchingKernel)
-    lsst::ip::diffim::computeSpatiallyVaryingPsfMatchingKernel<double, lsst::afw::image::maskPixelType>;
+/******************************************************************************/
 
-%template(maskOk)                           lsst::ip::diffim::maskOk<lsst::afw::image::maskPixelType>;
+%{
+#include "lsst/ip/diffim/SpatialModelKernel.h"
+%}
 
-%template(calculateMaskedImageResiduals)
-    lsst::ip::diffim::calculateMaskedImageResiduals<float, lsst::afw::image::maskPixelType>;
-%template(calculateMaskedImageResiduals)
-    lsst::ip::diffim::calculateMaskedImageResiduals<double, lsst::afw::image::maskPixelType>;
+SWIG_SHARED_PTR(SpatialModelKernelF, lsst::ip::diffim::SpatialModelKernel<float>);
+SWIG_SHARED_PTR(SpatialModelKernelD, lsst::ip::diffim::SpatialModelKernel<double>);
 
-%template(calculateImageResiduals)          lsst::ip::diffim::calculateImageResiduals<float>;
-%template(calculateImageResiduals)          lsst::ip::diffim::calculateImageResiduals<double>;
-%template(addFunction)                      lsst::ip::diffim::addFunction<double, double>;
-%template(addFunction)                      lsst::ip::diffim::addFunction<float, double>;
-%template(addFunction)                      lsst::ip::diffim::addFunction<double, float>;
-%template(addFunction)                      lsst::ip::diffim::addFunction<float, float>;
+%include "lsst/ip/diffim/SpatialModelKernel.h"
 %template(subtractFunction)                 lsst::ip::diffim::subtractFunction<double, double>;
 %template(subtractFunction)                 lsst::ip::diffim::subtractFunction<float, double>;
 %template(subtractFunction)                 lsst::ip::diffim::subtractFunction<double, float>;
 %template(subtractFunction)                 lsst::ip::diffim::subtractFunction<float, float>;
 
-/* ImageSubtract.h */
-/*******************/
-/* Pca.h */
+%template(SpatialModelKernelF) lsst::ip::diffim::SpatialModelKernel<float>;
+%template(SpatialModelKernelD) lsst::ip::diffim::SpatialModelKernel<double>;
+
+%template(VectorSpatialModelKernelF) std::vector<lsst::ip::diffim::SpatialModelKernel<float>::Ptr >;
+%template(VectorSpatialModelKernelD) std::vector<lsst::ip::diffim::SpatialModelKernel<double>::Ptr >;
+
+
+/******************************************************************************/
+
+%{
+#include "lsst/ip/diffim/SpatialModelCell.h"
+%}
+
+SWIG_SHARED_PTR(SpatialModelCellF, lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >);
+SWIG_SHARED_PTR(SpatialModelCellD, lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >);
+
+%include "lsst/ip/diffim/SpatialModelCell.h"
+
+%template(SpatialModelCellF) lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >;
+%template(SpatialModelCellD) lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >;
+
+%template(VectorSpatialModelCellF) std::vector<lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >::Ptr >;
+%template(VectorSpatialModelCellD) std::vector<lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >::Ptr >;
+
+/******************************************************************************/
+
+/*
+%{
+#include "lsst/ip/diffim/Pca.h"
+%}
 
 %include "lsst/ip/diffim/Pca.h"
+
 %template(computePca)                    lsst::ip::diffim::computePca<vw::math::Matrix<float>, vw::math::Vector<float> >;
 %template(computePca)                    lsst::ip::diffim::computePca<vw::math::Matrix<double>, vw::math::Vector<double> >;
 %template(decomposeMatrixUsingBasis)     lsst::ip::diffim::decomposeMatrixUsingBasis<vw::math::Matrix<float> >;
 %template(decomposeMatrixUsingBasis)     lsst::ip::diffim::decomposeMatrixUsingBasis<vw::math::Matrix<double> >;
 %template(approximateMatrixUsingBasis)   lsst::ip::diffim::approximateMatrixUsingBasis<vw::math::Matrix<float> >;
 %template(approximateMatrixUsingBasis)   lsst::ip::diffim::approximateMatrixUsingBasis<vw::math::Matrix<double> >;
-
-/* Pca.h */
-
-/*******************/
-/* WCSMatch.h */
-%include "lsst/ip/diffim/wcsMatch.h"
-%template(wcsMatch)    lsst::ip::diffim::wcsMatch<boost::uint16_t, lsst::afw::image::maskPixelType>;
-%template(wcsMatch)    lsst::ip::diffim::wcsMatch<float, lsst::afw::image::maskPixelType>;
-%template(wcsMatch)    lsst::ip::diffim::wcsMatch<double, lsst::afw::image::maskPixelType>;
-
-/******************************************************************************/
-// Local Variables: ***
-// eval: (setq indent-tabs-mode nil) ***
-// End: ***
+*/
