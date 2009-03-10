@@ -190,10 +190,10 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         
         for (unsigned int col = startCol; col < endCol; ++col) {
             
-            ImageT ncImage          = imageToNotConvolveLocator.image();
-            ImageT ncVariance       = imageToNotConvolveLocator.variance();
-            image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
-            double iVariance        = 1.0 / *varianceLocator;
+            ImageT const ncImage          = imageToNotConvolveLocator.image();
+            ImageT const ncVariance       = imageToNotConvolveLocator.variance();
+            image::MaskPixel const ncMask = imageToNotConvolveLocator.mask();
+            double const iVariance        = 1.0 / *varianceLocator;
             
             // Unit test ImageSubtract_1.py should show
             // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
@@ -212,8 +212,8 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
             typename std::vector<xy_locator>::iterator 
                 citerE = convolvedLocatorList.end();
             for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
-                ImageT           cdImagei = (*citeri).image();
-                image::MaskPixel cdMaski  = (*citeri).mask();
+                ImageT           const cdImagei = (*citeri).image();
+                image::MaskPixel const cdMaski  = (*citeri).mask();
                 if (cdMaski != 0) {
                     throw LSST_EXCEPT(exceptions::Exception, 
                                       str(boost::format("Accessing invalid pixel (%d) in PsfMatchingFunctor::apply") % 
@@ -224,7 +224,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
                 typename std::vector<xy_locator>::iterator 
                     citerj = citeri;
                 for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
-                    ImageT cdImagej  = (*citerj).image();
+                    ImageT const cdImagej  = (*citerj).image();
                     M(kidxi, kidxj) += cdImagei * cdImagej * iVariance;
                 } 
                 
@@ -494,10 +494,10 @@ void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
         
         for (unsigned int col = startCol; col < endCol; ++col) {
             
-            ImageT ncImage          = imageToNotConvolveLocator.image();
-            ImageT ncVariance       = imageToNotConvolveLocator.variance();
-            image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
-            double iVariance        = 1.0 / *varianceLocator;
+            ImageT const ncImage          = imageToNotConvolveLocator.image();
+            ImageT const ncVariance       = imageToNotConvolveLocator.variance();
+            image::MaskPixel const ncMask = imageToNotConvolveLocator.mask();
+            double const iVariance        = 1.0 / *varianceLocator;
             
             // Unit test ImageSubtract_1.py should show
             // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
@@ -516,8 +516,8 @@ void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
             typename std::vector<xy_locator>::iterator 
                 citerE = convolvedLocatorList.end();
             for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
-                ImageT           cdImagei = (*citeri).image();
-                image::MaskPixel cdMaski  = (*citeri).mask();
+                ImageT           const cdImagei = (*citeri).image();
+                image::MaskPixel const cdMaski  = (*citeri).mask();
                 if (cdMaski != 0) {
                     throw LSST_EXCEPT(exceptions::Exception, 
                                       str(boost::format("Accessing invalid pixel (%d) in PsfMatchingFunctor::applyGsl") % 
@@ -528,7 +528,7 @@ void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
                 typename std::vector<xy_locator>::iterator 
                     citerj = citeri;
                 for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
-                    ImageT cdImagej  = (*citerj).image();
+                    ImageT const cdImagej  = (*citerj).image();
                     *gsl_matrix_ptr(M, kidxi, kidxj) += cdImagei * cdImagej * iVariance;
                 } 
                 
@@ -750,10 +750,10 @@ void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
         
         for (unsigned int col = startCol; col < endCol; ++col) {
             
-            ImageT ncImage          = imageToNotConvolveLocator.image();
-            ImageT ncVariance       = imageToNotConvolveLocator.variance();
-            image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
-            double iVariance        = 1.0 / *varianceLocator;
+            ImageT const ncImage          = imageToNotConvolveLocator.image();
+            ImageT const ncVariance       = imageToNotConvolveLocator.variance();
+            image::MaskPixel const ncMask = imageToNotConvolveLocator.mask();
+            double const iVariance        = 1.0 / *varianceLocator;
             
             // Unit test ImageSubtract_1.py should show
             // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
@@ -772,8 +772,8 @@ void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
             typename std::vector<xy_locator>::iterator 
                 citerE = convolvedLocatorList.end();
             for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
-                ImageT           cdImagei = (*citeri).image();
-                image::MaskPixel cdMaski  = (*citeri).mask();
+                ImageT           const cdImagei = (*citeri).image();
+                image::MaskPixel const cdMaski  = (*citeri).mask();
                 if (cdMaski != 0) {
                     throw LSST_EXCEPT(exceptions::Exception, 
                                       str(boost::format("Accessing invalid pixel (%d) in PsfMatchingFunctor::applyVW") % 
@@ -784,7 +784,7 @@ void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
                 typename std::vector<xy_locator>::iterator 
                     citerj = citeri;
                 for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
-                    ImageT cdImagej  = (*citerj).image();
+                    ImageT const cdImagej  = (*citerj).image();
                     M[kidxi][kidxj]   += cdImagei * cdImagej * iVariance;
                 } 
                 
@@ -1542,10 +1542,10 @@ void diffim::computePsfMatchingKernelForFootprint(
         
         for (unsigned int col = startCol; col < endCol; ++col) {
             
-            ImageT ncImage          = imageToNotConvolveLocator.image();
-            ImageT ncVariance       = imageToNotConvolveLocator.variance();
-            image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
-            double iVariance        = 1.0 / *varianceLocator;
+            ImageT const ncImage          = imageToNotConvolveLocator.image();
+            ImageT const ncVariance       = imageToNotConvolveLocator.variance();
+            image::MaskPixel const ncMask = imageToNotConvolveLocator.mask();
+            double const iVariance        = 1.0 / *varianceLocator;
             
             // Unit test ImageSubtract_1.py should show
             // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
@@ -1565,8 +1565,8 @@ void diffim::computePsfMatchingKernelForFootprint(
                 citerE = convolvedLocatorList.end();
 
             for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
-                ImageT           cdImagei = (*citeri).image();
-                image::MaskPixel cdMaski  = (*citeri).mask();
+                ImageT           const cdImagei = (*citeri).image();
+                image::MaskPixel const cdMaski  = (*citeri).mask();
                 if (cdMaski != 0) {
                     throw LSST_EXCEPT(exceptions::Exception, 
                                       str(boost::format("Accessing invalid pixel (%d) in computePsfMatchingKernelForFootprint") % 
@@ -1578,7 +1578,7 @@ void diffim::computePsfMatchingKernelForFootprint(
                     citerj = citeri;
 
                 for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
-                    ImageT cdImagej = (*citerj).image();
+                    ImageT const cdImagej = (*citerj).image();
                     
                     *gsl_matrix_ptr(M, kidxi, kidxj) += cdImagei * cdImagej * iVariance;
                 } 
@@ -1867,10 +1867,10 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
         
         for (unsigned int col = startCol; col < endCol; ++col) {
             
-            ImageT ncImage          = imageToNotConvolveLocator.image();
-            ImageT ncVariance       = imageToNotConvolveLocator.variance();
-            image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
-            double iVariance        = 1.0 / *varianceLocator;
+            ImageT const ncImage          = imageToNotConvolveLocator.image();
+            ImageT const ncVariance       = imageToNotConvolveLocator.variance();
+            image::MaskPixel const ncMask = imageToNotConvolveLocator.mask();
+            double const iVariance        = 1.0 / *varianceLocator;
             
             // Unit test ImageSubtract_1.py should show
             // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
@@ -1890,8 +1890,8 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
                 citerE = convolvedLocatorList.end();
 
             for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
-                ImageT           cdImagei = (*citeri).image();
-                image::MaskPixel cdMaski  = (*citeri).mask();
+                ImageT           const cdImagei = (*citeri).image();
+                image::MaskPixel const cdMaski  = (*citeri).mask();
                 if (cdMaski != 0) {
                     throw LSST_EXCEPT(exceptions::Exception, 
                                       str(boost::format("Accessing invalid pixel (%d) in computePsfMatchingKernelForFootprint") % 
@@ -1903,7 +1903,7 @@ void diffim::computePsfMatchingKernelForFootprintEigen(
                     citerj = citeri;
 
                 for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
-                    ImageT cdImagej = (*citerj).image();
+                    ImageT const cdImagej = (*citerj).image();
                     
                     M(kidxi, kidxj) += cdImagei * cdImagej * iVariance;
                 } 
@@ -2194,10 +2194,10 @@ void diffim::computePsfMatchingKernelForFootprintVW(
         
         for (unsigned int col = startCol; col < endCol; ++col) {
             
-            ImageT ncImage          = imageToNotConvolveLocator.image();
-            ImageT ncVariance       = imageToNotConvolveLocator.variance();
-            image::MaskPixel ncMask = imageToNotConvolveLocator.mask();
-            double iVariance        = 1.0 / *varianceLocator;
+            ImageT const ncImage          = imageToNotConvolveLocator.image();
+            ImageT const ncVariance       = imageToNotConvolveLocator.variance();
+            image::MaskPixel const ncMask = imageToNotConvolveLocator.mask();
+            double const iVariance        = 1.0 / *varianceLocator;
             
             // Unit test ImageSubtract_1.py should show
             // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
@@ -2217,8 +2217,8 @@ void diffim::computePsfMatchingKernelForFootprintVW(
                 citerE = convolvedLocatorList.end();
 
             for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
-                ImageT           cdImagei = (*citeri).image();
-                image::MaskPixel cdMaski  = (*citeri).mask();
+                ImageT           const cdImagei = (*citeri).image();
+                image::MaskPixel const cdMaski  = (*citeri).mask();
                 if (cdMaski != 0) {
                     throw LSST_EXCEPT(exceptions::Exception, 
                                       str(boost::format("Accessing invalid pixel (%d) in computePsfMatchingKernelForFootprint") % 
@@ -2230,7 +2230,7 @@ void diffim::computePsfMatchingKernelForFootprintVW(
                     citerj = citeri;
 
                 for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
-                    ImageT cdImagej    = (*citerj).image();
+                    ImageT const cdImagej    = (*citerj).image();
                     M[kidxi][kidxj]   += cdImagei * cdImagej * iVariance;
                 } 
                 

@@ -92,7 +92,7 @@ namespace diffim {
         void apply(lsst::afw::image::MaskedImage<ImageT> const& image) {
             reset();
             for (int y = 0; y != image.getHeight(); ++y) {
-                for (x_iterator ptr = image.row_begin(y); ptr != image.row_end(y); ++ptr) {
+                for (x_iterator ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
                     if ((*ptr).mask() == 0) {
                         _counts += (*ptr).image();
                     }
@@ -133,10 +133,11 @@ namespace diffim {
         void apply(lsst::afw::image::MaskedImage<ImageT> const& image) {
             reset();
             for (int y = 0; y != image.getHeight(); ++y) {
-                for (x_iterator ptr = image.row_begin(y); ptr != image.row_end(y); ++ptr) {
+                for (x_iterator ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
                     if ((*ptr).mask() == 0) {
-                        _xsum  += (*ptr).image() / sqrt((*ptr).variance());
-                        _x2sum += (*ptr).image() * (*ptr).image() / (*ptr).variance();
+                        double const ivar = (*ptr).variance();
+                        _xsum  += (*ptr).image() * sqrt(ivar);
+                        _x2sum += (*ptr).image() * (*ptr).image() * ivar;
                         _npix  += 1;
                     }
                 }
