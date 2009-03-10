@@ -10,9 +10,13 @@ import lsst.afw.math      as afwMath
 import lsst.afw.image     as afwImage
 import lsst.afw.detection as afwDetection
 import lsst.ip.diffim     as ipDiffim
+import lsst.pex.logging   as logging
 
-import lsst.ip.diffim.diffimTools as ipDiffimTools
-import lsst.ip.diffim.runPca      as runPca
+############## NOTE - This is not finished for DC3a
+############## NOTE - This is not finished for DC3a
+############## NOTE - This is not finished for DC3a
+############## NOTE - This is not finished for DC3a
+############## NOTE - This is not finished for DC3a
 
 try:
     type(verbosity)
@@ -51,10 +55,10 @@ class fitFunctionUT(unittest.TestCase):
 
         pars     = num.zeros(2)
         stepsize = 0.1 * num.ones(2)
-        fit      = ipDiffimTools.fitFunction(afwMath.PolynomialFunction2D(2),
-                                             values, errors,
-                                             cols, rows,
-                                             policy)
+        fit      = ipDiffim.diffimTools.fitFunction(afwMath.PolynomialFunction2D(2),
+                                                    values, errors,
+                                                    cols, rows,
+                                                    policy)
         for i in range(len(inPars)):
             self.assertAlmostEqual(inPars[i], fit.parameterList[i])
     
