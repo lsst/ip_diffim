@@ -1208,8 +1208,10 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
                                "Grow by : %d pixels", fpGrowPix);
 
             // Grow the footprint
+            // true = isotropic grow = slow
+            // false = 'manhattan grow' = fast
             lsst::afw::detection::Footprint::Ptr fpGrow = 
-                lsst::afw::detection::growFootprint(*i, fpGrowPix);
+                lsst::afw::detection::growFootprint(*i, fpGrowPix, false);
             
             logging::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                                "Footprint out : %d,%d -> %d,%d",

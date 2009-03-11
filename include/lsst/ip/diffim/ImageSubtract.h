@@ -135,7 +135,7 @@ namespace diffim {
             for (int y = 0; y != image.getHeight(); ++y) {
                 for (x_iterator ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
                     if ((*ptr).mask() == 0) {
-                        double const ivar = (*ptr).variance();
+                        double const ivar = 1. / (*ptr).variance();
                         _xsum  += (*ptr).image() * sqrt(ivar);
                         _x2sum += (*ptr).image() * (*ptr).image() * ivar;
                         _npix  += 1;
@@ -157,7 +157,7 @@ namespace diffim {
             return sqrt(getVariance());
         }
         // Return the number of good pixels
-        double getNpix() const { return _npix; }
+        int getNpix() const { return _npix; }
 
         // Return Sdqa rating
         bool evaluateQuality(lsst::pex::policy::Policy const& policy) {
@@ -528,12 +528,6 @@ namespace diffim {
         lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& kernelInBasisList,
         lsst::pex::policy::Policy const& policy
-        );
-
-    template <typename PixelT, typename FunctionT>
-    void subtractFunction(
-        lsst::afw::image::Image<PixelT> &image,
-        lsst::afw::math::Function2<FunctionT> const &function
         );
 
 }}}

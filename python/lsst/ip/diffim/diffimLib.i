@@ -134,11 +134,15 @@ SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<do
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
 
+%template(FindCountsI)
+    lsst::ip::diffim::FindCounts<int>;
 %template(FindCountsF)
     lsst::ip::diffim::FindCounts<float>;
 %template(FindCountsD)
     lsst::ip::diffim::FindCounts<double>;
 
+%template(ImageStatisticsI)
+    lsst::ip::diffim::ImageStatistics<int>;
 %template(ImageStatisticsF)
     lsst::ip::diffim::ImageStatistics<float>;
 %template(ImageStatisticsD)
@@ -174,10 +178,6 @@ SWIG_SHARED_PTR(SpatialModelKernelF, lsst::ip::diffim::SpatialModelKernel<float>
 SWIG_SHARED_PTR(SpatialModelKernelD, lsst::ip::diffim::SpatialModelKernel<double>);
 
 %include "lsst/ip/diffim/SpatialModelKernel.h"
-%template(subtractFunction)                 lsst::ip::diffim::subtractFunction<double, double>;
-%template(subtractFunction)                 lsst::ip::diffim::subtractFunction<float, double>;
-%template(subtractFunction)                 lsst::ip::diffim::subtractFunction<double, float>;
-%template(subtractFunction)                 lsst::ip::diffim::subtractFunction<float, float>;
 
 %template(SpatialModelKernelF) lsst::ip::diffim::SpatialModelKernel<float>;
 %template(SpatialModelKernelD) lsst::ip::diffim::SpatialModelKernel<double>;
