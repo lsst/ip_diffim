@@ -53,7 +53,7 @@ if os.environ.get("USE_VW"):
 #
 for d in (
     ".",
-#    "doc",
+    "doc",
     "examples",
     "lib",
     "python/lsst/ip/diffim",
