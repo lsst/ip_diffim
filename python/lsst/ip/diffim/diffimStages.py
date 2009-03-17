@@ -1,7 +1,14 @@
+import numpy
+
 from lsst.pex.harness.Stage import Stage
+
 import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
-import diffimLib as ipDiffim
+import lsst.sdqa as sdqa
+import lsst.pex.logging as pexLog
+import diffimLib  as ipDiffim
+import diffimTools as diffimTools
+import spatialKernelFit as spatialKernelFit 
 
 class DiffimStage(Stage):
     def process(self):
@@ -32,7 +39,7 @@ class DiffimStage(Stage):
         exposureKey = self._policy.getString('differenceExposureKey')
         self.activeClipboard.put(exposureKey, differenceExposure)
 
-        clipboardKey = self._policy.getString('sdqaRatingSetKey')
+        sdqaKey = self._policy.getString('sdqaRatingSetKey')
         self.activeClipboard.put(sdqaKey, sdqaSet)
 
         self.outputQueue.addDataset(self.activeClipboard)
@@ -122,7 +129,8 @@ def subtractMaskedImage(templateMaskedImage,
                 policy)
 
     # Set up grid for spatial model
-    spatialCells = ipDiffim.createSpatialModelKernelCells(templateMaskedImage,
+    spatialCells = diffimTools.createSpatialModelKernelCells(
+            templateMaskedImage,
             scienceMaskedImage,
             fpList,
             kFunctor,
@@ -145,7 +153,7 @@ def subtractMaskedImage(templateMaskedImage,
         while (nRejected != 0) and (nIter < maxSpatialIterations):
             # Run the PCA
             mKernel, eKernelVector, eVal, eCoeff = \
-                    ipDiffim.spatialModelKernelPca(spatialCells, policy)
+                    spatialKernelFit.spatialModelKernelPca(spatialCells, policy)
 
             # Make the decision on how many components to use
             eFrac = numpy.cumsum(eVal)
@@ -155,7 +163,8 @@ def subtractMaskedImage(templateMaskedImage,
             nEval = max(nEval, minPrincipalComponents)
 
             # do spatial fit here by Principal Component
-            sKernel, bgFunction = ipDiffim.spatialModelByPca(spatialCells,
+            sKernel, bgFunction = spatialKernelFit.spatialModelByPca(
+                    spatialCells,
                     mKernel,
                     eKernelVector,
                     eCoeff,
@@ -163,7 +172,8 @@ def subtractMaskedImage(templateMaskedImage,
                     policy)
 
             # Evaluate quality of spatial fit
-            nRejected, sdqaList = ipDiffim.evaluateModelByPca(spatialCells,
+            nRejected, sdqaList = spatialKernelFit.evaluateModelByPca(
+                    spatialCells,
                     bgFunction, 
                     sKernel,
                     policy, 
@@ -176,12 +186,14 @@ def subtractMaskedImage(templateMaskedImage,
 
         while (nRejected != 0) and (nIter < maxSpatialIterations):
             # do spatial fit here pixel by pixel
-            sKernel, bgFunction = ipDiffim.spatialModelByPixel(spatialCells,
+            sKernel, bgFunction = spatialKernelFit.spatialModelByPixel(
+                    spatialCells,
                     kBasisList,
                     policy)
 
             # and check quality
-            nRejected, sdqaList  = ipDiffim.evaluateModelByPixel(spatialCells,
+            nRejected, sdqaList  = spatialKernelFit.evaluateModelByPixel(
+                    spatialCells,
                     bgFunction, 
                     sKernel, 
                     policy, 
@@ -217,7 +229,7 @@ def subtractMaskedImage(templateMaskedImage,
         for nCol in [0, templateMaskedImage.getWidth()]:
             kSums.append( sKernel.computeImage(kImage, False, nCol, nRow) )
     kSumArray = numpy.array(kSums)
-    Trace('lsst.ip.diffim.subtractMaskedImage', 3, 
+    pexLog.Trace('lsst.ip.diffim.subtractMaskedImage', 3, 
             'Final Kernel Sum from Image Corners : %0.3f (%0.3f)' % 
             (kSumArray.mean(), kSumArray.std()))
     kernelSumRating =  sdqa.SdqaRating("ip_diffim.kernelSum",
