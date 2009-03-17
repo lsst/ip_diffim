@@ -10,7 +10,8 @@ class DiffimStage(Stage):
         
         scienceExposure     = self.activeClipboard.get(scienceExposureKey)
         templateExposure    = self.activeClipboard.get(templateExposureKey)
-        
+       
+        diffimPolicy = self._policy.get('diffimPolicy')
         # step 1
         remapedTemplateExposure = warpTemplateExposure(templateExposure,
                         scienceExposure, 

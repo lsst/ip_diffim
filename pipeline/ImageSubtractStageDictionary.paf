@@ -10,6 +10,9 @@ debugPlot: false
 spatialKernelTesting: false
 spatialKernelRejection: true
 
+# Warping kernel order for warping template Exposure
+warpingKernelOrder: 4
+
 # Spatial function applied to : 'pca' or 'pixel' only
 spatialKernelModel: 'pca'
 

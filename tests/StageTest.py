@@ -40,7 +40,7 @@ class DiffimStageTestCase(unittest.TestCase):
         
         diffimPolicy = pexPolicy.Policy(diffimPolicyFile)
         self.policy.add('diffimPolicy', diffimPolicy)
-
+         
         # OUTPUTS
         self.policy.add('differenceExposureKey', 'differenceExposure0')
         self.policy.add('sdqaRatingSetKey',      'sdqaRatingSet0')
