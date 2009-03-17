@@ -33,7 +33,7 @@ class DiffimStageTestCase(unittest.TestCase):
         self.policy.add('scienceExposureKey', 'scienceExposure0')
         self.policy.add('templateExposureKey', 'templateExposure0')
         # ISR PROCESSING
-        path = os.path.join(eups.productDir("ip_diffim"),
+        path = os.path.join(os.environ["IP_DIFFIM_DIR"],
                             "pipeline", 
                             "ImageSubtractStageDictionary.paf")
         diffimPolicyFile = pexPolicy.PolicyFile(path)
@@ -51,7 +51,8 @@ class DiffimStageTestCase(unittest.TestCase):
                                       "cal-53535-i-797722_1")
         defTemplatePath = defSciencePath + "_tmpl"
         
-        scienceExposure = afwImage.ExposureF(defSciencePath)
+        bbox = afwImage.BBox(afwImage.PointI(32,32), 512, 512)
+        scienceExposure = afwImage.ExposureF(defSciencePath, 0, bbox)
         templateExposure = afwImage.ExposureF(defTemplatePath)
         
         clipboard = pexClipboard.Clipboard()

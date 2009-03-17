@@ -33,7 +33,7 @@ kernelSpatialOrder: 1
 # Order of background spatial variation
 backgroundSpatialOrder: 1
 
-######
+#####
 # Chops up the image into cells
 #
 #   segmentMaskedImage:
