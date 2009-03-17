@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Run with:
-   python IsrStageTest.py
+   python DiffimStageTest.py
 """
 
 import sys, os, math
@@ -18,7 +18,6 @@ import lsst.pex.logging as pexLog
 import lsst.ip.diffim.diffimStages as diffimStages
 import lsst.afw.image as afwImage
 import lsst.daf.base as dafBase
-from lsst.ctrl.dc3pipe.MetadataStages import transformMetadata
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 Verbosity = 4
@@ -34,23 +33,36 @@ class DiffimStageTestCase(unittest.TestCase):
         self.policy.add('scienceExposureKey', 'scienceExposure0')
         self.policy.add('templateExposureKey', 'templateExposure0')
         # ISR PROCESSING
-        self.policy.add('diffimPolicy',
-                        pexPolicy.Policy.createPolicy(os.path.join(diffimDir,
-                                                                   'pipeline',
-                                                                   'ImageSubtractStageDictionary.paf')))
+        path = os.path.join(eups.productDir("ip_diffim"),
+                            "pipeline", 
+                            "ImageSubtractStageDictionary.paf")
+        diffimPolicyFile = pexPolicy.PolicyFile(path)
+        
+        diffimPolicy = pexPolicy.Policy(diffimPolicyFile)
+        self.policy.add('diffimPolicy', diffimPolicy)
+
         # OUTPUTS
         self.policy.add('differenceExposureKey', 'differenceExposure0')
         self.policy.add('sdqaRatingSetKey',      'sdqaRatingSet0')
-       
-        
+              
         # create clipboard and fill 'er up!
+        defDataDir = eups.productDir('afwdata')
+        defSciencePath = os.path.join(defDataDir, "CFHT", "D4", 
+                                      "cal-53535-i-797722_1")
+        defTemplatePath = defSciencePath + "_tmpl"
+        
+        scienceExposure = afwImage.ExposureF(defSciencePath)
+        templateExposure = afwImage.ExposureF(defTemplatePath)
+        
         clipboard = pexClipboard.Clipboard()
+        clipboard.put(self.policy.get('scienceExposureKey'), scienceExposure)
+        clipboard.put(self.policy.get('templateExposureKey'), templateExposure)
 
         inQueue = pexQueue.Queue()
         inQueue.addDataset(clipboard)
         self.outQueue = pexQueue.Queue()
        
-        self.stage = diffimStages.diffimStage(1, self.policy)
+        self.stage = diffimStages.DiffimStage(0, self.policy)
         self.stage.initialize(self.outQueue, inQueue)
         self.stage.setUniverseSize(1)
         self.stage.setRun('SingleExposureTest')
