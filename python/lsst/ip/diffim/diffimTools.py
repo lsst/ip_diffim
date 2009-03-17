@@ -273,3 +273,55 @@ def imageFromVector(vec, width, height, retType=afwImage.ImageF):
             idx     += 1
     return im
 
+def computeTemplateBbox(scienceWcs, scienceDimensions, templateWcs, templateDimensions, borderWidth):
+    """Return the bounding box of a template exposure that matches a science exposure,
+    grown by borderWidth pixels on all sides.
+    
+    Inputs:
+    - scienceWcs: WCS of science exposure
+    - scienceDimensions: dimensions of science exposure
+    - templateWcs: WCS of template exposure
+    - templateDimensions: dimensions of template exposure
+    - borderWidth: width of border of template Bbox
+    """
+    scienceMaxInd = [val - 1 for val in scienceDimensions]
+    templateMaxInd = [val - 1 for val in templateDimensions]
+    sciencePos = afwImage.PointD()
+    # find lower left and upper right corners of bounding box on template that matches science image;
+    # fractional indices are truncated so grow upper right corner by 1 afterwards
+    llc = None
+    urc = None
+    for xMult in (0, 1):
+        sciencePos.setX(afwImage.indexToPosition(scienceMaxInd[0] * xMult))
+        for yMult in (0, 1):
+            sciencePos.setY(afwImage.indexToPosition(scienceMaxInd[1] * yMult))
+            templatePos = templateWcs.raDecToXY(scienceWcs.xyToRaDec(sciencePos))
+            templateInd = [afwImage.positionToIndex(val) for val in templatePos]
+            if llc == None:
+                llc = templateInd
+                urc = templateInd
+            else:
+                llc = minVec(llc, templateInd)
+                urc = maxVec(urc, templateInd)
+    # grow upper right corner by 1 because fractional indices were truncated
+    # and grow both corners by borderWidth
+    llc = [val - borderWidth for val in llc]
+    urc = [val + borderWidth + 1 for val in urc]
+    # constrain corners to template image boundaries
+    llc = maxVec([0, 0], llc)
+    urc = minVec(templateMaxInd, urc)
+    return afwImage.BBox(afwImage.PointI(*llc), afwImage.PointI(*urc))
+
+def minVec(vec1, vec2):
+    """Return index-wise minimum of two vectors.
+    
+    The result length is the shorter of the two input lengths.
+    """
+    return [min(val1, val2) for val1, val2 in zip(vec1, vec2)]
+    
+def maxVec(vec1, vec2):
+    """Return index-wise minimum of two vectors.
+    
+    The result length is the shorter of the two input lengths.
+    """
+    return [max(val1, val2) for val1, val2 in zip(vec1, vec2)]
