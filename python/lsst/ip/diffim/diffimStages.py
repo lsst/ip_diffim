@@ -4,20 +4,53 @@ from lsst.pex.harness.Stage import Stage
 class DiffimStage(Stage):
     def process(self):
         self.activeClipboard = self.inputQueue.getNextDataset()
-
+        
         scienceExposureKey  = self._policy.get('scienceExposure')
         templateExposureKey = self._policy.get('templateExposure')
-
+        
         scienceExposure     = self.activeClipboard.get(scienceExposureKey)
         templateExposure    = self.activeClipboard.get(templateExposureKey)
         
         # step 1
-        remapedTemplateExposure = warpExposure()
-
-        # step 2
-        subtractExposure()
+        remapedTemplateExposure = warpTemplateExposure(templateExposure,
+                        scienceExposure, 
+                        self._policy)
         
+        # step 2
+        products = subtractExposure(templateExposure, 
+                                    scienceExposure, 
+                                    self._policy)
+        if products == None:
+            raise RuntimeException("DiffimStage.subtractExposure failed")
 
+        differenceExposure, spatialKernel, backgroundModel, sdqaSet = products
+
+        exposureKey = self._policy.getString('differenceExposureKey')
+        self.activeClipboard.put(exposureKey, differenceExposure)
+
+        clipboardKey = self._policy.getString('sdqaRatingSetKey')
+        self.activeClipboard.put(sdqaKey, sdqaSet)
+
+        self.outputQueue.addDataset(self.activeClipboard)
+
+def warpTemplateExposure(templateExposure, scienceExposure, policy):
+    # Create the warping Kernel according to policy
+    warpingKernelOrder = policy.getInt("warpingKernelOrder")
+    warpingKernel = afwMath.LanczosWarpingKernel(warpingKernelOrder)
+
+    # create a blank exposure to hold the remaped template exposure
+    remapedTemplateExposure = templateExposure.Factory(
+                scienceExposure.getWidth(), 
+                scienceExposure.getHeight(),
+                scienceExposure.getWcs())
+
+    # warp the template exposure
+    afwMath.warpExposure(remapedTemplateExposure, 
+                templateExposure, 
+                warpingKernel)
+        
+    return remapedTemplateExposure
+    
 def subtractExposure(templateExposure, scienceExposure, policy):
     # Make sure they end up the same dimensions on the sky
     templateWcs      = templateExposure.getWcs() 
