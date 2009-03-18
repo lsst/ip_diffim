@@ -283,6 +283,8 @@ def computeTemplateBbox(scienceWcs, scienceDimensions, templateWcs, templateDime
     - templateWcs: WCS of template exposure
     - templateDimensions: dimensions of template exposure
     - borderWidth: width of border of template Bbox
+    
+    \raise RuntimeError if the resulting bounding box is entirely off the template.
     """
     scienceMaxInd = [val - 1 for val in scienceDimensions]
     templateMaxInd = [val - 1 for val in templateDimensions]
@@ -308,6 +310,9 @@ def computeTemplateBbox(scienceWcs, scienceDimensions, templateWcs, templateDime
     llc = [val - borderWidth for val in llc]
     urc = [val + borderWidth + 1 for val in urc]
     # constrain corners to template image boundaries
+    if urc[0] < 0 or urc[1] < 0 or llc[0] > templateMaxInd[0] or llc[1] > templateMaxInd[1]:
+        raise RuntimeError("BBox does not overlap template; desired region is (%s, %s) through (%s, %s)" % \
+            (llc[0], llc[1], urc[0], urc[1]))
     llc = maxVec([0, 0], llc)
     urc = minVec(templateMaxInd, urc)
     return afwImage.BBox(afwImage.PointI(*llc), afwImage.PointI(*urc))

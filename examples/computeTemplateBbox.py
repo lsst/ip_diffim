@@ -6,8 +6,8 @@ import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
 
-DefScienceImageName = "medswarp1lanczos2.fits"
-DefTemplateImageName = "med_img.fits"
+DefScienceExposureName = "medswarp1lanczos2.fits"
+DefTemplateExposureName = "med_img.fits"
 DefBorderWidth = 5
 DefVerbosity = 0
 
@@ -19,58 +19,65 @@ def getArg(ind, defValue):
 def printBBox(descr, bbox):
     print "%s: [%s, %s], [%s, %s]" % (descr, bbox.getX0(), bbox.getY0(), bbox.getX1(), bbox.getY1())
 
-def computeBBox(scienceImagePath, templateImagePath, borderWidth, templateSubImagePath=None):
+def computeBBox(scienceExposurePath, templateExposurePath, borderWidth, templateSubExposurePath=None):
     """Compute and print template bounding box
     
     Inputs:
-    - scienceImagePath: path to science image with Wcs info in header
-    - templateImagePath: path to template image with Wcs info in header
+    - scienceExposurePath: path to science image with Wcs info in header
+    - templateExposurePath: path to template image with Wcs info in header
     - borderWidth: size of border for template bounding box (pixels)
-    """
-    sciHdr = dafBase.PropertySet()
-    sciIm = afwImage.ImageF(scienceImagePath, 0, sciHdr)
-    sciWcs = afwImage.Wcs(sciHdr)
-    sciDim = sciIm.getDimensions()
-    sciBBox = afwImage.BBox(afwImage.PointI(0, 0), sciDim[0], sciDim[1])
-    printBBox("Science  BBox", sciBBox)
+    - templateSubExposure: path for output template SubExposure; not written if None
     
-    tmpHdrData = afwImage.readMetadata(templateImagePath)
+    All exposure paths must omit the final "_img.fits"
+    """
+    sciExp = afwImage.ExposureF(scienceExposurePath)
+    if not sciExp.hasWcs():
+        raise RuntimeError("Science exposure %r has no Wcs" % (scienceExposurePath,))
+    sciWcs = sciExp.getWcs()
+    sciDim = sciExp.getMaskedImage().getDimensions()
+    sciBBox = afwImage.BBox(afwImage.PointI(0, 0), sciDim[0], sciDim[1])
+    printBBox("Science BBox", sciBBox)
+    
+    # instead of reading in the template Exposure (which may be huge), just use the header
+    tmpHdrData = afwImage.readMetadata(templateExposurePath + "_img.fits")
     tmpDim = afwImage.PointI(tmpHdrData.getInt("NAXIS1"), tmpHdrData.getInt("NAXIS2"))
     tmpWcs = afwImage.Wcs(tmpHdrData)
+    tmpFullBBox = afwImage.BBox(afwImage.PointI(0, 0), tmpDim[0], tmpDim[1])
+    printBBox("Template Full BBox", tmpFullBBox)
     
     borderWidth = 5
     tmpBBox = ipDiffim.computeTemplateBbox(sciWcs, sciDim, tmpWcs, tmpDim, borderWidth)
     printBBox("Template BBox", tmpBBox)
 
-    print "Reading sub template exposure"
-    tmpSubHdr = dafBase.PropertySet()
-    tmpSubIm = afwImage.ImageF(templateImagePath, 0, tmpSubHdr, tmpBBox)
-    
-    if templateSubImagePath:
-        print "Saving templateSubImage to:", templateSubImagePath
-        tmpSubIm.writeFits(templateSubImagePath, tmpSubHdr)
+    if templateSubExposurePath:
+        print "Reading sub template exposure"
+        tmpSubExp = afwImage.ExposureF(templateExposurePath, 0, tmpBBox)
+
+        print "Saving templateSubExposure to:", templateSubExposurePath
+        tmpSubExp.writeFits(templateSubExposurePath)
 
 if __name__ == "__main__":
     dataDir = eups.productDir("afwdata")
     if not dataDir:
-        defScienceImagePath = None
-        defTemplateImagePath = None
+        defScienceExposurePath = None
+        defTemplateExposurePath = None
     else:
-        defScienceImagePath = os.path.join(dataDir, DefScienceImageName)
-        defTemplateImagePath = os.path.join(dataDir, DefTemplateImageName)
+        defScienceExposurePath = os.path.join(dataDir, DefScienceExposureName)
+        defTemplateExposurePath = os.path.join(dataDir, DefTemplateExposureName)
 
-    usage = """usage: %%prog [options] scienceImage templateImage [templateSubImage]
+    usage = """usage: %%prog [options] scienceExposure templateExposure [templateSubExposure]
 
-    Computes bounding box on a template image corresponding to a science image.
-    If templateSubImage is specified, saves the corresponding template subimage as a FITS file.
+    Computes bounding box on a template exposure corresponding to a science exposure.
+    If templateSubExposure is specified, saves the template sub-exposure as a FITS file.
     
     Warning: the two input FITS images must contain WCS information in their header
 
     Note:
-    - image arguments are paths to Image fits files; they must include WCS information
-    - default scienceImage = %s
-    - default templateImage = %s
-    """ % (defScienceImagePath, defTemplateImagePath)
+    - image arguments are paths to Exposure fits files; they must not include the final "_img.fits"
+      and must include WCS information
+    - default scienceExposure = %s
+    - default templateExposure = %s
+    """ % (defScienceExposurePath, defTemplateExposurePath)
     
     parser = optparse.OptionParser(usage)
     parser.add_option("-b", "--border",
@@ -83,21 +90,21 @@ if __name__ == "__main__":
     
     (opt, args) = parser.parse_args()
 
-    scienceImagePath = getArg(0, defScienceImagePath)
-    templateImagePath = getArg(1, defTemplateImagePath)
-    templateSubImagePath = getArg(2, None)
-    if None in (scienceImagePath, templateImagePath):
+    scienceExposurePath = getArg(0, defScienceExposurePath)
+    templateExposurePath = getArg(1, defTemplateExposurePath)
+    templateSubExposurePath = getArg(2, None)
+    if None in (scienceExposurePath, templateExposurePath):
         print "Must setup afwdata or else provide image paths"
     borderWidth = opt.border
 
-    print "Science  Image =", scienceImagePath
-    print "Template Image =", templateImagePath
+    print "Science  Exposure =", scienceExposurePath
+    print "Template Exposure =", templateExposurePath
     print "Border Width =", borderWidth
 
     if opt.verbosity > 0:
         print "Verbosity =", opt.verbosity
         lsst.pex.logging.Trace_setVerbosity("lsst.ip.diffim", opt.verbosity)
 
-    computeBBox(scienceImagePath, templateImagePath, borderWidth, templateSubImagePath)
+    computeBBox(scienceExposurePath, templateExposurePath, borderWidth, templateSubExposurePath)
         
     
