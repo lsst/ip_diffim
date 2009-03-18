@@ -188,7 +188,7 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
             nGood += 1
             label  = 'OK'
             footprintResidualsRating = sdqa.SdqaRating(
-                    "ip_diffim.footprint%d_residuals" % (idList[idx]),
+                    "ip.diffim.footprint%d_residuals" % (idList[idx]),
                     imStats.getMean(), 
                     imStats.getRms(), 
                     sdqa.SdqaRating.AMP)  

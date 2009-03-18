@@ -218,7 +218,7 @@ def subtractMaskedImage(templateMaskedImage,
     #
     imStats = ipDiffim.ImageStatisticsF()
     imStats.apply(differenceMaskedImage)
-    residualsRating = sdqa.SdqaRating("ip_diffim.residuals",
+    residualsRating = sdqa.SdqaRating("ip.diffim.residuals",
             imStats.getMean(), 
             imStats.getRms(), 
             sdqa.SdqaRating.AMP) 
@@ -234,7 +234,7 @@ def subtractMaskedImage(templateMaskedImage,
     pexLog.Trace('lsst.ip.diffim.subtractMaskedImage', 3, 
             'Final Kernel Sum from Image Corners : %0.3f (%0.3f)' % 
             (kSumArray.mean(), kSumArray.std()))
-    kernelSumRating =  sdqa.SdqaRating("ip_diffim.kernelSum",
+    kernelSumRating =  sdqa.SdqaRating("ip.diffim.kernelSum",
             kSumArray.mean(),
             kSumArray.std(), 
             sdqa.SdqaRating.AMP)  
