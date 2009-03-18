@@ -160,15 +160,18 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
     # image stats
     imStats = diffimLib.ImageStatisticsF()
 
-    sdqaList = []
+    sdqaList = sdqa.SdqaRatingSet()
     for idx in range(nCells):
         bgValue = bgFunction(cCol[idx], cRow[idx])
         sImage  = afwImage.ImageD(sKernel.getDimensions())
         sKernel.computeImage(sImage, False, cCol[idx], cRow[idx])
         kernel  = afwMath.FixedKernel(sImage)
-        diffIm  = diffimLib.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr(),
-                                                spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr(),
-                                                kernel, bgValue)
+        spatialCell = spatialCells[idList[idx]]
+        spatialCellModel = spatialCell.getCurrentModel()
+        diffIm  = diffimLib.convolveAndSubtract(
+                spatialCellModel.getMiToConvolvePtr(),
+                spatialCellModel.getMiToNotConvolvePtr(),
+                kernel, bgValue)
 
         # Find quality of difference image
         imStats.apply(diffIm)
@@ -184,13 +187,16 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
         else:
             nGood += 1
             label  = 'OK'
-            sdqaList.append( sdqa.SdqaRating("ip_diffim.footprint%d_residuals" % (idList[idx]),
-                                             imStats.getMean(), imStats.getRms(), sdqa.SdqaRating.AMP) ) 
-
+            footprintResidualsRating = sdqa.SdqaRating(
+                    "ip_diffim.footprint%d_residuals" % (idList[idx]),
+                    imStats.getMean(), 
+                    imStats.getRms(), 
+                    sdqa.SdqaRating.AMP)  
+            sdqaList.append(footprintResidualsRating)
         Trace('lsst.ip.diffim.evaluateModelByPixel', 5,
               '%s Kernel %d : %s Spatial residuals = %.2f +/- %.2f sigma' %
-              (spatialCells[ idList[idx] ].getLabel(),
-               spatialCells[ idList[idx] ].getCurrentId(),
+              (spatialCell.getLabel(),
+               spatialCell.getCurrentId(),
                label, imStats.getMean(), imStats.getRms()))
         # So the trace statements are in a reasonable order
         if rejected:
@@ -198,7 +204,7 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
             # May be needed in the future
             #
             # spatialCells[ idList[idx] ].getCurrentModel().setStatus(False)
-            spatialCells[ idList[idx] ].incrementModel()
+            spatialCell.incrementModel()
             
 
     Trace('lsst.ip.diffim.evaluateModelByPixel', 3,
@@ -231,23 +237,30 @@ def spatialModelKernelPca(spatialCells, policy, id=''):
     # matrix to invert
     M = numpy.zeros((kCols*kRows, nCells))
     for idx in range(nCells):
-        kPtr         = spatialCells[ idList[idx] ].getCurrentModel().getKernelPtr()
-        kImage       = afwImage.ImageD(kPtr.getDimensions())
+        currentModel = spatialCells[idList[idx]].getCurrentModel()
+        kPtr = currentModel.getKernelPtr()
+        kImage = afwImage.ImageD(kPtr.getDimensions())
         kPtr.computeImage(kImage, False)
-        M[:,idx]     = diffimTools.vectorFromImage(kImage)
+        M[:,idx] = diffimTools.vectorFromImage(kImage)
 
     # Call numpy Pca
     meanM, U, eVal, eCoeff = diffimTools.runPca(M, policy)
 
     # Turn principal components into Kernels (which are double)
-    mImage  = diffimTools.imageFromVector(meanM, kCols, kRows, retType=afwImage.ImageD)
+    mImage  = diffimTools.imageFromVector(meanM, 
+            kCols, 
+            kRows, 
+            retType=afwImage.ImageD)
     mKernel = afwMath.FixedKernel(mImage)
     if policy.get('debugIO'):
         mImage.writeFits('mKernel%s.fits' % (id))
 
     eKernelVector = afwMath.VectorKernel()
     for i in range(U.shape[1]):
-        eImage  = diffimTools.imageFromVector(U[:,i], kCols, kRows, retType=afwImage.ImageD)
+        eImage  = diffimTools.imageFromVector(U[:,i], 
+                kCols, 
+                kRows, 
+                retType=afwImage.ImageD)
         eKernel = afwMath.FixedKernel(eImage)
         eKernelVector.append(eKernel)
 
@@ -278,15 +291,17 @@ def spatialModelByPca(spatialCells, mKernel, eKernelVector, eCoeffs, nEVal, poli
     cCol = numpy.zeros(nCells)
     cRow = numpy.zeros(nCells)
     for idx in range(nCells):
-        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColc()
-        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowc()
+        currentModel = spatialCells[ idList[idx] ].getCurrentModel()
+        cCol[idx] = currentModel.getColc()
+        cRow[idx] = currentModel.getRowc()
 
     # fit the background
     bgValues = numpy.zeros(nCells)
     bgErrors = numpy.zeros(nCells)
     for idx in range(nCells):
-        bgValues[idx] = spatialCells[ idList[idx] ].getCurrentModel().getBg()
-        bgErrors[idx] = spatialCells[ idList[idx] ].getCurrentModel().getBgErr()
+        currentModel = spatialCells[ idList[idx] ].getCurrentModel()
+        bgValues[idx] = currentModel.getBg()
+        bgErrors[idx] = currentModel.getBgErr()
 
     bgFunction = afwMath.PolynomialFunction2D(bgSpatialOrder)
     bgFit      = diffimTools.fitFunction(bgFunction, bgValues, bgErrors,
@@ -366,23 +381,27 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
     cCol = numpy.zeros(nCells)
     cRow = numpy.zeros(nCells)
     for idx in range(nCells):
-        cCol[idx] = spatialCells[ idList[idx] ].getCurrentModel().getColc()
-        cRow[idx] = spatialCells[ idList[idx] ].getCurrentModel().getRowc()
+        currentModel = spatialCells[ idList[idx] ].getCurrentModel()
+        cCol[idx] = currentModel.getColc()
+        cRow[idx] = currentModel.getRowc()
 
     # Evaluate all the fits at the positions of the objects, create a
     # new kernel, then difference image, the calculate difference
     # image stats
     imStats = diffimLib.ImageStatisticsF()
 
-    sdqaList = []
+    sdqaList = sdqa.SdqaRatingSet() 
     for idx in range(nCells):
         bgValue = bgFunction(cCol[idx], cRow[idx])
         eImage  = afwImage.ImageD(eKernel.getDimensions())
         eKernel.computeImage(eImage, False, cCol[idx], cRow[idx])
         kernel  = afwMath.FixedKernel(eImage)
-        diffIm  = diffimLib.convolveAndSubtract(spatialCells[ idList[idx] ].getCurrentModel().getMiToConvolvePtr(),
-                                                spatialCells[ idList[idx] ].getCurrentModel().getMiToNotConvolvePtr(),
-                                                kernel, bgValue)
+        spatialCell = spatialCells[idList[idx]]
+        currentModel = spatialCell.getCurrentModel()
+        diffIm  = diffimLib.convolveAndSubtract(
+                currentModel.getMiToConvolvePtr(),
+                currentModel.getMiToNotConvolvePtr(),
+                kernel, bgValue)
 
         # Find quality of difference image
         imStats.apply(diffIm)
@@ -398,13 +417,16 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
         else:
             nGood += 1
             label = 'OK'
-            sdqaList.append( sdqa.SdqaRating("ip_diffim.footprint%d_residuals" % (idList[idx]),
-                                             imStats.getMean(), imStats.getRms(), sdqa.SdqaRating.AMP) ) 
-
+            footprintResidualsRating = sdqa.SdqaRating(
+                    "ip_diffim.footprint%d_residuals" % (idList[idx]),
+                    imStats.getMean(), 
+                    imStats.getRms(), 
+                    sdqa.SdqaRating.AMP) 
+            sdqaList.append(footprintResidualsRating)
         Trace('lsst.ip.diffim.evaluateModelByPca', 5,
               '%s Kernel %d : %s Pca residuals = %.2f +/- %.2f sigma' %
-              (spatialCells[ idList[idx] ].getLabel(),
-               spatialCells[ idList[idx] ].getCurrentId(),
+              (spatialCell.getLabel(),
+               spatialCell.getCurrentId(),
                label, imStats.getMean(), imStats.getRms()))
         # So the trace statements are in a reasonable order
         if rejected:
@@ -412,7 +434,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
             # May be needed in the future
             #
             # spatialCells[ idList[idx] ].getCurrentModel().setStatus(False)
-            spatialCells[ idList[idx] ].incrementModel()
+            spatialCell.incrementModel()
         
     Trace('lsst.ip.diffim.evaluateModelByPca', 3,
           'Spatial model by PCA : %d / %d Kernels acceptable' % (nGood, nCells))
@@ -466,15 +488,21 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
         while (nRejected != 0) and (nIter < maxSpatialIterations):
         
             # do spatial fit here pixel by pixel
-            sKernel, bgFunction = spatialModelByPixel(spatialCells, kBasisList, policy)
+            sKernel, bgFunction = spatialModelByPixel(
+                    spatialCells, 
+                    kBasisList, 
+                    policy)
 
             # and check quality
-            nRejected  = evaluateModelByPixel(spatialCells,
-                                              bgFunction, sKernel, 
-                                              policy, reject=rejectKernels)
+            nRejected  = evaluateModelByPixel(
+                    spatialCells,
+                    bgFunction, 
+                    sKernel, 
+                    policy, reject=rejectKernels)
             nIter += 1
 
-        # In future versions of the code, there will be no need to make pointers like this.
+        # In future versions of the code,
+        # there will be no need to make pointers like this.
         kList['spatial'].append( sKernel )
         bgList['spatial'].append( bgFunction )
         
@@ -487,18 +515,24 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
         while (nRejected != 0) and (nIter < maxSpatialIterations):
             
             # Run the PCA
-            mKernel, eKernelVector, eVal, eCoeff = spatialModelKernelPca(spatialCells, policy, scID)
+            mKernel, eKernelVector, eVal, eCoeff = \
+                    spatialModelKernelPca(spatialCells, policy, scID)
             
-            # Here we make a decision on how many eigenComponents to use based
-            # on eVal, etc
+            # Here we make a decision on how many eigenComponents 
+            # to use based on eVal, etc
             #
             # While we are testing, check them all
             
             # Find spatial variation of only those components
             # Remove this line after being done testing
             # We fit them all first
-            bgFunction, eFunctionList = spatialModelByPca(spatialCells, eCoeff, len(eVal), policy, False)
-    
+            bgFunction, eFunctionList = \
+                    spatialModelByPca(spatialCells, 
+                                      eCoeff, 
+                                      len(eVal), 
+                                      policy, 
+                                      False)
+             
             # LOOP 4b : Number of principal components
             for neVal in range( len(eVal) ):
             
@@ -508,9 +542,14 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
                 # Find spatial variation of only those components
                 # Comment this back in when we are not testing
                 #
-                # bgFunction, eFunctionList = spatialModelByPca(spatialCells, eCoeff, neVal, policy)
+                # bgFunction, eFunctionList = \
+                #       spatialModelByPca(spatialCells, 
+                #               eCoeff, 
+                #               neVal, 
+                #               policy)
             
-                # Build LinearCombinationKernel for only neVal components
+                # Build LinearCombinationKernel for only 
+                # neVal components
                 # Start with mean Kernel image
                 eKernelBases = afwMath.KernelListD()
                 eKernelBases.push_back(mKernel)
@@ -519,25 +558,33 @@ def spatialKernelTesting(spatialCells, kBasisList, policy, scID):
                     eKernelBases.push_back(eKernelVector[ek])
                     
                 # Mean kernel has no spatial variation
-                eKernelFunc   = afwMath.PolynomialFunction2D(kSpatialOrder)
-                kParams       = numpy.zeros( (neVal+1, eKernelFunc.getNParameters()) )
+                eKernelFunc = \
+                        afwMath.PolynomialFunction2D(kSpatialOrder)
+                kParams = numpy.zeros(( 
+                        neVal+1, 
+                        eKernelFunc.getNParameters()))
                 kParams[0][0] = 1.0
                 # Add already-fit-for spatial variation of eigenKernels
                 for ek in range(neVal):
                     kParams[ek+1] = eFunctionList[ek].getParameters()
     
                 # Create spatially varying eigenKernel pointer
-                eKernel = afwMath.LinearCombinationKernel(eKernelBases, eKernelFunc)
+                eKernel = afwMath.LinearCombinationKernel(eKernelBases, 
+                        eKernelFunc)
                 eKernel.setSpatialParameters(kParams)
         
                 # Evaluate quality of spatial fit
-                nRejected = evaluateModelByPca(spatialCells, bgFunction, eKernel,
-                                               policy, reject=rejectKernels)
+                nRejected = evaluateModelByPca(spatialCells, bgFunction,
+                        eKernel,
+                        policy, 
+                        reject=rejectKernels)
                 
             nIter += 1
 
-        # NOTE to self : you get the "final" PCA kernel here with all elements
-        # In future versions of the code, there will be no need to make pointers like this.
+        # NOTE to self : 
+        # you get the "final" PCA kernel here with all elements
+        # In future versions of the code, 
+        # there will be no need to make pointers like this.
         kList['pca'].append( eKernel )
         bgList['pca'].append( bgFunction )
                 

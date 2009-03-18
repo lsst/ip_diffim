@@ -36,11 +36,13 @@ class DiffimStage(Stage):
 
         differenceExposure, spatialKernel, backgroundModel, sdqaSet = products
 
+        persistableSdqaVector = sdqa.PersistableSdqaRatingVector(sdqaSet)
+
         exposureKey = self._policy.getString('differenceExposureKey')
         self.activeClipboard.put(exposureKey, differenceExposure)
 
         sdqaKey = self._policy.getString('sdqaRatingSetKey')
-        self.activeClipboard.put(sdqaKey, sdqaSet)
+        self.activeClipboard.put(sdqaKey, persistableSdqaVector)
 
         self.outputQueue.addDataset(self.activeClipboard)
 
