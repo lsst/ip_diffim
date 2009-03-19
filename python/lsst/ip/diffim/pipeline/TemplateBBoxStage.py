@@ -54,7 +54,8 @@ class TemplateBBoxStage(lsst.pex.harness.Stage.Stage):
             templateBBoxProperties.add(name, val)
             outStrList.append("%s=%s" % (name, val))
 
-        log.log(pexLog.Log.INFO, "templateBBoxProperties: %s" % ("; ".join(outStrList))
+        log.log(pexLog.Log.INFO,
+            "templateBBoxProperties: %s" % (";".join(outStrList)))
 
         activeClipboard.put('templateBBoxProperties', templateBBoxProperties)
 
