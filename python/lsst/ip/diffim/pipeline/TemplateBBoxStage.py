@@ -40,7 +40,8 @@ class TemplateBBoxStage(lsst.pex.harness.Stage.Stage):
             "scienceDimensions=%s, %s; templateDimensions=%s, %s" % \
                 (scienceDimensions[0], scienceDimensions[1], templateDimensions[0], templateDimensions[1]))
 
-        templateBBox = lsst.ip.diffim(scienceWcs, scienceDimensions, templateWcs, templateDimensions, borderWidth)
+        templateBBox = lsst.ip.diffim.computeTemplateBbox(scienceWcs, scienceDimensions, templateWcs,
+                                                          templateDimensions, borderWidth)
 
         nameValPairs = (
             ("llcx", templateBBox.getX0()),
