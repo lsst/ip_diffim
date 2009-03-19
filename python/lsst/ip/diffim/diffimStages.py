@@ -32,6 +32,15 @@ class DiffimStage(Stage):
             del im; del msk; del var
 
             templateExposure = afwImage.makeExposure(maskedImage) 
+
+            wcsKey = self._policy.get('templateWcsKey')
+            wcs = self.activeClipboard.get(wcsKey)
+            bBoxKey = self._policy.get('templateBBoxKey')
+            bBox = self.activeClipboard.get(bBoxKey)
+
+            nwcs = wcs.clone()
+            nwcs.shiftReferencePixel(bBox.get('llcx'), bBox.get('llcy'))
+            templateExposure.setWcs(nwcs)
        
         diffimPolicy = self._policy.get('diffimPolicy')
         # step 1
