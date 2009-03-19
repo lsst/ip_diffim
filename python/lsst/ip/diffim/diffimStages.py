@@ -1,4 +1,5 @@
 import numpy
+import re
 
 from lsst.pex.harness.Stage import Stage
 
@@ -19,6 +20,18 @@ class DiffimStage(Stage):
         
         scienceExposure = self.activeClipboard.get(scienceExposureKey)
         templateExposure = self.activeClipboard.get(templateExposureKey)
+        #
+        # We may have been passed an Image, but we need an Exposure
+        #
+        if re.search(r"ImageBase<", templateExposure.repr()): # Yes, an Image of some sort
+            # N.b. we don't use type() as we don't know what sort of Image it'll be, but repr can be fooled by a Mask
+            im = templateExposure
+            msk = afwImage.MaskU(im.getDimensions()); msk.set(0x0)
+            var = afwImage.ImageF(im.getDimensions()); var.set(0.0)
+            maskedImage = afwImage.makeMaskedImage(im, msk, var)
+            del im; del msk; del var
+
+            templateExposure = afwImage.makeExposure(maskedImage) 
        
         diffimPolicy = self._policy.get('diffimPolicy')
         # step 1
