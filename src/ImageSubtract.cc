@@ -1173,7 +1173,6 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         footprintListOut.clear();
         
         // Find detections
-	imageToConvolve.writeFits("/tmp/acbT");
         lsst::afw::detection::DetectionSet<ImageT> 
             detectionSet(imageToConvolve, lsst::afw::detection::Threshold(detThreshold, 
                                                                           lsst::afw::detection::Threshold::VALUE));
@@ -1212,22 +1211,13 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
             lsst::afw::detection::Footprint::Ptr fpGrow = 
                 lsst::afw::detection::growFootprint(*i, fpGrowPix, false);
             
-            logging::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                               "Footprint out : %d,%d -> %d,%d",
-                               (*fpGrow).getBBox().getX0(), (*fpGrow).getBBox().getX1(), 
-                               (*fpGrow).getBBox().getY0(), (*fpGrow).getBBox().getY1());
+            logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                               "Footprint out : %d,%d -> %d,%d (center %d,%d)",
+                               (*fpGrow).getBBox().getX0(), (*fpGrow).getBBox().getY0(),
+			       (*fpGrow).getBBox().getX1(), (*fpGrow).getBBox().getY1(),
+			       int( 0.5 * ((*i)->getBBox().getX0()+(*i)->getBBox().getX1()) ),
+			       int( 0.5 * ((*i)->getBBox().getY0()+(*i)->getBBox().getY1()) ) );
 
-            // Search for bad pixels within the footprint
-            itcFunctor.reset();
-            itcFunctor.apply(*fpGrow);
-            if (itcFunctor.getBits() > 0) {
-                continue;
-            }
-            itncFunctor.reset();
-            itncFunctor.apply(*fpGrow);
-            if (itncFunctor.getBits() > 0) {
-                continue;
-            }
 
             // Grab a subimage; there is an exception if its e.g. too close to the image */
             image::BBox fpBBox = (*fpGrow).getBBox();
@@ -1239,6 +1229,19 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
                                    "Exception caught extracting Footprint");
                 logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
                                    e.what());
+                continue;
+            }
+
+
+            // Search for bad pixels within the footprint
+            itcFunctor.reset();
+            itcFunctor.apply(*fpGrow);
+            if (itcFunctor.getBits() > 0) {
+                continue;
+            }
+            itncFunctor.reset();
+            itncFunctor.apply(*fpGrow);
+            if (itncFunctor.getBits() > 0) {
                 continue;
             }
 

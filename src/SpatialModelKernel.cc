@@ -79,9 +79,10 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     this->setRowc(0.5 * float(fpBBox.getY0() + fpBBox.getY1()));
 
     logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
-                       "Footprint = %d,%d -> %d,%d",
+                       "Footprint = %d,%d -> %d,%d (center %d,%d)",
                        fpBBox.getX0(), fpBBox.getY0(),
-                       fpBBox.getX1(), fpBBox.getY1());
+                       fpBBox.getX1(), fpBBox.getY1(),
+		       int(this->getColc()), int(this->getRowc()));
 
     // Estimate of the variance for first kernel pass
     // True argument is for a deep copy, so -= does not modify the original pixels

@@ -70,8 +70,8 @@ class DiffimStage(Stage):
 
 def warpTemplateExposure(templateExposure, scienceExposure, policy):
     # Create the warping Kernel according to policy
-    warpingKernelOrder = policy.getInt("warpingKernelOrder")
-    warpingKernel = afwMath.LanczosWarpingKernel(warpingKernelOrder)
+    warpingKernelSize = policy.getInt("warpingKernelSize")
+    warpingKernel = afwMath.LanczosWarpingKernel(warpingKernelSize)
 
     # create a blank exposure to hold the remaped template exposure
     remapedTemplateExposure = templateExposure.Factory(
