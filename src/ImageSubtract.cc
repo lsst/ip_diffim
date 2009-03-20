@@ -1173,16 +1173,15 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         footprintListOut.clear();
         
         // Find detections
+	imageToConvolve.writeFits("/tmp/acbT");
         lsst::afw::detection::DetectionSet<ImageT> 
-            //detectionSet(imageToConvolve, lsst::afw::detection::Threshold(footprintDetectionThreshold, 
-            //lsst::afw::detection::Threshold::VALUE));
             detectionSet(imageToConvolve, lsst::afw::detection::Threshold(detThreshold, 
-                                                                          lsst::afw::detection::Threshold::STDEV));
+                                                                          lsst::afw::detection::Threshold::VALUE));
         
         // Get the associated footprints
         footprintListIn = detectionSet.getFootprints();
         logging::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                           "Found %d total footprints above threshold %.3f sigma",
+                           "Found %d total footprints above threshold %.3f",
                            footprintListIn.size(), detThreshold);
 
         // Iterate over footprints, look for "good" ones
@@ -1250,6 +1249,11 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         
         detThreshold *= detThresholdScaling;
     }
+    if (footprintListOut.size() == 0) {
+      throw LSST_EXCEPT(exceptions::Exception, 
+			"Unable to find any footprints for Psf matching");
+    }
+
     logging::TTrace<3>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                        "Found %d clean footprints above threshold %.3f",
                        footprintListOut.size(), detThreshold/detThresholdScaling);
