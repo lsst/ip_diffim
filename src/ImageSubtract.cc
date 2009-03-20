@@ -980,6 +980,8 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
+    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
+    
     math::convolve(convolvedMaskedImage,
                    imageToConvolve,
                    convolutionKernel,
@@ -1021,6 +1023,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
+    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
     math::convolveLinear(convolvedMaskedImage,
                          imageToConvolve,
                          convolutionKernel,
@@ -1061,6 +1064,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
+    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
     math::convolve(convolvedMaskedImage,
                    imageToConvolve,
                    convolutionKernel,
@@ -1102,6 +1106,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
+    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
     math::convolveLinear(convolvedMaskedImage,
                          imageToConvolve,
                          convolutionKernel,

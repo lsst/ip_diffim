@@ -4,6 +4,8 @@ import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
 import lsst.pex.exceptions as Exceptions
 from   lsst.pex.logging import Trace
+import lsst.afw.display.ds9 as ds9
+import lsst.afw.display.utils as displayUtils
 
 # for DM <-> numpy conversions
 import lsst.afw.image.testUtils as imTestUtils
@@ -112,7 +114,8 @@ def createSpatialModelKernelCells(templateMaskedImage,
                                   fpInList,
                                   kFunctor,
                                   policy,
-                                  cFlag='c'):
+                                  cFlag='c',
+                                  display=False):
 
     nSegmentCol = policy.get('nSegmentCol')
     nSegmentRow = policy.get('nSegmentRow')
@@ -122,6 +125,12 @@ def createSpatialModelKernelCells(templateMaskedImage,
 
     spatialCells   = diffimLib.VectorSpatialModelCellF()
     
+    if display:
+        stamps = []; stampInfo = []
+        imagePairMosaic = displayUtils.Mosaic(mode="x")
+        imagePairMosaic.setGutter(2)
+        imagePairMosaic.setBackground(-10)
+
     cellCount = 0
     for col in range(nSegmentCol):
         colMin    = max(0, col*nSegmentColPix)
@@ -139,25 +148,54 @@ def createSpatialModelKernelCells(templateMaskedImage,
             # This is a bit dumb and could be more clever
             # Should never really have a loop within a loop within a loop
             # But we will not have *that many* Footprints...
+
             for fpID, fpPtr in enumerate(fpInList):
                 
-                fpBBox = fpPtr.getBBox()
-                fpColC = 0.5 * (fpBBox.getX0() + fpBBox.getX1())
-                fpRowC = 0.5 * (fpBBox.getY0() + fpBBox.getY1())
+                fpBBox = afwImage.BBox(fpPtr.getBBox().getLLC() - templateMaskedImage.getXY0(),
+                                       fpPtr.getBBox().getWidth(), fpPtr.getBBox().getHeight())
+                
+                fpColC = 0.5*(fpBBox.getX0() + fpBBox.getX1())
+                fpRowC = 0.5*(fpBBox.getY0() + fpBBox.getY1())
+
+                if col == 0 and row == 0:
+                    if display:
+                        ds9.dot("+", fpColC, fpRowC, frame=1)
 
                 if (fpColC >= colMin) and (fpColC < colMax) and (fpRowC >= rowMin) and (fpRowC < rowMax):
 
                     tSubImage = afwImage.MaskedImageF(templateMaskedImage, fpBBox)
-                    iSubimage = afwImage.MaskedImageF(scienceMaskedImage, fpBBox)
+                    iSubImage = afwImage.MaskedImageF(scienceMaskedImage, fpBBox)
                     model = diffimLib.SpatialModelKernelF(fpPtr,
                                                           tSubImage,
-                                                          iSubimage,
+                                                          iSubImage,
                                                           kFunctor,
                                                           policy,
                                                           False)
                     if policy.get('debugIO'):
-                        diffimDebug.writeDiffImages(cFlag, '%s_%d' % (label, fpID), model)
-                        
+                        diffimDebug.writeDiffImages(cFlag, '%s_%d' % (fpID), model)
+
+                    if display:
+                        tmpScience = iSubImage.Factory(iSubImage, True) # make a copy
+                        tmpTemplate = tSubImage.Factory(tSubImage, True) # make a copy
+
+                        tmpScience -=  afwMath.makeStatistics(iSubImage.getImage(), afwMath.MEDIAN).getValue()
+                        tmpTemplate -= afwMath.makeStatistics(tSubImage.getImage(), afwMath.MEDIAN).getValue()
+                        tmpTemplate *= afwMath.makeStatistics(tmpScience.getImage(), afwMath.MAX).getValue()/ \
+                                       afwMath.makeStatistics(tmpTemplate.getImage(), afwMath.MAX).getValue()
+
+                        panel = imagePairMosaic.makeMosaic([tmpTemplate, tmpScience])
+                        if True:        # afw > 3.3.10
+                            stamps.append(panel)
+                        else:
+                            tmp = panel.Factory(120, 60); tmp.set((0))
+                            stmp = tmp.Factory(tmp,
+                                               afwImage.BBox(afwImage.PointI(0, 0), panel.getWidth(), panel.getHeight()))
+                            stmp <<= panel
+                            
+                            stamps.append(tmp)
+                            
+                        stampInfo.append("%s %d" % (label, fpID))
+
                     modelList.push_back( model )
 
             spatialCell = diffimLib.SpatialModelCellF(label, colCenter, rowCenter, modelList)
@@ -167,6 +205,14 @@ def createSpatialModelKernelCells(templateMaskedImage,
             Trace('lsst.ip.diffim.createSpatialModelKernelCells', 2, '')
 
             cellCount += 1
+
+    if display and len(stamps) > 0:
+        mos = displayUtils.Mosaic()
+        mos.setGutter(5)
+        mos.setBackground(0)
+
+        ds9.mtv(mos.makeMosaic(stamps), frame=2)
+        mos.drawLabels(stampInfo, frame=2)
 
     return spatialCells
 

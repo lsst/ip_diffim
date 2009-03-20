@@ -192,7 +192,8 @@ def subtractMaskedImage(templateMaskedImage,
             scienceMaskedImage,
             fpList,
             kFunctor,
-            policy)
+            policy,
+            display=display)
 
     # Set up fitting loop 
     maxSpatialIterations = policy.getInt('maxSpatialIterations')
@@ -269,6 +270,18 @@ def subtractMaskedImage(templateMaskedImage,
             sKernel,
             bgFunction)
 
+    if display:
+        frame = 3
+        ds9.mtv(differenceMaskedImage, frame=frame)
+        ds9.dot("Subtracted", 0, 0, frame=frame)
+
+        chisqMI = differenceMaskedImage.Factory(differenceMaskedImage, True)
+        chisq = chisqMI.getImage();
+        chisq *= chisq; chisq /= scienceMaskedImage.getVariance()
+        del chisq
+
+        frame = 4
+        ds9.mtv(chisqMI, frame=frame)
     #
     # Lets do some more Sdqa here
     #
