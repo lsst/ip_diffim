@@ -3,13 +3,21 @@ import re
 
 from lsst.pex.harness.Stage import Stage
 
-import lsst.afw.math as afwMath
+import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath
 import lsst.sdqa as sdqa
 import lsst.pex.logging as pexLog
 import diffimLib  as ipDiffim
 import diffimTools as diffimTools
 import spatialKernelFit as spatialKernelFit 
+
+import lsst.afw.display.ds9 as ds9
+
+try:
+    type(display)
+except NameError:
+    display = False
 
 class DiffimStage(Stage):
     def process(self):
@@ -31,7 +39,7 @@ class DiffimStage(Stage):
             maskedImage = afwImage.makeMaskedImage(im, msk, var)
             del im; del msk; del var
 
-            templateExposure = afwImage.makeExposure(maskedImage) 
+            templateExposure = afwImage.makeExposure(maskedImage)
 
             wcsKey = self._policy.get('templateWcsKey')
             wcs = self.activeClipboard.get(wcsKey)
@@ -42,12 +50,23 @@ class DiffimStage(Stage):
             nwcs.shiftReferencePixel(bBox.get('llcx'), bBox.get('llcy'))
             templateExposure.setWcs(nwcs)
        
+        if display and False:
+            frame=0
+            ds9.mtv(templateExposure, frame=frame);  ds9.dot("Template", 0, 0, frame=frame)
+
         diffimPolicy = self._policy.get('diffimPolicy')
         # step 1
         remapedTemplateExposure = warpTemplateExposure(templateExposure,
                 scienceExposure, 
                 diffimPolicy)
         
+        if display:
+            frame = 0
+            ds9.mtv(remapedTemplateExposure, frame=frame);  ds9.dot("Warped Template", 0, 0, frame=frame)
+
+            frame = 1
+            ds9.mtv(scienceExposure, frame=frame);  ds9.dot("Science Exposure", 0, 0, frame=frame)
+
         # step 2
         products = subtractExposure(remapedTemplateExposure, 
                 scienceExposure, 
@@ -151,6 +170,21 @@ def subtractMaskedImage(templateMaskedImage,
                 templateMaskedImage,
                 scienceMaskedImage,
                 policy)
+
+    if display:
+        frame=1
+
+        diffimPlaneName = "DIFFIM_STAMP_PLANE"
+        diffimStampPlane = scienceMaskedImage.getMask().addMaskPlane(diffimPlaneName)
+        ds9.setMaskPlaneColor(diffimPlaneName, "cyan") # afw > 3.3.10 can handle any X11 colour, e.g. "powderBlue"
+
+        afwDetection.setMaskFromFootprintList(scienceMaskedImage.getMask(), fpList, (1 << diffimStampPlane))
+        ds9.mtv(scienceMaskedImage.getMask(), frame=frame)
+        
+        for fp in fpList:
+            x0, y0 = fp.getBBox().getLLC() - scienceMaskedImage.getXY0()
+            x1, y1 = fp.getBBox().getURC() - scienceMaskedImage.getXY0()
+            ds9.line([(x0, y0), (x0, y1), (x1, y1), (x1, y0), (x0, y0)], frame=frame)
 
     # Set up grid for spatial model
     spatialCells = diffimTools.createSpatialModelKernelCells(
