@@ -273,32 +273,41 @@ def imageFromVector(vec, width, height, retType=afwImage.ImageF):
             idx     += 1
     return im
 
-def computeTemplateBbox(scienceWcs, scienceDimensions, templateWcs, templateDimensions, borderWidth):
-    """Return the bounding box of a template exposure that matches a science exposure,
+def computeTemplateBBox(scienceWcs, scienceBBox, templateWcs, templateBBox, borderWidth):
+    """Return the bounding box of that portion of a template exposure that matches a science exposure,
     grown by borderWidth pixels on all sides.
     
     Inputs:
     - scienceWcs: WCS of science exposure
-    - scienceDimensions: dimensions of science exposure
+    - scienceBBox: bounding box of science exposure (starting at XY0)
     - templateWcs: WCS of template exposure
-    - templateDimensions: dimensions of template exposure
+    - templateBBox: bounding box of science exposure (starting at XY0)
     - borderWidth: width of border of template Bbox
     
-    \raise RuntimeError if the resulting bounding box is entirely off the template.
+    \return templateSubBBox, the bounding box of the template that corresponds to
+    that portion of the template that overlaps the science exposure, plus a border.
+    Note: the origin of the bounding box is relative to index 0,0 of the template
+    (it is NOT relative to the template XY0, even though the input bounding boxes are).
+    The returned bounding box is silently truncated as necessary so that it is entirely on the template;
+    however, if there is no overlap (before adding the border) then an exception is raised.
+    
+    \raise RuntimeError if there is no overlap between the science and template exposures.
     """
-    scienceMaxInd = [val - 1 for val in scienceDimensions]
-    templateMaxInd = [val - 1 for val in templateDimensions]
+    scienceXY0 = [scienceBBox.getX0(), scienceBBox.getY0()]
+    scienceMaxInd = [val - 1 for val in scienceBBox.getDimensions()]
+    templateXY0 = [templateBBox.getX0(), templateBBox.getY0()]
+    templateMaxInd = [val - 1 for val in templateBBox.getDimensions()]
     sciencePos = afwImage.PointD()
     # find lower left and upper right corners of bounding box on template that matches science image;
     # fractional indices are truncated so grow upper right corner by 1 afterwards
     llc = None
     urc = None
     for xMult in (0, 1):
-        sciencePos.setX(afwImage.indexToPosition(scienceMaxInd[0] * xMult))
+        sciencePos.setX(afwImage.indexToPosition(scienceMaxInd[0] * xMult + scienceXY0[0]))
         for yMult in (0, 1):
-            sciencePos.setY(afwImage.indexToPosition(scienceMaxInd[1] * yMult))
+            sciencePos.setY(afwImage.indexToPosition(scienceMaxInd[1] * yMult + scienceXY0[1]))
             templatePos = templateWcs.raDecToXY(scienceWcs.xyToRaDec(sciencePos))
-            templateInd = [afwImage.positionToIndex(val) for val in templatePos]
+            templateInd = [afwImage.positionToIndex(templatePos[ii]).first - templateXY0[ii] for ii in range(2)]
             if llc == None:
                 llc = templateInd
                 urc = templateInd
@@ -306,13 +315,15 @@ def computeTemplateBbox(scienceWcs, scienceDimensions, templateWcs, templateDime
                 llc = minVec(llc, templateInd)
                 urc = maxVec(urc, templateInd)
     # grow upper right corner by 1 because fractional indices were truncated
-    # and grow both corners by borderWidth
-    llc = [val - borderWidth for val in llc]
-    urc = [val + borderWidth + 1 for val in urc]
-    # constrain corners to template image boundaries
+    urc = [val + 1 for val in urc]
+    # if no overlap then raise an exception
     if urc[0] < 0 or urc[1] < 0 or llc[0] > templateMaxInd[0] or llc[1] > templateMaxInd[1]:
-        raise RuntimeError("BBox does not overlap template; desired region is (%s, %s) through (%s, %s)" % \
+        raise RuntimeError("BBox does not overlap template; desired region (without a border) is (%s, %s) through (%s, %s)" % \
             (llc[0], llc[1], urc[0], urc[1]))
+    # grow both corners by borderWidth
+    llc = [val - borderWidth for val in llc]
+    urc = [val + borderWidth for val in urc]
+    # constrain corners to template image boundaries
     llc = maxVec([0, 0], llc)
     urc = minVec(templateMaxInd, urc)
     return afwImage.BBox(afwImage.PointI(*llc), afwImage.PointI(*urc))

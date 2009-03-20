@@ -34,19 +34,18 @@ def computeBBox(scienceExposurePath, templateExposurePath, borderWidth, template
     if not sciExp.hasWcs():
         raise RuntimeError("Science exposure %r has no Wcs" % (scienceExposurePath,))
     sciWcs = sciExp.getWcs()
-    sciDim = sciExp.getMaskedImage().getDimensions()
-    sciBBox = afwImage.BBox(afwImage.PointI(0, 0), sciDim[0], sciDim[1])
+    sciBBox = sciExp.getMaskedImage().getBBox()
     printBBox("Science BBox", sciBBox)
     
     # instead of reading in the template Exposure (which may be huge), just use the header
     tmpHdrData = afwImage.readMetadata(templateExposurePath + "_img.fits")
-    tmpDim = afwImage.PointI(tmpHdrData.getInt("NAXIS1"), tmpHdrData.getInt("NAXIS2"))
     tmpWcs = afwImage.Wcs(tmpHdrData)
+    tmpDim = afwImage.PointI(tmpHdrData.getInt("NAXIS1"), tmpHdrData.getInt("NAXIS2"))
     tmpFullBBox = afwImage.BBox(afwImage.PointI(0, 0), tmpDim[0], tmpDim[1])
     printBBox("Template Full BBox", tmpFullBBox)
     
     borderWidth = 5
-    tmpBBox = ipDiffim.computeTemplateBbox(sciWcs, sciDim, tmpWcs, tmpDim, borderWidth)
+    tmpBBox = ipDiffim.computeTemplateBbox(sciWcs, sciBBox, tmpWcs, tmpFullBBox, borderWidth)
     printBBox("Template BBox", tmpBBox)
 
     if templateSubExposurePath:
