@@ -1,4 +1,10 @@
-import numpy, pylab
+import sys
+import numpy
+try:
+    import pylab
+except ImportError:
+    print >> sys.stderr, "Unable to import numpy"
+
 from lsst.pex.logging import Trace
 
 # relative imports, since these are in __init__.py
