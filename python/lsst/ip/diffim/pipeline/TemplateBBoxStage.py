@@ -14,10 +14,6 @@ class TemplateBBoxStage(lsst.pex.harness.Stage.Stage):
     Outputs:
     - templateBBoxProperties: bounding box of the template exposure as a PropertySet containing
         four integers named: llcx, llcy, width, height
-    
-    Warning: the template exposure is assumed to have an XY0 of (0, 0).
-    If that is not the case then the template full BBox (relative to XY0) will have to be
-    put on the clipboard, instead of the template dimensions.
     """
     def process(self):
         log = pexLog.Log(pexLog.Log.getDefaultLog(), "ip.diffim.TemplateBBoxStage")
@@ -35,19 +31,17 @@ class TemplateBBoxStage(lsst.pex.harness.Stage.Stage):
         templateWcs = activeClipboard.get(templateWcsName)
         borderWidth = self._policy.getInt("borderWidth")
         
+        scienceDimensions = scienceExposure.getMaskedImage().getDimensions()
         if not scienceExposure.hasWcs():
             raise RuntimeError("science exposure has no Wcs")
         scienceWcs = scienceExposure.getWcs()
-        scienceBBox = scienceExposure.getMaskedImage().getBBox()
-        templateBBox = afwImage.BBox(afwImage.PointI(0, 0), templateDimensions[0], templateDimensions[1])
 
         log.log(pexLog.Log.INFO,
-            "scienceBBox=(%s, %s) %s x %s; templateDimensions=%s, %s" % \
-                (scienceBBox.getX0(), scienceBBox.getY0(), scienceBBox.getWidth(), scienceBBox.getHeight(),
-                templateDimensions[0], templateDimensions[1]))
+            "scienceDimensions=%s, %s; templateDimensions=%s, %s" % \
+                (scienceDimensions[0], scienceDimensions[1], templateDimensions[0], templateDimensions[1]))
 
-        templateBBox = lsst.ip.diffim.computeTemplateBBox(
-            scienceWcs, scienceBBox, templateWcs, templateBBox, borderWidth)
+        templateBBox = lsst.ip.diffim.computeTemplateBbox(scienceWcs, scienceDimensions, templateWcs,
+                                                          templateDimensions, borderWidth)
 
         nameValPairs = (
             ("llcx", templateBBox.getX0()),
