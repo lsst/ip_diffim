@@ -1225,8 +1225,10 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 
 
             // Grab a subimage; there is an exception if its e.g. too close to the image */
-            image::BBox fpBBox = (*fpGrow).getBBox();
             try {
+                image::BBox fpBBox = (*fpGrow).getBBox();
+                fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
+                
                 lsst::afw::image::MaskedImage<ImageT> subImageToConvolve(imageToConvolve, fpBBox);
                 lsst::afw::image::MaskedImage<ImageT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
             } catch (exceptions::Exception& e) {
@@ -1237,14 +1239,12 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
                 continue;
             }
 
-
             // Search for bad pixels within the footprint
-            itcFunctor.reset();
             itcFunctor.apply(*fpGrow);
             if (itcFunctor.getBits() > 0) {
                 continue;
             }
-            itncFunctor.reset();
+
             itncFunctor.apply(*fpGrow);
             if (itncFunctor.getBits() > 0) {
                 continue;
