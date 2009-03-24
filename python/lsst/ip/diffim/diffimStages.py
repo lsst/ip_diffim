@@ -282,6 +282,11 @@ def subtractMaskedImage(templateMaskedImage,
 
         frame = 4
         ds9.mtv(chisqMI, frame=frame)
+
+    # N.b. Per-footprint sdqa ratings are not implemented for DC3a.
+    # Override the list returned from evaluateModelBy... for now.
+    sdqaList = sdqa.SdqaRatingSet()
+    
     #
     # Lets do some more Sdqa here
     #
