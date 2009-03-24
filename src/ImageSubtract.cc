@@ -1158,7 +1158,8 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     double detThreshold         = policy.getDouble("detThresholdSigma");
     double detThresholdScaling  = policy.getDouble("detThresholdScaling");
     double detThresholdMin      = policy.getDouble("detThresholdMin");
-    
+    std::string detThresholdType = policy.getString("detThresholdType");
+
     // Grab mask bits from the image to convolve, since that is what we'll be operating on
     // Overridden now that we use the FootprintFunctor to look for any masked pixels
     // int badMaskBit = imageToConvolve.getMask()->getMaskPlane("BAD");
@@ -1178,9 +1179,9 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         footprintListOut.clear();
         
         // Find detections
-        lsst::afw::detection::DetectionSet<ImageT> 
-            detectionSet(imageToConvolve, lsst::afw::detection::Threshold(detThreshold, 
-                                                                          lsst::afw::detection::Threshold::VALUE));
+        lsst::afw::detection::Threshold threshold = 
+                lsst::afw::detection::createThreshold(detThreshold, detThresholdType);
+        lsst::afw::detection::DetectionSet<ImageT> detectionSet(imageToConvolve, threshold);
         
         // Get the associated footprints
         footprintListIn = detectionSet.getFootprints();

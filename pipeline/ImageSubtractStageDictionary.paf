@@ -88,6 +88,9 @@ detThresholdScaling: 0.5
 # How low can you go
 detThresholdMin: 5.0
 
+#Do we want a sigma detection or signal detection?
+detThresholdType: "value"
+
 # Back compatibility for signal based vs. sigma based detection
 #footprintDetectionThreshold: 1000.0
 #detectionThresholdScaling: 0.50
