@@ -23,6 +23,9 @@ class DiffimStage(Stage):
     def process(self):
         self.activeClipboard = self.inputQueue.getNextDataset()
         
+        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
+                "ip.diffim.DiffimStage")
+
         scienceExposureKey = self._policy.get('scienceExposureKey')
         templateExposureKey = self._policy.get('templateExposureKey')
         
@@ -56,9 +59,11 @@ class DiffimStage(Stage):
 
         diffimPolicy = self._policy.get('diffimPolicy')
         # step 1
+        self.log.log(pexLog.Log.INFO, "Starting warp")
         remapedTemplateExposure = warpTemplateExposure(templateExposure,
                 scienceExposure, 
                 diffimPolicy)
+        self.log.log(pexLog.Log.INFO, "Ending warp")
         
         if display:
             frame = 0
@@ -68,9 +73,11 @@ class DiffimStage(Stage):
             ds9.mtv(scienceExposure, frame=frame);  ds9.dot("Science Exposure", 0, 0, frame=frame)
 
         # step 2
+        self.log.log(pexLog.Log.INFO, "Starting subtract")
         products = subtractExposure(remapedTemplateExposure, 
                 scienceExposure, 
                 diffimPolicy)
+        self.log.log(pexLog.Log.INFO, "Ending subtract")
 
         if products == None:
             raise RuntimeException("DiffimStage.subtractExposure failed")
