@@ -1,6 +1,6 @@
-setupRequired(afw >= 3.3.4)
-setupRequired(sdqa >= 3.0.1)
-setupRequired(pex_harness)
+setupRequired(afw >= 3.3.13)
+setupRequired(sdqa >= 3.0.3)
+setupRequired(pex_harness >= 3.2.10)
 
 setupOptional(afwdata)
 setupOptional(pyfits)
