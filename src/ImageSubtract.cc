@@ -1181,7 +1181,11 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         // Find detections
         lsst::afw::detection::Threshold threshold = 
                 lsst::afw::detection::createThreshold(detThreshold, detThresholdType);
-        lsst::afw::detection::DetectionSet<ImageT> detectionSet(imageToConvolve, threshold);
+        lsst::afw::detection::DetectionSet<ImageT> detectionSet(
+                imageToConvolve, 
+                threshold,
+                "",
+                fpNpixMin);
         
         // Get the associated footprints
         footprintListIn = detectionSet.getFootprints();
@@ -1192,14 +1196,11 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         // Iterate over footprints, look for "good" ones
         nCleanFp = 0;
         for (std::vector<lsst::afw::detection::Footprint::Ptr>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
-
-            // footprint has not enough pixels 
-            if (static_cast<unsigned int>((*i)->getNpix()) < fpNpixMin) {
-                continue;
-            }
-            
-            // footprint has too many
+            // footprint has too many pixels
             if (static_cast<unsigned int>((*i)->getNpix()) > fpNpixMax) {
+                logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                               "Footprint has too many pix: %d (max =%d)", 
+                               (*i)->getNpix(), fpNpixMax);
                 continue;
             } 
             
@@ -1243,11 +1244,15 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
             // Search for bad pixels within the footprint
             itcFunctor.apply(*fpGrow);
             if (itcFunctor.getBits() > 0) {
+                logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                               "Footprint has bad pix in image to convolve"); 
                 continue;
             }
 
             itncFunctor.apply(*fpGrow);
             if (itncFunctor.getBits() > 0) {
+                logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                               "Footprint has bad pix in image not to convolve");
                 continue;
             }
 

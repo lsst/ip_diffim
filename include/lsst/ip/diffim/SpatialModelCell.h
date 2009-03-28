@@ -77,8 +77,16 @@ namespace diffim {
 
         /** Destructor
          */
-        virtual ~SpatialModelCell() {;};
+        virtual ~SpatialModelCell() {};
 
+        /** Get Col position in overall image
+         */
+        int getCol() const { return _colC; }
+
+        /** Get row position in overall image
+         */
+        int getRow() const { return _rowC; }
+        
         /** Get current model
          */
         SpatialModel getCurrentModel() {return _modelPtrList[_currentId];};

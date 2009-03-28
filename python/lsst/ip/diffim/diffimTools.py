@@ -39,7 +39,7 @@ def fitFunction(function, values, errors, cols, rows, policy):
                                 rows,
                                 nSigmaSq)
     if not fit.isValid:
-        raise Exceptions.LsstRuntime('Spatial fit fails')
+        raise RuntimeError('Spatial fit fails')
 
     return fit
 
@@ -70,7 +70,7 @@ def rejectKernelSumOutliers(spatialCells, policy):
         nCells = len(kSumList)
 
         if nCells == 0:
-            raise Exceptions.LsstOutOfRange('No good cells found')
+            raise RuntimeError('No good cells found')
 
         kSumArray = numpy.array(kSumList)
         kSumMean  = kSumArray.mean()
@@ -172,7 +172,7 @@ def createSpatialModelKernelCells(templateMaskedImage,
                                                           policy,
                                                           False)
                     if policy.get('debugIO'):
-                        diffimDebug.writeDiffImages(cFlag, '%s_%d' % (fpID), model)
+                        diffimDebug.writeDiffImages(cFlag, fpID, model)
 
                     if display:
                         tmpScience = iSubImage.Factory(iSubImage, True) # make a copy
