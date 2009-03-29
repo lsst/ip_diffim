@@ -277,18 +277,39 @@ def subtractMaskedImage(templateMaskedImage,
             sKernel,
             bgFunction)
 
+    #
+    # Maybe subtract a background model from the difference image
+    #
+    if policy.exists("backgroundPolicy"):
+        algorithm = policy.get("backgroundPolicy.algorithm")
+        binsize = policy.get("backgroundPolicy.binsize")
+
+        if algorithm == "NATURAL_SPLINE":
+            bctrl = afwMath.BackgroundControl(afwMath.NATURAL_SPLINE)
+        else:
+            raise RuntimeError, "Unknown backgroundPolicy.algorithm: %s" % (algorithm)
+
+        bctrl.setNxSample(int(differenceMaskedImage.getWidth()//binsize) + 1)
+        bctrl.setNySample(int(differenceMaskedImage.getHeight()//binsize) + 1)
+        
+        image = differenceMaskedImage.getImage() 
+        backobj = afwMath.makeBackground(image, bctrl)
+        image -= backobj.getImageF()
+        del image; del backobj
+
     if display:
         frame = 3
         ds9.mtv(differenceMaskedImage, frame=frame)
         ds9.dot("Subtracted", 0, 0, frame=frame)
 
-        chisqMI = differenceMaskedImage.Factory(differenceMaskedImage, True)
-        chisq = chisqMI.getImage();
-        chisq *= chisq; chisq /= scienceMaskedImage.getVariance()
-        del chisq
+        if False:
+            chisqMI = differenceMaskedImage.Factory(differenceMaskedImage, True)
+            chisq = chisqMI.getImage();
+            chisq *= chisq; chisq /= scienceMaskedImage.getVariance()
+            del chisq
 
-        frame = 4
-        ds9.mtv(chisqMI, frame=frame)
+            frame = 4
+            ds9.mtv(chisqMI, frame=frame)
 
     # N.b. Per-footprint sdqa ratings are not implemented for DC3a.
     # Override the list returned from evaluateModelBy... for now.
