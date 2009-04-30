@@ -156,34 +156,14 @@ SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<do
 %enddef
 
 %convolveAndSubtract(float);
-//%convolveAndSubtract(double);           // image subtraction on double images??
+#if 0
+%convolveAndSubtract(double);           // image subtraction on double images??!?
+#endif
 
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double>;
-
-#if 1
-#if 0
-//
-// RHL: do we really need this?  It doesn't seem to be called
-//
-%define %addFunctionToImage(IMAGE_T, FUNC_RETURN_T)
-    %template(addFunctionToImage)
-          lsst::ip::diffim::addSomethingToImage<lsst::afw::Image<IMAGE_T>, lsst::afw::math::Function2<FUNC_RETURN_T> >;
-%enddef
-
-%addFunctionToImage(double, double);
-%addFunctionToImage(float, double);
-%addFunctionToImage(double, float);
-%addFunctionToImage(double, double);
-#endif
-#else
-%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, double>;
-%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, double>;
-%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, float>;
-%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, float>;
-#endif
 
 /******************************************************************************/
 
