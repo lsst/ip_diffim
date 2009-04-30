@@ -199,29 +199,6 @@ namespace diffim {
     /** Execute fundamental task of convolving template and subtracting it from science image
      *
      * @note D = I - (K.x.T + bg)
-     *
-     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
-     * 
-     * @note This is a specialization for LinearCombinationKernels
-     * 
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param convolutionKernelPtr  PSF-matching LinearCombinationKernelKernel used for convolution
-     * @param background  Differential background value
-     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
-     */    
-    template <typename ImageT, typename BackgroundT>
-    lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-        lsst::afw::math::LinearCombinationKernel const& convolutionKernel,
-        BackgroundT background, 
-        bool invert=true
-        );
-
-    /** Execute fundamental task of convolving template and subtracting it from science image
-     *
-     * @note D = I - (K.x.T + bg)
      * 
      * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
      * 

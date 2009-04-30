@@ -1038,47 +1038,6 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
 }
 
 /** 
- * @brief Implement fundamental difference imaging step of convolution and
- * subtraction : D = I - (K.x.T + bg)
- *
- * @return Difference image
- *
- * @ingroup diffim
- */
-template <typename ImageT, typename BackgroundT>
-image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const& imageToConvolve,
-    image::MaskedImage<ImageT> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    BackgroundT background,
-    bool invert
-    ) {
-    
-    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", "Convolving using convolveLinear");
-    
-    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
-    image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
-    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    math::convolveLinear(convolvedMaskedImage,
-                         imageToConvolve,
-                         convolutionKernel,
-                         edgeMaskBit);
-    
-    /* Add in background */
-    addSomethingToImage(*(convolvedMaskedImage.getImage()), background);
-    
-    /* Do actual subtraction */
-    convolvedMaskedImage -= imageToNotConvolve;
-
-    /* Invert */
-    if (invert) {
-        convolvedMaskedImage *= -1.0;
-    }
-    
-    return convolvedMaskedImage;
-}
-
-/** 
  * @brief Runs Detection on a single image for significant peaks, and checks
  * returned Footprints for Masked pixels.
  *
@@ -1178,7 +1137,7 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 			       int( 0.5 * ((*i)->getBBox().getY0()+(*i)->getBBox().getY1()) ) );
 
 
-            // Grab a subimage; there is an exception if its e.g. too close to the image */
+            // Grab a subimage; there is an exception if it's e.g. too close to the image */
             try {
                 image::BBox fpBBox = (*fpGrow).getBBox();
                 fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
@@ -1264,22 +1223,6 @@ image::MaskedImage<double> diffim::convolveAndSubtract(
     double background,
     bool invert);
 
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    double background,
-    bool invert);
-
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    double background,
-    bool invert);
-
 /* */
 
 template 
@@ -1297,25 +1240,6 @@ image::MaskedImage<double> diffim::convolveAndSubtract(
     math::Kernel const& convolutionKernel,
     math::Function2<double> const& backgroundFunction,
     bool invert);
-
-
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    math::Function2<double> const& backgroundFunction,
-    bool invert);
-
-
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    math::Function2<double> const& backgroundFunction,
-    bool invert);
-
 
 /* */
 
