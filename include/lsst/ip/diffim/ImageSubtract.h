@@ -173,10 +173,7 @@ namespace diffim {
     };
 
 
-    /** Build a set of Delta Function basis kernels
-     *
-     * @param nCols  Number of rows in the set
-     * @param nRows  Number of columns in the set
+    /* Build a set of Delta Function basis kernels
      */    
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateDeltaFunctionKernelSet(
         unsigned int width,

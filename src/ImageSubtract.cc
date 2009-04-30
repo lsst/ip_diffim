@@ -911,8 +911,8 @@ void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
  */
 math::KernelList<math::Kernel>
 diffim::generateDeltaFunctionKernelSet(
-    unsigned int width, 
-    unsigned int height  
+    unsigned int width,                 ///< number of columns in the set
+    unsigned int height                 ///< number of rows in the set
     ) {
     if ((width < 1) || (height < 1)) {
         throw LSST_EXCEPT(exceptions::Exception, "nRows and nCols must be positive");
@@ -982,21 +982,18 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
     
-    math::convolve(convolvedMaskedImage,
-                   imageToConvolve,
-                   convolutionKernel,
-                   false,
-                   edgeMaskBit);
+    math::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false, edgeMaskBit);
     
     /* Add in background */
     convolvedMaskedImage += background;
     
     /* Do actual subtraction */
-    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
+    convolvedMaskedImage -= imageToNotConvolve;
 
     /* Invert */
-    if (invert)
+    if (invert) {
         convolvedMaskedImage *= -1.0;
+    }
     
     return convolvedMaskedImage;
 }
@@ -1033,11 +1030,12 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     convolvedMaskedImage += background;
     
     /* Do actual subtraction */
-    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
+    convolvedMaskedImage -= imageToNotConvolve;
 
     /* Invert */
-    if (invert)
+    if (invert) {
         convolvedMaskedImage *= -1.0;
+    }
     
     return convolvedMaskedImage;
 }
@@ -1075,11 +1073,12 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
     
     /* Do actual subtraction */
-    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
+    convolvedMaskedImage -= imageToNotConvolve;
 
     /* Invert */
-    if (invert)
+    if (invert) {
         convolvedMaskedImage *= -1.0;
+    }
     
     return convolvedMaskedImage;
 }
@@ -1116,11 +1115,12 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
     
     /* Do actual subtraction */
-    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
+    convolvedMaskedImage -= imageToNotConvolve;
 
     /* Invert */
-    if (invert)
+    if (invert) {
         convolvedMaskedImage *= -1.0;
+    }
     
     return convolvedMaskedImage;
 }
