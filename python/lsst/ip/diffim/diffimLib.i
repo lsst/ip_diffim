@@ -148,25 +148,42 @@ SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<do
 %template(ImageStatisticsD)
     lsst::ip::diffim::ImageStatistics<double>;
 
-%template(convolveAndSubtract)
-    lsst::ip::diffim::convolveAndSubtract<float>;
-%template(convolveAndSubtract)
-    lsst::ip::diffim::convolveAndSubtract<double>;
+%define %convolveAndSubtract(PIXEL_T)
+   %template(convolveAndSubtract)
+       lsst::ip::diffim::convolveAndSubtract<PIXEL_T, double>;
+   %template(convolveAndSubtract)
+       lsst::ip::diffim::convolveAndSubtract<PIXEL_T, lsst::afw::math::Function2<double> const&>;
+%enddef
 
-%template(convolveAndSubtract)
-    lsst::ip::diffim::convolveAndSubtract<float, double>;
-%template(convolveAndSubtract)
-    lsst::ip::diffim::convolveAndSubtract<double, double>;
+%convolveAndSubtract(float);
+//%convolveAndSubtract(double);           // image subtraction on double images??
 
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double>;
 
+#if 1
+#if 0
+//
+// RHL: do we really need this?  It doesn't seem to be called
+//
+%define %addFunctionToImage(IMAGE_T, FUNC_RETURN_T)
+    %template(addFunctionToImage)
+          lsst::ip::diffim::addSomethingToImage<lsst::afw::Image<IMAGE_T>, lsst::afw::math::Function2<FUNC_RETURN_T> >;
+%enddef
+
+%addFunctionToImage(double, double);
+%addFunctionToImage(float, double);
+%addFunctionToImage(double, float);
+%addFunctionToImage(double, double);
+#endif
+#else
 %template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, double>;
 %template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, double>;
 %template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, float>;
 %template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, float>;
+#endif
 
 /******************************************************************************/
 

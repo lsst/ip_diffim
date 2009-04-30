@@ -958,6 +958,46 @@ diffim::generateAlardLuptonKernelSet(
     return kernelBasisList;
 }
 
+/************************************************************************************************************/
+/*
+ * Adds a Function to an Image
+ *
+ * @note MAJOR NOTE; I need to check if my scaling of the image range from -1 to
+ * 1 gets messed up here.  ACB.
+ *
+ * @note This routine assumes that the pixel coordinates start at (0, 0) which is
+ * in general not true
+ *
+ * @node this function was renamed from addFunctionToImage to addSomethingToImage to allow generic programming
+ */
+namespace {
+    template <typename ImageT, typename FunctionT>
+    void addSomethingToImage(ImageT &image,
+                             FunctionT const& function
+                            ) {
+
+        // Set the pixels row by row, to avoid repeated checks for end-of-row
+        for (int y = 0; y != image.getHeight(); ++y) {
+            double yPos = image::positionToIndex(y);
+        
+            double xPos = image::positionToIndex(0);
+            for (typename ImageT::x_iterator ptr = image.row_begin(y), end = image.row_end(y);
+                 ptr != end; ++ptr, ++xPos) {            
+                *ptr += function(xPos, yPos);
+            }
+        }
+    }
+    //
+    // Add a scalar.
+    //
+    template <typename ImageT>
+    void addSomethingToImage(image::Image<ImageT> &image,
+                             double value
+                            ) {
+        image += value;
+    }
+}
+
 /** 
  * @brief Implement fundamental difference imaging step of convolution and
  * subtraction : D = I - (K.x.T + bg)
@@ -966,17 +1006,16 @@ diffim::generateAlardLuptonKernelSet(
  *
  * @ingroup diffim
  */
-template <typename ImageT>
+template <typename ImageT, typename BackgroundT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     image::MaskedImage<ImageT> const& imageToConvolve,
     image::MaskedImage<ImageT> const& imageToNotConvolve,
     math::Kernel const& convolutionKernel,
-    double background,
+    BackgroundT background,
     bool invert
     ) {
     
-    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
-                       "Convolving using convolve");
+    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", "Convolving using convolve");
     
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
@@ -985,7 +1024,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     math::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false, edgeMaskBit);
     
     /* Add in background */
-    convolvedMaskedImage += background;
+    addSomethingToImage(*(convolvedMaskedImage.getImage()), background);
     
     /* Do actual subtraction */
     convolvedMaskedImage -= imageToNotConvolve;
@@ -1006,17 +1045,16 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  *
  * @ingroup diffim
  */
-template <typename ImageT>
+template <typename ImageT, typename BackgroundT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     image::MaskedImage<ImageT> const& imageToConvolve,
     image::MaskedImage<ImageT> const& imageToNotConvolve,
     math::LinearCombinationKernel const& convolutionKernel,
-    double background,
+    BackgroundT background,
     bool invert
     ) {
     
-    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
-                       "Convolving using convolveLinear");
+    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", "Convolving using convolveLinear");
     
     int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
@@ -1027,7 +1065,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
                          edgeMaskBit);
     
     /* Add in background */
-    convolvedMaskedImage += background;
+    addSomethingToImage(*(convolvedMaskedImage.getImage()), background);
     
     /* Do actual subtraction */
     convolvedMaskedImage -= imageToNotConvolve;
@@ -1039,92 +1077,6 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     
     return convolvedMaskedImage;
 }
-
-/** 
- * @brief Implement fundamental difference imaging step of convolution and
- * subtraction : D = I - (K.x.T + bg)
- *
- * @return Difference image
- *
- * @ingroup diffim
- */
-template <typename ImageT, typename FunctionT>
-image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const& imageToConvolve,
-    image::MaskedImage<ImageT> const& imageToNotConvolve,
-    math::Kernel const& convolutionKernel,
-    math::Function2<FunctionT> const& backgroundFunction,
-    bool invert
-    ) {
-    
-    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
-                       "Convolving using convolve and spatially varying background");
-    
-    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
-    image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
-    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    math::convolve(convolvedMaskedImage,
-                   imageToConvolve,
-                   convolutionKernel,
-                   false,
-                   edgeMaskBit);
-    
-    /* Add in background */
-    addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
-    
-    /* Do actual subtraction */
-    convolvedMaskedImage -= imageToNotConvolve;
-
-    /* Invert */
-    if (invert) {
-        convolvedMaskedImage *= -1.0;
-    }
-    
-    return convolvedMaskedImage;
-}
-
-/** 
- * @brief Implement fundamental difference imaging step of convolution and
- * subtraction : D = I - (K.x.T + bg)
- *
- * @return Difference image
- *
- * @ingroup diffim
- */
-template <typename ImageT, typename FunctionT>
-image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const& imageToConvolve,
-    image::MaskedImage<ImageT> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    math::Function2<FunctionT> const& backgroundFunction,
-    bool invert
-    ) {
-    
-    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
-                       "Convolving using convolveLinear and spatially varying background");
-    
-    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
-    image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
-    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    math::convolveLinear(convolvedMaskedImage,
-                         imageToConvolve,
-                         convolutionKernel,
-                         edgeMaskBit);
-    
-    /* Add in background */
-    addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
-    
-    /* Do actual subtraction */
-    convolvedMaskedImage -= imageToNotConvolve;
-
-    /* Invert */
-    if (invert) {
-        convolvedMaskedImage *= -1.0;
-    }
-    
-    return convolvedMaskedImage;
-}
-
 
 /** 
  * @brief Runs Detection on a single image for significant peaks, and checks
@@ -1275,35 +1227,6 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     return footprintListOut;
 }
 
-/** 
- * @brief Adds a Function to an Image
- *
- * @note MAJOR NOTE; I need to check if my scaling of the image range from -1 to
- * 1 gets messed up here.  ACB.
- *
- * @ingroup diffim
- */
-template <typename ImageT, typename FunctionT>
-void diffim::addFunctionToImage(
-    image::Image<ImageT> &image,
-    math::Function2<FunctionT> const& function
-    ) {
-
-    // Set the pixels row by row, to avoid repeated checks for end-of-row
-    for (int y = 0; y != image.getHeight(); ++y) {
-        double yPos = image::positionToIndex(y);
-        
-        int x = 0;
-        for (typename image::Image<ImageT>::x_iterator ptr = image.row_begin(y); 
-             ptr != image.row_end(y); ++ptr, ++x) {
-            
-            double xPos = image::positionToIndex(x);
-            *ptr += static_cast<ImageT>(function(xPos, yPos));
-
-        }
-    }
-}
-
 // Explicit instantiations
 
 template class diffim::PsfMatchingFunctor<float, float>;
@@ -1407,28 +1330,6 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     image::MaskedImage<double> const& imageToConvolve,
     image::MaskedImage<double> const& imageToNotConvolve,
     lsst::pex::policy::Policy  const& policy);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<float>&,
-    math::Function2<float> const&);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<float>&,
-    math::Function2<double> const&);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<double>&,
-    math::Function2<float> const&);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<double>&,
-    math::Function2<double> const&);
-
-
 
 #if false
 /** 

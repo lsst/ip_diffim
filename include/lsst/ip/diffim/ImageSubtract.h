@@ -210,56 +210,12 @@ namespace diffim {
      * @param background  Differential background value
      * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
      */    
-    template <typename ImageT>
+    template <typename ImageT, typename BackgroundT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
         lsst::afw::math::LinearCombinationKernel const& convolutionKernel,
-        double background, 
-        bool invert=true
-        );
-
-    /** Execute fundamental task of convolving template and subtracting it from science image
-     *
-     * @note D = I - (K.x.T + bg)
-     * 
-     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
-     * 
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param convolutionKernelPtr  PSF-matching Kernel used for convolution
-     * @param background  Differential background value
-     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
-     */    
-    template <typename ImageT>
-    lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-        lsst::afw::math::Kernel const& convolutionKernel,
-        double background,
-        bool invert=true
-        );
-
-    /** Execute fundamental task of convolving template and subtracting it from science image
-     *
-     * @note D = I - (K.x.T + bg)
-     * 
-     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
-     * 
-     * @note This is a specialization for LinearCombinationKernels
-     * 
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param convolutionKernelPtr  PSF-matching LinearCombinationKernel used for convolution
-     * @param background  Differential background function
-     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
-     */    
-    template <typename ImageT, typename FunctionT>
-    lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-        lsst::afw::math::LinearCombinationKernel const& convolutionKernel,
-        lsst::afw::math::Function2<FunctionT> const& backgroundFunction,
+        BackgroundT background, 
         bool invert=true
         );
 
@@ -275,12 +231,12 @@ namespace diffim {
      * @param background  Differential background function
      * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
      */    
-    template <typename ImageT, typename FunctionT>
+    template <typename ImageT, typename BackgroundT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
         lsst::afw::math::Kernel const& convolutionKernel,
-        lsst::afw::math::Function2<FunctionT> const& backgroundFunction,
+        BackgroundT background,
         bool invert=true
         );
 
@@ -407,21 +363,6 @@ namespace diffim {
             lsst::pex::policy::Policy             const& policy
             );
     };
-
-    /** Add a spatially varying function to an Image
-     *
-     * @note Typically used to add a background Function to an Image
-     *
-     * @param image Image to add function to
-     * @param function  Function added to image
-     */
-    template <typename ImageT, typename FunctionT>
-    void addFunctionToImage(
-        lsst::afw::image::Image<ImageT> &image,
-        lsst::afw::math::Function2<FunctionT> const& function
-        );
-
-
 
     // BELOW ARE LESS USEFUL / DEPRECATED PIECES OF CODE
 
