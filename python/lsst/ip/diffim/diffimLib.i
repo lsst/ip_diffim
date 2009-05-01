@@ -157,7 +157,7 @@ SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<do
 
 %convolveAndSubtract(float);
 #if 0
-%convolveAndSubtract(double);           // image subtraction on double images??!?
+%convolveAndSubtract(double);           // image subtraction on double images??!?  Not instantiated in .cc either
 #endif
 
 %template(getCollectionOfFootprintsForPsfMatching)

@@ -57,76 +57,66 @@ SpatialModelKernel<ImageT>::SpatialModelKernel(
     _isGood(false)
 {
     if (build == true) {
-        this->buildModel();
+        buildModel();
     }
 }
 
 template <typename ImageT>
 bool SpatialModelKernel<ImageT>::buildModel() {
 
-    if (this->isBuilt() == true) {
+    if (isBuilt() == true) {
         return false;
     }
 
     // fill in information on position in the image
-    image::BBox fpBBox = this->_fpPtr->getBBox();
+    image::BBox fpBBox = _fpPtr->getBBox();
 
     // NOTE : since we can't remap pixel range to go from -1 to 1 in convolve(),
     // we have to use the actual pixel value here.  Not optimal.
-    // this->setColc(float(fpBBox.getX0() + fpBBox.getX1()) / this->_miToConvolveParentPtr->getWidth() - 1.0);
-    // this->setRowc(float(fpBBox.getY0() + fpBBox.getY1()) / this->_miToConvolveParentPtr->getHeight() - 1.0);
-    this->setColc(0.5 * float(fpBBox.getX0() + fpBBox.getX1()));
-    this->setRowc(0.5 * float(fpBBox.getY0() + fpBBox.getY1()));
+    // setColc(float(fpBBox.getX0() + fpBBox.getX1()) / _miToConvolveParentPtr->getWidth() - 1.0);
+    // setRowc(float(fpBBox.getY0() + fpBBox.getY1()) / _miToConvolveParentPtr->getHeight() - 1.0);
+    setColc(0.5 * float(fpBBox.getX0() + fpBBox.getX1()));
+    setRowc(0.5 * float(fpBBox.getY0() + fpBBox.getY1()));
 
     logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                        "Footprint = %d,%d -> %d,%d (center %d,%d)",
                        fpBBox.getX0(), fpBBox.getY0(),
                        fpBBox.getX1(), fpBBox.getY1(),
-		       int(this->getColc()), int(this->getRowc()));
+		       int(getColc()), int(getRowc()));
 
     // Estimate of the variance for first kernel pass
     // True argument is for a deep copy, so -= does not modify the original pixels
-    image::MaskedImage<ImageT> varEstimate = 
-        image::MaskedImage<ImageT>(*(this->_miToNotConvolvePtr), true);
-    varEstimate -= *(this->_miToConvolvePtr);
-    
+    image::MaskedImage<ImageT> varEstimate = image::MaskedImage<ImageT>(*_miToNotConvolvePtr, true);
+    varEstimate -= *_miToConvolvePtr;
 
     try {
-        this->_kFunctor->apply(*(this->_miToConvolvePtr), 
-                               *(this->_miToNotConvolvePtr),
-                               *(varEstimate.getVariance()),
-                               this->_policy);
+        _kFunctor->apply(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr, *varEstimate.getVariance(), _policy);
     } catch (exceptions::Exception& e) {
-        this->setStatus(false);
+        setStatus(false);
         logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                            "Exception caught from computePsfMatchingKernelForFootprint"); 
         logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                            e.what());
         return false;
     }
-    boost::shared_ptr<math::Kernel> kernelPtr       = this->_kFunctor->getKernel();
-    boost::shared_ptr<math::Kernel> kernelErrorPtr  = this->_kFunctor->getKernelError();
-    double                          background      = this->_kFunctor->getBackground();
-    double                          backgroundError = this->_kFunctor->getBackgroundError();
+    math::Kernel::PtrT kernelPtr       = _kFunctor->getKernel();
+    math::Kernel::PtrT kernelErrorPtr  = _kFunctor->getKernelError();
+    double background =      _kFunctor->getBackground();
+    double backgroundError = _kFunctor->getBackgroundError();
 
     // Compute kernel sum
     double kSum = 0.;
-    unsigned int kCols = this->_policy.getInt("kernelCols");
-    unsigned int kRows = this->_policy.getInt("kernelRows");
+    unsigned int kCols = _policy.getInt("kernelCols");
+    unsigned int kRows = _policy.getInt("kernelRows");
     image::Image<double> kImage(kCols, kRows);
     kSum = kernelPtr->computeImage(kImage, false);
 
     // Create difference image and calculate associated statistics
-    image::MaskedImage<ImageT> diffIm = convolveAndSubtract( *(this->_miToConvolvePtr),
-                                                             *(this->_miToNotConvolvePtr),
-                                                             *(kernelPtr), 
-                                                             background);
+    image::MaskedImage<ImageT> diffIm = convolveAndSubtract(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr,
+                                                            *kernelPtr, background);
 
     // Find statistics of difference image 
-    boost::shared_ptr<diffim::ImageStatistics<ImageT> > kStats = 
-        boost::shared_ptr<diffim::ImageStatistics<ImageT> > (
-            new diffim::ImageStatistics<ImageT>()
-            );
+    typename diffim::ImageStatistics<ImageT>::Ptr kStats(new diffim::ImageStatistics<ImageT>());
     (*kStats).apply(diffIm);
     logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                        "Kernel pass 1 : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
@@ -135,37 +125,29 @@ bool SpatialModelKernel<ImageT>::buildModel() {
                        (*kStats).getRms());
 
     // A second pass with a better variance estimate from first difference image
-    bool iterateKernel = this->_policy.getBool("iterateKernel");
+    bool iterateKernel = _policy.getBool("iterateKernel");
     if (iterateKernel) {
         try {
             try {
-                this->_kFunctor->apply(*(this->_miToConvolvePtr), 
-                                       *(this->_miToNotConvolvePtr),
-                                       *(diffIm.getVariance()),
-                                       this->_policy);
+                _kFunctor->apply(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr, *diffIm.getVariance(), _policy);
             } catch (exceptions::Exception& e) {
                 throw;
             }
-            kernelPtr       = this->_kFunctor->getKernel();
-            kernelErrorPtr  = this->_kFunctor->getKernelError();
-            background      = this->_kFunctor->getBackground();
-            backgroundError = this->_kFunctor->getBackgroundError();
+            kernelPtr       = _kFunctor->getKernel();
+            kernelErrorPtr  = _kFunctor->getKernelError();
+            background      = _kFunctor->getBackground();
+            backgroundError = _kFunctor->getBackgroundError();
             
             kSum    = 0.;
             kSum    = kernelPtr->computeImage(kImage, false);
-            diffIm  = convolveAndSubtract( *(this->_miToConvolvePtr),
-                                           *(this->_miToNotConvolvePtr),
-                                           *(kernelPtr), 
-                                           background);
+            diffIm  = convolveAndSubtract(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr, *kernelPtr, background);
 
             // Reset the image its looking at
-            (*kStats).apply(diffIm);
+            kStats->apply(diffIm);
 
             logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                                "Kernel pass 2 : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
-                               kSum, background, backgroundError,
-                               (*kStats).getMean(),
-                               (*kStats).getRms());
+                               kSum, background, backgroundError, kStats->getMean(), kStats->getRms());
             
         } catch (exceptions::Exception& e) {
             logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
@@ -176,32 +158,29 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     }
         
     // Updates for derived class
-    this->_kPtr    = kernelPtr;
-    this->_kErrPtr = kernelErrorPtr;
-    this->_kSum    = kSum;
-    this->_bg      = background;
-    this->_bgErr   = backgroundError;
-    this->_kStats  = kStats;
+    _kPtr    = kernelPtr;
+    _kErrPtr = kernelErrorPtr;
+    _kSum    = kSum;
+    _bg      = background;
+    _bgErr   = backgroundError;
+    _kStats  = kStats;
     // Updates for base class
-    this->setStatus((*kStats).evaluateQuality(this->_policy));
-    this->setBuildStatus(true);
+    setStatus(kStats->evaluateQuality(_policy));
+    setBuildStatus(true);
 
     logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                        "Kernel : Kernel Sum = %.3f; Background = %.3f +/- %.3f; Diffim residuals = %.2f +/- %.2f sigma",
-                       this->_kSum, background, backgroundError,
-                       this->_kStats->getMean(),
-                       this->_kStats->getRms());
-
+                       _kSum, background, backgroundError, _kStats->getMean(), _kStats->getRms());
 
     // Return quality of the kernel
-    return this->getStatus();
+    return getStatus();
 }
 
 template <typename ImageT>
 double SpatialModelKernel<ImageT>::returnCellRating() {
     // Currently, just check the total flux in the template image
     FindCounts<ImageT> counter;
-    counter.apply(*(this->_miToConvolvePtr));
+    counter.apply(*_miToConvolvePtr);
     return counter.getCounts();
 }
 

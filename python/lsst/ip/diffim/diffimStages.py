@@ -272,10 +272,13 @@ def subtractMaskedImage(templateMaskedImage,
         # Throw exception!
         pass
 
-    differenceMaskedImage = ipDiffim.convolveAndSubtract(templateMaskedImage,
-            scienceMaskedImage,
-            sKernel,
-            bgFunction)
+    if policy.exists("backgroundPolicy"):
+        background = 0                  # no need to subtract a background in subtraction as we'll do so in a moment
+    else:
+        background = bgFunction
+        
+    differenceMaskedImage = ipDiffim.convolveAndSubtract(templateMaskedImage.getImage(),
+                                                         scienceMaskedImage, sKernel, background)
 
     #
     # Maybe subtract a background model from the difference image

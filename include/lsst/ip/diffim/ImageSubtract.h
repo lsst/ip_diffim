@@ -120,6 +120,7 @@ namespace diffim {
     template <typename ImageT>
     class ImageStatistics {
     public:
+        typedef boost::shared_ptr<ImageStatistics> Ptr;
         typedef typename lsst::afw::image::MaskedImage<ImageT>::x_iterator x_iterator;
 
         ImageStatistics() : 
@@ -196,21 +197,21 @@ namespace diffim {
         std::vector<double> const& degGauss
         );
 
-    /** Execute fundamental task of convolving template and subtracting it from science image
-     *
-     * @note D = I - (K.x.T + bg)
-     * 
-     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
-     * 
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param convolutionKernelPtr  PSF-matching Kernel used for convolution
-     * @param background  Differential background function
-     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
-     */    
+    /*
+     * Execute fundamental task of convolving template and subtracting it from science image
+     */
     template <typename ImageT, typename BackgroundT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+        lsst::afw::math::Kernel const& convolutionKernel,
+        BackgroundT background,
+        bool invert=true
+        );
+
+    template <typename ImageT, typename BackgroundT>
+    lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
+        lsst::afw::image::Image<ImageT> const& imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
         lsst::afw::math::Kernel const& convolutionKernel,
         BackgroundT background,
@@ -240,6 +241,7 @@ namespace diffim {
     template <typename ImageT, typename VarT=lsst::afw::image::VariancePixel>
     class PsfMatchingFunctor {
     public:
+        typedef boost::shared_ptr<PsfMatchingFunctor> Ptr;
         typedef typename lsst::afw::image::MaskedImage<ImageT>::xy_locator xy_locator;
         typedef typename lsst::afw::image::Image<VarT>::xy_locator         xyi_locator;
 
@@ -281,6 +283,13 @@ namespace diffim {
             lsst::afw::image::Image<VarT>         const& varianceEstimate,
             lsst::pex::policy::Policy             const& policy
             );
+
+        /* Create PSF matching kernel */
+        void apply(lsst::afw::image::Image<ImageT>       const& imageToConvolve,
+                   lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+                   lsst::afw::image::Image<VarT>         const& varianceEstimate,
+                   lsst::pex::policy::Policy             const& policy
+                  );
 
     protected:
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> _basisList;        ///< List of Kernel basis functions
