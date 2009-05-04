@@ -270,25 +270,11 @@ namespace diffim {
          */
         void reset();
 
-        /** Create PSF matching kernel
-         *
-         * @param imageToConvolve Image to apply kernel to
-         * @param imageToNotConvolve Image whose PSF you want to match to
-         * @param varianceEstimate Estimate of the variance per pixel
-         * @param policy Policy file
-         */
-        void apply(
-            lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-            lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-            lsst::afw::image::Image<VarT>         const& varianceEstimate,
-            lsst::pex::policy::Policy             const& policy
-            );
-
         /* Create PSF matching kernel */
-        void apply(lsst::afw::image::Image<ImageT>       const& imageToConvolve,
-                   lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-                   lsst::afw::image::Image<VarT>         const& varianceEstimate,
-                   lsst::pex::policy::Policy             const& policy
+        void apply(lsst::afw::image::Image<ImageT> const& imageToConvolve,
+                   lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
+                   lsst::afw::image::Image<VarT>   const& varianceEstimate,
+                   lsst::pex::policy::Policy const& policy
                   );
 
     protected:

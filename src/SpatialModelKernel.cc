@@ -90,7 +90,8 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     varEstimate -= *_miToConvolvePtr;
 
     try {
-        _kFunctor->apply(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr, *varEstimate.getVariance(), _policy);
+        _kFunctor->apply(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr->getImage(),
+                         *varEstimate.getVariance(), _policy);
     } catch (exceptions::Exception& e) {
         setStatus(false);
         logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
@@ -129,7 +130,8 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     if (iterateKernel) {
         try {
             try {
-                _kFunctor->apply(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr, *diffIm.getVariance(), _policy);
+                _kFunctor->apply(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr->getImage(),
+                                 *diffIm.getVariance(), _policy);
             } catch (exceptions::Exception& e) {
                 throw;
             }
