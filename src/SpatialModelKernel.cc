@@ -33,11 +33,11 @@ namespace diffim {
     
 template <typename ImageT>
 SpatialModelKernel<ImageT>::SpatialModelKernel(
-    detection::Footprint::Ptr const &fpPtr,
+    lsst::afw::detection::Footprint::Ptr const &fpPtr,
     MaskedImagePtr const &miToConvolvePtr,
     MaskedImagePtr const &miToNotConvolvePtr,
     boost::shared_ptr<PsfMatchingFunctor<ImageT> > const &kFunctor,
-    policy::Policy const &policy,
+    lsst::pex::policy::Policy const &policy,
     bool build
     ) :
     _fpPtr(fpPtr),

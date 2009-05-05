@@ -60,7 +60,7 @@ namespace diffim     = lsst::ip::diffim;
 //
 template <typename ImageT, typename VarT>
 diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
-    math::KernelList<lsst::afw::math::Kernel> const& basisList
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList
     ) :
     _basisList(basisList),
     _background(0.),
@@ -86,9 +86,9 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::reset() {
  */
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
-    image::Image<ImageT> const& imageToConvolve,        //!< Image to apply kernel to
-    image::Image<ImageT> const& imageToNotConvolve,     //!< Image whose PSF you want to match to
-    image::Image<VarT>   const& varianceEstimate,       //!< Estimate of the variance per pixel
+    lsst::afw::image::Image<ImageT> const& imageToConvolve,    //!< Image to apply kernel to
+    lsst::afw::image::Image<ImageT> const& imageToNotConvolve, //!< Image whose PSF you want to match to
+    lsst::afw::image::Image<VarT>   const& varianceEstimate,   //!< Estimate of the variance per pixel
     lsst::pex::policy::Policy  const& policy            //!< Policy file
     ) {
     
@@ -354,9 +354,9 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
 
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
-    image::MaskedImage<ImageT> const& imageToConvolve,
-    image::MaskedImage<ImageT> const& imageToNotConvolve,
-    image::Image<VarT>         const& varianceEstimate,
+    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
+    lsst::afw::image::Image<VarT>         const& varianceEstimate,
     lsst::pex::policy::Policy             const& policy
     ) {
     
@@ -983,9 +983,9 @@ namespace {
  */
 template <typename ImageT, typename BackgroundT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const& imageToConvolve,    ///< Image T to convolve with Kernel
-    image::MaskedImage<ImageT> const& imageToNotConvolve, ///< Image I to subtract convolved template from
-    math::Kernel const& convolutionKernel,                ///< PSF-matching Kernel used for convolution
+    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,    ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve, ///< Image I to subtract convolved template from
+    lsst::afw::math::Kernel const& convolutionKernel,                ///< PSF-matching Kernel used for convolution
     BackgroundT background,                               ///< Differential background function or scalar
     bool invert                                           ///< Invert the output difference image
     ) {
@@ -1027,11 +1027,11 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  */
 template <typename ImageT, typename BackgroundT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::Image<ImageT> const& imageToConvolve,          ///< Image T to convolve with Kernel
-    image::MaskedImage<ImageT> const& imageToNotConvolve, ///< Image I to subtract convolved template from
-    math::Kernel const& convolutionKernel,                ///< PSF-matching Kernel used for convolution
-    BackgroundT background,                               ///< Differential background function or scalar
-    bool invert                                           ///< Invert the output difference image
+    lsst::afw::image::Image<ImageT> const& imageToConvolve,          ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve, ///< Image I to subtract convolved template from
+    lsst::afw::math::Kernel const& convolutionKernel,                ///< PSF-matching Kernel used for convolution
+    BackgroundT background,                                          ///< Differential background function or scalar
+    bool invert                                                      ///< Invert the output difference image
     ) {
     
     logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", "Convolving using convolve");
@@ -1077,8 +1077,8 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  */
 template <typename ImageT>
 std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<ImageT> const& imageToConvolve,    
-    image::MaskedImage<ImageT> const& imageToNotConvolve, 
+    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,    
+    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve, 
     lsst::pex::policy::Policy  const& policy                                       
     ) {
     
@@ -1208,6 +1208,7 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 }
 
 // Explicit instantiations
+// \cond
 
 template class diffim::PsfMatchingFunctor<float, float>;
 template class diffim::PsfMatchingFunctor<double, float>;
@@ -2737,4 +2738,5 @@ std::vector<double> diffim::computePsfMatchingKernelForFootprint_Legacy(
     return kernelCoeffs;
 }
 #endif
+// \endcond
 

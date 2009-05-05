@@ -113,10 +113,9 @@ namespace diffim {
         */
 
         /** Set its quality status
-         *
-         * @param built  Boolean status of build
          */
-        void setStatus(bool status) {_isGood = status;};
+        void setStatus(bool status      //!< Boolean status of build
+                      ) {_isGood = status;};
 
         /** Get its quality status
          */
