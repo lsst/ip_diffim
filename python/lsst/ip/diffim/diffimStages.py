@@ -76,7 +76,8 @@ class DiffimStage(Stage):
         self.log.log(pexLog.Log.INFO, "Starting subtract")
         products = subtractExposure(remapedTemplateExposure, 
                 scienceExposure, 
-                diffimPolicy)
+                diffimPolicy,
+                self.log)
         self.log.log(pexLog.Log.INFO, "Ending subtract")
 
         if products == None:
@@ -93,6 +94,7 @@ class DiffimStage(Stage):
         self.activeClipboard.put(sdqaKey, persistableSdqaVector)
 
         self.outputQueue.addDataset(self.activeClipboard)
+
 
 def warpTemplateExposure(templateExposure, scienceExposure, policy):
     # Create the warping Kernel according to policy
@@ -115,7 +117,7 @@ def warpTemplateExposure(templateExposure, scienceExposure, policy):
         
     return remapedTemplateExposure
     
-def subtractExposure(templateExposure, scienceExposure, policy):
+def subtractExposure(templateExposure, scienceExposure, policy, log):
     # Make sure they end up the same dimensions on the sky
     templateWcs = templateExposure.getWcs() 
     scienceWcs = scienceExposure.getWcs()
@@ -145,7 +147,8 @@ def subtractExposure(templateExposure, scienceExposure, policy):
     differenceMaskedImage, spatialKernel, backgroundModel, sdqaList = \
             subtractMaskedImage(templateMaskedImage,
                     scienceMaskedImage,
-                    policy)
+                    policy,
+                    log)
 
     # Note : we assume that the Template is warped to the science image's WCS
     #      : meaning that the scienceWcs is the correct one to store in 
@@ -159,6 +162,7 @@ def subtractExposure(templateExposure, scienceExposure, policy):
 def subtractMaskedImage(templateMaskedImage, 
         scienceMaskedImage, 
         policy, 
+        log,
         fpList=None):
     # Make sure they are the EXACT same dimensions in pixels
     # This is non-negotiable
@@ -173,10 +177,13 @@ def subtractMaskedImage(templateMaskedImage,
 
     if fpList == None:
         # Need to find own footprints
+        log.log(pexLog.Log.INFO, "Starting footprints")
+
         fpList = ipDiffim.getCollectionOfFootprintsForPsfMatching(
                 templateMaskedImage,
                 scienceMaskedImage,
                 policy)
+        log.log(pexLog.Log.INFO, "Ending footprints")
 
     if display:
         frame=1
@@ -194,6 +201,8 @@ def subtractMaskedImage(templateMaskedImage,
             ds9.line([(x0, y0), (x0, y1), (x1, y1), (x1, y0), (x0, y0)], frame=frame)
 
     # Set up grid for spatial model
+
+    log.log(pexLog.Log.INFO, "Starting kernel")
     spatialCells = diffimTools.createSpatialModelKernelCells(
             templateMaskedImage,
             scienceMaskedImage,
@@ -272,10 +281,15 @@ def subtractMaskedImage(templateMaskedImage,
         # Throw exception!
         pass
 
+    log.log(pexLog.Log.INFO, "Ending kernel")
+
+    log.log(pexLog.Log.INFO, "Starting convolve")
+
     differenceMaskedImage = ipDiffim.convolveAndSubtract(templateMaskedImage,
             scienceMaskedImage,
             sKernel,
             bgFunction)
+    log.log(pexLog.Log.INFO, "Ending convolve")
 
     #
     # Maybe subtract a background model from the difference image
