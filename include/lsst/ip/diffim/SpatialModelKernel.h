@@ -113,10 +113,9 @@ namespace diffim {
         */
 
         /** Set its quality status
-         *
-         * @param built  Boolean status of build
          */
-        void setStatus(bool status) {_isGood = status;};
+        void setStatus(bool status      //!< Boolean status of build
+                      ) {_isGood = status;};
 
         /** Get its quality status
          */
@@ -172,19 +171,19 @@ namespace diffim {
          *
          * @param kPtr  pointer to the Kernel
          */
-        void setKernelPtr(boost::shared_ptr<lsst::afw::math::Kernel> kPtr) {_kPtr = kPtr;};
+        void setKernelPtr(lsst::afw::math::Kernel::PtrT kPtr) {_kPtr = kPtr;};
         /** Get Kernel pointer associated with the Footprint
          */
-        boost::shared_ptr<lsst::afw::math::Kernel> const& getKernelPtr() const {return _kPtr;};
+        lsst::afw::math::Kernel::PtrT const& getKernelPtr() const {return _kPtr;};
 
         /** Set pointer associated with the uncertainty in the Kernel
          *
          * @param kPtr  pointer to the Kernel uncertainty; represent as a Kernel
          */
-        void setKernelErrPtr(boost::shared_ptr<lsst::afw::math::Kernel> kPtr) {_kErrPtr = kPtr;};
+        void setKernelErrPtr(lsst::afw::math::Kernel::PtrT kPtr) {_kErrPtr = kPtr;};
         /** Get pointer associated with the uncertainty in the Kernel
          */
-        boost::shared_ptr<lsst::afw::math::Kernel> getKernelErrPtr() {return _kErrPtr;};
+        lsst::afw::math::Kernel::PtrT getKernelErrPtr() {return _kErrPtr;};
 
         /** Set Kernel sum
          *
@@ -239,10 +238,10 @@ namespace diffim {
          *
          * @note Has to be a pointer since there is no empty constructor of FootprintFunctor
          */
-        void setStats(boost::shared_ptr<ImageStatistics<ImageT> > kStats) {_kStats = kStats;};
+        void setStats(typename ImageStatistics<ImageT>::Ptr kStats) {_kStats = kStats;};
         /** Get class instance associated with residuals in the derived difference image
          */
-        boost::shared_ptr<ImageStatistics<ImageT> > getStats() {return _kStats;};
+        typename ImageStatistics<ImageT>::Ptr getStats() {return _kStats;};
 
     private: 
         /** Objects needed to build itself; only initializable during construction
@@ -250,7 +249,7 @@ namespace diffim {
         lsst::afw::detection::Footprint::Ptr _fpPtr; ///< Footprint containing pixels used to build Kernel
         MaskedImagePtr _miToConvolvePtr;             ///< Subimage around which you build kernel
         MaskedImagePtr _miToNotConvolvePtr;          ///< Subimage around which you build kernel
-        boost::shared_ptr<PsfMatchingFunctor<ImageT> > _kFunctor; ///< Functor to build PSF matching kernel
+        typename PsfMatchingFunctor<ImageT>::Ptr _kFunctor; ///< Functor to build PSF matching kernel
         lsst::pex::policy::Policy _policy;           ///< Policy file for operations
 
         double _colc;     ///< Effective col position of model in overall image
@@ -258,12 +257,12 @@ namespace diffim {
 
         /** Results from single Kernel fit
          */
-        boost::shared_ptr<lsst::afw::math::Kernel> _kPtr;    ///< Kernel
-        boost::shared_ptr<lsst::afw::math::Kernel> _kErrPtr; ///< Uncertainty in Kernel
+        lsst::afw::math::Kernel::PtrT _kPtr;    ///< Kernel
+        lsst::afw::math::Kernel::PtrT _kErrPtr; ///< Uncertainty in Kernel
         double _kSum;                                        ///< Kernel sum
         double _bg;                                          ///< Differential background value
         double _bgErr;                                       ///< Uncertainty in background
-        boost::shared_ptr<ImageStatistics<ImageT> > _kStats; ///< Home-grown statistics; placeholder for Sdqa
+        typename ImageStatistics<ImageT>::Ptr _kStats; ///< Home-grown statistics; placeholder for Sdqa
 
         /** Status of model
          */

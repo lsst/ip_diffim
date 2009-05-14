@@ -168,10 +168,9 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
         kernel  = afwMath.FixedKernel(sImage)
         spatialCell = spatialCells[idList[idx]]
         spatialCellModel = spatialCell.getCurrentModel()
-        diffIm  = diffimLib.convolveAndSubtract(
-                spatialCellModel.getMiToConvolvePtr(),
-                spatialCellModel.getMiToNotConvolvePtr(),
-                kernel, bgValue)
+        diffIm  = diffimLib.convolveAndSubtract(spatialCellModel.getMiToConvolvePtr().getImage(),
+                                                spatialCellModel.getMiToNotConvolvePtr(),
+                                                kernel, bgValue)
 
         # Find quality of difference image
         imStats.apply(diffIm)
@@ -398,10 +397,9 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
         kernel  = afwMath.FixedKernel(eImage)
         spatialCell = spatialCells[idList[idx]]
         currentModel = spatialCell.getCurrentModel()
-        diffIm  = diffimLib.convolveAndSubtract(
-                currentModel.getMiToConvolvePtr(),
-                currentModel.getMiToNotConvolvePtr(),
-                kernel, bgValue)
+        diffIm  = diffimLib.convolveAndSubtract(currentModel.getMiToConvolvePtr().getImage(),
+                                                currentModel.getMiToNotConvolvePtr(),
+                                                kernel, bgValue)
 
         # Find quality of difference image
         imStats.apply(diffIm)

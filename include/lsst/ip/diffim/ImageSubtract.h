@@ -120,6 +120,7 @@ namespace diffim {
     template <typename ImageT>
     class ImageStatistics {
     public:
+        typedef boost::shared_ptr<ImageStatistics> Ptr;
         typedef typename lsst::afw::image::MaskedImage<ImageT>::x_iterator x_iterator;
 
         ImageStatistics() : 
@@ -173,10 +174,7 @@ namespace diffim {
     };
 
 
-    /** Build a set of Delta Function basis kernels
-     *
-     * @param nCols  Number of rows in the set
-     * @param nRows  Number of columns in the set
+    /* Build a set of Delta Function basis kernels
      */    
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateDeltaFunctionKernelSet(
         unsigned int width,
@@ -199,91 +197,24 @@ namespace diffim {
         std::vector<double> const& degGauss
         );
 
-    /** Execute fundamental task of convolving template and subtracting it from science image
-     *
-     * @note D = I - (K.x.T + bg)
-     *
-     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
-     * 
-     * @note This is a specialization for LinearCombinationKernels
-     * 
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param convolutionKernelPtr  PSF-matching LinearCombinationKernelKernel used for convolution
-     * @param background  Differential background value
-     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
-     */    
-    template <typename ImageT>
-    lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-        lsst::afw::math::LinearCombinationKernel const& convolutionKernel,
-        double background, 
-        bool invert=true
-        );
-
-    /** Execute fundamental task of convolving template and subtracting it from science image
-     *
-     * @note D = I - (K.x.T + bg)
-     * 
-     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
-     * 
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param convolutionKernelPtr  PSF-matching Kernel used for convolution
-     * @param background  Differential background value
-     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
-     */    
-    template <typename ImageT>
+    /*
+     * Execute fundamental task of convolving template and subtracting it from science image
+     */
+    template <typename ImageT, typename BackgroundT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
         lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
         lsst::afw::math::Kernel const& convolutionKernel,
-        double background,
+        BackgroundT background,
         bool invert=true
         );
 
-    /** Execute fundamental task of convolving template and subtracting it from science image
-     *
-     * @note D = I - (K.x.T + bg)
-     * 
-     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
-     * 
-     * @note This is a specialization for LinearCombinationKernels
-     * 
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param convolutionKernelPtr  PSF-matching LinearCombinationKernel used for convolution
-     * @param background  Differential background function
-     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
-     */    
-    template <typename ImageT, typename FunctionT>
+    template <typename ImageT, typename BackgroundT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-        lsst::afw::math::LinearCombinationKernel const& convolutionKernel,
-        lsst::afw::math::Function2<FunctionT> const& backgroundFunction,
-        bool invert=true
-        );
-
-    /** Execute fundamental task of convolving template and subtracting it from science image
-     *
-     * @note D = I - (K.x.T + bg)
-     * 
-     * @note If you convolve the science image, D = (K.x.I + bg) - T, set invert=False
-     * 
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param convolutionKernelPtr  PSF-matching Kernel used for convolution
-     * @param background  Differential background function
-     * @param invert  Invert the difference image, which is (K.x.ITC + bg) - ITNC
-     */    
-    template <typename ImageT, typename FunctionT>
-    lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
+        lsst::afw::image::Image<ImageT> const& imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
         lsst::afw::math::Kernel const& convolutionKernel,
-        lsst::afw::math::Function2<FunctionT> const& backgroundFunction,
+        BackgroundT background,
         bool invert=true
         );
 
@@ -310,6 +241,7 @@ namespace diffim {
     template <typename ImageT, typename VarT=lsst::afw::image::VariancePixel>
     class PsfMatchingFunctor {
     public:
+        typedef boost::shared_ptr<PsfMatchingFunctor> Ptr;
         typedef typename lsst::afw::image::MaskedImage<ImageT>::xy_locator xy_locator;
         typedef typename lsst::afw::image::Image<VarT>::xy_locator         xyi_locator;
 
@@ -338,19 +270,12 @@ namespace diffim {
          */
         void reset();
 
-        /** Create PSF matching kernel
-         *
-         * @param imageToConvolve Image to apply kernel to
-         * @param imageToNotConvolve Image whose PSF you want to match to
-         * @param varianceEstimate Estimate of the variance per pixel
-         * @param policy Policy file
-         */
-        void apply(
-            lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-            lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-            lsst::afw::image::Image<VarT>         const& varianceEstimate,
-            lsst::pex::policy::Policy             const& policy
-            );
+        /* Create PSF matching kernel */
+        void apply(lsst::afw::image::Image<ImageT> const& imageToConvolve,
+                   lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
+                   lsst::afw::image::Image<VarT>   const& varianceEstimate,
+                   lsst::pex::policy::Policy const& policy
+                  );
 
     protected:
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> _basisList;        ///< List of Kernel basis functions
@@ -410,21 +335,6 @@ namespace diffim {
             lsst::pex::policy::Policy             const& policy
             );
     };
-
-    /** Add a spatially varying function to an Image
-     *
-     * @note Typically used to add a background Function to an Image
-     *
-     * @param image Image to add function to
-     * @param function  Function added to image
-     */
-    template <typename ImageT, typename FunctionT>
-    void addFunctionToImage(
-        lsst::afw::image::Image<ImageT> &image,
-        lsst::afw::math::Function2<FunctionT> const& function
-        );
-
-
 
     // BELOW ARE LESS USEFUL / DEPRECATED PIECES OF CODE
 

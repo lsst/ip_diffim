@@ -148,25 +148,22 @@ SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<do
 %template(ImageStatisticsD)
     lsst::ip::diffim::ImageStatistics<double>;
 
-%template(convolveAndSubtract)
-    lsst::ip::diffim::convolveAndSubtract<float>;
-%template(convolveAndSubtract)
-    lsst::ip::diffim::convolveAndSubtract<double>;
+%define %convolveAndSubtract(PIXEL_T)
+   %template(convolveAndSubtract)
+       lsst::ip::diffim::convolveAndSubtract<PIXEL_T, double>;
+   %template(convolveAndSubtract)
+       lsst::ip::diffim::convolveAndSubtract<PIXEL_T, lsst::afw::math::Function2<double> const&>;
+%enddef
 
-%template(convolveAndSubtract)
-    lsst::ip::diffim::convolveAndSubtract<float, double>;
-%template(convolveAndSubtract)
-    lsst::ip::diffim::convolveAndSubtract<double, double>;
+%convolveAndSubtract(float);
+#if 0
+%convolveAndSubtract(double);           // image subtraction on double images??!?  Not instantiated in .cc either
+#endif
 
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double>;
-
-%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, double>;
-%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, double>;
-%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<double, float>;
-%template(addFunctionToImage)               lsst::ip::diffim::addFunctionToImage<float, float>;
 
 /******************************************************************************/
 

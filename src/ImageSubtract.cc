@@ -60,7 +60,7 @@ namespace diffim     = lsst::ip::diffim;
 //
 template <typename ImageT, typename VarT>
 diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
-    math::KernelList<lsst::afw::math::Kernel> const& basisList
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList
     ) :
     _basisList(basisList),
     _background(0.),
@@ -82,54 +82,47 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::reset() {
     //this->_kernelError.reset();
 }
 
+/** Create PSF matching kernel
+ */
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
-    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-    lsst::afw::image::Image<VarT>         const& varianceEstimate,
-    lsst::pex::policy::Policy             const& policy
+    lsst::afw::image::Image<ImageT> const& imageToConvolve,    //!< Image to apply kernel to
+    lsst::afw::image::Image<ImageT> const& imageToNotConvolve, //!< Image whose PSF you want to match to
+    lsst::afw::image::Image<VarT>   const& varianceEstimate,   //!< Estimate of the variance per pixel
+    lsst::pex::policy::Policy  const& policy            //!< Policy file
     ) {
     
     // Make sure you do not overwrite anyone else's kernels
     this->reset();
 
-    // grab mask bits from the image to convolve, since that is what we'll be operating on
-    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
+    int const edgeMaskBit = image::Mask<unsigned short>::getMaskPlane("EDGE");
     
-    int nKernelParameters     = this->_basisList.size();
-    int nBackgroundParameters = 1;
-    int nParameters           = nKernelParameters + nBackgroundParameters;
+    int const nKernelParameters     = this->_basisList.size();
+    int const nBackgroundParameters = 1;
+    int const nParameters           = nKernelParameters + nBackgroundParameters;
     
     boost::timer t;
-    double time;
     t.restart();
     
     Eigen::MatrixXd M = Eigen::MatrixXd::Zero(nParameters, nParameters);
     Eigen::VectorXd B = Eigen::VectorXd::Zero(nParameters);
     
-    std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > > convolvedImageList(nKernelParameters);
-    typename std::vector<boost::shared_ptr<image::MaskedImage<ImageT> > >::iterator 
-        citer = convolvedImageList.begin();
-    std::vector<boost::shared_ptr<math::Kernel> >::const_iterator 
-        kiter = this->_basisList.begin();
+    std::vector<boost::shared_ptr<image::Image<ImageT> > > convolvedImageList(nKernelParameters);
+    typename std::vector<boost::shared_ptr<image::Image<ImageT> > >::iterator citer = convolvedImageList.begin();
+    std::vector<boost::shared_ptr<math::Kernel> >::const_iterator kiter = this->_basisList.begin();
     
     // Create C_ij in the formalism of Alard & Lupton */
     for (; kiter != this->_basisList.end(); ++kiter, ++citer) {
-        
-        /* NOTE : we could also *precompute* the entire template image convolved with these functions */
-        /*        and save them somewhere to avoid this step each time.  however, our paradigm is to */
-        /*        compute whatever is needed on the fly.  hence this step here. */
-        image::MaskedImage<ImageT> image(imageToConvolve.getDimensions());
-        math::convolve(image,
-                       imageToConvolve,
-                       **kiter,
-                       false,
-                       edgeMaskBit);
-        boost::shared_ptr<image::MaskedImage<ImageT> > imagePtr( new image::MaskedImage<ImageT>(image) );
-        *citer = imagePtr;
+        /*
+         * NOTE : we could also *precompute* the entire template image convolved with these functions
+         *        and save them somewhere to avoid this step each time.  however, our paradigm is to
+         *        compute whatever is needed on the fly.  hence this step here.
+         */
+        *citer = typename image::Image<ImageT>::Ptr(new image::Image<ImageT>(imageToConvolve.getDimensions()));
+        math::convolve(**citer, imageToConvolve, **kiter, false, edgeMaskBit);
     } 
 
-    time = t.elapsed();
+    double time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                        "Total compute time to do basis convolutions : %.2f s", time);
     t.restart();
@@ -164,17 +157,17 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     //               100-3+1 = 98, and the loops use i < 98, meaning the last
     //               index you address is 97.
    
-    unsigned int startCol = (*kiter)->getCtrX();
-    unsigned int startRow = (*kiter)->getCtrY();
-    unsigned int endCol   = (*citer)->getWidth()  - ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
-    unsigned int endRow   = (*citer)->getHeight() - ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
+    int const startCol = (*kiter)->getCtrX();
+    int const startRow = (*kiter)->getCtrY();
+    int const endCol   = (*citer)->getWidth()  - ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
+    int const endRow   = (*citer)->getHeight() - ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
 
-    std::vector<xy_locator> convolvedLocatorList;
+    std::vector<typename image::Image<ImageT>::xy_locator> convolvedLocatorList;
     for (citer = convolvedImageList.begin(); citer != convolvedImageList.end(); ++citer) {
         convolvedLocatorList.push_back( (**citer).xy_at(startCol,startRow) );
     }
-    xy_locator  imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
-    xy_locator  imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
+    typename image::Image<ImageT>::xy_locator imageToConvolveLocator = imageToConvolve.xy_at(startCol, startRow);
+    typename image::Image<ImageT>::xy_locator imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
     xyi_locator varianceLocator           = varianceEstimate.xy_at(startCol, startRow);
 
     // Unit test ImageSubtract_1.py should show
@@ -182,61 +175,36 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     logging::TTrace<8>("lsst.ip.diffim.PsfMatchingFunctor.apply",
                        "Image range : %d %d -> %d %d : %f %f",
                        startCol, startRow, endCol, endRow, 
-                       imageToConvolveLocator.image(), 
-                       imageToNotConvolveLocator.image());
+                       0 + *imageToConvolveLocator, 0 + *imageToNotConvolveLocator);
 
     std::pair<int, int> rowStep = std::make_pair(static_cast<int>(-(endCol-startCol)), 1);
-    for (unsigned int row = startRow; row < endRow; ++row) {
-        
-        for (unsigned int col = startCol; col < endCol; ++col) {
-            
-            ImageT const ncImage          = imageToNotConvolveLocator.image();
-            ImageT const ncVariance       = imageToNotConvolveLocator.variance();
-            image::MaskPixel const ncMask = imageToNotConvolveLocator.mask();
+    for (int row = startRow; row < endRow; ++row) {
+        for (int col = startCol; col < endCol; ++col) {
+            ImageT const ncImage          = *imageToNotConvolveLocator;
             double const iVariance        = 1.0 / *varianceLocator;
             
-            // Unit test ImageSubtract_1.py should show
-            // Accessing image row 9 col 9  : 2798.191 23.426 0 1792.511475
-            // Accessing image row 9 col 10 : 2805.171 23.459 0 1774.878662
-            // ...
-            // Accessing image row 9 col 30 : 2793.281 23.359 0 1779.194946
-            // Accessing image row 10 col 9 : 2802.968 23.464 0 1770.467163
-            // ...
-            logging::TTrace<8>("lsst.ip.diffim.PsfMatchingFunctor.apply",
-                               "Accessing image row %d col %d : %.3f %.3f %d %f",
-                               row, col, ncImage, ncVariance, ncMask, 1.0 * *varianceLocator);
-            
             // kernel index i
-            typename std::vector<xy_locator>::iterator 
-                citeri = convolvedLocatorList.begin();
-            typename std::vector<xy_locator>::iterator 
-                citerE = convolvedLocatorList.end();
+            typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citeri = convolvedLocatorList.begin();
+            typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citerE = convolvedLocatorList.end();
             for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
-                ImageT           const cdImagei = (*citeri).image();
-                image::MaskPixel const cdMaski  = (*citeri).mask();
-                if (cdMaski != 0) {
-                    throw LSST_EXCEPT(exceptions::Exception, 
-                                      str(boost::format("Accessing invalid pixel (%d) in PsfMatchingFunctor::apply") % 
-                                          kidxi));
-                }                
+                ImageT const cdImagei = **citeri;
                 
                 // kernel index j
-                typename std::vector<xy_locator>::iterator 
-                    citerj = citeri;
+                typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citerj = citeri;
                 for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
-                    ImageT const cdImagej  = (*citerj).image();
-                    M(kidxi, kidxj) += cdImagei * cdImagej * iVariance;
+                    ImageT const cdImagej  = **citerj;
+                    M(kidxi, kidxj) += cdImagei*cdImagej*iVariance;
                 } 
                 
-                B(kidxi) += ncImage * cdImagei * iVariance;
+                B(kidxi) += ncImage*cdImagei*iVariance;
                 
-                // Constant background term; effectively j=kidxj+1 */
-                M(kidxi, nParameters-1) += cdImagei * iVariance;
+                // Constant background term; effectively j = kidxj + 1 */
+                M(kidxi, nParameters-1) += cdImagei*iVariance;
             } 
             
-            // Background term; effectively i=kidxi+1 
-            B(nParameters-1)                += ncImage * iVariance;
-            M(nParameters-1, nParameters-1) += 1.0 * iVariance;
+            // Background term; effectively i = kidxi + 1 
+            B(nParameters-1)                += ncImage*iVariance;
+            M(nParameters-1, nParameters-1) += 1.0*iVariance;
             
             // Step each accessor in column
             ++imageToConvolveLocator.x();
@@ -251,9 +219,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         // Get to next row, first col
         imageToConvolveLocator    += rowStep;
         imageToNotConvolveLocator += rowStep;
-
-        // HACK UNTIL Ticket #647 FIXED
-        varianceLocator            = varianceEstimate.xy_at(startCol, row+1);
+        varianceLocator += rowStep;
 
         for (int ki = 0; ki < nKernelParameters; ++ki) {
             convolvedLocatorList[ki] += rowStep;
@@ -266,9 +232,11 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
      */
     
     // Fill in rest of M
-    for (int kidxi=0; kidxi < nParameters; ++kidxi) 
-        for (int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) 
+    for (int kidxi=0; kidxi < nParameters; ++kidxi) {
+        for (int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) {
             M(kidxj, kidxi) = M(kidxi, kidxj);
+        }
+    }
     
     time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
@@ -341,12 +309,12 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
                        "Total compute time to do matrix math : %.2f s", time);
     
     // Translate from Eigen vectors into LSST classes
-    unsigned int kCols = policy.getInt("kernelCols");
-    unsigned int kRows = policy.getInt("kernelRows");
+    int const kCols = policy.getInt("kernelCols");
+    int const kRows = policy.getInt("kernelRows");
     std::vector<double> kValues(kCols*kRows);
     std::vector<double> kErrValues(kCols*kRows);
-    for (unsigned int row = 0, idx = 0; row < kRows; row++) {
-        for (unsigned int col = 0; col < kCols; col++, idx++) {
+    for (int row = 0, idx = 0; row < kRows; row++) {
+        for (int col = 0; col < kCols; col++, idx++) {
             
             // Insanity checking
             if (std::isnan( Soln(idx) )) {
@@ -638,9 +606,9 @@ void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
 #if USE_VW
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
-    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-    lsst::afw::image::Image<VarT>         const& varianceEstimate,
+    image::MaskedImage<ImageT> const& imageToConvolve,
+    image::MaskedImage<ImageT> const& imageToNotConvolve,
+    image::Image<VarT>         const& varianceEstimate,
     lsst::pex::policy::Policy             const& policy
     ) {
     
@@ -911,8 +879,8 @@ void diffim::PsfMatchingFunctorVw<ImageT, VarT>::apply(
  */
 math::KernelList<math::Kernel>
 diffim::generateDeltaFunctionKernelSet(
-    unsigned int width, 
-    unsigned int height  
+    unsigned int width,                 ///< number of columns in the set
+    unsigned int height                 ///< number of rows in the set
     ) {
     if ((width < 1) || (height < 1)) {
         throw LSST_EXCEPT(exceptions::Exception, "nRows and nCols must be positive");
@@ -958,45 +926,88 @@ diffim::generateAlardLuptonKernelSet(
     return kernelBasisList;
 }
 
+/************************************************************************************************************/
+/*
+ * Adds a Function to an Image
+ *
+ * @note MAJOR NOTE; I need to check if my scaling of the image range from -1 to
+ * 1 gets messed up here.  ACB.
+ *
+ * @note This routine assumes that the pixel coordinates start at (0, 0) which is
+ * in general not true
+ *
+ * @node this function was renamed from addFunctionToImage to addSomethingToImage to allow generic programming
+ */
+namespace {
+    template <typename ImageT, typename FunctionT>
+    void addSomethingToImage(ImageT &image,
+                             FunctionT const& function
+                            ) {
+
+        // Set the pixels row by row, to avoid repeated checks for end-of-row
+        for (int y = 0; y != image.getHeight(); ++y) {
+            double yPos = image::positionToIndex(y);
+        
+            double xPos = image::positionToIndex(0);
+            for (typename ImageT::x_iterator ptr = image.row_begin(y), end = image.row_end(y);
+                 ptr != end; ++ptr, ++xPos) {            
+                *ptr += function(xPos, yPos);
+            }
+        }
+    }
+    //
+    // Add a scalar.
+    //
+    template <typename ImageT>
+    void addSomethingToImage(image::Image<ImageT> &image,
+                             double value
+                            ) {
+        if (value != 0.0) {
+            image += value;
+        }
+    }
+}
+
 /** 
  * @brief Implement fundamental difference imaging step of convolution and
- * subtraction : D = I - (K.x.T + bg)
+ * subtraction : D = I - (K*T + bg) where * denotes convolution
+ * 
+ * @note If you convolve the science image, D = (K*I + bg) - T, set invert=False
+ *
+ * @note The template is taken to be an MaskedImage; this takes c 1.6 times as long
+ * as using an Image
  *
  * @return Difference image
  *
  * @ingroup diffim
  */
-template <typename ImageT>
+template <typename ImageT, typename BackgroundT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const& imageToConvolve,
-    image::MaskedImage<ImageT> const& imageToNotConvolve,
-    math::Kernel const& convolutionKernel,
-    double background,
-    bool invert
+    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,    ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve, ///< Image I to subtract convolved template from
+    lsst::afw::math::Kernel const& convolutionKernel,                ///< PSF-matching Kernel used for convolution
+    BackgroundT background,                               ///< Differential background function or scalar
+    bool invert                                           ///< Invert the output difference image
     ) {
     
-    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
-                       "Convolving using convolve");
+    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", "Convolving using convolve");
     
-    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
+    int edgeMaskBit = imageToNotConvolve.getMask()->getMaskPlane("EDGE");
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
     
-    math::convolve(convolvedMaskedImage,
-                   imageToConvolve,
-                   convolutionKernel,
-                   false,
-                   edgeMaskBit);
+    math::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false, edgeMaskBit);
     
     /* Add in background */
-    convolvedMaskedImage += background;
+    addSomethingToImage(*(convolvedMaskedImage.getImage()), background);
     
     /* Do actual subtraction */
-    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
+    convolvedMaskedImage -= imageToNotConvolve;
 
     /* Invert */
-    if (invert)
+    if (invert) {
         convolvedMaskedImage *= -1.0;
+    }
     
     return convolvedMaskedImage;
 }
@@ -1005,126 +1016,47 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  * @brief Implement fundamental difference imaging step of convolution and
  * subtraction : D = I - (K.x.T + bg)
  *
+ * @note The template is taken to be an Image, not a MaskedImage; it therefore
+ * has neither variance nor bad pixels
+ *
+ * @note If you convolve the science image, D = (K*I + bg) - T, set invert=False
+ * 
  * @return Difference image
  *
  * @ingroup diffim
  */
-template <typename ImageT>
+template <typename ImageT, typename BackgroundT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const& imageToConvolve,
-    image::MaskedImage<ImageT> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    double background,
-    bool invert
+    lsst::afw::image::Image<ImageT> const& imageToConvolve,          ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve, ///< Image I to subtract convolved template from
+    lsst::afw::math::Kernel const& convolutionKernel,                ///< PSF-matching Kernel used for convolution
+    BackgroundT background,                                          ///< Differential background function or scalar
+    bool invert                                                      ///< Invert the output difference image
     ) {
     
-    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
-                       "Convolving using convolveLinear");
+    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", "Convolving using convolve");
     
-    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
+    int edgeMaskBit = imageToNotConvolve.getMask()->getMaskPlane("EDGE");
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    math::convolveLinear(convolvedMaskedImage,
-                         imageToConvolve,
-                         convolutionKernel,
-                         edgeMaskBit);
+    
+    math::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, convolutionKernel, false, edgeMaskBit);
     
     /* Add in background */
-    convolvedMaskedImage += background;
+    addSomethingToImage(*convolvedMaskedImage.getImage(), background);
     
     /* Do actual subtraction */
-    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
+    *convolvedMaskedImage.getImage() -= *imageToNotConvolve.getImage();
 
     /* Invert */
-    if (invert)
-        convolvedMaskedImage *= -1.0;
+    if (invert) {
+        *convolvedMaskedImage.getImage() *= -1.0;
+    }
+    *convolvedMaskedImage.getMask() <<= *imageToNotConvolve.getMask();
+    *convolvedMaskedImage.getVariance() <<= *imageToNotConvolve.getVariance();
     
     return convolvedMaskedImage;
 }
-
-/** 
- * @brief Implement fundamental difference imaging step of convolution and
- * subtraction : D = I - (K.x.T + bg)
- *
- * @return Difference image
- *
- * @ingroup diffim
- */
-template <typename ImageT, typename FunctionT>
-image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const& imageToConvolve,
-    image::MaskedImage<ImageT> const& imageToNotConvolve,
-    math::Kernel const& convolutionKernel,
-    math::Function2<FunctionT> const& backgroundFunction,
-    bool invert
-    ) {
-    
-    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
-                       "Convolving using convolve and spatially varying background");
-    
-    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
-    image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
-    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    math::convolve(convolvedMaskedImage,
-                   imageToConvolve,
-                   convolutionKernel,
-                   false,
-                   edgeMaskBit);
-    
-    /* Add in background */
-    addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
-    
-    /* Do actual subtraction */
-    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
-
-    /* Invert */
-    if (invert)
-        convolvedMaskedImage *= -1.0;
-    
-    return convolvedMaskedImage;
-}
-
-/** 
- * @brief Implement fundamental difference imaging step of convolution and
- * subtraction : D = I - (K.x.T + bg)
- *
- * @return Difference image
- *
- * @ingroup diffim
- */
-template <typename ImageT, typename FunctionT>
-image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    image::MaskedImage<ImageT> const& imageToConvolve,
-    image::MaskedImage<ImageT> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    math::Function2<FunctionT> const& backgroundFunction,
-    bool invert
-    ) {
-    
-    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", 
-                       "Convolving using convolveLinear and spatially varying background");
-    
-    int edgeMaskBit = imageToConvolve.getMask()->getMaskPlane("EDGE");
-    image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
-    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    math::convolveLinear(convolvedMaskedImage,
-                         imageToConvolve,
-                         convolutionKernel,
-                         edgeMaskBit);
-    
-    /* Add in background */
-    addFunctionToImage(*(convolvedMaskedImage.getImage()), backgroundFunction);
-    
-    /* Do actual subtraction */
-    convolvedMaskedImage -= const_cast<image::MaskedImage<ImageT> &> (imageToNotConvolve);
-
-    /* Invert */
-    if (invert)
-        convolvedMaskedImage *= -1.0;
-    
-    return convolvedMaskedImage;
-}
-
 
 /** 
  * @brief Runs Detection on a single image for significant peaks, and checks
@@ -1145,8 +1077,8 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  */
 template <typename ImageT>
 std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<ImageT> const& imageToConvolve,    
-    image::MaskedImage<ImageT> const& imageToNotConvolve, 
+    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,    
+    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve, 
     lsst::pex::policy::Policy  const& policy                                       
     ) {
     
@@ -1226,13 +1158,13 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 			       int( 0.5 * ((*i)->getBBox().getY0()+(*i)->getBBox().getY1()) ) );
 
 
-            // Grab a subimage; there is an exception if its e.g. too close to the image */
+            // Grab a subimage; there is an exception if it's e.g. too close to the image */
             try {
                 image::BBox fpBBox = (*fpGrow).getBBox();
                 fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
                 
-                lsst::afw::image::MaskedImage<ImageT> subImageToConvolve(imageToConvolve, fpBBox);
-                lsst::afw::image::MaskedImage<ImageT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
+                image::MaskedImage<ImageT> subImageToConvolve(imageToConvolve, fpBBox);
+                image::MaskedImage<ImageT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
             } catch (exceptions::Exception& e) {
                 logging::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
                                    "Exception caught extracting Footprint");
@@ -1275,36 +1207,8 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     return footprintListOut;
 }
 
-/** 
- * @brief Adds a Function to an Image
- *
- * @note MAJOR NOTE; I need to check if my scaling of the image range from -1 to
- * 1 gets messed up here.  ACB.
- *
- * @ingroup diffim
- */
-template <typename ImageT, typename FunctionT>
-void diffim::addFunctionToImage(
-    image::Image<ImageT> &image,
-    math::Function2<FunctionT> const& function
-    ) {
-
-    // Set the pixels row by row, to avoid repeated checks for end-of-row
-    for (int y = 0; y != image.getHeight(); ++y) {
-        double yPos = image::positionToIndex(y);
-        
-        int x = 0;
-        for (typename image::Image<ImageT>::x_iterator ptr = image.row_begin(y); 
-             ptr != image.row_end(y); ++ptr, ++x) {
-            
-            double xPos = image::positionToIndex(x);
-            *ptr += static_cast<ImageT>(function(xPos, yPos));
-
-        }
-    }
-}
-
 // Explicit instantiations
+// \cond
 
 template class diffim::PsfMatchingFunctor<float, float>;
 template class diffim::PsfMatchingFunctor<double, float>;
@@ -1325,74 +1229,34 @@ template class diffim::ImageStatistics<double>;
 
 /* */
 
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    math::Kernel const& convolutionKernel,
-    double background,
-    bool invert);
+#define p_INSTANTIATE_convolveAndSubtract(TEMPLATE_IMAGE_T, TYPE)     \
+    template \
+    image::MaskedImage<TYPE> diffim::convolveAndSubtract( \
+        image::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
+        image::MaskedImage<TYPE> const& imageToNotConvolve, \
+        math::Kernel const& convolutionKernel, \
+        double background, \
+        bool invert);      \
+    \
+    template \
+    image::MaskedImage<TYPE> diffim::convolveAndSubtract( \
+        image::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
+        image::MaskedImage<TYPE> const& imageToNotConvolve, \
+        math::Kernel const& convolutionKernel, \
+        math::Function2<double> const& backgroundFunction, \
+        bool invert); \
 
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    math::Kernel const& convolutionKernel,
-    double background,
-    bool invert);
-
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    double background,
-    bool invert);
-
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    double background,
-    bool invert);
-
-/* */
-
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    math::Kernel const& convolutionKernel,
-    math::Function2<double> const& backgroundFunction,
-    bool invert);
-
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    math::Kernel const& convolutionKernel,
-    math::Function2<double> const& backgroundFunction,
-    bool invert);
-
-
-template 
-image::MaskedImage<float> diffim::convolveAndSubtract(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    math::Function2<double> const& backgroundFunction,
-    bool invert);
-
-
-template 
-image::MaskedImage<double> diffim::convolveAndSubtract(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    math::LinearCombinationKernel const& convolutionKernel,
-    math::Function2<double> const& backgroundFunction,
-    bool invert);
-
+#define INSTANTIATE_convolveAndSubtract(TYPE) \
+p_INSTANTIATE_convolveAndSubtract(Image, TYPE) \
+p_INSTANTIATE_convolveAndSubtract(MaskedImage, TYPE)
+/*
+ * Here are the instantiations.
+ *
+ * Do we really need double diffim code?  It isn't sufficient to remove it here; you'll have to also remove at
+ * least SpatialModelKernel<double> and swig instantiations thereof
+ */
+INSTANTIATE_convolveAndSubtract(float);
+INSTANTIATE_convolveAndSubtract(double);
 
 /* */
 
@@ -1407,28 +1271,6 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     image::MaskedImage<double> const& imageToConvolve,
     image::MaskedImage<double> const& imageToNotConvolve,
     lsst::pex::policy::Policy  const& policy);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<float>&,
-    math::Function2<float> const&);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<float>&,
-    math::Function2<double> const&);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<double>&,
-    math::Function2<float> const&);
-
-template
-void diffim::addFunctionToImage(
-    image::Image<double>&,
-    math::Function2<double> const&);
-
-
 
 #if false
 /** 
@@ -2896,4 +2738,5 @@ std::vector<double> diffim::computePsfMatchingKernelForFootprint_Legacy(
     return kernelCoeffs;
 }
 #endif
+// \endcond
 
