@@ -185,14 +185,19 @@ def createSpatialModelKernelCells(templateMaskedImage,
 
                         if not model.isBuilt():
                             model.buildModel()
-                        tmpKernelImage = afwImage.ImageD(model.getKernelPtr().getDimensions())
-                        kSum = model.getKernelPtr().computeImage(tmpKernelImage, False)
-                        tmpKernelImage = tmpScience.Factory(tmpKernelImage.convertFloat(),
-                                                            afwImage.MaskU(tmpKernelImage.getDimensions()),
-                                                            afwImage.ImageF(tmpKernelImage.getDimensions())
-                                                            )
-                        tmpKernelImage *= afwMath.makeStatistics(tmpScience.getImage(), afwMath.MAX).getValue()/ \
-                                          afwMath.makeStatistics(tmpKernelImage.getImage(), afwMath.MAX).getValue()
+
+                        if model.getKernelPtr():
+                            tmpKernelImage = afwImage.ImageD(model.getKernelPtr().getDimensions())
+                            kSum = model.getKernelPtr().computeImage(tmpKernelImage, False)
+                            tmpKernelImage = tmpScience.Factory(tmpKernelImage.convertFloat(),
+                                                                afwImage.MaskU(tmpKernelImage.getDimensions()),
+                                                                afwImage.ImageF(tmpKernelImage.getDimensions())
+                                                                )
+                            tmpKernelImage *= afwMath.makeStatistics(tmpScience.getImage(), afwMath.MAX).getValue()/ \
+                                              afwMath.makeStatistics(tmpKernelImage.getImage(), afwMath.MAX).getValue()
+                        else:
+                            tmpKernelImage = tmpScience.Factory(tmpScience.getDimensions())
+                            tmpKernelImage.set(-10)                            
                         tmpKernelImage.getMask().set(0x0)
                         
                         stamps.append(imagePairMosaic.makeMosaic([tmpTemplate, tmpScience, tmpKernelImage]))
