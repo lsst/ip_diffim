@@ -183,16 +183,19 @@ def createSpatialModelKernelCells(templateMaskedImage,
                         tmpTemplate *= afwMath.makeStatistics(tmpScience.getImage(), afwMath.MAX).getValue()/ \
                                        afwMath.makeStatistics(tmpTemplate.getImage(), afwMath.MAX).getValue()
 
-                        panel = imagePairMosaic.makeMosaic([tmpTemplate, tmpScience])
-                        if True:        # afw > 3.3.10
-                            stamps.append(panel)
-                        else:
-                            tmp = panel.Factory(120, 60); tmp.set((0))
-                            stmp = tmp.Factory(tmp,
-                                               afwImage.BBox(afwImage.PointI(0, 0), panel.getWidth(), panel.getHeight()))
-                            stmp <<= panel
-                            
-                            stamps.append(tmp)
+                        if not model.isBuilt():
+                            model.buildModel()
+                        tmpKernelImage = afwImage.ImageD(model.getKernelPtr().getDimensions())
+                        kSum = model.getKernelPtr().computeImage(tmpKernelImage, False)
+                        tmpKernelImage = tmpScience.Factory(tmpKernelImage.convertFloat(),
+                                                            afwImage.MaskU(tmpKernelImage.getDimensions()),
+                                                            afwImage.ImageF(tmpKernelImage.getDimensions())
+                                                            )
+                        tmpKernelImage *= afwMath.makeStatistics(tmpScience.getImage(), afwMath.MAX).getValue()/ \
+                                          afwMath.makeStatistics(tmpKernelImage.getImage(), afwMath.MAX).getValue()
+                        tmpKernelImage.getMask().set(0x0)
+                        
+                        stamps.append(imagePairMosaic.makeMosaic([tmpTemplate, tmpScience, tmpKernelImage]))
                             
                         stampInfo.append("%s %d" % (label, fpID))
 
