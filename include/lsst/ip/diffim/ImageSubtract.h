@@ -206,8 +206,7 @@ namespace diffim {
         lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
         lsst::afw::math::Kernel const& convolutionKernel,
         BackgroundT background,
-        bool invert=true
-        );
+        bool invert=true);
 
     template <typename ImageT, typename BackgroundT>
     lsst::afw::image::MaskedImage<ImageT> convolveAndSubtract(
@@ -215,8 +214,7 @@ namespace diffim {
         lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
         lsst::afw::math::Kernel const& convolutionKernel,
         BackgroundT background,
-        bool invert=true
-        );
+        bool invert=true);
 
     /** Search through images for Footprints with no masked pixels
      *
@@ -230,216 +228,9 @@ namespace diffim {
     std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
         lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-        lsst::pex::policy::Policy const& policy
-        );
-    
-    /** Functor to create PSF Matching Kernel
-     *
-     * @ingroup diffim
-     * 
-     */
-    template <typename ImageT, typename VarT=lsst::afw::image::VariancePixel>
-    class PsfMatchingFunctor {
-    public:
-        typedef boost::shared_ptr<PsfMatchingFunctor> Ptr;
-        typedef typename lsst::afw::image::MaskedImage<ImageT>::xy_locator xy_locator;
-        typedef typename lsst::afw::image::Image<VarT>::xy_locator         xyi_locator;
-
-        PsfMatchingFunctor(
-            lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList
-            );
-        virtual ~PsfMatchingFunctor() {};
-
-        /** Return background value
-         */
-        double getBackground()                   const { return _background; }
-
-        /** Return uncertainty on background value
-         */
-        double getBackgroundError()              const { return _backgroundError; }
-
-        /** Return PSF matching kernel
-         */
-        boost::shared_ptr<lsst::afw::math::Kernel> getKernel()      const { return _kernel; }
-
-        /** Return uncertainty on matching kernel, as kernel itself
-         */
-        boost::shared_ptr<lsst::afw::math::Kernel> getKernelError() const { return _kernelError; }
-
-        /** Reset protected class members
-         */
-        void reset();
-
-        /* Create PSF matching kernel */
-        void apply(lsst::afw::image::Image<ImageT> const& imageToConvolve,
-                   lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
-                   lsst::afw::image::Image<VarT>   const& varianceEstimate,
-                   lsst::pex::policy::Policy const& policy
-                  );
-
-    protected:
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> _basisList;        ///< List of Kernel basis functions
-        double _background;                                                     ///< Differenaitl background estimate
-        double _backgroundError;                                                ///< Uncertainty on background
-        boost::shared_ptr<lsst::afw::math::Kernel> _kernel;                     ///< PSF matching kernel
-        boost::shared_ptr<lsst::afw::math::Kernel> _kernelError;                ///< Uncertainty on kernel
-    };
+        lsst::pex::policy::Policy const& policy);
     
     
-    /** Search through images for Footprints with no masked pixels
-     *
-     * @note Uses Gsl math backend
-     *
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param policy  Policy for operations; in particular object detection
-     */    
-    template <typename ImageT, typename VarT=lsst::afw::image::VariancePixel>
-    class PsfMatchingFunctorGsl : public PsfMatchingFunctor<ImageT> {
-    public:
-        typedef typename lsst::afw::image::MaskedImage<ImageT>::xy_locator xy_locator;
-        typedef typename lsst::afw::image::Image<VarT>::xy_locator         xyi_locator;
-
-        PsfMatchingFunctorGsl(lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList) :
-            PsfMatchingFunctor<ImageT>(basisList) {;}
-        virtual ~PsfMatchingFunctorGsl() {};
-        void apply(
-            lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-            lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-            lsst::afw::image::Image<VarT>         const& varianceEstimate,
-            lsst::pex::policy::Policy             const& policy
-            );
-    };
-
-    /** Search through images for Footprints with no masked pixels
-     *
-     * @note Uses VW math backend
-     *
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param policy  Policy for operations; in particular object detection
-     */    
-    template <typename ImageT, typename VarT=lsst::afw::image::VariancePixel>
-    class PsfMatchingFunctorVw : public PsfMatchingFunctor<ImageT> {
-    public:
-        typedef typename lsst::afw::image::MaskedImage<ImageT>::xy_locator xy_locator;
-        typedef typename lsst::afw::image::Image<VarT>::xy_locator         xyi_locator;
-
-        PsfMatchingFunctorVw(lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList) :
-            PsfMatchingFunctor<ImageT>(basisList) {;}
-        virtual ~PsfMatchingFunctorVw() {};
-        void apply(
-            lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-            lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-            lsst::afw::image::Image<VarT>         const& varianceEstimate,
-            lsst::pex::policy::Policy             const& policy
-            );
-    };
-
-    // BELOW ARE LESS USEFUL / DEPRECATED PIECES OF CODE
-
-
-
-    /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
-     *
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param varianceImage  Estimate of diffim variance
-     * @param kernelInBasisList  Input kernel basis set
-     * @param policy  Policy for operations; in particular object detection
-     *
-     * @param kernelPtr  Pointer to resulting PSF matching kernel
-     * @param kernelErrorPtr  Uncertainty on PSF matching kernel
-     * @param background  Differential background
-     * @param backgroundError  Uncertainty on differential background
-     */    
-    template <typename ImageT, typename VarT>
-    void computePsfMatchingKernelForFootprint(
-        double                                     &background,
-        double                                     &backgroundError,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
-        lsst::afw::image::MaskedImage<ImageT>         const& imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT>         const& imageToNotConvolve,
-        lsst::afw::image::Image<VarT>                 const& varianceImage,
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& kernelInBasisList,
-        lsst::pex::policy::Policy                     const& policy
-        );
-
-    /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
-     *
-     * @note This version uses Eigen
-     *
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param varianceImage  Estimate of diffim variance
-     * @param kernelInBasisList  Input kernel basis set
-     * @param policy  Policy for operations; in particular object detection
-     *
-     * @param kernelPtr  Pointer to resulting PSF matching kernel
-     * @param kernelErrorPtr  Uncertainty on PSF matching kernel
-     * @param background  Differential background
-     * @param backgroundError  Uncertainty on differential background
-     */    
-    template <typename ImageT, typename VarT>
-    void computePsfMatchingKernelForFootprintEigen(
-        double                                     &background,
-        double                                     &backgroundError,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
-        lsst::afw::image::MaskedImage<ImageT>         const& imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT>         const& imageToNotConvolve,
-        lsst::afw::image::Image<VarT>                 const& varianceImage,
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& kernelInBasisList,
-        lsst::pex::policy::Policy                     const& policy
-        );
-
-    /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
-     *
-     * @note This version uses VW
-     *
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param varianceImage  Estimate of diffim variance
-     * @param kernelInBasisList  Input kernel basis set
-     * @param policy  Policy for operations; in particular object detection
-     *
-     * @param kernelPtr  Pointer to resulting PSF matching kernel
-     * @param kernelErrorPtr  Uncertainty on PSF matching kernel
-     * @param background  Differential background
-     * @param backgroundError  Uncertainty on differential background
-     */    
-    template <typename ImageT, typename VarT>
-    void computePsfMatchingKernelForFootprintVW(
-        double                                     &background,
-        double                                     &backgroundError,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelPtr,
-        boost::shared_ptr<lsst::afw::math::Kernel> &kernelErrorPtr,
-        lsst::afw::image::MaskedImage<ImageT>         const& imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT>         const& imageToNotConvolve,
-        lsst::afw::image::Image<VarT>                 const& varianceImage,
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& kernelInBasisList,
-        lsst::pex::policy::Policy                     const& policy 
-        );
-
-
-    /** Build a single PSF-matching Kernel for a Footprint; core of ip_diffim processing
-     *
-     * @param background  Differential background value
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param kernelInBasisList  Input kernel basis set
-     * @param policy  Policy for operations; in particular object detection
-     */    
-    template <typename ImageT>
-    std::vector<double> computePsfMatchingKernelForFootprint_Legacy(
-        double &background,
-        lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
-        lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& kernelInBasisList,
-        lsst::pex::policy::Policy const& policy
-        );
-
 }}}
 
 #endif
