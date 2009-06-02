@@ -290,7 +290,7 @@ def subtractMaskedImage(templateMaskedImage,
     else:
         background = bgFunction
         
-    differenceMaskedImage = ipDiffim.convolveAndSubtract(templateMaskedImage.getImage(),
+    differenceMaskedImage = ipDiffim.convolveAndSubtract(templateMaskedImage,
                                                          scienceMaskedImage, sKernel, background)
 
     log.log(pexLog.Log.INFO, "Ending convolve")
