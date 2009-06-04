@@ -149,13 +149,16 @@ Notes:
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
+        
+    log = Log(Log.getDefaultLog(),
+              "ip.diffim.subtractMaskedImage")
 
     if policy.get('spatialKernelTesting') == True:
         testingLoop(templateMaskedImage, scienceMaskedImage, policy)
     else:
         differenceMaskedImage, sKernel, bgFunction, sdqaList =  subtractMaskedImage(templateMaskedImage,
                                                                                     scienceMaskedImage,
-                                                                                    policy)
+                                                                                    policy, log)
     differenceMaskedImage.writeFits(outputPath)
     
 

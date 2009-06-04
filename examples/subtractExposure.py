@@ -74,9 +74,12 @@ Notes:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
+    log = Log(Log.getDefaultLog(),
+              "ip.diffim.subtractExposure")
+
     differenceExposure, spatialKernel, backgroundModel, sdqaList = subtractExposure(templateExposure,
                                                                                     scienceExposure,
-                                                                                    policy)
+                                                                                    policy, log)
     differenceExposure.writeFits(outputPath)
 
 def run():
