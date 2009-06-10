@@ -46,6 +46,9 @@ Notes:
         help='write diagnostic intermediate files')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
         help='verbosity of diagnostic trace messages; 1 for just warnings, more for more information')
+    parser.add_option('-I', '--invert', action='store_true', default=False,
+        help='invert the image to convolve')
+
     (options, args) = parser.parse_args()
     
     def getArg(ind, defValue):
@@ -68,7 +71,13 @@ Notes:
     policy           = Policy.createPolicy(policyPath)
 
     if options.debugIO:
+        print 'DebugIO =', options.debugIO
         policy.set('debugIO', True)
+
+    invert = False
+    if options.invert:
+        print 'Invert =', options.invert
+        invert = True
 
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
@@ -79,7 +88,7 @@ Notes:
 
     differenceExposure, spatialKernel, backgroundModel, sdqaList = subtractExposure(templateExposure,
                                                                                     scienceExposure,
-                                                                                    policy, log)
+                                                                                    policy, log, invert=invert)
     differenceExposure.writeFits(outputPath)
 
 def run():

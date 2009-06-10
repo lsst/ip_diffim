@@ -10,8 +10,8 @@ debugPlot: false
 spatialKernelTesting: false
 spatialKernelRejection: true
 
-# Warping kernel size for warping template Exposure
-warpingKernelSize: 4
+# Warping kernel order for warping template Exposure
+warpingKernelSize: 8
 
 # Spatial function applied to : 'pca' or 'pixel' only
 spatialKernelModel: 'pca'
@@ -33,6 +33,13 @@ kernelSpatialOrder: 0
 # Order of background spatial variation
 backgroundSpatialOrder: 0
 
+backgroundPolicy: {
+    # how to interpolate the background values
+    algorithm:  "NATURAL_SPLINE" 
+    # how large regions of the sky should be used for each background point
+    binsize:    128
+}
+
 #####
 # Chops up the image into cells
 #
@@ -47,7 +54,7 @@ nSegmentRow: 10
 #   rejectKernelOutliers:
 #
 maxOutlierIterations: 5
-maxOutlierSigma: 3.0
+maxOutlierSigma: 2.0
 
 ######
 # Rejects objects with bad difference image quality
@@ -73,28 +80,31 @@ fpNpixMin: 9
 # Maximum number of pixels in an acceptible Footprint
 fpNpixMax: 500
 
-# Grow footprint by this many pixels
-fpGrowPix: 20
+# Grow footprint by this many units of the Kernel size
+#
+# Note : this number should be no smaller than 1.5.  Otherwise there
+# are too few pixels to accurately constrain the background and the
+# Kernel sum.  A value of 2.0 is slightly conservative in that the
+# quality of the Kernels should be better / more stable, but will take
+# about twice as long to calcuate.  If you look at the plot of Kernel
+# sum vs. this variable, kSum does not converge until at least 1.5.
+fpGrowKsize: 2.0
 
 # Minimum number of clean candidates
-minCleanFp: 10
+minCleanFp: 30
 
-# Threshold in sigma now
-detThresholdSigma: 50.0
+# Threshold 
+detThreshold: 50.0
+
+# Threshold in Sigma or Signal detection?
+# Allowed values : value, stdev, variance
+detThresholdType: "stdev"
 
 # How do you change the detection threshold if minimumCleanFootprints not found
 detThresholdScaling: 0.5
 
 # How low can you go
-detThresholdMin: 5.0
-
-#Do we want a sigma detection or signal detection?
-detThresholdType: "value"
-
-# Back compatibility for signal based vs. sigma based detection
-#footprintDetectionThreshold: 1000.0
-#detectionThresholdScaling: 0.50
-#minimumDetectionThreshold: 125.0
+detThresholdMin: 10.0
 
 ######
 # Controls MINUIT fitting
@@ -125,7 +135,7 @@ maxSpatialIterations: 3
 minPrincipalComponents: 3
 
 # How many (max)
-maxPrincipalComponents: 20
+maxPrincipalComponents: 25
 
 # How many (max)
 fracEigenVal : 0.95

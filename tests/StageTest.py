@@ -20,7 +20,7 @@ import lsst.afw.image as afwImage
 import lsst.daf.base as dafBase
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-Verbosity = 6
+Verbosity = 4
 pexLog.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 
 class DiffimStageTestCase(unittest.TestCase):

@@ -50,7 +50,7 @@ def rejectKernelSumOutliers(spatialCells, policy):
 
     maxOutlierIterations = policy.get('maxOutlierIterations')
     maxOutlierSigma      = policy.get('maxOutlierSigma')
-
+    
     # So are we using pexLog.Trace or pexLog.Log?
     Trace('lsst.ip.diffim.rejectKernelSumOutliers', 4,
           'Rejecting kernels with deviant kSums');
@@ -59,11 +59,15 @@ def rejectKernelSumOutliers(spatialCells, policy):
         kSumList = []
         idList   = []
         for scID, scPtr in enumerate(spatialCells):
+            
             # Is the cell usable at all?
             if not scPtr.isUsable():
                 continue
+
+            # print nIter, scID, scPtr.getLabel(), scPtr.getCurrentModel().getStatus(), scPtr.getCurrentModel().getKernelSum()
+            
             # Is the contained model usable?
-            if scPtr.getCurrentModel().getSdqaStatus():
+            if scPtr.getCurrentModel().getStatus():
                 kSumList.append( scPtr.getCurrentModel().getKernelSum() )
                 idList.append( scID )
 
@@ -72,22 +76,37 @@ def rejectKernelSumOutliers(spatialCells, policy):
         if nCells == 0:
             raise RuntimeError('No good cells found')
 
-        kSumArray = numpy.array(kSumList)
-        kSumMean  = kSumArray.mean()
-        kSumStd   = kSumArray.std()
+        # kSumArray and kSumList need to stay synchronized with spatialCells[]
+        kSumArray  = numpy.array(kSumList)
+
+        # kSort is sorted for IQR statistics
+        kSort = numpy.sort(kSumArray)
+        # Use interquartile range to get uncertainty on median
+        # This should be in an afwMath package
+        idx25 = int(0.25 * len(kSort))
+        idx50 = int(0.50 * len(kSort))
+        idx75 = int(0.75 * len(kSort))
+        d25   = kSort[idx25]
+        d50   = kSort[idx50]
+        d75   = kSort[idx75]
+        IQR          = (d75 - d25)
+        sigma_mean   = 0.741 * IQR
+        sigma_median = numpy.sqrt(numpy.pi / 2.) * sigma_mean
+        kSumMedian     = d50
+        kSumStd        = sigma_median
 
         # Reject kernels with aberrent statistics
         nRejected = 0
         for idx in range(nCells):
-            if numpy.fabs( (kSumArray[idx]-kSumMean)/kSumStd ) > maxOutlierSigma:
-                Trace('lsst.ip.diffim.rejectKernelSumOutliers', 5,
-                      '# %s Kernel %d (kSum=%.3f) REJECTED due to bad kernel sum (mean=%.3f, std=%.3f)' %
+            if numpy.fabs( (kSumArray[idx]-kSumMedian) ) > (kSumStd*maxOutlierSigma):
+                Trace('lsst.ip.diffim.rejectKernelSumOutliers', 4,
+                      '# %s Kernel %d (kSum=%.3f) REJECTED due to bad kernel sum (median=%.3f, std=%.3f)' %
                       (spatialCells[ idList[idx] ].getLabel(),
-                       spatialCells[ idList[idx] ].getCurrentModel().getID(),
-                       kSumArray[idx], kSumMean, kSumStd))
+                       spatialCells[ idList[idx] ].getCurrentId(),
+                       kSumArray[idx], kSumMedian, kSumStd))
                 
                 # Set it as fully bad, since its base model is aberrant
-                spatialCells[ idList[idx] ].getCurrentModel().setSdqaStatus(False)
+                spatialCells[ idList[idx] ].getCurrentModel().setStatus(False)
 
                 # Move to the next footprint in the cell
                 spatialCells[ idList[idx] ].incrementModel()
@@ -95,7 +114,7 @@ def rejectKernelSumOutliers(spatialCells, policy):
                 
         Trace('lsst.ip.diffim.rejectKernelSumOutliers', 4,
               'Kernel Sum Iteration %d, rejected %d kernels : Kernel Sum = %0.3f +/- %0.3f' %
-              (nIter, nRejected, kSumMean, kSumStd))
+              (nIter, nRejected, kSumMedian, kSumStd))
 
         if nRejected == 0:
             break
@@ -106,7 +125,7 @@ def rejectKernelSumOutliers(spatialCells, policy):
               (maxOutlierIterations))
 
     Trace('lsst.ip.diffim.rejectKernelSumOutliers', 3,
-          'Kernel Sum : %0.3f +/- %0.3f, %d kernels' % (kSumMean, kSumStd, nCells))
+          'Found Kernel Sum : %0.3f +/- %0.3f, %d kernels' % (kSumMedian, kSumStd, nCells))
 
 
 def createSpatialModelKernelCells(templateMaskedImage,

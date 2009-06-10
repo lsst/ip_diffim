@@ -168,7 +168,7 @@ def evaluateModelByPixel(spatialCells, bgFunction, sKernel, policy, reject=True)
         kernel  = afwMath.FixedKernel(sImage)
         spatialCell = spatialCells[idList[idx]]
         spatialCellModel = spatialCell.getCurrentModel()
-        diffIm  = diffimLib.convolveAndSubtract(spatialCellModel.getMiToConvolvePtr().getImage(),
+        diffIm  = diffimLib.convolveAndSubtract(spatialCellModel.getMiToConvolvePtr(),
                                                 spatialCellModel.getMiToNotConvolvePtr(),
                                                 kernel, bgValue)
 
@@ -319,6 +319,7 @@ def spatialModelByPca(spatialCells, mKernel, eKernelVector, eCoeffs, nEVal, poli
         # The uncertainties on these coefficients are not known
         # This is an approximation 
         errors = numpy.sqrt( numpy.abs(coeffs) )
+        # errors = numpy.abs(coeffs)
         
         eFunction = afwMath.PolynomialFunction2D(kSpatialOrder)
         eFit = diffimTools.fitFunction(eFunction,
@@ -397,7 +398,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
         kernel  = afwMath.FixedKernel(eImage)
         spatialCell = spatialCells[idList[idx]]
         currentModel = spatialCell.getCurrentModel()
-        diffIm  = diffimLib.convolveAndSubtract(currentModel.getMiToConvolvePtr().getImage(),
+        diffIm  = diffimLib.convolveAndSubtract(currentModel.getMiToConvolvePtr(),
                                                 currentModel.getMiToNotConvolvePtr(),
                                                 kernel, bgValue)
 
@@ -421,7 +422,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
                     imStats.getRms(), 
                     sdqa.SdqaRating.AMP) 
             sdqaList.append(footprintResidualsRating)
-        Trace('lsst.ip.diffim.evaluateModelByPca', 5,
+        Trace('lsst.ip.diffim.evaluateModelByPca', 4,
               '%s Kernel %d : %s Pca residuals = %.2f +/- %.2f sigma' %
               (spatialCell.getLabel(),
                spatialCell.getCurrentId(),

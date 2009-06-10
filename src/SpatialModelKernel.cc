@@ -56,6 +56,7 @@ SpatialModelKernel<ImageT>::SpatialModelKernel(
     _isBuilt(false),
     _isGood(false)
 {
+
     if (build == true) {
         buildModel();
     }
@@ -113,7 +114,7 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     kSum = kernelPtr->computeImage(kImage, false);
 
     // Create difference image and calculate associated statistics
-    image::MaskedImage<ImageT> diffIm = convolveAndSubtract(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr,
+    image::MaskedImage<ImageT> diffIm = convolveAndSubtract(*_miToConvolvePtr, *_miToNotConvolvePtr,
                                                             *kernelPtr, background);
 
     // Find statistics of difference image 
@@ -142,7 +143,7 @@ bool SpatialModelKernel<ImageT>::buildModel() {
             
             kSum    = 0.;
             kSum    = kernelPtr->computeImage(kImage, false);
-            diffIm  = convolveAndSubtract(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr, *kernelPtr, background);
+            diffIm  = convolveAndSubtract(*_miToConvolvePtr, *_miToNotConvolvePtr, *kernelPtr, background);
 
             // Reset the image its looking at
             kStats->apply(diffIm);

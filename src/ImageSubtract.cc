@@ -992,7 +992,9 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     
     logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", "Convolving using convolve");
     
-    int edgeMaskBit = imageToNotConvolve.getMask()->getMaskPlane("EDGE");
+    int const edgeMaskBit = image::Mask<unsigned short>::getMaskPlane("EDGE");
+    //int edgeMaskBit = imageToNotConvolve.getMask()->getMaskPlane("EDGE");
+
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
     
@@ -1036,7 +1038,9 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     
     logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", "Convolving using convolve");
     
-    int edgeMaskBit = imageToNotConvolve.getMask()->getMaskPlane("EDGE");
+    int const edgeMaskBit = image::Mask<unsigned short>::getMaskPlane("EDGE");
+    //int edgeMaskBit = imageToNotConvolve.getMask()->getMaskPlane("EDGE");
+
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
     
@@ -1085,12 +1089,19 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     // Parse the Policy
     unsigned int fpNpixMin      = policy.getInt("fpNpixMin");
     unsigned int fpNpixMax      = policy.getInt("fpNpixMax");
-    unsigned int fpGrowPix      = policy.getInt("fpGrowPix");
+
+    int const kCols             = policy.getInt("kernelCols");
+    int const kRows             = policy.getInt("kernelRows");
+    double fpGrowKsize          = policy.getDouble("fpGrowKsize");
+
     int minCleanFp              = policy.getInt("minCleanFp");
-    double detThreshold         = policy.getDouble("detThresholdSigma");
+    double detThreshold         = policy.getDouble("detThreshold");
     double detThresholdScaling  = policy.getDouble("detThresholdScaling");
     double detThresholdMin      = policy.getDouble("detThresholdMin");
     std::string detThresholdType = policy.getString("detThresholdType");
+
+    // Number of pixels to grow each Footprint, based upon the Kernel size
+    int fpGrowPix = int(fpGrowKsize * ( (kCols > kRows) ? kCols : kRows ));
 
     // Grab mask bits from the image to convolve, since that is what we'll be operating on
     // Overridden now that we use the FootprintFunctor to look for any masked pixels

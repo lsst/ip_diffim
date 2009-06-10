@@ -3,6 +3,7 @@ import lsst.afw.image as afwImage
 import numpy
 from lsst.pex.logging import Trace
 import lsst.daf.base as dafBase
+from   lsst.pex.logging import Trace
 
 # relative imports, since these are in __init__.py
 import diffimLib 
@@ -63,14 +64,16 @@ def plotDiffImQuality2(id, iteration,
 
 
 def writeDiffImages(prefix, id, kModel):
-    
+
     if not kModel.isBuilt():
+        Trace('lsst.ip.diffim.diffimDebug.writeDiffImages', 5, 'Building model for debugging')
         kModel.buildModel()
-    if not kModel.getSdqaStatus():
-        # I need to be careful here; since I am debuggin I want to
-        # look at everything except for when there was a kernel
-        # exception.
-        return
+
+#    if not kModel.getStatus():
+#        # I need to be careful here; since I am debuggin I want to
+#        # look at everything except for when there was a kernel
+#        # exception.
+#        return
         
     kModel.getMiToConvolvePtr().writeFits('tFoot_%s_%s' % (prefix, id))
     kModel.getMiToNotConvolvePtr().writeFits('iFoot_%s_%s' % (prefix, id))
@@ -84,11 +87,11 @@ def writeDiffImages(prefix, id, kModel):
     cmd.setString('CONV', 'Template')
     cmd.setFloat('KCOL', kModel.getColc())
     cmd.setFloat('KROW', kModel.getRowc())
-    cmd.setFloat('MSIG', kModel.getStats().getMean())
-    cmd.setFloat('VSIG', kModel.getStats().getVariance())
+#    cmd.setFloat('MSIG', kModel.getStats().getMean())
+#    cmd.setFloat('VSIG', kModel.getStats().getVariance())
     cmd.setFloat('BG',   kModel.getBackground())
     cmd.setFloat('KSUM', cks)
-    cmd.setBool('KQUALITY', kModel.getSdqaStatus())
+    cmd.setBool('KQUALITY', kModel.getStatus())
     cki.setMetadata(cmd)
     cki.writeFits('kernel_%s_%s.fits' % (prefix, id))
     

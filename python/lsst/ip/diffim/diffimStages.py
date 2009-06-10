@@ -14,6 +14,7 @@ import spatialKernelFit as spatialKernelFit
 
 import lsst.afw.display.ds9 as ds9
 
+display = False
 try:
     type(display)
 except NameError:
@@ -117,7 +118,7 @@ def warpTemplateExposure(templateExposure, scienceExposure, policy):
         
     return remapedTemplateExposure
     
-def subtractExposure(templateExposure, scienceExposure, policy, log):
+def subtractExposure(templateExposure, scienceExposure, policy, log, invert=False):
     # Make sure they end up the same dimensions on the sky
     templateWcs = templateExposure.getWcs() 
     scienceWcs = scienceExposure.getWcs()
@@ -145,10 +146,10 @@ def subtractExposure(templateExposure, scienceExposure, policy, log):
 
     # Subtract their MaskedImages
     differenceMaskedImage, spatialKernel, backgroundModel, sdqaList = \
-            subtractMaskedImage(templateMaskedImage,
-                    scienceMaskedImage,
-                    policy,
-                    log)
+                           subtractMaskedImage(templateMaskedImage,
+                                               scienceMaskedImage,
+                                               policy,
+                                               log, invert=invert)
 
     # Note : we assume that the Template is warped to the science image's WCS
     #      : meaning that the scienceWcs is the correct one to store in 
@@ -160,10 +161,11 @@ def subtractExposure(templateExposure, scienceExposure, policy, log):
 
 
 def subtractMaskedImage(templateMaskedImage, 
-        scienceMaskedImage, 
-        policy, 
-        log,
-        fpList=None):
+                        scienceMaskedImage, 
+                        policy, 
+                        log,
+                        fpList=None,
+                        invert=False):
     # Make sure they are the EXACT same dimensions in pixels
     # This is non-negotiable
     assert (templateMaskedImage.getDimensions() == \
@@ -200,8 +202,14 @@ def subtractMaskedImage(templateMaskedImage,
             x1, y1 = fp.getBBox().getURC() - scienceMaskedImage.getXY0()
             ds9.line([(x0, y0), (x0, y1), (x1, y1), (x1, y0), (x0, y0)], frame=frame)
 
-    # Set up grid for spatial model
+    # switch image you convolve
+    if invert:
+        tmp                 = templateMaskedImage
+        templateMaskedImage = scienceMaskedImage
+        scienceMaskedImage  = tmp
+    
 
+    # Set up grid for spatial model
     log.log(pexLog.Log.INFO, "Starting kernel")
     spatialCells = diffimTools.createSpatialModelKernelCells(
             templateMaskedImage,
@@ -210,6 +218,9 @@ def subtractMaskedImage(templateMaskedImage,
             kFunctor,
             policy,
             display=display)
+
+    # Reject kernel sum outliers
+    diffimTools.rejectKernelSumOutliers(spatialCells, policy)
 
     # Set up fitting loop 
     maxSpatialIterations = policy.getInt('maxSpatialIterations')
@@ -237,6 +248,9 @@ def subtractMaskedImage(templateMaskedImage,
             nEval = min(nEval, maxPrincipalComponents)
             nEval = max(nEval, minPrincipalComponents)
 
+            pexLog.Trace('lsst.ip.diffim.subtractMaskedImage', 3, 
+                         'PCA iteration %d : Using %d principal components' % (nIter, nEval))
+
             # do spatial fit here by Principal Component
             sKernel, bgFunction = spatialKernelFit.spatialModelByPca(
                     spatialCells,
@@ -253,7 +267,11 @@ def subtractMaskedImage(templateMaskedImage,
                     sKernel,
                     policy, 
                     reject=rejectKernels)
-               
+
+            # If you get a new kernel, make sure its consistent with the kernel sums
+            if nRejected:
+                diffimTools.rejectKernelSumOutliers(spatialCells, policy)
+                
             nIter += 1
 
     elif policy.get('spatialKernelModel') == 'pixel':
@@ -273,6 +291,10 @@ def subtractMaskedImage(templateMaskedImage,
                     sKernel, 
                     policy, 
                     reject=rejectKernels)
+
+            # If you get a new kernel, make sure its consistent with the kernel sums
+            if nRejected:
+                diffimTools.rejectKernelSumOutliers(spatialCells, policy)
 
             nIter += 1
         
@@ -328,6 +350,10 @@ def subtractMaskedImage(templateMaskedImage,
 
             frame = 4
             ds9.mtv(chisqMI, frame=frame)
+
+    # If we inverted the difference image...
+    if invert:
+        differenceMaskedImage *= -1
 
     # N.b. Per-footprint sdqa ratings are not implemented for DC3a.
     # Override the list returned from evaluateModelBy... for now.
