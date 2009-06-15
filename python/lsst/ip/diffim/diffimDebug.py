@@ -74,6 +74,9 @@ def writeDiffImages(prefix, id, kModel):
 #        # look at everything except for when there was a kernel
 #        # exception.
 #        return
+
+    if kModel.getKernelPtr() == None:
+        return
         
     kModel.getMiToConvolvePtr().writeFits('tFoot_%s_%s' % (prefix, id))
     kModel.getMiToNotConvolvePtr().writeFits('iFoot_%s_%s' % (prefix, id))
