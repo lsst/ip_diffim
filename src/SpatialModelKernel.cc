@@ -96,7 +96,7 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     } catch (exceptions::Exception& e) {
         setStatus(false);
         logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
-                           "Exception caught from computePsfMatchingKernelForFootprint"); 
+                           "Exception caught from kFunctor.apply"); 
         logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                            e.what());
         return false;
@@ -154,7 +154,7 @@ bool SpatialModelKernel<ImageT>::buildModel() {
             
         } catch (exceptions::Exception& e) {
             logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
-                               "Exception caught from computePsfMatchingKernelForFootprint, reverting to first solution");
+                               "Exception caught from kFunctor.apply, reverting to first solution");
             logging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.buildModel",
                                e.what());
         }
