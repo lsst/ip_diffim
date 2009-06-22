@@ -40,6 +40,9 @@ class DiffimTestCases(unittest.TestCase):
         # difference imaging functor
         self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
 
+        # edge bit
+        self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
+
     def tearDown(self):
         del self.policy
 
@@ -114,7 +117,7 @@ class DiffimTestCases(unittest.TestCase):
         smi.set(xpix, ypix, (scaling, 0x0, scaling))
         # convolve with gaussian
         cmi = afwImage.MaskedImageF(imsize, imsize)
-        afwMath.convolve(cmi, smi, self.gaussKernel, False)
+        afwMath.convolve(cmi, smi, self.gaussKernel, False, self.edgeBit)
         # this will adjust the kernel sum a bit
         # lose some at the outskirts of the kernel
         fc = ipDiffim.FindCountsF()
@@ -126,12 +129,18 @@ class DiffimTestCases(unittest.TestCase):
         # grab only the non-masked subregion
         bbox     = afwImage.BBox(afwImage.PointI(self.gaussKernel.getCtrX(),
                                                  self.gaussKernel.getCtrY()) ,
-                                 afwImage.PointI(imsize+1 - (self.gaussKernel.getWidth()  - self.gaussKernel.getCtrX()),
-                                                 imsize+1 - (self.gaussKernel.getHeight() - self.gaussKernel.getCtrY())))
+                                 afwImage.PointI(imsize - (self.gaussKernel.getWidth()  - self.gaussKernel.getCtrX()),
+                                                 imsize - (self.gaussKernel.getHeight() - self.gaussKernel.getCtrY())))
                                  
         tmi2     = afwImage.MaskedImageF(tmi, bbox)
         cmi2     = afwImage.MaskedImageF(cmi, bbox)
 
+        #ds9.mtv(tmi,  frame=1)
+        #ds9.mtv(cmi,  frame=2)
+        #ds9.mtv(tmi2, frame=3)
+        #ds9.mtv(cmi2, frame=4)
+        #pdb.set_trace()
+        
         # make sure its a valid subregion!
         mask     = cmi2.getMask()
         for j in range(mask.getHeight()):

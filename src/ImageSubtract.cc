@@ -95,6 +95,8 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     // Make sure you do not overwrite anyone else's kernels
     this->reset();
 
+    int const kCols = policy.getInt("kernelCols");
+    int const kRows = policy.getInt("kernelRows");
     int const edgeMaskBit = image::Mask<unsigned short>::getMaskPlane("EDGE");
     
     int const nKernelParameters     = this->_basisList.size();
@@ -166,16 +168,16 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     for (citer = convolvedImageList.begin(); citer != convolvedImageList.end(); ++citer) {
         convolvedLocatorList.push_back( (**citer).xy_at(startCol,startRow) );
     }
-    typename image::Image<ImageT>::xy_locator imageToConvolveLocator = imageToConvolve.xy_at(startCol, startRow);
+    typename image::Image<ImageT>::xy_locator imageToConvolveLocator    = imageToConvolve.xy_at(startCol, startRow);
     typename image::Image<ImageT>::xy_locator imageToNotConvolveLocator = imageToNotConvolve.xy_at(startCol, startRow);
-    xyi_locator varianceLocator           = varianceEstimate.xy_at(startCol, startRow);
+    xyi_locator varianceLocator                                         = varianceEstimate.xy_at(startCol, startRow);
 
     // Unit test ImageSubtract_1.py should show
     // Image range : 9 9 -> 31 31 : 2804.000000 2798.191162
     logging::TTrace<8>("lsst.ip.diffim.PsfMatchingFunctor.apply",
-                       "Image range : %d %d -> %d %d : %f %f",
+                       "Image range : %d %d -> %d %d : %f %f %f",
                        startCol, startRow, endCol, endRow, 
-                       0 + *imageToConvolveLocator, 0 + *imageToNotConvolveLocator);
+                       0 + *imageToConvolveLocator, 0 + *imageToNotConvolveLocator, 0 + *varianceLocator);
 
     std::pair<int, int> rowStep = std::make_pair(static_cast<int>(-(endCol-startCol)), 1);
     for (int row = startRow; row < endRow; ++row) {
@@ -194,6 +196,12 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
                 for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
                     ImageT const cdImagej  = **citerj;
                     M(kidxi, kidxj) += cdImagei*cdImagej*iVariance;
+		    
+		    /*
+		    logging::TTrace<8>("lsst.ip.diffim.PsfMatchingFunctor.apply",
+				       "%f %f %f",
+				       ncImage, cdImagei, cdImagej, 1./iVariance);
+		    */
                 } 
                 
                 B(kidxi) += ncImage*cdImagei*iVariance;
@@ -219,8 +227,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         // Get to next row, first col
         imageToConvolveLocator    += rowStep;
         imageToNotConvolveLocator += rowStep;
-        varianceLocator += rowStep;
-
+        varianceLocator           += rowStep;
         for (int ki = 0; ki < nKernelParameters; ++ki) {
             convolvedLocatorList[ki] += rowStep;
         }
@@ -229,8 +236,27 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     
     /** @note If we are going to regularize the solution to M, this is the place
      * to do it 
+     *
+     * This does not seem to change things much...
      */
-    
+
+    /*
+    for (int kidxi=0; kidxi < nKernelParameters; ++kidxi) {
+        int kiPosx     = kidxi % kCols;
+        int kiPosy     = kidxi / kCols;
+	double kiDist2 = (kiPosx-kCols/2)*(kiPosx-kCols/2) + (kiPosy-kRows/2)*(kiPosy-kRows/2);
+
+        for (int kidxj=kidxi; kidxj < nKernelParameters; ++kidxj) {
+	    int kjPosx     = kidxj % kCols;
+	    int kjPosy     = kidxj / kCols;
+	    double kjDist2 = (kjPosx-kCols/2)*(kjPosx-kCols/2) + (kjPosy-kRows/2)*(kjPosy-kRows/2);
+
+	    //std::cout << kidxi << " " << kidxj << " " << kiDist2 << " " << kjDist2 << std::endl;
+	    M(kidxi, kidxj) += kiDist2*kjDist2;
+        }
+    }
+    */
+
     // Fill in rest of M
     for (int kidxi=0; kidxi < nParameters; ++kidxi) {
         for (int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) {
@@ -309,8 +335,6 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
                        "Total compute time to do matrix math : %.2f s", time);
     
     // Translate from Eigen vectors into LSST classes
-    int const kCols = policy.getInt("kernelCols");
-    int const kRows = policy.getInt("kernelRows");
     std::vector<double> kValues(kCols*kRows);
     std::vector<double> kErrValues(kCols*kRows);
     for (int row = 0, idx = 0; row < kRows; row++) {
@@ -523,9 +547,7 @@ void diffim::PsfMatchingFunctorGsl<ImageT, VarT>::apply(
         // Get to next row, first col
         imageToConvolveLocator    += rowStep;
         imageToNotConvolveLocator += rowStep;
-
-        // HACK UNTIL Ticket #647 FIXED
-        varianceLocator            = varianceEstimate.xy_at(startCol, row+1);
+        varianceLocator           += rowStep;
 
         for (int ki = 0; ki < nKernelParameters; ++ki) {
             convolvedLocatorList[ki] += rowStep;
@@ -989,15 +1011,13 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     BackgroundT background,                               ///< Differential background function or scalar
     bool invert                                           ///< Invert the output difference image
     ) {
-    
+
     logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", "Convolving using convolve");
     
     int const edgeMaskBit = image::Mask<unsigned short>::getMaskPlane("EDGE");
-    //int edgeMaskBit = imageToNotConvolve.getMask()->getMaskPlane("EDGE");
 
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    
     math::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false, edgeMaskBit);
     
     /* Add in background */
@@ -1010,7 +1030,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     if (invert) {
         convolvedMaskedImage *= -1.0;
     }
-    
+
     return convolvedMaskedImage;
 }
 

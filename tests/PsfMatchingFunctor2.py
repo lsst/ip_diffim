@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-import os, pdb
-
+import os, pdb, sys
+import numpy as num
 import unittest
 import lsst.utils.tests as tests
 
@@ -19,6 +19,11 @@ logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
+
+display = False
+writefits = False
+
+# Recover a known smoothing kernel applied to real data
 
 class DiffimTestCases(unittest.TestCase):
     
@@ -45,12 +50,26 @@ class DiffimTestCases(unittest.TestCase):
         defSciencePath = os.path.join(defDataDir, "CFHT", "D4", 
                                       "cal-53535-i-797722_1")
         self.scienceImage  = afwImage.MaskedImageF(defSciencePath)
-        
+
+        # edge bit
+        self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
         
     def tearDown(self):
         del self.policy
 
-    def doGaussian(self, imsize=50, xloc=1118, yloc=2483):
+    def addNoise(self, mi):
+        # use median of variance for seed
+        # also the sqrt of this is used to scale the noise image
+        img       = mi.getImage()
+
+        seed      = int(afwMath.makeStatistics(mi.getVariance(), afwMath.MEDIAN).getValue())
+        rdm       = afwMath.Random(afwMath.Random.MT19937, seed)
+        rdmImage  = img.Factory(img.getDimensions())
+        afwMath.randomGaussianImage(rdmImage, rdm)
+        rdmImage *= num.sqrt(seed)
+        img      += rdmImage
+
+    def doGaussian(self, kNorm, imsize=60, xloc=1118, yloc=2483, addNoise=False):
         # NOTE : the size of these images have to be bigger
         #        size you lose pixels due to the convolution with the gaussian
         #        so adjust the size a bit to compensate 
@@ -64,66 +83,110 @@ class DiffimTestCases(unittest.TestCase):
         tmi  = afwImage.MaskedImageF(self.scienceImage, bbox)
 
         # now convolve it with a gaussian to make a science image
-        cmi = afwImage.MaskedImageF(imsize, imsize)
-        afwMath.convolve(cmi, tmi, self.gaussKernel, False)
+        smi = afwImage.MaskedImageF(imsize, imsize)
+        afwMath.convolve(smi, tmi, self.gaussKernel, kNorm, self.edgeBit)
 
+        if addNoise:
+            self.addNoise(smi)
+            
         # grab only the non-masked subregion
         bbox     = afwImage.BBox(afwImage.PointI(self.gaussKernel.getCtrX(),
                                                  self.gaussKernel.getCtrY()) ,
-                                 afwImage.PointI(imsize+1 - (self.gaussKernel.getWidth()  - self.gaussKernel.getCtrX()),
-                                                 imsize+1 - (self.gaussKernel.getHeight() - self.gaussKernel.getCtrY())))
-                                 
-        tmi2     = afwImage.MaskedImageF(tmi, bbox)
-        cmi2     = afwImage.MaskedImageF(cmi, bbox)
+                                 afwImage.PointI(imsize - (self.gaussKernel.getWidth()  - self.gaussKernel.getCtrX()),
+                                                 imsize - (self.gaussKernel.getHeight() - self.gaussKernel.getCtrY())))
+
+        # For testing only
+        invert = False
+        if invert:
+            tmi2     = afwImage.MaskedImageF(smi, bbox)
+            smi2     = afwImage.MaskedImageF(tmi, bbox)
+        else:
+            tmi2     = afwImage.MaskedImageF(tmi, bbox)
+            smi2     = afwImage.MaskedImageF(smi, bbox)
 
         # OUTPUT
-        self.kImageIn.writeFits('k1.fits')
-        tmi2.writeFits('t')
-        cmi2.writeFits('c')
-
+        if display:
+            ds9.mtv(tmi2, frame=1)
+            ds9.mtv(smi2, frame=2)
+            ds9.mtv(self.kImageIn, frame=3)
+        if writefits:
+            self.kImageIn.writeFits('kIn.fits')
+            tmi2.writeFits('t2')
+            smi2.writeFits('s2')
+            
         # make sure its a valid subregion!
-        mask     = cmi2.getMask()
+        mask     = smi2.getMask()
         for j in range(mask.getHeight()):
             for i in range(mask.getWidth()):
                 self.assertEqual(mask.get(i, j), 0)
                 
         # estimate of the variance
-        var  = afwImage.MaskedImageF(cmi2, True)
+        var  = afwImage.MaskedImageF(smi2, True)
         var -= tmi2
 
         # accepts : imageToConvolve, imageToNotConvolve
-        self.kFunctor.apply(tmi2.getImage(), cmi2.getImage(), var.getVariance(), self.policy)
+        self.kFunctor.apply(tmi2.getImage(), smi2.getImage(), var.getVariance(), self.policy)
         kernel    = self.kFunctor.getKernel()
         kImageOut = afwImage.ImageD(self.kCols, self.kRows)
         kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi2, cmi2, kernel, self.kFunctor.getBackground())
+        diffIm    = ipDiffim.convolveAndSubtract(tmi2, smi2, kernel, self.kFunctor.getBackground())
+        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
+                                                  kernel.getCtrY()) ,
+                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
+                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
+        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
 
         # OUTPUT
-        kImageOut.writeFits('k2a.fits')
-        diffIm.writeFits('da')
+        if display:
+            ds9.mtv(kImageOut, frame=4)
+            ds9.mtv(diffIm2, frame=5)
+        if writefits:
+            kImageOut.writeFits('k1.fits')
+            diffIm2.writeFits('dA2')
 
         # Second iteration
-        self.kFunctor.apply(tmi2.getImage(), cmi2.getImage(), diffIm.getVariance(), self.policy)
+        self.kFunctor.apply(tmi2.getImage(), smi2.getImage(), diffIm.getVariance(), self.policy)
         kernel    = self.kFunctor.getKernel()
         kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi2, cmi2, kernel, self.kFunctor.getBackground())
-        kImageOut.writeFits('k2b.fits')
-        diffIm.writeFits('db')
-
+        diffIm    = ipDiffim.convolveAndSubtract(tmi2, smi2, kernel, self.kFunctor.getBackground())
+        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
+                                                  kernel.getCtrY()) ,
+                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
+                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
+        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
+        
         # OUTPUT
-        tmi2.getImage().writeFits('t.fits')
-        cmi2.getImage().writeFits('c.fits')
+        if display:
+            ds9.mtv(kImageOut, frame=6)
+            ds9.mtv(diffIm2, frame=7)
+        if writefits:
+            kImageOut.writeFits('k2.fits')
+            diffIm2.writeFits('dB2')
 
+        # kernel sum should be 1.0 if kNorm
+        if kNorm:
+            if addNoise:
+                self.assertAlmostEqual(kSum, 1.0, 1)
+            else:
+                self.assertAlmostEqual(kSum, 1.0, 5)
+        
         # make sure the derived kernel looks like the input kernel
+        # only if you haven't normalized the kernel sum to be 1.0 during the initial convolution
         for j in range(kImageOut.getHeight()):
             for i in range(kImageOut.getWidth()):
-                if self.kImageIn.get(i,j) > 1e-3:
-                    self.assertAlmostEqual(kImageOut.get(i, j)/self.kImageIn.get(i,j), 1.0, 1)
+                if not kNorm:
+                    if addNoise:
+                        self.assertAlmostEqual(kImageOut.get(i, j), self.kImageIn.get(i,j), 1)
+                    else:
+                        self.assertAlmostEqual(kImageOut.get(i, j), self.kImageIn.get(i,j), 4)
 
 
-            
     def testGaussian(self):
-        self.doGaussian()
+        self.doGaussian(kNorm=True, addNoise=False)
+        self.doGaussian(kNorm=False, addNoise=False)
+        
+        self.doGaussian(kNorm=True, addNoise=True)
+        self.doGaussian(kNorm=False, addNoise=True)
 
         
 #####
@@ -142,4 +205,9 @@ def run(exit=False):
     tests.run(suite(), exit)
 
 if __name__ == "__main__":
+    if '-d' in sys.argv:
+        display = True
+    if '-w' in sys.argv:
+        writefits = True
+        
     run(True)
