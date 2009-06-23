@@ -62,7 +62,7 @@ class DiffimTestCases(unittest.TestCase):
         self.dStats  = ipDiffim.ImageStatisticsF()
 
         # footprints
-        self.detSet     = afwDetection.makeDetectionSet(self.scienceImage, afwDetection.Threshold(1000))
+        self.detSet     = afwDetection.makeDetectionSet(self.scienceImage, afwDetection.Threshold(800))
         self.footprints = self.detSet.getFootprints()
 
     def tearDown(self):
