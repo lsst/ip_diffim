@@ -10,6 +10,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.pex.policy as pexPolicy
 import lsst.ip.diffim as ipDiffim
+import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
@@ -22,18 +23,24 @@ diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary
 
 display = False
 writefits = False
+iterate = False
 
-# Recover a known smoothing kernel applied to real data with noise
+# This one looks for the PCA of a known Gaussian smearing kernel with
+# noise added to the images.
 
 class DiffimTestCases(unittest.TestCase):
     
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.policy    = pexPolicy.Policy.createPolicy(diffimPolicy)
-        self.kCols     = self.policy.getInt('kernelCols')
-        self.kRows     = self.policy.getInt('kernelRows')
-        self.basisList = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
+        self.policy      = pexPolicy.Policy.createPolicy(diffimPolicy)
+        self.kCols       = self.policy.getInt('kernelCols')
+        self.kRows       = self.policy.getInt('kernelRows')
+        self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
+        self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
+
+        # difference imaging functor
+        self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
 
         # gaussian reference kernel
         self.gSize         = self.kCols
@@ -42,18 +49,22 @@ class DiffimTestCases(unittest.TestCase):
         self.kImageIn      = afwImage.ImageD(self.gSize, self.gSize)
         self.gaussKernel.computeImage(self.kImageIn, False)
 
-        # difference imaging functor
-        self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
+        # edge bit
+        self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
 
         # known input images
         defDataDir = eups.productDir('afwdata')
-        defSciencePath = os.path.join(defDataDir, "CFHT", "D4", 
-                                      "cal-53535-i-797722_1")
+        defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
+                                      "v5-e0-c011-a00.sci")
         self.scienceImage  = afwImage.MaskedImageF(defSciencePath)
 
-        # edge bit
-        self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
-        
+        # image statistics
+        self.dStats  = ipDiffim.ImageStatisticsF()
+
+        # footprints
+        self.detSet     = afwDetection.makeDetectionSet(self.scienceImage, afwDetection.Threshold(1000))
+        self.footprints = self.detSet.getFootprints()
+
     def tearDown(self):
         del self.policy
 
@@ -69,40 +80,36 @@ class DiffimTestCases(unittest.TestCase):
         rdmImage *= num.sqrt(seed)
         img      += rdmImage
 
-    def doGaussian(self, kNorm, imsize=60, xloc=1118, yloc=2483, addNoise=False):
-        # NOTE : the size of these images have to be bigger
-        #        size you lose pixels due to the convolution with the gaussian
-        #        so adjust the size a bit to compensate 
-        imsize += self.gSize
+    def applyFunctor(self, xloc=397, yloc=580):
+        imsize  = int(3 * self.kCols)
+        imsize += self.gSize   # since we are convolving
 
         # chop out a region around a known object
         bbox = afwImage.BBox( afwImage.PointI(xloc - imsize/2,
                                               yloc - imsize/2),
                               afwImage.PointI(xloc + imsize/2,
                                               yloc + imsize/2) )
-        tmi  = afwImage.MaskedImageF(self.scienceImage, bbox)
+
+        # sometimes the box goes off the image; no big deal...
+        try:
+            tmi  = afwImage.MaskedImageF(self.scienceImage, bbox)
+        except:
+            return None
 
         # now convolve it with a gaussian to make a science image
-        smi = afwImage.MaskedImageF(imsize, imsize)
-        afwMath.convolve(smi, tmi, self.gaussKernel, kNorm, self.edgeBit)
+        smi = tmi.Factory( tmi.getDimensions() )
+        afwMath.convolve(smi, tmi, self.gaussKernel, False, self.edgeBit)
+        # and add noise
+        self.addNoise(smi)
 
-        if addNoise:
-            self.addNoise(smi)
-            
         # grab only the non-masked subregion
         bbox     = afwImage.BBox(afwImage.PointI(self.gaussKernel.getCtrX(),
                                                  self.gaussKernel.getCtrY()) ,
                                  afwImage.PointI(imsize - (self.gaussKernel.getWidth()  - self.gaussKernel.getCtrX()),
                                                  imsize - (self.gaussKernel.getHeight() - self.gaussKernel.getCtrY())))
-
-        # For testing only
-        invert = False
-        if invert:
-            tmi2     = afwImage.MaskedImageF(smi, bbox)
-            smi2     = afwImage.MaskedImageF(tmi, bbox)
-        else:
-            tmi2     = afwImage.MaskedImageF(tmi, bbox)
-            smi2     = afwImage.MaskedImageF(smi, bbox)
+        tmi2     = afwImage.MaskedImageF(tmi, bbox)
+        smi2     = afwImage.MaskedImageF(smi, bbox)
+        
 
         # OUTPUT
         if display:
@@ -111,8 +118,8 @@ class DiffimTestCases(unittest.TestCase):
             ds9.mtv(self.kImageIn, frame=3)
         if writefits:
             self.kImageIn.writeFits('kIn.fits')
-            tmi2.writeFits('t2')
-            smi2.writeFits('s2')
+            tmi2.writeFits('t2_%d' % (xloc))
+            smi2.writeFits('s2_%d' % (xloc))
             
         # make sure its a valid subregion!
         mask     = smi2.getMask()
@@ -136,13 +143,17 @@ class DiffimTestCases(unittest.TestCase):
                                                   diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
         diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
 
+
         # OUTPUT
         if display:
             ds9.mtv(kImageOut, frame=4)
             ds9.mtv(diffIm2, frame=5)
         if writefits:
-            kImageOut.writeFits('k1.fits')
-            diffIm2.writeFits('dA2')
+            kImageOut.writeFits('k1_%d.fits' % (xloc))
+            diffIm2.writeFits('dA2_%d' % (xloc))
+
+        if not iterate:
+            return kImageOut
 
         # Second iteration
         self.kFunctor.apply(tmi2.getImage(), smi2.getImage(), diffIm.getVariance(), self.policy)
@@ -160,33 +171,58 @@ class DiffimTestCases(unittest.TestCase):
             ds9.mtv(kImageOut, frame=6)
             ds9.mtv(diffIm2, frame=7)
         if writefits:
-            kImageOut.writeFits('k2.fits')
-            diffIm2.writeFits('dB2')
+            kImageOut.writeFits('k2_%d.fits' % (xloc))
+            diffIm2.writeFits('dB2_%d' % (xloc))
 
-        # kernel sum should be 1.0 if kNorm
-        if kNorm:
-            if addNoise:
-                self.assertAlmostEqual(kSum, 1.0, 1)
-            else:
-                self.assertAlmostEqual(kSum, 1.0, 5)
+        return kImageOut
+    
+    def testFunctor(self):
+        kernels = []
+        for object in self.footprints:
+            # note this returns the kernel images
+            kernel = self.applyFunctor(xloc= int(0.5 * ( object.getBBox().getX0() + object.getBBox().getX1() )),
+                                       yloc= int(0.5 * ( object.getBBox().getY0() + object.getBBox().getY1() )))
+
+            if kernel:
+                kernels.append(kernel)
+
+        nKernels = len(kernels)
+        kPca     = num.zeros((self.kCols*self.kRows, nKernels))
+        for idx in range(nKernels):
+            kPca[:,idx] = diffimTools.vectorFromImage(kernels[idx])
+            
+            
+        kMean, kU, kVal, kCoeff = diffimTools.runPca(kPca, None)
         
-        # make sure the derived kernel looks like the input kernel
-        # only if you haven't normalized the kernel sum to be 1.0 during the initial convolution
-        for j in range(kImageOut.getHeight()):
-            for i in range(kImageOut.getWidth()):
-                if not kNorm:
-                    if addNoise:
-                        self.assertAlmostEqual(kImageOut.get(i, j), self.kImageIn.get(i,j), 1)
-                    else:
-                        self.assertAlmostEqual(kImageOut.get(i, j), self.kImageIn.get(i,j), 4)
+        eKernels = []
+        # mean image
+        eKernels.append ( diffimTools.imageFromVector(kMean, self.kCols, self.kRows, retType=afwImage.ImageD) )
+        # eigen images
+        for i in range(kU.shape[1]):
+            eKernels.append ( diffimTools.imageFromVector(kU[:,i], self.kCols, self.kRows, retType=afwImage.ImageD) )
 
-
-    def testGaussian(self):
-        self.doGaussian(kNorm=True, addNoise=False)
-        self.doGaussian(kNorm=False, addNoise=False)
+        neKernels = len(eKernels)
         
-        self.doGaussian(kNorm=True, addNoise=True)
-        self.doGaussian(kNorm=False, addNoise=True)
+        if display:
+            # display them
+            frame = 0
+            for i in range(neKernels):
+                ds9.mtv(eKernels[i], frame=frame)
+                frame += 1
+            
+        kSum  = num.cumsum(kVal)
+        kSum /= kSum[-1]
+        #print '#eval', kSum
+
+        if writefits:
+            eKernels[0].writeFits('mK.fits')
+            for i in range(1,neKernels):
+                eKernels[i].writeFits('eK%d.fits' % (i))
+
+        # mean kernel is the known applied kernel
+        for j in range(self.kImageIn.getHeight()):
+            for i in range(self.kImageIn.getWidth()):
+                self.assertAlmostEqual(eKernels[0].get(i, j), self.kImageIn.get(i,j), 2)
 
         
 #####
@@ -209,5 +245,7 @@ if __name__ == "__main__":
         display = True
     if '-w' in sys.argv:
         writefits = True
+    if '-i' in sys.argv:
+        iterate = True
         
     run(True)

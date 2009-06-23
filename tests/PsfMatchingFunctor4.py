@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import os, pdb, sys
 import numpy as num
-#import pylab
 import unittest
 import lsst.utils.tests as tests
 
