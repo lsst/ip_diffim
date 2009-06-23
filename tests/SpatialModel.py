@@ -26,8 +26,8 @@ display = False
 writefits = False
 iterate = False
 
-# This one looks for the PCA of a known Gaussian smearing kernel with
-# noise added to the images.
+# This one looks for the spatial model of a known Gaussian smearing
+# kernel with noise added to the images.
 
 class DiffimTestCases(unittest.TestCase):
     
