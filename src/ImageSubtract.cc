@@ -342,16 +342,17 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
             
             // Insanity checking
             if (std::isnan( Soln(idx) )) {
-                throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel solution (nan)");
+                throw LSST_EXCEPT(exceptions::Exception, 
+                                  str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
             }
             if (std::isnan( Error2(idx, idx) )) {
-                throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel uncertainty (nan)");
+                throw LSST_EXCEPT(exceptions::Exception, 
+                                  str(boost::format("Unable to determine kernel uncertainty %d (nan)") % idx));
             }
             if (Error2(idx, idx) < 0.0) {
                 throw LSST_EXCEPT(exceptions::Exception,
-                                  str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
-                                      Error2(idx, idx)
-                                      ));
+                                  str(boost::format("Unable to determine kernel uncertainty, negative variance %d (%.3e)") % 
+                                      idx % Error2(idx, idx)));
             }
             
             kValues[idx]    = Soln(idx);
@@ -363,11 +364,11 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     
     // Estimate of Background and Background Error */
     if (std::isnan( Error2(nParameters-1, nParameters-1) )) {
-        throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel uncertainty (nan)");
+        throw LSST_EXCEPT(exceptions::Exception, "Unable to determine background uncertainty (nan)");
     }
     if (Error2(nParameters-1, nParameters-1) < 0.0) {
         throw LSST_EXCEPT(exceptions::Exception, 
-                          str(boost::format("Unable to determine kernel uncertainty, negative variance (%.3e)") % 
+                          str(boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % 
                               Error2(nParameters-1, nParameters-1) 
                               ));
     }
