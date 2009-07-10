@@ -153,7 +153,37 @@ class DC3aTestCase():
 
         return self.dStats.getMean(), self.dStats.getRms()
 
+    def getStats2(self, footprint):
+        bbox  = footprint.getBBox()
+        
+        sBits = ipDiffim.FindSetBitsU(self.differenceImage.getMaskedImage().getMask())
 
+        # Will throw if off image
+        try:
+            sBits.apply( footprint )
+        except:
+            #print '# Fail 1'
+            return None
+        
+        if sBits.getBits() > 0:
+            #print '# Fail 2'
+            return None
+
+        bbox.shift(-self.differenceImage.getMaskedImage().getX0(),
+                   -self.differenceImage.getMaskedImage().getY0())
+        try:
+            smi = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(), bbox)
+            dmi = afwImage.MaskedImageF(self.differenceImage.getMaskedImage(), bbox)
+        except:
+            #print '# Fail 3'
+            return None
+
+        srcFlux  = afwMath.makeStatistics(smi.getImage(),    afwMath.SUM).getValue()
+        diffMean = afwMath.makeStatistics(dmi.getImage(),    afwMath.MEAN).getValue()
+        diffVar  = afwMath.makeStatistics(dmi.getImage(),    afwMath.VARIANCE).getValue()
+        varMean  = afwMath.makeStatistics(dmi.getVariance(), afwMath.MEAN).getValue()
+
+        return srcFlux, diffMean, diffVar, varMean
 
     def getStats(self, footprint):
         bbox  = footprint.getBBox()
@@ -256,16 +286,20 @@ def run(ntodo):
                 bgX = fpX - dc3a.scienceImage.getMaskedImage().getX0()
                 bgY = fpY - dc3a.scienceImage.getMaskedImage().getY0()
 
-                results = dc3a.getStats(fpGrow)
+                results = dc3a.getStats2(fpGrow)
                 if results == None:
                     continue
-                mean, rms, flux = results
+                srcFlux, diffMean, diffVar, varMean = results
+                print fpId, fpX, fpY, srcFlux, diffMean, diffVar, varMean
 
-                bg    = dc3a.backobj.getPixel(bgX, bgY)
-                bgTot = bg * fpGrow.getNpix()
-                
-                print fpId, fpX, fpY, mean, rms, flux, bgTot
-                myInfo.append( (mean, rms, flux, bgTot) )
+                #results = dc3a.getStats(fpGrow)
+                #if results == None:
+                #    continue
+                #mean, rms, flux = results
+                #bg    = dc3a.backobj.getPixel(bgX, bgY)
+                #bgTot = bg * fpGrow.getNpix()
+                #print fpId, fpX, fpY, mean, rms, flux, bgTot
+                #myInfo.append( (mean, rms, flux, bgTot) )
 
             count += 1
             if count == ntodo:
@@ -296,7 +330,8 @@ def myhist(means, rms, output):
 if __name__ == "__main__":
     ntodo = int(sys.argv[1])
     results = run(ntodo)
-
+    sys.exit(1)
+    
     import pylab
     means = num.array( [ x[0] for x in results ] )
     rms   = num.array( [ x[1] for x in results ] )
