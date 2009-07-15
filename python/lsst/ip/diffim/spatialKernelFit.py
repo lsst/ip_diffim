@@ -422,7 +422,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
                     imStats.getRms(), 
                     sdqa.SdqaRating.AMP) 
             sdqaList.append(footprintResidualsRating)
-        Trace('lsst.ip.diffim.evaluateModelByPca', 4,
+        Trace('lsst.ip.diffim.evaluateModelByPca', 2,
               '%s Kernel %d : %s Pca residuals = %.2f +/- %.2f sigma' %
               (spatialCell.getLabel(),
                spatialCell.getCurrentId(),
@@ -435,7 +435,7 @@ def evaluateModelByPca(spatialCells, bgFunction, eKernel, policy, reject=True):
             # spatialCells[ idList[idx] ].getCurrentModel().setStatus(False)
             spatialCell.incrementModel()
         
-    Trace('lsst.ip.diffim.evaluateModelByPca', 3,
+    Trace('lsst.ip.diffim.evaluateModelByPca', 2,
           'Spatial model by PCA : %d / %d Kernels acceptable' % (nGood, nCells))
 
     return nRejected, sdqaList
