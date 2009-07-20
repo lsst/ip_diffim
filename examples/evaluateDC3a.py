@@ -223,7 +223,8 @@ def run(ntodo):
 
     dc3a = DC3aTestCase()
     
-    root = '/lsst/becker/lsst_devel/DMS/afwdata_trunk/DC3a-CFHT'
+    #root = '/lsst/becker/lsst_devel/DMS/afwdata_trunk/DC3a-CFHT'
+    root = '/lsst/DC3root/rlp1233/IPSD/output/'
     # use sci/ as the base directory
     sci  = os.path.join(root, 'sci')
     tmpl = os.path.join(root, 'tmpl')
