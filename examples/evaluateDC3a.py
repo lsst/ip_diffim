@@ -90,8 +90,10 @@ class DC3aTestCase():
         # Hack due to ticket #835
         filter           = self.scienceImage.getMetadata().get('FILTER').strip()
         datasetId        = self.scienceImage.getMetadata().get('datasetId').strip()
+
         #templatePath     = os.path.join('/lsst/images/repository/template', datasetId, '25', filter, 'T0004_%s_25_%s' % (datasetId, filter))
         templatePath     = os.path.join('/lsst/becker/lsst_devel/DMS/afwdata_trunk/templates', 'T0004_%s_25_%s' % (datasetId, filter))
+        
         templateExposure = afwImage.ExposureF(templatePath)
         afwMath.warpExposure(self.remappedImage, 
                              templateExposure, 
@@ -153,9 +155,7 @@ class DC3aTestCase():
 
         return self.dStats.getMean(), self.dStats.getRms()
 
-    def getStats2(self, footprint):
-        bbox  = footprint.getBBox()
-        
+    def getStats2(self, footprint, count):
         sBits = ipDiffim.FindSetBitsU(self.differenceImage.getMaskedImage().getMask())
 
         # Will throw if off image
@@ -169,6 +169,7 @@ class DC3aTestCase():
             #print '# Fail 2'
             return None
 
+        bbox  = footprint.getBBox()
         bbox.shift(-self.differenceImage.getMaskedImage().getX0(),
                    -self.differenceImage.getMaskedImage().getY0())
         try:
@@ -178,6 +179,9 @@ class DC3aTestCase():
             #print '# Fail 3'
             return None
 
+        smi.writeFits('SMI'+str(count))
+        dmi.writeFits('DMI'+str(count))
+
         srcFlux  = afwMath.makeStatistics(smi.getImage(),    afwMath.SUM).getValue()
         diffMean = afwMath.makeStatistics(dmi.getImage(),    afwMath.MEAN).getValue()
         diffVar  = afwMath.makeStatistics(dmi.getImage(),    afwMath.VARIANCE).getValue()
@@ -186,8 +190,6 @@ class DC3aTestCase():
         return srcFlux, diffMean, diffVar, varMean
 
     def getStats(self, footprint):
-        bbox  = footprint.getBBox()
-        
         sBits = ipDiffim.FindSetBitsU(self.differenceImage.getMaskedImage().getMask())
 
         # Will throw if off image
@@ -201,6 +203,7 @@ class DC3aTestCase():
             #print '# Fail 2'
             return None
 
+        bbox  = footprint.getBBox()
         bbox.shift(-self.differenceImage.getMaskedImage().getX0(),
                    -self.differenceImage.getMaskedImage().getY0())
         try:
@@ -218,6 +221,8 @@ class DC3aTestCase():
     
 def run(ntodo):
     """Run the tests"""
+
+    count = 0
 
     myInfo = []
 
@@ -287,7 +292,9 @@ def run(ntodo):
                 bgX = fpX - dc3a.scienceImage.getMaskedImage().getX0()
                 bgY = fpY - dc3a.scienceImage.getMaskedImage().getY0()
 
-                results = dc3a.getStats2(fpGrow)
+                results = dc3a.getStats2(fpGrow, count)
+                count += 1
+                
                 if results == None:
                     continue
                 srcFlux, diffMean, diffVar, varMean = results
