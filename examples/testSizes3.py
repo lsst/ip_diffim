@@ -89,13 +89,13 @@ class DiffimTestCases(unittest.TestCase):
                 tmi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(),  bbox)
                 smi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox)
             except:
-                return None
+                return None, None
         else:
             try:
                 smi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(),  bbox)
                 tmi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox)
             except:
-                return None
+                return None, None
 
         # OUTPUT
         if display:
@@ -113,7 +113,7 @@ class DiffimTestCases(unittest.TestCase):
         try:
             self.kFunctor.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
         except:
-            return None
+            return None, None
         kernel    = self.kFunctor.getKernel()
         kImageOut = afwImage.ImageD(self.kCols, self.kRows)
 
@@ -129,9 +129,11 @@ class DiffimTestCases(unittest.TestCase):
                                                        
         # Second iteration
         try:
+            bg = self.kFunctor.getBackground()
             self.kFunctor.apply(tmi.getImage(), smi.getImage(), diffIm.getVariance(), self.policy)
         except:
-            return kImageOut
+            return kImageOut, bg
+        
         kernel    = self.kFunctor.getKernel()
         kSum      = kernel.computeImage(kImageOut, False)
         diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor.getBackground())
@@ -151,7 +153,7 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut.writeFits('k2.fits')
             diffIm2.writeFits('dB2')
 
-        return kImageOut
+        return kImageOut, self.kFunctor.getBackground()
 
     def testFunctor(self):
         frame = 1
@@ -168,14 +170,16 @@ class DiffimTestCases(unittest.TestCase):
             for j in range(2, 11, 2):
                 # make a mean kernel
                 kernels = []
+                bgs     = []
                 for object in self.footprints:
                     # note this returns the kernel images
-                    kernel = self.applyFunctor(xloc= int(0.5 * ( object.getBBox().getX0() + object.getBBox().getX1() )),
-                                               yloc= int(0.5 * ( object.getBBox().getY0() + object.getBBox().getY1() )),
-                                               imscale=j)
+                    kernel, bg = self.applyFunctor(xloc= int(0.5 * ( object.getBBox().getX0() + object.getBBox().getX1() )),
+                                                   yloc= int(0.5 * ( object.getBBox().getY0() + object.getBBox().getY1() )),
+                                                   imscale=j)
         
                     if kernel:
                         kernels.append(kernel)
+                        bgs.append(bg)
         
                 nKernels = len(kernels)
                 kPca     = num.zeros((self.kCols*self.kRows, nKernels))
@@ -193,9 +197,17 @@ class DiffimTestCases(unittest.TestCase):
                 pylab.ylim(0,1)
                 pylab.savefig('%d_%d.png' % (j, i))
                 
-                kMeanIm = diffimTools.imageFromVector(kMean, self.kCols, self.kRows, retType=afwImage.ImageD) 
-                ds9.mtv(kMeanIm, frame=frame, title='%d %d' % (j, i))
-                frame += 1
+                kMeanIm = diffimTools.imageFromVector(kMean, self.kCols, self.kRows, retType=afwImage.ImageD)
+                if display:
+                    ds9.mtv(kMeanIm, frame=frame, title='%d %d' % (j, i))
+                    frame += 1
+
+                # lets make a full diffim using just the mean kernel
+                mKernel = afwMath.FixedKernel(kMeanIm)
+                diffIm  = ipDiffim.convolveAndSubtract(self.templateImage.getMaskedImage(),
+                                                       self.scienceImage.getMaskedImage(),
+                                                       mKernel, num.array(bgs).mean())
+                diffIm.writeFits('diffim3_%d_%d' % (j, i))
                 
 #####
         

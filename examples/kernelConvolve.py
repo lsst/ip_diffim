@@ -1,29 +1,22 @@
-import eups
 import lsst.afw.image as afwImage
 import lsst.afw.math  as afwMath
-import numpy as num
-import sys, os
+import sys
 
-id    = sys.argv[1]
-tRoot = 'tFoot_c_%s' % (id)
-iRoot = 'iFoot_c_%s' % (id)
-kRoot = 'kernel_c_%s.fits' % (id)
+tRoot  = sys.argv[1]
+iRoot  = sys.argv[2]
+kernel = sys.argv[3]
 
 tMi   = afwImage.MaskedImageF(tRoot)
 iMi   = afwImage.MaskedImageF(iRoot)
-kImg  = afwImage.ImageD(kRoot)
+kImg  = afwImage.ImageD(kernel)
 k     = afwMath.FixedKernel(kImg)
 
 cMi   = afwImage.MaskedImageF(tMi.getDimensions())
 afwMath.convolve(cMi, tMi, k, False)
-cMi.writeFits('c1')
 
-iMi  -= cMi
-iMi.writeFits('d1')
-
-gaussFunction = afwMath.GaussianFunction2D(2, 3)
-gaussKernel   = afwMath.AnalyticKernel(19, 19, gaussFunction)
-kImageIn      = afwImage.ImageD(19, 19)
-gaussKernel.computeImage(kImageIn, False)
-afwMath.convolve(cMi, tMi, gaussKernel, False)
-cMi.writeFits('c2')
+bbox      = afwImage.BBox(afwImage.PointI(k.getCtrX(),
+                                          k.getCtrY()) ,
+                          afwImage.PointI(cMi.getWidth() - (k.getWidth() - k.getCtrX()),
+                                          cMi.getHeight() - (k.getHeight() - k.getCtrY())))
+cMi2 = afwImage.MaskedImageF(cMi, bbox)
+cMi2.writeFits('conv')
