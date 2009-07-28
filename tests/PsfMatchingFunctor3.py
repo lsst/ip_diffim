@@ -79,7 +79,7 @@ class DiffimTestCases(unittest.TestCase):
         # NOTE : the size of these images have to be bigger
         #        size you lose pixels due to the convolution with the gaussian
         #        so adjust the size a bit to compensate 
-        imsize = int(6 * self.kCols)
+        imsize = int(3.5 * self.kCols)
 
         # chop out a region around a known object
         bbox = afwImage.BBox( afwImage.PointI(xloc - imsize/2,
@@ -174,8 +174,11 @@ class DiffimTestCases(unittest.TestCase):
         #self.applyFunctor(invert=False, foffset=0, xloc=460, yloc=1656)
         #self.applyFunctor(invert=True, foffset=4, xloc=460, yloc=1656)
         
-        self.applyFunctor(invert=False, foffset=0, xloc=288, yloc=952)
-        self.applyFunctor(invert=True, foffset=4, xloc=288, yloc=952)
+        #self.applyFunctor(invert=False, foffset=0, xloc=288, yloc=952)
+        #self.applyFunctor(invert=True, foffset=4, xloc=288, yloc=952)
+
+        self.applyFunctor(invert=False, foffset=0, xloc=460, yloc=1656)
+        self.applyFunctor(invert=True, foffset=4, xloc=460, yloc=1656)
         
         #self.applyFunctor(invert=False, foffset=0, xloc=251, yloc=1950)
         #self.applyFunctor(invert=True, foffset=4, xloc=251, yloc=1950)
