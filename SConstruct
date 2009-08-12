@@ -17,6 +17,8 @@ dependencies = [
     ["wcslib", "wcslib/wcs.h", "m wcs"], # remove m once SConsUtils bug fixed
     ["xpa", "xpa.h", "xpa", "XPAPuts"],
     ["minuit", "Minuit/FCNBase.h", "lcg_Minuit:C++"],
+    ["gsl", "gsl/gsl_matrix.h", "gslcblas gsl"],
+    ["eigen", "Eigen/Core.h"],
     ["pex_exceptions", "lsst/pex/exceptions.h", "pex_exceptions:C++"],
     ["utils", "lsst/utils/Utils.h", "utils:C++"],
     ["daf_base", "lsst/daf/base.h", "daf_base:C++"],
@@ -26,8 +28,6 @@ dependencies = [
     ["daf_persistence", "lsst/daf/persistence.h", "daf_persistence:C++"],
     ["daf_data", "lsst/daf/data.h", "daf_data:C++"],
     ["afw", "lsst/afw.h", "afw:C++"],
-    ["gsl", "gsl/gsl_matrix.h", "gslcblas gsl"],
-    ["eigen", "Eigen/Core.h"],
     ["sdqa", "lsst/sdqa/SdqaMetric.h", "sdqa:C++"],
     ]
 if os.environ.get("USE_VW"):
