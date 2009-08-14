@@ -46,16 +46,6 @@ namespace boost {
 #include <Eigen/LU>
 #include <Eigen/QR>
 
-#if !defined(USE_VW)
-#   define USE_VW 0
-#endif
-#if USE_VW
-#include <vw/Math/Functions.h> 
-#include <vw/Math/Vector.h> 
-#include <vw/Math/Matrix.h> 
-#include <vw/Math/LinearAlgebra.h> 
-#endif
-
 #include <lsst/pex/policy/Policy.h>
 %}
 
@@ -104,32 +94,12 @@ def version(HeadURL = r"$HeadURL$"):
 SWIG_SHARED_PTR(PsfMatchingFunctorF, lsst::ip::diffim::PsfMatchingFunctor<float>);
 SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double>);
 
-SWIG_SHARED_PTR(PsfMatchingFunctorGslF, lsst::ip::diffim::PsfMatchingFunctorGsl<float>);
-SWIG_SHARED_PTR(PsfMatchingFunctorGslD, lsst::ip::diffim::PsfMatchingFunctorGsl<double>);
-
-#if USE_VW
-SWIG_SHARED_PTR(PsfMatchingFunctorVwF, lsst::ip::diffim::PsfMatchingFunctorVw<float>);
-SWIG_SHARED_PTR(PsfMatchingFunctorVwD, lsst::ip::diffim::PsfMatchingFunctorVw<double>);
-#endif
-
 %include "lsst/ip/diffim/ImageSubtract.h"
 
 %template(PsfMatchingFunctorF)
     lsst::ip::diffim::PsfMatchingFunctor<float>;
 %template(PsfMatchingFunctorD)
     lsst::ip::diffim::PsfMatchingFunctor<double>;
-
-%template(PsfMatchingFunctorGslF)
-    lsst::ip::diffim::PsfMatchingFunctorGsl<float>;
-%template(PsfMatchingFunctorGslD)
-    lsst::ip::diffim::PsfMatchingFunctorGsl<double>;
-
-#if USE_VW
-%template(PsfMatchingFunctorVwF)
-    lsst::ip::diffim::PsfMatchingFunctorVw<float>;
-%template(PsfMatchingFunctorVwD)
-    lsst::ip::diffim::PsfMatchingFunctorVw<double>;
-#endif
 
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
@@ -202,17 +172,3 @@ SWIG_SHARED_PTR(SpatialModelCellD, lsst::ip::diffim::SpatialModelCell<lsst::ip::
 
 /******************************************************************************/
 
-/*
-%{
-#include "lsst/ip/diffim/Pca.h"
-%}
-
-%include "lsst/ip/diffim/Pca.h"
-
-%template(computePca)                    lsst::ip::diffim::computePca<vw::math::Matrix<float>, vw::math::Vector<float> >;
-%template(computePca)                    lsst::ip::diffim::computePca<vw::math::Matrix<double>, vw::math::Vector<double> >;
-%template(decomposeMatrixUsingBasis)     lsst::ip::diffim::decomposeMatrixUsingBasis<vw::math::Matrix<float> >;
-%template(decomposeMatrixUsingBasis)     lsst::ip::diffim::decomposeMatrixUsingBasis<vw::math::Matrix<double> >;
-%template(approximateMatrixUsingBasis)   lsst::ip::diffim::approximateMatrixUsingBasis<vw::math::Matrix<float> >;
-%template(approximateMatrixUsingBasis)   lsst::ip::diffim::approximateMatrixUsingBasis<vw::math::Matrix<double> >;
-*/

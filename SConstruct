@@ -17,6 +17,8 @@ dependencies = [
     ["wcslib", "wcslib/wcs.h", "m wcs"], # remove m once SConsUtils bug fixed
     ["xpa", "xpa.h", "xpa", "XPAPuts"],
     ["minuit", "Minuit/FCNBase.h", "lcg_Minuit:C++"],
+    ["gsl", "gsl/gsl_matrix.h", "gslcblas gsl"],
+    ["eigen", "Eigen/Core.h"],
     ["pex_exceptions", "lsst/pex/exceptions.h", "pex_exceptions:C++"],
     ["utils", "lsst/utils/Utils.h", "utils:C++"],
     ["daf_base", "lsst/daf/base.h", "daf_base:C++"],
@@ -26,15 +28,8 @@ dependencies = [
     ["daf_persistence", "lsst/daf/persistence.h", "daf_persistence:C++"],
     ["daf_data", "lsst/daf/data.h", "daf_data:C++"],
     ["afw", "lsst/afw.h", "afw:C++"],
-    ["gsl", "gsl/gsl_matrix.h", "gslcblas gsl"],
-    ["eigen", "Eigen/Core.h"],
     ["sdqa", "lsst/sdqa/SdqaMetric.h", "sdqa:C++"],
     ]
-if os.environ.get("USE_VW"):
-    dependencies += [
-        ["vw", "vw/Math.h", "vwMath:C++"],
-        ["lapack", None, "lapack", "dgesdd_"],
-        ]
 
 env = scons.makeEnv(
     "ip_diffim",
@@ -45,9 +40,6 @@ env = scons.makeEnv(
 #
 env.libs["ip_diffim"] += env.getlibs("boost wcslib cfitsio minuit utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy security afw gsl eigen sdqa")
 
-if os.environ.get("USE_VW"):
-    env.Append(CCFLAGS = "-DUSE_VW=1");
-    env.libs["ip_diffim"] += env.getlibs("vw lapack")
 #
 # Build/install things
 #

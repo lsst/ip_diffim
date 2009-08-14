@@ -6,8 +6,8 @@ import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
 
-DefScienceExposureName = "medswarp1lanczos2.fits"
-DefTemplateExposureName = "med_img.fits"
+DefScienceExposureName = "med"
+DefTemplateExposureName = "CFHT/D4/cal-53535-i-797722_1"
 DefBorderWidth = 5
 DefVerbosity = 0
 
@@ -36,18 +36,18 @@ def computeBBox(scienceExposurePath, templateExposurePath, borderWidth, template
     sciWcs = sciExp.getWcs()
     sciDim = sciExp.getMaskedImage().getDimensions()
     sciBBox = afwImage.BBox(afwImage.PointI(0, 0), sciDim[0], sciDim[1])
-    printBBox("Science BBox", sciBBox)
+    printBBox("Science Full BBox: ", sciBBox)
     
     # instead of reading in the template Exposure (which may be huge), just use the header
     tmpHdrData = afwImage.readMetadata(templateExposurePath + "_img.fits")
     tmpDim = afwImage.PointI(tmpHdrData.getInt("NAXIS1"), tmpHdrData.getInt("NAXIS2"))
     tmpWcs = afwImage.Wcs(tmpHdrData)
     tmpFullBBox = afwImage.BBox(afwImage.PointI(0, 0), tmpDim[0], tmpDim[1])
-    printBBox("Template Full BBox", tmpFullBBox)
+    printBBox("Template Full BBox:", tmpFullBBox)
     
     borderWidth = 5
     tmpBBox = ipDiffim.computeTemplateBbox(sciWcs, sciDim, tmpWcs, tmpDim, borderWidth)
-    printBBox("Template BBox", tmpBBox)
+    printBBox("Template Sub BBox: ", tmpBBox)
 
     if templateSubExposurePath:
         print "Reading sub template exposure"

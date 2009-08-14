@@ -22,7 +22,7 @@ diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
 
 display = False
-writefits = False
+writefits = True
 iterate = False
 
 # This one looks for the PCA of the convolution and devoncolution kernels
@@ -33,8 +33,8 @@ class DiffimTestCases(unittest.TestCase):
         
     def setUp(self):
         self.policy      = pexPolicy.Policy.createPolicy(diffimPolicy)
-        self.kCols       = self.policy.getInt('kernelCols')
-        self.kRows       = self.policy.getInt('kernelRows')
+        self.kCols       = 31 # self.policy.getInt('kernelCols')
+        self.kRows       = 31 # self.policy.getInt('kernelRows')
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
         self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
 
@@ -100,14 +100,6 @@ class DiffimTestCases(unittest.TestCase):
         #afwMath.convolve(cmi, smi, self.gaussKernel, False, self.edgeBit)
         #smi = cmi
         
-        # OUTPUT
-        if display:
-            ds9.mtv(tmi, frame=1+foffset)
-            ds9.mtv(smi, frame=2+foffset)
-        if writefits:
-            tmi.writeFits('t')
-            smi.writeFits('s')
-            
         # estimate of the variance
         var  = afwImage.MaskedImageF(smi, True)
         var -= tmi
@@ -124,7 +116,16 @@ class DiffimTestCases(unittest.TestCase):
                                                   diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
         diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
         self.dStats.apply( diffIm2 )
-        print 'Diffim residuals1 : %.2f +/- %.2f (%.3f)' % (self.dStats.getMean(), self.dStats.getRms(), kSum)
+        print 'Diffim residuals1 : %.2f +/- %.2f; %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
+                                                                 kSum, self.kFunctor.getBackground())
+        # OUTPUT
+        if display:
+            ds9.mtv(tmi, frame=1+foffset)
+            ds9.mtv(smi, frame=2+foffset)
+        if writefits:
+            tmi.writeFits('t')
+            smi.writeFits('s')
+            diffIm2.writeFits('d')
 
         if not iterate:
             return kImageOut
@@ -150,7 +151,8 @@ class DiffimTestCases(unittest.TestCase):
                                                   diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
         diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
         self.dStats.apply( diffIm2 )
-        print 'Diffim residuals2 : %.2f +/- %.2f (%.2f)' % (self.dStats.getMean(), self.dStats.getRms(), kSum)
+        print 'Diffim residuals2 : %.2f +/- %.2f; %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
+                                                                 kSum, self.kFunctor.getBackground())
         
         # OUTPUT
         if display:
@@ -197,6 +199,10 @@ class DiffimTestCases(unittest.TestCase):
         for i in range(cU.shape[1]):
             ceKernels.append ( diffimTools.imageFromVector(cU[:,i], self.kCols, self.kRows, retType=afwImage.ImageD) )
             deKernels.append ( diffimTools.imageFromVector(dU[:,i], self.kCols, self.kRows, retType=afwImage.ImageD) )
+
+        if writefits:
+            ceKernels[0].writeFits('Mc.fits')
+            deKernels[0].writeFits('Md.fits')
 
         if display:
             # display them
