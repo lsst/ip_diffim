@@ -39,9 +39,6 @@ class DC3aTestCase():
         # difference imaging functor
         self.kFunctor    = ipDiffim.PsfMatchingFunctorF(self.basisList)
 
-        # edge bit
-        self.edgeBit     = afwImage.MaskU().getMaskPlane('EDGE')
-
         # image statistics
         self.dStats      = ipDiffim.ImageStatisticsF()
 

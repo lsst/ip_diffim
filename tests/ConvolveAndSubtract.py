@@ -37,9 +37,6 @@ class DiffimTestCases(unittest.TestCase):
         self.gaussFunction = afwMath.GaussianFunction2D(2, 3)
         self.gaussKernel   = afwMath.AnalyticKernel(self.gSize, self.gSize, self.gaussFunction)
 
-        # edge bit
-        self.edgeBit       = afwImage.MaskU().getMaskPlane('EDGE')
-
         # known input images
         defDataDir = eups.productDir('afwdata')
         defImagePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
@@ -47,7 +44,7 @@ class DiffimTestCases(unittest.TestCase):
         self.templateImage  = afwImage.MaskedImageF(defImagePath)
         self.scienceImage   = self.templateImage.Factory( self.templateImage.getDimensions() )
         
-        afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False, self.edgeBit)
+        afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False)
         
     def tearDown(self):
         del self.policy

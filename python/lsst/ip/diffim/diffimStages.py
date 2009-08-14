@@ -27,8 +27,8 @@ class DiffimStage(Stage):
         self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
                 "ip.diffim.DiffimStage")
 
-        scienceExposureKey = self._policy.get('scienceExposureKey')
-        templateExposureKey = self._policy.get('templateExposureKey')
+        scienceExposureKey = self._policy.get("scienceExposureKey")
+        templateExposureKey = self._policy.get("templateExposureKey")
         
         scienceExposure = self.activeClipboard.get(scienceExposureKey)
         templateExposure = self.activeClipboard.get(templateExposureKey)
@@ -45,20 +45,20 @@ class DiffimStage(Stage):
 
             templateExposure = afwImage.makeExposure(maskedImage)
 
-            wcsKey = self._policy.get('templateWcsKey')
+            wcsKey = self._policy.get("templateWcsKey")
             wcs = self.activeClipboard.get(wcsKey)
-            bBoxKey = self._policy.get('templateBBoxKey')
+            bBoxKey = self._policy.get("templateBBoxKey")
             bBox = self.activeClipboard.get(bBoxKey)
 
             nwcs = wcs.clone()
-            nwcs.shiftReferencePixel(bBox.get('llcx'), bBox.get('llcy'))
+            nwcs.shiftReferencePixel(bBox.get("llcx"), bBox.get("llcy"))
             templateExposure.setWcs(nwcs)
        
         if display and False:
             frame=0
             ds9.mtv(templateExposure, frame=frame);  ds9.dot("Template", 0, 0, frame=frame)
 
-        diffimPolicy = self._policy.get('diffimPolicy')
+        diffimPolicy = self._policy.get("diffimPolicy")
         # step 1
         self.log.log(pexLog.Log.INFO, "Starting warp")
         remapedTemplateExposure = warpTemplateExposure(templateExposure,
@@ -88,10 +88,10 @@ class DiffimStage(Stage):
 
         persistableSdqaVector = sdqa.PersistableSdqaRatingVector(sdqaSet)
 
-        exposureKey = self._policy.getString('differenceExposureKey')
+        exposureKey = self._policy.getString("differenceExposureKey")
         self.activeClipboard.put(exposureKey, differenceExposure)
 
-        sdqaKey = self._policy.getString('sdqaRatingSetKey')
+        sdqaKey = self._policy.getString("sdqaRatingSetKey")
         self.activeClipboard.put(sdqaKey, persistableSdqaVector)
 
         self.outputQueue.addDataset(self.activeClipboard)
@@ -99,8 +99,8 @@ class DiffimStage(Stage):
 
 def warpTemplateExposure(templateExposure, scienceExposure, policy):
     # Create the warping Kernel according to policy
-    warpingKernelSize = policy.getInt("warpingKernelSize")
-    warpingKernel = afwMath.LanczosWarpingKernel(warpingKernelSize)
+    warpingKernelName = policy.getString("warpingKernel")
+    warpingKernel     = afwMath.makeWarpingKernel(warpingKernelName)
 
     # create a blank exposure to hold the remaped template exposure
     remapedTemplateExposure = templateExposure.Factory(
@@ -171,8 +171,8 @@ def subtractMaskedImage(templateMaskedImage,
     assert (templateMaskedImage.getDimensions() == \
             scienceMaskedImage.getDimensions())
     
-    kCols = policy.get('kernelCols')
-    kRows = policy.get('kernelRows')
+    kCols = policy.get("kernelCols")
+    kRows = policy.get("kernelRows")
 
     kBasisList = ipDiffim.generateDeltaFunctionKernelSet(kCols, kRows)
     kFunctor   = ipDiffim.PsfMatchingFunctorF(kBasisList)
@@ -221,18 +221,18 @@ def subtractMaskedImage(templateMaskedImage,
     diffimTools.rejectKernelSumOutliers(spatialCells, policy)
 
     # Set up fitting loop 
-    maxSpatialIterations = policy.getInt('maxSpatialIterations')
-    rejectKernels = policy.getBool('spatialKernelRejection')
+    maxSpatialIterations = policy.getInt("maxSpatialIterations")
+    rejectKernels = policy.getBool("spatialKernelRejection")
     nRejected = -1
     nIter =  0
     
     # And fit spatial kernel model
-    if policy.get('spatialKernelModel') == 'pca':
+    if policy.get("spatialKernelModel") == "pca":
         # Fit spatial variation of principal components
 
-        minPrincipalComponents = policy.getInt('minPrincipalComponents')
-        maxPrincipalComponents = policy.getInt('maxPrincipalComponents')
-        fracEigenVal = policy.getDouble('fracEigenVal')
+        minPrincipalComponents = policy.getInt("minPrincipalComponents")
+        maxPrincipalComponents = policy.getInt("maxPrincipalComponents")
+        fracEigenVal = policy.getDouble("fracEigenVal")
         
         while (nRejected != 0) and (nIter < maxSpatialIterations):
             # Run the PCA
@@ -246,8 +246,8 @@ def subtractMaskedImage(templateMaskedImage,
             nEval = min(nEval, maxPrincipalComponents)
             nEval = max(nEval, minPrincipalComponents)
 
-            pexLog.Trace('lsst.ip.diffim.subtractMaskedImage', 3, 
-                         'PCA iteration %d : Using %d principal components' % (nIter, nEval))
+            pexLog.Trace("lsst.ip.diffim.subtractMaskedImage", 3, 
+                         "PCA iteration %d : Using %d principal components" % (nIter, nEval))
 
             # do spatial fit here by Principal Component
             sKernel, bgFunction = spatialKernelFit.spatialModelByPca(
@@ -272,7 +272,7 @@ def subtractMaskedImage(templateMaskedImage,
                 
             nIter += 1
 
-    elif policy.get('spatialKernelModel') == 'pixel':
+    elif policy.get("spatialKernelModel") == "pixel":
         # Fit function to each pixel
 
         while (nRejected != 0) and (nIter < maxSpatialIterations):
@@ -375,8 +375,8 @@ def subtractMaskedImage(templateMaskedImage,
         for nCol in [0, templateMaskedImage.getWidth()]:
             kSums.append( sKernel.computeImage(kImage, False, nCol, nRow) )
     kSumArray = numpy.array(kSums)
-    pexLog.Trace('lsst.ip.diffim.subtractMaskedImage', 3, 
-            'Final Kernel Sum from Image Corners : %0.3f (%0.3f)' % 
+    pexLog.Trace("lsst.ip.diffim.subtractMaskedImage", 3, 
+            "Final Kernel Sum from Image Corners : %0.3f (%0.3f)" % 
             (kSumArray.mean(), kSumArray.std()))
     kernelSumRating =  sdqa.SdqaRating("ip.diffim.kernelSum",
             kSumArray.mean(),

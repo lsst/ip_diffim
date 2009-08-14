@@ -40,9 +40,6 @@ class DiffimTestCases(unittest.TestCase):
         # difference imaging functor
         self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
 
-        # edge bit
-        self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
-
     def tearDown(self):
         del self.policy
 
@@ -117,7 +114,7 @@ class DiffimTestCases(unittest.TestCase):
         smi.set(xpix, ypix, (scaling, 0x0, scaling))
         # convolve with gaussian
         cmi = afwImage.MaskedImageF(imsize, imsize)
-        afwMath.convolve(cmi, smi, self.gaussKernel, False, self.edgeBit)
+        afwMath.convolve(cmi, smi, self.gaussKernel, False)
         # this will adjust the kernel sum a bit
         # lose some at the outskirts of the kernel
         fc = ipDiffim.FindCountsF()

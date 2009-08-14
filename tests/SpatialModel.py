@@ -49,16 +49,13 @@ class DiffimTestCases(unittest.TestCase):
         self.kImageIn      = afwImage.ImageD(self.gSize, self.gSize)
         self.gaussKernel.computeImage(self.kImageIn, False)
 
-        # edge bit
-        self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
-
         # known input images
         defDataDir = eups.productDir('afwdata')
         defImagePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
                                     "v5-e0-c011-a00.sci")
         self.templateImage  = afwImage.MaskedImageF(defImagePath)
         self.scienceImage   = self.templateImage.Factory( self.templateImage.getDimensions() )
-        afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False, self.edgeBit)
+        afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False)
         self.addNoise(self.scienceImage) # entire image!
 
         # image statistics

@@ -59,9 +59,6 @@ class DiffimTestCases(unittest.TestCase):
                              wKernel)
         self.templateImage = self.remappedImage
 
-        # edge bit
-        self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
-
         # image statistics
         self.dStats  = ipDiffim.ImageStatisticsF()
         

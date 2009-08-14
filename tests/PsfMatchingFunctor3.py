@@ -53,21 +53,7 @@ class DiffimTestCases(unittest.TestCase):
                                        "v5-e0-c011-a00.sci")
         self.scienceImage   = afwImage.ExposureF(defSciencePath)
         self.templateImage  = afwImage.ExposureF(defTemplatePath)
-
-        # Remap the template to the image; replace self.templateImage with warped image
-        wKernel = afwMath.makeWarpingKernel('lanczos4')
-        self.remappedImage = self.templateImage.Factory(
-            self.scienceImage.getWidth(), 
-            self.scienceImage.getHeight(),
-            self.scienceImage.getWcs())
-        self.remappedImage.getMaskedImage().setXY0( self.scienceImage.getMaskedImage().getXY0() )
-        afwMath.warpExposure(self.remappedImage, 
-                             self.templateImage, 
-                             wKernel)
-        self.templateImage = self.remappedImage
-
-        # edge bit
-        self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
+        self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage, self.scienceImage, self.policy)
 
         # image statistics
         self.dStats  = ipDiffim.ImageStatisticsF()
@@ -96,7 +82,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # convolve science image with a gaussian for testing...
         #cmi = smi.Factory(smi.getDimensions())
-        #afwMath.convolve(cmi, smi, self.gaussKernel, False, self.edgeBit)
+        #afwMath.convolve(cmi, smi, self.gaussKernel, False)
         #smi = cmi
         
         # OUTPUT

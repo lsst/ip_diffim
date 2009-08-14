@@ -49,9 +49,6 @@ class DiffimTestCases(unittest.TestCase):
         self.kImageIn      = afwImage.ImageD(self.gSize, self.gSize)
         self.gaussKernel.computeImage(self.kImageIn, False)
 
-        # edge bit
-        self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
-
         # known input images
         defDataDir = eups.productDir('afwdata')
         defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
@@ -98,7 +95,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # now convolve it with a gaussian to make a science image
         smi = tmi.Factory( tmi.getDimensions() )
-        afwMath.convolve(smi, tmi, self.gaussKernel, False, self.edgeBit)
+        afwMath.convolve(smi, tmi, self.gaussKernel, False)
         # and add noise
         self.addNoise(smi)
 

@@ -10,8 +10,8 @@ debugPlot: false
 spatialKernelTesting: false
 spatialKernelRejection: true
 
-# Warping kernel order for warping template Exposure
-warpingKernelSize: 8
+# Warping kernel for warping template Exposure
+warpingKernelName: 'lanczos4'
 
 # Spatial function applied to : 'pca' or 'pixel' only
 spatialKernelModel: 'pca'

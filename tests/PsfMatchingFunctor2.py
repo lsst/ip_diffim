@@ -51,9 +51,6 @@ class DiffimTestCases(unittest.TestCase):
                                       "cal-53535-i-797722_1")
         self.scienceImage  = afwImage.MaskedImageF(defSciencePath)
 
-        # edge bit
-        self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
-        
     def tearDown(self):
         del self.policy
 
@@ -84,7 +81,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # now convolve it with a gaussian to make a science image
         smi = afwImage.MaskedImageF(imsize, imsize)
-        afwMath.convolve(smi, tmi, self.gaussKernel, kNorm, self.edgeBit)
+        afwMath.convolve(smi, tmi, self.gaussKernel, kNorm)
 
         if addNoise:
             self.addNoise(smi)
