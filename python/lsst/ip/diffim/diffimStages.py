@@ -204,9 +204,7 @@ def subtractMaskedImage(templateMaskedImage,
 
     # switch image you convolve
     if invert:
-        tmp                 = templateMaskedImage
-        templateMaskedImage = scienceMaskedImage
-        scienceMaskedImage  = tmp
+        (scienceMaskedImage, templateMaskedImage) = (templateMaskedImage, scienceMaskedImage)
     
 
     # Set up grid for spatial model

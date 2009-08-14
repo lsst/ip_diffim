@@ -30,11 +30,6 @@ dependencies = [
     ["afw", "lsst/afw.h", "afw:C++"],
     ["sdqa", "lsst/sdqa/SdqaMetric.h", "sdqa:C++"],
     ]
-if os.environ.get("USE_VW"):
-    dependencies += [
-        ["vw", "vw/Math.h", "vwMath:C++"],
-        ["lapack", None, "lapack", "dgesdd_"],
-        ]
 
 env = scons.makeEnv(
     "ip_diffim",
@@ -45,9 +40,6 @@ env = scons.makeEnv(
 #
 env.libs["ip_diffim"] += env.getlibs("boost wcslib cfitsio minuit utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy security afw gsl eigen sdqa")
 
-if os.environ.get("USE_VW"):
-    env.Append(CCFLAGS = "-DUSE_VW=1");
-    env.libs["ip_diffim"] += env.getlibs("vw lapack")
 #
 # Build/install things
 #
