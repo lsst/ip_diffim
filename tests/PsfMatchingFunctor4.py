@@ -22,7 +22,7 @@ diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
 
 display = False
-writefits = True
+writefits = False
 iterate = False
 
 # This one looks for the PCA of the convolution and devoncolution kernels
@@ -33,8 +33,8 @@ class DiffimTestCases(unittest.TestCase):
         
     def setUp(self):
         self.policy      = pexPolicy.Policy.createPolicy(diffimPolicy)
-        self.kCols       = 31 # self.policy.getInt('kernelCols')
-        self.kRows       = 31 # self.policy.getInt('kernelRows')
+        self.kCols       = self.policy.getInt('kernelCols')
+        self.kRows       = self.policy.getInt('kernelRows')
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
         self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
 
