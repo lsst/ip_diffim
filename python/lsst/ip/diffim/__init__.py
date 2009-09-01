@@ -2,8 +2,13 @@
 from diffimLib import *
 
 # python code
+from subtractMaskedImage import *
+from subtractExposure import *
 from diffimTools import *
 from spatialKernelFit import *
+from runPca import *
+from rejectKernelSumOutliers import *
+from createSpatialModelKernelCells import *
 
 # second tier, ask for them by name
 import diffimDebug 

@@ -10,7 +10,6 @@ import lsst.sdqa as sdqa
 from   lsst.pex.logging import Log
 from   lsst.pex.logging import Trace
 from   lsst.pex.policy  import Policy
-import lsst.pex.exceptions as Exceptions
 
 # relative imports, since these are in __init__.py
 import diffimLib 
