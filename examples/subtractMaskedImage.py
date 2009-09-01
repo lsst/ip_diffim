@@ -13,7 +13,7 @@ from lsst.pex.logging import Trace
 from lsst.pex.logging import Log
 from lsst.pex.policy import Policy
 
-from lsst.ip.diffim.diffimStages import subtractMaskedImage
+from lsst.ip.diffim import subtractMaskedImage
 
 # For degugging needs
 import pdb

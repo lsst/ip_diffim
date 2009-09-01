@@ -9,7 +9,7 @@ from lsst.pex.logging import Trace
 from lsst.pex.policy import Policy
 from lsst.pex.logging import Log
 
-from lsst.ip.diffim.diffimStages import subtractExposure
+from lsst.ip.diffim import subtractExposure
 
 def main():
     defDataDir   = eups.productDir('afwdata')
