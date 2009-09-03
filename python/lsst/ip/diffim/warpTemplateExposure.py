@@ -2,7 +2,7 @@ import lsst.afw.math as afwMath
 
 def warpTemplateExposure(templateExposure, scienceExposure, policy):
     # Create the warping Kernel according to policy
-    warpingKernelName = policy.getString("warpingKernel")
+    warpingKernelName = policy.getString("warpingKernelName")
     warpingKernel     = afwMath.makeWarpingKernel(warpingKernelName)
 
     # create a blank exposure to hold the remaped template exposure

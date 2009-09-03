@@ -117,6 +117,7 @@ Notes:
 """ % (defSciencePath, defTemplatePath, defOutputPath, defPolicyPath)
     
     parser = optparse.OptionParser(usage)
+    parser.add_option('-a', '--alard', action='store_true', default=False, help='use alard basis')
     parser.add_option('-p', '--policy', default=defPolicyPath, help='policy file')
     parser.add_option('-d', '--debugIO', action='store_true', default=False,
         help='write diagnostic intermediate files')
@@ -155,6 +156,11 @@ Notes:
         print 'Invert =', options.invert
         invert = True
 
+    alard = False
+    if options.alard:
+        print 'Using Alard basis'
+        alard = True
+        
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
@@ -167,7 +173,9 @@ Notes:
     else:
         differenceMaskedImage, sKernel, bgFunction, sdqaList =  subtractMaskedImage(templateMaskedImage,
                                                                                     scienceMaskedImage,
-                                                                                    policy, log, invert=invert)
+                                                                                    policy, log,
+                                                                                    useAlard=alard,
+                                                                                    invert=invert)
     differenceMaskedImage.writeFits(outputPath)
     
 

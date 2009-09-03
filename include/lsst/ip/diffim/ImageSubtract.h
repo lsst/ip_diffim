@@ -185,16 +185,16 @@ namespace diffim {
      *
      * @note NOT IMPLEMENTED
      *
-     * @param nCols  Number of rows in the set
-     * @param nRows  Number of columns in the set
-     * @param sigGauss  Widths of the Gaussian Kernels
-     * @param degGauss  Local spatial variation of bases
+     * @param halfWidth  size is 2*N + 1
+     * @param nGauss     number of gaussians
+     * @param sigGauss   Widths of the Gaussian Kernels
+     * @param degGauss   Local spatial variation of bases
      */    
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateAlardLuptonKernelSet(
-        unsigned int width,
-        unsigned int height,
-        std::vector<double> const& sigGauss,
-        std::vector<double> const& degGauss
+        unsigned int halfWidth,                ///< size is 2*N + 1
+        unsigned int nGauss,                   ///< number of gaussians
+        std::vector<double> const& sigGauss,   ///< width of the gaussians
+        std::vector<int>    const& degGauss    ///< local spatial variation of gaussians
         );
 
     /*
@@ -265,10 +265,6 @@ namespace diffim {
         /** Return uncertainty on matching kernel, as kernel itself
          */
         boost::shared_ptr<lsst::afw::math::Kernel> getKernelError() const { return _kernelError; }
-
-        /** Reset protected class members
-         */
-        void reset();
 
         /* Create PSF matching kernel */
         void apply(lsst::afw::image::Image<ImageT> const& imageToConvolve,

@@ -55,15 +55,6 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
 // Public Member Functions
 //
 
-template <typename ImageT, typename VarT>
-void diffim::PsfMatchingFunctor<ImageT, VarT>::reset() {
-    /* HEY , FOR SOME REASON THE KERNEL RESET DOES NOT WORK AND SEG FAULTS */
-    //this->_background      = 0.;
-    //this->_backgroundError = 0.;
-    //this->_kernel.reset();
-    //this->_kernelError.reset();
-}
-
 /** Create PSF matching kernel
  */
 template <typename ImageT, typename VarT>
@@ -74,15 +65,9 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     lsst::pex::policy::Policy  const& policy            //!< Policy file
     ) {
     
-    // Make sure you do not overwrite anyone else's kernels
-    this->reset();
-
-    int const kCols = policy.getInt("kernelCols");
-    int const kRows = policy.getInt("kernelRows");
-    
-    int const nKernelParameters     = this->_basisList.size();
-    int const nBackgroundParameters = 1;
-    int const nParameters           = nKernelParameters + nBackgroundParameters;
+    unsigned int const nKernelParameters     = this->_basisList.size();
+    unsigned int const nBackgroundParameters = 1;
+    unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
     
     boost::timer t;
     t.restart();
@@ -199,7 +184,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
             ++imageToConvolveLocator.x();
             ++imageToNotConvolveLocator.x();
             ++varianceLocator.x();
-            for (int ki = 0; ki < nKernelParameters; ++ki) {
+            for (unsigned int ki = 0; ki < nKernelParameters; ++ki) {
                 ++convolvedLocatorList[ki].x();
             }             
             
@@ -209,7 +194,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         imageToConvolveLocator    += rowStep;
         imageToNotConvolveLocator += rowStep;
         varianceLocator           += rowStep;
-        for (int ki = 0; ki < nKernelParameters; ++ki) {
+        for (unsigned int ki = 0; ki < nKernelParameters; ++ki) {
             convolvedLocatorList[ki] += rowStep;
         }
         
@@ -217,25 +202,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     
     /** @note If we are going to regularize the solution to M, this is the place
      * to do it 
-     *
-     * This does not seem to change things much...
-     */
 
-    /*
-    for (int kidxi=0; kidxi < nKernelParameters; ++kidxi) {
-        int kiPosx     = kidxi % kCols;
-        int kiPosy     = kidxi / kCols;
-	double kiDist2 = (kiPosx-kCols/2)*(kiPosx-kCols/2) + (kiPosy-kRows/2)*(kiPosy-kRows/2);
-
-        for (int kidxj=kidxi; kidxj < nKernelParameters; ++kidxj) {
-	    int kjPosx     = kidxj % kCols;
-	    int kjPosy     = kidxj / kCols;
-	    double kjDist2 = (kjPosx-kCols/2)*(kjPosx-kCols/2) + (kjPosy-kRows/2)*(kjPosy-kRows/2);
-
-	    //std::cout << kidxi << " " << kidxj << " " << kiDist2 << " " << kjDist2 << std::endl;
-	    M(kidxi, kidxj) += kiDist2*kjDist2;
-        }
-    }
     */
 
     // Fill in rest of M
@@ -316,29 +283,26 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
                        "Total compute time to do matrix math : %.2f s", time);
     
     // Translate from Eigen vectors into LSST classes
-    std::vector<double> kValues(kCols*kRows);
-    std::vector<double> kErrValues(kCols*kRows);
-    for (int row = 0, idx = 0; row < kRows; row++) {
-        for (int col = 0; col < kCols; col++, idx++) {
-            
-            // Insanity checking
-            if (std::isnan( Soln(idx) )) {
-                throw LSST_EXCEPT(exceptions::Exception, 
-                                  str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
-            }
-            if (std::isnan( Error2(idx, idx) )) {
-                throw LSST_EXCEPT(exceptions::Exception, 
-                                  str(boost::format("Unable to determine kernel uncertainty %d (nan)") % idx));
-            }
-            if (Error2(idx, idx) < 0.0) {
-                throw LSST_EXCEPT(exceptions::Exception,
-                                  str(boost::format("Unable to determine kernel uncertainty, negative variance %d (%.3e)") % 
-                                      idx % Error2(idx, idx)));
-            }
-            
-            kValues[idx]    = Soln(idx);
-            kErrValues[idx] = sqrt(Error2(idx, idx));
+    std::vector<double> kValues(nKernelParameters);
+    std::vector<double> kErrValues(nKernelParameters);
+    for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
+        // Insanity checking
+        if (std::isnan( Soln(idx) )) {
+            throw LSST_EXCEPT(exceptions::Exception, 
+                              str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
         }
+        if (std::isnan( Error2(idx, idx) )) {
+            throw LSST_EXCEPT(exceptions::Exception, 
+                              str(boost::format("Unable to determine kernel uncertainty %d (nan)") % idx));
+        }
+        if (Error2(idx, idx) < 0.0) {
+            throw LSST_EXCEPT(exceptions::Exception,
+                              str(boost::format("Unable to determine kernel uncertainty, negative variance %d (%.3e)") % 
+                                  idx % Error2(idx, idx)));
+        }
+        
+        kValues[idx]    = Soln(idx);
+        kErrValues[idx] = sqrt(Error2(idx, idx));
     }
     this->_kernel.reset( new math::LinearCombinationKernel(this->_basisList, kValues) );
     this->_kernelError.reset( new math::LinearCombinationKernel(this->_basisList, kErrValues) );
@@ -410,17 +374,69 @@ diffim::generateDeltaFunctionKernelSet(
  */
 math::KernelList<math::Kernel>
 diffim::generateAlardLuptonKernelSet(
-    unsigned int nRows, 
-    unsigned int nCols, 
-    std::vector<double> const& sigGauss, 
-    std::vector<double> const& degGauss  
+    unsigned int halfWidth,                ///< size is 2*N + 1
+    unsigned int nGauss,                   ///< number of gaussians
+    std::vector<double> const& sigGauss,   ///< width of the gaussians
+    std::vector<int>    const& degGauss    ///< local spatial variation of gaussians
     ) {
-    if ((nCols < 1) || (nRows < 1)) {
-        throw LSST_EXCEPT(exceptions::Exception, "nRows and nCols must be positive");
+    typedef lsst::afw::math::Kernel::PixelT PixelT;
+    typedef image::Image<double> ImageT;
+
+    if (halfWidth < 1) {
+        throw LSST_EXCEPT(exceptions::Exception, "halfWidth must be positive");
     }
-    throw LSST_EXCEPT(exceptions::Exception, "Not implemented");
+    if (nGauss != sigGauss.size()) {
+        throw LSST_EXCEPT(exceptions::Exception, "sigGauss does not have enough entries");
+    }
+    if (nGauss != degGauss.size()) {
+        throw LSST_EXCEPT(exceptions::Exception, "degGauss does not have enough entries");
+    }
+    int fullWidth = 2 * halfWidth + 1;
+    ImageT image(fullWidth, fullWidth);
     
     math::KernelList<math::Kernel> kernelBasisList;
+    for (unsigned int i = 0; i < nGauss; i++) {
+        /* 
+           sigma = FWHM / ( 2 * sqrt(2 * ln(2)) )
+        */
+        double sig = sigGauss[i];
+        unsigned int deg  = degGauss[i];
+        unsigned int nPar = (deg + 1) * (deg + 2) / 2;
+
+        math::GaussianFunction2<PixelT> gaussian(sig, sig);
+        math::AnalyticKernel kernel(fullWidth, fullWidth, gaussian);
+        math::PolynomialFunction2<PixelT> polynomial(deg);
+
+        for (unsigned int j = 0, n = 0; j <= deg; j++) {
+            for (unsigned int k = 0; k <= (deg - j); k++, n++) {
+                
+                /* original gaussian */
+                (void)kernel.computeImage(image, true);
+
+                /* to be modified by this polynomial */
+                polynomial.setParameter(n, 1.);
+
+                double ksum = 0.;
+                for (int y = 0, v = -halfWidth; y < image.getHeight(); y++, v++) {
+                    int u = -halfWidth;
+                    for (ImageT::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); ptr != end; ++ptr.x(), u++) {
+                        /* Evaluate from -1 to 1 */
+                        *ptr  = *ptr * polynomial(u/static_cast<double>(halfWidth), v/static_cast<double>(halfWidth));
+                        ksum += *ptr * *ptr;
+                    }
+                }
+                
+                //if ( (j % 2 == 0) && (k % 2 == 0) )
+                image /= sqrt(ksum);
+                
+                boost::shared_ptr<math::Kernel> 
+                    kernelPtr( new math::FixedKernel(image) );
+                kernelBasisList.push_back(kernelPtr);
+                
+                polynomial.setParameter(n, 0.);
+            }
+        }
+    }
     return kernelBasisList;
 }
 

@@ -14,6 +14,7 @@ from   lsst.pex.policy  import Policy
 # relative imports, since these are in __init__.py
 import diffimLib 
 import diffimTools
+from runPca import *
 
 import pdb
 
@@ -242,7 +243,7 @@ def spatialModelKernelPca(spatialCells, policy, id=''):
         M[:,idx] = diffimTools.vectorFromImage(kImage)
 
     # Call numpy Pca
-    meanM, U, eVal, eCoeff = diffimTools.runPca(M, policy)
+    meanM, U, eVal, eCoeff = runPca(M, policy)
 
     # Turn principal components into Kernels (which are double)
     mImage  = diffimTools.imageFromVector(meanM, 

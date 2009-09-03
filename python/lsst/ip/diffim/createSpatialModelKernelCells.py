@@ -9,6 +9,7 @@ import lsst.afw.math  as afwMath
 import lsst.afw.image as afwImage
 import lsst.afw.display.utils as displayUtils
 import lsst.afw.display.ds9 as ds9
+from lsst.pex.logging import Trace
 
 def createSpatialModelKernelCells(templateMaskedImage,
                                   scienceMaskedImage,

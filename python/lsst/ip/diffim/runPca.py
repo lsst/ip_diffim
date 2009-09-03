@@ -1,5 +1,6 @@
 import numpy
 import lsst.pex.exceptions as pexExceptions
+from lsst.pex.logging import Trace
 
 def runPca(M, policy):
     if type(M) != numpy.ndarray:
@@ -77,7 +78,6 @@ def runPca(M, policy):
         residual = numpy.sum(U * eCoeff[i], 1) - M[:,i]
         if (numpy.sum(residual) > 1e-10):
             raise pexExceptions.RangeError("lsst.ip.diffim.runPca PCA invalid")
-        assert
 
     return meanM, U, eVal, eCoeff
 

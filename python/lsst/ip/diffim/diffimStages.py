@@ -1,4 +1,7 @@
-import re
+import re, time
+
+from warpTemplateExposure import *
+from subtractExposure import *
 
 from lsst.pex.harness.Stage import Stage
 import lsst.afw.image as afwImage
@@ -52,11 +55,11 @@ class DiffimStage(Stage):
 
         diffimPolicy = self._policy.get("diffimPolicy")
         # step 1
-        self.log.log(pexLog.Log.INFO, "Starting warp")
+        self.log.log(pexLog.Log.INFO, "Starting warp : %s" % (time.ctime()))
         remapedTemplateExposure = warpTemplateExposure(templateExposure,
                 scienceExposure, 
                 diffimPolicy)
-        self.log.log(pexLog.Log.INFO, "Ending warp")
+        self.log.log(pexLog.Log.INFO, "Ending warp : %s" % (time.ctime()))
         
         if display:
             frame = 0
@@ -66,12 +69,12 @@ class DiffimStage(Stage):
             ds9.mtv(scienceExposure, frame=frame);  ds9.dot("Science Exposure", 0, 0, frame=frame)
 
         # step 2
-        self.log.log(pexLog.Log.INFO, "Starting subtract")
+        self.log.log(pexLog.Log.INFO, "Starting subtract : %s" % (time.ctime()))
         products = subtractExposure(remapedTemplateExposure, 
                 scienceExposure, 
                 diffimPolicy,
                 self.log)
-        self.log.log(pexLog.Log.INFO, "Ending subtract")
+        self.log.log(pexLog.Log.INFO, "Ending subtract : %s" % (time.ctime()))
 
         if products == None:
             raise RuntimeException("DiffimStage.subtractExposure failed")

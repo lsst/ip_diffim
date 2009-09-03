@@ -16,9 +16,9 @@ def findIqr(myArray):
     idx25 = int(0.25 * len(aSort))
     idx50 = int(0.50 * len(aSort))
     idx75 = int(0.75 * len(aSort))
-    d25   = kSort[idx25]
-    d50   = kSort[idx50]
-    d75   = kSort[idx75]
+    d25   = aSort[idx25]
+    d50   = aSort[idx50]
+    d75   = aSort[idx75]
 
     median         = d50
     Iqr            = (d75 - d25)

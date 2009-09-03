@@ -22,6 +22,12 @@ kernelRows: 19
 kernelCols: 19
 
 ######
+# Default Alard-Lupton Parameters
+alardNGauss: 3
+alardSigGauss: 0.7 1.5 3.0
+alardDegGauss: 4   3   2
+
+######
 # Remake kernel using better variance estimate?
 iterateKernel: false
 
@@ -132,10 +138,10 @@ maxSpatialIterations: 3
 # 
 
 # How many (min)
-minPrincipalComponents: 3
+minPrincipalComponents: 1
 
 # How many (max)
-maxPrincipalComponents: 25
+maxPrincipalComponents: 3
 
-# How many (max)
+# At what fraction of the eigenvalues do you cut off the expansion?
 fracEigenVal : 0.95

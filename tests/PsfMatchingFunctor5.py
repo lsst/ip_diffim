@@ -189,7 +189,7 @@ class DiffimTestCases(unittest.TestCase):
             kPca[:,idx] = diffimTools.vectorFromImage(kernels[idx])
             
             
-        kMean, kU, kVal, kCoeff = diffimTools.runPca(kPca, None)
+        kMean, kU, kVal, kCoeff = ipDiffim.runPca(kPca, None)
         
         eKernels = []
         # mean image

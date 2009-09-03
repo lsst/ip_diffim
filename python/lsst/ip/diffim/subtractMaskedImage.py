@@ -22,7 +22,10 @@ def subtractMaskedImage(templateMaskedImage,
                         policy, 
                         log,
                         fpList=None,
-                        invert=False):
+                        useAlard=False,
+                        invert=False,
+                        display=False):
+    
     # Make sure they are the EXACT same dimensions in pixels
     # This is non-negotiable
     assert (templateMaskedImage.getDimensions() == \
@@ -31,18 +34,32 @@ def subtractMaskedImage(templateMaskedImage,
     kCols = policy.get("kernelCols")
     kRows = policy.get("kernelRows")
 
-    kBasisList = diffimLib.generateDeltaFunctionKernelSet(kCols, kRows)
+    if useAlard:
+        nGauss   = policy.get("alardNGauss")
+        sigGauss = policy.getDoubleArray("alardSigGauss")
+        degGauss = policy.getIntArray("alardDegGauss")
+        
+        assert len(sigGauss) == nGauss
+        assert len(degGauss) == nGauss
+        assert kCols == kRows  # square
+        assert kCols % 2 == 1  # odd sized
+        
+        kHalfWidth = int(kCols/2)
+        kBasisList = diffimLib.generateAlardLuptonKernelSet(kHalfWidth, nGauss, sigGauss, degGauss)
+    else:
+        kBasisList = diffimLib.generateDeltaFunctionKernelSet(kCols, kRows)
+        
     kFunctor   = diffimLib.PsfMatchingFunctorF(kBasisList)
 
     if fpList == None:
         # Need to find own footprints
-        log.log(pexLog.Log.INFO, "Starting footprints")
+        log.log(pexLog.Log.INFO, "Starting footprints : %s" % (time.ctime()))
 
         fpList = diffimLib.getCollectionOfFootprintsForPsfMatching(
             templateMaskedImage,
             scienceMaskedImage,
             policy)
-        log.log(pexLog.Log.INFO, "Ending footprints")
+        log.log(pexLog.Log.INFO, "Ending footprints : %s" % (time.ctime()))
 
     if display:
         frame=1
@@ -64,7 +81,7 @@ def subtractMaskedImage(templateMaskedImage,
         (scienceMaskedImage, templateMaskedImage) = (templateMaskedImage, scienceMaskedImage)
 
     # Set up grid for spatial model
-    log.log(pexLog.Log.INFO, "Starting kernel")
+    log.log(pexLog.Log.INFO, "Starting kernel : %s" % (time.ctime()))
     spatialCells = createSpatialModelKernelCells(
         templateMaskedImage,
         scienceMaskedImage,
@@ -157,7 +174,7 @@ def subtractMaskedImage(templateMaskedImage,
         # Throw exception!
         pass
 
-    log.log(pexLog.Log.INFO, "Ending kernel")
+    log.log(pexLog.Log.INFO, "Ending kernel : %s" % (time.ctime()))
     log.log(pexLog.Log.INFO, "Starting convolve : %s" % (time.ctime()))
     if policy.exists("backgroundPolicy"):
         background = 0                  # no need to subtract a background in subtraction as we'll do so in a moment

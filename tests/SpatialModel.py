@@ -10,7 +10,6 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.pex.policy as pexPolicy
 import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.ip.diffim.spatialKernelFit as spatialKernelFit 
 import lsst.pex.logging as logging
 
@@ -87,7 +86,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def testSpatialModel(self):
         
-        spatialCells = diffimTools.createSpatialModelKernelCells(
+        spatialCells = ipDiffim.createSpatialModelKernelCells(
             self.templateImage,
             self.scienceImage,
             self.footprints,
@@ -102,7 +101,7 @@ class DiffimTestCases(unittest.TestCase):
             self.assertEqual(scPtr.isUsable(), True)
         
         # no kernels should be rejected based on kSum
-        diffimTools.rejectKernelSumOutliers(spatialCells, self.policy)
+        ipDiffim.rejectKernelSumOutliers(spatialCells, self.policy)
         for scID, scPtr in enumerate(spatialCells):
             if scPtr.getNModels() == 0:
                 continue
