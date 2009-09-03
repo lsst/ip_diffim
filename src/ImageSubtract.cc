@@ -206,8 +206,8 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     */
 
     // Fill in rest of M
-    for (int kidxi=0; kidxi < nParameters; ++kidxi) {
-        for (int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) {
+    for (unsigned int kidxi=0; kidxi < nParameters; ++kidxi) {
+        for (unsigned int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) {
             M(kidxj, kidxi) = M(kidxi, kidxj);
         }
     }
@@ -392,6 +392,7 @@ diffim::generateAlardLuptonKernelSet(
         throw LSST_EXCEPT(exceptions::Exception, "degGauss does not have enough entries");
     }
     int fullWidth = 2 * halfWidth + 1;
+    ImageT image0(fullWidth, fullWidth);
     ImageT image(fullWidth, fullWidth);
     
     math::KernelList<math::Kernel> kernelBasisList;
@@ -407,32 +408,74 @@ diffim::generateAlardLuptonKernelSet(
         math::AnalyticKernel kernel(fullWidth, fullWidth, gaussian);
         math::PolynomialFunction2<PixelT> polynomial(deg);
 
+        /* 
+
+        We want all the bases except for the first to sum to 0.0.  This allows
+        us to achieve kernel flux conservation (Ksum) across the image since all
+        the power will be in the first term, which will not vary spatially.
+
+           K(x,y) = Ksum * B_0 + Sum_i : a(x,y) * B_i
+
+        To do this, normalize all Kernels to sum = 1. and subtract B_0 from all
+        subsequent kenrels.  
+
+        To get an idea of the relative contribution of each of these basis
+        functions later on down the line, lets also normalize them such that 
+
+           Sum(B_i)  == 0.0   *and*
+           B_i * B_i == 1.0
+
+        For completeness 
+
+           Sum(B_0)  == 1.0
+           B_0 * B_0 != 1.0
+
+        */
+
+
         for (unsigned int j = 0, n = 0; j <= deg; j++) {
             for (unsigned int k = 0; k <= (deg - j); k++, n++) {
-                
-                /* original gaussian */
-                (void)kernel.computeImage(image, true);
-
-                /* to be modified by this polynomial */
+                /* gaussian to be modified by this term in the polynomial */
                 polynomial.setParameter(n, 1.);
 
+                if ( (n == 0) && (i == 0) ) {
+                    /* Very first kernel */
+                    (void)kernel.computeImage(image0, true);                    
+                    boost::shared_ptr<math::Kernel> 
+                        kernelPtr( new math::FixedKernel(image0) );
+                    kernelBasisList.push_back(kernelPtr);
+                    polynomial.setParameter(n, 0.);
+                    continue;
+                }
+
+                (void)kernel.computeImage(image, false); /* no need to normalize as its done below */
                 double ksum = 0.;
                 for (int y = 0, v = -halfWidth; y < image.getHeight(); y++, v++) {
                     int u = -halfWidth;
                     for (ImageT::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); ptr != end; ++ptr.x(), u++) {
                         /* Evaluate from -1 to 1 */
                         *ptr  = *ptr * polynomial(u/static_cast<double>(halfWidth), v/static_cast<double>(halfWidth));
-                        ksum += *ptr * *ptr;
+                        ksum += *ptr;
                     }
                 }
-                
-                //if ( (j % 2 == 0) && (k % 2 == 0) )
-                image /= sqrt(ksum);
-                
+
+                /* Normalize resulting basis to have sum = 1 */
+                image /= ksum;
+                /* All bases except the very first have zero total flux */
+                image -= image0;
+
+                /* Lets divide by a factor to make its dot product with itself 1.0 */
+                double ksum2 = 0.;
+                for (int y = 0; y < image.getHeight(); y++) {
+                    for (ImageT::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); ptr != end; ++ptr.x()) {
+                        ksum2 += *ptr * *ptr;
+                    }
+                }
+                image /= sqrt(ksum2);
+
                 boost::shared_ptr<math::Kernel> 
                     kernelPtr( new math::FixedKernel(image) );
                 kernelBasisList.push_back(kernelPtr);
-                
                 polynomial.setParameter(n, 0.);
             }
         }
