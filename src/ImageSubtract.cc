@@ -45,6 +45,40 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList
     ) :
     _basisList(basisList),
+    _penaltyVector(std::vector<double>()),
+    _background(0.),
+    _backgroundError(0.),
+    _kernel(boost::shared_ptr<lsst::afw::math::Kernel>()),
+    _kernelError(boost::shared_ptr<lsst::afw::math::Kernel>())
+{
+    
+    _penaltyVector.resize( _basisList.size() );
+    std::vector<boost::shared_ptr<lsst::afw::math::Kernel> >::const_iterator biter = _basisList.begin();
+    image::Image<double> image( (**biter).getDimensions() ); /* kernel images are double */
+
+    /* build your penalty function here; by default using second moments */
+    for (unsigned int i = 0; biter != _basisList.end(); i++, biter++) {
+        (void)( (**biter).computeImage(image, false) ); /* no normalization */
+        int halfWidth = image.getWidth() / 2;
+
+        double moment = 0.;
+        for (int y = 0, v = -halfWidth; y < image.getHeight(); y++, v++) {
+            int u = -halfWidth;
+            for (image::Image<double>::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); ptr != end; ++ptr.x(), u++) {
+                moment += *ptr * (u*u + v*v);
+            }
+        }
+        _penaltyVector[i] = moment;
+    }
+}
+
+template <typename ImageT, typename VarT>
+diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList,
+    std::vector<double> const vector
+    ) :
+    _basisList(basisList),
+    _penaltyVector(vector),
     _background(0.),
     _backgroundError(0.),
     _kernel(boost::shared_ptr<lsst::afw::math::Kernel>()),
@@ -59,13 +93,14 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
  */
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
-    lsst::afw::image::Image<ImageT> const& imageToConvolve,    //!< Image to apply kernel to
-    lsst::afw::image::Image<ImageT> const& imageToNotConvolve, //!< Image whose PSF you want to match to
-    lsst::afw::image::Image<VarT>   const& varianceEstimate,   //!< Estimate of the variance per pixel
-    lsst::pex::policy::Policy  const& policy            //!< Policy file
+    lsst::afw::image::Image<ImageT> const& imageToConvolve,    ///< Image to apply kernel to
+    lsst::afw::image::Image<ImageT> const& imageToNotConvolve, ///< Image whose PSF you want to match to
+    lsst::afw::image::Image<VarT>   const& varianceEstimate,   ///< Estimate of the variance per pixel
+    lsst::pex::policy::Policy  const& policy,                  ///< Policy file
+    bool applyPenalty                                          ///< Apply a penalty for regularization?
     ) {
     
-    unsigned int const nKernelParameters     = this->_basisList.size();
+    unsigned int const nKernelParameters     = _basisList.size();
     unsigned int const nBackgroundParameters = 1;
     unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
     
@@ -77,10 +112,10 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     
     std::vector<boost::shared_ptr<image::Image<ImageT> > > convolvedImageList(nKernelParameters);
     typename std::vector<boost::shared_ptr<image::Image<ImageT> > >::iterator citer = convolvedImageList.begin();
-    std::vector<boost::shared_ptr<math::Kernel> >::const_iterator kiter = this->_basisList.begin();
+    std::vector<boost::shared_ptr<math::Kernel> >::const_iterator kiter = _basisList.begin();
     
     // Create C_ij in the formalism of Alard & Lupton */
-    for (; kiter != this->_basisList.end(); ++kiter, ++citer) {
+    for (; kiter != _basisList.end(); ++kiter, ++citer) {
         /*
          * NOTE : we could also *precompute* the entire template image convolved with these functions
          *        and save them somewhere to avoid this step each time.  however, our paradigm is to
@@ -95,7 +130,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
                        "Total compute time to do basis convolutions : %.2f s", time);
     t.restart();
      
-    kiter = this->_basisList.begin();
+    kiter = _basisList.begin();
     citer = convolvedImageList.begin();
 
     // Ignore buffers around edge of convolved images :
@@ -200,10 +235,13 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         
     } // row
     
-    /** @note If we are going to regularize the solution to M, this is the place
-     * to do it 
-
-    */
+    /* for maximum penalized likelihood method */
+    if (applyPenalty) {
+        /* no penalty for background term */
+        for (unsigned int i=0; i<_basisList.size(); i++) {
+            B(i) -= _penaltyVector[i];
+        }
+    }
 
     // Fill in rest of M
     for (unsigned int kidxi=0; kidxi < nParameters; ++kidxi) {
@@ -304,8 +342,8 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         kValues[idx]    = Soln(idx);
         kErrValues[idx] = sqrt(Error2(idx, idx));
     }
-    this->_kernel.reset( new math::LinearCombinationKernel(this->_basisList, kValues) );
-    this->_kernelError.reset( new math::LinearCombinationKernel(this->_basisList, kErrValues) );
+    _kernel.reset( new math::LinearCombinationKernel(_basisList, kValues) );
+    _kernelError.reset( new math::LinearCombinationKernel(_basisList, kErrValues) );
     
     // Estimate of Background and Background Error */
     if (std::isnan( Error2(nParameters-1, nParameters-1) )) {
@@ -317,8 +355,8 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
                               Error2(nParameters-1, nParameters-1) 
                               ));
     }
-    this->_background      = Soln(nParameters-1);
-    this->_backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
+    _background      = Soln(nParameters-1);
+    _backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
 }
 
 
@@ -358,6 +396,49 @@ diffim::generateDeltaFunctionKernelSet(
         }
     }
     return kernelBasisList;
+}
+
+Eigen::MatrixXd
+diffim::generateDeltaFunctionPenalty(
+    unsigned int width,
+    unsigned int height,
+    unsigned int order) {
+
+    if ( (order < 0) || (order > 2) ) throw LSST_EXCEPT(exceptions::Exception, "Only orders 0..2 allowed");
+    if ( (width < 0) )  throw LSST_EXCEPT(exceptions::Exception, "Width < 0");
+    if ( (height < 0) ) throw LSST_EXCEPT(exceptions::Exception, "Height < 0");
+
+    /* 
+       Instead of Taylor expanding the forward difference approximation of
+       derivatives (N.R. section 18.5) lets just hard code in the expansion of
+       the 1st through 3rd derivatives, which will try and enforce smoothness of
+       0 through 2nd derivatives.
+    */
+    std::vector<std::vector<int> > coeffs(3, std::vector<int>(4,0));
+    coeffs[0][0] = -1; coeffs[0][1] = 1;
+    coeffs[1][0] = -1; coeffs[1][1] = 2; coeffs[1][2] = -1;
+    coeffs[2][0] = -1; coeffs[2][1] = 3; coeffs[2][2] = -3; coeffs[2][3] = 1;
+
+    Eigen::MatrixXd B = Eigen::MatrixXd::Zero(width*height-(order+1), width*height);
+    Eigen::MatrixXd M = Eigen::MatrixXd::Zero(width*height,           width*height);
+
+    /* Forward difference approximation */
+    for (unsigned int y = 0; y < width*height-(order+1); y++) {
+        for (unsigned int dx = 0; dx < (order+2); dx++) {
+
+            /* First address its neighbors along the x-direction */
+            B(y,y+dx) = coeffs[order][dx];
+
+            /* Next along the y-direction */
+            if ((y+dx)*width < height) 
+                B(y+dx,y+(y+dx)*width) = coeffs[order][dx];
+        }
+    }
+
+    //M = B.transpose() * B;
+    std::cout << "B " << std::endl << B << std::endl << std::endl;
+    //std::cout << "M " << std::endl << M << std::endl << std::endl;
+    //return M;
 }
 
 /** 
@@ -769,8 +850,6 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 }
 
 // Explicit instantiations
-// \cond
-
 template class diffim::PsfMatchingFunctor<float, float>;
 template class diffim::PsfMatchingFunctor<double, float>;
 

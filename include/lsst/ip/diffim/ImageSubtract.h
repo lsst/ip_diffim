@@ -15,6 +15,8 @@
 #include <vector>
 #include <string>
 
+#include <Eigen/Core>
+
 #include <boost/shared_ptr.hpp>
 
 #include <lsst/pex/policy/Policy.h>
@@ -181,6 +183,12 @@ namespace diffim {
         unsigned int height
         );
 
+    Eigen::MatrixXd generateDeltaFunctionPenalty(
+        unsigned int width,
+        unsigned int height,
+        unsigned int order
+        );
+
     /** Build a set of Alard/Lupton basis kernels
      *
      * @note NOT IMPLEMENTED
@@ -248,7 +256,20 @@ namespace diffim {
         PsfMatchingFunctor(
             lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList
             );
+        PsfMatchingFunctor(
+            lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList,
+            std::vector<double> const vec
+            );
         virtual ~PsfMatchingFunctor() {};
+
+        /** Set penalties (by default set during construction)
+         */
+        //void setPenaltyVector(std::vector<double> vec) { _penaltyVector = vec; }
+        //void setPenaltyVector(std::vector<float>  vec) { _penaltyVector = static_cast<std::vector<double> >(vec); }
+
+        /** Get penalties (by default set during construction 
+         */
+        std::vector<double> getPenaltyVector()   const { return _penaltyVector; }
 
         /** Return background value
          */
@@ -270,11 +291,13 @@ namespace diffim {
         void apply(lsst::afw::image::Image<ImageT> const& imageToConvolve,
                    lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
                    lsst::afw::image::Image<VarT>   const& varianceEstimate,
-                   lsst::pex::policy::Policy const& policy
+                   lsst::pex::policy::Policy const& policy,
+                   bool applyPenalty=false
                   );
 
     protected:
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> _basisList;        ///< List of Kernel basis functions
+        std::vector<double> _penaltyVector;                                     ///< List of basis penalties
         double _background;                                                     ///< Differenaitl background estimate
         double _backgroundError;                                                ///< Uncertainty on background
         boost::shared_ptr<lsst::afw::math::Kernel> _kernel;                     ///< PSF matching kernel
