@@ -221,11 +221,14 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         }
     }
     
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                       "Total compute time to step through pixels : %.2f s", time);
+    t.restart();
+
     /* If the regularization matrix is here and not null, we use it by default */
     if ( (_H.rows() != 0) && (_H.cols() != 0) ) {
-        logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                           "Applying kernel regularization");
-        std::cout << "Regularizing" << std::endl;
+        double regularizationScaling = policy.getDouble("regularizationScaling");        
         /* 
            See N.R. 18.5 equation 18.5.8 for the solution to the regularized
            normal equations.  For M.x = b, and solving for x, 
@@ -239,28 +242,18 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
 
          */
 
-        std::cout << "H1: " << _H.rows() << " " << _H.cols() << std::endl;
-        std::cout << "M1: " << M.rows() << " " << M.cols() << std::endl;
-        std::cout << "B1: " << B.rows() << std::endl;
-        
-        //M = 
-
         Eigen::MatrixXd Mt = M.transpose();
-        Eigen::MatrixXd Mr = Mt * M + 1000000 * _H;
-        Eigen::VectorXd Br = Mt * B;
-        M = Mr;
-        B = Br;
-        std::cout << "M2: " << M.rows() << " " << M.cols() << std::endl;
-        std::cout << "B2: " << B.rows() << std::endl;
+        M = Mt * M;
+
+        double lambda = M.trace() / _H.trace();
+        lambda *= regularizationScaling;
+
+        M = M + lambda * _H;
+        B = Mt * B;
+        logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                           "Applying kernel regularization with lambda = %.2e", lambda);
     }
     
-
-    time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                       "Total compute time to step through pixels : %.2f s", time);
-    t.restart();
-
-    //std::cout << "B eigen : " << B << std::endl;
 
     // To use Cholesky decomposition, the matrix needs to be symmetric (M is, by
     // design) and positive definite.  

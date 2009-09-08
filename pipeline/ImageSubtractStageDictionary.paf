@@ -17,6 +17,11 @@ warpingKernelName: 'lanczos4'
 spatialKernelModel: 'pca'
 
 ######
+# Fraction of the default lambda calculation (N.R. 18.5.8) to use in
+# the delta function regularization
+regularizationScaling: 0.001
+
+######
 # Size of the convolution kernel
 kernelRows: 19
 kernelCols: 19

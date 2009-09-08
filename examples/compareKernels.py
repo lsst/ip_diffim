@@ -38,7 +38,7 @@ class DiffimTestCases(unittest.TestCase):
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
 
         # Regularization term
-        self.H = ipDiffim.generateDeltaFunctionRegularization(self.kCols, self.kRows, 2)
+        self.H = ipDiffim.generateDeltaFunctionRegularization(self.kCols, self.kRows, 1)
 
         # Delta function basis set
         self.basisList1  = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
@@ -104,56 +104,6 @@ class DiffimTestCases(unittest.TestCase):
         # estimate of the variance
         var  = afwImage.MaskedImageF(smi, True)
         var -= tmi
-
-
-
-
-        # regularized delta function kernel
-        self.kFunctor3.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
-        kernel    = self.kFunctor3.getKernel()
-        kImageOut = afwImage.ImageD(self.kCols, self.kRows)
-        kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor3.getBackground())
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
-        self.dStats.apply( diffIm2 )
-
-        dmean1 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
-        dstd1  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
-        vmean1 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
-        
-        print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
-                                                                                     kSum, self.kFunctor3.getBackground(),
-                                                                                     dmean1, dstd1, vmean1)
-        # outputs
-        if display:
-            ds9.mtv(tmi, frame=8)
-            ds9.mtv(smi, frame=9)
-            ds9.mtv(kImageOut, frame=10)
-            ds9.mtv(diffIm2, frame=11)
-        if writefits:
-            diffIm2.writeFits('d3')
-            kImageOut.writeFits('k3.fits')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
