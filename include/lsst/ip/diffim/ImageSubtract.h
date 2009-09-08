@@ -183,7 +183,7 @@ namespace diffim {
         unsigned int height
         );
 
-    Eigen::MatrixXd generateDeltaFunctionPenalty(
+    Eigen::MatrixXd generateDeltaFunctionRegularization(
         unsigned int width,
         unsigned int height,
         unsigned int order
@@ -244,6 +244,8 @@ namespace diffim {
     /** Functor to create PSF Matching Kernel
      *
      * @ingroup diffim
+     *
+     * @note If constructed with a regularization matrix, will use it by default
      * 
      */
     template <typename ImageT, typename VarT=lsst::afw::image::VariancePixel>
@@ -258,18 +260,9 @@ namespace diffim {
             );
         PsfMatchingFunctor(
             lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList,
-            std::vector<double> const vec
+            Eigen::MatrixXd const H
             );
         virtual ~PsfMatchingFunctor() {};
-
-        /** Set penalties (by default set during construction)
-         */
-        //void setPenaltyVector(std::vector<double> vec) { _penaltyVector = vec; }
-        //void setPenaltyVector(std::vector<float>  vec) { _penaltyVector = static_cast<std::vector<double> >(vec); }
-
-        /** Get penalties (by default set during construction 
-         */
-        std::vector<double> getPenaltyVector()   const { return _penaltyVector; }
 
         /** Return background value
          */
@@ -291,13 +284,12 @@ namespace diffim {
         void apply(lsst::afw::image::Image<ImageT> const& imageToConvolve,
                    lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
                    lsst::afw::image::Image<VarT>   const& varianceEstimate,
-                   lsst::pex::policy::Policy const& policy,
-                   bool applyPenalty=false
+                   lsst::pex::policy::Policy       const& policy
                   );
 
     protected:
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> _basisList;        ///< List of Kernel basis functions
-        std::vector<double> _penaltyVector;                                     ///< List of basis penalties
+        Eigen::MatrixXd _H;                                                     ///< Regularization matrix
         double _background;                                                     ///< Differenaitl background estimate
         double _backgroundError;                                                ///< Uncertainty on background
         boost::shared_ptr<lsst::afw::math::Kernel> _kernel;                     ///< PSF matching kernel

@@ -42,43 +42,23 @@ namespace diffim     = lsst::ip::diffim;
 //
 template <typename ImageT, typename VarT>
 diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList
+    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList
     ) :
     _basisList(basisList),
-    _penaltyVector(std::vector<double>()),
+    _H(Eigen::MatrixXd()),
     _background(0.),
     _backgroundError(0.),
     _kernel(boost::shared_ptr<lsst::afw::math::Kernel>()),
     _kernelError(boost::shared_ptr<lsst::afw::math::Kernel>())
-{
-    
-    _penaltyVector.resize( _basisList.size() );
-    std::vector<boost::shared_ptr<lsst::afw::math::Kernel> >::const_iterator biter = _basisList.begin();
-    image::Image<double> image( (**biter).getDimensions() ); /* kernel images are double */
-
-    /* build your penalty function here; by default using second moments */
-    for (unsigned int i = 0; biter != _basisList.end(); i++, biter++) {
-        (void)( (**biter).computeImage(image, false) ); /* no normalization */
-        int halfWidth = image.getWidth() / 2;
-
-        double moment = 0.;
-        for (int y = 0, v = -halfWidth; y < image.getHeight(); y++, v++) {
-            int u = -halfWidth;
-            for (image::Image<double>::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); ptr != end; ++ptr.x(), u++) {
-                moment += *ptr * (u*u + v*v);
-            }
-        }
-        _penaltyVector[i] = moment;
-    }
-}
+{;}
 
 template <typename ImageT, typename VarT>
 diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList,
-    std::vector<double> const vector
+    Eigen::MatrixXd const H
     ) :
     _basisList(basisList),
-    _penaltyVector(vector),
+    _H(H),
     _background(0.),
     _backgroundError(0.),
     _kernel(boost::shared_ptr<lsst::afw::math::Kernel>()),
@@ -96,8 +76,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     lsst::afw::image::Image<ImageT> const& imageToConvolve,    ///< Image to apply kernel to
     lsst::afw::image::Image<ImageT> const& imageToNotConvolve, ///< Image whose PSF you want to match to
     lsst::afw::image::Image<VarT>   const& varianceEstimate,   ///< Estimate of the variance per pixel
-    lsst::pex::policy::Policy  const& policy,                  ///< Policy file
-    bool applyPenalty                                          ///< Apply a penalty for regularization?
+    lsst::pex::policy::Policy       const& policy              ///< Policy file
     ) {
     
     unsigned int const nKernelParameters     = _basisList.size();
@@ -235,14 +214,6 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         
     } // row
     
-    /* for maximum penalized likelihood method */
-    if (applyPenalty) {
-        /* no penalty for background term */
-        for (unsigned int i=0; i<_basisList.size(); i++) {
-            B(i) -= _penaltyVector[i];
-        }
-    }
-
     // Fill in rest of M
     for (unsigned int kidxi=0; kidxi < nParameters; ++kidxi) {
         for (unsigned int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) {
@@ -250,6 +221,40 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         }
     }
     
+    /* If the regularization matrix is here and not null, we use it by default */
+    if ( (_H.rows() != 0) && (_H.cols() != 0) ) {
+        logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                           "Applying kernel regularization");
+        std::cout << "Regularizing" << std::endl;
+        /* 
+           See N.R. 18.5 equation 18.5.8 for the solution to the regularized
+           normal equations.  For M.x = b, and solving for x, 
+
+           M -> (Mt.M + lambda*H)
+           B -> (Mt.B)
+
+           An estimate of lambda is NR 18.5.16
+
+           lambda = Trace(Mt.M) / Tr(H)
+
+         */
+
+        std::cout << "H1: " << _H.rows() << " " << _H.cols() << std::endl;
+        std::cout << "M1: " << M.rows() << " " << M.cols() << std::endl;
+        std::cout << "B1: " << B.rows() << std::endl;
+        
+        //M = 
+
+        Eigen::MatrixXd Mt = M.transpose();
+        Eigen::MatrixXd Mr = Mt * M + 1000000 * _H;
+        Eigen::VectorXd Br = Mt * B;
+        M = Mr;
+        B = Br;
+        std::cout << "M2: " << M.rows() << " " << M.cols() << std::endl;
+        std::cout << "B2: " << B.rows() << std::endl;
+    }
+    
+
     time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                        "Total compute time to step through pixels : %.2f s", time);
@@ -399,7 +404,7 @@ diffim::generateDeltaFunctionKernelSet(
 }
 
 Eigen::MatrixXd
-diffim::generateDeltaFunctionPenalty(
+diffim::generateDeltaFunctionRegularization(
     unsigned int width,
     unsigned int height,
     unsigned int order) {
@@ -419,8 +424,9 @@ diffim::generateDeltaFunctionPenalty(
     coeffs[1][0] = -1; coeffs[1][1] = 2; coeffs[1][2] = -1;
     coeffs[2][0] = -1; coeffs[2][1] = 3; coeffs[2][2] = -3; coeffs[2][3] = 1;
 
-    Eigen::MatrixXd B = Eigen::MatrixXd::Zero(width*height-(order+1), width*height);
-    Eigen::MatrixXd M = Eigen::MatrixXd::Zero(width*height,           width*height);
+    /* Note we have to add 1 extra (empty) term here because of the differential
+     * background fitting */
+    Eigen::MatrixXd B = Eigen::MatrixXd::Zero(width*height-(order+1)+1, width*height+1);
 
     /* Forward difference approximation */
     for (unsigned int y = 0; y < width*height-(order+1); y++) {
@@ -430,15 +436,12 @@ diffim::generateDeltaFunctionPenalty(
             B(y,y+dx) = coeffs[order][dx];
 
             /* Next along the y-direction */
-            if ((y+dx)*width < height) 
-                B(y+dx,y+(y+dx)*width) = coeffs[order][dx];
+            //if ((y+dx)*width < width*height) 
+            //B(y+dx,y+(y+dx)*width) = coeffs[order][dx];
         }
     }
-
-    //M = B.transpose() * B;
-    std::cout << "B " << std::endl << B << std::endl << std::endl;
-    //std::cout << "M " << std::endl << M << std::endl << std::endl;
-    //return M;
+    Eigen::MatrixXd H = B.transpose() * B;
+    return H;
 }
 
 /** 
