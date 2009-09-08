@@ -430,16 +430,28 @@ diffim::generateDeltaFunctionRegularization(
 
     /* Forward difference approximation */
     for (unsigned int y = 0; y < width*height-(order+1); y++) {
-        for (unsigned int dx = 0; dx < (order+2); dx++) {
 
-            /* First address its neighbors along the x-direction */
-            B(y,y+dx) = coeffs[order][dx];
+	unsigned int const i_row = y / width;
+	unsigned int const last_pix_this_row = (i_row + 1)*width - 1;
+	unsigned int const columns_remaining = last_pix_this_row - y;
 
-            /* Next along the y-direction */
-            //if ((y+dx)*width < width*height) 
-            //B(y+dx,y+(y+dx)*width) = coeffs[order][dx];
+        for (unsigned int dx = 0; dx < order+2; dx++) {
+
+	    /* First address its neighbors along the x-direction */
+	    if ( columns_remaining + 1 > dx ) {
+		B(y, y + dx) = coeffs[order][dx];
+	    }
+
+	    /* Next along the y-direction */
+            if ( (y + dx*width) < width*height )  {
+		B(y, y + dx*width) = coeffs[order][dx];
+	    }
         }
+
     }
+
+    //std::cout << B << std::endl;
+    
     Eigen::MatrixXd H = B.transpose() * B;
     return H;
 }
@@ -486,7 +498,7 @@ diffim::generateAlardLuptonKernelSet(
         */
         double sig = sigGauss[i];
         unsigned int deg  = degGauss[i];
-        unsigned int nPar = (deg + 1) * (deg + 2) / 2;
+        //unsigned int nPar = (deg + 1) * (deg + 2) / 2;
 
         math::GaussianFunction2<PixelT> gaussian(sig, sig);
         math::AnalyticKernel kernel(fullWidth, fullWidth, gaussian);
