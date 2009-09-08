@@ -441,7 +441,7 @@ diffim::generateDeltaFunctionRegularization(
 		
 		/* Next along the y-direction */
 		if ( (y + dx*width) < width*height )  {
-		    B(y, y + dx*width) = coeffs[order][dx];
+		    B(y, y + dx*width) += coeffs[order][dx];
 		}
 
 	    } else {
@@ -453,7 +453,7 @@ diffim::generateDeltaFunctionRegularization(
 		/* Next along the y-direction WRAPPED */
 		i_x = y % width;
 		int const i_y = (i_row + dx) % height;
-		B(y, i_y*width + i_x) = coeffs[order][dx];
+		B(y, i_y*width + i_x) += coeffs[order][dx];
 	    }
 
 
