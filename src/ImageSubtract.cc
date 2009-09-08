@@ -421,6 +421,8 @@ diffim::generateDeltaFunctionRegularization(
      * background fitting */
     Eigen::MatrixXd B = Eigen::MatrixXd::Zero(width*height-(order+1)+1, width*height+1);
 
+    int const wrapping = 1;
+
     /* Forward difference approximation */
     for (unsigned int y = 0; y < width*height-(order+1); y++) {
 
@@ -430,15 +432,31 @@ diffim::generateDeltaFunctionRegularization(
 
         for (unsigned int dx = 0; dx < order+2; dx++) {
 
-	    /* First address its neighbors along the x-direction */
-	    if ( columns_remaining + 1 > dx ) {
-		B(y, y + dx) = coeffs[order][dx];
+	    if ( ! wrapping ) {
+
+		/* First address its neighbors along the x-direction */
+		if ( columns_remaining + 1 > dx ) {
+		    B(y, y + dx) = coeffs[order][dx];
+		}
+		
+		/* Next along the y-direction */
+		if ( (y + dx*width) < width*height )  {
+		    B(y, y + dx*width) = coeffs[order][dx];
+		}
+
+	    } else {
+		
+		/* First address its neighbors along the x-direction WRAPPED */
+		int i_x = (y + dx) % width;
+		B(y, i_row*width + i_x) = coeffs[order][dx];
+
+		/* Next along the y-direction WRAPPED */
+		i_x = y % width;
+		int const i_y = (i_row + dx) % height;
+		B(y, i_y*width + i_x) = coeffs[order][dx];
 	    }
 
-	    /* Next along the y-direction */
-            if ( (y + dx*width) < width*height )  {
-		B(y, y + dx*width) = coeffs[order][dx];
-	    }
+
         }
 
     }
