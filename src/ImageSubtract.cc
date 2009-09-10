@@ -176,21 +176,19 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
                 for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
                     ImageT const cdImagej  = **citerj;
                     M(kidxi, kidxj) += cdImagei*cdImagej*iVariance;
-		    
 		    /*
 		    logging::TTrace<8>("lsst.ip.diffim.PsfMatchingFunctor.apply",
 				       "%f %f %f",
 				       ncImage, cdImagei, cdImagej, 1./iVariance);
 		    */
                 } 
-                
                 B(kidxi) += ncImage*cdImagei*iVariance;
-                
-                // Constant background term; effectively j = kidxj + 1 */
+
+                // Background term; effectively j = kidxj + 1 */
                 M(kidxi, nParameters-1) += cdImagei*iVariance;
             } 
             
-            // Background term; effectively i = kidxi + 1 
+            // Background term; effectively i = kidxi + 1, j = kidxj + 1
             B(nParameters-1)                += ncImage*iVariance;
             M(nParameters-1, nParameters-1) += 1.0*iVariance;
             
@@ -805,7 +803,7 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         for (std::vector<lsst::afw::detection::Footprint::Ptr>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
             // footprint has too many pixels
             if (static_cast<unsigned int>((*i)->getNpix()) > fpNpixMax) {
-                logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                                "Footprint has too many pix: %d (max =%d)", 
                                (*i)->getNpix(), fpNpixMax);
                 continue;
@@ -841,9 +839,9 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
                 image::MaskedImage<ImageT> subImageToConvolve(imageToConvolve, fpBBox);
                 image::MaskedImage<ImageT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
             } catch (exceptions::Exception& e) {
-                logging::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
-                                   "Exception caught extracting Footprint");
                 logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
+                                   "Exception caught extracting Footprint");
+                logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
                                    e.what());
                 continue;
             }
@@ -851,14 +849,14 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
             // Search for bad pixels within the footprint
             itcFunctor.apply(*fpGrow);
             if (itcFunctor.getBits() > 0) {
-                logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                                "Footprint has bad pix in image to convolve"); 
                 continue;
             }
 
             itncFunctor.apply(*fpGrow);
             if (itncFunctor.getBits() > 0) {
-                logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                                "Footprint has bad pix in image not to convolve");
                 continue;
             }
