@@ -18,8 +18,11 @@ spatialKernelModel: 'pca'
 
 ######
 # Fraction of the default lambda calculation (N.R. 18.5.8) to use in
-# the delta function regularization
-regularizationScaling: 0.001
+# the delta function regularization, and regularization order (0, 1,
+# 2)
+regularizationUse: true
+regularizationOrder: 0
+regularizationScaling: 0.0001
 
 ######
 # Size of the convolution kernel
@@ -44,12 +47,12 @@ kernelSpatialOrder: 0
 # Order of background spatial variation
 backgroundSpatialOrder: 0
 
-backgroundPolicy: {
-    # how to interpolate the background values
-    algorithm:  "NATURAL_SPLINE" 
-    # how large regions of the sky should be used for each background point
-    binsize:    128
-}
+#backgroundPolicy: {
+#    # how to interpolate the background values
+#    algorithm:  "NATURAL_SPLINE" 
+#    # how large regions of the sky should be used for each background point
+#    binsize:    128
+#}
 
 #####
 # Chops up the image into cells

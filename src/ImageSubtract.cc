@@ -411,6 +411,13 @@ diffim::generateDeltaFunctionRegularization(
        derivatives (N.R. section 18.5) lets just hard code in the expansion of
        the 1st through 3rd derivatives, which will try and enforce smoothness of
        0 through 2nd derivatives.
+
+       A property of the basic "finite difference regularization" is that their
+       rows (column multipliers) sum to 0.
+
+       Another consideration is to use *multiple* finite difference operators as
+       a constraint.
+
     */
     std::vector<std::vector<int> > coeffs(3, std::vector<int>(4,0));
     coeffs[0][0] = -1; coeffs[0][1] = 1;

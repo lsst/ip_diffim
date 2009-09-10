@@ -25,7 +25,7 @@ display = False
 writefits = False
 iterate = False
 
-# This one looks for the PCA of the convolution and devoncolution kernels
+# This one looks for the PCA of the convolution and deconvolution kernels
 
 class DiffimTestCases(unittest.TestCase):
     
@@ -37,9 +37,9 @@ class DiffimTestCases(unittest.TestCase):
         self.kRows       = self.policy.getInt('kernelRows')
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
         self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
-
+        self.H           = ipDiffim.generateDeltaFunctionRegularization(self.kCols, self.kRows, 0)
         # difference imaging functor
-        self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
+        self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H)
 
         # known input images
         defDataDir = eups.productDir('afwdata')

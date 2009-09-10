@@ -46,10 +46,18 @@ def subtractMaskedImage(templateMaskedImage,
         
         kHalfWidth = int(kCols/2)
         kBasisList = diffimLib.generateAlardLuptonKernelSet(kHalfWidth, nGauss, sigGauss, degGauss)
+        kFunctor   = diffimLib.PsfMatchingFunctorF(kBasisList)
     else:
         kBasisList = diffimLib.generateDeltaFunctionKernelSet(kCols, kRows)
+
+        if policy.get("regularizationUse") == True:
+            order    = policy.get("regularizationOrder")
+            H        = diffimLib.generateDeltaFunctionRegularization(kCols, kRows, order)
+            kFunctor = diffimLib.PsfMatchingFunctorF(kBasisList, H)
+        else:
+            kFunctor = diffimLib.PsfMatchingFunctorF(kBasisList)
         
-    kFunctor   = diffimLib.PsfMatchingFunctorF(kBasisList)
+        
 
     if fpList == None:
         # Need to find own footprints

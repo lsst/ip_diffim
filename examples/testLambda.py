@@ -130,7 +130,7 @@ class DiffimTestCases(unittest.TestCase):
         lams = range(-10, 1, 2)
         for i in range(len(lams)):
             lam = lams[i]
-            self.policy.set('regularizationScaling', 10**lam)
+            self.policy.set('regularizationScaling', 1.0 * 10**lam)
             self.applyFunctor(foffset=i*8)
                 
 #####

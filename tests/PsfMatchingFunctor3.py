@@ -35,7 +35,8 @@ class DiffimTestCases(unittest.TestCase):
         self.kRows       = self.policy.getInt('kernelRows')
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
         self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
-
+        self.H           = ipDiffim.generateDeltaFunctionRegularization(self.kCols, self.kRows, 0)
+        
         self.gSize         = self.kCols
         self.gaussFunction = afwMath.GaussianFunction2D(2, 2)
         self.gaussKernel   = afwMath.AnalyticKernel(self.gSize, self.gSize, self.gaussFunction)
@@ -43,7 +44,7 @@ class DiffimTestCases(unittest.TestCase):
         self.gaussKernel.computeImage(self.kImageIn, False)
 
         # difference imaging functor
-        self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
+        self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H)
 
         # known input images
         defDataDir = eups.productDir('afwdata')
