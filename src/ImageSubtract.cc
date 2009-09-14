@@ -321,6 +321,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     std::vector<double> kErrValues(nKernelParameters);
     for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
         // Insanity checking
+        
         if (std::isnan( Soln(idx) )) {
             throw LSST_EXCEPT(exceptions::Exception, 
                               str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
@@ -355,6 +356,291 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     _backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
 }
 
+#if 0
+
+template <typename ImageT>
+Eigen::MatrixXd diffim::imageToEigen(
+    lsst::afw::image::Image<ImageT> const& img
+    ) {
+    unsigned int rows = img.getHeight();
+    unsigned int cols = img.getWidth();
+    Eigen::MatrixXd M = Eigen::MatrixXd::Zero(rows, cols);
+
+    for (int y = 0; y != img.getHeight(); ++y) {
+        int x = 0;
+        for (typename lsst::afw::image::Image<ImageT>::x_iterator ptr = img.row_begin(y); ptr != img.row_end(y); ++ptr, ++x) {
+            M(x,y) = *ptr;
+        }
+    }
+    return M;
+}
+    
+
+
+template <typename ImageT, typename VarT>
+void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
+    lsst::afw::image::Image<ImageT> const& imageToConvolve,    ///< Image to apply kernel to
+    lsst::afw::image::Image<ImageT> const& imageToNotConvolve, ///< Image whose PSF you want to match to
+    lsst::afw::image::Image<VarT>   const& varianceEstimate,   ///< Estimate of the variance per pixel
+    lsst::pex::policy::Policy       const& policy              ///< Policy file
+    ) {
+    
+    unsigned int const nKernelParameters     = _basisList.size();
+    unsigned int const nBackgroundParameters = 1;
+    unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
+    
+    boost::timer t;
+    t.restart();
+    
+    /* least squares matrices */
+    Eigen::MatrixXd M = Eigen::MatrixXd::Zero(nParameters, nParameters);
+    Eigen::VectorXd B = Eigen::VectorXd::Zero(nParameters);
+    /* eigen representation of input images */
+    Eigen::MatrixXd eigenToConvolve    = diffim::imageToEigen(imageToConvolve);
+    Eigen::MatrixXd eigenToNotConvolve = diffim::imageToEigen(imageToNotConvolve);
+    Eigen::MatrixXd eigenVariance      = diffim::imageToEigen(varianceEstimate);
+
+    /* holds image convolved with basis function */
+    boost::shared_ptr<image::Image<ImageT> > cimage;
+
+    /* holds eigen representation of image convolved with all basis functions */
+    std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
+
+    /* iterators over convolved image list, and basis list */
+    typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = convolvedEigenList.begin();
+    std::vector<boost::shared_ptr<math::Kernel> >::const_iterator kiter = _basisList.begin();
+    /* create C_i in the formalism of Alard & Lupton */
+    for (; kiter != _basisList.end(); ++kiter, ++eiter) {
+        math::convolve(*cimage, imageToConvolve, **kiter, false);  /* cimage stores convolved image */
+        *eiter = diffim::imageToEigen(*cimage);                     /* append eigen representation to list */
+    } 
+
+    double time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                       "Total compute time to do basis convolutions : %.2f s", time);
+    t.restart();
+     
+    // Ignore buffers around edge of convolved images :
+    //
+    // If the kernel has width 5, it has center pixel 2.  The first good pixel
+    // is the (5-2)=3rd pixel, which is array index 2, and ends up being the
+    // index of the central pixel.
+    //
+    // You also have a buffer of unusable pixels on the other side, numbered
+    // width-center-1.  The last good usable pixel is N-width+center+1.
+
+    // Example : the kernel is width = 5, center = 2
+    //
+    //     ---|---|-c-|---|---|
+    //          
+    //           the image is width = N
+    //           convolve this with the kernel, and you get
+    //
+    //    |-x-|-x-|-g-|---|---| ... |---|---|-g-|-x-|-x-|
+    //
+    //           g = first/last good pixel
+    //           x = bad
+    // 
+    //           the first good pixel is the array index that has the value "center", 2
+    //           the last good pixel has array index N-(5-2)+1
+    //           eg. if N = 100, you want to use up to index 97
+    //               100-3+1 = 98, and the loops use i < 98, meaning the last
+    //               index you address is 97.
+   
+    unsigned int const startCol = (*kiter)->getCtrX();
+    unsigned int const startRow = (*kiter)->getCtrY();
+    unsigned int const endCol   = (*eiter)->cols() - ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
+    unsigned int const endRow   = (*eiter)->rows() - ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
+
+    for (unsigned int row = startRow; row < endRow; ++row) {
+        Eigen::VectorXd ncEigen   = eigenToNotConvolve.row(row).segment(startCol, startCol-endCol+1);
+        Eigen::VectorXd iVariance = 1. / eigenVariance.row(row).segment(startCol, startCol-endCol+1);
+
+        // kernel index i
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiteri = convolvedEigenList.begin();
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = convolvedEigenList.end();
+        for (unsigned int kidxi = 0; eiteri != eiterE; eiteri++, kidxi++) {
+            Eigen::VectorXd cEigeni = *eiteri.row(kidxi).segment(startCol, startCol-endCol+1);
+
+            typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = eiteri;
+            for (unsigned int kidxj = kidxi; eiterj != eiterE; eiterj++, kidxj++) {
+                Eigen::VectorXd cEigenj       = *eiterj.row(kidxj).segment(startCol, startCol-endCol+1);
+                M.part<Eigen::SelfAdjoint>() += cEigeni * cEigenj.transpose() * iVariance;
+            }
+            B                                               += ncEigen * cEigeni * iVariance;
+            M.part<Eigen::SelfAdjoint>().col(nParameters-1) += cEigeni * iVariance;
+        }
+        /* background term */
+        B(nParameters-1)                              += ncEigen * iVariance.transpose();
+        M.part<Eigen::SelfAdjoint>.row(nParameters-1) += iVariance.transpose();
+    }
+    /* Does M fill in the other half of itself? */
+
+    /* OR */
+    /* OR */
+    /* OR */
+    Eigen::VectorXd ncEigen   = eigenToNotConvolve.segment(startCol, startCol-endCol+1);
+    Eigen::VectorXd iVariance = 1. / eigenVariance.segment(startCol, startCol-endCol+1);
+
+    typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiteri = convolvedEigenList.begin();
+    typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = convolvedEigenList.end();
+    for (unsigned int kidxi = 0; eiteri != eiterE; eiteri++, kidxi++) {
+        Eigen::VectorXd cEigeni = *eiteri.segment(startCol, startCol-endCol+1);
+        
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = eiteri;
+        for (unsigned int kidxj = kidxi; eiterj != eiterE; eiterj++, kidxj++) {
+            Eigen::VectorXd cEigenj       = *eiterj.segment(startCol, startCol-endCol+1);
+            M.part<Eigen::SelfAdjoint>() += cEigeni * cEigenj.transpose() * iVariance;
+        }
+        B                                               += ncEigen * cEigeni * iVariance;
+        M.part<Eigen::SelfAdjoint>().col(nParameters-1) += cEigeni * iVariance;
+    }
+    /* background term */
+    B(nParameters-1)                              += ncEigen * iVariance.transpose();
+    M.part<Eigen::SelfAdjoint>.row(nParameters-1) += iVariance.transpose();
+    /* Does M fill in the other half of itself? */
+
+
+
+
+
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                       "Total compute time to step through pixels : %.2f s", time);
+    t.restart();
+
+    /* If the regularization matrix is here and not null, we use it by default */
+    if ( (_H.rows() != 0) && (_H.cols() != 0) ) {
+        double regularizationScaling = policy.getDouble("regularizationScaling");        
+        /* 
+           See N.R. 18.5 equation 18.5.8 for the solution to the regularized
+           normal equations.  For M.x = b, and solving for x, 
+
+           M -> (Mt.M + lambda*H)
+           B -> (Mt.B)
+
+           An estimate of lambda is NR 18.5.16
+
+           lambda = Trace(Mt.M) / Tr(H)
+
+         */
+
+        Eigen::MatrixXd Mt = M.transpose();
+        M = Mt * M;
+
+        double lambda = M.trace() / _H.trace();
+        lambda *= regularizationScaling;
+
+        M = M + lambda * _H;
+        B = Mt * B;
+        logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                           "Applying kernel regularization with lambda = %.2e", lambda);
+    }
+    
+
+    // To use Cholesky decomposition, the matrix needs to be symmetric (M is, by
+    // design) and positive definite.  
+    //
+    // Eventually put a check in here to make sure its positive definite
+    //
+    Eigen::VectorXd Soln = Eigen::VectorXd::Zero(nParameters);;
+    if (!( M.ldlt().solve(B, &Soln) )) {
+        logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                           "Unable to determine kernel via Cholesky LDL^T");
+        if (!( M.llt().solve(B, &Soln) )) {
+            logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                               "Unable to determine kernel via Cholesky LL^T");
+            if (!( M.lu().solve(B, &Soln) )) {
+                logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                                   "Unable to determine kernel via LU");
+                // LAST RESORT
+                try {
+                    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(M);
+                    Eigen::MatrixXd const& R = eVecValues.eigenvectors();
+                    Eigen::VectorXd eValues  = eVecValues.eigenvalues();
+                    
+                    for (int i = 0; i != eValues.rows(); ++i) {
+                        if (eValues(i) != 0.0) {
+                            eValues(i) = 1.0/eValues(i);
+                        }
+                    }
+                    
+                    Soln = R*eValues.asDiagonal()*R.transpose()*B;
+                } catch (exceptions::Exception& e) {
+                    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                                       "Unable to determine kernel via eigen-values");
+                    
+                    throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel solution in PsfMatchingFunctor::apply");
+                }
+            }
+        }
+    }
+    //std::cout << "Soln eigen : " << Soln << std::endl;
+    //return;
+
+    // Estimate of parameter uncertainties comes from the inverse of the
+    // covariance matrix (noise spectrum).  
+    // N.R. 15.4.8 to 15.4.15
+    // 
+    // Since this is a linear problem no need to use Fisher matrix
+    // N.R. 15.5.8
+
+    // Although I might be able to take advantage of the solution above.
+    // Since this now works and is not the rate limiting step, keep as-is for DC3a.
+
+    // Use Cholesky decomposition again.
+    // Cholkesy:
+    // Cov       =  L L^t
+    // Cov^(-1)  = (L L^t)^(-1)
+    //           = (L^T)^-1 L^(-1)
+    Eigen::MatrixXd             Cov    = M.transpose() * M;
+    Eigen::LLT<Eigen::MatrixXd> llt    = Cov.llt();
+    Eigen::MatrixXd             Error2 = llt.matrixL().transpose().inverse() * llt.matrixL().inverse();
+    
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                       "Total compute time to do matrix math : %.2f s", time);
+    
+    // Translate from Eigen vectors into LSST classes
+    std::vector<double> kValues(nKernelParameters);
+    std::vector<double> kErrValues(nKernelParameters);
+    for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
+        // Insanity checking
+        if (std::isnan( Soln(idx) )) {
+            throw LSST_EXCEPT(exceptions::Exception, 
+                              str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
+        }
+        if (std::isnan( Error2(idx, idx) )) {
+            throw LSST_EXCEPT(exceptions::Exception, 
+                              str(boost::format("Unable to determine kernel uncertainty %d (nan)") % idx));
+        }
+        if (Error2(idx, idx) < 0.0) {
+            throw LSST_EXCEPT(exceptions::Exception,
+                              str(boost::format("Unable to determine kernel uncertainty, negative variance %d (%.3e)") % 
+                                  idx % Error2(idx, idx)));
+        }
+        
+        kValues[idx]    = Soln(idx);
+        kErrValues[idx] = sqrt(Error2(idx, idx));
+    }
+    _kernel.reset( new math::LinearCombinationKernel(_basisList, kValues) );
+    _kernelError.reset( new math::LinearCombinationKernel(_basisList, kErrValues) );
+    
+    // Estimate of Background and Background Error */
+    if (std::isnan( Error2(nParameters-1, nParameters-1) )) {
+        throw LSST_EXCEPT(exceptions::Exception, "Unable to determine background uncertainty (nan)");
+    }
+    if (Error2(nParameters-1, nParameters-1) < 0.0) {
+        throw LSST_EXCEPT(exceptions::Exception, 
+                          str(boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % 
+                              Error2(nParameters-1, nParameters-1) 
+                              ));
+    }
+    _background      = Soln(nParameters-1);
+    _backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
+}
+
+#endif
 
 //
 // Subroutines
