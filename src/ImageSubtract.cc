@@ -219,6 +219,11 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         }
     }
     
+    std::cout << "M1 " << std::endl;
+    std::cout << M << std::endl;
+    std::cout << "B1 " << std::endl;
+    std::cout << B << std::endl;
+
     time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                        "Total compute time to step through pixels : %.2f s", time);
@@ -356,7 +361,6 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     _backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
 }
 
-#if 0
 
 template <typename ImageT>
 Eigen::MatrixXd diffim::imageToEigen(
@@ -376,7 +380,6 @@ Eigen::MatrixXd diffim::imageToEigen(
 }
     
 
-
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     lsst::afw::image::Image<ImageT> const& imageToConvolve,    ///< Image to apply kernel to
@@ -388,38 +391,8 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     unsigned int const nKernelParameters     = _basisList.size();
     unsigned int const nBackgroundParameters = 1;
     unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
-    
-    boost::timer t;
-    t.restart();
-    
-    /* least squares matrices */
-    Eigen::MatrixXd M = Eigen::MatrixXd::Zero(nParameters, nParameters);
-    Eigen::VectorXd B = Eigen::VectorXd::Zero(nParameters);
-    /* eigen representation of input images */
-    Eigen::MatrixXd eigenToConvolve    = diffim::imageToEigen(imageToConvolve);
-    Eigen::MatrixXd eigenToNotConvolve = diffim::imageToEigen(imageToNotConvolve);
-    Eigen::MatrixXd eigenVariance      = diffim::imageToEigen(varianceEstimate);
-
-    /* holds image convolved with basis function */
-    boost::shared_ptr<image::Image<ImageT> > cimage;
-
-    /* holds eigen representation of image convolved with all basis functions */
-    std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
-
-    /* iterators over convolved image list, and basis list */
-    typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = convolvedEigenList.begin();
     std::vector<boost::shared_ptr<math::Kernel> >::const_iterator kiter = _basisList.begin();
-    /* create C_i in the formalism of Alard & Lupton */
-    for (; kiter != _basisList.end(); ++kiter, ++eiter) {
-        math::convolve(*cimage, imageToConvolve, **kiter, false);  /* cimage stores convolved image */
-        *eiter = diffim::imageToEigen(*cimage);                     /* append eigen representation to list */
-    } 
 
-    double time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                       "Total compute time to do basis convolutions : %.2f s", time);
-    t.restart();
-     
     // Ignore buffers around edge of convolved images :
     //
     // If the kernel has width 5, it has center pixel 2.  The first good pixel
@@ -446,63 +419,86 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     //           eg. if N = 100, you want to use up to index 97
     //               100-3+1 = 98, and the loops use i < 98, meaning the last
     //               index you address is 97.
-   
     unsigned int const startCol = (*kiter)->getCtrX();
     unsigned int const startRow = (*kiter)->getCtrY();
-    unsigned int const endCol   = (*eiter)->cols() - ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
-    unsigned int const endRow   = (*eiter)->rows() - ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
+    unsigned int const endCol   = imageToConvolve.getWidth()  - ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
+    unsigned int const endRow   = imageToConvolve.getHeight() - ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
+    
+    boost::timer t;
+    t.restart();
+    
+    /* least squares matrices */
+    Eigen::MatrixXd M = Eigen::MatrixXd::Zero(nParameters, nParameters);
+    Eigen::VectorXd B = Eigen::VectorXd::Zero(nParameters);
+    /* eigen representation of input images; only the pixels that are unconvolved in cimage below */
+    Eigen::MatrixXd eigenToConvolveM    = diffim::imageToEigen(imageToConvolve).block(startRow, startCol, endRow-startRow, endCol-startCol);
+    Eigen::MatrixXd eigenToNotConvolveM = diffim::imageToEigen(imageToNotConvolve).block(startRow, startCol, endRow-startRow, endCol-startCol);
+    Eigen::MatrixXd eigeniVarianceM     = diffim::imageToEigen(varianceEstimate).block(startRow, startCol, endRow-startRow, endCol-startCol).cwise().inverse();
+    /* 
+       Finally, turn them into vectors for quick matrix updating.  We can technically do everything we want below using Matrices, 
+       since we are doing cwise() coefficient-wise multiplication, but doing this as Vectors seems to provide a slight speed up 
+       in the multiplication stages, 5% or so, at the expense of a bit more complexity in the code.
+    */
+    eigenToConvolveM.resize(eigenToConvolveM.rows()*eigenToConvolveM.cols(), 1);
+    eigenToNotConvolveM.resize(eigenToNotConvolveM.rows()*eigenToNotConvolveM.cols(), 1);
+    eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
+    Eigen::VectorXd eigenToConvolveV     = eigenToConvolveM.col(0);
+    Eigen::VectorXd eigenToNotConvolveV  = eigenToNotConvolveM.col(0);
+    Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
 
-    for (unsigned int row = startRow; row < endRow; ++row) {
-        Eigen::VectorXd ncEigen   = eigenToNotConvolve.row(row).segment(startCol, startCol-endCol+1);
-        Eigen::VectorXd iVariance = 1. / eigenVariance.row(row).segment(startCol, startCol-endCol+1);
+    /* holds image convolved with basis function */
+    image::Image<ImageT> cimage(imageToConvolve.getDimensions());
 
-        // kernel index i
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiteri = convolvedEigenList.begin();
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = convolvedEigenList.end();
-        for (unsigned int kidxi = 0; eiteri != eiterE; eiteri++, kidxi++) {
-            Eigen::VectorXd cEigeni = *eiteri.row(kidxi).segment(startCol, startCol-endCol+1);
+    /* holds eigen representation of image convolved with all basis functions */
+    std::vector<boost::shared_ptr<Eigen::VectorXd> > convolvedEigenList(nKernelParameters);
 
-            typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = eiteri;
-            for (unsigned int kidxj = kidxi; eiterj != eiterE; eiterj++, kidxj++) {
-                Eigen::VectorXd cEigenj       = *eiterj.row(kidxj).segment(startCol, startCol-endCol+1);
-                M.part<Eigen::SelfAdjoint>() += cEigeni * cEigenj.transpose() * iVariance;
-            }
-            B                                               += ncEigen * cEigeni * iVariance;
-            M.part<Eigen::SelfAdjoint>().col(nParameters-1) += cEigeni * iVariance;
-        }
-        /* background term */
-        B(nParameters-1)                              += ncEigen * iVariance.transpose();
-        M.part<Eigen::SelfAdjoint>.row(nParameters-1) += iVariance.transpose();
-    }
-    /* Does M fill in the other half of itself? */
+    /* iterators over convolved image list and basis list */
+    typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiter = convolvedEigenList.begin();
+    /* create C_i in the formalism of Alard & Lupton */
+    for (; kiter != _basisList.end(); ++kiter, ++eiter) {
+        math::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+        Eigen::MatrixXd cmat = diffim::imageToEigen(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol);
+	cmat.resize(cmat.rows()*cmat.cols(), 1);
+	boost::shared_ptr<Eigen::VectorXd> vmat (new Eigen::VectorXd(cmat.col(0)));
+	*eiter = vmat;
+    } 
 
-    /* OR */
-    /* OR */
-    /* OR */
-    Eigen::VectorXd ncEigen   = eigenToNotConvolve.segment(startCol, startCol-endCol+1);
-    Eigen::VectorXd iVariance = 1. / eigenVariance.segment(startCol, startCol-endCol+1);
+    double time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                       "Total compute time to do basis convolutions : %.2f s", time);
+    t.restart();
 
-    typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiteri = convolvedEigenList.begin();
-    typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = convolvedEigenList.end();
+    typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiteri = convolvedEigenList.begin();
+    typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = convolvedEigenList.end();
     for (unsigned int kidxi = 0; eiteri != eiterE; eiteri++, kidxi++) {
-        Eigen::VectorXd cEigeni = *eiteri.segment(startCol, startCol-endCol+1);
         
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = eiteri;
+        typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = eiteri;
         for (unsigned int kidxj = kidxi; eiterj != eiterE; eiterj++, kidxj++) {
-            Eigen::VectorXd cEigenj       = *eiterj.segment(startCol, startCol-endCol+1);
-            M.part<Eigen::SelfAdjoint>() += cEigeni * cEigenj.transpose() * iVariance;
+	   M(kidxi, kidxj) = ( ( (*eiteri)->cwise() * (**eiterj)).cwise() * eigeniVarianceV).sum();
+	   /* Equivalent to :
+	      Eigen::VectorXd mij = (*eiteri)->cwise() * (**eiterj);
+	      mij.cwise()        *= eigeniVarianceV;
+	      M(kidxi, kidxj)     = mij.sum();
+	   */
         }
-        B                                               += ncEigen * cEigeni * iVariance;
-        M.part<Eigen::SelfAdjoint>().col(nParameters-1) += cEigeni * iVariance;
+	B(kidxi)                 = ( ( (eigenToNotConvolveV.cwise()) * (**eiteri)).cwise() * eigeniVarianceV).sum();
+	M(kidxi, nParameters-1)  = ((*eiteri)->cwise() * eigeniVarianceV).sum();
     }
     /* background term */
-    B(nParameters-1)                              += ncEigen * iVariance.transpose();
-    M.part<Eigen::SelfAdjoint>.row(nParameters-1) += iVariance.transpose();
-    /* Does M fill in the other half of itself? */
+    B(nParameters-1)                = (eigenToNotConvolveV.cwise() * eigeniVarianceV).sum();
+    M(nParameters-1, nParameters-1) = eigeniVarianceV.sum();
 
+    // Fill in rest of M
+    for (unsigned int kidxi=0; kidxi < nParameters; ++kidxi) {
+        for (unsigned int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) {
+            M(kidxj, kidxi) = M(kidxi, kidxj);
+        }
+    }
 
-
-
+    std::cout << "M2 " << std::endl;
+    std::cout << M << std::endl;
+    std::cout << "B2 " << std::endl;
+    std::cout << B << std::endl;
 
     time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
@@ -639,8 +635,6 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     _background      = Soln(nParameters-1);
     _backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
 }
-
-#endif
 
 //
 // Subroutines

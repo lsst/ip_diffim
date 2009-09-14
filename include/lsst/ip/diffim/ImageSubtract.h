@@ -244,13 +244,11 @@ namespace diffim {
         lsst::pex::policy::Policy const& policy
         );
 
-    /*
     template <typename ImageT>
     Eigen::MatrixXd imageToEigen(
         lsst::afw::image::Image<ImageT> const& img
         );
-    */
-
+    
     /** Functor to create PSF Matching Kernel
      *
      * @ingroup diffim
@@ -296,13 +294,12 @@ namespace diffim {
                    lsst::afw::image::Image<VarT>   const& varianceEstimate,
                    lsst::pex::policy::Policy       const& policy
                   );
-        /*
+
         void apply2(lsst::afw::image::Image<ImageT> const& imageToConvolve,
                    lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
                    lsst::afw::image::Image<VarT>   const& varianceEstimate,
                    lsst::pex::policy::Policy       const& policy
                   );
-        */
 
     protected:
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> _basisList;        ///< List of Kernel basis functions
