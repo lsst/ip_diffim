@@ -20,7 +20,7 @@ logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
 
-display = False
+display = True
 writefits = False
 
 # This one just creates example convolution and deconvolution kernels
@@ -56,9 +56,12 @@ class DiffimTestCases(unittest.TestCase):
         self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
 
         # Regularization terms
-        self.H0 = ipDiffim.generateDeltaFunctionRegularization(self.kCols, self.kRows, 0)
-        self.H1 = ipDiffim.generateDeltaFunctionRegularization(self.kCols, self.kRows, 1)
-        self.H2 = ipDiffim.generateDeltaFunctionRegularization(self.kCols, self.kRows, 2)
+        forward, central     = 0, 1
+        no_wrap, wrap, taper = 0, 1, 2
+        boundary_style, diff_style = taper, forward
+        self.H0 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary_style, diff_style)
+        self.H1 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 1, boundary_style, diff_style)
+        self.H2 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2, boundary_style, diff_style)
         
         # difference imaging functor
         self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
@@ -125,9 +128,10 @@ class DiffimTestCases(unittest.TestCase):
 
         kSum = self.diffimQuality(self.kFunctor2, tmi, smi, var, foffset=foffset+6)
         print 'DFr2 : %.2f +/- %.2f (%.3f)' % (self.dStats.getMean(), self.dStats.getRms(), kSum)
-                                                       
+
     def testFunctor(self):
-        lams = range(-10, 1, 2)
+        lams = range(-8, 1, 2)
+        #lams = [-6]
         for i in range(len(lams)):
             lam = lams[i]
             self.policy.set('regularizationScaling', 1.0 * 10**lam)

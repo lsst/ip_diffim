@@ -38,7 +38,7 @@ class DiffimTestCases(unittest.TestCase):
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
 
         # Regularization term
-        self.H = ipDiffim.generateDeltaFunctionRegularization(self.kCols, self.kRows, 1)
+        self.H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 1)
 
         # Delta function basis set
         self.basisList1  = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)

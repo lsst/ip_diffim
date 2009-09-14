@@ -681,14 +681,34 @@ diffim::generateDeltaFunctionKernelSet(
 }
 
 Eigen::MatrixXd
-diffim::generateDeltaFunctionRegularization(
+diffim::generateFiniteDifferenceRegularization(
     unsigned int width,
     unsigned int height,
-    unsigned int order) {
+    unsigned int order,
+    unsigned int boundary_style,  // 0 = unwrapped, 1 = wrapped, 2 = order-tappered ('order' is highest used)
+    unsigned int difference_style, // 0 = forward, 1 = central
+    bool printB // a debug flag ... remove when done.
+					    ) {
 
     if ( (order < 0) || (order > 2) ) throw LSST_EXCEPT(exceptions::Exception, "Only orders 0..2 allowed");
     if ( (width < 0) )  throw LSST_EXCEPT(exceptions::Exception, "Width < 0");
     if ( (height < 0) ) throw LSST_EXCEPT(exceptions::Exception, "Height < 0");
+
+    if ( (boundary_style < 0) || (boundary_style > 2) ) { 
+	throw LSST_EXCEPT(exceptions::Exception, "Boundary styles 0..2 defined");
+    }
+    if ( (difference_style < 0) || (difference_style > 1) ) {
+	throw LSST_EXCEPT(exceptions::Exception, "Only forward (0), and central (1) difference styles defined.");
+    }
+
+    /* what works, and what doesn't */
+    // == good job == 
+    // - order 0, wrapped, forward
+    // - order 1, wrapped or tapered, central or forward
+    // - order 2, wrapped or tapered, forward
+    // == bad job (usually diagongal stripes) ==
+    // - all others
+
 
     /* 
        Instead of Taylor expanding the forward difference approximation of
@@ -703,56 +723,168 @@ diffim::generateDeltaFunctionRegularization(
        a constraint.
 
     */
-    std::vector<std::vector<int> > coeffs(3, std::vector<int>(4,0));
-    coeffs[0][0] = -1; coeffs[0][1] = 1;
-    coeffs[1][0] = -1; coeffs[1][1] = 2; coeffs[1][2] = -1;
-    coeffs[2][0] = -1; coeffs[2][1] = 3; coeffs[2][2] = -3; coeffs[2][3] = 1;
+
+
+    // ===========================================================================
+    // Get the coeffs for the finite differencing
+    // note: The coeffs are stored 2D although they are essentially 1D entities.
+    //       The 2d design was chosen to allow cross-terms to be included,
+    //         though they are not yet implemented.
+    //
+    std::vector<std::vector<std::vector<float> > > 
+	coeffs(3, std::vector<std::vector<float> >(5, std::vector<float>(5,0)));
+    unsigned int x_cen = 0,  y_cen = 0;  // center of reqested order coeffs
+    unsigned int x_cen1 = 0, y_cen1 = 0; // center of order 1 coeffs
+    unsigned int x_cen2 = 0, y_cen2 = 0; // center of order 2 coeffs
+    unsigned int x_size = 0, y_size = 0;
+
+    // forward difference coefficients
+    if ( difference_style == 0 ) {
+	
+	y_cen  = x_cen  = 0;
+	x_cen1 = y_cen1 = 0;
+	x_cen2 = y_cen2 = 0;
+
+	x_size = y_size = order + 2;
+
+	// default forward difference suggested in NR chap 18
+	// 0th order
+	coeffs[0][0][0] = -2; coeffs[0][0][1] = 1; 
+	coeffs[0][1][0] = 1;  coeffs[0][1][1] = 0;
+
+	// 1st 2
+	coeffs[1][0][0] = -2; coeffs[1][0][1] = 2;  coeffs[1][0][2] = -1; 
+	coeffs[1][1][0] = 2;  coeffs[1][1][1] = 0;  coeffs[1][1][2] =  0; 
+	coeffs[1][2][0] = -1; coeffs[1][2][1] = 0;  coeffs[1][2][2] =  0; 
+
+	// 2nd 2
+	coeffs[2][0][0] = -2; coeffs[2][0][1] = 3;  coeffs[2][0][2] = -3; coeffs[2][0][3] = 1; 
+	coeffs[2][1][0] = 3;  coeffs[2][1][1] = 0;  coeffs[2][1][2] =  0; coeffs[2][1][3] = 0; 
+	coeffs[2][2][0] = -3; coeffs[2][2][1] = 0;  coeffs[2][2][2] =  0; coeffs[2][2][3] = 0; 
+	coeffs[2][3][0] = 1;  coeffs[2][3][1] = 0;  coeffs[2][3][2] =  0; coeffs[2][3][3] = 0; 
+
+    }
+
+    // central difference coefficients
+    if ( difference_style == 1 ) {
+
+	// this is asymmetric and produces diagonal banding in the kernel
+	// from: http://www.holoborodko.com/pavel/?page_id=239
+	if ( order == 0 ) { 
+	    y_cen = x_cen = 1;
+	    x_size = y_size = 3;
+	}
+	coeffs[0][0][0] =  0; coeffs[0][0][1] = -1;  coeffs[0][0][2] =  0; 
+	coeffs[0][1][0] = -1; coeffs[0][1][1] =  0;  coeffs[0][1][2] =  1; 
+	coeffs[0][2][0] =  0; coeffs[0][2][1] =  1;  coeffs[0][2][2] =  0; 
+
+	// this works well and is largely the same as order=1 forward-diff.
+	// from: http://www.holoborodko.com/pavel/?page_id=239
+	if ( order == 1 ) { 
+	    y_cen = x_cen = 1;
+	    x_size = y_size = 3;
+	}
+	y_cen1 = x_cen1 = 1;
+	coeffs[1][0][0] =  0; coeffs[1][0][1] =  1;  coeffs[1][0][2] =  0;  
+	coeffs[1][1][0] =  1; coeffs[1][1][1] = -4;  coeffs[1][1][2] =  1; 
+	coeffs[1][2][0] =  0; coeffs[1][2][1] =  1;  coeffs[1][2][2] =  0;  
+
+	// asymmetric and produces diagonal banding in the kernel
+	// from http://www.holoborodko.com/pavel/?page_id=239
+	if ( order == 2 ) { 
+	    y_cen = x_cen = 2;
+	    x_size = y_size = 5;
+	}
+	y_cen2 = x_cen2 = 2;
+	coeffs[2][0][0] =  0; coeffs[2][0][1] =  0;  coeffs[2][0][2] = -1; coeffs[2][0][3] =  0; coeffs[2][0][4] =  0; 
+	coeffs[2][1][0] =  0; coeffs[2][1][1] =  0;  coeffs[2][1][2] =  2; coeffs[2][1][3] =  0; coeffs[2][1][4] =  0; 
+	coeffs[2][2][0] = -1; coeffs[2][2][1] =  2;  coeffs[2][2][2] =  0; coeffs[2][2][3] = -2; coeffs[2][2][4] =  1; 
+	coeffs[2][3][0] =  0; coeffs[2][3][1] =  0;  coeffs[2][3][2] = -2; coeffs[2][3][3] =  0; coeffs[2][3][4] =  0; 
+	coeffs[2][4][0] =  0; coeffs[2][4][1] =  0;  coeffs[2][4][2] =  1; coeffs[2][4][3] =  0; coeffs[2][4][4] =  0; 
+	
+    }
+
 
     /* Note we have to add 1 extra (empty) term here because of the differential
      * background fitting */
-    Eigen::MatrixXd B = Eigen::MatrixXd::Zero(width*height-(order+1)+1, width*height+1);
-
-    int const wrapping = 1;
+    Eigen::MatrixXd B = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
 
     /* Forward difference approximation */
-    for (unsigned int y = 0; y < width*height-(order+1); y++) {
+    for (unsigned int i = 0; i < width*height; i++) {
 
-	unsigned int const i_row = y / width;
-	unsigned int const last_pix_this_row = (i_row + 1)*width - 1;
-	unsigned int const columns_remaining = last_pix_this_row - y;
+	unsigned int const x0 = i % width;  // the x coord in the kernel image
+	unsigned int const y0 = i / width;  // the y coord in the kernel image
+	
+	unsigned int x_edge_distance = (x0 > (width - x0 - 1))  ? width - x0 - 1  : x0;
+	unsigned int y_edge_distance = (y0 > (height - y0 - 1)) ? height - y0 - 1 : y0;
+	unsigned int edge_distance = (x_edge_distance < y_edge_distance) ? x_edge_distance : y_edge_distance;
 
-        for (unsigned int dx = 0; dx < order+2; dx++) {
+        for (unsigned int dx = 0; dx < x_size; dx++) {
+	    for (unsigned int dy = 0; dy < y_size; dy++) {
 
-	    if ( ! wrapping ) {
+		// determine where to put this coeff
 
-		/* First address its neighbors along the x-direction */
-		if ( columns_remaining + 1 > dx ) {
-		    B(y, y + dx) = coeffs[order][dx];
-		}
+		// handle the boundary condition
+		// note: adding width and height in the sum prevents negatives
+		unsigned int x = 0;
+		unsigned int y = 0; 
+		double this_coeff = 0;
+
+		// no-wrapping at edges
+		if ( boundary_style == 0 ) {
+		    x = x0 + dx - x_cen;
+		    y = y0 + dy - y_cen;
+		    if ( y < 0 || y > height - 1 || x < 0 || x > width - 1 ) { continue; }
+		    this_coeff = coeffs[order][dx][dy];
+
+		// wrapping at edges
+		} else if ( boundary_style == 1) {
+		    x = (width  + x0 + dx - x_cen) % width;
+		    y = (height + y0 + dy - y_cen) % height;
+		    this_coeff = coeffs[order][dx][dy];
+
+		// order tapering to the edge (just clone wrapping for now)
+		// - use the lowest order possible
+		} else if ( boundary_style == 2) {
+
+		    // edge rows and columns ... set to constant
+		    if ( edge_distance == 0 ) {
+			x = x0;
+			y = y0;
+			this_coeff = 1;
+		    }
+		    // in one from edge, use 1st order
+		    else if ( edge_distance == 1 && order > 0 ) {
+			x = (width  + x0 + dx - x_cen1) % width;
+			y = (height + y0 + dy - y_cen1) % height;
+			if ( (dx < 3) && (dy < 3) ) { this_coeff = coeffs[1][dx][dy]; } 
+		    }
+		    // in two from edge, use 2st order if order > 1
+		    else if ( edge_distance == 2 && order > 1 ){
+			x = (width  + x0 + dx - x_cen2) % width;
+			y = (height + y0 + dy - y_cen2) % height;
+			if ( (dx < 5) && (dy < 5) ) { this_coeff = coeffs[2][dx][dy]; } 
+		    } 
+		    // if we're somewhere in the middle
+		    else if ( edge_distance > order ) {
+			x = (width  + x0 + dx - x_cen) % width;
+			y = (height + y0 + dy - y_cen) % height;
+		    	this_coeff = coeffs[order][dx][dy];
+		    }
+
+		} 
+
+		B(i, y*width + x) = this_coeff;
 		
-		/* Next along the y-direction */
-		if ( (y + dx*width) < width*height )  {
-		    B(y, y + dx*width) += coeffs[order][dx];
-		}
-
-	    } else {
-		
-		/* First address its neighbors along the x-direction WRAPPED */
-		int i_x = (y + dx) % width;
-		B(y, i_row*width + i_x) = coeffs[order][dx];
-
-		/* Next along the y-direction WRAPPED */
-		i_x = y % width;
-		int const i_y = (i_row + dx) % height;
-		B(y, i_y*width + i_x) += coeffs[order][dx];
 	    }
-
 
         }
 
     }
 
-    //std::cout << B << std::endl;
+    if ( printB )  {
+	std::cout << B << std::endl;
+    }
     
     Eigen::MatrixXd H = B.transpose() * B;
     return H;

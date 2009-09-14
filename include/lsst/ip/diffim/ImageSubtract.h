@@ -183,10 +183,13 @@ namespace diffim {
         unsigned int height
         );
 
-    Eigen::MatrixXd generateDeltaFunctionRegularization(
+    Eigen::MatrixXd generateFiniteDifferenceRegularization(
         unsigned int width,
         unsigned int height,
-        unsigned int order
+        unsigned int order,
+	unsigned int boundary_style = 1, 
+	unsigned int difference_style = 0,
+	bool printB=false
         );
 
     /** Build a set of Alard/Lupton basis kernels
