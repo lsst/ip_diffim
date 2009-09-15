@@ -256,7 +256,6 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                            "Applying kernel regularization with lambda = %.2e", lambda);
     }
-    
 
     // To use Cholesky decomposition, the matrix needs to be symmetric (M is, by
     // design) and positive definite.  
@@ -295,70 +294,81 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
             }
         }
     }
-    //std::cout << "Soln eigen : " << Soln << std::endl;
-    //return;
 
-    // Estimate of parameter uncertainties comes from the inverse of the
-    // covariance matrix (noise spectrum).  
-    // N.R. 15.4.8 to 15.4.15
-    // 
-    // Since this is a linear problem no need to use Fisher matrix
-    // N.R. 15.5.8
-
-    // Although I might be able to take advantage of the solution above.
-    // Since this now works and is not the rate limiting step, keep as-is for DC3a.
-
-    // Use Cholesky decomposition again.
-    // Cholkesy:
-    // Cov       =  L L^t
-    // Cov^(-1)  = (L L^t)^(-1)
-    //           = (L^T)^-1 L^(-1)
-    Eigen::MatrixXd             Cov    = M.transpose() * M;
-    Eigen::LLT<Eigen::MatrixXd> llt    = Cov.llt();
-    Eigen::MatrixXd             Error2 = llt.matrixL().transpose().inverse() * llt.matrixL().inverse();
-    
-    time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                       "Total compute time to do matrix math : %.2f s", time);
-    
-    // Translate from Eigen vectors into LSST classes
+    /* Fill in the kernel results */
     std::vector<double> kValues(nKernelParameters);
-    std::vector<double> kErrValues(nKernelParameters);
     for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
-        // Insanity checking
-        
         if (std::isnan( Soln(idx) )) {
             throw LSST_EXCEPT(exceptions::Exception, 
                               str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
         }
-        if (std::isnan( Error2(idx, idx) )) {
-            throw LSST_EXCEPT(exceptions::Exception, 
-                              str(boost::format("Unable to determine kernel uncertainty %d (nan)") % idx));
-        }
-        if (Error2(idx, idx) < 0.0) {
-            throw LSST_EXCEPT(exceptions::Exception,
-                              str(boost::format("Unable to determine kernel uncertainty, negative variance %d (%.3e)") % 
-                                  idx % Error2(idx, idx)));
-        }
-        
-        kValues[idx]    = Soln(idx);
-        kErrValues[idx] = sqrt(Error2(idx, idx));
+        kValues[idx] = Soln(idx);
     }
     _kernel.reset( new math::LinearCombinationKernel(_basisList, kValues) );
-    _kernelError.reset( new math::LinearCombinationKernel(_basisList, kErrValues) );
-    
-    // Estimate of Background and Background Error */
-    if (std::isnan( Error2(nParameters-1, nParameters-1) )) {
-        throw LSST_EXCEPT(exceptions::Exception, "Unable to determine background uncertainty (nan)");
-    }
-    if (Error2(nParameters-1, nParameters-1) < 0.0) {
+
+    if (std::isnan( Soln(nParameters-1) )) {
         throw LSST_EXCEPT(exceptions::Exception, 
-                          str(boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % 
-                              Error2(nParameters-1, nParameters-1) 
-                              ));
+                          str(boost::format("Unable to determine background solution %d (nan)") % (nParameters-1)));
     }
-    _background      = Soln(nParameters-1);
-    _backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
+    _background = Soln(nParameters-1);
+
+
+    /* Calculate the kernel & background uncertainties only if requested */
+    bool calculateKernelUncertainty = policy.getBool("calculateKernelUncertainty");            
+    if (calculateKernelUncertainty) {
+        // Estimate of parameter uncertainties comes from the inverse of the
+        // covariance matrix (noise spectrum).  
+        // N.R. 15.4.8 to 15.4.15
+        // 
+        // Since this is a linear problem no need to use Fisher matrix
+        // N.R. 15.5.8
+        
+        // Although I might be able to take advantage of the solution above.
+        // Since this now works and is not the rate limiting step, keep as-is for DC3a.
+        
+        // Use Cholesky decomposition again.
+        // Cholkesy:
+        // Cov       =  L L^t
+        // Cov^(-1)  = (L L^t)^(-1)
+        //           = (L^T)^-1 L^(-1)
+        Eigen::MatrixXd             Cov    = M.transpose() * M;
+        Eigen::LLT<Eigen::MatrixXd> llt    = Cov.llt();
+        Eigen::MatrixXd             Error2 = llt.matrixL().transpose().inverse() * llt.matrixL().inverse();
+        
+    
+        std::vector<double> kErrValues(nKernelParameters);
+        for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
+            // Insanity checking
+            if (std::isnan( Error2(idx, idx) )) {
+                throw LSST_EXCEPT(exceptions::Exception, 
+                                  str(boost::format("Unable to determine kernel uncertainty %d (nan)") % idx));
+            }
+            if (Error2(idx, idx) < 0.0) {
+                throw LSST_EXCEPT(exceptions::Exception,
+                                  str(boost::format("Unable to determine kernel uncertainty, negative variance %d (%.3e)") % 
+                                      idx % Error2(idx, idx)));
+            }
+            kErrValues[idx] = sqrt(Error2(idx, idx));
+        }
+        _kernelError.reset( new math::LinearCombinationKernel(_basisList, kErrValues) );
+    
+        // Estimate of Background and Background Error */
+        if (std::isnan( Error2(nParameters-1, nParameters-1) )) {
+            throw LSST_EXCEPT(exceptions::Exception, "Unable to determine background uncertainty (nan)");
+        }
+        if (Error2(nParameters-1, nParameters-1) < 0.0) {
+            throw LSST_EXCEPT(exceptions::Exception, 
+                              str(boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % 
+                                  Error2(nParameters-1, nParameters-1) 
+                                  ));
+        }
+        _backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
+    }
+
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                       "Total compute time to do matrix math : %.2f s", time);
+    
 }
 
 
@@ -392,7 +402,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     unsigned int const nBackgroundParameters = 1;
     unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
     std::vector<boost::shared_ptr<math::Kernel> >::const_iterator kiter = _basisList.begin();
-
+    
     // Ignore buffers around edge of convolved images :
     //
     // If the kernel has width 5, it has center pixel 2.  The first good pixel
@@ -445,13 +455,13 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     Eigen::VectorXd eigenToConvolveV     = eigenToConvolveM.col(0);
     Eigen::VectorXd eigenToNotConvolveV  = eigenToNotConvolveM.col(0);
     Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
-
+    
     /* holds image convolved with basis function */
     image::Image<ImageT> cimage(imageToConvolve.getDimensions());
-
+    
     /* holds eigen representation of image convolved with all basis functions */
     std::vector<boost::shared_ptr<Eigen::VectorXd> > convolvedEigenList(nKernelParameters);
-
+    
     /* iterators over convolved image list and basis list */
     typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiter = convolvedEigenList.begin();
     /* create C_i in the formalism of Alard & Lupton */
@@ -462,24 +472,24 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
 	boost::shared_ptr<Eigen::VectorXd> vmat (new Eigen::VectorXd(cmat.col(0)));
 	*eiter = vmat;
     } 
-
+    
     double time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                        "Total compute time to do basis convolutions : %.2f s", time);
     t.restart();
-
+    
     typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiteri = convolvedEigenList.begin();
     typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = convolvedEigenList.end();
     for (unsigned int kidxi = 0; eiteri != eiterE; eiteri++, kidxi++) {
         
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = eiteri;
         for (unsigned int kidxj = kidxi; eiterj != eiterE; eiterj++, kidxj++) {
-	   M(kidxi, kidxj) = ( ( (*eiteri)->cwise() * (**eiterj)).cwise() * eigeniVarianceV).sum();
-	   /* Equivalent to :
-	      Eigen::VectorXd mij = (*eiteri)->cwise() * (**eiterj);
-	      mij.cwise()        *= eigeniVarianceV;
-	      M(kidxi, kidxj)     = mij.sum();
-	   */
+            M(kidxi, kidxj) = ( ( (*eiteri)->cwise() * (**eiterj)).cwise() * eigeniVarianceV).sum();
+            /* Equivalent to :
+               Eigen::VectorXd mij = (*eiteri)->cwise() * (**eiterj);
+               mij.cwise()        *= eigeniVarianceV;
+               M(kidxi, kidxj)     = mij.sum();
+            */
         }
 	B(kidxi)                 = ( ( (eigenToNotConvolveV.cwise()) * (**eiteri)).cwise() * eigeniVarianceV).sum();
 	M(kidxi, nParameters-1)  = ((*eiteri)->cwise() * eigeniVarianceV).sum();
@@ -494,7 +504,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
             M(kidxj, kidxi) = M(kidxi, kidxj);
         }
     }
-
+    
     std::cout << "M2 " << std::endl;
     std::cout << M << std::endl;
     std::cout << "B2 " << std::endl;
@@ -571,69 +581,82 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
             }
         }
     }
-    //std::cout << "Soln eigen : " << Soln << std::endl;
-    //return;
 
-    // Estimate of parameter uncertainties comes from the inverse of the
-    // covariance matrix (noise spectrum).  
-    // N.R. 15.4.8 to 15.4.15
-    // 
-    // Since this is a linear problem no need to use Fisher matrix
-    // N.R. 15.5.8
-
-    // Although I might be able to take advantage of the solution above.
-    // Since this now works and is not the rate limiting step, keep as-is for DC3a.
-
-    // Use Cholesky decomposition again.
-    // Cholkesy:
-    // Cov       =  L L^t
-    // Cov^(-1)  = (L L^t)^(-1)
-    //           = (L^T)^-1 L^(-1)
-    Eigen::MatrixXd             Cov    = M.transpose() * M;
-    Eigen::LLT<Eigen::MatrixXd> llt    = Cov.llt();
-    Eigen::MatrixXd             Error2 = llt.matrixL().transpose().inverse() * llt.matrixL().inverse();
-    
-    time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                       "Total compute time to do matrix math : %.2f s", time);
-    
-    // Translate from Eigen vectors into LSST classes
+    /* Fill in the kernel results */
     std::vector<double> kValues(nKernelParameters);
-    std::vector<double> kErrValues(nKernelParameters);
     for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
-        // Insanity checking
         if (std::isnan( Soln(idx) )) {
             throw LSST_EXCEPT(exceptions::Exception, 
                               str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
         }
-        if (std::isnan( Error2(idx, idx) )) {
-            throw LSST_EXCEPT(exceptions::Exception, 
-                              str(boost::format("Unable to determine kernel uncertainty %d (nan)") % idx));
-        }
-        if (Error2(idx, idx) < 0.0) {
-            throw LSST_EXCEPT(exceptions::Exception,
-                              str(boost::format("Unable to determine kernel uncertainty, negative variance %d (%.3e)") % 
-                                  idx % Error2(idx, idx)));
-        }
-        
-        kValues[idx]    = Soln(idx);
-        kErrValues[idx] = sqrt(Error2(idx, idx));
+        kValues[idx] = Soln(idx);
     }
     _kernel.reset( new math::LinearCombinationKernel(_basisList, kValues) );
-    _kernelError.reset( new math::LinearCombinationKernel(_basisList, kErrValues) );
-    
-    // Estimate of Background and Background Error */
-    if (std::isnan( Error2(nParameters-1, nParameters-1) )) {
-        throw LSST_EXCEPT(exceptions::Exception, "Unable to determine background uncertainty (nan)");
-    }
-    if (Error2(nParameters-1, nParameters-1) < 0.0) {
+
+    if (std::isnan( Soln(nParameters-1) )) {
         throw LSST_EXCEPT(exceptions::Exception, 
-                          str(boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % 
-                              Error2(nParameters-1, nParameters-1) 
-                              ));
+                          str(boost::format("Unable to determine background solution %d (nan)") % (nParameters-1)));
     }
-    _background      = Soln(nParameters-1);
-    _backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
+    _background = Soln(nParameters-1);
+
+
+    /* Calculate the kernel & background uncertainties only if requested */
+    bool calculateKernelUncertainty = policy.getBool("calculateKernelUncertainty");            
+    if (calculateKernelUncertainty) {
+        // Estimate of parameter uncertainties comes from the inverse of the
+        // covariance matrix (noise spectrum).  
+        // N.R. 15.4.8 to 15.4.15
+        // 
+        // Since this is a linear problem no need to use Fisher matrix
+        // N.R. 15.5.8
+        
+        // Although I might be able to take advantage of the solution above.
+        // Since this now works and is not the rate limiting step, keep as-is for DC3a.
+        
+        // Use Cholesky decomposition again.
+        // Cholkesy:
+        // Cov       =  L L^t
+        // Cov^(-1)  = (L L^t)^(-1)
+        //           = (L^T)^-1 L^(-1)
+        Eigen::MatrixXd             Cov    = M.transpose() * M;
+        Eigen::LLT<Eigen::MatrixXd> llt    = Cov.llt();
+        Eigen::MatrixXd             Error2 = llt.matrixL().transpose().inverse() * llt.matrixL().inverse();
+        
+    
+        std::vector<double> kErrValues(nKernelParameters);
+        for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
+            // Insanity checking
+            if (std::isnan( Error2(idx, idx) )) {
+                throw LSST_EXCEPT(exceptions::Exception, 
+                                  str(boost::format("Unable to determine kernel uncertainty %d (nan)") % idx));
+            }
+            if (Error2(idx, idx) < 0.0) {
+                throw LSST_EXCEPT(exceptions::Exception,
+                                  str(boost::format("Unable to determine kernel uncertainty, negative variance %d (%.3e)") % 
+                                      idx % Error2(idx, idx)));
+            }
+            kErrValues[idx] = sqrt(Error2(idx, idx));
+        }
+        _kernelError.reset( new math::LinearCombinationKernel(_basisList, kErrValues) );
+    
+        // Estimate of Background and Background Error */
+        if (std::isnan( Error2(nParameters-1, nParameters-1) )) {
+            throw LSST_EXCEPT(exceptions::Exception, "Unable to determine background uncertainty (nan)");
+        }
+        if (Error2(nParameters-1, nParameters-1) < 0.0) {
+            throw LSST_EXCEPT(exceptions::Exception, 
+                              str(boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % 
+                                  Error2(nParameters-1, nParameters-1) 
+                                  ));
+        }
+        _backgroundError = sqrt(Error2(nParameters-1, nParameters-1));
+    }
+
+    time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                       "Total compute time to do matrix math : %.2f s", time);
+    
+
 }
 
 //

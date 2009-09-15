@@ -25,6 +25,11 @@ regularizationOrder: 0
 regularizationScaling: 0.0001
 
 ######
+# Calculate kernel and background uncertainties for each object?
+# Comes from inverse of the covariance matrix
+calculateKernelUncertainty: true
+
+######
 # Size of the convolution kernel
 kernelRows: 19
 kernelCols: 19
