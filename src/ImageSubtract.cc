@@ -481,18 +481,20 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiteri = convolvedEigenList.begin();
     typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = convolvedEigenList.end();
     for (unsigned int kidxi = 0; eiteri != eiterE; eiteri++, kidxi++) {
-        
+        /* Precalculate since its used in the inner loop */
+        Eigen::VectorXd eiteriDotiVariance = (*eiteri)->cwise() * eigeniVarianceV;
+
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = eiteri;
         for (unsigned int kidxj = kidxi; eiterj != eiterE; eiterj++, kidxj++) {
-            M(kidxi, kidxj) = ( ( (*eiteri)->cwise() * (**eiterj)).cwise() * eigeniVarianceV).sum();
+            M(kidxi, kidxj) = (eiteriDotiVariance.cwise() * (**eiterj)).sum();
             /* Equivalent to :
                Eigen::VectorXd mij = (*eiteri)->cwise() * (**eiterj);
                mij.cwise()        *= eigeniVarianceV;
                M(kidxi, kidxj)     = mij.sum();
             */
         }
-	B(kidxi)                 = ( ( (eigenToNotConvolveV.cwise()) * (**eiteri)).cwise() * eigeniVarianceV).sum();
-	M(kidxi, nParameters-1)  = ((*eiteri)->cwise() * eigeniVarianceV).sum();
+	B(kidxi)                 = (eiteriDotiVariance.cwise() * eigenToNotConvolveV).sum();
+	M(kidxi, nParameters-1)  = eiteriDotiVariance.sum();
     }
     /* background term */
     B(nParameters-1)                = (eigenToNotConvolveV.cwise() * eigeniVarianceV).sum();
