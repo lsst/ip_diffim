@@ -373,7 +373,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
 
 
 template <typename ImageT>
-Eigen::MatrixXd diffim::imageToEigen(
+Eigen::MatrixXd diffim::imageToEigenMatrix(
     lsst::afw::image::Image<ImageT> const& img
     ) {
     unsigned int rows = img.getHeight();
@@ -441,9 +441,9 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     Eigen::MatrixXd M = Eigen::MatrixXd::Zero(nParameters, nParameters);
     Eigen::VectorXd B = Eigen::VectorXd::Zero(nParameters);
     /* eigen representation of input images; only the pixels that are unconvolved in cimage below */
-    Eigen::MatrixXd eigenToConvolveM    = diffim::imageToEigen(imageToConvolve).block(startRow, startCol, endRow-startRow, endCol-startCol);
-    Eigen::MatrixXd eigenToNotConvolveM = diffim::imageToEigen(imageToNotConvolve).block(startRow, startCol, endRow-startRow, endCol-startCol);
-    Eigen::MatrixXd eigeniVarianceM     = diffim::imageToEigen(varianceEstimate).block(startRow, startCol, endRow-startRow, endCol-startCol).cwise().inverse();
+    Eigen::MatrixXd eigenToConvolveM    = diffim::imageToEigenMatrix(imageToConvolve).block(startRow, startCol, endRow-startRow, endCol-startCol);
+    Eigen::MatrixXd eigenToNotConvolveM = diffim::imageToEigenMatrix(imageToNotConvolve).block(startRow, startCol, endRow-startRow, endCol-startCol);
+    Eigen::MatrixXd eigeniVarianceM     = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, endRow-startRow, endCol-startCol).cwise().inverse();
     /* 
        Finally, turn them into vectors for quick matrix updating.  We can technically do everything we want below using Matrices, 
        since we are doing cwise() coefficient-wise multiplication, but doing this as Vectors seems to provide a slight speed up 
@@ -467,7 +467,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     /* create C_i in the formalism of Alard & Lupton */
     for (; kiter != _basisList.end(); ++kiter, ++eiter) {
         math::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
-        Eigen::MatrixXd cmat = diffim::imageToEigen(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol);
+        Eigen::MatrixXd cmat = diffim::imageToEigenMatrix(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol);
 	cmat.resize(cmat.rows()*cmat.cols(), 1);
 	boost::shared_ptr<Eigen::VectorXd> vmat (new Eigen::VectorXd(cmat.col(0)));
 	*eiter = vmat;

@@ -194,8 +194,6 @@ namespace diffim {
 
     /** Build a set of Alard/Lupton basis kernels
      *
-     * @note NOT IMPLEMENTED
-     *
      * @param halfWidth  size is 2*N + 1
      * @param nGauss     number of gaussians
      * @param sigGauss   Widths of the Gaussian Kernels
@@ -245,7 +243,7 @@ namespace diffim {
         );
 
     template <typename ImageT>
-    Eigen::MatrixXd imageToEigen(
+    Eigen::MatrixXd imageToEigenMatrix(
         lsst::afw::image::Image<ImageT> const& img
         );
     
@@ -293,13 +291,13 @@ namespace diffim {
                    lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
                    lsst::afw::image::Image<VarT>   const& varianceEstimate,
                    lsst::pex::policy::Policy       const& policy
-                  );
+            );
 
         void apply2(lsst::afw::image::Image<ImageT> const& imageToConvolve,
-                   lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
-                   lsst::afw::image::Image<VarT>   const& varianceEstimate,
-                   lsst::pex::policy::Policy       const& policy
-                  );
+                    lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
+                    lsst::afw::image::Image<VarT>   const& varianceEstimate,
+                    lsst::pex::policy::Policy       const& policy
+            );
 
     protected:
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> _basisList;        ///< List of Kernel basis functions
