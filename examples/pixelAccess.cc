@@ -165,5 +165,11 @@ int main() {
         Using opt=3:
         Manual pixel iteration = 11.4916
         Eigen pixel iteration = 2.10081
+       
+      On quad Intel(R) Xeon(TM) CPU 2.80GHz running RHEL5 and g++ 4.1.2
+      400 parameters, opt=3
+        Manual pixel iteration = 16.82
+        Eigen pixel iteration = 2.4
+
    */
 }
