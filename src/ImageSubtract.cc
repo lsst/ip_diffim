@@ -218,11 +218,13 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
             M(kidxj, kidxi) = M(kidxi, kidxj);
         }
     }
-    
-    std::cout << "M1 " << std::endl;
-    std::cout << M << std::endl;
-    std::cout << "B1 " << std::endl;
-    std::cout << B << std::endl;
+
+    if (DEBUG_MATRIX) {
+        std::cout << "M1 " << std::endl;
+        std::cout << M << std::endl;
+        std::cout << "B1 " << std::endl;
+        std::cout << B << std::endl;
+    }
 
     time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
@@ -492,25 +494,22 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
                mij.cwise()        *= eigeniVarianceV;
                M(kidxi, kidxj)     = mij.sum();
             */
+            M(kidxj, kidxi) = M(kidxi, kidxj);  /* M is symmetric */
         }
 	B(kidxi)                 = (eiteriDotiVariance.cwise() * eigenToNotConvolveV).sum();
 	M(kidxi, nParameters-1)  = eiteriDotiVariance.sum();
+	M(nParameters-1, kidxi)  = M(kidxi, nParameters-1); /* M is symmetric */
     }
     /* background term */
     B(nParameters-1)                = (eigenToNotConvolveV.cwise() * eigeniVarianceV).sum();
     M(nParameters-1, nParameters-1) = eigeniVarianceV.sum();
 
-    // Fill in rest of M
-    for (unsigned int kidxi=0; kidxi < nParameters; ++kidxi) {
-        for (unsigned int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) {
-            M(kidxj, kidxi) = M(kidxi, kidxj);
-        }
+    if (DEBUG_MATRIX) {
+        std::cout << "M2 " << std::endl;
+        std::cout << M << std::endl;
+        std::cout << "B2 " << std::endl;
+        std::cout << B << std::endl;
     }
-    
-    std::cout << "M2 " << std::endl;
-    std::cout << M << std::endl;
-    std::cout << "B2 " << std::endl;
-    std::cout << B << std::endl;
 
     time = t.elapsed();
     logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 

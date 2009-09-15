@@ -37,9 +37,6 @@ class DiffimTestCases(unittest.TestCase):
         self.kRows       = self.policy.getInt('kernelRows')
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
 
-        # Regularization term
-        self.H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 1)
-
         # Delta function basis set
         self.basisList1  = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
         self.kFunctor1   = ipDiffim.PsfMatchingFunctorF(self.basisList1)
@@ -57,6 +54,7 @@ class DiffimTestCases(unittest.TestCase):
         self.kFunctor2   = ipDiffim.PsfMatchingFunctorF(self.basisList2)
 
         # Regularized delta function basis set
+        self.H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, 2, 0)
         self.kFunctor3   = ipDiffim.PsfMatchingFunctorF(self.basisList1, self.H)
 
         # known input images
@@ -108,25 +106,26 @@ class DiffimTestCases(unittest.TestCase):
 
 
         # delta function kernel
-        self.kFunctor1.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
-        kernel    = self.kFunctor1.getKernel()
-        kImageOut = afwImage.ImageD(self.kCols, self.kRows)
-        kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor1.getBackground())
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
-        self.dStats.apply( diffIm2 )
-
-        dmean1 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
-        dstd1  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
-        vmean1 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
-        
-        print 'DF Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
-                                                                                    kSum, self.kFunctor1.getBackground(),
-                                                                                    dmean1, dstd1, vmean1)
+        for func in (self.kFunctor1.apply, self.kFunctor1.apply2):
+            func(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
+            kernel    = self.kFunctor1.getKernel()
+            kImageOut = afwImage.ImageD(self.kCols, self.kRows)
+            kSum      = kernel.computeImage(kImageOut, False)
+            diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor1.getBackground())
+            bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
+                                                      kernel.getCtrY()) ,
+                                      afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
+                                                      diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
+            diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
+            self.dStats.apply( diffIm2 )
+    
+            dmean1 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
+            dstd1  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
+            vmean1 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
+            
+            print 'DF Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
+                                                                                        kSum, self.kFunctor1.getBackground(),
+                                                                                        dmean1, dstd1, vmean1)
         # outputs
         if display:
             ds9.mtv(tmi, frame=0)
@@ -140,25 +139,26 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut.writeFits('k1.fits')
 
         # alard-lupton kernel
-        self.kFunctor2.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
-        kernel    = self.kFunctor2.getKernel()
-        kImageOut = afwImage.ImageD(self.kCols, self.kRows)
-        kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor2.getBackground())
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
-        self.dStats.apply( diffIm2 )
-
-        dmean2 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
-        dstd2  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
-        vmean2 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
-        
-        print 'AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
-                                                                                    kSum, self.kFunctor2.getBackground(),
-                                                                                    dmean2, dstd2, vmean2)
+        for func in (self.kFunctor2.apply, self.kFunctor2.apply2):
+            func(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
+            kernel    = self.kFunctor2.getKernel()
+            kImageOut = afwImage.ImageD(self.kCols, self.kRows)
+            kSum      = kernel.computeImage(kImageOut, False)
+            diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor2.getBackground())
+            bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
+                                                      kernel.getCtrY()) ,
+                                      afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
+                                                      diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
+            diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
+            self.dStats.apply( diffIm2 )
+    
+            dmean2 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
+            dstd2  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
+            vmean2 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
+            
+            print 'AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
+                                                                                        kSum, self.kFunctor2.getBackground(),
+                                                                                        dmean2, dstd2, vmean2)
         # outputs
         if display:
             ds9.mtv(tmi, frame=4)
@@ -170,25 +170,28 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut.writeFits('k2.fits')
 
         # regularized delta function kernel
-        self.kFunctor3.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
-        kernel    = self.kFunctor3.getKernel()
-        kImageOut = afwImage.ImageD(self.kCols, self.kRows)
-        kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor3.getBackground())
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
-        self.dStats.apply( diffIm2 )
-
-        dmean1 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
-        dstd1  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
-        vmean1 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
-        
-        print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
-                                                                                     kSum, self.kFunctor3.getBackground(),
-                                                                                     dmean1, dstd1, vmean1)
+        for func in (self.kFunctor3.apply, self.kFunctor3.apply2):
+            func(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
+            kernel    = self.kFunctor3.getKernel()
+            kImageOut = afwImage.ImageD(self.kCols, self.kRows)
+            kSum      = kernel.computeImage(kImageOut, False)
+            diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor3.getBackground())
+            bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
+                                                      kernel.getCtrY()) ,
+                                      afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
+                                                      diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
+            diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
+            self.dStats.apply( diffIm2 )
+    
+            dmean1 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
+            dstd1  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
+            vmean1 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
+            
+            print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
+                                                                                         kSum, self.kFunctor3.getBackground(),
+                                                                                         dmean1, dstd1, vmean1)
+        print
+            
         # outputs
         if display:
             ds9.mtv(tmi, frame=8)
