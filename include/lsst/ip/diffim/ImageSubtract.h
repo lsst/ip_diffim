@@ -177,12 +177,26 @@ namespace diffim {
 
 
     /* Build a set of Delta Function basis kernels
+     * 
+     * @note Total number of basis functions is width*height
+     * 
+     * @param width  Width of basis set
+     * @param height Height of basis set
      */    
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateDeltaFunctionKernelSet(
         unsigned int width,
         unsigned int height
         );
 
+    /* Build a regularization matrix for Delta function kernels
+     * 
+     * @param width            Width of basis set you want to regularize
+     * @param height           Height of basis set you want to regularize
+     * @param order            Which derivative you expect to be smooth (derivative order+1 is penalized) 
+     * @param boundary_style   0 = unwrapped, 1 = wrapped, 2 = order-tappered ('order' is highest used) 
+     * @param difference_style 0 = forward, 1 = central
+     * @param printB           debugging
+     */    
     Eigen::MatrixXd generateFiniteDifferenceRegularization(
         unsigned int width,
         unsigned int height,

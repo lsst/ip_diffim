@@ -17,11 +17,17 @@ warpingKernelName: 'lanczos4'
 spatialKernelModel: 'pca'
 
 ######
-# Fraction of the default lambda calculation (N.R. 18.5.8) to use in
-# the delta function regularization, and regularization order (0, 1,
-# 2)
+# To be used with delta function kernel basis set to enfore smoothness
+# and self-similarity
+#
+# order      : Which derivative you expect to be smooth (e.g. for order=0, first derivative is penalized)
+# boundary   : 0 = unwrapped, 1 = wrapped, 2 = order-tappered ('order' is highest used) 
+# difference : 0 = forward, 1 = central
+# scaling    : Fraction of the default lambda calculation (N.R. 18.5.8) to use; strength of regularization
 regularizationUse: true
-regularizationOrder: 0
+regularizationOrder: 1
+regularizationBoundary: 2
+regularizationDifference: 0
 regularizationScaling: 0.0001
 
 ######
