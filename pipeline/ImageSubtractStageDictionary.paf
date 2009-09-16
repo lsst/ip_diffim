@@ -33,7 +33,8 @@ regularizationScaling: 0.0001
 ######
 # Calculate kernel and background uncertainties for each object?
 # Comes from inverse of the covariance matrix
-calculateKernelUncertainty: true
+# Regularization can cause this step problems
+calculateKernelUncertainty: false
 
 ######
 # Size of the convolution kernel

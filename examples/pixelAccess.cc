@@ -33,37 +33,38 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
     int const endRow   = varianceEstimate.getHeight() - startRow;
     
     if (cswitch == 3) {
-       /* a list of images - in diffim each one of these is associated with a basis function */
-       std::vector<boost::shared_ptr<Eigen::VectorXd> > imageList(nParameters);
-       typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiter = imageList.begin();
-       image::Image<ImageT> cimage(varianceEstimate.getDimensions());
-       for (int i = 1; eiter != imageList.end(); ++eiter, ++i) {
-	  cimage = i; /* give it a value */
-	  Eigen::MatrixXd cmat = diffim::imageToEigenMatrix(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol);
-	  cmat.resize(cmat.rows()*cmat.cols(), 1);
-	  boost::shared_ptr<Eigen::VectorXd> vmat (new Eigen::VectorXd(cmat.col(0)));
-	  *eiter = vmat;
-       } 
-       
-       /* eigen representation of input images; only the pixels that are unconvolved in cimage below */
-       Eigen::MatrixXd eigeniVarianceM     = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
-												endRow-startRow, endCol-startCol).cwise().inverse();
-       eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
-       Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
-       
-       Eigen::MatrixXd C(eigeniVarianceV.size(), nParameters);
-       typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = imageList.begin();
-       typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = imageList.end();
-       for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-	  C.col(kidxj) = **eiterj;
-       }
-       
-       // Caculate the variance-weighted pixel values
-       Eigen::MatrixXd VC = eigeniVarianceV.asDiagonal() * C;
-       
-       // Calculate M as the variance-weighted inner product of C
-       M.part<Eigen::SelfAdjoint>() = (C.transpose() * VC).lazy(); 
-       return M;
+        /* a list of images - in diffim each one of these is associated with a basis function */
+        std::vector<boost::shared_ptr<Eigen::VectorXd> > imageList(nParameters);
+        typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiter = imageList.begin();
+        image::Image<ImageT> cimage(varianceEstimate.getDimensions());
+        for (int i = 1; eiter != imageList.end(); ++eiter, ++i) {
+            cimage = i; /* give it a value */
+            Eigen::MatrixXd cmat = diffim::imageToEigenMatrix(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol);
+            cmat.resize(cmat.rows()*cmat.cols(), 1);
+            boost::shared_ptr<Eigen::VectorXd> vmat (new Eigen::VectorXd(cmat.col(0)));
+            *eiter = vmat;
+        } 
+        
+        /* eigen representation of input images; only the pixels that are unconvolved in cimage below */
+        Eigen::MatrixXd eigeniVarianceM     = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
+                                                                                                 endRow-startRow, endCol-startCol).cwise().inverse();
+        eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
+        Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
+        
+        Eigen::MatrixXd C(eigeniVarianceV.size(), nParameters);
+        typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = imageList.begin();
+        typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = imageList.end();
+        for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
+            C.col(kidxj) = **eiterj;
+        }
+        
+        // Caculate the variance-weighted pixel values
+        Eigen::MatrixXd VC = eigeniVarianceV.asDiagonal() * C;
+        
+        // Calculate M as the variance-weighted inner product of C
+        //M.part<Eigen::SelfAdjoint>() = (C.transpose() * VC).lazy(); 
+        M = C.transpose() * VC;
+        return M;
     }
     else if (cswitch == 2) {
         /* a list of images - in diffim each one of these is associated with a basis function */
@@ -80,7 +81,7 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
         
         /* eigen representation of input images; only the pixels that are unconvolved in cimage below */
         Eigen::MatrixXd eigeniVarianceM     = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
-												 endRow-startRow, endCol-startCol).cwise().inverse();
+                                                                                                 endRow-startRow, endCol-startCol).cwise().inverse();
         eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
         Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
         
@@ -90,7 +91,7 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
             //Eigen::Cwise<Eigen::CwiseBinaryOp<Eigen::ei_scalar_product_op<double>, Eigen::VectorXd, Eigen::VectorXd> >
             //eiteriDotiVariance = ((*eiteri)->cwise() * eigeniVarianceV).cwise();
             Eigen::VectorXd eiteriDotiVariance = (*eiteri)->cwise() * eigeniVarianceV;
-
+            
             typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = eiteri;
             for (unsigned int kidxj = kidxi; eiterj != eiterE; eiterj++, kidxj++) {
                 M(kidxi, kidxj) = (eiteriDotiVariance.cwise() * (**eiterj)).sum();
@@ -148,13 +149,13 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
                 locatorList[ki] += rowStep;
             }
         } // row
-	// Fill in rest of M
-	for (unsigned int kidxi=0; kidxi < nParameters; ++kidxi) {
-	   for (unsigned int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) {
-	      M(kidxj, kidxi) = M(kidxi, kidxj);
-	   }
-	}
-
+        // Fill in rest of M
+        for (unsigned int kidxi=0; kidxi < nParameters; ++kidxi) {
+            for (unsigned int kidxj=kidxi+1; kidxj < nParameters; ++kidxj) {
+                M(kidxj, kidxi) = M(kidxi, kidxj);
+            }
+        }
+        
         return M;
     }   
 }
@@ -174,7 +175,7 @@ int main() {
     Eigen::MatrixXd M2 = test(varianceEstimate, 2);
     time = t.elapsed();
     std::cout << "Eigen pixel iteration = " << time << std::endl;
-
+    
     t.restart();
     Eigen::MatrixXd M3 = test(varianceEstimate, 3);
     time = t.elapsed();
@@ -217,17 +218,27 @@ int main() {
        400 parameters, opt=3
        Manual pixel iteration = 16.82
        Eigen pixel iteration = 2.4
+       
 
-
+       
        
        NOTE : Took one of the multiplications out of the inner loop to
        speed things up.  This improved the Eigen timing significantly,
        but not so much the afw loop.  Suggesting its the iterators
        accounting for the runtime.
-
+       
        Manual pixel iteration = 16.65
        Eigen pixel iteration = 1.86
 
+
+
+       
+       FINAL NOTE : With help from Mike Jarvis, I was able to speed
+       things up 5-10% more.
+
+       Manual pixel iteration = 17.8
+       Eigen pixel iteration = 1.86
+       Eigen2 pixel iteration = 1.76
 
     */
 }

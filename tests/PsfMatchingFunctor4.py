@@ -23,7 +23,6 @@ diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary
 
 display = False
 writefits = False
-iterate = False
 
 # This one looks for the PCA of the convolution and deconvolution kernels
 
@@ -37,9 +36,22 @@ class DiffimTestCases(unittest.TestCase):
         self.kRows       = self.policy.getInt('kernelRows')
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
         self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
-        self.H           = ipDiffim.generateDeltaFunctionRegularization(self.kCols, self.kRows, 0)
+        self.H           = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 1)
         # difference imaging functor
-        self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H)
+        #self.kFunctorD      = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H)
+        self.kFunctorD      = ipDiffim.PsfMatchingFunctorF(self.basisList)
+
+        # Alard-Lupton basis set
+        nGauss   = self.policy.get("alardNGauss")
+        sigGauss = self.policy.getDoubleArray("alardSigGauss")
+        degGauss = self.policy.getIntArray("alardDegGauss")
+        assert len(sigGauss) == nGauss
+        assert len(degGauss) == nGauss
+        assert self.kCols == self.kRows  # square
+        assert self.kCols % 2 == 1  # odd sized
+        kHalfWidth = int(self.kCols/2)
+        self.basisList2  = ipDiffim.generateAlardLuptonKernelSet(kHalfWidth, nGauss, sigGauss, degGauss)
+        self.kFunctorA   = ipDiffim.PsfMatchingFunctorF(self.basisList2)
 
         # known input images
         defDataDir = eups.productDir('afwdata')
@@ -56,12 +68,15 @@ class DiffimTestCases(unittest.TestCase):
 
         # footprints
         self.detSet     = afwDetection.makeDetectionSet(self.scienceImage.getMaskedImage(), afwDetection.Threshold(575))
+        #self.detSet     = afwDetection.makeDetectionSet(self.scienceImage.getMaskedImage(), afwDetection.Threshold(1000))
         self.footprints = self.detSet.getFootprints()
+
+        self.kFunctor = self.kFunctorA
         
     def tearDown(self):
         del self.policy
 
-    def applyFunctor(self, invert=False, foffset=0, xloc=397, yloc=580):
+    def applyFunctor(self, invert=False, foffset=0, xloc=397, yloc=580, iterate=False):
         imsize = int(3 * self.kCols)
 
         # chop out a region around a known object
@@ -214,7 +229,18 @@ class DiffimTestCases(unittest.TestCase):
         dSum /= dSum[-1]
         print '#C', cSum
         print '#D', dSum
-        
+
+        if writefits:
+            cmi1  = afwImage.MaskedImageF(self.templateImage.getMaskedImage().getDimensions())
+            afwMath.convolve(cmi1, self.templateImage.getMaskedImage(), afwMath.FixedKernel(ceKernels[0]), False)
+            cmi1 -= self.scienceImage.getMaskedImage()
+            cmi1.writeFits('cDiffim')
+            
+            cmi2 = afwImage.MaskedImageF(self.scienceImage.getMaskedImage().getDimensions())
+            afwMath.convolve(cmi2, self.scienceImage.getMaskedImage(), afwMath.FixedKernel(deKernels[0]), False)
+            cmi2 -= self.templateImage.getMaskedImage()
+            cmi2.writeFits('dDiffim')
+            
 #####
         
 def suite():
@@ -235,7 +261,5 @@ if __name__ == "__main__":
         display = True
     if '-w' in sys.argv:
         writefits = True
-    if '-i' in sys.argv:
-        iterate = True
         
     run(True)

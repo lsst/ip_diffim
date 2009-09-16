@@ -72,7 +72,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
 /** Create PSF matching kernel
  */
 template <typename ImageT, typename VarT>
-void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
+void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     lsst::afw::image::Image<ImageT> const& imageToConvolve,    ///< Image to apply kernel to
     lsst::afw::image::Image<ImageT> const& imageToNotConvolve, ///< Image whose PSF you want to match to
     lsst::afw::image::Image<VarT>   const& varianceEstimate,   ///< Estimate of the variance per pixel
@@ -393,7 +393,7 @@ Eigen::MatrixXd diffim::imageToEigenMatrix(
     
 
 template <typename ImageT, typename VarT>
-void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
+void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     lsst::afw::image::Image<ImageT> const& imageToConvolve,    ///< Image to apply kernel to
     lsst::afw::image::Image<ImageT> const& imageToNotConvolve, ///< Image whose PSF you want to match to
     lsst::afw::image::Image<VarT>   const& varianceEstimate,   ///< Estimate of the variance per pixel
@@ -439,40 +439,34 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     boost::timer t;
     t.restart();
     
-    /* least squares matrices */
+    /* Least squares matrices */
     Eigen::MatrixXd M = Eigen::MatrixXd::Zero(nParameters, nParameters);
     Eigen::VectorXd B = Eigen::VectorXd::Zero(nParameters);
-    /* eigen representation of input images; only the pixels that are unconvolved in cimage below */
-    Eigen::MatrixXd eigenToConvolveM    = diffim::imageToEigenMatrix(imageToConvolve).block(startRow, startCol, endRow-startRow, endCol-startCol);
-    Eigen::MatrixXd eigenToNotConvolveM = diffim::imageToEigenMatrix(imageToNotConvolve).block(startRow, startCol, endRow-startRow, endCol-startCol);
-    Eigen::MatrixXd eigeniVarianceM     = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, endRow-startRow, endCol-startCol).cwise().inverse();
-    /* 
-       Finally, turn them into vectors for quick matrix updating.  We can technically do everything we want below using Matrices, 
-       since we are doing cwise() coefficient-wise multiplication, but doing this as Vectors seems to provide a slight speed up 
-       in the multiplication stages, 5% or so, at the expense of a bit more complexity in the code.
-    */
-    eigenToConvolveM.resize(eigenToConvolveM.rows()*eigenToConvolveM.cols(), 1);
-    eigenToNotConvolveM.resize(eigenToNotConvolveM.rows()*eigenToNotConvolveM.cols(), 1);
-    eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
-    Eigen::VectorXd eigenToConvolveV     = eigenToConvolveM.col(0);
-    Eigen::VectorXd eigenToNotConvolveV  = eigenToNotConvolveM.col(0);
-    Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
+    /* Eigen representation of input images; only the pixels that are unconvolved in cimage below */
+    Eigen::MatrixXd eigenToConvolve    = diffim::imageToEigenMatrix(imageToConvolve).block(startRow, startCol, endRow-startRow, endCol-startCol);
+    Eigen::MatrixXd eigenToNotConvolve = diffim::imageToEigenMatrix(imageToNotConvolve).block(startRow, startCol, endRow-startRow, endCol-startCol);
+    Eigen::MatrixXd eigeniVariance     = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, endRow-startRow, endCol-startCol).cwise().inverse();
+    /* Resize into 1-D for later usage */
+    eigenToConvolve.resize(eigenToConvolve.rows()*eigenToConvolve.cols(), 1);
+    eigenToNotConvolve.resize(eigenToNotConvolve.rows()*eigenToNotConvolve.cols(), 1);
+    eigeniVariance.resize(eigeniVariance.rows()*eigeniVariance.cols(), 1);
     
-    /* holds image convolved with basis function */
+    /* Holds image convolved with basis function */
     image::Image<ImageT> cimage(imageToConvolve.getDimensions());
     
-    /* holds eigen representation of image convolved with all basis functions */
-    std::vector<boost::shared_ptr<Eigen::VectorXd> > convolvedEigenList(nKernelParameters);
+    /* Holds eigen representation of image convolved with all basis functions */
+    std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
     
-    /* iterators over convolved image list and basis list */
-    typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiter = convolvedEigenList.begin();
-    /* create C_i in the formalism of Alard & Lupton */
+    /* Iterators over convolved image list and basis list */
+    typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = convolvedEigenList.begin();
+    /* Create C_i in the formalism of Alard & Lupton */
     for (; kiter != _basisList.end(); ++kiter, ++eiter) {
         math::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
-        Eigen::MatrixXd cmat = diffim::imageToEigenMatrix(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol);
-	cmat.resize(cmat.rows()*cmat.cols(), 1);
-	boost::shared_ptr<Eigen::VectorXd> vmat (new Eigen::VectorXd(cmat.col(0)));
-	*eiter = vmat;
+	boost::shared_ptr<Eigen::MatrixXd> cmat (
+            new Eigen::MatrixXd(diffim::imageToEigenMatrix(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol))
+            );
+	cmat->resize(cmat->rows()*cmat->cols(), 1);
+	*eiter = cmat;
     } 
     
     double time = t.elapsed();
@@ -480,30 +474,55 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
                        "Total compute time to do basis convolutions : %.2f s", time);
     t.restart();
     
+    /* 
+     * 
+     * NOTE - 
+     * 
+     * Below is the original Eigen representation of the matrix math needed.
+     * Its a bit more readable but 5-10% slower than the as-implemented Eigen
+     * math.  Left here for reference as it simply outlines that math that goes
+     * into the construction of M and B.
+     * 
+
     typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiteri = convolvedEigenList.begin();
     typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = convolvedEigenList.end();
     for (unsigned int kidxi = 0; eiteri != eiterE; eiteri++, kidxi++) {
-        /* Precalculate since its used in the inner loop */
         Eigen::VectorXd eiteriDotiVariance = (*eiteri)->cwise() * eigeniVarianceV;
 
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = eiteri;
         for (unsigned int kidxj = kidxi; eiterj != eiterE; eiterj++, kidxj++) {
             M(kidxi, kidxj) = (eiteriDotiVariance.cwise() * (**eiterj)).sum();
-            /* Equivalent to :
-               Eigen::VectorXd mij = (*eiteri)->cwise() * (**eiterj);
-               mij.cwise()        *= eigeniVarianceV;
-               M(kidxi, kidxj)     = mij.sum();
-            */
-            M(kidxj, kidxi) = M(kidxi, kidxj);  /* M is symmetric */
+            M(kidxj, kidxi) = M(kidxi, kidxj);
         }
 	B(kidxi)                 = (eiteriDotiVariance.cwise() * eigenToNotConvolveV).sum();
 	M(kidxi, nParameters-1)  = eiteriDotiVariance.sum();
-	M(nParameters-1, kidxi)  = M(kidxi, nParameters-1); /* M is symmetric */
+	M(nParameters-1, kidxi)  = M(kidxi, nParameters-1);
     }
-    /* background term */
     B(nParameters-1)                = (eigenToNotConvolveV.cwise() * eigeniVarianceV).sum();
     M(nParameters-1, nParameters-1) = eigeniVarianceV.sum();
 
+    */
+    
+    /* 
+       Load matrix with all values from convolvedEigenList : all images
+       (eigeniVariance, convolvedEigenList) must be the same size
+    */
+    Eigen::MatrixXd C(eigeniVariance.col(0).size(), nParameters);
+    typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = convolvedEigenList.begin();
+    typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = convolvedEigenList.end();
+    for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
+        C.col(kidxj) = (*eiterj)->col(0);
+    }
+    /* Treat the last "image" as all 1's to do the background calculation. */
+    C.col(nParameters-1).fill(1.);
+    
+    /* Caculate the variance-weighted pixel values */
+    Eigen::MatrixXd VC = eigeniVariance.col(0).asDiagonal() * C;
+    
+    /* Calculate M as the variance-weighted inner product of C */
+    M = C.transpose() * VC;
+    B = VC.transpose() * eigenToNotConvolve.col(0);
+    
     if (DEBUG_MATRIX) {
         std::cout << "M2 " << std::endl;
         std::cout << M << std::endl;
