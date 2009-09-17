@@ -21,7 +21,7 @@ logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
 
-display = False
+display = True
 writefits = False
 iterate = False
 
@@ -73,6 +73,10 @@ class DiffimTestCases(unittest.TestCase):
         # footprints
         self.detSet     = afwDetection.makeDetectionSet(self.scienceImage.getMaskedImage(), afwDetection.Threshold(575))
         self.footprints = self.detSet.getFootprints()
+        # BLOCKED BY TICKET 911
+        #self.footprints  = ipDiffim.getCollectionOfFootprintsForPsfMatching(self.templateImage.getMaskedImage(),
+        #                                                                    self.scienceImage.getMaskedImage(),
+        #                                                                    self.policy)
         
     def tearDown(self):
         del self.policy
@@ -106,7 +110,7 @@ class DiffimTestCases(unittest.TestCase):
 
 
         # delta function kernel
-        for func in (self.kFunctor1.apply, self.kFunctor1.apply2):
+        for func in (self.kFunctor1.apply,):
             func(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
             kernel    = self.kFunctor1.getKernel()
             kImageOut = afwImage.ImageD(self.kCols, self.kRows)
@@ -139,7 +143,7 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut.writeFits('k1.fits')
 
         # alard-lupton kernel
-        for func in (self.kFunctor2.apply, self.kFunctor2.apply2):
+        for func in (self.kFunctor2.apply,):
             func(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
             kernel    = self.kFunctor2.getKernel()
             kImageOut = afwImage.ImageD(self.kCols, self.kRows)
@@ -159,6 +163,8 @@ class DiffimTestCases(unittest.TestCase):
             print 'AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
                                                                                         kSum, self.kFunctor2.getBackground(),
                                                                                         dmean2, dstd2, vmean2)
+            diffImAL = diffIm2
+            
         # outputs
         if display:
             ds9.mtv(tmi, frame=4)
@@ -170,7 +176,7 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut.writeFits('k2.fits')
 
         # regularized delta function kernel
-        for func in (self.kFunctor3.apply, self.kFunctor3.apply2):
+        for func in (self.kFunctor3.apply,):
             func(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
             kernel    = self.kFunctor3.getKernel()
             kImageOut = afwImage.ImageD(self.kCols, self.kRows)
@@ -190,8 +196,15 @@ class DiffimTestCases(unittest.TestCase):
             print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
                                                                                          kSum, self.kFunctor3.getBackground(),
                                                                                          dmean1, dstd1, vmean1)
+            diffImDRr = diffIm2
+
+        diffImAL -= diffImDRr
+        self.dStats.apply(diffImAL)
+        dmeanD = afwMath.makeStatistics(diffImAL.getImage(),    afwMath.MEAN).getValue()
+        dstdD  = afwMath.makeStatistics(diffImAL.getImage(),    afwMath.STDEV).getValue()
+        print 'AL-DFr Diffim residuals : %.2f +/- %.2f' % (self.dStats.getMean(), self.dStats.getRms())
         print
-            
+        
         # outputs
         if display:
             ds9.mtv(tmi, frame=8)

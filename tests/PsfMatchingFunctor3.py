@@ -35,7 +35,7 @@ class DiffimTestCases(unittest.TestCase):
         self.kRows       = self.policy.getInt('kernelRows')
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
         self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
-        self.H           = ipDiffim.generateDeltaFunctionRegularization(self.kCols, self.kRows, 0)
+        self.H           = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0)
         
         self.gSize         = self.kCols
         self.gaussFunction = afwMath.GaussianFunction2D(2, 2)

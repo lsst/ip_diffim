@@ -91,8 +91,10 @@ bool SpatialModelKernel<ImageT>::buildModel() {
     varEstimate -= *_miToConvolvePtr;
 
     try {
-        _kFunctor->apply(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr->getImage(),
-                         *varEstimate.getVariance(), _policy);
+        _kFunctor->apply(*_miToConvolvePtr->getImage(), 
+                         *_miToNotConvolvePtr->getImage(),
+                         *varEstimate.getVariance(), 
+                         _policy);
     } catch (exceptions::Exception& e) {
         setStatus(false);
         logging::TTrace<4>("lsst.ip.diffim.SpatialModelKernel.buildModel",
@@ -127,12 +129,15 @@ bool SpatialModelKernel<ImageT>::buildModel() {
                        (*kStats).getRms());
 
     // A second pass with a better variance estimate from first difference image
+    // An issue here is the boundary pixels are contaminated
     bool iterateKernel = _policy.getBool("iterateKernel");
     if (iterateKernel) {
         try {
             try {
-                _kFunctor->apply(*_miToConvolvePtr->getImage(), *_miToNotConvolvePtr->getImage(),
-                                 *diffIm.getVariance(), _policy);
+                _kFunctor->apply(*_miToConvolvePtr->getImage(), 
+                                 *_miToNotConvolvePtr->getImage(),
+                                 *diffIm.getVariance(), 
+                                 _policy);
             } catch (exceptions::Exception& e) {
                 throw;
             }

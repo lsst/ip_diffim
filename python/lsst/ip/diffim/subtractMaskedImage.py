@@ -51,9 +51,11 @@ def subtractMaskedImage(templateMaskedImage,
         kBasisList = diffimLib.generateDeltaFunctionKernelSet(kCols, kRows)
 
         if policy.get("regularizationUse") == True:
-            order    = policy.get("regularizationOrder")
-            H        = diffimLib.generateDeltaFunctionRegularization(kCols, kRows, order)
-            kFunctor = diffimLib.PsfMatchingFunctorF(kBasisList, H)
+            order      = policy.get("regularizationOrder")
+            boundary   = policy.get("regularizationBoundary")
+            difference = policy.get("regularizationDifference")
+            H          = diffimLib.generateFiniteDifferenceRegularization(kCols, kRows, order, boundary, difference)
+            kFunctor   = diffimLib.PsfMatchingFunctorF(kBasisList, H)
         else:
             kFunctor = diffimLib.PsfMatchingFunctorF(kBasisList)
         

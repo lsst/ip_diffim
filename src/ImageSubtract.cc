@@ -35,6 +35,7 @@ namespace exceptions = lsst::pex::exceptions;
 namespace logging    = lsst::pex::logging; 
 namespace image      = lsst::afw::image;
 namespace math       = lsst::afw::math;
+namespace detection  = lsst::afw::detection;
 namespace diffim     = lsst::ip::diffim;
 
 //
@@ -480,8 +481,8 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
      * 
      * Below is the original Eigen representation of the matrix math needed.
      * Its a bit more readable but 5-10% slower than the as-implemented Eigen
-     * math.  Left here for reference as it simply outlines that math that goes
-     * into the construction of M and B.
+     * math.  Left here for reference as it nicely and simply outlines the math
+     * that goes into the construction of M and B.
      * 
 
     typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiteri = convolvedEigenList.begin();
@@ -1217,31 +1218,32 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     double detThresholdMin      = policy.getDouble("detThresholdMin");
     std::string detThresholdType = policy.getString("detThresholdType");
 
+    // Temporary mask plane that tells us which pixels are already in objects
+    std::string const diffimMaskName = "DIFFIM_FOOTPRINTS";
+    int diffimMaskPlane = imageToConvolve.getMask()->addMaskPlane(diffimMaskName);
+    image::MaskPixel const diffimBitMask = imageToConvolve.getMask()->getPlaneBitMask(diffimMaskName);
+
     // Number of pixels to grow each Footprint, based upon the Kernel size
     int fpGrowPix = int(fpGrowKsize * ( (kCols > kRows) ? kCols : kRows ));
 
-    // Grab mask bits from the image to convolve, since that is what we'll be operating on
-    // Overridden now that we use the FootprintFunctor to look for any masked pixels
-    // int badMaskBit = imageToConvolve.getMask()->getMaskPlane("BAD");
-    // image::MaskPixel badPixelMask = (badMaskBit < 0) ? 0 : (1 << badMaskBit);
-    
     // List of Footprints
-    std::vector<lsst::afw::detection::Footprint::Ptr> footprintListIn;
-    std::vector<lsst::afw::detection::Footprint::Ptr> footprintListOut;
+    std::vector<detection::Footprint::Ptr> footprintListIn;
+    std::vector<detection::Footprint::Ptr> footprintListOut;
 
-    // Functors to search through the images for bad pixels within candidate footprints
+    // Functors to search through the images for masked pixels within candidate footprints
     diffim::FindSetBits<image::Mask<image::MaskPixel> > itcFunctor(*(imageToConvolve.getMask())); 
     diffim::FindSetBits<image::Mask<image::MaskPixel> > itncFunctor(*(imageToNotConvolve.getMask())); 
  
     int nCleanFp = 0;
     while ( (nCleanFp < minCleanFp) and (detThreshold > detThresholdMin) ) {
+        imageToConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
         footprintListIn.clear();
         footprintListOut.clear();
         
         // Find detections
-        lsst::afw::detection::Threshold threshold = 
-                lsst::afw::detection::createThreshold(detThreshold, detThresholdType);
-        lsst::afw::detection::DetectionSet<ImageT> detectionSet(
+        detection::Threshold threshold = 
+                detection::createThreshold(detThreshold, detThresholdType);
+        detection::DetectionSet<ImageT> detectionSet(
                 imageToConvolve, 
                 threshold,
                 "",
@@ -1255,7 +1257,7 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 
         // Iterate over footprints, look for "good" ones
         nCleanFp = 0;
-        for (std::vector<lsst::afw::detection::Footprint::Ptr>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
+        for (std::vector<detection::Footprint::Ptr>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
             // footprint has too many pixels
             if (static_cast<unsigned int>((*i)->getNpix()) > fpNpixMax) {
                 logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
@@ -1275,8 +1277,8 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
             // Grow the footprint
             // true = isotropic grow = slow
             // false = 'manhattan grow' = fast
-            lsst::afw::detection::Footprint::Ptr fpGrow = 
-                lsst::afw::detection::growFootprint(*i, fpGrowPix, false);
+            detection::Footprint::Ptr fpGrow = 
+                detection::growFootprint(*i, fpGrowPix, false);
             
             logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                                "Footprint out : %d,%d -> %d,%d (center %d,%d)",
@@ -1294,35 +1296,38 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
                 image::MaskedImage<ImageT> subImageToConvolve(imageToConvolve, fpBBox);
                 image::MaskedImage<ImageT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
             } catch (exceptions::Exception& e) {
-                logging::TTrace<5>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
-                                   "Exception caught extracting Footprint");
                 logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
+                                   "Exception caught extracting Footprint");
+                logging::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
                                    e.what());
                 continue;
             }
 
-            // Search for bad pixels within the footprint
+            // Search for any masked pixels within the footprint
             itcFunctor.apply(*fpGrow);
             if (itcFunctor.getBits() > 0) {
                 logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                               "Footprint has bad pix in image to convolve"); 
+                               "Footprint has masked pix in image to convolve"); 
                 continue;
             }
 
             itncFunctor.apply(*fpGrow);
             if (itncFunctor.getBits() > 0) {
                 logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                               "Footprint has bad pix in image not to convolve");
+                               "Footprint has masked pix in image not to convolve");
                 continue;
             }
 
             // If we get this far, we have a clean footprint
             footprintListOut.push_back(fpGrow);
+            (void)detection::setMaskFromFootprint(&(*imageToConvolve.getMask()), *fpGrow, diffimBitMask);
             nCleanFp += 1;
         }
-        
         detThreshold *= detThresholdScaling;
     }
+    /* Clean up the temporary mask plane */
+    imageToConvolve.getMask()->removeMaskPlane(diffimMaskName);
+
     if (footprintListOut.size() == 0) {
       throw LSST_EXCEPT(exceptions::Exception, 
 			"Unable to find any footprints for Psf matching");
@@ -1381,13 +1386,13 @@ INSTANTIATE_convolveAndSubtract(double);
 /* */
 
 template
-std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
+std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
     image::MaskedImage<float> const& imageToConvolve,
     image::MaskedImage<float> const& imageToNotConvolve,
     lsst::pex::policy::Policy const& policy);
 
 template
-std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
+std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
     image::MaskedImage<double> const& imageToConvolve,
     image::MaskedImage<double> const& imageToNotConvolve,
     lsst::pex::policy::Policy  const& policy);

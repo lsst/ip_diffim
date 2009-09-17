@@ -16,8 +16,8 @@ def warpTemplateExposure(templateExposure, scienceExposure, policy):
 
     # warp the template exposure
     afwMath.warpExposure(remapedTemplateExposure, 
-                templateExposure, 
-                warpingKernel)
+                         templateExposure, 
+                         warpingKernel)
         
     return remapedTemplateExposure
     
