@@ -25,10 +25,10 @@ spatialKernelModel: 'pca'
 # difference : 0 = forward, 1 = central
 # scaling    : Fraction of the default lambda calculation (N.R. 18.5.8) to use; strength of regularization
 regularizationUse: true
-regularizationOrder: 1
-regularizationBoundary: 2
+regularizationOrder: 2
+regularizationBoundary: 1
 regularizationDifference: 0
-regularizationScaling: 0.0001
+regularizationScaling: 0.001
 
 ######
 # Calculate kernel and background uncertainties for each object?
@@ -89,10 +89,10 @@ maxOutlierSigma: 2.0
 #
 
 # Maximum average of (residual/noise) for an acceptable Kernel; mean should be 0
-maximumFootprintResidualMean: 1.0
+maximumFootprintResidualMean: 0.5
 
 # Maximum standard deviation of (residual/noise) for an acceptable Kernel; variance should be 1
-maximumFootprintResidualStd: 2.0 
+maximumFootprintResidualStd: 1.5
 
 ######
 # Uses detection to find good objects for difference imaging
@@ -120,7 +120,7 @@ fpGrowKsize: 2.0
 minCleanFp: 30
 
 # Threshold 
-detThreshold: 50.0
+detThreshold: 250.0
 
 # Threshold in Sigma or Signal detection?
 # Allowed values : value, stdev, variance

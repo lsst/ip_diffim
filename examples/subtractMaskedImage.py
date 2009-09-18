@@ -121,9 +121,11 @@ Notes:
     parser.add_option('-p', '--policy', default=defPolicyPath, help='policy file')
     parser.add_option('-d', '--debugIO', action='store_true', default=False,
         help='write diagnostic intermediate files')
+    parser.add_option('-s', '--display', action='store_true', default=False,
+        help='display diagnostic images')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
         help='verbosity of diagnostic trace messages; 1 for just warnings, more for more information')
-    parser.add_option('-I', '--invert', action='store_true', default=False,
+    parser.add_option('-i', '--invert', action='store_true', default=False,
         help='invert the image to convolve')
                       
     (options, args) = parser.parse_args()
@@ -143,8 +145,11 @@ Notes:
     print 'Output image:  ', outputPath
     print 'Policy file:   ', policyPath
 
+    # Need to conform mask planes since these data are relatively old
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
+    templateMaskedImage.getMask().conformMaskPlanes(afwImage.MaskU(0,0).getMaskPlaneDict())
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
+    scienceMaskedImage.getMask().conformMaskPlanes(afwImage.MaskU(0,0).getMaskPlaneDict())
     policy              = Policy.createPolicy(policyPath)
     
     if options.debugIO:
@@ -160,6 +165,11 @@ Notes:
     if options.alard:
         print 'Using Alard basis'
         alard = True
+
+    display = False
+    if options.display:
+        print 'Displaying Images'
+        display = True
         
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
@@ -175,7 +185,8 @@ Notes:
                                                                                     scienceMaskedImage,
                                                                                     policy, log,
                                                                                     useAlard=alard,
-                                                                                    invert=invert)
+                                                                                    invert=invert,
+                                                                                    display=display)
     differenceMaskedImage.writeFits(outputPath)
     
 

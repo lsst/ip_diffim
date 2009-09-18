@@ -31,7 +31,7 @@ class DiffimTestCases(unittest.TestCase):
     
     # D = I - (K.x.T + bg)
         
-    def setUp(self):
+    def setUp(self, CFHT=True):
         self.policy      = pexPolicy.Policy.createPolicy(diffimPolicy)
         self.kCols       = self.policy.getInt('kernelCols')
         self.kRows       = self.policy.getInt('kernelRows')
@@ -54,34 +54,49 @@ class DiffimTestCases(unittest.TestCase):
         self.kFunctor2   = ipDiffim.PsfMatchingFunctorF(self.basisList2)
 
         # Regularized delta function basis set
-        self.H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, 2, 0)
+        self.H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2, 1, 0)
         self.kFunctor3   = ipDiffim.PsfMatchingFunctorF(self.basisList1, self.H)
 
         # known input images
         defDataDir = eups.productDir('afwdata')
-        defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
-                                      "v26-e0-c011-a00.sci")
-        defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                       "v5-e0-c011-a00.sci")
-        self.scienceImage   = afwImage.ExposureF(defSciencePath)
-        self.templateImage  = afwImage.ExposureF(defTemplatePath)
-        self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage, self.scienceImage, self.policy)
+        if CFHT:
+            defSciencePath  = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1')
+            defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1_tmpl')
+
+            # no need to remap
+            self.scienceImage   = afwImage.ExposureF(defSciencePath)
+            self.templateImage  = afwImage.ExposureF(defTemplatePath)
+
+            # but do need to fix up mask planes
+            #defDict = afwImage.MaskU(0,0).getMaskPlaneDict()
+            #self.templateImage.getMaskedImage().getMask().conformMaskPlanes(defDict)
+            #self.scienceImage.getMaskedImage().getMask().conformMaskPlanes(defDict)
+        else:
+            defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
+                                          "v26-e0-c011-a00.sci")
+            defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
+                                           "v5-e0-c011-a00.sci")
+            
+            self.scienceImage   = afwImage.ExposureF(defSciencePath)
+            self.templateImage  = afwImage.ExposureF(defTemplatePath)
+            self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage, self.scienceImage, self.policy)
+
 
         # image statistics
         self.dStats  = ipDiffim.ImageStatisticsF()
 
         # footprints
-        self.detSet     = afwDetection.makeDetectionSet(self.scienceImage.getMaskedImage(), afwDetection.Threshold(575))
-        self.footprints = self.detSet.getFootprints()
+        #self.detSet     = afwDetection.makeDetectionSet(self.scienceImage.getMaskedImage(), afwDetection.Threshold(575))
+        #self.footprints = self.detSet.getFootprints()
         # BLOCKED BY TICKET 911
-        #self.footprints  = ipDiffim.getCollectionOfFootprintsForPsfMatching(self.templateImage.getMaskedImage(),
-        #                                                                    self.scienceImage.getMaskedImage(),
-        #                                                                    self.policy)
+        self.footprints  = ipDiffim.getCollectionOfFootprintsForPsfMatching(self.templateImage.getMaskedImage(),
+                                                                            self.scienceImage.getMaskedImage(),
+                                                                            self.policy)
         
     def tearDown(self):
         del self.policy
 
-    def applyFunctor(self, invert=False, xloc=397, yloc=580):
+    def applyFunctor(self, invert=False, xloc=397, yloc=580, iterate=False):
         print '# %.2f %.2f' % (xloc, yloc)
         
         imsize = int(3 * self.kCols)
@@ -107,8 +122,6 @@ class DiffimTestCases(unittest.TestCase):
         var  = afwImage.MaskedImageF(smi, True)
         var -= tmi
 
-
-
         # delta function kernel
         for func in (self.kFunctor1.apply,):
             func(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
@@ -126,6 +139,23 @@ class DiffimTestCases(unittest.TestCase):
             dmean1 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
             dstd1  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
             vmean1 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
+
+            if iterate:
+                func(tmi.getImage(), smi.getImage(), diffIm.getVariance(), self.policy)
+                kernel    = self.kFunctor1.getKernel()
+                kImageOut = afwImage.ImageD(self.kCols, self.kRows)
+                kSum      = kernel.computeImage(kImageOut, False)
+                diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor1.getBackground())
+                bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
+                                                          kernel.getCtrY()) ,
+                                          afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
+                                                          diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
+                diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
+                self.dStats.apply( diffIm2 )
+                
+                dmean1 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
+                dstd1  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
+                vmean1 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
             
             print 'DF Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
                                                                                         kSum, self.kFunctor1.getBackground(),
@@ -160,6 +190,23 @@ class DiffimTestCases(unittest.TestCase):
             dstd2  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
             vmean2 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
             
+            if iterate:
+                func(tmi.getImage(), smi.getImage(), diffIm.getVariance(), self.policy)
+                kernel    = self.kFunctor2.getKernel()
+                kImageOut = afwImage.ImageD(self.kCols, self.kRows)
+                kSum      = kernel.computeImage(kImageOut, False)
+                diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor2.getBackground())
+                bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
+                                                          kernel.getCtrY()) ,
+                                          afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
+                                                          diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
+                diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
+                self.dStats.apply( diffIm2 )
+                
+                dmean2 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
+                dstd2  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
+                vmean2 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
+
             print 'AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
                                                                                         kSum, self.kFunctor2.getBackground(),
                                                                                         dmean2, dstd2, vmean2)
@@ -189,13 +236,30 @@ class DiffimTestCases(unittest.TestCase):
             diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
             self.dStats.apply( diffIm2 )
     
-            dmean1 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
-            dstd1  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
-            vmean1 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
+            dmean3 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
+            dstd3  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
+            vmean3 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
+
+            if iterate:
+                func(tmi.getImage(), smi.getImage(), diffIm.getVariance(), self.policy)
+                kernel    = self.kFunctor3.getKernel()
+                kImageOut = afwImage.ImageD(self.kCols, self.kRows)
+                kSum      = kernel.computeImage(kImageOut, False)
+                diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor3.getBackground())
+                bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
+                                                          kernel.getCtrY()) ,
+                                          afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
+                                                          diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
+                diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
+                self.dStats.apply( diffIm2 )
+                
+                dmean3 = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
+                dstd3  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
+                vmean3 = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
             
             print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(), self.dStats.getRms(),
                                                                                          kSum, self.kFunctor3.getBackground(),
-                                                                                         dmean1, dstd1, vmean1)
+                                                                                         dmean3, dstd3, vmean3)
             diffImDRr = diffIm2
 
         diffImAL -= diffImDRr
@@ -217,6 +281,11 @@ class DiffimTestCases(unittest.TestCase):
 
 
     def testFunctor(self):
+        ipDiffim.returnMeanKernel(self.templateImage.getMaskedImage(),
+                                  self.scienceImage.getMaskedImage(),
+                                  self.footprints,
+                                  self.policy)
+        sys.exit(1)
         for object in self.footprints:
             # note this returns the kernel images
             self.applyFunctor(invert=False, 

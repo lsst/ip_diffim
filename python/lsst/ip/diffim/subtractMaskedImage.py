@@ -15,6 +15,7 @@ import lsst.pex.logging as pexLog
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.math  as afwMath
 import lsst.afw.image as afwImage
+import lsst.afw.detection as afwDetection
 import lsst.sdqa as sdqa
 
 def subtractMaskedImage(templateMaskedImage, 
@@ -30,6 +31,10 @@ def subtractMaskedImage(templateMaskedImage,
     # This is non-negotiable
     assert (templateMaskedImage.getDimensions() == \
             scienceMaskedImage.getDimensions())
+
+    # We also assume that at this stage, they are aligned at the pixel level
+    # Assign to the coordinate system of the science image
+    templateMaskedImage.getMaskedImage().setXY0( scienceImage.getMaskedImage().getXY0() )
     
     kCols = policy.get("kernelCols")
     kRows = policy.get("kernelRows")
@@ -72,20 +77,13 @@ def subtractMaskedImage(templateMaskedImage,
         log.log(pexLog.Log.INFO, "Ending footprints : %s" % (time.ctime()))
 
     if display:
-        frame=1
-
-        diffimPlaneName = "DIFFIM_STAMP_PLANE"
-        diffimStampPlane = scienceMaskedImage.getMask().addMaskPlane(diffimPlaneName)
-        ds9.setMaskPlaneColor(diffimPlaneName, "cyan") # afw > 3.3.10 can handle any X11 colour, e.g. "powderBlue"
-
-        afwDetection.setMaskFromFootprintList(scienceMaskedImage.getMask(), fpList, (1 << diffimStampPlane))
-        ds9.mtv(scienceMaskedImage.getMask(), frame=frame)
+        ds9.mtv(templateMaskedImage, frame=0)
         
         for fp in fpList:
             x0, y0 = fp.getBBox().getLLC() - scienceMaskedImage.getXY0()
             x1, y1 = fp.getBBox().getURC() - scienceMaskedImage.getXY0()
-            ds9.line([(x0, y0), (x0, y1), (x1, y1), (x1, y0), (x0, y0)], frame=frame)
-
+            ds9.line([(x0, y0), (x0, y1), (x1, y1), (x1, y0), (x0, y0)], frame=0)
+    
     # switch image you convolve
     if invert:
         (scienceMaskedImage, templateMaskedImage) = (templateMaskedImage, scienceMaskedImage)

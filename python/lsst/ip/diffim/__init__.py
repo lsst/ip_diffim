@@ -10,6 +10,7 @@ from runPca import *
 from rejectKernelSumOutliers import *
 from createSpatialModelKernelCells import *
 from warpTemplateExposure import *
+from returnMeanKernel import *
 
 # second tier, ask for them by name
 import diffimDebug 

@@ -30,6 +30,10 @@
 namespace lsst {
 namespace ip {
 namespace diffim {
+
+    /** Mask plane definitions */
+    std::string const diffimStampCandidateStr = "DIFFIM_STAMP_CANDIDATE";
+    std::string const diffimStampUsedStr      = "DIFFIM_STAMP_USED";
     
     /** Uses a functor to accumulate Mask bits
      *
@@ -208,6 +212,9 @@ namespace diffim {
 
     /** Build a set of Alard/Lupton basis kernels
      *
+     * @note Should consider implementing as SeparableKernels for additional speed,
+     * but this will make the normalization a bit more complicated
+     * 
      * @param halfWidth  size is 2*N + 1
      * @param nGauss     number of gaussians
      * @param sigGauss   Widths of the Gaussian Kernels

@@ -382,11 +382,11 @@ Eigen::MatrixXd diffim::imageToEigenMatrix(
     unsigned int rows = img.getHeight();
     unsigned int cols = img.getWidth();
     Eigen::MatrixXd M = Eigen::MatrixXd::Zero(rows, cols);
-
     for (int y = 0; y != img.getHeight(); ++y) {
         int x = 0;
         for (typename lsst::afw::image::Image<ImageT>::x_iterator ptr = img.row_begin(y); ptr != img.row_end(y); ++ptr, ++x) {
-            M(x,y) = *ptr;
+            // M is addressed row, col
+            M(y,x) = *ptr;
         }
     }
     return M;
@@ -931,12 +931,10 @@ diffim::generateFiniteDifferenceRegularization(
 /** 
  * @brief Generate an Alard-Lupton basis set of Kernels.
  *
- * Not implemented.
+ * @note Should consider implementing as SeparableKernels for additional speed,
+ * but this will make the normalization a bit more complicated
  * 
  * @return Vector of Alard-Lupton Kernels.
- *
- * @throw lsst::pex::exceptions::DomainError if nRows or nCols not positive
- * @throw lsst::pex::exceptions::DomainError until implemented
  *
  * @ingroup diffim
  */
@@ -1055,9 +1053,6 @@ diffim::generateAlardLuptonKernelSet(
 /*
  * Adds a Function to an Image
  *
- * @note MAJOR NOTE; I need to check if my scaling of the image range from -1 to
- * 1 gets messed up here.  ACB.
- *
  * @note This routine assumes that the pixel coordinates start at (0, 0) which is
  * in general not true
  *
@@ -1161,7 +1156,6 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    
     math::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, convolutionKernel, false);
     
     /* Add in background */
@@ -1218,10 +1212,15 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     double detThresholdMin      = policy.getDouble("detThresholdMin");
     std::string detThresholdType = policy.getString("detThresholdType");
 
-    // Temporary mask plane that tells us which pixels are already in objects
-    std::string const diffimMaskName = "DIFFIM_FOOTPRINTS";
-    int diffimMaskPlane = imageToConvolve.getMask()->addMaskPlane(diffimMaskName);
-    image::MaskPixel const diffimBitMask = imageToConvolve.getMask()->getPlaneBitMask(diffimMaskName);
+    // New mask plane that tells us which pixels are already in sources
+    // Add to both images so mask planes are aligned
+    int diffimMaskPlane = imageToConvolve.getMask()->addMaskPlane(diffim::diffimStampCandidateStr);
+    (void)imageToNotConvolve.getMask()->addMaskPlane(diffim::diffimStampCandidateStr);
+    image::MaskPixel const diffimBitMask = imageToConvolve.getMask()->getPlaneBitMask(diffim::diffimStampCandidateStr);
+
+    // Add in new plane that will tell us which ones are used
+    (void)imageToConvolve.getMask()->addMaskPlane(diffim::diffimStampUsedStr);
+    (void)imageToNotConvolve.getMask()->addMaskPlane(diffim::diffimStampUsedStr);
 
     // Number of pixels to grow each Footprint, based upon the Kernel size
     int fpGrowPix = int(fpGrowKsize * ( (kCols > kRows) ? kCols : kRows ));
@@ -1237,6 +1236,8 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     int nCleanFp = 0;
     while ( (nCleanFp < minCleanFp) and (detThreshold > detThresholdMin) ) {
         imageToConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
+        imageToNotConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
+
         footprintListIn.clear();
         footprintListOut.clear();
         
@@ -1274,9 +1275,24 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
             logging::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                                "Grow by : %d pixels", fpGrowPix);
 
-            // Grow the footprint
-            // true = isotropic grow = slow
-            // false = 'manhattan grow' = fast
+            /* Grow the footprint
+               flag true  = isotropic grow   = slow
+               flag false = 'manhattan grow' = fast
+               
+               The manhattan masks are rotated 45 degree w.r.t. the coordinate
+               system.  They intersect the vertices of the rectangle that would
+               connect pixels (X0,Y0) (X1,Y0), (X0,Y1), (X1,Y1).
+               
+               The isotropic masks do take considerably longer to grow and are
+               basically elliptical.  X0, X1, Y0, Y1 delimit the extent of the
+               ellipse.
+
+               In both cases, since the masks aren't rectangles oriented with
+               the image coordinate system, when we DO extract such rectangles
+               as subimages for kernel fitting, some corner pixels can be found
+               in multiple subimages.
+
+            */
             detection::Footprint::Ptr fpGrow = 
                 detection::growFootprint(*i, fpGrowPix, false);
             
@@ -1288,11 +1304,19 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 			       int( 0.5 * ((*i)->getBBox().getY0()+(*i)->getBBox().getY1()) ) );
 
 
-            // Grab a subimage; there is an exception if it's e.g. too close to the image */
+            // Ignore if its too close to the edge of the amp image 
+            // Note we need to translate to pixel coordinates here
+            image::BBox fpBBox = (*fpGrow).getBBox();
+            fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
+            if ( ((*fpGrow).getBBox().getX0() < 0) ||
+                 ((*fpGrow).getBBox().getY0() < 0) ||
+                 ((*fpGrow).getBBox().getX1() > imageToConvolve.getWidth()) ||
+                 ((*fpGrow).getBBox().getY1() > imageToConvolve.getHeight()) )
+                continue;
+
+
+            // Grab a subimage; report any exception
             try {
-                image::BBox fpBBox = (*fpGrow).getBBox();
-                fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
-                
                 image::MaskedImage<ImageT> subImageToConvolve(imageToConvolve, fpBBox);
                 image::MaskedImage<ImageT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
             } catch (exceptions::Exception& e) {
@@ -1307,26 +1331,27 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
             itcFunctor.apply(*fpGrow);
             if (itcFunctor.getBits() > 0) {
                 logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                               "Footprint has masked pix in image to convolve"); 
+                                   "Footprint has masked pix (val=%d) in image to convolve", itcFunctor.getBits()); 
                 continue;
             }
 
             itncFunctor.apply(*fpGrow);
             if (itncFunctor.getBits() > 0) {
                 logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                               "Footprint has masked pix in image not to convolve");
+                                   "Footprint has masked pix (val=%d) in image not to convolve", itncFunctor.getBits());
                 continue;
             }
 
             // If we get this far, we have a clean footprint
             footprintListOut.push_back(fpGrow);
             (void)detection::setMaskFromFootprint(&(*imageToConvolve.getMask()), *fpGrow, diffimBitMask);
+            (void)detection::setMaskFromFootprint(&(*imageToNotConvolve.getMask()), *fpGrow, diffimBitMask);
             nCleanFp += 1;
         }
         detThreshold *= detThresholdScaling;
     }
-    /* Clean up the temporary mask plane */
-    imageToConvolve.getMask()->removeMaskPlane(diffimMaskName);
+    imageToConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
+    imageToNotConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
 
     if (footprintListOut.size() == 0) {
       throw LSST_EXCEPT(exceptions::Exception, 
