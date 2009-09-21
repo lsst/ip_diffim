@@ -41,13 +41,14 @@ class DiffimTestCases(unittest.TestCase):
         self.edgeBit       = afwImage.MaskU().getMaskPlane('EDGE')
 
         # known input images
-        defDataDir = eups.productDir('afwdata')
-        defImagePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                    "v5-e0-c011-a00.sci")
-        self.templateImage  = afwImage.MaskedImageF(defImagePath)
-        self.scienceImage   = self.templateImage.Factory( self.templateImage.getDimensions() )
-        
-        afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False, self.edgeBit)
+        self.defDataDir = eups.productDir('afwdata')
+        if self.defDataDir:
+            defImagePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
+                                        "v5-e0-c011-a00.sci")
+            self.templateImage  = afwImage.MaskedImageF(defImagePath)
+            self.scienceImage   = self.templateImage.Factory( self.templateImage.getDimensions() )
+            
+            afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False, self.edgeBit)
         
     def tearDown(self):
         del self.policy
@@ -76,6 +77,10 @@ class DiffimTestCases(unittest.TestCase):
                 self.assertAlmostEqual(diffIm2.getImage().get(i, j), -1.*bg, 4)
 
     def testConvolveAndSubtract(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+
         self.runConvolveAndSubtract(bg=0)
         self.runConvolveAndSubtract(bg=10)
 

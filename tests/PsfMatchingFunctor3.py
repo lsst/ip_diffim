@@ -46,31 +46,32 @@ class DiffimTestCases(unittest.TestCase):
         self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
 
         # known input images
-        defDataDir = eups.productDir('afwdata')
-        defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
-                                      "v26-e0-c011-a00.sci")
-        defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                       "v5-e0-c011-a00.sci")
-        self.scienceImage   = afwImage.ExposureF(defSciencePath)
-        self.templateImage  = afwImage.ExposureF(defTemplatePath)
-
-        # Remap the template to the image; replace self.templateImage with warped image
-        wKernel = afwMath.makeWarpingKernel('lanczos4')
-        self.remappedImage = self.templateImage.Factory(
-            self.scienceImage.getWidth(), 
-            self.scienceImage.getHeight(),
-            self.scienceImage.getWcs())
-        self.remappedImage.getMaskedImage().setXY0( self.scienceImage.getMaskedImage().getXY0() )
-        afwMath.warpExposure(self.remappedImage, 
-                             self.templateImage, 
-                             wKernel)
-        self.templateImage = self.remappedImage
-
-        # edge bit
-        self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
-
-        # image statistics
-        self.dStats  = ipDiffim.ImageStatisticsF()
+        self.defDataDir = eups.productDir('afwdata')
+        if self.defDataDir:
+            defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v26-e0",
+                                          "v26-e0-c011-a00.sci")
+            defTemplatePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
+                                           "v5-e0-c011-a00.sci")
+            self.scienceImage   = afwImage.ExposureF(defSciencePath)
+            self.templateImage  = afwImage.ExposureF(defTemplatePath)
+            
+            # Remap the template to the image; replace self.templateImage with warped image
+            wKernel = afwMath.makeWarpingKernel('lanczos4')
+            self.remappedImage = self.templateImage.Factory(
+                self.scienceImage.getWidth(), 
+                self.scienceImage.getHeight(),
+                self.scienceImage.getWcs())
+            self.remappedImage.getMaskedImage().setXY0( self.scienceImage.getMaskedImage().getXY0() )
+            afwMath.warpExposure(self.remappedImage, 
+                                 self.templateImage, 
+                                 wKernel)
+            self.templateImage = self.remappedImage
+            
+            # edge bit
+            self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
+            
+            # image statistics
+            self.dStats  = ipDiffim.ImageStatisticsF()
         
     def tearDown(self):
         del self.policy
@@ -168,6 +169,10 @@ class DiffimTestCases(unittest.TestCase):
             diffIm2.writeFits('dB2')
 
     def testFunctor(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+        
         #self.applyFunctor(invert=False, foffset=0)
         #self.applyFunctor(invert=True, foffset=4)
         

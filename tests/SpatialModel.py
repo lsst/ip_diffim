@@ -53,25 +53,26 @@ class DiffimTestCases(unittest.TestCase):
         self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
 
         # known input images
-        defDataDir = eups.productDir('afwdata')
-        defImagePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                    "v5-e0-c011-a00.sci")
-        self.templateImage  = afwImage.MaskedImageF(defImagePath)
-        self.scienceImage   = self.templateImage.Factory( self.templateImage.getDimensions() )
-        afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False, self.edgeBit)
-        self.addNoise(self.scienceImage) # entire image!
-
-        # image statistics
-        self.dStats  = ipDiffim.ImageStatisticsF()
-
-        self.policy.set('minCleanFp', 10)
-        self.policy.set('detThresholdType', 'value')
-        self.policy.set('detThreshold', 750.)
-        
-        self.footprints = ipDiffim.getCollectionOfFootprintsForPsfMatching(
-            self.templateImage,
-            self.scienceImage,
-            self.policy)
+        self.defDataDir = eups.productDir('afwdata')
+        if self.defDataDir:
+            defImagePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
+                                        "v5-e0-c011-a00.sci")
+            self.templateImage  = afwImage.MaskedImageF(defImagePath)
+            self.scienceImage   = self.templateImage.Factory( self.templateImage.getDimensions() )
+            afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False, self.edgeBit)
+            self.addNoise(self.scienceImage) # entire image!
+            
+            # image statistics
+            self.dStats  = ipDiffim.ImageStatisticsF()
+            
+            self.policy.set('minCleanFp', 10)
+            self.policy.set('detThresholdType', 'value')
+            self.policy.set('detThreshold', 750.)
+            
+            self.footprints = ipDiffim.getCollectionOfFootprintsForPsfMatching(
+                self.templateImage,
+                self.scienceImage,
+                self.policy)
 
     def tearDown(self):
         del self.policy
@@ -89,6 +90,9 @@ class DiffimTestCases(unittest.TestCase):
         img      += rdmImage
 
     def testSpatialModel(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
         
         spatialCells = diffimTools.createSpatialModelKernelCells(
             self.templateImage,
