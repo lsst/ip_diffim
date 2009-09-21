@@ -34,7 +34,7 @@ def subtractMaskedImage(templateMaskedImage,
 
     # We also assume that at this stage, they are aligned at the pixel level
     # Assign to the coordinate system of the science image
-    templateMaskedImage.getMaskedImage().setXY0( scienceImage.getMaskedImage().getXY0() )
+    templateMaskedImage.setXY0( scienceMaskedImage.getXY0() )
     
     kCols = policy.get("kernelCols")
     kRows = policy.get("kernelRows")

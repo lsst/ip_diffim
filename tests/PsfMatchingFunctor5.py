@@ -50,17 +50,18 @@ class DiffimTestCases(unittest.TestCase):
         self.gaussKernel.computeImage(self.kImageIn, False)
 
         # known input images
-        defDataDir = eups.productDir('afwdata')
-        defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                      "v5-e0-c011-a00.sci")
-        self.scienceImage  = afwImage.MaskedImageF(defSciencePath)
-
-        # image statistics
-        self.dStats  = ipDiffim.ImageStatisticsF()
-
-        # footprints
-        self.detSet     = afwDetection.makeDetectionSet(self.scienceImage, afwDetection.Threshold(800))
-        self.footprints = self.detSet.getFootprints()
+        self.defDataDir = eups.productDir('afwdata')
+        if self.defDataDir:
+            defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
+                                          "v5-e0-c011-a00.sci")
+            self.scienceImage  = afwImage.MaskedImageF(defSciencePath)
+            
+            # image statistics
+            self.dStats  = ipDiffim.ImageStatisticsF()
+            
+            # footprints
+            self.detSet     = afwDetection.makeDetectionSet(self.scienceImage, afwDetection.Threshold(800))
+            self.footprints = self.detSet.getFootprints()
 
     def tearDown(self):
         del self.policy
@@ -174,6 +175,10 @@ class DiffimTestCases(unittest.TestCase):
         return kImageOut
     
     def testFunctor(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+        
         kernels = []
         for object in self.footprints:
             # note this returns the kernel images

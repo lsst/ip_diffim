@@ -44,36 +44,42 @@ class DiffimStageTestCase(unittest.TestCase):
         # OUTPUTS
         self.policy.add('differenceExposureKey', 'differenceExposure0')
         self.policy.add('sdqaRatingSetKey',      'sdqaRatingSet0')
+
+        clipboard = pexClipboard.Clipboard()
               
         # create clipboard and fill 'er up!
-        defDataDir = eups.productDir('afwdata')
-        defSciencePath = os.path.join(defDataDir, "CFHT", "D4", 
-                                      "cal-53535-i-797722_1")
-        defTemplatePath = defSciencePath + "_tmpl"
+        self.defDataDir = eups.productDir('afwdata')
+        if self.defDataDir:
+            defSciencePath = os.path.join(self.defDataDir, "CFHT", "D4", 
+                                          "cal-53535-i-797722_1")
+            defTemplatePath = defSciencePath + "_tmpl"
+            
+            bbox = afwImage.BBox(afwImage.PointI(32,32), 512, 512)
+            scienceExposure = afwImage.ExposureF(defSciencePath, 0, bbox)
+            templateExposure = afwImage.ExposureF(defTemplatePath)
         
-        bbox = afwImage.BBox(afwImage.PointI(32,32), 512, 512)
-        scienceExposure = afwImage.ExposureF(defSciencePath, 0, bbox)
-        templateExposure = afwImage.ExposureF(defTemplatePath)
-        
-        clipboard = pexClipboard.Clipboard()
-        clipboard.put(self.policy.get('scienceExposureKey'), scienceExposure)
-        clipboard.put(self.policy.get('templateExposureKey'), templateExposure)
+            clipboard.put(self.policy.get('scienceExposureKey'), scienceExposure)
+            clipboard.put(self.policy.get('templateExposureKey'), templateExposure)
 
         inQueue = pexQueue.Queue()
         inQueue.addDataset(clipboard)
         self.outQueue = pexQueue.Queue()
-       
+        
         self.stage = diffimStages.DiffimStage(0, self.policy)
         self.stage.initialize(self.outQueue, inQueue)
         self.stage.setUniverseSize(1)
         self.stage.setRun('SingleExposureTest')
-
+        
 
     def tearDown(self):
         del self.stage
         del self.outQueue
 
     def testSingleInputExposure(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up; not running StageTest.py"
+            return
+        
         self.stage.process()
         clipboard = self.outQueue.getNextDataset()
         assert(clipboard.contains(self.policy.getString('differenceExposureKey')))

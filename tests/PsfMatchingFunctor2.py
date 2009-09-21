@@ -46,11 +46,12 @@ class DiffimTestCases(unittest.TestCase):
         self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
 
         # known input images
-        defDataDir = eups.productDir('afwdata')
-        defSciencePath = os.path.join(defDataDir, "CFHT", "D4", 
-                                      "cal-53535-i-797722_1")
-        self.scienceImage  = afwImage.MaskedImageF(defSciencePath)
-
+        self.defDataDir = eups.productDir('afwdata')
+        if self.defDataDir:
+            defSciencePath = os.path.join(self.defDataDir, "CFHT", "D4", 
+                                          "cal-53535-i-797722_1")
+            self.scienceImage  = afwImage.MaskedImageF(defSciencePath)
+            
     def tearDown(self):
         del self.policy
 
@@ -179,6 +180,10 @@ class DiffimTestCases(unittest.TestCase):
 
 
     def testGaussian(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+        
         self.doGaussian(kNorm=True, addNoise=False)
         self.doGaussian(kNorm=False, addNoise=False)
         

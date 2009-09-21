@@ -54,24 +54,23 @@ class DiffimTestCases(unittest.TestCase):
         self.kFunctorA   = ipDiffim.PsfMatchingFunctorF(self.basisList2)
 
         # known input images
-        defDataDir = eups.productDir('afwdata')
-        defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
-                                      "v26-e0-c011-a00.sci")
-        defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                       "v5-e0-c011-a00.sci")
-        self.scienceImage   = afwImage.ExposureF(defSciencePath)
-        self.templateImage  = afwImage.ExposureF(defTemplatePath)
-        self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage, self.scienceImage, self.policy)
-
-        # image statistics
-        self.dStats  = ipDiffim.ImageStatisticsF()
-
-        # footprints
-        self.detSet     = afwDetection.makeDetectionSet(self.scienceImage.getMaskedImage(), afwDetection.Threshold(575))
-        #self.detSet     = afwDetection.makeDetectionSet(self.scienceImage.getMaskedImage(), afwDetection.Threshold(1000))
-        self.footprints = self.detSet.getFootprints()
-
-        self.kFunctor = self.kFunctorA
+        self.defDataDir = eups.productDir('afwdata')
+        if self.defDataDir:
+            defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v26-e0",
+                                          "v26-e0-c011-a00.sci")
+            defTemplatePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
+                                           "v5-e0-c011-a00.sci")
+            self.scienceImage   = afwImage.ExposureF(defSciencePath)
+            self.templateImage  = afwImage.ExposureF(defTemplatePath)
+            self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage, self.scienceImage, self.policy)
+            
+            # image statistics
+            self.dStats  = ipDiffim.ImageStatisticsF()
+            
+            # footprints
+            self.detSet     = afwDetection.makeDetectionSet(self.scienceImage.getMaskedImage(), afwDetection.Threshold(575))
+            self.footprints = self.detSet.getFootprints()
+            self.kFunctor   = self.kFunctorA
         
     def tearDown(self):
         del self.policy
@@ -169,6 +168,10 @@ class DiffimTestCases(unittest.TestCase):
         return kImageOut
     
     def testFunctor(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+        
         cKernels = []
         dKernels = []
         for object in self.footprints:

@@ -47,17 +47,18 @@ class DiffimTestCases(unittest.TestCase):
         self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H)
 
         # known input images
-        defDataDir = eups.productDir('afwdata')
-        defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
-                                      "v26-e0-c011-a00.sci")
-        defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                       "v5-e0-c011-a00.sci")
-        self.scienceImage   = afwImage.ExposureF(defSciencePath)
-        self.templateImage  = afwImage.ExposureF(defTemplatePath)
-        self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage, self.scienceImage, self.policy)
-
-        # image statistics
-        self.dStats  = ipDiffim.ImageStatisticsF()
+        self.defDataDir = eups.productDir('afwdata')
+        if self.defDataDir:
+            defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v26-e0",
+                                          "v26-e0-c011-a00.sci")
+            defTemplatePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
+                                           "v5-e0-c011-a00.sci")
+            self.scienceImage   = afwImage.ExposureF(defSciencePath)
+            self.templateImage  = afwImage.ExposureF(defTemplatePath)
+            self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage, self.scienceImage, self.policy)
+            
+            # image statistics
+            self.dStats  = ipDiffim.ImageStatisticsF()
         
     def tearDown(self):
         del self.policy
@@ -155,6 +156,10 @@ class DiffimTestCases(unittest.TestCase):
             diffIm2.writeFits('dB2')
 
     def testFunctor(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+        
         #self.applyFunctor(invert=False, foffset=0)
         #self.applyFunctor(invert=True, foffset=4)
         
