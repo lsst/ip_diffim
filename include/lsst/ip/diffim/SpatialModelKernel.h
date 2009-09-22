@@ -26,82 +26,84 @@ namespace lsst {
 namespace ip {
 namespace diffim {
 
-//    /** 
-//     * 
-//     * @brief Class stored in SpatialCells for spatial Kernel fitting
-//     * 
-//     * KernelCandidate is a single Kernel derived around a source.  We'll assign
-//     * them to sets of SpatialCells; these sets will then be used to fit a
-//     * spatial model to the PSF.
-//     */    
-//    template <typename ImageT>
-//    class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<ImageT> {
-//        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getXCenter;
-//        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getYCenter;
-//        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getWidth;
-//        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getHeight;
-//    public: 
-//        typedef boost::shared_ptr<KernelCandidate> Ptr;
-//
-//        /// Constructor
-//        KernelCandidate(lsst::afw::detection::Source const& source, ///< The detected Source
-//                        typename ImageT::ConstPtr parentImage       ///< The image wherein lie the Sources
-//                        ) :
-//            lsst::afw::math::SpatialCellImageCandidate<ImageT>(source.getXAstrom(), source.getYAstrom()),
-//            _parentImage(parentImage),
-//            _source(source),
-//            _haveImage(false) {
-//        }
-//
-//        /// Destructor
-//        ~KernelCandidate() {};
-//
-//        /**
-//         * Return Cell rating
-//         * 
-//         * @note Required method for use by SpatialCell
-//         */
-//        double getCandidateRating() const { return _source.getPsfFlux(); }
-//
-//        /// Return the original Source
-//        lsst::afw::detection::Source const& getSource() const { return _source; }
-//
-//        typename ImageT::ConstPtr getImage() const;
-//    private:
-//        typename ImageT::ConstPtr _parentImage; // the %image that the Sources are found in
-//        lsst::afw::detection::Source const _source; // the Source itself
-//        bool mutable _haveImage;                    // do we have an Image to return?
-//    };
-//
-//    /**
-//     * Return a KernelCandidate of the right sort
-//     *
-//     * Cf. std::make_pair
-//     */
-//    template <typename ImageT>
-//    typename KernelCandidate<ImageT>::Ptr
-//    makeKernelCandidate(lsst::afw::detection::Source const& source, ///< The detected Source
-//                        typename ImageT::ConstPtr image             ///< The image wherein lies the object
-//                        ) {
-//        
-//        return typename KernelCandidate<ImageT>::Ptr(new KernelCandidate<ImageT>(source, image));
-//    }
-//
-//    template<typename PixelT>
-//    std::pair<lsst::afw::math::LinearCombinationKernel::PtrT, std::vector<double> >
-//    createKernelFromCandidates(lsst::afw::math::SpatialCellSet const& kernelCells,
-//                               int const nEigenComponents,
-//                               int const spatialOrder,
-//                               int const ksize,
-//                               int const nPerCell=-1                                  
-//                               );
-//
-//    template<typename PixelT>
-//    std::pair<bool, double>
-//    fitSpatialKernelFromCandidates(lsst::afw::math::Kernel *kernel,
-//                                   lsst::afw::math::SpatialCellSet const& kernelCells, 
-//                                   int const nStarPerCell=-1,
-//                                   double const tolerance=1e-5);
+    /** 
+     * 
+     * @brief Class stored in SpatialCells for spatial Kernel fitting
+     * 
+     * KernelCandidate is a single Kernel derived around a source.  We'll assign
+     * them to sets of SpatialCells; these sets will then be used to fit a
+     * spatial model to the PSF.
+     */    
+    template <typename ImageT>
+    class KernelCandidate : public lsst::ip::diffim::SpatialCellKernelCandidate<ImageT> {
+        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::getXCenter;
+        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::getYCenter;
+        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::getWidth;
+        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::getHeight;
+        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::_image;
+        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::_kernel;
+    public: 
+        typedef boost::shared_ptr<KernelCandidate> Ptr;
+
+        /// Constructor
+        KernelCandidate(lsst::afw::detection::Source const& source, ///< The detected Source
+                        typename ImageT::ConstPtr parentImage       ///< The image wherein lie the Sources
+                        ) :
+            lsst::afw::math::SpatialCellImageCandidate<ImageT>(source.getXAstrom(), source.getYAstrom()),
+            _parentImage(parentImage),
+            _source(source),
+            _haveImage(false) {
+        }
+
+        /// Destructor
+        ~KernelCandidate() {};
+
+        /**
+         * Return Cell rating
+         * 
+         * @note Required method for use by SpatialCell
+         */
+        double getCandidateRating() const { return _source.getPsfFlux(); }
+
+        /// Return the original Source
+        lsst::afw::detection::Source const& getSource() const { return _source; }
+
+        typename ImageT::ConstPtr getImage() const;
+    private:
+        typename ImageT::ConstPtr _parentImage; // the %image that the Sources are found in
+        lsst::afw::detection::Source const _source; // the Source itself
+        bool mutable _haveImage;                    // do we have an Image to return?
+    };
+
+    /**
+     * Return a KernelCandidate of the right sort
+     *
+     * Cf. std::make_pair
+     */
+    template <typename ImageT>
+    typename KernelCandidate<ImageT>::Ptr
+    makeKernelCandidate(lsst::afw::detection::Source const& source, ///< The detected Source
+                        typename ImageT::ConstPtr image             ///< The image wherein lies the object
+                        ) {
+        
+        return typename KernelCandidate<ImageT>::Ptr(new KernelCandidate<ImageT>(source, image));
+    }
+
+    template<typename PixelT>
+    std::pair<lsst::afw::math::LinearCombinationKernel::PtrT, std::vector<double> >
+    createKernelFromCandidates(lsst::afw::math::SpatialCellSet const& kernelCells,
+                               int const nEigenComponents,
+                               int const spatialOrder,
+                               int const ksize,
+                               int const nPerCell=-1                                  
+                               );
+
+    template<typename PixelT>
+    std::pair<bool, double>
+    fitSpatialKernelFromCandidates(lsst::afw::math::Kernel *kernel,
+                                   lsst::afw::math::SpatialCellSet const& kernelCells, 
+                                   int const nStarPerCell=-1,
+                                   double const tolerance=1e-5);
     
     
 

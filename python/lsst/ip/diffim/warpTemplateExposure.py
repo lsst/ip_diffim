@@ -1,6 +1,7 @@
 import lsst.afw.math as afwMath
 
 def warpTemplateExposure(templateExposure, scienceExposure, policy):
+    # The destination Wcs is in scienceExposure
     # Create the warping Kernel according to policy
     warpingKernelName = policy.getString("warpingKernelName")
     warpingKernel     = afwMath.makeWarpingKernel(warpingKernelName)

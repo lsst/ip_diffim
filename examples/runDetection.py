@@ -3,12 +3,16 @@ import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.display.ds9 as ds9
-import os
+import os, sys
 
-defDataDir = eups.productDir("afwdata")
-defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                               "v5-e0-c011-a00.sci")
-templateImage  = afwImage.MaskedImageF(defTemplatePath)
+if len(sys.argv) == 1:
+    defDataDir = eups.productDir("afwdata")
+    defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
+                                   "v5-e0-c011-a00.sci")
+    templateImage  = afwImage.MaskedImageF(defTemplatePath)
+else:
+    templateImage  = afwImage.MaskedImageF(sys.argv[1])
+    
 ds9.mtv(templateImage, frame=0)
 
 bctrl = afwMath.BackgroundControl(afwMath.NATURAL_SPLINE)
