@@ -30,6 +30,25 @@ namespace detection  = lsst::afw::detection;
 namespace lsst {
 namespace ip {
 namespace diffim {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#if 0
     
 template <typename ImageT>
 SpatialModelKernel<ImageT>::SpatialModelKernel(
@@ -192,9 +211,7 @@ double SpatialModelKernel<ImageT>::returnCellRating() {
     return counter.getCounts();
 }
 
-// Explicit instantiations
-template class SpatialModelKernel<float>;
-template class SpatialModelKernel<double>;
+#endif
 
 }}} // end of namespace lsst::ip::diffim
 

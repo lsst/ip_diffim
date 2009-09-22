@@ -24,6 +24,7 @@ namespace lsst {
 namespace ip {
 namespace diffim {
 
+#if 0
 template <typename ClassT>
 SpatialModelCell<ClassT>::SpatialModelCell(
     std::string  label,
@@ -185,6 +186,8 @@ template class SpatialModelCell<SpatialModelKernel<double> >;
 
 template class cmpSpatialModels<SpatialModelKernel<float> >;
 template class cmpSpatialModels<SpatialModelKernel<double> >;
+
+#endif
 
 }}} // end of namespace lsst::ip::diffim
 

@@ -155,6 +155,7 @@ SWIG_SHARED_PTR(SpatialModelKernelD, lsst::ip::diffim::SpatialModelKernel<double
 
 /******************************************************************************/
 
+/*
 %{
 #include "lsst/ip/diffim/SpatialModelCell.h"
 %}
@@ -169,6 +170,7 @@ SWIG_SHARED_PTR(SpatialModelCellD, lsst::ip::diffim::SpatialModelCell<lsst::ip::
 
 %template(VectorSpatialModelCellF) std::vector<lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >::Ptr >;
 %template(VectorSpatialModelCellD) std::vector<lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >::Ptr >;
+*/
 
 /******************************************************************************/
 

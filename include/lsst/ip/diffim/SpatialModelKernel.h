@@ -18,6 +18,7 @@
 #include <lsst/afw/math/KernelFunctions.h>
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/afw/detection/Footprint.h>
+#include <lsst/afw/math/SpatialCell.h>
 #include <lsst/sdqa/SdqaRating.h>
 
 #include <lsst/ip/diffim/ImageSubtract.h>
@@ -44,17 +45,23 @@ namespace diffim {
         using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::_kernel;
     public: 
         typedef boost::shared_ptr<KernelCandidate> Ptr;
-
-        /// Constructor
-        KernelCandidate(lsst::afw::detection::Source const& source, ///< The detected Source
-                        typename ImageT::ConstPtr parentImage       ///< The image wherein lie the Sources
-                        ) :
-            lsst::afw::math::SpatialCellImageCandidate<ImageT>(source.getXAstrom(), source.getYAstrom()),
-            _parentImage(parentImage),
-            _source(source),
-            _haveImage(false) {
-        }
-
+        typedef boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT> > MaskedImagePtr;
+	
+        /** Constructor
+         *
+         * @param fpPtr  Pointer to footprint of pixels used to build Kernel
+         * @param miToConvolvePtr  Pointer to template image
+         * @param miToNotConvolvePtr  Pointer to science image
+         * @param kernelFunctor  Functor to build the PSF Mathching Kernel
+         * @param policy  Policy for operations
+         * @param build  Build upon construction?  Default is false.
+         */
+        KernelCandidate(lsst::afw::detection::Footprint::Ptr const& fpPtr,
+			MaskedImagePtr const& miToConvolvePtr,
+			MaskedImagePtr const& miToNotConvolvePtr,
+			boost::shared_ptr<PsfMatchingFunctor<ImageT> > const& kernelFunctor,
+			lsst::pex::policy::Policy const& policy);
+	
         /// Destructor
         ~KernelCandidate() {};
 
@@ -63,16 +70,19 @@ namespace diffim {
          * 
          * @note Required method for use by SpatialCell
          */
-        double getCandidateRating() const { return _source.getPsfFlux(); }
-
-        /// Return the original Source
-        lsst::afw::detection::Source const& getSource() const { return _source; }
+        double getCandidateRating();
 
         typename ImageT::ConstPtr getImage() const;
+        lsst::afw::math::Kernel::PtrT getKernel() const;
+	
     private:
-        typename ImageT::ConstPtr _parentImage; // the %image that the Sources are found in
-        lsst::afw::detection::Source const _source; // the Source itself
-        bool mutable _haveImage;                    // do we have an Image to return?
+        lsst::afw::detection::Footprint::Ptr _fpPtr;        ///< Footprint containing pixels used to build Kernel
+        MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
+        MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel
+        typename PsfMatchingFunctor<ImageT>::Ptr _kFunctor; ///< Functor to build PSF matching kernel
+        lsst::pex::policy::Policy _policy;                  ///< Policy file for operations
+
+        bool mutable _haveImage;                            ///< do we have an Image to return?
     };
 
     /**
@@ -82,31 +92,19 @@ namespace diffim {
      */
     template <typename ImageT>
     typename KernelCandidate<ImageT>::Ptr
-    makeKernelCandidate(lsst::afw::detection::Source const& source, ///< The detected Source
-                        typename ImageT::ConstPtr image             ///< The image wherein lies the object
-                        ) {
+    makeKernelCandidate(lsst::afw::detection::Footprint::Ptr const& fpPtr,
+			boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT> > const& miToConvolvePtr,
+			boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT> > const& miToNotConvolvePtr,
+			boost::shared_ptr<PsfMatchingFunctor<ImageT> > const& kernelFunctor,
+			lsst::pex::policy::Policy const& policy) {
         
-        return typename KernelCandidate<ImageT>::Ptr(new KernelCandidate<ImageT>(source, image));
+       return typename KernelCandidate<ImageT>::Ptr(new KernelCandidate<ImageT>(fpPtr, miToConvolvePtr,
+										miToNotConvolvePtr, kernelFunctor, policy));
     }
 
-    template<typename PixelT>
-    std::pair<lsst::afw::math::LinearCombinationKernel::PtrT, std::vector<double> >
-    createKernelFromCandidates(lsst::afw::math::SpatialCellSet const& kernelCells,
-                               int const nEigenComponents,
-                               int const spatialOrder,
-                               int const ksize,
-                               int const nPerCell=-1                                  
-                               );
-
-    template<typename PixelT>
-    std::pair<bool, double>
-    fitSpatialKernelFromCandidates(lsst::afw::math::Kernel *kernel,
-                                   lsst::afw::math::SpatialCellSet const& kernelCells, 
-                                   int const nStarPerCell=-1,
-                                   double const tolerance=1e-5);
     
     
-
+#if 0
 
     /* OLD CODE BELOW */
 
@@ -356,7 +354,8 @@ namespace diffim {
 
     }; // end of class
 
-
+#endif
+    
 }}}
 
 #endif // LSST_IP_DIFFIM_SPATIALMODELKERNEL_H
