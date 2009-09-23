@@ -309,6 +309,11 @@ namespace diffim {
          */
         boost::shared_ptr<lsst::afw::math::Kernel> getKernelError() const { return _kernelError; }
 
+        /** Access to least squares info
+         */
+        Eigen::MatrixXd getM() const { return _M; }
+        Eigen::VectorXd getB() const { return _B; }
+    
         /* Create PSF matching kernel */
         void apply(lsst::afw::image::Image<ImageT> const& imageToConvolve,
                    lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
@@ -325,6 +330,8 @@ namespace diffim {
 
     protected:
         lsst::afw::math::KernelList<lsst::afw::math::Kernel> _basisList;        ///< List of Kernel basis functions
+        Eigen::MatrixXd _M;                                                     ///< Least squares matrix
+        Eigen::VectorXd _B;                                                     ///< Least squares vector
         Eigen::MatrixXd _H;                                                     ///< Regularization matrix
         double _background;                                                     ///< Differenaitl background estimate
         double _backgroundError;                                                ///< Uncertainty on background

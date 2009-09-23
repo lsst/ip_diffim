@@ -13,6 +13,7 @@
 #define LSST_IP_DIFFIM_SPATIALMODELKERNEL_H
 
 #include <boost/shared_ptr.hpp>
+#include <Eigen/Core>
 
 #include <lsst/afw/math/SpatialCell.h>
 #include <lsst/afw/math/Kernel.h>
@@ -79,9 +80,13 @@ namespace diffim {
 
         typename ImageT::ConstPtr getImage() const;
         lsst::afw::math::Kernel::PtrT getKernel() const;
-
+	Eigen::MatrixXd getM()  {return _M;}
+	Eigen::VectorXd getB()  {return _B;}
+	
         void setKernel(lsst::afw::math::Kernel::PtrT kernel) {_kernel = kernel; _haveKernel = true;}
         void setBackground(double background) {_background = background;}
+	void setM(Eigen::MatrixXd M) {_M = M;}
+	void setB(Eigen::VectorXd B) {_B = B;}
 	
     private:
         MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
@@ -89,6 +94,8 @@ namespace diffim {
 
         lsst::afw::math::Kernel::PtrT _kernel;              ///< Derived single-object convolution kernel
         double _background;                                 ///< Derived differential background estimate
+        Eigen::MatrixXd _M;                                 ///< Derived least squares matrix
+        Eigen::VectorXd _B;                                 ///< Derived least squares vector
 
         bool mutable _haveImage;                            ///< do we have an Image to return?
         bool mutable _haveKernel;                           ///< do we have a Kernel to return?

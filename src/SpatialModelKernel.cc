@@ -86,11 +86,19 @@ namespace {
             MaskedImageT var = MaskedImageT(kCandidate->getMiToNotConvolvePtr(), true);
             var             -= kCandidate->getMiToConvolvePtr();
 
-            _kFunctor.apply(kCandidate->getMiToConvolvePtr->getImage(),
-                            kCandidate->getMiToNotConvolvePtr->getImage(),
-                            var.getVariance(),
-                            _policy);
+            try {
+               _kFunctor.apply(kCandidate->getMiToConvolvePtr->getImage(),
+                               kCandidate->getMiToNotConvolvePtr->getImage(),
+                               var.getVariance(),
+                               _policy);
+            } catch (lsst::pex::exceptions::Exception &e) {
+               LSST_EXCEPT_ADD(e, "Unable to calculate Kernel");
+               throw e;
+            }
 
+            /* Update the candidate with derived products */
+            kCandidate->setM(_kFunctor.getM());
+            kCandidate->setB(_kFunctor.getB());
             kCandidate->setKernel(_kFunctor.getKernel());
             kCandidate->setBackground(_kFunctor.getBackground());
 
@@ -146,8 +154,15 @@ namespace {
         typedef afwImage::Image<PixelT> ImageT;
         typedef afwImage::MaskedImage<PixelT> MaskedImageT;
     public:
-        LinearSpatialFitVisitor() :
-            afwMath::CandidateVisitor() {}
+        LinearSpatialFitVisitor(
+				int const spatialOrder  ///< Order of spatial variation (cf. lsst::afw::math::PolynomialFunction2)
+				):
+           afwMath::CandidateVisitor(),
+	   _M(Eigen::MatrixXd()),
+	   _B(Eigen::VectorXd()),
+           _spatialFunction( new afwMath::PolynomialFunction2<double>(spatialOrder) ) {
+
+	}
         
         void processCandidate(afwMath::SpatialCellCandidate *candidate) {
             KernelCandidate<MaskedImageT, PixelT> *kCandidate = dynamic_cast<KernelCandidate<MaskedImageT, PixelT> *>(candidate);
@@ -155,11 +170,24 @@ namespace {
                 throw LSST_EXCEPT(lsst::pex::exceptions::LogicErrorException,
                                   "Failed to cast SpatialCellCandidate to KernelCandidate");
             }
-            
-            
+
+	    /* Calculate P matrix */
+	    std::vector<double> params = _spatialFunction->getParameters();
+	    Eigen::VectorXd p( params.size() );
+
+	    for (unsigned int idx = 0; idx < params.size(); idx++) {
+	       params[idx] = 1.0;
+	       _spatialFunction->setParameters(params);		  
+	       p(idx) = _spatialFunction( kCandidate->getXCenter(), kCandidate->getYCenter() );
+	       params[idx] = 0.0;
+	    }
+	    Eigen::MatrixXd P = (p.transpose() * p).asDiagonal();
         }
     private:
-        afwImage::ImagePca<ImageT> *_imagePca; 
+        Eigen::MatrixXd _M; ///< Least squares matrix
+        Eigen::VectorXd _B; ///< Least squares vector
+        int const _spatialOrder;
+        afwMath::Kernel::SpatialFunctionPtr _spatialFunction;
     };
 }
 
@@ -341,7 +369,7 @@ bool SpatialModelKernel<ImageT>::buildModel() {
                        "Footprint = %d,%d -> %d,%d (center %d,%d)",
                        fpBBox.getX0(), fpBBox.getY0(),
                        fpBBox.getX1(), fpBBox.getY1(),
-		       int(getColc()), int(getRowc()));
+                       int(getColc()), int(getRowc()));
 
     // Estimate of the variance for first kernel pass
     // True argument is for a deep copy, so -= does not modify the original pixels

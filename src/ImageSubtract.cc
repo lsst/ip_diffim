@@ -46,6 +46,8 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
     lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList
     ) :
     _basisList(basisList),
+    _M(Eigen::MatrixXd()),
+    _B(Eigen::VectorXd()),
     _H(Eigen::MatrixXd()),
     _background(0.),
     _backgroundError(0.),
@@ -59,6 +61,8 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
     Eigen::MatrixXd const H
     ) :
     _basisList(basisList),
+    _M(Eigen::MatrixXd()),
+    _B(Eigen::VectorXd()),
     _H(H),
     _background(0.),
     _backgroundError(0.),
@@ -315,6 +319,9 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     }
     _background = Soln(nParameters-1);
 
+    /* Save matrices for linear spatial fitting */
+    _M = M;
+    _B = B;
 
     /* Calculate the kernel & background uncertainties only if requested */
     bool calculateKernelUncertainty = policy.getBool("calculateKernelUncertainty");            
