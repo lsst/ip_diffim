@@ -181,7 +181,8 @@ namespace {
 	       p(idx) = _spatialFunction( kCandidate->getXCenter(), kCandidate->getYCenter() );
 	       params[idx] = 0.0;
 	    }
-	    Eigen::MatrixXd P = (p.transpose() * p).asDiagonal();
+	    Eigen::MatrixXd P = (p * p.transpose());
+	    P.resize(P.rows()*P.cols(), 1);
         }
     private:
         Eigen::MatrixXd _M; ///< Least squares matrix

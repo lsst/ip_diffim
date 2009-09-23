@@ -162,7 +162,7 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
 
 int main() {
     boost::timer t;
-    
+
     lsst::afw::image::Image<float> varianceEstimate(100, 100);
     varianceEstimate = 1;
     
