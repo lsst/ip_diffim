@@ -46,6 +46,8 @@ namespace boost {
 #include <Eigen/LU>
 #include <Eigen/QR>
 
+#include <lsst/afw/math/SpatialCell.h>
+
 #include <lsst/pex/policy/Policy.h>
 %}
 
@@ -56,6 +58,7 @@ namespace boost {
 %import  "lsst/afw/image/imageLib.i" 
 %import  "lsst/afw/detection/detectionLib.i"
 %import  "lsst/afw/math/kernelLib.i"
+%import  "lsst/afw/math/spatialCell.i"
 
 /* so SWIG knows that PolynomialFunction2D is derived from Function2 */
 %import  "lsst/afw/math/functionLib.i"  
@@ -141,19 +144,23 @@ SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double
 #include "lsst/ip/diffim/SpatialModelKernel.h"
 %}
 
+%define %IMAGE(PIXTYPE)
+lsst::afw::image::Image<PIXTYPE>
+%enddef
+
 %define %KernelCandidatePtr(NAME, TYPE)
 SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
-                        lsst::afw::math::SpatialCellImageCandidate<%MASKEDIMAGE(TYPE)>,
-                        lsst::ip::diffim::KernelCandidate<%MASKEDIMAGE(TYPE)>);
+                        lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::PixelT)>,
+                        lsst::ip::diffim::KernelCandidate<TYPE>);
 %enddef
 
 %define %KernelCandidate(NAME, TYPE)
-%template(KernelCandidate##NAME) lsst::ip::diffim::KernelCandidate<%MASKEDIMAGE(TYPE)>;
-%template(makeKernelCandidate) lsst::ip::diffim::makeKernelCandidate<%MASKEDIMAGE(TYPE)>;
+%template(KernelCandidate##NAME) lsst::ip::diffim::KernelCandidate<TYPE>;
+%template(makeKernelCandidate) lsst::ip::diffim::makeKernelCandidate<TYPE>;
 %inline %{
-    lsst::ip::diffim::KernelCandidate<%MASKEDIMAGE(TYPE)> *
+    lsst::ip::diffim::KernelCandidate<TYPE> *
         cast_KernelCandidate##NAME(lsst::afw::math::SpatialCellCandidate * candidate) {
-        return dynamic_cast<lsst::ip::diffim::KernelCandidate<%MASKEDIMAGE(TYPE)> *>(candidate);
+        return dynamic_cast<lsst::ip::diffim::KernelCandidate<TYPE> *>(candidate);
     }
 %}
 %enddef
@@ -164,6 +171,7 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 %include "lsst/ip/diffim/SpatialModelKernel.h"
 
 %KernelCandidate(F, float);
+%template(createPcaBasisFromCandidates) lsst::ip::diffim::createPcaBasisFromCandidates<float>;
 
 
 /******************************************************************************/
