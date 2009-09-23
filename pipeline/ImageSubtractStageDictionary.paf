@@ -69,10 +69,9 @@ backgroundSpatialOrder: 0
 #####
 # Chops up the image into cells
 #
-#   segmentMaskedImage:
 #
-nSegmentCol: 10
-nSegmentRow: 10
+sizeCellX: 10
+sizeCellY: 10
 
 ######
 # Rejects objects with deviant Kernel Sums

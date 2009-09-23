@@ -33,27 +33,6 @@ namespace ip {
 namespace diffim {
 
     
-    template<typename ImageT>
-    class SpatialCellKernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<ImageT> {
-    public:
-        typedef boost::shared_ptr<SpatialCellKernelCandidate<ImageT> > Ptr;
-        typedef boost::shared_ptr<const SpatialCellKernelCandidate<ImageT> > ConstPtr;
-
-        SpatialCellKernelCandidate(float const xCenter, ///< The object's column-centre
-                                   float const yCenter  ///< The object's row-centre
-            ) : lsst::afw::math::SpatialCellImageCandidate<ImageT>(xCenter, yCenter),
-                _kernel(typename lsst::afw::math::Kernel::PtrT()){
-        }
-
-        /// Return the Candidate's Kernel
-        virtual typename lsst::afw::math::Kernel::PtrT getKernel() const = 0;
-        
-    protected:
-        typename lsst::afw::math::Kernel::PtrT mutable _kernel; 
-    private:
-    };
-        
-
     /** Mask plane definitions */
     std::string const diffimStampCandidateStr = "DIFFIM_STAMP_CANDIDATE";
     std::string const diffimStampUsedStr      = "DIFFIM_STAMP_USED";

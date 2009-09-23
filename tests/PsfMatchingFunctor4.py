@@ -36,10 +36,9 @@ class DiffimTestCases(unittest.TestCase):
         self.kRows       = self.policy.getInt('kernelRows')
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
         self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
-        self.H           = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 1)
+        self.H           = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2, 1, 0)
         # difference imaging functor
-        #self.kFunctorD      = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H)
-        self.kFunctorD      = ipDiffim.PsfMatchingFunctorF(self.basisList)
+        self.kFunctorD      = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H)
 
         # Alard-Lupton basis set
         nGauss   = self.policy.get("alardNGauss")

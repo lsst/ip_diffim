@@ -38,7 +38,8 @@ for fp in footprints:
         
         ds9.line([(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)], ctype=ds9.RED)
 
-bitmask = templateImage.getMask().getPlaneBitMask("DETECTED")
+#bitmask = templateImage.getMask().getPlaneBitMask("DETECTED")
+bitmask = 0x1
 afwDetection.setMaskFromFootprintList(templateImage.getMask(), footprints, bitmask)
 ds9.mtv(templateImage, frame=1)
 

@@ -14,6 +14,7 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <lsst/afw/math/SpatialCell.h>
 #include <lsst/afw/math/Kernel.h>
 #include <lsst/afw/math/KernelFunctions.h>
 #include <lsst/pex/policy/Policy.h>
@@ -35,32 +36,33 @@ namespace diffim {
      * them to sets of SpatialCells; these sets will then be used to fit a
      * spatial model to the PSF.
      */    
-    template <typename ImageT>
-    class KernelCandidate : public lsst::ip::diffim::SpatialCellKernelCandidate<ImageT> {
-        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::getXCenter;
-        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::getYCenter;
-        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::getWidth;
-        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::getHeight;
-        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::_image;
-        using lsst::ip::diffim::SpatialCellKernelCandidate<ImageT>::_kernel;
+
+    template <typename ImageT, typename PixelT>
+    class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<ImageT> {
+        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getXCenter;
+        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getYCenter;
+        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getWidth;
+        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getHeight;
+        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::_image;
     public: 
         typedef boost::shared_ptr<KernelCandidate> Ptr;
-        typedef boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT> > MaskedImagePtr;
+        typedef boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
 	
         /** Constructor
          *
-         * @param fpPtr  Pointer to footprint of pixels used to build Kernel
          * @param miToConvolvePtr  Pointer to template image
          * @param miToNotConvolvePtr  Pointer to science image
-         * @param kernelFunctor  Functor to build the PSF Mathching Kernel
-         * @param policy  Policy for operations
-         * @param build  Build upon construction?  Default is false.
          */
-        KernelCandidate(lsst::afw::detection::Footprint::Ptr const& fpPtr,
-			MaskedImagePtr const& miToConvolvePtr,
-			MaskedImagePtr const& miToNotConvolvePtr,
-			boost::shared_ptr<PsfMatchingFunctor<ImageT> > const& kernelFunctor,
-			lsst::pex::policy::Policy const& policy);
+        KernelCandidate(float const xCenter,
+                        float const yCenter, 
+                        MaskedImagePtr const& miToConvolvePtr,
+			MaskedImagePtr const& miToNotConvolvePtr) :
+            lsst::afw::math::SpatialCellImageCandidate<ImageT>(xCenter, yCenter),
+            _miToConvolvePtr(miToConvolvePtr),
+            _miToNotConvolvePtr(miToNotConvolvePtr),
+            _haveImage(false),
+            _haveKernel(false) {
+        }
 	
         /// Destructor
         ~KernelCandidate() {};
@@ -68,41 +70,71 @@ namespace diffim {
         /**
          * Return Cell rating
          * 
-         * @note Required method for use by SpatialCell
+         * @note Required method for use by SpatialCell; e.g. total flux
          */
         double getCandidateRating();
 
+        MaskedImagePtr getMiToConvolvePtr() {return _miToConvolvePtr;}
+        MaskedImagePtr getMiToNotConvolvePtr() {return _miToNotConvolvePtr;}
+
         typename ImageT::ConstPtr getImage() const;
         lsst::afw::math::Kernel::PtrT getKernel() const;
+
+        void setKernel(lsst::afw::math::Kernel::PtrT kernel) {_kernel = kernel; _haveKernel = true;}
+        void setBackground(double background) {_background = background;}
 	
     private:
-        lsst::afw::detection::Footprint::Ptr _fpPtr;        ///< Footprint containing pixels used to build Kernel
         MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
         MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel
-        typename PsfMatchingFunctor<ImageT>::Ptr _kFunctor; ///< Functor to build PSF matching kernel
-        lsst::pex::policy::Policy _policy;                  ///< Policy file for operations
+
+        lsst::afw::math::Kernel::PtrT _kernel;              ///< Derived single-object convolution kernel
+        double _background;                                 ///< Derived differential background estimate
 
         bool mutable _haveImage;                            ///< do we have an Image to return?
+        bool mutable _haveKernel;                           ///< do we have a Kernel to return?
     };
 
     /**
-     * Return a KernelCandidate of the right sort
+     * Return a KernelCandidate pointer of the right sort
      *
-     * Cf. std::make_pair
      */
-    template <typename ImageT>
-    typename KernelCandidate<ImageT>::Ptr
-    makeKernelCandidate(lsst::afw::detection::Footprint::Ptr const& fpPtr,
-			boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT> > const& miToConvolvePtr,
-			boost::shared_ptr<lsst::afw::image::MaskedImage<ImageT> > const& miToNotConvolvePtr,
-			boost::shared_ptr<PsfMatchingFunctor<ImageT> > const& kernelFunctor,
-			lsst::pex::policy::Policy const& policy) {
+    template <typename ImageT, typename PixelT>
+    typename KernelCandidate<ImageT,PixelT>::Ptr
+    makeKernelCandidate(boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToConvolvePtr,
+			boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToNotConvolvePtr) {
         
-       return typename KernelCandidate<ImageT>::Ptr(new KernelCandidate<ImageT>(fpPtr, miToConvolvePtr,
-										miToNotConvolvePtr, kernelFunctor, policy));
+        return typename KernelCandidate<ImageT,PixelT>::Ptr(new KernelCandidate<ImageT,PixelT>(miToConvolvePtr,
+                                                                                               miToNotConvolvePtr));
     }
 
+    template<typename PixelT>
+    std::pair<lsst::afw::math::LinearCombinationKernel::PtrT, std::vector<double> >
+    createPcaBasisFromCandidates(lsst::afw::math::SpatialCellSet const& psfCells,
+                                 int const nEigenComponents,
+                                 int const spatialOrder,
+                                 int const nStarPerCell=-1);
+
+    /*
+    template<typename PixelT>
+    std::pair<lsst::afw::math::LinearCombinationKernel::PtrT, std::vector<double> >
+    returnKernelFromCandidates(lsst::afw::math::SpatialCellSet const& psfCells,
+                               int const spatialOrder,
+                               int const nStarPerCell=-1);
+    */
+
+    template<typename PixelT>
+    std::pair<bool, double>
+    fitSpatialKernelNonlinear(lsst::afw::math::Kernel *kernel,
+                              lsst::afw::math::SpatialCellSet const& psfCells, 
+                              int const nStarPerCell=-1,
+                              double const tolerance=1e-5);
     
+    template<typename PixelT>
+    std::pair<bool, double>
+    fitSpatialKernelLinear(lsst::afw::math::Kernel *kernel,
+                           lsst::afw::math::SpatialCellSet const& psfCells, 
+                           int const nStarPerCell=-1,
+                           double const tolerance=1e-5);
     
 #if 0
 
