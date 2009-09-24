@@ -34,9 +34,9 @@ namespace pexExcept      = lsst::pex::exceptions;
 namespace lsst {
 namespace ip {
 namespace diffim {
-            
-template <typename PixelT, typename ImageT>
-typename ImageT::ConstPtr lsst::ip::diffim::KernelCandidate<PixelT, ImageT>::getImage() const {
+
+template <typename PixelT>
+KernelCandidate<PixelT>::ImageT::ConstPtr KernelCandidate<PixelT>::getImage() const {
     int const width = getWidth() == 0 ? 15 : getWidth();
     int const height = getHeight() == 0 ? 15 : getHeight();
     
@@ -49,19 +49,26 @@ typename ImageT::ConstPtr lsst::ip::diffim::KernelCandidate<PixelT, ImageT>::get
     }
     
     if (!_haveImage) {
-        /* Calculate it from the Kernel */
+        // Calculate it from the Kernel 
         (void)_kernel->computeImage(*_image, false);                    
     }
     return _image;
 }
 
-template <typename PixelT, typename ImageT>
-typename ImageT::Ptr lsst::ip::diffim::KernelCandidate<PixelT, ImageT>::copyImage() const {
-    return typename ImageT::Ptr(new ImageT(*getImage(), true));
+template <typename PixelT>
+KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::copyImage() const {
+    return typename KernelCandidate<PixelT>::ImageT::Ptr(new typename KernelCandidate<PixelT>::ImageT(*getImage(), true));
+    /*
+    typename KernelCandidate<PixelT>::ImageT::Ptr imcopy(
+        new typename KernelCandidate<PixelT>::ImageT(*_image, true)
+        );
+    return imcopy;
+    */
 }
-    
-template <typename PixelT, typename ImageT>
-lsst::afw::math::Kernel::PtrT lsst::ip::diffim::KernelCandidate<PixelT, ImageT>::getKernel() const {
+
+  
+template <typename PixelT>
+afwMath::Kernel::PtrT KernelCandidate<PixelT>::getKernel() const {
     if (!_haveKernel) {
         throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
     }

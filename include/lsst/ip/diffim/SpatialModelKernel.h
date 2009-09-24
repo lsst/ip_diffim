@@ -38,8 +38,11 @@ namespace diffim {
      * spatial model to the PSF.
      */    
 
-    template <typename PixelT, typename ImageT=lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> >
-    class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<ImageT> {
+    template <typename PixelT>
+    class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> > {
+    public: 
+        typedef lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> ImageT;
+    private: 
         using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getXCenter;
         using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getYCenter;
         using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getWidth;
@@ -48,23 +51,25 @@ namespace diffim {
     public: 
         typedef boost::shared_ptr<KernelCandidate> Ptr;
         typedef boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
-	
+
         /** Constructor
          *
+         * @param xCenter Col position of object
+         * @param yCenter Row position of object
          * @param miToConvolvePtr  Pointer to template image
          * @param miToNotConvolvePtr  Pointer to science image
          */
         KernelCandidate(float const xCenter,
                         float const yCenter, 
                         MaskedImagePtr const& miToConvolvePtr,
-			MaskedImagePtr const& miToNotConvolvePtr) :
+                        MaskedImagePtr const& miToNotConvolvePtr) :
             lsst::afw::math::SpatialCellImageCandidate<ImageT>(xCenter, yCenter),
             _miToConvolvePtr(miToConvolvePtr),
             _miToNotConvolvePtr(miToNotConvolvePtr),
             _haveImage(false),
             _haveKernel(false) {
         }
-	
+        
         /// Destructor
         ~KernelCandidate() {};
 
@@ -81,14 +86,14 @@ namespace diffim {
         typename ImageT::ConstPtr getImage() const;
         typename ImageT::Ptr copyImage() const;
         lsst::afw::math::Kernel::PtrT getKernel() const;
-	Eigen::MatrixXd getM()  {return _M;}
-	Eigen::VectorXd getB()  {return _B;}
-	
+        Eigen::MatrixXd getM()  {return _M;}
+        Eigen::VectorXd getB()  {return _B;}
+        
         void setKernel(lsst::afw::math::Kernel::PtrT kernel) {_kernel = kernel; _haveKernel = true;}
         void setBackground(double background) {_background = background;}
-	void setM(Eigen::MatrixXd M) {_M = M;}
-	void setB(Eigen::VectorXd B) {_B = B;}
-	
+        void setM(Eigen::MatrixXd M) {_M = M;}
+        void setB(Eigen::VectorXd B) {_B = B;}
+        
     private:
         MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
         MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel
@@ -108,10 +113,13 @@ namespace diffim {
      */
     template <typename PixelT>
     typename KernelCandidate<PixelT>::Ptr
-    makeKernelCandidate(boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToConvolvePtr,
-			boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToNotConvolvePtr) {
+    makeKernelCandidate(float const xCenter,
+                        float const yCenter, 
+                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToConvolvePtr,
+                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToNotConvolvePtr) {
         
-        return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(miToConvolvePtr,
+        return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
+                                                                                 miToConvolvePtr,
                                                                                  miToNotConvolvePtr));
     }
 

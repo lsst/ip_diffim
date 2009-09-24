@@ -262,7 +262,7 @@ namespace diffim {
     std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
         lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,
         lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve,
-        lsst::pex::policy::Policy const& policy
+        lsst::pex::policy::Policy             const& policy
         );
 
     template <typename ImageT>

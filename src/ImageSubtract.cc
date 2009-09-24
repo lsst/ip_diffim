@@ -1202,7 +1202,7 @@ template <typename ImageT>
 std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
     lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,    
     lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve, 
-    lsst::pex::policy::Policy  const& policy                                       
+    lsst::pex::policy::Policy             const& policy                                       
     ) {
     
     // Parse the Policy

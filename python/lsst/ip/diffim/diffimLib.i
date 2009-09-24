@@ -167,31 +167,9 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 
 %KernelCandidatePtr(F, float);
 
-
 %include "lsst/ip/diffim/SpatialModelKernel.h"
 
 %KernelCandidate(F, float);
 %template(createPcaBasisFromCandidates) lsst::ip::diffim::createPcaBasisFromCandidates<float>;
 
-
-/******************************************************************************/
-
-/*
-%{
-#include "lsst/ip/diffim/SpatialModelCell.h"
-%}
-
-SWIG_SHARED_PTR(SpatialModelCellF, lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >);
-SWIG_SHARED_PTR(SpatialModelCellD, lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >);
-
-%include "lsst/ip/diffim/SpatialModelCell.h"
-
-%template(SpatialModelCellF) lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >;
-%template(SpatialModelCellD) lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >;
-
-%template(VectorSpatialModelCellF) std::vector<lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >::Ptr >;
-%template(VectorSpatialModelCellD) std::vector<lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >::Ptr >;
-*/
-
-/******************************************************************************/
 
