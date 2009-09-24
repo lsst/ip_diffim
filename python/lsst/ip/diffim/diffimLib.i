@@ -170,6 +170,7 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 %include "lsst/ip/diffim/SpatialModelKernel.h"
 
 %KernelCandidate(F, float);
-%template(createPcaBasisFromCandidates) lsst::ip::diffim::createPcaBasisFromCandidates<float>;
+%template(createPcaBasisFromCandidates)   lsst::ip::diffim::createPcaBasisFromCandidates<float>;
+%template(fitSpatialKernelFromCandidates) lsst::ip::diffim::fitSpatialKernelFromCandidates<float>;
 
 

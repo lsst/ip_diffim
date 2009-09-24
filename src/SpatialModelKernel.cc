@@ -30,6 +30,7 @@ namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
 namespace pexLogging     = lsst::pex::logging; 
 namespace pexExcept      = lsst::pex::exceptions; 
+namespace pexPolicy      = lsst::pex::policy; 
 
 namespace lsst {
 namespace ip {
@@ -173,6 +174,8 @@ namespace {
             _M(Eigen::MatrixXd()),
             _B(Eigen::VectorXd()),
             _Soln(Eigen::VectorXd()),
+            _spatialKernelOrder(spatialKernelOrder),
+            _spatialBgOrder(spatialBgOrder),
             _spatialKernelFunction( new afwMath::PolynomialFunction2<double>(spatialKernelOrder) ),
             _spatialBgFunction( new afwMath::PolynomialFunction2<double>(spatialBgOrder) ) {
             
@@ -206,7 +209,8 @@ namespace {
             for (unsigned int idx = 0; idx < nk; idx++) {
                 paramsK[idx] = 1.0;
                 _spatialKernelFunction->setParameters(paramsK);
-                Pk(idx) = _spatialKernelFunction( kCandidate->getXCenter(), kCandidate->getYCenter() );
+                Pk(idx) = (*_spatialKernelFunction)( kCandidate->getXCenter(), 
+                                                     kCandidate->getYCenter() );
                 paramsK[idx] = 0.0;
             }
             Eigen::MatrixXd PkPkt = (Pk * Pk.transpose());
@@ -217,7 +221,8 @@ namespace {
             for (unsigned int idx = 0; idx < nb; idx++) {
                 paramsB[idx] = 1.0;
                 _spatialBgFunction->setParameters(paramsB);
-                Pb(idx) = _spatialBgFunction( kCandidate->getXCenter(), kCandidate->getYCenter() );
+                Pb(idx) = (*_spatialBgFunction)( kCandidate->getXCenter(), 
+                                                 kCandidate->getYCenter() );
                 paramsB[idx] = 0.0;
             }
             Eigen::MatrixXd PbPbt = (Pb * Pb.transpose());
@@ -283,13 +288,15 @@ namespace {
                 }
             }
         }
-        
+
+        Eigen::VectorXd getSolution() {return _Soln;}
+
     private:
         Eigen::MatrixXd _M;    ///< Least squares matrix
         Eigen::VectorXd _B;    ///< Least squares vector
         Eigen::VectorXd _Soln; ///< Least squares solution
-        unsigned int const _spatialKernelOrder;
-        unsigned int const _spatialBgOrder;
+        int const _spatialKernelOrder;
+        int const _spatialBgOrder;
         unsigned int _nkt; ///< Number of kernel terms in spatial model
         unsigned int _nbt; ///< Number of backgruond terms in spatial model
         afwMath::Kernel::SpatialFunctionPtr _spatialKernelFunction;
@@ -297,14 +304,38 @@ namespace {
     };
 }
 
+/************************************************************************************************************/
+
+template<typename PixelT>
+std::pair<bool, double>
+fitSpatialKernelFromCandidates(
+    afwMath::Kernel *kernel,                 ///< the Kernel to fit
+    afwMath::SpatialCellSet const& psfCells, ///< A SpatialCellSet containing PsfCandidates
+    pexPolicy::Policy const& policy          ///< Policy to control the processing
+                                 ) {
+    
+    int const nStarPerCell       = policy.getInt("nStarPerCell");
+    int const spatialKernelOrder = policy.getInt("spatialKernelOrder");
+    int const spatialBgOrder     = policy.getInt("spatialBgOrder");
+
+    /* Do the linear fit */
+    LinearSpatialFitVisitor<PixelT> linearFitter(spatialKernelOrder, spatialBgOrder);
+    psfCells.visitCandidates(&linearFitter, nStarPerCell);
+    Eigen::VectorXd solution = linearFitter.getSolution();
+}
+
+/************************************************************************************************************/
+
 template<typename PixelT>
 std::pair<afwMath::LinearCombinationKernel::PtrT, std::vector<double> > createPcaBasisFromCandidates(
     afwMath::SpatialCellSet const& psfCells, ///< A SpatialCellSet containing PsfCandidates
-    int const nEigenComponents,              ///< number of eigen components to keep; <= 0 => infty
-    int const spatialOrder,                  ///< Order of spatial variation (cf. lsst::afw::math::PolynomialFunction2)
-    int const nStarPerCell                   ///< max no. of stars per cell; <= 0 => infty
+    pexPolicy::Policy const& policy  ///< Policy to control the processing
     ) {
     typedef typename afwImage::Image<lsst::afw::math::Kernel::PixelT> ImageT;
+
+    int const nEigenComponents   = policy.getInt("nEigenComponents");   // number of eigen components to keep; <= 0 => infty
+    int const nStarPerCell       = policy.getInt("nStarPerCell");       // order of spatial variation
+    int const spatialKernelOrder = policy.getInt("spatialKernelOrder"); // max no. of stars per cell; <= 0 => infty
     
     afwImage::ImagePca<ImageT> imagePca;
     SetPcaImageVisitor<PixelT> importStarVisitor(&imagePca);
@@ -328,7 +359,7 @@ std::pair<afwMath::LinearCombinationKernel::PtrT, std::vector<double> > createPc
                                  new afwMath::FixedKernel(afwImage::Image<afwMath::Kernel::PixelT>(*eigenImages[i], true)))
             );
         
-        afwMath::Kernel::SpatialFunctionPtr spatialFunction(new afwMath::PolynomialFunction2<double>(spatialOrder));
+        afwMath::Kernel::SpatialFunctionPtr spatialFunction(new afwMath::PolynomialFunction2<double>(spatialKernelOrder));
         if (i == 0) 
             spatialFunction->setParameter(0, 1.0); // the constant term = mean kernel; all others are 0
         spatialFunctionList.push_back(spatialFunction);
@@ -349,8 +380,14 @@ std::pair<afwMath::LinearCombinationKernel::PtrT, std::vector<double> > createPc
     template
     std::pair<lsst::afw::math::LinearCombinationKernel::PtrT, std::vector<double> >
     createPcaBasisFromCandidates<PixelT>(lsst::afw::math::SpatialCellSet const&,
-                                         int const, int const, int const);
+                                         lsst::pex::policy::Policy const&);
 
+    template
+    std::pair<bool, double>
+    fitSpatialKernelFromCandidates<PixelT>(lsst::afw::math::Kernel *,
+                                           lsst::afw::math::SpatialCellSet const&,
+                                           lsst::pex::policy::Policy const&);
+    
 /// \endcond
 
 }}} // end of namespace lsst::ip::diffim

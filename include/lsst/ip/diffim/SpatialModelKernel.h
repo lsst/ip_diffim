@@ -20,7 +20,6 @@
 #include <lsst/afw/math/KernelFunctions.h>
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/afw/detection/Footprint.h>
-#include <lsst/afw/math/SpatialCell.h>
 #include <lsst/sdqa/SdqaRating.h>
 
 #include <lsst/ip/diffim/ImageSubtract.h>
@@ -42,13 +41,11 @@ namespace diffim {
     class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> > {
     public: 
         typedef lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> ImageT;
-    private: 
-        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getXCenter;
-        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getYCenter;
-        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getWidth;
-        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::getHeight;
+
+    private:
         using lsst::afw::math::SpatialCellImageCandidate<ImageT>::_image;
-    public: 
+
+    public:
         typedef boost::shared_ptr<KernelCandidate> Ptr;
         typedef boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
 
@@ -126,9 +123,13 @@ namespace diffim {
     template<typename PixelT>
     std::pair<lsst::afw::math::LinearCombinationKernel::PtrT, std::vector<double> >
     createPcaBasisFromCandidates(lsst::afw::math::SpatialCellSet const& psfCells,
-                                 int const nEigenComponents,
-                                 int const spatialOrder,
-                                 int const nStarPerCell=-1);
+                                 lsst::pex::policy::Policy const& policy);
+
+    template<typename PixelT>
+    std::pair<bool, double>
+    fitSpatialKernelFromCandidates(lsst::afw::math::Kernel *kernel,
+                                   lsst::afw::math::SpatialCellSet const& psfCells,
+                                   lsst::pex::policy::Policy const& policy);
     
     
 }}}

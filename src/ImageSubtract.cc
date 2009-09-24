@@ -1419,13 +1419,13 @@ INSTANTIATE_convolveAndSubtract(double);
 
 template
 std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<float> const& imageToConvolve,
-    image::MaskedImage<float> const& imageToNotConvolve,
-    lsst::pex::policy::Policy const& policy);
+    image::MaskedImage<float> const&,
+    image::MaskedImage<float> const&,
+    lsst::pex::policy::Policy const&);
 
 template
 std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<double> const& imageToConvolve,
-    image::MaskedImage<double> const& imageToNotConvolve,
-    lsst::pex::policy::Policy  const& policy);
+    image::MaskedImage<double> const&,
+    image::MaskedImage<double> const&,
+    lsst::pex::policy::Policy  const&);
 
