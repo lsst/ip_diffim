@@ -63,6 +63,8 @@ namespace boost {
 /* so SWIG knows that PolynomialFunction2D is derived from Function2 */
 %import  "lsst/afw/math/functionLib.i"  
 
+%include "lsst/afw/image/lsstImageTypes.i"     // Image/Mask types and typedefs
+
 %lsst_exceptions();
 
 %pythoncode %{
