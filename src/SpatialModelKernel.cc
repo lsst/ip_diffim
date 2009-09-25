@@ -307,9 +307,8 @@ namespace {
 /************************************************************************************************************/
 
 template<typename PixelT>
-std::pair<bool, double>
+Eigen::VectorXd
 fitSpatialKernelFromCandidates(
-    afwMath::Kernel *kernel,                 ///< the Kernel to fit
     afwMath::SpatialCellSet const& psfCells, ///< A SpatialCellSet containing PsfCandidates
     pexPolicy::Policy const& policy          ///< Policy to control the processing
                                  ) {
@@ -322,6 +321,7 @@ fitSpatialKernelFromCandidates(
     LinearSpatialFitVisitor<PixelT> linearFitter(spatialKernelOrder, spatialBgOrder);
     psfCells.visitCandidates(&linearFitter, nStarPerCell);
     Eigen::VectorXd solution = linearFitter.getSolution();
+    return solution;
 }
 
 /************************************************************************************************************/
@@ -383,9 +383,8 @@ std::pair<afwMath::LinearCombinationKernel::PtrT, std::vector<double> > createPc
                                          lsst::pex::policy::Policy const&);
 
     template
-    std::pair<bool, double>
-    fitSpatialKernelFromCandidates<PixelT>(lsst::afw::math::Kernel *,
-                                           lsst::afw::math::SpatialCellSet const&,
+    Eigen::VectorXd
+    fitSpatialKernelFromCandidates<PixelT>(lsst::afw::math::SpatialCellSet const&,
                                            lsst::pex::policy::Policy const&);
     
 /// \endcond

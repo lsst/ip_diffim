@@ -126,9 +126,8 @@ namespace diffim {
                                  lsst::pex::policy::Policy const& policy);
 
     template<typename PixelT>
-    std::pair<bool, double>
-    fitSpatialKernelFromCandidates(lsst::afw::math::Kernel *kernel,
-                                   lsst::afw::math::SpatialCellSet const& psfCells,
+    Eigen::VectorXd
+    fitSpatialKernelFromCandidates(lsst::afw::math::SpatialCellSet const& psfCells,
                                    lsst::pex::policy::Policy const& policy);
     
     
