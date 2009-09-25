@@ -313,7 +313,11 @@ namespace diffim {
          */
         Eigen::MatrixXd getM() const { return _M; }
         Eigen::VectorXd getB() const { return _B; }
-    
+
+        /** Access to basis list
+         */
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> getBasisList() const { return _basisList; }
+
         /* Create PSF matching kernel */
         void apply(lsst::afw::image::Image<ImageT> const& imageToConvolve,
                    lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
@@ -329,14 +333,14 @@ namespace diffim {
             );
 
     protected:
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> _basisList;        ///< List of Kernel basis functions
-        Eigen::MatrixXd _M;                                                     ///< Least squares matrix
-        Eigen::VectorXd _B;                                                     ///< Least squares vector
-        Eigen::MatrixXd _H;                                                     ///< Regularization matrix
-        double _background;                                                     ///< Differenaitl background estimate
-        double _backgroundError;                                                ///< Uncertainty on background
-        boost::shared_ptr<lsst::afw::math::Kernel> _kernel;                     ///< PSF matching kernel
-        boost::shared_ptr<lsst::afw::math::Kernel> _kernelError;                ///< Uncertainty on kernel
+        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& _basisList;  ///< List of Kernel basis functions
+        Eigen::MatrixXd _M;                                                      ///< Least squares matrix
+        Eigen::VectorXd _B;                                                      ///< Least squares vector
+        Eigen::MatrixXd _H;                                                      ///< Regularization matrix
+        double _background;                                                      ///< Differenaitl background estimate
+        double _backgroundError;                                                 ///< Uncertainty on background
+        boost::shared_ptr<lsst::afw::math::Kernel> _kernel;                      ///< PSF matching kernel
+        boost::shared_ptr<lsst::afw::math::Kernel> _kernelError;                 ///< Uncertainty on kernel
     };
     
 }}}

@@ -167,6 +167,7 @@ namespace {
         typedef afwImage::Image<PixelT> ImageT;
     public:
         LinearSpatialFitVisitor(
+            typename PsfMatchingFunctor<PixelT>::Ptr const& kFunctor, ///< Basis functions used in the fit
             int const spatialKernelOrder,  ///< Order of spatial kernel variation (cf. lsst::afw::math::PolynomialFunction2)
             int const spatialBgOrder       ///< Order of spatial bg variation (cf. lsst::afw::math::PolynomialFunction2)
             ):
@@ -177,12 +178,18 @@ namespace {
             _spatialKernelOrder(spatialKernelOrder),
             _spatialBgOrder(spatialBgOrder),
             _spatialKernelFunction( new afwMath::PolynomialFunction2<double>(spatialKernelOrder) ),
-            _spatialBgFunction( new afwMath::PolynomialFunction2<double>(spatialBgOrder) ) {
+            _spatialBgFunction( new afwMath::PolynomialFunction2<double>(spatialBgOrder) ),
+            _nbases(kFunctor->getBasisList().size()) {
             
             /* Bookeeping terms */
             _nkt = _spatialKernelFunction->getParameters().size();
             _nbt = _spatialBgFunction->getParameters().size();
-            
+
+            /* Nbases + 1 term for background */
+            _M.resize((_nbases+1)*(_nkt + _nbt), (_nbases+1)*(_nkt + _nbt));
+            _B.resize((_nbases+1)*(_nkt + _nbt));
+            _M.setZero();
+            _B.setZero();
         }
         
         void processCandidate(afwMath::SpatialCellCandidate *candidate) {
@@ -191,22 +198,12 @@ namespace {
                 throw LSST_EXCEPT(lsst::pex::exceptions::LogicErrorException,
                                   "Failed to cast SpatialCellCandidate to KernelCandidate");
             }
-            /* Resize M and B on first visitor */
-            if ( (_M.rows() == 0) || (_M.cols() == 0) ) {           \
-                unsigned int m = kCandidate->getM().rows(); /* M is square */
-                
-                _M.resize(m*(_nkt + _nbt), m*(_nkt + _nbt));
-                _B.resize(m*(_nkt + _nbt));
-                
-                _M.setZero();
-                _B.setZero();
-            }
             
             /* Calculate P matrices */
             std::vector<double> paramsK = _spatialKernelFunction->getParameters();
-            unsigned int nk = paramsK.size();
-            Eigen::VectorXd Pk(nk);
-            for (unsigned int idx = 0; idx < nk; idx++) {
+            for (unsigned int idx = 0; idx < _nkt; idx++) { paramsK[idx] = 0.0; }
+            Eigen::VectorXd Pk(_nkt);
+            for (unsigned int idx = 0; idx < _nkt; idx++) {
                 paramsK[idx] = 1.0;
                 _spatialKernelFunction->setParameters(paramsK);
                 Pk(idx) = (*_spatialKernelFunction)( kCandidate->getXCenter(), 
@@ -216,9 +213,9 @@ namespace {
             Eigen::MatrixXd PkPkt = (Pk * Pk.transpose());
             
             std::vector<double> paramsB = _spatialBgFunction->getParameters();
-            unsigned int nb = paramsB.size();
-            Eigen::VectorXd Pb(nb);
-            for (unsigned int idx = 0; idx < nb; idx++) {
+            for (unsigned int idx = 0; idx < _nbt; idx++) { paramsB[idx] = 0.0; }
+            Eigen::VectorXd Pb(_nbt);
+            for (unsigned int idx = 0; idx < _nbt; idx++) {
                 paramsB[idx] = 1.0;
                 _spatialBgFunction->setParameters(paramsB);
                 Pb(idx) = (*_spatialBgFunction)( kCandidate->getXCenter(), 
@@ -234,19 +231,19 @@ namespace {
             
             for(unsigned int m1 = 0; m1 < _nkt; m1++)  {
                 for(unsigned int m2 = m1; m2 < _nkt; m2++)  {
-                    _M.block(m1*nk, m2*nk, nk, nk) += Q(m1,m2) * PkPkt;
-                    _M.block(m2*nk, m1*nk, nk, nk) += Q(m2,m1) * PkPkt;
+                    _M.block(m1*_nkt, m2*_nkt, _nkt, _nkt) += Q(m1,m2) * PkPkt;
+                    _M.block(m2*_nkt, m1*_nkt, _nkt, _nkt) += Q(m2,m1) * PkPkt;
                 }
-                _B.segment(m1*nk,nk)               += W(m1) * Pk;
+                _B.segment(m1*_nkt,_nkt)                   += W(m1) * Pk;
             } 
             
             /* shift things by m0 so as to not mix the background and kernel terms */
-            for(unsigned int m1 = 0, m0 = _nkt*nk; m1 < _nbt; m1++)  {
+            for(unsigned int m1 = 0, m0 = _nkt*_nkt; m1 < _nbt; m1++)  {
                 for(unsigned int m2 = m1; m2 < _nbt; m2++)  {
-                    _M.block(m0+m1*nb, m0+m2*nb, nb, nb) += Q(m1+_nkt,m2+_nkt) * PbPbt;
-                    _M.block(m0+m2*nb, m0+m1*nb, nb, nb) += Q(m2+_nkt,m1+_nkt) * PbPbt;
+                    _M.block(m0+m1*_nbt, m0+m2*_nbt, _nbt, _nbt) += Q(m1+_nkt,m2+_nkt) * PbPbt;
+                    _M.block(m0+m2*_nbt, m0+m1*_nbt, _nbt, _nbt) += Q(m2+_nkt,m1+_nkt) * PbPbt;
                 }
-                _B.segment(m0+m1*nb, nb)                 += W(m1+_nkt) * Pb;
+                _B.segment(m0+m1*_nbt, _nbt)                     += W(m1+_nkt) * Pb;
             } 
             
             
@@ -289,7 +286,10 @@ namespace {
             }
         }
 
-        Eigen::VectorXd getSolution() {return _Soln;}
+        
+        Eigen::VectorXd getSolution() {
+            return _Soln; 
+        }
 
     private:
         Eigen::MatrixXd _M;    ///< Least squares matrix
@@ -297,31 +297,69 @@ namespace {
         Eigen::VectorXd _Soln; ///< Least squares solution
         int const _spatialKernelOrder;
         int const _spatialBgOrder;
-        unsigned int _nkt; ///< Number of kernel terms in spatial model
-        unsigned int _nbt; ///< Number of backgruond terms in spatial model
         afwMath::Kernel::SpatialFunctionPtr _spatialKernelFunction;
         afwMath::Kernel::SpatialFunctionPtr _spatialBgFunction;
+        unsigned int _nbases;  ///< Number of bases being fit for
+        unsigned int _nkt;     ///< Number of kernel terms in spatial model
+        unsigned int _nbt;     ///< Number of backgruond terms in spatial model
     };
 }
 
 /************************************************************************************************************/
 
 template<typename PixelT>
-Eigen::VectorXd
+std::pair<afwMath::LinearCombinationKernel::PtrT, afwMath::Kernel::SpatialFunctionPtr>
 fitSpatialKernelFromCandidates(
-    afwMath::SpatialCellSet const& psfCells, ///< A SpatialCellSet containing PsfCandidates
-    pexPolicy::Policy const& policy          ///< Policy to control the processing
+    typename PsfMatchingFunctor<PixelT>::Ptr const& kFunctor, ///< kFunctor used to build the kernels
+    afwMath::SpatialCellSet const& psfCells,                  ///< A SpatialCellSet containing PsfCandidates
+    pexPolicy::Policy const& policy                           ///< Policy to control the processing
                                  ) {
     
     int const nStarPerCell       = policy.getInt("nStarPerCell");
     int const spatialKernelOrder = policy.getInt("spatialKernelOrder");
     int const spatialBgOrder     = policy.getInt("spatialBgOrder");
-
+    
     /* Do the linear fit */
-    LinearSpatialFitVisitor<PixelT> linearFitter(spatialKernelOrder, spatialBgOrder);
+    LinearSpatialFitVisitor<PixelT> linearFitter(kFunctor, spatialKernelOrder, spatialBgOrder);
     psfCells.visitCandidates(&linearFitter, nStarPerCell);
+    linearFitter.solveLinearEquation();
     Eigen::VectorXd solution = linearFitter.getSolution();
-    return solution;
+
+    /* Set up kernel */
+    std::vector<afwMath::Kernel::SpatialFunctionPtr> spatialFunctionList;
+    afwMath::KernelList<afwMath::Kernel> kernelList = kFunctor->getBasisList();
+    unsigned int const nComponents                  = kernelList.size();
+    for (unsigned int i = 0; i < nComponents; i++) {
+        afwMath::Kernel::SpatialFunctionPtr spatialFunction(new afwMath::PolynomialFunction2<double>(spatialKernelOrder));
+        spatialFunctionList.push_back(spatialFunction);
+    }
+    afwMath::LinearCombinationKernel::PtrT spatialKernel(new afwMath::LinearCombinationKernel(kernelList, spatialFunctionList));
+
+    /* Set up background */
+    afwMath::Kernel::SpatialFunctionPtr bgFunction(new afwMath::PolynomialFunction2<double>(spatialBgOrder));
+    
+    /* Set the coefficients */
+    unsigned int nk = spatialFunctionList[0]->getParameters().size();
+    unsigned int nb = bgFunction->getParameters().size();
+    
+    std::vector<std::vector<double> > kCoeffs;
+    kCoeffs.reserve(nComponents);
+    for (unsigned int i = 0, idx = 0; i < nComponents; i++, idx++) {
+        kCoeffs.push_back(std::vector<double>(nk));
+        for (unsigned int j = 0; j < nk; j++) {
+            kCoeffs[i][j] = solution[idx];
+        }
+    }
+
+    std::vector<double> bgCoeffs;
+    for (unsigned int i = 0; i < nb; i++) {
+        bgCoeffs[i] = solution[i + nComponents*nk];
+    }
+    
+    spatialKernel->setSpatialParameters(kCoeffs);
+    bgFunction->setParameters(bgCoeffs);
+    
+    return std::make_pair(spatialKernel, bgFunction);
 }
 
 /************************************************************************************************************/
@@ -383,8 +421,9 @@ std::pair<afwMath::LinearCombinationKernel::PtrT, std::vector<double> > createPc
                                          lsst::pex::policy::Policy const&);
 
     template
-    Eigen::VectorXd
-    fitSpatialKernelFromCandidates<PixelT>(lsst::afw::math::SpatialCellSet const&,
+    std::pair<afwMath::LinearCombinationKernel::PtrT, afwMath::Kernel::SpatialFunctionPtr>
+    fitSpatialKernelFromCandidates<PixelT>(PsfMatchingFunctor<PixelT>::Ptr const&,
+                                           lsst::afw::math::SpatialCellSet const&,
                                            lsst::pex::policy::Policy const&);
     
 /// \endcond
