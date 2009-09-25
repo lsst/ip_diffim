@@ -76,6 +76,32 @@ afwMath::Kernel::PtrT KernelCandidate<PixelT>::getKernel() const {
     return _kernel;
 }
 
+template <typename PixelT>
+lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage() {
+    if (!_haveKernel) {
+        throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
+    }
+    return returnDifferenceImage(_kernel, _background);
+}
+
+template <typename PixelT>
+lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage(
+    lsst::afw::math::Kernel::PtrT kernel,
+    double background
+    ) {
+    if (!_haveKernel) {
+        throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
+    }
+    
+    /* Make diffim and set chi2 from result */
+    lsst::afw::image::MaskedImage<PixelT> diffim = convolveAndSubtract(*_miToConvolvePtr,
+                                                                       *_miToNotConvolvePtr,
+                                                                       *kernel,
+                                                                       background);
+    return diffim;
+
+}
+
 namespace {
     /* Lets assume this steps over the bad footprints */
     template<typename PixelT>

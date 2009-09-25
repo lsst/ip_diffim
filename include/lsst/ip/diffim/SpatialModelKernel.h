@@ -80,6 +80,19 @@ namespace diffim {
         MaskedImagePtr getMiToConvolvePtr() {return _miToConvolvePtr;}
         MaskedImagePtr getMiToNotConvolvePtr() {return _miToNotConvolvePtr;}
 
+        /** 
+         * Calculate associated difference image
+         * 
+         * If not sent a kernel (e.g. building a spatial approximation) it uses
+         * _kernel and _background
+         *
+         */
+        lsst::afw::image::MaskedImage<PixelT> returnDifferenceImage();
+        lsst::afw::image::MaskedImage<PixelT> returnDifferenceImage(
+            lsst::afw::math::Kernel::PtrT kernel,
+            double background
+            );
+
         typename ImageT::ConstPtr getImage() const;
         typename ImageT::Ptr copyImage() const;
         lsst::afw::math::Kernel::PtrT getKernel() const;
