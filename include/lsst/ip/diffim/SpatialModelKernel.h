@@ -37,10 +37,11 @@ namespace diffim {
      * spatial model to the PSF.
      */    
 
-    template <typename PixelT>
+    template <typename _PixelT>
     class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> > {
     public: 
         typedef lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> ImageT;
+        typedef _PixelT PixelT;         // _after_ using lsst::afw::math::Kernel::PixelT
 
     private:
         using lsst::afw::math::SpatialCellImageCandidate<ImageT>::_image;
