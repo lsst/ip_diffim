@@ -167,9 +167,15 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 %}
 %enddef
 
+SWIG_SHARED_PTR(SpatialCellImageCandidateK,
+                lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::PixelT)>);
+
 %KernelCandidatePtr(F, float);
 
 %include "lsst/ip/diffim/SpatialModelKernel.h"
+
+%template(SpatialCellImageCandidateK)
+	lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::PixelT)>;
 
 %KernelCandidate(F, float);
 %template(createPcaBasisFromCandidates)   lsst::ip::diffim::createPcaBasisFromCandidates<float>;
