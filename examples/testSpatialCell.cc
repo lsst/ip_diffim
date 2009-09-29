@@ -25,6 +25,7 @@ void test() {
     afwMath::SpatialCellSet cellSet = afwMath::SpatialCellSet(bbox, cellSize, cellSize);
 
     ipDiffim::KernelCandidate<PixelT>::Ptr cand = ipDiffim::makeKernelCandidate(coord, coord, tmi, smi);
+    std::cout << cand->getStatus() << std::endl;
     cellSet.insertCandidate(cand);
 }
 

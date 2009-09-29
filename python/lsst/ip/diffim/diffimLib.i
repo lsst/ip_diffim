@@ -36,17 +36,10 @@ namespace boost {
 %{
 #include <boost/shared_ptr.hpp>
 
-#include <lsst/afw/image.h>
-#include <lsst/afw/math.h>
-#include <lsst/afw/detection.h>
-#include <lsst/afw/math/ConvolveImage.h>
+#include <lsst/afw.h>
 
-#include <Eigen/Cholesky>
-#include <Eigen/Core>
-#include <Eigen/LU>
-#include <Eigen/QR>
-
-#include <lsst/afw/math/SpatialCell.h>
+#include <lsst/ip/diffim/ImageSubtract.h>
+#include <lsst/ip/diffim/SpatialModelKernel.h>
 
 #include <lsst/pex/policy/Policy.h>
 %}
@@ -58,12 +51,18 @@ namespace boost {
 %import  "lsst/afw/image/imageLib.i" 
 %import  "lsst/afw/detection/detectionLib.i"
 %import  "lsst/afw/math/kernelLib.i"
-%import  "lsst/afw/math/spatialCell.i"
+
+/* Since my KernelCandidate is a derived class from SpatialCellImageCandidate,
+ * itself derived from SpatialCellCandidate, I actually need to generate wrapper
+ * code so "include" it instead of "import" it.
+ */
+%include  "lsst/afw/math/spatialCell.i"
 
 /* so SWIG knows that PolynomialFunction2D is derived from Function2 */
 %import  "lsst/afw/math/functionLib.i"  
 
-%include "lsst/afw/image/lsstImageTypes.i"     // Image/Mask types and typedefs
+/* Image/Mask types and typedefs */
+%include "lsst/afw/image/lsstImageTypes.i"     
 
 %lsst_exceptions();
 
@@ -174,8 +173,8 @@ SWIG_SHARED_PTR(SpatialCellImageCandidateK,
 
 %include "lsst/ip/diffim/SpatialModelKernel.h"
 
-%template(SpatialCellImageCandidateK)
-	lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::PixelT)>;
+//%template(SpatialCellImageCandidateK)
+//	lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::PixelT)>;
 
 %KernelCandidate(F, float);
 %template(createPcaBasisFromCandidates)   lsst::ip::diffim::createPcaBasisFromCandidates<float>;
