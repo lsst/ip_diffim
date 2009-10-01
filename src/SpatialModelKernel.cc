@@ -69,7 +69,7 @@ KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::copyImage() const 
 
   
 template <typename PixelT>
-afwMath::Kernel::PtrT KernelCandidate<PixelT>::getKernel() const {
+afwMath::Kernel::Ptr KernelCandidate<PixelT>::getKernel() const {
     if (!_haveKernel) {
         throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
     }
@@ -86,7 +86,7 @@ lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceI
 
 template <typename PixelT>
 lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage(
-    lsst::afw::math::Kernel::PtrT kernel,
+    lsst::afw::math::Kernel::Ptr kernel,
     double background
     ) {
     if (!_haveKernel) {
@@ -103,65 +103,9 @@ lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceI
 }
 
 namespace {
-    /* Lets assume this steps over the bad footprints */
-    template<typename PixelT>
-    class BuildKernelVisitor : public afwMath::CandidateVisitor {
-        typedef afwImage::MaskedImage<PixelT> MaskedImageT;
-    public:
-        BuildKernelVisitor(typename PsfMatchingFunctor<PixelT>::Ptr const& kFunctor,
-                           lsst::pex::policy::Policy const& policy) :
-            afwMath::CandidateVisitor(),
-            _kFunctor(kFunctor),
-            _policy(policy),
-            _imstats( ImageStatistics<PixelT>() ){}
-        
-        void processCandidate(afwMath::SpatialCellCandidate *candidate) {
-            KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
-            if (kCandidate == NULL) {
-                throw LSST_EXCEPT(lsst::pex::exceptions::LogicErrorException,
-                                  "Failed to cast SpatialCellCandidate to KernelCandidate");
-            }
-            
-            /* Build its kernel here */
-            MaskedImageT var = MaskedImageT(kCandidate->getMiToNotConvolvePtr(), true);
-            var             -= kCandidate->getMiToConvolvePtr();
-            
-            try {
-                _kFunctor.apply(kCandidate->getMiToConvolvePtr->getImage(),
-                                kCandidate->getMiToNotConvolvePtr->getImage(),
-                                var.getVariance(),
-                                _policy);
-            } catch (lsst::pex::exceptions::Exception &e) {
-                LSST_EXCEPT_ADD(e, "Unable to calculate Kernel");
-                throw e;
-            }
-            
-            /* Update the candidate with derived products */
-            kCandidate->setM(_kFunctor.getM());
-            kCandidate->setB(_kFunctor.getB());
-            kCandidate->setKernel(_kFunctor.getKernel());
-            kCandidate->setBackground(_kFunctor.getBackground());
-            
-            /* Make diffim and set chi2 from result */
-            MaskedImageT diffim = convolveAndSubtract(kCandidate->getMiToConvolvePtr(),
-                                                      kCandidate->getMiToNotConvolvePtr(),
-                                                      _kFunctor.getKernel(),
-                                                      _kFunctor.getBackground());
-            _imstats.apply(diffim);
-            kCandidate->setChi2(_imstats.getVariance());
-            
-        }
-    private:
-        typename PsfMatchingFunctor<PixelT>::Ptr _kFunctor;
-        lsst::pex::policy::Policy _policy;
-        ImageStatistics<PixelT> _imstats;
-    };
-}
-
-namespace {
     template<typename PixelT>
     class SetPcaImageVisitor : public afwMath::CandidateVisitor {
-        typedef afwImage::Image<lsst::afw::math::Kernel::PixelT> ImageT;
+        typedef afwImage::Image<lsst::afw::math::Kernel::Pixel> ImageT;
     public:
         SetPcaImageVisitor(afwImage::ImagePca<ImageT> *imagePca // Set of Images to initialise
             ) :
@@ -188,16 +132,76 @@ namespace {
 }
 
 namespace {
+    /* Lets assume this steps over the bad footprints */
     template<typename PixelT>
-    class LinearSpatialFitVisitor : public afwMath::CandidateVisitor {
+    class BuildSingleKernelVisitor : public afwMath::CandidateVisitor {
+        typedef afwImage::MaskedImage<PixelT> MaskedImageT;
+    public:
+        BuildSingleKernelVisitor(PsfMatchingFunctor<PixelT> &kFunctor,
+                           lsst::pex::policy::Policy const& policy) :
+            afwMath::CandidateVisitor(),
+            _kFunctor(kFunctor),
+            _policy(policy),
+            _imstats( ImageStatistics<PixelT>() ){}
+        
+        void processCandidate(afwMath::SpatialCellCandidate *candidate) {
+            KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
+            if (kCandidate == NULL) {
+                throw LSST_EXCEPT(lsst::pex::exceptions::LogicErrorException,
+                                  "Failed to cast SpatialCellCandidate to KernelCandidate");
+            }
+
+            pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                                  "Processing candidate %d", kCandidate->getId());
+            
+            /* Build its kernel here */
+            MaskedImageT var = MaskedImageT(*(kCandidate->getMiToNotConvolvePtr()), true);
+            var             -= *(kCandidate->getMiToConvolvePtr());
+            
+            try {
+                _kFunctor.apply(*(kCandidate->getMiToConvolvePtr()->getImage()),
+                                *(kCandidate->getMiToNotConvolvePtr()->getImage()),
+                                *(var.getVariance()),
+                                _policy);
+            } catch (lsst::pex::exceptions::Exception &e) {
+                LSST_EXCEPT_ADD(e, "Unable to calculate Kernel");
+                throw e;
+            }
+            
+            /* Update the candidate with derived products */
+            kCandidate->setM(_kFunctor.getM());
+            kCandidate->setB(_kFunctor.getB());
+            kCandidate->setKernel(_kFunctor.getKernel());
+            kCandidate->setBackground(_kFunctor.getBackground());
+            
+            /* Make diffim and set chi2 from result */
+            MaskedImageT diffim = convolveAndSubtract(*(kCandidate->getMiToConvolvePtr()),
+                                                      *(kCandidate->getMiToNotConvolvePtr()),
+                                                      *(_kFunctor.getKernel()),
+                                                      _kFunctor.getBackground());
+            _imstats.apply(diffim);
+            kCandidate->setChi2(_imstats.getVariance());
+            
+        }
+    private:
+        PsfMatchingFunctor<PixelT> _kFunctor;
+        lsst::pex::policy::Policy _policy;
+        ImageStatistics<PixelT> _imstats;
+    };
+}
+
+namespace {
+    template<typename PixelT>
+    class BuildSpatialKernelVisitor : public afwMath::CandidateVisitor {
         typedef afwImage::Image<PixelT> ImageT;
     public:
-        LinearSpatialFitVisitor(
-            typename PsfMatchingFunctor<PixelT>::Ptr const& kFunctor, ///< Basis functions used in the fit
+        BuildSpatialKernelVisitor(
+            PsfMatchingFunctor<PixelT> &kFunctor, ///< Basis functions used in the fit
             int const spatialKernelOrder,  ///< Order of spatial kernel variation (cf. lsst::afw::math::PolynomialFunction2)
             int const spatialBgOrder       ///< Order of spatial bg variation (cf. lsst::afw::math::PolynomialFunction2)
-            ):
+            ) :
             afwMath::CandidateVisitor(),
+            _kFunctor(kFunctor),
             _M(Eigen::MatrixXd()),
             _B(Eigen::VectorXd()),
             _Soln(Eigen::VectorXd()),
@@ -205,17 +209,20 @@ namespace {
             _spatialBgOrder(spatialBgOrder),
             _spatialKernelFunction( new afwMath::PolynomialFunction2<double>(spatialKernelOrder) ),
             _spatialBgFunction( new afwMath::PolynomialFunction2<double>(spatialBgOrder) ),
-            _nbases(kFunctor->getBasisList().size()) {
-            
+            _nbases(kFunctor.getBasisList().size()) {
+
             /* Bookeeping terms */
             _nkt = _spatialKernelFunction->getParameters().size();
             _nbt = _spatialBgFunction->getParameters().size();
-
+            
             /* Nbases + 1 term for background */
             _M.resize((_nbases+1)*(_nkt + _nbt), (_nbases+1)*(_nkt + _nbt));
             _B.resize((_nbases+1)*(_nkt + _nbt));
             _M.setZero();
             _B.setZero();
+            pexLogging::TTrace<5>("lsst.ip.diffim.LinearSpatialFitVisitor", 
+                                  "Initializing with size %d %d %d %d %d",
+                                  _nkt, _nbt, _M.rows(), _M.cols(), _B.size());
         }
         
         void processCandidate(afwMath::SpatialCellCandidate *candidate) {
@@ -316,8 +323,46 @@ namespace {
         Eigen::VectorXd getSolution() {
             return _Soln; 
         }
+        
+        std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> getSpatialModel() {
+            /* Bases are needed to make the kernel */
+            afwMath::KernelList kernelList = _kFunctor.getBasisList();
+
+            /* Set up kernel */
+            std::vector<afwMath::Kernel::SpatialFunctionPtr> spatialFunctionList;
+            for (unsigned int i = 0; i < _nbases; i++) {
+                afwMath::Kernel::SpatialFunctionPtr spatialFunction(_spatialKernelFunction->copy());
+                spatialFunctionList.push_back(spatialFunction);
+            }
+            afwMath::LinearCombinationKernel::Ptr spatialKernel(new afwMath::LinearCombinationKernel(kernelList, spatialFunctionList));
+            
+            /* Set up background */
+            afwMath::Kernel::SpatialFunctionPtr bgFunction(_spatialBgFunction->copy());
+            
+            /* Set the kernel coefficients */
+            std::vector<std::vector<double> > kCoeffs;
+            kCoeffs.reserve(_nbases);
+            for (unsigned int i = 0, idx = 0; i < _nbases; i++) {
+                kCoeffs.push_back(std::vector<double>(_nkt));
+                for (unsigned int j = 0; j < _nkt; j++, idx++) {
+                    kCoeffs[i][j] = _Soln[idx];
+                }
+            }
+            
+            /* Set the background coefficients */
+            std::vector<double> bgCoeffs;
+            for (unsigned int i = 0; i < _nbt; i++) {
+                bgCoeffs[i] = _Soln[i + _nbases*_nkt];
+            }
+            
+            spatialKernel->setSpatialParameters(kCoeffs);
+            bgFunction->setParameters(bgCoeffs);
+            
+            return std::make_pair(spatialKernel, bgFunction);
+        }
 
     private:
+        PsfMatchingFunctor<PixelT> _kFunctor;
         Eigen::MatrixXd _M;    ///< Least squares matrix
         Eigen::VectorXd _B;    ///< Least squares vector
         Eigen::VectorXd _Soln; ///< Least squares solution
@@ -334,68 +379,37 @@ namespace {
 /************************************************************************************************************/
 
 template<typename PixelT>
-std::pair<afwMath::LinearCombinationKernel::PtrT, afwMath::Kernel::SpatialFunctionPtr>
+std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr>
 fitSpatialKernelFromCandidates(
-    typename PsfMatchingFunctor<PixelT>::Ptr const& kFunctor, ///< kFunctor used to build the kernels
-    afwMath::SpatialCellSet const& psfCells,                  ///< A SpatialCellSet containing PsfCandidates
-    pexPolicy::Policy const& policy                           ///< Policy to control the processing
+    PsfMatchingFunctor<PixelT> &kFunctor,      ///< kFunctor used to build the kernels
+    afwMath::SpatialCellSet const& psfCells,   ///< A SpatialCellSet containing PsfCandidates
+    pexPolicy::Policy const& policy            ///< Policy to control the processing
                                  ) {
     
     int const nStarPerCell       = policy.getInt("nStarPerCell");
     int const spatialKernelOrder = policy.getInt("spatialKernelOrder");
     int const spatialBgOrder     = policy.getInt("spatialBgOrder");
     
-    /* Do the linear fit */
-    LinearSpatialFitVisitor<PixelT> linearFitter(kFunctor, spatialKernelOrder, spatialBgOrder);
-    psfCells.visitCandidates(&linearFitter, nStarPerCell);
-    linearFitter.solveLinearEquation();
-    Eigen::VectorXd solution = linearFitter.getSolution();
+    /* Visitor for the single kernel fit */
+    BuildSingleKernelVisitor<PixelT> singleKernelFitter(kFunctor, policy);
+    
+    /* Visitor for the spatial kernel fit */
+    BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(kFunctor, spatialKernelOrder, spatialBgOrder);
 
-    /* Set up kernel */
-    std::vector<afwMath::Kernel::SpatialFunctionPtr> spatialFunctionList;
-    afwMath::KernelList<afwMath::Kernel> kernelList = kFunctor->getBasisList();
-    unsigned int const nComponents                  = kernelList.size();
-    for (unsigned int i = 0; i < nComponents; i++) {
-        afwMath::Kernel::SpatialFunctionPtr spatialFunction(new afwMath::PolynomialFunction2<double>(spatialKernelOrder));
-        spatialFunctionList.push_back(spatialFunction);
-    }
-    afwMath::LinearCombinationKernel::PtrT spatialKernel(new afwMath::LinearCombinationKernel(kernelList, spatialFunctionList));
-
-    /* Set up background */
-    afwMath::Kernel::SpatialFunctionPtr bgFunction(new afwMath::PolynomialFunction2<double>(spatialBgOrder));
-    
-    /* Set the coefficients */
-    unsigned int nk = spatialFunctionList[0]->getParameters().size();
-    unsigned int nb = bgFunction->getParameters().size();
-    
-    std::vector<std::vector<double> > kCoeffs;
-    kCoeffs.reserve(nComponents);
-    for (unsigned int i = 0, idx = 0; i < nComponents; i++, idx++) {
-        kCoeffs.push_back(std::vector<double>(nk));
-        for (unsigned int j = 0; j < nk; j++) {
-            kCoeffs[i][j] = solution[idx];
-        }
-    }
-
-    std::vector<double> bgCoeffs;
-    for (unsigned int i = 0; i < nb; i++) {
-        bgCoeffs[i] = solution[i + nComponents*nk];
-    }
-    
-    spatialKernel->setSpatialParameters(kCoeffs);
-    bgFunction->setParameters(bgCoeffs);
-    
-    return std::make_pair(spatialKernel, bgFunction);
+    psfCells.visitCandidates(&singleKernelFitter, nStarPerCell);
+    psfCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
+    spatialKernelFitter.solveLinearEquation();
+    return spatialKernelFitter.getSpatialModel();
 }
 
 /************************************************************************************************************/
 
 template<typename PixelT>
-std::pair<afwMath::LinearCombinationKernel::PtrT, std::vector<double> > createPcaBasisFromCandidates(
+std::pair<afwMath::LinearCombinationKernel::Ptr, std::vector<double> > createPcaBasisFromCandidates(
     afwMath::SpatialCellSet const& psfCells, ///< A SpatialCellSet containing PsfCandidates
     pexPolicy::Policy const& policy  ///< Policy to control the processing
     ) {
-    typedef typename afwImage::Image<lsst::afw::math::Kernel::PixelT> ImageT;
+    typedef typename afwImage::Image<lsst::afw::math::Kernel::Pixel> ImageT;
 
     int const nEigenComponents   = policy.getInt("nEigenComponents");   // number of eigen components to keep; <= 0 => infty
     int const nStarPerCell       = policy.getInt("nStarPerCell");       // order of spatial variation
@@ -415,12 +429,12 @@ std::pair<afwMath::LinearCombinationKernel::PtrT, std::vector<double> > createPc
     // Now build our LinearCombinationKernel; build the lists of basis functions
     // and spatial variation, then assemble the Kernel
     //
-    afwMath::KernelList<afwMath::Kernel> kernelList;
+    afwMath::KernelList kernelList;
     std::vector<afwMath::Kernel::SpatialFunctionPtr> spatialFunctionList;
     
     for (int i = 0; i != ncomp; ++i) {
-        kernelList.push_back(afwMath::Kernel::PtrT(
-                                 new afwMath::FixedKernel(afwImage::Image<afwMath::Kernel::PixelT>(*eigenImages[i], true)))
+        kernelList.push_back(afwMath::Kernel::Ptr(
+                                 new afwMath::FixedKernel(afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[i], true)))
             );
         
         afwMath::Kernel::SpatialFunctionPtr spatialFunction(new afwMath::PolynomialFunction2<double>(spatialKernelOrder));
@@ -429,7 +443,7 @@ std::pair<afwMath::LinearCombinationKernel::PtrT, std::vector<double> > createPc
         spatialFunctionList.push_back(spatialFunction);
     }
     
-    afwMath::LinearCombinationKernel::PtrT kernel(new afwMath::LinearCombinationKernel(kernelList, spatialFunctionList));
+    afwMath::LinearCombinationKernel::Ptr kernel(new afwMath::LinearCombinationKernel(kernelList, spatialFunctionList));
     return std::make_pair(kernel, eigenValues);
 }
 
@@ -442,13 +456,13 @@ std::pair<afwMath::LinearCombinationKernel::PtrT, std::vector<double> > createPc
     template class KernelCandidate<PixelT>;
 
     template
-    std::pair<lsst::afw::math::LinearCombinationKernel::PtrT, std::vector<double> >
+    std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, std::vector<double> >
     createPcaBasisFromCandidates<PixelT>(lsst::afw::math::SpatialCellSet const&,
                                          lsst::pex::policy::Policy const&);
 
     template
-    std::pair<afwMath::LinearCombinationKernel::PtrT, afwMath::Kernel::SpatialFunctionPtr>
-    fitSpatialKernelFromCandidates<PixelT>(PsfMatchingFunctor<PixelT>::Ptr const&,
+    std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr>
+    fitSpatialKernelFromCandidates<PixelT>(PsfMatchingFunctor<PixelT> &,
                                            lsst::afw::math::SpatialCellSet const&,
                                            lsst::pex::policy::Policy const&);
     

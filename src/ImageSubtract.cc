@@ -43,12 +43,12 @@ namespace diffim     = lsst::ip::diffim;
 //
 template <typename ImageT, typename VarT>
 diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
-    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList
+    lsst::afw::math::KernelList const &basisList
     ) :
     _basisList(basisList),
     _M(Eigen::MatrixXd()),
     _B(Eigen::VectorXd()),
-    _H(Eigen::MatrixXd()),
+    _H(boost::shared_ptr<Eigen::MatrixXd>()),
     _background(0.),
     _backgroundError(0.),
     _kernel(boost::shared_ptr<lsst::afw::math::Kernel>()),
@@ -57,8 +57,8 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
 
 template <typename ImageT, typename VarT>
 diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
-    lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList,
-    Eigen::MatrixXd const H
+    lsst::afw::math::KernelList const &basisList,
+    boost::shared_ptr<Eigen::MatrixXd> const &H
     ) :
     _basisList(basisList),
     _M(Eigen::MatrixXd()),
@@ -78,10 +78,10 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
  */
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
-    lsst::afw::image::Image<ImageT> const& imageToConvolve,    ///< Image to apply kernel to
-    lsst::afw::image::Image<ImageT> const& imageToNotConvolve, ///< Image whose PSF you want to match to
-    lsst::afw::image::Image<VarT>   const& varianceEstimate,   ///< Estimate of the variance per pixel
-    lsst::pex::policy::Policy       const& policy              ///< Policy file
+    lsst::afw::image::Image<ImageT> const &imageToConvolve,    ///< Image to apply kernel to
+    lsst::afw::image::Image<ImageT> const &imageToNotConvolve, ///< Image whose PSF you want to match to
+    lsst::afw::image::Image<VarT>   const &varianceEstimate,   ///< Estimate of the variance per pixel
+    lsst::pex::policy::Policy       const &policy              ///< Policy file
     ) {
     
     unsigned int const nKernelParameters     = _basisList.size();
@@ -237,7 +237,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
     t.restart();
 
     /* If the regularization matrix is here and not null, we use it by default */
-    if ( (_H.rows() != 0) && (_H.cols() != 0) ) {
+    if ( (_H->rows() != 0) && (_H->cols() != 0) ) {
         double regularizationScaling = policy.getDouble("regularizationScaling");        
         /* 
            See N.R. 18.5 equation 18.5.8 for the solution to the regularized
@@ -255,10 +255,10 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
         Eigen::MatrixXd Mt = M.transpose();
         M = Mt * M;
 
-        double lambda = M.trace() / _H.trace();
+        double lambda = M.trace() / _H->trace();
         lambda *= regularizationScaling;
 
-        M = M + lambda * _H;
+        M = M + lambda * *_H;
         B = Mt * B;
         logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                            "Applying kernel regularization with lambda = %.2e", lambda);
@@ -384,7 +384,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply2(
 
 template <typename ImageT>
 Eigen::MatrixXd diffim::imageToEigenMatrix(
-    lsst::afw::image::Image<ImageT> const& img
+    lsst::afw::image::Image<ImageT> const &img
     ) {
     unsigned int rows = img.getHeight();
     unsigned int cols = img.getWidth();
@@ -402,10 +402,10 @@ Eigen::MatrixXd diffim::imageToEigenMatrix(
 
 template <typename ImageT, typename VarT>
 void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
-    lsst::afw::image::Image<ImageT> const& imageToConvolve,    ///< Image to apply kernel to
-    lsst::afw::image::Image<ImageT> const& imageToNotConvolve, ///< Image whose PSF you want to match to
-    lsst::afw::image::Image<VarT>   const& varianceEstimate,   ///< Estimate of the variance per pixel
-    lsst::pex::policy::Policy       const& policy              ///< Policy file
+    lsst::afw::image::Image<ImageT> const &imageToConvolve,    ///< Image to apply kernel to
+    lsst::afw::image::Image<ImageT> const &imageToNotConvolve, ///< Image whose PSF you want to match to
+    lsst::afw::image::Image<VarT>   const &varianceEstimate,   ///< Estimate of the variance per pixel
+    lsst::pex::policy::Policy       const &policy              ///< Policy file
     ) {
     
     unsigned int const nKernelParameters     = _basisList.size();
@@ -544,7 +544,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     t.restart();
 
     /* If the regularization matrix is here and not null, we use it by default */
-    if ( (_H.rows() != 0) && (_H.cols() != 0) ) {
+    if ( (_H->rows() != 0) && (_H->cols() != 0) ) {
         double regularizationScaling = policy.getDouble("regularizationScaling");        
         /* 
            See N.R. 18.5 equation 18.5.8 for the solution to the regularized
@@ -562,10 +562,10 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         Eigen::MatrixXd Mt = M.transpose();
         M = Mt * M;
 
-        double lambda = M.trace() / _H.trace();
+        double lambda = M.trace() / _H->trace();
         lambda *= regularizationScaling;
 
-        M = M + lambda * _H;
+        M = M + lambda * *_H;
         B = Mt * B;
         logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                            "Applying kernel regularization with lambda = %.2e", lambda);
@@ -704,7 +704,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
  *
  * @ingroup diffim
  */
-math::KernelList<math::Kernel>
+math::KernelList
 diffim::generateDeltaFunctionKernelSet(
     unsigned int width,                 ///< number of columns in the set
     unsigned int height                 ///< number of rows in the set
@@ -714,7 +714,7 @@ diffim::generateDeltaFunctionKernelSet(
     }
     const int signedWidth = static_cast<int>(width);
     const int signedHeight = static_cast<int>(height);
-    math::KernelList<math::Kernel> kernelBasisList;
+    math::KernelList kernelBasisList;
     for (int row = 0; row < signedHeight; ++row) {
         for (int col = 0; col < signedWidth; ++col) {
             boost::shared_ptr<math::Kernel> 
@@ -725,7 +725,7 @@ diffim::generateDeltaFunctionKernelSet(
     return kernelBasisList;
 }
 
-Eigen::MatrixXd
+boost::shared_ptr<Eigen::MatrixXd>
 diffim::generateFiniteDifferenceRegularization(
     unsigned int width,
     unsigned int height,
@@ -931,7 +931,7 @@ diffim::generateFiniteDifferenceRegularization(
 	std::cout << B << std::endl;
     }
     
-    Eigen::MatrixXd H = B.transpose() * B;
+    boost::shared_ptr<Eigen::MatrixXd> H (new Eigen::MatrixXd(B.transpose() * B));
     return H;
 }
 
@@ -945,14 +945,14 @@ diffim::generateFiniteDifferenceRegularization(
  *
  * @ingroup diffim
  */
-math::KernelList<math::Kernel>
+math::KernelList
 diffim::generateAlardLuptonKernelSet(
     unsigned int halfWidth,                ///< size is 2*N + 1
     unsigned int nGauss,                   ///< number of gaussians
-    std::vector<double> const& sigGauss,   ///< width of the gaussians
-    std::vector<int>    const& degGauss    ///< local spatial variation of gaussians
+    std::vector<double> const &sigGauss,   ///< width of the gaussians
+    std::vector<int>    const &degGauss    ///< local spatial variation of gaussians
     ) {
-    typedef lsst::afw::math::Kernel::PixelT PixelT;
+    typedef lsst::afw::math::Kernel::Pixel PixelT;
     typedef image::Image<double> ImageT;
 
     if (halfWidth < 1) {
@@ -968,7 +968,7 @@ diffim::generateAlardLuptonKernelSet(
     ImageT image0(fullWidth, fullWidth);
     ImageT image(fullWidth, fullWidth);
     
-    math::KernelList<math::Kernel> kernelBasisList;
+    math::KernelList kernelBasisList;
     for (unsigned int i = 0; i < nGauss; i++) {
         /* 
            sigma = FWHM / ( 2 * sqrt(2 * ln(2)) )
@@ -1068,7 +1068,7 @@ diffim::generateAlardLuptonKernelSet(
 namespace {
     template <typename ImageT, typename FunctionT>
     void addSomethingToImage(ImageT &image,
-                             FunctionT const& function
+                             FunctionT const &function
                             ) {
 
         // Set the pixels row by row, to avoid repeated checks for end-of-row
@@ -1110,9 +1110,9 @@ namespace {
  */
 template <typename ImageT, typename BackgroundT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,    ///< Image T to convolve with Kernel
-    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve, ///< Image I to subtract convolved template from
-    lsst::afw::math::Kernel const& convolutionKernel,                ///< PSF-matching Kernel used for convolution
+    lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,    ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
+    lsst::afw::math::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used for convolution
     BackgroundT background,                               ///< Differential background function or scalar
     bool invert                                           ///< Invert the output difference image
     ) {
@@ -1152,9 +1152,9 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  */
 template <typename ImageT, typename BackgroundT>
 image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    lsst::afw::image::Image<ImageT> const& imageToConvolve,          ///< Image T to convolve with Kernel
-    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve, ///< Image I to subtract convolved template from
-    lsst::afw::math::Kernel const& convolutionKernel,                ///< PSF-matching Kernel used for convolution
+    lsst::afw::image::Image<ImageT> const &imageToConvolve,          ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
+    lsst::afw::math::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used for convolution
     BackgroundT background,                                          ///< Differential background function or scalar
     bool invert                                                      ///< Invert the output difference image
     ) {
@@ -1200,9 +1200,9 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  */
 template <typename ImageT>
 std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::image::MaskedImage<ImageT> const& imageToConvolve,    
-    lsst::afw::image::MaskedImage<ImageT> const& imageToNotConvolve, 
-    lsst::pex::policy::Policy             const& policy                                       
+    lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,    
+    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve, 
+    lsst::pex::policy::Policy             const &policy                                       
     ) {
     
     // Parse the Policy
@@ -1417,15 +1417,16 @@ INSTANTIATE_convolveAndSubtract(double);
 
 /* */
 
-template
-std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<float> const&,
-    image::MaskedImage<float> const&,
-    lsst::pex::policy::Policy const&);
 
 template
 std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<double> const&,
-    image::MaskedImage<double> const&,
-    lsst::pex::policy::Policy  const&);
+    image::MaskedImage<float> const &,
+    image::MaskedImage<float> const &,
+    lsst::pex::policy::Policy const &);
+
+template
+std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
+    image::MaskedImage<double> const &,
+    image::MaskedImage<double> const &,
+    lsst::pex::policy::Policy  const &);
 

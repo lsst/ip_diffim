@@ -48,9 +48,9 @@ namespace boost {
 
 %include "lsst/p_lsstSwig.i"
 %include "lsst/daf/base/persistenceMacros.i"
-%import  "lsst/afw/image/imageLib.i" 
+%import  "lsst/afw/image/image.i" 
 %import  "lsst/afw/detection/detectionLib.i"
-%import  "lsst/afw/math/kernelLib.i"
+%import  "lsst/afw/math/kernel.i"
 
 /* Since my KernelCandidate is a derived class from SpatialCellImageCandidate,
  * itself derived from SpatialCellCandidate, I actually need to generate wrapper
@@ -59,7 +59,7 @@ namespace boost {
 %include  "lsst/afw/math/spatialCell.i"
 
 /* so SWIG knows that PolynomialFunction2D is derived from Function2 */
-%import  "lsst/afw/math/functionLib.i"  
+%import  "lsst/afw/math/function.i"  
 
 /* Image/Mask types and typedefs */
 %include "lsst/afw/image/lsstImageTypes.i"     
@@ -104,6 +104,8 @@ SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double
     lsst::ip::diffim::PsfMatchingFunctor<float>;
 %template(PsfMatchingFunctorD)
     lsst::ip::diffim::PsfMatchingFunctor<double>;
+%template(makePsfMatchingFunctorF) lsst::ip::diffim::makePsfMatchingFunctor<float>;
+%template(makePsfMatchingFunctorD) lsst::ip::diffim::makePsfMatchingFunctor<double>;
 
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
@@ -151,7 +153,7 @@ lsst::afw::image::Image<PIXTYPE>
 
 %define %KernelCandidatePtr(NAME, TYPE)
 SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
-                        lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::PixelT)>,
+                        lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::Pixel)>,
                         lsst::ip::diffim::KernelCandidate<TYPE>);
 %enddef
 
@@ -166,15 +168,14 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 %}
 %enddef
 
-SWIG_SHARED_PTR(SpatialCellImageCandidateK,
-                lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::PixelT)>);
+ //SWIG_SHARED_PTR(SpatialCellImageCandidateK,
+ //                lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::Pixel)>);
 
 %KernelCandidatePtr(F, float);
 
 %include "lsst/ip/diffim/SpatialModelKernel.h"
 
-//%template(SpatialCellImageCandidateK)
-//	lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::PixelT)>;
+%template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>;
 
 %KernelCandidate(F, float);
 %template(createPcaBasisFromCandidates)   lsst::ip::diffim::createPcaBasisFromCandidates<float>;

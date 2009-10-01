@@ -189,7 +189,7 @@ namespace diffim {
      * @param width  Width of basis set
      * @param height Height of basis set
      */    
-    lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateDeltaFunctionKernelSet(
+    lsst::afw::math::KernelList generateDeltaFunctionKernelSet(
         unsigned int width,
         unsigned int height
         );
@@ -203,7 +203,7 @@ namespace diffim {
      * @param difference_style 0 = forward, 1 = central
      * @param printB           debugging
      */    
-    Eigen::MatrixXd generateFiniteDifferenceRegularization(
+    boost::shared_ptr<Eigen::MatrixXd> generateFiniteDifferenceRegularization(
         unsigned int width,
         unsigned int height,
         unsigned int order,
@@ -222,7 +222,7 @@ namespace diffim {
      * @param sigGauss   Widths of the Gaussian Kernels
      * @param degGauss   Local spatial variation of bases
      */    
-    lsst::afw::math::KernelList<lsst::afw::math::Kernel> generateAlardLuptonKernelSet(
+    lsst::afw::math::KernelList generateAlardLuptonKernelSet(
         unsigned int halfWidth,                ///< size is 2*N + 1
         unsigned int nGauss,                   ///< number of gaussians
         std::vector<double> const& sigGauss,   ///< width of the gaussians
@@ -285,11 +285,11 @@ namespace diffim {
         typedef typename lsst::afw::image::Image<VarT>::xy_locator         xyi_locator;
 
         PsfMatchingFunctor(
-            lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList
+            lsst::afw::math::KernelList const& basisList
             );
         PsfMatchingFunctor(
-            lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& basisList,
-            Eigen::MatrixXd const H
+            lsst::afw::math::KernelList const& basisList,
+            boost::shared_ptr<Eigen::MatrixXd> const& H
             );
         virtual ~PsfMatchingFunctor() {};
 
@@ -316,7 +316,7 @@ namespace diffim {
 
         /** Access to basis list
          */
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> getBasisList() const { return _basisList; }
+        lsst::afw::math::KernelList getBasisList() const { return _basisList; }
 
         /* Create PSF matching kernel */
         void apply(lsst::afw::image::Image<ImageT> const& imageToConvolve,
@@ -333,16 +333,30 @@ namespace diffim {
             );
 
     protected:
-        lsst::afw::math::KernelList<lsst::afw::math::Kernel> const& _basisList;  ///< List of Kernel basis functions
-        Eigen::MatrixXd _M;                                                      ///< Least squares matrix
-        Eigen::VectorXd _B;                                                      ///< Least squares vector
-        Eigen::MatrixXd _H;                                                      ///< Regularization matrix
-        double _background;                                                      ///< Differenaitl background estimate
-        double _backgroundError;                                                 ///< Uncertainty on background
-        boost::shared_ptr<lsst::afw::math::Kernel> _kernel;                      ///< PSF matching kernel
-        boost::shared_ptr<lsst::afw::math::Kernel> _kernelError;                 ///< Uncertainty on kernel
+        lsst::afw::math::KernelList const _basisList;            ///< List of Kernel basis functions
+        Eigen::MatrixXd _M;                                      ///< Least squares matrix
+        Eigen::VectorXd _B;                                      ///< Least squares vector
+        boost::shared_ptr<Eigen::MatrixXd> const _H;             ///< Regularization matrix
+        double _background;                                      ///< Differential background estimate
+        double _backgroundError;                                 ///< Uncertainty on background
+        boost::shared_ptr<lsst::afw::math::Kernel> _kernel;      ///< PSF matching kernel
+        boost::shared_ptr<lsst::afw::math::Kernel> _kernelError; ///< Uncertainty on kernel
     };
     
+    template <typename ImageT>
+    typename PsfMatchingFunctor<ImageT>::Ptr
+    makePsfMatchingFunctor(lsst::afw::math::KernelList const& basisList) {
+        return typename PsfMatchingFunctor<ImageT>::Ptr(new PsfMatchingFunctor<ImageT>(basisList));
+    }
+
+    template <typename ImageT>
+    typename PsfMatchingFunctor<ImageT>::Ptr
+    makePsfMatchingFunctor(lsst::afw::math::KernelList const& basisList,
+                           boost::shared_ptr<Eigen::MatrixXd> const H) {
+        return typename PsfMatchingFunctor<ImageT>::Ptr(new PsfMatchingFunctor<ImageT>(basisList, H));
+    }
+
+
 }}}
 
 #endif

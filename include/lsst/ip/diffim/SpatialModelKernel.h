@@ -38,10 +38,10 @@ namespace diffim {
      */    
 
     template <typename _PixelT>
-    class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> > {
+    class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> > {
     public: 
-        typedef lsst::afw::image::Image<lsst::afw::math::Kernel::PixelT> ImageT;
-        typedef _PixelT PixelT;         // _after_ using lsst::afw::math::Kernel::PixelT
+        typedef lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> ImageT;
+        typedef _PixelT PixelT;         // _after_ using lsst::afw::math::Kernel::Pixel
 
     private:
         using lsst::afw::math::SpatialCellImageCandidate<ImageT>::_image;
@@ -90,17 +90,17 @@ namespace diffim {
          */
         lsst::afw::image::MaskedImage<PixelT> returnDifferenceImage();
         lsst::afw::image::MaskedImage<PixelT> returnDifferenceImage(
-            lsst::afw::math::Kernel::PtrT kernel,
+            lsst::afw::math::Kernel::Ptr kernel,
             double background
             );
 
         typename ImageT::ConstPtr getImage() const;
         typename ImageT::Ptr copyImage() const;
-        lsst::afw::math::Kernel::PtrT getKernel() const;
+        lsst::afw::math::Kernel::Ptr getKernel() const;
         Eigen::MatrixXd getM()  {return _M;}
         Eigen::VectorXd getB()  {return _B;}
         
-        void setKernel(lsst::afw::math::Kernel::PtrT kernel) {_kernel = kernel; _haveKernel = true;}
+        void setKernel(lsst::afw::math::Kernel::Ptr kernel) {_kernel = kernel; _haveKernel = true;}
         void setBackground(double background) {_background = background;}
         void setM(Eigen::MatrixXd M) {_M = M;}
         void setB(Eigen::VectorXd B) {_B = B;}
@@ -109,7 +109,7 @@ namespace diffim {
         MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
         MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel
 
-        lsst::afw::math::Kernel::PtrT _kernel;              ///< Derived single-object convolution kernel
+        lsst::afw::math::Kernel::Ptr _kernel;              ///< Derived single-object convolution kernel
         double _background;                                 ///< Derived differential background estimate
         Eigen::MatrixXd _M;                                 ///< Derived least squares matrix
         Eigen::VectorXd _B;                                 ///< Derived least squares vector
@@ -135,14 +135,14 @@ namespace diffim {
     }
 
     template<typename PixelT>
-    std::pair<lsst::afw::math::LinearCombinationKernel::PtrT, std::vector<double> >
+    std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, std::vector<double> >
     createPcaBasisFromCandidates(lsst::afw::math::SpatialCellSet const& psfCells,
                                  lsst::pex::policy::Policy const& policy);
 
     template<typename PixelT>
-    std::pair<lsst::afw::math::LinearCombinationKernel::PtrT, lsst::afw::math::Kernel::SpatialFunctionPtr>
+    std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
     fitSpatialKernelFromCandidates(
-        typename PsfMatchingFunctor<PixelT>::Ptr const& kFunctor,
+        PsfMatchingFunctor<PixelT> &kFunctor,
         lsst::afw::math::SpatialCellSet const& psfCells,
         lsst::pex::policy::Policy const& policy);
     
