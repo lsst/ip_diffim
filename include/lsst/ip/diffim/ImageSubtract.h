@@ -293,26 +293,15 @@ namespace diffim {
             );
         virtual ~PsfMatchingFunctor() {};
 
-        /** Return background value
-         */
-        double getBackground()                   const { return _background; }
+        /* Shallow copy only; shared matrix product uninitialized */
+        PsfMatchingFunctor<ImageT,VarT>(const PsfMatchingFunctor<ImageT,VarT> &rhs);
 
-        /** Return uncertainty on background value
-         */
-        double getBackgroundError()              const { return _backgroundError; }
-
-        /** Return PSF matching kernel
-         */
-        boost::shared_ptr<lsst::afw::math::Kernel> getKernel()      const { return _kernel; }
-
-        /** Return uncertainty on matching kernel, as kernel itself
-         */
-        boost::shared_ptr<lsst::afw::math::Kernel> getKernelError() const { return _kernelError; }
-
+        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getKernel();
+        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getKernelUncertainty();
+        
         /** Access to least squares info
          */
-        Eigen::MatrixXd getM() const { return _M; }
-        Eigen::VectorXd getB() const { return _B; }
+        std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> > getAndClearMB();
 
         /** Access to basis list
          */
@@ -325,22 +314,14 @@ namespace diffim {
                    lsst::pex::policy::Policy       const& policy
             );
 
-        /* Slow and outdated version */
-        void apply2(lsst::afw::image::Image<ImageT> const& imageToConvolve,
-                    lsst::afw::image::Image<ImageT> const& imageToNotConvolve,
-                    lsst::afw::image::Image<VarT>   const& varianceEstimate,
-                    lsst::pex::policy::Policy       const& policy
-            );
-
     protected:
         lsst::afw::math::KernelList const _basisList;            ///< List of Kernel basis functions
-        Eigen::MatrixXd _M;                                      ///< Least squares matrix
-        Eigen::VectorXd _B;                                      ///< Least squares vector
+        boost::shared_ptr<Eigen::MatrixXd> _M;                   ///< Least squares matrix
+        boost::shared_ptr<Eigen::VectorXd> _B;                   ///< Least squares vector
+        boost::shared_ptr<Eigen::VectorXd> _Soln;                ///< Least square solution
         boost::shared_ptr<Eigen::MatrixXd> const _H;             ///< Regularization matrix
-        double _background;                                      ///< Differential background estimate
-        double _backgroundError;                                 ///< Uncertainty on background
-        boost::shared_ptr<lsst::afw::math::Kernel> _kernel;      ///< PSF matching kernel
-        boost::shared_ptr<lsst::afw::math::Kernel> _kernelError; ///< Uncertainty on kernel
+        bool _initialized;                                       ///< Has been solved for
+        bool _regularize;                                        ///< Has a _H matrix
     };
     
     template <typename ImageT>

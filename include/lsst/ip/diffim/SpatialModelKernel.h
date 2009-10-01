@@ -97,22 +97,25 @@ namespace diffim {
         typename ImageT::ConstPtr getImage() const;
         typename ImageT::Ptr copyImage() const;
         lsst::afw::math::Kernel::Ptr getKernel() const;
-        Eigen::MatrixXd getM()  {return _M;}
-        Eigen::VectorXd getB()  {return _B;}
+        double getBackground() const;
+        boost::shared_ptr<Eigen::MatrixXd> const getM()  {return _M;}
+        boost::shared_ptr<Eigen::VectorXd> const getB()  {return _B;}
         
         void setKernel(lsst::afw::math::Kernel::Ptr kernel) {_kernel = kernel; _haveKernel = true;}
         void setBackground(double background) {_background = background;}
-        void setM(Eigen::MatrixXd M) {_M = M;}
-        void setB(Eigen::VectorXd B) {_B = B;}
+
+        void setM(boost::shared_ptr<Eigen::MatrixXd> M) {_M = M;}
+        void setB(boost::shared_ptr<Eigen::VectorXd> B) {_B = B;}
         
     private:
         MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
         MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel
 
-        lsst::afw::math::Kernel::Ptr _kernel;              ///< Derived single-object convolution kernel
+        lsst::afw::math::Kernel::Ptr _kernel;               ///< Derived single-object convolution kernel
         double _background;                                 ///< Derived differential background estimate
-        Eigen::MatrixXd _M;                                 ///< Derived least squares matrix
-        Eigen::VectorXd _B;                                 ///< Derived least squares vector
+
+        boost::shared_ptr<Eigen::MatrixXd> _M;              ///< Derived least squares matrix
+        boost::shared_ptr<Eigen::VectorXd> _B;              ///< Derived least squares vector
 
         bool mutable _haveImage;                            ///< do we have an Image to return?
         bool mutable _haveKernel;                           ///< do we have a Kernel to return?

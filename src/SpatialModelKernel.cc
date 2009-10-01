@@ -77,6 +77,14 @@ afwMath::Kernel::Ptr KernelCandidate<PixelT>::getKernel() const {
 }
 
 template <typename PixelT>
+double KernelCandidate<PixelT>::getBackground() const {
+    if (!_haveKernel) {
+        throw LSST_EXCEPT(pexExcept::Exception, "No Background for KernelCandidate");
+    }
+    return _background;
+}
+
+template <typename PixelT>
 lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage() {
     if (!_haveKernel) {
         throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
@@ -169,16 +177,19 @@ namespace {
             }
             
             /* Update the candidate with derived products */
-            kCandidate->setM(_kFunctor.getM());
-            kCandidate->setB(_kFunctor.getB());
-            kCandidate->setKernel(_kFunctor.getKernel());
-            kCandidate->setBackground(_kFunctor.getBackground());
+            std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> > MB = _kFunctor.getAndClearMB();
+            kCandidate->setM(MB.first);
+            kCandidate->setB(MB.second);
+
+            std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> KB = _kFunctor.getKernel();
+            kCandidate->setKernel(KB.first);
+            kCandidate->setBackground(KB.second);
             
             /* Make diffim and set chi2 from result */
             MaskedImageT diffim = convolveAndSubtract(*(kCandidate->getMiToConvolvePtr()),
                                                       *(kCandidate->getMiToNotConvolvePtr()),
-                                                      *(_kFunctor.getKernel()),
-                                                      _kFunctor.getBackground());
+                                                      *(kCandidate->getKernel()),
+                                                      kCandidate->getBackground());
             _imstats.apply(diffim);
             kCandidate->setChi2(_imstats.getVariance());
             
@@ -214,10 +225,12 @@ namespace {
             /* Bookeeping terms */
             _nkt = _spatialKernelFunction->getParameters().size();
             _nbt = _spatialBgFunction->getParameters().size();
+
+            std::cout << "IN " << _nkt << " " << _nbt << " " << _nbases << std::endl;
             
             /* Nbases + 1 term for background */
-            _M.resize((_nbases+1)*(_nkt + _nbt), (_nbases+1)*(_nkt + _nbt));
-            _B.resize((_nbases+1)*(_nkt + _nbt));
+            _M.resize(_nbases*_nkt + _nbt, _nbases*_nkt + _nbt);
+            _B.resize(_nbases*_nkt + _nbt);
             _M.setZero();
             _B.setZero();
             pexLogging::TTrace<5>("lsst.ip.diffim.LinearSpatialFitVisitor", 
@@ -259,32 +272,31 @@ namespace {
             
             
             /* Add 'em to the M, B matrix */
-            Eigen::MatrixXd Q   = kCandidate->getM();
-            Eigen::VectorXd W   = kCandidate->getB();
+            boost::shared_ptr<Eigen::MatrixXd> Q = kCandidate->getM();
+            boost::shared_ptr<Eigen::VectorXd> W = kCandidate->getB();
             
-            for(unsigned int m1 = 0; m1 < _nkt; m1++)  {
-                for(unsigned int m2 = m1; m2 < _nkt; m2++)  {
-                    _M.block(m1*_nkt, m2*_nkt, _nkt, _nkt) += Q(m1,m2) * PkPkt;
-                    _M.block(m2*_nkt, m1*_nkt, _nkt, _nkt) += Q(m2,m1) * PkPkt;
+            for(unsigned int m1 = 0; m1 < _nbases; m1++)  {
+                for(unsigned int m2 = m1; m2 < _nbases; m2++)  {
+                    _M.block(m1*_nkt, m2*_nkt, _nkt, _nkt) += (*Q)(m1,m2) * PkPkt;
+                    _M.block(m2*_nkt, m1*_nkt, _nkt, _nkt) += (*Q)(m2,m1) * PkPkt;
                 }
-                _B.segment(m1*_nkt,_nkt)                   += W(m1) * Pk;
+                _B.segment(m1*_nkt,_nkt)                   += (*W)(m1) * Pk;
             } 
             
-            /* shift things by m0 so as to not mix the background and kernel terms */
-            for(unsigned int m1 = 0, m0 = _nkt*_nkt; m1 < _nbt; m1++)  {
-                for(unsigned int m2 = m1; m2 < _nbt; m2++)  {
-                    _M.block(m0+m1*_nbt, m0+m2*_nbt, _nbt, _nbt) += Q(m1+_nkt,m2+_nkt) * PbPbt;
-                    _M.block(m0+m2*_nbt, m0+m1*_nbt, _nbt, _nbt) += Q(m2+_nkt,m1+_nkt) * PbPbt;
-                }
-                _B.segment(m0+m1*_nbt, _nbt)                     += W(m1+_nkt) * Pb;
-            } 
-            
+            /* Do not mix the background and kernel terms */
+            unsigned int m0 = _nkt*_nbases;
+            _M.block(m0, m0, _nbt, _nbt) += (*Q)(_nbases+1,_nbases+1) * PbPbt;
+            _M.block(m0, m0, _nbt, _nbt) += (*Q)(_nbases+1,_nbases+1) * PbPbt;
+            _B.segment(m0, _nbt)         += (*W)(_nbases+1) * Pb;
             
         }
         
         void solveLinearEquation() {
             _Soln = Eigen::VectorXd::Zero(_nkt + _nbt);
-            
+
+            std::cout << _M << std::endl;
+            std::cout << _B << std::endl;
+
             if (!( _M.ldlt().solve(_B, &_Soln) )) {
                 pexLogging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.solveLinearEquation", 
                                       "Unable to determine kernel via Cholesky LDL^T");
@@ -391,13 +403,18 @@ fitSpatialKernelFromCandidates(
     int const spatialBgOrder     = policy.getInt("spatialBgOrder");
     
     /* Visitor for the single kernel fit */
+    std::cout << "CAW" << std::endl;
     BuildSingleKernelVisitor<PixelT> singleKernelFitter(kFunctor, policy);
+    std::cout << "CAW" << std::endl;
     
     /* Visitor for the spatial kernel fit */
     BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(kFunctor, spatialKernelOrder, spatialBgOrder);
+    std::cout << "CAW" << std::endl;
 
     psfCells.visitCandidates(&singleKernelFitter, nStarPerCell);
+    std::cout << "CAW" << std::endl;
     psfCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
+    std::cout << "CAW" << std::endl;
     spatialKernelFitter.solveLinearEquation();
     return spatialKernelFitter.getSpatialModel();
 }
