@@ -181,4 +181,9 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 %template(createPcaBasisFromCandidates)   lsst::ip::diffim::createPcaBasisFromCandidates<float>;
 %template(fitSpatialKernelFromCandidates) lsst::ip::diffim::fitSpatialKernelFromCandidates<float>;
 
+%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<float,  lsst::afw::math::Function2<double> >;
+%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<double, lsst::afw::math::Function2<double> >;
+%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<float>;
+%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<double>;
+
 

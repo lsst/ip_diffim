@@ -822,33 +822,31 @@ diffim::generateAlardLuptonKernelSet(
  *
  * @node this function was renamed from addFunctionToImage to addSomethingToImage to allow generic programming
  */
-namespace {
-    template <typename ImageT, typename FunctionT>
-    void addSomethingToImage(ImageT &image,
-                             FunctionT const &function
-                            ) {
-
-        // Set the pixels row by row, to avoid repeated checks for end-of-row
-        for (int y = 0; y != image.getHeight(); ++y) {
-            double yPos = image::positionToIndex(y);
+template <typename PixelT, typename FunctionT>
+void diffim::addSomethingToImage(image::Image<PixelT> &image,
+                                 FunctionT const &function
+    ) {
+    
+    // Set the pixels row by row, to avoid repeated checks for end-of-row
+    for (int y = 0; y != image.getHeight(); ++y) {
+        double yPos = image::positionToIndex(y);
         
-            double xPos = image::positionToIndex(0);
-            for (typename ImageT::x_iterator ptr = image.row_begin(y), end = image.row_end(y);
-                 ptr != end; ++ptr, ++xPos) {            
-                *ptr += function(xPos, yPos);
-            }
+        double xPos = image::positionToIndex(0);
+        for (typename image::Image<PixelT>::x_iterator ptr = image.row_begin(y), end = image.row_end(y);
+             ptr != end; ++ptr, ++xPos) {            
+            *ptr += function(xPos, yPos);
         }
     }
-    //
-    // Add a scalar.
-    //
-    template <typename ImageT>
-    void addSomethingToImage(image::Image<ImageT> &image,
-                             double value
-                            ) {
-        if (value != 0.0) {
-            image += value;
-        }
+}
+//
+// Add a scalar.
+//
+template <typename PixelT>
+void diffim::addSomethingToImage(image::Image<PixelT> &image,
+                                 double value
+    ) {
+    if (value != 0.0) {
+        image += value;
     }
 }
 
@@ -1187,3 +1185,24 @@ std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMa
     image::MaskedImage<double> const &,
     lsst::pex::policy::Policy  const &);
 
+template 
+void diffim::addSomethingToImage(
+    image::Image<float> &,
+    math::PolynomialFunction2<double> const &
+    );
+template 
+void diffim::addSomethingToImage(
+    image::Image<double> &,
+    math::PolynomialFunction2<double> const &
+    );
+
+template 
+void diffim::addSomethingToImage(
+    image::Image<float> &,
+    double
+    );
+template 
+void diffim::addSomethingToImage(
+    image::Image<double> &,
+    double
+    );

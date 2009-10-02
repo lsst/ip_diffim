@@ -294,7 +294,7 @@ namespace diffim {
         virtual ~PsfMatchingFunctor() {};
 
         /* Shallow copy only; shared matrix product uninitialized */
-        PsfMatchingFunctor<ImageT,VarT>(const PsfMatchingFunctor<ImageT,VarT> &rhs);
+        PsfMatchingFunctor(const PsfMatchingFunctor<ImageT,VarT> &rhs);
 
         std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getKernel();
         std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getKernelUncertainty();
@@ -337,6 +337,13 @@ namespace diffim {
         return typename PsfMatchingFunctor<ImageT>::Ptr(new PsfMatchingFunctor<ImageT>(basisList, H));
     }
 
+    template <typename PixelT, typename FunctionT>
+    void addSomethingToImage(lsst::afw::image::Image<PixelT> &image,
+                             FunctionT const &function);
+
+    template <typename PixelT>
+    void addSomethingToImage(lsst::afw::image::Image<PixelT> &image,
+                             double value);
 
 }}}
 

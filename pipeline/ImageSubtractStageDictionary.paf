@@ -31,7 +31,7 @@ alardDegGauss: 4   3   2
 # boundary   : 0 = unwrapped, 1 = wrapped, 2 = order-tappered ('order' is highest used) 
 # difference : 0 = forward, 1 = central
 # scaling    : Fraction of the default lambda calculation (N.R. 18.5.8) to use; strength of regularization
-useRegularization: false
+useRegularization: true
 regularizationOrder: 2
 regularizationBoundary: 1
 regularizationDifference: 0

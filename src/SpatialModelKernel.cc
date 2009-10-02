@@ -8,6 +8,7 @@
  *
  * @ingroup ip_diffim
  */
+#include <boost/timer.hpp> 
 
 #include <lsst/afw/image/Image.h>
 #include <lsst/afw/image/ImagePca.h>
@@ -26,6 +27,8 @@
 
 #include <lsst/ip/diffim/SpatialModelKernel.h>
 
+#define DEBUG_MATRIX 0
+
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
 namespace pexLogging     = lsst::pex::logging; 
@@ -38,20 +41,23 @@ namespace diffim {
 
 template <typename PixelT>
 KernelCandidate<PixelT>::ImageT::ConstPtr KernelCandidate<PixelT>::getImage() const {
-    int const width = getWidth() == 0 ? 15 : getWidth();
-    int const height = getHeight() == 0 ? 15 : getHeight();
-    
-    if (_haveImage && (width != _image->getWidth() || height != _image->getHeight())) {
-        _haveImage = false;
-    }
-    
     if (!_haveKernel) {
         throw LSST_EXCEPT(pexExcept::Exception, "No Kernel to make KernelCandidate Image from");
     }
     
     if (!_haveImage) {
         // Calculate it from the Kernel 
-        (void)_kernel->computeImage(*_image, false);                    
+        setWidth(_kernel->getWidth());
+        setHeight(_kernel->getHeight());
+        
+        typename KernelCandidate<PixelT>::ImageT::Ptr image (
+            new typename KernelCandidate<PixelT>::ImageT(_kernel->getDimensions())
+            );
+        /* We can't use a const pointer here */
+        (void)_kernel->computeImage(*image, false);                    
+
+        _image     = image;
+        _haveImage = true;
     }
     return _image;
 }
@@ -176,15 +182,17 @@ namespace {
                 throw e;
             }
             
-            /* Update the candidate with derived products */
+
+            /* Update the candidate with derived products, need to get Kernel
+             * first.  This calls for some redesign */
+            std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> KB = _kFunctor.getKernel();
+            kCandidate->setKernel(KB.first);
+            kCandidate->setBackground(KB.second);
+
             std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> > MB = _kFunctor.getAndClearMB();
             kCandidate->setM(MB.first);
             kCandidate->setB(MB.second);
 
-            std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> KB = _kFunctor.getKernel();
-            kCandidate->setKernel(KB.first);
-            kCandidate->setBackground(KB.second);
-            
             /* Make diffim and set chi2 from result */
             MaskedImageT diffim = convolveAndSubtract(*(kCandidate->getMiToConvolvePtr()),
                                                       *(kCandidate->getMiToNotConvolvePtr()),
@@ -192,6 +200,9 @@ namespace {
                                                       kCandidate->getBackground());
             _imstats.apply(diffim);
             kCandidate->setChi2(_imstats.getVariance());
+
+            pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                                  "Chi2 = %.2f", kCandidate->getChi2());
             
         }
     private:
@@ -226,8 +237,6 @@ namespace {
             _nkt = _spatialKernelFunction->getParameters().size();
             _nbt = _spatialBgFunction->getParameters().size();
 
-            std::cout << "IN " << _nkt << " " << _nbt << " " << _nbases << std::endl;
-            
             /* Nbases + 1 term for background */
             _M.resize(_nbases*_nkt + _nbt, _nbases*_nkt + _nbt);
             _B.resize(_nbases*_nkt + _nbt);
@@ -270,11 +279,20 @@ namespace {
             }
             Eigen::MatrixXd PbPbt = (Pb * Pb.transpose());
             
+            if (DEBUG_MATRIX) {
+                std::cout << PkPkt << std::endl;
+                std::cout << PbPbt << std::endl;
+            }
             
             /* Add 'em to the M, B matrix */
             boost::shared_ptr<Eigen::MatrixXd> Q = kCandidate->getM();
             boost::shared_ptr<Eigen::VectorXd> W = kCandidate->getB();
-            
+
+            if (DEBUG_MATRIX) {
+                std::cout << (*Q) << std::endl;
+                std::cout << (*W) << std::endl;
+            }
+
             for(unsigned int m1 = 0; m1 < _nbases; m1++)  {
                 for(unsigned int m2 = m1; m2 < _nbases; m2++)  {
                     _M.block(m1*_nkt, m2*_nkt, _nkt, _nkt) += (*Q)(m1,m2) * PkPkt;
@@ -282,20 +300,23 @@ namespace {
                 }
                 _B.segment(m1*_nkt,_nkt)                   += (*W)(m1) * Pk;
             } 
-            
-            /* Do not mix the background and kernel terms */
+            /* Do not mix the background and kernel terms; bg term is last, so at address _nbases */
             unsigned int m0 = _nkt*_nbases;
-            _M.block(m0, m0, _nbt, _nbt) += (*Q)(_nbases+1,_nbases+1) * PbPbt;
-            _M.block(m0, m0, _nbt, _nbt) += (*Q)(_nbases+1,_nbases+1) * PbPbt;
-            _B.segment(m0, _nbt)         += (*W)(_nbases+1) * Pb;
-            
+            _M.block(m0, m0, _nbt, _nbt) += (*Q)(_nbases,_nbases) * PbPbt;
+            _M.block(m0, m0, _nbt, _nbt) += (*Q)(_nbases,_nbases) * PbPbt;
+            _B.segment(m0, _nbt)         += (*W)(_nbases) * Pb;
         }
         
         void solveLinearEquation() {
-            _Soln = Eigen::VectorXd::Zero(_nkt + _nbt);
+            boost::timer t;
+            t.restart();
 
-            std::cout << _M << std::endl;
-            std::cout << _B << std::endl;
+            _Soln = Eigen::VectorXd::Zero(_nbases*_nkt + _nbt);
+            
+            if (DEBUG_MATRIX) {
+                std::cout << _M << std::endl;
+                std::cout << _B << std::endl;
+            }
 
             if (!( _M.ldlt().solve(_B, &_Soln) )) {
                 pexLogging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.solveLinearEquation", 
@@ -329,6 +350,9 @@ namespace {
                     }
                 }
             }
+            double time = t.elapsed();
+            pexLogging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.solveLinearEquation", 
+                                  "Compute time to do spatial matrix math : %.2f s", time);
         }
 
         
@@ -362,7 +386,7 @@ namespace {
             }
             
             /* Set the background coefficients */
-            std::vector<double> bgCoeffs;
+            std::vector<double> bgCoeffs(_nbt);
             for (unsigned int i = 0; i < _nbt; i++) {
                 bgCoeffs[i] = _Soln[i + _nbases*_nkt];
             }
