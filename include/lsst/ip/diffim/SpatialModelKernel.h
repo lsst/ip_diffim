@@ -64,7 +64,11 @@ namespace diffim {
             lsst::afw::math::SpatialCellImageCandidate<ImageT>(xCenter, yCenter),
             _miToConvolvePtr(miToConvolvePtr),
             _miToNotConvolvePtr(miToNotConvolvePtr),
-            _haveImage(false),
+            _kernel(),
+            _kSum(0),
+            _background(0),
+            _M(),
+            _B(),
             _haveKernel(false) {
         }
         
@@ -94,14 +98,16 @@ namespace diffim {
             double background
             );
 
+
         typename ImageT::ConstPtr getImage() const;
         typename ImageT::Ptr copyImage() const;
+        double getKsum() const;
         lsst::afw::math::Kernel::Ptr getKernel() const;
         double getBackground() const;
         boost::shared_ptr<Eigen::MatrixXd> const getM()  {return _M;}
         boost::shared_ptr<Eigen::VectorXd> const getB()  {return _B;}
         
-        void setKernel(lsst::afw::math::Kernel::Ptr kernel) {_kernel = kernel; _haveKernel = true;}
+        void setKernel(lsst::afw::math::Kernel::Ptr kernel);
         void setBackground(double background) {_background = background;}
 
         void setM(boost::shared_ptr<Eigen::MatrixXd> M) {_M = M;}
@@ -112,12 +118,12 @@ namespace diffim {
         MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel
 
         lsst::afw::math::Kernel::Ptr _kernel;               ///< Derived single-object convolution kernel
+        double _kSum;                                       ///< Derived kernel sum
         double _background;                                 ///< Derived differential background estimate
 
         boost::shared_ptr<Eigen::MatrixXd> _M;              ///< Derived least squares matrix
         boost::shared_ptr<Eigen::VectorXd> _B;              ///< Derived least squares vector
 
-        bool mutable _haveImage;                            ///< do we have an Image to return?
         bool mutable _haveKernel;                           ///< do we have a Kernel to return?
     };
 

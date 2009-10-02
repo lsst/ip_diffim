@@ -44,21 +44,6 @@ KernelCandidate<PixelT>::ImageT::ConstPtr KernelCandidate<PixelT>::getImage() co
     if (!_haveKernel) {
         throw LSST_EXCEPT(pexExcept::Exception, "No Kernel to make KernelCandidate Image from");
     }
-    
-    if (!_haveImage) {
-        // Calculate it from the Kernel 
-        setWidth(_kernel->getWidth());
-        setHeight(_kernel->getHeight());
-        
-        typename KernelCandidate<PixelT>::ImageT::Ptr image (
-            new typename KernelCandidate<PixelT>::ImageT(_kernel->getDimensions())
-            );
-        /* We can't use a const pointer here */
-        (void)_kernel->computeImage(*image, false);                    
-
-        _image     = image;
-        _haveImage = true;
-    }
     return _image;
 }
 
@@ -75,6 +60,21 @@ KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::copyImage() const 
 
   
 template <typename PixelT>
+void KernelCandidate<PixelT>::setKernel(lsst::afw::math::Kernel::Ptr kernel) {
+    _kernel     = kernel; 
+    _haveKernel = true;
+
+    setWidth(_kernel->getWidth());
+    setHeight(_kernel->getHeight());
+    
+    typename KernelCandidate<PixelT>::ImageT::Ptr image (
+        new typename KernelCandidate<PixelT>::ImageT(_kernel->getDimensions())
+        );
+    _kSum  = _kernel->computeImage(*image, false);                    
+    _image = image;
+}
+
+template <typename PixelT>
 afwMath::Kernel::Ptr KernelCandidate<PixelT>::getKernel() const {
     if (!_haveKernel) {
         throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
@@ -85,9 +85,17 @@ afwMath::Kernel::Ptr KernelCandidate<PixelT>::getKernel() const {
 template <typename PixelT>
 double KernelCandidate<PixelT>::getBackground() const {
     if (!_haveKernel) {
-        throw LSST_EXCEPT(pexExcept::Exception, "No Background for KernelCandidate");
+        throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
     }
     return _background;
+}
+
+template <typename PixelT>
+double KernelCandidate<PixelT>::getKsum() const {
+    if (!_haveKernel) {
+        throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
+    }
+    return _kSum;
 }
 
 template <typename PixelT>
@@ -152,11 +160,11 @@ namespace {
         typedef afwImage::MaskedImage<PixelT> MaskedImageT;
     public:
         BuildSingleKernelVisitor(PsfMatchingFunctor<PixelT> &kFunctor,
-                           lsst::pex::policy::Policy const& policy) :
+                                 lsst::pex::policy::Policy const& policy) :
             afwMath::CandidateVisitor(),
             _kFunctor(kFunctor),
             _policy(policy),
-            _imstats( ImageStatistics<PixelT>() ){}
+            _imstats(ImageStatistics<PixelT>()){}
         
         void processCandidate(afwMath::SpatialCellCandidate *candidate) {
             KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
@@ -165,7 +173,7 @@ namespace {
                                   "Failed to cast SpatialCellCandidate to KernelCandidate");
             }
 
-            pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+            pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                   "Processing candidate %d", kCandidate->getId());
             
             /* Build its kernel here */
@@ -194,16 +202,38 @@ namespace {
             kCandidate->setB(MB.second);
 
             /* Make diffim and set chi2 from result */
-            MaskedImageT diffim = convolveAndSubtract(*(kCandidate->getMiToConvolvePtr()),
-                                                      *(kCandidate->getMiToNotConvolvePtr()),
-                                                      *(kCandidate->getKernel()),
-                                                      kCandidate->getBackground());
+            MaskedImageT diffim = kCandidate->returnDifferenceImage();
             _imstats.apply(diffim);
             kCandidate->setChi2(_imstats.getVariance());
 
-            pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+            pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                   "Chi2 = %.2f", kCandidate->getChi2());
-            
+            pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
+                                  "Kernel Sum = %.3f; Background = %.3f; Diffim residuals = %.2f +/- %.2f sigma",
+                                  kCandidate->getKsum(),  
+                                  kCandidate->getBackground(), 
+                                  _imstats.getMean(),
+                                  _imstats.getRms());
+
+            if (_imstats.getMean() > _policy.getDouble("candidateResidualMeanMax")) {
+                kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
+                pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                                      "Rejecting due to bad source kernel mean residuals : %.2f > %.2f",
+                                      _imstats.getMean(),
+                                      _policy.getDouble("candidateResidualMeanMax"));
+            }
+            else if (_imstats.getRms() > _policy.getDouble("candidateResidualStdMax")) {
+                kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
+                pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                                      "Rejecting due to bad source kernel residual rms : %.2f > %.2f",
+                                      _imstats.getRms(),
+                                      _policy.getDouble("candidateResidualStdMax"));
+            }
+            else {
+                kCandidate->setStatus(afwMath::SpatialCellCandidate::GOOD);
+                pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                                      "Source kernel OK");
+            }
         }
     private:
         PsfMatchingFunctor<PixelT> _kFunctor;
@@ -214,8 +244,96 @@ namespace {
 
 namespace {
     template<typename PixelT>
+    class AssessSpatialKernelVisitor : public afwMath::CandidateVisitor {
+        typedef afwImage::MaskedImage<PixelT> MaskedImageT;
+    public:
+        AssessSpatialKernelVisitor(afwMath::LinearCombinationKernel::Ptr spatialKernel,
+                                   afwMath::Kernel::SpatialFunctionPtr spatialBackground,
+                                   lsst::pex::policy::Policy const& policy) :
+            afwMath::CandidateVisitor(),
+            _spatialKernel(spatialKernel),
+            _spatialBackground(spatialBackground),
+            _policy(policy),
+            _imstats(ImageStatistics<PixelT>()),
+            _nRejected(0) {}
+        void processCandidate(afwMath::SpatialCellCandidate *candidate) {
+            KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
+            if (kCandidate == NULL) {
+                throw LSST_EXCEPT(lsst::pex::exceptions::LogicErrorException,
+                                  "Failed to cast SpatialCellCandidate to KernelCandidate");
+            }
+            
+            pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+                                  "Processing candidate %d", kCandidate->getId());
+            
+            /* Make diffim and set chi2 from result */
+
+            /* 
+               Note - this is a hack until the Kernel API is upgraded by the
+               Davis crew.  I need a "local" version of the spatially varying
+               Kernel
+            */
+            afwImage::Image<double> kImage(_spatialKernel->getDimensions());
+            double kSum = _spatialKernel->computeImage(kImage, false, 
+                                                       kCandidate->getXCenter(),
+                                                       kCandidate->getYCenter());
+            boost::shared_ptr<afwMath::Kernel>
+                kernelPtr( new afwMath::FixedKernel(kImage) );
+            /* </hack> */
+
+            double background = (*_spatialBackground)(kCandidate->getXCenter(), kCandidate->getYCenter());
+            
+            MaskedImageT diffim = kCandidate->returnDifferenceImage(kernelPtr, background);
+            _imstats.apply(diffim);
+            kCandidate->setChi2(_imstats.getVariance());
+            
+            pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+                                  "Chi2 = %.2f", kCandidate->getChi2());
+            pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                                  "Kernel Sum = %.3f; Background = %.3f; Diffim residuals = %.2f +/- %.2f sigma",
+                                  kSum, background, 
+                                  _imstats.getMean(),
+                                  _imstats.getRms());
+            
+            if (_imstats.getMean() > _policy.getDouble("candidateResidualMeanMax")) {
+                kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
+                pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+                                      "Rejecting due to bad spatial kernel mean residuals : %.2f > %.2f",
+                                      _imstats.getMean(),
+                                      _policy.getDouble("candidateResidualMeanMax"));
+                _nRejected += 1;
+            }
+            else if (_imstats.getRms() > _policy.getDouble("candidateResidualStdMax")) {
+                kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
+                pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+                                      "Rejecting due to bad spatial kernel residual rms : %.2f > %.2f",
+                                      _imstats.getRms(),
+                                      _policy.getDouble("candidateResidualStdMax"));
+                _nRejected += 1;
+            }
+            else {
+                kCandidate->setStatus(afwMath::SpatialCellCandidate::GOOD);
+                pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+                                      "Spatial kernel OK");
+            }
+        }
+
+        int getNRejected() {
+            return _nRejected;
+        }
+
+    private:
+        afwMath::LinearCombinationKernel::Ptr _spatialKernel;
+        afwMath::Kernel::SpatialFunctionPtr _spatialBackground;
+        lsst::pex::policy::Policy _policy;
+        ImageStatistics<PixelT> _imstats;
+        int _nRejected;
+    };
+}
+
+namespace {
+    template<typename PixelT>
     class BuildSpatialKernelVisitor : public afwMath::CandidateVisitor {
-        typedef afwImage::Image<PixelT> ImageT;
     public:
         BuildSpatialKernelVisitor(
             PsfMatchingFunctor<PixelT> &kFunctor, ///< Basis functions used in the fit
@@ -253,6 +371,9 @@ namespace {
                 throw LSST_EXCEPT(lsst::pex::exceptions::LogicErrorException,
                                   "Failed to cast SpatialCellCandidate to KernelCandidate");
             }
+
+            pexLogging::TTrace<3>("lsst.ip.diffim.BuildSpatialKernelVisitor.processCandidate", 
+                                  "Processing candidate %d", kCandidate->getId());
             
             /* Calculate P matrices */
             std::vector<double> paramsK = _spatialKernelFunction->getParameters();
@@ -421,26 +542,43 @@ fitSpatialKernelFromCandidates(
     afwMath::SpatialCellSet const& psfCells,   ///< A SpatialCellSet containing PsfCandidates
     pexPolicy::Policy const& policy            ///< Policy to control the processing
                                  ) {
-    
-    int const nStarPerCell       = policy.getInt("nStarPerCell");
-    int const spatialKernelOrder = policy.getInt("spatialKernelOrder");
-    int const spatialBgOrder     = policy.getInt("spatialBgOrder");
-    
-    /* Visitor for the single kernel fit */
-    std::cout << "CAW" << std::endl;
-    BuildSingleKernelVisitor<PixelT> singleKernelFitter(kFunctor, policy);
-    std::cout << "CAW" << std::endl;
-    
-    /* Visitor for the spatial kernel fit */
-    BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(kFunctor, spatialKernelOrder, spatialBgOrder);
-    std::cout << "CAW" << std::endl;
+    int const maxSpatialIterations = policy.getInt("maxSpatialIterations");
+    int const nStarPerCell         = policy.getInt("nStarPerCell");
+    int const spatialKernelOrder   = policy.getInt("spatialKernelOrder");
+    int const spatialBgOrder       = policy.getInt("spatialBgOrder");
 
-    psfCells.visitCandidates(&singleKernelFitter, nStarPerCell);
-    std::cout << "CAW" << std::endl;
-    psfCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
-    std::cout << "CAW" << std::endl;
-    spatialKernelFitter.solveLinearEquation();
-    return spatialKernelFitter.getSpatialModel();
+    afwMath::LinearCombinationKernel::Ptr spatialKernel;
+    afwMath::Kernel::SpatialFunctionPtr spatialBackground;
+    
+    for (int i=0; i < maxSpatialIterations; i++) {
+        /* Visitor for the single kernel fit */
+        BuildSingleKernelVisitor<PixelT> singleKernelFitter(kFunctor, policy);
+        
+        /* Visitor for the spatial kernel fit */
+        BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(kFunctor, spatialKernelOrder, spatialBgOrder);
+        
+        psfCells.visitCandidates(&singleKernelFitter, nStarPerCell);
+        psfCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
+        spatialKernelFitter.solveLinearEquation();
+        
+        std::pair<afwMath::LinearCombinationKernel::Ptr, 
+            afwMath::Kernel::SpatialFunctionPtr> KB = spatialKernelFitter.getSpatialModel();
+        
+        spatialKernel     = KB.first;
+        spatialBackground = KB.second;
+        
+        /* Visitor for the spatial kernel result */
+        AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel, spatialBackground, policy);
+        psfCells.visitCandidates(&spatialKernelAssessor, nStarPerCell);
+        int nRej = spatialKernelAssessor.getNRejected();
+
+        pexLogging::TTrace<5>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                              "Spatial Kernel iteration %d, %d rejected", i, nRej);
+        if (nRej == 0) {
+            break;
+        }
+    }
+    return std::make_pair(spatialKernel, spatialBackground);
 }
 
 /************************************************************************************************************/

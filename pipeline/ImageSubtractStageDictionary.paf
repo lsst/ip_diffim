@@ -54,11 +54,11 @@ iterateKernel: false
 
 
 #####
-# Chops up the image into cells
+# Chops up the image into cells of sizeCellX x sizeCellY pixels
 #
 #
-sizeCellX: 10
-sizeCellY: 10
+sizeCellX: 256
+sizeCellY: 256
 
 ######
 # Number of stars to use in the SpatialCell grid
@@ -92,10 +92,10 @@ maxOutlierSigma: 2.0
 #
 
 # Maximum average of (residual/noise) for an acceptable Kernel; mean should be 0
-maximumFootprintResidualMean: 0.5
+candidateResidualMeanMax: 0.5
 
 # Maximum standard deviation of (residual/noise) for an acceptable Kernel; variance should be 1
-maximumFootprintResidualStd: 1.5
+candidateResidualStdMax: 1.5
 
 ######
 # Uses detection to find good objects for difference imaging
