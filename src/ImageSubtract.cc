@@ -872,8 +872,9 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     bool invert                                           ///< Invert the output difference image
     ) {
 
-    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", "Convolving using convolve");
-    
+    boost::timer t;
+    t.restart();
+
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
     math::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false);
@@ -888,6 +889,10 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     if (invert) {
         convolvedMaskedImage *= -1.0;
     }
+
+    double time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
+                       "Total compute time to convolve and subtract : %.2f s", time);
 
     return convolvedMaskedImage;
 }
@@ -914,8 +919,9 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     bool invert                                                      ///< Invert the output difference image
     ) {
     
-    logging::TTrace<8>("lsst.ip.diffim.convolveAndSubtract", "Convolving using convolve");
-    
+    boost::timer t;
+    t.restart();
+
     image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
     math::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, convolutionKernel, false);
@@ -933,6 +939,10 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     *convolvedMaskedImage.getMask() <<= *imageToNotConvolve.getMask();
     *convolvedMaskedImage.getVariance() <<= *imageToNotConvolve.getVariance();
     
+    double time = t.elapsed();
+    logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
+                       "Total compute time to convolve and subtract : %.2f s", time);
+
     return convolvedMaskedImage;
 }
 
