@@ -3,7 +3,7 @@ import numpy
 try:
     import pylab
 except ImportError:
-    print >> sys.stderr, "Unable to import numpy"
+    print >> sys.stderr, "Unable to import pylab"
 
 from lsst.pex.logging import Trace
 
