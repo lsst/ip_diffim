@@ -238,11 +238,11 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     /* Calculate M as the variance-weighted inner product of C */
     M = C.transpose() * VC;
     B = VC.transpose() * eigenToNotConvolve.col(0);
-    
+
     if (DEBUG_MATRIX) {
-        std::cout << "M2 " << std::endl;
+        std::cout << "M " << std::endl;
         std::cout << M << std::endl;
-        std::cout << "B2 " << std::endl;
+        std::cout << "B " << std::endl;
         std::cout << B << std::endl;
     }
 
@@ -277,6 +277,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         B = Mt * B;
         logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                            "Applying kernel regularization with lambda = %.2e", lambda);
+        
     }
     
 
@@ -318,8 +319,12 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
         }
     }
 
+    /* Save matrices as they are expensive to calculate.
 
-    /* Save matrices as they are expensive to calculate */
+    NOTE : one might consider saving the VC and B vectors instead of M and B;
+       however then we would not be able to maintain the regularization of M
+       even though the stored B would be regularized.
+    */
     _M    = boost::shared_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd(M));
     _B    = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(B));
     _Soln = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(Soln));

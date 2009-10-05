@@ -106,13 +106,14 @@ namespace diffim {
         double getBackground() const;
         boost::shared_ptr<Eigen::MatrixXd> const getM()  {return _M;}
         boost::shared_ptr<Eigen::VectorXd> const getB()  {return _B;}
+        bool hasKernel() {return _haveKernel;}
         
         void setKernel(lsst::afw::math::Kernel::Ptr kernel);
         void setBackground(double background) {_background = background;}
 
         void setM(boost::shared_ptr<Eigen::MatrixXd> M) {_M = M;}
         void setB(boost::shared_ptr<Eigen::VectorXd> B) {_B = B;}
-        
+
     private:
         MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
         MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel

@@ -18,10 +18,17 @@ spatialKernelModel: 'pca'
 
 ######
 # Default Alard-Lupton Parameters
-useAlardKernel: false
+useAlardKernel: true
 alardNGauss: 3
 alardSigGauss: 0.7 1.5 3.0
 alardDegGauss: 4   3   2
+
+# Lets just make a couple for debugging
+#useAlardKernel: true
+#alardNGauss: 1
+#alardSigGauss: 1.5
+#alardDegGauss: 0
+
 
 ######
 # To be used with delta function kernel basis set to enfore smoothness
@@ -38,6 +45,15 @@ regularizationDifference: 0
 regularizationScaling: 0.001
 
 ######
+# Use constant variance weighting is single kernel fitting?  
+# In some cases better for bright star residuals.
+constantVarianceWeighting: false
+
+######
+# Remake kernel using better variance estimate after first pass?
+iterateSingleKernel: false
+
+######
 # Size of the convolution kernel
 kernelRows: 19
 kernelCols: 19
@@ -47,10 +63,6 @@ kernelCols: 19
 # Comes from inverse of the covariance matrix
 # Regularization can cause this step problems
 calculateKernelUncertainty: false
-
-######
-# Remake kernel using better variance estimate?
-iterateKernel: false
 
 
 #####
@@ -67,7 +79,7 @@ nStarPerCell: 1
 ######
 # Order of kernel and background spatial variation
 spatialKernelOrder: 1
-spatialBgOrder: 1
+spatialBgOrder: 0
 
 #backgroundPolicy: {
 #    # how to interpolate the background values
@@ -152,7 +164,7 @@ stepsize : 0.1
 #
 
 # How many iterations until you move on
-maxSpatialIterations: 3
+maxSpatialIterations: 1
 
 ######
 # How many principal components?
