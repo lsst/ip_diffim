@@ -485,6 +485,12 @@ namespace {
 
             /* Fill in matrices */
             unsigned int m0 = _nkt*_nbases;
+
+            /* Is the first term spatially invariant? */
+            if (_constantFirstTerm) {
+                ;
+            }
+
             for(unsigned int m1 = 0; m1 < _nbases; m1++)  {
                 
                 /* Kernel-kernel terms */
@@ -522,6 +528,7 @@ namespace {
             t.restart();
 
             /* Fill in the other half of _M */
+            /* Uh do we need to do this?  CHECK ON THIS BIG BOY! */
             /*
             for (int i = 0; i < _M.rows(); i++) {
                 for (int j = i+1; j < _M.cols(); j++) {
@@ -636,7 +643,7 @@ namespace {
         unsigned int _nkt;        ///< Number of kernel terms in spatial model
         unsigned int _nbt;        ///< Number of backgruond terms in spatial model
         lsst::pex::policy::Policy _policy;
-        bool _constantFirstTerm;  ///< Is the first term spatially variable?
+        bool _constantFirstTerm;  ///< Is the first term spatially invariant?
     };
 }
 
@@ -649,6 +656,50 @@ fitSpatialKernelFromCandidates(
     afwMath::SpatialCellSet const& psfCells,   ///< A SpatialCellSet containing PsfCandidates
     pexPolicy::Policy const& policy            ///< Policy to control the processing
                                  ) {
+
+    /* There are a variety of recipes for creating a spatial kernel which I will
+     * outline here :
+     *
+     * 1a) Using unregularized delta function kernels, run a full spatial model
+           where effectively each delta function basis varys spatially
+           individually.  While this is the most general solution and may be
+           fast due to the specialization of delta-function convolution, it has
+           also been shown to lead to noisy kernels.  This is not recommended.
+
+     * 1b) Using unregularized delta function kernels, do a PCA of the returned
+           Kernels, and use these to create a new basis set.  This requires a
+           first call to singleKernelFitter, then an instance of
+           SetPcaImageVisitor() to do the PCA, creation of a new kFunctor with
+           the eigenBases, a new call to singleKernelFitter using these new
+           bases then a call to spatialKernelFitter.  It appaears that the
+           kernels are not self-similar enough to make this a viable solution.
+
+     * 2a) Using regularized delta function kernels, run a full spatial model
+           where effectively each delta function basis varys spatially
+           individually.  This merely requires repeated calls to
+           singleKernelFitter and spatialKernelFitter with the supplied
+           kFunctor, same as option 1a) and 3).  While this is general and may
+           be fast due to the specialized delta-function convolution, we cannot
+           enforce that the kernel sum does not vary spatially.
+
+     * 2b) Using regularized delta function kernels, do a PCA of the returned
+           Kernels, and use these to create a new basis set.  This requires a
+           first call to singleKernelFitter, then an instance of
+           SetPcaImageVisitor() to do the PCA, creation of a new kFunctor with
+           the eigenBases, a new call to singleKernelFitter using these new
+           bases then a call to spatialKernelFitter.  While this seems somewhat
+           circuitous, we should be able to use many fewer basis functions,
+           making the final image convolution faster.  We can also enforce that
+           the kernel sum does not vary spatially by modifying the eigenBases.
+
+     * 3)  Use Alard Lupton basis set.  This merely requires repeated calls to
+           singleKernelFitter and spatialKernelFitter with the supplied
+           kFunctor.  With these we can enforce that the kernel sum does not
+           vary spatially.
+     * 
+    */
+    
+
     int const maxSpatialIterations = policy.getInt("maxSpatialIterations");
     int const nStarPerCell         = policy.getInt("nStarPerCell");
     int const spatialKernelOrder   = policy.getInt("spatialKernelOrder");
