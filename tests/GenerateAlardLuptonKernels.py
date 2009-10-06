@@ -56,18 +56,18 @@ class DiffimTestCases(unittest.TestCase):
         assert self.kCols % 2 == 1       # odd sized
         kHalfWidth = int(self.kCols/2)
         self.basisList  = ipDiffim.generateAlardLuptonKernelSet(kHalfWidth, nGauss, sigGauss, degGauss)
-
         kim1 = afwImage.ImageD(self.basisList[0].getDimensions())
-        
+        nBasis = len(self.basisList)
+
         # the first one sums to 1; the rest sum to 0
         self.basisList[0].computeImage(kim1, False)
         self.assertAlmostEqual(num.sum(num.ravel(imTestUtils.arrayFromImage(kim1))), 1.0)
-        for k1 in range(1, self.basisList.size()):
+        for k1 in range(1, nBasis):
             self.basisList[k1].computeImage(kim1, False)
             self.assertAlmostEqual(num.sum(num.ravel(imTestUtils.arrayFromImage(kim1))), 0.0)
 
         # the images dotted with themselves is 1, except for the first
-        for k1 in range(1, self.basisList.size()):
+        for k1 in range(1, nBasis):
             self.basisList[k1].computeImage(kim1, False)
             arr1 = imTestUtils.arrayFromImage(kim1)
             self.assertAlmostEqual(num.sum(arr1*arr1), 1.0)

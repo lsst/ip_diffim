@@ -34,7 +34,7 @@ namespace diffim {
      * 
      * KernelCandidate is a single Kernel derived around a source.  We'll assign
      * them to sets of SpatialCells; these sets will then be used to fit a
-     * spatial model to the PSF.
+     * spatial model to the Kernel.
      */    
 
     template <typename _PixelT>
@@ -145,15 +145,10 @@ namespace diffim {
     }
 
     template<typename PixelT>
-    std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, std::vector<double> >
-    createPcaBasisFromCandidates(lsst::afw::math::SpatialCellSet const& psfCells,
-                                 lsst::pex::policy::Policy const& policy);
-
-    template<typename PixelT>
     std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
     fitSpatialKernelFromCandidates(
         PsfMatchingFunctor<PixelT> &kFunctor,
-        lsst::afw::math::SpatialCellSet const& psfCells,
+        lsst::afw::math::SpatialCellSet const& kernelCells,
         lsst::pex::policy::Policy const& policy);
     
     

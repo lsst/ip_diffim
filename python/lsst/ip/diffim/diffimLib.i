@@ -178,7 +178,6 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 %template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>;
 
 %KernelCandidate(F, float);
-%template(createPcaBasisFromCandidates)   lsst::ip::diffim::createPcaBasisFromCandidates<float>;
 %template(fitSpatialKernelFromCandidates) lsst::ip::diffim::fitSpatialKernelFromCandidates<float>;
 
 %template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<float,  lsst::afw::math::Function2<double> >;

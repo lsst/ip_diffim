@@ -467,7 +467,7 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::getAndClearMB() {
  * @ingroup diffim
  */
 math::KernelList
-diffim::generateDeltaFunctionKernelSet(
+diffim::generateDeltaFunctionBasisSet(
     unsigned int width,                 ///< number of columns in the set
     unsigned int height                 ///< number of rows in the set
     ) {
@@ -708,7 +708,7 @@ diffim::generateFiniteDifferenceRegularization(
  * @ingroup diffim
  */
 math::KernelList
-diffim::generateAlardLuptonKernelSet(
+diffim::generateAlardLuptonBasisSet(
     unsigned int halfWidth,                ///< size is 2*N + 1
     unsigned int nGauss,                   ///< number of gaussians
     std::vector<double> const &sigGauss,   ///< width of the gaussians

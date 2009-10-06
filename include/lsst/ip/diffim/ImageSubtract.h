@@ -186,10 +186,10 @@ namespace diffim {
      * 
      * @note Total number of basis functions is width*height
      * 
-     * @param width  Width of basis set
-     * @param height Height of basis set
+     * @param width  Width of basis set (cols)
+     * @param height Height of basis set (rows)
      */    
-    lsst::afw::math::KernelList generateDeltaFunctionKernelSet(
+    lsst::afw::math::KernelList generateDeltaFunctionBasisSet(
         unsigned int width,
         unsigned int height
         );
@@ -222,7 +222,7 @@ namespace diffim {
      * @param sigGauss   Widths of the Gaussian Kernels
      * @param degGauss   Local spatial variation of bases
      */    
-    lsst::afw::math::KernelList generateAlardLuptonKernelSet(
+    lsst::afw::math::KernelList generateAlardLuptonBasisSet(
         unsigned int halfWidth,                ///< size is 2*N + 1
         unsigned int nGauss,                   ///< number of gaussians
         std::vector<double> const& sigGauss,   ///< width of the gaussians
