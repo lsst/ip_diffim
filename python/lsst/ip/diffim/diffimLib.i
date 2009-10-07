@@ -11,7 +11,6 @@ Python bindings for lsst::ip::diffim code
 // Avoid Swig bug exposed in Ticket 640
 // http://dev.lsstcorp.org/trac/ticket/640
 %ignore lsst::ip::diffim::FindSetBits::operator();
-%ignore lsst::ip::diffim::FindCounts::operator();
 %ignore lsst::ip::diffim::ImageStatistics::operator();
 
 // Reference for this file is at http://dev.lsstcorp.org/trac/wiki/SwigFAQ 
@@ -109,13 +108,6 @@ SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double
 
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
-
-%template(FindCountsI)
-    lsst::ip::diffim::FindCounts<int>;
-%template(FindCountsF)
-    lsst::ip::diffim::FindCounts<float>;
-%template(FindCountsD)
-    lsst::ip::diffim::FindCounts<double>;
 
 %template(ImageStatisticsI)
     lsst::ip::diffim::ImageStatistics<int>;

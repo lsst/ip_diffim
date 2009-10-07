@@ -76,45 +76,6 @@ namespace diffim {
         typename MaskT::Pixel _bits;
     };
 
-    /** Uses a functor to sum over the MaskedImage pixels
-     *
-     * @ingroup diffim
-     *
-     * @note Count the total flux within the image, excluding masked pixels
-     * 
-     * @note Still needs a background model to correct for
-     *
-     */
-    template <typename PixelT>
-    class FindCounts {
-    public:
-        typedef typename lsst::afw::image::MaskedImage<PixelT>::x_iterator x_iterator;
-        FindCounts() : 
-            _counts(0.) {} ;
-        virtual ~FindCounts() {};
-
-        // Clear the accumulator
-        void reset() { _counts = 0.; }
-
-        // Count pixels
-        void apply(lsst::afw::image::MaskedImage<PixelT> const& image) {
-            reset();
-            for (int y = 0; y != image.getHeight(); ++y) {
-                for (x_iterator ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
-                    if ((*ptr).mask() == 0) {
-                        _counts += (*ptr).image();
-                    }
-                }
-            }
-        }
-
-        // Return the total counts
-        double getCounts() const { return _counts; }
-        
-    private:
-        double _counts;
-    };
-
     /** Uses a functor to calculate difference image statistics
      *
      * @ingroup diffim

@@ -1177,9 +1177,6 @@ template class diffim::PsfMatchingFunctor<double, float>;
 
 template class diffim::FindSetBits<image::Mask<> >;
 
-template class diffim::FindCounts<float>;
-template class diffim::FindCounts<double>;
-
 template class diffim::ImageStatistics<float>;
 template class diffim::ImageStatistics<double>;
 
