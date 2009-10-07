@@ -197,7 +197,7 @@ calculateKernelUncertainty: false
 # Order of kernel and background spatial variation
 #
 spatialKernelOrder: 1
-spatialBgOrder: 0
+spatialBgOrder: 1
 
 ######
 # Do we subtract off the differential background outside of ip_diffim?
@@ -225,7 +225,7 @@ nStarPerCell: 1
 ######
 # Number of iterations to reject bad footprints in the spatial fitting
 #
-maxSpatialIterations: 1
+maxSpatialIterations: 5
 
 ######
 # Do we use PCA to reduce the dimensionality of the basis sets?
