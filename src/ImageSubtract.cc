@@ -41,8 +41,8 @@ namespace diffim     = lsst::ip::diffim;
 //
 // Constructors
 //
-template <typename ImageT, typename VarT>
-diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
+template <typename PixelT, typename VarT>
+diffim::PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
     lsst::afw::math::KernelList const &basisList
     ) :
     _basisList(basisList),
@@ -54,8 +54,8 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
     _regularize(false)
 {;}
 
-template <typename ImageT, typename VarT>
-diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
+template <typename PixelT, typename VarT>
+diffim::PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
     lsst::afw::math::KernelList const &basisList,
     boost::shared_ptr<Eigen::MatrixXd> const &H
     ) :
@@ -68,9 +68,9 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
     _regularize(true)
 {;}
 
-template <typename ImageT, typename VarT>
-diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
-    const PsfMatchingFunctor<ImageT,VarT> &rhs
+template <typename PixelT, typename VarT>
+diffim::PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
+    const PsfMatchingFunctor<PixelT,VarT> &rhs
     ) :
     _basisList(rhs._basisList),
     _M(),
@@ -87,16 +87,16 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::PsfMatchingFunctor(
 
 /** Create PSF matching kernel
  */
-template <typename ImageT>
+template <typename PixelT>
 Eigen::MatrixXd diffim::imageToEigenMatrix(
-    lsst::afw::image::Image<ImageT> const &img
+    lsst::afw::image::Image<PixelT> const &img
     ) {
     unsigned int rows = img.getHeight();
     unsigned int cols = img.getWidth();
     Eigen::MatrixXd M = Eigen::MatrixXd::Zero(rows, cols);
     for (int y = 0; y != img.getHeight(); ++y) {
         int x = 0;
-        for (typename lsst::afw::image::Image<ImageT>::x_iterator ptr = img.row_begin(y); ptr != img.row_end(y); ++ptr, ++x) {
+        for (typename lsst::afw::image::Image<PixelT>::x_iterator ptr = img.row_begin(y); ptr != img.row_end(y); ++ptr, ++x) {
             // M is addressed row, col
             M(y,x) = *ptr;
         }
@@ -105,10 +105,10 @@ Eigen::MatrixXd diffim::imageToEigenMatrix(
 }
     
 
-template <typename ImageT, typename VarT>
-void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
-    lsst::afw::image::Image<ImageT> const &imageToConvolve,    ///< Image to apply kernel to
-    lsst::afw::image::Image<ImageT> const &imageToNotConvolve, ///< Image whose PSF you want to match to
+template <typename PixelT, typename VarT>
+void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
+    lsst::afw::image::Image<PixelT> const &imageToConvolve,    ///< Image to apply kernel to
+    lsst::afw::image::Image<PixelT> const &imageToNotConvolve, ///< Image whose PSF you want to match to
     lsst::afw::image::Image<VarT>   const &varianceEstimate,   ///< Estimate of the variance per pixel
     lsst::pex::policy::Policy       const &policy              ///< Policy file
     ) {
@@ -168,7 +168,7 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     eigeniVariance.resize(eigeniVariance.rows()*eigeniVariance.cols(), 1);
     
     /* Holds image convolved with basis function */
-    image::Image<ImageT> cimage(imageToConvolve.getDimensions());
+    image::Image<PixelT> cimage(imageToConvolve.getDimensions());
     
     /* Holds eigen representation of image convolved with all basis functions */
     std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
@@ -335,9 +335,9 @@ void diffim::PsfMatchingFunctor<ImageT, VarT>::apply(
     
 }
 
-template <typename ImageT, typename VarT>
+template <typename PixelT, typename VarT>
 std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
-diffim::PsfMatchingFunctor<ImageT, VarT>::getKernel() {
+diffim::PsfMatchingFunctor<PixelT, VarT>::getKernel() {
 
     if (!(_initialized)) {
         throw LSST_EXCEPT(exceptions::Exception, "Kernel not initialized");
@@ -369,9 +369,9 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::getKernel() {
     return std::make_pair(kernel, background);
 }
 
-template <typename ImageT, typename VarT>
+template <typename PixelT, typename VarT>
 std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
-diffim::PsfMatchingFunctor<ImageT, VarT>::getKernelUncertainty() {
+diffim::PsfMatchingFunctor<PixelT, VarT>::getKernelUncertainty() {
 
     if (!(_initialized)) {
         throw LSST_EXCEPT(exceptions::Exception, "Kernel not initialized");
@@ -433,9 +433,9 @@ diffim::PsfMatchingFunctor<ImageT, VarT>::getKernelUncertainty() {
     return std::make_pair(kernelErr, backgroundErr);
 }
 
-template <typename ImageT, typename VarT>
+template <typename PixelT, typename VarT>
 std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> >
-diffim::PsfMatchingFunctor<ImageT, VarT>::getAndClearMB() {
+diffim::PsfMatchingFunctor<PixelT, VarT>::getAndClearMB() {
 
     boost::shared_ptr<Eigen::MatrixXd> Mout = _M;
     boost::shared_ptr<Eigen::VectorXd> Bout = _B;
@@ -698,6 +698,81 @@ diffim::generateFiniteDifferenceRegularization(
 }
 
 /** 
+ * @brief Rescale an input set of kernels 
+ *
+ * @return Vector of renormalized kernels
+ *
+ * @ingroup diffim
+ */
+math::KernelList
+diffim::renormalizeKernelList(
+    math::KernelList const &kernelListIn
+    ) {
+    typedef lsst::afw::math::Kernel::Pixel PixelT;
+    typedef image::Image<PixelT> ImageT;
+
+    /* 
+       
+    We want all the bases except for the first to sum to 0.0.  This allows
+    us to achieve kernel flux conservation (Ksum) across the image since all
+    the power will be in the first term, which will not vary spatially.
+    
+    K(x,y) = Ksum * B_0 + Sum_i : a(x,y) * B_i
+    
+    To do this, normalize all Kernels to sum = 1. and subtract B_0 from all
+    subsequent kenrels.  
+    
+    To get an idea of the relative contribution of each of these basis
+    functions later on down the line, lets also normalize them such that 
+    
+    Sum(B_i)  == 0.0   *and*
+    B_i * B_i == 1.0
+    
+    For completeness 
+    
+    Sum(B_0)  == 1.0
+    B_0 * B_0 != 1.0
+    
+    */
+    math::KernelList kernelListOut;
+    if (kernelListIn.size() == 0) {
+        return kernelListOut;
+    }
+
+    ImageT image0(kernelListIn[0]->getDimensions());
+    ImageT image(kernelListIn[0]->getDimensions());
+    
+    for (unsigned int i = 0; i < kernelListIn.size(); i++) {
+        if (i == 0) {
+            /* Make sure that it is normalized to kSum 1. */
+            (void)kernelListIn[i]->computeImage(image0, true);
+            boost::shared_ptr<math::Kernel> 
+                kernelPtr( new math::FixedKernel(image0) );
+            kernelListOut.push_back(kernelPtr);
+            continue;
+        }
+
+        /* For the rest, normalize to kSum 1. and subtract off image0 */
+        (void)kernelListIn[i]->computeImage(image, true);
+        image -= image0;
+
+        /* Finally, rescale such that the inner product is 1 */
+        double ksum = 0.;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (ImageT::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); ptr != end; ++ptr.x()) {
+                ksum += *ptr * *ptr;
+            }
+        }
+        image /= sqrt(ksum);
+
+        boost::shared_ptr<math::Kernel> 
+            kernelPtr( new math::FixedKernel(image) );
+        kernelListOut.push_back(kernelPtr);
+    }
+    return kernelListOut;
+}
+
+/** 
  * @brief Generate an Alard-Lupton basis set of Kernels.
  *
  * @note Should consider implementing as SeparableKernels for additional speed,
@@ -715,7 +790,7 @@ diffim::generateAlardLuptonBasisSet(
     std::vector<int>    const &degGauss    ///< local spatial variation of gaussians
     ) {
     typedef lsst::afw::math::Kernel::Pixel PixelT;
-    typedef image::Image<double> ImageT;
+    typedef image::Image<PixelT> ImageT;
 
     if (halfWidth < 1) {
         throw LSST_EXCEPT(exceptions::Exception, "halfWidth must be positive");
@@ -727,7 +802,6 @@ diffim::generateAlardLuptonBasisSet(
         throw LSST_EXCEPT(exceptions::Exception, "degGauss does not have enough entries");
     }
     int fullWidth = 2 * halfWidth + 1;
-    ImageT image0(fullWidth, fullWidth);
     ImageT image(fullWidth, fullWidth);
     
     math::KernelList kernelBasisList;
@@ -735,79 +809,34 @@ diffim::generateAlardLuptonBasisSet(
         /* 
            sigma = FWHM / ( 2 * sqrt(2 * ln(2)) )
         */
-        double sig = sigGauss[i];
+        double sig        = sigGauss[i];
         unsigned int deg  = degGauss[i];
-        //unsigned int nPar = (deg + 1) * (deg + 2) / 2;
 
         math::GaussianFunction2<PixelT> gaussian(sig, sig);
         math::AnalyticKernel kernel(fullWidth, fullWidth, gaussian);
         math::PolynomialFunction2<PixelT> polynomial(deg);
 
-        /* 
-
-        We want all the bases except for the first to sum to 0.0.  This allows
-        us to achieve kernel flux conservation (Ksum) across the image since all
-        the power will be in the first term, which will not vary spatially.
-
-           K(x,y) = Ksum * B_0 + Sum_i : a(x,y) * B_i
-
-        To do this, normalize all Kernels to sum = 1. and subtract B_0 from all
-        subsequent kenrels.  
-
-        To get an idea of the relative contribution of each of these basis
-        functions later on down the line, lets also normalize them such that 
-
-           Sum(B_i)  == 0.0   *and*
-           B_i * B_i == 1.0
-
-        For completeness 
-
-           Sum(B_0)  == 1.0
-           B_0 * B_0 != 1.0
-
-        */
-
-
         for (unsigned int j = 0, n = 0; j <= deg; j++) {
             for (unsigned int k = 0; k <= (deg - j); k++, n++) {
-                /* gaussian to be modified by this term in the polynomial */
-                polynomial.setParameter(n, 1.);
-
-                if ( (n == 0) && (i == 0) ) {
-                    /* Very first kernel */
-                    (void)kernel.computeImage(image0, true);                    
+                /* for 0th order term, skip polynomial */
+                (void)kernel.computeImage(image, true);
+                if (n == 0) {
                     boost::shared_ptr<math::Kernel> 
-                        kernelPtr( new math::FixedKernel(image0) );
+                        kernelPtr( new math::FixedKernel(image) );
                     kernelBasisList.push_back(kernelPtr);
-                    polynomial.setParameter(n, 0.);
                     continue;
                 }
-
-                (void)kernel.computeImage(image, false); /* no need to normalize as its done below */
-                double ksum = 0.;
+                
+                /* gaussian to be modified by this term in the polynomial */
+                polynomial.setParameter(n, 1.);
+                (void)kernel.computeImage(image, true);
                 for (int y = 0, v = -halfWidth; y < image.getHeight(); y++, v++) {
                     int u = -halfWidth;
                     for (ImageT::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); ptr != end; ++ptr.x(), u++) {
                         /* Evaluate from -1 to 1 */
                         *ptr  = *ptr * polynomial(u/static_cast<double>(halfWidth), v/static_cast<double>(halfWidth));
-                        ksum += *ptr;
                     }
                 }
-
-                /* Normalize resulting basis to have sum = 1 */
-                image /= ksum;
-                /* All bases except the very first have zero total flux */
-                image -= image0;
-
-                /* Lets divide by a factor to make its dot product with itself 1.0 */
-                double ksum2 = 0.;
-                for (int y = 0; y < image.getHeight(); y++) {
-                    for (ImageT::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); ptr != end; ++ptr.x()) {
-                        ksum2 += *ptr * *ptr;
-                    }
-                }
-                image /= sqrt(ksum2);
-
                 boost::shared_ptr<math::Kernel> 
                     kernelPtr( new math::FixedKernel(image) );
                 kernelBasisList.push_back(kernelPtr);
@@ -815,7 +844,7 @@ diffim::generateAlardLuptonBasisSet(
             }
         }
     }
-    return kernelBasisList;
+    return renormalizeKernelList(kernelBasisList);
 }
 
 /************************************************************************************************************/
@@ -868,10 +897,10 @@ void diffim::addSomethingToImage(image::Image<PixelT> &image,
  *
  * @ingroup diffim
  */
-template <typename ImageT, typename BackgroundT>
-image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,    ///< Image T to convolve with Kernel
-    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
+template <typename PixelT, typename BackgroundT>
+image::MaskedImage<PixelT> diffim::convolveAndSubtract(
+    lsst::afw::image::MaskedImage<PixelT> const &imageToConvolve,    ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
     lsst::afw::math::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used for convolution
     BackgroundT background,                               ///< Differential background function or scalar
     bool invert                                           ///< Invert the output difference image
@@ -880,7 +909,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     boost::timer t;
     t.restart();
 
-    image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
+    image::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
     math::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false);
     
@@ -915,10 +944,10 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  *
  * @ingroup diffim
  */
-template <typename ImageT, typename BackgroundT>
-image::MaskedImage<ImageT> diffim::convolveAndSubtract(
-    lsst::afw::image::Image<ImageT> const &imageToConvolve,          ///< Image T to convolve with Kernel
-    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
+template <typename PixelT, typename BackgroundT>
+image::MaskedImage<PixelT> diffim::convolveAndSubtract(
+    lsst::afw::image::Image<PixelT> const &imageToConvolve,          ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
     lsst::afw::math::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used for convolution
     BackgroundT background,                                          ///< Differential background function or scalar
     bool invert                                                      ///< Invert the output difference image
@@ -927,7 +956,7 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
     boost::timer t;
     t.restart();
 
-    image::MaskedImage<ImageT> convolvedMaskedImage(imageToConvolve.getDimensions());
+    image::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
     math::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, convolutionKernel, false);
     
@@ -968,10 +997,10 @@ image::MaskedImage<ImageT> diffim::convolveAndSubtract(
  *
  * @ingroup diffim
  */
-template <typename ImageT>
+template <typename PixelT>
 std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::image::MaskedImage<ImageT> const &imageToConvolve,    
-    lsst::afw::image::MaskedImage<ImageT> const &imageToNotConvolve, 
+    lsst::afw::image::MaskedImage<PixelT> const &imageToConvolve,    
+    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, 
     lsst::pex::policy::Policy             const &policy                                       
     ) {
     
@@ -1021,7 +1050,7 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         // Find detections
         detection::Threshold threshold = 
                 detection::createThreshold(detThreshold, detThresholdType);
-        detection::DetectionSet<ImageT> detectionSet(
+        detection::DetectionSet<PixelT> detectionSet(
                 imageToConvolve, 
                 threshold,
                 "",
@@ -1094,8 +1123,8 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 
             // Grab a subimage; report any exception
             try {
-                image::MaskedImage<ImageT> subImageToConvolve(imageToConvolve, fpBBox);
-                image::MaskedImage<ImageT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
+                image::MaskedImage<PixelT> subImageToConvolve(imageToConvolve, fpBBox);
+                image::MaskedImage<PixelT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
             } catch (exceptions::Exception& e) {
                 logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
                                    "Exception caught extracting Footprint");

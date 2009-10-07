@@ -55,7 +55,7 @@ class DiffimTestCases(unittest.TestCase):
         assert self.kCols == self.kRows  # square
         assert self.kCols % 2 == 1       # odd sized
         kHalfWidth = int(self.kCols/2)
-        self.basisList  = ipDiffim.generateAlardLuptonKernelSet(kHalfWidth, nGauss, sigGauss, degGauss)
+        self.basisList  = ipDiffim.generateAlardLuptonBasisSet(kHalfWidth, nGauss, sigGauss, degGauss)
         kim1 = afwImage.ImageD(self.basisList[0].getDimensions())
         nBasis = len(self.basisList)
 

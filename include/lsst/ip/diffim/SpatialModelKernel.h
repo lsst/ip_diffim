@@ -18,6 +18,7 @@
 #include <lsst/afw/math/SpatialCell.h>
 #include <lsst/afw/math/Kernel.h>
 #include <lsst/afw/math/KernelFunctions.h>
+#include <lsst/afw/math/Statistics.h>
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/afw/detection/Footprint.h>
 #include <lsst/sdqa/SdqaRating.h>
@@ -64,12 +65,17 @@ namespace diffim {
             lsst::afw::math::SpatialCellImageCandidate<ImageT>(xCenter, yCenter),
             _miToConvolvePtr(miToConvolvePtr),
             _miToNotConvolvePtr(miToNotConvolvePtr),
+            _templateFlux(),
             _kernel(),
-            _kSum(0),
-            _background(0),
+            _kSum(0.),
+            _background(0.),
             _M(),
             _B(),
             _haveKernel(false) {
+
+            /* Rank by brightness in template */
+            lsst::afw::math::Statistics stats = lsst::afw::math::makeStatistics(*_miToConvolvePtr, lsst::afw::math::SUM);             
+            _templateFlux = stats.getValue(lsst::afw::math::SUM);
         }
         
         /// Destructor
@@ -80,7 +86,7 @@ namespace diffim {
          * 
          * @note Required method for use by SpatialCell; e.g. total flux
          */
-        double getCandidateRating() const { return 100; }
+        double getCandidateRating() const { return _templateFlux; }
 
         MaskedImagePtr getMiToConvolvePtr() {return _miToConvolvePtr;}
         MaskedImagePtr getMiToNotConvolvePtr() {return _miToNotConvolvePtr;}
@@ -117,6 +123,7 @@ namespace diffim {
     private:
         MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
         MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel
+        double _templateFlux;                               ///< Brightness in the template image; used to rank candidates
 
         lsst::afw::math::Kernel::Ptr _kernel;               ///< Derived single-object convolution kernel
         double _kSum;                                       ///< Derived kernel sum

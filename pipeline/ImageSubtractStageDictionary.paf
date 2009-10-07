@@ -153,12 +153,12 @@ maxKsumSigma: 3.0
 #
 # Maximum diffim average of (residual/noise) for an acceptable Kernel
 #
-candidateResidualMeanMax: 0.5
+candidateResidualMeanMax: 0.25
 
 ######
 # Maximum diffim standard deviation of (residual/noise) for an acceptable Kernel
 #
-candidateResidualStdMax: 1.5
+candidateResidualStdMax: 1.25
 
 
 
@@ -236,7 +236,7 @@ maxSpatialIterations: 5
 # eigenKernels which are then fit for spatially using the same
 # technique as for the non-PCA delta-function and Alard-Lupton kernels
 # 
-usePcaForSpatialKernel: false
+usePcaForSpatialKernel: true
 
 ######
 # How many 
@@ -244,16 +244,8 @@ usePcaForSpatialKernel: false
 numPrincipalComponents: 5
 
 ######
-# How many (min)
-#
-minPrincipalComponents: 1
-
-######
-# How many (max)
-#
-maxPrincipalComponents: 3
-
-######
 # At what fraction of the eigenvalues do you cut off the expansion?
+#
+# This currently not implemented
 #
 fracEigenVal : 0.95
