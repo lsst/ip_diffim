@@ -94,6 +94,9 @@ detThresholdMin: 10.0
 # variation and the kernel sum will be conserved
 #
 #
+# NOTE : if "alard-lupton" you likely want to turn off
+#        "usePcaForSpatialKernel" down below
+#
 kernelBasisSet: "delta-function"
 
 ######
@@ -164,6 +167,24 @@ candidateResidualMeanMax: 0.25
 # Maximum diffim standard deviation of (residual/noise) for an acceptable Kernel
 #
 candidateResidualStdMax: 1.25
+
+######
+# What types of sigma clipping to enable
+#
+# If you want sigma clipping at each step along the way, it should be:
+#   singleKernelClipping:  true
+#   kernelSumClipping:     true
+#   spatialKernelClipping: true
+#
+# If you only care about the final spatial kernel quality it should be:
+#   singleKernelClipping:  false
+#   kernelSumClipping:     false
+#   spatialKernelClipping: true
+    # In this case you might want to consider upping "maxSpatialIterations" below
+#
+singleKernelClipping:  false
+kernelSumClipping:     false
+spatialKernelClipping: true
 
 
 

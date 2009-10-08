@@ -287,13 +287,13 @@ void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
     // Eventually put a check in here to make sure its positive definite
     //
     Eigen::VectorXd Soln = Eigen::VectorXd::Zero(nParameters);;
-    if (!( M.ldlt().solve(B, &Soln) )) {
+    if (!(M.ldlt().solve(B, &Soln))) {
         logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                            "Unable to determine kernel via Cholesky LDL^T");
-        if (!( M.llt().solve(B, &Soln) )) {
+        if (!(M.llt().solve(B, &Soln))) {
             logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                                "Unable to determine kernel via Cholesky LL^T");
-            if (!( M.lu().solve(B, &Soln) )) {
+            if (!(M.lu().solve(B, &Soln))) {
                 logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                                    "Unable to determine kernel via LU");
                 // LAST RESORT
@@ -320,11 +320,16 @@ void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
     }
 
     /* Save matrices as they are expensive to calculate.
-
-    NOTE : one might consider saving the VC and B vectors instead of M and B;
-       however then we would not be able to maintain the regularization of M
-       even though the stored B would be regularized.
-    */
+     * 
+     * NOTE : one might consider saving the VC and B vectors instead of M and B;
+     * however then we would not be able to maintain the regularization of M
+     * even though the stored B would be regularized.
+     * 
+     * ANOTHER NOTE : we might also consider *not* solving for Soln here, in the
+     * case that we don't care about the results of the single-kernel fit.  That
+     * is, if we decide to only do sigma clipping on the spatial results.
+     * 
+     */
     _M    = boost::shared_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd(M));
     _B    = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(B));
     _Soln = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(Soln));
@@ -350,7 +355,7 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::getKernel() {
     /* Fill in the kernel results */
     std::vector<double> kValues(nKernelParameters);
     for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
-        if (std::isnan( (*_Soln)(idx) )) {
+        if (std::isnan((*_Soln)(idx))) {
             throw LSST_EXCEPT(exceptions::Exception, 
                               str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
         }
@@ -360,7 +365,7 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::getKernel() {
         new math::LinearCombinationKernel(_basisList, kValues) 
         );
     
-    if (std::isnan( (*_Soln)(nParameters-1) )) {
+    if (std::isnan((*_Soln)(nParameters-1))) {
         throw LSST_EXCEPT(exceptions::Exception, 
                           str(boost::format("Unable to determine background solution %d (nan)") % (nParameters-1)));
     }
@@ -403,7 +408,7 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::getKernelUncertainty() {
     std::vector<double> kErrValues(nKernelParameters);
     for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
         // Insanity checking
-        if (std::isnan( Error2(idx, idx) )) {
+        if (std::isnan(Error2(idx, idx))) {
             throw LSST_EXCEPT(exceptions::Exception, 
                               str(boost::format("Unable to determine kernel uncertainty %d (nan)") % idx));
         }
@@ -419,7 +424,7 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::getKernelUncertainty() {
         );
  
     // Estimate of Background and Background Error */
-    if (std::isnan( Error2(nParameters-1, nParameters-1) )) {
+    if (std::isnan(Error2(nParameters-1, nParameters-1))) {
         throw LSST_EXCEPT(exceptions::Exception, "Unable to determine background uncertainty (nan)");
     }
     if (Error2(nParameters-1, nParameters-1) < 0.0) {
@@ -480,7 +485,7 @@ diffim::generateDeltaFunctionBasisSet(
     for (int row = 0; row < signedHeight; ++row) {
         for (int col = 0; col < signedWidth; ++col) {
             boost::shared_ptr<math::Kernel> 
-                kernelPtr( new math::DeltaFunctionKernel(width, height, image::PointI(col,row) ) );
+                kernelPtr(new math::DeltaFunctionKernel(width, height, image::PointI(col,row)));
             kernelBasisList.push_back(kernelPtr);
         }
     }
@@ -497,14 +502,14 @@ diffim::generateFiniteDifferenceRegularization(
     bool printB // a debug flag ... remove when done.
 					    ) {
 
-    if ( (order < 0) || (order > 2) ) throw LSST_EXCEPT(exceptions::Exception, "Only orders 0..2 allowed");
-    if ( (width < 0) )  throw LSST_EXCEPT(exceptions::Exception, "Width < 0");
-    if ( (height < 0) ) throw LSST_EXCEPT(exceptions::Exception, "Height < 0");
+    if ((order < 0) || (order > 2)) throw LSST_EXCEPT(exceptions::Exception, "Only orders 0..2 allowed");
+    if ((width < 0))  throw LSST_EXCEPT(exceptions::Exception, "Width < 0");
+    if ((height < 0)) throw LSST_EXCEPT(exceptions::Exception, "Height < 0");
 
-    if ( (boundary_style < 0) || (boundary_style > 2) ) { 
+    if ((boundary_style < 0) || (boundary_style > 2)) { 
 	throw LSST_EXCEPT(exceptions::Exception, "Boundary styles 0..2 defined");
     }
-    if ( (difference_style < 0) || (difference_style > 1) ) {
+    if ((difference_style < 0) || (difference_style > 1)) {
 	throw LSST_EXCEPT(exceptions::Exception, "Only forward (0), and central (1) difference styles defined.");
     }
 
@@ -546,7 +551,7 @@ diffim::generateFiniteDifferenceRegularization(
     unsigned int x_size = 0, y_size = 0;
 
     // forward difference coefficients
-    if ( difference_style == 0 ) {
+    if (difference_style == 0) {
 	
 	y_cen  = x_cen  = 0;
 	x_cen1 = y_cen1 = 0;
@@ -573,11 +578,11 @@ diffim::generateFiniteDifferenceRegularization(
     }
 
     // central difference coefficients
-    if ( difference_style == 1 ) {
+    if (difference_style == 1) {
 
 	// this is asymmetric and produces diagonal banding in the kernel
 	// from: http://www.holoborodko.com/pavel/?page_id=239
-	if ( order == 0 ) { 
+	if (order == 0) { 
 	    y_cen = x_cen = 1;
 	    x_size = y_size = 3;
 	}
@@ -587,7 +592,7 @@ diffim::generateFiniteDifferenceRegularization(
 
 	// this works well and is largely the same as order=1 forward-diff.
 	// from: http://www.holoborodko.com/pavel/?page_id=239
-	if ( order == 1 ) { 
+	if (order == 1) { 
 	    y_cen = x_cen = 1;
 	    x_size = y_size = 3;
 	}
@@ -598,7 +603,7 @@ diffim::generateFiniteDifferenceRegularization(
 
 	// asymmetric and produces diagonal banding in the kernel
 	// from http://www.holoborodko.com/pavel/?page_id=239
-	if ( order == 2 ) { 
+	if (order == 2) { 
 	    y_cen = x_cen = 2;
 	    x_size = y_size = 5;
 	}
@@ -638,42 +643,42 @@ diffim::generateFiniteDifferenceRegularization(
 		double this_coeff = 0;
 
 		// no-wrapping at edges
-		if ( boundary_style == 0 ) {
+		if (boundary_style == 0) {
 		    x = x0 + dx - x_cen;
 		    y = y0 + dy - y_cen;
-		    if ( y < 0 || y > height - 1 || x < 0 || x > width - 1 ) { continue; }
+		    if ((y < 0) || (y > height - 1) || (x < 0) || (x > width - 1)) { continue; }
 		    this_coeff = coeffs[order][dx][dy];
 
 		// wrapping at edges
-		} else if ( boundary_style == 1) {
+		} else if (boundary_style == 1) {
 		    x = (width  + x0 + dx - x_cen) % width;
 		    y = (height + y0 + dy - y_cen) % height;
 		    this_coeff = coeffs[order][dx][dy];
 
 		// order tapering to the edge (just clone wrapping for now)
 		// - use the lowest order possible
-		} else if ( boundary_style == 2) {
+		} else if (boundary_style == 2) {
 
 		    // edge rows and columns ... set to constant
-		    if ( edge_distance == 0 ) {
+		    if (edge_distance == 0) {
 			x = x0;
 			y = y0;
 			this_coeff = 1;
 		    }
 		    // in one from edge, use 1st order
-		    else if ( edge_distance == 1 && order > 0 ) {
+		    else if (edge_distance == 1 && order > 0) {
 			x = (width  + x0 + dx - x_cen1) % width;
 			y = (height + y0 + dy - y_cen1) % height;
-			if ( (dx < 3) && (dy < 3) ) { this_coeff = coeffs[1][dx][dy]; } 
+			if ((dx < 3) && (dy < 3)) { this_coeff = coeffs[1][dx][dy]; } 
 		    }
 		    // in two from edge, use 2st order if order > 1
-		    else if ( edge_distance == 2 && order > 1 ){
+		    else if (edge_distance == 2 && order > 1){
 			x = (width  + x0 + dx - x_cen2) % width;
 			y = (height + y0 + dy - y_cen2) % height;
-			if ( (dx < 5) && (dy < 5) ) { this_coeff = coeffs[2][dx][dy]; } 
+			if ((dx < 5) && (dy < 5)) { this_coeff = coeffs[2][dx][dy]; } 
 		    } 
 		    // if we're somewhere in the middle
-		    else if ( edge_distance > order ) {
+		    else if (edge_distance > order) {
 			x = (width  + x0 + dx - x_cen) % width;
 			y = (height + y0 + dy - y_cen) % height;
 		    	this_coeff = coeffs[order][dx][dy];
@@ -689,7 +694,7 @@ diffim::generateFiniteDifferenceRegularization(
 
     }
 
-    if ( printB )  {
+    if (printB)  {
 	std::cout << B << std::endl;
     }
     
@@ -747,7 +752,7 @@ diffim::renormalizeKernelList(
             /* Make sure that it is normalized to kSum 1. */
             (void)kernelListIn[i]->computeImage(image0, true);
             boost::shared_ptr<math::Kernel> 
-                kernelPtr( new math::FixedKernel(image0) );
+                kernelPtr(new math::FixedKernel(image0));
             kernelListOut.push_back(kernelPtr);
             continue;
         }
@@ -766,7 +771,7 @@ diffim::renormalizeKernelList(
         image /= sqrt(ksum);
 
         boost::shared_ptr<math::Kernel> 
-            kernelPtr( new math::FixedKernel(image) );
+            kernelPtr(new math::FixedKernel(image));
         kernelListOut.push_back(kernelPtr);
     }
     return kernelListOut;
@@ -822,7 +827,7 @@ diffim::generateAlardLuptonBasisSet(
                 (void)kernel.computeImage(image, true);
                 if (n == 0) {
                     boost::shared_ptr<math::Kernel> 
-                        kernelPtr( new math::FixedKernel(image) );
+                        kernelPtr(new math::FixedKernel(image));
                     kernelBasisList.push_back(kernelPtr);
                     continue;
                 }
@@ -838,7 +843,7 @@ diffim::generateAlardLuptonBasisSet(
                     }
                 }
                 boost::shared_ptr<math::Kernel> 
-                    kernelPtr( new math::FixedKernel(image) );
+                    kernelPtr(new math::FixedKernel(image));
                 kernelBasisList.push_back(kernelPtr);
                 polynomial.setParameter(n, 0.);
             }
@@ -1029,7 +1034,7 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     (void)imageToNotConvolve.getMask()->addMaskPlane(diffim::diffimStampUsedStr);
 
     // Number of pixels to grow each Footprint, based upon the Kernel size
-    int fpGrowPix = int(fpGrowKsize * ( (kCols > kRows) ? kCols : kRows ));
+    int fpGrowPix = int(fpGrowKsize * ((kCols > kRows) ? kCols : kRows));
 
     // List of Footprints
     std::vector<detection::Footprint::Ptr> footprintListIn;
@@ -1040,7 +1045,7 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     diffim::FindSetBits<image::Mask<image::MaskPixel> > itncFunctor(*(imageToNotConvolve.getMask())); 
  
     int nCleanFp = 0;
-    while ( (nCleanFp < minCleanFp) and (detThreshold > detThresholdMin) ) {
+    while ((nCleanFp < minCleanFp) and (detThreshold > detThresholdMin)) {
         imageToConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
         imageToNotConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
 
@@ -1106,18 +1111,18 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
                                "Footprint out : %d,%d -> %d,%d (center %d,%d)",
                                (*fpGrow).getBBox().getX0(), (*fpGrow).getBBox().getY0(),
 			       (*fpGrow).getBBox().getX1(), (*fpGrow).getBBox().getY1(),
-			       int( 0.5 * ((*i)->getBBox().getX0()+(*i)->getBBox().getX1()) ),
-			       int( 0.5 * ((*i)->getBBox().getY0()+(*i)->getBBox().getY1()) ) );
+			       int(0.5 * ((*i)->getBBox().getX0()+(*i)->getBBox().getX1())),
+			       int(0.5 * ((*i)->getBBox().getY0()+(*i)->getBBox().getY1())));
 
 
             // Ignore if its too close to the edge of the amp image 
             // Note we need to translate to pixel coordinates here
             image::BBox fpBBox = (*fpGrow).getBBox();
             fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
-            if ( ((*fpGrow).getBBox().getX0() < 0) ||
-                 ((*fpGrow).getBBox().getY0() < 0) ||
-                 ((*fpGrow).getBBox().getX1() > imageToConvolve.getWidth()) ||
-                 ((*fpGrow).getBBox().getY1() > imageToConvolve.getHeight()) )
+            if (((*fpGrow).getBBox().getX0() < 0) ||
+                ((*fpGrow).getBBox().getY0() < 0) ||
+                ((*fpGrow).getBBox().getX1() > imageToConvolve.getWidth()) ||
+                ((*fpGrow).getBBox().getY1() > imageToConvolve.getHeight()))
                 continue;
 
 
