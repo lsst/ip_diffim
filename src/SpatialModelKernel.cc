@@ -170,7 +170,7 @@ namespace detail {
                 if (_policy.getBool("kernelSumClipping")) {
                     if (fabs(kCandidate->getKsum() - _kSumMean) > (_dkSumMax)) {
                         kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-                        pexLogging::TTrace<5>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
+                        pexLogging::TTrace<4>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
                                               "Rejecting candidate %d due to bad source kernel sum : (%.2f)",
                                               kCandidate->getId(),
                                               kCandidate->getKsum());
@@ -190,7 +190,7 @@ namespace detail {
             _kSumStd  = stats.getValue(afwMath::STDEVCLIP);
             _kSumNpts = static_cast<int>(stats.getValue(afwMath::NPOINT));
             _dkSumMax = _policy.getDouble("maxKsumSigma") * _kSumStd;
-            pexLogging::TTrace<3>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
+            pexLogging::TTrace<2>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
                                   "Kernel Sum Distribution : %.3f +/- %.3f (%d points)", _kSumMean, _kSumStd, _kSumNpts);
         }
         
@@ -304,7 +304,7 @@ namespace detail {
                 return;
             }
             
-            pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+            pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                   "Processing candidate %d", kCandidate->getId());
             
             /* Estimate of the variance */
@@ -399,7 +399,7 @@ namespace detail {
                                   "Kernel Sum = %.3f", kSum);
             pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                                   "Background = %.3f", background);
-            pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
+            pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                                   "Diffim residuals = %.2f +/- %.2f sigma",
                                   _imstats.getMean(),
                                   _imstats.getRms());
@@ -407,7 +407,7 @@ namespace detail {
             if (_policy.getBool("singleKernelClipping")) {
                 if (fabs(_imstats.getMean()) > _policy.getDouble("candidateResidualMeanMax")) {
                     kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-                    pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                    pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                           "Rejecting due to bad source kernel mean residuals : |%.2f| > %.2f",
                                           _imstats.getMean(),
                                           _policy.getDouble("candidateResidualMeanMax"));
@@ -415,7 +415,7 @@ namespace detail {
                 }
                 else if (_imstats.getRms() > _policy.getDouble("candidateResidualStdMax")) {
                     kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-                    pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                    pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                           "Rejecting due to bad source kernel residual rms : %.2f > %.2f",
                                           _imstats.getRms(),
                                           _policy.getDouble("candidateResidualStdMax"));
@@ -460,14 +460,14 @@ namespace detail {
             _nRejected(0) {}
 
         void reset() {
-            _nRejected = 0;
             _nGood = 0;
+            _nRejected = 0;
         }
+
+        int getNGood() {return _nGood;}
 
         int getNRejected() {return _nRejected;}
 
-        int getNGood() {return _nGood;}
-        
         void processCandidate(afwMath::SpatialCellCandidate *candidate) {
             KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
             if (kCandidate == NULL) {
@@ -480,7 +480,7 @@ namespace detail {
                 return;
             }
             
-            pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+            pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                                   "Processing candidate %d", kCandidate->getId());
             
             /* 
@@ -512,7 +512,7 @@ namespace detail {
                                   "Kernel Sum = %.3f", kSum);
             pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                                   "Background = %.3f", background);
-            pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+            pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                                   "Diffim residuals = %.2f +/- %.2f sigma",
                                   _imstats.getMean(),
                                   _imstats.getRms());
@@ -520,7 +520,7 @@ namespace detail {
             if (_policy.getBool("spatialKernelClipping")) {            
                 if (fabs(_imstats.getMean()) > _policy.getDouble("candidateResidualMeanMax")) {
                     kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-                    pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+                    pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                                           "Rejecting due to bad spatial kernel mean residuals : |%.2f| > %.2f",
                                           _imstats.getMean(),
                                           _policy.getDouble("candidateResidualMeanMax"));
@@ -528,7 +528,7 @@ namespace detail {
                 }
                 else if (_imstats.getRms() > _policy.getDouble("candidateResidualStdMax")) {
                     kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-                    pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+                    pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                                           "Rejecting due to bad spatial kernel residual rms : %.2f > %.2f",
                                           _imstats.getRms(),
                                           _policy.getDouble("candidateResidualStdMax"));
@@ -553,8 +553,8 @@ namespace detail {
         afwMath::Kernel::SpatialFunctionPtr _spatialBackground;
         lsst::pex::policy::Policy _policy;
         ImageStatistics<PixelT> _imstats;
-        int _nRejected;
         int _nGood;
+        int _nRejected;
     };
     
     
@@ -727,6 +727,9 @@ namespace detail {
         void solveLinearEquation() {
             boost::timer t;
             t.restart();
+
+            pexLogging::TTrace<2>("lsst.ip.diffim.SpatialModelKernel.solveLinearEquation", 
+                                  "Solving for spatial model");
             
             /* Fill in the other half of _M */
             for (unsigned int i = 0; i < _nt; i++) {
@@ -781,7 +784,7 @@ namespace detail {
             }
             
             double time = t.elapsed();
-            pexLogging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.solveLinearEquation", 
+            pexLogging::TTrace<3>("lsst.ip.diffim.SpatialModelKernel.solveLinearEquation", 
                                   "Compute time to do spatial matrix math : %.2f s", time);
         }
         
@@ -924,7 +927,7 @@ fitSpatialKernelFromCandidates(
     for (int i=0, nRejected=-1; i < maxSpatialIterations; i++) {
         /* Make sure there are no uninitialized candidates as current occupant of Cell */
         while (nRejected != 0) {
-            pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor", 
+            pexLogging::TTrace<2>("lsst.ip.diffim.BuildSingleKernelVisitor", 
                                   "Building single kernels A...");
             singleKernelFitter.reset();
             kernelCells.visitCandidates(&singleKernelFitter, nStarPerCell);
@@ -940,7 +943,7 @@ fitSpatialKernelFromCandidates(
             kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::REJECT);
             kernelCells.visitCandidates(&kernelSumVisitor, nStarPerCell);
             nRejected = kernelSumVisitor.getNRejected();
-            pexLogging::TTrace<3>("lsst.ip.diffim.KernelSumVisitor", 
+            pexLogging::TTrace<2>("lsst.ip.diffim.KernelSumVisitor", 
                                   "Ksum Iteration %d, rejected %d Kernels", j+1, nRejected);
             if (nRejected == 0) {
                 break;
@@ -991,7 +994,7 @@ fitSpatialKernelFromCandidates(
             /* Always true for Pca kernel; leave original kernel alone for future Pca iterations */
             singleKernelFitterPca.setCandidateKernel(false);
             
-            pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor", 
+            pexLogging::TTrace<2>("lsst.ip.diffim.BuildSingleKernelVisitor", 
                                   "Rebuilding kernels using Pca basis");
             
             /* Only true for the first visit so we rebuild each good kernel with
@@ -1031,10 +1034,10 @@ fitSpatialKernelFromCandidates(
         spatialKernelAssessor.reset();
         kernelCells.visitCandidates(&spatialKernelAssessor, nStarPerCell);
         nRejected = spatialKernelAssessor.getNRejected();
-        pexLogging::TTrace<3>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+        pexLogging::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                               "Spatial Kernel iteration %d, rejected %d Kernels, using %d Kernels", i+1, 
                               nRejected, spatialKernelAssessor.getNGood());
-        pexLogging::TTrace<3>("lsst.ip.diffim.fitSpatialKernelFromCandidates", "");
+        pexLogging::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", "");
         if (nRejected == 0) {
             break;
         }
@@ -1046,7 +1049,7 @@ fitSpatialKernelFromCandidates(
     }
     
     double time = t.elapsed();
-    pexLogging::TTrace<3>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+    pexLogging::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                           "Total time to compute the spatial kernel : %.2f s", time);
     
     return std::make_pair(spatialKernel, spatialBackground);

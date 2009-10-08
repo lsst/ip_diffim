@@ -1169,7 +1169,7 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 			"Unable to find any footprints for Psf matching");
     }
 
-    logging::TTrace<3>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+    logging::TTrace<1>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                        "Found %d clean footprints above threshold %.3f",
                        footprintListOut.size(), detThreshold/detThresholdScaling);
     
