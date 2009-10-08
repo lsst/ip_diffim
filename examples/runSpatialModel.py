@@ -139,7 +139,7 @@ if display:
         for y in (0, height//2, height):
             im   = afwImage.ImageD(spatialKernel.getDimensions())
             ksum = spatialKernel.computeImage(im, False, float(x), float(y))
-            mos.append(im, "x=%d y=%d kSum=%.1f" % (x, y, ksum))
+            mos.append(im, "x=%d y=%d kSum=%.2f" % (x, y, ksum))
 
     mosaic = mos.makeMosaic()
     ds9.mtv(mosaic, frame=frame)
