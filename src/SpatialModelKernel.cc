@@ -377,7 +377,12 @@ namespace {
             _imstats.apply(diffim);
             kCandidate->setChi2(_imstats.getVariance());
 
-            /* WARNING - NOT ALL THESE GET RESET WHEN USING A NEW PCA BASIS */
+            /* When using a Pca basis, we don't reset the kernel or background,
+               so we need to evaluate these locally for the Trace */
+            afwImage::Image<double> kImage(KB.first->getDimensions());
+            double kSum = KB.first->computeImage(kImage, false);
+            double background = KB.second;
+
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                   "Chi2 = %.2f", kCandidate->getChi2());
             pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
@@ -385,9 +390,9 @@ namespace {
                                   kCandidate->getXCenter(), 
                                   kCandidate->getYCenter());
             pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
-                                  "Kernel Sum = %.3f", kCandidate->getKsum());
+                                  "Kernel Sum = %.3f", kSum);
             pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
-                                  "Background = %.3f", kCandidate->getBackground());
+                                  "Background = %.3f", background);
             pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                                   "Diffim residuals = %.2f +/- %.2f sigma",
                                   _imstats.getMean(),
@@ -548,19 +553,39 @@ namespace {
             _policy(policy),
             _constantFirstTerm(false){
 
+            /* 
+               NOTE : The variable _constantFirstTerm allows that the first
+               component of the basisList has no spatial variation.  This is
+               useful to conserve the kernel sum across the image.  There are 2
+               options to enable this : we can make the input matrices/vectors
+               smaller by (_nkt-1), or we can create _M and _B with empty values
+               for the first component's spatial terms.  The latter should cause
+               problems for the matrix math even though its probably more
+               readable, so we go with the former.
+            */
+            if ( (_policy.getString("kernelBasisSet") == "alard-lupton") || _policy.getBool("usePcaForSpatialKernel")) {
+                _constantFirstTerm = true;
+            }
+
             /* Bookeeping terms */
             _nkt = _spatialKernelFunction->getParameters().size();
             _nbt = _spatialBgFunction->getParameters().size();
 
-            /* Nbases + 1 term for background */
-            _M.resize(_nbases*_nkt + _nbt, _nbases*_nkt + _nbt);
-            _B.resize(_nbases*_nkt + _nbt);
-            _M.setZero();
-            _B.setZero();
-
+            if (_constantFirstTerm) {
+                _M.resize((_nbases-1)*_nkt+1 + _nbt, (_nbases-1)*_nkt+1 + _nbt);
+                _B.resize((_nbases-1)*_nkt+1 + _nbt);
+                _M.setZero();
+                _B.setZero();
+            } else {
+                _M.resize(_nbases*_nkt + _nbt, _nbases*_nkt + _nbt);
+                _B.resize(_nbases*_nkt + _nbt);
+                _M.setZero();
+                _B.setZero();
+            }
             pexLogging::TTrace<5>("lsst.ip.diffim.LinearSpatialFitVisitor", 
-                                  "Initializing with size %d %d %d %d %d",
-                                  _nkt, _nbt, _M.rows(), _M.cols(), _B.size());
+                                  "Initializing with size %d %d %d %d %d and constant first term = %s",
+                                  _nkt, _nbt, _M.rows(), _M.cols(), _B.size(),
+                                  _constantFirstTerm ? "true" : "false");
         }
         
         void processCandidate(afwMath::SpatialCellCandidate *candidate) {
@@ -625,37 +650,80 @@ namespace {
                 std::cout << "B " << (*W) << std::endl;
             }
 
-            /* Fill in matrices */
-            unsigned int m0 = _nkt*_nbases;
-
-            /* Is the first term spatially invariant? */
             if (_constantFirstTerm) {
-                ;
-            }
 
-            for(unsigned int m1 = 0; m1 < _nbases; m1++)  {
-                
-                /* Kernel-kernel terms */
-                for(unsigned int m2 = m1; m2 < _nbases; m2++)  {
-                    if (m1 == m2) {
-                        /* Diagonal kernel-kernel term; only use upper triangular part of PkPkt */
-                        _M.block(m1*_nkt, m2*_nkt, _nkt, _nkt) += (*Q)(m1,m1) * PkPkt.part<Eigen::UpperTriangular>();
+            }
+            else {
+                /* Fill in matrices */
+                unsigned int mb = _nkt*_nbases;
+                for(unsigned int m1 = 0; m1 < _nbases; m1++)  {
+                    
+                    /* Kernel-kernel terms */
+                    for(unsigned int m2 = m1; m2 < _nbases; m2++)  {
+                        if (m1 == m2) {
+                            /* Diagonal kernel-kernel term; only use upper triangular part of PkPkt */
+                            _M.block(m1*_nkt, m2*_nkt, _nkt, _nkt) += (*Q)(m1,m1) * PkPkt.part<Eigen::UpperTriangular>();
+                        }
+                        else {
+                            _M.block(m1*_nkt, m2*_nkt, _nkt, _nkt) += (*Q)(m1,m2) * PkPkt;
+                        }
                     }
-                    else {
-                        _M.block(m1*_nkt, m2*_nkt, _nkt, _nkt) += (*Q)(m1,m2) * PkPkt;
-                    }
+	            
+                    /* Kernel cross terms with background */
+                    _M.block(m1*_nkt, mb, _nkt, _nbt) += (*Q)(m1,_nbases) * PkPbt;
+                    
+                    /* B vector */
+                    _B.segment(m1*_nkt, _nkt) += (*W)(m1) * Pk;
                 }
                 
-                /* Kernel cross terms with background */
-                _M.block(m1*_nkt, m0, _nkt, _nbt) += (*Q)(m1,_nbases) * PkPbt;
+                /* Background-background terms only */
+                _M.block(mb, mb, _nbt, _nbt) += (*Q)(_nbases,_nbases) * PbPbt.part<Eigen::UpperTriangular>();
+                _B.segment(mb, _nbt)         += (*W)(_nbases) * Pb;
+            }
 
+            /* Fill in matrices */
+            unsigned int m0 = _constantFirstTerm ? 1 : _nkt;
+            unsigned int mb = _nkt*_nbases;
+
+            /* DAMMIT THIS IS AN INDEXING MESS - I THINK EVERYTHING IS RIGHT UP UNTIL mb */
+
+            /* For simplicity look at first element first */
+            if (_constantFirstTerm) {
+                _M.block(0, 0, 1, 1) += (*Q)(0,0);
+                for(unsigned int m2 = 1; m2 < _nbases; m2++)  {
+                    _M.block(0, m2*_nkt, 1, _nkt) += (*Q)(0,m2) * Pk;
+                }
+                _M.block(0, mb, 1, _nbt) += (*Q)(0,_nbases) * Pb;
+                _B.segment(0, 1) += (*W)(0);
+            }
+            else {
+                _M.block(0, 0, _nkt, _nkt) += (*Q)(0,0) * PkPkt.part<Eigen::UpperTriangular>();
+                for(unsigned int m2 = 1; m2 < _nbases; m2++)  {
+                    _M.block(0, m2*_nkt, _nkt, _nkt) += (*Q)(0,m2) * PkPkt;
+                }
+                _M.block(0, mb, _nkt, _nbt) += (*Q)(0,_nbases) * PkPbt;
+                _B.segment(0, _nkt) += (*W)(0) * Pk;
+            }
+
+            /* The rest of the terms */
+            for(unsigned int m1 = 1; m1 < _nbases; m1++)  {
+                /* Diagonal kernel-kernel term; only use upper triangular part of PkPkt */
+                _M.block(m1*_nkt, m0+m1*_nkt, _nkt, _nkt) += (*Q)(m1,m1) * PkPkt.part<Eigen::UpperTriangular>();
+
+                /* Kernel-kernel terms */
+                for(unsigned int m2 = m1+1; m2 < _nbases; m2++)  {
+                    _M.block(m1*_nkt, m0+m2*_nkt, _nkt, _nkt) += (*Q)(m1,m2) * PkPkt;
+                }
+
+                /* Kernel cross terms with background */
+                _M.block(m1*_nkt, m0+mb, _nkt, _nbt) += (*Q)(m1,_nbases) * PkPbt;
                 /* B vector */
-                _B.segment(m1*_nkt, _nkt) += (*W)(m1) * Pk;
+                _B.segment(m0+m1*_nkt, _nkt) += (*W)(m1) * Pk;
             } 
 
             /* Background-background terms only */
-            _M.block(m0, m0, _nbt, _nbt) += (*Q)(_nbases,_nbases) * PbPbt.part<Eigen::UpperTriangular>();
-            _B.segment(m0, _nbt)         += (*W)(_nbases) * Pb;
+            _M.block(mb, mb, _nbt, _nbt) += (*Q)(_nbases,_nbases) * PbPbt.part<Eigen::UpperTriangular>();
+            _B.segment(mb, _nbt)         += (*W)(_nbases) * Pb;
 
             if (DEBUG_MATRIX) {
                 std::cout << "Spatial matrix outputs" << std::endl;

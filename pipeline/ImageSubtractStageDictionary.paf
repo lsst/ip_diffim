@@ -87,7 +87,12 @@ detThresholdMin: 10.0
 #
 ######
 # Type of basis set for PSF matching kernel
+#
 # Options are : delta-function, alard-lupton
+#
+# If alard-lupton is used, the first term will have no spatial
+# variation and the kernel sum will be conserved
+#
 #
 kernelBasisSet: "delta-function"
 
@@ -236,6 +241,9 @@ maxSpatialIterations: 5
 # eigenKernels which are then fit for spatially using the same
 # technique as for the non-PCA delta-function and Alard-Lupton kernels
 # 
+# If this option is used, the first term (mean kernel) will have no
+# spatial variation and the kernel sum will be conserved
+#
 usePcaForSpatialKernel: true
 
 ######

@@ -38,15 +38,12 @@ kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(templateMas
                                        policy.getInt("sizeCellX"),
                                        policy.getInt("sizeCellY"))
 
-fc = ipDiffim.FindCountsF()
-
 for fp in footprints:
     bbox = fp.getBBox()
     xC   = 0.5 * ( bbox.getX0() + bbox.getX1() )
     yC   = 0.5 * ( bbox.getY0() + bbox.getY1() )
     tmi  = afwImage.MaskedImageF(templateMaskedImage,  bbox)
     smi  = afwImage.MaskedImageF(scienceMaskedImage, bbox)
-    fc.apply(tmi)
     
     #if not goodKernelCandidate():
     #    continue
