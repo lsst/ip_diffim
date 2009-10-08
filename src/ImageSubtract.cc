@@ -1050,14 +1050,14 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         // Find detections
         detection::Threshold threshold = 
                 detection::createThreshold(detThreshold, detThresholdType);
-        detection::DetectionSet<PixelT> detectionSet(
+        detection::FootprintSet<PixelT> footprintSet(
                 imageToConvolve, 
                 threshold,
                 "",
                 fpNpixMin);
         
         // Get the associated footprints
-        footprintListIn = detectionSet.getFootprints();
+        footprintListIn = footprintSet.getFootprints();
         logging::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                            "Found %d total footprints above threshold %.3f",
                            footprintListIn.size(), detThreshold);

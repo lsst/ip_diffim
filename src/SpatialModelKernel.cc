@@ -564,7 +564,7 @@ namespace {
                readable, so we go with the former.
             */
             if ( (_policy.getString("kernelBasisSet") == "alard-lupton") || _policy.getBool("usePcaForSpatialKernel")) {
-                _constantFirstTerm = true;
+	       //_constantFirstTerm = true;
             }
 
             /* Bookeeping terms */
@@ -651,22 +651,52 @@ namespace {
             }
 
             if (_constantFirstTerm) {
+	       /* Fill in matrices */
+	       unsigned int dm = _nkt-1;
+	       unsigned int mb = (_nbases-1)*_nkt+1;
+	       
+	       /* Zeroth term, m1=0 */
+	       {
+		  unsigned int m1 = 0;
+		  _M(m1, m1) += (*Q)(m1,m1);
+		  for(unsigned int m2 = m1+1; m2 < _nbases; m2++)  {
+		     _M.block(m1, m2*_nkt, 1, _nkt) += (*Q)(m1,m2) * Pk;
+		  }
+		  _M.block(m1, mb, 1, _nbt) += (*Q)(m1,_nbases) * Pb;
+		  _B(m1) += (*W)(m1);
+	       }
 
+	       /* The rest of the terms */
+	       for(unsigned int m1 = 1; m1 < _nbases; m1++)  {
+		  /* Diagonal kernel-kernel term; only use upper triangular part of PkPkt */
+		  _M.block(m1*_nkt-dm, m1*_nkt, _nkt, _nkt) += (*Q)(m1,m1) * PkPkt.part<Eigen::UpperTriangular>();
+		  
+		  /* Kernel-kernel terms */
+		  for(unsigned int m2 = m1+1; m2 < _nbases; m2++)  {
+		     _M.block(m1*_nkt-dm, m2*_nkt, _nkt, _nkt) += (*Q)(m1,m2) * PkPkt;
+		  }
+		  
+		  /* Kernel cross terms with background */
+		  _M.block(m1*_nkt-dm, mb, _nkt, _nbt) += (*Q)(m1,_nbases) * PkPbt;
+
+		  /* B vector */
+		  _B.segment(m1*_nkt-dm, _nkt) += (*W)(m1) * Pk;
+	       } 
+
+	       /* Background-background terms only */
+	       _M.block(mb, mb, _nbt, _nbt) += (*Q)(_nbases,_nbases) * PbPbt.part<Eigen::UpperTriangular>();
+	       _B.segment(mb, _nbt)         += (*W)(_nbases) * Pb;
             }
             else {
                 /* Fill in matrices */
-                unsigned int mb = _nkt*_nbases;
+	        unsigned int mb = _nbases*_nkt;
                 for(unsigned int m1 = 0; m1 < _nbases; m1++)  {
+		    /* Diagonal kernel-kernel term; only use upper triangular part of PkPkt */
+ 		    _M.block(m1*_nkt, m1*_nkt, _nkt, _nkt) += (*Q)(m1,m1) * PkPkt.part<Eigen::UpperTriangular>();
                     
                     /* Kernel-kernel terms */
-                    for(unsigned int m2 = m1; m2 < _nbases; m2++)  {
-                        if (m1 == m2) {
-                            /* Diagonal kernel-kernel term; only use upper triangular part of PkPkt */
-                            _M.block(m1*_nkt, m2*_nkt, _nkt, _nkt) += (*Q)(m1,m1) * PkPkt.part<Eigen::UpperTriangular>();
-                        }
-                        else {
-                            _M.block(m1*_nkt, m2*_nkt, _nkt, _nkt) += (*Q)(m1,m2) * PkPkt;
-                        }
+                    for(unsigned int m2 = m1+1; m2 < _nbases; m2++)  {
+		       _M.block(m1*_nkt, m2*_nkt, _nkt, _nkt) += (*Q)(m1,m2) * PkPkt;
                     }
 	            
                     /* Kernel cross terms with background */
@@ -680,50 +710,6 @@ namespace {
                 _M.block(mb, mb, _nbt, _nbt) += (*Q)(_nbases,_nbases) * PbPbt.part<Eigen::UpperTriangular>();
                 _B.segment(mb, _nbt)         += (*W)(_nbases) * Pb;
             }
-
-            /* Fill in matrices */
-            unsigned int m0 = _constantFirstTerm ? 1 : _nkt;
-            unsigned int mb = _nkt*_nbases;
-
-            /* DAMMIT THIS IS AN INDEXING MESS - I THINK EVERYTHING IS RIGHT UP UNTIL mb */
-
-            /* For simplicity look at first element first */
-            if (_constantFirstTerm) {
-                _M.block(0, 0, 1, 1) += (*Q)(0,0);
-                for(unsigned int m2 = 1; m2 < _nbases; m2++)  {
-                    _M.block(0, m2*_nkt, 1, _nkt) += (*Q)(0,m2) * Pk;
-                }
-                _M.block(0, mb, 1, _nbt) += (*Q)(0,_nbases) * Pb;
-                _B.segment(0, 1) += (*W)(0);
-            }
-            else {
-                _M.block(0, 0, _nkt, _nkt) += (*Q)(0,0) * PkPkt.part<Eigen::UpperTriangular>();
-                for(unsigned int m2 = 1; m2 < _nbases; m2++)  {
-                    _M.block(0, m2*_nkt, _nkt, _nkt) += (*Q)(0,m2) * PkPkt;
-                }
-                _M.block(0, mb, _nkt, _nbt) += (*Q)(0,_nbases) * PkPbt;
-                _B.segment(0, _nkt) += (*W)(0) * Pk;
-            }
-
-            /* The rest of the terms */
-            for(unsigned int m1 = 1; m1 < _nbases; m1++)  {
-                /* Diagonal kernel-kernel term; only use upper triangular part of PkPkt */
-                _M.block(m1*_nkt, m0+m1*_nkt, _nkt, _nkt) += (*Q)(m1,m1) * PkPkt.part<Eigen::UpperTriangular>();
-
-                /* Kernel-kernel terms */
-                for(unsigned int m2 = m1+1; m2 < _nbases; m2++)  {
-                    _M.block(m1*_nkt, m0+m2*_nkt, _nkt, _nkt) += (*Q)(m1,m2) * PkPkt;
-                }
-
-                /* Kernel cross terms with background */
-                _M.block(m1*_nkt, m0+mb, _nkt, _nbt) += (*Q)(m1,_nbases) * PkPbt;
-                /* B vector */
-                _B.segment(m0+m1*_nkt, _nkt) += (*W)(m1) * Pk;
-            } 
-
-            /* Background-background terms only */
-            _M.block(mb, mb, _nbt, _nbt) += (*Q)(_nbases,_nbases) * PbPbt.part<Eigen::UpperTriangular>();
-            _B.segment(mb, _nbt)         += (*W)(_nbases) * Pb;
 
             if (DEBUG_MATRIX) {
                 std::cout << "Spatial matrix outputs" << std::endl;
