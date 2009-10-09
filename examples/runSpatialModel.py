@@ -12,7 +12,7 @@ import lsst.afw.display.utils as displayUtils
 
 display = True
 
-Verbosity = 1
+Verbosity = 4
 pexLogging.Trace_setVerbosity("lsst.ip.diffim", Verbosity)
 
 defDataDir   = eups.productDir("afwdata") 

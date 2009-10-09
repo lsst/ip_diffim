@@ -6,7 +6,7 @@
  *
  * @author Andrew Becker, University of Washington
  *
- * @ingroup afw
+ * @ingroup ip::diffim
  */
 
 #ifndef LSST_IP_DIFFIM_SPATIALMODELKERNEL_H
