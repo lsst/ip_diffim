@@ -5,7 +5,8 @@ import lsst.afw.math.mathLib as afwMath
 # Most general routine
 def createPsfMatchingKernel(templateMaskedImage,
                             scienceMaskedImage,
-                            policy):
+                            policy,
+                            footprints=None):
 
     # Object to store the KernelCandidates for spatial modeling
     kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(templateMaskedImage.getX0(),
@@ -19,9 +20,10 @@ def createPsfMatchingKernel(templateMaskedImage,
     kFunctor = ipDiffim.createKernelFunctor(policy)
 
     # Candidate source footprints to use for Psf matching
-    footprints = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
-                                                                  scienceMaskedImage,
-                                                                  policy)
+    if footprints == None:
+        footprints = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
+                                                                      scienceMaskedImage,
+                                                                      policy)
 
     # Place candidate footprints within the spatial grid
     for fp in footprints:
