@@ -128,7 +128,8 @@ namespace detail {
         SetPcaImageVisitor(afwImage::ImagePca<ImageT> *imagePca // Set of Images to initialise
             ) :
             afwMath::CandidateVisitor(),
-            _imagePca(imagePca) {}
+            _imagePca(imagePca),
+            _mean() {}
         
         // Called by SpatialCellSet::visitCandidates for each Candidate
         void processCandidate(afwMath::SpatialCellCandidate *candidate) {
@@ -154,8 +155,44 @@ namespace detail {
                 return;
             }
         }
+
+        void subtractMean() {
+            /* 
+               If we don't subtract off the mean before we do the Pca, the
+               subsequent terms carry less of the power than if you do subtract
+               off the means.  Explicit example:
+
+               With mean subtraction:
+                 DEBUG: Eigenvalue 0 : 0.010953 (0.373870 %)
+                 DEBUG: Eigenvalue 1 : 0.007927 (0.270604 %)
+                 DEBUG: Eigenvalue 2 : 0.001393 (0.047542 %)
+                 DEBUG: Eigenvalue 3 : 0.001092 (0.037261 %)
+                 DEBUG: Eigenvalue 4 : 0.000829 (0.028283 %)
+               
+               Without mean subtraction:
+                 DEBUG: Eigenvalue 0 : 0.168627 (0.876046 %)
+                 DEBUG: Eigenvalue 1 : 0.007935 (0.041223 %)
+                 DEBUG: Eigenvalue 2 : 0.006049 (0.031424 %)
+                 DEBUG: Eigenvalue 3 : 0.001188 (0.006173 %)
+                 DEBUG: Eigenvalue 4 : 0.001050 (0.005452 %)
+
+               After the first term above, which basically represents the mean,
+               the remaining terms carry less of the power than if you do
+               subtract off the mean.  (0.041223/(1-0.876046) < 0.373870).  Not
+               by much, but still significant.
+             */
+            _mean = _imagePca->getMean();
+            afwImage::ImagePca<ImageT>::ImageList imageList = _imagePca->getImageList();
+            for (typename afwImage::ImagePca<ImageT>::ImageList::const_iterator ptr = imageList.begin(), end = imageList.end(); ptr != end; ++ptr) {
+                **ptr -= *_mean;
+            }
+        } 
+        
+        ImageT::Ptr returnMean() {return _mean;}
+
     private:
         afwImage::ImagePca<ImageT> *_imagePca; 
+        ImageT::Ptr _mean;
     };
     
     

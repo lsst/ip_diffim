@@ -243,16 +243,26 @@ fitSpatialKernelFromCandidates(
             afwImage::ImagePca<ImageT> imagePca;
             detail::SetPcaImageVisitor<PixelT> importStarVisitor(&imagePca);
             kernelCells.visitCandidates(&importStarVisitor, nStarPerCell);
+            importStarVisitor.subtractMean();
             imagePca.analyze();
             std::vector<typename ImageT::Ptr> eigenImages = imagePca.getEigenImages();
             std::vector<double> eigenValues = imagePca.getEigenValues();
-            int const nEigen = static_cast<int>(eigenValues.size());
+
+            double eSum = std::accumulate(eigenValues.begin(), eigenValues.end(), 0.);
+            for(unsigned int j=0; j < eigenValues.size(); j++) {
+                pexLogging::TTrace<6>("lsst.ip.diffim.SetPcaImageVisitor", 
+                                      "Eigenvalue %d : %f (%f \%)", j, eigenValues[j], eigenValues[j]/eSum);
+            }
+
+            int const nEigen = static_cast<int>(eigenValues.size()) - 1; /* -1 since we have subtracted mean */
             int const ncomp  = (nEigenComponents <= 0 || nEigen < nEigenComponents) ? nEigen : nEigenComponents;
             //
             afwMath::KernelList kernelListRaw;
-            for (int i = 0; i != ncomp; ++i) {
+            kernelListRaw.push_back(afwMath::Kernel::Ptr(
+                                        new afwMath::FixedKernel(afwImage::Image<afwMath::Kernel::Pixel>(*(importStarVisitor.returnMean()), true))));
+            for (int j = 0; j != ncomp; ++j) {
                 kernelListRaw.push_back(afwMath::Kernel::Ptr(
-                                            new afwMath::FixedKernel(afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[i], true))));
+                                            new afwMath::FixedKernel(afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[j], true))));
             }
             /* Put all the power in the first kernel, which will not vary spatially */
             afwMath::KernelList kernelListPca = renormalizeKernelList(kernelListRaw);

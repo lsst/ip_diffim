@@ -270,9 +270,13 @@ maxSpatialIterations: 5
 usePcaForSpatialKernel: true
 
 ######
-# How many 
+# How many principal components do you use in the decomposition?
 #
-numPrincipalComponents: 5
+# Note : this is defined to be the number to use *_in addition to_*
+# the mean kernel, so in total you use N+1 basis functions for the
+# decomposition.
+# 
+numPrincipalComponents: 4
 
 ######
 # At what fraction of the eigenvalues do you cut off the expansion?
