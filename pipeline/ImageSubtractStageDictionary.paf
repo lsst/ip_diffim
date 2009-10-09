@@ -91,8 +91,10 @@ detThresholdMin: 10.0
 # Options are : delta-function, alard-lupton
 #
 # If alard-lupton is used, the first term will have no spatial
-# variation and the kernel sum will be conserved
-#
+# variation and the kernel sum will be conserved.  If delta-function
+# is used, you have the option to "useRegularization", and might also
+# want to seriously consider "usePcaForSpatialKernel" which will also
+# enable kernel sum conservation for the delta function kernels.
 #
 # NOTE : if "alard-lupton" you likely want to turn off
 #        "usePcaForSpatialKernel" down below
@@ -180,10 +182,10 @@ candidateResidualStdMax: 1.25
 #   singleKernelClipping:  false
 #   kernelSumClipping:     false
 #   spatialKernelClipping: true
-    # In this case you might want to consider upping "maxSpatialIterations" below
+# In this case you might want to consider upping "maxSpatialIterations" below
 #
-singleKernelClipping:  false
-kernelSumClipping:     false
+singleKernelClipping:  true
+kernelSumClipping:     true
 spatialKernelClipping: true
 
 
