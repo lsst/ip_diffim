@@ -27,15 +27,15 @@ def subtractExposure(templateExposure, scienceExposure, policy):
     scienceMaskedImage  = scienceExposure.getMaskedImage()
 
     # Subtract their MaskedImages
-    differenceMaskedImage, spatialKernel, spatialBg = \
+    differenceMaskedImage, spatialKernel, spatialBg, kernelCellSet = \
                            subtractMaskedImage(templateMaskedImage,
                                                scienceMaskedImage,
                                                policy)
-
+    
     # Generate an exposure from the results
     differenceExposure = afwImage.ExposureF(differenceMaskedImage, scienceWcs)
 
-    return differenceExposure, spatialKernel, spatialBg
+    return differenceExposure, spatialKernel, spatialBg, kernelCellSet
 
 
 

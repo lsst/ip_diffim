@@ -1,4 +1,10 @@
-import lsst.ip.diffim as ipDiffim
+# all the c++ level classes and routines
+import diffimLib
+
+# all the other diffim routines
+from createKernelFunctor import createKernelFunctor
+
+# all the other LSST packages
 import lsst.afw.image.imageLib as afwImage
 import lsst.afw.math.mathLib as afwMath
 
@@ -17,13 +23,13 @@ def createPsfMatchingKernel(templateMaskedImage,
                                            policy.getInt("sizeCellY"))
     
     # Object to perform the Psf matching on a source-by-source basis
-    kFunctor = ipDiffim.createKernelFunctor(policy)
+    kFunctor = createKernelFunctor(policy)
 
     # Candidate source footprints to use for Psf matching
     if footprints == None:
-        footprints = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
-                                                                      scienceMaskedImage,
-                                                                      policy)
+        footprints = diffimLib.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
+                                                                       scienceMaskedImage,
+                                                                       policy)
 
     # Place candidate footprints within the spatial grid
     for fp in footprints:
@@ -33,13 +39,13 @@ def createPsfMatchingKernel(templateMaskedImage,
         tmi  = afwImage.MaskedImageF(templateMaskedImage,  bbox)
         smi  = afwImage.MaskedImageF(scienceMaskedImage, bbox)
         
-        cand = ipDiffim.makeKernelCandidate(xC, yC, tmi, smi)
+        cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi)
         kernelCellSet.insertCandidate(cand)
 
     # Create the Psf matching kernel
-    spatialKernel, spatialBg = ipDiffim.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
+    spatialKernel, spatialBg = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
 
-    return spatialKernel, spatialBg
+    return spatialKernel, spatialBg, kernelCellSet
 
 
 # Specialized routines where I tweak the policy based on what you want done

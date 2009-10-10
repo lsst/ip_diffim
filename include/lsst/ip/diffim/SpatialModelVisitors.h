@@ -276,8 +276,11 @@ namespace detail {
                                 *(var.getVariance()),
                                 _policy);
             } catch (lsst::pex::exceptions::Exception &e) {
-                LSST_EXCEPT_ADD(e, "Unable to calculate Kernel");
-                throw e;
+                kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
+                pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                                      "Unable to process candidate; exception caught (%s)", e.what());
+                _nRejected += 1;
+                return;
             }
             
             /* 
@@ -285,7 +288,17 @@ namespace detail {
                second fitting loop after the results of the first fitting loop
                are used to define a PCA basis
             */
-            std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> KB = _kFunctor.getKernel();
+            std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> KB;
+            try {
+                KB = _kFunctor.getKernel();
+            } catch (lsst::pex::exceptions::Exception &e) {
+                kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
+                pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                                      "Unable to process candidate; exception caught (%s)", e.what());
+                _nRejected += 1;
+                return;
+            }
+
             if (_setCandidateKernel) {
                 kCandidate->setKernel(KB.first);
                 kCandidate->setBackground(KB.second);
@@ -498,6 +511,7 @@ namespace detail {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::GOOD);
                 pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                                       "Sigma clipping not enabled");
+                _nGood += 1;
             }
         }
         

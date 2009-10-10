@@ -259,10 +259,14 @@ fitSpatialKernelFromCandidates(
             //
             afwMath::KernelList kernelListRaw;
             kernelListRaw.push_back(afwMath::Kernel::Ptr(
-                                        new afwMath::FixedKernel(afwImage::Image<afwMath::Kernel::Pixel>(*(importStarVisitor.returnMean()), true))));
+                                        new afwMath::FixedKernel(
+                                            afwImage::Image<afwMath::Kernel::Pixel>
+                                            (*(importStarVisitor.returnMean()), true))));
             for (int j = 0; j != ncomp; ++j) {
                 kernelListRaw.push_back(afwMath::Kernel::Ptr(
-                                            new afwMath::FixedKernel(afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[j], true))));
+                                            new afwMath::FixedKernel(
+                                                afwImage::Image<afwMath::Kernel::Pixel>
+                                                (*eigenImages[j], true))));
             }
             /* Put all the power in the first kernel, which will not vary spatially */
             afwMath::KernelList kernelListPca = renormalizeKernelList(kernelListRaw);

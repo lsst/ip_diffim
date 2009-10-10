@@ -38,7 +38,7 @@ class DiffimTestCases(unittest.TestCase):
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
 
         # Delta function basis set
-        self.basisList1  = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
+        self.basisList1  = ipDiffim.generateDeltaFunctionBasisSet(self.kCols, self.kRows)
         self.kFunctor1   = ipDiffim.PsfMatchingFunctorF(self.basisList1)
 
         # Alard-Lupton basis set
@@ -50,7 +50,7 @@ class DiffimTestCases(unittest.TestCase):
         assert self.kCols == self.kRows  # square
         assert self.kCols % 2 == 1  # odd sized
         kHalfWidth = int(self.kCols/2)
-        self.basisList2  = ipDiffim.generateAlardLuptonKernelSet(kHalfWidth, nGauss, sigGauss, degGauss)
+        self.basisList2  = ipDiffim.generateAlardLuptonBasisSet(kHalfWidth, nGauss, sigGauss, degGauss)
         self.kFunctor2   = ipDiffim.PsfMatchingFunctorF(self.basisList2)
 
         # Regularized delta function basis set

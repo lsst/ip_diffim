@@ -166,7 +166,7 @@ void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
     eigenToConvolve.resize(eigenToConvolve.rows()*eigenToConvolve.cols(), 1);
     eigenToNotConvolve.resize(eigenToNotConvolve.rows()*eigenToNotConvolve.cols(), 1);
     eigeniVariance.resize(eigeniVariance.rows()*eigeniVariance.cols(), 1);
-    
+
     /* Holds image convolved with basis function */
     image::Image<PixelT> cimage(imageToConvolve.getDimensions());
     

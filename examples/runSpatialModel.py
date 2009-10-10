@@ -27,73 +27,9 @@ templateMaskedImage = afwImage.MaskedImageF(defTemplatePath)
 scienceMaskedImage  = afwImage.MaskedImageF(defSciencePath)
 policy              = pexPolicy.Policy.createPolicy(defPolicyPath)
 
-footprints = ipDiffim.getCollectionOfFootprintsForPsfMatching(templateMaskedImage,
-                                                              scienceMaskedImage,
-                                                              policy)
-
-kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(templateMaskedImage.getX0(),
-                                                                     templateMaskedImage.getY0()),
-                                                     templateMaskedImage.getWidth(),
-                                                     templateMaskedImage.getHeight()),
-                                       policy.getInt("sizeCellX"),
-                                       policy.getInt("sizeCellY"))
-
-for fp in footprints:
-    bbox = fp.getBBox()
-    xC   = 0.5 * ( bbox.getX0() + bbox.getX1() )
-    yC   = 0.5 * ( bbox.getY0() + bbox.getY1() )
-    tmi  = afwImage.MaskedImageF(templateMaskedImage,  bbox)
-    smi  = afwImage.MaskedImageF(scienceMaskedImage, bbox)
-    
-    #if not goodKernelCandidate():
-    #    continue
-    
-    cand = ipDiffim.makeKernelCandidate(xC, yC, tmi, smi)
-    kernelCellSet.insertCandidate(cand)
-
-# Do we reduce the dimensionality first by doing PCA on the DF/DFr kernels?
-doPca = False
-if doPca:
-    nEigenComponents            = policy.getInt("nEigenComponents")
-    spatialOrder                = policy.getInt("spatialOrder")
-    nStarPerCell                = policy.getInt("nStarPerCell")
-    nStarPerCellSpatialFit      = policy.getInt("nStarPerCellSpatialFit")
-    tolerance                   = policy.getDouble("tolerance")
-    reducedChi2ForPsfCandidates = policy.getDouble("reducedChi2ForPsfCandidates")
-    nIterForPsf                 = policy.getInt("nIterForPsf")
-        
-kFunctor       = ipDiffim.createKernelFunctor(policy)
-nIterForKernel = policy.getInt("maxSpatialIterations")
-
-if doPca:
-    kernel, eigenValues = ipDiffim.createPcaBasisFromCandidates(kernelCellSet, nEigenComponents,
-                                                                spatialOrder, nStarPerCell)
-else:
-    spatialKernel, spatialBg = ipDiffim.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
-
-nCellAll  = 0
-nCellUsed = 0
-nCandAll  = 0
-nCandUsed = 0
-for cell in kernelCellSet.getCellList():
-    cellFound = False
-    for cand in cell.begin(False): # False = include bad candidates
-        cand = ipDiffim.cast_KernelCandidateF(cand)
-        if cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
-            nCandAll  += 1
-        elif cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
-            nCandUsed += 1
-            cellFound  = True
-        #else:
-        #    print 'Uh', cand.getStatus()
-    if cellFound:
-        nCellUsed += 1
-    nCellAll += 1
-
-print 'Using %d / %d Cells; %d / %d Candiates' % (nCellUsed, nCellAll, nCandUsed, nCandAll)
-
-if nCellUsed == 0 or nCandUsed == 0:
-    print 'Damn, unable to do a thing'
+spatialKernel, spatialBg, kernelCellSet = ipDiffim.createPsfMatchingKernel(templateMaskedImage,
+                                                                           scienceMaskedImage,
+                                                                           policy)
 
 # Lets see what we got
 if display:

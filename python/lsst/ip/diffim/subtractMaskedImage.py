@@ -26,10 +26,10 @@ def subtractMaskedImage(templateMaskedImage,
     templateMaskedImage.setXY0(scienceMaskedImage.getXY0())
 
     
-    spatialKernel, spatialBg = createPsfMatchingKernel(templateMaskedImage,
-                                                       scienceMaskedImage,
-                                                       policy,
-                                                       footprints)
+    spatialKernel, spatialBg, kernelCellSet = createPsfMatchingKernel(templateMaskedImage,
+                                                                      scienceMaskedImage,
+                                                                      policy,
+                                                                      footprints)
     
     # no need to subtract a background in subtraction as we'll do so in a moment
     if policy.exists("backgroundPolicy"):
@@ -70,4 +70,4 @@ def subtractMaskedImage(templateMaskedImage,
     # Place holder for Sqda on diffim; diffim stats and kernel sum
     #
 
-    return differenceMaskedImage, spatialKernel, spatialBg
+    return differenceMaskedImage, spatialKernel, spatialBg, kernelCellSet

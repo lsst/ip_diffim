@@ -224,11 +224,19 @@ calculateKernelUncertainty: false
 ######
 # Order of kernel and background spatial variation
 #
-spatialKernelOrder: 1
-spatialBgOrder: 1
+# If you are using a large image, spatialKernelOrder=0, and a constant
+# kernel is a bad approximation, you probably want to use the
+# following configuration for the sigma clipping above:
+#
+#   singleKernelClipping:  true
+#   kernelSumClipping:     true
+#   spatialKernelClipping: false
+# 
+spatialKernelOrder: 2
+spatialBgOrder:     1
 
 ######
-# Do we subtract off the differential background outside of ip_diffim?
+# Do we subtract off the differential background independent of ip_diffim?
 # 
 #backgroundPolicy: {
 #    # how to interpolate the background values
