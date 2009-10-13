@@ -8,6 +8,7 @@
  *
  * @ingroup ip_diffim
  */
+
 #include <numeric>
 
 #include <boost/timer.hpp> 
