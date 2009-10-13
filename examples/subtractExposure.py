@@ -42,12 +42,10 @@ Notes:
     
     parser = optparse.OptionParser(usage)
     parser.add_option('-p', '--policy', default=defPolicyPath, help='policy file')
-    parser.add_option('-d', '--debugIO', action='store_true', default=False,
-        help='write diagnostic intermediate files')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
-        help='verbosity of diagnostic trace messages; 1 for just warnings, more for more information')
-    parser.add_option('-I', '--invert', action='store_true', default=False,
-        help='invert the image to convolve')
+                      help='verbosity of diagnostic trace messages; 1 for just warnings, more for more information')
+    parser.add_option('-i', '--invert', action='store_true', default=False,
+                      help='invert the image to convolve')
 
     (options, args) = parser.parse_args()
     
@@ -70,10 +68,6 @@ Notes:
     scienceExposure  = afwImage.ExposureF(sciencePath)
     policy           = Policy.createPolicy(policyPath)
 
-    if options.debugIO:
-        print 'DebugIO =', options.debugIO
-        policy.set('debugIO', True)
-
     invert = False
     if options.invert:
         print 'Invert =', options.invert
@@ -86,9 +80,9 @@ Notes:
     log = Log(Log.getDefaultLog(),
               "ip.diffim.subtractExposure")
 
-    differenceExposure, spatialKernel, backgroundModel, sdqaList = subtractExposure(templateExposure,
-                                                                                    scienceExposure,
-                                                                                    policy, log, invert=invert)
+    differenceExposure, spatialKernel, backgroundModel, kernelCellSet = subtractExposure(templateExposure,
+                                                                                         scienceExposure,
+                                                                                         policy)
     differenceExposure.writeFits(outputPath)
 
 def run():

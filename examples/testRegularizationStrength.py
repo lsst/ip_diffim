@@ -14,13 +14,13 @@ import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
 
-Verbosity = 4
+Verbosity = 5
 logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
 
-display = False
+display = True
 writefits = False
 
 # This one just creates example convolution and deconvolution kernels
@@ -28,15 +28,48 @@ writefits = False
 class DiffimTestCases(unittest.TestCase):
     
     # D = I - (K.x.T + bg)
+
+    def diffimQuality(self, kFunctor, tmi, smi, var, foffset=0):
+        kFunctor.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
+        KB         = kFunctor.getKernel()
+        kernel     = KB.first
+        background = KB.second
+        kImageOut  = afwImage.ImageD(self.kCols, self.kRows)
+
+        kSum      = kernel.computeImage(kImageOut, False)
+        diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, background)
+        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
+                                                  kernel.getCtrY()) ,
+                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
+                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
+        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
+        self.dStats.apply( diffIm2 )
+
+        if display:
+            ds9.mtv(kImageOut, frame=foffset)
+            ds9.mtv(diffIm2, frame=foffset+1)
+        return kSum
+        
         
     def setUp(self):
         self.policy      = pexPolicy.Policy.createPolicy(diffimPolicy)
         self.kCols       = self.policy.getInt('kernelCols')
         self.kRows       = self.policy.getInt('kernelRows')
-        self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
+        self.basisList   = ipDiffim.generateDeltaFunctionBasisSet(self.kCols, self.kRows)
 
+        # Regularization terms
+        forward, central     = 0, 1
+        no_wrap, wrap, taper = 0, 1, 2
+        boundary_style, diff_style = taper, forward
+        self.H0 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary_style, diff_style)
+        self.H1 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 1, boundary_style, diff_style)
+        self.H2 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2, boundary_style, diff_style)
+        
         # difference imaging functor
         self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
+        self.kFunctor0     = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H0)
+        self.kFunctor1     = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H1)
+        self.kFunctor2     = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H2)
 
         # known input images
         defDataDir = eups.productDir('afwdata')
@@ -81,75 +114,30 @@ class DiffimTestCases(unittest.TestCase):
             smi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(),  bbox)
             tmi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox)
 
-        # OUTPUT
-        if display:
-            ds9.mtv(tmi, frame=0+foffset)
-            ds9.mtv(smi, frame=1+foffset)
-        if writefits:
-            tmi.writeFits('t')
-            smi.writeFits('s')
-            
         # estimate of the variance
         var  = afwImage.MaskedImageF(smi, True)
         var -= tmi
 
         # accepts : imageToConvolve, imageToNotConvolve
-        self.kFunctor.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
-        kernel    = self.kFunctor.getKernel()
-        kImageOut = afwImage.ImageD(self.kCols, self.kRows)
+        kSum = self.diffimQuality(self.kFunctor, tmi, smi, var, foffset=foffset+0)
+        print 'DF : %.2f +/- %.2f (%.3f)' % (self.dStats.getMean(), self.dStats.getRms(), kSum)
 
-        kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor.getBackground())
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
-        self.dStats.apply( diffIm2 )
-        print 'Diffim residuals1 : %.2f +/- %.2f (%.3f)' % (self.dStats.getMean(), self.dStats.getRms(), kSum)
-                                                       
-        # Second iteration
-        self.kFunctor.apply(tmi.getImage(), smi.getImage(), diffIm.getVariance(), self.policy)
-        kernel    = self.kFunctor.getKernel()
-        kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor.getBackground())
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
-        self.dStats.apply( diffIm2 )
-        print 'Diffim residuals2 : %.2f +/- %.2f (%.2f)' % (self.dStats.getMean(), self.dStats.getRms(), kSum)
-        
-        # OUTPUT
-        if display:
-            ds9.mtv(kImageOut, frame=2+foffset)
-            ds9.mtv(diffIm2, frame=3+foffset)
-        if writefits:
-            kImageOut.writeFits('k2.fits')
-            diffIm2.writeFits('dB2')
+        kSum = self.diffimQuality(self.kFunctor0, tmi, smi, var, foffset=foffset+2)
+        print 'DFr0 : %.2f +/- %.2f (%.3f)' % (self.dStats.getMean(), self.dStats.getRms(), kSum)
 
-        return kImageOut, diffIm2
+        kSum = self.diffimQuality(self.kFunctor1, tmi, smi, var, foffset=foffset+4)
+        print 'DFr1 : %.2f +/- %.2f (%.3f)' % (self.dStats.getMean(), self.dStats.getRms(), kSum)
+
+        kSum = self.diffimQuality(self.kFunctor2, tmi, smi, var, foffset=foffset+6)
+        print 'DFr2 : %.2f +/- %.2f (%.3f)' % (self.dStats.getMean(), self.dStats.getRms(), kSum)
 
     def testFunctor(self):
-        frame = 1
-        
-        for i in range(5, 20, 2):
-            self.kCols       = i
-            self.kRows       = i
-            self.policy.set('kernelCols', i)
-            self.policy.set('kernelRows', i)
-
-            self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
-            self.kFunctor    = ipDiffim.PsfMatchingFunctorF(self.basisList)
-            
-            for j in range(2, 9, 2):
-                kernel, diffim = self.applyFunctor(invert=False, imscale=j)
-                
-                ds9.mtv(kernel, frame=frame)
-                frame += 1
-                ds9.mtv(diffim, frame=frame)
-                frame += 1
+        lams = range(-8, 1, 2)
+        #lams = [-6]
+        for i in range(len(lams)):
+            lam = lams[i]
+            self.policy.set('regularizationScaling', 1.0 * 10**lam)
+            self.applyFunctor(foffset=i*8)
                 
 #####
         
