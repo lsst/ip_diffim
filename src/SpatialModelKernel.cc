@@ -8,6 +8,8 @@
  *
  * @ingroup ip_diffim
  */
+#include <numeric>
+
 #include <boost/timer.hpp> 
 
 #include <lsst/afw/image/Image.h>
@@ -79,7 +81,7 @@ afwMath::Kernel::Ptr KernelCandidate<PixelT>::getKernel() const {
 template <typename PixelT>
 double KernelCandidate<PixelT>::getBackground() const {
     if (!_haveKernel) {
-        throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
+        throw LSST_EXCEPT(pexExcept::Exception, "No Background for KernelCandidate");
     }
     return _background;
 }
@@ -87,7 +89,7 @@ double KernelCandidate<PixelT>::getBackground() const {
 template <typename PixelT>
 double KernelCandidate<PixelT>::getKsum() const {
     if (!_haveKernel) {
-        throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
+        throw LSST_EXCEPT(pexExcept::Exception, "No Ksum for KernelCandidate");
     }
     return _kSum;
 }
@@ -105,9 +107,6 @@ lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceI
     lsst::afw::math::Kernel::Ptr kernel,
     double background
     ) {
-    if (!_haveKernel) {
-        throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
-    }
     
     /* Make diffim and set chi2 from result */
     lsst::afw::image::MaskedImage<PixelT> diffim = convolveAndSubtract(*_miToConvolvePtr,

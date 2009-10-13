@@ -45,23 +45,12 @@ namespace boost {
 
 /******************************************************************************/
 
+
 %include "lsst/p_lsstSwig.i"
 %include "lsst/daf/base/persistenceMacros.i"
-%import  "lsst/afw/image/image.i" 
+%import  "lsst/afw/image/imageLib.i"
+%import  "lsst/afw/math/mathLib.i"
 %import  "lsst/afw/detection/detectionLib.i"
-%import  "lsst/afw/math/kernel.i"
-
-/* Since my KernelCandidate is a derived class from SpatialCellImageCandidate,
- * itself derived from SpatialCellCandidate, I actually need to generate wrapper
- * code so "include" it instead of "import" it.
- */
-%include  "lsst/afw/math/spatialCell.i"
-
-/* so SWIG knows that PolynomialFunction2D is derived from Function2 */
-%import  "lsst/afw/math/function.i"  
-
-/* Image/Mask types and typedefs */
-%include "lsst/afw/image/lsstImageTypes.i"     
 
 %lsst_exceptions();
 
@@ -159,9 +148,6 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
     }
 %}
 %enddef
-
- //SWIG_SHARED_PTR(SpatialCellImageCandidateK,
- //                lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::Pixel)>);
 
 %KernelCandidatePtr(F, float);
 
