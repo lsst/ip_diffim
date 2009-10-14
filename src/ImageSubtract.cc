@@ -342,7 +342,7 @@ void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
 
 template <typename PixelT, typename VarT>
 std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
-diffim::PsfMatchingFunctor<PixelT, VarT>::getKernel() {
+diffim::PsfMatchingFunctor<PixelT, VarT>::getSolution() {
 
     if (!(_initialized)) {
         throw LSST_EXCEPT(exceptions::Exception, "Kernel not initialized");
@@ -376,7 +376,7 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::getKernel() {
 
 template <typename PixelT, typename VarT>
 std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
-diffim::PsfMatchingFunctor<PixelT, VarT>::getKernelUncertainty() {
+diffim::PsfMatchingFunctor<PixelT, VarT>::getSolutionUncertainty() {
 
     if (!(_initialized)) {
         throw LSST_EXCEPT(exceptions::Exception, "Kernel not initialized");
@@ -1234,12 +1234,12 @@ std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMa
 template 
 void diffim::addSomethingToImage(
     image::Image<float> &,
-    math::PolynomialFunction2<double> const &
+    math::Function2<double> const &
     );
 template 
 void diffim::addSomethingToImage(
     image::Image<double> &,
-    math::PolynomialFunction2<double> const &
+    math::Function2<double> const &
     );
 
 template 

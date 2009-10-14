@@ -248,12 +248,9 @@ namespace diffim {
      * imaging kernel around one object realized in 2 different images.  If
      * constructed with a regularization matrix, will use it by default.  This
      * creates the M and B vectors that are used to solve for the kernel
-     * parameters 'x' as in Mx = B.  It temporarily stores them until applied to
-     * the next set of masked images.  This also provides a public interface to
-     * the resulting Kernel model and background values, which are contructed
-     * from M and B.  This creates a single kernel around a single object, and
-     * operates in tandem with the KernelCandidate + BuildSingleKernelVisitor
-     * classes for the spatial modeling.
+     * parameters 'x' as in Mx = B.  This creates a single kernel around a
+     * single object, and operates in tandem with the KernelCandidate +
+     * BuildSingleKernelVisitor classes for the spatial modeling.
      * 
      */
     template <typename PixelT, typename VarT=lsst::afw::image::VariancePixel>
@@ -275,8 +272,8 @@ namespace diffim {
         /* Shallow copy only; shared matrix product uninitialized */
         PsfMatchingFunctor(const PsfMatchingFunctor<PixelT,VarT> &rhs);
 
-        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getKernel();
-        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getKernelUncertainty();
+        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolution();
+        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolutionUncertainty();
         
         /** Access to least squares info
          */

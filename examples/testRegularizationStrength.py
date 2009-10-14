@@ -31,7 +31,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def diffimQuality(self, kFunctor, tmi, smi, var, foffset=0):
         kFunctor.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
-        KB         = kFunctor.getKernel()
+        KB         = kFunctor.getSolution()
         kernel     = KB.first
         background = KB.second
         kImageOut  = afwImage.ImageD(self.kCols, self.kRows)

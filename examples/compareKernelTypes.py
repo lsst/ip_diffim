@@ -89,7 +89,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def apply(self, functor, tmi, smi, var):
         functor.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
-        pair      = functor.getKernel()
+        pair      = functor.getSolution()
         kernel    = pair.first
         bg        = pair.second
         kImageOut = afwImage.ImageD(self.kCols, self.kRows)
@@ -139,8 +139,8 @@ class DiffimTestCases(unittest.TestCase):
                                                                                     kSum1, bg1,
                                                                                     dmean1, dstd1, vmean1)
         if display:
-            ds9.mtv(tmi, frame=0)
-            ds9.mtv(smi, frame=1)
+            ds9.mtv(tmi, frame=1) # ds9 switches frame 0 and 1 for some reason
+            ds9.mtv(smi, frame=0)
             ds9.mtv(kImageOut1, frame=2)
             ds9.mtv(diffIm1, frame=3)
         if writefits:
@@ -178,6 +178,8 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut3.writeFits('k3.fits')
             diffIm3.writeFits('d3')
 
+        import pdb
+        pdb.set_trace()
 
     def testFunctor(self):
         for object in self.footprints:

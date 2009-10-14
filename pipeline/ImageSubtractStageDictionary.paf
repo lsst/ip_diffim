@@ -139,7 +139,7 @@ useRegularization: true
 regularizationOrder: 2
 regularizationBoundary: 1
 regularizationDifference: 0
-regularizationScaling: 0.001
+regularizationScaling: 0.0001
 
 
 

@@ -16,12 +16,15 @@
 
 #include <lsst/afw/image/Image.h>
 #include <lsst/afw/image/ImagePca.h>
+#include <lsst/afw/math/SpatialCell.h>
 #include <lsst/afw/math/Kernel.h>
 #include <lsst/afw/math/FunctionLibrary.h>
 
 #include <lsst/pex/exceptions/Runtime.h>
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/pex/logging/Trace.h>
+
+#include <lsst/ip/diffim/SpatialModelKernel.h>
 
 #include <Eigen/Core>
 #include <Eigen/Cholesky>
@@ -60,10 +63,18 @@ namespace detail {
         
         void setMode(Mode mode) {_mode = mode;}
 
-        int getNRejected() {return _nRejected;}
+        int    getNRejected() {return _nRejected;}
+        double getkSumMean()  {return _kSumMean;}
+        double getkSumStd()   {return _kSumStd;}
+        double getdkSumMax()  {return _dkSumMax;}
+        double getkSumNpts()  {return _kSumNpts;}
 
         void reset() {
             _kSums.clear();
+            _kSumMean =  0.;
+            _kSumStd  =  0.;
+            _dkSumMax =  0.;
+            _kSumNpts =  0;
             _nRejected = 0;
         }
 
@@ -290,7 +301,7 @@ namespace detail {
             */
             std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> KB;
             try {
-                KB = _kFunctor.getKernel();
+                KB = _kFunctor.getSolution();
             } catch (lsst::pex::exceptions::Exception &e) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
@@ -335,11 +346,22 @@ namespace detail {
                     LSST_EXCEPT_ADD(e, "Unable to recalculate Kernel");
                     throw e;
                 }
-                KB = _kFunctor.getKernel();
+
+                try {
+                    KB = _kFunctor.getSolution();
+                } catch (lsst::pex::exceptions::Exception &e) {
+                    kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
+                    pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                                          "Unable to process candidate; exception caught (%s)", e.what());
+                    _nRejected += 1;
+                    return;
+                }
+
                 if (_setCandidateKernel) {
                     kCandidate->setKernel(KB.first);
                     kCandidate->setBackground(KB.second);
                 }
+
                 MB = _kFunctor.getAndClearMB();
                 kCandidate->setM(MB.first);
                 kCandidate->setB(MB.second);

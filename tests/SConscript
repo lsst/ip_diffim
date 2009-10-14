@@ -2,10 +2,15 @@
 Import("env")
 
 import lsst.tests
+import glob
 
-#env.Program(["testLocators.cc"], LIBS=env.getlibs("afw"))
-
-tests = lsst.tests.Control(env, ignoreList=[])
+for fileName in glob.glob("*.cc"):
+    env.Program(fileName, LIBS=env.getlibs("afw ip_diffim"))
 
 for target in tests.run("*.py"):
     env.Depends(target, "../python/lsst/ip/diffim/_diffimLib%s" % (env["LDMODULESUFFIX"]))
+
+testArgs   = {}
+ignoreList = []
+tests = lsst.tests.Control(env, args = testArgs, ignoreList=ignoreList, verbose = True)
+tests.run("*.cc")
