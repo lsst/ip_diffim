@@ -156,6 +156,13 @@ BOOST_AUTO_TEST_CASE(SetPcaImageVisitor) {
         importStarVisitor.processCandidate(&(*cand1));
         importStarVisitor.processCandidate(&(*cand1));
         importStarVisitor.processCandidate(&(*cand2));
+
+        /* Have we divided by the kernel sum? */
+        afwImage::ImagePca<ImageT>::ImageList imageList = imagePca.getImageList();
+        BOOST_CHECK_CLOSE((*imageList[0])(4, 4), 1., 1e-6);
+        BOOST_CHECK_CLOSE((*imageList[1])(4, 4), 1., 1e-6);
+        BOOST_CHECK_CLOSE((*imageList[2])(4, 4), 1., 1e-6);
+
         importStarVisitor.subtractMean();
         ImageT kMean = *(importStarVisitor.returnMean());
 
@@ -163,7 +170,7 @@ BOOST_AUTO_TEST_CASE(SetPcaImageVisitor) {
         BOOST_CHECK_CLOSE(kMean(4, 4), 1., 1e-6);
 
         /* Candidates in imagePca have their values modified before doing Pca */
-        afwImage::ImagePca<ImageT>::ImageList imageList = imagePca.getImageList();
+        imageList = imagePca.getImageList();
         BOOST_CHECK_SMALL((*imageList[0])(4, 4), 1e-6);
         BOOST_CHECK_SMALL((*imageList[1])(4, 4), 1e-6);
         BOOST_CHECK_SMALL((*imageList[2])(4, 4), 1e-6);

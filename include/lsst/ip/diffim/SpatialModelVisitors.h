@@ -80,7 +80,9 @@ class KernelSumVisitor : public afwMath::CandidateVisitor {
 public:
     enum Mode {AGGREGATE = 0, REJECT = 1};
     
-    KernelSumVisitor(lsst::pex::policy::Policy const& policy) :
+    KernelSumVisitor(
+        lsst::pex::policy::Policy const& policy ///< Policy file directing behavior
+        ) :
         afwMath::CandidateVisitor(),
         _mode(AGGREGATE),
         _kSums(std::vector<double>()),
@@ -207,7 +209,8 @@ class SetPcaImageVisitor : public afwMath::CandidateVisitor {
     typedef afwImage::Image<lsst::afw::math::Kernel::Pixel> ImageT;
 public:
     
-    SetPcaImageVisitor(afwImage::ImagePca<ImageT> *imagePca // Set of Images to initialise
+    SetPcaImageVisitor(
+        afwImage::ImagePca<ImageT> *imagePca ///< Set of Images to initialise
         ) :
         afwMath::CandidateVisitor(),
         _imagePca(imagePca),
@@ -235,7 +238,7 @@ public:
         /* 
            If we don't subtract off the mean before we do the Pca, the
            subsequent terms carry less of the power than if you do subtract
-           off the means.  Explicit example:
+           off the mean.  Explicit example:
 
            With mean subtraction:
              DEBUG: Eigenvalue 0 : 0.010953 (0.373870 %)
@@ -270,12 +273,68 @@ private:
 };
 
 
+/**
+ * @class BuildSingleKernelVisitor
+ * @ingroup ip_diffim
+ *
+ * @brief Builds the convolution kernel for a given candidate
+ *
+ * @code
+    detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter(kFunctor, policy);
+    int nRejected = -1;
+    while (nRejected != 0) {
+        singleKernelFitter.reset();
+        kernelCells.visitCandidates(&singleKernelFitter, nStarPerCell);
+        nRejected = singleKernelFitter.getNRejected();
+    }
+ * @endcode
+ *
+ * @note Visits each current candidate in a afwMath::SpatialCellSet, and builds
+ * its kernel using member object kFunctor.  We don't build the kernel for
+ * *every* candidate since this is computationally expensive, only when its the
+ * current candidate in the cell.  During the course of building the kernel, it
+ * also assesses the quality of the difference image.  If it is determined to be
+ * bad (based on the Policy paramters) the candidate is flagged as
+ * afwMath::SpatialCellCandidate::BAD; otherwise its marked as
+ * afwMath::SpatialCellCandidate::GOOD.  Keeps a running sample of all the new
+ * candidates it visited that turned out to be bad.
+ *
+ * @note Because this visitor does not have access to the next candidate in the
+ * cell, it must be called iteratively until no candidates are rejected.  This
+ * ensures that the current candidate of every cell has an initialized Kernel.
+ * This also requires that this class re-Visit all the cells after any other
+ * Visitors with the ability to mark something as BAD.
+ *
+ * @note Because we are frequently re-Visiting entirely GOOD candidates during
+ * these iterations, the option of _skipBuilt=true will enable the user to *not*
+ * rebuilt the kernel on every visit.
+ *
+ * @note For the particular use case of creating a Pca basis from the raw
+ * kernels, we want to re-Visit each candidate and re-fit the kernel using this
+ * Pca basis.  However, we don't want to overwrite the original raw kernel,
+ * since that is what is used to create the Pca basis in the first place.  Thus
+ * the user has the option to change _setCandidateKernel=false, which will not
+ * override the candidates original kernel, but will override its _M and _B
+ * matrices for use in the spatial modeling.
+ * 
+ * @note When sending data to _kFunctor, this class uses an estimate of the
+ * variance which is the straight difference of the 2 images.  If requested in
+ * the Policy ("iterateSingleKernel"), the kernel will be rebuilt using the
+ * variance of the difference image resulting from this first approximate step.
+ * This is particularly useful when convolving a single-depth science image; the
+ * variance (and thus resulting kernel) generally converges after 1 iteration.
+ * If "constantVarianceWeighting" is requested in the Policy, no iterations will
+ * be performed even if requested.
+ * 
+ */
 template<typename PixelT>
 class BuildSingleKernelVisitor : public afwMath::CandidateVisitor {
     typedef afwImage::MaskedImage<PixelT> MaskedImageT;
 public:
-    BuildSingleKernelVisitor(PsfMatchingFunctor<PixelT> &kFunctor,
-                             lsst::pex::policy::Policy const& policy) :
+    BuildSingleKernelVisitor(
+        PsfMatchingFunctor<PixelT> &kFunctor,   ///< Functor that builds the kernels
+        lsst::pex::policy::Policy const& policy ///< Policy file directing behavior
+        ) :
         afwMath::CandidateVisitor(),
         _kFunctor(kFunctor),
         _policy(policy),
@@ -304,15 +363,6 @@ public:
     */
     void setSkipBuilt(bool skip)      {_skipBuilt = skip;}
     
-    /* 
-       Since this is the base class that builds a kernel, we need to make
-       sure that the current Kernel in the Cell is initialized.  To do this,
-       if we set something afwMath::SpatialCellCandidate::BAD we have to go
-       back over the Cells and build the next Candidate, until we are out of
-       Candidates (in which case this will get called on no Cells and
-       nRejected=0) or all current Candidates are
-       afwMath::SpatialCellCandidate::GOOD.
-    */
     void reset()          {_nRejected = 0;}
 
     int  getNRejected()   {return _nRejected;}
@@ -495,13 +545,33 @@ private:
 };
 
 
+/**
+ * @class AssessSpatialKernelVisitor
+ * @ingroup ip_diffim
+ *
+ * @brief Asseses the quality of a candidate given a spatial kernel and background model
+ *
+ * @code
+    detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel, spatialBackground, policy);
+    spatialKernelAssessor.reset();
+    kernelCells.visitCandidates(&spatialKernelAssessor, nStarPerCell);
+    nRejected = spatialKernelAssessor.getNRejected();
+ * @endcode
+ *
+ * @note Evaluates the spatial kernel and spatial background at the location of
+ * each candidate, and computes the resulting difference image.  Sets candidate
+ * as afwMath::SpatialCellCandidate::GOOD/BAD if requested by the Policy.
+ * 
+ */
 template<typename PixelT>
 class AssessSpatialKernelVisitor : public afwMath::CandidateVisitor {
     typedef afwImage::MaskedImage<PixelT> MaskedImageT;
 public:
-    AssessSpatialKernelVisitor(afwMath::LinearCombinationKernel::Ptr spatialKernel,
-                               afwMath::Kernel::SpatialFunctionPtr spatialBackground,
-                               lsst::pex::policy::Policy const& policy) :
+    AssessSpatialKernelVisitor(
+        afwMath::LinearCombinationKernel::Ptr spatialKernel,   ///< Spatially varying kernel model
+        afwMath::Kernel::SpatialFunctionPtr spatialBackground, ///< Spatially varying backgound model
+        lsst::pex::policy::Policy const& policy                ///< Policy file directing behavior
+        ) : 
         afwMath::CandidateVisitor(),
         _spatialKernel(spatialKernel),
         _spatialBackground(spatialBackground),
@@ -610,14 +680,40 @@ private:
 };
 
 
+/**
+ * @class BuildSpatialKernelVisitor
+ * @ingroup ip_diffim
+ *
+ * @brief Creates a spatial kernel and background from a list of candidates
+ *
+ * @code
+    detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse, spatialKernelOrder, spatialBgOrder, policy);
+    kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
+    spatialKernelFitter.solveLinearEquation();
+    std::pair<afwMath::LinearCombinationKernel::Ptr, 
+        afwMath::Kernel::SpatialFunctionPtr> KB = spatialKernelFitter.getSpatialModel();
+    spatialKernel     = KB.first;
+    spatialBackground = KB.second; 
+ * @endcode
+ *
+ * @note After visiting all candidates, solveLinearEquation() must be called to
+ * trigger the matrix math.
+ *
+ * @note The user has the option to enfore conservation of the kernel sum across
+ * the image through the policy.  In this case, all terms but the first are fit
+ * for spatial variation.  This requires a little extra code to make sure the
+ * matrices are the correct size, and that it is accessing the appropriate terms
+ * in the matrices when creating the spatial models.
+ * 
+ */
 template<typename PixelT>
 class BuildSpatialKernelVisitor : public afwMath::CandidateVisitor {
 public:
     BuildSpatialKernelVisitor(
-        afwMath::KernelList basisList,  ///< Basis functions used in the fit
-        int const spatialKernelOrder,   ///< Order of spatial kernel variation (cf. lsst::afw::math::PolynomialFunction2)
-        int const spatialBgOrder,       ///< Order of spatial bg variation (cf. lsst::afw::math::PolynomialFunction2)
-        lsst::pex::policy::Policy policy
+        afwMath::KernelList basisList,   ///< Basis functions used in the fit
+        int const spatialKernelOrder,    ///< Order of spatial kernel variation (cf. lsst::afw::math::PolynomialFunction2)
+        int const spatialBgOrder,        ///< Order of spatial bg variation (cf. lsst::afw::math::PolynomialFunction2)
+        lsst::pex::policy::Policy policy ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _basisList(basisList),
@@ -898,4 +994,5 @@ private:
     lsst::pex::policy::Policy _policy;
     bool _constantFirstTerm;  ///< Is the first term spatially invariant?
 };
+
 }}}}
