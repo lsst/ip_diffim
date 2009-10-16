@@ -199,14 +199,13 @@ fitSpatialKernelFromCandidates(
         while (nRejected != 0) {
             pexLogging::TTrace<2>("lsst.ip.diffim.BuildSingleKernelVisitor", 
                                   "Building single kernels A...");
-            singleKernelFitter.reset();
             kernelCells.visitCandidates(&singleKernelFitter, nStarPerCell);
             nRejected = singleKernelFitter.getNRejected();
         }
         
         /* Reject outliers in kernel sum */
         for (int j=0; j < maxKsumIterations; j++) {
-            kernelSumVisitor.reset();
+            kernelSumVisitor.resetDerived();
             kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::AGGREGATE);
             kernelCells.visitCandidates(&kernelSumVisitor, nStarPerCell);
             kernelSumVisitor.processKsumDistribution();
@@ -223,7 +222,6 @@ fitSpatialKernelFromCandidates(
                 while (nRejected != 0) {
                     pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor", 
                                           "Building single kernels B...");
-                    singleKernelFitter.reset();
                     kernelCells.visitCandidates(&singleKernelFitter, nStarPerCell);
                     nRejected = singleKernelFitter.getNRejected();
                 }
@@ -294,7 +292,6 @@ fitSpatialKernelFromCandidates(
             while (nRejected != 0) {
                 pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor", 
                                       "Building single kernels C...");
-                singleKernelFitterPca.reset();
                 kernelCells.visitCandidates(&singleKernelFitterPca, nStarPerCell);
                 nRejected = singleKernelFitterPca.getNRejected();
             }
@@ -315,7 +312,6 @@ fitSpatialKernelFromCandidates(
         
         /* Visitor for the spatial kernel result */
         detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel, spatialBackground, policy);
-        spatialKernelAssessor.reset();
         kernelCells.visitCandidates(&spatialKernelAssessor, nStarPerCell);
         nRejected = spatialKernelAssessor.getNRejected();
         pexLogging::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 

@@ -101,7 +101,13 @@ public:
     double getdkSumMax()  {return _dkSumMax;}
     double getkSumNpts()  {return _kSumNpts;}
 
-    void reset() {
+    /* NOTE - reset() is an overridden method of the base class that gets called
+     * before every visitCandidates().  Since we use this class to visit each
+     * candidate twice, and need to retain the information of the first visit
+     * for the second, we can't clear the values in reset().  Call our mode
+     * resetDerived().
+     */
+    void resetDerived() {
         _kSums.clear();
         _kSumMean =  0.;
         _kSumStd  =  0.;
@@ -128,9 +134,9 @@ public:
                 if (fabs(kCandidate->getKsum() - _kSumMean) > (_dkSumMax)) {
                     kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                     pexLogging::TTrace<4>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
-                                          "Rejecting candidate %d due to bad source kernel sum : (%.2f)",
+                                          "Rejecting candidate %d due to bad source kernel sum : (%.2f %.2f %.2f)",
                                           kCandidate->getId(),
-                                          kCandidate->getKsum());
+                                          kCandidate->getKsum(), _kSumMean, _dkSumMax);
                     _nRejected += 1;
                 }
             }
@@ -730,13 +736,13 @@ public:
         
         /* 
            NOTE : The variable _constantFirstTerm allows that the first
-           component of the basisList has no spatial variation.  This is
-           useful to conserve the kernel sum across the image.  There are 2
-           options to enable this : we can make the input matrices/vectors
-           smaller by (_nkt-1), or we can create _M and _B with empty values
-           for the first component's spatial terms.  The latter could cause
-           problems for the matrix math even though its probably more
-           readable, so we go with the former.
+           component of the basisList has no spatial variation.  This is useful
+           to conserve the kernel sum across the image.  There are 2 ways to
+           implement this : we can make the input matrices/vectors smaller by
+           (_nkt-1), or we can create _M and _B with empty values for the first
+           component's spatial terms.  The latter could cause problems for the
+           matrix math even though its probably more readable, so we go with the
+           former.
         */
         if ((_policy.getString("kernelBasisSet") == "alard-lupton") || _policy.getBool("usePcaForSpatialKernel")) {
             _constantFirstTerm = true;

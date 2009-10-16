@@ -1,4 +1,4 @@
-import os
+import os, sys
 import eups
 import time
 import lsst.afw.image.imageLib as afwImage
@@ -12,14 +12,21 @@ import lsst.afw.display.utils as displayUtils
 
 display = True
 
-Verbosity = 4
+Verbosity = 5
 pexLogging.Trace_setVerbosity("lsst.ip.diffim", Verbosity)
 
 defDataDir   = eups.productDir("afwdata") 
 imageProcDir = eups.productDir("ip_diffim")
 
-defSciencePath  = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2")
-defTemplatePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2_tmpl")
+if len(sys.argv) == 1:
+    defTemplatePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2_tmpl")
+    defSciencePath  = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2")
+elif len(sys.argv) == 3:
+    defTemplatePath = sys.argv[1]
+    defSciencePath  = sys.argv[2]
+else:
+    sys.exit(1)
+    
 defPolicyPath   = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
 defOutputPath   = "diffImage"
 
