@@ -7,5 +7,6 @@
 
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/SpatialModelKernel.h"
+#include "lsst/ip/diffim/SpatialModelVisitors.h"
 
 #endif // LSST_IP_DIFFIM_H

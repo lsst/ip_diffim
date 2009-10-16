@@ -90,9 +90,14 @@ if display:
             
 
     # Background
+    print spatialBg.getParameters()
+    print spatialBg(0, 0)
+    print spatialBg(100, 100)
+    print spatialBg(2, 2034)
     frame = 3
     backgroundIm = afwImage.ImageF(templateMaskedImage.getDimensions())
     ipDiffim.addSomethingToImage(backgroundIm, spatialBg)
+    backgroundIm.writeFits('/tmp/bg.fits')
     ds9.mtv(backgroundIm, frame=frame)
 
     # Diffim!

@@ -300,12 +300,24 @@ namespace diffim {
         bool _regularize;                                        ///< Has a _H matrix
     };
     
+    /**
+     * @brief Helper method to return a pointer to a PsfMatchingFunctor()
+     *
+     * @ingroup ip_diffim
+     *
+     */
     template <typename PixelT>
     typename PsfMatchingFunctor<PixelT>::Ptr
     makePsfMatchingFunctor(lsst::afw::math::KernelList const& basisList) {
         return typename PsfMatchingFunctor<PixelT>::Ptr(new PsfMatchingFunctor<PixelT>(basisList));
     }
 
+    /**
+     * @brief Helper method to return a pointer to a PsfMatchingFunctor() with regularization
+     *
+     * @ingroup ip_diffim
+     *
+     */
     template <typename PixelT>
     typename PsfMatchingFunctor<PixelT>::Ptr
     makePsfMatchingFunctor(lsst::afw::math::KernelList const& basisList,
@@ -313,10 +325,22 @@ namespace diffim {
         return typename PsfMatchingFunctor<PixelT>::Ptr(new PsfMatchingFunctor<PixelT>(basisList, H));
     }
 
+    /**
+     * @brief Helper method to add a Function to an Image
+     *
+     * @ingroup ip_diffim
+     *
+     */
     template <typename PixelT, typename FunctionT>
     void addSomethingToImage(lsst::afw::image::Image<PixelT> &image,
                              FunctionT const &function);
 
+    /**
+     * @brief Helper method to add a double to an Image
+     *
+     * @ingroup ip_diffim
+     *
+     */
     template <typename PixelT>
     void addSomethingToImage(lsst::afw::image::Image<PixelT> &image,
                              double value);

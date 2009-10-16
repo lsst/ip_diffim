@@ -1234,12 +1234,12 @@ std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMa
 template 
 void diffim::addSomethingToImage(
     image::Image<float> &,
-    math::Function2<double> const &
+    math::PolynomialFunction2<double> const &
     );
 template 
 void diffim::addSomethingToImage(
     image::Image<double> &,
-    math::Function2<double> const &
+    math::PolynomialFunction2<double> const &
     );
 
 template 
