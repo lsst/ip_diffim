@@ -1,12 +1,12 @@
 // -*- lsst-c++ -*-
 /**
- * @file
+ * @file SpatialModelKernel.h
  *
  * @brief Class used by SpatialModelCell for spatial Kernel fitting
  *
  * @author Andrew Becker, University of Washington
  *
- * @ingroup ip::diffim
+ * @ingroup ip_diffim
  */
 
 #ifndef LSST_IP_DIFFIM_SPATIALMODELKERNEL_H
@@ -24,20 +24,21 @@
 #include <lsst/sdqa/SdqaRating.h>
 
 #include <lsst/ip/diffim/ImageSubtract.h>
+#include <lsst/ip/diffim/PsfMatchingFunctor.h>
 
 namespace lsst {
 namespace ip {
 namespace diffim {
 
     /** 
-     * 
      * @brief Class stored in SpatialCells for spatial Kernel fitting
      * 
-     * KernelCandidate is a single Kernel derived around a source.  We'll assign
+     * @note KernelCandidate is a single Kernel derived around a source.  We'll assign
      * them to sets of SpatialCells; these sets will then be used to fit a
      * spatial model to the Kernel.
+     *
+     * @ingroup ip_diffim
      */    
-
     template <typename _PixelT>
     class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> > {
     public: 
@@ -51,7 +52,8 @@ namespace diffim {
         typedef boost::shared_ptr<KernelCandidate> Ptr;
         typedef boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
 
-        /** Constructor
+        /**
+	 * @brief Constructor
          *
          * @param xCenter Col position of object
          * @param yCenter Row position of object
@@ -92,13 +94,13 @@ namespace diffim {
         MaskedImagePtr getMiToNotConvolvePtr() {return _miToNotConvolvePtr;}
 
         /** 
-         * Calculate associated difference image
-         * 
-         * If not sent a kernel (e.g. building a spatial approximation) it uses
-         * _kernel and _background
-         *
-         */
+         * @brief Calculate associated difference image using member _kernel/_background
+	 */
         lsst::afw::image::MaskedImage<PixelT> returnDifferenceImage();
+	
+        /** 
+         * @brief Calculate associated difference image using provided kernel and background
+	 */
         lsst::afw::image::MaskedImage<PixelT> returnDifferenceImage(
             lsst::afw::math::Kernel::Ptr kernel,
             double background
@@ -136,8 +138,14 @@ namespace diffim {
     };
 
     /**
-     * Return a KernelCandidate pointer of the right sort
+     * @brief Return a KernelCandidate pointer of the right sort
      *
+     * @param xCenter  X-center of candidate
+     * @param yCenter  Y-center of candidate
+     * @param miToConvolvePtr  Template subimage 
+     * @param miToNotConvolvePtr  Science image subimage
+     *
+     * @ingroup ip_diffim
      */
     template <typename PixelT>
     typename KernelCandidate<PixelT>::Ptr
@@ -151,6 +159,15 @@ namespace diffim {
                                                                                  miToNotConvolvePtr));
     }
 
+    /**
+     * @brief Fit for a spatial model of the kernel and background
+     *
+     * @param kFunctor  Functor used for the single-kernel Psf matching
+     * @param kernelCells  SpatialCellSet containing the candidate kernels
+     * @param policy  Policy for configuration
+     *
+     * @ingroup ip_diffim
+     */
     template<typename PixelT>
     std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
     fitSpatialKernelFromCandidates(
@@ -161,5 +178,5 @@ namespace diffim {
     
 }}}
 
-#endif // LSST_IP_DIFFIM_SPATIALMODELKERNEL_H
+#endif
 

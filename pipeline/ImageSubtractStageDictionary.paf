@@ -184,8 +184,8 @@ candidateResidualStdMax: 1.25
 #   spatialKernelClipping: true
 # In this case you might want to consider upping "maxSpatialIterations" below
 #
-singleKernelClipping:  true
-kernelSumClipping:     true
+singleKernelClipping:  false
+kernelSumClipping:     false
 spatialKernelClipping: true
 
 

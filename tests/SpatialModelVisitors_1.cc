@@ -8,6 +8,7 @@
 
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/logging/Trace.h"
+#include "lsst/ip/diffim/BasisSets.h"
 #include "lsst/ip/diffim/SpatialModelVisitors.h"
 
 using lsst::pex::policy::Policy;

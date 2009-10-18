@@ -23,6 +23,8 @@
 #include <lsst/pex/policy/Policy.h>
 #include <lsst/pex/logging/Trace.h>
 
+#include <lsst/ip/diffim/BasisSets.h>
+#include <lsst/ip/diffim/PsfMatchingFunctor.h>
 #include <lsst/ip/diffim/SpatialModelKernel.h>
 #include <lsst/ip/diffim/SpatialModelVisitors.h>
 
@@ -339,7 +341,6 @@ fitSpatialKernelFromCandidates(
 //
 // Explicit instantiations
 //
-/// \cond
 
 typedef float PixelT;
 template class KernelCandidate<PixelT>;
@@ -350,7 +351,5 @@ fitSpatialKernelFromCandidates<PixelT>(PsfMatchingFunctor<PixelT> &,
                                        lsst::afw::math::SpatialCellSet const&,
                                        lsst::pex::policy::Policy const&);
 
-/// \endcond
-    
 }}} // end of namespace lsst::ip::diffim
 

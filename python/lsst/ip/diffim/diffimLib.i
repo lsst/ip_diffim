@@ -38,6 +38,8 @@ namespace boost {
 #include <lsst/afw.h>
 
 #include <lsst/ip/diffim/ImageSubtract.h>
+#include <lsst/ip/diffim/BasisSets.h>
+#include <lsst/ip/diffim/PsfMatchingFunctor.h>
 #include <lsst/ip/diffim/SpatialModelKernel.h>
 
 #include <lsst/pex/policy/Policy.h>
@@ -79,14 +81,16 @@ def version(HeadURL = r"$HeadURL$"):
 
 %}
 
+/******************************************************************************/
+
 %{
-#include "lsst/ip/diffim/ImageSubtract.h"
+#include "lsst/ip/diffim/PsfMatchingFunctor.h"
 %}
 
 SWIG_SHARED_PTR(PsfMatchingFunctorF, lsst::ip::diffim::PsfMatchingFunctor<float>);
 SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double>);
 
-%include "lsst/ip/diffim/ImageSubtract.h"
+%include "lsst/ip/diffim/PsfMatchingFunctor.h"
 
 %template(PsfMatchingFunctorF)
     lsst::ip::diffim::PsfMatchingFunctor<float>;
@@ -94,6 +98,16 @@ SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double
     lsst::ip::diffim::PsfMatchingFunctor<double>;
 %template(makePsfMatchingFunctorF) lsst::ip::diffim::makePsfMatchingFunctor<float>;
 %template(makePsfMatchingFunctorD) lsst::ip::diffim::makePsfMatchingFunctor<double>;
+
+%template(pair_Kernel_double)   std::pair<lsst::afw::math::Kernel::Ptr, double>;
+
+/******************************************************************************/
+
+%{
+#include "lsst/ip/diffim/ImageSubtract.h"
+%}
+
+%include "lsst/ip/diffim/ImageSubtract.h"
 
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
@@ -121,6 +135,11 @@ SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double>;
+
+%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<float,  lsst::afw::math::PolynomialFunction2<double> >;
+%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<double, lsst::afw::math::PolynomialFunction2<double> >;
+%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<float>;
+%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<double>;
 
 /******************************************************************************/
 
@@ -153,16 +172,12 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 
 %include "lsst/ip/diffim/SpatialModelKernel.h"
 
-%template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>;
-%template(pair_Kernel_double)   std::pair<lsst::afw::math::Kernel::Ptr, double>;
-//%template(eigenMatrix)          boost::shared_ptr<Eigen::MatrixXd>;
-
 %KernelCandidate(F, float);
 %template(fitSpatialKernelFromCandidates) lsst::ip::diffim::fitSpatialKernelFromCandidates<float>;
 
-%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<float,  lsst::afw::math::PolynomialFunction2<double> >;
-%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<double, lsst::afw::math::PolynomialFunction2<double> >;
-%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<float>;
-%template(addSomethingToImage)   lsst::ip::diffim::addSomethingToImage<double>;
+%template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>;
 
+/******************************************************************************/
+
+//%template(eigenMatrix)          boost::shared_ptr<Eigen::MatrixXd>;
 

@@ -18,18 +18,18 @@ class DiffimTestCases(unittest.TestCase):
         del self.function
 
     def testDouble(self):
-        img = afwImage.ImageF(10,10)
+        img = afwImage.ImageF(10,10,0)
         ipDiffim.addSomethingToImage(img, self.value)
         for j in range(img.getHeight()):
             for i in range(img.getWidth()):
                 self.assertEqual(img.get(i,j), self.value)
 
-#    def testFunction(self):
-#        img = afwImage.ImageF(10,10)
-#        ipDiffim.addSomethingToImage(img, self.function)
-#        for j in range(img.getHeight()):
-#            for i in range(img.getWidth()):
-#                self.assertEqual(img.get(i,j), self.function(i,j))
+    def testFunction(self):
+        img = afwImage.ImageF(10,10,0)
+        ipDiffim.addSomethingToImage(img, self.function)
+        for j in range(img.getHeight()):
+            for i in range(img.getWidth()):
+                self.assertEqual(img.get(i,j), self.function(i,j))
 
 #####
         

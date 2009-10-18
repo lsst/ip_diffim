@@ -12,7 +12,7 @@ import lsst.afw.display.utils as displayUtils
 
 display = True
 
-Verbosity = 5
+Verbosity = 4
 pexLogging.Trace_setVerbosity("lsst.ip.diffim", Verbosity)
 
 defDataDir   = eups.productDir("afwdata") 
@@ -90,14 +90,9 @@ if display:
             
 
     # Background
-    print spatialBg.getParameters()
-    print spatialBg(0, 0)
-    print spatialBg(100, 100)
-    print spatialBg(2, 2034)
     frame = 3
-    backgroundIm = afwImage.ImageF(templateMaskedImage.getDimensions())
+    backgroundIm = afwImage.ImageF(templateMaskedImage.getDimensions(), 0)
     ipDiffim.addSomethingToImage(backgroundIm, spatialBg)
-    backgroundIm.writeFits('/tmp/bg.fits')
     ds9.mtv(backgroundIm, frame=frame)
 
     # Diffim!

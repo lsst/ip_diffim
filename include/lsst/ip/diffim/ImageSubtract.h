@@ -20,12 +20,8 @@
 #include <boost/shared_ptr.hpp>
 
 #include <lsst/pex/policy/Policy.h>
-#include <lsst/afw/math/Kernel.h>
-#include <lsst/afw/math/KernelFunctions.h>
-#include <lsst/afw/math/Function.h>
-#include <lsst/afw/math/SpatialCell.h>
-#include <lsst/afw/image/Mask.h>
-#include <lsst/afw/image/MaskedImage.h>
+#include <lsst/afw/math.h>
+#include <lsst/afw/image.h>
 #include <lsst/afw/detection/Footprint.h>
 
 namespace lsst {
@@ -37,21 +33,23 @@ namespace diffim {
     std::string const diffimStampCandidateStr = "DIFFIM_STAMP_CANDIDATE";
     std::string const diffimStampUsedStr      = "DIFFIM_STAMP_USED";
     
-    /** Uses a functor to accumulate Mask bits
-     *
-     * @ingroup diffim
+    /**
+     * @brief Uses a functor to accumulate Mask bits
      *
      * @note Search through a footprint for any set mask fits.
      * 
      * @note May need to modify this as our mask planes evolve to include
      * non-bad mask information
      *
-     * Example usage : 
-     *  FindSetBits<image::Mask<image::MaskPixel> > count(mask); 
-     *  count.reset(); 
-     *  count.apply(footprint); 
-     *  nSet = count.getBits();
+     * @code
+        FindSetBits<image::Mask<image::MaskPixel> > count(mask); 
+        count.reset(); 
+        count.apply(footprint); 
+        nSet = count.getBits();
+     * @endcode
      * 
+     * @ingroup ip_diffim
+     *
      */
     template <typename MaskT>
     class FindSetBits : public lsst::afw::detection::FootprintFunctor<MaskT> {
@@ -76,15 +74,13 @@ namespace diffim {
         typename MaskT::Pixel _bits;
     };
 
-    /** Uses a functor to calculate difference image statistics
+    /**
+     * @brief Class to calculate difference image statistics
      *
-     * @ingroup diffim
-     *
-     * @note Looks like this is (almost) implemented in lsst/afw/math/Statistics.h
-     * 
      * @note Find mean and unbiased variance of pixel residuals in units of
      * sqrt(variance)
      * 
+     * @ingroup ip_diffim
      */
     template <typename PixelT>
     class ImageStatistics {
@@ -143,64 +139,18 @@ namespace diffim {
     };
 
 
-    /* Build a set of Delta Function basis kernels
+    /**
+     * @brief Execute fundamental task of convolving template and subtracting it from science image
      * 
-     * @note Total number of basis functions is width*height
+     * @note This version accepts a MaskedImage for the template
      * 
-     * @param width  Width of basis set (cols)
-     * @param height Height of basis set (rows)
-     */    
-    lsst::afw::math::KernelList generateDeltaFunctionBasisSet(
-        unsigned int width,
-        unsigned int height
-        );
-
-    /* Build a regularization matrix for Delta function kernels
+     * @param imageToConvolve  MaskedImage to apply convolutionKernel to
+     * @param imageToNotConvolve  MaskedImage from which convolved imageToConvolve is subtracted 
+     * @param convolutionKernel  Kernel to apply to imageToConvolve
+     * @param background  Background scalar or function to subtract after convolution
+     * @param invert  Invert the output difference image
      * 
-     * @param width            Width of basis set you want to regularize
-     * @param height           Height of basis set you want to regularize
-     * @param order            Which derivative you expect to be smooth (derivative order+1 is penalized) 
-     * @param boundary_style   0 = unwrapped, 1 = wrapped, 2 = order-tappered ('order' is highest used) 
-     * @param difference_style 0 = forward, 1 = central
-     * @param printB           debugging
-     */    
-    boost::shared_ptr<Eigen::MatrixXd> generateFiniteDifferenceRegularization(
-        unsigned int width,
-        unsigned int height,
-        unsigned int order,
-	unsigned int boundary_style = 1, 
-	unsigned int difference_style = 0,
-	bool printB=false
-        );
-
-    /** Renormalize a list of basis kernels
-     *
-     * @note Renormalization means make Ksum_0 = 1.0, Ksum_i = 0.0, K_i.dot.K_i = 1.0
-     * @note Output list of shared pointers to FixedKernels
-     *
-     * @param kernelListIn input list of basis kernels
-     */
-    lsst::afw::math::KernelList renormalizeKernelList(lsst::afw::math::KernelList const &kernelListIn);
-
-    /** Build a set of Alard/Lupton basis kernels
-     *
-     * @note Should consider implementing as SeparableKernels for additional speed,
-     * but this will make the normalization a bit more complicated
-     * 
-     * @param halfWidth  size is 2*N + 1
-     * @param nGauss     number of gaussians
-     * @param sigGauss   Widths of the Gaussian Kernels
-     * @param degGauss   Local spatial variation of bases
-     */    
-    lsst::afw::math::KernelList generateAlardLuptonBasisSet(
-        unsigned int halfWidth,                ///< size is 2*N + 1
-        unsigned int nGauss,                   ///< number of gaussians
-        std::vector<double> const& sigGauss,   ///< width of the gaussians
-        std::vector<int>    const& degGauss    ///< local spatial variation of gaussians
-        );
-
-    /*
-     * Execute fundamental task of convolving template and subtracting it from science image
+     * @ingroup ip_diffim
      */
     template <typename PixelT, typename BackgroundT>
     lsst::afw::image::MaskedImage<PixelT> convolveAndSubtract(
@@ -211,6 +161,19 @@ namespace diffim {
         bool invert=true
         );
 
+    /**
+     * @brief Execute fundamental task of convolving template and subtracting it from science image
+     * 
+     * @note This version accepts an Image for the template, and is thus faster during convolution
+     * 
+     * @param imageToConvolve  Image to apply convolutionKernel to
+     * @param imageToNotConvolve  MaskedImage from which convolved imageToConvolve is subtracted 
+     * @param convolutionKernel  Kernel to apply to imageToConvolve
+     * @param background  Background scalar or function to subtract after convolution
+     * @param invert  Invert the output difference image
+     * 
+     * @ingroup ip_diffim
+     */
     template <typename PixelT, typename BackgroundT>
     lsst::afw::image::MaskedImage<PixelT> convolveAndSubtract(
         lsst::afw::image::Image<PixelT> const& imageToConvolve,
@@ -220,13 +183,16 @@ namespace diffim {
         bool invert=true
         );
 
-    /** Search through images for Footprints with no masked pixels
+    /**
+     * @brief Search through images for Footprints with no masked pixels
      *
-     * @note Uses Eigen math backend
+     * @note Runs detection on the template; searches through both images for masked pixels
      *
-     * @param imageToConvolve  MaskedImage to convolve with Kernel
+     * @param imageToConvolve  MaskedImage that will be convolved with kernel; detection is run on this image
      * @param imageToNotConvolve  MaskedImage to subtract convolved template from
      * @param policy  Policy for operations; in particular object detection
+     *
+     * @ingroup ip_diffim
      */    
     template <typename PixelT>
     std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
@@ -235,101 +201,25 @@ namespace diffim {
         lsst::pex::policy::Policy             const& policy
         );
 
+    /**
+     * @brief Turns a 2-d Image into a 2-d Eigen Matrix
+     *
+     * @param img  Image whose pixel values are read into an Eigen::MatrixXd
+     *
+     * @ingroup ip_diffim
+     */
     template <typename PixelT>
     Eigen::MatrixXd imageToEigenMatrix(
         lsst::afw::image::Image<PixelT> const& img
         );
     
-    /** Functor to create PSF Matching Kernel
-     *
-     * @ingroup diffim
-     *
-     * @note This class owns the functionality to make a single difference
-     * imaging kernel around one object realized in 2 different images.  If
-     * constructed with a regularization matrix, will use it by default.  This
-     * creates the M and B vectors that are used to solve for the kernel
-     * parameters 'x' as in Mx = B.  This creates a single kernel around a
-     * single object, and operates in tandem with the KernelCandidate +
-     * BuildSingleKernelVisitor classes for the spatial modeling.
-     * 
-     */
-    template <typename PixelT, typename VarT=lsst::afw::image::VariancePixel>
-    class PsfMatchingFunctor {
-    public:
-        typedef boost::shared_ptr<PsfMatchingFunctor> Ptr;
-        typedef typename lsst::afw::image::MaskedImage<PixelT>::xy_locator xy_locator;
-        typedef typename lsst::afw::image::Image<VarT>::xy_locator         xyi_locator;
-
-        PsfMatchingFunctor(
-            lsst::afw::math::KernelList const& basisList
-            );
-        PsfMatchingFunctor(
-            lsst::afw::math::KernelList const& basisList,
-            boost::shared_ptr<Eigen::MatrixXd> const& H
-            );
-        virtual ~PsfMatchingFunctor() {};
-
-        /* Shallow copy only; shared matrix product uninitialized */
-        PsfMatchingFunctor(const PsfMatchingFunctor<PixelT,VarT> &rhs);
-
-        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolution();
-        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolutionUncertainty();
-        
-        /** Access to least squares info
-         */
-        std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> > getAndClearMB();
-
-        /** Access to basis list
-         */
-        lsst::afw::math::KernelList getBasisList() const { return _basisList; }
-
-        /* Create PSF matching kernel */
-        void apply(lsst::afw::image::Image<PixelT> const& imageToConvolve,
-                   lsst::afw::image::Image<PixelT> const& imageToNotConvolve,
-                   lsst::afw::image::Image<VarT>   const& varianceEstimate,
-                   lsst::pex::policy::Policy       const& policy
-            );
-
-    protected:
-        lsst::afw::math::KernelList const _basisList;            ///< List of Kernel basis functions
-        boost::shared_ptr<Eigen::MatrixXd> _M;                   ///< Least squares matrix
-        boost::shared_ptr<Eigen::VectorXd> _B;                   ///< Least squares vector
-        boost::shared_ptr<Eigen::VectorXd> _Soln;                ///< Least square solution
-        boost::shared_ptr<Eigen::MatrixXd> const _H;             ///< Regularization matrix
-        bool _initialized;                                       ///< Has been solved for
-        bool _regularize;                                        ///< Has a _H matrix
-    };
-    
-    /**
-     * @brief Helper method to return a pointer to a PsfMatchingFunctor()
-     *
-     * @ingroup ip_diffim
-     *
-     */
-    template <typename PixelT>
-    typename PsfMatchingFunctor<PixelT>::Ptr
-    makePsfMatchingFunctor(lsst::afw::math::KernelList const& basisList) {
-        return typename PsfMatchingFunctor<PixelT>::Ptr(new PsfMatchingFunctor<PixelT>(basisList));
-    }
-
-    /**
-     * @brief Helper method to return a pointer to a PsfMatchingFunctor() with regularization
-     *
-     * @ingroup ip_diffim
-     *
-     */
-    template <typename PixelT>
-    typename PsfMatchingFunctor<PixelT>::Ptr
-    makePsfMatchingFunctor(lsst::afw::math::KernelList const& basisList,
-                           boost::shared_ptr<Eigen::MatrixXd> const H) {
-        return typename PsfMatchingFunctor<PixelT>::Ptr(new PsfMatchingFunctor<PixelT>(basisList, H));
-    }
-
     /**
      * @brief Helper method to add a Function to an Image
      *
-     * @ingroup ip_diffim
+     * @param image  Image to be modified
+     * @param function  Funtion that is evaluated at all pixel values and added to image
      *
+     * @ingroup ip_diffim
      */
     template <typename PixelT, typename FunctionT>
     void addSomethingToImage(lsst::afw::image::Image<PixelT> &image,
@@ -338,8 +228,10 @@ namespace diffim {
     /**
      * @brief Helper method to add a double to an Image
      *
-     * @ingroup ip_diffim
+     * @param image  Image to be modified
+     * @param value  Value to be added to image
      *
+     * @ingroup ip_diffim
      */
     template <typename PixelT>
     void addSomethingToImage(lsst::afw::image::Image<PixelT> &image,

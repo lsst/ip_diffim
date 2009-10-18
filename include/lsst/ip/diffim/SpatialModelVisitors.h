@@ -10,8 +10,12 @@
  * namespace but then they could not be unit tested.  These are
  * implementation and not API, and will not be swigged.
  *
- * @ingroup ip::diffim
+ * @ingroup ip_diffim
  */
+
+#ifndef LSST_IP_DIFFIM_SPATIALMODELVISITORS_H
+#define LSST_IP_DIFFIM_SPATIALMODELVISITORS_H
+
 #include <boost/timer.hpp> 
 
 #include <lsst/afw/image/Image.h>
@@ -65,7 +69,7 @@ namespace detail {
     int nRejected = kernelSumVisitor.getNRejected();
  * @endcode
  *
-
+ *
  * @note The class has 2 processing modes; the first AGGREGATES kernel sums
  * across all candidates.  You must the process the distribution to set member
  * variables representing the mean and standard deviation of the kernel sums.
@@ -1044,3 +1048,5 @@ private:
 };
 
 }}}}
+
+#endif
