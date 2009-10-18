@@ -967,8 +967,8 @@ public:
         */
         afwImage::Image<double> kImage(_spatialKernel->getDimensions());
         double kSum = _spatialKernel->computeImage(kImage, false, 
-                                                   kCandidate->getXCenter(),
-                                                   kCandidate->getYCenter());
+                                                   afwImage::indexToPosition(kCandidate->getXCenter()),
+                                                   afwImage::indexToPosition(kCandidate->getYCenter()));
         boost::shared_ptr<afwMath::Kernel>
             kernelPtr(new afwMath::FixedKernel(kImage));
         /* </hack> */

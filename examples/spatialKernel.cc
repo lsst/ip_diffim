@@ -48,7 +48,7 @@ int main() {
     mimg2->writeFits("mimg2");
 
     afwImage::Image<double> kImage(spatialKernel->getDimensions());
-    (void)spatialKernel->computeImage(kImage, false, loc, loc);
+    (void)spatialKernel->computeImage(kImage, false, afwImage::indexToPosition(loc), afwImage::indexToPosition(loc));
     kImage.writeFits("kernel.fits");
     
 }

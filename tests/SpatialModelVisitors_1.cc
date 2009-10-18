@@ -453,7 +453,7 @@ BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
          * evaluated at its position */
         afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand(new KernelCandidate<PixelT>(loc, loc, tmi, smi));
         afwImage::Image<double> kImage(spatialKernel->getDimensions());
-        (void)spatialKernel->computeImage(kImage, false, loc, loc);
+        (void)spatialKernel->computeImage(kImage, false, afwImage::indexToPosition(loc), afwImage::indexToPosition(loc));
         boost::shared_ptr<afwMath::Kernel>
             kernelPtr(new afwMath::FixedKernel(kImage));
         kImage.writeFits("/tmp/kernel1.fits");
