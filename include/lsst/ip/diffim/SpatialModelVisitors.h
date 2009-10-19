@@ -967,14 +967,14 @@ public:
         */
         afwImage::Image<double> kImage(_spatialKernel->getDimensions());
         double kSum = _spatialKernel->computeImage(kImage, false, 
-                                                   afwImage::indexToPosition(kCandidate->getXCenter()),
-                                                   afwImage::indexToPosition(kCandidate->getYCenter()));
+                                                   afwImage::indexToPosition(static_cast<int>(kCandidate->getXCenter())),
+                                                   afwImage::indexToPosition(static_cast<int>(kCandidate->getYCenter())));
         boost::shared_ptr<afwMath::Kernel>
             kernelPtr(new afwMath::FixedKernel(kImage));
         /* </hack> */
         
-        double background = (*_spatialBackground)(afwImage::indexToPosition(kCandidate->getXCenter()),
-						  afwImage::indexToPosition(kCandidate->getYCenter()));
+        double background = (*_spatialBackground)(afwImage::indexToPosition(static_cast<int>(kCandidate->getXCenter())),
+                                                  afwImage::indexToPosition(static_cast<int>(kCandidate->getYCenter())));
         
         MaskedImageT diffim = kCandidate->returnDifferenceImage(kernelPtr, background);
 	

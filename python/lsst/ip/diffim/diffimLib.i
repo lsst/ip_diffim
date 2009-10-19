@@ -179,5 +179,14 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 
 /******************************************************************************/
 
-//%template(eigenMatrix)          boost::shared_ptr<Eigen::MatrixXd>;
+%include "lsst/ip/diffim/BasisSets.h"
+
+/******************************************************************************/
+/* I shouldn't have to do this but it exists noplace else, so... */
+
+%{
+#include "Eigen/Core"
+%}
+
+%template(eigenMatrix) boost::shared_ptr<Eigen::MatrixXd>;
 
