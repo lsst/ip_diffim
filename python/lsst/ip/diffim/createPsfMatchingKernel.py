@@ -43,7 +43,9 @@ def createPsfMatchingKernel(templateMaskedImage,
         kernelCellSet.insertCandidate(cand)
 
     # Create the Psf matching kernel
-    spatialKernel, spatialBg = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
+    KB = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
+    spatialKernel = KB.first
+    spatialBg = KB.second
 
     return spatialKernel, spatialBg, kernelCellSet
 

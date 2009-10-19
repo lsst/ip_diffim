@@ -32,7 +32,7 @@ def subtractMaskedImage(templateMaskedImage,
                                                                       footprints)
     
     # no need to subtract a background in subtraction as we'll do so in a moment
-    if policy.exists("backgroundPolicy"):
+    if policy.get("useAfwBackground"):
         background = 0.                  
     else:
         background = spatialBg
@@ -47,9 +47,9 @@ def subtractMaskedImage(templateMaskedImage,
                  "Total time for final convolve and subtract : %.2f s" % (t1-t0))
 
     #
-    # Maybe subtract a background model from the difference image
+    # Instead subtract afw's background model from the difference image
     #
-    if policy.exists("backgroundPolicy"):
+    if policy.get("useAfwBackground"):
         algorithm = policy.get("backgroundPolicy.algorithm")
         binsize   = policy.get("backgroundPolicy.binsize")
 

@@ -236,14 +236,21 @@ spatialKernelOrder: 2
 spatialBgOrder:     1
 
 ######
-# Do we subtract off the differential background independent of ip_diffim?
+# Control for background subtraction
 # 
-#backgroundPolicy: {
-#    # how to interpolate the background values
-#    algorithm:  "NATURAL_SPLINE" 
-#    # how large regions of the sky should be used for each background point
-#    binsize:    128
-#}
+# algorithm = how to interpolate the background values
+# binsize = how large regions of the sky should be used for each background point
+#
+backgroundPolicy: {
+    algorithm:  "NATURAL_SPLINE" 
+    binsize:    256
+}
+
+######
+# Control if we use afwMath.BackgroundControl to subtract off its own
+# determination of the background or not
+# 
+useAfwBackground: false
 
 #####
 # Chops up the image into cells of sizeCellX x sizeCellY pixels
