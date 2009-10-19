@@ -100,7 +100,7 @@ namespace diffim {
             reset();
             for (int y = 0; y != image.getHeight(); ++y) {
                 for (x_iterator ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
-                    if ((*ptr).mask() == 0) {
+		    if ((*ptr).mask() == 0) {
                         double const ivar = 1. / (*ptr).variance();
                         _xsum  += (*ptr).image() * sqrt(ivar);
                         _x2sum += (*ptr).image() * (*ptr).image() * ivar;

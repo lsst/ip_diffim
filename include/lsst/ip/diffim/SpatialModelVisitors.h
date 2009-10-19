@@ -973,13 +973,11 @@ public:
             kernelPtr(new afwMath::FixedKernel(kImage));
         /* </hack> */
         
-        double background = (*_spatialBackground)(kCandidate->getXCenter(), kCandidate->getYCenter());
+        double background = (*_spatialBackground)(afwImage::indexToPosition(kCandidate->getXCenter()),
+						  afwImage::indexToPosition(kCandidate->getYCenter()));
         
         MaskedImageT diffim = kCandidate->returnDifferenceImage(kernelPtr, background);
-
-        kImage.writeFits("/tmp/kernel2.fits");
-        diffim.writeFits("/tmp/diffim");
-
+	
         _imstats.apply(diffim);
         kCandidate->setChi2(_imstats.getVariance());
         

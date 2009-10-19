@@ -30,7 +30,7 @@ int main() {
     for (unsigned int i = 0, idx = 0; i < nBases; i++) {
         kCoeffs.push_back(std::vector<double>(spatialKernelFunction->getNParameters()));
         for (unsigned int j = 0; j < spatialKernelFunction->getNParameters(); j++) {
-            kCoeffs[i][j] = sqrt(sqrt(idx++));
+	   kCoeffs[i][j] = sqrt(sqrt(sqrt(idx++)));
         }
     }
     spatialKernel->setSpatialParameters(kCoeffs);

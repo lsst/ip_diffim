@@ -21,6 +21,8 @@ using namespace lsst::ip::diffim;
 typedef float PixelT;
 typedef afwImage::Image<afwMath::Kernel::Pixel> ImageT;
 
+//Trace::setVerbosity("lsst.ip.diffim", 6);
+
 BOOST_AUTO_TEST_CASE(KernelSumVisitor) {
     Policy::Ptr policy(new Policy);
     policy->set("kernelSumClipping", false);
@@ -409,10 +411,10 @@ BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
     /* Set up some fake terms */
     std::vector<std::vector<double> > kCoeffs;
     kCoeffs.reserve(nBases);
-    for (unsigned int i = 0, idx = 0; i < nBases; i++) {
+    for (unsigned int i = 0, idx = 1; i < nBases; i++) {
         kCoeffs.push_back(std::vector<double>(spatialKernelFunction->getNParameters()));
         for (unsigned int j = 0; j < spatialKernelFunction->getNParameters(); j++) {
-            kCoeffs[i][j] = sqrt(idx++);
+	    kCoeffs[i][j] = 1.e-4 * (idx++);
         }
     }
     spatialKernel->setSpatialParameters(kCoeffs);
@@ -422,7 +424,7 @@ BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
     spatialBg->setParameters(bgCoeffs);
 
     {
-        Trace::setVerbosity("lsst.ip.diffim", 6);
+
         /* Manually create a canidate with the spatial kernel, and
          * then assess its quality with the same spatial kernel */
 
@@ -430,6 +432,9 @@ BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
         afwImage::MaskedImage<PixelT>::Ptr mimg1(
             new afwImage::MaskedImage<PixelT>(100,100)
             );
+	*mimg1->getImage() = 0;
+	*mimg1->getVariance() = 1;
+	*mimg1->getMask() = 0x0;
         *mimg1->at(loc, loc) = afwImage::MaskedImage<PixelT>::Pixel(1, 0x0, 1);
         afwImage::MaskedImage<PixelT>::Ptr mimg2(
             new afwImage::MaskedImage<PixelT>(mimg1->getDimensions())
@@ -446,22 +451,31 @@ BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
             new afwImage::MaskedImage<PixelT>(*mimg2, bbox)
             );
 
-        tmi->writeFits("/tmp/tmi");
-        smi->writeFits("/tmp/smi");
-
         /* Create the candidate and give it the spatial kernel
          * evaluated at its position */
-        afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand(new KernelCandidate<PixelT>(loc, loc, tmi, smi));
+        afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand1(new KernelCandidate<PixelT>(loc, loc, tmi, smi));
         afwImage::Image<double> kImage(spatialKernel->getDimensions());
-        (void)spatialKernel->computeImage(kImage, false, afwImage::indexToPosition(loc), afwImage::indexToPosition(loc));
+        double kSum = spatialKernel->computeImage(kImage, false, afwImage::indexToPosition(loc), afwImage::indexToPosition(loc));
         boost::shared_ptr<afwMath::Kernel>
             kernelPtr(new afwMath::FixedKernel(kImage));
-        kImage.writeFits("/tmp/kernel1.fits");
-        dynamic_cast<KernelCandidate<PixelT> *>(&(*cand))->setKernel(kernelPtr);
+        dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->setKernel(kernelPtr);
+        dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->setBackground(0.);
+        detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor1(spatialKernel, spatialBg, *policy);
+        spatialKernelAssessor1.processCandidate(&(*cand1));
+        BOOST_CHECK_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
 
-        /* Process it! */
-        detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel, spatialBg, *policy);
-        spatialKernelAssessor.processCandidate(&(*cand));
+	/* Now tweak the kernel to create a bad diffim, on purpose */
+	for (unsigned int i = 0; i < spatialBg->getNParameters(); i++) {
+	   bgCoeffs[i] = kSum * i;
+	}
+	spatialBg->setParameters(bgCoeffs);
+
+        afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand2(new KernelCandidate<PixelT>(loc, loc, tmi, smi));
+        dynamic_cast<KernelCandidate<PixelT> *>(&(*cand2))->setKernel(kernelPtr);
+        dynamic_cast<KernelCandidate<PixelT> *>(&(*cand2))->setBackground(0.);
+        detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor2(spatialKernel, spatialBg, *policy);
+        spatialKernelAssessor2.processCandidate(&(*cand2));
+        BOOST_CHECK_EQUAL(cand2->getStatus(), afwMath::SpatialCellCandidate::BAD);
     }
 }
 
