@@ -221,9 +221,9 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */
-    template <typename PixelT, typename FunctionT>
+    template <typename PixelT>
     void addSomethingToImage(lsst::afw::image::Image<PixelT> &image,
-                             FunctionT const &function);
+                             lsst::afw::math::Function2<double> const &function);
 
     /**
      * @brief Helper method to add a double to an Image

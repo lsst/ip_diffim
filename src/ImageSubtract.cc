@@ -61,9 +61,9 @@ Eigen::MatrixXd diffim::imageToEigenMatrix(
  * in general not true
  *
  */
-template <typename PixelT, typename FunctionT>
-void diffim::addSomethingToImage(image::Image<PixelT> &image,
-                                 FunctionT const &function
+template <typename PixelT>
+void diffim::addSomethingToImage(lsst::afw::image::Image<PixelT> &image,
+                                 lsst::afw::math::Function2<double> const &function
     ) {
     
     // Set the pixels row by row, to avoid repeated checks for end-of-row
@@ -435,12 +435,12 @@ std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMa
 template 
 void diffim::addSomethingToImage(
     image::Image<float> &,
-    math::PolynomialFunction2<double> const &
+    math::Function2<double> const &
     );
 template 
 void diffim::addSomethingToImage(
     image::Image<double> &,
-    math::PolynomialFunction2<double> const &
+    math::Function2<double> const &
     );
 
 template 
