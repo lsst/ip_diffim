@@ -93,7 +93,7 @@ if display:
     frame = 3
     backgroundIm = afwImage.ImageF(templateMaskedImage.getWidth(),
                                    templateMaskedImage.getHeight(), 0)
-    ipDiffim.addSomethingToImage(backgroundIm, spatialBg)
+    ipDiffim.addToImage(backgroundIm, spatialBg)
     ds9.mtv(backgroundIm, frame=frame)
 
     # Diffim!

@@ -64,8 +64,8 @@ Eigen::MatrixXd imageToEigenMatrix(
  *
  */
 template <typename PixelT>
-void addSomethingToImage(afwImage::Image<PixelT> &image,
-                         afwMath::Function2<double> const &function
+void addToImage(afwImage::Image<PixelT> &image,
+                afwMath::Function2<double> const &function
     ) {
     
     // Set the pixels row by row, to avoid repeated checks for end-of-row
@@ -83,8 +83,8 @@ void addSomethingToImage(afwImage::Image<PixelT> &image,
  * @brief Adds a scalar to an Image
  */
 template <typename PixelT>
-void addSomethingToImage(afwImage::Image<PixelT> &image,
-                         double value
+void addToImage(afwImage::Image<PixelT> &image,
+                double value
     ) {
     if (value != 0.0) {
         image += value;
@@ -121,7 +121,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     afwMath::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false);
     
     /* Add in background */
-    addSomethingToImage(*(convolvedMaskedImage.getImage()), background);
+    addToImage(*(convolvedMaskedImage.getImage()), background);
     
     /* Do actual subtraction */
     convolvedMaskedImage -= imageToNotConvolve;
@@ -168,7 +168,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     afwMath::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, convolutionKernel, false);
     
     /* Add in background */
-    addSomethingToImage(*(convolvedMaskedImage.getImage()), background);
+    addToImage(*(convolvedMaskedImage.getImage()), background);
     
     /* Do actual subtraction */
     *convolvedMaskedImage.getImage() -= *imageToNotConvolve.getImage();
@@ -435,23 +435,23 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
     pexPolicy::Policy  const &);
 
 template 
-void addSomethingToImage(
+void addToImage(
     afwImage::Image<float> &,
     afwMath::Function2<double> const &
     );
 template 
-void addSomethingToImage(
+void addToImage(
     afwImage::Image<double> &,
     afwMath::Function2<double> const &
     );
 
 template 
-void addSomethingToImage(
+void addToImage(
     afwImage::Image<float> &,
     double
     );
 template 
-void addSomethingToImage(
+void addToImage(
     afwImage::Image<double> &,
     double
     );
