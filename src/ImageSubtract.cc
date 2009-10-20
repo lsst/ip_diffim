@@ -47,7 +47,8 @@ Eigen::MatrixXd imageToEigenMatrix(
     Eigen::MatrixXd M = Eigen::MatrixXd::Zero(rows, cols);
     for (int y = 0; y != img.getHeight(); ++y) {
         int x = 0;
-        for (typename afwImage::Image<PixelT>::x_iterator ptr = img.row_begin(y); ptr != img.row_end(y); ++ptr, ++x) {
+        for (typename afwImage::Image<PixelT>::x_iterator ptr = img.row_begin(y); 
+             ptr != img.row_end(y); ++ptr, ++x) {
             // M is addressed row, col
             M(y,x) = *ptr;
         }
@@ -98,7 +99,9 @@ void addToImage(afwImage::Image<PixelT> &image,
  * @note If you convolve the science image, D = (K*I + bg) - T, set invert=False
  *
  * @note The template is taken to be an MaskedImage; this takes c 1.6 times as long
- * as using an Image
+ * as using an Image.
+ *
+ * @note Instantiated such that background can be a double or Function2D
  *
  * @return Difference image
  *
@@ -107,9 +110,9 @@ void addToImage(afwImage::Image<PixelT> &image,
 template <typename PixelT, typename BackgroundT>
 afwImage::MaskedImage<PixelT> convolveAndSubtract(
     afwImage::MaskedImage<PixelT> const &imageToConvolve,    ///< Image T to convolve with Kernel
-    afwImage::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
-    afwMath::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used for convolution
-    BackgroundT background,                                  ///< Differential background function or scalar
+    afwImage::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract T from
+    afwMath::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used
+    BackgroundT background,                                  ///< Differential background 
     bool invert                                              ///< Invert the output difference image
     ) {
 
@@ -147,6 +150,8 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
  *
  * @note If you convolve the science image, D = (K*I + bg) - T, set invert=False
  * 
+ * @note Instantiated such that background can be a double or Function2D
+ *
  * @return Difference image
  *
  * @ingroup diffim
@@ -154,9 +159,9 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
 template <typename PixelT, typename BackgroundT>
 afwImage::MaskedImage<PixelT> convolveAndSubtract(
     afwImage::Image<PixelT> const &imageToConvolve,          ///< Image T to convolve with Kernel
-    afwImage::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
-    afwMath::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used for convolution
-    BackgroundT background,                                  ///< Differential background function or scalar
+    afwImage::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract T from
+    afwMath::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used
+    BackgroundT background,                                  ///< Differential background 
     bool invert                                              ///< Invert the output difference image
     ) {
     
@@ -228,7 +233,8 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
     // Add to both images so mask planes are aligned
     int diffimMaskPlane = imageToConvolve.getMask()->addMaskPlane(diffimStampCandidateStr);
     (void)imageToNotConvolve.getMask()->addMaskPlane(diffimStampCandidateStr);
-    afwImage::MaskPixel const diffimBitMask = imageToConvolve.getMask()->getPlaneBitMask(diffimStampCandidateStr);
+    afwImage::MaskPixel const diffimBitMask = 
+        imageToConvolve.getMask()->getPlaneBitMask(diffimStampCandidateStr);
 
     // Add in new plane that will tell us which ones are used
     (void)imageToConvolve.getMask()->addMaskPlane(diffimStampUsedStr);
@@ -270,7 +276,8 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
 
         // Iterate over footprints, look for "good" ones
         nCleanFp = 0;
-        for (std::vector<afwDetect::Footprint::Ptr>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
+        for (std::vector<afwDetect::Footprint::Ptr>::iterator i = footprintListIn.begin(); 
+             i != footprintListIn.end(); ++i) {
             // footprint has too many pixels
             if (static_cast<unsigned int>((*i)->getNpix()) > fpNpixMax) {
                 pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
@@ -343,14 +350,16 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
             itcFunctor.apply(*fpGrow);
             if (itcFunctor.getBits() > 0) {
                 pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                                  "Footprint has masked pix (val=%d) in image to convolve", itcFunctor.getBits()); 
+                                  "Footprint has masked pix (val=%d) in image to convolve", 
+                                  itcFunctor.getBits()); 
                 continue;
             }
 
             itncFunctor.apply(*fpGrow);
             if (itncFunctor.getBits() > 0) {
                 pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                                  "Footprint has masked pix (val=%d) in image not to convolve", itncFunctor.getBits());
+                                  "Footprint has masked pix (val=%d) in image not to convolve", 
+                                  itncFunctor.getBits());
                 continue;
             }
 
@@ -367,7 +376,7 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
 
     if (footprintListOut.size() == 0) {
       throw LSST_EXCEPT(pexExcept::Exception, 
-			"Unable to find any footprints for Psf matching");
+                        "Unable to find any footprints for Psf matching");
     }
 
     pexLog::TTrace<1>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 

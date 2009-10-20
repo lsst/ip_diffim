@@ -28,7 +28,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policy    = pexPolicy.Policy.createPolicy(diffimPolicy)
         self.kCols     = self.policy.getInt('kernelCols')
         self.kRows     = self.policy.getInt('kernelRows')
-        self.basisList = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
+        self.basisList = ipDiffim.generateDeltaFunctionBasisSet(self.kCols, self.kRows)
 
         # gaussian reference kernel
         self.gSize         = self.kCols
@@ -69,18 +69,19 @@ class DiffimTestCases(unittest.TestCase):
         # accepts : imageToConvolve, imageToNotConvolve
         self.kFunctor.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
 
-        kernel   = self.kFunctor.getKernel()
-        kImage   = afwImage.ImageD(self.kCols, self.kRows)
-        kSum     = kernel.computeImage(kImage, False)
+        kb     = self.kFunctor.getSolution()
+        kSoln  = kb.first
+        bgSoln = kb.second
+        kImage = afwImage.ImageD(self.kCols, self.kRows)
+        kSum   = kSoln.computeImage(kImage, False)
 
         # make sure the correct background and scaling have been determined
-        self.assertAlmostEqual(self.kFunctor.getBackground(), background, 5)
+        self.assertAlmostEqual(bgSoln, background, 5)
         self.assertAlmostEqual(kSum, scaling, 5)
-        #print background, self.kFunctor.getBackground(), scaling, kSum
 
         # make sure the delta function is in the right place
-        xpix = kernel.getCtrX() - dX
-        ypix = kernel.getCtrY() - dY
+        xpix = kSoln.getCtrX() - dX
+        ypix = kSoln.getCtrY() - dY
         for j in range(kImage.getHeight()):
             for i in range(kImage.getWidth()):
 
@@ -117,9 +118,8 @@ class DiffimTestCases(unittest.TestCase):
         afwMath.convolve(cmi, smi, self.gaussKernel, False)
         # this will adjust the kernel sum a bit
         # lose some at the outskirts of the kernel
-        fc = ipDiffim.FindCountsF()
-        fc.apply(cmi)
-        cscaling = fc.getCounts()
+        stats = afwMath.makeStatistics(cmi, afwMath.SUM)
+        cscaling = stats.getValue(afwMath.SUM)
         # any additional background
         cmi += background
 
@@ -151,14 +151,15 @@ class DiffimTestCases(unittest.TestCase):
         # accepts : imageToConvolve, imageToNotConvolve
         self.kFunctor.apply(tmi2.getImage(), cmi2.getImage(), var.getVariance(), self.policy)
 
-        kernel    = self.kFunctor.getKernel()
+        kb        = self.kFunctor.getSolution()
+        kSoln     = kb.first
+        bgSoln    = kb.second
         kImageOut = afwImage.ImageD(self.kCols, self.kRows)
-        kSum      = kernel.computeImage(kImageOut, False)
+        kSum      = kSoln.computeImage(kImageOut, False)
 
         # make sure the correct background and scaling have been determined
-        self.assertAlmostEqual(self.kFunctor.getBackground(), background, 4)
+        self.assertAlmostEqual(bgSoln, background, 4)
         self.assertAlmostEqual(kSum, cscaling, 4)
-        #print background, self.kFunctor.getBackground(), scaling, cscaling, kSum
 
         #self.kImageIn.writeFits('k1.fits')
         #kImageOut.writeFits('k2.fits')

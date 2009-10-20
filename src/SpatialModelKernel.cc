@@ -46,7 +46,9 @@ KernelCandidate<PixelT>::ImageT::ConstPtr KernelCandidate<PixelT>::getImage() co
     
 template <typename PixelT>
 KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::copyImage() const {
-    return typename KernelCandidate<PixelT>::ImageT::Ptr(new typename KernelCandidate<PixelT>::ImageT(*getImage(), true));
+    return typename KernelCandidate<PixelT>::ImageT::Ptr(
+        new typename KernelCandidate<PixelT>::ImageT(*getImage(), true)
+        );
     /*
       typename KernelCandidate<PixelT>::ImageT::Ptr imcopy(
       new typename KernelCandidate<PixelT>::ImageT(*_image, true)
@@ -110,11 +112,11 @@ afwImage::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage(
     ) {
     
     /* Make diffim and set chi2 from result */
-    afwImage::MaskedImage<PixelT> diffim = convolveAndSubtract(*_miToConvolvePtr,
+    afwImage::MaskedImage<PixelT> diffIm = convolveAndSubtract(*_miToConvolvePtr,
                                                                *_miToNotConvolvePtr,
                                                                *kernel,
                                                                background);
-    return diffim;
+    return diffIm;
     
 }
     
@@ -234,7 +236,7 @@ fitSpatialKernelFromCandidates(
            dimensionality, and then apply the spatial fit to these kernels 
         */
         if (usePcaForSpatialKernel) {
-            int const nEigenComponents = policy.getInt("numPrincipalComponents");
+            int const nComponents = policy.getInt("numPrincipalComponents");
             
             pexLogging::TTrace<5>("lsst.ip.diffim.SetPcaImageVisitor", 
                                   "Building Pca Basis");
@@ -252,8 +254,8 @@ fitSpatialKernelFromCandidates(
                                       "Eigenvalue %d : %f (%f \%)", j, eigenValues[j], eigenValues[j]/eSum);
             }
 
-            int const nEigen = static_cast<int>(eigenValues.size()) - 1; /* -1 since we have subtracted mean */
-            int const ncomp  = (nEigenComponents <= 0 || nEigen < nEigenComponents) ? nEigen : nEigenComponents;
+            int const nEigen = static_cast<int>(eigenValues.size()) - 1; /* -1 since we subtracted mean */
+            int const ncomp  = (nComponents <= 0 || nEigen < nComponents) ? nEigen : nComponents;
             //
             afwMath::KernelList kernelListRaw;
             kernelListRaw.push_back(afwMath::Kernel::Ptr(
@@ -302,7 +304,10 @@ fitSpatialKernelFromCandidates(
         }
         
         /* Visitor for the spatial kernel fit */
-        detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse, spatialKernelOrder, spatialBgOrder, policy);
+        detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse, 
+                                                                      spatialKernelOrder, 
+                                                                      spatialBgOrder, 
+                                                                      policy);
         kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
         spatialKernelFitter.solveLinearEquation();
         std::pair<afwMath::LinearCombinationKernel::Ptr, 
@@ -311,7 +316,9 @@ fitSpatialKernelFromCandidates(
         spatialBackground = KB.second;
         
         /* Visitor for the spatial kernel result */
-        detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel, spatialBackground, policy);
+        detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel, 
+                                                                         spatialBackground, 
+                                                                         policy);
         kernelCells.visitCandidates(&spatialKernelAssessor, nStarPerCell);
         nRejected = spatialKernelAssessor.getNRejected();
         pexLogging::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 

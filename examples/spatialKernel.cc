@@ -1,3 +1,4 @@
+#include <cmath> 
 #include <lsst/afw/math.h>
 #include <lsst/afw/image.h>
 #include <lsst/ip/diffim.h>
@@ -12,7 +13,7 @@ int main() {
     int kSize = 5;
     unsigned int nBases = kSize * kSize;
     int spatialKernelOrder = 2;
-
+    
     lsst::afw::math::KernelList basisList = generateDeltaFunctionBasisSet(kSize, kSize);
     /* Spatial Kernel */
     afwMath::Kernel::SpatialFunctionPtr spatialKernelFunction(
@@ -23,18 +24,20 @@ int main() {
         afwMath::Kernel::SpatialFunctionPtr spatialFunction(spatialKernelFunction->copy());
         spatialFunctionList.push_back(spatialFunction);
     }
-    afwMath::LinearCombinationKernel::Ptr spatialKernel(new afwMath::LinearCombinationKernel(basisList, spatialFunctionList));
+    afwMath::LinearCombinationKernel::Ptr spatialKernel(
+        new afwMath::LinearCombinationKernel(basisList, spatialFunctionList)
+        );
     /* Set up some fake terms */
     std::vector<std::vector<double> > kCoeffs;
     kCoeffs.reserve(nBases);
     for (unsigned int i = 0, idx = 0; i < nBases; i++) {
         kCoeffs.push_back(std::vector<double>(spatialKernelFunction->getNParameters()));
-        for (unsigned int j = 0; j < spatialKernelFunction->getNParameters(); j++) {
-	   kCoeffs[i][j] = sqrt(sqrt(sqrt(idx++)));
+        for (unsigned int j = 0; j < spatialKernelFunction->getNParameters(); j++, idx++) {
+            kCoeffs[i][j] = std::sqrt(std::sqrt(std::sqrt(idx)));
         }
     }
     spatialKernel->setSpatialParameters(kCoeffs);
-
+    
     unsigned int loc = 50;
     afwImage::MaskedImage<PixelT>::Ptr mimg1(
         new afwImage::MaskedImage<PixelT>(100,100)
@@ -46,9 +49,12 @@ int main() {
     afwMath::convolve(*mimg2, *mimg1, *spatialKernel, false);
     mimg1->writeFits("mimg1");
     mimg2->writeFits("mimg2");
-
+    
     afwImage::Image<double> kImage(spatialKernel->getDimensions());
-    (void)spatialKernel->computeImage(kImage, false, afwImage::indexToPosition(loc), afwImage::indexToPosition(loc));
+    (void)spatialKernel->computeImage(kImage, 
+                                      false, 
+                                      afwImage::indexToPosition(loc), 
+                                      afwImage::indexToPosition(loc));
     kImage.writeFits("kernel.fits");
     
 }

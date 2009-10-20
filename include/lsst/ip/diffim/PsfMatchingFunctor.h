@@ -49,7 +49,7 @@ namespace lsst { namespace ip { namespace diffim {
             );
         PsfMatchingFunctor(
             afwMath::KernelList const& basisList,
-            boost::shared_ptr<Eigen::MatrixXd> const& H
+            boost::shared_ptr<Eigen::MatrixXd> const& _hMat
             );
         virtual ~PsfMatchingFunctor() {};
 
@@ -75,11 +75,11 @@ namespace lsst { namespace ip { namespace diffim {
             );
 
     protected:
-        afwMath::KernelList const _basisList;            ///< List of Kernel basis functions
-        boost::shared_ptr<Eigen::MatrixXd> _M;                   ///< Least squares matrix
-        boost::shared_ptr<Eigen::VectorXd> _B;                   ///< Least squares vector
-        boost::shared_ptr<Eigen::VectorXd> _Soln;                ///< Least square solution
-        boost::shared_ptr<Eigen::MatrixXd> const _H;             ///< Regularization matrix
+        afwMath::KernelList const _basisList;                    ///< List of Kernel basis functions
+        boost::shared_ptr<Eigen::MatrixXd> _mMat;                ///< Least squares matrix
+        boost::shared_ptr<Eigen::VectorXd> _bVec;                ///< Least squares vector
+        boost::shared_ptr<Eigen::VectorXd> _sVec;                ///< Least square solution
+        boost::shared_ptr<Eigen::MatrixXd> const _hMat;          ///< Regularization matrix
         bool _initialized;                                       ///< Has been solved for
         bool _regularize;                                        ///< Has a _H matrix
     };
@@ -108,8 +108,8 @@ namespace lsst { namespace ip { namespace diffim {
     template <typename PixelT>
     typename PsfMatchingFunctor<PixelT>::Ptr
     makePsfMatchingFunctor(afwMath::KernelList const& basisList,
-                           boost::shared_ptr<Eigen::MatrixXd> const H) {
-        return typename PsfMatchingFunctor<PixelT>::Ptr(new PsfMatchingFunctor<PixelT>(basisList, H));
+                           boost::shared_ptr<Eigen::MatrixXd> const _hMat) {
+        return typename PsfMatchingFunctor<PixelT>::Ptr(new PsfMatchingFunctor<PixelT>(basisList, _hMat));
     }
 
 }}}

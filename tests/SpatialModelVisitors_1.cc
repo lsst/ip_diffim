@@ -18,44 +18,54 @@ namespace afwImage = lsst::afw::image;
 namespace afwMath  = lsst::afw::math;
 using namespace lsst::ip::diffim;
 
-typedef float PixelT;
-typedef afwImage::Image<afwMath::Kernel::Pixel> ImageT;
+typedef float Pixel;
+typedef afwImage::Image<afwMath::Kernel::Pixel> Image;
 
 //Trace::setVerbosity("lsst.ip.diffim", 6);
 
-BOOST_AUTO_TEST_CASE(KernelSumVisitor) {
+BOOST_AUTO_TEST_CASE(kernelSumVisitor) {
     Policy::Ptr policy(new Policy);
     policy->set("kernelSumClipping", false);
     policy->set("maxKsumSigma", 3.0);
 
     /* Dummy images */
-    afwImage::MaskedImage<PixelT>::Ptr mimg1(
-        new afwImage::MaskedImage<PixelT>(5,5)
+    afwImage::MaskedImage<Pixel>::Ptr mimg1(
+        new afwImage::MaskedImage<Pixel>(5,5)
         );
-    afwImage::MaskedImage<PixelT>::Ptr mimg2(
-        new afwImage::MaskedImage<PixelT>(5,5)
+    afwImage::MaskedImage<Pixel>::Ptr mimg2(
+        new afwImage::MaskedImage<Pixel>(5,5)
         );
 
-    afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand1(new KernelCandidate<PixelT>(10., 10., mimg1, mimg2));
-    afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand2(new KernelCandidate<PixelT>(20., 20., mimg1, mimg2));
-    afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand3(new KernelCandidate<PixelT>(30., 30., mimg1, mimg2));
-    afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand4(new KernelCandidate<PixelT>(40., 40., mimg1, mimg2));
-    afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand5(new KernelCandidate<PixelT>(50., 50., mimg1, mimg2));
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand1(
+        new KernelCandidate<Pixel>(10., 10., mimg1, mimg2)
+        );
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand2(
+        new KernelCandidate<Pixel>(20., 20., mimg1, mimg2)
+        );
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand3(
+        new KernelCandidate<Pixel>(30., 30., mimg1, mimg2)
+        );
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand4(
+        new KernelCandidate<Pixel>(40., 40., mimg1, mimg2)
+        );
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand5(
+        new KernelCandidate<Pixel>(50., 50., mimg1, mimg2)
+        );
     
-    ImageT img1(10,10);
+    Image img1(10,10);
     img1 = 0;
     *img1.at(4, 4) = 1;
-    ImageT img2(10,10);
+    Image img2(10,10);
     img2 = 0;
     *img2.at(4, 4) = 1;
-    ImageT img3(10,10);
+    Image img3(10,10);
     img3 = 0;
     *img3.at(4, 4) = 1;
-    ImageT img4(10,10);
+    Image img4(10,10);
     img4 = 0;
     *img4.at(4, 4) = 1;
     /* outlier */
-    ImageT img5(10,10);
+    Image img5(10,10);
     img5 = 0;
     *img5.at(4, 4) = 100;
     
@@ -65,11 +75,11 @@ BOOST_AUTO_TEST_CASE(KernelSumVisitor) {
     afwMath::Kernel::Ptr k4(new afwMath::FixedKernel(img4));
     afwMath::Kernel::Ptr k5(new afwMath::FixedKernel(img5));
 
-    dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->setKernel(k1);
-    dynamic_cast<KernelCandidate<PixelT> *>(&(*cand2))->setKernel(k2);
-    dynamic_cast<KernelCandidate<PixelT> *>(&(*cand3))->setKernel(k3);
-    dynamic_cast<KernelCandidate<PixelT> *>(&(*cand4))->setKernel(k4);
-    dynamic_cast<KernelCandidate<PixelT> *>(&(*cand5))->setKernel(k5);
+    dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->setKernel(k1);
+    dynamic_cast<KernelCandidate<Pixel> *>(&(*cand2))->setKernel(k2);
+    dynamic_cast<KernelCandidate<Pixel> *>(&(*cand3))->setKernel(k3);
+    dynamic_cast<KernelCandidate<Pixel> *>(&(*cand4))->setKernel(k4);
+    dynamic_cast<KernelCandidate<Pixel> *>(&(*cand5))->setKernel(k5);
 
     /* Lets assume they got here being labeled as GOOD */
     cand1->setStatus(afwMath::SpatialCellCandidate::GOOD);
@@ -80,8 +90,8 @@ BOOST_AUTO_TEST_CASE(KernelSumVisitor) {
     
     /* Basic sum */
     {
-        detail::KernelSumVisitor<PixelT> kernelSumVisitor(*policy);
-        kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::AGGREGATE);
+        detail::KernelSumVisitor<Pixel> kernelSumVisitor(*policy);
+        kernelSumVisitor.setMode(detail::KernelSumVisitor<Pixel>::AGGREGATE);
         kernelSumVisitor.processCandidate(&(*cand1));
         kernelSumVisitor.processCandidate(&(*cand5));
         kernelSumVisitor.processKsumDistribution();
@@ -92,15 +102,15 @@ BOOST_AUTO_TEST_CASE(KernelSumVisitor) {
     
     /* There is sigma clipping in the stats, but kernelSumClipping = false */
     {
-        detail::KernelSumVisitor<PixelT> kernelSumVisitor(*policy);
-        kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::AGGREGATE);
+        detail::KernelSumVisitor<Pixel> kernelSumVisitor(*policy);
+        kernelSumVisitor.setMode(detail::KernelSumVisitor<Pixel>::AGGREGATE);
         kernelSumVisitor.processCandidate(&(*cand1));
         kernelSumVisitor.processCandidate(&(*cand2));
         kernelSumVisitor.processCandidate(&(*cand3));
         kernelSumVisitor.processCandidate(&(*cand4));
         kernelSumVisitor.processCandidate(&(*cand5));
         kernelSumVisitor.processKsumDistribution();
-        kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::REJECT);
+        kernelSumVisitor.setMode(detail::KernelSumVisitor<Pixel>::REJECT);
         kernelSumVisitor.processCandidate(&(*cand1));
         kernelSumVisitor.processCandidate(&(*cand2));
         kernelSumVisitor.processCandidate(&(*cand3));
@@ -119,15 +129,15 @@ BOOST_AUTO_TEST_CASE(KernelSumVisitor) {
     /* There is sigma clipping in the stats, and now kernelSumClipping = true */
     {
         policy->set("kernelSumClipping", true);
-        detail::KernelSumVisitor<PixelT> kernelSumVisitor(*policy);
-        kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::AGGREGATE);
+        detail::KernelSumVisitor<Pixel> kernelSumVisitor(*policy);
+        kernelSumVisitor.setMode(detail::KernelSumVisitor<Pixel>::AGGREGATE);
         kernelSumVisitor.processCandidate(&(*cand1));
         kernelSumVisitor.processCandidate(&(*cand2));
         kernelSumVisitor.processCandidate(&(*cand3));
         kernelSumVisitor.processCandidate(&(*cand4));
         kernelSumVisitor.processCandidate(&(*cand5));
         kernelSumVisitor.processKsumDistribution();
-        kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::REJECT);
+        kernelSumVisitor.setMode(detail::KernelSumVisitor<Pixel>::REJECT);
         kernelSumVisitor.processCandidate(&(*cand1));
         kernelSumVisitor.processCandidate(&(*cand2));
         kernelSumVisitor.processCandidate(&(*cand3));
@@ -156,11 +166,11 @@ BOOST_AUTO_TEST_CASE(KernelSumVisitor) {
         kernelCells.insertCandidate(cand4);
         kernelCells.insertCandidate(cand5);
 
-        detail::KernelSumVisitor<PixelT> kernelSumVisitor(*policy);
-        kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::AGGREGATE);
+        detail::KernelSumVisitor<Pixel> kernelSumVisitor(*policy);
+        kernelSumVisitor.setMode(detail::KernelSumVisitor<Pixel>::AGGREGATE);
         kernelCells.visitCandidates(&kernelSumVisitor, 1);
         kernelSumVisitor.processKsumDistribution();
-        kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::REJECT);
+        kernelSumVisitor.setMode(detail::KernelSumVisitor<Pixel>::REJECT);
         kernelCells.visitCandidates(&kernelSumVisitor, 1);
 
         BOOST_CHECK_EQUAL(kernelSumVisitor.getkSumMean(),  1.0);   
@@ -174,27 +184,33 @@ BOOST_AUTO_TEST_CASE(KernelSumVisitor) {
     }
 }
 
-BOOST_AUTO_TEST_CASE(SetPcaImageVisitor) {
+BOOST_AUTO_TEST_CASE(setPcaImageVisitor) {
     /* Dummy images */
-    afwImage::MaskedImage<PixelT>::Ptr mimg1(
-        new afwImage::MaskedImage<PixelT>(100,100)
+    afwImage::MaskedImage<Pixel>::Ptr mimg1(
+        new afwImage::MaskedImage<Pixel>(100,100)
         );
-    afwImage::MaskedImage<PixelT>::Ptr mimg2(
-        new afwImage::MaskedImage<PixelT>(100,100)
+    afwImage::MaskedImage<Pixel>::Ptr mimg2(
+        new afwImage::MaskedImage<Pixel>(100,100)
         );
 
-    afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand1(new KernelCandidate<PixelT>(10., 10., mimg1, mimg2));
-    afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand2(new KernelCandidate<PixelT>(20., 20., mimg1, mimg2));
-    afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand3(new KernelCandidate<PixelT>(30., 30., mimg1, mimg2));
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand1(
+        new KernelCandidate<Pixel>(10., 10., mimg1, mimg2)
+        );
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand2(
+        new KernelCandidate<Pixel>(20., 20., mimg1, mimg2)
+        );
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand3(
+        new KernelCandidate<Pixel>(30., 30., mimg1, mimg2)
+        );
     
-    ImageT img1(10,10);
+    Image img1(10,10);
     img1 = 0;
     *img1.at(4, 4) = 1.;
-    ImageT img2(10,10);
+    Image img2(10,10);
     img2 = 0;
     *img2.at(4, 4) = 1.;
     /* Outlier */
-    ImageT img3(10,10);
+    Image img3(10,10);
     img3 = 0;
     *img3.at(4, 4) = 100.;
     
@@ -202,20 +218,20 @@ BOOST_AUTO_TEST_CASE(SetPcaImageVisitor) {
     afwMath::Kernel::Ptr k2(new afwMath::FixedKernel(img2));
     afwMath::Kernel::Ptr k3(new afwMath::FixedKernel(img3));
 
-    dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->setKernel(k1);
-    dynamic_cast<KernelCandidate<PixelT> *>(&(*cand2))->setKernel(k2);
-    dynamic_cast<KernelCandidate<PixelT> *>(&(*cand3))->setKernel(k3);
+    dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->setKernel(k1);
+    dynamic_cast<KernelCandidate<Pixel> *>(&(*cand2))->setKernel(k2);
+    dynamic_cast<KernelCandidate<Pixel> *>(&(*cand3))->setKernel(k3);
 
     /* Test eigen decomposition; all images the same shape */
     {
-        afwImage::ImagePca<ImageT> imagePca;
-        detail::SetPcaImageVisitor<PixelT> importStarVisitor(&imagePca);
+        afwImage::ImagePca<Image> imagePca;
+        detail::SetPcaImageVisitor<Pixel> importStarVisitor(&imagePca);
         importStarVisitor.processCandidate(&(*cand1));
         importStarVisitor.processCandidate(&(*cand2));
         importStarVisitor.processCandidate(&(*cand3));
 
         imagePca.analyze();
-        std::vector<ImageT::Ptr> eigenImages = imagePca.getEigenImages();
+        std::vector<Image::Ptr> eigenImages = imagePca.getEigenImages();
         std::vector<double> eigenValues = imagePca.getEigenValues();
         BOOST_CHECK_EQUAL(static_cast<int>(eigenImages.size()), 3);   
         BOOST_CHECK_CLOSE(eigenValues[0], 1., 1e-6);   
@@ -225,20 +241,20 @@ BOOST_AUTO_TEST_CASE(SetPcaImageVisitor) {
 
     /* Test mean subtraction; recall all images are scaled to have the same kSum! */
     {
-        afwImage::ImagePca<ImageT> imagePca;
-        detail::SetPcaImageVisitor<PixelT> importStarVisitor(&imagePca);
+        afwImage::ImagePca<Image> imagePca;
+        detail::SetPcaImageVisitor<Pixel> importStarVisitor(&imagePca);
         importStarVisitor.processCandidate(&(*cand1));
         importStarVisitor.processCandidate(&(*cand2));
         importStarVisitor.processCandidate(&(*cand3));
 
         /* Have we divided by the kernel sum? */
-        afwImage::ImagePca<ImageT>::ImageList imageList = imagePca.getImageList();
+        afwImage::ImagePca<Image>::ImageList imageList = imagePca.getImageList();
         BOOST_CHECK_CLOSE((*imageList[0])(4, 4), 1., 1e-6);
         BOOST_CHECK_CLOSE((*imageList[1])(4, 4), 1., 1e-6);
         BOOST_CHECK_CLOSE((*imageList[2])(4, 4), 1., 1e-6);
 
         importStarVisitor.subtractMean();
-        ImageT kMean = *(importStarVisitor.returnMean());
+        Image kMean = *(importStarVisitor.returnMean());
 
         /* Mean has the right central pixel value */
         BOOST_CHECK_CLOSE(kMean(4, 4), 1., 1e-6);
@@ -252,7 +268,7 @@ BOOST_AUTO_TEST_CASE(SetPcaImageVisitor) {
     }
 }
 
-BOOST_AUTO_TEST_CASE(BuildSingleKernelVisitor) {
+BOOST_AUTO_TEST_CASE(buildSingleKernelVisitor) {
     Policy::Ptr policy(new Policy);
     policy->set("constantVarianceWeighting", false);
     policy->set("iterateSingleKernel", false);
@@ -262,8 +278,8 @@ BOOST_AUTO_TEST_CASE(BuildSingleKernelVisitor) {
 
     int imageSize = 35;
     int kernelSize = 11;
-    lsst::afw::math::KernelList basisList = generateDeltaFunctionBasisSet(kernelSize, kernelSize);
-    PsfMatchingFunctor<PixelT> kFunctor = PsfMatchingFunctor<PixelT>(basisList);
+    afwMath::KernelList basisList = generateDeltaFunctionBasisSet(kernelSize, kernelSize);
+    PsfMatchingFunctor<Pixel> kFunctor = PsfMatchingFunctor<Pixel>(basisList);
 
     afwMath::GaussianFunction2<double> gaussFunc2(2, 2);
     afwMath::GaussianFunction2<double> gaussFunc4(4, 4);
@@ -276,13 +292,13 @@ BOOST_AUTO_TEST_CASE(BuildSingleKernelVisitor) {
 
     {
         /* Make them the same so a delta function result */
-        afwImage::Image<PixelT> kImage1F(kImage1D, true);
-        afwImage::Image<PixelT> kImage2F(kImage1D, true);
-        afwImage::MaskedImage<PixelT>::Ptr mimg1(
-            new afwImage::MaskedImage<PixelT>(k1.getDimensions())
+        afwImage::Image<Pixel> kImage1F(kImage1D, true);
+        afwImage::Image<Pixel> kImage2F(kImage1D, true);
+        afwImage::MaskedImage<Pixel>::Ptr mimg1(
+            new afwImage::MaskedImage<Pixel>(k1.getDimensions())
             );
-        afwImage::MaskedImage<PixelT>::Ptr mimg2(
-            new afwImage::MaskedImage<PixelT>(k2.getDimensions())
+        afwImage::MaskedImage<Pixel>::Ptr mimg2(
+            new afwImage::MaskedImage<Pixel>(k2.getDimensions())
             );
         *mimg1->getImage() = kImage1F;
         *mimg2->getImage() = kImage2F;
@@ -291,16 +307,18 @@ BOOST_AUTO_TEST_CASE(BuildSingleKernelVisitor) {
         *mimg1->getMask() = 0x0;
         *mimg2->getMask() = 0x0;
 
-        afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand1(new KernelCandidate<PixelT>(10., 10., mimg1, mimg2));
-        BOOST_CHECK(dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->hasKernel() == false);
+        afwMath::SpatialCellImageCandidate<Image>::Ptr cand1(
+            new KernelCandidate<Pixel>(10., 10., mimg1, mimg2)
+            );
+        BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == false);
 
-        detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter(kFunctor, *policy);
+        detail::BuildSingleKernelVisitor<Pixel> singleKernelFitter(kFunctor, *policy);
         singleKernelFitter.processCandidate(&(*cand1));
 
-        BOOST_CHECK(dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->hasKernel() == true);
+        BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == true);
         /* We're not checking kFunctor here, just that the values are set, so just check to 1% */
-        BOOST_CHECK_CLOSE(dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->getKsum(), 1.0, 1.);
-        BOOST_CHECK_SMALL(dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->getBackground(), 1.);
+        BOOST_CHECK_CLOSE(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getKsum(), 1.0, 1.);
+        BOOST_CHECK_SMALL(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getBackground(), 1.);
         BOOST_CHECK_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
     }
 
@@ -308,13 +326,13 @@ BOOST_AUTO_TEST_CASE(BuildSingleKernelVisitor) {
      * but we do overwrite M and B */
     {
         /* Make them the same so a delta function result */
-        afwImage::Image<PixelT> kImage1F(kImage1D, true);
-        afwImage::Image<PixelT> kImage2F(kImage1D, true);
-        afwImage::MaskedImage<PixelT>::Ptr mimg1(
-            new afwImage::MaskedImage<PixelT>(k1.getDimensions())
+        afwImage::Image<Pixel> kImage1F(kImage1D, true);
+        afwImage::Image<Pixel> kImage2F(kImage1D, true);
+        afwImage::MaskedImage<Pixel>::Ptr mimg1(
+            new afwImage::MaskedImage<Pixel>(k1.getDimensions())
             );
-        afwImage::MaskedImage<PixelT>::Ptr mimg2(
-            new afwImage::MaskedImage<PixelT>(k2.getDimensions())
+        afwImage::MaskedImage<Pixel>::Ptr mimg2(
+            new afwImage::MaskedImage<Pixel>(k2.getDimensions())
             );
         *mimg1->getImage() = kImage1F;
         *mimg2->getImage() = kImage2F;
@@ -322,43 +340,46 @@ BOOST_AUTO_TEST_CASE(BuildSingleKernelVisitor) {
         *mimg2->getVariance() = 1;
         *mimg1->getMask() = 0x0;
         *mimg2->getMask() = 0x0;
-        afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand1(new KernelCandidate<PixelT>(10., 10., mimg1, mimg2));
-        BOOST_CHECK(dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->hasKernel() == false);
-        detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter(kFunctor, *policy);
+        afwMath::SpatialCellImageCandidate<Image>::Ptr cand1(
+            new KernelCandidate<Pixel>(10., 10., mimg1, mimg2)
+            );
+        BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == false);
+        detail::BuildSingleKernelVisitor<Pixel> singleKernelFitter(kFunctor, *policy);
         singleKernelFitter.processCandidate(&(*cand1));
 
         /* Reprocess with a new basis */
-        Eigen::MatrixXd Morig = *(dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->getM());
-        Eigen::VectorXd Borig = *(dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->getB());
-        lsst::afw::math::Kernel::Ptr Korig = dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->getKernel();
-        double bgorig                      = dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->getBackground();
+        Eigen::MatrixXd mOrig = *(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getM());
+        Eigen::VectorXd bOrig = *(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getB());
+        afwMath::Kernel::Ptr kOrig = dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getKernel();
+        double bgOrig              = dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getBackground();
 
-        lsst::afw::math::KernelList basisList2 = generateDeltaFunctionBasisSet(kernelSize-1, kernelSize-1);
-        PsfMatchingFunctor<PixelT> kFunctor2 = PsfMatchingFunctor<PixelT>(basisList2);
-        detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter2(kFunctor2, *policy);
+        afwMath::KernelList basisList2 = generateDeltaFunctionBasisSet(kernelSize-1, 
+                                                                       kernelSize-1);
+        PsfMatchingFunctor<Pixel> kFunctor2 = PsfMatchingFunctor<Pixel>(basisList2);
+        detail::BuildSingleKernelVisitor<Pixel> singleKernelFitter2(kFunctor2, *policy);
         singleKernelFitter2.setCandidateKernel(false);
         singleKernelFitter2.setSkipBuilt(false);
         singleKernelFitter2.processCandidate(&(*cand1));
         
-        Eigen::MatrixXd Mnew = *(dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->getM());
-        Eigen::VectorXd Bnew = *(dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->getB());
-        lsst::afw::math::Kernel::Ptr Knew  = dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->getKernel();
-        double bgnew                       = dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->getBackground();
+        Eigen::MatrixXd mNew = *(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getM());
+        Eigen::VectorXd bNew = *(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getB());
+        afwMath::Kernel::Ptr kNew = dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getKernel();
+        double bgNew              = dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getBackground();
 
         /* Matrices are updated for spatial fitting */
-        BOOST_CHECK(Borig.size() == (kernelSize*kernelSize+1));
-        BOOST_CHECK(Bnew.size()  == ((kernelSize-1)*(kernelSize-1)+1));
-        BOOST_CHECK(Morig.rows() > Mnew.rows());
-        BOOST_CHECK(Morig.cols() > Mnew.cols());
+        BOOST_CHECK(bOrig.size() == (kernelSize*kernelSize+1));
+        BOOST_CHECK(bNew.size()  == ((kernelSize-1)*(kernelSize-1)+1));
+        BOOST_CHECK(mOrig.rows() > mNew.rows());
+        BOOST_CHECK(mOrig.cols() > mNew.cols());
         /* But the raw kernel is not */
-        BOOST_CHECK(Korig->getHeight() == Knew->getHeight());
-        BOOST_CHECK(Korig->getWidth() == Knew->getWidth());
-        BOOST_CHECK(bgorig == bgnew);
+        BOOST_CHECK(kOrig->getHeight() == kNew->getHeight());
+        BOOST_CHECK(kOrig->getWidth() == kNew->getWidth());
+        BOOST_CHECK(bgOrig == bgNew);
     }
     
 }
 
-BOOST_AUTO_TEST_CASE(BuildSpatialKernelVisitor) {
+BOOST_AUTO_TEST_CASE(buildSpatialKernelVisitor) {
     int spatialKernelOrder = 2;
     int spatialBgOrder = 1;
 
@@ -370,15 +391,19 @@ BOOST_AUTO_TEST_CASE(BuildSpatialKernelVisitor) {
 
 
     int kernelSize = 11;
-    lsst::afw::math::KernelList basisList = generateDeltaFunctionBasisSet(kernelSize, kernelSize);
-    detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(basisList, spatialKernelOrder, spatialBgOrder, *policy);
+    afwMath::KernelList basisList = generateDeltaFunctionBasisSet(kernelSize, 
+                                                                  kernelSize);
+    detail::BuildSpatialKernelVisitor<Pixel> spatialKernelFitter(basisList, 
+                                                                  spatialKernelOrder, 
+                                                                  spatialBgOrder, 
+                                                                  *policy);
 
     {
-        /* This is going to be tough to unit test thoroughly */
+        /* This is going to be tough to unit test thoroughly; TBD */
     }
 }
 
-BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
+BOOST_AUTO_TEST_CASE(assessSpatialKernelVisitor) {
     int spatialKernelOrder = 2;
     int spatialBgOrder = 1;
     unsigned int kSize = 5;
@@ -391,7 +416,7 @@ BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
     policy->set("candidateResidualMeanMax", 0.25);
     policy->set("candidateResidualStdMax", 1.25);
 
-    lsst::afw::math::KernelList basisList = generateDeltaFunctionBasisSet(kSize, kSize);
+    afwMath::KernelList basisList = generateDeltaFunctionBasisSet(kSize, kSize);
     /* Spatial Kernel */
     afwMath::Kernel::SpatialFunctionPtr spatialKernelFunction(
         new afwMath::PolynomialFunction2<double>(spatialKernelOrder)
@@ -401,7 +426,9 @@ BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
         afwMath::Kernel::SpatialFunctionPtr spatialFunction(spatialKernelFunction->copy());
         spatialFunctionList.push_back(spatialFunction);
     }
-    afwMath::LinearCombinationKernel::Ptr spatialKernel(new afwMath::LinearCombinationKernel(basisList, spatialFunctionList));
+    afwMath::LinearCombinationKernel::Ptr spatialKernel(
+        new afwMath::LinearCombinationKernel(basisList, spatialFunctionList)
+        );
     
     /* Spatial Background */
     afwMath::Kernel::SpatialFunctionPtr spatialBg(
@@ -414,7 +441,7 @@ BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
     for (unsigned int i = 0, idx = 1; i < nBases; i++) {
         kCoeffs.push_back(std::vector<double>(spatialKernelFunction->getNParameters()));
         for (unsigned int j = 0; j < spatialKernelFunction->getNParameters(); j++) {
-	    kCoeffs[i][j] = 1.e-4 * (idx++);
+            kCoeffs[i][j] = 1.e-4 * (idx++);
         }
     }
     spatialKernel->setSpatialParameters(kCoeffs);
@@ -429,51 +456,62 @@ BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
          * then assess its quality with the same spatial kernel */
 
         unsigned int loc = 50;
-        afwImage::MaskedImage<PixelT>::Ptr mimg1(
-            new afwImage::MaskedImage<PixelT>(100,100)
+        afwImage::MaskedImage<Pixel>::Ptr mimg1(
+            new afwImage::MaskedImage<Pixel>(100,100)
             );
-	*mimg1->getImage() = 0;
-	*mimg1->getVariance() = 1;
-	*mimg1->getMask() = 0x0;
-        *mimg1->at(loc, loc) = afwImage::MaskedImage<PixelT>::Pixel(1, 0x0, 1);
-        afwImage::MaskedImage<PixelT>::Ptr mimg2(
-            new afwImage::MaskedImage<PixelT>(mimg1->getDimensions())
+        *mimg1->getImage() = 0;
+        *mimg1->getVariance() = 1;
+        *mimg1->getMask() = 0x0;
+        *mimg1->at(loc, loc) = afwImage::MaskedImage<Pixel>::Pixel(1, 0x0, 1);
+        afwImage::MaskedImage<Pixel>::Ptr mimg2(
+            new afwImage::MaskedImage<Pixel>(mimg1->getDimensions())
             );
         afwMath::convolve(*mimg2, *mimg1, *spatialKernel, false);
 
         /* Grab a subimage to create the candidate */
         afwImage::BBox bbox = afwImage::BBox(afwImage::PointI(loc-10, loc-10),
                                              afwImage::PointI(loc+10, loc+10));
-        afwImage::MaskedImage<PixelT>::Ptr tmi(
-            new afwImage::MaskedImage<PixelT>(*mimg1, bbox)
+        afwImage::MaskedImage<Pixel>::Ptr tmi(
+            new afwImage::MaskedImage<Pixel>(*mimg1, bbox)
             );
-        afwImage::MaskedImage<PixelT>::Ptr smi(
-            new afwImage::MaskedImage<PixelT>(*mimg2, bbox)
+        afwImage::MaskedImage<Pixel>::Ptr smi(
+            new afwImage::MaskedImage<Pixel>(*mimg2, bbox)
             );
 
         /* Create the candidate and give it the spatial kernel
          * evaluated at its position */
-        afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand1(new KernelCandidate<PixelT>(loc, loc, tmi, smi));
+        afwMath::SpatialCellImageCandidate<Image>::Ptr cand1(
+            new KernelCandidate<Pixel>(loc, loc, tmi, smi)
+            );
         afwImage::Image<double> kImage(spatialKernel->getDimensions());
-        double kSum = spatialKernel->computeImage(kImage, false, afwImage::indexToPosition(loc), afwImage::indexToPosition(loc));
+        double kSum = spatialKernel->computeImage(kImage, 
+                                                  false, 
+                                                  afwImage::indexToPosition(loc), 
+                                                  afwImage::indexToPosition(loc));
         boost::shared_ptr<afwMath::Kernel>
             kernelPtr(new afwMath::FixedKernel(kImage));
-        dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->setKernel(kernelPtr);
-        dynamic_cast<KernelCandidate<PixelT> *>(&(*cand1))->setBackground(0.);
-        detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor1(spatialKernel, spatialBg, *policy);
+        dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->setKernel(kernelPtr);
+        dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->setBackground(0.);
+        detail::AssessSpatialKernelVisitor<Pixel> spatialKernelAssessor1(spatialKernel, 
+                                                                          spatialBg, 
+                                                                          *policy);
         spatialKernelAssessor1.processCandidate(&(*cand1));
         BOOST_CHECK_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
 
-	/* Now tweak the kernel to create a bad diffim, on purpose */
-	for (unsigned int i = 0; i < spatialBg->getNParameters(); i++) {
-	   bgCoeffs[i] = kSum * i;
-	}
-	spatialBg->setParameters(bgCoeffs);
+        /* Now tweak the kernel to create a bad diffim, on purpose */
+        for (unsigned int i = 0; i < spatialBg->getNParameters(); i++) {
+            bgCoeffs[i] = kSum * i;
+        }
+        spatialBg->setParameters(bgCoeffs);
 
-        afwMath::SpatialCellImageCandidate<ImageT>::Ptr cand2(new KernelCandidate<PixelT>(loc, loc, tmi, smi));
-        dynamic_cast<KernelCandidate<PixelT> *>(&(*cand2))->setKernel(kernelPtr);
-        dynamic_cast<KernelCandidate<PixelT> *>(&(*cand2))->setBackground(0.);
-        detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor2(spatialKernel, spatialBg, *policy);
+        afwMath::SpatialCellImageCandidate<Image>::Ptr cand2(
+            new KernelCandidate<Pixel>(loc, loc, tmi, smi)
+            );
+        dynamic_cast<KernelCandidate<Pixel> *>(&(*cand2))->setKernel(kernelPtr);
+        dynamic_cast<KernelCandidate<Pixel> *>(&(*cand2))->setBackground(0.);
+        detail::AssessSpatialKernelVisitor<Pixel> spatialKernelAssessor2(spatialKernel, 
+                                                                          spatialBg, 
+                                                                          *policy);
         spatialKernelAssessor2.processCandidate(&(*cand2));
         BOOST_CHECK_EQUAL(cand2->getStatus(), afwMath::SpatialCellCandidate::BAD);
     }

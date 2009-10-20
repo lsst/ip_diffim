@@ -18,8 +18,12 @@ void test() {
     int stampSize  = 10;
     float coord    = 7.;
     
-    boost::shared_ptr<afwImage::MaskedImage<PixelT> > tmi( new afwImage::MaskedImage<PixelT>(stampSize, stampSize) );
-    boost::shared_ptr<afwImage::MaskedImage<PixelT> > smi( new afwImage::MaskedImage<PixelT>(stampSize, stampSize) );
+    boost::shared_ptr<afwImage::MaskedImage<PixelT> > tmi( 
+        new afwImage::MaskedImage<PixelT>(stampSize, stampSize) 
+        );
+    boost::shared_ptr<afwImage::MaskedImage<PixelT> > smi( 
+        new afwImage::MaskedImage<PixelT>(stampSize, stampSize) 
+        );
 
     afwImage::BBox          bbox    = afwImage::BBox(afwImage::PointI(0, 0), fullSize, fullSize);
     afwMath::SpatialCellSet cellSet = afwMath::SpatialCellSet(bbox, cellSize, cellSize);
@@ -31,7 +35,7 @@ void test() {
 
 int main() {
     try {
-        test();
+        ::test();
     } catch (std::exception const &e) {
         std::clog << e.what() << std::endl;
         return EXIT_FAILURE;

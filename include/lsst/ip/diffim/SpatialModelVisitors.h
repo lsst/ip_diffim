@@ -436,9 +436,9 @@ public:
            second fitting loop after the results of the first fitting loop
            are used to define a PCA basis
         */
-        std::pair<boost::shared_ptr<afwMath::Kernel>, double> KB;
+        std::pair<boost::shared_ptr<afwMath::Kernel>, double> kb;
         try {
-            KB = _kFunctor.getSolution();
+            kb = _kFunctor.getSolution();
         } catch (pexExcept::Exception &e) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
@@ -448,24 +448,24 @@ public:
         }
 
         if (_setCandidateKernel) {
-            kCandidate->setKernel(KB.first);
-            kCandidate->setBackground(KB.second);
+            kCandidate->setKernel(kb.first);
+            kCandidate->setBackground(kb.second);
         }
         
         /* 
          * However you *always* need to reset M and B since these are used *
          * in the spatial fitting
          */
-        std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> > MB = _kFunctor.getAndClearMB();
-        kCandidate->setM(MB.first);
-        kCandidate->setB(MB.second);
+        std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> > mb = _kFunctor.getAndClearMB();
+        kCandidate->setM(mb.first);
+        kCandidate->setB(mb.second);
         
         /* 
          * Make diffim and set chi2 from result.  Note that you need to send
          * the newly-derived kernel and background in the case that
          * _setCandidateKernel = false.
          */
-        MaskedImageT diffim = kCandidate->returnDifferenceImage(KB.first, KB.second);
+        MaskedImageT diffim = kCandidate->returnDifferenceImage(kb.first, kb.second);
         
         /* 
          * Remake the kernel using the first iteration difference image
@@ -485,7 +485,7 @@ public:
             }
 
             try {
-                KB = _kFunctor.getSolution();
+                kb = _kFunctor.getSolution();
             } catch (pexExcept::Exception &e) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
@@ -495,14 +495,14 @@ public:
             }
 
             if (_setCandidateKernel) {
-                kCandidate->setKernel(KB.first);
-                kCandidate->setBackground(KB.second);
+                kCandidate->setKernel(kb.first);
+                kCandidate->setBackground(kb.second);
             }
 
-            MB = _kFunctor.getAndClearMB();
-            kCandidate->setM(MB.first);
-            kCandidate->setB(MB.second);
-            diffim = kCandidate->returnDifferenceImage(KB.first, KB.second);                
+            mb = _kFunctor.getAndClearMB();
+            kCandidate->setM(mb.first);
+            kCandidate->setB(mb.second);
+            diffim = kCandidate->returnDifferenceImage(kb.first, kb.second);                
         }
         
         _imstats.apply(diffim);
@@ -510,9 +510,9 @@ public:
         
         /* When using a Pca basis, we don't reset the kernel or background,
            so we need to evaluate these locally for the Trace */
-        afwImage::Image<double> kImage(KB.first->getDimensions());
-        double kSum = KB.first->computeImage(kImage, false);
-        double background = KB.second;
+        afwImage::Image<double> kImage(kb.first->getDimensions());
+        double kSum = kb.first->computeImage(kImage, false);
+        double background = kb.second;
         
         pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                               "Chi2 = %.2f", kCandidate->getChi2());
@@ -594,9 +594,9 @@ private:
     kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
     spatialKernelFitter.solveLinearEquation();
     std::pair<afwMath::LinearCombinationKernel::Ptr, 
-        afwMath::Kernel::SpatialFunctionPtr> KB = spatialKernelFitter.getSpatialModel();
-    spatialKernel     = KB.first;
-    spatialBackground = KB.second; 
+        afwMath::Kernel::SpatialFunctionPtr> kb = spatialKernelFitter.getSpatialModel();
+    spatialKernel     = kb.first;
+    spatialBackground = kb.second; 
  * @endcode
  *
  * @note After visiting all candidates, solveLinearEquation() must be called to
@@ -620,9 +620,9 @@ public:
         ) :
         afwMath::CandidateVisitor(),
         _basisList(basisList),
-        _M(Eigen::MatrixXd()),
-        _B(Eigen::VectorXd()),
-        _Soln(Eigen::VectorXd()),
+        _mMat(Eigen::MatrixXd()),
+        _bVec(Eigen::VectorXd()),
+        _sVec(Eigen::VectorXd()),
         _spatialKernelOrder(spatialKernelOrder),
         _spatialBgOrder(spatialBgOrder),
         _spatialKernelFunction(new afwMath::PolynomialFunction2<double>(spatialKernelOrder)),
@@ -653,10 +653,10 @@ public:
         } else {
             _nt = _nbases*_nkt + _nbt;
         }
-        _M.resize(_nt, _nt);
-        _B.resize(_nt);
-        _M.setZero();
-        _B.setZero();
+        _mMat.resize(_nt, _nt);
+        _bVec.resize(_nt);
+        _mMat.setZero();
+        _bVec.setZero();
         
         pexLogging::TTrace<5>("lsst.ip.diffim.LinearSpatialFitVisitor", 
                               "Initializing with size %d %d %d and constant first term = %s",
@@ -683,47 +683,47 @@ public:
         /* Pure kernel terms */
         std::vector<double> paramsK = _spatialKernelFunction->getParameters();
         for (unsigned int idx = 0; idx < _nkt; idx++) { paramsK[idx] = 0.0; }
-        Eigen::VectorXd Pk(_nkt);
+        Eigen::VectorXd pK(_nkt);
         for (unsigned int idx = 0; idx < _nkt; idx++) {
             paramsK[idx] = 1.0;
             _spatialKernelFunction->setParameters(paramsK);
-            Pk(idx) = (*_spatialKernelFunction)(kCandidate->getXCenter(), 
+            pK(idx) = (*_spatialKernelFunction)(kCandidate->getXCenter(), 
                                                 kCandidate->getYCenter());
             paramsK[idx] = 0.0;
         }
-        Eigen::MatrixXd PkPkt = (Pk * Pk.transpose());
+        Eigen::MatrixXd pKpKt = (pK * pK.transpose());
         
         /* Pure background terms */
         std::vector<double> paramsB = _spatialBgFunction->getParameters();
         for (unsigned int idx = 0; idx < _nbt; idx++) { paramsB[idx] = 0.0; }
-        Eigen::VectorXd Pb(_nbt);
+        Eigen::VectorXd pB(_nbt);
         for (unsigned int idx = 0; idx < _nbt; idx++) {
             paramsB[idx] = 1.0;
             _spatialBgFunction->setParameters(paramsB);
-            Pb(idx) = (*_spatialBgFunction)(kCandidate->getXCenter(), 
+            pB(idx) = (*_spatialBgFunction)(kCandidate->getXCenter(), 
                                             kCandidate->getYCenter());
             paramsB[idx] = 0.0;
         }
-        Eigen::MatrixXd PbPbt = (Pb * Pb.transpose());
+        Eigen::MatrixXd pBpBt = (pB * pB.transpose());
         
         /* Cross terms */
-        Eigen::MatrixXd PkPbt = (Pk * Pb.transpose());
+        Eigen::MatrixXd pKpBt = (pK * pB.transpose());
         
         if (DEBUG_MATRIX) {
             std::cout << "Spatial weights" << std::endl;
-            std::cout << "PkPkt " << PkPkt << std::endl;
-            std::cout << "PbPbt " << PbPbt << std::endl;
-            std::cout << "PkPbt " << PkPbt << std::endl;
+            std::cout << "pKpKt " << pKpKt << std::endl;
+            std::cout << "pBpBt " << pBpBt << std::endl;
+            std::cout << "pKpBt " << pKpBt << std::endl;
         }
         
         /* Add each candidate to the M, B matrix */
-        boost::shared_ptr<Eigen::MatrixXd> Q = kCandidate->getM();
-        boost::shared_ptr<Eigen::VectorXd> W = kCandidate->getB();
+        boost::shared_ptr<Eigen::MatrixXd> qMat = kCandidate->getM();
+        boost::shared_ptr<Eigen::VectorXd> wVec = kCandidate->getB();
         
         if (DEBUG_MATRIX) {
             std::cout << "Spatial matrix inputs" << std::endl;
-            std::cout << "M " << (*Q) << std::endl;
-            std::cout << "B " << (*W) << std::endl;
+            std::cout << "M " << (*qMat) << std::endl;
+            std::cout << "B " << (*wVec) << std::endl;
         }
         
         /* first index to start the spatial blocks; default=0 for non-constant first term */
@@ -737,40 +737,40 @@ public:
             m0 = 1;       /* we need to manually fill in the first (non-spatial) terms below */
             dm = _nkt-1;  /* need to shift terms due to lack of spatial variation in first term */
             
-            _M(0, 0) += (*Q)(0,0);
+            _mMat(0, 0) += (*qMat)(0,0);
             for(unsigned int m2 = 1; m2 < _nbases; m2++)  {
-                _M.block(0, m2*_nkt-dm, 1, _nkt) += (*Q)(0,m2) * Pk.transpose();
+                _mMat.block(0, m2*_nkt-dm, 1, _nkt) += (*qMat)(0,m2) * pK.transpose();
             }
             
-            _M.block(0, mb, 1, _nbt) += (*Q)(0,_nbases) * Pb.transpose();
-            _B(0) += (*W)(0);
+            _mMat.block(0, mb, 1, _nbt) += (*qMat)(0,_nbases) * pB.transpose();
+            _bVec(0) += (*wVec)(0);
         }
         
         /* Fill in the spatial blocks */
         for(unsigned int m1 = m0; m1 < _nbases; m1++)  {
-            /* Diagonal kernel-kernel term; only use upper triangular part of PkPkt */
-            _M.block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += (*Q)(m1,m1) * PkPkt.part<Eigen::UpperTriangular>();
+            /* Diagonal kernel-kernel term; only use upper triangular part of pKpKt */
+            _mMat.block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += (*qMat)(m1,m1) * pKpKt.part<Eigen::UpperTriangular>();
             
             /* Kernel-kernel terms */
             for(unsigned int m2 = m1+1; m2 < _nbases; m2++)  {
-                _M.block(m1*_nkt-dm, m2*_nkt-dm, _nkt, _nkt) += (*Q)(m1,m2) * PkPkt;
+                _mMat.block(m1*_nkt-dm, m2*_nkt-dm, _nkt, _nkt) += (*qMat)(m1,m2) * pKpKt;
             }
             
             /* Kernel cross terms with background */
-            _M.block(m1*_nkt-dm, mb, _nkt, _nbt) += (*Q)(m1,_nbases) * PkPbt;
+            _mMat.block(m1*_nkt-dm, mb, _nkt, _nbt) += (*qMat)(m1,_nbases) * pKpBt;
             
             /* B vector */
-            _B.segment(m1*_nkt-dm, _nkt) += (*W)(m1) * Pk;
+            _bVec.segment(m1*_nkt-dm, _nkt) += (*wVec)(m1) * pK;
         }
         
         /* Background-background terms only */
-        _M.block(mb, mb, _nbt, _nbt) += (*Q)(_nbases,_nbases) * PbPbt.part<Eigen::UpperTriangular>();
-        _B.segment(mb, _nbt)         += (*W)(_nbases) * Pb;
+        _mMat.block(mb, mb, _nbt, _nbt) += (*qMat)(_nbases,_nbases) * pBpBt.part<Eigen::UpperTriangular>();
+        _bVec.segment(mb, _nbt)         += (*wVec)(_nbases) * pB;
         
         if (DEBUG_MATRIX) {
             std::cout << "Spatial matrix outputs" << std::endl;
-            std::cout << "_M " << _M << std::endl;
-            std::cout << "_B " << _B << std::endl;
+            std::cout << "_mMat " << _mMat << std::endl;
+            std::cout << "_bVec " << _bVec << std::endl;
         }
         
     }
@@ -782,32 +782,32 @@ public:
         pexLogging::TTrace<2>("lsst.ip.diffim.SpatialModelKernel.solveLinearEquation", 
                               "Solving for spatial model");
         
-        /* Fill in the other half of _M */
+        /* Fill in the other half of _mMat */
         for (unsigned int i = 0; i < _nt; i++) {
             for (unsigned int j = i+1; j < _nt; j++) {
-                _M(j,i) = _M(i,j);
+                _mMat(j,i) = _mMat(i,j);
             }
         }
-        _Soln = Eigen::VectorXd::Zero(_nt);
+        _sVec = Eigen::VectorXd::Zero(_nt);
         
         if (DEBUG_MATRIX) {
-            std::cout << "Solving for _M:" << std::endl;
-            std::cout << _M << std::endl;
-            std::cout << _B << std::endl;
+            std::cout << "Solving for _mMat:" << std::endl;
+            std::cout << _mMat << std::endl;
+            std::cout << _bVec << std::endl;
         }
         
-        if (!(_M.ldlt().solve(_B, &_Soln))) {
+        if (!(_mMat.ldlt().solve(_bVec, &_sVec))) {
             pexLogging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.solveLinearEquation", 
                                   "Unable to determine kernel via Cholesky LDL^T");
-            if (!(_M.llt().solve(_B, &_Soln))) {
+            if (!(_mMat.llt().solve(_bVec, &_sVec))) {
                 pexLogging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.solveLinearEquation", 
                                       "Unable to determine kernel via Cholesky LL^T");
-                if (!(_M.lu().solve(_B, &_Soln))) {
+                if (!(_mMat.lu().solve(_bVec, &_sVec))) {
                     pexLogging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.solveLinearEquation", 
                                           "Unable to determine kernel via LU");
                     // LAST RESORT
                     try {
-                        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(_M);
+                        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(_mMat);
                         Eigen::MatrixXd const& R = eVecValues.eigenvectors();
                         Eigen::VectorXd eValues  = eVecValues.eigenvalues();
                         
@@ -817,7 +817,7 @@ public:
                             }
                         }
                         
-                        _Soln = R*eValues.asDiagonal()*R.transpose()*_B;
+                        _sVec = R*eValues.asDiagonal()*R.transpose()*_bVec;
                     } catch (pexExcept::Exception& e) {
                         pexLogging::TTrace<5>("lsst.ip.diffim.SpatialModelKernel.solveLinearEquation", 
                                               "Unable to determine kernel via eigen-values");
@@ -831,7 +831,7 @@ public:
         
         if (DEBUG_MATRIX) {
             std::cout << "Solution:" << std::endl;
-            std::cout << _Soln << std::endl;
+            std::cout << _sVec << std::endl;
         }
         
         double time = t.elapsed();
@@ -860,11 +860,11 @@ public:
             
             /* Deal with the possibility the first term doesn't vary spatially */
             if ((i == 0) && (_constantFirstTerm)) {
-                kCoeffs[i][0] = _Soln[idx++];
+                kCoeffs[i][0] = _sVec[idx++];
             }
             else {
                 for (unsigned int j = 0; j < _nkt; j++) {
-                    kCoeffs[i][j] = _Soln[idx++];
+                    kCoeffs[i][j] = _sVec[idx++];
                 }
             }
         }
@@ -872,7 +872,7 @@ public:
         /* Set the background coefficients */
         std::vector<double> bgCoeffs(_nbt);
         for (unsigned int i = 0; i < _nbt; i++) {
-            bgCoeffs[i] = _Soln[_nt - _nbt + i];
+            bgCoeffs[i] = _sVec[_nt - _nbt + i];
         }
         
         spatialKernel->setSpatialParameters(kCoeffs);
@@ -883,9 +883,9 @@ public:
     
 private:
     afwMath::KernelList _basisList;
-    Eigen::MatrixXd _M;       ///< Least squares matrix
-    Eigen::VectorXd _B;       ///< Least squares vector
-    Eigen::VectorXd _Soln;    ///< Least squares solution
+    Eigen::MatrixXd _mMat;       ///< Least squares matrix
+    Eigen::VectorXd _bVec;       ///< Least squares vector
+    Eigen::VectorXd _sVec;       ///< Least squares solution
     int const _spatialKernelOrder;
     int const _spatialBgOrder;
     afwMath::Kernel::SpatialFunctionPtr _spatialKernelFunction;
@@ -974,7 +974,7 @@ public:
                                                   afwImage::indexToPosition(static_cast<int>(kCandidate->getYCenter())));
         
         MaskedImageT diffim = kCandidate->returnDifferenceImage(kernelPtr, background);
-	
+        
         _imstats.apply(diffim);
         kCandidate->setChi2(_imstats.getVariance());
         

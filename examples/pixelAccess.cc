@@ -39,15 +39,18 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
         image::Image<ImageT> cimage(varianceEstimate.getDimensions());
         for (int i = 1; eiter != imageList.end(); ++eiter, ++i) {
             cimage = i; /* give it a value */
-            Eigen::MatrixXd cmat = diffim::imageToEigenMatrix(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol);
+            Eigen::MatrixXd cmat = diffim::imageToEigenMatrix(cimage).block(startRow, startCol, 
+                                                                            endRow-startRow, 
+                                                                            endCol-startCol);
             cmat.resize(cmat.rows()*cmat.cols(), 1);
             boost::shared_ptr<Eigen::VectorXd> vmat (new Eigen::VectorXd(cmat.col(0)));
             *eiter = vmat;
         } 
         
         /* eigen representation of input images; only the pixels that are unconvolved in cimage below */
-        Eigen::MatrixXd eigeniVarianceM     = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
-                                                                                                 endRow-startRow, endCol-startCol).cwise().inverse();
+        Eigen::MatrixXd eigeniVarianceM = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
+                                                                                             endRow-startRow, 
+                                                                                             endCol-startCol).cwise().inverse();
         eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
         Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
         
@@ -73,23 +76,25 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
         image::Image<ImageT> cimage(varianceEstimate.getDimensions());
         for (int i = 1; eiter != imageList.end(); ++eiter, ++i) {
             cimage = i; /* give it a value */
-            Eigen::MatrixXd cmat = diffim::imageToEigenMatrix(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol);
+            Eigen::MatrixXd cmat = diffim::imageToEigenMatrix(cimage).block(startRow, 
+                                                                            startCol, 
+                                                                            endRow-startRow, 
+                                                                            endCol-startCol);
             cmat.resize(cmat.rows()*cmat.cols(), 1);
             boost::shared_ptr<Eigen::VectorXd> vmat (new Eigen::VectorXd(cmat.col(0)));
             *eiter = vmat;
         } 
         
         /* eigen representation of input images; only the pixels that are unconvolved in cimage below */
-        Eigen::MatrixXd eigeniVarianceM     = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
-                                                                                                 endRow-startRow, endCol-startCol).cwise().inverse();
+        Eigen::MatrixXd eigeniVarianceM = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
+                                                                                             endRow-startRow, 
+                                                                                             endCol-startCol).cwise().inverse();
         eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
         Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
         
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiteri = imageList.begin();
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = imageList.end();
         for (unsigned int kidxi = 0; eiteri != eiterE; eiteri++, kidxi++) {
-            //Eigen::Cwise<Eigen::CwiseBinaryOp<Eigen::ei_scalar_product_op<double>, Eigen::VectorXd, Eigen::VectorXd> >
-            //eiteriDotiVariance = ((*eiteri)->cwise() * eigeniVarianceV).cwise();
             Eigen::VectorXd eiteriDotiVariance = (*eiteri)->cwise() * eigeniVarianceV;
             
             typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = eiteri;
@@ -106,7 +111,9 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
         std::vector<boost::shared_ptr<image::Image<ImageT> > > imageList(nParameters);
         typename std::vector<boost::shared_ptr<image::Image<ImageT> > >::iterator citer = imageList.begin();
         for (int i = 1; citer != imageList.end(); ++citer, ++i) {
-            *citer = typename image::Image<ImageT>::Ptr(new image::Image<ImageT>(varianceEstimate.getDimensions()));
+            *citer = typename image::Image<ImageT>::Ptr(
+                new image::Image<ImageT>(varianceEstimate.getDimensions())
+                );
             **citer = i; /* give it a value */
         } 
         
@@ -115,7 +122,7 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
         for (citer = imageList.begin(); citer != imageList.end(); ++citer) {
             locatorList.push_back( (**citer).xy_at(startCol,startRow) );
         }
-        typename image::Image<ImageT>::xy_locator varianceLocator           = varianceEstimate.xy_at(startCol, startRow);
+        typename image::Image<ImageT>::xy_locator varianceLocator = varianceEstimate.xy_at(startCol, startRow);
         
         /* at end of each row, this steps in column back to starting col pixel of next row */
         std::pair<int, int> rowStep = std::make_pair(static_cast<int>(-(endCol-startCol)), 1);
@@ -167,17 +174,17 @@ int main() {
     varianceEstimate = 1;
     
     t.restart();
-    Eigen::MatrixXd M1 = test(varianceEstimate, 1);
+    Eigen::MatrixXd M1 = ::test(varianceEstimate, 1);
     double time = t.elapsed();
     std::cout << "Manual pixel iteration = " << time << std::endl;
     
     t.restart();
-    Eigen::MatrixXd M2 = test(varianceEstimate, 2);
+    Eigen::MatrixXd M2 = ::test(varianceEstimate, 2);
     time = t.elapsed();
     std::cout << "Eigen pixel iteration = " << time << std::endl;
     
     t.restart();
-    Eigen::MatrixXd M3 = test(varianceEstimate, 3);
+    Eigen::MatrixXd M3 = ::test(varianceEstimate, 3);
     time = t.elapsed();
     std::cout << "Eigen2 pixel iteration = " << time << std::endl;
     
