@@ -20,6 +20,9 @@ logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
 
+# This tests delta function kernels with delta-function images, and
+# known gaussian smoothing kernels
+
 class DiffimTestCases(unittest.TestCase):
     
     # D = I - (K.x.T + bg)
@@ -132,12 +135,6 @@ class DiffimTestCases(unittest.TestCase):
         tmi2     = afwImage.MaskedImageF(tmi, bbox)
         cmi2     = afwImage.MaskedImageF(cmi, bbox)
 
-        #ds9.mtv(tmi,  frame=1)
-        #ds9.mtv(cmi,  frame=2)
-        #ds9.mtv(tmi2, frame=3)
-        #ds9.mtv(cmi2, frame=4)
-        #pdb.set_trace()
-        
         # make sure its a valid subregion!
         mask     = cmi2.getMask()
         for j in range(mask.getHeight()):
@@ -160,11 +157,6 @@ class DiffimTestCases(unittest.TestCase):
         # make sure the correct background and scaling have been determined
         self.assertAlmostEqual(bgSoln, background, 4)
         self.assertAlmostEqual(kSum, cscaling, 4)
-
-        #self.kImageIn.writeFits('k1.fits')
-        #kImageOut.writeFits('k2.fits')
-        #tmi2.getImage().writeFits('t.fits')
-        #cmi2.getImage().writeFits('c.fits')
 
         # make sure the derived kernel looks like the input kernel
         for j in range(kImageOut.getHeight()):

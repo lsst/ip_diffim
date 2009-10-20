@@ -23,7 +23,8 @@ diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary
 display = False
 writefits = False
 
-# Recover a known smoothing kernel applied to real data with noise
+# Recover a known smoothing kernel applied to real CFHT data with
+# additional noise added
 
 class DiffimTestCases(unittest.TestCase):
     
@@ -33,7 +34,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policy    = pexPolicy.Policy.createPolicy(diffimPolicy)
         self.kCols     = self.policy.getInt('kernelCols')
         self.kRows     = self.policy.getInt('kernelRows')
-        self.basisList = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
+        self.basisList = ipDiffim.generateDeltaFunctionBasisSet(self.kCols, self.kRows)
 
         # gaussian reference kernel
         self.gSize         = self.kCols
@@ -90,8 +91,10 @@ class DiffimTestCases(unittest.TestCase):
         # grab only the non-masked subregion
         bbox     = afwImage.BBox(afwImage.PointI(self.gaussKernel.getCtrX(),
                                                  self.gaussKernel.getCtrY()) ,
-                                 afwImage.PointI(imsize - (self.gaussKernel.getWidth()  - self.gaussKernel.getCtrX()),
-                                                 imsize - (self.gaussKernel.getHeight() - self.gaussKernel.getCtrY())))
+                                 afwImage.PointI(imsize - (self.gaussKernel.getWidth()  -
+                                                           self.gaussKernel.getCtrX()),
+                                                 imsize - (self.gaussKernel.getHeight() -
+                                                           self.gaussKernel.getCtrY())))
 
         # For testing only
         invert = False
@@ -124,14 +127,18 @@ class DiffimTestCases(unittest.TestCase):
 
         # accepts : imageToConvolve, imageToNotConvolve
         self.kFunctor.apply(tmi2.getImage(), smi2.getImage(), var.getVariance(), self.policy)
-        kernel    = self.kFunctor.getKernel()
+        kb     = self.kFunctor.getSolution()
+        kSoln  = kb.first
+        bgSoln = kb.second
         kImageOut = afwImage.ImageD(self.kCols, self.kRows)
-        kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi2, smi2, kernel, self.kFunctor.getBackground())
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
+        kSum      = kSoln.computeImage(kImageOut, False)
+        diffIm    = ipDiffim.convolveAndSubtract(tmi2, smi2, kSoln, bgSoln)
+        bbox      = afwImage.BBox(afwImage.PointI(kSoln.getCtrX(),
+                                                  kSoln.getCtrY()) ,
+                                  afwImage.PointI(diffIm.getWidth() - (kSoln.getWidth()  -
+                                                                       kSoln.getCtrX()),
+                                                  diffIm.getHeight() - (kSoln.getHeight() -
+                                                                        kSoln.getCtrY())))
         diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
 
         # OUTPUT
@@ -141,25 +148,6 @@ class DiffimTestCases(unittest.TestCase):
         if writefits:
             kImageOut.writeFits('k1.fits')
             diffIm2.writeFits('dA2')
-
-        # Second iteration
-        self.kFunctor.apply(tmi2.getImage(), smi2.getImage(), diffIm.getVariance(), self.policy)
-        kernel    = self.kFunctor.getKernel()
-        kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi2, smi2, kernel, self.kFunctor.getBackground())
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
-        
-        # OUTPUT
-        if display:
-            ds9.mtv(kImageOut, frame=6)
-            ds9.mtv(diffIm2, frame=7)
-        if writefits:
-            kImageOut.writeFits('k2.fits')
-            diffIm2.writeFits('dB2')
 
         # kernel sum should be 1.0 if kNorm
         if kNorm:
@@ -178,7 +166,14 @@ class DiffimTestCases(unittest.TestCase):
                     else:
                         self.assertAlmostEqual(kImageOut.get(i, j), self.kImageIn.get(i,j), 4)
 
-
+        # finally, stats on the diffim
+        imstat = ipDiffim.ImageStatisticsF()
+        imstat.apply(diffIm2)
+        self.assertAlmostEqual(imstat.getMean(), 0, 4)
+        if not addNoise:
+            self.assertAlmostEqual(imstat.getRms(), 0, 4)
+            
+        
     def testGaussian(self):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"

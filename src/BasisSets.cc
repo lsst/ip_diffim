@@ -35,7 +35,7 @@ namespace lsst { namespace ip { namespace diffim {
  *
  * @ingroup ip_diffim
  */
-afwMath::KernelList
+lsst::afw::math::KernelList
 generateDeltaFunctionBasisSet(
     unsigned int width,                 ///< number of columns in the set
     unsigned int height                 ///< number of rows in the set
@@ -66,7 +66,7 @@ generateDeltaFunctionBasisSet(
  *
  * @ingroup ip_diffim
  */
-afwMath::KernelList
+lsst::afw::math::KernelList
 generateAlardLuptonBasisSet(
     unsigned int halfWidth,                ///< size is 2*N + 1
     unsigned int nGauss,                   ///< number of gaussians
@@ -141,7 +141,7 @@ generateFiniteDifferenceRegularization(
     unsigned int width,
     unsigned int height,
     unsigned int order,
-    unsigned int boundary_style,   // 0 = unwrapped, 1 = wrapped, 2 = order-tappered ('order' is highest used)
+    unsigned int boundary_style,   // 0 = unwrapped, 1 = wrapped, 2 = order-tapered ('order' is highest used)
     unsigned int difference_style, // 0 = forward, 1 = central
     bool printB // a debug flag ... remove when done.
     ) {
@@ -152,7 +152,7 @@ generateFiniteDifferenceRegularization(
         throw LSST_EXCEPT(pexExcept::Exception, "Boundary styles 0..2 defined");
     }
     if (difference_style > 1) {
-        throw LSST_EXCEPT(pexExcept::Exception, "Only forward (0), and central (1) difference styles defined.");
+        throw LSST_EXCEPT(pexExcept::Exception, "Only forward(0), and central(1) difference types defined");
     }
 
     /* what works, and what doesn't */
@@ -418,9 +418,9 @@ generateFiniteDifferenceRegularization(
  *
  * @ingroup ip_diffim
  */
-afwMath::KernelList
+lsst::afw::math::KernelList
 renormalizeKernelList(
-    afwMath::KernelList const &kernelListIn
+    lsst::afw::math::KernelList const &kernelListIn
     ) {
     typedef afwMath::Kernel::Pixel Pixel;
     typedef afwImage::Image<Pixel> Image;

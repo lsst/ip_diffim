@@ -59,7 +59,7 @@ KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::copyImage() const 
 
 
 template <typename PixelT>
-void KernelCandidate<PixelT>::setKernel(afwMath::Kernel::Ptr kernel) {
+void KernelCandidate<PixelT>::setKernel(lsst::afw::math::Kernel::Ptr kernel) {
     _kernel     = kernel; 
     _haveKernel = true;
     
@@ -74,7 +74,7 @@ void KernelCandidate<PixelT>::setKernel(afwMath::Kernel::Ptr kernel) {
 }
 
 template <typename PixelT>
-afwMath::Kernel::Ptr KernelCandidate<PixelT>::getKernel() const {
+lsst::afw::math::Kernel::Ptr KernelCandidate<PixelT>::getKernel() const {
     if (!_haveKernel) {
         throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
     }
@@ -98,7 +98,7 @@ double KernelCandidate<PixelT>::getKsum() const {
 }
 
 template <typename PixelT>
-afwImage::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage() {
+lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage() {
     if (!_haveKernel) {
         throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
     }
@@ -106,8 +106,8 @@ afwImage::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage() {
 }
 
 template <typename PixelT>
-afwImage::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage(
-    afwMath::Kernel::Ptr kernel,
+lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage(
+    lsst::afw::math::Kernel::Ptr kernel,
     double background
     ) {
     
@@ -123,11 +123,11 @@ afwImage::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage(
 /************************************************************************************************************/
     
 template<typename PixelT>
-std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr>
+std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
 fitSpatialKernelFromCandidates(
-    PsfMatchingFunctor<PixelT> &kFunctor,       ///< kFunctor used to build the kernels
-    afwMath::SpatialCellSet const& kernelCells, ///< A SpatialCellSet containing KernelCandidates
-    pexPolicy::Policy const& policy             ///< Policy to control the processing
+    PsfMatchingFunctor<PixelT> &kFunctor,               ///< kFunctor used to build the kernels
+    lsst::afw::math::SpatialCellSet const& kernelCells, ///< A SpatialCellSet containing KernelCandidates
+    lsst::pex::policy::Policy const& policy             ///< Policy to control the processing
     ) {
     typedef typename afwImage::Image<afwMath::Kernel::Pixel> ImageT;
     
@@ -351,10 +351,10 @@ typedef float PixelT;
 template class KernelCandidate<PixelT>;
 
 template
-std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr>
+std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
 fitSpatialKernelFromCandidates<PixelT>(PsfMatchingFunctor<PixelT> &,
-                                       afwMath::SpatialCellSet const&,
-                                       pexPolicy::Policy const&);
+                                       lsst::afw::math::SpatialCellSet const&,
+                                       lsst::pex::policy::Policy const&);
 
 }}} // end of namespace lsst::ip::diffim
 

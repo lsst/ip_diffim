@@ -18,10 +18,6 @@
 #include <lsst/afw/math/Kernel.h>
 #include <lsst/afw/image/MaskedImage.h>
 
-namespace pexPolicy  = lsst::pex::policy; 
-namespace afwMath    = lsst::afw::math;
-namespace afwImage   = lsst::afw::image;
-
 namespace lsst { namespace ip { namespace diffim {
    
    /**
@@ -37,18 +33,18 @@ namespace lsst { namespace ip { namespace diffim {
      * 
      * @ingroup ip_diffim
      */
-    template <typename PixelT, typename VarT=afwImage::VariancePixel>
+    template <typename PixelT, typename VarT=lsst::afw::image::VariancePixel>
     class PsfMatchingFunctor {
     public:
         typedef boost::shared_ptr<PsfMatchingFunctor> Ptr;
-        typedef typename afwImage::MaskedImage<PixelT>::xy_locator xy_locator;
-        typedef typename afwImage::Image<VarT>::xy_locator         xyi_locator;
+        typedef typename lsst::afw::image::MaskedImage<PixelT>::xy_locator xy_locator;
+        typedef typename lsst::afw::image::Image<VarT>::xy_locator         xyi_locator;
 
         PsfMatchingFunctor(
-            afwMath::KernelList const& basisList
+            lsst::afw::math::KernelList const& basisList
             );
         PsfMatchingFunctor(
-            afwMath::KernelList const& basisList,
+            lsst::afw::math::KernelList const& basisList,
             boost::shared_ptr<Eigen::MatrixXd> const& _hMat
             );
         virtual ~PsfMatchingFunctor() {};
@@ -56,8 +52,8 @@ namespace lsst { namespace ip { namespace diffim {
         /* Shallow copy only; shared matrix product uninitialized */
         PsfMatchingFunctor(const PsfMatchingFunctor<PixelT,VarT> &rhs);
 
-        std::pair<boost::shared_ptr<afwMath::Kernel>, double> getSolution();
-        std::pair<boost::shared_ptr<afwMath::Kernel>, double> getSolutionUncertainty();
+        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolution();
+        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolutionUncertainty();
         
         /** Access to least squares info
          */
@@ -65,23 +61,23 @@ namespace lsst { namespace ip { namespace diffim {
 
         /** Access to basis list
          */
-        afwMath::KernelList getBasisList() const { return _basisList; }
+        lsst::afw::math::KernelList getBasisList() const { return _basisList; }
 
         /* Create PSF matching kernel */
-        void apply(afwImage::Image<PixelT> const& imageToConvolve,
-                   afwImage::Image<PixelT> const& imageToNotConvolve,
-                   afwImage::Image<VarT>   const& varianceEstimate,
-                   pexPolicy::Policy       const& policy
+        void apply(lsst::afw::image::Image<PixelT> const& imageToConvolve,
+                   lsst::afw::image::Image<PixelT> const& imageToNotConvolve,
+                   lsst::afw::image::Image<VarT>   const& varEstimate,
+                   lsst::pex::policy::Policy       const& policy
             );
 
     protected:
-        afwMath::KernelList const _basisList;                    ///< List of Kernel basis functions
+        lsst::afw::math::KernelList const _basisList;            ///< List of Kernel basis functions
         boost::shared_ptr<Eigen::MatrixXd> _mMat;                ///< Least squares matrix
         boost::shared_ptr<Eigen::VectorXd> _bVec;                ///< Least squares vector
         boost::shared_ptr<Eigen::VectorXd> _sVec;                ///< Least square solution
         boost::shared_ptr<Eigen::MatrixXd> const _hMat;          ///< Regularization matrix
         bool _initialized;                                       ///< Has been solved for
-        bool _regularize;                                        ///< Has a _H matrix
+        bool _regularize;                                        ///< Has a _hMat matrix
     };
     
     /**
@@ -93,7 +89,7 @@ namespace lsst { namespace ip { namespace diffim {
      */
     template <typename PixelT>
     typename PsfMatchingFunctor<PixelT>::Ptr
-    makePsfMatchingFunctor(afwMath::KernelList const& basisList) {
+    makePsfMatchingFunctor(lsst::afw::math::KernelList const& basisList) {
         return typename PsfMatchingFunctor<PixelT>::Ptr(new PsfMatchingFunctor<PixelT>(basisList));
     }
 
@@ -101,13 +97,13 @@ namespace lsst { namespace ip { namespace diffim {
      * @brief Helper method to return a pointer to a PsfMatchingFunctor() with regularization
      *
      * @param basisList  Input set of basis kernels to use for Psf matching
-     * @param H  Regularization matrix (for delta-function bases)
+     * @param _hMat  Regularization matrix (for delta-function bases)
      *
      * @ingroup ip_diffim
      */
     template <typename PixelT>
     typename PsfMatchingFunctor<PixelT>::Ptr
-    makePsfMatchingFunctor(afwMath::KernelList const& basisList,
+    makePsfMatchingFunctor(lsst::afw::math::KernelList const& basisList,
                            boost::shared_ptr<Eigen::MatrixXd> const _hMat) {
         return typename PsfMatchingFunctor<PixelT>::Ptr(new PsfMatchingFunctor<PixelT>(basisList, _hMat));
     }

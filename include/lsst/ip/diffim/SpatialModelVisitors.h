@@ -139,7 +139,7 @@ public:
                 if (fabs(kCandidate->getKsum() - _kSumMean) > (_dkSumMax)) {
                     kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                     pexLogging::TTrace<4>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
-                                          "Rejecting candidate %d due to bad source kernel sum : (%.2f %.2f %.2f)",
+                                          "Rejecting candidate %d; bad source kernel sum : (%.2f %.2f %.2f)",
                                           kCandidate->getId(),
                                           kCandidate->getKsum(), _kSumMean, _dkSumMax);
                     _nRejected += 1;
@@ -154,7 +154,9 @@ public:
     
     void processKsumDistribution() {
         try {
-            afwMath::Statistics stats = afwMath::makeStatistics(_kSums, afwMath::NPOINT | afwMath::MEANCLIP | afwMath::STDEVCLIP); 
+            afwMath::Statistics stats = afwMath::makeStatistics(_kSums, afwMath::NPOINT | 
+                                                                afwMath::MEANCLIP | 
+                                                                afwMath::STDEVCLIP); 
             _kSumMean = stats.getValue(afwMath::MEANCLIP);
             _kSumStd  = stats.getValue(afwMath::STDEVCLIP);
             _kSumNpts = static_cast<int>(stats.getValue(afwMath::NPOINT));
@@ -164,7 +166,8 @@ public:
         }
         _dkSumMax = _policy.getDouble("maxKsumSigma") * _kSumStd;
         pexLogging::TTrace<2>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
-                              "Kernel Sum Distribution : %.3f +/- %.3f (%d points)", _kSumMean, _kSumStd, _kSumNpts);
+                              "Kernel Sum Distribution : %.3f +/- %.3f (%d points)", 
+                              _kSumMean, _kSumStd, _kSumNpts);
     }
 
 private:
@@ -276,7 +279,8 @@ public:
          */
         _mean = _imagePca->getMean();
         afwImage::ImagePca<ImageT>::ImageList imageList = _imagePca->getImageList();
-        for (typename afwImage::ImagePca<ImageT>::ImageList::const_iterator ptr = imageList.begin(), end = imageList.end(); ptr != end; ++ptr) {
+        for (typename afwImage::ImagePca<ImageT>::ImageList::const_iterator ptr = imageList.begin(), 
+                 end = imageList.end(); ptr != end; ++ptr) {
             **ptr -= *_mean;
         }
     } 
@@ -456,7 +460,8 @@ public:
          * However you *always* need to reset M and B since these are used *
          * in the spatial fitting
          */
-        std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> > mb = _kFunctor.getAndClearMB();
+        std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> > mb = 
+            _kFunctor.getAndClearMB();
         kCandidate->setM(mb.first);
         kCandidate->setB(mb.second);
         
@@ -590,7 +595,10 @@ private:
     policy->set("kernelBasisSet", "delta-function");
     policy->set("usePcaForSpatialKernel", true);
 
-    detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse, spatialKernelOrder, spatialBgOrder, *policy);
+    detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse, 
+                                                                  spatialKernelOrder, 
+                                                                  spatialBgOrder, 
+                                                                  *policy);
     kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
     spatialKernelFitter.solveLinearEquation();
     std::pair<afwMath::LinearCombinationKernel::Ptr, 
@@ -614,8 +622,8 @@ class BuildSpatialKernelVisitor : public afwMath::CandidateVisitor {
 public:
     BuildSpatialKernelVisitor(
         afwMath::KernelList basisList,   ///< Basis functions used in the fit
-        int const spatialKernelOrder,    ///< Order of spatial kernel variation (cf. lsst::afw::math::PolynomialFunction2)
-        int const spatialBgOrder,        ///< Order of spatial bg variation (cf. lsst::afw::math::PolynomialFunction2)
+        int const spatialKernelOrder,    ///< Order of spatial kernel variation
+        int const spatialBgOrder,        ///< Order of spatial bg variation 
         pexPolicy::Policy policy         ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
@@ -641,7 +649,8 @@ public:
            matrix math even though its probably more readable, so we go with the
            former.
         */
-        if ((_policy.getString("kernelBasisSet") == "alard-lupton") || _policy.getBool("usePcaForSpatialKernel")) {
+        if ((_policy.getString("kernelBasisSet") == "alard-lupton") || 
+            _policy.getBool("usePcaForSpatialKernel")) {
             _constantFirstTerm = true;
         }
         
@@ -749,7 +758,8 @@ public:
         /* Fill in the spatial blocks */
         for(unsigned int m1 = m0; m1 < _nbases; m1++)  {
             /* Diagonal kernel-kernel term; only use upper triangular part of pKpKt */
-            _mMat.block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += (*qMat)(m1,m1) * pKpKt.part<Eigen::UpperTriangular>();
+            _mMat.block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += (*qMat)(m1,m1) * 
+                pKpKt.part<Eigen::UpperTriangular>();
             
             /* Kernel-kernel terms */
             for(unsigned int m2 = m1+1; m2 < _nbases; m2++)  {
@@ -764,7 +774,8 @@ public:
         }
         
         /* Background-background terms only */
-        _mMat.block(mb, mb, _nbt, _nbt) += (*qMat)(_nbases,_nbases) * pBpBt.part<Eigen::UpperTriangular>();
+        _mMat.block(mb, mb, _nbt, _nbt) += (*qMat)(_nbases,_nbases) * 
+            pBpBt.part<Eigen::UpperTriangular>();
         _bVec.segment(mb, _nbt)         += (*wVec)(_nbases) * pB;
         
         if (DEBUG_MATRIX) {
@@ -823,7 +834,7 @@ public:
                                               "Unable to determine kernel via eigen-values");
                         
                         throw LSST_EXCEPT(pexExcept::Exception, 
-                                          "Unable to determine kernel solution in SpatialModelKernel::solveLinearEquation");
+                                          "Unable to determine kernel solution");
                     }
                 }
             }
@@ -847,7 +858,9 @@ public:
             afwMath::Kernel::SpatialFunctionPtr spatialFunction(_spatialKernelFunction->copy());
             spatialFunctionList.push_back(spatialFunction);
         }
-        afwMath::LinearCombinationKernel::Ptr spatialKernel(new afwMath::LinearCombinationKernel(_basisList, spatialFunctionList));
+        afwMath::LinearCombinationKernel::Ptr spatialKernel(
+            new afwMath::LinearCombinationKernel(_basisList, spatialFunctionList)
+            );
         
         /* Set up background */
         afwMath::Kernel::SpatialFunctionPtr bgFunction(_spatialBgFunction->copy());
@@ -905,7 +918,9 @@ private:
  * @brief Asseses the quality of a candidate given a spatial kernel and background model
  *
  * @code
-    detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel, spatialBackground, policy);
+    detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel, 
+                                                                     spatialBackground, 
+                                                                     policy);
     spatialKernelAssessor.reset();
     kernelCells.visitCandidates(&spatialKernelAssessor, nStarPerCell);
     nRejected = spatialKernelAssessor.getNRejected();
@@ -964,14 +979,18 @@ public:
         */
         afwImage::Image<double> kImage(_spatialKernel->getDimensions());
         double kSum = _spatialKernel->computeImage(kImage, false, 
-                                                   afwImage::indexToPosition(static_cast<int>(kCandidate->getXCenter())),
-                                                   afwImage::indexToPosition(static_cast<int>(kCandidate->getYCenter())));
+                                                   afwImage::indexToPosition(
+                                                       static_cast<int>(kCandidate->getXCenter())),
+                                                   afwImage::indexToPosition(
+                                                       static_cast<int>(kCandidate->getYCenter())));
         boost::shared_ptr<afwMath::Kernel>
             kernelPtr(new afwMath::FixedKernel(kImage));
         /* </hack> */
         
-        double background = (*_spatialBackground)(afwImage::indexToPosition(static_cast<int>(kCandidate->getXCenter())),
-                                                  afwImage::indexToPosition(static_cast<int>(kCandidate->getYCenter())));
+        double background = (*_spatialBackground)(afwImage::indexToPosition(
+                                                      static_cast<int>(kCandidate->getXCenter())),
+                                                  afwImage::indexToPosition(
+                                                      static_cast<int>(kCandidate->getYCenter())));
         
         MaskedImageT diffim = kCandidate->returnDifferenceImage(kernelPtr, background);
         

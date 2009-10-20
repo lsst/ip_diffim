@@ -40,7 +40,7 @@ namespace lsst { namespace ip { namespace diffim {
  */
 template <typename PixelT>
 Eigen::MatrixXd imageToEigenMatrix(
-    afwImage::Image<PixelT> const &img
+    lsst::afw::image::Image<PixelT> const &img
     ) {
     unsigned int rows = img.getHeight();
     unsigned int cols = img.getWidth();
@@ -65,8 +65,8 @@ Eigen::MatrixXd imageToEigenMatrix(
  *
  */
 template <typename PixelT>
-void addToImage(afwImage::Image<PixelT> &image,
-                afwMath::Function2<double> const &function
+void addToImage(lsst::afw::image::Image<PixelT> &image,
+                lsst::afw::math::Function2<double> const &function
     ) {
     
     // Set the pixels row by row, to avoid repeated checks for end-of-row
@@ -84,7 +84,7 @@ void addToImage(afwImage::Image<PixelT> &image,
  * @brief Adds a scalar to an Image
  */
 template <typename PixelT>
-void addToImage(afwImage::Image<PixelT> &image,
+void addToImage(lsst::afw::image::Image<PixelT> &image,
                 double value
     ) {
     if (value != 0.0) {
@@ -109,9 +109,9 @@ void addToImage(afwImage::Image<PixelT> &image,
  */
 template <typename PixelT, typename BackgroundT>
 afwImage::MaskedImage<PixelT> convolveAndSubtract(
-    afwImage::MaskedImage<PixelT> const &imageToConvolve,    ///< Image T to convolve with Kernel
-    afwImage::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract T from
-    afwMath::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used
+    lsst::afw::image::MaskedImage<PixelT> const &imageToConvolve,    ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract T from
+    lsst::afw::math::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used
     BackgroundT background,                                  ///< Differential background 
     bool invert                                              ///< Invert the output difference image
     ) {
@@ -158,9 +158,9 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
  */
 template <typename PixelT, typename BackgroundT>
 afwImage::MaskedImage<PixelT> convolveAndSubtract(
-    afwImage::Image<PixelT> const &imageToConvolve,          ///< Image T to convolve with Kernel
-    afwImage::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract T from
-    afwMath::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used
+    lsst::afw::image::Image<PixelT> const &imageToConvolve,          ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract T from
+    lsst::afw::math::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used
     BackgroundT background,                                  ///< Differential background 
     bool invert                                              ///< Invert the output difference image
     ) {
@@ -210,9 +210,9 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
  */
 template <typename PixelT>
 std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-    afwImage::MaskedImage<PixelT> const &imageToConvolve,    
-    afwImage::MaskedImage<PixelT> const &imageToNotConvolve, 
-    pexPolicy::Policy             const &policy                                       
+    lsst::afw::image::MaskedImage<PixelT> const &imageToConvolve,    
+    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, 
+    lsst::pex::policy::Policy             const &policy                                       
     ) {
     
     // Parse the Policy
@@ -388,12 +388,12 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
 
 // Explicit instantiations
 template 
-Eigen::MatrixXd imageToEigenMatrix(afwImage::Image<float> const &);
+Eigen::MatrixXd imageToEigenMatrix(lsst::afw::image::Image<float> const &);
 
 template 
-Eigen::MatrixXd imageToEigenMatrix(afwImage::Image<double> const &);
+Eigen::MatrixXd imageToEigenMatrix(lsst::afw::image::Image<double> const &);
 
-template class FindSetBits<afwImage::Mask<> >;
+template class FindSetBits<lsst::afw::image::Mask<> >;
 template class ImageStatistics<float>;
 template class ImageStatistics<double>;
 
@@ -401,19 +401,19 @@ template class ImageStatistics<double>;
 
 #define p_INSTANTIATE_convolveAndSubtract(TEMPLATE_IMAGE_T, TYPE)     \
     template \
-    afwImage::MaskedImage<TYPE> convolveAndSubtract( \
-        afwImage::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
-        afwImage::MaskedImage<TYPE> const& imageToNotConvolve, \
-        afwMath::Kernel const& convolutionKernel, \
-        double background, \
-        bool invert);      \
+    lsst::afw::image::MaskedImage<TYPE> convolveAndSubtract(            \
+        lsst::afw::image::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
+        lsst::afw::image::MaskedImage<TYPE> const& imageToNotConvolve,  \
+        lsst::afw::math::Kernel const& convolutionKernel,               \
+        double background,                                              \
+        bool invert);                                                   \
     \
     template \
     afwImage::MaskedImage<TYPE> convolveAndSubtract( \
-        afwImage::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
-        afwImage::MaskedImage<TYPE> const& imageToNotConvolve, \
-        afwMath::Kernel const& convolutionKernel, \
-        afwMath::Function2<double> const& backgroundFunction, \
+        lsst::afw::image::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
+        lsst::afw::image::MaskedImage<TYPE> const& imageToNotConvolve, \
+        lsst::afw::math::Kernel const& convolutionKernel, \
+        lsst::afw::math::Function2<double> const& backgroundFunction, \
         bool invert); \
 
 #define INSTANTIATE_convolveAndSubtract(TYPE) \
@@ -432,36 +432,36 @@ INSTANTIATE_convolveAndSubtract(double);
 
 
 template
-std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-    afwImage::MaskedImage<float> const &,
-    afwImage::MaskedImage<float> const &,
-    pexPolicy::Policy const &);
+std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
+    lsst::afw::image::MaskedImage<float> const &,
+    lsst::afw::image::MaskedImage<float> const &,
+    lsst::pex::policy::Policy const &);
 
 template
-std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-    afwImage::MaskedImage<double> const &,
-    afwImage::MaskedImage<double> const &,
+std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
+    lsst::afw::image::MaskedImage<double> const &,
+    lsst::afw::image::MaskedImage<double> const &,
     pexPolicy::Policy  const &);
 
 template 
 void addToImage(
-    afwImage::Image<float> &,
-    afwMath::Function2<double> const &
+    lsst::afw::image::Image<float> &,
+    lsst::afw::math::Function2<double> const &
     );
 template 
 void addToImage(
-    afwImage::Image<double> &,
-    afwMath::Function2<double> const &
+    lsst::afw::image::Image<double> &,
+    lsst::afw::math::Function2<double> const &
     );
 
 template 
 void addToImage(
-    afwImage::Image<float> &,
+    lsst::afw::image::Image<float> &,
     double
     );
 template 
 void addToImage(
-    afwImage::Image<double> &,
+    lsst::afw::image::Image<double> &,
     double
     );
 

@@ -36,7 +36,7 @@ namespace lsst { namespace ip { namespace diffim {
 //
 template <typename PixelT, typename VarT>
 PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
-    afwMath::KernelList const &basisList
+    lsst::afw::math::KernelList const &basisList
     ) :
     _basisList(basisList),
     _mMat(),
@@ -49,7 +49,7 @@ PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
 
 template <typename PixelT, typename VarT>
 PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
-    afwMath::KernelList const &basisList,
+    lsst::afw::math::KernelList const &basisList,
     boost::shared_ptr<Eigen::MatrixXd> const &hMat
     ) :
     _basisList(basisList),
@@ -80,10 +80,10 @@ PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
 
 template <typename PixelT, typename VarT>
 void PsfMatchingFunctor<PixelT, VarT>::apply(
-    afwImage::Image<PixelT> const &imageToConvolve,    ///< Image to apply kernel to
-    afwImage::Image<PixelT> const &imageToNotConvolve, ///< Image whose PSF you want to match to
-    afwImage::Image<VarT>   const &varianceEstimate,   ///< Estimate of the variance per pixel
-    pexPolicy::Policy       const &policy              ///< Policy file
+    lsst::afw::image::Image<PixelT> const &imageToConvolve,    ///< Image to apply kernel to
+    lsst::afw::image::Image<PixelT> const &imageToNotConvolve, ///< Image whose PSF you want to match to
+    lsst::afw::image::Image<VarT>   const &varEstimate,        ///< Estimate of the variance per pixel
+    lsst::pex::policy::Policy       const &policy              ///< Policy file
     ) {
     
     unsigned int const nKernelParameters     = _basisList.size();
@@ -137,9 +137,9 @@ void PsfMatchingFunctor<PixelT, VarT>::apply(
     Eigen::MatrixXd eigenToNotConvolve = imageToEigenMatrix(imageToNotConvolve).block(startRow, startCol, 
                                                                                       endRow-startRow, 
                                                                                       endCol-startCol);
-    Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
-                                                                                endRow-startRow, 
-                                                                                endCol-startCol).cwise().inverse();
+    Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(varEstimate).block(startRow, startCol, 
+                                                                           endRow-startRow, 
+                                                                           endCol-startCol).cwise().inverse();
     /* Resize into 1-D for later usage */
     eigenToConvolve.resize(eigenToConvolve.rows()*eigenToConvolve.cols(), 1);
     eigenToNotConvolve.resize(eigenToNotConvolve.rows()*eigenToNotConvolve.cols(), 1);
@@ -157,7 +157,10 @@ void PsfMatchingFunctor<PixelT, VarT>::apply(
     for (; kiter != _basisList.end(); ++kiter, ++eiter) {
         afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
         boost::shared_ptr<Eigen::MatrixXd> cMat (
-            new Eigen::MatrixXd(imageToEigenMatrix(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol))
+            new Eigen::MatrixXd(imageToEigenMatrix(cimage).block(startRow, 
+                                                                 startCol, 
+                                                                 endRow-startRow, 
+                                                                 endCol-startCol))
             );
         cMat->resize(cMat->rows()*cMat->cols(), 1);
         *eiter = cMat;
@@ -291,7 +294,7 @@ void PsfMatchingFunctor<PixelT, VarT>::apply(
                     pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                                       "Unable to determine kernel via eigen-values");
                     
-                    throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution in PsfMatchingFunctor::apply");
+                    throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution");
                 }
             }
         }
@@ -319,7 +322,7 @@ void PsfMatchingFunctor<PixelT, VarT>::apply(
 }
 
 template <typename PixelT, typename VarT>
-std::pair<boost::shared_ptr<afwMath::Kernel>, double>
+std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
 PsfMatchingFunctor<PixelT, VarT>::getSolution() {
 
     if (!(_initialized)) {
@@ -353,7 +356,7 @@ PsfMatchingFunctor<PixelT, VarT>::getSolution() {
 }
 
 template <typename PixelT, typename VarT>
-std::pair<boost::shared_ptr<afwMath::Kernel>, double>
+std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
 PsfMatchingFunctor<PixelT, VarT>::getSolutionUncertainty() {
 
     if (!(_initialized)) {
@@ -388,11 +391,11 @@ PsfMatchingFunctor<PixelT, VarT>::getSolutionUncertainty() {
         // Insanity checking
         if (std::isnan(Error2(idx, idx))) {
             throw LSST_EXCEPT(pexExcept::Exception, 
-                              str(boost::format("Unable to determine kernel uncertainty %d (nan)") % idx));
+                              str(boost::format("Unable to determine kernel err %d (nan)") % idx));
         }
         if (Error2(idx, idx) < 0.0) {
             throw LSST_EXCEPT(pexExcept::Exception,
-                              str(boost::format("Unable to determine kernel uncertainty, negative variance %d (%.3e)") % 
+                              str(boost::format("Unable to determine kernel err, negative var %d (%.3e)") % 
                                   idx % Error2(idx, idx)));
         }
         kErrValues[idx] = std::sqrt(Error2(idx, idx));
@@ -403,11 +406,11 @@ PsfMatchingFunctor<PixelT, VarT>::getSolutionUncertainty() {
  
     // Estimate of Background and Background Error */
     if (std::isnan(Error2(nParameters-1, nParameters-1))) {
-        throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine background uncertainty (nan)");
+        throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine background err (nan)");
     }
     if (Error2(nParameters-1, nParameters-1) < 0.0) {
         throw LSST_EXCEPT(pexExcept::Exception, 
-                          str(boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % 
+                          str(boost::format("Unable to determine background err, negative var (%.3e)") % 
                               Error2(nParameters-1, nParameters-1) 
                               ));
     }
