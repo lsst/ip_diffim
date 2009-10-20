@@ -24,9 +24,12 @@
 #include <lsst/afw/image.h>
 #include <lsst/afw/detection/Footprint.h>
 
-namespace lsst {
-namespace ip {
-namespace diffim {
+namespace afwImage   = lsst::afw::image;
+namespace afwMath    = lsst::afw::math;
+namespace afwDetect  = lsst::afw::detection;
+namespace pexPolicy  = lsst::pex::policy; 
+
+namespace lsst { namespace ip { namespace diffim {
 
     
     /** Mask plane definitions */
@@ -52,10 +55,10 @@ namespace diffim {
      *
      */
     template <typename MaskT>
-    class FindSetBits : public lsst::afw::detection::FootprintFunctor<MaskT> {
+    class FindSetBits : public afwDetect::FootprintFunctor<MaskT> {
     public:
         FindSetBits(MaskT const& mask) : 
-            lsst::afw::detection::FootprintFunctor<MaskT>(mask), _bits(0) {;}
+            afwDetect::FootprintFunctor<MaskT>(mask), _bits(0) {;}
         
         void operator()(typename MaskT::xy_locator loc, ///< locator pointing at the pixel
                         int x,                          ///< column-position of pixel
@@ -86,7 +89,7 @@ namespace diffim {
     class ImageStatistics {
     public:
         typedef boost::shared_ptr<ImageStatistics> Ptr;
-        typedef typename lsst::afw::image::MaskedImage<PixelT>::x_iterator x_iterator;
+        typedef typename afwImage::MaskedImage<PixelT>::x_iterator x_iterator;
 
         ImageStatistics() : 
             _xsum(0.), _x2sum(0.), _npix(0) {} ;
@@ -96,7 +99,7 @@ namespace diffim {
         void reset() { _xsum = _x2sum = 0.; _npix = 0;}
 
         // Work your magic
-        void apply(lsst::afw::image::MaskedImage<PixelT> const& image) {
+        void apply(afwImage::MaskedImage<PixelT> const& image) {
             reset();
             for (int y = 0; y != image.getHeight(); ++y) {
                 for (x_iterator ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
@@ -126,7 +129,7 @@ namespace diffim {
         int getNpix() const { return _npix; }
 
         // Return Sdqa rating
-        bool evaluateQuality(lsst::pex::policy::Policy const& policy) {
+        bool evaluateQuality(pexPolicy::Policy const& policy) {
             if ( fabs(getMean())     > policy.getDouble("maximumFootprintResidualMean") ) return false;
             if ( getRms()            > policy.getDouble("maximumFootprintResidualStd")  ) return false;
             return true;
@@ -153,10 +156,10 @@ namespace diffim {
      * @ingroup ip_diffim
      */
     template <typename PixelT, typename BackgroundT>
-    lsst::afw::image::MaskedImage<PixelT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<PixelT> const& imageToConvolve,
-        lsst::afw::image::MaskedImage<PixelT> const& imageToNotConvolve,
-        lsst::afw::math::Kernel const& convolutionKernel,
+    afwImage::MaskedImage<PixelT> convolveAndSubtract(
+        afwImage::MaskedImage<PixelT> const& imageToConvolve,
+        afwImage::MaskedImage<PixelT> const& imageToNotConvolve,
+        afwMath::Kernel const& convolutionKernel,
         BackgroundT background,
         bool invert=true
         );
@@ -175,10 +178,10 @@ namespace diffim {
      * @ingroup ip_diffim
      */
     template <typename PixelT, typename BackgroundT>
-    lsst::afw::image::MaskedImage<PixelT> convolveAndSubtract(
-        lsst::afw::image::Image<PixelT> const& imageToConvolve,
-        lsst::afw::image::MaskedImage<PixelT> const& imageToNotConvolve,
-        lsst::afw::math::Kernel const& convolutionKernel,
+    afwImage::MaskedImage<PixelT> convolveAndSubtract(
+        afwImage::Image<PixelT> const& imageToConvolve,
+        afwImage::MaskedImage<PixelT> const& imageToNotConvolve,
+        afwMath::Kernel const& convolutionKernel,
         BackgroundT background,
         bool invert=true
         );
@@ -195,10 +198,10 @@ namespace diffim {
      * @ingroup ip_diffim
      */    
     template <typename PixelT>
-    std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-        lsst::afw::image::MaskedImage<PixelT> const& imageToConvolve,
-        lsst::afw::image::MaskedImage<PixelT> const& imageToNotConvolve,
-        lsst::pex::policy::Policy             const& policy
+    std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
+        afwImage::MaskedImage<PixelT> const& imageToConvolve,
+        afwImage::MaskedImage<PixelT> const& imageToNotConvolve,
+        pexPolicy::Policy             const& policy
         );
 
     /**
@@ -210,7 +213,7 @@ namespace diffim {
      */
     template <typename PixelT>
     Eigen::MatrixXd imageToEigenMatrix(
-        lsst::afw::image::Image<PixelT> const& img
+        afwImage::Image<PixelT> const& img
         );
     
     /**
@@ -222,8 +225,8 @@ namespace diffim {
      * @ingroup ip_diffim
      */
     template <typename PixelT>
-    void addSomethingToImage(lsst::afw::image::Image<PixelT> &image,
-                             lsst::afw::math::Function2<double> const &function);
+    void addSomethingToImage(afwImage::Image<PixelT> &image,
+                             afwMath::Function2<double> const &function);
 
     /**
      * @brief Helper method to add a double to an Image
@@ -234,7 +237,7 @@ namespace diffim {
      * @ingroup ip_diffim
      */
     template <typename PixelT>
-    void addSomethingToImage(lsst::afw::image::Image<PixelT> &image,
+    void addSomethingToImage(afwImage::Image<PixelT> &image,
                              double value);
 
 }}}

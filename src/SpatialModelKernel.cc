@@ -34,9 +34,7 @@ namespace pexLogging     = lsst::pex::logging;
 namespace pexExcept      = lsst::pex::exceptions; 
 namespace pexPolicy      = lsst::pex::policy; 
 
-namespace lsst {
-namespace ip {
-namespace diffim {
+namespace lsst { namespace ip { namespace diffim {
             
 template <typename PixelT>
 KernelCandidate<PixelT>::ImageT::ConstPtr KernelCandidate<PixelT>::getImage() const {
@@ -59,7 +57,7 @@ KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::copyImage() const 
 
 
 template <typename PixelT>
-void KernelCandidate<PixelT>::setKernel(lsst::afw::math::Kernel::Ptr kernel) {
+void KernelCandidate<PixelT>::setKernel(afwMath::Kernel::Ptr kernel) {
     _kernel     = kernel; 
     _haveKernel = true;
     
@@ -98,7 +96,7 @@ double KernelCandidate<PixelT>::getKsum() const {
 }
 
 template <typename PixelT>
-lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage() {
+afwImage::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage() {
     if (!_haveKernel) {
         throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
     }
@@ -106,16 +104,16 @@ lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceI
 }
 
 template <typename PixelT>
-lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage(
-    lsst::afw::math::Kernel::Ptr kernel,
+afwImage::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage(
+    afwMath::Kernel::Ptr kernel,
     double background
     ) {
     
     /* Make diffim and set chi2 from result */
-    lsst::afw::image::MaskedImage<PixelT> diffim = convolveAndSubtract(*_miToConvolvePtr,
-                                                                       *_miToNotConvolvePtr,
-                                                                       *kernel,
-                                                                       background);
+    afwImage::MaskedImage<PixelT> diffim = convolveAndSubtract(*_miToConvolvePtr,
+                                                               *_miToNotConvolvePtr,
+                                                               *kernel,
+                                                               background);
     return diffim;
     
 }
@@ -348,8 +346,8 @@ template class KernelCandidate<PixelT>;
 template
 std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr>
 fitSpatialKernelFromCandidates<PixelT>(PsfMatchingFunctor<PixelT> &,
-                                       lsst::afw::math::SpatialCellSet const&,
-                                       lsst::pex::policy::Policy const&);
+                                       afwMath::SpatialCellSet const&,
+                                       pexPolicy::Policy const&);
 
 }}} // end of namespace lsst::ip::diffim
 

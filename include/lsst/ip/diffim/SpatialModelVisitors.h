@@ -43,10 +43,7 @@ namespace pexLogging     = lsst::pex::logging;
 namespace pexExcept      = lsst::pex::exceptions; 
 namespace pexPolicy      = lsst::pex::policy; 
 
-namespace lsst {
-namespace ip {
-namespace diffim {
-namespace detail {
+namespace lsst { namespace ip { namespace diffim { namespace detail {
 
 /**
  * @class KernelSumVisitor
@@ -89,7 +86,7 @@ public:
     enum Mode {AGGREGATE = 0, REJECT = 1};
     
     KernelSumVisitor(
-        lsst::pex::policy::Policy const& policy ///< Policy file directing behavior
+        pexPolicy::Policy const& policy ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _mode(AGGREGATE),
@@ -127,7 +124,7 @@ public:
     void processCandidate(afwMath::SpatialCellCandidate *candidate) {
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
-            throw LSST_EXCEPT(lsst::pex::exceptions::LogicErrorException,
+            throw LSST_EXCEPT(pexExcept::LogicErrorException,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
         pexLogging::TTrace<6>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
@@ -161,7 +158,7 @@ public:
             _kSumMean = stats.getValue(afwMath::MEANCLIP);
             _kSumStd  = stats.getValue(afwMath::STDEVCLIP);
             _kSumNpts = static_cast<int>(stats.getValue(afwMath::NPOINT));
-        } catch (lsst::pex::exceptions::Exception &e) {
+        } catch (pexExcept::Exception &e) {
             LSST_EXCEPT_ADD(e, "Kernel Sum Statistics");
             throw e;
         }
@@ -178,7 +175,7 @@ private:
     double _dkSumMax;
     int    _kSumNpts;
     int    _nRejected;
-    lsst::pex::policy::Policy _policy;
+    pexPolicy::Policy _policy;
 };    
 
 
@@ -225,7 +222,7 @@ private:
  */
 template<typename PixelT>
 class SetPcaImageVisitor : public afwMath::CandidateVisitor {
-    typedef afwImage::Image<lsst::afw::math::Kernel::Pixel> ImageT;
+    typedef afwImage::Image<afwMath::Kernel::Pixel> ImageT;
 public:
     
     SetPcaImageVisitor(
@@ -238,7 +235,7 @@ public:
     void processCandidate(afwMath::SpatialCellCandidate *candidate) {
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
-            throw LSST_EXCEPT(lsst::pex::exceptions::LogicErrorException,
+            throw LSST_EXCEPT(pexExcept::LogicErrorException,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
         
@@ -248,7 +245,7 @@ public:
             *kImage           /= kCandidate->getKsum();
             /* Tell imagePca they have the same weighting in the Pca */
             _imagePca->addImage(kImage, 1.0);
-        } catch(lsst::pex::exceptions::LengthErrorException &e) {
+        } catch(pexExcept::LengthErrorException &e) {
             return;
         }
     }
@@ -360,7 +357,7 @@ class BuildSingleKernelVisitor : public afwMath::CandidateVisitor {
 public:
     BuildSingleKernelVisitor(
         PsfMatchingFunctor<PixelT> &kFunctor,   ///< Functor that builds the kernels
-        lsst::pex::policy::Policy const& policy ///< Policy file directing behavior
+        pexPolicy::Policy const& policy ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _kFunctor(kFunctor),
@@ -398,7 +395,7 @@ public:
     void processCandidate(afwMath::SpatialCellCandidate *candidate) {
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
-            throw LSST_EXCEPT(lsst::pex::exceptions::LogicErrorException,
+            throw LSST_EXCEPT(pexExcept::LogicErrorException,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
         
@@ -426,7 +423,7 @@ public:
                             *(kCandidate->getMiToNotConvolvePtr()->getImage()),
                             *(var.getVariance()),
                             _policy);
-        } catch (lsst::pex::exceptions::Exception &e) {
+        } catch (pexExcept::Exception &e) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                   "Unable to process candidate; exception caught (%s)", e.what());
@@ -439,10 +436,10 @@ public:
            second fitting loop after the results of the first fitting loop
            are used to define a PCA basis
         */
-        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> KB;
+        std::pair<boost::shared_ptr<afwMath::Kernel>, double> KB;
         try {
             KB = _kFunctor.getSolution();
-        } catch (lsst::pex::exceptions::Exception &e) {
+        } catch (pexExcept::Exception &e) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                   "Unable to process candidate; exception caught (%s)", e.what());
@@ -482,14 +479,14 @@ public:
                                 *(kCandidate->getMiToNotConvolvePtr()->getImage()),
                                 *(diffim.getVariance()),
                                 _policy);
-            } catch (lsst::pex::exceptions::Exception &e) {
+            } catch (pexExcept::Exception &e) {
                 LSST_EXCEPT_ADD(e, "Unable to recalculate Kernel");
                 throw e;
             }
 
             try {
                 KB = _kFunctor.getSolution();
-            } catch (lsst::pex::exceptions::Exception &e) {
+            } catch (pexExcept::Exception &e) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                       "Unable to process candidate; exception caught (%s)", e.what());
@@ -572,7 +569,7 @@ public:
     }
 private:
     PsfMatchingFunctor<PixelT> _kFunctor;
-    lsst::pex::policy::Policy _policy;
+    pexPolicy::Policy _policy;
     ImageStatistics<PixelT> _imstats;
     bool _setCandidateKernel;
     bool _skipBuilt;
@@ -619,7 +616,7 @@ public:
         afwMath::KernelList basisList,   ///< Basis functions used in the fit
         int const spatialKernelOrder,    ///< Order of spatial kernel variation (cf. lsst::afw::math::PolynomialFunction2)
         int const spatialBgOrder,        ///< Order of spatial bg variation (cf. lsst::afw::math::PolynomialFunction2)
-        lsst::pex::policy::Policy policy ///< Policy file directing behavior
+        pexPolicy::Policy policy         ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _basisList(basisList),
@@ -670,7 +667,7 @@ public:
     void processCandidate(afwMath::SpatialCellCandidate *candidate) {
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
-            throw LSST_EXCEPT(lsst::pex::exceptions::LogicErrorException,
+            throw LSST_EXCEPT(pexExcept::LogicErrorException,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
         if (!(kCandidate->hasKernel())) {
@@ -897,7 +894,7 @@ private:
     unsigned int _nkt;        ///< Number of kernel terms in spatial model
     unsigned int _nbt;        ///< Number of backgruond terms in spatial model
     unsigned int _nt;         ///< Total number of terms in the solution; also dimensions of matrices
-    lsst::pex::policy::Policy _policy;
+    pexPolicy::Policy _policy;
     bool _constantFirstTerm;  ///< Is the first term spatially invariant?
 };
 
@@ -926,7 +923,7 @@ public:
     AssessSpatialKernelVisitor(
         afwMath::LinearCombinationKernel::Ptr spatialKernel,   ///< Spatially varying kernel model
         afwMath::Kernel::SpatialFunctionPtr spatialBackground, ///< Spatially varying backgound model
-        lsst::pex::policy::Policy const& policy                ///< Policy file directing behavior
+        pexPolicy::Policy const& policy                        ///< Policy file directing behavior
         ) : 
         afwMath::CandidateVisitor(),
         _spatialKernel(spatialKernel),
@@ -948,7 +945,7 @@ public:
     void processCandidate(afwMath::SpatialCellCandidate *candidate) {
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
-            throw LSST_EXCEPT(lsst::pex::exceptions::LogicErrorException,
+            throw LSST_EXCEPT(pexExcept::LogicErrorException,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
         if (!(kCandidate->hasKernel())) {
@@ -1039,7 +1036,7 @@ public:
 private:
     afwMath::LinearCombinationKernel::Ptr _spatialKernel;
     afwMath::Kernel::SpatialFunctionPtr _spatialBackground;
-    lsst::pex::policy::Policy _policy;
+    pexPolicy::Policy _policy;
     ImageStatistics<PixelT> _imstats;
     int _nGood;
     int _nRejected;

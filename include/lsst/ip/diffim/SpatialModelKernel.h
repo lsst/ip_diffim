@@ -26,9 +26,11 @@
 #include <lsst/ip/diffim/ImageSubtract.h>
 #include <lsst/ip/diffim/PsfMatchingFunctor.h>
 
-namespace lsst {
-namespace ip {
-namespace diffim {
+namespace pexPolicy  = lsst::pex::policy; 
+namespace afwMath    = lsst::afw::math;
+namespace afwImage   = lsst::afw::image;
+
+namespace lsst { namespace ip { namespace diffim {
 
     /** 
      * @brief Class stored in SpatialCells for spatial Kernel fitting
@@ -40,17 +42,17 @@ namespace diffim {
      * @ingroup ip_diffim
      */    
     template <typename _PixelT>
-    class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> > {
+    class KernelCandidate : public afwMath::SpatialCellImageCandidate<afwImage::Image<afwMath::Kernel::Pixel> > {
     public: 
-        typedef lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> ImageT;
-        typedef _PixelT PixelT;         // _after_ using lsst::afw::math::Kernel::Pixel
+        typedef afwImage::Image<afwMath::Kernel::Pixel> ImageT;
+        typedef _PixelT PixelT;         // _after_ using afwMath::Kernel::Pixel
 
     private:
-        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::_image;
+        using afwMath::SpatialCellImageCandidate<ImageT>::_image;
 
     public:
         typedef boost::shared_ptr<KernelCandidate> Ptr;
-        typedef boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
+        typedef boost::shared_ptr<afwImage::MaskedImage<PixelT> > MaskedImagePtr;
 
         /**
 	 * @brief Constructor
@@ -64,7 +66,7 @@ namespace diffim {
                         float const yCenter, 
                         MaskedImagePtr const& miToConvolvePtr,
                         MaskedImagePtr const& miToNotConvolvePtr) :
-            lsst::afw::math::SpatialCellImageCandidate<ImageT>(xCenter, yCenter),
+            afwMath::SpatialCellImageCandidate<ImageT>(xCenter, yCenter),
             _miToConvolvePtr(miToConvolvePtr),
             _miToNotConvolvePtr(miToNotConvolvePtr),
             _templateFlux(),
@@ -76,8 +78,8 @@ namespace diffim {
             _haveKernel(false) {
 
             /* Rank by brightness in template */
-            lsst::afw::math::Statistics stats = lsst::afw::math::makeStatistics(*_miToConvolvePtr, lsst::afw::math::SUM);             
-            _templateFlux = stats.getValue(lsst::afw::math::SUM);
+            afwMath::Statistics stats = afwMath::makeStatistics(*_miToConvolvePtr, afwMath::SUM);             
+            _templateFlux = stats.getValue(afwMath::SUM);
         }
         
         /// Destructor
@@ -96,13 +98,13 @@ namespace diffim {
         /** 
          * @brief Calculate associated difference image using member _kernel/_background
 	 */
-        lsst::afw::image::MaskedImage<PixelT> returnDifferenceImage();
+        afwImage::MaskedImage<PixelT> returnDifferenceImage();
 	
         /** 
          * @brief Calculate associated difference image using provided kernel and background
 	 */
-        lsst::afw::image::MaskedImage<PixelT> returnDifferenceImage(
-            lsst::afw::math::Kernel::Ptr kernel,
+        afwImage::MaskedImage<PixelT> returnDifferenceImage(
+            afwMath::Kernel::Ptr kernel,
             double background
             );
 
@@ -110,13 +112,13 @@ namespace diffim {
         typename ImageT::ConstPtr getImage() const;
         typename ImageT::Ptr copyImage() const;
         double getKsum() const;
-        lsst::afw::math::Kernel::Ptr getKernel() const;
+        afwMath::Kernel::Ptr getKernel() const;
         double getBackground() const;
         boost::shared_ptr<Eigen::MatrixXd> const getM()  {return _M;}
         boost::shared_ptr<Eigen::VectorXd> const getB()  {return _B;}
         bool hasKernel() {return _haveKernel;}
         
-        void setKernel(lsst::afw::math::Kernel::Ptr kernel);
+        void setKernel(afwMath::Kernel::Ptr kernel);
         void setBackground(double background) {_background = background;}
 
         void setM(boost::shared_ptr<Eigen::MatrixXd> M) {_M = M;}
@@ -127,7 +129,7 @@ namespace diffim {
         MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel
         double _templateFlux;                               ///< Brightness in the template image; used to rank candidates
 
-        lsst::afw::math::Kernel::Ptr _kernel;               ///< Derived single-object convolution kernel
+        afwMath::Kernel::Ptr _kernel;                       ///< Derived single-object convolution kernel
         double _kSum;                                       ///< Derived kernel sum
         double _background;                                 ///< Derived differential background estimate
 
@@ -151,8 +153,8 @@ namespace diffim {
     typename KernelCandidate<PixelT>::Ptr
     makeKernelCandidate(float const xCenter,
                         float const yCenter, 
-                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToConvolvePtr,
-                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToNotConvolvePtr) {
+                        boost::shared_ptr<afwImage::MaskedImage<PixelT> > const& miToConvolvePtr,
+                        boost::shared_ptr<afwImage::MaskedImage<PixelT> > const& miToNotConvolvePtr) {
         
         return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
                                                                                  miToConvolvePtr,
@@ -169,11 +171,11 @@ namespace diffim {
      * @ingroup ip_diffim
      */
     template<typename PixelT>
-    std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
+    std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr>
     fitSpatialKernelFromCandidates(
         PsfMatchingFunctor<PixelT> &kFunctor,
-        lsst::afw::math::SpatialCellSet const& kernelCells,
-        lsst::pex::policy::Policy const& policy);
+        afwMath::SpatialCellSet const& kernelCells,
+        pexPolicy::Policy const& policy);
     
     
 }}}

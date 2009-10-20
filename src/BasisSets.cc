@@ -15,11 +15,11 @@
 #include <lsst/afw/math.h>
 #include <lsst/ip/diffim/BasisSets.h>
 
-namespace exceptions = lsst::pex::exceptions; 
-namespace image      = lsst::afw::image;
-namespace math       = lsst::afw::math;
-namespace diffim     = lsst::ip::diffim;
+namespace pexExcept  = lsst::pex::exceptions; 
+namespace afwImage   = lsst::afw::image;
+namespace afwMath    = lsst::afw::math;
 
+namespace lsst { namespace ip { namespace diffim {
 
 /** 
  * @brief Generate a basis set of delta function Kernels.
@@ -34,21 +34,21 @@ namespace diffim     = lsst::ip::diffim;
  *
  * @ingroup ip_diffim
  */
-math::KernelList
-diffim::generateDeltaFunctionBasisSet(
+afwMath::KernelList
+generateDeltaFunctionBasisSet(
     unsigned int width,                 ///< number of columns in the set
     unsigned int height                 ///< number of rows in the set
     ) {
     if ((width < 1) || (height < 1)) {
-        throw LSST_EXCEPT(exceptions::Exception, "nRows and nCols must be positive");
+        throw LSST_EXCEPT(pexExcept::Exception, "nRows and nCols must be positive");
     }
     const int signedWidth = static_cast<int>(width);
     const int signedHeight = static_cast<int>(height);
-    math::KernelList kernelBasisList;
+    afwMath::KernelList kernelBasisList;
     for (int row = 0; row < signedHeight; ++row) {
         for (int col = 0; col < signedWidth; ++col) {
-            boost::shared_ptr<math::Kernel> 
-                kernelPtr(new math::DeltaFunctionKernel(width, height, image::PointI(col,row)));
+            boost::shared_ptr<afwMath::Kernel> 
+                kernelPtr(new afwMath::DeltaFunctionKernel(width, height, afwImage::PointI(col,row)));
             kernelBasisList.push_back(kernelPtr);
         }
     }
@@ -65,29 +65,29 @@ diffim::generateDeltaFunctionBasisSet(
  *
  * @ingroup ip_diffim
  */
-math::KernelList
-diffim::generateAlardLuptonBasisSet(
+afwMath::KernelList
+generateAlardLuptonBasisSet(
     unsigned int halfWidth,                ///< size is 2*N + 1
     unsigned int nGauss,                   ///< number of gaussians
     std::vector<double> const &sigGauss,   ///< width of the gaussians
     std::vector<int>    const &degGauss    ///< local spatial variation of gaussians
     ) {
-    typedef math::Kernel::Pixel PixelT;
-    typedef image::Image<PixelT> ImageT;
+    typedef afwMath::Kernel::Pixel PixelT;
+    typedef afwImage::Image<PixelT> ImageT;
 
     if (halfWidth < 1) {
-        throw LSST_EXCEPT(exceptions::Exception, "halfWidth must be positive");
+        throw LSST_EXCEPT(pexExcept::Exception, "halfWidth must be positive");
     }
     if (nGauss != sigGauss.size()) {
-        throw LSST_EXCEPT(exceptions::Exception, "sigGauss does not have enough entries");
+        throw LSST_EXCEPT(pexExcept::Exception, "sigGauss does not have enough entries");
     }
     if (nGauss != degGauss.size()) {
-        throw LSST_EXCEPT(exceptions::Exception, "degGauss does not have enough entries");
+        throw LSST_EXCEPT(pexExcept::Exception, "degGauss does not have enough entries");
     }
     int fullWidth = 2 * halfWidth + 1;
     ImageT image(fullWidth, fullWidth);
     
-    math::KernelList kernelBasisList;
+    afwMath::KernelList kernelBasisList;
     for (unsigned int i = 0; i < nGauss; i++) {
         /* 
            sigma = FWHM / ( 2 * sqrt(2 * ln(2)) )
@@ -95,17 +95,17 @@ diffim::generateAlardLuptonBasisSet(
         double sig        = sigGauss[i];
         unsigned int deg  = degGauss[i];
 
-        math::GaussianFunction2<PixelT> gaussian(sig, sig);
-        math::AnalyticKernel kernel(fullWidth, fullWidth, gaussian);
-        math::PolynomialFunction2<PixelT> polynomial(deg);
+        afwMath::GaussianFunction2<PixelT> gaussian(sig, sig);
+        afwMath::AnalyticKernel kernel(fullWidth, fullWidth, gaussian);
+        afwMath::PolynomialFunction2<PixelT> polynomial(deg);
 
         for (unsigned int j = 0, n = 0; j <= deg; j++) {
             for (unsigned int k = 0; k <= (deg - j); k++, n++) {
                 /* for 0th order term, skip polynomial */
                 (void)kernel.computeImage(image, true);
                 if (n == 0) {
-                    boost::shared_ptr<math::Kernel> 
-                        kernelPtr(new math::FixedKernel(image));
+                    boost::shared_ptr<afwMath::Kernel> 
+                        kernelPtr(new afwMath::FixedKernel(image));
                     kernelBasisList.push_back(kernelPtr);
                     continue;
                 }
@@ -120,8 +120,8 @@ diffim::generateAlardLuptonBasisSet(
                         *ptr  = *ptr * polynomial(u/static_cast<double>(halfWidth), v/static_cast<double>(halfWidth));
                     }
                 }
-                boost::shared_ptr<math::Kernel> 
-                    kernelPtr(new math::FixedKernel(image));
+                boost::shared_ptr<afwMath::Kernel> 
+                    kernelPtr(new afwMath::FixedKernel(image));
                 kernelBasisList.push_back(kernelPtr);
                 polynomial.setParameter(n, 0.);
             }
@@ -134,7 +134,7 @@ diffim::generateAlardLuptonBasisSet(
  * @brief Generate regularization matrix for delta function kernels
  */
 boost::shared_ptr<Eigen::MatrixXd>
-diffim::generateFiniteDifferenceRegularization(
+generateFiniteDifferenceRegularization(
     unsigned int width,
     unsigned int height,
     unsigned int order,
@@ -143,15 +143,15 @@ diffim::generateFiniteDifferenceRegularization(
     bool printB // a debug flag ... remove when done.
 					    ) {
 
-    if ((order < 0) || (order > 2)) throw LSST_EXCEPT(exceptions::Exception, "Only orders 0..2 allowed");
-    if ((width < 0))  throw LSST_EXCEPT(exceptions::Exception, "Width < 0");
-    if ((height < 0)) throw LSST_EXCEPT(exceptions::Exception, "Height < 0");
+    if ((order < 0) || (order > 2)) throw LSST_EXCEPT(pexExcept::Exception, "Only orders 0..2 allowed");
+    if ((width < 0))  throw LSST_EXCEPT(pexExcept::Exception, "Width < 0");
+    if ((height < 0)) throw LSST_EXCEPT(pexExcept::Exception, "Height < 0");
 
     if ((boundary_style < 0) || (boundary_style > 2)) { 
-	throw LSST_EXCEPT(exceptions::Exception, "Boundary styles 0..2 defined");
+	throw LSST_EXCEPT(pexExcept::Exception, "Boundary styles 0..2 defined");
     }
     if ((difference_style < 0) || (difference_style > 1)) {
-	throw LSST_EXCEPT(exceptions::Exception, "Only forward (0), and central (1) difference styles defined.");
+	throw LSST_EXCEPT(pexExcept::Exception, "Only forward (0), and central (1) difference styles defined.");
     }
 
     /* what works, and what doesn't */
@@ -350,12 +350,12 @@ diffim::generateFiniteDifferenceRegularization(
  *
  * @ingroup ip_diffim
  */
-math::KernelList
-diffim::renormalizeKernelList(
-    math::KernelList const &kernelListIn
+afwMath::KernelList
+renormalizeKernelList(
+    afwMath::KernelList const &kernelListIn
     ) {
-    typedef math::Kernel::Pixel PixelT;
-    typedef image::Image<PixelT> ImageT;
+    typedef afwMath::Kernel::Pixel PixelT;
+    typedef afwImage::Image<PixelT> ImageT;
 
     /* 
        
@@ -380,7 +380,7 @@ diffim::renormalizeKernelList(
     B_0 * B_0 != 1.0
     
     */
-    math::KernelList kernelListOut;
+    afwMath::KernelList kernelListOut;
     if (kernelListIn.size() == 0) {
         return kernelListOut;
     }
@@ -392,8 +392,8 @@ diffim::renormalizeKernelList(
         if (i == 0) {
             /* Make sure that it is normalized to kSum 1. */
             (void)kernelListIn[i]->computeImage(image0, true);
-            boost::shared_ptr<math::Kernel> 
-                kernelPtr(new math::FixedKernel(image0));
+            boost::shared_ptr<afwMath::Kernel> 
+                kernelPtr(new afwMath::FixedKernel(image0));
             kernelListOut.push_back(kernelPtr);
             continue;
         }
@@ -411,10 +411,11 @@ diffim::renormalizeKernelList(
         }
         image /= sqrt(ksum);
 
-        boost::shared_ptr<math::Kernel> 
-            kernelPtr(new math::FixedKernel(image));
+        boost::shared_ptr<afwMath::Kernel> 
+            kernelPtr(new afwMath::FixedKernel(image));
         kernelListOut.push_back(kernelPtr);
     }
     return kernelListOut;
 }
 
+}}}

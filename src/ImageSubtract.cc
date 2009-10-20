@@ -26,26 +26,28 @@
 #include <lsst/afw/detection/Footprint.h>
 #include <lsst/afw/math/ConvolveImage.h>
 
-namespace exceptions = lsst::pex::exceptions; 
-namespace logging    = lsst::pex::logging; 
-namespace image      = lsst::afw::image;
-namespace math       = lsst::afw::math;
-namespace detection  = lsst::afw::detection;
-namespace diffim     = lsst::ip::diffim;
+namespace pexExcept  = lsst::pex::exceptions; 
+namespace pexLog     = lsst::pex::logging; 
+namespace pexPolicy  = lsst::pex::policy; 
+namespace afwImage   = lsst::afw::image;
+namespace afwMath    = lsst::afw::math;
+namespace afwDetect  = lsst::afw::detection;
+
+namespace lsst { namespace ip { namespace diffim {
 
 /**
  * @brief Turns Image into a 2-D Eigen Matrix
  */
 template <typename PixelT>
-Eigen::MatrixXd diffim::imageToEigenMatrix(
-    lsst::afw::image::Image<PixelT> const &img
+Eigen::MatrixXd imageToEigenMatrix(
+    afwImage::Image<PixelT> const &img
     ) {
     unsigned int rows = img.getHeight();
     unsigned int cols = img.getWidth();
     Eigen::MatrixXd M = Eigen::MatrixXd::Zero(rows, cols);
     for (int y = 0; y != img.getHeight(); ++y) {
         int x = 0;
-        for (typename lsst::afw::image::Image<PixelT>::x_iterator ptr = img.row_begin(y); ptr != img.row_end(y); ++ptr, ++x) {
+        for (typename afwImage::Image<PixelT>::x_iterator ptr = img.row_begin(y); ptr != img.row_end(y); ++ptr, ++x) {
             // M is addressed row, col
             M(y,x) = *ptr;
         }
@@ -62,15 +64,15 @@ Eigen::MatrixXd diffim::imageToEigenMatrix(
  *
  */
 template <typename PixelT>
-void diffim::addSomethingToImage(lsst::afw::image::Image<PixelT> &image,
-                                 lsst::afw::math::Function2<double> const &function
+void addSomethingToImage(afwImage::Image<PixelT> &image,
+                         afwMath::Function2<double> const &function
     ) {
     
     // Set the pixels row by row, to avoid repeated checks for end-of-row
     for (int y = 0; y != image.getHeight(); ++y) {
-        double yPos = image::positionToIndex(y);
-        double xPos = image::positionToIndex(0);
-        for (typename image::Image<PixelT>::x_iterator ptr = image.row_begin(y), end = image.row_end(y);
+        double yPos = afwImage::positionToIndex(y);
+        double xPos = afwImage::positionToIndex(0);
+        for (typename afwImage::Image<PixelT>::x_iterator ptr = image.row_begin(y), end = image.row_end(y);
              ptr != end; ++ptr, ++xPos) {            
             *ptr += function(xPos, yPos);
         }
@@ -81,8 +83,8 @@ void diffim::addSomethingToImage(lsst::afw::image::Image<PixelT> &image,
  * @brief Adds a scalar to an Image
  */
 template <typename PixelT>
-void diffim::addSomethingToImage(image::Image<PixelT> &image,
-                                 double value
+void addSomethingToImage(afwImage::Image<PixelT> &image,
+                         double value
     ) {
     if (value != 0.0) {
         image += value;
@@ -103,20 +105,20 @@ void diffim::addSomethingToImage(image::Image<PixelT> &image,
  * @ingroup diffim
  */
 template <typename PixelT, typename BackgroundT>
-image::MaskedImage<PixelT> diffim::convolveAndSubtract(
-    lsst::afw::image::MaskedImage<PixelT> const &imageToConvolve,    ///< Image T to convolve with Kernel
-    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
-    lsst::afw::math::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used for convolution
-    BackgroundT background,                                          ///< Differential background function or scalar
-    bool invert                                                      ///< Invert the output difference image
+afwImage::MaskedImage<PixelT> convolveAndSubtract(
+    afwImage::MaskedImage<PixelT> const &imageToConvolve,    ///< Image T to convolve with Kernel
+    afwImage::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
+    afwMath::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used for convolution
+    BackgroundT background,                                  ///< Differential background function or scalar
+    bool invert                                              ///< Invert the output difference image
     ) {
 
     boost::timer t;
     t.restart();
 
-    image::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
+    afwImage::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    math::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false);
+    afwMath::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false);
     
     /* Add in background */
     addSomethingToImage(*(convolvedMaskedImage.getImage()), background);
@@ -130,8 +132,8 @@ image::MaskedImage<PixelT> diffim::convolveAndSubtract(
     }
 
     double time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
-                       "Total compute time to convolve and subtract : %.2f s", time);
+    pexLog::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
+                      "Total compute time to convolve and subtract : %.2f s", time);
 
     return convolvedMaskedImage;
 }
@@ -150,23 +152,23 @@ image::MaskedImage<PixelT> diffim::convolveAndSubtract(
  * @ingroup diffim
  */
 template <typename PixelT, typename BackgroundT>
-image::MaskedImage<PixelT> diffim::convolveAndSubtract(
-    lsst::afw::image::Image<PixelT> const &imageToConvolve,          ///< Image T to convolve with Kernel
-    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
-    lsst::afw::math::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used for convolution
-    BackgroundT background,                                          ///< Differential background function or scalar
-    bool invert                                                      ///< Invert the output difference image
+afwImage::MaskedImage<PixelT> convolveAndSubtract(
+    afwImage::Image<PixelT> const &imageToConvolve,          ///< Image T to convolve with Kernel
+    afwImage::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract convolved template from
+    afwMath::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used for convolution
+    BackgroundT background,                                  ///< Differential background function or scalar
+    bool invert                                              ///< Invert the output difference image
     ) {
     
     boost::timer t;
     t.restart();
 
-    image::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
+    afwImage::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    math::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, convolutionKernel, false);
+    afwMath::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, convolutionKernel, false);
     
     /* Add in background */
-    addSomethingToImage(*convolvedMaskedImage.getImage(), background);
+    addSomethingToImage(*(convolvedMaskedImage.getImage()), background);
     
     /* Do actual subtraction */
     *convolvedMaskedImage.getImage() -= *imageToNotConvolve.getImage();
@@ -179,8 +181,8 @@ image::MaskedImage<PixelT> diffim::convolveAndSubtract(
     *convolvedMaskedImage.getVariance() <<= *imageToNotConvolve.getVariance();
     
     double time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
-                       "Total compute time to convolve and subtract : %.2f s", time);
+    pexLog::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
+                      "Total compute time to convolve and subtract : %.2f s", time);
 
     return convolvedMaskedImage;
 }
@@ -202,10 +204,10 @@ image::MaskedImage<PixelT> diffim::convolveAndSubtract(
  *
  */
 template <typename PixelT>
-std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::image::MaskedImage<PixelT> const &imageToConvolve,    
-    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, 
-    lsst::pex::policy::Policy             const &policy                                       
+std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
+    afwImage::MaskedImage<PixelT> const &imageToConvolve,    
+    afwImage::MaskedImage<PixelT> const &imageToNotConvolve, 
+    pexPolicy::Policy             const &policy                                       
     ) {
     
     // Parse the Policy
@@ -224,24 +226,24 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 
     // New mask plane that tells us which pixels are already in sources
     // Add to both images so mask planes are aligned
-    int diffimMaskPlane = imageToConvolve.getMask()->addMaskPlane(diffim::diffimStampCandidateStr);
-    (void)imageToNotConvolve.getMask()->addMaskPlane(diffim::diffimStampCandidateStr);
-    image::MaskPixel const diffimBitMask = imageToConvolve.getMask()->getPlaneBitMask(diffim::diffimStampCandidateStr);
+    int diffimMaskPlane = imageToConvolve.getMask()->addMaskPlane(diffimStampCandidateStr);
+    (void)imageToNotConvolve.getMask()->addMaskPlane(diffimStampCandidateStr);
+    afwImage::MaskPixel const diffimBitMask = imageToConvolve.getMask()->getPlaneBitMask(diffimStampCandidateStr);
 
     // Add in new plane that will tell us which ones are used
-    (void)imageToConvolve.getMask()->addMaskPlane(diffim::diffimStampUsedStr);
-    (void)imageToNotConvolve.getMask()->addMaskPlane(diffim::diffimStampUsedStr);
+    (void)imageToConvolve.getMask()->addMaskPlane(diffimStampUsedStr);
+    (void)imageToNotConvolve.getMask()->addMaskPlane(diffimStampUsedStr);
 
     // Number of pixels to grow each Footprint, based upon the Kernel size
     int fpGrowPix = int(fpGrowKsize * ((kCols > kRows) ? kCols : kRows));
 
     // List of Footprints
-    std::vector<detection::Footprint::Ptr> footprintListIn;
-    std::vector<detection::Footprint::Ptr> footprintListOut;
+    std::vector<afwDetect::Footprint::Ptr> footprintListIn;
+    std::vector<afwDetect::Footprint::Ptr> footprintListOut;
 
     // Functors to search through the images for masked pixels within candidate footprints
-    diffim::FindSetBits<image::Mask<image::MaskPixel> > itcFunctor(*(imageToConvolve.getMask())); 
-    diffim::FindSetBits<image::Mask<image::MaskPixel> > itncFunctor(*(imageToNotConvolve.getMask())); 
+    FindSetBits<afwImage::Mask<afwImage::MaskPixel> > itcFunctor(*(imageToConvolve.getMask())); 
+    FindSetBits<afwImage::Mask<afwImage::MaskPixel> > itncFunctor(*(imageToNotConvolve.getMask())); 
  
     int nCleanFp = 0;
     while ((nCleanFp < minCleanFp) and (detThreshold > detThresholdMin)) {
@@ -252,9 +254,9 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         footprintListOut.clear();
         
         // Find detections
-        detection::Threshold threshold = 
-                detection::createThreshold(detThreshold, detThresholdType);
-        detection::FootprintSet<PixelT> footprintSet(
+        afwDetect::Threshold threshold = 
+                afwDetect::createThreshold(detThreshold, detThresholdType);
+        afwDetect::FootprintSet<PixelT> footprintSet(
                 imageToConvolve, 
                 threshold,
                 "",
@@ -262,28 +264,28 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
         
         // Get the associated footprints
         footprintListIn = footprintSet.getFootprints();
-        logging::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                           "Found %d total footprints above threshold %.3f",
-                           footprintListIn.size(), detThreshold);
+        pexLog::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                          "Found %d total footprints above threshold %.3f",
+                          footprintListIn.size(), detThreshold);
 
         // Iterate over footprints, look for "good" ones
         nCleanFp = 0;
-        for (std::vector<detection::Footprint::Ptr>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
+        for (std::vector<afwDetect::Footprint::Ptr>::iterator i = footprintListIn.begin(); i != footprintListIn.end(); ++i) {
             // footprint has too many pixels
             if (static_cast<unsigned int>((*i)->getNpix()) > fpNpixMax) {
-                logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                               "Footprint has too many pix: %d (max =%d)", 
-                               (*i)->getNpix(), fpNpixMax);
+                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                                  "Footprint has too many pix: %d (max =%d)", 
+                                  (*i)->getNpix(), fpNpixMax);
                 continue;
             } 
             
-            logging::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                               "Footprint in : %d,%d -> %d,%d",
-                               (*i)->getBBox().getX0(), (*i)->getBBox().getX1(), 
-                               (*i)->getBBox().getY0(), (*i)->getBBox().getY1());
+            pexLog::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                              "Footprint in : %d,%d -> %d,%d",
+                              (*i)->getBBox().getX0(), (*i)->getBBox().getX1(), 
+                              (*i)->getBBox().getY0(), (*i)->getBBox().getY1());
 
-            logging::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                               "Grow by : %d pixels", fpGrowPix);
+            pexLog::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                              "Grow by : %d pixels", fpGrowPix);
 
             /* Grow the footprint
                flag true  = isotropic grow   = slow
@@ -303,20 +305,20 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
                in multiple subimages.
 
             */
-            detection::Footprint::Ptr fpGrow = 
-                detection::growFootprint(*i, fpGrowPix, false);
+            afwDetect::Footprint::Ptr fpGrow = 
+                afwDetect::growFootprint(*i, fpGrowPix, false);
             
-            logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                               "Footprint out : %d,%d -> %d,%d (center %d,%d)",
-                               (*fpGrow).getBBox().getX0(), (*fpGrow).getBBox().getY0(),
-			       (*fpGrow).getBBox().getX1(), (*fpGrow).getBBox().getY1(),
-			       int(0.5 * ((*i)->getBBox().getX0()+(*i)->getBBox().getX1())),
-			       int(0.5 * ((*i)->getBBox().getY0()+(*i)->getBBox().getY1())));
+            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                              "Footprint out : %d,%d -> %d,%d (center %d,%d)",
+                              (*fpGrow).getBBox().getX0(), (*fpGrow).getBBox().getY0(),
+                              (*fpGrow).getBBox().getX1(), (*fpGrow).getBBox().getY1(),
+                              int(0.5 * ((*i)->getBBox().getX0()+(*i)->getBBox().getX1())),
+                              int(0.5 * ((*i)->getBBox().getY0()+(*i)->getBBox().getY1())));
 
 
             // Ignore if its too close to the edge of the amp image 
             // Note we need to translate to pixel coordinates here
-            image::BBox fpBBox = (*fpGrow).getBBox();
+            afwImage::BBox fpBBox = (*fpGrow).getBBox();
             fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
             if (((*fpGrow).getBBox().getX0() < 0) ||
                 ((*fpGrow).getBBox().getY0() < 0) ||
@@ -327,35 +329,35 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
 
             // Grab a subimage; report any exception
             try {
-                image::MaskedImage<PixelT> subImageToConvolve(imageToConvolve, fpBBox);
-                image::MaskedImage<PixelT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
-            } catch (exceptions::Exception& e) {
-                logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
-                                   "Exception caught extracting Footprint");
-                logging::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
-                                   e.what());
+                afwImage::MaskedImage<PixelT> subImageToConvolve(imageToConvolve, fpBBox);
+                afwImage::MaskedImage<PixelT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
+            } catch (pexExcept::Exception& e) {
+                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
+                                  "Exception caught extracting Footprint");
+                pexLog::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
+                                  e.what());
                 continue;
             }
 
             // Search for any masked pixels within the footprint
             itcFunctor.apply(*fpGrow);
             if (itcFunctor.getBits() > 0) {
-                logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                                   "Footprint has masked pix (val=%d) in image to convolve", itcFunctor.getBits()); 
+                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                                  "Footprint has masked pix (val=%d) in image to convolve", itcFunctor.getBits()); 
                 continue;
             }
 
             itncFunctor.apply(*fpGrow);
             if (itncFunctor.getBits() > 0) {
-                logging::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                                   "Footprint has masked pix (val=%d) in image not to convolve", itncFunctor.getBits());
+                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                                  "Footprint has masked pix (val=%d) in image not to convolve", itncFunctor.getBits());
                 continue;
             }
 
             // If we get this far, we have a clean footprint
             footprintListOut.push_back(fpGrow);
-            (void)detection::setMaskFromFootprint(&(*imageToConvolve.getMask()), *fpGrow, diffimBitMask);
-            (void)detection::setMaskFromFootprint(&(*imageToNotConvolve.getMask()), *fpGrow, diffimBitMask);
+            (void)afwDetect::setMaskFromFootprint(&(*imageToConvolve.getMask()), *fpGrow, diffimBitMask);
+            (void)afwDetect::setMaskFromFootprint(&(*imageToNotConvolve.getMask()), *fpGrow, diffimBitMask);
             nCleanFp += 1;
         }
         detThreshold *= detThresholdScaling;
@@ -364,45 +366,45 @@ std::vector<lsst::afw::detection::Footprint::Ptr> diffim::getCollectionOfFootpri
     imageToNotConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
 
     if (footprintListOut.size() == 0) {
-      throw LSST_EXCEPT(exceptions::Exception, 
+      throw LSST_EXCEPT(pexExcept::Exception, 
 			"Unable to find any footprints for Psf matching");
     }
 
-    logging::TTrace<1>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                       "Found %d clean footprints above threshold %.3f",
-                       footprintListOut.size(), detThreshold/detThresholdScaling);
+    pexLog::TTrace<1>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                      "Found %d clean footprints above threshold %.3f",
+                      footprintListOut.size(), detThreshold/detThresholdScaling);
     
     return footprintListOut;
 }
 
 // Explicit instantiations
 template 
-Eigen::MatrixXd diffim::imageToEigenMatrix(lsst::afw::image::Image<float> const &);
+Eigen::MatrixXd imageToEigenMatrix(afwImage::Image<float> const &);
 
 template 
-Eigen::MatrixXd diffim::imageToEigenMatrix(lsst::afw::image::Image<double> const &);
+Eigen::MatrixXd imageToEigenMatrix(afwImage::Image<double> const &);
 
-template class diffim::FindSetBits<image::Mask<> >;
-template class diffim::ImageStatistics<float>;
-template class diffim::ImageStatistics<double>;
+template class FindSetBits<afwImage::Mask<> >;
+template class ImageStatistics<float>;
+template class ImageStatistics<double>;
 
 /* */
 
 #define p_INSTANTIATE_convolveAndSubtract(TEMPLATE_IMAGE_T, TYPE)     \
     template \
-    image::MaskedImage<TYPE> diffim::convolveAndSubtract( \
-        image::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
-        image::MaskedImage<TYPE> const& imageToNotConvolve, \
-        math::Kernel const& convolutionKernel, \
+    afwImage::MaskedImage<TYPE> convolveAndSubtract( \
+        afwImage::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
+        afwImage::MaskedImage<TYPE> const& imageToNotConvolve, \
+        afwMath::Kernel const& convolutionKernel, \
         double background, \
         bool invert);      \
     \
     template \
-    image::MaskedImage<TYPE> diffim::convolveAndSubtract( \
-        image::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
-        image::MaskedImage<TYPE> const& imageToNotConvolve, \
-        math::Kernel const& convolutionKernel, \
-        math::Function2<double> const& backgroundFunction, \
+    afwImage::MaskedImage<TYPE> convolveAndSubtract( \
+        afwImage::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
+        afwImage::MaskedImage<TYPE> const& imageToNotConvolve, \
+        afwMath::Kernel const& convolutionKernel, \
+        afwMath::Function2<double> const& backgroundFunction, \
         bool invert); \
 
 #define INSTANTIATE_convolveAndSubtract(TYPE) \
@@ -421,35 +423,37 @@ INSTANTIATE_convolveAndSubtract(double);
 
 
 template
-std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<float> const &,
-    image::MaskedImage<float> const &,
-    lsst::pex::policy::Policy const &);
+std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
+    afwImage::MaskedImage<float> const &,
+    afwImage::MaskedImage<float> const &,
+    pexPolicy::Policy const &);
 
 template
-std::vector<detection::Footprint::Ptr> diffim::getCollectionOfFootprintsForPsfMatching(
-    image::MaskedImage<double> const &,
-    image::MaskedImage<double> const &,
-    lsst::pex::policy::Policy  const &);
+std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
+    afwImage::MaskedImage<double> const &,
+    afwImage::MaskedImage<double> const &,
+    pexPolicy::Policy  const &);
 
 template 
-void diffim::addSomethingToImage(
-    image::Image<float> &,
-    math::Function2<double> const &
+void addSomethingToImage(
+    afwImage::Image<float> &,
+    afwMath::Function2<double> const &
     );
 template 
-void diffim::addSomethingToImage(
-    image::Image<double> &,
-    math::Function2<double> const &
+void addSomethingToImage(
+    afwImage::Image<double> &,
+    afwMath::Function2<double> const &
     );
 
 template 
-void diffim::addSomethingToImage(
-    image::Image<float> &,
+void addSomethingToImage(
+    afwImage::Image<float> &,
     double
     );
 template 
-void diffim::addSomethingToImage(
-    image::Image<double> &,
+void addSomethingToImage(
+    afwImage::Image<double> &,
     double
     );
+
+}}}

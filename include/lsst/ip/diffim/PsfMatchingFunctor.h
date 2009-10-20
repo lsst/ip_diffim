@@ -18,9 +18,11 @@
 #include <lsst/afw/math/Kernel.h>
 #include <lsst/afw/image/MaskedImage.h>
 
-namespace lsst {
-namespace ip {
-namespace diffim {
+namespace pexPolicy  = lsst::pex::policy; 
+namespace afwMath    = lsst::afw::math;
+namespace afwImage   = lsst::afw::image;
+
+namespace lsst { namespace ip { namespace diffim {
    
    /**
      * @brief Functor to create PSF Matching Kernel
@@ -35,18 +37,18 @@ namespace diffim {
      * 
      * @ingroup ip_diffim
      */
-    template <typename PixelT, typename VarT=lsst::afw::image::VariancePixel>
+    template <typename PixelT, typename VarT=afwImage::VariancePixel>
     class PsfMatchingFunctor {
     public:
         typedef boost::shared_ptr<PsfMatchingFunctor> Ptr;
-        typedef typename lsst::afw::image::MaskedImage<PixelT>::xy_locator xy_locator;
-        typedef typename lsst::afw::image::Image<VarT>::xy_locator         xyi_locator;
+        typedef typename afwImage::MaskedImage<PixelT>::xy_locator xy_locator;
+        typedef typename afwImage::Image<VarT>::xy_locator         xyi_locator;
 
         PsfMatchingFunctor(
-            lsst::afw::math::KernelList const& basisList
+            afwMath::KernelList const& basisList
             );
         PsfMatchingFunctor(
-            lsst::afw::math::KernelList const& basisList,
+            afwMath::KernelList const& basisList,
             boost::shared_ptr<Eigen::MatrixXd> const& H
             );
         virtual ~PsfMatchingFunctor() {};
@@ -54,8 +56,8 @@ namespace diffim {
         /* Shallow copy only; shared matrix product uninitialized */
         PsfMatchingFunctor(const PsfMatchingFunctor<PixelT,VarT> &rhs);
 
-        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolution();
-        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolutionUncertainty();
+        std::pair<boost::shared_ptr<afwMath::Kernel>, double> getSolution();
+        std::pair<boost::shared_ptr<afwMath::Kernel>, double> getSolutionUncertainty();
         
         /** Access to least squares info
          */
@@ -63,17 +65,17 @@ namespace diffim {
 
         /** Access to basis list
          */
-        lsst::afw::math::KernelList getBasisList() const { return _basisList; }
+        afwMath::KernelList getBasisList() const { return _basisList; }
 
         /* Create PSF matching kernel */
-        void apply(lsst::afw::image::Image<PixelT> const& imageToConvolve,
-                   lsst::afw::image::Image<PixelT> const& imageToNotConvolve,
-                   lsst::afw::image::Image<VarT>   const& varianceEstimate,
-                   lsst::pex::policy::Policy       const& policy
+        void apply(afwImage::Image<PixelT> const& imageToConvolve,
+                   afwImage::Image<PixelT> const& imageToNotConvolve,
+                   afwImage::Image<VarT>   const& varianceEstimate,
+                   pexPolicy::Policy       const& policy
             );
 
     protected:
-        lsst::afw::math::KernelList const _basisList;            ///< List of Kernel basis functions
+        afwMath::KernelList const _basisList;            ///< List of Kernel basis functions
         boost::shared_ptr<Eigen::MatrixXd> _M;                   ///< Least squares matrix
         boost::shared_ptr<Eigen::VectorXd> _B;                   ///< Least squares vector
         boost::shared_ptr<Eigen::VectorXd> _Soln;                ///< Least square solution
@@ -91,7 +93,7 @@ namespace diffim {
      */
     template <typename PixelT>
     typename PsfMatchingFunctor<PixelT>::Ptr
-    makePsfMatchingFunctor(lsst::afw::math::KernelList const& basisList) {
+    makePsfMatchingFunctor(afwMath::KernelList const& basisList) {
         return typename PsfMatchingFunctor<PixelT>::Ptr(new PsfMatchingFunctor<PixelT>(basisList));
     }
 
@@ -105,7 +107,7 @@ namespace diffim {
      */
     template <typename PixelT>
     typename PsfMatchingFunctor<PixelT>::Ptr
-    makePsfMatchingFunctor(lsst::afw::math::KernelList const& basisList,
+    makePsfMatchingFunctor(afwMath::KernelList const& basisList,
                            boost::shared_ptr<Eigen::MatrixXd> const H) {
         return typename PsfMatchingFunctor<PixelT>::Ptr(new PsfMatchingFunctor<PixelT>(basisList, H));
     }

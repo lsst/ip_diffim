@@ -16,9 +16,9 @@
 #include <Eigen/Core>
 #include <lsst/afw/math/Kernel.h>
 
-namespace lsst {
-namespace ip {
-namespace diffim {
+namespace afwMath    = lsst::afw::math;
+
+namespace lsst { namespace ip { namespace diffim {
    
     /**
      * @brief Build a set of Delta Function basis kernels
@@ -30,7 +30,7 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */    
-    lsst::afw::math::KernelList generateDeltaFunctionBasisSet(
+    afwMath::KernelList generateDeltaFunctionBasisSet(
         unsigned int width,
         unsigned int height
         );
@@ -66,7 +66,7 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */
-    lsst::afw::math::KernelList renormalizeKernelList(lsst::afw::math::KernelList const &kernelListIn);
+    afwMath::KernelList renormalizeKernelList(afwMath::KernelList const &kernelListIn);
 
     /**
      * @brief Build a set of Alard/Lupton basis kernels
@@ -81,7 +81,7 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */    
-    lsst::afw::math::KernelList generateAlardLuptonBasisSet(
+    afwMath::KernelList generateAlardLuptonBasisSet(
         unsigned int halfWidth,                ///< size is 2*N + 1
         unsigned int nGauss,                   ///< number of gaussians
         std::vector<double> const& sigGauss,   ///< width of the gaussians

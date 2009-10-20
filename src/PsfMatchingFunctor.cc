@@ -22,18 +22,20 @@
 
 #define DEBUG_MATRIX 0
 
-namespace exceptions = lsst::pex::exceptions; 
-namespace logging    = lsst::pex::logging; 
-namespace image      = lsst::afw::image;
-namespace math       = lsst::afw::math;
-namespace diffim     = lsst::ip::diffim;
+namespace pexExcept  = lsst::pex::exceptions; 
+namespace pexLog     = lsst::pex::logging; 
+namespace pexPolicy  = lsst::pex::policy; 
+namespace afwImage   = lsst::afw::image;
+namespace afwMath    = lsst::afw::math;
+
+namespace lsst { namespace ip { namespace diffim {
 
 //
 // Constructors
 //
 template <typename PixelT, typename VarT>
-diffim::PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
-    lsst::afw::math::KernelList const &basisList
+PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
+    afwMath::KernelList const &basisList
     ) :
     _basisList(basisList),
     _M(),
@@ -45,8 +47,8 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
 {;}
 
 template <typename PixelT, typename VarT>
-diffim::PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
-    lsst::afw::math::KernelList const &basisList,
+PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
+    afwMath::KernelList const &basisList,
     boost::shared_ptr<Eigen::MatrixXd> const &H
     ) :
     _basisList(basisList),
@@ -59,7 +61,7 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
 {;}
 
 template <typename PixelT, typename VarT>
-diffim::PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
+PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
     const PsfMatchingFunctor<PixelT,VarT> &rhs
     ) :
     _basisList(rhs._basisList),
@@ -76,17 +78,17 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
 //
 
 template <typename PixelT, typename VarT>
-void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
-    lsst::afw::image::Image<PixelT> const &imageToConvolve,    ///< Image to apply kernel to
-    lsst::afw::image::Image<PixelT> const &imageToNotConvolve, ///< Image whose PSF you want to match to
-    lsst::afw::image::Image<VarT>   const &varianceEstimate,   ///< Estimate of the variance per pixel
-    lsst::pex::policy::Policy       const &policy              ///< Policy file
+void PsfMatchingFunctor<PixelT, VarT>::apply(
+    afwImage::Image<PixelT> const &imageToConvolve,    ///< Image to apply kernel to
+    afwImage::Image<PixelT> const &imageToNotConvolve, ///< Image whose PSF you want to match to
+    afwImage::Image<VarT>   const &varianceEstimate,   ///< Estimate of the variance per pixel
+    pexPolicy::Policy       const &policy              ///< Policy file
     ) {
     
     unsigned int const nKernelParameters     = _basisList.size();
     unsigned int const nBackgroundParameters = 1;
     unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
-    std::vector<boost::shared_ptr<math::Kernel> >::const_iterator kiter = _basisList.begin();
+    std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = _basisList.begin();
     
     // Ignore buffers around edge of convolved images :
     //
@@ -126,19 +128,19 @@ void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
     Eigen::MatrixXd M = Eigen::MatrixXd::Zero(nParameters, nParameters);
     Eigen::VectorXd B = Eigen::VectorXd::Zero(nParameters);
     /* Eigen representation of input images; only the pixels that are unconvolved in cimage below */
-    Eigen::MatrixXd eigenToConvolve    = diffim::imageToEigenMatrix(imageToConvolve).block(startRow, startCol, 
-                                                                                           endRow-startRow, endCol-startCol);
-    Eigen::MatrixXd eigenToNotConvolve = diffim::imageToEigenMatrix(imageToNotConvolve).block(startRow, startCol, 
-                                                                                              endRow-startRow, endCol-startCol);
-    Eigen::MatrixXd eigeniVariance     = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
-                                                                                            endRow-startRow, endCol-startCol).cwise().inverse();
+    Eigen::MatrixXd eigenToConvolve    = imageToEigenMatrix(imageToConvolve).block(startRow, startCol, 
+                                                                                   endRow-startRow, endCol-startCol);
+    Eigen::MatrixXd eigenToNotConvolve = imageToEigenMatrix(imageToNotConvolve).block(startRow, startCol, 
+                                                                                      endRow-startRow, endCol-startCol);
+    Eigen::MatrixXd eigeniVariance     = imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
+                                                                                    endRow-startRow, endCol-startCol).cwise().inverse();
     /* Resize into 1-D for later usage */
     eigenToConvolve.resize(eigenToConvolve.rows()*eigenToConvolve.cols(), 1);
     eigenToNotConvolve.resize(eigenToNotConvolve.rows()*eigenToNotConvolve.cols(), 1);
     eigeniVariance.resize(eigeniVariance.rows()*eigeniVariance.cols(), 1);
 
     /* Holds image convolved with basis function */
-    image::Image<PixelT> cimage(imageToConvolve.getDimensions());
+    afwImage::Image<PixelT> cimage(imageToConvolve.getDimensions());
     
     /* Holds eigen representation of image convolved with all basis functions */
     std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
@@ -147,17 +149,17 @@ void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
     typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = convolvedEigenList.begin();
     /* Create C_i in the formalism of Alard & Lupton */
     for (; kiter != _basisList.end(); ++kiter, ++eiter) {
-        math::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+        afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
 	boost::shared_ptr<Eigen::MatrixXd> cmat (
-            new Eigen::MatrixXd(diffim::imageToEigenMatrix(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol))
+            new Eigen::MatrixXd(imageToEigenMatrix(cimage).block(startRow, startCol, endRow-startRow, endCol-startCol))
             );
 	cmat->resize(cmat->rows()*cmat->cols(), 1);
 	*eiter = cmat;
     } 
     
     double time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                       "Total compute time to do basis convolutions : %.2f s", time);
+    pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                      "Total compute time to do basis convolutions : %.2f s", time);
     t.restart();
     
     /* 
@@ -217,8 +219,8 @@ void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
     }
 
     time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                       "Total compute time to step through pixels : %.2f s", time);
+    pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                      "Total compute time to step through pixels : %.2f s", time);
     t.restart();
 
     /* If the regularization matrix is here and not null, we use it by default */
@@ -245,8 +247,8 @@ void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
 
         M = M + lambda * *_H;
         B = Mt * B;
-        logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                           "Applying kernel regularization with lambda = %.2e", lambda);
+        pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                          "Applying kernel regularization with lambda = %.2e", lambda);
         
     }
     
@@ -258,14 +260,14 @@ void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
     //
     Eigen::VectorXd Soln = Eigen::VectorXd::Zero(nParameters);;
     if (!(M.ldlt().solve(B, &Soln))) {
-        logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                           "Unable to determine kernel via Cholesky LDL^T");
+        pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                          "Unable to determine kernel via Cholesky LDL^T");
         if (!(M.llt().solve(B, &Soln))) {
-            logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                               "Unable to determine kernel via Cholesky LL^T");
+            pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                              "Unable to determine kernel via Cholesky LL^T");
             if (!(M.lu().solve(B, &Soln))) {
-                logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                                   "Unable to determine kernel via LU");
+                pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                                  "Unable to determine kernel via LU");
                 // LAST RESORT
                 try {
                     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(M);
@@ -279,11 +281,11 @@ void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
                     }
                     
                     Soln = R*eValues.asDiagonal()*R.transpose()*B;
-                } catch (exceptions::Exception& e) {
-                    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                                       "Unable to determine kernel via eigen-values");
+                } catch (pexExcept::Exception& e) {
+                    pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                                      "Unable to determine kernel via eigen-values");
                     
-                    throw LSST_EXCEPT(exceptions::Exception, "Unable to determine kernel solution in PsfMatchingFunctor::apply");
+                    throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution in PsfMatchingFunctor::apply");
                 }
             }
         }
@@ -305,17 +307,17 @@ void diffim::PsfMatchingFunctor<PixelT, VarT>::apply(
     _Soln = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(Soln));
     _initialized = true;
     time = t.elapsed();
-    logging::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                       "Total compute time to do matrix math : %.2f s", time);
+    pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                      "Total compute time to do matrix math : %.2f s", time);
     
 }
 
 template <typename PixelT, typename VarT>
-std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
-diffim::PsfMatchingFunctor<PixelT, VarT>::getSolution() {
+std::pair<boost::shared_ptr<afwMath::Kernel>, double>
+PsfMatchingFunctor<PixelT, VarT>::getSolution() {
 
     if (!(_initialized)) {
-        throw LSST_EXCEPT(exceptions::Exception, "Kernel not initialized");
+        throw LSST_EXCEPT(pexExcept::Exception, "Kernel not initialized");
     }
 
     unsigned int const nKernelParameters     = _basisList.size();
@@ -326,17 +328,17 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::getSolution() {
     std::vector<double> kValues(nKernelParameters);
     for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
         if (std::isnan((*_Soln)(idx))) {
-            throw LSST_EXCEPT(exceptions::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception, 
                               str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
         }
         kValues[idx] = (*_Soln)(idx);
     }
-    boost::shared_ptr<lsst::afw::math::Kernel> kernel( 
-        new math::LinearCombinationKernel(_basisList, kValues) 
+    boost::shared_ptr<afwMath::Kernel> kernel( 
+        new afwMath::LinearCombinationKernel(_basisList, kValues) 
         );
     
     if (std::isnan((*_Soln)(nParameters-1))) {
-        throw LSST_EXCEPT(exceptions::Exception, 
+        throw LSST_EXCEPT(pexExcept::Exception, 
                           str(boost::format("Unable to determine background solution %d (nan)") % (nParameters-1)));
     }
     double background = (*_Soln)(nParameters-1);
@@ -345,11 +347,11 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::getSolution() {
 }
 
 template <typename PixelT, typename VarT>
-std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
-diffim::PsfMatchingFunctor<PixelT, VarT>::getSolutionUncertainty() {
+std::pair<boost::shared_ptr<afwMath::Kernel>, double>
+PsfMatchingFunctor<PixelT, VarT>::getSolutionUncertainty() {
 
     if (!(_initialized)) {
-        throw LSST_EXCEPT(exceptions::Exception, "Kernel not initialized");
+        throw LSST_EXCEPT(pexExcept::Exception, "Kernel not initialized");
     }
 
     unsigned int const nKernelParameters     = _basisList.size();
@@ -379,26 +381,26 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::getSolutionUncertainty() {
     for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
         // Insanity checking
         if (std::isnan(Error2(idx, idx))) {
-            throw LSST_EXCEPT(exceptions::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception, 
                               str(boost::format("Unable to determine kernel uncertainty %d (nan)") % idx));
         }
         if (Error2(idx, idx) < 0.0) {
-            throw LSST_EXCEPT(exceptions::Exception,
+            throw LSST_EXCEPT(pexExcept::Exception,
                               str(boost::format("Unable to determine kernel uncertainty, negative variance %d (%.3e)") % 
                                   idx % Error2(idx, idx)));
         }
         kErrValues[idx] = sqrt(Error2(idx, idx));
     }
-    boost::shared_ptr<lsst::afw::math::Kernel> kernelErr( 
-        new math::LinearCombinationKernel(_basisList, kErrValues) 
+    boost::shared_ptr<afwMath::Kernel> kernelErr( 
+        new afwMath::LinearCombinationKernel(_basisList, kErrValues) 
         );
  
     // Estimate of Background and Background Error */
     if (std::isnan(Error2(nParameters-1, nParameters-1))) {
-        throw LSST_EXCEPT(exceptions::Exception, "Unable to determine background uncertainty (nan)");
+        throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine background uncertainty (nan)");
     }
     if (Error2(nParameters-1, nParameters-1) < 0.0) {
-        throw LSST_EXCEPT(exceptions::Exception, 
+        throw LSST_EXCEPT(pexExcept::Exception, 
                           str(boost::format("Unable to determine background uncertainty, negative variance (%.3e)") % 
                               Error2(nParameters-1, nParameters-1) 
                               ));
@@ -410,7 +412,7 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::getSolutionUncertainty() {
 
 template <typename PixelT, typename VarT>
 std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> >
-diffim::PsfMatchingFunctor<PixelT, VarT>::getAndClearMB() {
+PsfMatchingFunctor<PixelT, VarT>::getAndClearMB() {
 
     boost::shared_ptr<Eigen::MatrixXd> Mout = _M;
     boost::shared_ptr<Eigen::VectorXd> Bout = _B;
@@ -421,6 +423,7 @@ diffim::PsfMatchingFunctor<PixelT, VarT>::getAndClearMB() {
     return std::make_pair(Mout, Bout);
 }
 
-template class diffim::PsfMatchingFunctor<float, float>;
-template class diffim::PsfMatchingFunctor<double, float>;
+template class PsfMatchingFunctor<float, float>;
+template class PsfMatchingFunctor<double, float>;
 
+}}}
