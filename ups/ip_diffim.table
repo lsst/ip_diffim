@@ -1,4 +1,4 @@
-setupRequired(afw >= svn10346)
+setupRequired(afw)
 setupRequired(sdqa >= 3.0.3)
 setupRequired(pex_harness >= 3.2.10)
 
