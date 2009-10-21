@@ -174,14 +174,14 @@ public:
     }
 
 private:
-    Mode _mode;
-    std::vector<double> _kSums;
-    double _kSumMean;
-    double _kSumStd;
-    double _dkSumMax;
-    int    _kSumNpts;
-    int    _nRejected;
-    pexPolicy::Policy _policy;
+    Mode _mode;                  ///< Processing mode; AGGREGATE or REJECT
+    std::vector<double> _kSums;  ///< List of all candidate kernel sums
+    double _kSumMean;            ///< Clipped mean of the kernel sums
+    double _kSumStd;             ///< Clipped standard deviation of kernel sums
+    double _dkSumMax;            ///< Maximum acceptable deviation from mean sum
+    int    _kSumNpts;            ///< Number of points used in the statistics
+    int    _nRejected;           ///< Number of candidates rejected during processCandidate()
+    pexPolicy::Policy _policy;   ///< Policy controlling behavior
 };    
 
 
@@ -291,8 +291,8 @@ public:
     ImageT::Ptr returnMean() {return _mean;}
 
 private:
-    afwImage::ImagePca<ImageT> *_imagePca; 
-    ImageT::Ptr _mean;
+    afwImage::ImagePca<ImageT> *_imagePca; ///< Structure to fill with images
+    ImageT::Ptr _mean;                     ///< Mean image calculated before Pca
 };
 
 
@@ -364,7 +364,7 @@ class BuildSingleKernelVisitor : public afwMath::CandidateVisitor {
 public:
     BuildSingleKernelVisitor(
         PsfMatchingFunctor<PixelT> &kFunctor,   ///< Functor that builds the kernels
-        pexPolicy::Policy const& policy ///< Policy file directing behavior
+        pexPolicy::Policy const& policy         ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _kFunctor(kFunctor),
@@ -578,12 +578,12 @@ public:
 
     }
 private:
-    PsfMatchingFunctor<PixelT> _kFunctor;
-    pexPolicy::Policy _policy;
-    ImageStatistics<PixelT> _imstats;
-    bool _setCandidateKernel;
-    bool _skipBuilt;
-    int _nRejected;
+    PsfMatchingFunctor<PixelT> _kFunctor; ///< Psf matching functor
+    pexPolicy::Policy _policy;            ///< Policy controlling behavior
+    ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
+    bool _setCandidateKernel;             ///< Do you set the KernelCandidate kernel, or just matrices
+    bool _skipBuilt;                      ///< Skip over built candidates during processCandidate()
+    int _nRejected;                       ///< Number of candidates rejected during processCandidate()
 };
 
 
@@ -901,20 +901,20 @@ public:
     }
     
 private:
-    afwMath::KernelList _basisList;
-    Eigen::MatrixXd _mMat;       ///< Least squares matrix
-    Eigen::VectorXd _bVec;       ///< Least squares vector
-    Eigen::VectorXd _sVec;       ///< Least squares solution
-    int const _spatialKernelOrder;
-    int const _spatialBgOrder;
-    afwMath::Kernel::SpatialFunctionPtr _spatialKernelFunction;
-    afwMath::Kernel::SpatialFunctionPtr _spatialBgFunction;
-    unsigned int _nbases;     ///< Number of bases being fit for
-    unsigned int _nkt;        ///< Number of kernel terms in spatial model
-    unsigned int _nbt;        ///< Number of backgruond terms in spatial model
-    unsigned int _nt;         ///< Total number of terms in the solution; also dimensions of matrices
-    pexPolicy::Policy _policy;
-    bool _constantFirstTerm;  ///< Is the first term spatially invariant?
+    afwMath::KernelList _basisList; ///< List of kernel basis functions
+    Eigen::MatrixXd _mMat;          ///< Least squares matrix
+    Eigen::VectorXd _bVec;          ///< Least squares vector
+    Eigen::VectorXd _sVec;          ///< Least squares solution
+    int const _spatialKernelOrder;  ///< Spatial order of kernel variation
+    int const _spatialBgOrder;      ///< Spatial order of background variation
+    afwMath::Kernel::SpatialFunctionPtr _spatialKernelFunction; ///< Pointer to spatial kernel function
+    afwMath::Kernel::SpatialFunctionPtr _spatialBgFunction;     ///< Pointer to spatial background function
+    unsigned int _nbases;      ///< Number of bases being fit for
+    unsigned int _nkt;         ///< Number of kernel terms in spatial model
+    unsigned int _nbt;         ///< Number of backgruond terms in spatial model
+    unsigned int _nt;          ///< Total number of terms in the solution; also dimensions of matrices
+    pexPolicy::Policy _policy; ///< Policy controlling behavior
+    bool _constantFirstTerm;   ///< Is the first term spatially invariant?
 };
 
 /**
@@ -1061,12 +1061,12 @@ public:
     }
     
 private:
-    afwMath::LinearCombinationKernel::Ptr _spatialKernel;
-    afwMath::Kernel::SpatialFunctionPtr _spatialBackground;
-    pexPolicy::Policy _policy;
-    ImageStatistics<PixelT> _imstats;
-    int _nGood;
-    int _nRejected;
+    afwMath::LinearCombinationKernel::Ptr _spatialKernel;   ///< Spatial kernel function
+    afwMath::Kernel::SpatialFunctionPtr _spatialBackground; ///< Spatial background function
+    pexPolicy::Policy _policy;            ///< Policy controlling behavior
+    ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
+    int _nGood;                           ///< Number of good candidates remaining
+    int _nRejected;                       ///< Number of candidates rejected during processCandidate()
 };
 
 }}}} // end of namespace lsst::ip::diffim::detail
