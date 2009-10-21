@@ -12,13 +12,17 @@
 #ifndef LSST_IP_DIFFIM_PSFMATCHINGFUNCTOR_H
 #define LSST_IP_DIFFIM_PSFMATCHINGFUNCTOR_H
 
-#include <Eigen/Core>
-#include <boost/shared_ptr.hpp>
-#include <lsst/pex/policy/Policy.h>
-#include <lsst/afw/math/Kernel.h>
-#include <lsst/afw/image/MaskedImage.h>
+#include "Eigen/Core"
 
-namespace lsst { namespace ip { namespace diffim {
+#include "boost/shared_ptr.hpp"
+
+#include "lsst/pex/policy/Policy.h"
+#include "lsst/afw/math/Kernel.h"
+#include "lsst/afw/image/MaskedImage.h"
+
+namespace lsst { 
+namespace ip { 
+namespace diffim {
    
    /**
      * @brief Functor to create PSF Matching Kernel
@@ -108,6 +112,6 @@ namespace lsst { namespace ip { namespace diffim {
         return typename PsfMatchingFunctor<PixelT>::Ptr(new PsfMatchingFunctor<PixelT>(basisList, _hMat));
     }
 
-}}}
+}}} // end of namespace lsst::ip::diffim
 
 #endif

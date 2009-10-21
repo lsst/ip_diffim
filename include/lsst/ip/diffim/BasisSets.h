@@ -12,11 +12,15 @@
 #ifndef LSST_IP_DIFFIM_BASISSETS_H
 #define LSST_IP_DIFFIM_BASISSETS_H
 
-#include <boost/shared_ptr.hpp>
-#include <Eigen/Core>
-#include <lsst/afw/math/Kernel.h>
+#include "boost/shared_ptr.hpp"
 
-namespace lsst { namespace ip { namespace diffim {
+#include "Eigen/Core"
+
+#include "lsst/afw/math/Kernel.h"
+
+namespace lsst { 
+namespace ip { 
+namespace diffim {
    
     /**
      * @brief Build a set of Delta Function basis kernels
@@ -86,6 +90,6 @@ namespace lsst { namespace ip { namespace diffim {
         std::vector<int>    const& degGauss    ///< local spatial variation of gaussians
         );
 
-}}}
+}}} // end of namespace lsst::ip::diffim
 
 #endif

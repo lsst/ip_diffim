@@ -15,16 +15,18 @@
 #include <vector>
 #include <string>
 
-#include <Eigen/Core>
+#include "Eigen/Core"
 
-#include <boost/shared_ptr.hpp>
+#include "boost/shared_ptr.hpp"
 
-#include <lsst/pex/policy/Policy.h>
-#include <lsst/afw/math.h>
-#include <lsst/afw/image.h>
-#include <lsst/afw/detection/Footprint.h>
+#include "lsst/pex/policy/Policy.h"
+#include "lsst/afw/math.h"
+#include "lsst/afw/image.h"
+#include "lsst/afw/detection/Footprint.h"
 
-namespace lsst { namespace ip { namespace diffim {
+namespace lsst { 
+namespace ip { 
+namespace diffim {
 
     
     /** Mask plane definitions */
@@ -235,7 +237,7 @@ namespace lsst { namespace ip { namespace diffim {
     void addToImage(lsst::afw::image::Image<PixelT> &image,
                     double value);
 
-}}}
+}}} // end of namespace lsst::ip::diffim
 
 #endif
 

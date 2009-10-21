@@ -81,7 +81,10 @@ if display:
     for x in (0, width//2, width):
         for y in (0, height//2, height):
             im   = afwImage.ImageD(spatialKernel.getDimensions())
-            ksum = spatialKernel.computeImage(im, False, afwImage.indexToPosition(x), afwImage.indexToPosition(y))
+            ksum = spatialKernel.computeImage(im,
+                                              False,
+                                              afwImage.indexToPosition(x),
+                                              afwImage.indexToPosition(y))
             mos.append(im, "x=%d y=%d kSum=%.2f" % (x, y, ksum))
 
     mosaic = mos.makeMosaic()

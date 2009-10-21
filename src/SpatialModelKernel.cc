@@ -11,22 +11,22 @@
 
 #include <numeric>
 
-#include <boost/timer.hpp> 
+#include "boost/timer.hpp" 
 
-#include <lsst/afw/image/Image.h>
-#include <lsst/afw/image/ImagePca.h>
-#include <lsst/afw/math/Kernel.h>
-#include <lsst/afw/math/FunctionLibrary.h>
-#include <lsst/afw/detection/Footprint.h>
+#include "lsst/afw/image/Image.h"
+#include "lsst/afw/image/ImagePca.h"
+#include "lsst/afw/math/Kernel.h"
+#include "lsst/afw/math/FunctionLibrary.h"
+#include "lsst/afw/detection/Footprint.h"
 
-#include <lsst/pex/exceptions/Runtime.h>
-#include <lsst/pex/policy/Policy.h>
-#include <lsst/pex/logging/Trace.h>
+#include "lsst/pex/exceptions/Runtime.h"
+#include "lsst/pex/policy/Policy.h"
+#include "lsst/pex/logging/Trace.h"
 
-#include <lsst/ip/diffim/BasisSets.h>
-#include <lsst/ip/diffim/PsfMatchingFunctor.h>
-#include <lsst/ip/diffim/SpatialModelKernel.h>
-#include <lsst/ip/diffim/SpatialModelVisitors.h>
+#include "lsst/ip/diffim/BasisSets.h"
+#include "lsst/ip/diffim/PsfMatchingFunctor.h"
+#include "lsst/ip/diffim/SpatialModelKernel.h"
+#include "lsst/ip/diffim/SpatialModelVisitors.h"
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
@@ -34,7 +34,9 @@ namespace pexLogging     = lsst::pex::logging;
 namespace pexExcept      = lsst::pex::exceptions; 
 namespace pexPolicy      = lsst::pex::policy; 
 
-namespace lsst { namespace ip { namespace diffim {
+namespace lsst { 
+namespace ip { 
+namespace diffim {
             
 template <typename PixelT>
 KernelCandidate<PixelT>::ImageT::ConstPtr KernelCandidate<PixelT>::getImage() const {

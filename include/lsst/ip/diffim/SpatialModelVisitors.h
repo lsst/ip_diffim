@@ -16,24 +16,24 @@
 #ifndef LSST_IP_DIFFIM_SPATIALMODELVISITORS_H
 #define LSST_IP_DIFFIM_SPATIALMODELVISITORS_H
 
-#include <boost/timer.hpp> 
+#include "boost/timer.hpp" 
 
-#include <lsst/afw/image/Image.h>
-#include <lsst/afw/image/ImagePca.h>
-#include <lsst/afw/math/SpatialCell.h>
-#include <lsst/afw/math/Kernel.h>
-#include <lsst/afw/math/FunctionLibrary.h>
+#include "Eigen/Core"
+#include "Eigen/Cholesky"
+#include "Eigen/LU"
+#include "Eigen/QR"
 
-#include <lsst/pex/exceptions/Runtime.h>
-#include <lsst/pex/policy/Policy.h>
-#include <lsst/pex/logging/Trace.h>
+#include "lsst/afw/image/Image.h"
+#include "lsst/afw/image/ImagePca.h"
+#include "lsst/afw/math/SpatialCell.h"
+#include "lsst/afw/math/Kernel.h"
+#include "lsst/afw/math/FunctionLibrary.h"
 
-#include <lsst/ip/diffim/SpatialModelKernel.h>
+#include "lsst/pex/exceptions/Runtime.h"
+#include "lsst/pex/policy/Policy.h"
+#include "lsst/pex/logging/Trace.h"
 
-#include <Eigen/Core>
-#include <Eigen/Cholesky>
-#include <Eigen/LU>
-#include <Eigen/QR>
+#include "lsst/ip/diffim/SpatialModelKernel.h"
 
 #define DEBUG_MATRIX 0
 
@@ -43,7 +43,10 @@ namespace pexLogging     = lsst::pex::logging;
 namespace pexExcept      = lsst::pex::exceptions; 
 namespace pexPolicy      = lsst::pex::policy; 
 
-namespace lsst { namespace ip { namespace diffim { namespace detail {
+namespace lsst { 
+namespace ip { 
+namespace diffim { 
+namespace detail {
 
 /**
  * @class KernelSumVisitor
@@ -533,8 +536,10 @@ public:
                               "Diffim residuals = %.2f +/- %.2f sigma",
                               _imstats.getMean(),
                               _imstats.getRms());
-
-        if ((std::isnan(_imstats.getMean())) || (std::isnan(_imstats.getRms()))) {
+        
+        bool meanIsNan = std::isnan(_imstats.getMean());
+        bool rmsIsNan  = std::isnan(_imstats.getRms());
+        if (meanIsNan || rmsIsNan) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                   "Rejecting candidate, encountered NaN");
@@ -649,8 +654,9 @@ public:
            matrix math even though its probably more readable, so we go with the
            former.
         */
-        if ((_policy.getString("kernelBasisSet") == "alard-lupton") || 
-            _policy.getBool("usePcaForSpatialKernel")) {
+        bool isAlardLupton = _policy.getString("kernelBasisSet") == "alard-lupton";
+        bool usePca        = _policy.getBool("usePcaForSpatialKernel");
+        if (isAlardLupton || usePca) {
             _constantFirstTerm = true;
         }
         
@@ -1012,7 +1018,9 @@ public:
                               _imstats.getMean(),
                               _imstats.getRms());
 
-        if ((std::isnan(_imstats.getMean())) || (std::isnan(_imstats.getRms()))) {
+        bool meanIsNan = std::isnan(_imstats.getMean());
+        bool rmsIsNan  = std::isnan(_imstats.getRms());
+        if (meanIsNan || rmsIsNan) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                                   "Rejecting candidate, encountered NaN");
@@ -1061,6 +1069,6 @@ private:
     int _nRejected;
 };
 
-}}}}
+}}}} // end of namespace lsst::ip::diffim::detail
 
 #endif

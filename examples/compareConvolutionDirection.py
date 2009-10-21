@@ -23,7 +23,6 @@ diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary
 
 display = True
 writefits = False
-iterate = False
 
 # This one compares DeltaFunction and AlardLupton kernels
 
@@ -109,8 +108,13 @@ class DiffimTestCases(unittest.TestCase):
         vmean = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
         return kSum, bg, dmean, dstd, vmean, kImageOut, diffIm2
         
-    def applyFunctor(self, invert=False, xloc=397, yloc=580, iterate=False):
-        print '# %.2f %.2f' % (xloc, yloc)
+    def applyFunctor(self, invert=False, xloc=397, yloc=580):
+        if invert:
+            frame0 = 12
+        else:
+            frame0 = 0
+            
+        print '# %.2f %.2f %s' % (xloc, yloc, invert)
         
         imsize = int(3 * self.kCols)
 
@@ -142,10 +146,10 @@ class DiffimTestCases(unittest.TestCase):
                                                                                     kSum1, bg1,
                                                                                     dmean1, dstd1, vmean1)
         if display:
-            ds9.mtv(tmi, frame=1) # ds9 switches frame 0 and 1 for some reason
-            ds9.mtv(smi, frame=0)
-            ds9.mtv(kImageOut1, frame=2)
-            ds9.mtv(diffIm1, frame=3)
+            ds9.mtv(tmi, frame=frame0+0)
+            ds9.mtv(smi, frame=frame0+1)
+            ds9.mtv(kImageOut1, frame=frame0+2)
+            ds9.mtv(diffIm1, frame=frame0+3)
         if writefits:
             tmi.writeFits('t')
             smi.writeFits('s')
@@ -159,10 +163,10 @@ class DiffimTestCases(unittest.TestCase):
                                                                                     kSum2, bg2,
                                                                                     dmean2, dstd2, vmean2)
         if display:
-            ds9.mtv(tmi, frame=4)
-            ds9.mtv(smi, frame=5)
-            ds9.mtv(kImageOut2, frame=6)
-            ds9.mtv(diffIm2, frame=7)
+            ds9.mtv(tmi, frame=frame0+4)
+            ds9.mtv(smi, frame=frame0+5)
+            ds9.mtv(kImageOut2, frame=frame0+6)
+            ds9.mtv(diffIm2, frame=frame0+7)
         if writefits:
             kImageOut2.writeFits('k2.fits')
             diffIm2.writeFits('d2')
@@ -175,16 +179,13 @@ class DiffimTestCases(unittest.TestCase):
                                                                                      dmean3, dstd3, vmean3)
         # outputs
         if display:
-            ds9.mtv(tmi, frame=8)
-            ds9.mtv(smi, frame=9)
-            ds9.mtv(kImageOut3, frame=10)
-            ds9.mtv(diffIm3, frame=11)
+            ds9.mtv(tmi, frame=frame0+8)
+            ds9.mtv(smi, frame=frame0+9)
+            ds9.mtv(kImageOut3, frame=frame0+10)
+            ds9.mtv(diffIm3, frame=frame0+11)
         if writefits:
             kImageOut3.writeFits('k3.fits')
             diffIm3.writeFits('d3')
-
-        import pdb
-        pdb.set_trace()
 
     def testFunctor(self):
         for object in self.footprints:
@@ -192,6 +193,12 @@ class DiffimTestCases(unittest.TestCase):
             self.applyFunctor(invert=False, 
                               xloc= int(0.5 * ( object.getBBox().getX0() + object.getBBox().getX1() )),
                               yloc= int(0.5 * ( object.getBBox().getY0() + object.getBBox().getY1() )))
+            self.applyFunctor(invert=True, 
+                              xloc= int(0.5 * ( object.getBBox().getX0() + object.getBBox().getX1() )),
+                              yloc= int(0.5 * ( object.getBBox().getY0() + object.getBBox().getY1() )))
+            import pdb
+            pdb.set_trace()
+
        
 #####
         
@@ -213,7 +220,5 @@ if __name__ == "__main__":
         display = True
     if '-w' in sys.argv:
         writefits = True
-    if '-i' in sys.argv:
-        iterate = True
         
     run(True)

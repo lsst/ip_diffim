@@ -10,21 +10,21 @@
  */
 #include <iostream>
 #include <limits>
-#include <boost/timer.hpp> 
 
-#include <Eigen/Core>
+#include "boost/timer.hpp" 
+
+#include "Eigen/Core"
 
 // NOTE -  trace statements >= 6 can ENTIRELY kill the run time
 // #define LSST_MAX_TRACE 5
 
-#include <lsst/ip/diffim/ImageSubtract.h>
-#include <lsst/afw/image.h>
-#include <lsst/afw/math.h>
-#include <lsst/pex/exceptions/Exception.h>
-#include <lsst/pex/logging/Trace.h>
-#include <lsst/pex/logging/Log.h>
-#include <lsst/afw/detection/Footprint.h>
-#include <lsst/afw/math/ConvolveImage.h>
+#include "lsst/ip/diffim/ImageSubtract.h"
+#include "lsst/afw/image.h"
+#include "lsst/afw/math.h"
+#include "lsst/afw/detection/Footprint.h"
+#include "lsst/pex/exceptions/Exception.h"
+#include "lsst/pex/logging/Trace.h"
+#include "lsst/pex/logging/Log.h"
 
 namespace pexExcept  = lsst::pex::exceptions; 
 namespace pexLog     = lsst::pex::logging; 
@@ -33,7 +33,9 @@ namespace afwImage   = lsst::afw::image;
 namespace afwMath    = lsst::afw::math;
 namespace afwDetect  = lsst::afw::detection;
 
-namespace lsst { namespace ip { namespace diffim {
+namespace lsst { 
+namespace ip { 
+namespace diffim {
 
 /**
  * @brief Turns Image into a 2-D Eigen Matrix
@@ -327,12 +329,12 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
             // Note we need to translate to pixel coordinates here
             afwImage::BBox fpBBox = (*fpGrow).getBBox();
             fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
-            if (((*fpGrow).getBBox().getX0() < 0) ||
-                ((*fpGrow).getBBox().getY0() < 0) ||
-                ((*fpGrow).getBBox().getX1() > imageToConvolve.getWidth()) ||
-                ((*fpGrow).getBBox().getY1() > imageToConvolve.getHeight()))
+            bool belowOriginX = (*fpGrow).getBBox().getX0() < 0;
+            bool belowOriginY = (*fpGrow).getBBox().getY0() < 0;
+            bool offImageX    = (*fpGrow).getBBox().getX1() > imageToConvolve.getWidth();
+            bool offImageY    = (*fpGrow).getBBox().getY1() > imageToConvolve.getHeight();
+            if (belowOriginX || belowOriginY || offImageX || offImageY)
                 continue;
-
 
             // Grab a subimage; report any exception
             try {
@@ -465,4 +467,4 @@ void addToImage(
     double
     );
 
-}}}
+}}} // end of namespace lsst::ip::diffim

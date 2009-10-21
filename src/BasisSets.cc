@@ -9,18 +9,21 @@
  * @ingroup ip_diffim
  */
 #include <cmath> 
-#include <boost/timer.hpp> 
 
-#include <lsst/pex/exceptions/Exception.h>
-#include <lsst/afw/image.h>
-#include <lsst/afw/math.h>
-#include <lsst/ip/diffim/BasisSets.h>
+#include "boost/timer.hpp" 
+
+#include "lsst/pex/exceptions/Exception.h"
+#include "lsst/afw/image.h"
+#include "lsst/afw/math.h"
+#include "lsst/ip/diffim/BasisSets.h"
 
 namespace pexExcept  = lsst::pex::exceptions; 
 namespace afwImage   = lsst::afw::image;
 namespace afwMath    = lsst::afw::math;
 
-namespace lsst { namespace ip { namespace diffim {
+namespace lsst { 
+namespace ip { 
+namespace diffim {
 
 /** 
  * @brief Generate a basis set of delta function Kernels.
@@ -487,4 +490,4 @@ renormalizeKernelList(
     return kernelListOut;
 }
 
-}}}
+}}} // end of namespace lsst::ip::diffim

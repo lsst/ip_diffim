@@ -12,21 +12,23 @@
 #ifndef LSST_IP_DIFFIM_SPATIALMODELKERNEL_H
 #define LSST_IP_DIFFIM_SPATIALMODELKERNEL_H
 
-#include <boost/shared_ptr.hpp>
-#include <Eigen/Core>
+#include "boost/shared_ptr.hpp"
+#include "Eigen/Core"
 
-#include <lsst/afw/math/SpatialCell.h>
-#include <lsst/afw/math/Kernel.h>
-#include <lsst/afw/math/KernelFunctions.h>
-#include <lsst/afw/math/Statistics.h>
-#include <lsst/pex/policy/Policy.h>
-#include <lsst/afw/detection/Footprint.h>
-#include <lsst/sdqa/SdqaRating.h>
+#include "lsst/afw/math/SpatialCell.h"
+#include "lsst/afw/math/Kernel.h"
+#include "lsst/afw/math/KernelFunctions.h"
+#include "lsst/afw/math/Statistics.h"
+#include "lsst/pex/policy/Policy.h"
+#include "lsst/afw/detection/Footprint.h"
+#include "lsst/sdqa/SdqaRating.h"
 
-#include <lsst/ip/diffim/ImageSubtract.h>
-#include <lsst/ip/diffim/PsfMatchingFunctor.h>
+#include "lsst/ip/diffim/ImageSubtract.h"
+#include "lsst/ip/diffim/PsfMatchingFunctor.h"
 
-namespace lsst { namespace ip { namespace diffim {
+namespace lsst { 
+namespace ip { 
+namespace diffim {
 
     /** 
      * @brief Class stored in SpatialCells for spatial Kernel fitting
@@ -71,18 +73,18 @@ namespace lsst { namespace ip { namespace diffim {
             _kernel(),
             _kSum(0.),
             _background(0.),
-            _M(),
-            _B(),
+            _mMat(),
+            _bVec(),
             _haveKernel(false) {
 
             /* Rank by brightness in template */
             lsst::afw::math::Statistics stats = lsst::afw::math::makeStatistics(*_miToConvolvePtr, 
-                                                                                lsst::afw::math::SUM);             
+                                                                                lsst::afw::math::SUM);
             _templateFlux = stats.getValue(lsst::afw::math::SUM);
         }
         
         /// Destructor
-        ~KernelCandidate() {};
+        virtual ~KernelCandidate() {};
 
         /**
          * Return Cell rating
@@ -113,27 +115,27 @@ namespace lsst { namespace ip { namespace diffim {
         double getKsum() const;
         lsst::afw::math::Kernel::Ptr getKernel() const;
         double getBackground() const;
-        boost::shared_ptr<Eigen::MatrixXd> const getM()  {return _M;}
-        boost::shared_ptr<Eigen::VectorXd> const getB()  {return _B;}
+        boost::shared_ptr<Eigen::MatrixXd> const getM()  {return _mMat;}
+        boost::shared_ptr<Eigen::VectorXd> const getB()  {return _bVec;}
         bool hasKernel() {return _haveKernel;}
         
         void setKernel(lsst::afw::math::Kernel::Ptr kernel);
         void setBackground(double background) {_background = background;}
 
-        void setM(boost::shared_ptr<Eigen::MatrixXd> M) {_M = M;}
-        void setB(boost::shared_ptr<Eigen::VectorXd> B) {_B = B;}
+        void setM(boost::shared_ptr<Eigen::MatrixXd> mMat) {_mMat = mMat;}
+        void setB(boost::shared_ptr<Eigen::VectorXd> bVec) {_bVec = bVec;}
 
     private:
         MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
         MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel
-        double _templateFlux;                               ///< Brightness in the template image; used to rank candidates
+        double _templateFlux;                               ///< Brightness in the template image
 
         lsst::afw::math::Kernel::Ptr _kernel;               ///< Derived single-object convolution kernel
         double _kSum;                                       ///< Derived kernel sum
         double _background;                                 ///< Derived differential background estimate
 
-        boost::shared_ptr<Eigen::MatrixXd> _M;              ///< Derived least squares matrix
-        boost::shared_ptr<Eigen::VectorXd> _B;              ///< Derived least squares vector
+        boost::shared_ptr<Eigen::MatrixXd> _mMat;           ///< Derived least squares matrix
+        boost::shared_ptr<Eigen::VectorXd> _bVec;           ///< Derived least squares vector
 
         bool mutable _haveKernel;                           ///< do we have a Kernel to return?
     };
@@ -153,7 +155,7 @@ namespace lsst { namespace ip { namespace diffim {
     makeKernelCandidate(float const xCenter,
                         float const yCenter, 
                         boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToConvolvePtr,
-                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToNotConvolvePtr) {
+                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToNotConvolvePtr){
         
         return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
                                                                                  miToConvolvePtr,
@@ -177,7 +179,7 @@ namespace lsst { namespace ip { namespace diffim {
         lsst::pex::policy::Policy const& policy);
     
     
-}}}
+}}} // end of namespace lsst::ip::diffim
 
 #endif
 

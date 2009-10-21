@@ -9,17 +9,19 @@
  * @ingroup ip_diffim
  */
 #include <cmath>
-#include <boost/timer.hpp> 
-#include <Eigen/Core>
-#include <Eigen/QR>
-#include <Eigen/LU>
 
-#include <lsst/pex/exceptions/Exception.h>
-#include <lsst/pex/logging/Trace.h>
-#include <lsst/afw/image.h>
-#include <lsst/afw/math.h>
-#include <lsst/ip/diffim/PsfMatchingFunctor.h>
-#include <lsst/ip/diffim/ImageSubtract.h>
+#include "boost/timer.hpp" 
+
+#include "Eigen/Core"
+#include "Eigen/QR"
+#include "Eigen/LU"
+
+#include "lsst/pex/exceptions/Exception.h"
+#include "lsst/pex/logging/Trace.h"
+#include "lsst/afw/image.h"
+#include "lsst/afw/math.h"
+#include "lsst/ip/diffim/PsfMatchingFunctor.h"
+#include "lsst/ip/diffim/ImageSubtract.h"
 
 #define DEBUG_MATRIX 0
 
@@ -29,7 +31,9 @@ namespace pexPolicy  = lsst::pex::policy;
 namespace afwImage   = lsst::afw::image;
 namespace afwMath    = lsst::afw::math;
 
-namespace lsst { namespace ip { namespace diffim {
+namespace lsst { 
+namespace ip { 
+namespace diffim {
 
 //
 // Constructors
@@ -435,4 +439,4 @@ PsfMatchingFunctor<PixelT, VarT>::getAndClearMB() {
 template class PsfMatchingFunctor<float, float>;
 template class PsfMatchingFunctor<double, float>;
 
-}}}
+}}} // end of namespace lsst::ip::diffim
