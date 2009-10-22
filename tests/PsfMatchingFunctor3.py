@@ -15,7 +15,7 @@ import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
 
-Verbosity = 4
+Verbosity = 1
 logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
@@ -86,6 +86,15 @@ class DiffimTestCases(unittest.TestCase):
         # you run detection on.  Here it is the template.
         algorithm = self.policy.get("backgroundPolicy.algorithm")
         binsize   = self.policy.get("backgroundPolicy.binsize")
+
+        # hack to get around ticket #987
+        # hack to get around ticket #987
+        # hack to get around ticket #987
+        binsize   = binsize//2
+        # hack to get around ticket #987
+        # hack to get around ticket #987
+        # hack to get around ticket #987
+        
         bctrl     = afwMath.BackgroundControl(afwMath.NATURAL_SPLINE)
         bctrl.setNxSample(int(self.templateImage.getWidth()//binsize) + 1)
         bctrl.setNySample(int(self.templateImage.getHeight()//binsize) + 1)

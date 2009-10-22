@@ -21,7 +21,7 @@ import lsst.afw.math as afwMath
 import lsst.daf.base as dafBase
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-Verbosity = 4
+Verbosity = 1
 pexLog.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 
 class DiffimStageTestCase(unittest.TestCase):
