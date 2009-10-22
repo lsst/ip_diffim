@@ -20,7 +20,7 @@ class DiffimStage(Stage):
         self.activeClipboard = self.inputQueue.getNextDataset()
         
         self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
-                "ip.diffim.DiffimStage")
+                              "ip.diffim.DiffimStage")
 
         scienceExposureKey = self._policy.get("scienceExposureKey")
         templateExposureKey = self._policy.get("templateExposureKey")
@@ -30,8 +30,10 @@ class DiffimStage(Stage):
         #
         # We may have been passed an Image, but we need an Exposure
         #
-        if re.search(r"ImageBase<", templateExposure.repr()): # Yes, an Image of some sort
-            # N.b. we don't use type() as we don't know what sort of Image it'll be, but repr can be fooled by a Mask
+        if re.search(r"ImageBase<", templateExposure.repr()):
+            # Yes, an Image of some sort
+            # N.b. we don't use type() as we don't know what sort of Image it'll be,
+            # but repr can be fooled by a Mask
             im = templateExposure
             msk = afwImage.MaskU(im.getDimensions()); msk.set(0x0)
             var = afwImage.ImageF(im.getDimensions()); var.set(0.0)
@@ -54,6 +56,7 @@ class DiffimStage(Stage):
             ds9.mtv(templateExposure, frame=frame);  ds9.dot("Template", 0, 0, frame=frame)
 
         diffimPolicy = self._policy.get("diffimPolicy")
+
         # step 1
         self.log.log(pexLog.Log.INFO, "Starting warp : %s" % (time.ctime()))
         remapedTemplateExposure = warpTemplateExposure(templateExposure,
@@ -68,18 +71,18 @@ class DiffimStage(Stage):
             frame = 1
             ds9.mtv(scienceExposure, frame=frame);  ds9.dot("Science Exposure", 0, 0, frame=frame)
 
-        # step 2
+        # step 3
         self.log.log(pexLog.Log.INFO, "Starting subtract : %s" % (time.ctime()))
         products = subtractExposure(remapedTemplateExposure, 
-                scienceExposure, 
-                diffimPolicy,
-                self.log)
+                                    scienceExposure, 
+                                    diffimPolicy,
+                                    self.log)
         self.log.log(pexLog.Log.INFO, "Ending subtract : %s" % (time.ctime()))
 
         if products == None:
             raise RuntimeException("DiffimStage.subtractExposure failed")
 
-        differenceExposure, spatialKernel, backgroundModel, sdqaSet = products
+        differenceExposure, spatialKernel, spatialBg, kernelCellSet = products
 
         persistableSdqaVector = sdqa.PersistableSdqaRatingVector(sdqaSet)
 
