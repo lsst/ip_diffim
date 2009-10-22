@@ -317,7 +317,7 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
             afwDetect::Footprint::Ptr fpGrow = 
                 afwDetect::growFootprint(*i, fpGrowPix, false);
             
-            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+            pexLog::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                               "Footprint out : %d,%d -> %d,%d (center %d,%d)",
                               (*fpGrow).getBBox().getX0(), (*fpGrow).getBBox().getY0(),
                               (*fpGrow).getBBox().getX1(), (*fpGrow).getBBox().getY1(),

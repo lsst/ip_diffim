@@ -7,6 +7,7 @@ from createKernelFunctor import createKernelFunctor
 # all the other LSST packages
 import lsst.afw.image.imageLib as afwImage
 import lsst.afw.math.mathLib as afwMath
+import lsst.pex.logging as pexLog
 
 # Most general routine
 def createPsfMatchingKernel(templateMaskedImage,
@@ -45,8 +46,20 @@ def createPsfMatchingKernel(templateMaskedImage,
     # Create the Psf matching kernel
     KB = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
     spatialKernel = KB.first
-    spatialBg = KB.second
+    spatialBg     = KB.second
 
+    # What is the status of the processing?
+    nGood = 0
+    for cell in kernelCellSet.getCellList():
+        for cand in cell.begin(True):
+            cand = diffimLib.cast_KernelCandidateF(cand)
+            if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
+                nGood += 1
+    if nGood == 0:
+        pexLog.Trace("lsst.ip.diffim.createPsfMatchingKernel", 1, "WARNING")
+    pexLog.Trace("lsst.ip.diffim.createPsfMatchingKernel", 1,
+                 "Used %d kernels for spatial fit" % (nGood))
+                 
     return spatialKernel, spatialBg, kernelCellSet
 
 

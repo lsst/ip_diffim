@@ -43,9 +43,11 @@ Notes:
     parser = optparse.OptionParser(usage)
     parser.add_option('-p', '--policy', default=defPolicyPath, help='policy file')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
-                      help='verbosity of diagnostic trace messages; 1 for just warnings, more for more information')
+                      help='verbosity of Trace messages')
     parser.add_option('-i', '--invert', action='store_true', default=False,
                       help='invert the image to convolve')
+    parser.add_option('-d', '--display', action='store_true', default=False,
+                      help='display the images')
 
     (options, args) = parser.parse_args()
     
@@ -73,6 +75,11 @@ Notes:
         print 'Invert =', options.invert
         invert = True
 
+    display = False
+    if options.display:
+        print 'Display =', options.display
+        display = True
+
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
@@ -82,7 +89,8 @@ Notes:
 
     differenceExposure, spatialKernel, backgroundModel, kernelCellSet = subtractExposure(templateExposure,
                                                                                          scienceExposure,
-                                                                                         policy)
+                                                                                         policy,
+                                                                                         display)
     differenceExposure.writeFits(outputPath)
 
 def run():

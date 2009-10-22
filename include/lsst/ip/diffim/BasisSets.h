@@ -66,9 +66,16 @@ namespace diffim {
      *
      * @param kernelListIn input list of basis kernels
      *
+     * @note Images are checked for their current kernel sum.  If it is larger
+     * than std::numeric_limits<double>::epsilon(), the kernel is first divided
+     * by the kernel sum, giving it a kSum of 1.0, and then the first
+     * (normalized) component is subtracted from it, giving it a kSum of 0.0.
+     *
      * @ingroup ip_diffim
      */
-    lsst::afw::math::KernelList renormalizeKernelList(lsst::afw::math::KernelList const &kernelListIn);
+    lsst::afw::math::KernelList renormalizeKernelList(
+        lsst::afw::math::KernelList const &kernelListIn
+        );
 
     /**
      * @brief Build a set of Alard/Lupton basis kernels

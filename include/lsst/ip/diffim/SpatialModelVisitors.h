@@ -686,6 +686,7 @@ public:
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
         if (!(kCandidate->hasKernel())) {
+            kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<3>("lsst.ip.diffim.BuildSpatialKernelVisitor.processCandidate", 
                                   "Cannot process candidate %d, continuing", kCandidate->getId());
             return;
@@ -970,6 +971,7 @@ public:
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
         if (!(kCandidate->hasKernel())) {
+            kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                                   "Cannot process candidate %d, continuing", kCandidate->getId());
             return;

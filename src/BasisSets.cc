@@ -9,6 +9,7 @@
  * @ingroup ip_diffim
  */
 #include <cmath> 
+#include <limits>
 
 #include "boost/timer.hpp" 
 
@@ -423,10 +424,11 @@ generateFiniteDifferenceRegularization(
  */
 lsst::afw::math::KernelList
 renormalizeKernelList(
-    lsst::afw::math::KernelList const &kernelListIn
-    ) {
+    lsst::afw::math::KernelList const &kernelListIn ///< Input list to be renormalized
+    ) { 
     typedef afwMath::Kernel::Pixel Pixel;
     typedef afwImage::Image<Pixel> Image;
+    double kSum;
 
     /* 
        
@@ -457,8 +459,6 @@ renormalizeKernelList(
     }
 
     Image image0(kernelListIn[0]->getDimensions());
-    Image image(kernelListIn[0]->getDimensions());
-    
     for (unsigned int i = 0; i < kernelListIn.size(); i++) {
         if (i == 0) {
             /* Make sure that it is normalized to kSum 1. */
@@ -466,22 +466,38 @@ renormalizeKernelList(
             boost::shared_ptr<afwMath::Kernel> 
                 kernelPtr(new afwMath::FixedKernel(image0));
             kernelListOut.push_back(kernelPtr);
+
             continue;
         }
 
-        /* For the rest, normalize to kSum 1. and subtract off image0 */
-        (void)kernelListIn[i]->computeImage(image, true);
-        image -= image0;
-
-        /* Finally, rescale such that the inner product is 1 */
-        double ksum = 0.;
+        /* Don't normalize here */
+        Image image(kernelListIn[i]->getDimensions());
+        (void)kernelListIn[i]->computeImage(image, false);
+        
+        /* Check the kernel sum; if its close to zero don't do anything */
+        kSum = 0.;
         for (int y = 0; y < image.getHeight(); y++) {
             for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); 
                  ptr != end; ++ptr.x()) {
-                ksum += *ptr * *ptr;
+                kSum += *ptr;
             }
         }
-        image /= std::sqrt(ksum);
+
+        if (fabs(kSum) > std::numeric_limits<double>::epsilon()) {
+            image /= kSum;
+            image -= image0;
+        }
+
+
+        /* Finally, rescale such that the inner product is 1 */
+        kSum = 0.;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); 
+                 ptr != end; ++ptr.x()) {
+                kSum += *ptr * *ptr;
+            }
+        }
+        image /= std::sqrt(kSum);
 
         boost::shared_ptr<afwMath::Kernel> 
             kernelPtr(new afwMath::FixedKernel(image));

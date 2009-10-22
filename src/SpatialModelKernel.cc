@@ -265,10 +265,19 @@ fitSpatialKernelFromCandidates(
                                             afwImage::Image<afwMath::Kernel::Pixel>
                                             (*(importStarVisitor.returnMean()), true))));
             for (int j = 0; j != ncomp; ++j) {
-                kernelListRaw.push_back(afwMath::Kernel::Ptr(
-                                            new afwMath::FixedKernel(
-                                                afwImage::Image<afwMath::Kernel::Pixel>
-                                                (*eigenImages[j], true))));
+                /* Any NaN? */
+                afwImage::Image<afwMath::Kernel::Pixel> img = 
+                    afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[j], true);
+                afwMath::Statistics stats = afwMath::makeStatistics(img, afwMath::SUM);
+
+                if (std::isnan(stats.getValue(afwMath::SUM))) {
+                    pexLogging::TTrace<2>("lsst.ip.diffim.SetPcaImageVisitor", 
+                                          "WARNING : NaN in principal component %d; skipping", j);
+                } else {
+                    kernelListRaw.push_back(afwMath::Kernel::Ptr(
+                                                new afwMath::FixedKernel(img)
+                                                ));
+                }
             }
             /* Put all the power in the first kernel, which will not vary spatially */
             afwMath::KernelList kernelListPca = renormalizeKernelList(kernelListRaw);
