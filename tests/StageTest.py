@@ -17,6 +17,7 @@ import lsst.pex.policy as pexPolicy
 import lsst.pex.logging as pexLog
 import lsst.ip.diffim.diffimStages as diffimStages
 import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath
 import lsst.daf.base as dafBase
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -54,9 +55,30 @@ class DiffimStageTestCase(unittest.TestCase):
                                           "cal-53535-i-797722_1")
             defTemplatePath = defSciencePath + "_tmpl"
             
+            self.policy.set("diffimPolicy.spatialKernelOrder", 1)
+            self.policy.set("diffimPolicy.sizeCellX", 128)
+            self.policy.set("diffimPolicy.sizeCellY", 128)
             bbox = afwImage.BBox(afwImage.PointI(32,32), 512, 512)
             scienceExposure = afwImage.ExposureF(defSciencePath, 0, bbox)
             templateExposure = afwImage.ExposureF(defTemplatePath)
+
+            # NOTE - you need to subtract off background from the image
+            # you run detection on.  Here it is the template.
+            algorithm = self.policy.get("diffimPolicy.backgroundPolicy.algorithm")
+            binsize   = self.policy.get("diffimPolicy.backgroundPolicy.binsize")
+            bctrl     = afwMath.BackgroundControl(afwMath.NATURAL_SPLINE)
+            bctrl.setNxSample(int(templateExposure.getWidth()//binsize) + 1)
+            bctrl.setNySample(int(templateExposure.getHeight()//binsize) + 1)
+
+            image   = templateExposure.getMaskedImage().getImage() 
+            backobj = afwMath.makeBackground(image, bctrl)
+            image  -= backobj.getImageF()
+
+            image   = scienceExposure.getMaskedImage().getImage() 
+            backobj = afwMath.makeBackground(image, bctrl)
+            image  -= backobj.getImageF()
+            
+            del image; del backobj
         
             clipboard.put(self.policy.get('scienceExposureKey'), scienceExposure)
             clipboard.put(self.policy.get('templateExposureKey'), templateExposure)

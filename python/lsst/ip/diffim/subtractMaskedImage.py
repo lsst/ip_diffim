@@ -25,12 +25,19 @@ def subtractMaskedImage(templateMaskedImage,
     # Assign to the coordinate system of the science image
     templateMaskedImage.setXY0(scienceMaskedImage.getXY0())
 
-    
-    spatialKernel, spatialBg, kernelCellSet = createPsfMatchingKernel(templateMaskedImage,
-                                                                      scienceMaskedImage,
-                                                                      policy,
-                                                                      footprints)
-    
+
+    try:
+        result = createPsfMatchingKernel(templateMaskedImage,
+                                         scienceMaskedImage,
+                                         policy,
+                                         footprints)
+    except:
+        pexLog.Trace("lsst.ip.diffim.subtractMaskedImage", 1,
+                     "ERROR: Unable to calculate psf matching kernel")
+        raise
+    else:
+        spatialKernel, spatialBg, kernelCellSet = result
+        
     # no need to subtract a background in subtraction as we'll do so in a moment
     if policy.get("useAfwBackground"):
         background = 0.                  

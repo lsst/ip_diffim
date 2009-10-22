@@ -2,6 +2,7 @@ from subtractMaskedImage import subtractMaskedImage
 from warpTemplateExposure import warpTemplateExposure
 
 import lsst.pex.logging as pexLog
+import lsst.pex.exceptions as pexExcept
 import lsst.afw.image as afwImage
 import lsst.afw.display.ds9 as ds9
 
@@ -46,12 +47,20 @@ def subtractExposure(templateExposure, scienceExposure, policy, display=False):
         ds9.mtv(scienceMaskedImage, frame=1)
 
     # Subtract their MaskedImages
-    differenceMaskedImage, spatialKernel, spatialBg, kernelCellSet = \
-                           subtractMaskedImage(templateMaskedImage,
-                                               scienceMaskedImage,
-                                               policy)
+    try:
+        result = subtractMaskedImage(templateMaskedImage,
+                                     scienceMaskedImage,
+                                     policy)
+    except:
+        pexLog.Trace("lsst.ip.diffim.subtractExposure", 1,
+                     "ERROR: Unable to calculate psf matching kernel")
+        raise
+    else:
+        differenceMaskedImage, spatialKernel, spatialBg, kernelCellSet = result
+        
     if display:
         ds9.mtv(differenceMaskedImage, frame=2)
+        
     
     # Generate an exposure from the results
     differenceExposure = afwImage.ExposureF(differenceMaskedImage, scienceWcs)

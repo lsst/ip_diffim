@@ -157,14 +157,15 @@ public:
     
     void processKsumDistribution() {
         try {
-            afwMath::Statistics stats = afwMath::makeStatistics(_kSums, afwMath::NPOINT | 
+            afwMath::Statistics stats = afwMath::makeStatistics(_kSums, 
+                                                                afwMath::NPOINT | 
                                                                 afwMath::MEANCLIP | 
                                                                 afwMath::STDEVCLIP); 
             _kSumMean = stats.getValue(afwMath::MEANCLIP);
             _kSumStd  = stats.getValue(afwMath::STDEVCLIP);
             _kSumNpts = static_cast<int>(stats.getValue(afwMath::NPOINT));
         } catch (pexExcept::Exception &e) {
-            LSST_EXCEPT_ADD(e, "Kernel Sum Statistics");
+            LSST_EXCEPT_ADD(e, "Unable to calculate kernel sum statistics");
             throw e;
         }
         _dkSumMax = _policy.getDouble("maxKsumSigma") * _kSumStd;

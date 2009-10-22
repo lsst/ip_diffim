@@ -125,6 +125,14 @@ alardDegGauss: 4   3   2
 #alardSigGauss: 1.5
 #alardDegGauss: 1
 
+######
+# FUTURE : Scaling of these numbers with the Psf Fwhm
+#
+kernelRowFwhmScaling: 3.
+kernelColFwhmScaling: 3.
+alardSigGaussFwhmScaling: 0.5 1.0 2.0
+
+
 
 ######
 # Regularization used with delta-function kernel basis set to enfore
@@ -232,7 +240,7 @@ calculateKernelUncertainty: false
 #   kernelSumClipping:     true
 #   spatialKernelClipping: false
 # 
-spatialKernelOrder: 2
+spatialKernelOrder: 1
 spatialBgOrder:     1
 
 ######
@@ -243,7 +251,7 @@ spatialBgOrder:     1
 #
 backgroundPolicy: {
     algorithm:  "NATURAL_SPLINE" 
-    binsize:    256
+    binsize:    512
 }
 
 ######

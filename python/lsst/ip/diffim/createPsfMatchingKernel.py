@@ -8,6 +8,7 @@ from createKernelFunctor import createKernelFunctor
 import lsst.afw.image.imageLib as afwImage
 import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
+import lsst.pex.exceptions as pexExcept
 
 # Most general routine
 def createPsfMatchingKernel(templateMaskedImage,
@@ -44,9 +45,17 @@ def createPsfMatchingKernel(templateMaskedImage,
         kernelCellSet.insertCandidate(cand)
 
     # Create the Psf matching kernel
-    KB = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
-    spatialKernel = KB.first
-    spatialBg     = KB.second
+    try:
+        KB = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
+    except pexExcept.LsstCppException, e:
+        pexLog.Trace("lsst.ip.diffim.createPsfMatchingKernel", 1,
+                     "ERROR: Unable to calculate psf matching kernel")
+        pexLog.Trace("lsst.ip.diffim.createPsfMatchingKernel", 2,
+                     e.args[0].what())
+        raise
+    else:
+        spatialKernel = KB.first
+        spatialBg     = KB.second
 
     # What is the status of the processing?
     nGood = 0

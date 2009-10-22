@@ -53,7 +53,8 @@ class DiffimStage(Stage):
        
         if display and False:
             frame=0
-            ds9.mtv(templateExposure, frame=frame);  ds9.dot("Template", 0, 0, frame=frame)
+            ds9.mtv(templateExposure, frame=frame)
+            ds9.dot("Template", 0, 0, frame=frame)
 
         diffimPolicy = self._policy.get("diffimPolicy")
 
@@ -66,25 +67,29 @@ class DiffimStage(Stage):
         
         if display:
             frame = 0
-            ds9.mtv(remapedTemplateExposure, frame=frame);  ds9.dot("Warped Template", 0, 0, frame=frame)
+            ds9.mtv(remapedTemplateExposure, frame=frame)
+            ds9.dot("Warped Template", 0, 0, frame=frame)
 
             frame = 1
-            ds9.mtv(scienceExposure, frame=frame);  ds9.dot("Science Exposure", 0, 0, frame=frame)
+            ds9.mtv(scienceExposure, frame=frame)
+            ds9.dot("Science Exposure", 0, 0, frame=frame)
 
-        # step 3
+        # step 2
         self.log.log(pexLog.Log.INFO, "Starting subtract : %s" % (time.ctime()))
-        products = subtractExposure(remapedTemplateExposure, 
-                                    scienceExposure, 
-                                    diffimPolicy,
-                                    self.log)
+        try:
+            result = subtractExposure(remapedTemplateExposure, 
+                                      scienceExposure, 
+                                      diffimPolicy)
+        except:
+            pexLog.Trace("lsst.ip.diffim.DiffimStage", 1,
+                         "ERROR: Unable to calculate psf matching kernel")
+            raise RuntimeException("DiffimStage.subtractExposure failed")
+        else:
+            differenceExposure, spatialKernel, spatialBg, kernelCellSet = result
+            
         self.log.log(pexLog.Log.INFO, "Ending subtract : %s" % (time.ctime()))
 
-        if products == None:
-            raise RuntimeException("DiffimStage.subtractExposure failed")
-
-        differenceExposure, spatialKernel, spatialBg, kernelCellSet = products
-
-        persistableSdqaVector = sdqa.PersistableSdqaRatingVector(sdqaSet)
+        persistableSdqaVector = sdqa.PersistableSdqaRatingVector()
 
         exposureKey = self._policy.getString("differenceExposureKey")
         self.activeClipboard.put(exposureKey, differenceExposure)
