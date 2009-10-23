@@ -10,7 +10,7 @@ import lsst.sdqa as sdqa
 import lsst.pex.logging as pexLog
 import lsst.afw.display.ds9 as ds9
 
-display = True
+display = False
 
 class DiffimStage(Stage):
 
