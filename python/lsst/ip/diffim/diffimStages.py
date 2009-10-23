@@ -2,6 +2,7 @@ import re, time
 
 from warpTemplateExposure import *
 from subtractExposure import *
+from createSdqaRatingVector import *
 
 from lsst.pex.harness.Stage import Stage
 import lsst.afw.image as afwImage
@@ -9,13 +10,10 @@ import lsst.sdqa as sdqa
 import lsst.pex.logging as pexLog
 import lsst.afw.display.ds9 as ds9
 
-display = False
-try:
-    type(display)
-except NameError:
-    display = False
+display = True
 
 class DiffimStage(Stage):
+
     def process(self):
         self.activeClipboard = self.inputQueue.getNextDataset()
         
@@ -51,26 +49,21 @@ class DiffimStage(Stage):
             nwcs.shiftReferencePixel(bBox.get("llcx"), bBox.get("llcy"))
             templateExposure.setWcs(nwcs)
        
-        if display and False:
-            frame=0
-            ds9.mtv(templateExposure, frame=frame)
-            ds9.dot("Template", 0, 0, frame=frame)
-
         diffimPolicy = self._policy.get("diffimPolicy")
 
         # step 1
         self.log.log(pexLog.Log.INFO, "Starting warp : %s" % (time.ctime()))
         remapedTemplateExposure = warpTemplateExposure(templateExposure,
-                scienceExposure, 
-                diffimPolicy)
+                                                       scienceExposure, 
+                                                       diffimPolicy)
         self.log.log(pexLog.Log.INFO, "Ending warp : %s" % (time.ctime()))
         
         if display:
-            frame = 0
+            frame = 1
             ds9.mtv(remapedTemplateExposure, frame=frame)
             ds9.dot("Warped Template", 0, 0, frame=frame)
 
-            frame = 1
+            frame = 2
             ds9.mtv(scienceExposure, frame=frame)
             ds9.dot("Science Exposure", 0, 0, frame=frame)
 
@@ -89,7 +82,13 @@ class DiffimStage(Stage):
             
         self.log.log(pexLog.Log.INFO, "Ending subtract : %s" % (time.ctime()))
 
-        persistableSdqaVector = sdqa.PersistableSdqaRatingVector()
+        if display:
+            frame = 3
+            ds9.mtv(differenceExposure, frame=frame)
+            ds9.dot("Difference Exposure", 0, 0, frame=frame)
+
+        sdqaVector = createSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg)
+        persistableSdqaVector = sdqa.PersistableSdqaRatingVector(sdqaVector)
 
         exposureKey = self._policy.getString("differenceExposureKey")
         self.activeClipboard.put(exposureKey, differenceExposure)

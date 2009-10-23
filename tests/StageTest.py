@@ -21,7 +21,7 @@ import lsst.afw.math as afwMath
 import lsst.daf.base as dafBase
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-Verbosity = 1
+Verbosity = 3
 pexLog.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 
 class DiffimStageTestCase(unittest.TestCase):
@@ -54,6 +54,9 @@ class DiffimStageTestCase(unittest.TestCase):
             defSciencePath = os.path.join(self.defDataDir, "CFHT", "D4", 
                                           "cal-53535-i-797722_1")
             defTemplatePath = defSciencePath + "_tmpl"
+            
+            self.policy.set("diffimPolicy.kernelBasisSet", "alard-lupton")
+            self.policy.set("diffimPolicy.usePcaForSpatialKernel", True)
             
             self.policy.set("diffimPolicy.spatialKernelOrder", 1)
             self.policy.set("diffimPolicy.sizeCellX", 128)

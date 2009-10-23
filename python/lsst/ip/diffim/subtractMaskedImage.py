@@ -11,24 +11,24 @@ import lsst.afw.image as afwImage
 import lsst.pex.logging as pexLog
 import lsst.sdqa as sdqa
 
-def subtractMaskedImage(templateMaskedImage, 
-                        scienceMaskedImage, 
+def subtractMaskedImage(maskedImageToConvolve, 
+                        maskedImageToNotConvolve, 
                         policy, 
                         footprints=None):
     
     # Make sure they are the EXACT same dimensions in pixels
     # This is non-negotiable
-    assert (templateMaskedImage.getDimensions() == \
-            scienceMaskedImage.getDimensions())
+    assert (maskedImageToConvolve.getDimensions() == \
+            maskedImageToNotConvolve.getDimensions())
 
     # We also assume that at this stage, they are aligned at the pixel level
     # Assign to the coordinate system of the science image
-    templateMaskedImage.setXY0(scienceMaskedImage.getXY0())
+    maskedImageToConvolve.setXY0(maskedImageToNotConvolve.getXY0())
 
 
     try:
-        result = createPsfMatchingKernel(templateMaskedImage,
-                                         scienceMaskedImage,
+        result = createPsfMatchingKernel(maskedImageToConvolve,
+                                         maskedImageToNotConvolve,
                                          policy,
                                          footprints)
     except:
@@ -45,8 +45,8 @@ def subtractMaskedImage(templateMaskedImage,
         background = spatialBg
 
     t0 = time.time()
-    differenceMaskedImage = diffimLib.convolveAndSubtract(templateMaskedImage,
-                                                          scienceMaskedImage,
+    differenceMaskedImage = diffimLib.convolveAndSubtract(maskedImageToConvolve,
+                                                          maskedImageToNotConvolve,
                                                           spatialKernel,
                                                           background)
     t1 = time.time()

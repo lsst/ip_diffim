@@ -6,19 +6,19 @@ import lsst.pex.exceptions as pexExcept
 import lsst.afw.image as afwImage
 import lsst.afw.display.ds9 as ds9
 
-def subtractExposure(templateExposure, scienceExposure, policy, display=False):
+def subtractExposure(exposureToConvolve, exposureToNotConvolve, policy, display=False):
     # Make sure they end up the same dimensions on the sky
-    templateWcs    = templateExposure.getWcs() 
-    scienceWcs     = scienceExposure.getWcs()
+    templateWcs    = exposureToConvolve.getWcs() 
+    scienceWcs     = exposureToNotConvolve.getWcs()
 
     # LLC
     templateOrigin = templateWcs.xyToRaDec(0,0)
     scienceOrigin  = scienceWcs.xyToRaDec(0,0)
     # URC
-    templateLimit  = templateWcs.xyToRaDec(templateExposure.getWidth(),
-                                           templateExposure.getHeight())
-    scienceLimit   = scienceWcs.xyToRaDec(scienceExposure.getWidth(),
-                                          scienceExposure.getHeight())
+    templateLimit  = templateWcs.xyToRaDec(exposureToConvolve.getWidth(),
+                                           exposureToConvolve.getHeight())
+    scienceLimit   = scienceWcs.xyToRaDec(exposureToNotConvolve.getWidth(),
+                                          exposureToNotConvolve.getHeight())
 
     pexLog.Trace("lsst.ip.diffim.subtractExposure", 1,
                  "Template limits : %f,%f -> %f,%f" %
@@ -33,14 +33,14 @@ def subtractExposure(templateExposure, scienceExposure, policy, display=False):
     # Remap if they do not line up in size on the sky, and size in pixels
     if ( (templateOrigin != scienceOrigin) or \
          (templateLimit  != scienceLimit)  or \
-         (templateExposure.getHeight() != scienceExposure.getHeight()) or \
-         (templateExposure.getWidth()  != scienceExposure.getWidth()) ):
+         (exposureToConvolve.getHeight() != exposureToNotConvolve.getHeight()) or \
+         (exposureToConvolve.getWidth()  != exposureToNotConvolve.getWidth()) ):
         pexLog.Trace("lsst.ip.diffim.subtractExposure", 1,
                      "Astrometrically registering template to science image")
-        templateExposure = warpTemplateExposure(templateExposure, scienceExposure, policy)
+        exposureToConvolve = warpTemplateExposure(exposureToConvolve, exposureToNotConvolve, policy)
     
-    templateMaskedImage = templateExposure.getMaskedImage()
-    scienceMaskedImage  = scienceExposure.getMaskedImage()
+    maskedImageToConvolve = exposureToConvolve.getMaskedImage()
+    maskedImageToNotConvolve = exposureToNotConvolve.getMaskedImage()
 
     if display:
         ds9.mtv(templateMaskedImage, frame=0)
@@ -48,8 +48,8 @@ def subtractExposure(templateExposure, scienceExposure, policy, display=False):
 
     # Subtract their MaskedImages
     try:
-        result = subtractMaskedImage(templateMaskedImage,
-                                     scienceMaskedImage,
+        result = subtractMaskedImage(maskedImageToConvolve,
+                                     maskedImageToNotConvolve,
                                      policy)
     except:
         pexLog.Trace("lsst.ip.diffim.subtractExposure", 1,

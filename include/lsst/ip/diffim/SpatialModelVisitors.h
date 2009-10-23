@@ -434,7 +434,9 @@ public:
         } catch (pexExcept::Exception &e) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
-                                  "Unable to process candidate; exception caught (%s)", e.what());
+                                  "Unable to process candidate %d; exception caught (%s)", 
+                                  kCandidate->getId(),
+                                  e.what());
             _nRejected += 1;
             return;
         }
@@ -450,7 +452,9 @@ public:
         } catch (pexExcept::Exception &e) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
-                                  "Unable to process candidate; exception caught (%s)", e.what());
+                                  "Unable to process candidate %d; exception caught (%s)", 
+                                  kCandidate->getId(),
+                                  e.what());
             _nRejected += 1;
             return;
         }
@@ -498,7 +502,9 @@ public:
             } catch (pexExcept::Exception &e) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
-                                      "Unable to process candidate; exception caught (%s)", e.what());
+                                      "Unable to process candidate %d; exception caught (%s)", 
+                                      kCandidate->getId(), 
+                                      e.what());
                 _nRejected += 1;
                 return;
             }
@@ -534,7 +540,8 @@ public:
         pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                               "Background = %.3f", background);
         pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
-                              "Diffim residuals = %.2f +/- %.2f sigma",
+                              "Candidate %d diffim residuals = %.2f +/- %.2f sigma",
+                              kCandidate->getId(),
                               _imstats.getMean(),
                               _imstats.getRms());
         
@@ -543,7 +550,8 @@ public:
         if (meanIsNan || rmsIsNan) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
-                                  "Rejecting candidate, encountered NaN");
+                                  "Rejecting candidate %d, encountered NaN",
+                                  kCandidate->getId());
             _nRejected += 1;
             return;
         }
@@ -552,7 +560,8 @@ public:
             if (fabs(_imstats.getMean()) > _policy.getDouble("candidateResidualMeanMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
-                                      "Rejecting due to bad source kernel mean residuals : |%.2f| > %.2f",
+                                      "Rejecting candidate %d; bad mean residual : |%.2f| > %.2f",
+                                      kCandidate->getId(),
                                       _imstats.getMean(),
                                       _policy.getDouble("candidateResidualMeanMax"));
                 _nRejected += 1;
@@ -560,7 +569,8 @@ public:
             else if (_imstats.getRms() > _policy.getDouble("candidateResidualStdMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
-                                      "Rejecting due to bad source kernel residual rms : %.2f > %.2f",
+                                      "Rejecting candidate %d; bad residual rms : %.2f > %.2f",
+                                      kCandidate->getId(),
                                       _imstats.getRms(),
                                       _policy.getDouble("candidateResidualStdMax"));
                 _nRejected += 1;
@@ -643,7 +653,8 @@ public:
         _spatialBgFunction(new afwMath::PolynomialFunction2<double>(spatialBgOrder)),
         _nbases(basisList.size()),
         _policy(policy),
-        _constantFirstTerm(false){
+        _constantFirstTerm(false),
+        _nCandidates(0) {
         
         /* 
            NOTE : The variable _constantFirstTerm allows that the first
@@ -679,6 +690,8 @@ public:
                               _nkt, _nbt, _nt,
                               _constantFirstTerm ? "true" : "false");
     }
+
+    int getNCandidates() { return _nCandidates; }
     
     void processCandidate(afwMath::SpatialCellCandidate *candidate) {
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
@@ -695,7 +708,8 @@ public:
         
         pexLogging::TTrace<6>("lsst.ip.diffim.BuildSpatialKernelVisitor.processCandidate", 
                               "Processing candidate %d", kCandidate->getId());
-        
+        _nCandidates += 1;
+
         /* Calculate P matrices */
         /* Pure kernel terms */
         std::vector<double> paramsK = _spatialKernelFunction->getParameters();
@@ -913,10 +927,11 @@ private:
     afwMath::Kernel::SpatialFunctionPtr _spatialBgFunction;     ///< Pointer to spatial background function
     unsigned int _nbases;      ///< Number of bases being fit for
     unsigned int _nkt;         ///< Number of kernel terms in spatial model
-    unsigned int _nbt;         ///< Number of backgruond terms in spatial model
+    unsigned int _nbt;         ///< Number of background terms in spatial model
     unsigned int _nt;          ///< Total number of terms in the solution; also dimensions of matrices
     pexPolicy::Policy _policy; ///< Policy controlling behavior
     bool _constantFirstTerm;   ///< Is the first term spatially invariant?
+    int _nCandidates;          ///< Number of candidates visited
 };
 
 /**
@@ -1017,7 +1032,8 @@ public:
         pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                               "Background = %.3f", background);
         pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
-                              "Diffim residuals = %.2f +/- %.2f sigma",
+                              "Candidate %d diffim residuals = %.2f +/- %.2f sigma",
+                              kCandidate->getId(),
                               _imstats.getMean(),
                               _imstats.getRms());
 
@@ -1026,7 +1042,8 @@ public:
         if (meanIsNan || rmsIsNan) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                  "Rejecting candidate, encountered NaN");
+                                  "Rejecting candidate %d, encountered NaN",
+                                  kCandidate->getId());
             _nRejected += 1;
             return;
         }
@@ -1035,7 +1052,8 @@ public:
             if (fabs(_imstats.getMean()) > _policy.getDouble("candidateResidualMeanMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                      "Rejecting due to bad spatial kernel mean residuals : |%.2f| > %.2f",
+                                      "Rejecting candidate %d; bad mean residual : |%.2f| > %.2f",
+                                      kCandidate->getId(),
                                       _imstats.getMean(),
                                       _policy.getDouble("candidateResidualMeanMax"));
                 _nRejected += 1;
@@ -1043,7 +1061,8 @@ public:
             else if (_imstats.getRms() > _policy.getDouble("candidateResidualStdMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                      "Rejecting due to bad spatial kernel residual rms : %.2f > %.2f",
+                                      "Rejecting candidate %d; bad residual rms : %.2f > %.2f",
+                                      kCandidate->getId(),
                                       _imstats.getRms(),
                                       _policy.getDouble("candidateResidualStdMax"));
                 _nRejected += 1;

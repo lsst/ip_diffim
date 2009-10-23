@@ -1,3 +1,5 @@
+// -*- lsst-c++ -*-
+
 #include <iostream>
 
 #define BOOST_TEST_DYN_LINK

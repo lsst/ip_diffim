@@ -62,24 +62,7 @@ detThresholdType: "stdev"
 #
 # For standard processing a value like 10 would be acceptable
 # 
-detThreshold: 250.0
-
-######
-# Minimum number of clean candidates in the image
-#
-minCleanFp: 30
-
-######
-# How do you change the detection threshold if minCleanFp
-# not found
-#
-detThresholdScaling: 0.5
-
-######
-# How low can you go
-#
-detThresholdMin: 10.0
-
+detThreshold: 10.
 
 
 ####################################

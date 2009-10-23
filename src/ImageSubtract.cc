@@ -225,10 +225,7 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
     int const kRows             = policy.getInt("kernelRows");
     double fpGrowKsize          = policy.getDouble("fpGrowKsize");
 
-    int minCleanFp              = policy.getInt("minCleanFp");
     double detThreshold         = policy.getDouble("detThreshold");
-    double detThresholdScaling  = policy.getDouble("detThresholdScaling");
-    double detThresholdMin      = policy.getDouble("detThresholdMin");
     std::string detThresholdType = policy.getString("detThresholdType");
 
     // New mask plane that tells us which pixels are already in sources
@@ -254,128 +251,126 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
     FindSetBits<afwImage::Mask<afwImage::MaskPixel> > itncFunctor(*(imageToNotConvolve.getMask())); 
  
     int nCleanFp = 0;
-    while ((nCleanFp < minCleanFp) and (detThreshold > detThresholdMin)) {
-        imageToConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
-        imageToNotConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
-
-        footprintListIn.clear();
-        footprintListOut.clear();
-        
-        // Find detections
-        afwDetect::Threshold threshold = 
-                afwDetect::createThreshold(detThreshold, detThresholdType);
-        afwDetect::FootprintSet<PixelT> footprintSet(
-                imageToConvolve, 
-                threshold,
-                "",
-                fpNpixMin);
-        
-        // Get the associated footprints
-        footprintListIn = footprintSet.getFootprints();
-        pexLog::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                          "Found %d total footprints above threshold %.3f",
-                          footprintListIn.size(), detThreshold);
-
-        // Iterate over footprints, look for "good" ones
-        nCleanFp = 0;
-        for (std::vector<afwDetect::Footprint::Ptr>::iterator i = footprintListIn.begin(); 
-             i != footprintListIn.end(); ++i) {
-            // footprint has too many pixels
-            if (static_cast<unsigned int>((*i)->getNpix()) > fpNpixMax) {
-                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                                  "Footprint has too many pix: %d (max =%d)", 
-                                  (*i)->getNpix(), fpNpixMax);
-                continue;
-            } 
-            
-            pexLog::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                              "Footprint in : %d,%d -> %d,%d",
-                              (*i)->getBBox().getX0(), (*i)->getBBox().getX1(), 
-                              (*i)->getBBox().getY0(), (*i)->getBBox().getY1());
-
-            pexLog::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                              "Grow by : %d pixels", fpGrowPix);
-
-            /* Grow the footprint
-               flag true  = isotropic grow   = slow
-               flag false = 'manhattan grow' = fast
-               
-               The manhattan masks are rotated 45 degree w.r.t. the coordinate
-               system.  They intersect the vertices of the rectangle that would
-               connect pixels (X0,Y0) (X1,Y0), (X0,Y1), (X1,Y1).
-               
-               The isotropic masks do take considerably longer to grow and are
-               basically elliptical.  X0, X1, Y0, Y1 delimit the extent of the
-               ellipse.
-
-               In both cases, since the masks aren't rectangles oriented with
-               the image coordinate system, when we DO extract such rectangles
-               as subimages for kernel fitting, some corner pixels can be found
-               in multiple subimages.
-
-            */
-            afwDetect::Footprint::Ptr fpGrow = 
-                afwDetect::growFootprint(*i, fpGrowPix, false);
-            
-            pexLog::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                              "Footprint out : %d,%d -> %d,%d (center %d,%d)",
-                              (*fpGrow).getBBox().getX0(), (*fpGrow).getBBox().getY0(),
-                              (*fpGrow).getBBox().getX1(), (*fpGrow).getBBox().getY1(),
-                              int(0.5 * ((*i)->getBBox().getX0()+(*i)->getBBox().getX1())),
-                              int(0.5 * ((*i)->getBBox().getY0()+(*i)->getBBox().getY1())));
-
-
-            // Ignore if its too close to the edge of the amp image 
-            // Note we need to translate to pixel coordinates here
-            afwImage::BBox fpBBox = (*fpGrow).getBBox();
-            fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
-            bool belowOriginX = (*fpGrow).getBBox().getX0() < 0;
-            bool belowOriginY = (*fpGrow).getBBox().getY0() < 0;
-            bool offImageX    = (*fpGrow).getBBox().getX1() > imageToConvolve.getWidth();
-            bool offImageY    = (*fpGrow).getBBox().getY1() > imageToConvolve.getHeight();
-            if (belowOriginX || belowOriginY || offImageX || offImageY)
-                continue;
-
-            // Grab a subimage; report any exception
-            try {
-                afwImage::MaskedImage<PixelT> subImageToConvolve(imageToConvolve, fpBBox);
-                afwImage::MaskedImage<PixelT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
-            } catch (pexExcept::Exception& e) {
-                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
-                                  "Exception caught extracting Footprint");
-                pexLog::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
-                                  e.what());
-                continue;
-            }
-
-            // Search for any masked pixels within the footprint
-            itcFunctor.apply(*fpGrow);
-            if (itcFunctor.getBits() > 0) {
-                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                                  "Footprint has masked pix (val=%d) in image to convolve", 
-                                  itcFunctor.getBits()); 
-                continue;
-            }
-
-            itncFunctor.apply(*fpGrow);
-            if (itncFunctor.getBits() > 0) {
-                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                                  "Footprint has masked pix (val=%d) in image not to convolve", 
-                                  itncFunctor.getBits());
-                continue;
-            }
-
-            // If we get this far, we have a clean footprint
-            footprintListOut.push_back(fpGrow);
-            (void)afwDetect::setMaskFromFootprint(&(*imageToConvolve.getMask()), *fpGrow, diffimBitMask);
-            (void)afwDetect::setMaskFromFootprint(&(*imageToNotConvolve.getMask()), *fpGrow, diffimBitMask);
-            nCleanFp += 1;
-        }
-        detThreshold *= detThresholdScaling;
-    }
     imageToConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
     imageToNotConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
-
+    
+    footprintListIn.clear();
+    footprintListOut.clear();
+    
+    // Find detections
+    afwDetect::Threshold threshold = 
+        afwDetect::createThreshold(detThreshold, detThresholdType);
+    afwDetect::FootprintSet<PixelT> footprintSet(
+        imageToConvolve, 
+        threshold,
+        "",
+        fpNpixMin);
+    
+    // Get the associated footprints
+    footprintListIn = footprintSet.getFootprints();
+    pexLog::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                      "Found %d total footprints above threshold %.3f",
+                      footprintListIn.size(), detThreshold);
+    
+    // Iterate over footprints, look for "good" ones
+    nCleanFp = 0;
+    for (std::vector<afwDetect::Footprint::Ptr>::iterator i = footprintListIn.begin(); 
+         i != footprintListIn.end(); ++i) {
+        // footprint has too many pixels
+        if (static_cast<unsigned int>((*i)->getNpix()) > fpNpixMax) {
+            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                              "Footprint has too many pix: %d (max =%d)", 
+                              (*i)->getNpix(), fpNpixMax);
+            continue;
+        } 
+        
+        pexLog::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                          "Footprint in : %d,%d -> %d,%d",
+                          (*i)->getBBox().getX0(), (*i)->getBBox().getX1(), 
+                          (*i)->getBBox().getY0(), (*i)->getBBox().getY1());
+        
+        pexLog::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                          "Grow by : %d pixels", fpGrowPix);
+        
+        /* Grow the footprint
+           flag true  = isotropic grow   = slow
+           flag false = 'manhattan grow' = fast
+           
+           The manhattan masks are rotated 45 degree w.r.t. the coordinate
+           system.  They intersect the vertices of the rectangle that would
+           connect pixels (X0,Y0) (X1,Y0), (X0,Y1), (X1,Y1).
+           
+           The isotropic masks do take considerably longer to grow and are
+           basically elliptical.  X0, X1, Y0, Y1 delimit the extent of the
+           ellipse.
+           
+           In both cases, since the masks aren't rectangles oriented with
+           the image coordinate system, when we DO extract such rectangles
+           as subimages for kernel fitting, some corner pixels can be found
+           in multiple subimages.
+           
+        */
+        afwDetect::Footprint::Ptr fpGrow = 
+            afwDetect::growFootprint(*i, fpGrowPix, false);
+        
+        pexLog::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                          "Footprint out : %d,%d -> %d,%d (center %d,%d)",
+                          (*fpGrow).getBBox().getX0(), (*fpGrow).getBBox().getY0(),
+                          (*fpGrow).getBBox().getX1(), (*fpGrow).getBBox().getY1(),
+                          int(0.5 * ((*i)->getBBox().getX0()+(*i)->getBBox().getX1())),
+                          int(0.5 * ((*i)->getBBox().getY0()+(*i)->getBBox().getY1())));
+        
+        
+        // Ignore if its too close to the edge of the amp image 
+        // Note we need to translate to pixel coordinates here
+        afwImage::BBox fpBBox = (*fpGrow).getBBox();
+        fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
+        bool belowOriginX = (*fpGrow).getBBox().getX0() < 0;
+        bool belowOriginY = (*fpGrow).getBBox().getY0() < 0;
+        bool offImageX    = (*fpGrow).getBBox().getX1() > imageToConvolve.getWidth();
+        bool offImageY    = (*fpGrow).getBBox().getY1() > imageToConvolve.getHeight();
+        if (belowOriginX || belowOriginY || offImageX || offImageY)
+            continue;
+        
+        // Grab a subimage; report any exception
+        try {
+            afwImage::MaskedImage<PixelT> subImageToConvolve(imageToConvolve, fpBBox);
+            afwImage::MaskedImage<PixelT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
+        } catch (pexExcept::Exception& e) {
+            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
+                              "Exception caught extracting Footprint");
+            pexLog::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
+                              e.what());
+            continue;
+        }
+        
+        // Search for any masked pixels within the footprint
+        itcFunctor.apply(*fpGrow);
+        if (itcFunctor.getBits() > 0) {
+            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                              "Footprint has masked pix (val=%d) in image to convolve", 
+                              itcFunctor.getBits()); 
+            continue;
+        }
+        
+        itncFunctor.apply(*fpGrow);
+        if (itncFunctor.getBits() > 0) {
+            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                              "Footprint has masked pix (val=%d) in image not to convolve", 
+                              itncFunctor.getBits());
+            continue;
+        }
+        
+        // If we get this far, we have a clean footprint
+        footprintListOut.push_back(fpGrow);
+        (void)afwDetect::setMaskFromFootprint(&(*imageToConvolve.getMask()), *fpGrow, diffimBitMask);
+        (void)afwDetect::setMaskFromFootprint(&(*imageToNotConvolve.getMask()), *fpGrow, diffimBitMask);
+        nCleanFp += 1;
+    }
+    
+    imageToConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
+    imageToNotConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
+    
     if (footprintListOut.size() == 0) {
       throw LSST_EXCEPT(pexExcept::Exception, 
                         "Unable to find any footprints for Psf matching");
@@ -383,7 +378,7 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
 
     pexLog::TTrace<1>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                       "Found %d clean footprints above threshold %.3f",
-                      footprintListOut.size(), detThreshold/detThresholdScaling);
+                      footprintListOut.size(), detThreshold);
     
     return footprintListOut;
 }
