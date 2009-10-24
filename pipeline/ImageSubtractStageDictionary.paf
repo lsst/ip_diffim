@@ -287,6 +287,6 @@ numPrincipalComponents: 4
 ######
 # At what fraction of the eigenvalues do you cut off the expansion?
 #
-# This currently not implemented
+# This is currently not implemented
 #
 fracEigenVal : 0.95

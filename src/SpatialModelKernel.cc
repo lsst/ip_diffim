@@ -128,7 +128,7 @@ template<typename PixelT>
 std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
 fitSpatialKernelFromCandidates(
     PsfMatchingFunctor<PixelT> &kFunctor,               ///< kFunctor used to build the kernels
-    lsst::afw::math::SpatialCellSet const& kernelCells, ///< A SpatialCellSet containing KernelCandidates
+    lsst::afw::math::SpatialCellSet &kernelCells,       ///< A SpatialCellSet containing KernelCandidates
     lsst::pex::policy::Policy const& policy             ///< Policy to control the processing
     ) {
     typedef typename afwImage::Image<afwMath::Kernel::Pixel> ImageT;
@@ -317,15 +317,19 @@ fitSpatialKernelFromCandidates(
                 basisListToUse.reset(new afwMath::KernelList(kFunctor.getBasisList()));
             }
             
-            /* Visitor for the spatial kernel fit */
             detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse, 
                                                                           spatialKernelOrder, 
                                                                           spatialBgOrder, 
                                                                           policy);
             kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
             spatialKernelFitter.solveLinearEquation();
-            std::pair<afwMath::LinearCombinationKernel::Ptr, 
-                afwMath::Kernel::SpatialFunctionPtr> KB = spatialKernelFitter.getSpatialModel();
+            pexLogging::TTrace<3>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                                  "Spatial kernel built with %d candidates", 
+                                  spatialKernelFitter.getNCandidates());
+
+            std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> KB =
+                spatialKernelFitter.getSpatialModel();
+
             spatialKernel     = KB.first;
             spatialBackground = KB.second;
             
@@ -338,7 +342,6 @@ fitSpatialKernelFromCandidates(
             pexLogging::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                   "Spatial Kernel iteration %d, rejected %d Kernels, using %d Kernels", 
                                   i+1, nRejected, spatialKernelAssessor.getNGood());
-            pexLogging::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", "");
             if (nRejected == 0) {
                 break;
             }
@@ -355,6 +358,7 @@ fitSpatialKernelFromCandidates(
     double time = t.elapsed();
     pexLogging::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                           "Total time to compute the spatial kernel : %.2f s", time);
+    pexLogging::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", "");
     
     return std::make_pair(spatialKernel, spatialBackground);
 }
@@ -370,7 +374,7 @@ template class KernelCandidate<PixelT>;
 template
 std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
 fitSpatialKernelFromCandidates<PixelT>(PsfMatchingFunctor<PixelT> &,
-                                       lsst::afw::math::SpatialCellSet const&,
+                                       lsst::afw::math::SpatialCellSet &,
                                        lsst::pex::policy::Policy const&);
 
 }}} // end of namespace lsst::ip::diffim

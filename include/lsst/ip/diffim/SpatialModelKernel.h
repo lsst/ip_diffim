@@ -175,10 +175,11 @@ namespace diffim {
     std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
     fitSpatialKernelFromCandidates(
         PsfMatchingFunctor<PixelT> &kFunctor,
-        lsst::afw::math::SpatialCellSet const& kernelCells,
-        lsst::pex::policy::Policy const& policy);
-    
-    
+        lsst::afw::math::SpatialCellSet &kernelCells,
+        lsst::pex::policy::Policy const& policy
+        );
+
+
 }}} // end of namespace lsst::ip::diffim
 
 #endif

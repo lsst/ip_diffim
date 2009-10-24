@@ -245,6 +245,8 @@ public:
             throw LSST_EXCEPT(pexExcept::LogicErrorException,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
+        pexLogging::TTrace<6>("lsst.ip.diffim.SetPcaImageVisitor.processCandidate", 
+                              "Processing candidate %d", kCandidate->getId());
         
         try {
             /* Normalize to unit sum */
