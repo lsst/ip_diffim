@@ -34,7 +34,7 @@ defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
 
 class DiffimTestCases(unittest.TestCase):
     def setUp(self):
-        self.policy = pexPolicy.Policy.createPolicy(diffimPolicy)
+        self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
         self.scienceImage   = afwImage.ExposureF(defSciencePath)
         self.templateImage  = afwImage.ExposureF(defTemplatePath)
         # takes forever to remap the CFHT images
@@ -197,6 +197,8 @@ class DiffimTestCases(unittest.TestCase):
        
 
     def runTest(self, mode):
+        pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
+                     "Mode %s" % (mode))
         if mode == "DF":
             self.policy.set("kernelBasisSet", "delta-function")
             self.policy.set("useRegularization", False)

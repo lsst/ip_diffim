@@ -14,7 +14,7 @@ import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
 
-Verbosity = 4
+Verbosity = 1
 logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
@@ -28,7 +28,7 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.policy    = pexPolicy.Policy.createPolicy(diffimPolicy)
+        self.policy    = ipDiffim.generateDefaultPolicy(diffimPolicy, modify=False)
         self.kCols     = self.policy.getInt('kernelCols')
         self.kRows     = self.policy.getInt('kernelRows')
         self.basisList = ipDiffim.generateDeltaFunctionBasisSet(self.kCols, self.kRows)

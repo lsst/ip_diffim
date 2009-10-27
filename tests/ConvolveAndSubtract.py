@@ -28,7 +28,7 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.policy      = pexPolicy.Policy.createPolicy(diffimPolicy)
+        self.policy      = ipDiffim.generateDefaultPolicy(diffimPolicy)
         self.kCols       = self.policy.getInt('kernelCols')
         self.kRows       = self.policy.getInt('kernelRows')
 
@@ -71,7 +71,7 @@ class DiffimTestCases(unittest.TestCase):
         # image is empty (or the additional background you subtracted off)
         for j in range(diffIm2.getHeight()):
             for i in range(diffIm2.getWidth()):
-                self.assertAlmostEqual(diffIm2.getImage().get(i, j), -1.*bgVal, 4)
+                self.assertAlmostEqual(diffIm2.getImage().get(i, j), -1.*bgVal, 3)
 
     def runConvolveAndSubtract2(self, bgOrder=0, xloc = 408, yloc = 580):
         imsize = int(5 * self.kCols)

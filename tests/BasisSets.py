@@ -25,7 +25,7 @@ diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = pexPolicy.Policy.createPolicy(diffimPolicy)
+        self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy, modify=False)
         self.kCols  = self.policy.getInt('kernelCols')
         self.kRows  = self.policy.getInt('kernelRows')
 

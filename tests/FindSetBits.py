@@ -13,7 +13,7 @@ import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
 
-Verbosity = 4
+Verbosity = 1
 logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
@@ -22,7 +22,7 @@ diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = pexPolicy.Policy.createPolicy(diffimPolicy)
+        self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
         
     def tearDown(self):
         del self.policy
