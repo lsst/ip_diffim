@@ -68,7 +68,7 @@ Notes:
     
     templateExposure = afwImage.ExposureF(templatePath)
     scienceExposure  = afwImage.ExposureF(sciencePath)
-    policy           = Policy.createPolicy(policyPath)
+    policy           = ipDiffim.generateDefaultPolicy(policyPath)
 
     invert = False
     if options.invert:

@@ -116,7 +116,8 @@ namespace diffim {
         }
         // Variance of distribution 
         double getVariance() const { 
-            return (_npix > 1) ? (_x2sum/_npix - _xsum/_npix * _xsum/_npix) * _npix/(_npix-1.) : std::numeric_limits<double>::quiet_NaN(); 
+            return (_npix > 1) ? (_x2sum/_npix - _xsum/_npix * _xsum/_npix) * _npix/(_npix-1.) : 
+                std::numeric_limits<double>::quiet_NaN(); 
         }
         // RMS
         double getRms() const { 

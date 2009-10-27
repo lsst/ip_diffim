@@ -52,7 +52,7 @@ class DiffimTestCases(unittest.TestCase):
         
         
     def setUp(self):
-        self.policy      = pexPolicy.Policy.createPolicy(diffimPolicy)
+        self.policy      = ipDiffim.generateDefaultPolicy(diffimPolicy)
         self.kCols       = self.policy.getInt('kernelCols')
         self.kRows       = self.policy.getInt('kernelRows')
         self.basisList   = ipDiffim.generateDeltaFunctionBasisSet(self.kCols, self.kRows)

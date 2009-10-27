@@ -71,7 +71,7 @@ Notes:
 
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
-    policy              = Policy.createPolicy(policyPath)
+    policy              = ipDiffim.generateDefaultPolicy(policyPath)
     
     invert = False
     if options.invert:

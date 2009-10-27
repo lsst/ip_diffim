@@ -33,7 +33,7 @@ defOutputPath   = "diffImage"
 
 templateMaskedImage = afwImage.MaskedImageF(defTemplatePath)
 scienceMaskedImage  = afwImage.MaskedImageF(defSciencePath)
-policy              = pexPolicy.Policy.createPolicy(defPolicyPath)
+policy              = ipDiffim.generateDefaultPolicy(defPolicyPath)
 
 
 # same for all kernels

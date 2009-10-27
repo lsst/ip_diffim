@@ -220,10 +220,7 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
     // Parse the Policy
     unsigned int fpNpixMin      = policy.getInt("fpNpixMin");
     unsigned int fpNpixMax      = policy.getInt("fpNpixMax");
-
-    int const kCols             = policy.getInt("kernelCols");
-    int const kRows             = policy.getInt("kernelRows");
-    double fpGrowKsize          = policy.getDouble("fpGrowKsize");
+    int fpGrowPix               = policy.getInt("fpGrowPix");
 
     double detThreshold         = policy.getDouble("detThreshold");
     std::string detThresholdType = policy.getString("detThresholdType");
@@ -238,9 +235,6 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
     // Add in new plane that will tell us which ones are used
     (void)imageToConvolve.getMask()->addMaskPlane(diffimStampUsedStr);
     (void)imageToNotConvolve.getMask()->addMaskPlane(diffimStampUsedStr);
-
-    // Number of pixels to grow each Footprint, based upon the Kernel size
-    int fpGrowPix = int(fpGrowKsize * ((kCols > kRows) ? kCols : kRows));
 
     // List of Footprints
     std::vector<afwDetect::Footprint::Ptr> footprintListIn;
@@ -286,8 +280,8 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
         
         pexLog::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                           "Footprint in : %d,%d -> %d,%d",
-                          (*i)->getBBox().getX0(), (*i)->getBBox().getX1(), 
-                          (*i)->getBBox().getY0(), (*i)->getBBox().getY1());
+                          (*i)->getBBox().getX0(), (*i)->getBBox().getY0(), 
+                          (*i)->getBBox().getX1(), (*i)->getBBox().getY1());
         
         pexLog::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                           "Grow by : %d pixels", fpGrowPix);

@@ -31,7 +31,7 @@ class DiffimTestCases(unittest.TestCase):
     
     # D = I - (K.x.T + bg)
     def setUp(self, CFHT=True):
-        self.policy      = pexPolicy.Policy.createPolicy(diffimPolicy)
+        self.policy      = ipDiffim.generateDefaultPolicy(diffimPolicy)
         self.kCols       = self.policy.getInt('kernelCols')
         self.kRows       = self.policy.getInt('kernelRows')
         self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')

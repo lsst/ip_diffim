@@ -16,6 +16,7 @@ def createPsfMatchingKernel(maskedImageToConvolve,
                             policy,
                             footprints=None):
 
+    
     # Object to store the KernelCandidates for spatial modeling
     kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(maskedImageToConvolve.getX0(),
                                                                          maskedImageToConvolve.getY0()),
