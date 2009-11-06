@@ -48,9 +48,10 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
         } 
         
         /* eigen representation of input images; only the pixels that are unconvolved in cimage below */
-        Eigen::MatrixXd eigeniVarianceM = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
-                                                                                             endRow-startRow, 
-                                                                                             endCol-startCol).cwise().inverse();
+        Eigen::MatrixXd eigeniVarianceM = 
+            diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
+                                                               endRow-startRow, 
+                                                               endCol-startCol).cwise().inverse();
         eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
         Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
         
@@ -86,9 +87,10 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
         } 
         
         /* eigen representation of input images; only the pixels that are unconvolved in cimage below */
-        Eigen::MatrixXd eigeniVarianceM = diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
-                                                                                             endRow-startRow, 
-                                                                                             endCol-startCol).cwise().inverse();
+        Eigen::MatrixXd eigeniVarianceM = 
+            diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
+                                                               endRow-startRow, 
+                                                               endCol-startCol).cwise().inverse();
         eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
         Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
         
@@ -122,7 +124,8 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
         for (citer = imageList.begin(); citer != imageList.end(); ++citer) {
             locatorList.push_back( (**citer).xy_at(startCol,startRow) );
         }
-        typename image::Image<ImageT>::xy_locator varianceLocator = varianceEstimate.xy_at(startCol, startRow);
+        typename image::Image<ImageT>::xy_locator varianceLocator = 
+            varianceEstimate.xy_at(startCol, startRow);
         
         /* at end of each row, this steps in column back to starting col pixel of next row */
         std::pair<int, int> rowStep = std::make_pair(static_cast<int>(-(endCol-startCol)), 1);
@@ -132,12 +135,15 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
             for (int col = startCol; col < endCol; ++col) {
                 double const iVariance        = 1.0 / *varianceLocator;
                 
-                typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citeri = locatorList.begin();
-                typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citerE = locatorList.end();
+                typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citeri = 
+                    locatorList.begin();
+                typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citerE = 
+                    locatorList.end();
                 for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
                     ImageT const cdImagei = **citeri * iVariance;
                     
-                    typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citerj = citeri;
+                    typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citerj = 
+                        citeri;
                     for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
                         M(kidxi, kidxj) += cdImagei * **citerj;
                     } 

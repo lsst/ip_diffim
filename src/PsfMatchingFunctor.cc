@@ -352,7 +352,8 @@ PsfMatchingFunctor<PixelT, VarT>::getSolution() {
     
     if (std::isnan((*_sVec)(nParameters-1))) {
         throw LSST_EXCEPT(pexExcept::Exception, 
-                          str(boost::format("Unable to determine background solution %d (nan)") % (nParameters-1)));
+                          str(boost::format("Unable to determine background solution %d (nan)") % 
+                              (nParameters-1)));
     }
     double background = (*_sVec)(nParameters-1);
 

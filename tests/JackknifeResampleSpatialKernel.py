@@ -3,7 +3,7 @@ import os, pdb, sys
 import numpy as num
 import unittest
 import lsst.utils.tests as tests
-
+ 
 import eups
 import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage

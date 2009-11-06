@@ -122,7 +122,7 @@ lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceI
     
 }
     
-/************************************************************************************************************/
+/***********************************************************************************************************/
     
 template<typename PixelT>
 std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
@@ -363,7 +363,7 @@ fitSpatialKernelFromCandidates(
     return std::make_pair(spatialKernel, spatialBackground);
 }
     
-/************************************************************************************************************/
+/***********************************************************************************************************/
 //
 // Explicit instantiations
 //

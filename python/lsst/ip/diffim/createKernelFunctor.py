@@ -1,4 +1,5 @@
 import lsst.pex.policy as pexPolicy
+import lsst.pex.logging as pexLogging
 import lsst.afw.math.mathLib as afwMath
 import diffimLib 
 
@@ -6,11 +7,16 @@ def createKernelFunctor(policy):
     kCols = policy.getInt("kernelCols")
     kRows = policy.getInt("kernelRows")
     kType = policy.getString("kernelBasisSet")
+    useRegularization = policy.getBool("useRegularization")
     
     if kType == "alard-lupton":
         alardNGauss   = policy.getInt("alardNGauss")
         alardSigGauss = policy.getDoubleArray("alardSigGauss")
         alardDegGauss = policy.getIntArray("alardDegGauss")
+
+        if useRegularization:
+            pexLogging.Trace("lsst.ip.diffim.createKernelFunctor", 1,
+                             "Warning : Regularization not enabled for Alard-Lupton kernels")
 
         try:
             assert len(alardSigGauss) == alardNGauss
@@ -21,14 +27,16 @@ def createKernelFunctor(policy):
             raise RuntimeError("Invalid Alard-Lupton kernel configuration")
         
         kHalfWidth = kCols//2
-        basisList  = diffimLib.generateAlardLuptonBasisSet(kHalfWidth, alardNGauss, alardSigGauss, alardDegGauss)
+        basisList  = diffimLib.generateAlardLuptonBasisSet(kHalfWidth,
+                                                           alardNGauss,
+                                                           alardSigGauss,
+                                                           alardDegGauss)
         kFunctor   = diffimLib.PsfMatchingFunctorF(basisList)
         return kFunctor
 
     elif kType == "delta-function":
         basisList = diffimLib.generateDeltaFunctionBasisSet(kCols, kRows)
         
-        useRegularization = policy.getBool("useRegularization")
         if useRegularization:
             regularizationOrder      = policy.getInt("regularizationOrder")
             regularizationBoundary   = policy.getInt("regularizationBoundary")

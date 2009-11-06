@@ -425,7 +425,7 @@ BOOST_AUTO_TEST_CASE(assessSpatialKernelVisitor) {
         );
     std::vector<afwMath::Kernel::SpatialFunctionPtr> spatialFunctionList;
     for (unsigned int i = 0; i < nBases; i++) {
-        afwMath::Kernel::SpatialFunctionPtr spatialFunction(spatialKernelFunction->copy());
+        afwMath::Kernel::SpatialFunctionPtr spatialFunction(spatialKernelFunction->clone());
         spatialFunctionList.push_back(spatialFunction);
     }
     afwMath::LinearCombinationKernel::Ptr spatialKernel(

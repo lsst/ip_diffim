@@ -10,6 +10,7 @@ import lsst.pex.logging as pexLogging
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.display.utils as displayUtils
 
+subBackground = True
 display = True
 
 Verbosity = 4
@@ -30,12 +31,50 @@ else:
 defPolicyPath   = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
 defOutputPath   = "diffImage"
 
-templateMaskedImage = afwImage.MaskedImageF(defTemplatePath)
-scienceMaskedImage  = afwImage.MaskedImageF(defSciencePath)
-policy              = ipDiffim.generateDefaultPolicy(defPolicyPath)
+templateImage = afwImage.ExposureF(defTemplatePath)
+scienceImage  = afwImage.ExposureF(defSciencePath)
+policy        = ipDiffim.generateDefaultPolicy(defPolicyPath)
 
-spatialKernel, spatialBg, kernelCellSet = ipDiffim.createPsfMatchingKernel(templateMaskedImage,
-                                                                           scienceMaskedImage,
+if defSciencePath.find('CFHT') == -1:
+    templateImage = ipDiffim.warpTemplateExposure(templateImage,
+                                                  scienceImage,
+                                                  policy)
+    policy.set("detThreshold", 5.)
+    policy.set("sizeCellX", 128)
+    policy.set("sizeCellY", 128)
+    policy.set("kernelBasisSet", "alard-lupton")
+    policy.set("useRegularization", False)
+
+if subBackground:
+    # NOTE - you need to subtract off background from the image
+    # you run detection on.  Here it is the template.
+    algorithm = policy.get("backgroundPolicy.algorithm")
+    binsize   = policy.get("backgroundPolicy.binsize")
+    # hack to get around ticket #987
+    # hack to get around ticket #987
+    # hack to get around ticket #987
+    binsize   = binsize//2
+    # hack to get around ticket #987
+    # hack to get around ticket #987
+    # hack to get around ticket #987
+    bctrl     = afwMath.BackgroundControl(afwMath.NATURAL_SPLINE)
+    bctrl.setNxSample(int(templateImage.getWidth()//binsize) + 1)
+    bctrl.setNySample(int(templateImage.getHeight()//binsize) + 1)
+    
+    image   = templateImage.getMaskedImage().getImage() 
+    backobj = afwMath.makeBackground(image, bctrl)
+    image  -= backobj.getImageF()
+    
+    image   = scienceImage.getMaskedImage().getImage() 
+    backobj = afwMath.makeBackground(image, bctrl)
+    image  -= backobj.getImageF()
+    
+    del image; del backobj
+    #
+    #
+
+spatialKernel, spatialBg, kernelCellSet = ipDiffim.createPsfMatchingKernel(templateImage.getMaskedImage(),
+                                                                           scienceImage.getMaskedImage(),
                                                                            policy)
 
 # Lets see what we got
@@ -51,7 +90,13 @@ if display:
                 
             try:
                 im = cand.getImage()
-                mos.append(im, "#%d: %.1f (%s)" % (cand.getId(), rchi2, cand.getStatus()))
+                if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
+                    statStr = "Good"
+                elif cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
+                    statStr = "Bad"
+                else:
+                    statStr = "Unkn"
+                mos.append(im, "#%d: %.1f (%s)" % (cand.getId(), rchi2, statStr))
             except Exception, e:
                 pass
     mosaic = mos.makeMosaic()
@@ -75,8 +120,8 @@ if display:
     # Spatial model
     frame = 2
     mos.reset()
-    width = templateMaskedImage.getWidth()
-    height = templateMaskedImage.getHeight()
+    width = templateImage.getWidth()
+    height = templateImage.getHeight()
     stamps = []; stampInfo = []
     for x in (0, width//2, width):
         for y in (0, height//2, height):
@@ -94,17 +139,18 @@ if display:
 
     # Background
     frame = 3
-    backgroundIm = afwImage.ImageF(templateMaskedImage.getWidth(),
-                                   templateMaskedImage.getHeight(), 0)
+    backgroundIm = afwImage.ImageF(templateImage.getWidth(),
+                                   templateImage.getHeight(), 0)
     ipDiffim.addToImage(backgroundIm, spatialBg)
     ds9.mtv(backgroundIm, frame=frame)
 
     # Diffim!
     frame = 4
-    diffIm = ipDiffim.convolveAndSubtract(templateMaskedImage,
-                                          scienceMaskedImage,
+    diffIm = ipDiffim.convolveAndSubtract(templateImage.getMaskedImage(),
+                                          scienceImage.getMaskedImage(),
                                           spatialKernel,
                                           spatialBg)
     ds9.mtv(diffIm, frame=frame)
 
 
+# examples/runSpatialModel.py $AFWDATA_DIR/DC3a-Sim/sci/v5-e0/v5-e0-c011-a00.sci $AFWDATA_DIR/DC3a-Sim/sci/v26-e0/v26-e0-c011-a00.sci

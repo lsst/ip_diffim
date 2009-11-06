@@ -879,7 +879,7 @@ public:
         /* Set up kernel */
         std::vector<afwMath::Kernel::SpatialFunctionPtr> spatialFunctionList;
         for (unsigned int i = 0; i < _nbases; i++) {
-            afwMath::Kernel::SpatialFunctionPtr spatialFunction(_spatialKernelFunction->copy());
+            afwMath::Kernel::SpatialFunctionPtr spatialFunction(_spatialKernelFunction->clone());
             spatialFunctionList.push_back(spatialFunction);
         }
         afwMath::LinearCombinationKernel::Ptr spatialKernel(
@@ -887,7 +887,7 @@ public:
             );
         
         /* Set up background */
-        afwMath::Kernel::SpatialFunctionPtr bgFunction(_spatialBgFunction->copy());
+        afwMath::Kernel::SpatialFunctionPtr bgFunction(_spatialBgFunction->clone());
         
         /* Set the kernel coefficients */
         std::vector<std::vector<double> > kCoeffs;

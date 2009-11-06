@@ -33,7 +33,6 @@ class DiffimTestCases(unittest.TestCase):
         self.policy      = ipDiffim.generateDefaultPolicy(diffimPolicy)
         self.kCols       = self.policy.getInt('kernelCols')
         self.kRows       = self.policy.getInt('kernelRows')
-        self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
 
         # Delta function basis set
         self.basisList1  = ipDiffim.generateDeltaFunctionBasisSet(self.kCols, self.kRows)

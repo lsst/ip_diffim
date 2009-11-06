@@ -80,7 +80,8 @@ detThreshold: 10.
 # enable kernel sum conservation for the delta function kernels.
 #
 # NOTE : if "alard-lupton" you likely want to turn off
-#        "usePcaForSpatialKernel" down below
+# "usePcaForSpatialKernel" down below.  And almost certainly
+# "useRegularization" = false
 #
 kernelBasisSet: "delta-function"
 
@@ -180,8 +181,8 @@ candidateResidualStdMax: 1.25
 #   spatialKernelClipping: true
 # In this case you might want to consider upping "maxSpatialIterations" below
 #
-singleKernelClipping:  false
-kernelSumClipping:     false
+singleKernelClipping:  true
+kernelSumClipping:     true
 spatialKernelClipping: true
 
 
