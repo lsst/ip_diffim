@@ -57,17 +57,14 @@ def subtractMaskedImage(maskedImageToConvolve,
     # Instead subtract afw's background model from the difference image
     #
     if policy.get("useAfwBackground"):
-        algorithm = policy.get("backgroundPolicy.algorithm")
-        binsize   = policy.get("backgroundPolicy.binsize")
+        algorithm   = policy.get("backgroundPolicy.algorithm")
+        binsize     = policy.get("backgroundPolicy.binsize")
+        undersample = policy.get("backgroundPolicy.undersample")
+        bctrl       = afwMath.BackgroundControl(algorithm)
+        bctrl.setNxSample(differenceMaskedImage.getWidth()//binsize + 1)
+        bctrl.setNySample(differenceMaskedImage.getHeight()//binsize + 1)
+        bctrl.setUndersampleStyle(undersample)
 
-        if algorithm == "NATURAL_SPLINE":
-            bctrl = afwMath.BackgroundControl(afwMath.NATURAL_SPLINE)
-        else:
-            raise RuntimeError, "Unknown backgroundPolicy.algorithm: %s" % (algorithm)
-
-        bctrl.setNxSample(int(differenceMaskedImage.getWidth()//binsize) + 1)
-        bctrl.setNySample(int(differenceMaskedImage.getHeight()//binsize) + 1)
-        
         image   = differenceMaskedImage.getImage() 
         backobj = afwMath.makeBackground(image, bctrl)
         image  -= backobj.getImageF()

@@ -47,20 +47,14 @@ class DiffimTestCases(unittest.TestCase):
         self.templateMaskedImage = self.templateImage.getMaskedImage()
         self.dStats = ipDiffim.ImageStatisticsF()
         
+        algorithm   = self.policy.get("backgroundPolicy.algorithm")
         binsize     = self.policy.get("backgroundPolicy.binsize")
-
-        # hack to get around ticket #987
-        # hack to get around ticket #987
-        # hack to get around ticket #987
-        binsize   = binsize//2
-        # hack to get around ticket #987
-        # hack to get around ticket #987
-        # hack to get around ticket #987
-
-        bctrl     = afwMath.BackgroundControl(afwMath.NATURAL_SPLINE)
-        bctrl.setNxSample(int(self.templateImage.getWidth()//binsize) + 1)
-        bctrl.setNySample(int(self.templateImage.getHeight()//binsize) + 1)
-
+        undersample = self.policy.get("backgroundPolicy.undersample")
+        bctrl       = afwMath.BackgroundControl(algorithm)
+        bctrl.setNxSample(self.templateImage.getWidth()//binsize + 1)
+        bctrl.setNySample(self.templateImage.getHeight()//binsize + 1)
+        bctrl.setUndersampleStyle(undersample)
+        
         image   = self.templateMaskedImage.getImage() 
         backobj = afwMath.makeBackground(image, bctrl)
         image  -= backobj.getImageF()

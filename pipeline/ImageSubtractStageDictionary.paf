@@ -237,10 +237,12 @@ spatialBgOrder:     1
 # 
 # algorithm = how to interpolate the background values
 # binsize = how large regions of the sky should be used for each background point
+# undersample = what do do if there are not enough regions for the interpolation
 #
 backgroundPolicy: {
     algorithm:  "NATURAL_SPLINE" 
     binsize:    512
+    undersample: "REDUCE_INTERP_ORDER"
 }
 
 ######

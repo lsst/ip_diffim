@@ -48,18 +48,13 @@ if defSciencePath.find('CFHT') == -1:
 if subBackground:
     # NOTE - you need to subtract off background from the image
     # you run detection on.  Here it is the template.
-    algorithm = policy.get("backgroundPolicy.algorithm")
-    binsize   = policy.get("backgroundPolicy.binsize")
-    # hack to get around ticket #987
-    # hack to get around ticket #987
-    # hack to get around ticket #987
-    binsize   = binsize//2
-    # hack to get around ticket #987
-    # hack to get around ticket #987
-    # hack to get around ticket #987
-    bctrl     = afwMath.BackgroundControl(afwMath.NATURAL_SPLINE)
-    bctrl.setNxSample(int(templateImage.getWidth()//binsize) + 1)
-    bctrl.setNySample(int(templateImage.getHeight()//binsize) + 1)
+    algorithm   = policy.get("backgroundPolicy.algorithm")
+    binsize     = policy.get("backgroundPolicy.binsize")
+    undersample = policy.get("backgroundPolicy.undersample")
+    bctrl       = afwMath.BackgroundControl(algorithm)
+    bctrl.setNxSample(templateImage.getWidth()//binsize + 1)
+    bctrl.setNySample(templateImage.getHeight()//binsize + 1)
+    bctrl.setUndersampleStyle(undersample)
     
     image   = templateImage.getMaskedImage().getImage() 
     backobj = afwMath.makeBackground(image, bctrl)

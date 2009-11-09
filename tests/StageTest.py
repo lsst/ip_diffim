@@ -67,11 +67,13 @@ class DiffimStageTestCase(unittest.TestCase):
 
             # NOTE - you need to subtract off background from the image
             # you run detection on.  Here it is the template.
-            algorithm = self.policy.get("diffimPolicy.backgroundPolicy.algorithm")
-            binsize   = self.policy.get("diffimPolicy.backgroundPolicy.binsize")
-            bctrl     = afwMath.BackgroundControl(afwMath.NATURAL_SPLINE)
-            bctrl.setNxSample(int(templateExposure.getWidth()//binsize) + 1)
-            bctrl.setNySample(int(templateExposure.getHeight()//binsize) + 1)
+            algorithm   = self.policy.get("diffimPolicy.backgroundPolicy.algorithm")
+            binsize     = self.policy.get("diffimPolicy.backgroundPolicy.binsize")
+            undersample = self.policy.get("diffimPolicy.backgroundPolicy.undersample")
+            bctrl       = afwMath.BackgroundControl(algorithm)
+            bctrl.setNxSample(templateExposure.getWidth()//binsize + 1)
+            bctrl.setNySample(templateExposure.getHeight()//binsize + 1)
+            bctrl.setUndersampleStyle(undersample)
 
             image   = templateExposure.getMaskedImage().getImage() 
             backobj = afwMath.makeBackground(image, bctrl)
