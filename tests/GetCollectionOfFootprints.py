@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os
+import os, sys
 import unittest
 import lsst.utils.tests as tests
 
