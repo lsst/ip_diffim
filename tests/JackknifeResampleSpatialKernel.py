@@ -223,7 +223,7 @@ class DiffimTestCases(unittest.TestCase):
         
     def test(self):
         if not defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up; not running StageTest.py"
+            print >> sys.stderr, "Warning: afwdata not set up; not running JackknifeResampleSpatialKernel.py"
             return
         
         self.runTest(mode="DFr")

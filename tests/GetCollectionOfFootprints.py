@@ -40,7 +40,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def testGetCollection(self):
         if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up; not running StageTest.py"
+            print >> sys.stderr, "Warning: afwdata is not set up; not running GetCollectionOfFootprints.py"
             return
 
         # NOTE - you need to subtract off background from the image
