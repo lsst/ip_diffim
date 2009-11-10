@@ -39,6 +39,9 @@ class DiffimTestCases(unittest.TestCase):
         del self.policy
 
     def testGetCollection(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up; not running StageTest.py"
+            return
 
         # NOTE - you need to subtract off background from the image
         # you run detection on.  Here it is the template.

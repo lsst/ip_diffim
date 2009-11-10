@@ -25,15 +25,19 @@ display   = False
 writefits = False
 
 defDataDir = eups.productDir('afwdata')
-defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                               "v5-e0-c011-a00.sci")
-defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
-                              "v26-e0-c011-a00.sci")
+if defDataDir:
+    defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
+                                   "v5-e0-c011-a00.sci")
+    defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
+                                  "v26-e0-c011-a00.sci")
 
 # THIS IS "LEAVE-ONE-OUT" CROSS VALIDATION OF THE SPATIAL KERNEL
 
 class DiffimTestCases(unittest.TestCase):
     def setUp(self):
+        if not defDataDir:
+            return
+        
         self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
         self.scienceImage   = afwImage.ExposureF(defSciencePath)
         self.templateImage  = afwImage.ExposureF(defTemplatePath)
@@ -218,6 +222,10 @@ class DiffimTestCases(unittest.TestCase):
         self.jackknifeResample(results)
         
     def test(self):
+        if not defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up; not running StageTest.py"
+            return
+        
         self.runTest(mode="DFr")
 
 #####
