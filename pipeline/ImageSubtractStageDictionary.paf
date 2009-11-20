@@ -97,7 +97,7 @@ kernelCols: 19
 ######
 # Default Alard-Lupton Parameters
 # 
-# Note that the widths are in sigma, not FWHM
+# Note that the widths are in sigma, not FWHM (FWHM = 2.355 sigma)
 # len(alardSigGauss) and len(alardDegGauss) must equal alardNGauss
 #
 alardNGauss:   3
