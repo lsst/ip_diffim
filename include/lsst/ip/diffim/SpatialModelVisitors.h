@@ -136,6 +136,7 @@ public:
         /* Grab all kernel sums and look for outliers */
         if (_mode == AGGREGATE) {
             _kSums.push_back(kCandidate->getKsum());
+            std::cout << "AGG " << kCandidate->getKsum() << std::endl;
         }
         else if (_mode == REJECT) {
             if (_policy.getBool("kernelSumClipping")) {
@@ -157,6 +158,10 @@ public:
     
     void processKsumDistribution() {
         try {
+            for (int i = 0; i < _kSums.size(); i++) {
+                std::cout << "PROCESS " << i << " " << _kSums[i] << std::endl;
+            }
+
             afwMath::Statistics stats = afwMath::makeStatistics(_kSums, 
                                                                 afwMath::NPOINT | 
                                                                 afwMath::MEANCLIP | 

@@ -9,7 +9,8 @@ from lsst.pex.logging import Trace
 from lsst.pex.policy import Policy
 from lsst.pex.logging import Log
 
-from lsst.ip.diffim import subtractExposure
+from lsst.ip.diffim import subtractExposure, generateDefaultPolicy
+import lsst.ip.diffim.diffimTools as diffimTools
 
 def main():
     defDataDir   = eups.productDir('afwdata')
@@ -48,6 +49,8 @@ Notes:
                       help='invert the image to convolve')
     parser.add_option('-d', '--display', action='store_true', default=False,
                       help='display the images')
+    parser.add_option('-b', '--bg', action='store_true', default=False,
+                      help='subtract backgrounds')
 
     (options, args) = parser.parse_args()
     
@@ -68,7 +71,7 @@ Notes:
     
     templateExposure = afwImage.ExposureF(templatePath)
     scienceExposure  = afwImage.ExposureF(sciencePath)
-    policy           = ipDiffim.generateDefaultPolicy(policyPath)
+    policy           = generateDefaultPolicy(policyPath)
 
     invert = False
     if options.invert:
@@ -80,12 +83,21 @@ Notes:
         print 'Display =', options.display
         display = True
 
+    bgSub = False
+    if options.bg:
+        print 'Background subtract =', options.bg
+        bgSub = True
+
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
     log = Log(Log.getDefaultLog(),
               "ip.diffim.subtractExposure")
+
+    if bgSub:
+        diffimTools.backgroundSubtract(policy, [templateExposure.getMaskedImage(),
+                                                scienceExposure.getMaskedImage()])
 
     differenceExposure, spatialKernel, backgroundModel, kernelCellSet = subtractExposure(templateExposure,
                                                                                          scienceExposure,

@@ -51,23 +51,8 @@ class DiffimTestCases(unittest.TestCase):
         self.templateMaskedImage = self.templateImage.getMaskedImage()
         self.dStats = ipDiffim.ImageStatisticsF()
         
-        algorithm   = self.policy.get("backgroundPolicy.algorithm")
-        binsize     = self.policy.get("backgroundPolicy.binsize")
-        undersample = self.policy.get("backgroundPolicy.undersample")
-        bctrl       = afwMath.BackgroundControl(algorithm)
-        bctrl.setNxSample(self.templateImage.getWidth()//binsize + 1)
-        bctrl.setNySample(self.templateImage.getHeight()//binsize + 1)
-        bctrl.setUndersampleStyle(undersample)
-        
-        image   = self.templateMaskedImage.getImage() 
-        backobj = afwMath.makeBackground(image, bctrl)
-        image  -= backobj.getImageF()
-
-        image   = self.scienceMaskedImage.getImage() 
-        backobj = afwMath.makeBackground(image, bctrl)
-        image  -= backobj.getImageF()
-        
-        del image; del backobj
+        diffimTools.backgroundSubtract(self.policy, [self.templateMaskedImage,
+                                                     self.scienceMaskedImage])
 
     def stats(self, id, diffim, size=5):
         bbox = afwImage.BBox(afwImage.PointI((diffim.getWidth() - size)//2,

@@ -16,6 +16,7 @@ import lsst.pex.harness.Clipboard as pexClipboard
 import lsst.pex.policy as pexPolicy
 import lsst.pex.logging as pexLog
 import lsst.ip.diffim.diffimStages as diffimStages
+import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.daf.base as dafBase
@@ -65,25 +66,10 @@ class DiffimStageTestCase(unittest.TestCase):
             scienceExposure = afwImage.ExposureF(defSciencePath, 0, bbox)
             templateExposure = afwImage.ExposureF(defTemplatePath)
 
-            # NOTE - you need to subtract off background from the image
-            # you run detection on.  Here it is the template.
-            algorithm   = self.policy.get("diffimPolicy.backgroundPolicy.algorithm")
-            binsize     = self.policy.get("diffimPolicy.backgroundPolicy.binsize")
-            undersample = self.policy.get("diffimPolicy.backgroundPolicy.undersample")
-            bctrl       = afwMath.BackgroundControl(algorithm)
-            bctrl.setNxSample(templateExposure.getWidth()//binsize + 1)
-            bctrl.setNySample(templateExposure.getHeight()//binsize + 1)
-            bctrl.setUndersampleStyle(undersample)
-
-            image   = templateExposure.getMaskedImage().getImage() 
-            backobj = afwMath.makeBackground(image, bctrl)
-            image  -= backobj.getImageF()
-
-            image   = scienceExposure.getMaskedImage().getImage() 
-            backobj = afwMath.makeBackground(image, bctrl)
-            image  -= backobj.getImageF()
-            
-            del image; del backobj
+            diffimTools.backgroundSubtract(
+                self.policy.get('diffimPolicy'), [templateExposure.getMaskedImage(),
+                                                  scienceExposure.getMaskedImage()]
+                )
         
             clipboard.put(self.policy.get('scienceExposureKey'), scienceExposure)
             clipboard.put(self.policy.get('templateExposureKey'), templateExposure)

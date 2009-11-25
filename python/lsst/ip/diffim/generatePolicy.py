@@ -3,30 +3,37 @@ import os
 import lsst.pex.policy as pexPolicy
 import lsst.pex.logging as pexLog
 
-def generateDefaultPolicy(path, modify=True, fwhm=3.5):
-    diffimDir    = eups.productDir('ip_diffim')
-    diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-    policy       = pexPolicy.Policy.createPolicy(diffimPolicy)
+import math
+sigma2fwhm = 2. * math.sqrt(2. * math.log(2.))
+
+# Here we assume we have the FWHM of the images' PSF in pixels.  We
+# will generate an alard-lupton kernel policy based upon these values.
+# A complication is that the "sigma" of the AL gaussians is related to
+# the FWHM through a scaling of 2.35.
+
+def generateDefaultPolicy(policyPath, modify=True, fwhm=3.5):
+    policy = pexPolicy.Policy.createPolicy(policyPath)
     if modify:
         modifyKernelPolicy(policy, fwhm)
     return policy
 
 def modifyKernelPolicy(policy, fwhm=3.5):
     # Modify the kernel policy parameters based upon the images FWHM
-    
+    print 'caw'
     kernelRadius = policy.getDouble("kernelRadiusFwhmScaling") * fwhm
     kernelRadius = min(kernelRadius, policy.getInt("kernelRadiusMax"))
     kernelRadius = max(kernelRadius, policy.getInt("kernelRadiusMin"))
     kernelSize   = 2 * int(kernelRadius + 0.5) + 1
     policy.set("kernelRows", kernelSize)
     policy.set("kernelCols", kernelSize)
-    
+
     fpGrow = policy.getDouble("fpGrowFwhmScaling") * fwhm
     fpGrow = min(fpGrow, policy.getInt("fpGrowMax"))
     fpGrow = max(fpGrow, policy.getInt("fpGrowMin"))
     policy.set("fpGrowPix", int(fpGrow))
 
-    alardSig = [x*fwhm for x in policy.getDoubleArray("alardSigFwhmScaling")]
+    sigma = fwhm / sigma2fwhm
+    alardSig = [x*sigma for x in policy.getDoubleArray("alardSigFwhmScaling")]
     policy.set("alardSigGauss", alardSig[0])
     for sig in alardSig[1:]:
         policy.add("alardSigGauss", sig)

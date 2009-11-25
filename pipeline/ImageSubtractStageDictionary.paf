@@ -79,9 +79,8 @@ detThreshold: 10.
 # want to seriously consider "usePcaForSpatialKernel" which will also
 # enable kernel sum conservation for the delta function kernels.
 #
-# NOTE : if "alard-lupton" you likely want to turn off
-# "usePcaForSpatialKernel" down below.  And almost certainly
-# "useRegularization" = false
+# NOTE : if "alard-lupton" you might want to turn off
+# "usePcaForSpatialKernel" down below.  
 #
 kernelBasisSet: "delta-function"
 
@@ -97,7 +96,7 @@ kernelCols: 19
 ######
 # Default Alard-Lupton Parameters
 # 
-# Note that the widths are in sigma, not FWHM (FWHM = 2.355 sigma)
+# Note that the widths are in sigma, not FWHM (FWHM = 2.35 sigma)
 # len(alardSigGauss) and len(alardDegGauss) must equal alardNGauss
 #
 alardNGauss:   3
@@ -113,14 +112,15 @@ alardDegGauss: 4   3   2
 # FUTURE : Scaling of these numbers with the Psf Fwhm
 #
 fpGrowFwhmScaling: 10.
-fpGrowMin: 30
-fpGrowMax: 62
+fpGrowMin: 20
+fpGrowMax: 40
 
 kernelRadiusFwhmScaling: 2.5
 kernelRadiusMin: 7
 kernelRadiusMax: 15
 
-alardSigFwhmScaling: 0.25 0.50 1.00
+# Scaling of the AL gaussian "sigmas" by Fwhm/2.35
+alardSigFwhmScaling: 0.50 1.00 2.00
 
 
 ######
@@ -230,7 +230,7 @@ calculateKernelUncertainty: false
 #   spatialKernelClipping: false
 # 
 spatialKernelOrder: 1
-spatialBgOrder:     1
+spatialBgOrder:     0
 
 ######
 # Control for background subtraction

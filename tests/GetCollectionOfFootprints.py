@@ -7,6 +7,7 @@ import eups
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
+import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.policy as pexPolicy
 import lsst.pex.logging as logging
 
@@ -45,19 +46,8 @@ class DiffimTestCases(unittest.TestCase):
 
         # NOTE - you need to subtract off background from the image
         # you run detection on.  Here it is the template.
-        algorithm   = self.policy.get("backgroundPolicy.algorithm")
-        binsize     = self.policy.get("backgroundPolicy.binsize")
-        undersample = self.policy.get("backgroundPolicy.undersample")
-        bctrl       = afwMath.BackgroundControl(algorithm)
-        bctrl.setNxSample(self.templateImage.getWidth()//binsize + 1)
-        bctrl.setNySample(self.templateImage.getHeight()//binsize + 1)
-        bctrl.setUndersampleStyle(undersample)
+        diffimTools.backgroundSubtract(self.policy, [self.templateImage,])
 
-        image   = self.templateImage.getImage() 
-        backobj = afwMath.makeBackground(image, bctrl)
-        image  -= backobj.getImageF()
-        del image; del backobj
-        
         fpList1 = ipDiffim.getCollectionOfFootprintsForPsfMatching(self.templateImage,
                                                                    self.scienceImage,
                                                                    self.policy)

@@ -4,6 +4,7 @@ import time
 import lsst.afw.image.imageLib as afwImage
 import lsst.afw.math.mathLib as afwMath
 import lsst.ip.diffim as ipDiffim
+import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.policy as pexPolicy
 import lsst.pex.logging as pexLogging
 
@@ -46,27 +47,8 @@ if defSciencePath.find('CFHT') == -1:
     policy.set("useRegularization", False)
 
 if subBackground:
-    # NOTE - you need to subtract off background from the image
-    # you run detection on.  Here it is the template.
-    algorithm   = policy.get("backgroundPolicy.algorithm")
-    binsize     = policy.get("backgroundPolicy.binsize")
-    undersample = policy.get("backgroundPolicy.undersample")
-    bctrl       = afwMath.BackgroundControl(algorithm)
-    bctrl.setNxSample(templateImage.getWidth()//binsize + 1)
-    bctrl.setNySample(templateImage.getHeight()//binsize + 1)
-    bctrl.setUndersampleStyle(undersample)
-    
-    image   = templateImage.getMaskedImage().getImage() 
-    backobj = afwMath.makeBackground(image, bctrl)
-    image  -= backobj.getImageF()
-    
-    image   = scienceImage.getMaskedImage().getImage() 
-    backobj = afwMath.makeBackground(image, bctrl)
-    image  -= backobj.getImageF()
-    
-    del image; del backobj
-    #
-    #
+    diffimTools.backgroundSubtract(policy, [templateImage.getMaskedImage(),
+                                            scienceImage.getMaskedImage()])
 
 spatialKernel, spatialBg, kernelCellSet = ipDiffim.createPsfMatchingKernel(templateImage.getMaskedImage(),
                                                                            scienceImage.getMaskedImage(),

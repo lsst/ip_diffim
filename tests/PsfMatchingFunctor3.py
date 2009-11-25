@@ -82,20 +82,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set("spatialKernelOrder", 0)
         self.policy.set("spatialBgOrder", 0)
 
-        # NOTE - you need to subtract off background from the image
-        # you run detection on.  Here it is the template.
-        algorithm   = self.policy.get("backgroundPolicy.algorithm")
-        binsize     = self.policy.get("backgroundPolicy.binsize")
-        undersample = self.policy.get("backgroundPolicy.undersample")
-        bctrl       = afwMath.BackgroundControl(algorithm)
-        bctrl.setNxSample(self.templateImage.getWidth()//binsize + 1)
-        bctrl.setNySample(self.templateImage.getHeight()//binsize + 1)
-        bctrl.setUndersampleStyle(undersample)
-
-        image   = self.templateImage.getImage() 
-        backobj = afwMath.makeBackground(image, bctrl)
-        image  -= backobj.getImageF()
-        del image; del backobj
+        diffimTools.backgroundSubtract(self.policy, [self.templateImage,])
 
         result = ipDiffim.createPsfMatchingKernel(self.templateImage,
                                                   self.scienceImage,

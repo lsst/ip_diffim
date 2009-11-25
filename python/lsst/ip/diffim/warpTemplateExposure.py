@@ -1,6 +1,10 @@
+import time
 import lsst.afw.math as afwMath
+import lsst.pex.logging as pexLog
 
 def warpTemplateExposure(templateExposure, scienceExposure, policy):
+    t0 = time.time()
+    
     # The destination Wcs is in scienceExposure
     # Create the warping Kernel according to policy
     warpingKernelName = policy.getString("warpingKernelName")
@@ -20,5 +24,9 @@ def warpTemplateExposure(templateExposure, scienceExposure, policy):
                          templateExposure, 
                          warpingKernel)
         
+    t1 = time.time()
+    pexLog.Trace("lsst.ip.diffim.warpTemplateExposure", 1,
+                 "Total time for warping : %.2f s" % (t1-t0))
+
     return remapedTemplateExposure
     

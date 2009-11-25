@@ -51,12 +51,6 @@ KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::copyImage() const 
     return typename KernelCandidate<PixelT>::ImageT::Ptr(
         new typename KernelCandidate<PixelT>::ImageT(*getImage(), true)
         );
-    /*
-      typename KernelCandidate<PixelT>::ImageT::Ptr imcopy(
-      new typename KernelCandidate<PixelT>::ImageT(*_image, true)
-      );
-      return imcopy;
-    */
 }
 
 
