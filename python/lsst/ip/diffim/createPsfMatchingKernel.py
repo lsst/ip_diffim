@@ -82,6 +82,11 @@ def createPsfMatchingKernel(maskedImageToConvolve,
 # Matching an image to a Gaussian model
 # This requires sending footprints since we can only accept stars
 # In this case, maskedImageToConvolve is played by the science image
+
+# We need either sources (ideally, centroided and photometered) or a
+# list of isolated Psf star footprints (which we will centroid and
+# photometer ourselves).
+
 def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
                                       sigGauss,
                                       policy,
@@ -89,7 +94,8 @@ def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
 
     # We must use alard-lupton here because the image we are applying
     # the kernel to is noisy
-    #policy.set("kernelBasisSet", "alard-lupton")
+    policy.set("kernelBasisSet", "alard-lupton")
+    
     # This is for debugging
     policy.set("spatialKernelClipping", False)
 
@@ -97,14 +103,11 @@ def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
     centroidAlgorithm = "SDSS"
     policy.set("centroidAlgorithm", centroidAlgorithm)
 
-    photometryAlgorithm = "SINC"
-    policy.set("photometryAlgorithm", photometryAlgorithm)
+    #photometryAlgorithm = "SINC"
+    #policy.set("photometryAlgorithm", photometryAlgorithm)
 
-    photometryAperture = 10.
-    policy.set("photometryAperture", photometryAperture)
-
-    lanczOrder  = 5
-    policy.set("lanczOrder", lanczOrder)
+    #photometryAperture = 10.
+    #policy.set("photometryAperture", photometryAperture)
 
     maxCentroidShift  = 0.05
     policy.set("maxCentroidShift", maxCentroidShift)
@@ -116,14 +119,12 @@ def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
     # Centroider to be able to shift this Gaussian to align at the
     # sub-pixel level with the star
     centroider  = measAlgorithms.createMeasureCentroid(policy.get("centroidAlgorithm"))
-    lanczOrder  = policy.get("lanczOrder")
-    lanczSize   = 2 * lanczOrder + 1
 
     # Need to measure the flux of the star to scale the gaussian
     # PSF IS A HACK FOR NOW
-    psf        = measAlgorithms.createPSF("DoubleGaussian", 15, 15, 5.)
-    photometer = measAlgorithms.createMeasurePhotometry(policy.get("photometryAlgorithm"),
-                                                        policy.get("photometryAperture"))
+    #psf        = measAlgorithms.createPSF("DoubleGaussian", 15, 15, 5.)
+    #photometer = measAlgorithms.createMeasurePhotometry(policy.get("photometryAlgorithm"),
+    #                                                    policy.get("photometryAperture"))
 
     # Object to store the KernelCandidates for spatial modeling
     kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(maskedImageToConvolve.getX0(),
@@ -136,13 +137,13 @@ def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
     # Place candidate footprints within the spatial grid
     for fp in footprints:
         bbox = fp.getBBox()
-        xC   = 0.5 * ( bbox.getX0() + bbox.getX1() )
-        yC   = 0.5 * ( bbox.getY0() + bbox.getY1() )
+        xC   = 0.5 * (bbox.getX0() + bbox.getX1())
+        yC   = 0.5 * (bbox.getY0() + bbox.getY1())
         tmi  = afwImage.MaskedImageF(maskedImageToConvolve,  bbox)
 
         # Find object flux so we can center the Gaussian
-        phot  = photometer.apply(maskedImageToConvolve, xC, yC, psf, 0.0)
-        flux  = phot.getApFlux()
+        #phot  = photometer.apply(maskedImageToConvolve, xC, yC, psf, 0.0)
+        #flux  = phot.getApFlux()
         
         # The object is not centered on a pixel
         # Offsets are defined such that afwMath.offsetImage will shift the pixel
@@ -152,7 +153,7 @@ def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
         dy    = cen.getY() - yC
 
         # Evaluate the gaussian slightly shifted
-        kImageG     = afwImage.ImageD(tmi.getWidth(), tmi.getHeight())
+        kImageG = afwImage.ImageF(tmi.getWidth(), tmi.getHeight())
         for y in range(tmi.getHeight()):
             yg = tmi.getHeight()//2 - y
             
@@ -161,18 +162,17 @@ def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
                 
                 kImageG.set(x, y, gaussFunc(xg+dx, yg+dy))
 
-        # Ticket 1040        
-        # kImage2 = kImage.convertFloat() 
-        # kImage  = kImage2
-        foo = diffimTools.vectorFromImage(kImageG)
-        foo2 = diffimTools.imageFromVector(foo, kImageG.getWidth(), kImageG.getHeight())
-        kImage = foo2
-    
+        # Try and scale the images to both have sum = 1?
+        sumG     = afwMath.makeStatistics(kImageG, afwMath.SUM).getValue()
+        kImageG /= sumG
+        sumT     = afwMath.makeStatistics(tmi.getImage(), afwMath.SUM).getValue()
+        tmi     /= sumT
+
         # Did our centroiding work out?
         cTest1 = afwImage.ImageF(tmi.getImage(), True)
         cTest1.setXY0(afwImage.PointI(0, 0))
         cen1   = centroider.apply(cTest1, cTest1.getWidth()//2, cTest1.getHeight()//2)
-        cTest2 = afwImage.ImageF(kImage, True)
+        cTest2 = afwImage.ImageF(kImageG, True)
         cTest2.setXY0(afwImage.PointI(0, 0))
         cen2   = centroider.apply(cTest2, cTest2.getWidth()//2, cTest2.getHeight()//2)
         pexLog.Trace("lsst.ip.diffim.createPsfMatchingKernelToGaussian", 5,
@@ -194,7 +194,7 @@ def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
         
         # Create a masked image that your input image will be matched to
         # Empty mask and zero variance
-        smi  = afwImage.MaskedImageF(kImage)
+        smi  = afwImage.MaskedImageF(kImageG)
 
         # Scale the Gaussian to have the same flux as the star
         #
@@ -202,10 +202,10 @@ def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
         # the Gaussian in N pixels is the same as the flux of the star
         # in those same N pixels.  When they are different FWHMs.  Hmm...
         
-        phot = photometer.apply(smi, smi.getWidth()//2, smi.getHeight()//2, psf, 0.0)
-        smi *= flux / phot.getApFlux()
-        pexLog.Trace("lsst.ip.diffim.createPsfMatchingKernelToGaussian", 5,
-                     "Scaling gaussian by %.2f" % (flux / phot.getApFlux()))
+        #phot = photometer.apply(smi, smi.getWidth()//2, smi.getHeight()//2, psf, 0.0)
+        #smi *= flux / phot.getApFlux()
+        #pexLog.Trace("lsst.ip.diffim.createPsfMatchingKernelToGaussian", 5,
+        #             "Scaling gaussian by %.2f" % (flux / phot.getApFlux()))
 
 
         cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi)

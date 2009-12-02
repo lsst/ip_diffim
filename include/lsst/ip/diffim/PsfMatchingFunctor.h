@@ -23,8 +23,19 @@
 namespace lsst { 
 namespace ip { 
 namespace diffim {
-   
-   /**
+
+    /* 
+     * @brief Method used to solve for M and B
+     */
+    enum KernelSolvedBy {
+        NONE          = 0x0,
+        CHOLESKY_LDLT = 0x1,
+        CHOLESKY_LLT  = 0x2,
+        LU            = 0x3,
+        EIGENVECTOR   = 0x4
+    };
+    
+    /**
      * @brief Functor to create PSF Matching Kernel
      *
      * @note This class owns the functionality to make a single difference
@@ -56,12 +67,25 @@ namespace diffim {
         /* Shallow copy only; shared matrix product uninitialized */
         PsfMatchingFunctor(const PsfMatchingFunctor<PixelT,VarT> &rhs);
 
+        /* Do and store solution */
+        void solveMB(Eigen::MatrixXd mMat, Eigen::VectorXd bVec);
+
         std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolution();
         std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolutionUncertainty();
         
         /** Access to least squares info
          */
         std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> > getAndClearMB();
+        boost::shared_ptr<Eigen::MatrixXd> getM() {return _mMat;}
+        boost::shared_ptr<Eigen::VectorXd> getB() {return _bVec;}
+        boost::shared_ptr<Eigen::VectorXd> getS() {return _sVec;}
+
+        KernelSolvedBy getSolvedBy() {return _solvedBy;}
+
+        /** Normalize the kernel to have a kernel sum of 1.  This requires also
+         * modifying B for consistency during any spatial modeling.
+         */
+        void normalizeKernel();
 
         /** Access to basis list
          */
@@ -82,6 +106,7 @@ namespace diffim {
         boost::shared_ptr<Eigen::MatrixXd> const _hMat;          ///< Regularization matrix
         bool _initialized;                                       ///< Has been solved for
         bool _regularize;                                        ///< Has a _hMat matrix
+        KernelSolvedBy _solvedBy;                                      ///< How Kernel was determined
     };
     
     /**

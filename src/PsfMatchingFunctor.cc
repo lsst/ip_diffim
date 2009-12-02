@@ -48,7 +48,8 @@ PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
     _sVec(),
     _hMat(),
     _initialized(false),
-    _regularize(false)
+    _regularize(false),
+    _solvedBy(lsst::ip::diffim::NONE)
 {;}
 
 template <typename PixelT, typename VarT>
@@ -62,7 +63,8 @@ PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
     _sVec(),
     _hMat(hMat),
     _initialized(false),
-    _regularize(true)
+    _regularize(true),
+    _solvedBy(lsst::ip::diffim::NONE)
 {;}
 
 template <typename PixelT, typename VarT>
@@ -75,12 +77,80 @@ PsfMatchingFunctor<PixelT, VarT>::PsfMatchingFunctor(
     _sVec(),
     _hMat(rhs._hMat),
     _initialized(false),
-    _regularize(rhs._regularize)
+    _regularize(rhs._regularize),
+    _solvedBy(lsst::ip::diffim::NONE)
 {;}
 
 //
 // Public Member Functions
 //
+
+template <typename PixelT, typename VarT>
+void PsfMatchingFunctor<PixelT, VarT>::solveMB(
+    Eigen::MatrixXd mMat, 
+    Eigen::VectorXd bVec) {
+
+    // To use Cholesky decomposition, the matrix needs to be symmetric (M is, by
+    // design) and positive definite.  
+    //
+    // Eventually put a check in here to make sure its positive definite
+    //
+    Eigen::VectorXd sVec = Eigen::VectorXd::Zero(bVec.size());
+
+    _solvedBy = lsst::ip::diffim::CHOLESKY_LDLT;
+    if (!(mMat.ldlt().solve(bVec, &sVec))) {
+        pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                          "Unable to determine kernel via Cholesky LDL^T");
+
+        _solvedBy = lsst::ip::diffim::CHOLESKY_LLT;
+        if (!(mMat.llt().solve(bVec, &sVec))) {
+            pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                              "Unable to determine kernel via Cholesky LL^T");
+
+            _solvedBy = lsst::ip::diffim::LU;
+            if (!(mMat.lu().solve(bVec, &sVec))) {
+                pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                                  "Unable to determine kernel via LU");
+                // LAST RESORT
+                try {
+
+                    _solvedBy = lsst::ip::diffim::EIGENVECTOR;
+                    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(mMat);
+                    Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
+                    Eigen::VectorXd eValues = eVecValues.eigenvalues();
+                    
+                    for (int i = 0; i != eValues.rows(); ++i) {
+                        if (eValues(i) != 0.0) {
+                            eValues(i) = 1.0/eValues(i);
+                        }
+                    }
+                    
+                    sVec = rMat*eValues.asDiagonal()*rMat.transpose()*bVec;
+                } catch (pexExcept::Exception& e) {
+
+                    _solvedBy = lsst::ip::diffim::NONE;
+                    pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
+                                      "Unable to determine kernel via eigen-values");
+                    
+                    throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution");
+                }
+            }
+        }
+    }
+
+    /* Save matrices as they are expensive to calculate.
+     * 
+     * NOTE : one might consider saving the VC and B vectors instead of M and B;
+     * however then we would not be able to maintain the regularization of M
+     * even though the stored B would be regularized.
+     * 
+     * 
+     */
+    _mMat = boost::shared_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd(mMat));
+    _bVec = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(bVec));
+    _sVec = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(sVec));
+    _initialized = true;
+}
 
 template <typename PixelT, typename VarT>
 void PsfMatchingFunctor<PixelT, VarT>::apply(
@@ -264,61 +334,16 @@ void PsfMatchingFunctor<PixelT, VarT>::apply(
                           "Applying kernel regularization with lambda = %.2e", lambda);
         
     }
-    
 
-    // To use Cholesky decomposition, the matrix needs to be symmetric (M is, by
-    // design) and positive definite.  
-    //
-    // Eventually put a check in here to make sure its positive definite
-    //
-    Eigen::VectorXd sVec = Eigen::VectorXd::Zero(nParameters);
-    if (!(mMat.ldlt().solve(bVec, &sVec))) {
-        pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                          "Unable to determine kernel via Cholesky LDL^T");
-        if (!(mMat.llt().solve(bVec, &sVec))) {
-            pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                              "Unable to determine kernel via Cholesky LL^T");
-            if (!(mMat.lu().solve(bVec, &sVec))) {
-                pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                                  "Unable to determine kernel via LU");
-                // LAST RESORT
-                try {
-                    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(mMat);
-                    Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
-                    Eigen::VectorXd eValues = eVecValues.eigenvalues();
-                    
-                    for (int i = 0; i != eValues.rows(); ++i) {
-                        if (eValues(i) != 0.0) {
-                            eValues(i) = 1.0/eValues(i);
-                        }
-                    }
-                    
-                    sVec = rMat*eValues.asDiagonal()*rMat.transpose()*bVec;
-                } catch (pexExcept::Exception& e) {
-                    pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
-                                      "Unable to determine kernel via eigen-values");
-                    
-                    throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution");
-                }
-            }
-        }
-    }
-
-    /* Save matrices as they are expensive to calculate.
+    /* Do and store the solution 
      * 
-     * NOTE : one might consider saving the VC and B vectors instead of M and B;
-     * however then we would not be able to maintain the regularization of M
-     * even though the stored B would be regularized.
-     * 
-     * ANOTHER NOTE : we might also consider *not* solving for Soln here, in the
-     * case that we don't care about the results of the single-kernel fit.  That
-     * is, if we decide to only do sigma clipping on the spatial results.
-     * 
+     * NOTE : we might consider *not* solving for Soln, in the case that we
+     * don't care about the results of the single-kernel fit.  That is, if we
+     * decide to only do sigma clipping on the spatial results.
+     *
      */
-    _mMat = boost::shared_ptr<Eigen::MatrixXd>(new Eigen::MatrixXd(mMat));
-    _bVec = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(bVec));
-    _sVec = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(sVec));
-    _initialized = true;
+    solveMB(mMat, bVec);
+
     time = t.elapsed();
     pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.apply", 
                       "Total compute time to do matrix math : %.2f s", time);
@@ -434,8 +459,45 @@ PsfMatchingFunctor<PixelT, VarT>::getAndClearMB() {
     _bVec.reset();
     _sVec.reset();
     _initialized=false;
+    _solvedBy = lsst::ip::diffim::NONE;
     return std::make_pair(mOut, bOut);
 }
+
+template <typename PixelT, typename VarT>
+void 
+PsfMatchingFunctor<PixelT, VarT>::normalizeKernel() {
+    if (!(_initialized)) {
+        throw LSST_EXCEPT(pexExcept::Exception, "Kernel not initialized");
+    }
+    std::pair<boost::shared_ptr<afwMath::Kernel>, double> kb;
+    kb = getSolution();
+    afwImage::Image<double> kImage(kb.first->getDimensions());
+    double kSum = kb.first->computeImage(kImage, false);
+
+    pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.normalizeKernel", 
+                      "Kernel sum before normalization : %.2f", kSum);
+
+    (*_bVec) /= kSum;
+    (*_sVec) /= kSum;
+
+    /* Double check */
+    kb   = getSolution();
+    kSum = kb.first->computeImage(kImage, false);
+
+    pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.normalizeKernel", 
+                      "Kernel sum after normalization : %.2f", kSum);
+
+    /* 
+       Note : This should be C++ unit tested; that the solution of Mx = B ends
+       up being x/kSum after I divide B by kSum.  Instead I am being blunt and
+       modifying both 'x' and 'B' in place.  To be entirely consistent but
+       perhaps unnecessarily inefficient perhaps I should do another
+
+       solveMB(*_mMat, *_bVec);
+       
+     */
+}
+
 
 template class PsfMatchingFunctor<float, float>;
 template class PsfMatchingFunctor<double, float>;

@@ -129,8 +129,10 @@ class DiffimTestCases(unittest.TestCase):
         # grab only the non-masked subregion
         bbox     = afwImage.BBox(afwImage.PointI(self.gaussKernel.getCtrX(),
                                                  self.gaussKernel.getCtrY()) ,
-                                 afwImage.PointI(imsize - (self.gaussKernel.getWidth()  - self.gaussKernel.getCtrX()),
-                                                 imsize - (self.gaussKernel.getHeight() - self.gaussKernel.getCtrY())))
+                                 afwImage.PointI(imsize - (self.gaussKernel.getWidth()  -
+                                                           self.gaussKernel.getCtrX()),
+                                                 imsize - (self.gaussKernel.getHeight() -
+                                                           self.gaussKernel.getCtrY())))
                                  
         tmi2     = afwImage.MaskedImageF(tmi, bbox)
         cmi2     = afwImage.MaskedImageF(cmi, bbox)
@@ -165,7 +167,8 @@ class DiffimTestCases(unittest.TestCase):
                 # once we start to add in a background, the outer
                 # portions of the kernel start to get a bit noisy.
                 #
-                # print i, j, self.kImageIn.get(i,j), kImageOut.get(i, j), kImageOut.get(i, j)/self.kImageIn.get(i,j)
+                # print i, j, self.kImageIn.get(i,j), kImageOut.get(i, j),
+                # kImageOut.get(i, j)/self.kImageIn.get(i,j)
                 #
                 # however, where the power is, the results are the
                 # same
