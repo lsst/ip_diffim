@@ -442,7 +442,19 @@ public:
             _nRejected += 1;
             return;
         }
-        
+
+        /* If we need to renormalize the kernel and its B matrix, do it here.
+           This is particularly relevant when you are building a kernel matching
+           an image to a Gaussian model, when each star is a different
+           brightness.  We don't want to have to scale each Gaussian model to
+           the flux of the star; we just scale all the kernels to have the same
+           kernel sum, but we have to also scale the B matrix so that this does
+           not go awry in the spatial modeling.
+        */
+        if (_policy.getBool("psfMatchToGaussian")) {
+            _kFunctor.normalizeKernel();
+        }
+
         /* 
            Sometimes you do not want to override the kernel; e.g. on a
            second fitting loop after the results of the first fitting loop
@@ -497,6 +509,10 @@ public:
             } catch (pexExcept::Exception &e) {
                 LSST_EXCEPT_ADD(e, "Unable to recalculate Kernel");
                 throw e;
+            }
+
+            if (_policy.getBool("psfMatchToGaussian")) {
+                _kFunctor.normalizeKernel();
             }
 
             try {

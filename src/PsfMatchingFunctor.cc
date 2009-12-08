@@ -477,8 +477,13 @@ PsfMatchingFunctor<PixelT, VarT>::normalizeKernel() {
     pexLog::TTrace<5>("lsst.ip.diffim.PsfMatchingFunctor.normalizeKernel", 
                       "Kernel sum before normalization : %.2f", kSum);
 
-    (*_bVec) /= kSum;
-    (*_sVec) /= kSum;
+    /* Don't want to scale the background term!  So iterate explicitly over each
+     * term.  
+     */
+    for (int i = 0; i < (*_bVec).size() - 1; i++) {
+        (*_bVec)(i) /= kSum;
+        (*_sVec)(i) /= kSum;
+    }
 
     /* Double check */
     kb   = getSolution();
@@ -496,6 +501,13 @@ PsfMatchingFunctor<PixelT, VarT>::normalizeKernel() {
        solveMB(*_mMat, *_bVec);
        
      */
+
+    /* 
+       Finally, note to self.  In the spatial modeling the final solution does
+       not end up always having a kernel sum of 1.0.  This has got to be due to
+       cross terms between the background and the kernel.  Is this an issue?  I
+       don't entirely know.
+    */
 }
 
 

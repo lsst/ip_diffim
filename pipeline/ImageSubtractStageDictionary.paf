@@ -213,6 +213,17 @@ constantVarianceWeighting: false
 #
 calculateKernelUncertainty: false
 
+######
+# Do you psf match to an idealized Gaussian instead of another image?
+#
+#
+psfMatchToGaussian: false
+psfMatchToGaussianSigma1: 3.0
+psfMatchToGaussianFlux1: 0.9
+psfMatchToGaussianSigma2: 5.0
+psfMatchToGaussianFlux2: 0.1
+
+
 
 
 ####################################

@@ -97,6 +97,9 @@ def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
     policy.set("kernelBasisSet", "alard-lupton")
     
     # This is for debugging
+    policy.set("psfMatchToGaussian", True)
+    policy.set("singleKernelClipping", False)
+    policy.set("kernelSumClipping", False)
     policy.set("spatialKernelClipping", False)
 
     # TO BE SET IN POLICY LATER

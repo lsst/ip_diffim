@@ -84,20 +84,24 @@ class DiffimTestCases(unittest.TestCase):
 
         # accepts : imageToConvolve, imageToNotConvolve
         self.kFunctor.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
-        kb        = self.kFunctor.getSolution()
-        kSoln     = kb.first
-        bgSoln    = kb.second
+        kb1       = self.kFunctor.getSolution()
+        kSoln1    = kb1.first
+        bgSoln1   = kb1.second
         kImageOut = afwImage.ImageD(self.kCols, self.kRows)
-        kSum      = kSoln.computeImage(kImageOut, False)
-        self.assertNotEqual(kSum, 1.)
+        kSum1     = kSoln1.computeImage(kImageOut, False)
+        self.assertNotEqual(kSum1, 1.)
 
         # test normalization of the coefficient vectors
         self.kFunctor.normalizeKernel()
 
-        kb        = self.kFunctor.getSolution()
-        kSoln     = kb.first
-        kSum      = kSoln.computeImage(kImageOut, False)
-        self.assertAlmostEqual(kSum, 1.)
+        kb2       = self.kFunctor.getSolution()
+        kSoln2    = kb2.first
+        bgSoln2   = kb2.second
+        kSum2     = kSoln2.computeImage(kImageOut, False)
+        self.assertAlmostEqual(kSum2, 1.)
+
+        # the background should not change!
+        self.assertEqual(bgSoln1, bgSoln2)
 
     def testNormalize(self):
         if not self.defDataDir:

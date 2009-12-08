@@ -111,7 +111,7 @@ def displaySpatialKernelQuality(kernelCellSet, spatialKernel, spatialBg, frame):
                          "Candidate %d sdiffim residuals = %.2f +/- %.2f sigma" % (cand.getId(),
                                                                                    imstat.getMean(),
                                                                                    imstat.getRms()))
-            raw_input("Next: ")
+            #raw_input("Next: ")
 
                     
             

@@ -275,6 +275,7 @@ BOOST_AUTO_TEST_CASE(buildSingleKernelVisitor) {
     policy->set("constantVarianceWeighting", false);
     policy->set("iterateSingleKernel", false);
     policy->set("singleKernelClipping", true);
+    policy->set("psfMatchToGaussian", false);
     policy->set("candidateResidualMeanMax", 0.25);
     policy->set("candidateResidualStdMax", 1.25);
 
