@@ -133,8 +133,8 @@ alardSigFwhmScaling: 0.50 1.00 2.00
 # scaling    : Fraction of the default lambda calculation (N.R. 18.5.8) to use; strength of regularization
 #
 useRegularization: true
-regularizationOrder: 2
-regularizationBoundary: 1
+regularizationOrder: 1
+regularizationBoundary: 2
 regularizationDifference: 0
 regularizationScaling: 0.0001
 
