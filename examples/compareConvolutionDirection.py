@@ -195,8 +195,7 @@ class DiffimTestCases(unittest.TestCase):
             self.applyFunctor(invert=True, 
                               xloc= int(0.5 * ( object.getBBox().getX0() + object.getBBox().getX1() )),
                               yloc= int(0.5 * ( object.getBBox().getY0() + object.getBBox().getY1() )))
-            import pdb
-            pdb.set_trace()
+            raw_input('Next: ')
 
        
 #####

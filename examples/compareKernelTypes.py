@@ -182,8 +182,7 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut3.writeFits('k3.fits')
             diffIm3.writeFits('d3')
 
-        import pdb
-        pdb.set_trace()
+        raw_input('Next: ')
 
     def testFunctor(self):
         for object in self.footprints:
