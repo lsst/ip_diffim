@@ -58,7 +58,6 @@ Eigen::MatrixXd imageToEigenMatrix(
     return M;
 }
     
-
 /**
  * @brief Adds a Function to an Image
  *
@@ -66,34 +65,21 @@ Eigen::MatrixXd imageToEigenMatrix(
  * in general not true
  *
  */
-template <typename PixelT>
-void addToImage(lsst::afw::image::Image<PixelT> &image,
-                lsst::afw::math::Function2<double> const &function
-    ) {
-    
+template <typename ImageT>
+void operator+=(ImageT &image,                                     ///< Image to augment
+                lsst::afw::math::Function2<double> const &function ///< function to add
+               ) {
     // Set the pixels row by row, to avoid repeated checks for end-of-row
     for (int y = 0; y != image.getHeight(); ++y) {
         double yPos = afwImage::positionToIndex(y);
         double xPos = afwImage::positionToIndex(0);
-        for (typename afwImage::Image<PixelT>::x_iterator ptr = image.row_begin(y), end = image.row_end(y);
+        for (typename ImageT::x_iterator ptr = image.row_begin(y), end = image.row_end(y);
              ptr != end; ++ptr, ++xPos) {            
             *ptr += function(xPos, yPos);
         }
     }
 }
-
-/**
- * @brief Adds a scalar to an Image
- */
-template <typename PixelT>
-void addToImage(lsst::afw::image::Image<PixelT> &image,
-                double value
-    ) {
-    if (value != 0.0) {
-        image += value;
-    }
-}
-
+    
 /** 
  * @brief Implement fundamental difference imaging step of convolution and
  * subtraction : D = I - (K*T + bg) where * denotes convolution
@@ -126,7 +112,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     afwMath::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false);
     
     /* Add in background */
-    addToImage(*(convolvedMaskedImage.getImage()), background);
+    *convolvedMaskedImage.getImage() += background;
     
     /* Do actual subtraction */
     convolvedMaskedImage -= imageToNotConvolve;
@@ -175,7 +161,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     afwMath::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, convolutionKernel, false);
     
     /* Add in background */
-    addToImage(*(convolvedMaskedImage.getImage()), background);
+    *convolvedMaskedImage.getImage() += background;
     
     /* Do actual subtraction */
     *convolvedMaskedImage.getImage() -= *imageToNotConvolve.getImage();
@@ -378,16 +364,7 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
 }
 
 // Explicit instantiations
-template 
-Eigen::MatrixXd imageToEigenMatrix(lsst::afw::image::Image<float> const &);
-
-template 
-Eigen::MatrixXd imageToEigenMatrix(lsst::afw::image::Image<double> const &);
-
-template class FindSetBits<lsst::afw::image::Mask<> >;
-template class ImageStatistics<float>;
-template class ImageStatistics<double>;
-
+// \cond
 /* */
 
 #define p_INSTANTIATE_convolveAndSubtract(TEMPLATE_IMAGE_T, TYPE)     \
@@ -407,53 +384,33 @@ template class ImageStatistics<double>;
         lsst::afw::math::Function2<double> const& backgroundFunction, \
         bool invert); \
 
-#define INSTANTIATE_convolveAndSubtract(TYPE) \
-p_INSTANTIATE_convolveAndSubtract(Image, TYPE) \
-p_INSTANTIATE_convolveAndSubtract(MaskedImage, TYPE)
+#define INSTANTIATE(TYPE) \
+    p_INSTANTIATE_convolveAndSubtract(Image, TYPE)   \
+    p_INSTANTIATE_convolveAndSubtract(MaskedImage, TYPE)        \
+    \
+    template \
+    std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(\
+    lsst::afw::image::MaskedImage<TYPE> const &, \
+    lsst::afw::image::MaskedImage<TYPE> const &, \
+    lsst::pex::policy::Policy const &); \
+    \
+    template \
+    void operator+=(lsst::afw::image::Image<TYPE> &image, \
+                    lsst::afw::math::Function2<double> const &function); \
+    template \
+    Eigen::MatrixXd imageToEigenMatrix(lsst::afw::image::Image<TYPE> const &); \
+    \
+    template class ImageStatistics<TYPE>;
+
 /*
  * Here are the instantiations.
  *
  * Do we need double diffim code?  It isn't sufficient to remove it here; you'll have to also remove at
  * least SpatialModelKernel<double> and swig instantiations thereof
  */
-INSTANTIATE_convolveAndSubtract(float);
-INSTANTIATE_convolveAndSubtract(double);
+template class FindSetBits<lsst::afw::image::Mask<> >; 
 
-/* */
-
-
-template
-std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::image::MaskedImage<float> const &,
-    lsst::afw::image::MaskedImage<float> const &,
-    lsst::pex::policy::Policy const &);
-
-template
-std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::image::MaskedImage<double> const &,
-    lsst::afw::image::MaskedImage<double> const &,
-    pexPolicy::Policy  const &);
-
-template 
-void addToImage(
-    lsst::afw::image::Image<float> &,
-    lsst::afw::math::Function2<double> const &
-    );
-template 
-void addToImage(
-    lsst::afw::image::Image<double> &,
-    lsst::afw::math::Function2<double> const &
-    );
-
-template 
-void addToImage(
-    lsst::afw::image::Image<float> &,
-    double
-    );
-template 
-void addToImage(
-    lsst::afw::image::Image<double> &,
-    double
-    );
+INSTANTIATE(float);
+INSTANTIATE(double);
 
 }}} // end of namespace lsst::ip::diffim

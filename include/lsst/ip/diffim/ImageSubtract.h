@@ -214,29 +214,8 @@ namespace diffim {
         lsst::afw::image::Image<PixelT> const& img
         );
     
-    /**
-     * @brief Helper method to add a Function to an Image
-     *
-     * @param image  Image to be modified
-     * @param function  Funtion that is evaluated at all pixel values and added to image
-     *
-     * @ingroup ip_diffim
-     */
-    template <typename PixelT>
-    void addToImage(lsst::afw::image::Image<PixelT> &image,
-                    lsst::afw::math::Function2<double> const &function);
-
-    /**
-     * @brief Helper method to add a double to an Image
-     *
-     * @param image  Image to be modified
-     * @param value  Value to be added to image
-     *
-     * @ingroup ip_diffim
-     */
-    template <typename PixelT>
-    void addToImage(lsst::afw::image::Image<PixelT> &image,
-                    double value);
+    template <typename ImageT>
+    void operator+=(ImageT &image, lsst::afw::math::Function2<double> const &function);
 
 }}} // end of namespace lsst::ip::diffim
 
