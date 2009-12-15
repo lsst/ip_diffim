@@ -19,14 +19,14 @@ class DiffimTestCases(unittest.TestCase):
 
     def testDouble(self):
         img = afwImage.ImageF(10,10,0)
-        img += self.value
+        ipDiffim.addToImage(img, self.value)
         for j in range(img.getHeight()):
             for i in range(img.getWidth()):
                 self.assertEqual(img.get(i,j), self.value)
 
     def testFunction(self):
         img = afwImage.ImageF(10,10,0)
-        img += self.function
+        ipDiffim.addToImage(img, self.function)
         for j in range(img.getHeight()):
             for i in range(img.getWidth()):
                 self.assertEqual(img.get(i,j), self.function(i,j))

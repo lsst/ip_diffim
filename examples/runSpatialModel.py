@@ -118,7 +118,7 @@ if display:
     frame = 3
     backgroundIm = afwImage.ImageF(templateImage.getWidth(),
                                    templateImage.getHeight(), 0)
-    backgroundIm += spatialBg
+    ipDiffim.addToImage(backgroundIm, spatialBg)
     ds9.mtv(backgroundIm, frame=frame)
 
     # Diffim!

@@ -103,10 +103,6 @@ SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double
 
 /******************************************************************************/
 
-%define %IMAGE(PIXTYPE)
-lsst::afw::image::Image<PIXTYPE>
-%enddef
-
 %{
 #include "lsst/ip/diffim/ImageSubtract.h"
 %}
@@ -140,13 +136,18 @@ lsst::afw::image::Image<PIXTYPE>
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double>;
 
-%template(operatorPE)   lsst::ip::diffim::operator+=<%IMAGE(float)>;
+%template(addToImage)   lsst::ip::diffim::addToImage<float>;
+%template(addToImage)   lsst::ip::diffim::addToImage<double>;
 
 /******************************************************************************/
 
 %{
 #include "lsst/ip/diffim/SpatialModelKernel.h"
 %}
+
+%define %IMAGE(PIXTYPE)
+lsst::afw::image::Image<PIXTYPE>
+%enddef
 
 %define %KernelCandidatePtr(NAME, TYPE)
 SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
