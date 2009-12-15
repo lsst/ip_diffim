@@ -173,8 +173,6 @@ fitSpatialKernelFromCandidates(
     int const maxKsumIterations       = policy.getInt("maxKsumIterations");
     int const maxSpatialIterations    = policy.getInt("maxSpatialIterations");
     int const nStarPerCell            = policy.getInt("nStarPerCell");
-    int const spatialKernelOrder      = policy.getInt("spatialKernelOrder");
-    int const spatialBgOrder          = policy.getInt("spatialBgOrder");
     bool const usePcaForSpatialKernel = policy.getBool("usePcaForSpatialKernel");
     
     boost::timer t;
@@ -312,8 +310,6 @@ fitSpatialKernelFromCandidates(
             }
             
             detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse, 
-                                                                          spatialKernelOrder, 
-                                                                          spatialBgOrder, 
                                                                           policy);
             kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
             spatialKernelFitter.solveLinearEquation();

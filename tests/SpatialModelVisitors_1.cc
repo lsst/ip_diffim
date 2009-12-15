@@ -387,22 +387,112 @@ BOOST_AUTO_TEST_CASE(buildSpatialKernelVisitor) {
     int spatialBgOrder = 1;
 
     Policy::Ptr policy(new Policy);
+    policy->set("constantVarianceWeighting", false);
+    policy->set("iterateSingleKernel", false);
+    policy->set("singleKernelClipping", true);
+    policy->set("psfMatchToGaussian", false);
+    policy->set("candidateResidualMeanMax", 0.25);
+    policy->set("candidateResidualStdMax", 1.25);
     policy->set("spatialKernelOrder", spatialKernelOrder);
     policy->set("spatialBgOrder", spatialBgOrder);
     policy->set("kernelBasisSet", "delta-function");
     policy->set("usePcaForSpatialKernel", true);
 
-
+    /* Need to set up some dummy single kernels first */
+    int imageSize = 35;
     int kernelSize = 11;
-    afwMath::KernelList basisList = generateDeltaFunctionBasisSet(kernelSize, 
-                                                                  kernelSize);
-    detail::BuildSpatialKernelVisitor<Pixel> spatialKernelFitter(basisList, 
-                                                                  spatialKernelOrder, 
-                                                                  spatialBgOrder, 
-                                                                  *policy);
+    afwMath::KernelList basisList = generateDeltaFunctionBasisSet(kernelSize, kernelSize);
+    PsfMatchingFunctor<Pixel> kFunctor = PsfMatchingFunctor<Pixel>(basisList);
 
+    afwMath::GaussianFunction2<double> gaussFunc2(2, 2);
+    afwMath::AnalyticKernel k1(imageSize, imageSize, gaussFunc2);
+    afwImage::Image<double> kImage1D(k1.getDimensions());
+    (void)k1.computeImage(kImage1D, true);
+
+    /* Make them the same so a delta function result */
+    afwImage::Image<Pixel> kImage1F(kImage1D, true);
+    afwImage::Image<Pixel> kImage2F(kImage1D, true);
+    afwImage::MaskedImage<Pixel>::Ptr mimg1(
+        new afwImage::MaskedImage<Pixel>(k1.getDimensions())
+        );
+    afwImage::MaskedImage<Pixel>::Ptr mimg2(
+        new afwImage::MaskedImage<Pixel>(k1.getDimensions())
+        );
+    *mimg1->getImage() = kImage1F;
+    *mimg2->getImage() = kImage2F;
+    *mimg1->getVariance() = 1;
+    *mimg2->getVariance() = 1;
+    *mimg1->getMask() = 0x0;
+    *mimg2->getMask() = 0x0;
+    
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand1(
+        new KernelCandidate<Pixel>(10., 10., mimg1, mimg2)
+        );
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand2(
+        new KernelCandidate<Pixel>(20., 20., mimg1, mimg2)
+        );
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand3(
+        new KernelCandidate<Pixel>(30., 30., mimg1, mimg2)
+        );
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand4(
+        new KernelCandidate<Pixel>(40., 40., mimg1, mimg2)
+        );
+    afwMath::SpatialCellImageCandidate<Image>::Ptr cand5(
+        new KernelCandidate<Pixel>(50., 50., mimg1, mimg2)
+        );
+    BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == false);
+    BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand2))->hasKernel() == false);
+    BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand3))->hasKernel() == false);
+    BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand4))->hasKernel() == false);
+    BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand5))->hasKernel() == false);
+    
+    detail::BuildSingleKernelVisitor<Pixel> singleKernelFitter(kFunctor, *policy);
+    singleKernelFitter.processCandidate(&(*cand1));
+    singleKernelFitter.processCandidate(&(*cand2));
+    singleKernelFitter.processCandidate(&(*cand3));
+    singleKernelFitter.processCandidate(&(*cand4));
+    singleKernelFitter.processCandidate(&(*cand5));
+
+    /* Now we can start testing the spatial fitter after its been visited by the
+     * single kernel visitor
+     */
+    
+    /* Test spatially varying case */
     {
-        /* This is going to be tough to unit test thoroughly; TBD */
+        detail::BuildSpatialKernelVisitor<Pixel> spatialKernelFitter(basisList, 
+                                                                     *policy);
+        spatialKernelFitter.processCandidate(&(*cand1));
+        spatialKernelFitter.processCandidate(&(*cand2));
+        spatialKernelFitter.processCandidate(&(*cand3));
+        spatialKernelFitter.processCandidate(&(*cand4));
+        spatialKernelFitter.processCandidate(&(*cand5));
+        spatialKernelFitter.solveLinearEquation();
+        std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> KB =
+            spatialKernelFitter.getSpatialModel();
+
+        afwMath::LinearCombinationKernel::Ptr spatialKernel = KB.first;
+        afwMath::Kernel::SpatialFunctionPtr spatialBackground = KB.second;
+        BOOST_CHECK(spatialKernel->isSpatiallyVarying() == true);
+    }        
+    /* Test non-spatially varying specialization */
+    {
+        spatialKernelOrder = 0;
+        policy->set("spatialKernelOrder", spatialKernelOrder);
+        
+        detail::BuildSpatialKernelVisitor<Pixel> spatialKernelFitter(basisList, 
+                                                                     *policy);
+        spatialKernelFitter.processCandidate(&(*cand1));
+        spatialKernelFitter.processCandidate(&(*cand2));
+        spatialKernelFitter.processCandidate(&(*cand3));
+        spatialKernelFitter.processCandidate(&(*cand4));
+        spatialKernelFitter.processCandidate(&(*cand5));
+        spatialKernelFitter.solveLinearEquation();
+        std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> KB =
+            spatialKernelFitter.getSpatialModel();
+
+        afwMath::LinearCombinationKernel::Ptr spatialKernel = KB.first;
+        afwMath::Kernel::SpatialFunctionPtr spatialBackground = KB.second;
+        BOOST_CHECK(spatialKernel->isSpatiallyVarying() == false);
     }
 }
 

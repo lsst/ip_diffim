@@ -630,8 +630,6 @@ private:
     policy->set("usePcaForSpatialKernel", true);
 
     detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse, 
-                                                                  spatialKernelOrder, 
-                                                                  spatialBgOrder, 
                                                                   *policy);
     kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
     spatialKernelFitter.solveLinearEquation();
@@ -656,8 +654,6 @@ class BuildSpatialKernelVisitor : public afwMath::CandidateVisitor {
 public:
     BuildSpatialKernelVisitor(
         afwMath::KernelList basisList,   ///< Basis functions used in the fit
-        int const spatialKernelOrder,    ///< Order of spatial kernel variation
-        int const spatialBgOrder,        ///< Order of spatial bg variation 
         pexPolicy::Policy policy         ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
@@ -665,10 +661,10 @@ public:
         _mMat(Eigen::MatrixXd()),
         _bVec(Eigen::VectorXd()),
         _sVec(Eigen::VectorXd()),
-        _spatialKernelOrder(spatialKernelOrder),
-        _spatialBgOrder(spatialBgOrder),
-        _spatialKernelFunction(new afwMath::PolynomialFunction2<double>(spatialKernelOrder)),
-        _spatialBgFunction(new afwMath::PolynomialFunction2<double>(spatialBgOrder)),
+        _spatialKernelOrder(policy.getInt("spatialKernelOrder")),
+        _spatialBgOrder(policy.getInt("spatialBgOrder")),
+        _spatialKernelFunction(new afwMath::PolynomialFunction2<double>(_spatialKernelOrder)),
+        _spatialBgFunction(new afwMath::PolynomialFunction2<double>(_spatialBgOrder)),
         _nbases(basisList.size()),
         _policy(policy),
         _constantFirstTerm(false),
@@ -893,42 +889,59 @@ public:
     
     std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> getSpatialModel() {
         /* Set up kernel */
-        std::vector<afwMath::Kernel::SpatialFunctionPtr> spatialFunctionList;
-        for (unsigned int i = 0; i < _nbases; i++) {
-            afwMath::Kernel::SpatialFunctionPtr spatialFunction(_spatialKernelFunction->clone());
-            spatialFunctionList.push_back(spatialFunction);
-        }
         afwMath::LinearCombinationKernel::Ptr spatialKernel(
-            new afwMath::LinearCombinationKernel(_basisList, spatialFunctionList)
+            new afwMath::LinearCombinationKernel(_basisList, *_spatialKernelFunction)
             );
+                
+        if (_spatialKernelOrder == 0) {
+            /* Not spatially varying; specialization for convolution speed--up */
+            
+            /* Make sure the coefficients look right */
+            if (static_cast<int>(_nbases) != (_sVec.size()-_nbt)) {
+                throw LSST_EXCEPT(pexExcept::Exception, 
+                                  "Wrong number of terms for non spatially varying kernel");
+            }
+            
+            /* Set the basis coefficients */
+            std::vector<double> kCoeffs(_nbases);
+            for (unsigned int i = 0; i < _nbases; i++) {
+                kCoeffs[i] = _sVec[i];
+            }
+            spatialKernel.reset(
+                new afwMath::LinearCombinationKernel(_basisList, kCoeffs)
+                );
+
+        }
+        else {
+            /* Spatially varying */
+
+            /* Set the kernel coefficients */
+            std::vector<std::vector<double> > kCoeffs;
+            kCoeffs.reserve(_nbases);
+            for (unsigned int i = 0, idx = 0; i < _nbases; i++) {
+                kCoeffs.push_back(std::vector<double>(_nkt));
+                
+                /* Deal with the possibility the first term doesn't vary spatially */
+                if ((i == 0) && (_constantFirstTerm)) {
+                    kCoeffs[i][0] = _sVec[idx++];
+                }
+                else {
+                    for (unsigned int j = 0; j < _nkt; j++) {
+                        kCoeffs[i][j] = _sVec[idx++];
+                    }
+                }
+            }
+            spatialKernel->setSpatialParameters(kCoeffs);
+        }
         
         /* Set up background */
         afwMath::Kernel::SpatialFunctionPtr bgFunction(_spatialBgFunction->clone());
-        
-        /* Set the kernel coefficients */
-        std::vector<std::vector<double> > kCoeffs;
-        kCoeffs.reserve(_nbases);
-        for (unsigned int i = 0, idx = 0; i < _nbases; i++) {
-            kCoeffs.push_back(std::vector<double>(_nkt));
-            
-            /* Deal with the possibility the first term doesn't vary spatially */
-            if ((i == 0) && (_constantFirstTerm)) {
-                kCoeffs[i][0] = _sVec[idx++];
-            }
-            else {
-                for (unsigned int j = 0; j < _nkt; j++) {
-                    kCoeffs[i][j] = _sVec[idx++];
-                }
-            }
-        }
-        
+
         /* Set the background coefficients */
         std::vector<double> bgCoeffs(_nbt);
         for (unsigned int i = 0; i < _nbt; i++) {
             bgCoeffs[i] = _sVec[_nt - _nbt + i];
         }
-        
-        spatialKernel->setSpatialParameters(kCoeffs);
         bgFunction->setParameters(bgCoeffs);
         
         return std::make_pair(spatialKernel, bgFunction);
