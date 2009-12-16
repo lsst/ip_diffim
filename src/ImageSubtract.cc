@@ -241,8 +241,7 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
     std::vector<afwDetect::Footprint::Ptr> footprintListOut;
 
     // Functors to search through the images for masked pixels within candidate footprints
-    FindSetBits<afwImage::Mask<afwImage::MaskPixel> > itcFunctor(*(imageToConvolve.getMask())); 
-    FindSetBits<afwImage::Mask<afwImage::MaskPixel> > itncFunctor(*(imageToNotConvolve.getMask())); 
+    FindSetBits<afwImage::Mask<afwImage::MaskPixel> > fsb;
  
     int nCleanFp = 0;
     imageToConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
@@ -306,30 +305,64 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
         */
         afwDetect::Footprint::Ptr fpGrow = 
             afwDetect::growFootprint(*i, fpGrowPix, false);
+
+        /* Operate on the BBox when grabbing sub images from the main image */
+        afwImage::BBox fpBBox = fpGrow->getBBox();
         
         pexLog::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
                           "Footprint out : %d,%d -> %d,%d (center %d,%d)",
-                          (*fpGrow).getBBox().getX0(), (*fpGrow).getBBox().getY0(),
-                          (*fpGrow).getBBox().getX1(), (*fpGrow).getBBox().getY1(),
-                          int(0.5 * ((*i)->getBBox().getX0()+(*i)->getBBox().getX1())),
-                          int(0.5 * ((*i)->getBBox().getY0()+(*i)->getBBox().getY1())));
+                          fpBBox.getX0(), fpBBox.getY0(),
+                          fpBBox.getX1(), fpBBox.getY1(),
+                          int(0.5 * (fpBBox.getX0() + fpBBox.getX1())),
+                          int(0.5 * (fpBBox.getY0() + fpBBox.getY1())));
         
         
-        // Ignore if its too close to the edge of the amp image 
-        // Note we need to translate to pixel coordinates here
-        afwImage::BBox fpBBox = (*fpGrow).getBBox();
+        /* 
+           Note we need to translate to pixel coordinates here since thats how
+           BBoxes address (sub)images.  This does not affect the Footprint.  
+        */
         fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
-        bool belowOriginX = (*fpGrow).getBBox().getX0() < 0;
-        bool belowOriginY = (*fpGrow).getBBox().getY0() < 0;
-        bool offImageX    = (*fpGrow).getBBox().getX1() > imageToConvolve.getWidth();
-        bool offImageY    = (*fpGrow).getBBox().getY1() > imageToConvolve.getHeight();
-        if (belowOriginX || belowOriginY || offImageX || offImageY)
+
+        pexLog::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                          "Footprint shifted : %d,%d -> %d,%d (center %d,%d)",
+                          fpBBox.getX0(), fpBBox.getY0(),
+                          fpBBox.getX1(), fpBBox.getY1(),
+                          int(0.5 * (fpBBox.getX0() + fpBBox.getX1())),
+                          int(0.5 * (fpBBox.getY0() + fpBBox.getY1())));
+
+        // Ignore if its too close to the edge of the image 
+        bool belowOriginX = fpBBox.getX0() < 0;
+        bool belowOriginY = fpBBox.getY0() < 0;
+        bool offImageX    = fpBBox.getX1() > imageToConvolve.getWidth();
+        bool offImageY    = fpBBox.getY1() > imageToConvolve.getHeight();
+        if (belowOriginX || belowOriginY || offImageX || offImageY) {
+            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                              "Footprint grown off image"); 
             continue;
+        }
         
         // Grab a subimage; report any exception
         try {
             afwImage::MaskedImage<PixelT> subImageToConvolve(imageToConvolve, fpBBox);
             afwImage::MaskedImage<PixelT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
+            
+            // Search for any masked pixels within the footprint
+            fsb.apply(*(subImageToConvolve.getMask()));
+            if (fsb.getBits() > 0) {
+                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                                  "Footprint has masked pix (val=%d) in image to convolve", 
+                                  fsb.getBits()); 
+                continue;
+            }
+            
+            fsb.apply(*(subImageToNotConvolve.getMask()));
+            if (fsb.getBits() > 0) {
+                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
+                                  "Footprint has masked pix (val=%d) in image not to convolve", 
+                                  fsb.getBits());
+                continue;
+            }
+            
         } catch (pexExcept::Exception& e) {
             pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
                               "Exception caught extracting Footprint");
@@ -337,24 +370,7 @@ std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
                               e.what());
             continue;
         }
-        
-        // Search for any masked pixels within the footprint
-        itcFunctor.apply(*fpGrow);
-        if (itcFunctor.getBits() > 0) {
-            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                              "Footprint has masked pix (val=%d) in image to convolve", 
-                              itcFunctor.getBits()); 
-            continue;
-        }
-        
-        itncFunctor.apply(*fpGrow);
-        if (itncFunctor.getBits() > 0) {
-            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                              "Footprint has masked pix (val=%d) in image not to convolve", 
-                              itncFunctor.getBits());
-            continue;
-        }
-        
+
         // If we get this far, we have a clean footprint
         footprintListOut.push_back(fpGrow);
         (void)afwDetect::setMaskFromFootprint(&(*imageToConvolve.getMask()), *fpGrow, diffimBitMask);

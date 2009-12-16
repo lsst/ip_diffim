@@ -34,42 +34,37 @@ namespace diffim {
     std::string const diffimStampUsedStr      = "DIFFIM_STAMP_USED";
     
     /**
-     * @brief Uses a functor to accumulate Mask bits
+     * @brief Class to accumulate Mask bits
      *
-     * @note Search through a footprint for any set mask fits.
-     * 
-     * @note May need to modify this as our mask planes evolve to include
-     * non-bad mask information
-     *
-     * @code
-        FindSetBits<image::Mask<image::MaskPixel> > count(mask); 
-        count.reset(); 
-        count.apply(footprint); 
-        nSet = count.getBits();
-     * @endcode
+     * @note Search through a Mask for any set bits.
      * 
      * @ingroup ip_diffim
-     *
      */
     template <typename MaskT>
-    class FindSetBits : public lsst::afw::detection::FootprintFunctor<MaskT> {
+    class FindSetBits {
     public:
-        FindSetBits(MaskT const& mask) : 
-            lsst::afw::detection::FootprintFunctor<MaskT>(mask), _bits(0) {;}
-        
-        void operator()(typename MaskT::xy_locator loc, ///< locator pointing at the pixel
-                        int x,                          ///< column-position of pixel
-                        int y                           ///< row-position of pixel
-            ) {
-            _bits |= *loc;
-        }
-        
+        typedef typename MaskT::x_iterator x_iterator;
+
+        FindSetBits() : 
+            _bits(0) {;}
+        virtual ~FindSetBits() {} ;
+
+        // Clear the accumulators
+        void reset() { _bits = 0;}
+
         // Return the bits set
         typename MaskT::Pixel getBits() const { return _bits; }
-        
-        // Clear the accumulator
-        void reset() { _bits = 0; }
-        
+
+        // Work your magic
+        void apply(MaskT const& mask) {
+            reset();
+            for (int y = 0; y != mask.getHeight(); ++y) {
+                for (x_iterator ptr = mask.row_begin(y), end = mask.row_end(y); ptr != end; ++ptr) {
+                    _bits |= (*ptr);
+                }
+            }
+        }
+
     private:
         typename MaskT::Pixel _bits;
     };

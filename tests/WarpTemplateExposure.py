@@ -6,6 +6,7 @@ import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
 import eups
 import os
+#import lsst.afw.display.ds9 as ds9
 
 class DiffimTestCases(unittest.TestCase):
     def setUp(self):
@@ -64,7 +65,52 @@ class DiffimTestCases(unittest.TestCase):
                          wcs2.xyToRaDec(remappedImage.getWidth(),
                                         remappedImage.getHeight())[1])
                          
-                         
+
+    def testXY0(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata not set up; not running WarpTemplateExposure.py"
+            return
+
+        bbox     = afwImage.BBox(afwImage.PointI(2,900),
+                                 afwImage.PointI(102,1000))
+        templateSubImage = afwImage.ExposureF(self.templateImage, bbox)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, bbox)
+
+        # image 1 gets remapped to match up with image 2
+        remappedImage = ipDiffim.warpTemplateExposure(templateSubImage,
+                                                      scienceSubImage,
+                                                      self.policy)
+
+
+        # sizes in pixels
+        self.assertEqual(remappedImage.getHeight(),
+                         scienceSubImage.getHeight())
+        self.assertEqual(remappedImage.getWidth(),
+                         scienceSubImage.getWidth())
+
+        #ds9.mtv(scienceSubImage, frame=1)
+        #ds9.mtv(remappedImage, frame=2)
+        
+        # sizes on the sky
+        wcs1 = remappedImage.getWcs()
+        wcs2 = scienceSubImage.getWcs()
+
+        self.assertEqual(wcs1.xyToRaDec(0,0)[0],
+                         wcs2.xyToRaDec(0,0)[0])
+        self.assertEqual(wcs1.xyToRaDec(0,0)[1],
+                         wcs2.xyToRaDec(0,0)[1])
+
+
+        self.assertEqual(wcs1.xyToRaDec(remappedImage.getWidth(),
+                                        remappedImage.getHeight())[0],
+                         wcs2.xyToRaDec(remappedImage.getWidth(),
+                                        remappedImage.getHeight())[0])
+        self.assertEqual(wcs1.xyToRaDec(remappedImage.getWidth(),
+                                        remappedImage.getHeight())[1],
+                         wcs2.xyToRaDec(remappedImage.getWidth(),
+                                        remappedImage.getHeight())[1])
+        
+       
 #####
         
 def suite():

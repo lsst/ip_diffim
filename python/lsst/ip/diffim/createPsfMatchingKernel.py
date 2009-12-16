@@ -40,9 +40,17 @@ def createPsfMatchingKernel(maskedImageToConvolve,
     # Place candidate footprints within the spatial grid
     for fp in footprints:
         bbox = fp.getBBox()
+
+        # Grab the centers in the parent's coordinate system
         xC   = 0.5 * ( bbox.getX0() + bbox.getX1() )
         yC   = 0.5 * ( bbox.getY0() + bbox.getY1() )
-        tmi  = afwImage.MaskedImageF(maskedImageToConvolve,  bbox)
+
+        # Since the footprint is in the parent's coordinate system,
+        # while the BBox uses the child's coordinate system.
+        bbox.shift(-maskedImageToConvolve.getX0(),
+                   -maskedImageToConvolve.getY0())
+        
+        tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox)
         smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox)
 
         cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi)
