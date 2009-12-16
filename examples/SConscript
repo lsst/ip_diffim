@@ -2,7 +2,10 @@
 import sys
 Import("env")
 
-# env.Program("smc", ["smc.cc"], LIBS=env.getlibs("ip_diffim"))
+env.Program("pixelAccess", ["pixelAccess.cc"], LIBS=env.getlibs("afw", "ip_diffim"))
+env.Program("testSpatialCell", ["testSpatialCell.cc"], LIBS=env.getlibs("afw", "ip_diffim"))
+env.Program("spatialKernel", ["spatialKernel.cc"], LIBS=env.getlibs("afw", "ip_diffim"))
+env.Program("shiftBBox", ["shiftBBox.cc"], LIBS=env.getlibs("afw", "ip_diffim"))
 
 
 #

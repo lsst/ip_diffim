@@ -11,7 +11,6 @@ Python bindings for lsst::ip::diffim code
 // Avoid Swig bug exposed in Ticket 640
 // http://dev.lsstcorp.org/trac/ticket/640
 %ignore lsst::ip::diffim::FindSetBits::operator();
-%ignore lsst::ip::diffim::FindCounts::operator();
 %ignore lsst::ip::diffim::ImageStatistics::operator();
 
 // Reference for this file is at http://dev.lsstcorp.org/trac/wiki/SwigFAQ 
@@ -36,29 +35,24 @@ namespace boost {
 %{
 #include <boost/shared_ptr.hpp>
 
-#include <lsst/afw/image.h>
-#include <lsst/afw/math.h>
-#include <lsst/afw/detection.h>
-#include <lsst/afw/math/ConvolveImage.h>
+#include <lsst/afw.h>
 
-#include <Eigen/Cholesky>
-#include <Eigen/Core>
-#include <Eigen/LU>
-#include <Eigen/QR>
+#include <lsst/ip/diffim/ImageSubtract.h>
+#include <lsst/ip/diffim/BasisSets.h>
+#include <lsst/ip/diffim/PsfMatchingFunctor.h>
+#include <lsst/ip/diffim/SpatialModelKernel.h>
 
 #include <lsst/pex/policy/Policy.h>
 %}
 
 /******************************************************************************/
 
+
 %include "lsst/p_lsstSwig.i"
 %include "lsst/daf/base/persistenceMacros.i"
-%import  "lsst/afw/image/imageLib.i" 
+%import  "lsst/afw/image/imageLib.i"
+%import  "lsst/afw/math/mathLib.i"
 %import  "lsst/afw/detection/detectionLib.i"
-%import  "lsst/afw/math/kernelLib.i"
-
-/* so SWIG knows that PolynomialFunction2D is derived from Function2 */
-%import  "lsst/afw/math/functionLib.i"  
 
 %lsst_exceptions();
 
@@ -87,29 +81,36 @@ def version(HeadURL = r"$HeadURL$"):
 
 %}
 
+/******************************************************************************/
+
 %{
-#include "lsst/ip/diffim/ImageSubtract.h"
+#include "lsst/ip/diffim/PsfMatchingFunctor.h"
 %}
 
 SWIG_SHARED_PTR(PsfMatchingFunctorF, lsst::ip::diffim::PsfMatchingFunctor<float>);
 SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double>);
 
-%include "lsst/ip/diffim/ImageSubtract.h"
+%include "lsst/ip/diffim/PsfMatchingFunctor.h"
 
 %template(PsfMatchingFunctorF)
     lsst::ip::diffim::PsfMatchingFunctor<float>;
 %template(PsfMatchingFunctorD)
     lsst::ip::diffim::PsfMatchingFunctor<double>;
+%template(makePsfMatchingFunctorF) lsst::ip::diffim::makePsfMatchingFunctor<float>;
+%template(makePsfMatchingFunctorD) lsst::ip::diffim::makePsfMatchingFunctor<double>;
+
+%template(pair_Kernel_double)   std::pair<lsst::afw::math::Kernel::Ptr, double>;
+
+/******************************************************************************/
+
+%{
+#include "lsst/ip/diffim/ImageSubtract.h"
+%}
+
+%include "lsst/ip/diffim/ImageSubtract.h"
 
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
-
-%template(FindCountsI)
-    lsst::ip::diffim::FindCounts<int>;
-%template(FindCountsF)
-    lsst::ip::diffim::FindCounts<float>;
-%template(FindCountsD)
-    lsst::ip::diffim::FindCounts<double>;
 
 %template(ImageStatisticsI)
     lsst::ip::diffim::ImageStatistics<int>;
@@ -135,40 +136,57 @@ SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double>;
 
+%template(addToImage)   lsst::ip::diffim::addToImage<float>;
+%template(addToImage)   lsst::ip::diffim::addToImage<double>;
+
 /******************************************************************************/
 
 %{
 #include "lsst/ip/diffim/SpatialModelKernel.h"
 %}
 
-SWIG_SHARED_PTR(SpatialModelKernelF, lsst::ip::diffim::SpatialModelKernel<float>);
-SWIG_SHARED_PTR(SpatialModelKernelD, lsst::ip::diffim::SpatialModelKernel<double>);
+%define %IMAGE(PIXTYPE)
+lsst::afw::image::Image<PIXTYPE>
+%enddef
+
+%define %KernelCandidatePtr(NAME, TYPE)
+SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
+                        lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::Pixel)>,
+                        lsst::ip::diffim::KernelCandidate<TYPE>);
+%enddef
+
+%define %KernelCandidate(NAME, TYPE)
+%template(KernelCandidate##NAME) lsst::ip::diffim::KernelCandidate<TYPE>;
+%template(makeKernelCandidate) lsst::ip::diffim::makeKernelCandidate<TYPE>;
+%inline %{
+    lsst::ip::diffim::KernelCandidate<TYPE> *
+        cast_KernelCandidate##NAME(lsst::afw::math::SpatialCellCandidate * candidate) {
+        return dynamic_cast<lsst::ip::diffim::KernelCandidate<TYPE> *>(candidate);
+    }
+%}
+%enddef
+
+%KernelCandidatePtr(F, float);
 
 %include "lsst/ip/diffim/SpatialModelKernel.h"
 
-%template(SpatialModelKernelF) lsst::ip::diffim::SpatialModelKernel<float>;
-%template(SpatialModelKernelD) lsst::ip::diffim::SpatialModelKernel<double>;
+%KernelCandidate(F, float);
+%template(fitSpatialKernelFromCandidates) lsst::ip::diffim::fitSpatialKernelFromCandidates<float>;
 
-%template(VectorSpatialModelKernelF) std::vector<lsst::ip::diffim::SpatialModelKernel<float>::Ptr >;
-%template(VectorSpatialModelKernelD) std::vector<lsst::ip::diffim::SpatialModelKernel<double>::Ptr >;
-
+%template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, 
+                                          lsst::afw::math::Kernel::SpatialFunctionPtr>;
 
 /******************************************************************************/
+
+%include "lsst/ip/diffim/BasisSets.h"
+
+/******************************************************************************/
+/* I shouldn't have to do this but it exists noplace else, so... */
 
 %{
-#include "lsst/ip/diffim/SpatialModelCell.h"
+#include "Eigen/Core"
 %}
 
-SWIG_SHARED_PTR(SpatialModelCellF, lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >);
-SWIG_SHARED_PTR(SpatialModelCellD, lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >);
-
-%include "lsst/ip/diffim/SpatialModelCell.h"
-
-%template(SpatialModelCellF) lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >;
-%template(SpatialModelCellD) lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >;
-
-%template(VectorSpatialModelCellF) std::vector<lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<float> >::Ptr >;
-%template(VectorSpatialModelCellD) std::vector<lsst::ip::diffim::SpatialModelCell<lsst::ip::diffim::SpatialModelKernel<double> >::Ptr >;
-
-/******************************************************************************/
+%template(eigenMatrix) boost::shared_ptr<Eigen::MatrixXd>;
+%template(eigenVector) boost::shared_ptr<Eigen::VectorXd>;
 

@@ -2,9 +2,15 @@
 from diffimLib import *
 
 # python code
-from diffimTools import *
-from spatialKernelFit import *
+from createKernelFunctor import *
+from createPsfMatchingKernel import *
+from createSdqaRatingVector import *
+from generatePolicy import *
 
-# second tier, ask for them by name
-import diffimDebug 
-import diffimPlot
+from subtractMaskedImage import *
+from subtractExposure import *
+
+from warpTemplateExposure import *
+
+from diffimTools import *
+

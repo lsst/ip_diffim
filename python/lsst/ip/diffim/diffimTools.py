@@ -1,330 +1,17 @@
-import numpy
-import lsst.afw.detection as detection
-import lsst.afw.math as afwMath
+# all the c++ level classes and routines
+import diffimLib
+
+# all the other LSST packages
 import lsst.afw.image as afwImage
-import lsst.pex.exceptions as Exceptions
-from   lsst.pex.logging import Trace
-import lsst.afw.display.ds9 as ds9
-import lsst.afw.display.utils as displayUtils
+import lsst.afw.math.mathLib as afwMath
+import lsst.pex.logging as pexLog
 
-# for DM <-> numpy conversions
-import lsst.afw.image.testUtils as imTestUtils
-
-# relative imports, since these are in __init__.py
-import diffimLib 
-import diffimDebug
-
-import pdb
+# third party
+import numpy
+import time
 
 #######
-# Helper functions used by all ip_diffim packages
-#######
-
-def fitFunction(function, values, errors, cols, rows, policy):
-    # Fit a function to data
-    nSigmaSq = policy.get('nSigmaSq')
-    stepsize = policy.get('stepsize')
-
-    # initialize fit parameters
-    nPar = function.getNParameters()
-    pars = numpy.zeros(nPar)       # start with no spatial variation
-    pars[0]  = numpy.mean(values)  # except for the constant term
-    stepsize = stepsize * numpy.ones(nPar)
-    fit      = afwMath.minimize(function,
-                                pars,
-                                stepsize,
-                                values,
-                                errors,
-                                cols,
-                                rows,
-                                nSigmaSq)
-    if not fit.isValid:
-        raise RuntimeError('Spatial fit fails')
-
-    return fit
-
-def rejectKernelSumOutliers(spatialCells, policy):
-    # Compare kernel sums; things that are bad (e.g. variable stars,
-    # moving objects, cosmic rays) will have a kernel sum far from the
-    # mean; reject these.
-
-    maxOutlierIterations = policy.get('maxOutlierIterations')
-    maxOutlierSigma      = policy.get('maxOutlierSigma')
-    
-    # So are we using pexLog.Trace or pexLog.Log?
-    Trace('lsst.ip.diffim.rejectKernelSumOutliers', 4,
-          'Rejecting kernels with deviant kSums');
-    
-    for nIter in xrange(maxOutlierIterations):
-        kSumList = []
-        idList   = []
-        for scID, scPtr in enumerate(spatialCells):
-            
-            # Is the cell usable at all?
-            if not scPtr.isUsable():
-                continue
-
-            # print nIter, scID, scPtr.getLabel(), scPtr.getCurrentModel().getStatus(), scPtr.getCurrentModel().getKernelSum()
-            
-            # Is the contained model usable?
-            if scPtr.getCurrentModel().getStatus():
-                kSumList.append( scPtr.getCurrentModel().getKernelSum() )
-                idList.append( scID )
-
-        nCells = len(kSumList)
-
-        if nCells == 0:
-            raise RuntimeError('No good cells found')
-
-        # kSumArray and kSumList need to stay synchronized with spatialCells[]
-        kSumArray  = numpy.array(kSumList)
-
-        # kSort is sorted for IQR statistics
-        kSort = numpy.sort(kSumArray)
-        # Use interquartile range to get uncertainty on median
-        # This should be in an afwMath package
-        idx25 = int(0.25 * len(kSort))
-        idx50 = int(0.50 * len(kSort))
-        idx75 = int(0.75 * len(kSort))
-        d25   = kSort[idx25]
-        d50   = kSort[idx50]
-        d75   = kSort[idx75]
-        IQR          = (d75 - d25)
-        sigma_mean   = 0.741 * IQR
-        sigma_median = numpy.sqrt(numpy.pi / 2.) * sigma_mean
-        kSumMedian     = d50
-        kSumStd        = sigma_median
-
-        # Reject kernels with aberrent statistics
-        nRejected = 0
-        for idx in range(nCells):
-            if numpy.fabs( (kSumArray[idx]-kSumMedian) ) > (kSumStd*maxOutlierSigma):
-                Trace('lsst.ip.diffim.rejectKernelSumOutliers', 4,
-                      '# %s Kernel %d (kSum=%.3f) REJECTED due to bad kernel sum (median=%.3f, std=%.3f)' %
-                      (spatialCells[ idList[idx] ].getLabel(),
-                       spatialCells[ idList[idx] ].getCurrentId(),
-                       kSumArray[idx], kSumMedian, kSumStd))
-                
-                # Set it as fully bad, since its base model is aberrant
-                spatialCells[ idList[idx] ].getCurrentModel().setStatus(False)
-
-                # Move to the next footprint in the cell
-                spatialCells[ idList[idx] ].incrementModel()
-                nRejected += 1
-                
-        Trace('lsst.ip.diffim.rejectKernelSumOutliers', 4,
-              'Kernel Sum Iteration %d, rejected %d kernels : Kernel Sum = %0.3f +/- %0.3f' %
-              (nIter, nRejected, kSumMedian, kSumStd))
-
-        if nRejected == 0:
-            break
-
-    if nIter == (maxOutlierIterations-1) and nRejected != 0:
-        Trace('lsst.ip.diffim.rejectKernelSumOutliers', 3,
-              'Detection of kernels with deviant kSums reached its limit of %d iterations' %
-              (maxOutlierIterations))
-
-    Trace('lsst.ip.diffim.rejectKernelSumOutliers', 3,
-          'Found Kernel Sum : %0.3f +/- %0.3f, %d kernels' % (kSumMedian, kSumStd, nCells))
-
-
-def createSpatialModelKernelCells(templateMaskedImage,
-                                  scienceMaskedImage,
-                                  fpInList,
-                                  kFunctor,
-                                  policy,
-                                  cFlag='c',
-                                  display=False):
-
-    nSegmentCol = policy.get('nSegmentCol')
-    nSegmentRow = policy.get('nSegmentRow')
-
-    nSegmentColPix = int( templateMaskedImage.getWidth() / nSegmentCol )
-    nSegmentRowPix = int( templateMaskedImage.getHeight() / nSegmentRow )
-
-    spatialCells   = diffimLib.VectorSpatialModelCellF()
-    
-    if display:
-        stamps = []; stampInfo = []
-        imagePairMosaic = displayUtils.Mosaic(mode="x")
-        imagePairMosaic.setGutter(2)
-        imagePairMosaic.setBackground(-10)
-
-    cellCount = 0
-    for col in range(nSegmentCol):
-        colMin    = max(0, col*nSegmentColPix)
-        colMax    = min(templateMaskedImage.getWidth(), (col+1)*nSegmentColPix)
-        colCenter = int( 0.5 * (colMin + colMax) )
-        
-        for row in range(nSegmentRow):
-            rowMin     = max(0, row*nSegmentRowPix)
-            rowMax     = min(templateMaskedImage.getHeight(), (row+1)*nSegmentRowPix)
-            rowCenter  = int( 0.5 * (rowMin + rowMax) )
-            label      = 'c%d' % cellCount
-
-            modelList = diffimLib.VectorSpatialModelKernelF()
-
-            # This is a bit dumb and could be more clever
-            # Should never really have a loop within a loop within a loop
-            # But we will not have *that many* Footprints...
-
-            for fpID, fpPtr in enumerate(fpInList):
-                
-                fpBBox = afwImage.BBox(fpPtr.getBBox().getLLC() - templateMaskedImage.getXY0(),
-                                       fpPtr.getBBox().getWidth(), fpPtr.getBBox().getHeight())
-                
-                fpColC = 0.5*(fpBBox.getX0() + fpBBox.getX1())
-                fpRowC = 0.5*(fpBBox.getY0() + fpBBox.getY1())
-
-                if col == 0 and row == 0:
-                    if display:
-                        ds9.dot("+", fpColC, fpRowC, frame=1)
-
-                if (fpColC >= colMin) and (fpColC < colMax) and (fpRowC >= rowMin) and (fpRowC < rowMax):
-
-                    tSubImage = afwImage.MaskedImageF(templateMaskedImage, fpBBox)
-                    iSubImage = afwImage.MaskedImageF(scienceMaskedImage, fpBBox)
-                    model = diffimLib.SpatialModelKernelF(fpPtr,
-                                                          tSubImage,
-                                                          iSubImage,
-                                                          kFunctor,
-                                                          policy,
-                                                          False)
-                    if policy.get('debugIO'):
-                        diffimDebug.writeDiffImages(cFlag, fpID, model)
-
-                    if display:
-                        tmpScience = iSubImage.Factory(iSubImage, True) # make a copy
-                        tmpTemplate = tSubImage.Factory(tSubImage, True) # make a copy
-
-                        tmpScience -=  afwMath.makeStatistics(iSubImage.getImage(), afwMath.MEDIAN).getValue()
-                        tmpTemplate -= afwMath.makeStatistics(tSubImage.getImage(), afwMath.MEDIAN).getValue()
-                        tmpTemplate *= afwMath.makeStatistics(tmpScience.getImage(), afwMath.MAX).getValue()/ \
-                                       afwMath.makeStatistics(tmpTemplate.getImage(), afwMath.MAX).getValue()
-
-                        if not model.isBuilt():
-                            model.buildModel()
-
-                        if model.getKernelPtr():
-                            tmpKernelImage = afwImage.ImageD(model.getKernelPtr().getDimensions())
-                            kSum = model.getKernelPtr().computeImage(tmpKernelImage, False)
-                            tmpKernelImage = tmpScience.Factory(tmpKernelImage.convertFloat(),
-                                                                afwImage.MaskU(tmpKernelImage.getDimensions()),
-                                                                afwImage.ImageF(tmpKernelImage.getDimensions())
-                                                                )
-                            tmpKernelImage *= afwMath.makeStatistics(tmpScience.getImage(), afwMath.MAX).getValue()/ \
-                                              afwMath.makeStatistics(tmpKernelImage.getImage(), afwMath.MAX).getValue()
-                        else:
-                            tmpKernelImage = tmpScience.Factory(tmpScience.getDimensions())
-                            tmpKernelImage.set(-10)                            
-                        tmpKernelImage.getMask().set(0x0)
-                        
-                        stamps.append(imagePairMosaic.makeMosaic([tmpTemplate, tmpScience, tmpKernelImage]))
-                            
-                        stampInfo.append("%s %d" % (label, fpID))
-
-                    modelList.push_back( model )
-
-            spatialCell = diffimLib.SpatialModelCellF(label, colCenter, rowCenter, modelList)
-            spatialCells.push_back(spatialCell)
-
-            # Formatting to the screen 
-            Trace('lsst.ip.diffim.createSpatialModelKernelCells', 2, '')
-
-            cellCount += 1
-
-    if display and len(stamps) > 0:
-        mos = displayUtils.Mosaic()
-        mos.setGutter(5)
-        mos.setBackground(0)
-
-        ds9.mtv(mos.makeMosaic(stamps), frame=2)
-        mos.drawLabels(stampInfo, frame=2)
-
-    return spatialCells
-
-
-def runPca(M, policy):
-    if type(M) != numpy.ndarray:
-        raise Exceptions.LsstInvalidParameter('Invalid matrix type sent to runPca')
-    
-    # Structure of numpy arrays :
-    #   numpy.zeros( (2,3) )
-    #   array([[ 0.,  0.,  0.],
-    #          [ 0.,  0.,  0.]])
-    # The first dimension is rows, second is columns
-
-    # We are going to put the features down a given row; the instances
-    # one in each column.  We need to subtract off the Mean feature -
-    # array.mean(0) returns the mean for each column; array.mean(1)
-    # returns the mean for each row.  Therefore the mean Kernel is
-    # M.mean(1).
-    meanM = M.mean(1)
-
-    # Subtract off the mean Kernel from each column.
-    M    -= meanM[:,numpy.newaxis]
-
-    # def svd(a, full_matrices=1, compute_uv=1):
-    #
-    #    """Singular Value Decomposition.
-    #
-    #    Factorizes the matrix a into two unitary matrices U and Vh and
-    #    an 1d-array s of singular values (real, non-negative) such that
-    #    a == U S Vh  if S is an suitably shaped matrix of zeros whose
-    #    main diagonal is s.
-    #
-    #    Parameters
-    #    ----------
-    #    a : array-like, shape (M, N)
-    #        Matrix to decompose
-    #    full_matrices : boolean
-    #        If true,  U, Vh are shaped  (M,M), (N,N)
-    #        If false, the shapes are    (M,K), (K,N) where K = min(M,N)
-    #    compute_uv : boolean
-    #        Whether to compute U and Vh in addition to s
-    #
-    #    Returns
-    #    -------
-    #    U:  array, shape (M,M) or (M,K) depending on full_matrices
-    #    s:  array, shape (K,)
-    #        The singular values, sorted so that s[i] >= s[i+1]
-    #        K = min(M, N)
-    #    Vh: array, shape (N,N) or (K,N) depending on full_matrices
-    #
-    # 
-
-    # A given eigenfeature of M will be down a row of U; the different
-    # eigenfeatures are in the columns of U.  I.e the primary
-    # eigenfeature is U[:,0].
-    #
-    # The eigenvalues correspond to s**2 and are already sorted
-    U,s,Vh = numpy.linalg.svd( M, full_matrices=0 )
-    eVal   = s**2
-
-    Trace('lsst.ip.diffim.runPca', 5,
-          'EigenValues : %s' % (' '.join([('%10.3e' % (x)) for x in eVal])))
-    eSum  = numpy.cumsum(eVal)
-    eSum /= eSum[-1]
-    Trace('lsst.ip.diffim.runPca', 5,
-          'EigenFraction : %s' % (' '.join([('%10.3e' % (x)) for x in eSum])))
-
-    # Find the contribution of each eigenKernel to each Kernel.
-    # Simple dot product, transpose of M dot the eigenCoeff matrix.
-    # The contribution of eigenKernel X to Kernel Y is in eCoeff[Y,X].
-    #
-    # I.e. M[:,X] = numpy.sum(U * eCoeff[X], 1)
-    eCoeff = numpy.dot(M.T, U)
-
-    # This should probably be moved to a unit test
-    for i in range(M.shape[1]):
-        residual = numpy.sum(U * eCoeff[i], 1) - M[:,i]
-        assert(numpy.sum(residual) < 1e-10)
-
-    return meanM, U, eVal, eCoeff
-
-
-#######
-# Expansions of functionality found in imTestUtils
+# Expansions of functionality found in lsst.afw.image.testUtils
 #######
 
 def vectorFromImage(im, dtype=float):
@@ -346,62 +33,157 @@ def imageFromVector(vec, width, height, retType=afwImage.ImageF):
             idx     += 1
     return im
 
-def computeTemplateBbox(scienceWcs, scienceDimensions, templateWcs, templateDimensions, borderWidth):
-    """Return the bounding box of a template exposure that matches a science exposure,
-    grown by borderWidth pixels on all sides.
-    
-    Inputs:
-    - scienceWcs: WCS of science exposure
-    - scienceDimensions: dimensions of science exposure
-    - templateWcs: WCS of template exposure
-    - templateDimensions: dimensions of template exposure
-    - borderWidth: width of border of template Bbox
-    
-    \raise RuntimeError if there is no overlap between science and template images.
-    """
-    scienceMaxInd = [val - 1 for val in scienceDimensions]
-    templateMaxInd = [val - 1 for val in templateDimensions]
-    sciencePos = afwImage.PointD()
-    # find lower left and upper right corners of bounding box on template that matches science image;
-    # fractional indices are truncated so grow upper right corner by 1 afterwards
-    llc = None
-    urc = None
-    for xMult in (0, 1):
-        sciencePos.setX(afwImage.indexToPosition(scienceMaxInd[0] * xMult))
-        for yMult in (0, 1):
-            sciencePos.setY(afwImage.indexToPosition(scienceMaxInd[1] * yMult))
-            templatePos = templateWcs.raDecToXY(scienceWcs.xyToRaDec(sciencePos))
-            templateInd = [afwImage.positionToIndex(val) for val in templatePos]
-            if llc == None:
-                llc = templateInd
-                urc = templateInd
-            else:
-                llc = minVec(llc, templateInd)
-                urc = maxVec(urc, templateInd)
-    # grow upper right corner by 1 because fractional indices were truncated
-    urc = [val + 1 for val in urc]
-    # make sure there is overlap before adding border, because overlap only in the border is not useful
-    if urc[0] < 0 or urc[1] < 0 or llc[0] > templateMaxInd[0] or llc[1] > templateMaxInd[1]:
-        raise RuntimeError("BBox does not overlap template; desired region (without border) is (%s, %s) through (%s, %s)" % \
-            (llc[0], llc[1], urc[0], urc[1]))
-    # grow both corners by borderWidth
-    llc = [val - borderWidth for val in llc]
-    urc = [val + borderWidth for val in urc]
-    # constrain corners to template image boundaries
-    llc = maxVec([0, 0], llc)
-    urc = minVec(templateMaxInd, urc)
-    return afwImage.BBox(afwImage.PointI(*llc), afwImage.PointI(*urc))
+#######
+# Background subtraction for ip_diffim
+#######
 
-def minVec(vec1, vec2):
-    """Return index-wise minimum of two vectors.
+def backgroundSubtract(policy, maskedImages):
+    t0 = time.time()
+    algorithm   = policy.get("backgroundPolicy.algorithm")
+    binsize     = policy.get("backgroundPolicy.binsize")
+    undersample = policy.get("backgroundPolicy.undersample")
+    bctrl       = afwMath.BackgroundControl(algorithm)
+    bctrl.setUndersampleStyle(undersample)
+    for maskedImage in maskedImages:
+        bctrl.setNxSample(maskedImage.getWidth()//binsize + 1)
+        bctrl.setNySample(maskedImage.getHeight()//binsize + 1)
+        
+        image   = maskedImage.getImage() 
+        backobj = afwMath.makeBackground(image, bctrl)
+        image  -= backobj.getImageF()
+        del image; del backobj
+        
+    t1 = time.time()
+    pexLog.Trace("lsst.ip.diffim.backgroundSubtract", 1,
+                 "Total time for background subtraction : %.2f s" % (t1-t0))
     
-    The result length is the shorter of the two input lengths.
-    """
-    return [min(val1, val2) for val1, val2 in zip(vec1, vec2)]
+
+#######
+# Visualization of kernels
+#######
+
+def displaySpatialKernelQuality(kernelCellSet, spatialKernel, spatialBg, frame):
+    import lsst.afw.display.ds9 as ds9
+    import lsst.afw.display.utils as displayUtils
+
+    mos    = displayUtils.Mosaic()
+    imstat = diffimLib.ImageStatisticsF()
     
-def maxVec(vec1, vec2):
-    """Return index-wise minimum of two vectors.
+    for cell in kernelCellSet.getCellList():
+        for cand in cell.begin(True): # False = include bad candidates
+            cand  = diffimLib.cast_KernelCandidateF(cand)
+            if not (cand.getStatus() == afwMath.SpatialCellCandidate.GOOD):
+                continue
+
+            # raw inputs
+            tmi = cand.getMiToConvolvePtr()
+            smi = cand.getMiToNotConvolvePtr()
+            ki  = cand.getImage()
+            dmi = cand.returnDifferenceImage()
+
+            # spatial model
+            ski   = afwImage.ImageD(ki.getDimensions())
+            spatialKernel.computeImage(ski, False,
+                                       afwImage.indexToPosition(int(cand.getXCenter())),
+                                       afwImage.indexToPosition(int(cand.getYCenter())))
+            sk    = afwMath.FixedKernel(ski)
+            sbg   = spatialBg(afwImage.indexToPosition(int(cand.getXCenter())),
+                              afwImage.indexToPosition(int(cand.getYCenter())))
+            sdmi  = cand.returnDifferenceImage(sk, sbg)
+
+            ds9.mtv(tmi,  frame=frame+0)
+            ds9.mtv(smi,  frame=frame+1)
+            ds9.mtv(ki,   frame=frame+2)
+            ds9.mtv(dmi,  frame=frame+3)
+            ds9.mtv(ski,  frame=frame+4)
+            ds9.mtv(sdmi, frame=frame+5)
+
+            ki -= ski
+            ds9.mtv(ki,   frame=frame+6)
+
+            imstat.apply(dmi)
+            pexLog.Trace("lsst.ip.diffim.displaySpatialKernelQuality", 1,
+                         "Candidate %d diffim residuals = %.2f +/- %.2f sigma" % (cand.getId(),
+                                                                                  imstat.getMean(),
+                                                                                  imstat.getRms()))
+            imstat.apply(sdmi)
+            pexLog.Trace("lsst.ip.diffim.displaySpatialKernelQuality", 1,
+                         "Candidate %d sdiffim residuals = %.2f +/- %.2f sigma" % (cand.getId(),
+                                                                                   imstat.getMean(),
+                                                                                   imstat.getRms()))
+            #raw_input("Next: ")
+
+                    
+            
+def displaySpatialKernelMosaic(spatialKernel, width, height, frame):
+    import lsst.afw.display.ds9 as ds9
+    import lsst.afw.display.utils as displayUtils
+
+    mos = displayUtils.Mosaic()
     
-    The result length is the shorter of the two input lengths.
-    """
-    return [max(val1, val2) for val1, val2 in zip(vec1, vec2)]
+    for x in (0, width//2, width):
+        for y in (0, height//2, height):
+            im   = afwImage.ImageD(spatialKernel.getDimensions())
+            ksum = spatialKernel.computeImage(im,
+                                              False,
+                                              afwImage.indexToPosition(x),
+                                              afwImage.indexToPosition(y))
+            mos.append(im, "x=%d y=%d kSum=%.2f" % (x, y, ksum))
+    
+    mosaic = mos.makeMosaic()
+    ds9.mtv(mosaic, frame=frame)
+    mos.drawLabels(frame=frame)
+    
+
+def displayBasisMosaic(spatialKernel, frame):
+    import lsst.afw.display.ds9 as ds9
+    import lsst.afw.display.utils as displayUtils
+
+    mos = displayUtils.Mosaic()
+
+    basisList = spatialKernel.getKernelList()
+    for idx in range(len(basisList)):
+        kernel = basisList[idx]
+        im   = afwImage.ImageD(spatialKernel.getDimensions())
+        ksum = kernel.computeImage(im, False)
+        mos.append(im, "K%d" % (idx))
+    mosaic = mos.makeMosaic()
+    ds9.mtv(mosaic, frame=frame)
+    mos.drawLabels(frame=frame)
+
+def displayCandidateMosaic(kernelCellSet, frame):
+    import lsst.afw.display.ds9 as ds9
+    import lsst.afw.display.utils as displayUtils
+
+    mos = displayUtils.Mosaic()
+
+    for cell in kernelCellSet.getCellList():
+        for cand in cell.begin(False): # False = include bad candidates
+            cand  = diffimLib.cast_KernelCandidateF(cand)
+            rchi2 = cand.getChi2()
+                
+            try:
+                im = cand.getImage()
+                if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
+                    statStr = "Good"
+                elif cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
+                    statStr = "Bad"
+                else:
+                    statStr = "Unkn"
+                mos.append(im, "#%d: %.1f (%s)" % (cand.getId(), rchi2, statStr))
+            except Exception, e:
+                pass
+    mosaic = mos.makeMosaic()
+    ds9.mtv(mosaic, frame=frame)
+    mos.drawLabels(frame=frame)
+    
+
+def displaySpatialKernel(kernelCellSet, spatialKernel):
+    import lsst.afw.display.ds9 as ds9
+    import lsst.afw.display.utils as displayUtils
+
+    for cell in kernelCellSet.getCellList():
+        for cand in cell.begin(False): # False = include bad candidates
+            cand  = diffimLib.cast_KernelCandidateF(cand)
+            rchi2 = cand.getChi2()    
+    

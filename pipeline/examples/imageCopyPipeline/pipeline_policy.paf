@@ -1,4 +1,0 @@
-executionMode: "oneloop"
-appStages: "lsst.pex.harness.IOStage.InputStage" "lsst.ip.diffim.pipeline.ImageCopyStage" "lsst.pex.harness.IOStage.OutputStage"
-eventTopics: "None" "None" "None"
-stagePolicies: "input_policy.paf" "None" "output_policy.paf"

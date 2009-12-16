@@ -13,7 +13,7 @@ import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
 
-Verbosity = 4
+Verbosity = 1
 logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
@@ -22,7 +22,7 @@ diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = pexPolicy.Policy.createPolicy(diffimPolicy)
+        self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
         
     def tearDown(self):
         del self.policy
@@ -30,12 +30,11 @@ class DiffimTestCases(unittest.TestCase):
     def testNoMask(self):
         mask = afwImage.MaskU(20,20)
         mask.set(0)
-        fsb  = ipDiffim.FindSetBitsU(mask)
+        fsb  = ipDiffim.FindSetBitsU()
 
         bbox     = afwImage.BBox(afwImage.PointI(0,10),
                                  afwImage.PointI(9,12))
-        fp       = afwDetection.Footprint(bbox)
-        fsb.apply(fp)
+        fsb.apply(afwImage.MaskU(mask, bbox))
 
         self.assertEqual(fsb.getBits(), 0)
 
@@ -43,7 +42,7 @@ class DiffimTestCases(unittest.TestCase):
         mask = afwImage.MaskU(20,20)
         mask.set(0)
         bitmaskBad = mask.getPlaneBitMask('BAD')
-        fsb = ipDiffim.FindSetBitsU(mask)
+        fsb = ipDiffim.FindSetBitsU()
 
         bbox     = afwImage.BBox(afwImage.PointI(9,10),
                                  afwImage.PointI(11,12))
@@ -52,8 +51,7 @@ class DiffimTestCases(unittest.TestCase):
 
         bbox2    = afwImage.BBox(afwImage.PointI(8,8),
                                  afwImage.PointI(19,19))
-        fp       = afwDetection.Footprint(bbox2)
-        fsb.apply(fp)
+        fsb.apply(afwImage.MaskU(mask, bbox2))
 
         self.assertEqual(fsb.getBits(), bitmaskBad)
 
@@ -62,7 +60,7 @@ class DiffimTestCases(unittest.TestCase):
         mask.set(0)
         bitmaskBad = mask.getPlaneBitMask('BAD')
         bitmaskSat = mask.getPlaneBitMask('SAT')
-        fsb = ipDiffim.FindSetBitsU(mask)
+        fsb = ipDiffim.FindSetBitsU()
 
         bbox      = afwImage.BBox(afwImage.PointI(9,10),
                                   afwImage.PointI(11,12))
@@ -77,7 +75,7 @@ class DiffimTestCases(unittest.TestCase):
         bbox3     = afwImage.BBox(afwImage.PointI(0,0),
                                   afwImage.PointI(19,19))
         fp       = afwDetection.Footprint(bbox3)
-        fsb.apply(fp)
+        fsb.apply(afwImage.MaskU(mask, bbox3))
 
         self.assertEqual(fsb.getBits(), bitmaskBad | bitmaskSat)
 

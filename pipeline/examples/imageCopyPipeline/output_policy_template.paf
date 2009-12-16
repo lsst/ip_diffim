@@ -1,9 +1,0 @@
-OutputItems: {
-    OutputImage: {
-        Required: true
-        StoragePolicy: {
-            Storage: "FitsStorage"
-            Location: "%(outputImagePath)s"
-        }
-    }
-}

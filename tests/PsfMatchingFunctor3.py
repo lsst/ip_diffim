@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os, pdb, sys
-
+import numpy as num
 import unittest
 import lsst.utils.tests as tests
 
@@ -10,11 +10,12 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.pex.policy as pexPolicy
 import lsst.ip.diffim as ipDiffim
+import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
 
-Verbosity = 4
+Verbosity = 1
 logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
@@ -23,170 +24,104 @@ diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary
 display = False
 writefits = False
 
-# This one just creates example convolution and deconvolution kernels
+# This one looks for the PCA of a known Gaussian smearing kernel with
+# noise added to the smeared image
 
 class DiffimTestCases(unittest.TestCase):
     
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.policy      = pexPolicy.Policy.createPolicy(diffimPolicy)
+        self.policy      = ipDiffim.generateDefaultPolicy(diffimPolicy, modify=False)
         self.kCols       = self.policy.getInt('kernelCols')
         self.kRows       = self.policy.getInt('kernelRows')
-        self.fpGrowKsize = self.policy.getDouble('fpGrowKsize')
-        self.basisList   = ipDiffim.generateDeltaFunctionKernelSet(self.kCols, self.kRows)
-
+        
+        # gaussian reference kernel
         self.gSize         = self.kCols
-        self.gaussFunction = afwMath.GaussianFunction2D(2, 2)
+        self.gaussFunction = afwMath.GaussianFunction2D(2, 3)
         self.gaussKernel   = afwMath.AnalyticKernel(self.gSize, self.gSize, self.gaussFunction)
         self.kImageIn      = afwImage.ImageD(self.gSize, self.gSize)
-        self.gaussKernel.computeImage(self.kImageIn, False)
-
-        # difference imaging functor
-        self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
+        self.kSumIn        = self.gaussKernel.computeImage(self.kImageIn, False)
 
         # known input images
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
-            defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v26-e0",
-                                          "v26-e0-c011-a00.sci")
-            defTemplatePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                           "v5-e0-c011-a00.sci")
-            self.scienceImage   = afwImage.ExposureF(defSciencePath)
-            self.templateImage  = afwImage.ExposureF(defTemplatePath)
-            
-            # Remap the template to the image; replace self.templateImage with warped image
-            wKernel = afwMath.makeWarpingKernel('lanczos4')
-            self.remappedImage = self.templateImage.Factory(
-                self.scienceImage.getWidth(), 
-                self.scienceImage.getHeight(),
-                self.scienceImage.getWcs())
-            self.remappedImage.getMaskedImage().setXY0( self.scienceImage.getMaskedImage().getXY0() )
-            afwMath.warpExposure(self.remappedImage, 
-                                 self.templateImage, 
-                                 wKernel)
-            self.templateImage = self.remappedImage
-            
-            # edge bit
-            self.edgeBit = afwImage.MaskU().getMaskPlane('EDGE')
+            defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
+                                          "v5-e0-c011-a00.sci")
+            self.templateImage = afwImage.MaskedImageF(defSciencePath)
             
             # image statistics
             self.dStats  = ipDiffim.ImageStatisticsF()
-        
+
+            self.scienceImage = self.templateImage.Factory( self.templateImage.getDimensions() )
+            afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False)
+            self.addNoise(self.scienceImage)
+
     def tearDown(self):
         del self.policy
 
-    def applyFunctor(self, invert=False, foffset=0, xloc=397, yloc=580):
-        # NOTE : the size of these images have to be bigger
-        #        size you lose pixels due to the convolution with the gaussian
-        #        so adjust the size a bit to compensate 
-        imsize = int(3.5 * self.kCols)
+    def addNoise(self, mi):
+        # use median of variance for seed
+        # also the sqrt of this is used to scale the noise image
+        img       = mi.getImage()
 
-        # chop out a region around a known object
-        bbox = afwImage.BBox( afwImage.PointI(xloc - imsize/2,
-                                              yloc - imsize/2),
-                              afwImage.PointI(xloc + imsize/2,
-                                              yloc + imsize/2) )
+        seed      = int(afwMath.makeStatistics(mi.getVariance(), afwMath.MEDIAN).getValue())
+        rdm       = afwMath.Random(afwMath.Random.MT19937, seed)
+        rdmImage  = img.Factory(img.getDimensions())
+        afwMath.randomGaussianImage(rdmImage, rdm)
+        rdmImage *= num.sqrt(seed)
+        img      += rdmImage
 
-        if invert:
-            tmi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(),  bbox)
-            smi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox)
-        else:
-            smi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(),  bbox)
-            tmi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox)
-
-        # convolve science image with a gaussian for testing...
-        #cmi = smi.Factory(smi.getDimensions())
-        #afwMath.convolve(cmi, smi, self.gaussKernel, False, self.edgeBit)
-        #smi = cmi
-        
-        # OUTPUT
-        if display:
-            ds9.mtv(tmi, frame=1+foffset)
-            ds9.mtv(smi, frame=2+foffset)
-        if writefits:
-            tmi.writeFits('t')
-            smi.writeFits('s')
-            
-        # estimate of the variance
-        var  = afwImage.MaskedImageF(smi, True)
-        var -= tmi
-
-        #print 'Estimated variance   : %.2f %.2f -> %.2f' % (afwMath.makeStatistics(tmi.getVariance(), afwMath.MEDIAN).getValue(),
-        #                                                    afwMath.makeStatistics(smi.getVariance(), afwMath.MEDIAN).getValue(),
-        #                                                    afwMath.makeStatistics(var.getVariance(), afwMath.MEDIAN).getValue())
-        
-        # accepts : imageToConvolve, imageToNotConvolve
-        self.kFunctor.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
-        kernel    = self.kFunctor.getKernel()
-        kImageOut = afwImage.ImageD(self.kCols, self.kRows)
-        kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor.getBackground())
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
-        self.dStats.apply( diffIm2 )
-        print 'Diffim residuals1 : %.2f +/- %.2f (%.3f)' % (self.dStats.getMean(), self.dStats.getRms(), kSum)
-        #print 'Diffim variance   : %.2f %.2f -> %.2f' % (afwMath.makeStatistics(tmi.getVariance(), afwMath.MEDIAN).getValue(),
-        #                                                 afwMath.makeStatistics(smi.getVariance(), afwMath.MEDIAN).getValue(),
-        #                                                 afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEDIAN).getValue())
-                                                       
-        
-        # OUTPUT
-#        if display:
-#            ds9.mtv(kImageOut, frame=3)
-#            ds9.mtv(diffIm, frame=4)
-#            ds9.mtv(diffIm2, frame=5)
-#        if writefits:
-#            kImageOut.writeFits('k1.fits')
-#            diffIm.writeFits('dA1')
-#            diffIm2.writeFits('dA2')
-
-        # Second iteration
-        self.kFunctor.apply(tmi.getImage(), smi.getImage(), diffIm.getVariance(), self.policy)
-        kernel    = self.kFunctor.getKernel()
-        kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, self.kFunctor.getBackground())
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
-        self.dStats.apply( diffIm2 )
-        print 'Diffim residuals2 : %.2f +/- %.2f (%.2f)' % (self.dStats.getMean(), self.dStats.getRms(), kSum)
-        #print 'Diffim variance   : %.2f %.2f -> %.2f' % (afwMath.makeStatistics(tmi.getVariance(), afwMath.MEDIAN).getValue(),
-        #                                                 afwMath.makeStatistics(smi.getVariance(), afwMath.MEDIAN).getValue(),
-        #                                                 afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEDIAN).getValue())
-        
-        # OUTPUT
-        if display:
-            ds9.mtv(kImageOut, frame=3+foffset)
-            ds9.mtv(diffIm2, frame=4+foffset)
-        if writefits:
-            kImageOut.writeFits('k2.fits')
-            diffIm2.writeFits('dB2')
-
-    def testFunctor(self):
+    def testPca(self):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
-        
-        #self.applyFunctor(invert=False, foffset=0)
-        #self.applyFunctor(invert=True, foffset=4)
-        
-        #self.applyFunctor(invert=False, foffset=0, xloc=460, yloc=1656)
-        #self.applyFunctor(invert=True, foffset=4, xloc=460, yloc=1656)
-        
-        #self.applyFunctor(invert=False, foffset=0, xloc=288, yloc=952)
-        #self.applyFunctor(invert=True, foffset=4, xloc=288, yloc=952)
 
-        self.applyFunctor(invert=False, foffset=0, xloc=460, yloc=1656)
-        self.applyFunctor(invert=True, foffset=4, xloc=460, yloc=1656)
+        self.policy.set("kernelBasisSet", "delta-function")
+        self.policy.set("useRegularization", False)
+        self.policy.set("spatialKernelOrder", 0)
+        self.policy.set("spatialBgOrder", 0)
+
+        diffimTools.backgroundSubtract(self.policy, [self.templateImage,])
+
+        result = ipDiffim.createPsfMatchingKernel(self.templateImage,
+                                                  self.scienceImage,
+                                                  self.policy)
         
-        #self.applyFunctor(invert=False, foffset=0, xloc=251, yloc=1950)
-        #self.applyFunctor(invert=True, foffset=4, xloc=251, yloc=1950)
+        spatialKernel, spatialBg, kernelCellSet = result
+        basisList = spatialKernel.getKernelList()
+        kernel0 = basisList[0]
+        im0     = afwImage.ImageD(spatialKernel.getDimensions())
+        ksum0   = kernel0.computeImage(im0, False)    
+
+        if display:
+            frame=0
+            ds9.mtv(self.kImageIn, frame=0)
+            frame += 1
+            
+            for idx in range(min(5, len(basisList))):
+                kernel = basisList[idx]
+                im     = afwImage.ImageD(spatialKernel.getDimensions())
+                ksum   = kernel.computeImage(im, False)    
+                ds9.mtv(im, frame=frame)
+                frame += 1
+                
+        # mean kernel is the known applied kernel
+        self.assertAlmostEqual(ksum0, self.kSumIn, 2)
+        for j in range(self.kImageIn.getHeight()):
+            for i in range(self.kImageIn.getWidth()):
+                self.assertAlmostEqual(self.kImageIn.get(i,j), im0.get(i, j), 2)
+
+        # and the eigen kernel sums are close to 0
+        # tough to test each pixel since there are fluctuations
+        # so this test just says, they should carry no overall power
+        for idx in range(1, len(basisList)):
+            kernel = basisList[idx]
+            im     = afwImage.ImageD(spatialKernel.getDimensions())
+            ksum   = kernel.computeImage(im, False)    
+
+            self.assertAlmostEqual(ksum, 0, 2)
+                    
 #####
         
 def suite():

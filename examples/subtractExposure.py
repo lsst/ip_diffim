@@ -9,7 +9,8 @@ from lsst.pex.logging import Trace
 from lsst.pex.policy import Policy
 from lsst.pex.logging import Log
 
-from lsst.ip.diffim.diffimStages import subtractExposure
+from lsst.ip.diffim import subtractExposure, generateDefaultPolicy
+import lsst.ip.diffim.diffimTools as diffimTools
 
 def main():
     defDataDir   = eups.productDir('afwdata')
@@ -42,12 +43,14 @@ Notes:
     
     parser = optparse.OptionParser(usage)
     parser.add_option('-p', '--policy', default=defPolicyPath, help='policy file')
-    parser.add_option('-d', '--debugIO', action='store_true', default=False,
-        help='write diagnostic intermediate files')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
-        help='verbosity of diagnostic trace messages; 1 for just warnings, more for more information')
-    parser.add_option('-I', '--invert', action='store_true', default=False,
-        help='invert the image to convolve')
+                      help='verbosity of Trace messages')
+    parser.add_option('-i', '--invert', action='store_true', default=False,
+                      help='invert the image to convolve')
+    parser.add_option('-d', '--display', action='store_true', default=False,
+                      help='display the images')
+    parser.add_option('-b', '--bg', action='store_true', default=False,
+                      help='subtract backgrounds')
 
     (options, args) = parser.parse_args()
     
@@ -68,16 +71,22 @@ Notes:
     
     templateExposure = afwImage.ExposureF(templatePath)
     scienceExposure  = afwImage.ExposureF(sciencePath)
-    policy           = Policy.createPolicy(policyPath)
-
-    if options.debugIO:
-        print 'DebugIO =', options.debugIO
-        policy.set('debugIO', True)
+    policy           = generateDefaultPolicy(policyPath)
 
     invert = False
     if options.invert:
         print 'Invert =', options.invert
         invert = True
+
+    display = False
+    if options.display:
+        print 'Display =', options.display
+        display = True
+
+    bgSub = False
+    if options.bg:
+        print 'Background subtract =', options.bg
+        bgSub = True
 
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
@@ -86,9 +95,14 @@ Notes:
     log = Log(Log.getDefaultLog(),
               "ip.diffim.subtractExposure")
 
-    differenceExposure, spatialKernel, backgroundModel, sdqaList = subtractExposure(templateExposure,
-                                                                                    scienceExposure,
-                                                                                    policy, log, invert=invert)
+    if bgSub:
+        diffimTools.backgroundSubtract(policy, [templateExposure.getMaskedImage(),
+                                                scienceExposure.getMaskedImage()])
+
+    differenceExposure, spatialKernel, backgroundModel, kernelCellSet = subtractExposure(templateExposure,
+                                                                                         scienceExposure,
+                                                                                         policy,
+                                                                                         display)
     differenceExposure.writeFits(outputPath)
 
 def run():
