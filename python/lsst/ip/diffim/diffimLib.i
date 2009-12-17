@@ -136,9 +136,6 @@ SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double
 %template(getCollectionOfFootprintsForPsfMatching)
     lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double>;
 
-%template(addToImage)   lsst::ip::diffim::addToImage<float>;
-%template(addToImage)   lsst::ip::diffim::addToImage<double>;
-
 /******************************************************************************/
 
 %{

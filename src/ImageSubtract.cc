@@ -59,41 +59,6 @@ Eigen::MatrixXd imageToEigenMatrix(
 }
     
 
-/**
- * @brief Adds a Function to an Image
- *
- * @note This routine assumes that the pixel coordinates start at (0, 0) which is
- * in general not true
- *
- */
-template <typename PixelT>
-void addToImage(lsst::afw::image::Image<PixelT> &image,
-                lsst::afw::math::Function2<double> const &function
-    ) {
-    
-    // Set the pixels row by row, to avoid repeated checks for end-of-row
-    for (int y = 0; y != image.getHeight(); ++y) {
-        double yPos = afwImage::positionToIndex(y);
-        double xPos = afwImage::positionToIndex(0);
-        for (typename afwImage::Image<PixelT>::x_iterator ptr = image.row_begin(y), end = image.row_end(y);
-             ptr != end; ++ptr, ++xPos) {            
-            *ptr += function(xPos, yPos);
-        }
-    }
-}
-
-/**
- * @brief Adds a scalar to an Image
- */
-template <typename PixelT>
-void addToImage(lsst::afw::image::Image<PixelT> &image,
-                double value
-    ) {
-    if (value != 0.0) {
-        image += value;
-    }
-}
-
 /** 
  * @brief Implement fundamental difference imaging step of convolution and
  * subtraction : D = I - (K*T + bg) where * denotes convolution
@@ -126,7 +91,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     afwMath::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false);
     
     /* Add in background */
-    addToImage(*(convolvedMaskedImage.getImage()), background);
+    *(convolvedMaskedImage.getImage()) += background;
     
     /* Do actual subtraction */
     convolvedMaskedImage -= imageToNotConvolve;
@@ -175,7 +140,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     afwMath::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, convolutionKernel, false);
     
     /* Add in background */
-    addToImage(*(convolvedMaskedImage.getImage()), background);
+    *(convolvedMaskedImage.getImage()) += background;
     
     /* Do actual subtraction */
     *convolvedMaskedImage.getImage() -= *imageToNotConvolve.getImage();
@@ -449,27 +414,5 @@ std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPs
     lsst::afw::image::MaskedImage<double> const &,
     lsst::afw::image::MaskedImage<double> const &,
     pexPolicy::Policy  const &);
-
-template 
-void addToImage(
-    lsst::afw::image::Image<float> &,
-    lsst::afw::math::Function2<double> const &
-    );
-template 
-void addToImage(
-    lsst::afw::image::Image<double> &,
-    lsst::afw::math::Function2<double> const &
-    );
-
-template 
-void addToImage(
-    lsst::afw::image::Image<float> &,
-    double
-    );
-template 
-void addToImage(
-    lsst::afw::image::Image<double> &,
-    double
-    );
 
 }}} // end of namespace lsst::ip::diffim
