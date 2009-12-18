@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-import os, pdb
+import os
+import sys
+import pdb
 
 import unittest
 import lsst.utils.tests as tests

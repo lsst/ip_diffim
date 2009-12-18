@@ -50,10 +50,15 @@ class DiffimTestCases(unittest.TestCase):
                                           afwImage.PointI(511,2046))
 
     def tearDown(self):
-        del self.scienceImage
-        del self.templateImage
+        if self.defDataDir:
+            del self.scienceImage
+            del self.templateImage
 
     def testXY0(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
 

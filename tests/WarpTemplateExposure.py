@@ -6,6 +6,7 @@ import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
 import eups
 import os
+import sys
 #import lsst.afw.display.ds9 as ds9
 
 class DiffimTestCases(unittest.TestCase):
@@ -26,8 +27,9 @@ class DiffimTestCases(unittest.TestCase):
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
  
     def tearDown(self):
-        del self.scienceImage
-        del self.templateImage
+        if self.defDataDir:
+            del self.scienceImage
+            del self.templateImage
 
     def testWarp(self):
         if not self.defDataDir:
