@@ -25,7 +25,7 @@ typedef afwImage::Image<afwMath::Kernel::Pixel> Image;
 
 //Trace::setVerbosity("lsst.ip.diffim", 6);
 
-BOOST_AUTO_TEST_CASE(kernelSumVisitor) {
+BOOST_AUTO_TEST_CASE(KernelSumVisitor) {
     Policy::Ptr policy(new Policy);
     policy->set("kernelSumClipping", false);
     policy->set("maxKsumSigma", 3.0);
@@ -97,9 +97,9 @@ BOOST_AUTO_TEST_CASE(kernelSumVisitor) {
         kernelSumVisitor.processCandidate(&(*cand1));
         kernelSumVisitor.processCandidate(&(*cand5));
         kernelSumVisitor.processKsumDistribution();
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getkSumMean(),  101*0.5);   
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getkSumNpts(),  2);   
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getNRejected(), 0);   
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getkSumMean(),  101*0.5);   
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getkSumNpts(),  2);   
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getNRejected(), 0);   
     }
     
     /* There is sigma clipping in the stats, but kernelSumClipping = false */
@@ -118,14 +118,14 @@ BOOST_AUTO_TEST_CASE(kernelSumVisitor) {
         kernelSumVisitor.processCandidate(&(*cand3));
         kernelSumVisitor.processCandidate(&(*cand4));
         kernelSumVisitor.processCandidate(&(*cand5));
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getkSumMean(),  1.0);   
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getkSumNpts(),  4);   /* cand2 sigma clipped out in the stats */
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getNRejected(), 0);   /* but not from the cells */
-        BOOST_CHECK_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand2->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand3->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand4->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand5->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getkSumMean(),  1.0);   
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getkSumNpts(),  4);   /* cand2 sigma clipped out in the stats */
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getNRejected(), 0);   /* but not from the cells */
+        BOOST_REQUIRE_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand2->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand3->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand4->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand5->getStatus(), afwMath::SpatialCellCandidate::GOOD);
     }
 
     /* There is sigma clipping in the stats, and now kernelSumClipping = true */
@@ -145,14 +145,14 @@ BOOST_AUTO_TEST_CASE(kernelSumVisitor) {
         kernelSumVisitor.processCandidate(&(*cand3));
         kernelSumVisitor.processCandidate(&(*cand4));
         kernelSumVisitor.processCandidate(&(*cand5));
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getkSumMean(),  1.0);   
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getkSumNpts(),  4);   /* cand5 sigma clipped out in the stats */
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getNRejected(), 1);   /* and from the cells */
-        BOOST_CHECK_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand2->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand3->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand4->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand5->getStatus(), afwMath::SpatialCellCandidate::BAD);
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getkSumMean(),  1.0);   
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getkSumNpts(),  4);   /* cand5 sigma clipped out in the stats */
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getNRejected(), 1);   /* and from the cells */
+        BOOST_REQUIRE_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand2->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand3->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand4->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand5->getStatus(), afwMath::SpatialCellCandidate::BAD);
     }
 
     /* Finally test it in the visitCandidates() paradigm */
@@ -175,18 +175,18 @@ BOOST_AUTO_TEST_CASE(kernelSumVisitor) {
         kernelSumVisitor.setMode(detail::KernelSumVisitor<Pixel>::REJECT);
         kernelCells.visitCandidates(&kernelSumVisitor, 1);
 
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getkSumMean(),  1.0);   
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getkSumNpts(),  4);   /* cand5 sigma clipped out in the stats */
-        BOOST_CHECK_EQUAL(kernelSumVisitor.getNRejected(), 1);   /* and from the cells */
-        BOOST_CHECK_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand2->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand3->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand4->getStatus(), afwMath::SpatialCellCandidate::GOOD);
-        BOOST_CHECK_EQUAL(cand5->getStatus(), afwMath::SpatialCellCandidate::BAD);
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getkSumMean(),  1.0);   
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getkSumNpts(),  4);   /* cand5 sigma clipped out in the stats */
+        BOOST_REQUIRE_EQUAL(kernelSumVisitor.getNRejected(), 1);   /* and from the cells */
+        BOOST_REQUIRE_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand2->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand3->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand4->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand5->getStatus(), afwMath::SpatialCellCandidate::BAD);
     }
 }
 
-BOOST_AUTO_TEST_CASE(setPcaImageVisitor) {
+BOOST_AUTO_TEST_CASE(SetPcaImageVisitor) {
     /* Dummy images */
     afwImage::MaskedImage<Pixel>::Ptr mimg1(
         new afwImage::MaskedImage<Pixel>(100,100)
@@ -235,10 +235,10 @@ BOOST_AUTO_TEST_CASE(setPcaImageVisitor) {
         imagePca.analyze();
         std::vector<Image::Ptr> eigenImages = imagePca.getEigenImages();
         std::vector<double> eigenValues = imagePca.getEigenValues();
-        BOOST_CHECK_EQUAL(static_cast<int>(eigenImages.size()), 3);   
-        BOOST_CHECK_CLOSE(eigenValues[0], 1., 1e-6);   
-        BOOST_CHECK_SMALL(eigenValues[1], 1e-6);   
-        BOOST_CHECK_SMALL(eigenValues[2], 1e-6);   
+        BOOST_REQUIRE_EQUAL(static_cast<int>(eigenImages.size()), 3);   
+        BOOST_REQUIRE_CLOSE(eigenValues[0], 1., 1e-6);   
+        BOOST_REQUIRE_SMALL(eigenValues[1], 1e-6);   
+        BOOST_REQUIRE_SMALL(eigenValues[2], 1e-6);   
     }
 
     /* Test mean subtraction; recall all images are scaled to have the same kSum! */
@@ -251,26 +251,26 @@ BOOST_AUTO_TEST_CASE(setPcaImageVisitor) {
 
         /* Have we divided by the kernel sum? */
         afwImage::ImagePca<Image>::ImageList imageList = imagePca.getImageList();
-        BOOST_CHECK_CLOSE((*imageList[0])(4, 4), 1., 1e-6);
-        BOOST_CHECK_CLOSE((*imageList[1])(4, 4), 1., 1e-6);
-        BOOST_CHECK_CLOSE((*imageList[2])(4, 4), 1., 1e-6);
+        BOOST_REQUIRE_CLOSE((*imageList[0])(4, 4), 1., 1e-6);
+        BOOST_REQUIRE_CLOSE((*imageList[1])(4, 4), 1., 1e-6);
+        BOOST_REQUIRE_CLOSE((*imageList[2])(4, 4), 1., 1e-6);
 
         importStarVisitor.subtractMean();
         Image kMean = *(importStarVisitor.returnMean());
 
         /* Mean has the right central pixel value */
-        BOOST_CHECK_CLOSE(kMean(4, 4), 1., 1e-6);
+        BOOST_REQUIRE_CLOSE(kMean(4, 4), 1., 1e-6);
 
         /* Candidates in imagePca have their values modified before doing Pca */
         imageList = imagePca.getImageList();
-        BOOST_CHECK_SMALL((*imageList[0])(4, 4), 1e-6);
-        BOOST_CHECK_SMALL((*imageList[1])(4, 4), 1e-6);
-        BOOST_CHECK_SMALL((*imageList[2])(4, 4), 1e-6);
+        BOOST_REQUIRE_SMALL((*imageList[0])(4, 4), 1e-6);
+        BOOST_REQUIRE_SMALL((*imageList[1])(4, 4), 1e-6);
+        BOOST_REQUIRE_SMALL((*imageList[2])(4, 4), 1e-6);
 
     }
 }
 
-BOOST_AUTO_TEST_CASE(buildSingleKernelVisitor) {
+BOOST_AUTO_TEST_CASE(BuildSingleKernelVisitor) {
     Policy::Ptr policy(new Policy);
     policy->set("constantVarianceWeighting", false);
     policy->set("iterateSingleKernel", false);
@@ -313,16 +313,16 @@ BOOST_AUTO_TEST_CASE(buildSingleKernelVisitor) {
         afwMath::SpatialCellImageCandidate<Image>::Ptr cand1(
             new KernelCandidate<Pixel>(10., 10., mimg1, mimg2)
             );
-        BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == false);
+        BOOST_REQUIRE(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == false);
 
         detail::BuildSingleKernelVisitor<Pixel> singleKernelFitter(kFunctor, *policy);
         singleKernelFitter.processCandidate(&(*cand1));
 
-        BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == true);
+        BOOST_REQUIRE(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == true);
         /* We're not checking kFunctor here, just that the values are set, so just check to 1% */
-        BOOST_CHECK_CLOSE(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getKsum(), 1.0, 1.);
-        BOOST_CHECK_SMALL(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getBackground(), 1.);
-        BOOST_CHECK_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_CLOSE(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getKsum(), 1.0, 1.);
+        BOOST_REQUIRE_SMALL(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getBackground(), 1.);
+        BOOST_REQUIRE_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
     }
 
     /* Check to make sure we dont overwrite kernel and background,
@@ -346,7 +346,7 @@ BOOST_AUTO_TEST_CASE(buildSingleKernelVisitor) {
         afwMath::SpatialCellImageCandidate<Image>::Ptr cand1(
             new KernelCandidate<Pixel>(10., 10., mimg1, mimg2)
             );
-        BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == false);
+        BOOST_REQUIRE(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == false);
         detail::BuildSingleKernelVisitor<Pixel> singleKernelFitter(kFunctor, *policy);
         singleKernelFitter.processCandidate(&(*cand1));
 
@@ -370,19 +370,19 @@ BOOST_AUTO_TEST_CASE(buildSingleKernelVisitor) {
         double bgNew              = dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->getBackground();
 
         /* Matrices are updated for spatial fitting */
-        BOOST_CHECK(bOrig.size() == (kernelSize*kernelSize+1));
-        BOOST_CHECK(bNew.size()  == ((kernelSize-1)*(kernelSize-1)+1));
-        BOOST_CHECK(mOrig.rows() > mNew.rows());
-        BOOST_CHECK(mOrig.cols() > mNew.cols());
+        BOOST_REQUIRE(bOrig.size() == (kernelSize*kernelSize+1));
+        BOOST_REQUIRE(bNew.size()  == ((kernelSize-1)*(kernelSize-1)+1));
+        BOOST_REQUIRE(mOrig.rows() > mNew.rows());
+        BOOST_REQUIRE(mOrig.cols() > mNew.cols());
         /* But the raw kernel is not */
-        BOOST_CHECK(kOrig->getHeight() == kNew->getHeight());
-        BOOST_CHECK(kOrig->getWidth() == kNew->getWidth());
-        BOOST_CHECK(bgOrig == bgNew);
+        BOOST_REQUIRE(kOrig->getHeight() == kNew->getHeight());
+        BOOST_REQUIRE(kOrig->getWidth() == kNew->getWidth());
+        BOOST_REQUIRE_EQUAL(bgOrig, bgNew);
     }
     
 }
 
-BOOST_AUTO_TEST_CASE(buildSpatialKernelVisitor) {
+BOOST_AUTO_TEST_CASE(BuildSpatialKernelVisitor) {
     int spatialKernelOrder = 2;
     int spatialBgOrder = 1;
 
@@ -440,11 +440,11 @@ BOOST_AUTO_TEST_CASE(buildSpatialKernelVisitor) {
     afwMath::SpatialCellImageCandidate<Image>::Ptr cand5(
         new KernelCandidate<Pixel>(50., 50., mimg1, mimg2)
         );
-    BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == false);
-    BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand2))->hasKernel() == false);
-    BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand3))->hasKernel() == false);
-    BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand4))->hasKernel() == false);
-    BOOST_CHECK(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand5))->hasKernel() == false);
+    BOOST_REQUIRE(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand1))->hasKernel() == false);
+    BOOST_REQUIRE(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand2))->hasKernel() == false);
+    BOOST_REQUIRE(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand3))->hasKernel() == false);
+    BOOST_REQUIRE(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand4))->hasKernel() == false);
+    BOOST_REQUIRE(dynamic_cast<KernelCandidate<Pixel> *>(&(*cand5))->hasKernel() == false);
     
     detail::BuildSingleKernelVisitor<Pixel> singleKernelFitter(kFunctor, *policy);
     singleKernelFitter.processCandidate(&(*cand1));
@@ -467,12 +467,12 @@ BOOST_AUTO_TEST_CASE(buildSpatialKernelVisitor) {
         spatialKernelFitter.processCandidate(&(*cand4));
         spatialKernelFitter.processCandidate(&(*cand5));
         spatialKernelFitter.solveLinearEquation();
-        std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> KB =
+        std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> kb =
             spatialKernelFitter.getSpatialModel();
 
-        afwMath::LinearCombinationKernel::Ptr spatialKernel = KB.first;
-        afwMath::Kernel::SpatialFunctionPtr spatialBackground = KB.second;
-        BOOST_CHECK(spatialKernel->isSpatiallyVarying() == true);
+        afwMath::LinearCombinationKernel::Ptr spatialKernel = kb.first;
+        afwMath::Kernel::SpatialFunctionPtr spatialBackground = kb.second;
+        BOOST_REQUIRE(spatialKernel->isSpatiallyVarying() == true);
     }        
     /* Test non-spatially varying specialization */
     {
@@ -487,16 +487,16 @@ BOOST_AUTO_TEST_CASE(buildSpatialKernelVisitor) {
         spatialKernelFitter.processCandidate(&(*cand4));
         spatialKernelFitter.processCandidate(&(*cand5));
         spatialKernelFitter.solveLinearEquation();
-        std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> KB =
+        std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> kb =
             spatialKernelFitter.getSpatialModel();
 
-        afwMath::LinearCombinationKernel::Ptr spatialKernel = KB.first;
-        afwMath::Kernel::SpatialFunctionPtr spatialBackground = KB.second;
-        BOOST_CHECK(spatialKernel->isSpatiallyVarying() == false);
+        afwMath::LinearCombinationKernel::Ptr spatialKernel = kb.first;
+        afwMath::Kernel::SpatialFunctionPtr spatialBackground = kb.second;
+        BOOST_REQUIRE(spatialKernel->isSpatiallyVarying() == false);
     }
 }
 
-BOOST_AUTO_TEST_CASE(assessSpatialKernelVisitor) {
+BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
     int spatialKernelOrder = 2;
     int spatialBgOrder = 1;
     unsigned int kSize = 5;
@@ -589,7 +589,7 @@ BOOST_AUTO_TEST_CASE(assessSpatialKernelVisitor) {
                                                                           spatialBg, 
                                                                           *policy);
         spatialKernelAssessor1.processCandidate(&(*cand1));
-        BOOST_CHECK_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
+        BOOST_REQUIRE_EQUAL(cand1->getStatus(), afwMath::SpatialCellCandidate::GOOD);
 
         /* Now tweak the kernel to create a bad diffim, on purpose */
         for (unsigned int i = 0; i < spatialBg->getNParameters(); i++) {
@@ -606,7 +606,7 @@ BOOST_AUTO_TEST_CASE(assessSpatialKernelVisitor) {
                                                                           spatialBg, 
                                                                           *policy);
         spatialKernelAssessor2.processCandidate(&(*cand2));
-        BOOST_CHECK_EQUAL(cand2->getStatus(), afwMath::SpatialCellCandidate::BAD);
+        BOOST_REQUIRE_EQUAL(cand2->getStatus(), afwMath::SpatialCellCandidate::BAD);
     }
 }
 

@@ -30,7 +30,8 @@ int main() {
     /* Set up some fake terms */
     std::vector<std::vector<double> > kCoeffs;
     kCoeffs.reserve(nBases);
-    for (unsigned int i = 0, idx = 0; i < nBases; i++) {
+    unsigned int idx = 0;
+    for (unsigned int i = 0; i < nBases; i++) {
         kCoeffs.push_back(std::vector<double>(spatialKernelFunction->getNParameters()));
         for (unsigned int j = 0; j < spatialKernelFunction->getNParameters(); j++, idx++) {
             kCoeffs[i][j] = std::sqrt(std::sqrt(std::sqrt(idx)));
