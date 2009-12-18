@@ -1,22 +1,19 @@
 #!/usr/bin/env python
-import os, pdb, sys
-import numpy as num
+import os
+import pdb
+import sys
 import unittest
 import lsst.utils.tests as tests
 
 import eups
-import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.pex.policy as pexPolicy
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
 import lsst.ip.diffim.diffimTools as diffimTools
 
-import lsst.afw.display.ds9 as ds9
-
-Verbosity = 3
-logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
+verbosity = 3
+logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
@@ -46,8 +43,8 @@ class DiffimTestCases(unittest.TestCase):
             diffimTools.backgroundSubtract(self.policy, [self.templateImage.getMaskedImage(),
                                                          self.scienceImage.getMaskedImage()])
 
-            self.bbox     = afwImage.BBox(afwImage.PointI(0,1500),
-                                          afwImage.PointI(511,2046))
+            self.bbox     = afwImage.BBox(afwImage.PointI(0, 1500),
+                                          afwImage.PointI(511, 2046))
 
     def tearDown(self):
         if self.defDataDir:
@@ -66,8 +63,8 @@ class DiffimTestCases(unittest.TestCase):
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 
         # take away XY0
-        templateSubImage.getMaskedImage().setXY0(0,0)
-        scienceSubImage.getMaskedImage().setXY0(0,0)
+        templateSubImage.getMaskedImage().setXY0(0, 0)
+        scienceSubImage.getMaskedImage().setXY0(0, 0)
 
         # redo
         results2 = ipDiffim.subtractExposure(templateSubImage, scienceSubImage, self.policy)
@@ -148,9 +145,9 @@ def suite():
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
-def run(exit=False):
+def run(doExit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    tests.run(suite(), doExit)
 
 if __name__ == "__main__":
     run(True)

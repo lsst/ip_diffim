@@ -7,14 +7,11 @@ import lsst.utils.tests as tests
 import eups
 import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
-import lsst.pex.policy as pexPolicy
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
 
-import lsst.afw.display.ds9 as ds9
-
-Verbosity = 1
-logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
+verbosity = 1
+logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
@@ -28,53 +25,52 @@ class DiffimTestCases(unittest.TestCase):
         del self.policy
 
     def testNoMask(self):
-        mask = afwImage.MaskU(20,20)
+        mask = afwImage.MaskU(20, 20)
         mask.set(0)
         fsb  = ipDiffim.FindSetBitsU()
 
-        bbox     = afwImage.BBox(afwImage.PointI(0,10),
-                                 afwImage.PointI(9,12))
+        bbox     = afwImage.BBox(afwImage.PointI(0, 10),
+                                 afwImage.PointI(9, 12))
         fsb.apply(afwImage.MaskU(mask, bbox))
 
         self.assertEqual(fsb.getBits(), 0)
 
     def testOneMask(self):
-        mask = afwImage.MaskU(20,20)
+        mask = afwImage.MaskU(20, 20)
         mask.set(0)
         bitmaskBad = mask.getPlaneBitMask('BAD')
         fsb = ipDiffim.FindSetBitsU()
 
-        bbox     = afwImage.BBox(afwImage.PointI(9,10),
-                                 afwImage.PointI(11,12))
+        bbox     = afwImage.BBox(afwImage.PointI(9, 10),
+                                 afwImage.PointI(11, 12))
         submask  = afwImage.MaskU(mask, bbox)
         submask |= bitmaskBad
 
-        bbox2    = afwImage.BBox(afwImage.PointI(8,8),
-                                 afwImage.PointI(19,19))
+        bbox2    = afwImage.BBox(afwImage.PointI(8, 8),
+                                 afwImage.PointI(19, 19))
         fsb.apply(afwImage.MaskU(mask, bbox2))
 
         self.assertEqual(fsb.getBits(), bitmaskBad)
 
     def testManyMask(self):
-        mask = afwImage.MaskU(20,20)
+        mask = afwImage.MaskU(20, 20)
         mask.set(0)
         bitmaskBad = mask.getPlaneBitMask('BAD')
         bitmaskSat = mask.getPlaneBitMask('SAT')
         fsb = ipDiffim.FindSetBitsU()
 
-        bbox      = afwImage.BBox(afwImage.PointI(9,10),
-                                  afwImage.PointI(11,12))
-        submask   = afwImage.MaskU(mask, bbox)
+        bbox      = afwImage.BBox(afwImage.PointI(9, 10),
+                                  afwImage.PointI(11, 12))
+        submask   = afwImage.MaskU(mask, bbox) 
         submask  |= bitmaskBad
 
-        bbox2     = afwImage.BBox(afwImage.PointI(8,8),
-                                  afwImage.PointI(19,19))
+        bbox2     = afwImage.BBox(afwImage.PointI(8, 8),
+                                  afwImage.PointI(19, 19))
         submask2  = afwImage.MaskU(mask, bbox2)
         submask2 |= bitmaskSat
 
-        bbox3     = afwImage.BBox(afwImage.PointI(0,0),
-                                  afwImage.PointI(19,19))
-        fp       = afwDetection.Footprint(bbox3)
+        bbox3     = afwImage.BBox(afwImage.PointI(0, 0),
+                                  afwImage.PointI(19, 19))
         fsb.apply(afwImage.MaskU(mask, bbox3))
 
         self.assertEqual(fsb.getBits(), bitmaskBad | bitmaskSat)
@@ -90,9 +86,9 @@ def suite():
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
-def run(exit=False):
+def run(doExit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    tests.run(suite(), doExit)
 
 if __name__ == "__main__":
     run(True)

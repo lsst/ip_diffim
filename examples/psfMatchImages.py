@@ -3,11 +3,10 @@ import eups
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
-import lsst.pex.policy as pexPolicy
 import lsst.pex.logging as pexLog
 
-Verbosity = 3
-pexLog.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
+verbosity = 3
+pexLog.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 imageProcDir  = eups.productDir("ip_diffim")
 defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")

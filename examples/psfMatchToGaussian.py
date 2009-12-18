@@ -2,11 +2,10 @@
 import unittest
 import eups
 import os
+import sys
 import lsst.utils.tests as tests
 import lsst.ip.diffim as ipDiffim
-import lsst.pex.policy as pexPolicy
 import lsst.afw.image as afwImage
-import lsst.afw.math as afwMath
 import lsst.afw.detection as afwDetection
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
@@ -77,9 +76,9 @@ def suite():
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
-def run(exit=False):
+def run(doExit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    tests.run(suite(), doExit)
 
 if __name__ == "__main__":
     run(True)

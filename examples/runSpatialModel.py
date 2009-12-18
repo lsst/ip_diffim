@@ -1,11 +1,10 @@
-import os, sys
+import os
+import sys
 import eups
-import time
 import lsst.afw.image.imageLib as afwImage
 import lsst.afw.math.mathLib as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
-import lsst.pex.policy as pexPolicy
 import lsst.pex.logging as pexLogging
 
 import lsst.afw.display.ds9 as ds9
@@ -14,8 +13,8 @@ import lsst.afw.display.utils as displayUtils
 subBackground = True
 display = True
 
-Verbosity = 4
-pexLogging.Trace_setVerbosity("lsst.ip.diffim", Verbosity)
+verbosity = 4
+pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 
 defDataDir   = eups.productDir("afwdata") 
 imageProcDir = eups.productDir("ip_diffim")
@@ -99,7 +98,8 @@ if display:
     mos.reset()
     width = templateImage.getWidth()
     height = templateImage.getHeight()
-    stamps = []; stampInfo = []
+    stamps = []
+    stampInfo = []
     for x in (0, width//2, width):
         for y in (0, height//2, height):
             im   = afwImage.ImageD(spatialKernel.getDimensions())
@@ -130,4 +130,5 @@ if display:
     ds9.mtv(diffIm, frame=frame)
 
 
-# examples/runSpatialModel.py $AFWDATA_DIR/DC3a-Sim/sci/v5-e0/v5-e0-c011-a00.sci $AFWDATA_DIR/DC3a-Sim/sci/v26-e0/v26-e0-c011-a00.sci
+# examples/runSpatialModel.py $AFWDATA_DIR/DC3a-Sim/sci/v5-e0/v5-e0-c011-a00.sci
+# ... $AFWDATA_DIR/DC3a-Sim/sci/v26-e0/v26-e0-c011-a00.sci

@@ -61,7 +61,7 @@ def createPsfMatchingKernel(maskedImageToConvolve,
 
     # Create the Psf matching kernel
     try:
-        KB = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
+        kb = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
     except pexExcept.LsstCppException, e:
         pexLog.Trace("lsst.ip.diffim.createPsfMatchingKernel", 1,
                      "ERROR: Unable to calculate psf matching kernel")
@@ -69,8 +69,8 @@ def createPsfMatchingKernel(maskedImageToConvolve,
                      e.args[0].what())
         raise
     else:
-        spatialKernel = KB.first
-        spatialBg     = KB.second
+        spatialKernel = kb.first
+        spatialBg     = kb.second
 
     # What is the status of the processing?
     nGood = 0
@@ -233,7 +233,7 @@ def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
 
     # Create the Psf matching kernel
     try:
-        KB = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
+        kb = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
     except pexExcept.LsstCppException, e:
         pexLog.Trace("lsst.ip.diffim.createPsfMatchingKernel", 1,
                      "ERROR: Unable to calculate psf matching kernel")
@@ -241,8 +241,8 @@ def createPsfMatchingKernelToGaussian(maskedImageToConvolve,
                      e.args[0].what())
         raise
     else:
-        spatialKernel = KB.first
-        spatialBg     = KB.second
+        spatialKernel = kb.first
+        spatialBg     = kb.second
 
     # What is the status of the processing?
     nGood = 0

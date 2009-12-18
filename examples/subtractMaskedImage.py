@@ -1,13 +1,14 @@
 import eups
-import sys, os, optparse
-import numpy
+import sys
+import os
+import optparse
 
 import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
+import lsst.afw.display.ds9 as ds9
 
 from lsst.pex.logging import Trace
 from lsst.pex.logging import Log
-from lsst.pex.policy import Policy
 
 from lsst.ip.diffim import subtractMaskedImage, generateDefaultPolicy
 import lsst.ip.diffim.diffimTools as diffimTools
@@ -48,8 +49,6 @@ Notes:
     parser.add_option('-p', '--policy', default=defPolicyPath, help='policy file')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
                       help='verbosity of Trace messages')
-    parser.add_option('-i', '--invert', action='store_true', default=False,
-                      help='invert the image to convolve')
     parser.add_option('-d', '--display', action='store_true', default=False,
                       help='display the images')
     parser.add_option('-b', '--bg', action='store_true', default=False,
@@ -76,11 +75,6 @@ Notes:
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
     policy              = generateDefaultPolicy(policyPath)
     
-    invert = False
-    if options.invert:
-        print 'Invert =', options.invert
-        invert = True
-
     display = False
     if options.display:
         print 'Display =', options.display
@@ -95,18 +89,17 @@ Notes:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
         
-    log = Log(Log.getDefaultLog(),
-              "ip.diffim.subtractMaskedImage")
-
     if bgSub:
         diffimTools.backgroundSubtract(policy, [templateMaskedImage, scienceMaskedImage])
 
-    differenceMaskedImage, sKernel, bgFunction, kernelCellSet = subtractMaskedImage(templateMaskedImage,
-                                                                                    scienceMaskedImage,
-                                                                                    policy)
+    results = subtractMaskedImage(templateMaskedImage,
+                                  scienceMaskedImage,
+                                  policy)
+    differenceMaskedImage = results[0]
     differenceMaskedImage.writeFits(outputPath)
     
-
+    if display:
+        ds9.mtv(differenceMaskedImage)
 
 def run():
     Log.getDefaultLog()

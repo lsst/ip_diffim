@@ -25,7 +25,7 @@ typedef afwImage::Image<afwMath::Kernel::Pixel> Image;
 
 //Trace::setVerbosity("lsst.ip.diffim", 6);
 
-BOOST_AUTO_TEST_CASE(KernelSumVisitor) {
+BOOST_AUTO_TEST_CASE(kernelSumVisitor) {
     Policy::Ptr policy(new Policy);
     policy->set("kernelSumClipping", false);
     policy->set("maxKsumSigma", 3.0);
@@ -186,7 +186,7 @@ BOOST_AUTO_TEST_CASE(KernelSumVisitor) {
     }
 }
 
-BOOST_AUTO_TEST_CASE(SetPcaImageVisitor) {
+BOOST_AUTO_TEST_CASE(setPcaImageVisitor) {
     /* Dummy images */
     afwImage::MaskedImage<Pixel>::Ptr mimg1(
         new afwImage::MaskedImage<Pixel>(100,100)
@@ -270,7 +270,7 @@ BOOST_AUTO_TEST_CASE(SetPcaImageVisitor) {
     }
 }
 
-BOOST_AUTO_TEST_CASE(BuildSingleKernelVisitor) {
+BOOST_AUTO_TEST_CASE(buildSingleKernelVisitor) {
     Policy::Ptr policy(new Policy);
     policy->set("constantVarianceWeighting", false);
     policy->set("iterateSingleKernel", false);
@@ -382,7 +382,7 @@ BOOST_AUTO_TEST_CASE(BuildSingleKernelVisitor) {
     
 }
 
-BOOST_AUTO_TEST_CASE(BuildSpatialKernelVisitor) {
+BOOST_AUTO_TEST_CASE(buildSpatialKernelVisitor) {
     int spatialKernelOrder = 2;
     int spatialBgOrder = 1;
 
@@ -496,7 +496,7 @@ BOOST_AUTO_TEST_CASE(BuildSpatialKernelVisitor) {
     }
 }
 
-BOOST_AUTO_TEST_CASE(AssessSpatialKernelVisitor) {
+BOOST_AUTO_TEST_CASE(assessSpatialKernelVisitor) {
     int spatialKernelOrder = 2;
     int spatialBgOrder = 1;
     unsigned int kSize = 5;

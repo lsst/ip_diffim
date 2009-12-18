@@ -4,7 +4,7 @@ import lsst.afw.display.ds9 as ds9
 import numpy as num
 import lsst.afw.image.testUtils as imTestUtils
 
-klist = ipDiffim.generateAlardLuptonBasisSet(15, 3, [2, 4, 8], [4,3,2])
+klist = ipDiffim.generateAlardLuptonBasisSet(15, 3, [2, 4, 8], [4, 3, 2])
 frame = 1
 for kernel in klist:
     kImageOut = afwImage.ImageD(kernel.getDimensions())

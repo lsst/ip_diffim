@@ -2,7 +2,6 @@ from subtractMaskedImage import subtractMaskedImage
 from warpTemplateExposure import warpTemplateExposure
 
 import lsst.pex.logging as pexLog
-import lsst.pex.exceptions as pexExcept
 import lsst.afw.image as afwImage
 import lsst.afw.display.ds9 as ds9
 
@@ -12,8 +11,8 @@ def subtractExposure(exposureToConvolve, exposureToNotConvolve, policy, display=
     scienceWcs     = exposureToNotConvolve.getWcs()
 
     # LLC
-    templateOrigin = templateWcs.xyToRaDec(0,0)
-    scienceOrigin  = scienceWcs.xyToRaDec(0,0)
+    templateOrigin = templateWcs.xyToRaDec(0, 0)
+    scienceOrigin  = scienceWcs.xyToRaDec(0, 0)
     # URC
     templateLimit  = templateWcs.xyToRaDec(exposureToConvolve.getWidth(),
                                            exposureToConvolve.getHeight())
@@ -43,8 +42,8 @@ def subtractExposure(exposureToConvolve, exposureToNotConvolve, policy, display=
     maskedImageToNotConvolve = exposureToNotConvolve.getMaskedImage()
 
     if display:
-        ds9.mtv(templateMaskedImage, frame=0)
-        ds9.mtv(scienceMaskedImage, frame=1)
+        ds9.mtv(maskedImageToConvolve, frame=0)
+        ds9.mtv(maskedImageToNotConvolve, frame=1)
 
     # Subtract their MaskedImages
     try:

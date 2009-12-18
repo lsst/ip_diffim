@@ -62,9 +62,9 @@ def suite():
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
-def run(exit=False):
+def run(doExit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    tests.run(suite(), doExit)
 
 if __name__ == "__main__":
     run(True)

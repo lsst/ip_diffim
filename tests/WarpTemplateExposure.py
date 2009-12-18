@@ -2,7 +2,6 @@
 import unittest
 import lsst.utils.tests as tests
 import lsst.ip.diffim as ipDiffim
-import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
 import eups
 import os
@@ -52,10 +51,10 @@ class DiffimTestCases(unittest.TestCase):
         wcs1 = remappedImage.getWcs()
         wcs2 = self.scienceImage.getWcs()
 
-        self.assertEqual(wcs1.xyToRaDec(0,0)[0],
-                         wcs2.xyToRaDec(0,0)[0])
-        self.assertEqual(wcs1.xyToRaDec(0,0)[1],
-                         wcs2.xyToRaDec(0,0)[1])
+        self.assertEqual(wcs1.xyToRaDec(0, 0)[0],
+                         wcs2.xyToRaDec(0, 0)[0])
+        self.assertEqual(wcs1.xyToRaDec(0, 0)[1],
+                         wcs2.xyToRaDec(0, 0)[1])
 
 
         self.assertEqual(wcs1.xyToRaDec(remappedImage.getWidth(),
@@ -73,8 +72,8 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata not set up; not running WarpTemplateExposure.py"
             return
 
-        bbox     = afwImage.BBox(afwImage.PointI(2,900),
-                                 afwImage.PointI(102,1000))
+        bbox     = afwImage.BBox(afwImage.PointI(2, 900),
+                                 afwImage.PointI(102, 1000))
         templateSubImage = afwImage.ExposureF(self.templateImage, bbox)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, bbox)
 
@@ -97,10 +96,10 @@ class DiffimTestCases(unittest.TestCase):
         wcs1 = remappedImage.getWcs()
         wcs2 = scienceSubImage.getWcs()
 
-        self.assertEqual(wcs1.xyToRaDec(0,0)[0],
-                         wcs2.xyToRaDec(0,0)[0])
-        self.assertEqual(wcs1.xyToRaDec(0,0)[1],
-                         wcs2.xyToRaDec(0,0)[1])
+        self.assertEqual(wcs1.xyToRaDec(0, 0)[0],
+                         wcs2.xyToRaDec(0, 0)[0])
+        self.assertEqual(wcs1.xyToRaDec(0, 0)[1],
+                         wcs2.xyToRaDec(0, 0)[1])
 
 
         self.assertEqual(wcs1.xyToRaDec(remappedImage.getWidth(),
@@ -124,9 +123,9 @@ def suite():
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
-def run(exit=False):
+def run(doExit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    tests.run(suite(), doExit)
 
 if __name__ == "__main__":
     run(True)

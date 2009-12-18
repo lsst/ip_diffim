@@ -1,22 +1,22 @@
 #!/usr/bin/env python
-import os, pdb, sys
+import os
+import pdb
+import sys
 import numpy as num
 import unittest
 import lsst.utils.tests as tests
 
 import eups
-import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.pex.policy as pexPolicy
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
 
-Verbosity = 1
-logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
+verbosity = 1
+logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
@@ -87,8 +87,8 @@ class DiffimTestCases(unittest.TestCase):
         result = ipDiffim.createPsfMatchingKernel(self.templateImage,
                                                   self.scienceImage,
                                                   self.policy)
-        
-        spatialKernel, spatialBg, kernelCellSet = result
+
+        spatialKernel = result[0]
         basisList = spatialKernel.getKernelList()
         kernel0 = basisList[0]
         im0     = afwImage.ImageD(spatialKernel.getDimensions())
@@ -110,7 +110,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertAlmostEqual(ksum0, self.kSumIn, 2)
         for j in range(self.kImageIn.getHeight()):
             for i in range(self.kImageIn.getWidth()):
-                self.assertAlmostEqual(self.kImageIn.get(i,j), im0.get(i, j), 2)
+                self.assertAlmostEqual(self.kImageIn.get(i, j), im0.get(i, j), 2)
 
         # and the eigen kernel sums are close to 0
         # tough to test each pixel since there are fluctuations
@@ -133,9 +133,9 @@ def suite():
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
-def run(exit=False):
+def run(doExit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    tests.run(suite(), doExit)
 
 if __name__ == "__main__":
     if '-d' in sys.argv:

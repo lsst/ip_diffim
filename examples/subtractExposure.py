@@ -1,12 +1,12 @@
 import eups
-import sys, os, optparse
-import numpy
+import sys
+import os
+import optparse
 
 import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
 
 from lsst.pex.logging import Trace
-from lsst.pex.policy import Policy
 from lsst.pex.logging import Log
 
 from lsst.ip.diffim import subtractExposure, generateDefaultPolicy
@@ -45,8 +45,6 @@ Notes:
     parser.add_option('-p', '--policy', default=defPolicyPath, help='policy file')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
                       help='verbosity of Trace messages')
-    parser.add_option('-i', '--invert', action='store_true', default=False,
-                      help='invert the image to convolve')
     parser.add_option('-d', '--display', action='store_true', default=False,
                       help='display the images')
     parser.add_option('-b', '--bg', action='store_true', default=False,
@@ -73,11 +71,6 @@ Notes:
     scienceExposure  = afwImage.ExposureF(sciencePath)
     policy           = generateDefaultPolicy(policyPath)
 
-    invert = False
-    if options.invert:
-        print 'Invert =', options.invert
-        invert = True
-
     display = False
     if options.display:
         print 'Display =', options.display
@@ -92,17 +85,15 @@ Notes:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
-    log = Log(Log.getDefaultLog(),
-              "ip.diffim.subtractExposure")
-
     if bgSub:
         diffimTools.backgroundSubtract(policy, [templateExposure.getMaskedImage(),
                                                 scienceExposure.getMaskedImage()])
 
-    differenceExposure, spatialKernel, backgroundModel, kernelCellSet = subtractExposure(templateExposure,
-                                                                                         scienceExposure,
-                                                                                         policy,
-                                                                                         display)
+    results = subtractExposure(templateExposure,
+                               scienceExposure,
+                               policy,
+                               display)
+    differenceExposure = results[0]
     differenceExposure.writeFits(outputPath)
 
 def run():

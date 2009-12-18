@@ -1,29 +1,26 @@
 #!/usr/bin/env python
-import os, pdb, sys
-import numpy as num
+import os
+import pdb
+import sys
 import unittest
 import lsst.utils.tests as tests
 
 import eups
-import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.pex.policy as pexPolicy
 import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
 
-Verbosity = 5
-logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
+verbosity = 5
+logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
 
 display = True
 writefits = False
-iterate = False
 
 # This one compares DeltaFunction and AlardLupton kernels
 
@@ -52,8 +49,8 @@ class DiffimTestCases(unittest.TestCase):
         self.kFunctor2   = ipDiffim.PsfMatchingFunctorF(self.basisList2)
 
         # Regularized delta function basis set
-        self.H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2, 1, 0)
-        self.kFunctor3   = ipDiffim.PsfMatchingFunctorF(self.basisList1, self.H)
+        self.h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2, 1, 0)
+        self.kFunctor3   = ipDiffim.PsfMatchingFunctorF(self.basisList1, self.h)
 
         # known input images
         defDataDir = eups.productDir('afwdata')
@@ -81,9 +78,9 @@ class DiffimTestCases(unittest.TestCase):
         self.dStats  = ipDiffim.ImageStatisticsF()
 
         #
-        self.footprints = ipDiffim.getCollectionOfFootprintsForPsfMatching(self.templateImage.getMaskedImage(),
-                                                                           self.scienceImage.getMaskedImage(),
-                                                                           self.policy)
+        tmi = self.templateImage.getMaskedImage()
+        smi = self.scienceImage.getMaskedImage()
+        self.footprints = ipDiffim.getCollectionOfFootprintsForPsfMatching(tmi, smi, self.policy)
         
     def tearDown(self):
         del self.policy
@@ -108,7 +105,7 @@ class DiffimTestCases(unittest.TestCase):
         vmean = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
         return kSum, bg, dmean, dstd, vmean, kImageOut, diffIm2
         
-    def applyFunctor(self, invert=False, xloc=397, yloc=580, iterate=False):
+    def applyFunctor(self, invert=False, xloc=397, yloc=580):
         print '# %.2f %.2f' % (xloc, yloc)
         
         imsize = int(3 * self.kCols)
@@ -127,7 +124,7 @@ class DiffimTestCases(unittest.TestCase):
             else:
                 smi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(),  bbox)
                 tmi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox)
-        except:
+        except Exception, e:
             return None
 
         # estimate of the variance
@@ -185,11 +182,11 @@ class DiffimTestCases(unittest.TestCase):
         raw_input('Next: ')
 
     def testFunctor(self):
-        for object in self.footprints:
+        for fp in self.footprints:
             # note this returns the kernel images
             self.applyFunctor(invert=False, 
-                              xloc= int(0.5 * ( object.getBBox().getX0() + object.getBBox().getX1() )),
-                              yloc= int(0.5 * ( object.getBBox().getY0() + object.getBBox().getY1() )))
+                              xloc= int(0.5 * ( fp.getBBox().getX0() + fp.getBBox().getX1() )),
+                              yloc= int(0.5 * ( fp.getBBox().getY0() + fp.getBBox().getY1() )))
        
 #####
         
@@ -202,16 +199,14 @@ def suite():
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
-def run(exit=False):
+def run(doExit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    tests.run(suite(), doExit)
 
 if __name__ == "__main__":
     if '-d' in sys.argv:
         display = True
     if '-w' in sys.argv:
         writefits = True
-    if '-i' in sys.argv:
-        iterate = True
         
     run(True)

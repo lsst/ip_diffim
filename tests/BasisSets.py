@@ -6,18 +6,14 @@ import unittest
 import lsst.utils.tests as tests
 
 import eups
-import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.pex.policy as pexPolicy
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
 import lsst.afw.image.testUtils as imTestUtils
 
-import lsst.afw.display.ds9 as ds9
-
-Verbosity = 4
-logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
+verbosity = 4
+logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
@@ -60,22 +56,22 @@ class DiffimTestCases(unittest.TestCase):
         # test order
         order = -1
         try:
-            H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, 0, 0)
-        except:
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, 0, 0)
+        except Exception, e:
             pass
         else:
             self.fail()
 
         order = 0
         try:
-            H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, 0, 0)
-        except:
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, 0, 0)
+        except Exception, e:
             self.fail()
 
         order = 3
         try:
-            H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, 0, 0)
-        except:
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, 0, 0)
+        except Exception, e:
             pass
         else:
             self.fail()
@@ -83,22 +79,22 @@ class DiffimTestCases(unittest.TestCase):
         # test boundary_style
         boundary = -1
         try:
-            H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, 0)
-        except:
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, 0)
+        except Exception, e:
             pass
         else:
             self.fail()        
 
         boundary = 0
         try:
-            H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, 0)
-        except:
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, 0)
+        except Exception, e:
             self.fail()        
 
         boundary = 3
         try:
-            H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, 0)
-        except:
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, 0)
+        except Exception, e:
             pass
         else:
             self.fail()
@@ -106,22 +102,22 @@ class DiffimTestCases(unittest.TestCase):
         # test difference_style
         difference = -1
         try:
-            H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, 0, difference)
-        except:
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, 0, difference)
+        except Exception, e:
             pass
         else:
             self.fail()
 
         difference = 0
         try:
-            H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, 0, difference)
-        except:
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, 0, difference)
+        except Exception, e:
             self.fail()
 
         difference = 2
         try:
-            H = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, 0, difference)
-        except:
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, 0, difference)
+        except Exception, e:
             pass
         else:
             self.fail()
@@ -129,9 +125,9 @@ class DiffimTestCases(unittest.TestCase):
 
     def testRenormalize(self):
         # inputs
-        gauss1 = afwMath.GaussianFunction2D(2,2)
-        gauss2 = afwMath.GaussianFunction2D(3,4)
-        gauss3 = afwMath.GaussianFunction2D(0.2,0.25)
+        gauss1 = afwMath.GaussianFunction2D(2, 2)
+        gauss2 = afwMath.GaussianFunction2D(3, 4)
+        gauss3 = afwMath.GaussianFunction2D(0.2, 0.25)
         gaussKernel1 = afwMath.AnalyticKernel(self.kCols, self.kRows, gauss1)
         gaussKernel2 = afwMath.AnalyticKernel(self.kCols, self.kRows, gauss2)
         gaussKernel3 = afwMath.AnalyticKernel(self.kCols, self.kRows, gauss3)
@@ -249,9 +245,9 @@ def suite():
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
-def run(exit=False):
+def run(doExit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    tests.run(suite(), doExit)
 
 if __name__ == "__main__":
     run(True)

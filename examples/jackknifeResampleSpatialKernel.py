@@ -1,22 +1,21 @@
 #!/usr/bin/env python
-import os, pdb, sys
-import numpy as num
+import os
+import pdb
+import sys
 import unittest
 import lsst.utils.tests as tests
  
 import eups
-import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.pex.policy as pexPolicy
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
 
 import lsst.afw.display.ds9 as ds9
 
-Verbosity = 3
-pexLog.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
+verbosity = 3
+pexLog.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
@@ -54,14 +53,14 @@ class DiffimTestCases(unittest.TestCase):
         diffimTools.backgroundSubtract(self.policy, [self.templateMaskedImage,
                                                      self.scienceMaskedImage])
 
-    def stats(self, id, diffim, size=5):
+    def stats(self, cid, diffim, size=5):
         bbox = afwImage.BBox(afwImage.PointI((diffim.getWidth() - size)//2,
                                              (diffim.getHeight() - size)//2),
                              afwImage.PointI((diffim.getWidth() + size)//2,
                                              (diffim.getHeight() + size)//2))
         self.dStats.apply(diffim)
         pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
-                     "Candidate %d : Residuals all (%d px): %.3f +/- %.3f" % (id,
+                     "Candidate %d : Residuals all (%d px): %.3f +/- %.3f" % (cid,
                                                                               self.dStats.getNpix(),
                                                                               self.dStats.getMean(),
                                                                               self.dStats.getRms()))
@@ -70,7 +69,7 @@ class DiffimTestCases(unittest.TestCase):
         diffim2 = afwImage.MaskedImageF(diffim, bbox)
         self.dStats.apply(diffim2)
         pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
-                     "Candidate %d : Residuals core (%d px): %.3f +/- %.3f" % (id,
+                     "Candidate %d : Residuals core (%d px): %.3f +/- %.3f" % (cid,
                                                                                self.dStats.getNpix(),
                                                                                self.dStats.getMean(),
                                                                                self.dStats.getRms()))
@@ -83,9 +82,9 @@ class DiffimTestCases(unittest.TestCase):
         smi   = cand.getMiToNotConvolvePtr()
         
         im1   = afwImage.ImageD(kFn1.getDimensions())
-        ksum1 = kFn1.computeImage(im1, False,
-                                  afwImage.indexToPosition(int(cand.getXCenter())),
-                                  afwImage.indexToPosition(int(cand.getYCenter())))
+        kFn1.computeImage(im1, False,
+                          afwImage.indexToPosition(int(cand.getXCenter())),
+                          afwImage.indexToPosition(int(cand.getYCenter())))
         fk1   = afwMath.FixedKernel(im1)
         bg1   = bgFn1(afwImage.indexToPosition(int(cand.getXCenter())),
                       afwImage.indexToPosition(int(cand.getYCenter())))
@@ -94,9 +93,9 @@ class DiffimTestCases(unittest.TestCase):
         ####
         
         im2   = afwImage.ImageD(kFn2.getDimensions())
-        ksum2 = kFn2.computeImage(im2, False,
-                                  afwImage.indexToPosition(int(cand.getXCenter())),
-                                  afwImage.indexToPosition(int(cand.getYCenter())))
+        kFn2.computeImage(im2, False,
+                          afwImage.indexToPosition(int(cand.getXCenter())),
+                          afwImage.indexToPosition(int(cand.getYCenter())))
         fk2   = afwMath.FixedKernel(im2)
         bg2   = bgFn2(afwImage.indexToPosition(int(cand.getXCenter())),
                       afwImage.indexToPosition(int(cand.getYCenter())))
@@ -120,14 +119,13 @@ class DiffimTestCases(unittest.TestCase):
                      "N-1 Spatial Model")
         self.stats(cand.getId(), d2)
             
-    def setStatus(self, cellSet, id, value):
+    def setStatus(self, cellSet, cid, value):
         # ideally
         # cellSet.getCandidateById(id).setStatus(value)
-        # hack
         for cell in cellSet.getCellList():
             for cand in cell.begin(False):
                 cand = ipDiffim.cast_KernelCandidateF(cand)
-                if (cand.getId() == id):
+                if (cand.getId() == cid):
                     cand.setStatus(value)
                     return cand
 
@@ -139,8 +137,6 @@ class DiffimTestCases(unittest.TestCase):
         
         kernel, bg, cellSet = results
         basisList   = kernel.getKernelList()
-        kernelOrder = self.policy.get("spatialKernelOrder")
-        bgOrder     = self.policy.get("spatialBgOrder")
         kFunctor    = ipDiffim.PsfMatchingFunctorF(basisList)
         
         goodList = []
@@ -156,13 +152,13 @@ class DiffimTestCases(unittest.TestCase):
                     cand.setStatus(afwMath.SpatialCellCandidate.BAD)
 
         for idx in range(len(goodList)):
-            id   = goodList[idx]
+            cid   = goodList[idx]
 
             print # clear the screen
             pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
-                         "Removing candidate %d" % (id))
+                         "Removing candidate %d" % (cid))
             
-            cand = self.setStatus(cellSet, id, afwMath.SpatialCellCandidate.BAD)
+            cand = self.setStatus(cellSet, cid, afwMath.SpatialCellCandidate.BAD)
 
             jkResults = ipDiffim.fitSpatialKernelFromCandidates(kFunctor,
                                                                 cellSet,
@@ -176,7 +172,7 @@ class DiffimTestCases(unittest.TestCase):
             # only 6 windows
             self.assess(cand, kernel, bg, jkKernel, jkBg, 1)
 
-            self.setStatus(cellSet, id, afwMath.SpatialCellCandidate.GOOD)
+            self.setStatus(cellSet, cid, afwMath.SpatialCellCandidate.GOOD)
        
 
     def runTest(self, mode):
@@ -224,9 +220,9 @@ def suite():
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
-def run(exit=False):
+def run(doExit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    tests.run(suite(), doExit)
 
 if __name__ == "__main__":
     if len(sys.argv) > 3:
@@ -239,4 +235,5 @@ if __name__ == "__main__":
     run(True)
 
 # python tests/JackknifeResampleSpatialKernel.py -d
-# python tests/JackknifeResampleSpatialKernel.py $AFWDATA_DIR/CFHT/D4/cal-53535-i-797722_1_tmpl $AFWDATA_DIR/CFHT/D4/cal-53535-i-797722_1 -d
+# python tests/JackknifeResampleSpatialKernel.py $AFWDATA_DIR/CFHT/D4/cal-53535-i-797722_1_tmpl
+# ... $AFWDATA_DIR/CFHT/D4/cal-53535-i-797722_1 -d

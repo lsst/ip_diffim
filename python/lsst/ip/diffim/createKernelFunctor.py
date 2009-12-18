@@ -1,6 +1,4 @@
-import lsst.pex.policy as pexPolicy
 import lsst.pex.logging as pexLogging
-import lsst.afw.math.mathLib as afwMath
 import diffimLib 
 
 def createKernelFunctor(policy):
@@ -41,12 +39,12 @@ def createKernelFunctor(policy):
             regularizationOrder      = policy.getInt("regularizationOrder")
             regularizationBoundary   = policy.getInt("regularizationBoundary")
             regularizationDifference = policy.getInt("regularizationDifference")
-            H = diffimLib.generateFiniteDifferenceRegularization(kCols, kRows,
+            h = diffimLib.generateFiniteDifferenceRegularization(kCols, kRows,
                                                                  regularizationOrder,
                                                                  regularizationBoundary,
                                                                  regularizationDifference)
 
-            kFunctor = diffimLib.PsfMatchingFunctorF(basisList, H)
+            kFunctor = diffimLib.PsfMatchingFunctorF(basisList, h)
             return kFunctor
 
         kFunctor = diffimLib.PsfMatchingFunctorF(basisList)

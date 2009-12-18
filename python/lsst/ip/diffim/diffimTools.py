@@ -51,7 +51,8 @@ def backgroundSubtract(policy, maskedImages):
         image   = maskedImage.getImage() 
         backobj = afwMath.makeBackground(image, bctrl)
         image  -= backobj.getImageF()
-        del image; del backobj
+        del image
+        del backobj
         
     t1 = time.time()
     pexLog.Trace("lsst.ip.diffim.backgroundSubtract", 1,
@@ -64,9 +65,7 @@ def backgroundSubtract(policy, maskedImages):
 
 def displaySpatialKernelQuality(kernelCellSet, spatialKernel, spatialBg, frame):
     import lsst.afw.display.ds9 as ds9
-    import lsst.afw.display.utils as displayUtils
 
-    mos    = displayUtils.Mosaic()
     imstat = diffimLib.ImageStatisticsF()
     
     for cell in kernelCellSet.getCellList():
@@ -145,7 +144,7 @@ def displayBasisMosaic(spatialKernel, frame):
     for idx in range(len(basisList)):
         kernel = basisList[idx]
         im   = afwImage.ImageD(spatialKernel.getDimensions())
-        ksum = kernel.computeImage(im, False)
+        kernel.computeImage(im, False)
         mos.append(im, "K%d" % (idx))
     mosaic = mos.makeMosaic()
     ds9.mtv(mosaic, frame=frame)
@@ -176,14 +175,4 @@ def displayCandidateMosaic(kernelCellSet, frame):
     mosaic = mos.makeMosaic()
     ds9.mtv(mosaic, frame=frame)
     mos.drawLabels(frame=frame)
-    
-
-def displaySpatialKernel(kernelCellSet, spatialKernel):
-    import lsst.afw.display.ds9 as ds9
-    import lsst.afw.display.utils as displayUtils
-
-    for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(False): # False = include bad candidates
-            cand  = diffimLib.cast_KernelCandidateF(cand)
-            rchi2 = cand.getChi2()    
-    
+        

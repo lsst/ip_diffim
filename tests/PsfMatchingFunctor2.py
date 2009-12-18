@@ -1,21 +1,21 @@
 #!/usr/bin/env python
-import os, pdb, sys
+import os
+import pdb
+import sys
 import numpy as num
 import unittest
 import lsst.utils.tests as tests
 
 import eups
-import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.pex.policy as pexPolicy
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
 
-Verbosity = 4
-logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
+verbosity = 4
+logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
@@ -162,9 +162,9 @@ class DiffimTestCases(unittest.TestCase):
             for i in range(kImageOut.getWidth()):
                 if not kNorm:
                     if addNoise:
-                        self.assertAlmostEqual(kImageOut.get(i, j), self.kImageIn.get(i,j), 1)
+                        self.assertAlmostEqual(kImageOut.get(i, j), self.kImageIn.get(i, j), 1)
                     else:
-                        self.assertAlmostEqual(kImageOut.get(i, j), self.kImageIn.get(i,j), 4)
+                        self.assertAlmostEqual(kImageOut.get(i, j), self.kImageIn.get(i, j), 4)
 
         # finally, stats on the diffim
         imstat = ipDiffim.ImageStatisticsF()
@@ -197,9 +197,9 @@ def suite():
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
-def run(exit=False):
+def run(doExit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    tests.run(suite(), doExit)
 
 if __name__ == "__main__":
     if '-d' in sys.argv:

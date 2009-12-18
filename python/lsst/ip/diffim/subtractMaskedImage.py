@@ -7,9 +7,8 @@ import diffimLib
 from createPsfMatchingKernel import createPsfMatchingKernel
 
 # all the other LSST packages
-import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath
 import lsst.pex.logging as pexLog
-import lsst.sdqa as sdqa
 
 def subtractMaskedImage(maskedImageToConvolve, 
                         maskedImageToNotConvolve, 
@@ -68,7 +67,8 @@ def subtractMaskedImage(maskedImageToConvolve,
         image   = differenceMaskedImage.getImage() 
         backobj = afwMath.makeBackground(image, bctrl)
         image  -= backobj.getImageF()
-        del image; del backobj
+        del image
+        del backobj
 
     #
     # Place holder for Sqda on diffim; diffim stats and kernel sum

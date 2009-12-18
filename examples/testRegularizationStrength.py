@@ -1,21 +1,21 @@
 #!/usr/bin/env python
-import os, pdb, sys
+import os
+import pdb
+import sys
 
 import unittest
 import lsst.utils.tests as tests
 
 import eups
-import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.pex.policy as pexPolicy
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
 
-Verbosity = 5
-logging.Trace_setVerbosity('lsst.ip.diffim', Verbosity)
+verbosity = 5
+logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
@@ -31,17 +31,19 @@ class DiffimTestCases(unittest.TestCase):
 
     def diffimQuality(self, kFunctor, tmi, smi, var, foffset=0):
         kFunctor.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
-        KB         = kFunctor.getSolution()
-        kernel     = KB.first
-        background = KB.second
+        kb         = kFunctor.getSolution()
+        kernel     = kb.first
+        background = kb.second
         kImageOut  = afwImage.ImageD(self.kCols, self.kRows)
 
         kSum      = kernel.computeImage(kImageOut, False)
         diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, background)
         bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
                                                   kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() - kernel.getCtrY())))
+                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  -
+                                                                       kernel.getCtrX()),
+                                                  diffIm.getHeight() - (kernel.getHeight() -
+                                                                        kernel.getCtrY())))
         diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
         self.dStats.apply( diffIm2 )
 
@@ -59,17 +61,20 @@ class DiffimTestCases(unittest.TestCase):
 
         # Regularization terms
         forward, central     = 0, 1
-        no_wrap, wrap, taper = 0, 1, 2
-        boundary_style, diff_style = taper, forward
-        self.H0 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary_style, diff_style)
-        self.H1 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 1, boundary_style, diff_style)
-        self.H2 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2, boundary_style, diff_style)
+        noWrap, wrap, taper  = 0, 1, 2
+        boundaryStyle, diffStyle = taper, forward
+        self.h0 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0,
+                                                                  boundaryStyle, diffStyle)
+        self.h1 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 1,
+                                                                  boundaryStyle, diffStyle)
+        self.h2 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2,
+                                                                  boundaryStyle, diffStyle)
         
         # difference imaging functor
         self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
-        self.kFunctor0     = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H0)
-        self.kFunctor1     = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H1)
-        self.kFunctor2     = ipDiffim.PsfMatchingFunctorF(self.basisList, self.H2)
+        self.kFunctor0     = ipDiffim.PsfMatchingFunctorF(self.basisList, self.h0)
+        self.kFunctor1     = ipDiffim.PsfMatchingFunctorF(self.basisList, self.h1)
+        self.kFunctor2     = ipDiffim.PsfMatchingFunctorF(self.basisList, self.h2)
 
         # known input images
         defDataDir = eups.productDir('afwdata')
@@ -150,9 +155,9 @@ def suite():
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
-def run(exit=False):
+def run(doExit=False):
     """Run the tests"""
-    tests.run(suite(), exit)
+    tests.run(suite(), doExit)
 
 if __name__ == "__main__":
     if '-d' in sys.argv:

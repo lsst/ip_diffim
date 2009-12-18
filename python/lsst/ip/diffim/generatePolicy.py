@@ -1,5 +1,3 @@
-import eups
-import os
 import lsst.pex.policy as pexPolicy
 import lsst.pex.logging as pexLog
 
@@ -47,7 +45,7 @@ def modifyKernelPolicy(policy, fwhm=3.5):
     pexLog.Trace("lsst.ip.diffim.generateKernelPolicy", 2,
                  "Footprint grow rad : %d px" % (policy.getInt("fpGrowPix")))
 
-    outStr = ", ".join(["%.2f"%(x) for x in policy.getDoubleArray("alardSigGauss")])
+    outStr = ", ".join(["%.2f" % (x) for x in policy.getDoubleArray("alardSigGauss")])
     pexLog.Trace("lsst.ip.diffim.generateKernelPolicy", 2,
                  "A/L gaussian sig   : %s px" % (outStr))
 

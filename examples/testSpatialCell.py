@@ -10,7 +10,7 @@ coord     = 7.
 tmi = afwImage.MaskedImageF(stampSize, stampSize)
 smi = afwImage.MaskedImageF(stampSize, stampSize)
 
-bbox    = afwImage.BBox(afwImage.PointI(0,0), fullSize, fullSize)
+bbox    = afwImage.BBox(afwImage.PointI(0, 0), fullSize, fullSize)
 cellSet = afwMath.SpatialCellSet(bbox, cellSize, cellSize)
 cand    = ipDiffim.makeKernelCandidate(coord, coord, tmi, smi)
 print cand.getStatus()
