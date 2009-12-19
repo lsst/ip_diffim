@@ -131,9 +131,9 @@ class DiffimTestCases(unittest.TestCase):
 
     def jackknifeResample(self, results):
         # do as little re-processing as possible
-        self.policy.set("singleKernelClipping", False);
-        self.policy.set("kernelSumClipping", False);
-        self.policy.set("spatialKernelClipping", False);
+        self.policy.set("singleKernelClipping", False)
+        self.policy.set("kernelSumClipping", False)
+        self.policy.set("spatialKernelClipping", False)
         
         kernel, bg, cellSet = results
         basisList   = kernel.getKernelList()
