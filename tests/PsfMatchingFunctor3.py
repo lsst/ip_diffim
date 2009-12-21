@@ -95,8 +95,8 @@ class DiffimTestCases(unittest.TestCase):
         ksum0   = kernel0.computeImage(im0, False)    
 
         if display:
-            frame=0
-            ds9.mtv(self.kImageIn, frame=0)
+            frame = 0
+            ds9.mtv(self.kImageIn, frame = 0)
             frame += 1
             
             for idx in range(min(5, len(basisList))):
