@@ -16,7 +16,7 @@ dependencies = [
     ["cfitsio", "fitsio.h", "m cfitsio", "ffopen"],
     ["wcslib", "wcslib/wcs.h", "m wcs"], # remove m once SConsUtils bug fixed
     ["xpa", "xpa.h", "xpa", "XPAPuts"],
-    ["minuit", "Minuit/FCNBase.h", "lcg_Minuit:C++"],
+    ["minuit2", "Minuit2/FCNBase.h", "Minuit2:C++"],
     ["gsl", "gsl/gsl_matrix.h", "gslcblas gsl"],
     ["eigen", "Eigen/Core.h"],
     ["pex_exceptions", "lsst/pex/exceptions.h", "pex_exceptions:C++"],
@@ -38,7 +38,7 @@ env = scons.makeEnv(
 #
 # Libraries needed to link libraries/executables
 #
-env.libs["ip_diffim"] += env.getlibs("boost wcslib cfitsio minuit utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy security afw gsl eigen sdqa")
+env.libs["ip_diffim"] += env.getlibs("boost wcslib cfitsio minuit2 utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy security afw gsl eigen sdqa")
 
 #
 # Build/install things
