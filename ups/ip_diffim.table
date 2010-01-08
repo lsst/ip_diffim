@@ -1,5 +1,5 @@
-setupRequired(afw >= 3.3.18)
-setupRequired(meas_algorithms)
+setupRequired(afw >= svn12359)
+setupRequired(meas_algorithms >= svn12523)
 setupRequired(sdqa >= 3.0.3)
 
 setupOptional(afwdata)
