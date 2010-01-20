@@ -1,5 +1,5 @@
 setupRequired(meas_algorithms >= 3.0.12)
-setupRequired(sdqa >= 3.0.3)
+setupRequired(sdqa >= 3.0.3+1)
 
 setupOptional(afwdata)
 setupOptional(pyfits)
