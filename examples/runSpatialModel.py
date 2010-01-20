@@ -13,7 +13,7 @@ import lsst.afw.display.utils as displayUtils
 subBackground = True
 display = True
 
-verbosity = 4
+verbosity = 5
 pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 
 defDataDir   = eups.productDir("afwdata") 
@@ -39,11 +39,11 @@ if defSciencePath.find('CFHT') == -1:
     templateImage = ipDiffim.warpTemplateExposure(templateImage,
                                                   scienceImage,
                                                   policy)
-    policy.set("detThreshold", 5.)
-    policy.set("sizeCellX", 128)
-    policy.set("sizeCellY", 128)
-    policy.set("kernelBasisSet", "alard-lupton")
-    policy.set("useRegularization", False)
+    #policy.set("detThreshold", 5.)
+    #policy.set("sizeCellX", 128)
+    #policy.set("sizeCellY", 128)
+    #policy.set("kernelBasisSet", "alard-lupton")
+    #policy.set("useRegularization", False)
 
 if subBackground:
     diffimTools.backgroundSubtract(policy, [templateImage.getMaskedImage(),

@@ -4,7 +4,7 @@ import time
 import diffimLib
 
 # all the other diffim routines
-from createPsfMatchingKernel import createPsfMatchingKernel
+from .createPsfMatchingKernel import createPsfMatchingKernel
 
 # all the other LSST packages
 import lsst.afw.math as afwMath

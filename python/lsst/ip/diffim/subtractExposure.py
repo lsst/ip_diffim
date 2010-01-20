@@ -1,5 +1,5 @@
-from subtractMaskedImage import subtractMaskedImage
-from warpTemplateExposure import warpTemplateExposure
+from .subtractMaskedImage import subtractMaskedImage
+from .warpTemplateExposure import warpTemplateExposure
 
 import lsst.pex.logging as pexLog
 import lsst.afw.image as afwImage
