@@ -217,8 +217,8 @@ fitSpatialKernelFromCandidates(
 
             nRejected = kernelSumVisitor.getNRejected();
             pexLogging::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
-                                  "Ksum Iteration %d, rejected %d Kernels", 
-                                  nKsumIterations, nRejected);
+                                  "Spatial iteration %d, Ksum Iteration %d, rejected %d Kernels", 
+                                  i, nKsumIterations, nRejected);
 
             if ((nRejected > 0) && (nKsumIterations < maxKsumIterations)) {
                 /* Jump back to the top; don't count against index i */
@@ -298,8 +298,8 @@ fitSpatialKernelFromCandidates(
 
                 nRejected = singleKernelFitterPca.getNRejected();
                 pexLogging::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
-                                      "Pca Iteration %d, rejected %d Kernels", 
-                                      nPcaIterations, nRejected);
+                                      "Spatial iteration %d, Pca Iteration %d, rejected %d Kernels", 
+                                      i, nPcaIterations, nRejected);
 
                 if ((nRejected > 0) && (nPcaIterations < maxPcaIterations)) {
                     /* We don't want to continue on (yet) with the spatial modeling,
