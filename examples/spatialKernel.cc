@@ -57,5 +57,5 @@ int main() {
                                       afwImage::indexToPosition(loc), 
                                       afwImage::indexToPosition(loc));
     kImage.writeFits("kernel.fits");
-    
+
 }

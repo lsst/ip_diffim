@@ -53,6 +53,9 @@ spatialKernel, spatialBg, kernelCellSet = ipDiffim.createPsfMatchingKernel(templ
                                                                            scienceImage.getMaskedImage(),
                                                                            policy)
 
+import pdb
+pdb.set_trace()
+
 # Lets see what we got
 if display:
     mos = displayUtils.Mosaic()

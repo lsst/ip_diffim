@@ -479,7 +479,7 @@ public:
         }
         
         /* 
-         * However you *always* need to reset M and B since these are used *
+         * However you *always* need to reset M and B since these are used 
          * in the spatial fitting
          */
         std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> > mb = 

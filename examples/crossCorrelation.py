@@ -1,0 +1,250 @@
+import lsst.ip.diffim.diffimTools as diffimTools
+import lsst.ip.diffim as ipDiffim
+import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath
+import lsst.pex.logging as pexLogging
+import lsst.afw.display.ds9 as ds9
+import pylab
+import numpy as num
+
+verbosity = 5
+pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
+
+# Define the diagnostic functions on the goodness of fit of the
+# spatial model (k_s) to each individual kernel (k)
+
+# import crossCorrelation
+# r, d1, d2 = crossCorrelation.makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot=True)
+# reload(crossCorrelation)
+
+def makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot = False):
+    kImage  = afwImage.ImageD(spatialKernel.getDimensions())
+    ksImage = afwImage.ImageD(spatialKernel.getDimensions())
+    kInfo   = []
+
+    candList = []
+    for cell in kernelCellSet.getCellList():
+        for cand in cell.begin(True): # only look at non-bad candidates
+            if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
+                candList.append(cand.getId())
+
+
+    r  = []
+    d1 = []
+    d2 = []
+        
+    for i in range(len(candList)):
+        cand1    = ipDiffim.cast_KernelCandidateF(kernelCellSet.getCandidateById(candList[i]))
+        x1       = cand1.getXCenter()
+        y1       = cand1.getYCenter()
+
+        # Original kernel
+        kImage1  = afwImage.ImageD(spatialKernel.getDimensions())
+        cand1.getKernel().computeImage(kImage1, False)
+
+        # Spatial approximation
+        ksImage1 = afwImage.ImageD(spatialKernel.getDimensions())
+        spatialKernel.computeImage(ksImage1, False,
+                                   afwImage.indexToPosition(int(x1)),
+                                   afwImage.indexToPosition(int(y1)))
+
+        # Turn into numarrays for dot product
+        ksVector1 = diffimTools.vectorFromImage(ksImage1)
+        kVector1  = diffimTools.vectorFromImage(kImage1)
+        
+        for j in range(i+1, len(candList)):
+            cand2    = ipDiffim.cast_KernelCandidateF(kernelCellSet.getCandidateById(candList[j]))
+            x2       = cand2.getXCenter()
+            y2       = cand2.getYCenter()
+            
+            # Original kernel
+            kImage2  = afwImage.ImageD(spatialKernel.getDimensions())
+            cand2.getKernel().computeImage(kImage2, False)
+            
+            # Spatial approximation
+            ksImage2 = afwImage.ImageD(spatialKernel.getDimensions())
+            spatialKernel.computeImage(ksImage2, False,
+                                       afwImage.indexToPosition(int(x2)),
+                                       afwImage.indexToPosition(int(y2)))
+
+            # Turn into numarrays for dot product
+            ksVector2 = diffimTools.vectorFromImage(ksImage2)
+            kVector2  = diffimTools.vectorFromImage(kImage2)
+
+            ###
+
+            # Add to cross correlation functions
+            r.append(num.sqrt((x1 - x2)**2 + (y1 - y2)**2))
+            d1.append(correlationD1(kVector1, ksVector1, kVector2, ksVector2))
+            d2.append(correlationD2(kVector1, ksVector1, kVector2, ksVector2))
+
+    r  = num.array(r)
+    d1 = num.array(d1)
+    d2 = num.array(d2)
+
+    if makePlot:
+        plotCrossCorrelation(r, d1, d2)
+        
+    return r, d1, d2
+
+
+def plotCrossCorrelation(r, d1, d2, bsize = 100):
+    import pylab
+
+    dbin  = num.arange(0, max(r) + bsize, bsize)
+    xbin  = []
+    d1av  = []
+    d1rms = []
+    d2av  = []
+    d2rms = []
+
+    for i in range(len(dbin)-1):
+        idx, = num.where((r > dbin[i]) & (r <= dbin[i+1]))
+        if len(idx) >= 1:
+            d1av.append(num.mean( d1[idx] ))
+            d1rms.append(num.std( d1[idx] ))
+            d2av.append(num.mean( d2[idx] ))
+            d2rms.append(num.std( d2[idx] ))
+            xbin.append(num.mean( r[idx] ))
+
+    xbin  = num.array(xbin)
+    d1av  = num.array(d1av)
+    d1rms = num.array(d1rms)
+    d2av  = num.array(d2av)
+    d2rms = num.array(d2rms)
+
+    pylab.figure()
+    
+    pylab.plot(r, d1, 'ro', ms = 2, alpha = 0.25)
+    pylab.plot(r, d2, 'gs', ms = 2, alpha = 0.25)
+    pylab.errorbar(xbin, d1av, yerr = d1rms, fmt = 'ro', label = 'D1')
+    pylab.errorbar(xbin, d2av, yerr = d2rms, fmt = 'gs', label = 'D2')
+    pylab.xlabel('r')
+    pylab.ylabel('Correlation Function')
+    pylab.legend(loc = 1, numpoints = 1)
+    pylab.axhline(y = 0, color = 'k', linestyle = '--')
+    
+    pylab.show()
+
+def correlationD1(k1, ks1, k2, ks2):
+    # Autocorrelation in residuals
+    # [ (k - k_s) * (k - k_s) ] (r)
+    t1 = (k1 - ks1)
+    t2 = (k2 - ks2)
+
+    return num.dot(t1, t2)
+    
+                
+def correlationD2(k1, ks1, k2, ks2):
+    # Data-residual cross correlation
+    # [ k * (k - k_s) + (k - k_s) * k ] (r)
+    t11 = k1
+    t12 = (k2 - ks2)
+
+    t21 = (k1 - ks1)
+    t22 = k2
+
+    return num.dot(t11, t12) + num.dot(t21, t22)
+
+#################
+
+def addNoise(mi):
+    img       = mi.getImage()
+    seed      = int(afwMath.makeStatistics(mi.getVariance(), afwMath.MAX).getValue())+1
+    rdm       = afwMath.Random(afwMath.Random.MT19937, seed)
+    rdmImage  = img.Factory(img.getDimensions())
+    afwMath.randomGaussianImage(rdmImage, rdm)
+    rdmImage *= num.sqrt(seed)
+    img      += rdmImage
+
+    # and don't forget to add to the variance
+    var  = mi.getVariance()
+    var += 1.0
+
+def testAutoCorrelation(orderMake, orderFit, policy = None, inMi = None, display = False):
+    if policy == None:
+        import eups
+        import os
+        imageProcDir  = eups.productDir("ip_diffim")
+        defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
+        policy        = ipDiffim.generateDefaultPolicy(defPolicyPath)
+
+    stride = 100
+    
+    if inMi == None:
+        width  = 512
+        height = 2048
+        inMi = afwImage.MaskedImageF(width, height)
+        for j in num.arange(stride//2, height, stride):
+            for i in num.arange(stride//2, width, stride):
+                inMi.set(i-1, j-1, (100, 0x0, 1))
+                inMi.set(i-1, j+0, (100, 0x0, 1))
+                inMi.set(i-1, j+1, (100, 0x0, 1))
+                inMi.set(i+0, j-1, (100, 0x0, 1))
+                inMi.set(i+0, j+0, (100, 0x0, 1))
+                inMi.set(i+0, j+1, (100, 0x0, 1))
+                inMi.set(i+1, j-1, (100, 0x0, 1))
+                inMi.set(i+1, j+0, (100, 0x0, 1))
+                inMi.set(i+1, j+1, (100, 0x0, 1))
+
+    addNoise(inMi)
+    
+    kSize = policy.get('kernelRows')
+
+    basicGaussian1 = afwMath.GaussianFunction2D(2., 2., 0.)
+    basicKernel1   = afwMath.AnalyticKernel(kSize, kSize, basicGaussian1)
+
+    basicGaussian2 = afwMath.GaussianFunction2D(5., 3., 0.5 * num.pi)
+    basicKernel2   = afwMath.AnalyticKernel(kSize, kSize, basicGaussian2)
+
+    basisList = afwMath.KernelList()
+    basisList.append(basicKernel1)
+    basisList.append(basicKernel2)
+
+    spatialKernelFunction = afwMath.PolynomialFunction2D(orderMake)
+    spatialKernel = afwMath.LinearCombinationKernel(basisList, spatialKernelFunction)
+    kCoeffs = [[1.0      for x in range(1,spatialKernelFunction.getNParameters()+1)],
+               [0.01 * x for x in range(1,spatialKernelFunction.getNParameters()+1)]]
+    spatialKernel.setSpatialParameters(kCoeffs)
+
+    cMi = afwImage.MaskedImageF(inMi.getDimensions())
+    afwMath.convolve(cMi, inMi, spatialKernel, True)
+
+    if display:
+        ds9.mtv(inMi.getImage(), frame=1)
+        ds9.mtv(inMi.getVariance(), frame=2)
+
+        ds9.mtv(cMi.getImage(), frame=3)
+        ds9.mtv(cMi.getVariance(), frame=4)
+        
+        #ds9.mtv(inMi, frame=1)
+        #ds9.mtv(cMi, frame=2)
+
+        #kImage = afwImage.ImageD(spatialKernel.getDimensions())
+        #spatialKernel.computeImage(kImage, True, 1, 1)
+        #ds9.mtv(kImage, frame=3)
+
+        #spatialKernel.computeImage(kImage, True, spatialKernel.getWidth(), spatialKernel.getHeight())
+        #ds9.mtv(kImage, frame=4)
+
+    policy.set("spatialKernelOrder", orderFit)
+    policy.set("sizeCellX", stride)
+    policy.set("sizeCellY", stride)
+    #policy.set("kernelBasisSet", "alard-lupton")
+    
+    result = ipDiffim.subtractMaskedImage(inMi, cMi, policy)
+    differenceMaskedImage, spatialKernel, spatialBg, kernelCellSet = result
+    makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot = True)
+
+def doOverConstrained(policy = None, inMi = None, display = False):
+    testAutoCorrelation(orderMake = 1, orderFit = 3, policy = policy, inMi = inMi, display = display)
+
+
+def doUnderConstrained(policy = None, inMi = None, display = False):
+    testAutoCorrelation(orderMake = 2, orderFit = 0, policy = policy, inMi = inMi, display = display)
+
+    
+
+if __name__ == '__main__':
+    #doOverConstrained(display = True)
+    doUnderConstrained(display = True)

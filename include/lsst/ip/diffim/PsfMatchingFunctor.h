@@ -106,7 +106,7 @@ namespace diffim {
         boost::shared_ptr<Eigen::MatrixXd> const _hMat;          ///< Regularization matrix
         bool _initialized;                                       ///< Has been solved for
         bool _regularize;                                        ///< Has a _hMat matrix
-        KernelSolvedBy _solvedBy;                                      ///< How Kernel was determined
+        KernelSolvedBy _solvedBy;                                ///< How Kernel was determined
     };
     
     /**
