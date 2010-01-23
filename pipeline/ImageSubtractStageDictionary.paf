@@ -295,6 +295,11 @@ maxSpatialIterations: 5
 usePcaForSpatialKernel: true
 
 ######
+# Number of iterations to reject bad footprints in the Pca portion
+#
+maxPcaIterations: 5
+
+######
 # How many principal components do you use in the decomposition?
 #
 # Note : this is defined to be the number to use *_in addition to_*
