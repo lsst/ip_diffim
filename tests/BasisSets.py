@@ -53,10 +53,17 @@ class DiffimTestCases(unittest.TestCase):
         self.runDeltaFunction(7, 10)
 
     def testRegularization(self):
+
+        unwrap = ipDiffim.UNWRAPPED # 0
+        wrap = ipDiffim.WRAPPED     # 1
+        taper = ipDiffim.TAPERED    # 2
+        forw = ipDiffim.FORWARD_DIFFERENCE # 0
+        cent = ipDiffim.CENTRAL_DIFFERENCE # 1
+        
         # test order
         order = -1
         try:
-            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, 0, 0)
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, unwrap, forw)
         except Exception, e:
             pass
         else:
@@ -64,43 +71,43 @@ class DiffimTestCases(unittest.TestCase):
 
         order = 0
         try:
-            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, 0, 0)
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, unwrap, forw)
         except Exception, e:
             self.fail()
 
         order = 3
         try:
-            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, 0, 0)
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, order, unwrap, forw)
         except Exception, e:
             pass
         else:
             self.fail()
 
         # test boundary_style
-        boundary = -1
+        boundary = -1 # too low
         try:
-            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, 0)
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, forw)
         except Exception, e:
             pass
         else:
             self.fail()        
 
-        boundary = 0
+        boundary = wrap
         try:
-            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, 0)
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, forw)
         except Exception, e:
             self.fail()        
 
-        boundary = 3
+        boundary = 3  # too high
         try:
-            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, 0)
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, boundary, forw)
         except Exception, e:
             pass
         else:
             self.fail()
             
         # test difference_style
-        difference = -1
+        difference = -1 # too low
         try:
             h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, 0, difference)
         except Exception, e:
@@ -108,21 +115,21 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.fail()
 
-        difference = 0
+        difference = forw
         try:
-            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, 0, difference)
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, unwrap, difference)
         except Exception, e:
             self.fail()
 
-        difference = 2
+        difference = 2 # too high
         try:
-            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, 0, difference)
+            h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0, unwrap, difference)
         except Exception, e:
             pass
         else:
             self.fail()
         
-
+            
     def testRenormalize(self):
         # inputs
         gauss1 = afwMath.GaussianFunction2D(2, 2)
