@@ -45,7 +45,6 @@ namespace diffim {
      * @param order            Which derivative you expect to be smooth (derivative order+1 is penalized) 
      * @param boundary_style   0 = unwrapped, 1 = wrapped, 2 = order-tappered ('order' is highest used) 
      * @param difference_style 0 = forward, 1 = central
-     * @param printB           debugging
      *
      * @ingroup ip_diffim
      */    
@@ -54,10 +53,19 @@ namespace diffim {
         unsigned int height,
         unsigned int order,
 	unsigned int boundary_style = 1, 
-	unsigned int difference_style = 0,
-	bool printB=false
+	unsigned int difference_style = 0
         );
-
+    
+    namespace details {
+    boost::shared_ptr<Eigen::MatrixXd> generateFdrBMatrix(
+        unsigned int width,
+        unsigned int height,
+        unsigned int order,
+	unsigned int boundary_style = 1, 
+	unsigned int difference_style = 0
+        );
+    }
+    
     /**
      * @brief Renormalize a list of basis kernels
      *

@@ -122,7 +122,7 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.fail()
         
-
+            
     def testRenormalize(self):
         # inputs
         gauss1 = afwMath.GaussianFunction2D(2, 2)

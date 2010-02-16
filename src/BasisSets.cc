@@ -145,9 +145,29 @@ generateFiniteDifferenceRegularization(
     unsigned int width,
     unsigned int height,
     unsigned int order,
+    unsigned int boundaryStyle,   // 0 = unwrapped, 1 = wrapped, 2 = order-tapered ('order' is highest used)
+    unsigned int differenceStyle  // 0 = forward, 1 = central
+    ) {
+    
+    boost::shared_ptr<Eigen::MatrixXd> bMat = details::generateFdrBMatrix(width, height, order,
+                                                                          boundaryStyle, differenceStyle);
+
+    boost::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd(bMat->transpose() * (*bMat)));
+    return hMat;
+
+}
+
+namespace details {
+/** 
+ * @brief Generate regularization matrix for delta function kernels
+ */
+boost::shared_ptr<Eigen::MatrixXd>
+generateFdrBMatrix(
+    unsigned int width,
+    unsigned int height,
+    unsigned int order,
     unsigned int boundary_style,   // 0 = unwrapped, 1 = wrapped, 2 = order-tapered ('order' is highest used)
-    unsigned int difference_style, // 0 = forward, 1 = central
-    bool printB // a debug flag ... remove when done.
+    unsigned int difference_style  // 0 = forward, 1 = central
     ) {
 
     if (order > 2) throw LSST_EXCEPT(pexExcept::Exception, "Only orders 0..2 allowed");
@@ -332,7 +352,8 @@ generateFiniteDifferenceRegularization(
 
     /* Note we have to add 1 extra (empty) term here because of the differential
      * background fitting */
-    Eigen::MatrixXd bMat = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
+    boost::shared_ptr<Eigen::MatrixXd> bMat(new Eigen::MatrixXd(Eigen::MatrixXd::Zero(width*height+1,
+                                                                                      width*height+1)));
 
     /* Forward difference approximation */
     for (unsigned int i = 0; i < width*height; i++) {
@@ -399,7 +420,7 @@ generateFiniteDifferenceRegularization(
 
                 } 
 
-                bMat(i, y*width + x) = this_coeff;
+                (*bMat)(i, y*width + x) = this_coeff;
                 
             }
 
@@ -407,14 +428,13 @@ generateFiniteDifferenceRegularization(
 
     }
 
-    if (printB)  {
-        std::cout << bMat << std::endl;
-    }
-    
-    boost::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd(bMat.transpose() * bMat));
-    return hMat;
+    return bMat;
 }
+    
+} // end namespace details
+    
 
+    
 /** 
  * @brief Rescale an input set of kernels 
  *
