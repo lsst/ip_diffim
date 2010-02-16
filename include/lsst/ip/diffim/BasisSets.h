@@ -1,4 +1,6 @@
 // -*- lsst-c++ -*-
+#ifndef LSST_IP_DIFFIM_BASISSETS_H
+#define LSST_IP_DIFFIM_BASISSETS_H
 /**
  * @file BasisSets.h
  *
@@ -8,9 +10,6 @@
  *
  * @ingroup ip_diffim
  */
-
-#ifndef LSST_IP_DIFFIM_BASISSETS_H
-#define LSST_IP_DIFFIM_BASISSETS_H
 
 #include "boost/shared_ptr.hpp"
 
@@ -56,19 +55,19 @@ namespace diffim {
         unsigned int width,
         unsigned int height,
         unsigned int order,
-	BoundStyle boundaryStyle = WRAPPED, 
-	DiffStyle differenceStyle = FORWARD_DIFFERENCE
-        );
+        BoundStyle boundaryStyle = WRAPPED,
+        DiffStyle differenceStyle = FORWARD_DIFFERENCE
+                                                                             );
     
-    namespace details {
+namespace details {
     boost::shared_ptr<Eigen::MatrixXd> generateFdrBMatrix(
-        unsigned int width,
-        unsigned int height,
-        unsigned int order,
-	BoundStyle boundaryStyle = WRAPPED, 
-	DiffStyle differenceStyle = FORWARD_DIFFERENCE
-        );
-    }
+            unsigned int width,
+            unsigned int height,
+            unsigned int order,
+            BoundStyle boundaryStyle = WRAPPED, 
+            DiffStyle differenceStyle = FORWARD_DIFFERENCE
+                                                             );
+}
     
     /**
      * @brief Renormalize a list of basis kernels

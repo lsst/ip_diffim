@@ -44,60 +44,63 @@ BOOST_AUTO_TEST_CASE(BasisSetRegMatrix) { /* parasoft-suppress  LsstDm-3-2a Lsst
     Param pars111 = {1, ipDiffim::WRAPPED, ipDiffim::CENTRAL_DIFFERENCE};
     paramSetList.push_back(pars111);
     int *vals111[16];
-    int vals111_0[] = {-4, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}; vals111[0] = vals111_0;
-    int vals111_1[] = {1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0}; vals111[1] = vals111_1;
-    int vals111_2[] = {0, 1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0}; vals111[2] = vals111_2;
-    int vals111_3[] = {1, 0, 1, -4, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1}; vals111[3] = vals111_3;
-    int vals111_4[] = {1, 0, 0, 0, -4, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0}; vals111[4] = vals111_4;
-    int vals111_5[] = {0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0}; vals111[5] = vals111_5;
-    int vals111_6[] = {0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0}; vals111[6] = vals111_6;
-    int vals111_7[] = {0, 0, 0, 1, 1, 0, 1, -4, 0, 0, 0, 1, 0, 0, 0, 0}; vals111[7] = vals111_7;
-    int vals111_8[] = {0, 0, 0, 0, 1, 0, 0, 0, -4, 1, 0, 1, 1, 0, 0, 0}; vals111[8] = vals111_8;
-    int vals111_9[] = {0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0}; vals111[9] = vals111_9;
-    int vals111_10[] = {0, 0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0}; vals111[10] = vals111_10;
-    int vals111_11[] = {0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, -4, 0, 0, 0, 1}; vals111[11] = vals111_11;
-    int vals111_12[] = {1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, -4, 1, 0, 1}; vals111[12] = vals111_12;
-    int vals111_13[] = {0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1, 0}; vals111[13] = vals111_13;
-    int vals111_14[] = {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1}; vals111[14] = vals111_14;
-    int vals111_15[] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, -4}; vals111[15] = vals111_15;
+    int vals111r0[] = {-4, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}; vals111[0] = vals111r0;
+    int vals111r1[] = {1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0}; vals111[1] = vals111r1;
+    int vals111r2[] = {0, 1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0}; vals111[2] = vals111r2;
+    int vals111r3[] = {1, 0, 1, -4, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1}; vals111[3] = vals111r3;
+    int vals111r4[] = {1, 0, 0, 0, -4, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0}; vals111[4] = vals111r4;
+    int vals111r5[] = {0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0}; vals111[5] = vals111r5;
+    int vals111r6[] = {0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0}; vals111[6] = vals111r6;
+    int vals111r7[] = {0, 0, 0, 1, 1, 0, 1, -4, 0, 0, 0, 1, 0, 0, 0, 0}; vals111[7] = vals111r7;
+    int vals111r8[] = {0, 0, 0, 0, 1, 0, 0, 0, -4, 1, 0, 1, 1, 0, 0, 0}; vals111[8] = vals111r8;
+    int vals111r9[] = {0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0}; vals111[9] = vals111r9;
+    int vals111r10[] = {0, 0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0}; vals111[10] = vals111r10;
+    int vals111r11[] = {0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, -4, 0, 0, 0, 1}; vals111[11] = vals111r11;
+    int vals111r12[] = {1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, -4, 1, 0, 1}; vals111[12] = vals111r12;
+    int vals111r13[] = {0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1, 0}; vals111[13] = vals111r13;
+    int vals111r14[] = {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1}; vals111[14] = vals111r14;
+    int vals111r15[] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, -4}; vals111[15] = vals111r15;
     knownBList.push_back(vals111);
 
     // - order 1, tapered, central
     Param pars121 = {1, ipDiffim::TAPERED, ipDiffim::CENTRAL_DIFFERENCE};
     paramSetList.push_back(pars121);
     int *vals121[16];
-    int vals121_0[] = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[0] = vals121_0;
-    int vals121_1[] = {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[1] = vals121_1;
-    int vals121_2[] = {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[2] = vals121_2;
-    int vals121_3[] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[3] = vals121_3;
-    int vals121_4[] = {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[4] = vals121_4;
-    int vals121_5[] = {0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0}; vals121[5] = vals121_5;
-    int vals121_6[] = {0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0}; vals121[6] = vals121_6;
-    int vals121_7[] = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[7] = vals121_7;
-    int vals121_8[] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}; vals121[8] = vals121_8;
-    int vals121_9[] = {0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0}; vals121[9] = vals121_9;
-    int vals121_10[] = {0, 0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0}; vals121[10] = vals121_10;
-    int vals121_11[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0}; vals121[11] = vals121_11;
-    int vals121_12[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}; vals121[12] = vals121_12;
-    int vals121_13[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0}; vals121[13] = vals121_13;
-    int vals121_14[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0}; vals121[14] = vals121_14;
-    int vals121_15[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}; vals121[15] = vals121_15;
+    int vals121r0[] = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[0] = vals121r0;
+    int vals121r1[] = {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[1] = vals121r1;
+    int vals121r2[] = {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[2] = vals121r2;
+    int vals121r3[] = {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[3] = vals121r3;
+    int vals121r4[] = {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[4] = vals121r4;
+    int vals121r5[] = {0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0}; vals121[5] = vals121r5;
+    int vals121r6[] = {0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0, 0, 0, 0}; vals121[6] = vals121r6;
+    int vals121r7[] = {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[7] = vals121r7;
+    int vals121r8[] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}; vals121[8] = vals121r8;
+    int vals121r9[] = {0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0, 0}; vals121[9] = vals121r9;
+    int vals121r10[] = {0, 0, 0, 0, 0, 0, 1, 0, 0, 1, -4, 1, 0, 0, 1, 0}; vals121[10] = vals121r10;
+    int vals121r11[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0}; vals121[11] = vals121r11;
+    int vals121r12[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}; vals121[12] = vals121r12;
+    int vals121r13[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0}; vals121[13] = vals121r13;
+    int vals121r14[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0}; vals121[14] = vals121r14;
+    int vals121r15[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}; vals121[15] = vals121r15;
     knownBList.push_back(vals121);
     
 
     // Loop over each possible set of parameters and check the outputs
-    for(unsigned int k = 0; k < paramSetList.size(); k++) {
+    for (unsigned int k = 0; k < paramSetList.size(); k++) {
         
         int const order                 = paramSetList[k].order;
         ipDiffim::BoundStyle boundStyle = paramSetList[k].bound;
         ipDiffim::DiffStyle  diffStyle  = paramSetList[k].diff;
         int **bKnown = knownBList[k];
+
+        // note: calling FdrBMatrix (which returns B),
+        //       not FiniteDifferenceRegularization (which returns h = BTranspose*B)
         boost::shared_ptr<Eigen::MatrixXd> b =
             ipDiffim::details::generateFdrBMatrix(nCols, nRows, order, boundStyle, diffStyle);
 
         // Do the comparison
-        for(int i = 0; i < nRows*nCols; i++) {
-            for(int j = 0; j < nRows*nCols; j++) {
+        for (int i = 0; i < nRows*nCols; i++) {
+            for (int j = 0; j < nRows*nCols; j++) {
                 int val = (*b)(i, j);
                 int valKnown = bKnown[i][j];
                 BOOST_CHECK_EQUAL(val, valKnown);
@@ -108,8 +111,8 @@ BOOST_AUTO_TEST_CASE(BasisSetRegMatrix) { /* parasoft-suppress  LsstDm-3-2a Lsst
 #if defined(PRINT2D)
         // print the matrix elements in 2D, so you can see how they're positioned
         // -- use this output to verify by eye
-        for(int i = 0; i < nRows*nCols; i++) {
-            for(int j = 0; j < nRows*nCols; j++) {
+        for (int i = 0; i < nRows*nCols; i++) {
+            for (int j = 0; j < nRows*nCols; j++) {
                 int val = (*b)(i, j);
                 std::cout << val << " ";
                 if (j % nCols == (nCols - 1)) std::cout << std::endl;
@@ -125,9 +128,9 @@ BOOST_AUTO_TEST_CASE(BasisSetRegMatrix) { /* parasoft-suppress  LsstDm-3-2a Lsst
         // -- assuming you've verified the values by eye!!!
         std::cout << "    int *vals" << order << boundStyle << diffStyle <<
             "[" << nRows*nCols << "];" << std::endl;
-        for(int i = 0; i < nRows*nCols; i++) {
+        for (int i = 0; i < nRows*nCols; i++) {
             std::cout << "    int vals" << order << boundStyle << diffStyle << "_" << i << "[] = {";
-            for(int j = 0; j < nRows*nCols; j++) {
+            for (int j = 0; j < nRows*nCols; j++) {
                 int val = (*b)(i, j);
                 std::cout << val;
                 if (j < nRows*nCols-1) std::cout << ", ";

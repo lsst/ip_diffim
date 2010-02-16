@@ -47,13 +47,13 @@ generateDeltaFunctionBasisSet(
     if ((width < 1) || (height < 1)) {
         throw LSST_EXCEPT(pexExcept::Exception, "nRows and nCols must be positive");
     }
-    const int signedWidth = static_cast<int>(width);
-    const int signedHeight = static_cast<int>(height);
+    int const signedWidth = static_cast<int>(width);
+    int const signedHeight = static_cast<int>(height);
     afwMath::KernelList kernelBasisList;
     for (int row = 0; row < signedHeight; ++row) {
         for (int col = 0; col < signedWidth; ++col) {
             boost::shared_ptr<afwMath::Kernel> 
-                kernelPtr(new afwMath::DeltaFunctionKernel(width, height, afwImage::PointI(col,row)));
+                kernelPtr(new afwMath::DeltaFunctionKernel(width, height, afwImage::PointI(col, row)));
             kernelBasisList.push_back(kernelPtr);
         }
     }
@@ -116,7 +116,7 @@ generateAlardLuptonBasisSet(
                 }
                 
                 /* gaussian to be modified by this term in the polynomial */
-                polynomial.setParameter(n, 1.);
+                polynomial.setParameter(n, 1.0);
                 (void)kernel.computeImage(image, true);
                 for (int y = 0, v = -halfWidth; y < image.getHeight(); y++, v++) {
                     int u = -halfWidth;
@@ -130,7 +130,7 @@ generateAlardLuptonBasisSet(
                 boost::shared_ptr<afwMath::Kernel> 
                     kernelPtr(new afwMath::FixedKernel(image));
                 kernelBasisList.push_back(kernelPtr);
-                polynomial.setParameter(n, 0.);
+                polynomial.setParameter(n, 0.0);
             }
         }
     }
@@ -211,20 +211,20 @@ generateFdrBMatrix(
     //         though they are not yet implemented.
     //
     std::vector<std::vector<std::vector<float> > > 
-        coeffs(3, std::vector<std::vector<float> >(5, std::vector<float>(5,0)));
-    unsigned int x_cen = 0,  y_cen = 0;  // center of reqested order coeffs
-    unsigned int x_cen1 = 0, y_cen1 = 0; // center of order 1 coeffs
-    unsigned int x_cen2 = 0, y_cen2 = 0; // center of order 2 coeffs
-    unsigned int x_size = 0, y_size = 0;
+        coeffs(3, std::vector<std::vector<float> >(5, std::vector<float>(5, 0)));
+    unsigned int xCen = 0,  yCen = 0;  // center of reqested order coeffs
+    unsigned int xCen1 = 0, yCen1 = 0; // center of order 1 coeffs
+    unsigned int xCen2 = 0, yCen2 = 0; // center of order 2 coeffs
+    unsigned int xSize = 0, ySize = 0;
 
     // forward difference coefficients
     if (differenceStyle == FORWARD_DIFFERENCE) {
         
-        y_cen  = x_cen  = 0;
-        x_cen1 = y_cen1 = 0;
-        x_cen2 = y_cen2 = 0;
+        yCen  = xCen  = 0;
+        xCen1 = yCen1 = 0;
+        xCen2 = yCen2 = 0;
 
-        x_size = y_size = order + 2;
+        xSize = ySize = order + 2;
 
         // default forward difference suggested in NR chap 18
         // 0th order
@@ -276,8 +276,8 @@ generateFdrBMatrix(
         // this is asymmetric and produces diagonal banding in the kernel
         // from: http://www.holoborodko.com/pavel/?page_id=239
         if (order == 0) { 
-            y_cen = x_cen = 1;
-            x_size = y_size = 3;
+            yCen = xCen = 1;
+            xSize = ySize = 3;
         }
         coeffs[0][0][0] =  0; 
         coeffs[0][0][1] = -1; 
@@ -295,10 +295,10 @@ generateFdrBMatrix(
         // this works well and is largely the same as order=1 forward-diff.
         // from: http://www.holoborodko.com/pavel/?page_id=239
         if (order == 1) { 
-            y_cen = x_cen = 1;
-            x_size = y_size = 3;
+            yCen = xCen = 1;
+            xSize = ySize = 3;
         }
-        y_cen1 = x_cen1 = 1;
+        yCen1 = xCen1 = 1;
         coeffs[1][0][0] =  0; 
         coeffs[1][0][1] =  1; 
         coeffs[1][0][2] =  0;  
@@ -315,10 +315,10 @@ generateFdrBMatrix(
         // asymmetric and produces diagonal banding in the kernel
         // from http://www.holoborodko.com/pavel/?page_id=239
         if (order == 2) { 
-            y_cen = x_cen = 2;
-            x_size = y_size = 5;
+            yCen = xCen = 2;
+            xSize = ySize = 5;
         }
-        y_cen2 = x_cen2 = 2;
+        yCen2 = xCen2 = 2;
         coeffs[2][0][0] =  0;
         coeffs[2][0][1] =  0; 
         coeffs[2][0][2] = -1; 
@@ -353,8 +353,8 @@ generateFdrBMatrix(
 
     /* Note we have to add 1 extra (empty) term here because of the differential
      * background fitting */
-    boost::shared_ptr<Eigen::MatrixXd> bMat(new Eigen::MatrixXd(Eigen::MatrixXd::Zero(width*height+1,
-                                                                                      width*height+1)));
+    boost::shared_ptr<Eigen::MatrixXd> bMat(new Eigen::MatrixXd(Eigen::MatrixXd::Zero(width*height + 1,
+                                                                                      width*height + 1)));
 
     /* Forward difference approximation */
     for (unsigned int i = 0; i < width*height; i++) {
@@ -362,12 +362,12 @@ generateFdrBMatrix(
         unsigned int const x0 = i % width;  // the x coord in the kernel image
         unsigned int const y0 = i / width;  // the y coord in the kernel image
         
-        unsigned int x_edge_distance = (x0 > (width - x0 - 1))  ? width - x0 - 1  : x0;
-        unsigned int y_edge_distance = (y0 > (height - y0 - 1)) ? height - y0 - 1 : y0;
-        unsigned int edge_distance = (x_edge_distance < y_edge_distance) ? x_edge_distance : y_edge_distance;
+        unsigned int xEdgeDistance = (x0 > (width - x0 - 1))  ? width - x0 - 1  : x0;
+        unsigned int yEdgeDistance = (y0 > (height - y0 - 1)) ? height - y0 - 1 : y0;
+        unsigned int edgeDistance = (xEdgeDistance < yEdgeDistance) ? xEdgeDistance : yEdgeDistance;
 
-        for (unsigned int dx = 0; dx < x_size; dx++) {
-            for (unsigned int dy = 0; dy < y_size; dy++) {
+        for (unsigned int dx = 0; dx < xSize; dx++) {
+            for (unsigned int dy = 0; dy < ySize; dy++) {
 
                 // determine where to put this coeff
 
@@ -375,53 +375,53 @@ generateFdrBMatrix(
                 // note: adding width and height in the sum prevents negatives
                 unsigned int x = 0;
                 unsigned int y = 0; 
-                double this_coeff = 0;
+                double thisCoeff = 0;
 
                 // no-wrapping at edges
                 if (boundaryStyle == UNWRAPPED) {
-                    x = x0 + dx - x_cen;
-                    y = y0 + dy - y_cen;
+                    x = x0 + dx - xCen;
+                    y = y0 + dy - yCen;
                     if ((y < 0) || (y > height - 1) || (x < 0) || (x > width - 1)) { continue; }
-                    this_coeff = coeffs[order][dx][dy];
+                    thisCoeff = coeffs[order][dx][dy];
 
                     // wrapping at edges
                 } else if (boundaryStyle == WRAPPED) {
-                    x = (width  + x0 + dx - x_cen) % width;
-                    y = (height + y0 + dy - y_cen) % height;
-                    this_coeff = coeffs[order][dx][dy];
+                    x = (width  + x0 + dx - xCen) % width;
+                    y = (height + y0 + dy - yCen) % height;
+                    thisCoeff = coeffs[order][dx][dy];
 
                     // order tapering to the edge (just clone wrapping for now)
                     // - use the lowest order possible
                 } else if (boundaryStyle == TAPERED) {
 
                     // edge rows and columns ... set to constant
-                    if (edge_distance == 0) {
+                    if (edgeDistance == 0) {
                         x = x0;
                         y = y0;
-                        this_coeff = 1;
+                        thisCoeff = 1;
                     }
                     // in one from edge, use 1st order
-                    else if (edge_distance == 1 && order > 0) {
-                        x = (width  + x0 + dx - x_cen1) % width;
-                        y = (height + y0 + dy - y_cen1) % height;
-                        if ((dx < 3) && (dy < 3)) { this_coeff = coeffs[1][dx][dy]; } 
+                    else if (edgeDistance == 1 && order > 0) {
+                        x = (width  + x0 + dx - xCen1) % width;
+                        y = (height + y0 + dy - yCen1) % height;
+                        if ((dx < 3) && (dy < 3)) { thisCoeff = coeffs[1][dx][dy]; } 
                     }
                     // in two from edge, use 2st order if order > 1
-                    else if (edge_distance == 2 && order > 1){
-                        x = (width  + x0 + dx - x_cen2) % width;
-                        y = (height + y0 + dy - y_cen2) % height;
-                        if ((dx < 5) && (dy < 5)) { this_coeff = coeffs[2][dx][dy]; } 
+                    else if (edgeDistance == 2 && order > 1){
+                        x = (width  + x0 + dx - xCen2) % width;
+                        y = (height + y0 + dy - yCen2) % height;
+                        if ((dx < 5) && (dy < 5)) { thisCoeff = coeffs[2][dx][dy]; } 
                     } 
                     // if we're somewhere in the middle
-                    else if (edge_distance > order) {
-                        x = (width  + x0 + dx - x_cen) % width;
-                        y = (height + y0 + dy - y_cen) % height;
-                        this_coeff = coeffs[order][dx][dy];
+                    else if (edgeDistance > order) {
+                        x = (width  + x0 + dx - xCen) % width;
+                        y = (height + y0 + dy - yCen) % height;
+                        thisCoeff = coeffs[order][dx][dy];
                     }
 
                 } 
 
-                (*bMat)(i, y*width + x) = this_coeff;
+                (*bMat)(i, y*width + x) = thisCoeff;
                 
             }
 
@@ -496,7 +496,7 @@ renormalizeKernelList(
         (void)kernelListIn[i]->computeImage(image, false);
         
         /* Check the kernel sum; if its close to zero don't do anything */
-        kSum = 0.;
+        kSum = 0.0;
         for (int y = 0; y < image.getHeight(); y++) {
             for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); 
                  ptr != end; ++ptr.x()) {
@@ -511,7 +511,7 @@ renormalizeKernelList(
 
 
         /* Finally, rescale such that the inner product is 1 */
-        kSum = 0.;
+        kSum = 0.0;
         for (int y = 0; y < image.getHeight(); y++) {
             for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); 
                  ptr != end; ++ptr.x()) {
