@@ -13,17 +13,24 @@ namespace ipDiffim = lsst::ip::diffim;
 // #define PRINT2D 1
 // #define PRINTCODE 1
 
+typedef struct {
+    int order;
+    ipDiffim::BoundStyle bound;
+    ipDiffim::DiffStyle diff;
+} Param;
+
 BOOST_AUTO_TEST_CASE(BasisSetRegMatrix) { /* parasoft-suppress  LsstDm-3-2a LsstDm-3-4a LsstDm-4-6 LsstDm-5-25 "Boost non-Std" */
 
     int nRows = 4, nCols = 4;
 
-    std::vector<int*> paramSetList;     // stored as order, boundStyle, diffStyle
+    std::vector<Param> paramSetList;     // stored as order, boundStyle, diffStyle
     std::vector<int**> knownBList;
 
     // check a few of the different regularization matrices against known values
     // These two have been checked by eye and are known to produce the correct regularization matrix
     // The issue is to verify that the tapering (lower order near kernel edge), and wrapping
     //    are correct.  The only way to do this is to print them as 2d matrices and look.
+
     // There's code below to print the matrices, and also to generate the code lines defining
     //    the test arrays, which have indeed been verified.
     // This test actually does relatively little ... if someone changes the regularization matrices
@@ -31,9 +38,10 @@ BOOST_AUTO_TEST_CASE(BasisSetRegMatrix) { /* parasoft-suppress  LsstDm-3-2a Lsst
     
     // boundStyles: 0 = unwrapped, 1 = wrapped, 2 = order-tapered ('order' is highest used)
     // diffStyles: 0 = forward, 1 = central
+
     
-    // - order 1, wrapped, forward
-    int pars111[3] = {1, 1, 1};
+    // - order 1, wrapped, central
+    Param pars111 = {1, ipDiffim::WRAPPED, ipDiffim::CENTRAL_DIFFERENCE};
     paramSetList.push_back(pars111);
     int *vals111[16];
     int vals111_0[] = {-4, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0}; vals111[0] = vals111_0;
@@ -55,7 +63,7 @@ BOOST_AUTO_TEST_CASE(BasisSetRegMatrix) { /* parasoft-suppress  LsstDm-3-2a Lsst
     knownBList.push_back(vals111);
 
     // - order 1, tapered, central
-    int pars121[3] = {1, 2, 1};
+    Param pars121 = {1, ipDiffim::TAPERED, ipDiffim::CENTRAL_DIFFERENCE};
     paramSetList.push_back(pars121);
     int *vals121[16];
     int vals121_0[] = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; vals121[0] = vals121_0;
@@ -80,9 +88,9 @@ BOOST_AUTO_TEST_CASE(BasisSetRegMatrix) { /* parasoft-suppress  LsstDm-3-2a Lsst
     // Loop over each possible set of parameters and check the outputs
     for(unsigned int k = 0; k < paramSetList.size(); k++) {
         
-        int const order      = paramSetList[k][0];
-        int const boundStyle = paramSetList[k][1];
-        int const diffStyle  = paramSetList[k][2];
+        int const order                 = paramSetList[k].order;
+        ipDiffim::BoundStyle boundStyle = paramSetList[k].bound;
+        ipDiffim::DiffStyle  diffStyle  = paramSetList[k].diff;
         int **bKnown = knownBList[k];
         boost::shared_ptr<Eigen::MatrixXd> b =
             ipDiffim::details::generateFdrBMatrix(nCols, nRows, order, boundStyle, diffStyle);

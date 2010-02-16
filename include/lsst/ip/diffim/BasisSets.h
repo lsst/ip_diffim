@@ -21,7 +21,11 @@
 namespace lsst { 
 namespace ip { 
 namespace diffim {
-   
+
+
+    enum BoundStyle { UNWRAPPED, WRAPPED, TAPERED, NBOUND };
+    enum DiffStyle { FORWARD_DIFFERENCE, CENTRAL_DIFFERENCE, NDIFF };
+    
     /**
      * @brief Build a set of Delta Function basis kernels
      * 
@@ -43,8 +47,8 @@ namespace diffim {
      * @param width            Width of basis set you want to regularize
      * @param height           Height of basis set you want to regularize
      * @param order            Which derivative you expect to be smooth (derivative order+1 is penalized) 
-     * @param boundary_style   0 = unwrapped, 1 = wrapped, 2 = order-tappered ('order' is highest used) 
-     * @param difference_style 0 = forward, 1 = central
+     * @param boundaryStyle    0 = unwrapped, 1 = wrapped, 2 = order-tappered ('order' is highest used) 
+     * @param differenceStyle  0 = forward, 1 = central
      *
      * @ingroup ip_diffim
      */    
@@ -52,8 +56,8 @@ namespace diffim {
         unsigned int width,
         unsigned int height,
         unsigned int order,
-	unsigned int boundary_style = 1, 
-	unsigned int difference_style = 0
+	BoundStyle boundaryStyle = WRAPPED, 
+	DiffStyle differenceStyle = FORWARD_DIFFERENCE
         );
     
     namespace details {
@@ -61,8 +65,8 @@ namespace diffim {
         unsigned int width,
         unsigned int height,
         unsigned int order,
-	unsigned int boundary_style = 1, 
-	unsigned int difference_style = 0
+	BoundStyle boundaryStyle = WRAPPED, 
+	DiffStyle differenceStyle = FORWARD_DIFFERENCE
         );
     }
     

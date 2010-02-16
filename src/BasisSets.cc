@@ -145,8 +145,8 @@ generateFiniteDifferenceRegularization(
     unsigned int width,
     unsigned int height,
     unsigned int order,
-    unsigned int boundaryStyle,   // 0 = unwrapped, 1 = wrapped, 2 = order-tapered ('order' is highest used)
-    unsigned int differenceStyle  // 0 = forward, 1 = central
+    BoundStyle boundaryStyle, // 0 = unwrapped, 1 = wrapped, 2 = order-tapered ('order' is highest used)
+    DiffStyle differenceStyle // 0 = forward, 1 = central
     ) {
     
     boost::shared_ptr<Eigen::MatrixXd> bMat = details::generateFdrBMatrix(width, height, order,
@@ -166,17 +166,18 @@ generateFdrBMatrix(
     unsigned int width,
     unsigned int height,
     unsigned int order,
-    unsigned int boundary_style,   // 0 = unwrapped, 1 = wrapped, 2 = order-tapered ('order' is highest used)
-    unsigned int difference_style  // 0 = forward, 1 = central
+    BoundStyle boundaryStyle, // 0 = unwrapped, 1 = wrapped, 2 = order-tapered ('order' is highest used)
+    DiffStyle differenceStyle // 0 = forward, 1 = central
     ) {
 
     if (order > 2) throw LSST_EXCEPT(pexExcept::Exception, "Only orders 0..2 allowed");
 
-    if (boundary_style > 2) { 
-        throw LSST_EXCEPT(pexExcept::Exception, "Boundary styles 0..2 defined");
+    if ( !(boundaryStyle == UNWRAPPED || boundaryStyle == WRAPPED || boundaryStyle == TAPERED) ) { 
+        throw LSST_EXCEPT(pexExcept::Exception, "Boundary styles UNWRAPPED, WRAPPED, TAPERED defined");
     }
-    if (difference_style > 1) {
-        throw LSST_EXCEPT(pexExcept::Exception, "Only forward(0), and central(1) difference types defined");
+    if ( !(differenceStyle == FORWARD_DIFFERENCE || differenceStyle == CENTRAL_DIFFERENCE )) {
+        throw LSST_EXCEPT(pexExcept::Exception,
+                          "Only FORWARD_DIFFERENCE, and CENTRAL_DIFFERENCE difference types defined");
     }
 
     /* what works, and what doesn't */
@@ -217,7 +218,7 @@ generateFdrBMatrix(
     unsigned int x_size = 0, y_size = 0;
 
     // forward difference coefficients
-    if (difference_style == 0) {
+    if (differenceStyle == FORWARD_DIFFERENCE) {
         
         y_cen  = x_cen  = 0;
         x_cen1 = y_cen1 = 0;
@@ -270,7 +271,7 @@ generateFdrBMatrix(
     }
 
     // central difference coefficients
-    if (difference_style == 1) {
+    if (differenceStyle == CENTRAL_DIFFERENCE) {
 
         // this is asymmetric and produces diagonal banding in the kernel
         // from: http://www.holoborodko.com/pavel/?page_id=239
@@ -377,21 +378,21 @@ generateFdrBMatrix(
                 double this_coeff = 0;
 
                 // no-wrapping at edges
-                if (boundary_style == 0) {
+                if (boundaryStyle == UNWRAPPED) {
                     x = x0 + dx - x_cen;
                     y = y0 + dy - y_cen;
                     if ((y < 0) || (y > height - 1) || (x < 0) || (x > width - 1)) { continue; }
                     this_coeff = coeffs[order][dx][dy];
 
                     // wrapping at edges
-                } else if (boundary_style == 1) {
+                } else if (boundaryStyle == WRAPPED) {
                     x = (width  + x0 + dx - x_cen) % width;
                     y = (height + y0 + dy - y_cen) % height;
                     this_coeff = coeffs[order][dx][dy];
 
                     // order tapering to the edge (just clone wrapping for now)
                     // - use the lowest order possible
-                } else if (boundary_style == 2) {
+                } else if (boundaryStyle == TAPERED) {
 
                     // edge rows and columns ... set to constant
                     if (edge_distance == 0) {
