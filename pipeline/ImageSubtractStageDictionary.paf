@@ -295,6 +295,11 @@ maxSpatialIterations: 5
 usePcaForSpatialKernel: true
 
 ######
+# Subtract off the mean feature before doing the Pca?
+#
+subtractMeanForPca: true
+
+######
 # Number of iterations to reject bad footprints in the Pca portion
 #
 maxPcaIterations: 5
