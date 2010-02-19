@@ -254,7 +254,7 @@ public:
             *kImage           /= kCandidate->getKsum();
             /* Tell imagePca they have the same weighting in the Pca */
             _imagePca->addImage(kImage, 1.0);
-        } catch(pexExcept::LengthErrorException &e) {
+        } catch(pexExcept::Exception &e) {
             return;
         }
     }
@@ -283,6 +283,9 @@ public:
            the remaining terms carry less of the power than if you do
            subtract off the mean.  (0.041223/(1-0.876046) < 0.373870).
          */
+        pexLogging::TTrace<6>("lsst.ip.diffim.SetPcaImageVisitor.subtractMean", 
+                              "Subtracting mean feature before Pca");
+
         _mean = _imagePca->getMean();
         afwImage::ImagePca<ImageT>::ImageList imageList = _imagePca->getImageList();
         for (typename afwImage::ImagePca<ImageT>::ImageList::const_iterator ptr = imageList.begin(), 
