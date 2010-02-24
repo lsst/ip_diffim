@@ -131,15 +131,30 @@ SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double
 %convolveAndSubtract(double);           // image subtraction on double images??!?  Not instantiated in .cc either
 #endif
 
-%template(getCollectionOfFootprintsForPsfMatching)
-    lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<float>;
-%template(getCollectionOfFootprintsForPsfMatching)
-    lsst::ip::diffim::getCollectionOfFootprintsForPsfMatching<double>;
-
 /******************************************************************************/
 
 %{
-#include "lsst/ip/diffim/SpatialModelKernel.h"
+#include "lsst/ip/diffim/KernelCandidateDetection.h"
+%}
+
+%define %KernelCandidateDetectionPtr(NAME, TYPE)
+SWIG_SHARED_PTR(KernelCandidateDetection##NAME,
+                lsst::ip::diffim::KernelCandidateDetection<TYPE>);
+%enddef
+
+%define %KernelCandidateDetection(NAME, TYPE)
+%template(KernelCandidateDetection##NAME) lsst::ip::diffim::KernelCandidateDetection<TYPE>;
+%enddef
+
+%KernelCandidateDetectionPtr(F, float);
+
+%include "lsst/ip/diffim/KernelCandidateDetection.h"
+
+%KernelCandidateDetection(F, float);
+/******************************************************************************/
+
+%{
+#include "lsst/ip/diffim/KernelCandidate.h"
 %}
 
 %define %IMAGE(PIXTYPE)
@@ -165,9 +180,16 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 
 %KernelCandidatePtr(F, float);
 
-%include "lsst/ip/diffim/SpatialModelKernel.h"
+%include "lsst/ip/diffim/KernelCandidate.h"
 
 %KernelCandidate(F, float);
+
+/******************************************************************************/
+
+%{
+#include "lsst/ip/diffim/SpatialModelKernel.h"
+%}
+%include "lsst/ip/diffim/SpatialModelKernel.h"
 %template(fitSpatialKernelFromCandidates) lsst::ip::diffim::fitSpatialKernelFromCandidates<float>;
 
 %template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, 

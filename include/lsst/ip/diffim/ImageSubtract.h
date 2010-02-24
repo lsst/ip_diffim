@@ -29,10 +29,6 @@ namespace ip {
 namespace diffim {
 
     
-    /** Mask plane definitions */
-    std::string const diffimStampCandidateStr = "DIFFIM_STAMP_CANDIDATE";
-    std::string const diffimStampUsedStr      = "DIFFIM_STAMP_USED";
-    
     /**
      * @brief Class to accumulate Mask bits
      *
@@ -84,7 +80,19 @@ namespace diffim {
         typedef typename lsst::afw::image::MaskedImage<PixelT>::x_iterator x_iterator;
 
         ImageStatistics() : 
-            _xsum(0.), _x2sum(0.), _npix(0) {} ;
+            _xsum(0.), _x2sum(0.), _npix(0) {
+            lsst::afw::image::MaskPixel const edgeMask   = 
+                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("EDGE");
+            lsst::afw::image::MaskPixel const crMask     = 
+                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("CR");
+            lsst::afw::image::MaskPixel const satMask    = 
+                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("SAT");
+            lsst::afw::image::MaskPixel const badMask    = 
+                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("BAD");
+            lsst::afw::image::MaskPixel const interpMask = 
+                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("INTERP");
+            _bpMask = edgeMask | crMask | satMask | badMask | interpMask;
+        } ;
         virtual ~ImageStatistics() {} ;
 
         // Clear the accumulators
@@ -95,7 +103,7 @@ namespace diffim {
             reset();
             for (int y = 0; y != image.getHeight(); ++y) {
                 for (x_iterator ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
-		    if ((*ptr).mask() == 0) {
+                    if (!((*ptr).mask() & _bpMask)) {
                         double const ivar = 1. / (*ptr).variance();
                         _xsum  += (*ptr).image() * sqrt(ivar);
                         _x2sum += (*ptr).image() * (*ptr).image() * ivar;
@@ -104,7 +112,30 @@ namespace diffim {
                 }
             }
         }
-        
+
+        void apply(lsst::afw::image::MaskedImage<PixelT> const& image, int core) {
+            reset();
+            int y0 = std::max(0, image.getHeight()/2 - core);
+            int y1 = std::min(image.getHeight(), image.getHeight()/2 + core);
+            int x0 = std::max(0, image.getWidth()/2 - core);
+            int x1 = std::min(image.getWidth(), image.getWidth()/2 + core);
+
+            for (int y = y0; y != y1; ++y) {
+                for (x_iterator ptr = image.x_at(x0, y), end = image.x_at(x1, y); 
+                     ptr != end; ++ptr) {
+                    if (!((*ptr).mask() & _bpMask)) {
+                        double const ivar = 1. / (*ptr).variance();
+                        _xsum  += (*ptr).image() * sqrt(ivar);
+                        _x2sum += (*ptr).image() * (*ptr).image() * ivar;
+                        _npix  += 1;
+                    }
+                }
+            }
+        }
+
+        void setBpMask(lsst::afw::image::MaskPixel bpMask) {_bpMask = bpMask;}
+        lsst::afw::image::MaskPixel getBpMask() {return _bpMask;}
+
         // Mean of distribution
         double getMean() const { 
             return (_npix > 0) ? _xsum/_npix : std::numeric_limits<double>::quiet_NaN(); 
@@ -132,6 +163,7 @@ namespace diffim {
         double _xsum;
         double _x2sum;
         int    _npix;
+        lsst::afw::image::MaskPixel _bpMask;
     };
 
 
@@ -177,24 +209,6 @@ namespace diffim {
         lsst::afw::math::Kernel const& convolutionKernel,
         BackgroundT background,
         bool invert=true
-        );
-
-    /**
-     * @brief Search through images for Footprints with no masked pixels
-     *
-     * @note Runs detection on the template; searches through both images for masked pixels
-     *
-     * @param imageToConvolve  MaskedImage that will be convolved with kernel; detection is run on this image
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param policy  Policy for operations; in particular object detection
-     *
-     * @ingroup ip_diffim
-     */    
-    template <typename PixelT>
-    std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-        lsst::afw::image::MaskedImage<PixelT> const& imageToConvolve,
-        lsst::afw::image::MaskedImage<PixelT> const& imageToNotConvolve,
-        lsst::pex::policy::Policy             const& policy
         );
 
     /**

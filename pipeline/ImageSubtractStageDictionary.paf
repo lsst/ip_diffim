@@ -30,6 +30,12 @@ warpingKernelName: "lanczos4"
 fpNpixMin: 5
 
 ######
+# Run detection on the template (imageToConvolve; value = true) or
+# science image (imageToNotConvolve; value = false)
+#
+detOnTemplate: true
+
+######
 # Maximum number of pixels in an acceptible Footprint
 #
 # Too big and the subsequent convolutions become unwieldy 
@@ -60,7 +66,8 @@ detThresholdType: "stdev"
 #
 # Initial detection threshold (if high, this is for debugging)
 #
-# For standard processing a value like 10 would be acceptable
+# For standard processing a value like 10 would be acceptable when
+# detecting on a template, 5 for on a science image
 # 
 detThreshold: 10.
 
@@ -82,7 +89,7 @@ detThreshold: 10.
 # NOTE : if "alard-lupton" you might want to turn off
 # "usePcaForSpatialKernel" down below.  
 #
-kernelBasisSet: "delta-function"
+kernelBasisSet: "alard-lupton"
 
 ######
 # Size of the convolution kernel
@@ -111,7 +118,7 @@ alardDegGauss: 4   3   2
 ######
 # FUTURE : Scaling of these numbers with the Psf Fwhm
 #
-fpGrowFwhmScaling: 10.
+fpGrowFwhmScaling: 4.0
 fpGrowMin: 20
 fpGrowMax: 40
 
@@ -267,8 +274,8 @@ useAfwBackground: false
 #
 # Used to initialize afwMath::SpatialCellSet class 
 #
-sizeCellX: 256
-sizeCellY: 256
+sizeCellX: 128
+sizeCellY: 128
 
 ######
 # Number of stars to use in each SpatialCell cell
@@ -292,7 +299,7 @@ maxSpatialIterations: 5
 # If this option is used, the first term (mean kernel) will have no
 # spatial variation and the kernel sum will be conserved
 #
-usePcaForSpatialKernel: true
+usePcaForSpatialKernel: false
 
 ######
 # Subtract off the mean feature before doing the Pca?

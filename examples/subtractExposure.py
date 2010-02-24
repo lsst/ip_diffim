@@ -27,6 +27,7 @@ def main():
     defPolicyPath   = os.path.join(imageProcDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
     defOutputPath   = 'diffExposure'
     defVerbosity    = 0
+    defFwhm         = None
     
     usage = """usage: %%prog [options] [scienceExposure [templateExposure [outputExposure]]]]
 
@@ -49,6 +50,8 @@ Notes:
                       help='display the images')
     parser.add_option('-b', '--bg', action='store_true', default=False,
                       help='subtract backgrounds')
+    parser.add_option('-f', '--fwhm', type=float,
+                      help='Psf Fwhm (pixel)')
 
     (options, args) = parser.parse_args()
     
@@ -66,10 +69,11 @@ Notes:
     print 'Template exposure:', templatePath
     print 'Output exposure:  ', outputPath
     print 'Policy file:      ', policyPath
-    
-    templateExposure = afwImage.ExposureF(templatePath)
-    scienceExposure  = afwImage.ExposureF(sciencePath)
-    policy           = generateDefaultPolicy(policyPath)
+
+    fwhm = defFwhm
+    if options.fwhm:
+        print 'Fwhm =', options.fwhm
+        fwhm = options.fwhm
 
     display = False
     if options.display:
@@ -84,6 +88,12 @@ Notes:
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
+
+    ####
+        
+    templateExposure = afwImage.ExposureF(templatePath)
+    scienceExposure  = afwImage.ExposureF(sciencePath)
+    policy           = generateDefaultPolicy(policyPath, fwhm=fwhm)
 
     if bgSub:
         diffimTools.backgroundSubtract(policy, [templateExposure.getMaskedImage(),

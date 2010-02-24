@@ -33,7 +33,8 @@
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/logging/Trace.h"
 
-#include "lsst/ip/diffim/SpatialModelKernel.h"
+#include "lsst/ip/diffim/ImageSubtract.h"
+#include "lsst/ip/diffim/KernelCandidate.h"
 
 #define DEBUG_MATRIX 0
 
@@ -496,7 +497,7 @@ public:
          * _setCandidateKernel = false.
          */
         MaskedImageT diffim = kCandidate->returnDifferenceImage(kb.first, kb.second);
-        
+
         /* 
          * Remake the kernel using the first iteration difference image
          * variance as a better estimate of the true diffim variance.  If
@@ -541,6 +542,17 @@ public:
             diffim = kCandidate->returnDifferenceImage(kb.first, kb.second);                
         }
         
+        /* Core resids */
+        _imstats.apply(diffim, 3);
+        pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
+                              "Candidate %d core resids = %.2f +/- %.2f sigma (%d pix)",
+                              kCandidate->getId(),
+                              _imstats.getMean(),
+                              _imstats.getRms(),
+                              _imstats.getNpix());
+
+        
+        /* Official resids */
         _imstats.apply(diffim);
         kCandidate->setChi2(_imstats.getVariance());
         
@@ -561,10 +573,11 @@ public:
         pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                               "Background = %.3f", background);
         pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
-                              "Candidate %d diffim residuals = %.2f +/- %.2f sigma",
+                              "Candidate %d resids = %.2f +/- %.2f sigma (%d pix)",
                               kCandidate->getId(),
                               _imstats.getMean(),
-                              _imstats.getRms());
+                              _imstats.getRms(),
+                              _imstats.getNpix());
         
         bool meanIsNan = std::isnan(_imstats.getMean());
         bool rmsIsNan  = std::isnan(_imstats.getRms());
@@ -1052,6 +1065,17 @@ public:
         
         MaskedImageT diffim = kCandidate->returnDifferenceImage(kernelPtr, background);
         
+        /* Core resids */
+        _imstats.apply(diffim, 3);
+        pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
+                              "Candidate %d core resids = %.2f +/- %.2f sigma (%d pix)",
+                              kCandidate->getId(),
+                              _imstats.getMean(),
+                              _imstats.getRms(),
+                              _imstats.getNpix());
+
+        
+        /* Official resids */
         _imstats.apply(diffim);
         kCandidate->setChi2(_imstats.getVariance());
         
@@ -1066,10 +1090,11 @@ public:
         pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                               "Background = %.3f", background);
         pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
-                              "Candidate %d diffim residuals = %.2f +/- %.2f sigma",
+                              "Candidate %d resids = %.2f +/- %.2f sigma (%d pix)",
                               kCandidate->getId(),
                               _imstats.getMean(),
-                              _imstats.getRms());
+                              _imstats.getRms(),
+                              _imstats.getNpix());
 
         bool meanIsNan = std::isnan(_imstats.getMean());
         bool rmsIsNan  = std::isnan(_imstats.getRms());

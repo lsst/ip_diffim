@@ -22,7 +22,7 @@ def createPsfMatchingKernel(maskedImageToConvolve,
                             policy,
                             footprints=None):
 
-    
+
     # Object to store the KernelCandidates for spatial modeling
     kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(maskedImageToConvolve.getX0(),
                                                                          maskedImageToConvolve.getY0()),
@@ -55,6 +55,16 @@ def createPsfMatchingKernel(maskedImageToConvolve,
 
         cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi)
         kernelCellSet.insertCandidate(cand)
+
+
+    print "CAW CAW CAW"
+
+    # ACB debugging
+    from .diffimTools import displayFootprints
+    ds9.mtv(maskedImageToConvolve, frame=2)
+    ds9.mtv(maskedImageToNotConvolve, frame=3)
+    displayFootprints(maskedImageToNotConvolve, footprints, frame=4)
+
 
     # Object to perform the Psf matching on a source-by-source basis
     kFunctor = createKernelFunctor(policy)

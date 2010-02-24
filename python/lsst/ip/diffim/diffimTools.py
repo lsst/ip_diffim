@@ -175,4 +175,28 @@ def displayCandidateMosaic(kernelCellSet, frame):
     mosaic = mos.makeMosaic()
     ds9.mtv(mosaic, frame=frame)
     mos.drawLabels(frame=frame)
-        
+
+
+def displayFootprints(image, footprintList, frame):
+    import lsst.afw.display.ds9 as ds9
+    import lsst.afw.detection as afwDetection
+
+    bitmask = image.getMask().getPlaneBitMask("DETECTED")
+    afwDetection.setMaskFromFootprintList(image.getMask(), footprintList, bitmask)
+
+    ds9.mtv(image, frame=frame)
+
+    #ds9.mtv(image, frame=frame)
+    #for fp in footprintList:
+    #    bboxes = afwDetection.footprintToBBoxList(fp)
+    #    for bbox in bboxes:
+    #        bbox.shift(-image.getX0(),-image.getY0())
+    #        
+    #        x0, y0, x1, y1 = bbox.getX0(), bbox.getY0(), bbox.getX1(), bbox.getY1()
+    #        
+    #        x0 -= 0.5; y0 -= 0.5
+    #        x1 += 0.5; y1 += 0.5
+    #        
+    #        ds9.line([(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)], ctype=ds9.RED)
+    
+

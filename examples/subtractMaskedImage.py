@@ -53,6 +53,8 @@ Notes:
                       help='display the images')
     parser.add_option('-b', '--bg', action='store_true', default=False,
                       help='subtract backgrounds')
+    parser.add_option('-f', '--fwhm', type=float,
+                      help='Psf Fwhm (pixel)')
                       
     (options, args) = parser.parse_args()
     
@@ -71,10 +73,11 @@ Notes:
     print 'Output image:  ', outputPath
     print 'Policy file:   ', policyPath
 
-    templateMaskedImage = afwImage.MaskedImageF(templatePath)
-    scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
-    policy              = generateDefaultPolicy(policyPath)
-    
+    fwhm = defFwhm
+    if options.fwhm:
+        print 'Fwhm =', options.fwhm
+        fwhm = options.fwhm
+
     display = False
     if options.display:
         print 'Display =', options.display
@@ -89,6 +92,12 @@ Notes:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
         
+    ####
+        
+    templateMaskedImage = afwImage.MaskedImageF(templatePath)
+    scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
+    policy              = generateDefaultPolicy(policyPath, fwhm=fwhm)
+    
     if bgSub:
         diffimTools.backgroundSubtract(policy, [templateMaskedImage, scienceMaskedImage])
 
