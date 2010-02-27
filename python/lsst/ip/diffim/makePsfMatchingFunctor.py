@@ -1,7 +1,7 @@
 import lsst.pex.logging as pexLogging
 import diffimLib 
 
-def createKernelFunctor(policy):
+def makePsfMatchingFunctor(policy):
     kCols = policy.getInt("kernelCols")
     kRows = policy.getInt("kernelRows")
     kType = policy.getString("kernelBasisSet")
@@ -13,7 +13,7 @@ def createKernelFunctor(policy):
         alardDegGauss = policy.getIntArray("alardDegGauss")
 
         if useRegularization:
-            pexLogging.Trace("lsst.ip.diffim.createKernelFunctor", 1,
+            pexLogging.Trace("lsst.ip.diffim.makePsfMatchingFunctor", 1,
                              "Warning : Regularization not enabled for Alard-Lupton kernels")
 
         try:

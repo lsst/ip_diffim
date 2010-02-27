@@ -4,16 +4,16 @@ import time
 import diffimLib
 
 # all the other diffim routines
-from .createPsfMatchingKernel import createPsfMatchingKernel
+from .makePsfMatchingKernel import makePsfMatchingKernel
 
 # all the other LSST packages
 import lsst.afw.math as afwMath
 import lsst.pex.logging as pexLog
 
-def subtractMaskedImage(maskedImageToConvolve, 
-                        maskedImageToNotConvolve, 
-                        policy, 
-                        footprints=None):
+def subtractMaskedImages(maskedImageToConvolve, 
+                         maskedImageToNotConvolve, 
+                         policy, 
+                         footprints=None):
     
     # Make sure they are the EXACT same dimensions in pixels
     # This is non-negotiable
@@ -26,10 +26,10 @@ def subtractMaskedImage(maskedImageToConvolve,
 
 
     try:
-        result = createPsfMatchingKernel(maskedImageToConvolve,
-                                         maskedImageToNotConvolve,
-                                         policy,
-                                         footprints)
+        result = makePsfMatchingKernel(maskedImageToConvolve,
+                                       maskedImageToNotConvolve,
+                                       policy,
+                                       footprints)
     except:
         pexLog.Trace("lsst.ip.diffim.subtractMaskedImage", 1,
                      "ERROR: Unable to calculate psf matching kernel")

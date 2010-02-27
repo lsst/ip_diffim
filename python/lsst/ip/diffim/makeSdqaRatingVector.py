@@ -9,7 +9,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.pex.logging as pexLog
 
-def createSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg, scope=sdqa.SdqaRating.AMP):
+def makeSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg, scope=sdqa.SdqaRating.AMP):
     imstats    = diffimLib.ImageStatisticsF()
     sdqaVector = sdqa.SdqaRatingSet()
 
@@ -59,7 +59,7 @@ def createSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg, scope=sdqa.S
                 sdqaVector.append(candRating)
 
     for i in range(sdqaVector.size()):
-        pexLog.Trace("lsst.ip.diffim.createSdqaRatingVector", 3,
+        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 3,
                      "Sdqa Rating %s : %.2f %.2f" % (sdqaVector[i].getName(),
                                                      sdqaVector[i].getValue(),
                                                      sdqaVector[i].getErr()))

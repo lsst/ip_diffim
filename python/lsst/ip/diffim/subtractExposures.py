@@ -1,11 +1,11 @@
-from .subtractMaskedImage import subtractMaskedImage
+from .subtractMaskedImages import subtractMaskedImages
 from .warpTemplateExposure import warpTemplateExposure
 
 import lsst.pex.logging as pexLog
 import lsst.afw.image as afwImage
 import lsst.afw.display.ds9 as ds9
 
-def subtractExposure(exposureToConvolve, exposureToNotConvolve, policy, display=False):
+def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display=False):
     # Make sure they end up the same dimensions on the sky
     templateWcs    = exposureToConvolve.getWcs() 
     scienceWcs     = exposureToNotConvolve.getWcs()
