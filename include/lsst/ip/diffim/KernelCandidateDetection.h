@@ -37,21 +37,24 @@ namespace diffim {
         typedef boost::shared_ptr<KernelCandidateDetection> Ptr;
         typedef boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
 
-        KernelCandidateDetection(lsst::pex::policy::Policy const& policy) :     
-            _policy(policy) {};
+        KernelCandidateDetection(lsst::pex::policy::Policy const& policy);
 
         virtual ~KernelCandidateDetection() {};
 
-        std::vector<lsst::afw::detection::Footprint::Ptr> apply(MaskedImagePtr const& miToConvolvePtr,
-                                                                MaskedImagePtr const& miToNotConvolvePtr);
+        void apply(MaskedImagePtr const& miToConvolvePtr,
+                   MaskedImagePtr const& miToNotConvolvePtr);
         
         bool growCandidate(lsst::afw::detection::Footprint::Ptr fp,
                            int fpGrowPix,
                            MaskedImagePtr const& miToConvolvePtr,
                            MaskedImagePtr const& miToNotConvolvePtr);
-        
+
+        std::vector<lsst::afw::detection::Footprint::Ptr> getFootprints() {return _footprints;};
+
     private:
         lsst::pex::policy::Policy _policy;
+        lsst::afw::image::MaskPixel _badBitMask;
+        std::vector<lsst::afw::detection::Footprint::Ptr> _footprints;
     };
 
 

@@ -30,17 +30,26 @@ warpingKernelName: "lanczos4"
 fpNpixMin: 5
 
 ######
+# Maximum number of pixels in an acceptible Footprint
+#
+# Too big and the subsequent convolutions become unwieldy 
+#
+fpNpixMax: 500
+
+######
 # Run detection on the template (imageToConvolve; value = true) or
 # science image (imageToNotConvolve; value = false)
 #
 detOnTemplate: true
 
 ######
-# Maximum number of pixels in an acceptible Footprint
+# Mask planes that lead to an invalid detection
 #
-# Too big and the subsequent convolutions become unwieldy 
+# Options: EDGE SAT BAD CR INTERP
+# 
+# E.g. : EDGE SAT BAD allows CR-masked and interpolated pixels
 #
-fpNpixMax: 500
+detBadMaskPlanes: "EDGE" "SAT" "BAD"
 
 ######
 # Grow each raw detection footprint by this many pixels
@@ -110,13 +119,11 @@ alardNGauss:   3
 alardSigGauss: 0.7 1.5 3.0
 alardDegGauss: 4   3   2
 
-# Lets just make a couple for debugging
-#alardNGauss: 1
-#alardSigGauss: 1.5
-#alardDegGauss: 1
-
 ######
-# FUTURE : Scaling of these numbers with the Psf Fwhm
+# Scaling of these numbers with the Psf Fwhm
+#
+# Value of 4.0 works for alard-lupton basis; need something larger for
+# delta-function
 #
 fpGrowFwhmScaling: 4.0
 fpGrowMin: 20
@@ -142,7 +149,7 @@ alardSigFwhmScaling: 0.50 1.00 2.00
 useRegularization: true
 regularizationOrder: 1
 regularizationBoundary: 2
-regularizationDifference: 0
+regularizationDifference: 1
 regularizationScaling: 0.0001
 
 
@@ -192,7 +199,13 @@ singleKernelClipping:  true
 kernelSumClipping:     true
 spatialKernelClipping: true
 
-
+######
+# Radius for calculation of stats in "core" of KernelCandidate diffim.
+# Total number of pixels used will be (2*radius)**2.  This is used
+# both for "core" diffim quality as well as ranking of
+# KernelCandidates by their total flux in this core 
+#
+candidateCoreRadius: 3
 
 ####################################
 # SINGLE KERNEL FITTING AROUND 1 SOURCE

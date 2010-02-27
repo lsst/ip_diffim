@@ -10,8 +10,15 @@
 
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/logging/Trace.h"
+
 #include "lsst/ip/diffim/BasisSets.h"
-#include "lsst/ip/diffim/SpatialModelVisitors.h"
+#include "lsst/ip/diffim/KernelCandidate.h"
+
+#include "lsst/ip/diffim/KernelSumVisitor.h"
+#include "lsst/ip/diffim/BuildSingleKernelVisitor.h"
+#include "lsst/ip/diffim/KernelPcaVisitor.h"
+#include "lsst/ip/diffim/BuildSpatialKernelVisitor.h"
+#include "lsst/ip/diffim/AssessSpatialKernelVisitor.h"
 
 using lsst::pex::policy::Policy;
 using lsst::pex::logging::Trace;
@@ -186,7 +193,7 @@ BOOST_AUTO_TEST_CASE(kernelSumVisitor) {
     }
 }
 
-BOOST_AUTO_TEST_CASE(setPcaImageVisitor) {
+BOOST_AUTO_TEST_CASE(kernelPcaVisitor) {
     /* Dummy images */
     afwImage::MaskedImage<Pixel>::Ptr mimg1(
         new afwImage::MaskedImage<Pixel>(100,100)
@@ -227,7 +234,7 @@ BOOST_AUTO_TEST_CASE(setPcaImageVisitor) {
     /* Test eigen decomposition; all images the same shape */
     {
         afwImage::ImagePca<Image> imagePca;
-        detail::SetPcaImageVisitor<Pixel> importStarVisitor(&imagePca);
+        detail::KernelPcaVisitor<Pixel> importStarVisitor(&imagePca);
         importStarVisitor.processCandidate(&(*cand1));
         importStarVisitor.processCandidate(&(*cand2));
         importStarVisitor.processCandidate(&(*cand3));
@@ -244,7 +251,7 @@ BOOST_AUTO_TEST_CASE(setPcaImageVisitor) {
     /* Test mean subtraction; recall all images are scaled to have the same kSum! */
     {
         afwImage::ImagePca<Image> imagePca;
-        detail::SetPcaImageVisitor<Pixel> importStarVisitor(&imagePca);
+        detail::KernelPcaVisitor<Pixel> importStarVisitor(&imagePca);
         importStarVisitor.processCandidate(&(*cand1));
         importStarVisitor.processCandidate(&(*cand2));
         importStarVisitor.processCandidate(&(*cand3));

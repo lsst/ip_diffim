@@ -53,28 +53,13 @@ namespace diffim {
          * @param yCenter Row position of object
          * @param miToConvolvePtr  Pointer to template image
          * @param miToNotConvolvePtr  Pointer to science image
+         * @param policy  Policy file
          */
         KernelCandidate(float const xCenter,
                         float const yCenter, 
                         MaskedImagePtr const& miToConvolvePtr,
-                        MaskedImagePtr const& miToNotConvolvePtr) :
-            lsst::afw::math::SpatialCellImageCandidate<ImageT>(xCenter, yCenter),
-            _miToConvolvePtr(miToConvolvePtr),
-            _miToNotConvolvePtr(miToNotConvolvePtr),
-            _templateFlux(),
-            _kernel(),
-            _kSum(0.),
-            _background(0.),
-            _mMat(),
-            _bVec(),
-            _haveKernel(false) {
-
-            /* Rank by brightness in template */
-            lsst::afw::math::Statistics stats = lsst::afw::math::makeStatistics(*_miToConvolvePtr, 
-                                                                                lsst::afw::math::SUM);
-            _templateFlux = stats.getValue(lsst::afw::math::SUM);
-        }
-        
+                        MaskedImagePtr const& miToNotConvolvePtr,
+                        lsst::pex::policy::Policy const& policy);        
         /// Destructor
         virtual ~KernelCandidate() {};
 
@@ -83,7 +68,7 @@ namespace diffim {
          * 
          * @note Required method for use by SpatialCell; e.g. total flux
          */
-        double getCandidateRating() const { return _templateFlux; }
+        double getCandidateRating() const { return _coreFlux; }
 
         MaskedImagePtr getMiToConvolvePtr() {return _miToConvolvePtr;}
         MaskedImagePtr getMiToNotConvolvePtr() {return _miToNotConvolvePtr;}
@@ -120,7 +105,8 @@ namespace diffim {
     private:
         MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
         MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel
-        double _templateFlux;                               ///< Brightness in the template image
+        lsst::pex::policy::Policy _policy;                  ///< Policy
+        double _coreFlux;                                   ///< Mean S/N in the science image
 
         lsst::afw::math::Kernel::Ptr _kernel;               ///< Derived single-object convolution kernel
         double _kSum;                                       ///< Derived kernel sum
@@ -147,11 +133,13 @@ namespace diffim {
     makeKernelCandidate(float const xCenter,
                         float const yCenter, 
                         boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToConvolvePtr,
-                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToNotConvolvePtr){
+                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToNotConvolvePtr,
+                        lsst::pex::policy::Policy const& policy){
         
         return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
                                                                                  miToConvolvePtr,
-                                                                                 miToNotConvolvePtr));
+                                                                                 miToNotConvolvePtr,
+                                                                                 policy));
     }
 
 

@@ -11,6 +11,7 @@
 
 #include "lsst/afw/image/Image.h"
 #include "lsst/afw/detection/Footprint.h"
+#include "lsst/pex/exceptions/Exception.h"
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/logging/Trace.h"
 
@@ -20,10 +21,40 @@
 namespace afwImage  = lsst::afw::image;
 namespace afwDetect = lsst::afw::detection;
 namespace pexLog    = lsst::pex::logging; 
+namespace pexExcept = lsst::pex::exceptions; 
 
 namespace lsst { 
 namespace ip { 
 namespace diffim {
+
+    
+    template <typename PixelT>
+    KernelCandidateDetection<PixelT>::KernelCandidateDetection(
+        lsst::pex::policy::Policy const& policy
+        ) :
+        _policy(policy), 
+        _badBitMask(0), 
+        _footprints(std::vector<lsst::afw::detection::Footprint::Ptr>()) {
+
+        std::cout << "CAW" << std::endl;
+
+        std::vector<std::string> detBadMaskPlanes = _policy.getStringArray("detBadMaskPlanes");
+        for (std::vector<std::string>::iterator mi = detBadMaskPlanes.begin(); 
+             mi != detBadMaskPlanes.end(); ++mi){
+            try {
+                _badBitMask |= afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask(*mi);
+            } catch (pexExcept::Exception& e) {
+                pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection",
+                                  "Cannot update bad bit mask with %s", (*mi).c_str());
+                pexLog::TTrace<7>("lsst.ip.diffim.KernelCandidateDetection",
+                                  e.what());
+            }
+        }
+        pexLog::TTrace<4>("lsst.ip.diffim.KernelCandidateDetection", 
+                          "Using bad bit mask %d", _badBitMask);
+    }
+        
+        
 
     /** 
      * @brief Runs Detection on a single image for significant peaks, and checks
@@ -44,22 +75,24 @@ namespace diffim {
      *
      */
     template <typename PixelT>
-    std::vector<afwDetect::Footprint::Ptr> KernelCandidateDetection<PixelT>::apply(
+    void KernelCandidateDetection<PixelT>::apply(
         MaskedImagePtr const& miToConvolvePtr,
         MaskedImagePtr const& miToNotConvolvePtr
         ) {
         
         // Parse the Policy
-        unsigned int fpNpixMin       = _policy.getInt("fpNpixMin");
+        int fpNpixMin                = _policy.getInt("fpNpixMin");
         int fpGrowPix                = _policy.getInt("fpGrowPix");
         
         bool detOnTemplate           = _policy.getBool("detOnTemplate");
         double detThreshold          = _policy.getDouble("detThreshold");
         std::string detThresholdType = _policy.getString("detThresholdType");
-        
+
+        /* reset private variables */
+        _footprints.clear();
+
         // List of Footprints
         std::vector<afwDetect::Footprint::Ptr> footprintListIn;
-        std::vector<afwDetect::Footprint::Ptr> footprintListOut;
         
         // Find detections
         afwDetect::Threshold threshold = 
@@ -91,31 +124,22 @@ namespace diffim {
         }    
         
         // Iterate over footprints, look for "good" ones
-        int nCleanFp = 0;
-        int nTotFp   = 0;
         for (std::vector<afwDetect::Footprint::Ptr>::iterator i = footprintListIn.begin(); 
-             i != footprintListIn.end(); ++i, ++nTotFp) {
-
+             i != footprintListIn.end(); ++i) {
+            
             pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                              "Processing candidate %d", nTotFp);
-                              
-            if (growCandidate((*i), fpGrowPix, miToConvolvePtr, miToNotConvolvePtr)) {
-                footprintListOut.push_back((*i));
-                nCleanFp += 1;
-            }
-
+                              "Processing candidate %d", (*i)->getId());
+            growCandidate((*i), fpGrowPix, miToConvolvePtr, miToNotConvolvePtr);
         }
         
-        if (footprintListOut.size() == 0) {
+        if (_footprints.size() == 0) {
             throw LSST_EXCEPT(pexExcept::Exception, 
                               "Unable to find any footprints for Psf matching");
         }
         
         pexLog::TTrace<1>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                           "Found %d clean footprints above threshold %.3f",
-                          footprintListOut.size(), detThreshold);
-        
-        return footprintListOut;
+                          _footprints.size(), detThreshold);
         
     }
     
@@ -143,6 +167,27 @@ namespace diffim {
          */
         FindSetBits<afwImage::Mask<afwImage::MaskPixel> > fsb;
         
+        afwImage::BBox fpBBox = fp->getBBox();
+        /* Failure Condition 1) 
+         * 
+         * Footprint has too many pixels off the bat.  We don't want to throw
+         * away these guys, they have alot of signal!  Lets just use the core of
+         * it.
+         * 
+         */
+        if (fp->getNpix() > fpNpixMax) {
+            pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
+                              "Footprint has too many pix: %d (max =%d)", 
+                              fp->getNpix(), fpNpixMax);
+            
+            int xc = int(0.5 * (fpBBox.getX0() + fpBBox.getX1()));
+            int yc = int(0.5 * (fpBBox.getY0() + fpBBox.getY1()));
+            afwDetect::Footprint::Ptr fpCore(
+                new afwDetect::Footprint(afwImage::BBox(afwImage::PointI(xc, yc)))
+                );
+            return growCandidate(fpCore, fpGrowPix, miToConvolvePtr, miToNotConvolvePtr);
+        } 
+        
         /* Grow the footprint
          * flag true  = isotropic grow   = slow
          * flag false = 'manhattan grow' = fast
@@ -161,25 +206,8 @@ namespace diffim {
          * in multiple subimages.
          * 
          */
-        afwImage::BBox fpBBox = fp->getBBox();
         afwDetect::Footprint::Ptr fpGrow = 
             afwDetect::growFootprint(fp, fpGrowPix, false);
-        
-        /* Failure Condition 1) 
-         * Footprint has too many pixels 
-         */
-        if (fp->getNpix() > fpNpixMax) {
-            pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                              "Footprint has too many pix: %d (max =%d)", 
-                              fp->getNpix(), fpNpixMax);
-            
-            if (fpGrowPix == fpGrowMin) {
-                return false;
-            }
-            else {
-                return growCandidate(fp, fpGrowMin, miToConvolvePtr, miToNotConvolvePtr);
-            }
-        } 
         
         /* Next we look at the image within this Footprint.  To do this we
          * create a subimage using a BBox.  When this happens, the BBox
@@ -229,7 +257,7 @@ namespace diffim {
             
             // Search for any masked pixels within the footprint
             fsb.apply(*(subImageToConvolve.getMask()));
-            if (fsb.getBits() > 0) {
+            if (fsb.getBits() & _badBitMask) {
                 pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                                   "Footprint has masked pix (vals=%d) in image to convolve", 
                                   fsb.getBits()); 
@@ -237,7 +265,7 @@ namespace diffim {
             }
             
             fsb.apply(*(subImageToNotConvolve.getMask()));
-            if (fsb.getBits() > 0) {
+            if (fsb.getBits() & _badBitMask) {
                 pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                                   "Footprint has masked pix (vals=%d) in image not to convolve", 
                                   fsb.getBits());
@@ -260,8 +288,7 @@ namespace diffim {
             }
         } else {
             /* We have a good candidate */
-            //fp.reset(fpGrow);
-            fp = fpGrow;
+            _footprints.push_back(fpGrow);
             return true;
         }
     }
@@ -270,8 +297,8 @@ namespace diffim {
 //
 // Explicit instantiations
 //
-typedef float PixelT;
-template class KernelCandidateDetection<PixelT>;
+    typedef float PixelT;
+    template class KernelCandidateDetection<PixelT>;
 
 }}} // end of namespace lsst::ip::diffim
 

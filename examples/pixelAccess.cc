@@ -3,6 +3,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/timer.hpp> 
 #include <lsst/afw/image.h>
+
 #include <lsst/ip/diffim/ImageSubtract.h>
 
 namespace image   = lsst::afw::image;

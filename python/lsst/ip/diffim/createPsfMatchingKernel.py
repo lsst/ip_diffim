@@ -33,9 +33,9 @@ def createPsfMatchingKernel(maskedImageToConvolve,
     
     # Candidate source footprints to use for Psf matching
     if footprints == None:
-        footprints = diffimLib.getCollectionOfFootprintsForPsfMatching(maskedImageToConvolve,
-                                                                       maskedImageToNotConvolve,
-                                                                       policy)
+        kcDetect = diffimLib.KernelCandidateDetectionF(policy)
+        kcDetect.apply(maskedImageToConvolve, maskedImageToNotConvolve)
+        footprints = kcDetect.getFootprints()
 
     # Place candidate footprints within the spatial grid
     for fp in footprints:
@@ -53,7 +53,7 @@ def createPsfMatchingKernel(maskedImageToConvolve,
         tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox)
         smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox)
 
-        cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi)
+        cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, policy)
         kernelCellSet.insertCandidate(cand)
 
 
@@ -63,7 +63,7 @@ def createPsfMatchingKernel(maskedImageToConvolve,
     from .diffimTools import displayFootprints
     ds9.mtv(maskedImageToConvolve, frame=2)
     ds9.mtv(maskedImageToNotConvolve, frame=3)
-    displayFootprints(maskedImageToNotConvolve, footprints, frame=4)
+    displayFootprints(maskedImageToNotConvolve, footprints, frame=5)
 
 
     # Object to perform the Psf matching on a source-by-source basis

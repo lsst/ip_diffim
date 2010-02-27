@@ -49,6 +49,37 @@ namespace ip {
 namespace diffim { 
 namespace detail {
 
+template<typename PixelT>
+class KernelSumVisitor : public afwMath::CandidateVisitor {
+    typedef afwImage::Image<afwMath::Kernel::Pixel> ImageT;
+public:
+    enum Mode {AGGREGATE = 0, REJECT = 1};
+    
+    KernelSumVisitor(pexPolicy::Policy const& policy);
+    virtual ~KernelSumVisitor() {}
+
+    void setMode(Mode mode) {_mode = mode;}
+    int    getNRejected() {return _nRejected;}
+    double getkSumMean()  {return _kSumMean;}
+    double getkSumStd()   {return _kSumStd;}
+    double getdkSumMax()  {return _dkSumMax;}
+    double getkSumNpts()  {return _kSumNpts;}
+
+    void resetKernelSum();
+    void processCandidate(afwMath::SpatialCellCandidate *candidate);
+    void processKsumDistribution();
+
+private:
+    Mode _mode;                  ///< Processing mode; AGGREGATE or REJECT
+    std::vector<double> _kSums;  ///< List of all candidate kernel sums
+    double _kSumMean;            ///< Clipped mean of the kernel sums
+    double _kSumStd;             ///< Clipped standard deviation of kernel sums
+    double _dkSumMax;            ///< Maximum acceptable deviation from mean sum
+    int    _kSumNpts;            ///< Number of points used in the statistics
+    int    _nRejected;           ///< Number of candidates rejected during processCandidate()
+    pexPolicy::Policy _policy;   ///< Policy controlling behavior
+};    
+
 /**
  * @class KernelSumVisitor
  * @ingroup ip_diffim
@@ -116,7 +147,7 @@ public:
      * for the second, we can't clear the values in reset().  Call our mode
      * resetDerived().
      */
-    void resetDerived() {
+    void resetKernelSum() {
         _kSums.clear();
         _kSumMean =  0.;
         _kSumStd  =  0.;
@@ -542,16 +573,6 @@ public:
             diffim = kCandidate->returnDifferenceImage(kb.first, kb.second);                
         }
         
-        /* Core resids */
-        _imstats.apply(diffim, 3);
-        pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
-                              "Candidate %d core resids = %.2f +/- %.2f sigma (%d pix)",
-                              kCandidate->getId(),
-                              _imstats.getMean(),
-                              _imstats.getRms(),
-                              _imstats.getNpix());
-
-        
         /* Official resids */
         _imstats.apply(diffim);
         kCandidate->setChi2(_imstats.getVariance());
@@ -611,15 +632,25 @@ public:
             }
             else {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::GOOD);
-                pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                       "Source kernel OK");
             }
         }
         else {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::GOOD);
-            pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+            pexLogging::TTrace<6>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                   "Sigma clipping not enabled");
         }
+
+        /* Core resids */
+        int candidateCoreRadius = _policy.getInt("candidateCoreRadius");
+        _imstats.apply(diffim, candidateCoreRadius);
+        pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
+                              "Candidate %d core resids = %.2f +/- %.2f sigma (%d pix)",
+                              kCandidate->getId(),
+                              _imstats.getMean(),
+                              _imstats.getRms(),
+                              _imstats.getNpix());
 
     }
 private:
@@ -1065,16 +1096,6 @@ public:
         
         MaskedImageT diffim = kCandidate->returnDifferenceImage(kernelPtr, background);
         
-        /* Core resids */
-        _imstats.apply(diffim, 3);
-        pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
-                              "Candidate %d core resids = %.2f +/- %.2f sigma (%d pix)",
-                              kCandidate->getId(),
-                              _imstats.getMean(),
-                              _imstats.getRms(),
-                              _imstats.getNpix());
-
-        
         /* Official resids */
         _imstats.apply(diffim);
         kCandidate->setChi2(_imstats.getVariance());
@@ -1128,17 +1149,29 @@ public:
             }
             else {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::GOOD);
-                pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+                pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                                       "Spatial kernel OK");
                 _nGood += 1;
             }
         }
         else {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::GOOD);
-            pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+            pexLogging::TTrace<6>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                                   "Sigma clipping not enabled");
             _nGood += 1;
         }
+
+        /* Core resids */
+        int candidateCoreRadius = _policy.getInt("candidateCoreRadius");
+        _imstats.apply(diffim, candidateCoreRadius);
+        pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
+                              "Candidate %d core resids = %.2f +/- %.2f sigma (%d pix)",
+                              kCandidate->getId(),
+                              _imstats.getMean(),
+                              _imstats.getRms(),
+                              _imstats.getNpix());
+
+        
     }
     
 private:

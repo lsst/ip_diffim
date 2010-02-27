@@ -26,7 +26,13 @@
 #include "lsst/ip/diffim/BasisSets.h"
 #include "lsst/ip/diffim/PsfMatchingFunctor.h"
 #include "lsst/ip/diffim/SpatialModelKernel.h"
-#include "lsst/ip/diffim/SpatialModelVisitors.h"
+#include "lsst/ip/diffim/KernelCandidate.h"
+
+#include "lsst/ip/diffim/KernelSumVisitor.h"
+#include "lsst/ip/diffim/BuildSingleKernelVisitor.h"
+#include "lsst/ip/diffim/KernelPcaVisitor.h"
+#include "lsst/ip/diffim/BuildSpatialKernelVisitor.h"
+#include "lsst/ip/diffim/AssessSpatialKernelVisitor.h"
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
@@ -38,86 +44,6 @@ namespace lsst {
 namespace ip { 
 namespace diffim {
             
-template <typename PixelT>
-KernelCandidate<PixelT>::ImageT::ConstPtr KernelCandidate<PixelT>::getImage() const {
-    if (!_haveKernel) {
-        throw LSST_EXCEPT(pexExcept::Exception, "No Kernel to make KernelCandidate Image from");
-    }
-    return _image;
-}
-    
-template <typename PixelT>
-KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::copyImage() const {
-    return typename KernelCandidate<PixelT>::ImageT::Ptr(
-        new typename KernelCandidate<PixelT>::ImageT(*getImage(), true)
-        );
-}
-
-
-template <typename PixelT>
-void KernelCandidate<PixelT>::setKernel(lsst::afw::math::Kernel::Ptr kernel) {
-    _kernel     = kernel; 
-    _haveKernel = true;
-    
-    setWidth(_kernel->getWidth());
-    setHeight(_kernel->getHeight());
-    
-    typename KernelCandidate<PixelT>::ImageT::Ptr image (
-        new typename KernelCandidate<PixelT>::ImageT(_kernel->getDimensions())
-        );
-    _kSum  = _kernel->computeImage(*image, false);                    
-    _image = image;
-}
-
-template <typename PixelT>
-lsst::afw::math::Kernel::Ptr KernelCandidate<PixelT>::getKernel() const {
-    if (!_haveKernel) {
-        throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
-    }
-    return _kernel;
-}
-
-template <typename PixelT>
-double KernelCandidate<PixelT>::getBackground() const {
-    if (!_haveKernel) {
-        throw LSST_EXCEPT(pexExcept::Exception, "No Background for KernelCandidate");
-    }
-    return _background;
-}
-
-template <typename PixelT>
-double KernelCandidate<PixelT>::getKsum() const {
-    if (!_haveKernel) {
-        throw LSST_EXCEPT(pexExcept::Exception, "No Ksum for KernelCandidate");
-    }
-    return _kSum;
-}
-
-template <typename PixelT>
-lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage() {
-    if (!_haveKernel) {
-        throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
-    }
-    return returnDifferenceImage(_kernel, _background);
-}
-
-template <typename PixelT>
-lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage(
-    lsst::afw::math::Kernel::Ptr kernel,
-    double background
-    ) {
-    
-    /* Make diffim and set chi2 from result */
-    afwImage::MaskedImage<PixelT> diffIm = convolveAndSubtract(*_miToConvolvePtr,
-                                                               *_miToNotConvolvePtr,
-                                                               *kernel,
-                                                               background);
-    return diffIm;
-    
-}
-    
-/***********************************************************************************************************/
-    
 template<typename PixelT>
 std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
 fitSpatialKernelFromCandidates(
@@ -139,7 +65,7 @@ fitSpatialKernelFromCandidates(
      * 1b) Using unregularized delta function kernels, do a PCA of the returned
      Kernels, and use these to create a new basis set.  This requires a
      first call to singleKernelFitter, then an instance of
-     SetPcaImageVisitor() to do the PCA, creation of a new kFunctor with
+     KernelPcaVisitor() to do the PCA, creation of a new kFunctor with
      the eigenBases, a new call to singleKernelFitter using these new
      bases then a call to spatialKernelFitter.  It appears that the
      kernels are not self-similar enough to make this a viable solution.
@@ -155,7 +81,7 @@ fitSpatialKernelFromCandidates(
      * 2b) Using regularized delta function kernels, do a PCA of the returned
      Kernels, and use these to create a new basis set.  This requires a
      first call to singleKernelFitter, then an instance of
-     SetPcaImageVisitor() to do the PCA, creation of a new kFunctor with
+     KernelPcaVisitor() to do the PCA, creation of a new kFunctor with
      the eigenBases, a new call to singleKernelFitter using these new
      bases then a call to spatialKernelFitter.  While this seems somewhat
      circuitous, we should be able to use many fewer basis functions,
@@ -201,7 +127,7 @@ fitSpatialKernelFromCandidates(
 
             /* Make sure there are no uninitialized candidates as current occupant of Cell */
             while (nRejected != 0) {
-                pexLogging::TTrace<2>("lsst.ip.diffim.BuildSingleKernelVisitor", 
+                pexLogging::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                       "Building single kernels...");
                 kernelCells.visitCandidates(&singleKernelFitter, nStarPerCell);
                 nRejected = singleKernelFitter.getNRejected();
@@ -209,7 +135,7 @@ fitSpatialKernelFromCandidates(
             
             /* Reject outliers in kernel sum */
             nKsumIterations += 1;
-            kernelSumVisitor.resetDerived();
+            kernelSumVisitor.resetKernelSum();
             kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::AGGREGATE);
             kernelCells.visitCandidates(&kernelSumVisitor, nStarPerCell);
             kernelSumVisitor.processKsumDistribution();
@@ -241,10 +167,10 @@ fitSpatialKernelFromCandidates(
 
                 int const nComponents = policy.getInt("numPrincipalComponents");
                 
-                pexLogging::TTrace<5>("lsst.ip.diffim.SetPcaImageVisitor", 
+                pexLogging::TTrace<5>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                       "Building Pca Basis");
                 afwImage::ImagePca<ImageT> imagePca;
-                detail::SetPcaImageVisitor<PixelT> importStarVisitor(&imagePca);
+                detail::KernelPcaVisitor<PixelT> importStarVisitor(&imagePca);
                 kernelCells.visitCandidates(&importStarVisitor, nStarPerCell);
                 if (subtractMeanForPca) {
                     importStarVisitor.subtractMean();
@@ -255,7 +181,7 @@ fitSpatialKernelFromCandidates(
                 
                 double eSum = std::accumulate(eigenValues.begin(), eigenValues.end(), 0.);
                 for(unsigned int j=0; j < eigenValues.size(); j++) {
-                    pexLogging::TTrace<6>("lsst.ip.diffim.SetPcaImageVisitor", 
+                    pexLogging::TTrace<6>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                           "Eigenvalue %d : %f (%f \%)", 
                                           j, eigenValues[j], eigenValues[j]/eSum);
                 }
@@ -278,7 +204,7 @@ fitSpatialKernelFromCandidates(
                     afwMath::Statistics stats = afwMath::makeStatistics(img, afwMath::SUM);
                     
                     if (std::isnan(stats.getValue(afwMath::SUM))) {
-                        pexLogging::TTrace<2>("lsst.ip.diffim.SetPcaImageVisitor", 
+                        pexLogging::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                               "WARNING : NaN in principal component %d; skipping", j);
                     } else {
                         kernelListRaw.push_back(afwMath::Kernel::Ptr(
@@ -296,7 +222,7 @@ fitSpatialKernelFromCandidates(
                 /* Always true for Pca kernel; leave original kernel alone for future Pca iterations */
                 singleKernelFitterPca.setCandidateKernel(false);
                 
-                pexLogging::TTrace<2>("lsst.ip.diffim.BuildSingleKernelVisitor", 
+                pexLogging::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                       "Rebuilding kernels using Pca basis");
 
                 /* Only true for the first visit so we rebuild each good kernel with
