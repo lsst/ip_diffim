@@ -2,13 +2,13 @@
 from diffimLib import *
 
 # python code
-from createKernelFunctor import *
-from createPsfMatchingKernel import *
-from createSdqaRatingVector import *
+from makePsfMatchingFunctor import *
+from makePsfMatchingKernel import *
+from makeSdqaRatingVector import *
 from generatePolicy import *
 
-from subtractMaskedImage import *
-from subtractExposure import *
+from subtractMaskedImages import *
+from subtractExposures import *
 
 from warpTemplateExposure import *
 

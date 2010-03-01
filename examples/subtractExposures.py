@@ -5,19 +5,15 @@ import optparse
 
 import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
-import lsst.afw.display.ds9 as ds9
 
 from lsst.pex.logging import Trace
 from lsst.pex.logging import Log
 
-from lsst.ip.diffim import subtractMaskedImage, generateDefaultPolicy
+from lsst.ip.diffim import subtractExposures, generateDefaultPolicy
 import lsst.ip.diffim.diffimTools as diffimTools
 
-# For degugging needs
-import pdb
-
 def main():
-    defDataDir = eups.productDir('afwdata') 
+    defDataDir   = eups.productDir('afwdata')
     if defDataDir == None:
         print 'Error: afwdata not set up'
         sys.exit(1)
@@ -29,19 +25,20 @@ def main():
     defSciencePath  = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1')
     defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1_tmpl')
     defPolicyPath   = os.path.join(imageProcDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-    defOutputPath   = 'diffImage'
+    defOutputPath   = 'diffExposure'
     defVerbosity    = 0
+    defFwhm         = None
     
-    usage = """usage: %%prog [options] [scienceImage [templateImage [outputImage]]]]
+    usage = """usage: %%prog [options] [scienceExposure [templateExposure [outputExposure]]]]
 
 Notes:
-- image arguments are paths to MaskedImage fits files
+- image arguments are paths to Expoure fits files
 - image arguments must NOT include the final _img.fits
 - the result is science image - template image
-- the template image is convolved, the science image is not
-- default scienceMaskedImage=%s
-- default templateMaskedImage=%s
-- default outputImage=%s 
+- the template exposure is convolved, the science exposure is not
+- default scienceExposure=%s
+- default templateExposure=%s
+- default outputExposure=%s 
 - default --policy=%s
 """ % (defSciencePath, defTemplatePath, defOutputPath, defPolicyPath)
     
@@ -55,7 +52,7 @@ Notes:
                       help='subtract backgrounds')
     parser.add_option('-f', '--fwhm', type=float,
                       help='Psf Fwhm (pixel)')
-                      
+
     (options, args) = parser.parse_args()
     
     def getArg(ind, defValue):
@@ -68,10 +65,10 @@ Notes:
     outputPath   = getArg(2, defOutputPath)
     policyPath   = options.policy
     
-    print 'Science image: ', sciencePath
-    print 'Template image:', templatePath
-    print 'Output image:  ', outputPath
-    print 'Policy file:   ', policyPath
+    print 'Science exposure: ', sciencePath
+    print 'Template exposure:', templatePath
+    print 'Output exposure:  ', outputPath
+    print 'Policy file:      ', policyPath
 
     fwhm = defFwhm
     if options.fwhm:
@@ -91,24 +88,23 @@ Notes:
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
-        
+
     ####
         
-    templateMaskedImage = afwImage.MaskedImageF(templatePath)
-    scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
-    policy              = generateDefaultPolicy(policyPath, fwhm=fwhm)
-    
-    if bgSub:
-        diffimTools.backgroundSubtract(policy, [templateMaskedImage, scienceMaskedImage])
+    templateExposure = afwImage.ExposureF(templatePath)
+    scienceExposure  = afwImage.ExposureF(sciencePath)
+    policy           = generateDefaultPolicy(policyPath, fwhm=fwhm)
 
-    results = subtractMaskedImage(templateMaskedImage,
-                                  scienceMaskedImage,
-                                  policy)
-    differenceMaskedImage = results[0]
-    differenceMaskedImage.writeFits(outputPath)
-    
-    if display:
-        ds9.mtv(differenceMaskedImage)
+    if bgSub:
+        diffimTools.backgroundSubtract(policy, [templateExposure.getMaskedImage(),
+                                                scienceExposure.getMaskedImage()])
+
+    results = subtractExposures(templateExposure,
+                                scienceExposure,
+                                policy,
+                                display)
+    differenceExposure = results[0]
+    differenceExposure.writeFits(outputPath)
 
 def run():
     Log.getDefaultLog()

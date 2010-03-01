@@ -2,7 +2,7 @@
 import diffimLib
 
 # all the other diffim routines
-from .createKernelFunctor import createKernelFunctor
+from .makePsfMatchingFunctor import makePsfMatchingFunctor
 
 # all the other LSST packages
 import lsst.afw.image.imageLib as afwImage

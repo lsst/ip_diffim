@@ -49,12 +49,12 @@ if subBackground:
     diffimTools.backgroundSubtract(policy, [templateImage.getMaskedImage(),
                                             scienceImage.getMaskedImage()])
 
-spatialKernel, spatialBg, kernelCellSet = ipDiffim.createPsfMatchingKernel(templateImage.getMaskedImage(),
-                                                                           scienceImage.getMaskedImage(),
-                                                                           policy)
+spatialKernel, spatialBg, kernelCellSet = ipDiffim.makePsfMatchingKernel(templateImage.getMaskedImage(),
+                                                                         scienceImage.getMaskedImage(),
+                                                                         policy)
 
-import pdb
-pdb.set_trace()
+#import pdb
+#pdb.set_trace()
 
 # Lets see what we got
 if display:
