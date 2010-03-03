@@ -57,13 +57,12 @@ def makePsfMatchingKernel(maskedImageToConvolve,
         kernelCellSet.insertCandidate(cand)
 
 
-    print "CAW CAW CAW"
-
-    # ACB debugging
-    from .diffimTools import displayFootprints
-    ds9.mtv(maskedImageToConvolve, frame=2)
-    ds9.mtv(maskedImageToNotConvolve, frame=3)
-    displayFootprints(maskedImageToNotConvolve, footprints, frame=5)
+    #print "CAW CAW CAW"
+    ## ACB debugging
+    #from .diffimTools import displayFootprints
+    #ds9.mtv(maskedImageToConvolve, frame=2)
+    #ds9.mtv(maskedImageToNotConvolve, frame=3)
+    #displayFootprints(maskedImageToNotConvolve, footprints, frame=5)
 
 
     # Object to perform the Psf matching on a source-by-source basis
