@@ -176,6 +176,30 @@ def displayCandidateMosaic(kernelCellSet, frame):
     ds9.mtv(mosaic, frame=frame)
     mos.drawLabels(frame=frame)
 
+def displayCandiateResults(kernelCellSet, frame):
+    import lsst.afw.display.ds9 as ds9
+    import lsst.afw.display.utils as displayUtils
+    mos = displayUtils.Mosaic()
+
+    for cell in kernelCellSet.getCellList():
+        for cand in cell.begin(True): # False = include bad candidates
+            cand  = diffimLib.cast_KernelCandidateF(cand)
+            try:
+                tmi   = cand.getMiToConvolvePtr()
+                smi   = cand.getMiToNotConvolvePtr()
+                ki    = cand.getImage()
+                dmi   = cand.returnDifferenceImage()
+
+                mos.append(tmi)
+                mos.append(smi)
+                mos.append(ki)
+                mos.append(dmi)
+                
+            except Exception, e:
+                pass
+            
+    mosaic = mos.makeMosaic(mode=4)
+    ds9.mtv(mosaic, frame=frame)
 
 def displayFootprints(image, footprintList, frame):
     import lsst.afw.display.ds9 as ds9

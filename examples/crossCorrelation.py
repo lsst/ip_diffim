@@ -232,7 +232,7 @@ def testAutoCorrelation(orderMake, orderFit, policy = None, inMi = None, display
     policy.set("sizeCellY", stride)
     #policy.set("kernelBasisSet", "alard-lupton")
     
-    result = ipDiffim.subtractMaskedImage(inMi, cMi, policy)
+    result = ipDiffim.subtractMaskedImages(inMi, cMi, policy)
     differenceMaskedImage, spatialKernel, spatialBg, kernelCellSet = result
     makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot = True)
 

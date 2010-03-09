@@ -98,7 +98,7 @@ detThreshold: 10.
 # NOTE : if "alard-lupton" you might want to turn off
 # "usePcaForSpatialKernel" down below.  
 #
-kernelBasisSet: "alard-lupton"
+kernelBasisSet: "delta-function"
 
 ######
 # Size of the convolution kernel
@@ -148,9 +148,9 @@ alardSigFwhmScaling: 0.50 1.00 2.00
 #
 useRegularization: true
 regularizationOrder: 1
-regularizationBoundary: 2
-regularizationDifference: 1
-regularizationScaling: 0.0001
+regularizationBoundary: 0
+regularizationDifference: 0
+regularizationScaling: 0.001
 
 
 
@@ -312,7 +312,7 @@ maxSpatialIterations: 5
 # If this option is used, the first term (mean kernel) will have no
 # spatial variation and the kernel sum will be conserved
 #
-usePcaForSpatialKernel: false
+usePcaForSpatialKernel: true
 
 ######
 # Subtract off the mean feature before doing the Pca?

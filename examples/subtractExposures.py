@@ -27,7 +27,7 @@ def main():
     defPolicyPath   = os.path.join(imageProcDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
     defOutputPath   = 'diffExposure'
     defVerbosity    = 0
-    defFwhm         = None
+    defFwhm         = 3.5
     
     usage = """usage: %%prog [options] [scienceExposure [templateExposure [outputExposure]]]]
 

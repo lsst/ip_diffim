@@ -47,9 +47,9 @@ def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display
 
     # Subtract their MaskedImages
     try:
-        result = subtractMaskedImage(maskedImageToConvolve,
-                                     maskedImageToNotConvolve,
-                                     policy)
+        result = subtractMaskedImages(maskedImageToConvolve,
+                                      maskedImageToNotConvolve,
+                                      policy)
     except:
         pexLog.Trace("lsst.ip.diffim.subtractExposure", 1,
                      "ERROR: Unable to calculate psf matching kernel")

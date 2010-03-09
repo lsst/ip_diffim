@@ -62,14 +62,43 @@ class DiffimTestCases(unittest.TestCase):
         # Regularization terms
         forward, central     = 0, 1
         noWrap, wrap, taper  = 0, 1, 2
-        boundaryStyle, diffStyle = taper, forward
-        self.h0 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0,
-                                                                  boundaryStyle, diffStyle)
-        self.h1 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 1,
-                                                                  boundaryStyle, diffStyle)
-        self.h2 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2,
-                                                                  boundaryStyle, diffStyle)
+        boundaryStyle, diffStyle = noWrap, forward
+
+        #foo0 = ipDiffim.foo(5, 5, 2)
+        #foo1 = ipDiffim.foo(self.kCols, self.kRows, 2)
+        #foo2 = ipDiffim.foo(self.kCols, self.kRows, 3)
+        #sys.exit(1)
         
+        self.h0 = ipDiffim.foo(self.kCols, self.kRows, 1, -1)
+        self.h1 = ipDiffim.foo(self.kCols, self.kRows, 2, -1)
+        self.h2 = ipDiffim.foo(self.kCols, self.kRows, 3, -1)
+
+        ## zeroth order
+        #print 'ZERO'
+        #ipDiffim.foo(4, 4, 1)
+        #print 
+        #ipDiffim.generateFiniteDifferenceRegularization(4, 4, 0, taper, forward, True)
+        #print
+        
+        #print 'ONE'
+        #ipDiffim.foo(4, 4, 2)
+        #print
+        #ipDiffim.generateFiniteDifferenceRegularization(4, 4, 1, taper, forward, True)
+        #print
+        
+        #print 'TWO'
+        #ipDiffim.foo(4, 4, 3)
+        #print
+        #ipDiffim.generateFiniteDifferenceRegularization(4, 4, 2, taper, forward, True)
+        #sys.exit(1)
+
+        #self.h0 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0,
+        #                                                          boundaryStyle, diffStyle)
+        #self.h1 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 1,
+        #                                                          boundaryStyle, diffStyle, True)
+        #self.h2 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2,
+        #                                                          boundaryStyle, diffStyle)
+
         # difference imaging functor
         self.kFunctor      = ipDiffim.PsfMatchingFunctorF(self.basisList)
         self.kFunctor0     = ipDiffim.PsfMatchingFunctorF(self.basisList, self.h0)

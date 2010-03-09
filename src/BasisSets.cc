@@ -209,7 +209,6 @@ generateFiniteDifferenceRegularization(
         // 0th order
         coeffs[0][0][0] = -2; 
         coeffs[0][0][1] =  1; 
-
         coeffs[0][1][0] =  1;  
         coeffs[0][1][1] =  0;
 
@@ -217,36 +216,30 @@ generateFiniteDifferenceRegularization(
         coeffs[1][0][0] = -2; 
         coeffs[1][0][1] =  2;  
         coeffs[1][0][2] = -1; 
-
         coeffs[1][1][0] =  2;  
         coeffs[1][1][1] =  0;  
         coeffs[1][1][2] =  0; 
-
         coeffs[1][2][0] = -1; 
         coeffs[1][2][1] =  0;  
         coeffs[1][2][2] =  0; 
-
+        
         // 2nd 2
         coeffs[2][0][0] = -2; 
         coeffs[2][0][1] =  3;  
         coeffs[2][0][2] = -3; 
         coeffs[2][0][3] =  1; 
-
         coeffs[2][1][0] =  3;  
         coeffs[2][1][1] =  0;  
         coeffs[2][1][2] =  0; 
         coeffs[2][1][3] =  0; 
-
         coeffs[2][2][0] = -3; 
         coeffs[2][2][1] =  0;  
         coeffs[2][2][2] =  0; 
         coeffs[2][2][3] =  0; 
-
         coeffs[2][3][0] =  1;  
         coeffs[2][3][1] =  0;  
         coeffs[2][3][2] =  0; 
         coeffs[2][3][3] =  0; 
-
     }
 
     // central difference coefficients
@@ -414,6 +407,94 @@ generateFiniteDifferenceRegularization(
     boost::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd(bMat.transpose() * bMat));
     return hMat;
 }
+
+/** 
+ * @brief Generate regularization matrix for delta function kernels
+ */
+boost::shared_ptr<Eigen::MatrixXd>
+foo(
+    unsigned int width,
+    unsigned int height,
+    unsigned int order,
+    int borderPenalty
+    ) {
+
+    /* 
+       Instead of Taylor expanding the forward difference approximation of
+       derivatives (N.R. section 18.5) lets just hard code in the expansion of
+       the 1st through 3rd derivatives, which will try and enforce smoothness of
+       0 through 2nd derivatives.
+
+       A property of the basic "finite difference regularization" is that their
+       rows (column multipliers) sum to 0.
+
+       We taper the order of the constraint as you get close to the boundary.
+       The actual perimeter values are left unconstrained but we might want to
+       consider giving these the same penalties as the other border pixels,
+       which is -1.  The user has the choice of making this -1, 0, 1.
+
+    */
+
+    if ((order < 1) || (order > 3)) 
+        throw LSST_EXCEPT(pexExcept::Exception, "Only orders 1..3 allowed");
+    if ((borderPenalty < -1) || (borderPenalty > 1)) 
+        throw LSST_EXCEPT(pexExcept::Exception, "Only border penalty of -1, 0, 1 allowed");
+    
+    std::vector<std::vector<float> >
+        coeffs(4, std::vector<float>(4,0));
+
+    // penalize border?  
+    coeffs[0][0] = borderPenalty; 
+
+    // zeroth derivative
+    coeffs[1][0] = -1;
+    coeffs[1][1] = +1;
+
+    // first derivative
+    coeffs[2][0] = -1;
+    coeffs[2][1] = +2;
+    coeffs[2][2] = -1;
+
+    // second derivative
+    coeffs[3][0] = -1;
+    coeffs[3][1] = +3;
+    coeffs[3][2] = -3;
+    coeffs[3][3] = +1;
+
+
+    Eigen::MatrixXd bMatX = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
+    Eigen::MatrixXd bMatY = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
+
+    for (unsigned int i = 0; i < width*height; i++) {
+        unsigned int const x0 = i % width;         // the x coord in the kernel image
+        unsigned int const y0 = i / width;         // the y coord in the kernel image
+
+        unsigned int distX       = width - x0 - 1; // distance from edge of image
+        unsigned int orderToUseX = std::min(distX, order);
+        for (unsigned int j = 0; j < orderToUseX+1; j++) {
+           bMatX(i, i + j) = coeffs[orderToUseX][j];
+        }
+
+        unsigned int distY       = height - y0 - 1; // distance from edge of image
+        unsigned int orderToUseY = std::min(distY, order);
+        for (unsigned int j = 0; j < orderToUseY+1; j++) {
+           bMatY(i, i + j * width) = coeffs[orderToUseY][j];
+        }
+    }
+    Eigen::MatrixXd bMat = bMatX + bMatY;
+
+    /* Last row / col should have no regularization since its the background term */
+    if (bMat.col(width*height).sum() != 0.) {
+        throw LSST_EXCEPT(pexExcept::Exception, "Error in regularization matrix");
+    }
+    if (bMat.row(width*height).sum() != 0.) {
+        throw LSST_EXCEPT(pexExcept::Exception, "Error in regularization matrix");
+    }
+    
+    boost::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd(bMat.transpose() * bMat));
+    return hMat;
+}
+
 
 /** 
  * @brief Rescale an input set of kernels 

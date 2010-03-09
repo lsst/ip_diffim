@@ -43,6 +43,9 @@ def makePsfMatchingFunctor(policy):
                                                                  regularizationOrder,
                                                                  regularizationBoundary,
                                                                  regularizationDifference)
+            # ACB
+            h = diffimLib.foo(kCols, kRows, 2, -1)
+            # ACB
 
             kFunctor = diffimLib.PsfMatchingFunctorF(basisList, h)
             return kFunctor

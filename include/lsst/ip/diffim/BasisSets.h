@@ -58,6 +58,13 @@ namespace diffim {
 	bool printB=false
         );
 
+    boost::shared_ptr<Eigen::MatrixXd> foo(
+        unsigned int width,
+        unsigned int height,
+        unsigned int order,
+        int borderPenalty
+        );
+
     /**
      * @brief Renormalize a list of basis kernels
      *

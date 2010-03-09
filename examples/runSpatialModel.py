@@ -89,6 +89,10 @@ if display:
     ds9.mtv(mosaic, frame=frame)
     mos.drawLabels(frame=frame)
 
+    # KernelCandidates
+    frame += 1
+    diffimTools.displayCandiateResults(kernelCellSet, frame)
+
     # Bases
     mos.reset()
     basisList = spatialKernel.getKernelList()
