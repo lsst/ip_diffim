@@ -90,7 +90,7 @@ namespace diffim {
             lsst::afw::image::MaskPixel const badMask    = 
                 lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("BAD");
             lsst::afw::image::MaskPixel const interpMask = 
-                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("INTERP");
+                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("INTRP");
             _bpMask = edgeMask | crMask | satMask | badMask | interpMask;
         } ;
         virtual ~ImageStatistics() {} ;
