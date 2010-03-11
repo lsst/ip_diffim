@@ -31,6 +31,7 @@ def main():
     defPolicyPath   = os.path.join(imageProcDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
     defOutputPath   = 'diffImage'
     defVerbosity    = 0
+    defFwhm         = 3.5
     
     usage = """usage: %%prog [options] [scienceImage [templateImage [outputImage]]]]
 

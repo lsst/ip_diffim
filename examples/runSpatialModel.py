@@ -60,8 +60,8 @@ spatialKernel, spatialBg, kernelCellSet = ipDiffim.makePsfMatchingKernel(templat
                                                                          scienceImage.getMaskedImage(),
                                                                          policy)
 
-#import pdb
-#pdb.set_trace()
+import pdb
+pdb.set_trace()
 
 # Lets see what we got
 if display:

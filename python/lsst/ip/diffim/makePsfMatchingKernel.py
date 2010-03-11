@@ -228,7 +228,7 @@ def makePsfMatchingKernelToGaussian(maskedImageToConvolve,
         #             "Scaling gaussian by %.2f" % (flux / phot.getApFlux()))
 
 
-        cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi)
+        cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, policy)
         kernelCellSet.insertCandidate(cand)
 
         if display:

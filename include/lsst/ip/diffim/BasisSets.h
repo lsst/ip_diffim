@@ -16,6 +16,7 @@
 
 #include "Eigen/Core"
 
+#include "lsst/pex/policy/Policy.h"
 #include "lsst/afw/math/Kernel.h"
 
 namespace lsst { 
@@ -32,37 +33,57 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */    
-    lsst::afw::math::KernelList generateDeltaFunctionBasisSet(
+    lsst::afw::math::KernelList makeDeltaFunctionBasisSet(
         unsigned int width,
         unsigned int height
         );
-
+    
     /**
      * @brief Build a regularization matrix for Delta function kernels
      * 
+     * @param policy           Policy file dictating which type of matrix to make
+     *
+     * @ingroup ip_diffim
+     *
+     * @notes Calls either makeForwardDifferenceMatrix or
+     * makeCentralDifferenceMatrix based on the policy file.
+     */    
+    boost::shared_ptr<Eigen::MatrixXd> makeRegularizationMatrix(
+        lsst::pex::policy::Policy policy
+        );
+
+    /**
+     * @brief Build a forward difference regularization matrix for Delta function kernels
+     * 
      * @param width            Width of basis set you want to regularize
      * @param height           Height of basis set you want to regularize
-     * @param order            Which derivative you expect to be smooth (derivative order+1 is penalized) 
-     * @param boundary_style   0 = unwrapped, 1 = wrapped, 2 = order-tappered ('order' is highest used) 
-     * @param difference_style 0 = forward, 1 = central
-     * @param printB           debugging
+     * @param orders           Which derivatives to penalize (1,2,3)
+     * @param borderPenalty    Amount of penalty (if any) to apply to border pixels; > 0
      *
      * @ingroup ip_diffim
      */    
-    boost::shared_ptr<Eigen::MatrixXd> generateFiniteDifferenceRegularization(
+    boost::shared_ptr<Eigen::MatrixXd> makeForwardDifferenceMatrix(
         unsigned int width,
         unsigned int height,
-        unsigned int order,
-	unsigned int boundary_style = 1, 
-	unsigned int difference_style = 0,
-	bool printB=false
+        std::vector<int> const& orders,
+        float borderPenalty
         );
 
-    boost::shared_ptr<Eigen::MatrixXd> foo(
+    /**
+     * @brief Build a central difference Laplacian regularization matrix for Delta function kernels
+     * 
+     * @param width            Width of basis set you want to regularize
+     * @param height           Height of basis set you want to regularize
+     * @param stencil          Which type of Laplacian approximation to use
+     * @param borderPenalty    Amount of penalty (if any) to apply to border pixels; > 0
+     *
+     * @ingroup ip_diffim
+     */    
+    boost::shared_ptr<Eigen::MatrixXd> makeCentralDifferenceMatrix(
         unsigned int width,
         unsigned int height,
-        unsigned int order,
-        int borderPenalty
+        unsigned int stencil,
+        float borderPenalty
         );
 
     /**
@@ -97,11 +118,23 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */    
-    lsst::afw::math::KernelList generateAlardLuptonBasisSet(
+    lsst::afw::math::KernelList makeAlardLuptonBasisSet(
         unsigned int halfWidth,                ///< size is 2*N + 1
         unsigned int nGauss,                   ///< number of gaussians
         std::vector<double> const& sigGauss,   ///< width of the gaussians
         std::vector<int>    const& degGauss    ///< local spatial variation of gaussians
+        );
+
+
+
+
+    boost::shared_ptr<Eigen::MatrixXd> makeFiniteDifferenceRegularizationDeprecated(
+        unsigned int width,
+        unsigned int height,
+        unsigned int order,
+	unsigned int boundary_style = 1, 
+	unsigned int difference_style = 0,
+	bool printB=false
         );
 
 }}} // end of namespace lsst::ip::diffim

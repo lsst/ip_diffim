@@ -14,6 +14,7 @@
 #include "boost/timer.hpp" 
 
 #include "lsst/pex/exceptions/Exception.h"
+#include "lsst/pex/policy/Policy.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
 #include "lsst/ip/diffim/BasisSets.h"
@@ -40,7 +41,7 @@ namespace diffim {
  * @ingroup ip_diffim
  */
 lsst::afw::math::KernelList
-generateDeltaFunctionBasisSet(
+makeDeltaFunctionBasisSet(
     unsigned int width,                 ///< number of columns in the set
     unsigned int height                 ///< number of rows in the set
     ) {
@@ -71,7 +72,7 @@ generateDeltaFunctionBasisSet(
  * @ingroup ip_diffim
  */
 lsst::afw::math::KernelList
-generateAlardLuptonBasisSet(
+makeAlardLuptonBasisSet(
     unsigned int halfWidth,                ///< size is 2*N + 1
     unsigned int nGauss,                   ///< number of gaussians
     std::vector<double> const &sigGauss,   ///< width of the gaussians
@@ -137,11 +138,358 @@ generateAlardLuptonBasisSet(
     return renormalizeKernelList(kernelBasisList);
 }
 
+
+boost::shared_ptr<Eigen::MatrixXd>
+makeRegularizationMatrix(
+    lsst::pex::policy::Policy policy
+    ) {
+
+    /* NOTES 
+     * 
+     * The 3-point first derivative central difference (Laplacian) yields
+     * diagonal stripes and should not be used.
+     
+        coeffs[0][1] = -1. / 2.;
+        coeffs[1][0] = -1. / 2.;
+        coeffs[1][2] =  1. / 2.;
+        coeffs[2][1] =  1. / 2.;
+
+     * The 5-point second derivative central difference (Laplacian) looks great.
+     * For smaller lambdas you need a higher border penalty.  In general, if you
+     * decrease the regularization strength you should increase the border
+     * penalty to avoid noise in the border pixels.  This has been used to value
+     * 10 and things still look OK.
+
+     * The 9-point second derivative central difference (Laplacian with off
+     * diagonal terms) also looks great.  Seems to have slightly higher-valued
+     * border pixels so make boundary larger if using this.  E.g. 1.5.
+
+     * The forward finite difference, first derivative term works good
+     *
+     * The forward finite difference, second derivative term is slightly banded
+     * in LLC
+     * 
+     * The forward finite difference, third derivative term is highly banded in
+     * LLC and should not be used.
+     * 
+     */
+
+    std::string regularizationType = policy.getString("regularizationType");
+    unsigned int width   = policy.getInt("kernelCols");
+    unsigned int height  = policy.getInt("kernelRows");
+    float borderPenalty  = policy.getDouble("regularizationBorderPenalty");
+
+    boost::shared_ptr<Eigen::MatrixXd> bMat;
+    if (regularizationType == "centralDifference") {
+        unsigned int stencil = policy.getInt("centralRegularizationStencil");
+        bMat = makeCentralDifferenceMatrix(width, height, stencil, borderPenalty);
+    }
+    else if (regularizationType == "forwardDifference") {
+        std::vector<int> orders = policy.getIntArray("forwardRegularizationOrders");
+        bMat = makeForwardDifferenceMatrix(width, height, orders, borderPenalty);
+    }
+    else {
+        throw LSST_EXCEPT(pexExcept::Exception, "regularizationType not recognized");
+    }
+
+    boost::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd((*bMat).transpose() * (*bMat)));
+    return hMat;
+}
+
 /** 
  * @brief Generate regularization matrix for delta function kernels
  */
 boost::shared_ptr<Eigen::MatrixXd>
-generateFiniteDifferenceRegularization(
+makeCentralDifferenceMatrix(
+    unsigned int width,
+    unsigned int height,
+    unsigned int stencil,
+    float borderPenalty
+    ) {
+
+    /* 5- or 9-point stencil to approximate the Laplacian; i.e. this is a second
+     * order central finite difference.
+     * 
+     * 5-point approximation ignores off-diagonal elements, and is
+     * 
+     *  f(x-1,y) + f(x+1,y) + f(x,y-1) + f(x,y+1) - 4 f(x,y)
+     * 
+     *   0   1   0
+     *   1  -4   1
+     *   0   1   0
+     *
+     *
+     * 9-point approximation includes diagonals and is
+     * 
+     *   1   4   1
+     *   4  -20  4  / 6
+     *   1   4   1
+     * 
+     */
+
+    if (borderPenalty < 0)
+        throw LSST_EXCEPT(pexExcept::Exception, "Only border penalty of >= 0 allowed");
+    
+    std::vector<std::vector<float> >
+        coeffs(3, std::vector<float>(3,0));
+    
+    if (stencil == 5) {
+        /* http://www.physics.arizona.edu/~restrepo/475B/Notes/source/node51.html
+         * 
+         * This is equivalent to a second order central difference summed along
+         * the x-axis, and then summed along the y-axis.
+         * 
+         * http://www.holoborodko.com/pavel/?page_id=239
+         * 
+         */
+        coeffs[0][1] =  1.;
+        coeffs[1][0] =  1.;
+        coeffs[1][1] = -4.;
+        coeffs[1][2] =  1.;
+        coeffs[2][1] =  1.;
+    }
+    else if (stencil == 9) {
+        /* http://www.physics.arizona.edu/~restrepo/475B/Notes/source/node52.html */
+        coeffs[0][0] =   1. / 6.;
+        coeffs[0][1] =   4. / 6.;
+        coeffs[0][2] =   1. / 6.;
+        coeffs[1][0] =   4. / 6.;
+        coeffs[1][1] = -20. / 6.;
+        coeffs[1][2] =   4. / 6.;
+        coeffs[2][0] =   1. / 6.;
+        coeffs[2][1] =   4. / 6.;
+        coeffs[2][2] =   1. / 6.;
+    }
+    else {
+        throw LSST_EXCEPT(pexExcept::Exception, "Only 5- or 9-point Laplacian stencils allowed");
+    }
+    
+    Eigen::MatrixXd bMat = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
+    
+    for (int i = 0; i < width*height; i++) {
+        int const x0    = i % width;       // the x coord in the kernel image
+        int const y0    = i / width;       // the y coord in the kernel image
+        int const distX = width - x0 - 1;  // distance from edge of image
+        int const distY = height - y0 - 1; // distance from edge of image
+        
+        if ( (x0 > 0) && (y0 > 0) && (distX > 0) && (distY > 0) ) {
+            for (int dx = -1; dx < 2; dx += 1) {
+                for (int dy = -1; dy < 2; dy += 1) {
+                    bMat(i, i + dx + dy * width) += coeffs[dx+1][dy+1];
+                }
+            }
+        }
+        else {
+            bMat(i, i) = borderPenalty;
+        }
+    }
+
+    /* Last row / col should have no regularization since its the background term */
+    if (bMat.col(width*height).sum() != 0.) {
+        throw LSST_EXCEPT(pexExcept::Exception, "Error 1 in regularization matrix");
+    }
+    if (bMat.row(width*height).sum() != 0.) {
+        throw LSST_EXCEPT(pexExcept::Exception, "Error 2 in regularization matrix");
+    }
+
+    boost::shared_ptr<Eigen::MatrixXd> bMatPtr (new Eigen::MatrixXd(bMat));
+    return bMatPtr;
+}
+
+/** 
+ * @brief Generate regularization matrix for delta function kernels
+ */
+boost::shared_ptr<Eigen::MatrixXd>
+makeForwardDifferenceMatrix(
+    unsigned int width,
+    unsigned int height,
+    std::vector<int> const& orders,
+    float borderPenalty
+    ) {
+
+    /* 
+       Instead of Taylor expanding the forward difference approximation of
+       derivatives (N.R. section 18.5) lets just hard code in the expansion of
+       the 1st through 3rd derivatives, which will try and enforce smoothness of
+       0 through 2nd derivatives.
+
+       A property of the basic "finite difference regularization" is that their
+       rows (column multipliers) sum to 0.
+
+       We taper the order of the constraint as you get close to the boundary.
+       The actual perimeter values are left unconstrained but we might want to
+       consider giving these the same penalties as the other border pixels,
+       which is +1 (since the value gets squared).
+
+    */
+
+    if (borderPenalty < 0)
+        throw LSST_EXCEPT(pexExcept::Exception, "Only border penalty of >= 0 allowed");
+    
+    std::vector<std::vector<float> >
+        coeffs(4, std::vector<float>(4,0));
+
+    // penalize border?  this is along the diagonal and gets squared, so sign does not matter
+    coeffs[0][0] = borderPenalty; 
+
+    // penalize zeroth derivative
+    coeffs[1][0] = -1.;
+    coeffs[1][1] = +1.;
+
+    // penalize first derivative
+    coeffs[2][0] = -1.;
+    coeffs[2][1] = +2.;
+    coeffs[2][2] = -1.;
+
+    // penalize second derivative
+    coeffs[3][0] = -1.;
+    coeffs[3][1] = +3.;
+    coeffs[3][2] = -3.;
+    coeffs[3][3] = +1.;
+
+    Eigen::MatrixXd bTot  = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
+    
+    std::vector<int>::const_iterator order;
+    for (order = orders.begin(); order != orders.end(); order++) {
+        if ((*order < 1) || (*order > 3)) 
+            throw LSST_EXCEPT(pexExcept::Exception, "Only orders 1..3 allowed");
+        
+        Eigen::MatrixXd bMatX = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
+        Eigen::MatrixXd bMatY = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
+        
+        for (int i = 0; i < width*height; i++) {
+            int const x0 = i % width;         // the x coord in the kernel image
+            int const y0 = i / width;         // the y coord in the kernel image
+            
+            int distX       = width - x0 - 1; // distance from edge of image
+            int orderToUseX = std::min(distX, *order);
+            for (int j = 0; j < orderToUseX+1; j++) {
+                bMatX(i, i + j) = coeffs[orderToUseX][j];
+            }
+            
+            int distY       = height - y0 - 1; // distance from edge of image
+            int orderToUseY = std::min(distY, *order);
+            for (int j = 0; j < orderToUseY+1; j++) {
+                bMatY(i, i + j * width) = coeffs[orderToUseY][j];
+            }
+        }
+        bTot += bMatX;
+        bTot += bMatY;
+    }
+
+    /* Last row / col should have no regularization since its the background term */
+    if (bTot.col(width*height).sum() != 0.) {
+        throw LSST_EXCEPT(pexExcept::Exception, "Error in regularization matrix");
+    }
+    if (bTot.row(width*height).sum() != 0.) {
+        throw LSST_EXCEPT(pexExcept::Exception, "Error in regularization matrix");
+    }
+
+    boost::shared_ptr<Eigen::MatrixXd> bMatPtr (new Eigen::MatrixXd(bTot));
+    return bMatPtr;
+}
+
+
+/** 
+ * @brief Rescale an input set of kernels 
+ *
+ * @return Vector of renormalized kernels
+ *
+ * @ingroup ip_diffim
+ */
+lsst::afw::math::KernelList
+renormalizeKernelList(
+    lsst::afw::math::KernelList const &kernelListIn ///< Input list to be renormalized
+    ) { 
+    typedef afwMath::Kernel::Pixel Pixel;
+    typedef afwImage::Image<Pixel> Image;
+    double kSum;
+
+    /* 
+       
+    We want all the bases except for the first to sum to 0.0.  This allows
+    us to achieve kernel flux conservation (Ksum) across the image since all
+    the power will be in the first term, which will not vary spatially.
+    
+    K(x,y) = Ksum * B_0 + Sum_i : a(x,y) * B_i
+    
+    To do this, normalize all Kernels to sum = 1. and subtract B_0 from all
+    subsequent kenrels.  
+    
+    To get an idea of the relative contribution of each of these basis
+    functions later on down the line, lets also normalize them such that 
+    
+    Sum(B_i)  == 0.0   *and*
+    B_i * B_i == 1.0
+    
+    For completeness 
+    
+    Sum(B_0)  == 1.0
+    B_0 * B_0 != 1.0
+    
+    */
+    afwMath::KernelList kernelListOut;
+    if (kernelListIn.size() == 0) {
+        return kernelListOut;
+    }
+
+    Image image0(kernelListIn[0]->getDimensions());
+    for (unsigned int i = 0; i < kernelListIn.size(); i++) {
+        if (i == 0) {
+            /* Make sure that it is normalized to kSum 1. */
+            (void)kernelListIn[i]->computeImage(image0, true);
+            boost::shared_ptr<afwMath::Kernel> 
+                kernelPtr(new afwMath::FixedKernel(image0));
+            kernelListOut.push_back(kernelPtr);
+
+            continue;
+        }
+
+        /* Don't normalize here */
+        Image image(kernelListIn[i]->getDimensions());
+        (void)kernelListIn[i]->computeImage(image, false);
+        
+        /* Check the kernel sum; if its close to zero don't do anything */
+        kSum = 0.;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); 
+                 ptr != end; ++ptr.x()) {
+                kSum += *ptr;
+            }
+        }
+
+        if (fabs(kSum) > std::numeric_limits<double>::epsilon()) {
+            image /= kSum;
+            image -= image0;
+        }
+
+
+        /* Finally, rescale such that the inner product is 1 */
+        kSum = 0.;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); 
+                 ptr != end; ++ptr.x()) {
+                kSum += *ptr * *ptr;
+            }
+        }
+        image /= std::sqrt(kSum);
+
+        boost::shared_ptr<afwMath::Kernel> 
+            kernelPtr(new afwMath::FixedKernel(image));
+        kernelListOut.push_back(kernelPtr);
+    }
+    return kernelListOut;
+}
+
+
+
+
+
+/** 
+ * @brief Generate regularization matrix for delta function kernels
+ */
+boost::shared_ptr<Eigen::MatrixXd>
+makeFiniteDifferenceRegularizationDeprecated(
     unsigned int width,
     unsigned int height,
     unsigned int order,
@@ -408,183 +756,5 @@ generateFiniteDifferenceRegularization(
     return hMat;
 }
 
-/** 
- * @brief Generate regularization matrix for delta function kernels
- */
-boost::shared_ptr<Eigen::MatrixXd>
-foo(
-    unsigned int width,
-    unsigned int height,
-    unsigned int order,
-    int borderPenalty
-    ) {
-
-    /* 
-       Instead of Taylor expanding the forward difference approximation of
-       derivatives (N.R. section 18.5) lets just hard code in the expansion of
-       the 1st through 3rd derivatives, which will try and enforce smoothness of
-       0 through 2nd derivatives.
-
-       A property of the basic "finite difference regularization" is that their
-       rows (column multipliers) sum to 0.
-
-       We taper the order of the constraint as you get close to the boundary.
-       The actual perimeter values are left unconstrained but we might want to
-       consider giving these the same penalties as the other border pixels,
-       which is -1.  The user has the choice of making this -1, 0, 1.
-
-    */
-
-    if ((order < 1) || (order > 3)) 
-        throw LSST_EXCEPT(pexExcept::Exception, "Only orders 1..3 allowed");
-    if ((borderPenalty < -1) || (borderPenalty > 1)) 
-        throw LSST_EXCEPT(pexExcept::Exception, "Only border penalty of -1, 0, 1 allowed");
-    
-    std::vector<std::vector<float> >
-        coeffs(4, std::vector<float>(4,0));
-
-    // penalize border?  
-    coeffs[0][0] = borderPenalty; 
-
-    // zeroth derivative
-    coeffs[1][0] = -1;
-    coeffs[1][1] = +1;
-
-    // first derivative
-    coeffs[2][0] = -1;
-    coeffs[2][1] = +2;
-    coeffs[2][2] = -1;
-
-    // second derivative
-    coeffs[3][0] = -1;
-    coeffs[3][1] = +3;
-    coeffs[3][2] = -3;
-    coeffs[3][3] = +1;
-
-
-    Eigen::MatrixXd bMatX = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
-    Eigen::MatrixXd bMatY = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
-
-    for (unsigned int i = 0; i < width*height; i++) {
-        unsigned int const x0 = i % width;         // the x coord in the kernel image
-        unsigned int const y0 = i / width;         // the y coord in the kernel image
-
-        unsigned int distX       = width - x0 - 1; // distance from edge of image
-        unsigned int orderToUseX = std::min(distX, order);
-        for (unsigned int j = 0; j < orderToUseX+1; j++) {
-           bMatX(i, i + j) = coeffs[orderToUseX][j];
-        }
-
-        unsigned int distY       = height - y0 - 1; // distance from edge of image
-        unsigned int orderToUseY = std::min(distY, order);
-        for (unsigned int j = 0; j < orderToUseY+1; j++) {
-           bMatY(i, i + j * width) = coeffs[orderToUseY][j];
-        }
-    }
-    Eigen::MatrixXd bMat = bMatX + bMatY;
-
-    /* Last row / col should have no regularization since its the background term */
-    if (bMat.col(width*height).sum() != 0.) {
-        throw LSST_EXCEPT(pexExcept::Exception, "Error in regularization matrix");
-    }
-    if (bMat.row(width*height).sum() != 0.) {
-        throw LSST_EXCEPT(pexExcept::Exception, "Error in regularization matrix");
-    }
-    
-    boost::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd(bMat.transpose() * bMat));
-    return hMat;
-}
-
-
-/** 
- * @brief Rescale an input set of kernels 
- *
- * @return Vector of renormalized kernels
- *
- * @ingroup ip_diffim
- */
-lsst::afw::math::KernelList
-renormalizeKernelList(
-    lsst::afw::math::KernelList const &kernelListIn ///< Input list to be renormalized
-    ) { 
-    typedef afwMath::Kernel::Pixel Pixel;
-    typedef afwImage::Image<Pixel> Image;
-    double kSum;
-
-    /* 
-       
-    We want all the bases except for the first to sum to 0.0.  This allows
-    us to achieve kernel flux conservation (Ksum) across the image since all
-    the power will be in the first term, which will not vary spatially.
-    
-    K(x,y) = Ksum * B_0 + Sum_i : a(x,y) * B_i
-    
-    To do this, normalize all Kernels to sum = 1. and subtract B_0 from all
-    subsequent kenrels.  
-    
-    To get an idea of the relative contribution of each of these basis
-    functions later on down the line, lets also normalize them such that 
-    
-    Sum(B_i)  == 0.0   *and*
-    B_i * B_i == 1.0
-    
-    For completeness 
-    
-    Sum(B_0)  == 1.0
-    B_0 * B_0 != 1.0
-    
-    */
-    afwMath::KernelList kernelListOut;
-    if (kernelListIn.size() == 0) {
-        return kernelListOut;
-    }
-
-    Image image0(kernelListIn[0]->getDimensions());
-    for (unsigned int i = 0; i < kernelListIn.size(); i++) {
-        if (i == 0) {
-            /* Make sure that it is normalized to kSum 1. */
-            (void)kernelListIn[i]->computeImage(image0, true);
-            boost::shared_ptr<afwMath::Kernel> 
-                kernelPtr(new afwMath::FixedKernel(image0));
-            kernelListOut.push_back(kernelPtr);
-
-            continue;
-        }
-
-        /* Don't normalize here */
-        Image image(kernelListIn[i]->getDimensions());
-        (void)kernelListIn[i]->computeImage(image, false);
-        
-        /* Check the kernel sum; if its close to zero don't do anything */
-        kSum = 0.;
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); 
-                 ptr != end; ++ptr.x()) {
-                kSum += *ptr;
-            }
-        }
-
-        if (fabs(kSum) > std::numeric_limits<double>::epsilon()) {
-            image /= kSum;
-            image -= image0;
-        }
-
-
-        /* Finally, rescale such that the inner product is 1 */
-        kSum = 0.;
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y); 
-                 ptr != end; ++ptr.x()) {
-                kSum += *ptr * *ptr;
-            }
-        }
-        image /= std::sqrt(kSum);
-
-        boost::shared_ptr<afwMath::Kernel> 
-            kernelPtr(new afwMath::FixedKernel(image));
-        kernelListOut.push_back(kernelPtr);
-    }
-    return kernelListOut;
-}
 
 }}} // end of namespace lsst::ip::diffim

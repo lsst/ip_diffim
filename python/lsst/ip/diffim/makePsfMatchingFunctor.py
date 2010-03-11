@@ -25,28 +25,18 @@ def makePsfMatchingFunctor(policy):
             raise RuntimeError("Invalid Alard-Lupton kernel configuration")
         
         kHalfWidth = kCols//2
-        basisList  = diffimLib.generateAlardLuptonBasisSet(kHalfWidth,
-                                                           alardNGauss,
-                                                           alardSigGauss,
-                                                           alardDegGauss)
+        basisList  = diffimLib.makeAlardLuptonBasisSet(kHalfWidth,
+                                                       alardNGauss,
+                                                       alardSigGauss,
+                                                       alardDegGauss)
         kFunctor   = diffimLib.PsfMatchingFunctorF(basisList)
         return kFunctor
 
     elif kType == "delta-function":
-        basisList = diffimLib.generateDeltaFunctionBasisSet(kCols, kRows)
+        basisList = diffimLib.makeDeltaFunctionBasisSet(kCols, kRows)
         
         if useRegularization:
-            regularizationOrder      = policy.getInt("regularizationOrder")
-            regularizationBoundary   = policy.getInt("regularizationBoundary")
-            regularizationDifference = policy.getInt("regularizationDifference")
-            h = diffimLib.generateFiniteDifferenceRegularization(kCols, kRows,
-                                                                 regularizationOrder,
-                                                                 regularizationBoundary,
-                                                                 regularizationDifference)
-            # ACB
-            h = diffimLib.foo(kCols, kRows, 2, -1)
-            # ACB
-
+            h = diffimLib.makeRegularizationMatrix(policy)
             kFunctor = diffimLib.PsfMatchingFunctorF(basisList, h)
             return kFunctor
 

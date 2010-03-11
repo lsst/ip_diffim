@@ -45,7 +45,7 @@ detOnTemplate: true
 ######
 # Mask planes that lead to an invalid detection
 #
-# Options: EDGE SAT BAD CR INTERP
+# Options: EDGE SAT BAD CR INTRP
 # 
 # E.g. : EDGE SAT BAD allows CR-masked and interpolated pixels
 #
@@ -95,6 +95,9 @@ detThreshold: 10.
 # want to seriously consider "usePcaForSpatialKernel" which will also
 # enable kernel sum conservation for the delta function kernels.
 #
+# Delta function, even regularized, do not work well for convolving
+# single-depth images.
+#
 # NOTE : if "alard-lupton" you might want to turn off
 # "usePcaForSpatialKernel" down below.  
 #
@@ -141,16 +144,21 @@ alardSigFwhmScaling: 0.50 1.00 2.00
 # Regularization used with delta-function kernel basis set to enfore
 # smoothness and self-similarity
 #
-# order      : Which derivative you expect to be smooth (e.g. for order=0, first derivative is penalized)
-# boundary   : 0 = unwrapped, 1 = wrapped, 2 = order-tapered ('order' is highest used) 
-# difference : 0 = forward, 1 = central
-# scaling    : Fraction of the default lambda calculation (N.R. 18.5.8) to use; strength of regularization
+# regularizationType : centralDifference (penalizes second derivative using 2-D stencil)
+#                      forwardDifference (penalizes first, second, third or combination of derivatives)
+# centralRegularizationStencil : for central difference, 5 or 9 point stencil
+# forwardRegularizationOrders  : array showing which order derivatives to penalize
+# regularizationBorderPenalty  : penalty for value of kernel along its border
+# regularizationScaling        : fraction of the default lambda strength (N.R. 18.5.8) to use. 
+#                                somewhere around 1e-4 to 1e-5 seems to work.
+#                                some kernels need high freq power
 #
 useRegularization: true
-regularizationOrder: 1
-regularizationBoundary: 0
-regularizationDifference: 0
-regularizationScaling: 0.001
+regularizationType: centralDifference
+centralRegularizationStencil: 9
+forwardRegularizationOrders: 1 2 
+regularizationBorderPenalty: 10.
+regularizationScaling: 0.00001
 
 
 

@@ -191,14 +191,14 @@ def displayCandiateResults(kernelCellSet, frame):
                 dmi   = cand.returnDifferenceImage()
 
                 mos.append(tmi)
-                mos.append(smi)
-                mos.append(ki)
-                mos.append(dmi)
+                mos.append(foo1)
+                #mos.append(ki)
+                mos.append(foo2)
                 
             except Exception, e:
                 pass
             
-    mosaic = mos.makeMosaic(mode=4)
+    mosaic = mos.makeMosaic(mode=3)
     ds9.mtv(mosaic, frame=frame)
 
 def displayFootprints(image, footprintList, frame):

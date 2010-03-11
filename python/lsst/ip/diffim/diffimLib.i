@@ -206,6 +206,6 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 #include "Eigen/Core"
 %}
 
-%template(eigenMatrix) boost::shared_ptr<Eigen::MatrixXd>;
-%template(eigenVector) boost::shared_ptr<Eigen::VectorXd>;
+%template(eigenMatrixPtr) boost::shared_ptr<Eigen::MatrixXd>;
+%template(eigenVectorPtr) boost::shared_ptr<Eigen::VectorXd>;
 

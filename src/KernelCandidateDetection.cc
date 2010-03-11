@@ -36,8 +36,6 @@ namespace diffim {
         _badBitMask(0), 
         _footprints(std::vector<lsst::afw::detection::Footprint::Ptr>()) {
 
-        std::cout << "CAW" << std::endl;
-
         std::vector<std::string> detBadMaskPlanes = _policy.getStringArray("detBadMaskPlanes");
         for (std::vector<std::string>::iterator mi = detBadMaskPlanes.begin(); 
              mi != detBadMaskPlanes.end(); ++mi){

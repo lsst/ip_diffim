@@ -61,10 +61,10 @@ class DiffimTestCases(unittest.TestCase):
         # you run detection on.  Here it is the template.
         diffimTools.backgroundSubtract(self.policy, [self.scienceImage,])
 
-        ipDiffim.createPsfMatchingKernelToGaussian(self.scienceImage,
-                                                   sigGauss,
-                                                   self.policy,
-                                                   self.footprints)
+        ipDiffim.makePsfMatchingKernelToGaussian(self.scienceImage,
+                                                 sigGauss,
+                                                 self.policy,
+                                                 self.footprints)
 #####
         
 def suite():

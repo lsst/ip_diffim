@@ -33,7 +33,7 @@ class DiffimTestCases(unittest.TestCase):
         self.kRows       = self.policy.getInt('kernelRows')
 
         # Delta function basis set
-        self.basisList1  = ipDiffim.generateDeltaFunctionBasisSet(self.kCols, self.kRows)
+        self.basisList1  = ipDiffim.makeDeltaFunctionBasisSet(self.kCols, self.kRows)
         self.kFunctor1   = ipDiffim.PsfMatchingFunctorF(self.basisList1)
 
         # Alard-Lupton basis set
@@ -45,12 +45,18 @@ class DiffimTestCases(unittest.TestCase):
         assert self.kCols == self.kRows  # square
         assert self.kCols % 2 == 1  # odd sized
         kHalfWidth = int(self.kCols/2)
-        self.basisList2  = ipDiffim.generateAlardLuptonBasisSet(kHalfWidth, nGauss, sigGauss, degGauss)
+        self.basisList2  = ipDiffim.makeAlardLuptonBasisSet(kHalfWidth, nGauss, sigGauss, degGauss)
         self.kFunctor2   = ipDiffim.PsfMatchingFunctorF(self.basisList2)
 
-        # Regularized delta function basis set
-        self.h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2, 1, 0)
-        self.kFunctor3   = ipDiffim.PsfMatchingFunctorF(self.basisList1, self.h)
+        # Regularized delta function basis set using default forward diff
+        self.policy.set("regularizationType", "forwardDifference")
+        h3 = ipDiffim.makeRegularizationMatrix(self.policy)
+        self.kFunctor3   = ipDiffim.PsfMatchingFunctorF(self.basisList1, h3)
+
+        # Regularized delta function basis set using default central diff
+        self.policy.set("regularizationType", "centralDifference")
+        h4 = ipDiffim.makeRegularizationMatrix(self.policy)
+        self.kFunctor4   = ipDiffim.PsfMatchingFunctorF(self.basisList1, h4)
 
         # known input images
         defDataDir = eups.productDir('afwdata')
@@ -80,7 +86,11 @@ class DiffimTestCases(unittest.TestCase):
         #
         tmi = self.templateImage.getMaskedImage()
         smi = self.scienceImage.getMaskedImage()
-        self.footprints = ipDiffim.getCollectionOfFootprintsForPsfMatching(tmi, smi, self.policy)
+
+        self.policy.set("detThreshold", 100.)
+        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy)
+        kcDetect.apply(tmi, smi)
+        self.footprints = kcDetect.getFootprints()
         
     def tearDown(self):
         del self.policy
@@ -107,7 +117,7 @@ class DiffimTestCases(unittest.TestCase):
         
     def applyFunctor(self, invert=False, xloc=397, yloc=580):
         if invert:
-            frame0 = 12
+            frame0 = 16
         else:
             frame0 = 0
             
@@ -168,7 +178,7 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut2.writeFits('k2.fits')
             diffIm2.writeFits('d2')
 
-        # regularized delta function kernel
+        # regularized delta function kernel 1
         kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3 = self.apply(self.kFunctor3, tmi, smi, var)
         print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                      self.dStats.getRms(),
@@ -183,6 +193,22 @@ class DiffimTestCases(unittest.TestCase):
         if writefits:
             kImageOut3.writeFits('k3.fits')
             diffIm3.writeFits('d3')
+
+        # regularized delta function kernel 2
+        kSum4, bg4, dmean4, dstd4, vmean4, kImageOut4, diffIm4 = self.apply(self.kFunctor4, tmi, smi, var)
+        print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
+                                                                                     self.dStats.getRms(),
+                                                                                     kSum4, bg4,
+                                                                                     dmean4, dstd4, vmean4)
+        # outputs
+        if display:
+            ds9.mtv(tmi, frame=frame0+12)
+            ds9.mtv(smi, frame=frame0+13)
+            ds9.mtv(kImageOut4, frame=frame0+14)
+            ds9.mtv(diffIm4, frame=frame0+15)
+        if writefits:
+            kImageOut4.writeFits('k4.fits')
+            diffIm4.writeFits('d4')
 
     def testFunctor(self):
         for fp in self.footprints:
