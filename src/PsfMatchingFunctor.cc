@@ -308,7 +308,9 @@ void PsfMatchingFunctor<PixelT, VarT>::apply(
 
     /* If the regularization matrix is here and not null, we use it by default */
     if (_regularize) {
-        double regularizationScaling = policy.getDouble("regularizationScaling");        
+        std::string lambdaType = policy.getString("lambdaType");        
+        double lambdaValue  = policy.getDouble("lambdaValue");
+
         /* 
            See N.R. 18.5 equation 18.5.8 for the solution to the regularized
            normal equations.  For M.x = b, and solving for x, 
@@ -325,8 +327,17 @@ void PsfMatchingFunctor<PixelT, VarT>::apply(
         Eigen::MatrixXd mtMat = mMat.transpose();
         mMat = mtMat * mMat;
 
-        double lambda = mMat.trace() / _hMat->trace();
-        lambda *= regularizationScaling;
+        double lambda;
+        if (lambdaType == "absolute") {
+            lambda = lambdaValue;
+        }
+        else if (lambdaType == "relative") {
+            lambda  = mMat.trace() / _hMat->trace();
+            lambda *= lambdaValue;
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception, "lambdaType in Policy not recognized");
+        }
 
         mMat = mMat + lambda * *_hMat;
         bVec = mtMat * bVec;

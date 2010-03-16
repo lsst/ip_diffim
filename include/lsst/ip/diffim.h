@@ -9,6 +9,7 @@
 #include "lsst/ip/diffim/BasisSets.h"
 #include "lsst/ip/diffim/PsfMatchingFunctor.h"
 #include "lsst/ip/diffim/SpatialModelKernel.h"
+#include "lsst/ip/diffim/KernelSolution.h"
 #include "lsst/ip/diffim/KernelCandidate.h"
 #include "lsst/ip/diffim/KernelCandidateDetection.h"
 
