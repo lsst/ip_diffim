@@ -21,7 +21,6 @@
 
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelCandidate.h"
-#include "lsst/ip/diffim/PsfMatchingFunctor.h"
 #include "lsst/ip/diffim/BuildSingleKernelVisitor.h"
 
 #define DEBUG_MATRIX 0
@@ -51,7 +50,7 @@ namespace detail {
         policy->set("candidateResidualMeanMax", 0.25);
         policy->set("candidateResidualStdMax", 1.25);
     
-        detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter(kFunctor, *policy);
+        detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter(*policy);
         int nRejected = -1;
         while (nRejected != 0) {
             singleKernelFitter.reset();
@@ -60,15 +59,15 @@ namespace detail {
         }
      * @endcode
      *
-     * @note Visits each current candidate in a afwMath::SpatialCellSet, and builds
-     * its kernel using member object kFunctor.  We don't build the kernel for
-     * *every* candidate since this is computationally expensive, only when its the
-     * current candidate in the cell.  During the course of building the kernel, it
-     * also assesses the quality of the difference image.  If it is determined to be
-     * bad (based on the Policy paramters) the candidate is flagged as
-     * afwMath::SpatialCellCandidate::BAD; otherwise its marked as
-     * afwMath::SpatialCellCandidate::GOOD.  Keeps a running sample of all the new
-     * candidates it visited that turned out to be bad.
+     * @note Visits each current candidate in a afwMath::SpatialCellSet, and
+     * builds its kernel using its build() method.  We don't build the kernel
+     * for *every* candidate since this is computationally expensive, only when
+     * its the current candidate in the cell.  During the course of building the
+     * kernel, it also assesses the quality of the difference image.  If it is
+     * determined to be bad (based on the Policy paramters) the candidate is
+     * flagged as afwMath::SpatialCellCandidate::BAD; otherwise its marked as
+     * afwMath::SpatialCellCandidate::GOOD.  Keeps a running sample of all the
+     * new candidates it visited that turned out to be bad.
      *
      * @note Because this visitor does not have access to the next candidate in the
      * cell, it must be called iteratively until no candidates are rejected.  This
@@ -89,24 +88,17 @@ namespace detail {
      * use in the spatial modeling.  This also requires the user to
      * setSkipBuilt(false) so that the candidate is reprocessed with this new basis.
      * 
-     * @note When sending data to _kFunctor, this class uses an estimate of the
-     * variance which is the straight difference of the 2 images.  If requested in
-     * the Policy ("iterateSingleKernel"), the kernel will be rebuilt using the
-     * variance of the difference image resulting from this first approximate step.
-     * This is particularly useful when convolving a single-depth science image; the
-     * variance (and thus resulting kernel) generally converges after 1 iteration.
-     * If "constantVarianceWeighting" is requested in the Policy, no iterations will
-     * be performed even if requested.
-     * 
      */
     template<typename PixelT>
     BuildSingleKernelVisitor<PixelT>::BuildSingleKernelVisitor(
-        PsfMatchingFunctor<PixelT> &kFunctor,    ///< Functor that builds the kernels
-        lsst::pex::policy::Policy const& policy  ///< Policy file directing behavior
+        boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
+        lsst::pex::policy::Policy const& policy,  ///< Policy file directing behavior
+        boost::shared_ptr<Eigen::MatrixXd> hMat
         ) :
         afwMath::CandidateVisitor(),
-        _kFunctor(kFunctor),
+        _basisList(basisList),
         _policy(policy),
+        _hMat(hMat),
         _imstats(ImageStatistics<PixelT>()),
         _setCandidateKernel(true),
         _skipBuilt(true),
@@ -125,30 +117,16 @@ namespace detail {
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
         
-        if (_skipBuilt and kCandidate->hasKernel()) {
+        if (_skipBuilt and kCandidate->isInitialized()) {
             return;
         }
         
         pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                               "Processing candidate %d", kCandidate->getId());
         
-        /* Estimate of the variance */
-        MaskedImageT var = MaskedImageT(*(kCandidate->getMiToNotConvolvePtr()), true);
-        if (_policy.getBool("constantVarianceWeighting")) {
-            /* Constant variance weighting */
-            *var.getVariance() = 1;
-        }
-        else {
-            /* Variance estimate is the straight difference */
-            var -= *(kCandidate->getMiToConvolvePtr());
-        }
-        
         /* Build its kernel here */
         try {
-            _kFunctor.apply(*(kCandidate->getMiToConvolvePtr()->getImage()),
-                            *(kCandidate->getMiToNotConvolvePtr()->getImage()),
-                            *(var.getVariance()),
-                            _policy);
+            kCandidate->build(_basisList, _hMat);
         } catch (pexExcept::Exception &e) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
@@ -168,101 +146,21 @@ namespace detail {
            not go awry in the spatial modeling.
         */
         if (_policy.getBool("psfMatchToGaussian")) {
-            _kFunctor.normalizeKernel();
+            //_kFunctor.normalizeKernel();
         }
         
         /* 
-           Sometimes you do not want to override the kernel; e.g. on a
-           second fitting loop after the results of the first fitting loop
-           are used to define a PCA basis
-        */
-        std::pair<boost::shared_ptr<afwMath::Kernel>, double> kb;
-        try {
-            kb = _kFunctor.getSolution();
-        } catch (pexExcept::Exception &e) {
-            kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-            pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
-                                  "Unable to process candidate %d; exception caught (%s)", 
-                                  kCandidate->getId(),
-                                  e.what());
-            _nRejected += 1;
-            return;
-        }
-        
-        if (_setCandidateKernel) {
-            kCandidate->setKernel(kb.first);
-            kCandidate->setBackground(kb.second);
-        }
-        
-        /* 
-         * However you *always* need to reset M and B since these are used 
-         * in the spatial fitting
+         * Make diffim and set chi2 from result.  Note that you need to use the
+         * most recent kernel
          */
-        std::pair<boost::shared_ptr<Eigen::MatrixXd>, boost::shared_ptr<Eigen::VectorXd> > mb = 
-            _kFunctor.getAndClearMB();
-        kCandidate->setM(mb.first);
-        kCandidate->setB(mb.second);
-        
-        /* 
-         * Make diffim and set chi2 from result.  Note that you need to send
-         * the newly-derived kernel and background in the case that
-         * _setCandidateKernel = false.
-         */
-        MaskedImageT diffim = kCandidate->returnDifferenceImage(kb.first, kb.second);
-        
-        /* 
-         * Remake the kernel using the first iteration difference image
-         * variance as a better estimate of the true diffim variance.  If
-         * you are setting "constantVarianceWeighting" it makes no sense to
-         * do this
-         */
-        if (_policy.getBool("iterateSingleKernel") && (!(_policy.getBool("constantVarianceWeighting")))) {
-            try {
-                _kFunctor.apply(*(kCandidate->getMiToConvolvePtr()->getImage()),
-                                *(kCandidate->getMiToNotConvolvePtr()->getImage()),
-                                *(diffim.getVariance()),
-                                _policy);
-            } catch (pexExcept::Exception &e) {
-                LSST_EXCEPT_ADD(e, "Unable to recalculate Kernel");
-                throw e;
-            }
-            
-            if (_policy.getBool("psfMatchToGaussian")) {
-                _kFunctor.normalizeKernel();
-            }
-            
-            try {
-                kb = _kFunctor.getSolution();
-            } catch (pexExcept::Exception &e) {
-                kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-                pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
-                                      "Unable to process candidate %d; exception caught (%s)", 
-                                      kCandidate->getId(), 
-                                      e.what());
-                _nRejected += 1;
-                return;
-            }
-            
-            if (_setCandidateKernel) {
-                kCandidate->setKernel(kb.first);
-                kCandidate->setBackground(kb.second);
-            }
-            
-            mb = _kFunctor.getAndClearMB();
-            kCandidate->setM(mb.first);
-            kCandidate->setB(mb.second);
-            diffim = kCandidate->returnDifferenceImage(kb.first, kb.second);                
-        }
-        
-        /* Official resids */
+        MaskedImageT diffim = kCandidate->getDifferenceImage(KernelCandidate<PixelT>::RECENT);
         _imstats.apply(diffim);
         kCandidate->setChi2(_imstats.getVariance());
         
         /* When using a Pca basis, we don't reset the kernel or background,
            so we need to evaluate these locally for the Trace */
-        afwImage::Image<double> kImage(kb.first->getDimensions());
-        double kSum = kb.first->computeImage(kImage, false);
-        double background = kb.second;
+        double kSum = kCandidate->getKsum(KernelCandidate<PixelT>::RECENT);
+        double background = kCandidate->getBackground(KernelCandidate<PixelT>::RECENT);
         
         pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                               "Chi2 = %.2f", kCandidate->getChi2());

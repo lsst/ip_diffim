@@ -46,28 +46,7 @@ namespace diffim {
         _policy(policy),
         _coreFlux(),
         _isInitialized(false),
-        _kernelSolutionOrig(),
-        _kernelSolutionPca()
-    {
-        
-    }
-
-    template <typename PixelT, typename VarT>
-    KernelCandidate<PixelT, VarT>::KernelCandidate(
-        float const xCenter,
-        float const yCenter, 
-        MaskedImagePtr const& miToConvolvePtr,
-        MaskedImagePtr const& miToNotConvolvePtr,
-        VariancePtr varianceEstimate,
-        lsst::pex::policy::Policy const& policy
-        ) :
-        lsst::afw::math::SpatialCellImageCandidate<ImageT>(xCenter, yCenter),
-        _miToConvolvePtr(miToConvolvePtr),
-        _miToNotConvolvePtr(miToNotConvolvePtr),
-        _varianceEstimate(varianceEstimate),
-        _policy(policy),
-        _coreFlux(),
-        _isInitialized(false),
+        _regularize(false),
         _kernelSolutionOrig(),
         _kernelSolutionPca()
     {
@@ -90,11 +69,53 @@ namespace diffim {
         boost::shared_ptr<Eigen::MatrixXd> hMat
         ) {
 
-        bool regularize;
+        /* Examine the policy for control over the variance estimate */
+        afwImage::MaskedImage<PixelT> var = 
+            afwImage::MaskedImage<PixelT>(*(_miToNotConvolvePtr), true);
+        if (_policy.getBool("constantVarianceWeighting")) {
+            /* Constant variance weighting */
+            *var.getVariance() = 1.;
+        }
+        else {
+            /* Variance estimate comes from the straight difference */
+            var -= *(_miToConvolvePtr);
+        }
+        _varianceEstimate = var.getVariance();
+
+        /* Do we have a regularization matrix?  If so use it */
         if (hMat)
-            regularize = true;
+            _regularize = true;
         else
-            regularize = false;
+            _regularize = false;
+
+        try {
+            buildEngine(basisList, hMat);
+        } catch (pexExcept::Exception &e) {
+            throw e;
+        }
+
+        if (_policy.getBool("iterateSingleKernel") && (!(_policy.getBool("constantVarianceWeighting")))) {
+            afwImage::MaskedImage<PixelT> diffim = getDifferenceImage(KernelCandidate::RECENT);
+            _varianceEstimate = diffim.getVariance();
+            try {
+                buildEngine(basisList, hMat);
+            } catch (pexExcept::Exception &e) {
+                throw e;
+            }
+        }
+
+        /* Don't put this in buildEngine() since you might have to iterate the
+         * first kernel */
+        _isInitialized = true;
+
+    }
+            
+
+    template <typename PixelT, typename VarT>
+    void KernelCandidate<PixelT, VarT>::buildEngine(
+        boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
+        boost::shared_ptr<Eigen::MatrixXd> hMat
+        ) {
 
         lsst::afw::image::Image<PixelT> const &imageToConvolve = *(_miToConvolvePtr->getImage());
         lsst::afw::image::Image<PixelT> const &imageToNotConvolve = *(_miToNotConvolvePtr->getImage());
@@ -256,7 +277,7 @@ namespace diffim {
         t.restart();
         
         /* If the regularization matrix is here and not null, we use it by default */
-        if (regularize) {
+        if (_regularize) {
             std::string lambdaType = _policy.getString("lambdaType");        
             double lambdaValue  = _policy.getDouble("lambdaValue");
             
@@ -306,111 +327,192 @@ namespace diffim {
             _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution>(
                 new StaticKernelSolution(mMat, bVec, basisList)
                 );
-            _isInitialized = true;
         }
     }
     
+    
+    
+    template <typename PixelT, typename VarT>
+    lsst::afw::math::Kernel::Ptr KernelCandidate<PixelT, VarT>::getKernel(CandidateSwitch cand) const {
+        if (cand == KernelCandidate::ORIG) {
+            if (_kernelSolutionOrig) 
+                return _kernelSolutionOrig->getKernel();
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+        }
+        else if (cand == KernelCandidate::PCA) {
+            if (_kernelSolutionPca) 
+                return _kernelSolutionPca->getKernel();
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+        }
+        else if (cand == KernelCandidate::RECENT) {
+            if (_kernelSolutionPca) 
+                return _kernelSolutionPca->getKernel();
+            else if (_kernelSolutionOrig)
+                return _kernelSolutionOrig->getKernel();
+            else
+                throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get kernel");
+        }
+    }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    //
-    //
-    //
-    //
-    //
-    //
-    //
-    //template <typename PixelT>
-    //KernelCandidate<PixelT>::ImageT::ConstPtr KernelCandidate<PixelT>::getOrigImage() const {
-    //if (!_haveKernel) {
-    //throw LSST_EXCEPT(pexExcept::Exception, "No Kernel to make KernelCandidate Image from");
-//}
-    //
-    //return _image;
-//}
-    //
-    //template <typename PixelT>
-    //KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::copyImage() const {
-    //return typename KernelCandidate<PixelT>::ImageT::Ptr(
-    //new typename KernelCandidate<PixelT>::ImageT(*getImage(), true)
-    //);
-//}
-    //
-    //
-    //template <typename PixelT>
-    //void KernelCandidate<PixelT>::setKernel(lsst::afw::math::Kernel::Ptr kernel) {
-    //_kernel     = kernel; 
-    //_haveKernel = true;
-    //
-    //setWidth(_kernel->getWidth());
-    //setHeight(_kernel->getHeight());
-    //
-    //typename KernelCandidate<PixelT>::ImageT::Ptr image (
-    //new typename KernelCandidate<PixelT>::ImageT(_kernel->getDimensions())
-    //);
-    //_kSum  = _kernel->computeImage(*image, false);                    
-    //_image = image;
-//}
-    //
-    //template <typename PixelT>
-    //lsst::afw::math::Kernel::Ptr KernelCandidate<PixelT>::getKernel() const {
-    //if (!_haveKernel) {
-    //throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
-//}
-    //return _kernel;
-//}
-    //
-    //template <typename PixelT>
-    //double KernelCandidate<PixelT>::getBackground() const {
-    //if (!_haveKernel) {
-    //throw LSST_EXCEPT(pexExcept::Exception, "No Background for KernelCandidate");
-//}
-    //return _background;
-//}
-    //
-    //template <typename PixelT>
-    //double KernelCandidate<PixelT>::getKsum() const {
-    //if (!_haveKernel) {
-    //throw LSST_EXCEPT(pexExcept::Exception, "No Ksum for KernelCandidate");
-//}
-    //return _kSum;
-//}
-    //
-    //template <typename PixelT>
-    //lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage() {
-    //if (!_haveKernel) {
-    //throw LSST_EXCEPT(pexExcept::Exception, "No Kernel for KernelCandidate");
-//}
-    //return returnDifferenceImage(_kernel, _background);
-//}
-    //
-    //template <typename PixelT>
-    //lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::returnDifferenceImage(
-    //lsst::afw::math::Kernel::Ptr kernel,
-    //double background
-    //) {
-    //
-    ///* Make diffim and set chi2 from result */
-    //afwImage::MaskedImage<PixelT> diffIm = convolveAndSubtract(*_miToConvolvePtr,
-    //*_miToNotConvolvePtr,
-    //*kernel,
-    //background);
-    //return diffIm;
-    //
-//}
+    template <typename PixelT, typename VarT>
+    double KernelCandidate<PixelT, VarT>::getBackground(CandidateSwitch cand) const {
+        if (cand == KernelCandidate::ORIG) {
+            if (_kernelSolutionOrig) 
+                return _kernelSolutionOrig->getBackground();
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+        }
+        else if (cand == KernelCandidate::PCA) {
+            if (_kernelSolutionPca) 
+                return _kernelSolutionPca->getBackground();
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+        }
+        else if (cand == KernelCandidate::RECENT) {
+            if (_kernelSolutionPca) 
+                return _kernelSolutionPca->getBackground();
+            else if (_kernelSolutionOrig)
+                return _kernelSolutionOrig->getBackground();
+            else
+                throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get background");
+        }
+    }
+
+    template <typename PixelT, typename VarT>
+    double KernelCandidate<PixelT, VarT>::getKsum(CandidateSwitch cand) const {
+        if (cand == KernelCandidate::ORIG) {
+            if (_kernelSolutionOrig) 
+                return _kernelSolutionOrig->getKsum();
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+        }
+        else if (cand == KernelCandidate::PCA) {
+            if (_kernelSolutionPca) 
+                return _kernelSolutionPca->getKsum();
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+        }
+        else if (cand == KernelCandidate::RECENT) {
+            if (_kernelSolutionPca) 
+                return _kernelSolutionPca->getKsum();
+            else if (_kernelSolutionOrig)
+                return _kernelSolutionOrig->getKsum();
+            else
+                throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get kSum");
+        }
+    }
+
+    template <typename PixelT, typename VarT>
+    KernelCandidate<PixelT, VarT>::ImageT::Ptr KernelCandidate<PixelT, VarT>::getKernelImage(
+        CandidateSwitch cand) const {
+        if (cand == KernelCandidate::ORIG) {
+            if (_kernelSolutionOrig) 
+                return _kernelSolutionOrig->makeKernelImage();
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+        }
+        else if (cand == KernelCandidate::PCA) {
+            if (_kernelSolutionPca) 
+                return _kernelSolutionPca->makeKernelImage();
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+        }
+        else if (cand == KernelCandidate::RECENT) {
+            if (_kernelSolutionPca) 
+                return _kernelSolutionPca->makeKernelImage();
+            else if (_kernelSolutionOrig)
+                return _kernelSolutionOrig->makeKernelImage();
+            else
+                throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get kernel image");
+        }
+    }
+
+    template <typename PixelT, typename VarT>
+    boost::shared_ptr<StaticKernelSolution> KernelCandidate<PixelT, VarT>::getKernelSolution(
+        CandidateSwitch cand) const {
+        if (cand == KernelCandidate::ORIG) {
+            if (_kernelSolutionOrig) 
+                return _kernelSolutionOrig;
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+        }
+        else if (cand == KernelCandidate::PCA) {
+            if (_kernelSolutionPca) 
+                return _kernelSolutionPca;
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+        }
+        else if (cand == KernelCandidate::RECENT) {
+            if (_kernelSolutionPca) 
+                return _kernelSolutionPca;
+            else if (_kernelSolutionOrig)
+                return _kernelSolutionOrig;
+            else
+                throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get solution");
+        }
+    }
+
+    template <typename PixelT, typename VarT>
+    lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT, VarT>::getDifferenceImage(
+        CandidateSwitch cand) {
+        if (cand == KernelCandidate::ORIG) {
+            if (_kernelSolutionOrig) 
+                return getDifferenceImage(_kernelSolutionOrig->getKernel(),
+                                          _kernelSolutionOrig->getBackground());
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+        }
+        else if (cand == KernelCandidate::PCA) {
+            if (_kernelSolutionPca) 
+                return getDifferenceImage(_kernelSolutionPca->getKernel(),
+                                          _kernelSolutionPca->getBackground());
+            else 
+                throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+        }
+        else if (cand == KernelCandidate::RECENT) {
+            if (_kernelSolutionPca) 
+                return getDifferenceImage(_kernelSolutionPca->getKernel(),
+                                          _kernelSolutionPca->getBackground());
+            else if (_kernelSolutionOrig)
+                return getDifferenceImage(_kernelSolutionOrig->getKernel(),
+                                          _kernelSolutionOrig->getBackground());
+            else
+                throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get diffim");
+        }
+    }
+
+    template <typename PixelT, typename VarT>
+    lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT, VarT>::getDifferenceImage(
+        lsst::afw::math::Kernel::Ptr kernel,
+        double background
+        ) {
+        /* Make diffim and set chi2 from result */
+        afwImage::MaskedImage<PixelT> diffIm = convolveAndSubtract(*_miToConvolvePtr,
+                                                                   *_miToNotConvolvePtr,
+                                                                   *kernel,
+                                                                   background);
+        return diffIm;
+    }
 
     
 /***********************************************************************************************************/

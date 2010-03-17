@@ -18,7 +18,6 @@
 #include "lsst/pex/policy/Policy.h"
 
 #include "lsst/ip/diffim/ImageSubtract.h"
-#include "lsst/ip/diffim/PsfMatchingFunctor.h"
 
 namespace lsst { 
 namespace ip { 
@@ -30,8 +29,9 @@ namespace detail {
         typedef lsst::afw::image::MaskedImage<PixelT> MaskedImageT;
     public:
         BuildSingleKernelVisitor(
-            PsfMatchingFunctor<PixelT> &kFunctor,    ///< Functor that builds the kernels
-            lsst::pex::policy::Policy const& policy  ///< Policy file directing behavior
+            boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
+            lsst::pex::policy::Policy const& policy,  ///< Policy file directing behavior
+            boost::shared_ptr<Eigen::MatrixXd> hMat = boost::shared_ptr<Eigen::MatrixXd>()
             );
         virtual ~BuildSingleKernelVisitor() {};
         
@@ -60,8 +60,9 @@ namespace detail {
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
 
     private:
-        PsfMatchingFunctor<PixelT> _kFunctor; ///< Psf matching functor
+        boost::shared_ptr<lsst::afw::math::KernelList> const& _basisList; ///< Basis set
         lsst::pex::policy::Policy _policy;    ///< Policy controlling behavior
+        boost::shared_ptr<Eigen::MatrixXd> _hMat; ///< Regularization matrix
         ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
         bool _setCandidateKernel;             ///< Do you set the KernelCandidate kernel, or just matrices
         bool _skipBuilt;                      ///< Skip over built candidates during processCandidate()

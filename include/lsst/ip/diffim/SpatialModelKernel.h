@@ -22,8 +22,6 @@
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/afw/detection/Footprint.h"
 
-#include "lsst/ip/diffim/PsfMatchingFunctor.h"
-
 namespace lsst { 
 namespace ip { 
 namespace diffim {
@@ -31,7 +29,6 @@ namespace diffim {
     /**
      * @brief Fit for a spatial model of the kernel and background
      *
-     * @param kFunctor  Functor used for the single-kernel Psf matching
      * @param kernelCells  SpatialCellSet containing the candidate kernels
      * @param policy  Policy for configuration
      *
@@ -40,7 +37,6 @@ namespace diffim {
     template<typename PixelT>
     std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
     fitSpatialKernelFromCandidates(
-        PsfMatchingFunctor<PixelT> &kFunctor,
         lsst::afw::math::SpatialCellSet &kernelCells,
         lsst::pex::policy::Policy const& policy
         );

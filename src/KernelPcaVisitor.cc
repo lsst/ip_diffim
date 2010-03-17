@@ -90,8 +90,10 @@ namespace detail {
         
         try {
             /* Normalize to unit sum */
-            ImageT::Ptr kImage = kCandidate->copyImage();
-            *kImage           /= kCandidate->getKsum();
+            ImageT::Ptr kImage = kCandidate->getKernelSolution(
+                KernelCandidate<PixelT>::ORIG)->makeKernelImage();
+            *kImage           /= kCandidate->getKernelSolution(
+                KernelCandidate<PixelT>::ORIG)->getKsum();
             /* Tell imagePca they have the same weighting in the Pca */
             _imagePca->addImage(kImage, 1.0);
         } catch(pexExcept::Exception &e) {

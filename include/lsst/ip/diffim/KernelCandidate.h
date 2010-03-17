@@ -22,6 +22,7 @@
 namespace lsst { 
 namespace ip { 
 namespace diffim {
+    
 
     /** 
      * @brief Class stored in SpatialCells for spatial Kernel fitting
@@ -48,6 +49,12 @@ namespace diffim {
         typedef boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
         typedef boost::shared_ptr<lsst::afw::image::Image<VarT> > VariancePtr;
 
+        enum CandidateSwitch {
+            ORIG    = 0,
+            PCA     = 1,
+            RECENT  = 2
+        };
+
         /**
 	 * @brief Constructor
          *
@@ -61,12 +68,6 @@ namespace diffim {
                         float const yCenter, 
                         MaskedImagePtr const& miToConvolvePtr,
                         MaskedImagePtr const& miToNotConvolvePtr,
-                        lsst::pex::policy::Policy const& policy);        
-        KernelCandidate(float const xCenter,
-                        float const yCenter, 
-                        MaskedImagePtr const& miToConvolvePtr,
-                        MaskedImagePtr const& miToNotConvolvePtr,
-                        VariancePtr varianceEstimate,
                         lsst::pex::policy::Policy const& policy);        
         /// Destructor
         virtual ~KernelCandidate() {};
@@ -88,40 +89,30 @@ namespace diffim {
          * @brief Return results of kernel solution
          * 
          */
-        lsst::afw::math::Kernel::Ptr getOrigKernel() const {return _kernelSolutionOrig->getKernel();}
-        double getOrigBackground() const {return _kernelSolutionOrig->getBackground();}
-        double getOrigKsum() const {return _kernelSolutionOrig->getKsum();}
-        bool isInitialized() const {return _isInitialized;}
-
-        lsst::afw::math::Kernel::Ptr getPcaKernel() const {return _kernelSolutionPca->getKernel();}
-        double getPcaBackground() const {return _kernelSolutionPca->getBackground();}
-        double getPcaKsum() const {return _kernelSolutionPca->getKsum();}
-
-        void setVariance(VariancePtr var) {_varianceEstimate = var;}
-
-        /**
-         * @brief Return pointers to the image of the kernel.  Needed for Pca.
-         */
-        typename ImageT::ConstPtr getOrigImage() const;
-        typename ImageT::Ptr copyOrigImage() const;
-        typename ImageT::ConstPtr getPcaImage() const;
-        typename ImageT::Ptr copyPcaImage() const;
-
+        lsst::afw::math::Kernel::Ptr getKernel(CandidateSwitch cand) const;
+        double getBackground(CandidateSwitch cand) const;
+        double getKsum(CandidateSwitch cand) const;
+        typename ImageT::Ptr getKernelImage(CandidateSwitch cand) const;
+        boost::shared_ptr<StaticKernelSolution> getKernelSolution(CandidateSwitch cand) const; 
+        
         /** 
          * @brief Calculate associated difference image using internal solutions
          */
-        lsst::afw::image::MaskedImage<PixelT> returnOrigDifferenceImage();
-        lsst::afw::image::MaskedImage<PixelT> returnPcaDifferenceImage();
+        lsst::afw::image::MaskedImage<PixelT> getDifferenceImage(CandidateSwitch cand);
 
         /** 
          * @brief Calculate associated difference image using input kernel and background.
          * 
          * @note Useful for spatial modeling
          */
-        lsst::afw::image::MaskedImage<PixelT> returnDifferenceImage(
+        lsst::afw::image::MaskedImage<PixelT> getDifferenceImage(
             lsst::afw::math::Kernel::Ptr kernel,
             double background
             );
+        
+        
+        bool isInitialized() const {return _isInitialized;}
+
 
         /** 
          * @brief Core functionality of KernelCandidate, to build and fill a KernelSolution
@@ -142,7 +133,6 @@ namespace diffim {
          *  original KernelSolution.  This solution ends up as
          *  _kernelSolutionCurrent.
          */
-        //void build(boost::shared_ptr<lsst::afw::math::KernelList> const& basisList);
 
         /** 
          * @brief Build KernelSolution matrices for M x = B with regularization matrix H 
@@ -157,11 +147,25 @@ namespace diffim {
          * We scale this estimate by lambdaScaling to give more/less
          * consideration to the smoothness of the kernel.
          */
+
+        /*
+         * @note This method uses an estimate of the variance which is the
+         * straight difference of the 2 images.  If requested in the Policy
+         * ("iterateSingleKernel"), the kernel will be rebuilt using the
+         * variance of the difference image resulting from this first
+         * approximate step.  This is particularly useful when convolving a
+         * single-depth science image; the variance (and thus resulting kernel)
+         * generally converges after 1 iteration.  If
+         * "constantVarianceWeighting" is requested in the Policy, no iterations
+         * will be performed even if requested.
+         */
+
         void build(
             boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
             boost::shared_ptr<Eigen::MatrixXd> hMat = boost::shared_ptr<Eigen::MatrixXd>()
             );
 
+       
 
     private:
         MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
@@ -170,6 +174,7 @@ namespace diffim {
         lsst::pex::policy::Policy _policy;                  ///< Policy
         double _coreFlux;                                   ///< Mean S/N in the science image
         bool _isInitialized;                                ///< Has the kernel been built
+        bool _regularize;                                   ///< Use regularization?              
 
         /* best single raw kernel */
         boost::shared_ptr<StaticKernelSolution> _kernelSolutionOrig;    ///< Original basis kernel solution
@@ -177,6 +182,8 @@ namespace diffim {
         /* with Pca basis */
         boost::shared_ptr<StaticKernelSolution> _kernelSolutionPca;     ///< Most recent kernel solution
 
+        void buildEngine(boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
+                         boost::shared_ptr<Eigen::MatrixXd> hMat);
     };
 
 

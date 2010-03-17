@@ -74,7 +74,7 @@ namespace detail {
             throw LSST_EXCEPT(pexExcept::LogicErrorException,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
-        if (!(kCandidate->hasKernel())) {
+        if (!(kCandidate->isInitialized())) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                                   "Cannot process candidate %d, continuing", kCandidate->getId());
@@ -104,7 +104,7 @@ namespace detail {
                                                   afwImage::indexToPosition(
                                                       static_cast<int>(kCandidate->getYCenter())));
         
-        MaskedImageT diffim = kCandidate->returnDifferenceImage(kernelPtr, background);
+        MaskedImageT diffim = kCandidate->getDifferenceImage(kernelPtr, background);
         
         /* Official resids */
         _imstats.apply(diffim);

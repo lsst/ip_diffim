@@ -9,6 +9,12 @@
  * @ingroup ip_diffim
  */
 
+#include "boost/timer.hpp" 
+
+#include "Eigen/Core"
+#include "Eigen/QR"
+#include "Eigen/LU"
+
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
 #include "lsst/pex/exceptions/Runtime.h"
@@ -33,36 +39,36 @@ namespace diffim {
         _mMat(mMat),
         _bVec(bVec),
         _sVec(),
-        _solvedBy(lsst::ip::diffim::NONE)
+        _solvedBy(KernelSolution::NONE)
     {};
 
-    KernelSolution::solve() {
-        Eigen::VectorXd sVec = Eigen::VectorXd::Zero(_bVec.size());
+    void KernelSolution::solve() {
+        Eigen::VectorXd sVec = Eigen::VectorXd::Zero(_bVec->size());
 
         boost::timer t;
         t.restart();
         
-        pexLogging::TTrace<2>("lsst.ip.diffim.KernelSolution.solve", 
-                              "Solving for kernel");
+        pexLog::TTrace<2>("lsst.ip.diffim.KernelSolution.solve", 
+                          "Solving for kernel");
         
-        _solvedBy = lsst::ip::diffim::CHOLESKY_LDLT;
-        if (!(_mMat.ldlt().solve(_bVec, &sVec))) {
+        _solvedBy = KernelSolution::CHOLESKY_LDLT;
+        if (!(_mMat->ldlt().solve(*_bVec, &sVec))) {
             pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                               "Unable to determine kernel via Cholesky LDL^T");
             
-            _solvedBy = lsst::ip::diffim::CHOLESKY_LLT;
-            if (!(_mMat.llt().solve(_bVec, &sVec))) {
+            _solvedBy = KernelSolution::CHOLESKY_LLT;
+            if (!(_mMat->llt().solve(*_bVec, &sVec))) {
                 pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                                   "Unable to determine kernel via Cholesky LL^T");
                 
-                _solvedBy = lsst::ip::diffim::LU;
-                if (!(_mMat.lu().solve(_bVec, &sVec))) {
+                _solvedBy = KernelSolution::LU;
+                if (!(_mMat->lu().solve(*_bVec, &sVec))) {
                     pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                                       "Unable to determine kernel via LU");
                     /* LAST RESORT */
                     try {
                         
-                        _solvedBy = lsst::ip::diffim::EIGENVECTOR;
+                        _solvedBy = KernelSolution::EIGENVECTOR;
                         Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(_mMat);
                         Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
                         Eigen::VectorXd eValues = eVecValues.eigenvalues();
@@ -73,10 +79,10 @@ namespace diffim {
                             }
                         }
                         
-                        sVec = rMat*eValues.asDiagonal()*rMat.transpose()*_bVec;
+                        sVec = rMat*eValues.asDiagonal()*rMat.transpose()*(*_bVec);
                     } catch (pexExcept::Exception& e) {
                         
-                        _solvedBy = lsst::ip::diffim::NONE;
+                        _solvedBy = KernelSolution::NONE;
                         pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                                           "Unable to determine kernel via eigen-values");
                         
@@ -87,8 +93,8 @@ namespace diffim {
         }
 
         double time = t.elapsed();
-        pexLogging::TTrace<3>("lsst.ip.diffim.KernelSolution.solve", 
-                              "Compute time for matrix math : %.2f s", time);
+        pexLog::TTrace<3>("lsst.ip.diffim.KernelSolution.solve", 
+                          "Compute time for matrix math : %.2f s", time);
 
         boost::shared_ptr<Eigen::VectorXd> _sVec (new Eigen::VectorXd(sVec));
     }
@@ -114,24 +120,35 @@ namespace diffim {
     {};
 
     lsst::afw::math::Kernel::Ptr StaticKernelSolution::getKernel() {
-        if (_solvedBy == lsst::ip::diffim::None) {
+        if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
         }
         return _kernel;
     }
 
+    lsst::afw::image::Image<lsst::afw::image::VariancePixel>::Ptr StaticKernelSolution::makeKernelImage() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
+        }
+        lsst::afw::image::Image<lsst::afw::image::VariancePixel>::Ptr image (
+            new lsst::afw::image::Image<lsst::afw::image::VariancePixel>::Image(_kernel->getDimensions())
+            );
+        _kSum  = _kernel->computeImage(*image, false);              
+        return image;
+    }
+
     double StaticKernelSolution::getBackground() {
-        if (_solvedBy == lsst::ip::diffim::None) {
+        if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return background");
         }
         return _background;
     }
 
     double StaticKernelSolution::getKsum() {
-        if (_solvedBy == lsst::ip::diffim::None) {
+        if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return ksum");
         }
-        return _ksum;
+        return _kSum;
     }
 
     void StaticKernelSolution::solve(bool calculateUncertainties) {
@@ -145,7 +162,10 @@ namespace diffim {
         std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> kb = getKernelSolution();
         _kernel = kb.first;
         _background = kb.second;
-        
+
+        /* set kernel sum */
+        (void)makeKernelImage();
+
         if (calculateError) {
             std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> dkb = getKernelUncertainty();
             _kernelErr = dkb.first;
@@ -156,13 +176,13 @@ namespace diffim {
     std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
     StaticKernelSolution::getKernelSolution() {
 
-        if (_solvedBy == lsst::ip::diffim::None) {
+        if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
         }
 
-        unsigned int const nParameters           = _sVec.size();
+        unsigned int const nParameters           = _sVec->size();
         unsigned int const nBackgroundParameters = 1;
-        unsigned int const nKernelParameters     = _basisList.size();
+        unsigned int const nKernelParameters     = _basisList->size();
         if (nParameters != (nKernelParameters + nBackgroundParameters)) 
             throw LSST_EXCEPT(pexExcept::Exception, "Mismatched sizes in kernel solution");
 
@@ -193,7 +213,7 @@ namespace diffim {
     std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
     StaticKernelSolution::getSolutionUncertainty() {
 
-        if (_solvedBy == lsst::ip::diffim::None) {
+        if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return uncertainty");
         }
 
@@ -201,9 +221,9 @@ namespace diffim {
             return std::make_pair(_kernelErr, _backgroundErr);
         }
 
-        unsigned int const nParameters           = _sVec.size();
+        unsigned int const nParameters           = _sVec->size();
         unsigned int const nBackgroundParameters = 1;
-        unsigned int const nKernelParameters     = _basisList.size();
+        unsigned int const nKernelParameters     = _basisList->size();
         if (nParameters != (nKernelParameters + nBackgroundParameters)) 
             throw LSST_EXCEPT(pexExcept::Exception, "Mismatched sizes in kernel solution");
         
@@ -288,7 +308,8 @@ namespace diffim {
 
     void SpatialKernelSolution::solve(bool calculateUncertainties) {
         try {
-            KernelSolution::solve();
+            //KernelSolution::solve();
+            this->solve();
         } catch (pexExcept::Exception &e) {
             LSST_EXCEPT_ADD(e, "Unable to solve spatial kernel matrix");
             throw e;
@@ -299,11 +320,11 @@ namespace diffim {
         _kernel = kb.first;
         _background = kb.second;
         
-        if (calculateError) {
+        if (calculateUncertainties) {
             std::pair<afwMath::LinearCombinationKernel::Ptr, 
                 afwMath::Kernel::SpatialFunctionPtr> dkb = getKernelUncertainty();
             _kernelErr = dkb.first;
-            _backgroundErr = kdb.second;
+            _backgroundErr = dkb.second;
         }
     }
 
@@ -312,7 +333,8 @@ namespace diffim {
 
         unsigned int nkt    = _spatialKernelFunction->getParameters().size();
         unsigned int nbt    = _spatialBgFunction->getParameters().size();
-        unsigned int nBases = _basisList.size();
+        unsigned int nt     = _sVec->size();
+        unsigned int nbases = _basisList->size();
 
         /* Set up kernel */
         afwMath::LinearCombinationKernel::Ptr spatialKernel(
@@ -324,7 +346,7 @@ namespace diffim {
              * for convolution speed--up */
             
             /* Make sure the coefficients look right */
-            if (static_cast<int>(nbases) != (_sVec.size()-nbt)) {
+            if (static_cast<int>(nbases) != (nt - nbt)) {
                 throw LSST_EXCEPT(pexExcept::Exception, 
                                   "Wrong number of terms for non spatially varying kernel");
             }
@@ -332,7 +354,7 @@ namespace diffim {
             /* Set the basis coefficients */
             std::vector<double> kCoeffs(nbases);
             for (unsigned int i = 0; i < nbases; i++) {
-                kCoeffs[i] = _sVec[i];
+                kCoeffs[i] = (*_sVec)(i);
             }
             spatialKernel.reset(
                 new afwMath::LinearCombinationKernel(_basisList, kCoeffs)
@@ -348,11 +370,11 @@ namespace diffim {
                 
                 /* Deal with the possibility the first term doesn't vary spatially */
                 if ((i == 0) && (_constantFirstTerm)) {
-                    kCoeffs[i][0] = _sVec[idx++];
+                    kCoeffs[i][0] = (*_sVec)(idx++);
                 }
                 else {
                     for (unsigned int j = 0; j < nkt; j++) {
-                        kCoeffs[i][j] = _sVec[idx++];
+                        kCoeffs[i][j] = (*_sVec)(idx++);
                     }
                 }
             }
@@ -365,7 +387,7 @@ namespace diffim {
         /* Set the background coefficients */
         std::vector<double> bgCoeffs(nbt);
         for (unsigned int i = 0; i < nbt; i++) {
-            bgCoeffs[i] = _sVec[nt - nbt + i];
+            bgCoeffs[i] = (*_sVec)(nt - nbt + i);
         }
         bgFunction->setParameters(bgCoeffs);
         

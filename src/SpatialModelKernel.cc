@@ -23,9 +23,8 @@
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/logging/Trace.h"
 
-#include "lsst/ip/diffim/BasisSets.h"
-#include "lsst/ip/diffim/PsfMatchingFunctor.h"
 #include "lsst/ip/diffim/SpatialModelKernel.h"
+#include "lsst/ip/diffim/BasisSets.h"
 #include "lsst/ip/diffim/KernelCandidate.h"
 
 #include "lsst/ip/diffim/KernelSumVisitor.h"
@@ -47,7 +46,6 @@ namespace diffim {
 template<typename PixelT>
 std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
 fitSpatialKernelFromCandidates(
-    PsfMatchingFunctor<PixelT> &kFunctor,               ///< kFunctor used to build the kernels
     lsst::afw::math::SpatialCellSet &kernelCells,       ///< A SpatialCellSet containing KernelCandidates
     lsst::pex::policy::Policy const& policy             ///< Policy to control the processing
     ) {
@@ -103,17 +101,18 @@ fitSpatialKernelFromCandidates(
     bool const usePcaForSpatialKernel = policy.getBool("usePcaForSpatialKernel");
     bool const subtractMeanForPca     = policy.getBool("subtractMeanForPca");
     
+    /* Build basis list here */
+    /* Build regularization matrix here */
+    boost::shared_ptr<lsst::afw::math::KernelList> const& basisList();
+
     boost::timer t;
     t.restart();
-    
-    /* The basis used for the spatial fit may change if we run Pca */
-    boost::shared_ptr<afwMath::KernelList> basisListToUse;
     
     afwMath::LinearCombinationKernel::Ptr spatialKernel;
     afwMath::Kernel::SpatialFunctionPtr spatialBackground;
     
     /* Visitor for the single kernel fit */
-    detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter(kFunctor, policy);
+    detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter(basisList, policy);
     
     /* Visitor for the kernel sum rejection */
     detail::KernelSumVisitor<PixelT> kernelSumVisitor(policy);
@@ -162,6 +161,7 @@ fitSpatialKernelFromCandidates(
                we run a PCA, use these as a *new* basis set with lower
                dimensionality, and then apply the spatial fit to these kernels 
             */
+            boost::shared_ptr<afwMath::KernelList> spatialBasisList;
             if (usePcaForSpatialKernel) {
                 nPcaIterations += 1;
 
@@ -213,11 +213,12 @@ fitSpatialKernelFromCandidates(
                     }
                 }
                 /* Put all the power in the first kernel, which will not vary spatially */
-                afwMath::KernelList kernelListPca = renormalizeKernelList(kernelListRaw);
+                boost::shared_ptr<afwMath::KernelList> basisListPca (
+                    new afwMath::KernelList(renormalizeKernelList(kernelListRaw))
+                    );
                 
                 /* New PsfMatchingFunctor and Kernel visitor for this new basis list */
-                PsfMatchingFunctor<PixelT> kFunctorPca(kernelListPca);
-                detail::BuildSingleKernelVisitor<PixelT> singleKernelFitterPca(kFunctorPca, policy);
+                detail::BuildSingleKernelVisitor<PixelT> singleKernelFitterPca(basisListPca, policy);
                 
                 /* Always true for Pca kernel; leave original kernel alone for future Pca iterations */
                 singleKernelFitterPca.setCandidateKernel(false);
@@ -255,15 +256,15 @@ fitSpatialKernelFromCandidates(
                     continue;
                 }
                 
-                basisListToUse.reset(new afwMath::KernelList(kFunctorPca.getBasisList()));
+                *spatialBasisList = *basisListPca;
             }
             else {
-                basisListToUse.reset(new afwMath::KernelList(kFunctor.getBasisList()));
+                *spatialBasisList = *basisList;
             }
 
                 
             /* We have gotten on to the spatial modeling part */
-            detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse, 
+            detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(spatialBasisList, 
                                                                           policy);
             kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
             spatialKernelFitter.solveLinearEquation();
@@ -272,7 +273,7 @@ fitSpatialKernelFromCandidates(
                                   spatialKernelFitter.getNCandidates());
 
             std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> kb =
-                spatialKernelFitter.getSpatialModel();
+                spatialKernelFitter.getKernelSolution();
 
             spatialKernel     = kb.first;
             spatialBackground = kb.second;
@@ -319,8 +320,7 @@ typedef float PixelT;
 
 template
 std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
-fitSpatialKernelFromCandidates<PixelT>(PsfMatchingFunctor<PixelT> &,
-                                       lsst::afw::math::SpatialCellSet &,
+fitSpatialKernelFromCandidates<PixelT>(lsst::afw::math::SpatialCellSet &,
                                        lsst::pex::policy::Policy const&);
 
 }}} // end of namespace lsst::ip::diffim

@@ -25,22 +25,24 @@ namespace diffim {
     /* 
      * @brief Method used to solve for M and B
      */
-    enum KernelSolvedBy {
-        NONE          = 0,
-        CHOLESKY_LDLT = 1,
-        CHOLESKY_LLT  = 2,
-        LU            = 3,
-        EIGENVECTOR   = 4
-    };
 
     class KernelSolution {
     public:
         typedef boost::shared_ptr<KernelSolution> Ptr;
+
+        enum KernelSolvedBy {
+            NONE          = 0,
+            CHOLESKY_LDLT = 1,
+            CHOLESKY_LLT  = 2,
+            LU            = 3,
+            EIGENVECTOR   = 4
+        };
+
         explicit KernelSolution(boost::shared_ptr<Eigen::MatrixXd> mMat,
                                 boost::shared_ptr<Eigen::VectorXd> bVec);
         virtual ~KernelSolution() {};
 
-        void solve(bool calculateErrors=false);
+        void solve();
         inline boost::shared_ptr<Eigen::MatrixXd> getM() {return _mMat;}
         inline boost::shared_ptr<Eigen::VectorXd> getB() {return _bVec;}
 
@@ -61,6 +63,7 @@ namespace diffim {
         virtual ~StaticKernelSolution() {};
 
         lsst::afw::math::Kernel::Ptr getKernel();
+        lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr makeKernelImage();
         double getBackground();
         double getKsum();
 

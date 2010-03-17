@@ -55,7 +55,7 @@ namespace detail {
         kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
         spatialKernelFitter.solveLinearEquation();
         std::pair<afwMath::LinearCombinationKernel::Ptr, 
-            afwMath::Kernel::SpatialFunctionPtr> kb = spatialKernelFitter.getSpatialModel();
+            afwMath::Kernel::SpatialFunctionPtr> kb = spatialKernelFitter.getKernelSolution();
         spatialKernel     = kb.first;
         spatialBackground = kb.second; 
      * @endcode
@@ -72,7 +72,7 @@ namespace detail {
      */
     template<typename PixelT>
     BuildSpatialKernelVisitor<PixelT>::BuildSpatialKernelVisitor(
-        lsst::afw::math::KernelList basisList,   ///< Basis functions used in the fit
+        boost::shared_ptr<lsst::afw::math::KernelList> const& basisList, ///< Basis functions used in the fit
         lsst::pex::policy::Policy policy         ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
@@ -81,7 +81,7 @@ namespace detail {
         _spatialBgOrder(policy.getInt("spatialBgOrder")),
         _spatialKernelFunction(new afwMath::PolynomialFunction2<double>(_spatialKernelOrder)),
         _spatialBgFunction(new afwMath::PolynomialFunction2<double>(_spatialBgOrder)),
-        _nbases(basisList.size()),
+        _nbases(_basisList->size()),
         _policy(policy),
         _constantFirstTerm(false),
         _nCandidates(0) {
@@ -141,7 +141,7 @@ namespace detail {
             throw LSST_EXCEPT(pexExcept::LogicErrorException,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
-        if (!(kCandidate->hasKernel())) {
+        if (!(kCandidate->isInitialized())) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<3>("lsst.ip.diffim.BuildSpatialKernelVisitor.processCandidate", 
                                   "Cannot process candidate %d, continuing", kCandidate->getId());
@@ -155,9 +155,9 @@ namespace detail {
         /* Calculate P matrices */
         /* Pure kernel terms */
         std::vector<double> paramsK = _spatialKernelFunction->getParameters();
-        for (unsigned int idx = 0; idx < _nkt; idx++) { paramsK[idx] = 0.0; }
+        for (int idx = 0; idx < _nkt; idx++) { paramsK[idx] = 0.0; }
         Eigen::VectorXd pK(_nkt);
-        for (unsigned int idx = 0; idx < _nkt; idx++) {
+        for (int idx = 0; idx < _nkt; idx++) {
             paramsK[idx] = 1.0;
             _spatialKernelFunction->setParameters(paramsK);
             pK(idx) = (*_spatialKernelFunction)(kCandidate->getXCenter(), 
@@ -168,9 +168,9 @@ namespace detail {
         
         /* Pure background terms */
         std::vector<double> paramsB = _spatialBgFunction->getParameters();
-        for (unsigned int idx = 0; idx < _nbt; idx++) { paramsB[idx] = 0.0; }
+        for (int idx = 0; idx < _nbt; idx++) { paramsB[idx] = 0.0; }
         Eigen::VectorXd pB(_nbt);
-        for (unsigned int idx = 0; idx < _nbt; idx++) {
+        for (int idx = 0; idx < _nbt; idx++) {
             paramsB[idx] = 1.0;
             _spatialBgFunction->setParameters(paramsB);
             pB(idx) = (*_spatialBgFunction)(kCandidate->getXCenter(), 
@@ -190,8 +190,10 @@ namespace detail {
         }
         
         /* Add each candidate to the M, B matrix */
-        boost::shared_ptr<Eigen::MatrixXd> qMat = kCandidate->getM();
-        boost::shared_ptr<Eigen::VectorXd> wVec = kCandidate->getB();
+        boost::shared_ptr<Eigen::MatrixXd> qMat = 
+            kCandidate->getKernelSolution(KernelCandidate<PixelT>::RECENT)->getM();
+        boost::shared_ptr<Eigen::VectorXd> wVec = 
+            kCandidate->getKernelSolution(KernelCandidate<PixelT>::RECENT)->getB();
         
         if (DEBUG_MATRIX) {
             std::cout << "Spatial matrix inputs" << std::endl;
@@ -204,18 +206,18 @@ namespace detail {
         boost::shared_ptr<Eigen::VectorXd> bVec = _kernelSolution->getB();
         
         /* first index to start the spatial blocks; default=0 for non-constant first term */
-        unsigned int m0 = 0; 
+        int m0 = 0; 
         /* how many rows/cols to adjust the matrices/vectors; default=0 for non-constant first term */
-        unsigned int dm = 0; 
+        int dm = 0; 
         /* where to start the background terms; this is always true */
-        unsigned int mb = _nt - _nbt;
+        int mb = _nt - _nbt;
         
         if (_constantFirstTerm) {
             m0 = 1;       /* we need to manually fill in the first (non-spatial) terms below */
             dm = _nkt-1;  /* need to shift terms due to lack of spatial variation in first term */
             
             (*mMat)(0, 0) += (*qMat)(0,0);
-            for(unsigned int m2 = 1; m2 < _nbases; m2++)  {
+            for(int m2 = 1; m2 < _nbases; m2++)  {
                 (*mMat).block(0, m2*_nkt-dm, 1, _nkt) += (*qMat)(0,m2) * pK.transpose();
             }
             
@@ -224,13 +226,13 @@ namespace detail {
         }
         
         /* Fill in the spatial blocks */
-        for(unsigned int m1 = m0; m1 < _nbases; m1++)  {
+        for(int m1 = m0; m1 < _nbases; m1++)  {
             /* Diagonal kernel-kernel term; only use upper triangular part of pKpKt */
             (*mMat).block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += (*qMat)(m1,m1) * 
                 pKpKt.part<Eigen::UpperTriangular>();
             
             /* Kernel-kernel terms */
-            for(unsigned int m2 = m1+1; m2 < _nbases; m2++)  {
+            for(int m2 = m1+1; m2 < _nbases; m2++)  {
                 (*mMat).block(m1*_nkt-dm, m2*_nkt-dm, _nkt, _nkt) += (*qMat)(m1,m2) * pKpKt;
             }
             
@@ -247,8 +249,8 @@ namespace detail {
         (*bVec).segment(mb, _nbt)         += (*wVec)(_nbases) * pB;
 
         /* Fill in the other half of mMat */
-        for (unsigned int i = 0; i < _nt; i++) {
-            for (unsigned int j = i+1; j < _nt; j++) {
+        for (int i = 0; i < _nt; i++) {
+            for (int j = i+1; j < _nt; j++) {
                 (*mMat)(j,i) = (*mMat)(i,j);
             }
         }
@@ -263,13 +265,13 @@ namespace detail {
 
     template<typename PixelT>
     void BuildSpatialKernelVisitor<PixelT>::solveLinearEquation() {
-        _kernelSolution.solve();
+        _kernelSolution->solve();
     }
 
     template<typename PixelT>
     std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr>
-    BuildSpatialKernelVisitor<PixelT>::getSpatialModel() {
-        return _kernelSolution.getKernelSolution();
+    BuildSpatialKernelVisitor<PixelT>::getKernelSolution() {
+        return _kernelSolution->getKernelSolution();
     }
 
     typedef float PixelT;
