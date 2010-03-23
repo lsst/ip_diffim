@@ -6,8 +6,7 @@
 #define LSST_IP_DIFFIM_H
 
 #include "lsst/ip/diffim/ImageSubtract.h"
-#include "lsst/ip/diffim/BasisSets.h"
-#include "lsst/ip/diffim/PsfMatchingFunctor.h"
+#include "lsst/ip/diffim/BasisLists.h"
 #include "lsst/ip/diffim/SpatialModelKernel.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 #include "lsst/ip/diffim/KernelCandidate.h"

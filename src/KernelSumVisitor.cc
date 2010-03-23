@@ -99,16 +99,17 @@ namespace detail {
         
         /* Grab all kernel sums and look for outliers */
         if (_mode == AGGREGATE) {
-            _kSums.push_back(kCandidate->getKsum());
+            _kSums.push_back(kCandidate->getKernelSolution(KernelCandidate<PixelT>::ORIG)->getKsum());
         }
         else if (_mode == REJECT) {
             if (_policy.getBool("kernelSumClipping")) {
-                if (fabs(kCandidate->getKsum() - _kSumMean) > (_dkSumMax)) {
+                double kSum = kCandidate->getKernelSolution(KernelCandidate<PixelT>::ORIG)->getKsum();
+                if (fabs(kSum - _kSumMean) > _dkSumMax) {
                     kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                     pexLogging::TTrace<4>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
                                           "Rejecting candidate %d; bad source kernel sum : (%.2f %.2f %.2f)",
                                           kCandidate->getId(),
-                                          kCandidate->getKsum(), _kSumMean, _dkSumMax);
+                                          kSum, _kSumMean, _dkSumMax);
                     _nRejected += 1;
                 }
             }

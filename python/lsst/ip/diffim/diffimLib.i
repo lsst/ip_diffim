@@ -37,10 +37,7 @@ namespace boost {
 
 #include <lsst/afw.h>
 
-#include <lsst/ip/diffim/ImageSubtract.h>
-#include <lsst/ip/diffim/BasisSets.h>
-#include <lsst/ip/diffim/PsfMatchingFunctor.h>
-#include <lsst/ip/diffim/SpatialModelKernel.h>
+#include <lsst/ip/diffim.h>
 
 #include <lsst/pex/policy/Policy.h>
 %}
@@ -83,22 +80,6 @@ def version(HeadURL = r"$HeadURL$"):
 
 /******************************************************************************/
 
-%{
-#include "lsst/ip/diffim/PsfMatchingFunctor.h"
-%}
-
-SWIG_SHARED_PTR(PsfMatchingFunctorF, lsst::ip::diffim::PsfMatchingFunctor<float>);
-SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double>);
-
-%include "lsst/ip/diffim/PsfMatchingFunctor.h"
-
-%template(PsfMatchingFunctorF)
-    lsst::ip::diffim::PsfMatchingFunctor<float>;
-%template(PsfMatchingFunctorD)
-    lsst::ip::diffim::PsfMatchingFunctor<double>;
-%template(makePsfMatchingFunctorF) lsst::ip::diffim::makePsfMatchingFunctor<float>;
-%template(makePsfMatchingFunctorD) lsst::ip::diffim::makePsfMatchingFunctor<double>;
-
 %template(pair_Kernel_double)   std::pair<lsst::afw::math::Kernel::Ptr, double>;
 
 /******************************************************************************/
@@ -128,8 +109,12 @@ SWIG_SHARED_PTR(PsfMatchingFunctorD, lsst::ip::diffim::PsfMatchingFunctor<double
 
 %convolveAndSubtract(float);
 #if 0
-%convolveAndSubtract(double);           // image subtraction on double images??!?  Not instantiated in .cc either
+%convolveAndSubtract(double);  // image subtraction on double images??!?  Not instantiated in .cc either
 #endif
+
+/******************************************************************************/
+
+%include "lsst/ip/diffim/KernelSolution.h"
 
 /******************************************************************************/
 
@@ -197,7 +182,7 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 
 /******************************************************************************/
 
-%include "lsst/ip/diffim/BasisSets.h"
+%include "lsst/ip/diffim/BasisLists.h"
 
 /******************************************************************************/
 /* I shouldn't have to do this but it exists noplace else, so... */

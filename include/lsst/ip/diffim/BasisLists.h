@@ -1,6 +1,6 @@
 // -*- lsst-c++ -*-
 /**
- * @file BasisSets.h
+ * @file BasisLists.h
  *
  * @brief Subroutines associated with generating, normalising, and regularising Basis functions 
  *
@@ -22,6 +22,9 @@
 namespace lsst { 
 namespace ip { 
 namespace diffim {
+
+    boost::shared_ptr<lsst::afw::math::KernelList>
+    makeKernelBasisList(lsst::pex::policy::Policy policy);
    
     /**
      * @brief Build a set of Delta Function basis kernels
@@ -33,9 +36,9 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */    
-    lsst::afw::math::KernelList makeDeltaFunctionBasisSet(
-        unsigned int width,
-        unsigned int height
+    lsst::afw::math::KernelList makeDeltaFunctionBasisList(
+        int width,
+        int height
         );
     
     /**
@@ -63,8 +66,8 @@ namespace diffim {
      * @ingroup ip_diffim
      */    
     boost::shared_ptr<Eigen::MatrixXd> makeForwardDifferenceMatrix(
-        unsigned int width,
-        unsigned int height,
+        int width,
+        int height,
         std::vector<int> const& orders,
         float borderPenalty
         );
@@ -80,9 +83,9 @@ namespace diffim {
      * @ingroup ip_diffim
      */    
     boost::shared_ptr<Eigen::MatrixXd> makeCentralDifferenceMatrix(
-        unsigned int width,
-        unsigned int height,
-        unsigned int stencil,
+        int width,
+        int height,
+        int stencil,
         float borderPenalty
         );
 
@@ -118,9 +121,9 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */    
-    lsst::afw::math::KernelList makeAlardLuptonBasisSet(
-        unsigned int halfWidth,                ///< size is 2*N + 1
-        unsigned int nGauss,                   ///< number of gaussians
+    lsst::afw::math::KernelList makeAlardLuptonBasisList(
+        int halfWidth,                ///< size is 2*N + 1
+        int nGauss,                   ///< number of gaussians
         std::vector<double> const& sigGauss,   ///< width of the gaussians
         std::vector<int>    const& degGauss    ///< local spatial variation of gaussians
         );

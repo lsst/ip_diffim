@@ -29,6 +29,8 @@ namespace diffim {
     class KernelSolution {
     public:
         typedef boost::shared_ptr<KernelSolution> Ptr;
+        typedef lsst::afw::math::Kernel::Pixel PixelT;
+        typedef lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> ImageT;
 
         enum KernelSolvedBy {
             NONE          = 0,
@@ -46,7 +48,7 @@ namespace diffim {
         inline boost::shared_ptr<Eigen::MatrixXd> getM() {return _mMat;}
         inline boost::shared_ptr<Eigen::VectorXd> getB() {return _bVec;}
 
-    private:
+    protected:
         boost::shared_ptr<Eigen::MatrixXd> _mMat;               ///< Derived least squares M matrix
         boost::shared_ptr<Eigen::VectorXd> _bVec;               ///< Derived least squares B vector
         boost::shared_ptr<Eigen::VectorXd> _sVec;               ///< Derived least squares solution matrix
@@ -62,8 +64,9 @@ namespace diffim {
                              boost::shared_ptr<lsst::afw::math::KernelList> const& basisList);
         virtual ~StaticKernelSolution() {};
 
+        void solve(bool calculateUncertainties);
         lsst::afw::math::Kernel::Ptr getKernel();
-        lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr makeKernelImage();
+        ImageT::Ptr makeKernelImage();
         double getBackground();
         double getKsum();
 
@@ -94,6 +97,7 @@ namespace diffim {
 
         virtual ~SpatialKernelSolution() {};
 
+        void solve(bool calculateUncertainties);
         std::pair<lsst::afw::math::LinearCombinationKernel::Ptr,
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getKernelSolution();
         std::pair<lsst::afw::math::LinearCombinationKernel::Ptr,

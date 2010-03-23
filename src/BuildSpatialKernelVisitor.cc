@@ -265,7 +265,7 @@ namespace detail {
 
     template<typename PixelT>
     void BuildSpatialKernelVisitor<PixelT>::solveLinearEquation() {
-        _kernelSolution->solve();
+        _kernelSolution->solve(_policy.getBool("calculateKernelUncertainty"));
     }
 
     template<typename PixelT>

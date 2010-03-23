@@ -24,7 +24,7 @@
 #include "lsst/pex/logging/Trace.h"
 
 #include "lsst/ip/diffim/SpatialModelKernel.h"
-#include "lsst/ip/diffim/BasisSets.h"
+#include "lsst/ip/diffim/BasisLists.h"
 #include "lsst/ip/diffim/KernelCandidate.h"
 
 #include "lsst/ip/diffim/KernelSumVisitor.h"
@@ -102,8 +102,24 @@ fitSpatialKernelFromCandidates(
     bool const subtractMeanForPca     = policy.getBool("subtractMeanForPca");
     
     /* Build basis list here */
+    boost::shared_ptr<lsst::afw::math::KernelList> basisList = makeKernelBasisList(policy);
+
     /* Build regularization matrix here */
-    boost::shared_ptr<lsst::afw::math::KernelList> const& basisList();
+    boost::shared_ptr<Eigen::MatrixXd> hMat;
+    bool useRegularization     = policy.getBool("useRegularization");
+    std::string kernelBasisSet = policy.getString("kernelBasisSet");
+
+    if (useRegularization) {
+        if (kernelBasisSet == "alard-lupton") {
+            pexLogging::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                                  "Regularization not enabled for Alard-Lupton kernels");
+            useRegularization = false;
+        }
+        else {
+            hMat = makeRegularizationMatrix(policy);
+        }
+    }
+        
 
     boost::timer t;
     t.restart();
@@ -255,11 +271,10 @@ fitSpatialKernelFromCandidates(
                     i -= 1;
                     continue;
                 }
-                
-                *spatialBasisList = *basisListPca;
+                spatialBasisList = basisListPca;
             }
             else {
-                *spatialBasisList = *basisList;
+                spatialBasisList = basisList;
             }
 
                 

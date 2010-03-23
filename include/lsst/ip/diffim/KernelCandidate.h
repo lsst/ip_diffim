@@ -93,6 +93,7 @@ namespace diffim {
         double getBackground(CandidateSwitch cand) const;
         double getKsum(CandidateSwitch cand) const;
         typename ImageT::Ptr getKernelImage(CandidateSwitch cand) const;
+        typename ImageT::ConstPtr getImage() const; // For SpatialCellImageCandidate
         boost::shared_ptr<StaticKernelSolution> getKernelSolution(CandidateSwitch cand) const; 
         
         /** 
