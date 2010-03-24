@@ -17,7 +17,7 @@ def generateDefaultPolicy(policyPath, modify=True, fwhm=3.5):
 
 def modifyKernelPolicy(policy, fwhm=3.5):
     # Modify the kernel policy parameters based upon the images FWHM
-    print policy.getDouble("kernelRadiusFwhmScaling"), fwhm
+
     kernelRadius = policy.getDouble("kernelRadiusFwhmScaling") * fwhm
     kernelRadius = min(kernelRadius, policy.getInt("kernelRadiusMax"))
     kernelRadius = max(kernelRadius, policy.getInt("kernelRadiusMin"))

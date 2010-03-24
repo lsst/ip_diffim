@@ -442,6 +442,11 @@ namespace diffim {
     }
 
     template <typename PixelT, typename VarT>
+    KernelCandidate<PixelT, VarT>::ImageT::ConstPtr KernelCandidate<PixelT, VarT>::getImage() const {
+        return getKernelImage(KernelCandidate::ORIG);
+    }
+
+    template <typename PixelT, typename VarT>
     boost::shared_ptr<StaticKernelSolution> KernelCandidate<PixelT, VarT>::getKernelSolution(
         CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {

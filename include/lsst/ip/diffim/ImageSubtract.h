@@ -212,6 +212,21 @@ namespace diffim {
         );
 
     /**
+     * @brief Fit for a spatial model of the kernel and background
+     *
+     * @param kernelCells  SpatialCellSet containing the candidate kernels
+     * @param policy  Policy for configuration
+     *
+     * @ingroup ip_diffim
+     */
+    template<typename PixelT>
+    std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
+    fitSpatialKernelFromCandidates(
+        lsst::afw::math::SpatialCellSet &kernelCells,
+        lsst::pex::policy::Policy const& policy
+        );
+
+    /**
      * @brief Turns a 2-d Image into a 2-d Eigen Matrix
      *
      * @param img  Image whose pixel values are read into an Eigen::MatrixXd

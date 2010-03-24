@@ -61,7 +61,7 @@ class DiffimTestCases(unittest.TestCase):
         self.deltaFunctionTest(ks)
 
 
-    def xtestDeltaFunction(self):
+    def testDeltaFunction(self):
         self.policy.set("kernelBasisSet", "delta-function")
         ks = ipDiffim.makeKernelBasisList(self.policy)
 
@@ -94,7 +94,7 @@ class DiffimTestCases(unittest.TestCase):
             self.assertAlmostEqual(num.sum(arr*arr), 1.0)
 
 
-    def xtestAlardLupton(self):
+    def testAlardLupton(self):
         self.policy.set("kernelBasisSet", "delta-function")
         ks = ipDiffim.makeKernelBasisList(self.policy)
 

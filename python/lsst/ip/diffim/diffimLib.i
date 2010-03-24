@@ -49,6 +49,7 @@ namespace boost {
 %include "lsst/daf/base/persistenceMacros.i"
 %import  "lsst/afw/image/imageLib.i"
 %import  "lsst/afw/math/mathLib.i"
+%import  "lsst/afw/math/objectVectors.i"
 %import  "lsst/afw/detection/detectionLib.i"
 
 %lsst_exceptions();
@@ -89,6 +90,11 @@ def version(HeadURL = r"$HeadURL$"):
 %}
 
 %include "lsst/ip/diffim/ImageSubtract.h"
+
+%template(fitSpatialKernelFromCandidates) lsst::ip::diffim::fitSpatialKernelFromCandidates<float>;
+
+%template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, 
+                                          lsst::afw::math::Kernel::SpatialFunctionPtr>;
 
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
@@ -171,17 +177,6 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 
 /******************************************************************************/
 
-%{
-#include "lsst/ip/diffim/SpatialModelKernel.h"
-%}
-%include "lsst/ip/diffim/SpatialModelKernel.h"
-%template(fitSpatialKernelFromCandidates) lsst::ip::diffim::fitSpatialKernelFromCandidates<float>;
-
-%template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, 
-                                          lsst::afw::math::Kernel::SpatialFunctionPtr>;
-
-/******************************************************************************/
-
 %include "lsst/ip/diffim/BasisLists.h"
 
 /******************************************************************************/
@@ -194,3 +189,4 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 %template(eigenMatrixPtr) boost::shared_ptr<Eigen::MatrixXd>;
 %template(eigenVectorPtr) boost::shared_ptr<Eigen::VectorXd>;
 
+SWIG_SHARED_PTR(KernelListPtr, std::vector<boost::shared_ptr<lsst::afw::math::Kernel> >);
