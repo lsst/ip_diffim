@@ -322,11 +322,13 @@ namespace diffim {
             _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution>(
                 new StaticKernelSolution(mMat, bVec, basisList)
                 );
+            _kernelSolutionPca->solve(false);
         }
         else {
             _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution>(
                 new StaticKernelSolution(mMat, bVec, basisList)
                 );
+            _kernelSolutionOrig->solve(false);
         }
     }
     

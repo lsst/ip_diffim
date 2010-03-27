@@ -120,7 +120,16 @@ def version(HeadURL = r"$HeadURL$"):
 
 /******************************************************************************/
 
+%{
+#include "lsst/ip/diffim/KernelSolution.h"
+%}
+
+SWIG_SHARED_PTR(KernelSolution, lsst::ip::diffim::KernelSolution);
+SWIG_SHARED_PTR(StaticKernelSolution, lsst::ip::diffim::StaticKernelSolution);
+SWIG_SHARED_PTR(SpatialKernelSolution, lsst::ip::diffim::SpatialKernelSolution);
+
 %include "lsst/ip/diffim/KernelSolution.h"
+
 
 /******************************************************************************/
 

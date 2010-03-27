@@ -97,7 +97,7 @@ namespace diffim {
         pexLog::TTrace<3>("lsst.ip.diffim.KernelSolution.solve", 
                           "Compute time for matrix math : %.2f s", time);
 
-        boost::shared_ptr<Eigen::VectorXd> _sVec (new Eigen::VectorXd(sVec));
+        _sVec = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(sVec));
     }
 
     /* 

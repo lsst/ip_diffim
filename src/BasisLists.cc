@@ -796,5 +796,4 @@ namespace diffim {
         return hMat;
     }
     
-
 }}} // end of namespace lsst::ip::diffim
