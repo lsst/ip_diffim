@@ -7,7 +7,6 @@ import eups
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
 
 diffimDir    = eups.productDir('ip_diffim')
