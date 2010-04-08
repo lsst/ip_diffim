@@ -165,18 +165,45 @@ lsst::afw::image::Image<PIXTYPE>
 SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
                         lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::Pixel)>,
                         lsst::ip::diffim::KernelCandidate<TYPE>);
+
+/* Same problem as with meas algorithms makePsfCandidate */
+%inline %{
+namespace lsst { namespace ip { namespace diffim { namespace lsstSwig {
+template <typename PixelT>
+typename KernelCandidate<PixelT>::Ptr
+makeKernelCandidateForSwig(float const xCenter,
+                           float const yCenter, 
+                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
+                               miToConvolvePtr,
+                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
+                               miToNotConvolvePtr,
+                           lsst::pex::policy::Policy const& policy) {
+    
+    return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
+                                                                             miToConvolvePtr,
+                                                                             miToNotConvolvePtr,
+                                                                             policy));
+}
+}}}}
+%}
+
+%ignore makeKernelCandidate;
 %enddef
 
 %define %KernelCandidate(NAME, TYPE)
 %template(KernelCandidate##NAME) lsst::ip::diffim::KernelCandidate<TYPE>;
-%template(makeKernelCandidate) lsst::ip::diffim::makeKernelCandidate<TYPE>;
+%template(makeKernelCandidate) lsst::ip::diffim::lsstSwig::makeKernelCandidateForSwig<TYPE>;
 %inline %{
-    lsst::ip::diffim::KernelCandidate<TYPE> *
-        cast_KernelCandidate##NAME(lsst::afw::math::SpatialCellCandidate * candidate) {
-        return dynamic_cast<lsst::ip::diffim::KernelCandidate<TYPE> *>(candidate);
+    lsst::ip::diffim::KernelCandidate<TYPE>::Ptr
+        cast_KernelCandidate##NAME(lsst::afw::math::SpatialCellCandidate::Ptr candidate) {
+        return boost::shared_dynamic_cast<lsst::ip::diffim::KernelCandidate<TYPE> >(candidate);
     }
 %}
 %enddef
+
+
+
+
 
 %KernelCandidatePtr(F, float);
 
@@ -199,3 +226,8 @@ SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
 %template(eigenVectorPtr) boost::shared_ptr<Eigen::VectorXd>;
 
 SWIG_SHARED_PTR(KernelListPtr, std::vector<boost::shared_ptr<lsst::afw::math::Kernel> >);
+
+/******************************************************************************/
+
+%include "lsst/ip/diffim/detail.i"
+

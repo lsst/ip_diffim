@@ -363,6 +363,7 @@ class DiffimTestCases(unittest.TestCase):
     def testInsert(self):
         mi = afwImage.MaskedImageF(10, 10)
         kc = ipDiffim.makeKernelCandidate(0., 0., mi, mi, self.policy)
+        print type(kc)
         kc.setStatus(afwMath.SpatialCellCandidate.GOOD)
         
         sizeCellX = self.policy.get("sizeCellX")

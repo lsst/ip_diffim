@@ -15,6 +15,7 @@
 #include "Eigen/Core"
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
+#include "lsst/ip/diffim.h"
 #include "lsst/pex/policy/Policy.h"
 
 namespace lsst { 

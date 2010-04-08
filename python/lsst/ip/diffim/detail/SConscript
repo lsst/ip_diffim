@@ -1,0 +1,6 @@
+# -*- python -*-
+Import("env")
+
+# includedProducts lists packages with included .i files
+env.CheckSwig("python", ilang="c++", includedProducts="utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy afw security")
+env.LoadableModuleIncomplete("_diffimDetailLib", "diffimDetailLib.i", LIBS=env.getlibs("ip_diffim"))

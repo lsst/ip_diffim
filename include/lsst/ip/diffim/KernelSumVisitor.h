@@ -34,7 +34,7 @@ namespace detail {
         double getkSumMean()  {return _kSumMean;}
         double getkSumStd()   {return _kSumStd;}
         double getdkSumMax()  {return _dkSumMax;}
-        double getkSumNpts()  {return _kSumNpts;}
+        int    getkSumNpts()  {return _kSumNpts;}
         
         void resetKernelSum();
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);

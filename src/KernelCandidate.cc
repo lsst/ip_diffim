@@ -527,6 +527,7 @@ namespace diffim {
 // Explicit instantiations
 //
     typedef float PixelT;
+
     template class KernelCandidate<PixelT>;
-    
+
 }}} // end of namespace lsst::ip::diffim

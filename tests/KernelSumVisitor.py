@@ -30,16 +30,16 @@ class DiffimTestCases(unittest.TestCase):
         mi2 = afwImage.MaskedImageF(size, size)
         mi2.getVariance().set(0.1) # avoid NaNs
         mi2.set(size//2, size//2, (kSum, 0x0, 1))
+        # currently works, but cannot put in spatialcell
         kc = ipDiffim.KernelCandidateF(x, y, mi1, mi2, self.policy)
-        print type(kc)
-        kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
-        print type(kc)
+        # currently fails
+        #kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
     
     def tearDown(self):
         del self.policy
 
-    def xtestAggregate(self, kSums = [1., 1., 1., 1., 2., 3., 4.]):
+    def testAggregate(self, kSums = [1., 1., 1., 1., 2., 3., 4.]):
         ksv = ipDiffim.KernelSumVisitorF(self.policy)
         ksv.setMode(ipDiffim.KernelSumVisitorF.AGGREGATE)
 
@@ -77,7 +77,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(ksv.getkSumNpts(), len(kSums))
 
 
-    def xtestReject(self):
+    def testReject(self):
         self.doReject(clipping = False)
         self.doReject(clipping = True)
 
@@ -134,15 +134,13 @@ class DiffimTestCases(unittest.TestCase):
                 kc.build(self.kList)
                 kernelCellSet.insertCandidate(kc)
                 print kc.getXCenter(), kc.getYCenter(), kc.getKsum(ipDiffim.KernelCandidateF.RECENT)
-                                        
-                                        
-            
 
-        #ksv.setMode(ipDiffim.KernelSumVisitorF.AGGREGATE)
-        #kernelCells.visitCandidates(ksv, 1)
-        #ksv.processKsumDistribution()
-        #ksv.setMode(ipDiffim.KernelSumVisitorF.REJECT)
-        #kernelCells.visitCandidates(ksv, 1)
+        # NEEDS TO GET FINISHED ONCE I CAN MAKECANDIDATE
+        ksv.setMode(ipDiffim.KernelSumVisitorF.AGGREGATE)
+        kernelCells.visitCandidates(ksv, 1)
+        ksv.processKsumDistribution()
+        ksv.setMode(ipDiffim.KernelSumVisitorF.REJECT)
+        kernelCells.visitCandidates(ksv, 1)
 
 #####
         
