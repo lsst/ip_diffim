@@ -22,8 +22,9 @@ namespace detail {
     
     template<typename PixelT>
     class KernelPcaVisitor : public lsst::afw::math::CandidateVisitor {
-        typedef lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> ImageT;
     public:
+        typedef lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> ImageT;
+        typedef boost::shared_ptr<KernelPcaVisitor<PixelT> > Ptr;
         
         KernelPcaVisitor(lsst::afw::image::ImagePca<ImageT> *imagePca);
         virtual ~KernelPcaVisitor() {};
@@ -35,6 +36,12 @@ namespace detail {
         lsst::afw::image::ImagePca<ImageT> *_imagePca; ///< Structure to fill with images
         ImageT::Ptr _mean;                             ///< Mean image calculated before Pca
     };
+
+    template<typename PixelT>
+    boost::shared_ptr<KernelPcaVisitor<PixelT> >
+    makeKernelPcaVisitor(lsst::afw::image::ImagePca<typename KernelPcaVisitor<PixelT>::ImageT> *imagePca) {
+        return typename KernelPcaVisitor<PixelT>::Ptr(new KernelPcaVisitor<PixelT>(imagePca));
+    }
     
 }}}} // end of namespace lsst::ip::diffim::detail
 

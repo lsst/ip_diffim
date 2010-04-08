@@ -21,7 +21,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.policy
-        
+
 #####
         
 def suite():

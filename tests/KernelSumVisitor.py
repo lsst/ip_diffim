@@ -23,16 +23,13 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set("useRegularization", False)
         self.kList = ipDiffim.makeKernelBasisList(self.policy)
 
-    def makeCandidate(self, kSum, x, y, size = 50):
+    def makeCandidate(self, kSum, x, y, size = 51):
         mi1 = afwImage.MaskedImageF(size, size)
         mi1.getVariance().set(0.1) # avoid NaNs
         mi1.set(size//2, size//2, (1, 0x0, 1))
         mi2 = afwImage.MaskedImageF(size, size)
         mi2.getVariance().set(0.1) # avoid NaNs
         mi2.set(size//2, size//2, (kSum, 0x0, 1))
-        # currently works, but cannot put in spatialcell
-        #kc = ipDiffim.KernelCandidateF(x, y, mi1, mi2, self.policy)
-        # currently fails
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
     
@@ -111,7 +108,7 @@ class DiffimTestCases(unittest.TestCase):
             self.assertEqual(ksv.getNRejected(), 0)
 
 
-    def xtestVisit(self, nCell = 3):
+    def testVisit(self, nCell = 3):
         # This currently fails since I can't get visitCandidates to
         # tell this is a pointer
         ksv = ipDiffim.makeKernelSumVisitor(self.policy)

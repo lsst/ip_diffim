@@ -25,7 +25,7 @@ namespace detail {
     template<typename PixelT>
     class KernelSumVisitor : public lsst::afw::math::CandidateVisitor {
     public:
-        typedef boost::shared_ptr<KernelSumVisitor> Ptr;
+        typedef boost::shared_ptr<KernelSumVisitor<PixelT> > Ptr;
 
         enum Mode {AGGREGATE = 0, REJECT = 1};
         
