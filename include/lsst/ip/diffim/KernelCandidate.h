@@ -33,7 +33,7 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */    
-    template <typename _PixelT, typename VarT=lsst::afw::image::VariancePixel>
+    template <typename _PixelT>
     class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<
         lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> 
         > {
@@ -47,7 +47,7 @@ namespace diffim {
     public:
         typedef boost::shared_ptr<KernelCandidate> Ptr;
         typedef boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
-        typedef boost::shared_ptr<lsst::afw::image::Image<VarT> > VariancePtr;
+        typedef boost::shared_ptr<lsst::afw::image::Image<lsst::afw::image::VariancePixel> > VariancePtr;
 
         enum CandidateSwitch {
             ORIG    = 0,
@@ -200,7 +200,7 @@ namespace diffim {
      * @ingroup ip_diffim
      */
     template <typename PixelT>
-    typename KernelCandidate<PixelT>::Ptr
+    boost::shared_ptr<KernelCandidate<PixelT> >
     makeKernelCandidate(float const xCenter,
                         float const yCenter, 
                         boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToConvolvePtr,

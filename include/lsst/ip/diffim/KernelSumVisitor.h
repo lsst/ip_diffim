@@ -12,6 +12,7 @@
 #ifndef LSST_IP_DIFFIM_KERNELSUMVISITOR_H
 #define LSST_IP_DIFFIM_KERNELSUMVISITOR_H
 
+#include "boost/shared_ptr.hpp"
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
 #include "lsst/pex/policy/Policy.h"
@@ -24,6 +25,8 @@ namespace detail {
     template<typename PixelT>
     class KernelSumVisitor : public lsst::afw::math::CandidateVisitor {
     public:
+        typedef boost::shared_ptr<KernelSumVisitor> Ptr;
+
         enum Mode {AGGREGATE = 0, REJECT = 1};
         
         KernelSumVisitor(lsst::pex::policy::Policy const& policy);
@@ -51,6 +54,12 @@ namespace detail {
         lsst::pex::policy::Policy _policy;   ///< Policy controlling behavior
     };    
     
+    template<typename PixelT>
+    boost::shared_ptr<KernelSumVisitor<PixelT> >
+    makeKernelSumVisitor(lsst::pex::policy::Policy const& policy) {
+        return typename KernelSumVisitor<PixelT>::Ptr(new KernelSumVisitor<PixelT>(policy));
+    }
+
 }}}} // end of namespace lsst::ip::diffim::detail
 
 #endif

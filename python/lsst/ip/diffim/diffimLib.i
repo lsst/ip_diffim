@@ -37,8 +37,6 @@ namespace boost {
 
 #include <lsst/afw.h>
 
-#include <lsst/ip/diffim.h>
-
 #include <lsst/pex/policy/Policy.h>
 %}
 
@@ -212,6 +210,10 @@ makeKernelCandidateForSwig(float const xCenter,
 %KernelCandidate(F, float);
 
 /******************************************************************************/
+
+%{
+#include "lsst/ip/diffim/BasisLists.h"
+%}
 
 %include "lsst/ip/diffim/BasisLists.h"
 

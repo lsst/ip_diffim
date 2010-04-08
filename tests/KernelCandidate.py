@@ -86,7 +86,7 @@ class DiffimTestCases(unittest.TestCase):
                 else:
                     self.assertAlmostEqual(kImage.get(i, j), 0., 5)
 
-    def xtestConstructor(self):
+    def testConstructor(self):
         # Original and uninitialized
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.scienceImage2.getMaskedImage(),
@@ -138,7 +138,7 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.fail()
 
-    def xtestDeltaFunctionScaled(self, scaling = 2.7, bg = 11.3):
+    def testDeltaFunctionScaled(self, scaling = 2.7, bg = 11.3):
         sIm  = afwImage.MaskedImageF(self.templateImage2.getMaskedImage(), True)
         sIm *= scaling
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
@@ -170,7 +170,7 @@ class DiffimTestCases(unittest.TestCase):
 
         
 
-    def xtestDeltaFunction(self):
+    def testDeltaFunction(self):
         # Match an image to itself, with delta-function basis set
         # No regularization
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
@@ -228,7 +228,7 @@ class DiffimTestCases(unittest.TestCase):
         
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT))
 
-    def xtestGaussianWithNoise(self):
+    def testGaussianWithNoise(self):
         # Convolve a real image with a gaussian and try and recover
         # it.  Add noise and perform the same test.
 
@@ -301,7 +301,7 @@ class DiffimTestCases(unittest.TestCase):
                     self.assertAlmostEqual(kImageOut.get(i, j), kImageIn.get(i, j), 2)
         
 
-    def xtestGaussian(self, imsize = 50):
+    def testGaussian(self, imsize = 50):
         # Convolve a delta function with a known gaussian; try to
         # recover using delta-function basis
 
@@ -363,7 +363,6 @@ class DiffimTestCases(unittest.TestCase):
     def testInsert(self):
         mi = afwImage.MaskedImageF(10, 10)
         kc = ipDiffim.makeKernelCandidate(0., 0., mi, mi, self.policy)
-        print type(kc)
         kc.setStatus(afwMath.SpatialCellCandidate.GOOD)
         
         sizeCellX = self.policy.get("sizeCellX")
@@ -373,7 +372,7 @@ class DiffimTestCases(unittest.TestCase):
         nSeen = 0
         for cell in kernelCellSet.getCellList():
             for cand in cell.begin(True):
-                cand  = diffimLib.cast_KernelCandidateF(cand)
+                cand  = ipDiffim.cast_KernelCandidateF(cand)
                 self.assertEqual(cand.getStatus(), afwMath.SpatialCellCandidate.GOOD)
                 nSeen += 1
         self.assertEqual(nSeen, 1)

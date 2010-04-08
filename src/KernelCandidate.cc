@@ -31,8 +31,8 @@ namespace lsst {
 namespace ip { 
 namespace diffim {
 
-    template <typename PixelT, typename VarT>
-    KernelCandidate<PixelT, VarT>::KernelCandidate(
+    template <typename PixelT>
+    KernelCandidate<PixelT>::KernelCandidate(
         float const xCenter,
         float const yCenter, 
         MaskedImagePtr const& miToConvolvePtr,
@@ -63,8 +63,8 @@ namespace diffim {
     }
     
     
-    template <typename PixelT, typename VarT>
-    void KernelCandidate<PixelT, VarT>::build(
+    template <typename PixelT>
+    void KernelCandidate<PixelT>::build(
         boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
         boost::shared_ptr<Eigen::MatrixXd> hMat
         ) {
@@ -111,8 +111,8 @@ namespace diffim {
     }
             
 
-    template <typename PixelT, typename VarT>
-    void KernelCandidate<PixelT, VarT>::buildEngine(
+    template <typename PixelT>
+    void KernelCandidate<PixelT>::buildEngine(
         boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
         boost::shared_ptr<Eigen::MatrixXd> hMat
         ) {
@@ -334,8 +334,8 @@ namespace diffim {
     
     
     
-    template <typename PixelT, typename VarT>
-    lsst::afw::math::Kernel::Ptr KernelCandidate<PixelT, VarT>::getKernel(CandidateSwitch cand) const {
+    template <typename PixelT>
+    lsst::afw::math::Kernel::Ptr KernelCandidate<PixelT>::getKernel(CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
             if (_kernelSolutionOrig) 
                 return _kernelSolutionOrig->getKernel();
@@ -361,8 +361,8 @@ namespace diffim {
         }
     }
 
-    template <typename PixelT, typename VarT>
-    double KernelCandidate<PixelT, VarT>::getBackground(CandidateSwitch cand) const {
+    template <typename PixelT>
+    double KernelCandidate<PixelT>::getBackground(CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
             if (_kernelSolutionOrig) 
                 return _kernelSolutionOrig->getBackground();
@@ -388,8 +388,8 @@ namespace diffim {
         }
     }
 
-    template <typename PixelT, typename VarT>
-    double KernelCandidate<PixelT, VarT>::getKsum(CandidateSwitch cand) const {
+    template <typename PixelT>
+    double KernelCandidate<PixelT>::getKsum(CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
             if (_kernelSolutionOrig) 
                 return _kernelSolutionOrig->getKsum();
@@ -415,8 +415,8 @@ namespace diffim {
         }
     }
 
-    template <typename PixelT, typename VarT>
-    KernelCandidate<PixelT, VarT>::ImageT::Ptr KernelCandidate<PixelT, VarT>::getKernelImage(
+    template <typename PixelT>
+    KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::getKernelImage(
         CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
             if (_kernelSolutionOrig) 
@@ -443,13 +443,13 @@ namespace diffim {
         }
     }
 
-    template <typename PixelT, typename VarT>
-    KernelCandidate<PixelT, VarT>::ImageT::ConstPtr KernelCandidate<PixelT, VarT>::getImage() const {
+    template <typename PixelT>
+    KernelCandidate<PixelT>::ImageT::ConstPtr KernelCandidate<PixelT>::getImage() const {
         return getKernelImage(KernelCandidate::ORIG);
     }
 
-    template <typename PixelT, typename VarT>
-    boost::shared_ptr<StaticKernelSolution> KernelCandidate<PixelT, VarT>::getKernelSolution(
+    template <typename PixelT>
+    boost::shared_ptr<StaticKernelSolution> KernelCandidate<PixelT>::getKernelSolution(
         CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
             if (_kernelSolutionOrig) 
@@ -476,8 +476,8 @@ namespace diffim {
         }
     }
 
-    template <typename PixelT, typename VarT>
-    lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT, VarT>::getDifferenceImage(
+    template <typename PixelT>
+    lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::getDifferenceImage(
         CandidateSwitch cand) {
         if (cand == KernelCandidate::ORIG) {
             if (_kernelSolutionOrig) 
@@ -508,8 +508,8 @@ namespace diffim {
         }
     }
 
-    template <typename PixelT, typename VarT>
-    lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT, VarT>::getDifferenceImage(
+    template <typename PixelT>
+    lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::getDifferenceImage(
         lsst::afw::math::Kernel::Ptr kernel,
         double background
         ) {
