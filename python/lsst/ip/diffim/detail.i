@@ -1,12 +1,12 @@
 // -*- lsst-c++ -*-
 
-%{
+//%{
 //#include "lsst/ip/diffim/AssessSpatialKernelVisitor.h"
 //#include "lsst/ip/diffim/BuildSingleKernelVisitor.h"
 //#include "lsst/ip/diffim/BuildSpatialKernelVisitor.h"
 //#include "lsst/ip/diffim/KernelPcaVisitor.h"
-#include "lsst/ip/diffim/KernelSumVisitor.h"
-%}
+//#include "lsst/ip/diffim/KernelSumVisitor.h"
+//%}
 
 //SWIG_SHARED_PTR(AssessSpatialKernelVisitor, lsst::ip::diffim::detail::AssessSpatialKernelVisitor);
 //SWIG_SHARED_PTR(BuildSingleKernelVisitor, lsst::ip::diffim::detail::BuildSingleKernelVisitor);
@@ -65,3 +65,27 @@ SWIG_SHARED_PTR_DERIVED(KernelPcaVisitor##NAME,
 %KernelPcaVisitor(F, float)
 
 /******************************************************************************/
+
+%{
+#include "lsst/ip/diffim/BuildSingleKernelVisitor.h"
+%}
+
+%define %BuildSingleKernelVisitorPtr(NAME, TYPE)
+SWIG_SHARED_PTR_DERIVED(BuildSingleKernelVisitor##NAME, 
+                        lsst::afw::math::CandidateVisitor, 
+                        lsst::ip::diffim::detail::BuildSingleKernelVisitor<TYPE>);
+%enddef
+
+%define %BuildSingleKernelVisitor(NAME, TYPE)
+%template(BuildSingleKernelVisitor##NAME) lsst::ip::diffim::detail::BuildSingleKernelVisitor<TYPE>;
+%template(makeBuildSingleKernelVisitor) lsst::ip::diffim::detail::makeBuildSingleKernelVisitor<TYPE>;
+%enddef
+
+%BuildSingleKernelVisitorPtr(F, float)
+
+%include "lsst/ip/diffim/BuildSingleKernelVisitor.h"
+
+%BuildSingleKernelVisitor(F, float)
+
+/******************************************************************************/
+

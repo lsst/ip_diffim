@@ -28,6 +28,8 @@ namespace detail {
     class BuildSingleKernelVisitor : public lsst::afw::math::CandidateVisitor {
         typedef lsst::afw::image::MaskedImage<PixelT> MaskedImageT;
     public:
+        typedef boost::shared_ptr<BuildSingleKernelVisitor<PixelT> > Ptr;
+
         BuildSingleKernelVisitor(
             boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
             lsst::pex::policy::Policy const& policy,  ///< Policy file directing behavior
@@ -69,6 +71,18 @@ namespace detail {
         int _nRejected;                       ///< Number of candidates rejected during processCandidate()
     };
     
+    template<typename PixelT>
+    boost::shared_ptr<BuildSingleKernelVisitor<PixelT> >
+    makeBuildSingleKernelVisitor(
+        boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
+        lsst::pex::policy::Policy const& policy,  ///< Policy file directing behavior
+        boost::shared_ptr<Eigen::MatrixXd> hMat = boost::shared_ptr<Eigen::MatrixXd>()
+        ) {
+
+        return typename BuildSingleKernelVisitor<PixelT>::Ptr(
+            new BuildSingleKernelVisitor<PixelT>(basisList, policy, hMat)
+            );
+    }
 
 }}}} // end of namespace lsst::ip::diffim::detail
 

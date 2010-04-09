@@ -234,6 +234,12 @@ namespace detail {
     }
 
     typedef float PixelT;
+
     template class BuildSingleKernelVisitor<PixelT>;
+
+    template boost::shared_ptr<BuildSingleKernelVisitor<PixelT> >
+    makeBuildSingleKernelVisitor<PixelT>(boost::shared_ptr<lsst::afw::math::KernelList> const&,
+                                         lsst::pex::policy::Policy const&,
+                                         boost::shared_ptr<Eigen::MatrixXd>);
 
 }}}} // end of namespace lsst::ip::diffim::detail
