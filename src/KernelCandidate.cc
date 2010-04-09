@@ -46,7 +46,7 @@ namespace diffim {
         _policy(policy),
         _coreFlux(),
         _isInitialized(false),
-        _regularize(false),
+        _useRegularization(false),
         _kernelSolutionOrig(),
         _kernelSolutionPca()
     {
@@ -62,12 +62,22 @@ namespace diffim {
                           this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);
     }
     
+
+    template <typename PixelT>
+    void KernelCandidate<PixelT>::build(
+        lsst::afw::math::KernelList const& basisList
+        ) {
+        std::cout << "BUILD 1" << std::endl;
+        build(basisList, boost::shared_ptr<Eigen::MatrixXd>());
+    }
+    
     
     template <typename PixelT>
     void KernelCandidate<PixelT>::build(
-        boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
+        lsst::afw::math::KernelList const& basisList,
         boost::shared_ptr<Eigen::MatrixXd> hMat
         ) {
+        std::cout << "BUILD 2" << std::endl;
 
         /* Examine the policy for control over the variance estimate */
         afwImage::MaskedImage<PixelT> var = 
@@ -83,10 +93,17 @@ namespace diffim {
         _varianceEstimate = var.getVariance();
 
         /* Do we have a regularization matrix?  If so use it */
-        if (hMat)
-            _regularize = true;
-        else
-            _regularize = false;
+        if (hMat) {
+            _useRegularization = true;
+            pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
+                              "Using kernel regularization");
+        }
+        else {
+            _useRegularization = false;
+            pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
+                              "Not using kernel regularization");
+        }
+
 
         try {
             buildEngine(basisList, hMat);
@@ -113,17 +130,17 @@ namespace diffim {
 
     template <typename PixelT>
     void KernelCandidate<PixelT>::buildEngine(
-        boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
+        lsst::afw::math::KernelList const& basisList,
         boost::shared_ptr<Eigen::MatrixXd> hMat
         ) {
 
         lsst::afw::image::Image<PixelT> const &imageToConvolve = *(_miToConvolvePtr->getImage());
         lsst::afw::image::Image<PixelT> const &imageToNotConvolve = *(_miToNotConvolvePtr->getImage());
         
-        unsigned int const nKernelParameters     = basisList->size();
+        unsigned int const nKernelParameters     = basisList.size();
         unsigned int const nBackgroundParameters = 1;
         unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
-        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList->begin();
+        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
         
         /* Ignore buffers around edge of convolved images :
          * 
@@ -159,6 +176,10 @@ namespace diffim {
         unsigned int const endRow   = imageToConvolve.getHeight() - 
             ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
         
+
+        std::cout << "D" << " " << (*kiter)->getCtrX() << " " << (*kiter)->getCtrY() << " " << (*kiter)->getWidth() << " " << (*kiter)->getHeight() << std::endl;
+        std::cout << startCol << " " << startRow << " " << endCol << " " << endRow << std::endl;
+
         boost::timer t;
         t.restart();
         
@@ -189,7 +210,7 @@ namespace diffim {
         typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
             convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
-        for (; kiter != basisList->end(); ++kiter, ++eiter) {
+        for (; kiter != basisList.end(); ++kiter, ++eiter) {
             afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
             boost::shared_ptr<Eigen::MatrixXd> cMat (
                 new Eigen::MatrixXd(imageToEigenMatrix(cimage).block(startRow, 
@@ -277,7 +298,7 @@ namespace diffim {
         t.restart();
         
         /* If the regularization matrix is here and not null, we use it by default */
-        if (_regularize) {
+        if (_useRegularization) {
             std::string lambdaType = _policy.getString("lambdaType");        
             double lambdaValue  = _policy.getDouble("lambdaValue");
             

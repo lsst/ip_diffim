@@ -61,7 +61,7 @@ namespace diffim {
 
         StaticKernelSolution(boost::shared_ptr<Eigen::MatrixXd> mMat,
                              boost::shared_ptr<Eigen::VectorXd> bVec,
-                             boost::shared_ptr<lsst::afw::math::KernelList> const& basisList);
+                             lsst::afw::math::KernelList const& basisList);
         virtual ~StaticKernelSolution() {};
 
         void solve(bool calculateUncertainties);
@@ -73,7 +73,7 @@ namespace diffim {
         std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getKernelSolution();
         std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getKernelUncertainty();
     private:
-        boost::shared_ptr<lsst::afw::math::KernelList> _basisList;   ///< List of Basis Kernels
+        lsst::afw::math::KernelList _basisList;                 ///< List of Basis Kernels
 
         lsst::afw::math::Kernel::Ptr _kernel;                   ///< Derived single-object convolution kernel
         double _background;                                     ///< Derived differential background estimate
@@ -90,7 +90,7 @@ namespace diffim {
 
         SpatialKernelSolution(boost::shared_ptr<Eigen::MatrixXd> mMat,
                               boost::shared_ptr<Eigen::VectorXd> bVec,
-                              boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
+                              lsst::afw::math::KernelList const& basisList,
                               lsst::afw::math::Kernel::SpatialFunctionPtr spatialKernelFunction,
                               lsst::afw::math::Kernel::SpatialFunctionPtr spatialBgFunction,
                               bool constantFirstTerm);
@@ -103,7 +103,7 @@ namespace diffim {
         std::pair<lsst::afw::math::LinearCombinationKernel::Ptr,
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getKernelUncertainty();
     private:
-        boost::shared_ptr<lsst::afw::math::KernelList> _basisList;          ///< List of Basis Kernels
+        lsst::afw::math::KernelList _basisList;          ///< List of Basis Kernels
         lsst::afw::math::Kernel::SpatialFunctionPtr _spatialKernelFunction; ///< Spatial function for Kernel
         lsst::afw::math::Kernel::SpatialFunctionPtr _spatialBgFunction;     ///< Spatial function for Bg
         bool _constantFirstTerm;                                            ///< Is the first term constant

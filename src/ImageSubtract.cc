@@ -94,7 +94,7 @@ fitSpatialKernelFromCandidates(
     bool const subtractMeanForPca     = policy.getBool("subtractMeanForPca");
     
     /* Build basis list here */
-    boost::shared_ptr<lsst::afw::math::KernelList> basisList = makeKernelBasisList(policy);
+    lsst::afw::math::KernelList basisList = makeKernelBasisList(policy);
 
     /* Build regularization matrix here */
     boost::shared_ptr<Eigen::MatrixXd> hMat;
@@ -169,7 +169,7 @@ fitSpatialKernelFromCandidates(
                we run a PCA, use these as a *new* basis set with lower
                dimensionality, and then apply the spatial fit to these kernels 
             */
-            boost::shared_ptr<afwMath::KernelList> spatialBasisList;
+            afwMath::KernelList spatialBasisList;
             if (usePcaForSpatialKernel) {
                 nPcaIterations += 1;
 
@@ -221,15 +221,13 @@ fitSpatialKernelFromCandidates(
                     }
                 }
                 /* Put all the power in the first kernel, which will not vary spatially */
-                boost::shared_ptr<afwMath::KernelList> basisListPca (
-                    new afwMath::KernelList(renormalizeKernelList(kernelListRaw))
-                    );
+                afwMath::KernelList basisListPca = renormalizeKernelList(kernelListRaw);
                 
                 /* New PsfMatchingFunctor and Kernel visitor for this new basis list */
                 detail::BuildSingleKernelVisitor<PixelT> singleKernelFitterPca(basisListPca, policy);
                 
                 /* Always true for Pca kernel; leave original kernel alone for future Pca iterations */
-                singleKernelFitterPca.setCandidateKernel(false);
+                //singleKernelFitterPca.setCandidateKernel(false);
                 
                 pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                   "Rebuilding kernels using Pca basis");

@@ -137,10 +137,10 @@ class DiffimTestCases(unittest.TestCase):
                 kernelCellSet.insertCandidate(kc)
 
         ksv.setMode(ipDiffim.KernelSumVisitorF.AGGREGATE)
-        kernelCellSet.visitCandidates(ksv)
+        kernelCellSet.visitCandidates(ksv, 1)
         ksv.processKsumDistribution()
         ksv.setMode(ipDiffim.KernelSumVisitorF.REJECT)
-        kernelCellSet.visitCandidates(ksv)
+        kernelCellSet.visitCandidates(ksv, 1)
 
         self.assertEqual(ksv.getNRejected(), 1)
 

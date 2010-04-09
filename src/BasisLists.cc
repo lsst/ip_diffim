@@ -27,11 +27,10 @@ namespace lsst {
 namespace ip { 
 namespace diffim {
 
-    boost::shared_ptr<lsst::afw::math::KernelList>
+    lsst::afw::math::KernelList
     makeKernelBasisList(
         lsst::pex::policy::Policy policy
         ) {
-        typedef boost::shared_ptr<lsst::afw::math::KernelList> basisPtr;
 
         std::string kernelBasisSet = policy.getString("kernelBasisSet");
         int kCols = policy.getInt("kernelCols");
@@ -52,13 +51,10 @@ namespace diffim {
                 throw LSST_EXCEPT(pexExcept::Exception, "Only odd-sized Alard-Lupton bases allowed");
             }
 
-            return basisPtr(new lsst::afw::math::KernelList(makeAlardLuptonBasisList(kCols/2, 
-                                                                                     alardNGauss, 
-                                                                                     alardSigGauss, 
-                                                                                     alardDegGauss)));
-        }
+            return makeAlardLuptonBasisList(kCols/2, alardNGauss, alardSigGauss, alardDegGauss);
+}
         else if (kernelBasisSet == "delta-function") {
-            return basisPtr(new lsst::afw::math::KernelList(makeDeltaFunctionBasisList(kCols, kRows)));
+            return makeDeltaFunctionBasisList(kCols, kRows);
         }
         else {
             throw LSST_EXCEPT(pexExcept::Exception, "Invalid basis set requested");

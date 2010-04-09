@@ -29,6 +29,7 @@ namespace detail {
         KernelPcaVisitor(lsst::afw::image::ImagePca<ImageT> *imagePca);
         virtual ~KernelPcaVisitor() {};
         
+        //getEigenKernels();
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
         void subtractMean();
         ImageT::Ptr returnMean() {return _mean;}

@@ -107,7 +107,7 @@ namespace diffim {
     StaticKernelSolution::StaticKernelSolution(
         boost::shared_ptr<Eigen::MatrixXd> mMat,
         boost::shared_ptr<Eigen::VectorXd> bVec,
-        boost::shared_ptr<lsst::afw::math::KernelList> const& basisList
+        lsst::afw::math::KernelList const& basisList
         ) 
         :
         KernelSolution(mMat, bVec),
@@ -183,7 +183,7 @@ namespace diffim {
 
         unsigned int const nParameters           = _sVec->size();
         unsigned int const nBackgroundParameters = 1;
-        unsigned int const nKernelParameters     = _basisList->size();
+        unsigned int const nKernelParameters     = _basisList.size();
         if (nParameters != (nKernelParameters + nBackgroundParameters)) 
             throw LSST_EXCEPT(pexExcept::Exception, "Mismatched sizes in kernel solution");
 
@@ -197,7 +197,7 @@ namespace diffim {
             kValues[idx] = (*_sVec)(idx);
         }
         boost::shared_ptr<afwMath::Kernel> kernel( 
-            new afwMath::LinearCombinationKernel(*_basisList, kValues) 
+            new afwMath::LinearCombinationKernel(_basisList, kValues) 
             );
         
         if (std::isnan((*_sVec)(nParameters-1))) {
@@ -224,7 +224,7 @@ namespace diffim {
 
         unsigned int const nParameters           = _sVec->size();
         unsigned int const nBackgroundParameters = 1;
-        unsigned int const nKernelParameters     = _basisList->size();
+        unsigned int const nKernelParameters     = _basisList.size();
         if (nParameters != (nKernelParameters + nBackgroundParameters)) 
             throw LSST_EXCEPT(pexExcept::Exception, "Mismatched sizes in kernel solution");
         
@@ -264,7 +264,7 @@ namespace diffim {
             kErrValues[idx] = std::sqrt(Error2(idx, idx));
         }
         boost::shared_ptr<afwMath::Kernel> kernelErr( 
-            new afwMath::LinearCombinationKernel(*_basisList, kErrValues) 
+            new afwMath::LinearCombinationKernel(_basisList, kErrValues) 
             );
         
         /* Estimate of Background and Background Error */
@@ -290,7 +290,7 @@ namespace diffim {
     SpatialKernelSolution::SpatialKernelSolution(
         boost::shared_ptr<Eigen::MatrixXd> mMat,
         boost::shared_ptr<Eigen::VectorXd> bVec,
-        boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
+        lsst::afw::math::KernelList const& basisList,
         lsst::afw::math::Kernel::SpatialFunctionPtr spatialKernelFunction,
         lsst::afw::math::Kernel::SpatialFunctionPtr spatialBgFunction,
         bool constantFirstTerm
@@ -334,11 +334,11 @@ namespace diffim {
         unsigned int nkt    = _spatialKernelFunction->getParameters().size();
         unsigned int nbt    = _spatialBgFunction->getParameters().size();
         unsigned int nt     = _sVec->size();
-        unsigned int nbases = _basisList->size();
+        unsigned int nbases = _basisList.size();
 
         /* Set up kernel */
         afwMath::LinearCombinationKernel::Ptr spatialKernel(
-            new afwMath::LinearCombinationKernel(*_basisList, *_spatialKernelFunction)
+            new afwMath::LinearCombinationKernel(_basisList, *_spatialKernelFunction)
             );
         
         if (nkt == 1) {
@@ -357,7 +357,7 @@ namespace diffim {
                 kCoeffs[i] = (*_sVec)(i);
             }
             spatialKernel.reset(
-                new afwMath::LinearCombinationKernel(*_basisList, kCoeffs)
+                new afwMath::LinearCombinationKernel(_basisList, kCoeffs)
                 );
         }
         else {

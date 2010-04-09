@@ -227,8 +227,6 @@ makeKernelCandidateForSwig(float const xCenter,
 %template(eigenMatrixPtr) boost::shared_ptr<Eigen::MatrixXd>;
 %template(eigenVectorPtr) boost::shared_ptr<Eigen::VectorXd>;
 
-SWIG_SHARED_PTR(KernelListPtr, std::vector<boost::shared_ptr<lsst::afw::math::Kernel> >);
-
 /******************************************************************************/
 
 %include "lsst/ip/diffim/detail.i"

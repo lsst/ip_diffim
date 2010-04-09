@@ -27,7 +27,7 @@ namespace detail {
     class BuildSpatialKernelVisitor : public lsst::afw::math::CandidateVisitor {
     public:
         BuildSpatialKernelVisitor(
-            boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,  ///< Basis functions
+            lsst::afw::math::KernelList const& basisList,  ///< Basis functions
             lsst::pex::policy::Policy policy         ///< Policy file directing behavior
             );
 
@@ -41,7 +41,7 @@ namespace detail {
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getKernelSolution();
 
     private:
-        boost::shared_ptr<lsst::afw::math::KernelList> const& _basisList; ///< List of kernel basis functions
+        lsst::afw::math::KernelList const& _basisList; ///< List of kernel basis functions
         boost::shared_ptr<SpatialKernelSolution> _kernelSolution; ///< Spatial solution
         int const _spatialKernelOrder;  ///< Spatial order of kernel variation
         int const _spatialBgOrder;      ///< Spatial order of background variation

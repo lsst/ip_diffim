@@ -72,7 +72,7 @@ namespace detail {
      */
     template<typename PixelT>
     BuildSpatialKernelVisitor<PixelT>::BuildSpatialKernelVisitor(
-        boost::shared_ptr<lsst::afw::math::KernelList> const& basisList, ///< Basis functions used in the fit
+        lsst::afw::math::KernelList const& basisList, ///< Basis functions used in the fit
         lsst::pex::policy::Policy policy         ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
@@ -81,7 +81,7 @@ namespace detail {
         _spatialBgOrder(policy.getInt("spatialBgOrder")),
         _spatialKernelFunction(new afwMath::PolynomialFunction2<double>(_spatialKernelOrder)),
         _spatialBgFunction(new afwMath::PolynomialFunction2<double>(_spatialBgOrder)),
-        _nbases(_basisList->size()),
+        _nbases(_basisList.size()),
         _policy(policy),
         _constantFirstTerm(false),
         _nCandidates(0) {

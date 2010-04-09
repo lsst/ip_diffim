@@ -162,8 +162,11 @@ namespace diffim {
          */
 
         void build(
-            boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
-            boost::shared_ptr<Eigen::MatrixXd> hMat = boost::shared_ptr<Eigen::MatrixXd>()
+            lsst::afw::math::KernelList const& basisList
+            );
+        void build(
+            lsst::afw::math::KernelList const& basisList,
+            boost::shared_ptr<Eigen::MatrixXd> hMat
             );
 
        
@@ -175,7 +178,7 @@ namespace diffim {
         lsst::pex::policy::Policy _policy;                  ///< Policy
         double _coreFlux;                                   ///< Mean S/N in the science image
         bool _isInitialized;                                ///< Has the kernel been built
-        bool _regularize;                                   ///< Use regularization?              
+        bool _useRegularization;                            ///< Use regularization?              
 
         /* best single raw kernel */
         boost::shared_ptr<StaticKernelSolution> _kernelSolutionOrig;    ///< Original basis kernel solution
@@ -183,7 +186,7 @@ namespace diffim {
         /* with Pca basis */
         boost::shared_ptr<StaticKernelSolution> _kernelSolutionPca;     ///< Most recent kernel solution
 
-        void buildEngine(boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
+        void buildEngine(lsst::afw::math::KernelList const& basisList,
                          boost::shared_ptr<Eigen::MatrixXd> hMat);
     };
 

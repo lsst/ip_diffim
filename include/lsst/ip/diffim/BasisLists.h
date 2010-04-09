@@ -23,7 +23,7 @@ namespace lsst {
 namespace ip { 
 namespace diffim {
 
-    boost::shared_ptr<lsst::afw::math::KernelList>
+    lsst::afw::math::KernelList
     makeKernelBasisList(lsst::pex::policy::Policy policy);
    
     /**

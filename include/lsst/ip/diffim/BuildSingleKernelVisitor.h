@@ -31,21 +31,15 @@ namespace detail {
         typedef boost::shared_ptr<BuildSingleKernelVisitor<PixelT> > Ptr;
 
         BuildSingleKernelVisitor(
-            boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
-            lsst::pex::policy::Policy const& policy,  ///< Policy file directing behavior
-            boost::shared_ptr<Eigen::MatrixXd> hMat = boost::shared_ptr<Eigen::MatrixXd>()
+            lsst::afw::math::KernelList const& basisList,
+            lsst::pex::policy::Policy const& policy  
+            );
+        BuildSingleKernelVisitor(
+            lsst::afw::math::KernelList const& basisList,
+            lsst::pex::policy::Policy const& policy, 
+            boost::shared_ptr<Eigen::MatrixXd> hMat  
             );
         virtual ~BuildSingleKernelVisitor() {};
-        
-        /* 
-         * This functionality allows the user to not set the "kernel" and thus
-         * "image" values of the KernelCandidate.  When running a PCA fit on the
-         * kernels, we want to keep the delta-function representation of the raw
-         * kernel which are used to derive the eigenBases, while still being
-         * able to modify the _M and _B matrices with linear fits to the
-         * eigenBases themselves.
-         */
-        void setCandidateKernel(bool set) {_setCandidateKernel = set;}
         
         /* 
            Don't reprocess candidate if its already been build.  The use
@@ -56,27 +50,41 @@ namespace detail {
         */
         void setSkipBuilt(bool skip)      {_skipBuilt = skip;}
         
-        int  getNRejected()   {return _nRejected;}
-        void reset()          {_nRejected = 0;}
+        int getNRejected()    {return _nRejected;}
+        int getNProcessed()   {return _nProcessed;}
+        void reset()          {_nRejected = 0; _nProcessed = 0;}
         
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
 
     private:
-        boost::shared_ptr<lsst::afw::math::KernelList> const& _basisList; ///< Basis set
+        lsst::afw::math::KernelList const& _basisList; ///< Basis set
         lsst::pex::policy::Policy _policy;    ///< Policy controlling behavior
         boost::shared_ptr<Eigen::MatrixXd> _hMat; ///< Regularization matrix
         ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
-        bool _setCandidateKernel;             ///< Do you set the KernelCandidate kernel, or just matrices
         bool _skipBuilt;                      ///< Skip over built candidates during processCandidate()
         int _nRejected;                       ///< Number of candidates rejected during processCandidate()
+        int _nProcessed;                      ///< Number of candidates processed during processCandidate()
+        bool _useRegularization;              ///< Regularize if delta function basis
     };
     
     template<typename PixelT>
     boost::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor(
-        boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
-        lsst::pex::policy::Policy const& policy,  ///< Policy file directing behavior
-        boost::shared_ptr<Eigen::MatrixXd> hMat = boost::shared_ptr<Eigen::MatrixXd>()
+        lsst::afw::math::KernelList const& basisList,
+        lsst::pex::policy::Policy const& policy
+        ) {
+
+        return typename BuildSingleKernelVisitor<PixelT>::Ptr(
+            new BuildSingleKernelVisitor<PixelT>(basisList, policy)
+            );
+    }
+
+    template<typename PixelT>
+    boost::shared_ptr<BuildSingleKernelVisitor<PixelT> >
+    makeBuildSingleKernelVisitor(
+        lsst::afw::math::KernelList const& basisList,
+        lsst::pex::policy::Policy const& policy,
+        boost::shared_ptr<Eigen::MatrixXd> hMat  
         ) {
 
         return typename BuildSingleKernelVisitor<PixelT>::Ptr(

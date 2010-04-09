@@ -135,7 +135,7 @@ class DiffimTestCases(unittest.TestCase):
                 kc.build(self.kList)
                 kernelCellSet.insertCandidate(kc)
 
-        kernelCellSet.visitCandidates(kpv)
+        kernelCellSet.visitCandidates(kpv, 1)
         imagePca.analyze()
         eigenImages = imagePca.getEigenImages()
         eigenValues = imagePca.getEigenValues()

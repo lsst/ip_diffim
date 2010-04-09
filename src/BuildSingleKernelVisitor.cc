@@ -80,18 +80,35 @@ namespace detail {
      * rebuilt the kernel on every visit.
      *
      * @note For the particular use case of creating a Pca basis from the raw
-     * kernels, we want to re-Visit each candidate and re-fit the kernel using this
-     * Pca basis.  However, we don't want to overwrite the original raw kernel,
-     * since that is what is used to create the Pca basis in the first place.  Thus
-     * the user has the option to setCandidateKernel(false), which will not override
-     * the candidates original kernel, but will override its _M and _B matrices for
-     * use in the spatial modeling.  This also requires the user to
-     * setSkipBuilt(false) so that the candidate is reprocessed with this new basis.
+     * kernels, we want to re-Visit each candidate and re-fit the kernel using
+     * this Pca basis.  This requires the user to setSkipBuilt(false) so that
+     * the candidate is reprocessed with this new basis.
      * 
      */
     template<typename PixelT>
     BuildSingleKernelVisitor<PixelT>::BuildSingleKernelVisitor(
-        boost::shared_ptr<lsst::afw::math::KernelList> const& basisList,
+        lsst::afw::math::KernelList const& basisList,
+        lsst::pex::policy::Policy const& policy  ///< Policy file directing behavior
+        ) :
+        afwMath::CandidateVisitor(),
+        _basisList(basisList),
+        _policy(policy),
+        _hMat(),
+        _imstats(ImageStatistics<PixelT>()),
+        _skipBuilt(true),
+        _nRejected(0),
+        _nProcessed(0),
+        _useRegularization(false)
+    {
+        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter1 = basisList.begin();
+        std::cout << "A1" << " " << (*kiter1)->getCtrX() << " " << (*kiter1)->getCtrY() << " " << (*kiter1)->getWidth() << " " << (*kiter1)->getHeight() << std::endl;
+        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter2 = _basisList.begin();
+        std::cout << "B1" << " " << (*kiter2)->getCtrX() << " " << (*kiter2)->getCtrY() << " " << (*kiter2)->getWidth() << " " << (*kiter2)->getHeight() << std::endl;
+    };
+
+    template<typename PixelT>
+    BuildSingleKernelVisitor<PixelT>::BuildSingleKernelVisitor(
+        lsst::afw::math::KernelList const& basisList,
         lsst::pex::policy::Policy const& policy,  ///< Policy file directing behavior
         boost::shared_ptr<Eigen::MatrixXd> hMat
         ) :
@@ -100,10 +117,16 @@ namespace detail {
         _policy(policy),
         _hMat(hMat),
         _imstats(ImageStatistics<PixelT>()),
-        _setCandidateKernel(true),
         _skipBuilt(true),
-        _nRejected(0)
-    {};
+        _nRejected(0),
+        _nProcessed(0),
+        _useRegularization(true)
+    {
+        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter1 = basisList.begin();
+        std::cout << "A2" << " " << (*kiter1)->getCtrX() << " " << (*kiter1)->getCtrY() << " " << (*kiter1)->getWidth() << " " << (*kiter1)->getHeight() << std::endl;
+        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter2 = _basisList.begin();
+        std::cout << "B2" << " " << (*kiter2)->getCtrX() << " " << (*kiter2)->getCtrY() << " " << (*kiter2)->getWidth() << " " << (*kiter2)->getHeight() << std::endl;
+    };
 
     
     template<typename PixelT>
@@ -120,13 +143,20 @@ namespace detail {
         if (_skipBuilt and kCandidate->isInitialized()) {
             return;
         }
+
+        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = _basisList.begin();
+        std::cout << "C" << " " << (*kiter)->getCtrX() << " " << (*kiter)->getCtrY() << " " << (*kiter)->getWidth() << " " << (*kiter)->getHeight() << std::endl;
         
         pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                               "Processing candidate %d", kCandidate->getId());
         
         /* Build its kernel here */
         try {
-            kCandidate->build(_basisList, _hMat);
+            if (_useRegularization) 
+                kCandidate->build(_basisList, _hMat);
+            else
+                kCandidate->build(_basisList);
+
         } catch (pexExcept::Exception &e) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
@@ -135,7 +165,8 @@ namespace detail {
                                   e.what());
             _nRejected += 1;
             return;
-        }
+        } 
+        _nProcessed += 1;
         
         /* If we need to renormalize the kernel and its B matrix, do it here.
            This is particularly relevant when you are building a kernel matching
@@ -145,6 +176,7 @@ namespace detail {
            kernel sum, but we have to also scale the B matrix so that this does
            not go awry in the spatial modeling.
         */
+        /* NOT IMPLEMENTED YET */
         if (_policy.getBool("psfMatchToGaussian")) {
             //_kFunctor.normalizeKernel();
         }
@@ -238,7 +270,7 @@ namespace detail {
     template class BuildSingleKernelVisitor<PixelT>;
 
     template boost::shared_ptr<BuildSingleKernelVisitor<PixelT> >
-    makeBuildSingleKernelVisitor<PixelT>(boost::shared_ptr<lsst::afw::math::KernelList> const&,
+    makeBuildSingleKernelVisitor<PixelT>(lsst::afw::math::KernelList const&,
                                          lsst::pex::policy::Policy const&,
                                          boost::shared_ptr<Eigen::MatrixXd>);
 
