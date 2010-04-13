@@ -2,7 +2,7 @@
 import diffimLib
 
 # all the other diffim routines
-import lsst.sdqa.sdqaLib as sdqa
+import lsst.sdqa as sdqa
 
 # all the other LSST packages
 import lsst.afw.image as afwImage
