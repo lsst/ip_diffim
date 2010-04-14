@@ -26,6 +26,7 @@ class DiffimTestCases(unittest.TestCase):
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
  
     def tearDown(self):
+        del self.policy
         if self.defDataDir:
             del self.scienceImage
             del self.templateImage

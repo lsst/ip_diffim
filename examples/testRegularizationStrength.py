@@ -62,7 +62,7 @@ class DiffimTestCases(unittest.TestCase):
         # Regularization terms
         forward, central     = 0, 1
         noWrap, wrap, taper  = 0, 1, 2
-        boundaryStyle, diffStyle = taper, forward
+        boundaryStyle, diffStyle = noWrap, central
         self.h0 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 0,
                                                                   boundaryStyle, diffStyle)
         self.h1 = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 1,

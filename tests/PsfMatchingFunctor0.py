@@ -56,6 +56,14 @@ class DiffimTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.policy
+        del self.basisList
+        del self.gaussFunction
+        del self.gaussKernel
+        del self.kImageIn
+        del self.kFunctor
+        if self.defDataDir:
+            del self.scienceImage
+            del self.templateImage
 
     def doNormalize(self, xloc=397, yloc=580, imscale=2.):
         imsize = int(3 * self.kCols)

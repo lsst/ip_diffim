@@ -47,9 +47,11 @@ class DiffimTestCases(unittest.TestCase):
                                           afwImage.PointI(511, 2046))
 
     def tearDown(self):
+        del self.policy
         if self.defDataDir:
             del self.scienceImage
             del self.templateImage
+            del self.bbox
 
     def testXY0(self):
         if not self.defDataDir:

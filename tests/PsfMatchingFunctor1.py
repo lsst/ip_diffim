@@ -42,6 +42,11 @@ class DiffimTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.policy
+        del self.basisList
+        del self.gaussFunction
+        del self.gaussKernel
+        del self.kImageIn
+        del self.kFunctor
 
     def doDeltaFunction(self, dX, dY, scaling, background, imsize=50):
         # template image with a single hot pixel in the exact center

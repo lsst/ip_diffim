@@ -45,6 +45,11 @@ class DiffimTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.policy
+        del self.gaussFunction
+        del self.gaussKernel
+        if self.defDataDir:
+            del self.templateImage
+            del self.scienceImage
 
     def runConvolveAndSubtract1(self, bgVal = 0, xloc = 408, yloc = 580):
         imsize = int(5 * self.kCols)

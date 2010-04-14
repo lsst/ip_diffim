@@ -59,6 +59,13 @@ class DiffimTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.policy
+        del self.gaussFunction
+        del self.gaussKernel
+        del self.kImageIn
+        if self.defDataDir:
+            del self.templateImage
+            del self.scienceImage
+            del self.dStats
 
     def addNoise(self, mi):
         # use median of variance for seed

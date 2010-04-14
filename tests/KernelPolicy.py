@@ -12,6 +12,9 @@ class DiffimTestCases(unittest.TestCase):
         self.policyPath   = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
         self.p0           = pexPolicy.Policy.createPolicy(self.policyPath)
 
+    def tearDown(self):
+        del self.p0
+        
     def testNoModify(self):
         p1 = ipDiffim.generateDefaultPolicy(self.policyPath, modify=False)
         self.assertEqual(self.p0.get("kernelRows"), p1.get("kernelRows"))
