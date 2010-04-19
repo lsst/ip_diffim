@@ -384,6 +384,9 @@ class DiffimTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.policy
+        if self.defDataDir:
+            del self.scienceImage2
+            del self.templateImage2
         
 #####
         
