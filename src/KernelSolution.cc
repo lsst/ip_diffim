@@ -102,6 +102,10 @@ namespace diffim {
 
     /* 
      *
+     *
+     *
+     *
+     *
      */
 
     StaticKernelSolution::StaticKernelSolution(
@@ -111,14 +115,19 @@ namespace diffim {
         ) 
         :
         KernelSolution(mMat, bVec),
-        _basisList(basisList),
         _kernel(),
         _background(0.0),
         _kSum(0.0),
         _kernelErr(),
         _backgroundErr(0.0),
         _errCalculated(false)
-    {};
+    {
+        std::vector<double> kValues(basisList.size());
+        _kernel = boost::shared_ptr<afwMath::Kernel>( 
+            new afwMath::LinearCombinationKernel(basisList, kValues) 
+            );
+        
+    };
 
     lsst::afw::math::Kernel::Ptr StaticKernelSolution::getKernel() {
         if (_solvedBy == KernelSolution::NONE) {
@@ -134,7 +143,7 @@ namespace diffim {
         ImageT::Ptr image (
             new ImageT::Image(_kernel->getDimensions())
             );
-        _kSum  = _kernel->computeImage(*image, false);              
+        (void)_kernel->computeImage(*image, false);              
         return image;
     }
 
@@ -152,6 +161,27 @@ namespace diffim {
         return _kSum;
     }
 
+    std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
+    StaticKernelSolution::getKernelSolution() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
+        }
+
+        return std::make_pair(_kernel, _background);
+    }
+
+    std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
+    StaticKernelSolution::getKernelUncertainty() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
+        }
+        if (_errCalculated = false) {
+            _setKernelUncertainty();
+        }
+
+        return std::make_pair(_kernelErr, _backgroundErr);
+    }
+
     void StaticKernelSolution::solve(bool calculateUncertainties) {
         try {
             KernelSolution::solve();
@@ -159,31 +189,37 @@ namespace diffim {
             LSST_EXCEPT_ADD(e, "Unable to solve static kernel matrix");
             throw e;
         }
-        
-        std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> kb = getKernelSolution();
-        _kernel = kb.first;
-        _background = kb.second;
+        /* Turn matrices into _kernel and _background */
+        _setKernelSolution();
 
         /* set kernel sum */
-        (void)makeKernelImage();
+        _setKernelSum();
 
         if (calculateUncertainties) {
-            std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> dkb = getKernelUncertainty();
-            _kernelErr = dkb.first;
-            _backgroundErr = dkb.second;
+            _setKernelUncertainty();
         }
     }
 
-    std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
-    StaticKernelSolution::getKernelSolution() {
-
+    void StaticKernelSolution::_setKernelSum() {
         if (_solvedBy == KernelSolution::NONE) {
-            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
+        }
+        ImageT::Ptr image (
+            new ImageT::Image(_kernel->getDimensions())
+            );
+        _kSum  = _kernel->computeImage(*image, false);              
+    }
+
+    void
+    StaticKernelSolution::_setKernelSolution() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot make solution");
         }
 
         unsigned int const nParameters           = _sVec->size();
         unsigned int const nBackgroundParameters = 1;
-        unsigned int const nKernelParameters     = _basisList.size();
+        unsigned int const nKernelParameters     = 
+            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
         if (nParameters != (nKernelParameters + nBackgroundParameters)) 
             throw LSST_EXCEPT(pexExcept::Exception, "Mismatched sizes in kernel solution");
 
@@ -196,35 +232,28 @@ namespace diffim {
             }
             kValues[idx] = (*_sVec)(idx);
         }
-        boost::shared_ptr<afwMath::Kernel> kernel( 
-            new afwMath::LinearCombinationKernel(_basisList, kValues) 
-            );
+        _kernel->setKernelParameters(kValues);
         
         if (std::isnan((*_sVec)(nParameters-1))) {
             throw LSST_EXCEPT(pexExcept::Exception, 
                               str(boost::format("Unable to determine background solution %d (nan)") % 
                                   (nParameters-1)));
         }
-        double background = (*_sVec)(nParameters-1);
-        
-        return std::make_pair(kernel, background);
+        _background = (*_sVec)(nParameters-1);
     }        
 
 
-    std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
-    StaticKernelSolution::getKernelUncertainty() {
-
+    void
+    StaticKernelSolution::_setKernelUncertainty() {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return uncertainty");
         }
 
-        if (_errCalculated) {
-            return std::make_pair(_kernelErr, _backgroundErr);
-        }
-
         unsigned int const nParameters           = _sVec->size();
         unsigned int const nBackgroundParameters = 1;
-        unsigned int const nKernelParameters     = _basisList.size();
+        unsigned int const nKernelParameters     = 
+            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
+
         if (nParameters != (nKernelParameters + nBackgroundParameters)) 
             throw LSST_EXCEPT(pexExcept::Exception, "Mismatched sizes in kernel solution");
         
@@ -248,7 +277,7 @@ namespace diffim {
         Eigen::MatrixXd             Cov    = (*_mMat).transpose() * (*_mMat);
         Eigen::LLT<Eigen::MatrixXd> llt    = Cov.llt();
         Eigen::MatrixXd             Error2 = llt.matrixL().transpose().inverse() * llt.matrixL().inverse();
-        
+
         std::vector<double> kErrValues(nKernelParameters);
         for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
             // Insanity checking
@@ -263,9 +292,7 @@ namespace diffim {
             }
             kErrValues[idx] = std::sqrt(Error2(idx, idx));
         }
-        boost::shared_ptr<afwMath::Kernel> kernelErr( 
-            new afwMath::LinearCombinationKernel(_basisList, kErrValues) 
-            );
+        _kernelErr->setKernelParameters(kErrValues);
         
         /* Estimate of Background and Background Error */
         if (std::isnan(Error2(nParameters-1, nParameters-1))) {
@@ -277,13 +304,16 @@ namespace diffim {
                                   Error2(nParameters-1, nParameters-1) 
                                   ));
         }
-        double backgroundErr = std::sqrt(Error2(nParameters-1, nParameters-1));
-
+        _backgroundErr = std::sqrt(Error2(nParameters-1, nParameters-1));
         _errCalculated = true;
-        return std::make_pair(kernelErr, backgroundErr);
     }
 
     /* 
+     *
+     *
+     *
+     *
+     *
      *
      */
 
@@ -296,7 +326,6 @@ namespace diffim {
         bool constantFirstTerm
         ) :
         KernelSolution(mMat, bVec),
-        _basisList(basisList),
         _spatialKernelFunction(spatialKernelFunction),
         _spatialBgFunction(spatialBgFunction),
         _constantFirstTerm(constantFirstTerm),
@@ -305,7 +334,32 @@ namespace diffim {
         _kernelErr(),
         _backgroundErr(),
         _errCalculated(false)
-    {};
+    {
+        _kernel = afwMath::LinearCombinationKernel::Ptr(
+            new afwMath::LinearCombinationKernel(basisList, *_spatialKernelFunction)
+            );
+    };
+
+    KernelSolution::ImageT::Ptr SpatialKernelSolution::makeKernelImage() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
+        }
+        ImageT::Ptr image (
+            new ImageT::Image(_kernel->getDimensions())
+            );
+        (void)_kernel->computeImage(*image, false);              
+        return image;
+    }
+
+    void SpatialKernelSolution::_setKernelSum() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
+        }
+        ImageT::Ptr image (
+            new ImageT::Image(_kernel->getDimensions())
+            );
+        _kSum  = _kernel->computeImage(*image, false);              
+    }
 
     void SpatialKernelSolution::solve(bool calculateUncertainties) {
         try {
@@ -314,33 +368,34 @@ namespace diffim {
             LSST_EXCEPT_ADD(e, "Unable to solve spatial kernel matrix");
             throw e;
         }
-            
-        std::pair<afwMath::LinearCombinationKernel::Ptr, 
-            afwMath::Kernel::SpatialFunctionPtr> kb = getKernelSolution();
-        _kernel = kb.first;
-        _background = kb.second;
+        /* Turn matrices into _kernel and _background */
+        _setKernelSolution();
         
+        /* set kernel sum */
+        _setKernelSum();
+
         if (calculateUncertainties) {
-            std::pair<afwMath::LinearCombinationKernel::Ptr, 
-                afwMath::Kernel::SpatialFunctionPtr> dkb = getKernelUncertainty();
-            _kernelErr = dkb.first;
-            _backgroundErr = dkb.second;
+            _setKernelUncertainty();
         }
     }
 
     std::pair<afwMath::LinearCombinationKernel::Ptr, 
-              afwMath::Kernel::SpatialFunctionPtr> SpatialKernelSolution::getKernelSolution() {
-
+            afwMath::Kernel::SpatialFunctionPtr> SpatialKernelSolution::getKernelSolution() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
+        }
+        
+        return std::make_pair(_kernel, _background);
+    }
+    
+    void SpatialKernelSolution::_setKernelSolution() {
+        
         unsigned int nkt    = _spatialKernelFunction->getParameters().size();
         unsigned int nbt    = _spatialBgFunction->getParameters().size();
         unsigned int nt     = _sVec->size();
-        unsigned int nbases = _basisList.size();
+        unsigned int nbases = 
+            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
 
-        /* Set up kernel */
-        afwMath::LinearCombinationKernel::Ptr spatialKernel(
-            new afwMath::LinearCombinationKernel(_basisList, *_spatialKernelFunction)
-            );
-        
         if (nkt == 1) {
             /* Not spatially varying; this fork is a specialization
              * for convolution speed--up */
@@ -356,8 +411,10 @@ namespace diffim {
             for (unsigned int i = 0; i < nbases; i++) {
                 kCoeffs[i] = (*_sVec)(i);
             }
-            spatialKernel.reset(
-                new afwMath::LinearCombinationKernel(_basisList, kCoeffs)
+            lsst::afw::math::KernelList basisList = 
+                boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
+            _kernel.reset(
+                new afwMath::LinearCombinationKernel(basisList, kCoeffs)
                 );
         }
         else {
@@ -378,22 +435,22 @@ namespace diffim {
                     }
                 }
             }
-            spatialKernel->setSpatialParameters(kCoeffs);
+            _kernel->setSpatialParameters(kCoeffs);
         }
-        
-        /* Set up background */
-        afwMath::Kernel::SpatialFunctionPtr bgFunction(_spatialBgFunction->clone());
         
         /* Set the background coefficients */
         std::vector<double> bgCoeffs(nbt);
         for (unsigned int i = 0; i < nbt; i++) {
             bgCoeffs[i] = (*_sVec)(nt - nbt + i);
         }
-        bgFunction->setParameters(bgCoeffs);
-        
-        return std::make_pair(spatialKernel, bgFunction);
+        _background->setParameters(bgCoeffs);
     }
 
+
+    void SpatialKernelSolution::_setKernelUncertainty() {
+        throw LSST_EXCEPT(pexExcept::Exception, 
+                          "SpatialKernelSolution::_setKernelUncertainty not implemented");
+    }
 
     std::pair<afwMath::LinearCombinationKernel::Ptr, 
               afwMath::Kernel::SpatialFunctionPtr> SpatialKernelSolution::getKernelUncertainty() {
