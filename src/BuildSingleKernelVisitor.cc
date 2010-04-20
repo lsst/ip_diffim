@@ -30,6 +30,7 @@ namespace afwImage       = lsst::afw::image;
 namespace pexLogging     = lsst::pex::logging; 
 namespace pexPolicy      = lsst::pex::policy; 
 namespace pexExcept      = lsst::pex::exceptions; 
+namespace ipDiffim       = lsst::ip::diffim;
 
 namespace lsst { 
 namespace ip { 
@@ -134,7 +135,8 @@ namespace detail {
         lsst::afw::math::SpatialCellCandidate *candidate
         ) {
         
-        KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
+        ipDiffim::KernelCandidate<PixelT> *kCandidate = 
+            dynamic_cast<ipDiffim::KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
             throw LSST_EXCEPT(pexExcept::LogicErrorException,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
@@ -143,8 +145,10 @@ namespace detail {
         if (_skipBuilt and kCandidate->isInitialized()) {
             return;
         }
-
+        
+        std::cout << "GET READY" << std::endl;
         std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = _basisList.begin();
+        std::cout << "GET SET" << std::endl;
         std::cout << "C" << " " << (*kiter)->getCtrX() << " " << (*kiter)->getCtrY() << " " << (*kiter)->getWidth() << " " << (*kiter)->getHeight() << std::endl;
         
         pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
@@ -185,14 +189,14 @@ namespace detail {
          * Make diffim and set chi2 from result.  Note that you need to use the
          * most recent kernel
          */
-        MaskedImageT diffim = kCandidate->getDifferenceImage(KernelCandidate<PixelT>::RECENT);
+        MaskedImageT diffim = kCandidate->getDifferenceImage(ipDiffim::KernelCandidate<PixelT>::RECENT);
         _imstats.apply(diffim);
         kCandidate->setChi2(_imstats.getVariance());
         
         /* When using a Pca basis, we don't reset the kernel or background,
            so we need to evaluate these locally for the Trace */
-        double kSum = kCandidate->getKsum(KernelCandidate<PixelT>::RECENT);
-        double background = kCandidate->getBackground(KernelCandidate<PixelT>::RECENT);
+        double kSum = kCandidate->getKsum(ipDiffim::KernelCandidate<PixelT>::RECENT);
+        double background = kCandidate->getBackground(ipDiffim::KernelCandidate<PixelT>::RECENT);
         
         pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                               "Chi2 = %.2f", kCandidate->getChi2());

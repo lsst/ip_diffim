@@ -17,4 +17,6 @@
 #include "lsst/ip/diffim/KernelPcaVisitor.h"
 #include "lsst/ip/diffim/KernelSumVisitor.h"
 
+#include "lsst/ip/diffim/foo.h"
+
 #endif // LSST_IP_DIFFIM_H

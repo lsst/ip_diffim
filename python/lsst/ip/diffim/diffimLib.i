@@ -35,7 +35,10 @@ namespace boost {
 %{
 #include <boost/shared_ptr.hpp>
 
-#include <lsst/afw.h>
+//#include <lsst/afw.h>
+#include <lsst/afw/math.h>
+#include <lsst/afw/image.h>
+#include <lsst/afw/detection.h>
 
 #include <lsst/pex/policy/Policy.h>
 %}
@@ -226,6 +229,13 @@ makeKernelCandidateForSwig(float const xCenter,
 
 %template(eigenMatrixPtr) boost::shared_ptr<Eigen::MatrixXd>;
 %template(eigenVectorPtr) boost::shared_ptr<Eigen::VectorXd>;
+
+/******************************************************************************/
+
+%{
+#include "lsst/ip/diffim/foo.h"
+%}
+%include "lsst/ip/diffim/foo.h"
 
 /******************************************************************************/
 

@@ -20,8 +20,9 @@ class DiffimTestCases(unittest.TestCase):
         self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
         self.policy.set("kernelBasisSet", "delta-function")
         self.policy.set("useRegularization", False)
-        self.kList = ipDiffim.makeKernelBasisList(self.policy)
-
+        #self.kList = ipDiffim.makeKernelBasisList(self.policy)
+        self.kList = ipDiffim.makeDeltaFunctionBasisList(5, 5)
+        
     def makeCandidate(self, kSum, x, y, size = 51):
         mi1 = afwImage.MaskedImageF(size, size)
         mi1.getVariance().set(0.1) # avoid NaNs
@@ -43,9 +44,10 @@ class DiffimTestCases(unittest.TestCase):
         #bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy, hMat)
         print type(self.kList), type(self.kList[0])
         bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy)
+        print type(self.kList), type(self.kList[0])
 
-        import pdb
-        pdb.set_trace()
+        #import pdb
+        #pdb.set_trace()
         bskv.processCandidate(kc1)
         bskv.processCandidate(kc2)
         bskv.processCandidate(kc3)
@@ -138,6 +140,7 @@ class DiffimTestCases(unittest.TestCase):
         
     def tearDown(self):
         del self.policy
+        del self.kList
 
 #####
         
