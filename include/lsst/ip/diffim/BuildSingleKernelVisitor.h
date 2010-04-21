@@ -57,9 +57,9 @@ namespace detail {
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
 
     private:
-        lsst::afw::math::KernelList const& _basisList; ///< Basis set
-        lsst::pex::policy::Policy _policy;    ///< Policy controlling behavior
-        boost::shared_ptr<Eigen::MatrixXd> _hMat; ///< Regularization matrix
+        lsst::afw::math::KernelList const _basisList; ///< Basis set
+        lsst::pex::policy::Policy _policy;            ///< Policy controlling behavior
+        boost::shared_ptr<Eigen::MatrixXd> _hMat;     ///< Regularization matrix
         ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
         bool _skipBuilt;                      ///< Skip over built candidates during processCandidate()
         int _nRejected;                       ///< Number of candidates rejected during processCandidate()

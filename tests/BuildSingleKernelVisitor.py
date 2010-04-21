@@ -20,8 +20,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
         self.policy.set("kernelBasisSet", "delta-function")
         self.policy.set("useRegularization", False)
-        #self.kList = ipDiffim.makeKernelBasisList(self.policy)
-        self.kList = ipDiffim.makeDeltaFunctionBasisList(5, 5)
+        self.kList = ipDiffim.makeKernelBasisList(self.policy)
         
     def makeCandidate(self, kSum, x, y, size = 51):
         mi1 = afwImage.MaskedImageF(size, size)
@@ -35,16 +34,19 @@ class DiffimTestCases(unittest.TestCase):
 
 
     def testWithOneBasis(self):
+        #self.runWithOneBasis(False)
+        self.runWithOneBasis(True)
+        
+    def runWithOneBasis(self, useRegularization):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc2 = self.makeCandidate(2, 0.0, 0.0)
         kc3 = self.makeCandidate(3, 0.0, 0.0)
 
-        #hMat = ipDiffim.makeRegularizationMatrix(self.policy)
-        #print type(hMat)
-        #bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy, hMat)
-        print type(self.kList), type(self.kList[0])
-        bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy)
-        print type(self.kList), type(self.kList[0])
+        if useRegularization:
+            hMat = ipDiffim.makeRegularizationMatrix(self.policy)
+            bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy, hMat)
+        else:
+            bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy)
 
         #import pdb
         #pdb.set_trace()
@@ -92,7 +94,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(bskv.getNProcessed(), 0)
         
         
-    def testWithThreeBases(self):
+    def xtestWithThreeBases(self):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc2 = self.makeCandidate(2, 0.0, 0.0)
         kc3 = self.makeCandidate(3, 0.0, 0.0)

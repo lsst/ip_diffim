@@ -101,10 +101,6 @@ namespace detail {
         _nProcessed(0),
         _useRegularization(false)
     {
-        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter1 = basisList.begin();
-        std::cout << "A1" << " " << (*kiter1)->getCtrX() << " " << (*kiter1)->getCtrY() << " " << (*kiter1)->getWidth() << " " << (*kiter1)->getHeight() << std::endl;
-        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter2 = _basisList.begin();
-        std::cout << "B1" << " " << (*kiter2)->getCtrX() << " " << (*kiter2)->getCtrY() << " " << (*kiter2)->getWidth() << " " << (*kiter2)->getHeight() << std::endl;
     };
 
     template<typename PixelT>
@@ -123,10 +119,6 @@ namespace detail {
         _nProcessed(0),
         _useRegularization(true)
     {
-        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter1 = basisList.begin();
-        std::cout << "A2" << " " << (*kiter1)->getCtrX() << " " << (*kiter1)->getCtrY() << " " << (*kiter1)->getWidth() << " " << (*kiter1)->getHeight() << std::endl;
-        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter2 = _basisList.begin();
-        std::cout << "B2" << " " << (*kiter2)->getCtrX() << " " << (*kiter2)->getCtrY() << " " << (*kiter2)->getWidth() << " " << (*kiter2)->getHeight() << std::endl;
     };
 
     
@@ -146,17 +138,12 @@ namespace detail {
             return;
         }
         
-        std::cout << "GET READY" << std::endl;
-        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = _basisList.begin();
-        std::cout << "GET SET" << std::endl;
-        std::cout << "C" << " " << (*kiter)->getCtrX() << " " << (*kiter)->getCtrY() << " " << (*kiter)->getWidth() << " " << (*kiter)->getHeight() << std::endl;
-        
         pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                               "Processing candidate %d", kCandidate->getId());
         
         /* Build its kernel here */
         try {
-            if (_useRegularization) 
+            if (_useRegularization)
                 kCandidate->build(_basisList, _hMat);
             else
                 kCandidate->build(_basisList);

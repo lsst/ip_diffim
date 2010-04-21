@@ -67,7 +67,6 @@ namespace diffim {
     void KernelCandidate<PixelT>::build(
         lsst::afw::math::KernelList const& basisList
         ) {
-        std::cout << "BUILD 1" << std::endl;
         build(basisList, boost::shared_ptr<Eigen::MatrixXd>());
     }
     
@@ -77,7 +76,6 @@ namespace diffim {
         lsst::afw::math::KernelList const& basisList,
         boost::shared_ptr<Eigen::MatrixXd> hMat
         ) {
-        std::cout << "BUILD 2" << std::endl;
 
         /* Examine the policy for control over the variance estimate */
         afwImage::MaskedImage<PixelT> var = 
@@ -176,10 +174,6 @@ namespace diffim {
         unsigned int const endRow   = imageToConvolve.getHeight() - 
             ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
         
-
-        std::cout << "D" << " " << (*kiter)->getCtrX() << " " << (*kiter)->getCtrY() << " " << (*kiter)->getWidth() << " " << (*kiter)->getHeight() << std::endl;
-        std::cout << startCol << " " << startRow << " " << endCol << " " << endRow << std::endl;
-
         boost::timer t;
         t.restart();
         
@@ -331,9 +325,10 @@ namespace diffim {
                 throw LSST_EXCEPT(pexExcept::Exception, "lambdaType in Policy not recognized");
             }
             
+
             mMat.reset(new Eigen::MatrixXd(mtmMat + lambda * (*hMat)));
             bVec.reset(new Eigen::VectorXd(mtbVec));
-            
+
             pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
                               "Applying kernel regularization with lambda = %.2e", lambda);
             

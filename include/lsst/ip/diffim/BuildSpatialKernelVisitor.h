@@ -41,7 +41,7 @@ namespace detail {
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getKernelSolution();
 
     private:
-        lsst::afw::math::KernelList const& _basisList; ///< List of kernel basis functions
+        lsst::afw::math::KernelList const _basisList; ///< List of kernel basis functions
         boost::shared_ptr<SpatialKernelSolution> _kernelSolution; ///< Spatial solution
         int const _spatialKernelOrder;  ///< Spatial order of kernel variation
         int const _spatialBgOrder;      ///< Spatial order of background variation
