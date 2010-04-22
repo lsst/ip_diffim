@@ -7,6 +7,7 @@ import eups
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
+import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
 import lsst.afw.display.ds9 as ds9
 import numpy as num
@@ -242,12 +243,8 @@ class DiffimTestCases(unittest.TestCase):
         smi = afwImage.MaskedImageF(imX, imY)
         afwMath.convolve(smi, self.templateImage2.getMaskedImage(), gaussKernel, False)
 
-        bbox     = afwImage.BBox(afwImage.PointI(gaussKernel.getCtrX(),
-                                                 gaussKernel.getCtrY()) ,
-                                 afwImage.PointI(imX - (gaussKernel.getWidth()  -
-                                                        gaussKernel.getCtrX()),
-                                                 imY - (gaussKernel.getHeight() -
-                                                        gaussKernel.getCtrY())))
+        p0, p1   = diffimTools.getConvolvedImageLimits(gaussKernel, smi)
+        bbox     = afwImage.BBox(p0, p1)
 
         tmi2 = afwImage.MaskedImageF(self.templateImage2.getMaskedImage(), bbox)
         smi2 = afwImage.MaskedImageF(smi, bbox)
@@ -327,12 +324,9 @@ class DiffimTestCases(unittest.TestCase):
         gscaling = afwMath.makeStatistics(smi, afwMath.SUM).getValue(afwMath.SUM)
 
         # grab only the non-masked subregion
-        bbox     = afwImage.BBox(afwImage.PointI(gaussKernel.getCtrX(),
-                                                 gaussKernel.getCtrY()) ,
-                                 afwImage.PointI(tsize - (gaussKernel.getWidth()  -
-                                                          gaussKernel.getCtrX()),
-                                                 tsize - (gaussKernel.getHeight() -
-                                                          gaussKernel.getCtrY())))
+        p0, p1   = diffimTools.getConvolvedImageLimits(gaussKernel, smi)
+        bbox     = afwImage.BBox(p0, p1)
+
         tmi2 = afwImage.MaskedImageF(tmi, bbox)
         smi2 = afwImage.MaskedImageF(smi, bbox)
 

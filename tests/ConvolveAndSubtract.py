@@ -9,6 +9,7 @@ import eups
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
+import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as logging
 
 verbosity = 4
@@ -45,6 +46,11 @@ class DiffimTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.policy
+        del self.gaussFunction
+        del self.gaussKernel
+        if self.defDataDir:
+            del self.templateImage
+            del self.scienceImage
 
     def runConvolveAndSubtract1(self, bgVal = 0, xloc = 408, yloc = 580):
         imsize = int(5 * self.kCols)
@@ -57,10 +63,7 @@ class DiffimTestCases(unittest.TestCase):
         smi     = afwImage.MaskedImageF(self.scienceImage, bbox)
         diffIm  = ipDiffim.convolveAndSubtract(tmi, smi, self.gaussKernel, bgVal)
 
-        p0 = afwImage.PointI(self.gaussKernel.getCtrX(),
-                             self.gaussKernel.getCtrY())
-        p1 = afwImage.PointI(imsize - (self.gaussKernel.getWidth()  - self.gaussKernel.getCtrX()),
-                             imsize - (self.gaussKernel.getHeight() - self.gaussKernel.getCtrY()))
+        p0, p1  = diffimTools.getConvolvedImageLimits(self.gaussKernel, diffIm)
         bbox    = afwImage.BBox(p0, p1)
         diffIm2 = afwImage.MaskedImageF(diffIm, bbox)
 
@@ -81,10 +84,7 @@ class DiffimTestCases(unittest.TestCase):
         bgFunc  = afwMath.PolynomialFunction2D(bgOrder)  # coeffs are 0. by default
         diffIm  = ipDiffim.convolveAndSubtract(tmi, smi, self.gaussKernel, bgFunc)
 
-        p0 = afwImage.PointI(self.gaussKernel.getCtrX(),
-                             self.gaussKernel.getCtrY())
-        p1 = afwImage.PointI(imsize - (self.gaussKernel.getWidth()  - self.gaussKernel.getCtrX()),
-                             imsize - (self.gaussKernel.getHeight() - self.gaussKernel.getCtrY()))
+        p0, p1  = diffimTools.getConvolvedImageLimits(self.gaussKernel, diffIm)
         bbox    = afwImage.BBox(p0, p1)
         diffIm2 = afwImage.MaskedImageF(diffIm, bbox)
         for j in range(diffIm2.getHeight()):

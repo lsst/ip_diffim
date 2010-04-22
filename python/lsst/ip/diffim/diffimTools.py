@@ -34,6 +34,21 @@ def imageFromVector(vec, width, height, retType=afwImage.ImageF):
     return im
 
 #######
+# Limits of good pixels in a convolved image
+#######
+
+def getConvolvedImageLimits(kernel, image):
+    # first good pixel
+    p0 = afwImage.PointI(kernel.getCtrX(),
+                         kernel.getCtrY())
+
+    # last good pixel
+    p1 = afwImage.PointI(image.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
+                         image.getHeight() - (kernel.getHeight() - kernel.getCtrY()))
+
+    return p0, p1
+
+#######
 # Background subtraction for ip_diffim
 #######
 
