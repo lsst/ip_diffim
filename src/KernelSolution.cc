@@ -33,10 +33,14 @@ namespace lsst {
 namespace ip { 
 namespace diffim {
     
+    /* Unique identifier for solution */
+    int KernelSolution::_SolutionId = 0;
+
     KernelSolution::KernelSolution(
         boost::shared_ptr<Eigen::MatrixXd> mMat,
         boost::shared_ptr<Eigen::VectorXd> bVec
         ) :
+        _id(++_SolutionId),
         _mMat(mMat),
         _bVec(bVec),
         _sVec(),

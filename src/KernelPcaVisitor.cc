@@ -78,6 +78,30 @@ namespace detail {
     {};
 
     template<typename PixelT>
+    lsst::afw::math::KernelList KernelPcaVisitor<PixelT>::getEigenKernels() {
+        afwMath::KernelList kernelList;
+
+        std::vector<typename ImageT::Ptr> eigenImages = (*_imagePca).getEigenImages();
+        int ncomp = eigenImages.size();
+
+        if (_mean) {
+            kernelList.push_back(afwMath::Kernel::Ptr(
+                                     new afwMath::FixedKernel(
+                                         afwImage::Image<afwMath::Kernel::Pixel>
+                                         (*_mean, true))));
+        }
+        for (int i = 0; i < ncomp; i++) {
+            afwImage::Image<afwMath::Kernel::Pixel> img = 
+                afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[i], true);
+            kernelList.push_back(afwMath::Kernel::Ptr(
+                                     new afwMath::FixedKernel(img)
+                                     ));
+        }
+
+        return kernelList;
+    }
+
+    template<typename PixelT>
     void KernelPcaVisitor<PixelT>::processCandidate(lsst::afw::math::SpatialCellCandidate *candidate) {
         
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);

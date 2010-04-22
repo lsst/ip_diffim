@@ -47,12 +47,15 @@ namespace diffim {
         void solve();
         inline boost::shared_ptr<Eigen::MatrixXd> getM() {return _mMat;}
         inline boost::shared_ptr<Eigen::VectorXd> getB() {return _bVec;}
+        int getId() const { return _id; }
 
     protected:
+        int _id;                                                ///< Unique ID for object
         boost::shared_ptr<Eigen::MatrixXd> _mMat;               ///< Derived least squares M matrix
         boost::shared_ptr<Eigen::VectorXd> _bVec;               ///< Derived least squares B vector
         boost::shared_ptr<Eigen::VectorXd> _sVec;               ///< Derived least squares solution matrix
         KernelSolvedBy _solvedBy;                               ///< Type of algorithm used to make solution
+        static int _SolutionId;                                 ///< Unique identifier for solution
     };
 
     class StaticKernelSolution : public KernelSolution {
