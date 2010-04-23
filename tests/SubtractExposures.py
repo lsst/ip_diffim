@@ -47,6 +47,7 @@ class DiffimTestCases(unittest.TestCase):
                                           afwImage.PointI(511, 2046))
 
     def tearDown(self):
+        del self.policy
         if self.defDataDir:
             del self.scienceImage
             del self.templateImage
@@ -59,7 +60,7 @@ class DiffimTestCases(unittest.TestCase):
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
 
-        results1 = ipDiffim.subtractExposure(templateSubImage, scienceSubImage, self.policy)
+        results1 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy)
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 
         # take away XY0
@@ -67,7 +68,7 @@ class DiffimTestCases(unittest.TestCase):
         scienceSubImage.getMaskedImage().setXY0(0, 0)
 
         # redo
-        results2 = ipDiffim.subtractExposure(templateSubImage, scienceSubImage, self.policy)
+        results2 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy)
         differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
 
         kp1 = spatialKernel1.getKernelParameters()

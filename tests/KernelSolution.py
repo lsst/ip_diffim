@@ -14,6 +14,9 @@ diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 
+# Note most of the "is the resulting kernel what I expect" tests are
+# in KernelCandidate.py
+
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):

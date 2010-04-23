@@ -214,8 +214,9 @@ namespace diffim {
                 );
             cMat->resize(cMat->rows()*cMat->cols(), 1);
             *eiter = cMat;
+
         } 
-        
+
         double time = t.elapsed();
         pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
                           "Total compute time to do basis convolutions : %.2f s", time);

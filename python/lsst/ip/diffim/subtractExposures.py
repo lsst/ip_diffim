@@ -11,13 +11,13 @@ def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display
     scienceWcs     = exposureToNotConvolve.getWcs()
 
     # LLC
-    templateOrigin = templateWcs.xyToRaDec(0, 0)
-    scienceOrigin  = scienceWcs.xyToRaDec(0, 0)
+    templateOrigin = templateWcs.pixelToSky(0, 0)
+    scienceOrigin  = scienceWcs.pixelToSky(0, 0)
     # URC
-    templateLimit  = templateWcs.xyToRaDec(exposureToConvolve.getWidth(),
-                                           exposureToConvolve.getHeight())
-    scienceLimit   = scienceWcs.xyToRaDec(exposureToNotConvolve.getWidth(),
-                                          exposureToNotConvolve.getHeight())
+    templateLimit  = templateWcs.pixelToSky(exposureToConvolve.getWidth(),
+                                            exposureToConvolve.getHeight())
+    scienceLimit   = scienceWcs.pixelToSky(exposureToNotConvolve.getWidth(),
+                                           exposureToNotConvolve.getHeight())
 
     pexLog.Trace("lsst.ip.diffim.subtractExposure", 1,
                  "Template limits : %f,%f -> %f,%f" %

@@ -49,7 +49,9 @@ class DiffimTestCases(unittest.TestCase):
         self.assertTrue(p1.get("fpGrowPix") == self.p0.get("fpGrowMin"))
         self.assertTrue(p1.get("kernelRows")//2 == self.p0.get("kernelRadiusMin"))
         self.assertTrue(p1.get("kernelCols")//2 == self.p0.get("kernelRadiusMin"))
-            
+
+    def tearDown(self):
+        del self.p0
         
 #####
         

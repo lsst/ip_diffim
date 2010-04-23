@@ -78,6 +78,15 @@ def backgroundSubtract(policy, maskedImages):
 # Visualization of kernels
 #######
 
+def displayKernelList(kernelList, frame0 = 0):
+    import lsst.afw.display.ds9 as ds9
+    frame = frame0
+    for kernel in kernelList:
+        ki = afwImage.ImageD(kernel.getDimensions())
+        kernel.computeImage(ki, False)
+        ds9.mtv(ki, frame = frame)
+        frame += 1
+
 def displaySpatialKernelQuality(kernelCellSet, spatialKernel, spatialBg, frame):
     import lsst.afw.display.ds9 as ds9
 
@@ -129,17 +138,17 @@ def displaySpatialKernelQuality(kernelCellSet, spatialKernel, spatialBg, frame):
 
                     
             
-def displaySpatialKernelMosaic(spatialKernel, width, height, frame):
+def displaySpatialKernelMosaic(spatialKernel, width, height, frame, doNorm=False):
     import lsst.afw.display.ds9 as ds9
     import lsst.afw.display.utils as displayUtils
 
     mos = displayUtils.Mosaic()
     
-    for x in (0, width//2, width):
-        for y in (0, height//2, height):
+    for y in (0, height//2, height):
+        for x in (0, width//2, width):
             im   = afwImage.ImageD(spatialKernel.getDimensions())
             ksum = spatialKernel.computeImage(im,
-                                              False,
+                                              doNorm,
                                               afwImage.indexToPosition(x),
                                               afwImage.indexToPosition(y))
             mos.append(im, "x=%d y=%d kSum=%.2f" % (x, y, ksum))
