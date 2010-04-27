@@ -24,6 +24,8 @@
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
+#define DEBUG_MATRIX 0
+
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
 namespace pexLog         = lsst::pex::logging; 
@@ -38,13 +40,24 @@ namespace diffim {
 
     KernelSolution::KernelSolution(
         boost::shared_ptr<Eigen::MatrixXd> mMat,
-        boost::shared_ptr<Eigen::VectorXd> bVec
+        boost::shared_ptr<Eigen::VectorXd> bVec,
+        bool fitForBackground
         ) :
         _id(++_SolutionId),
         _mMat(mMat),
         _bVec(bVec),
         _sVec(),
-        _solvedBy(KernelSolution::NONE)
+        _solvedBy(KernelSolution::NONE),
+        _fitForBackground(fitForBackground)
+    {};
+
+    KernelSolution::KernelSolution() :
+        _id(++_SolutionId),
+        _mMat(),
+        _bVec(),
+        _sVec(),
+        _solvedBy(KernelSolution::NONE),
+        _fitForBackground(true)
     {};
 
     void KernelSolution::solve() {
@@ -115,10 +128,11 @@ namespace diffim {
     StaticKernelSolution::StaticKernelSolution(
         boost::shared_ptr<Eigen::MatrixXd> mMat,
         boost::shared_ptr<Eigen::VectorXd> bVec,
+        bool fitForBackground,
         lsst::afw::math::KernelList const& basisList
         ) 
         :
-        KernelSolution(mMat, bVec),
+        KernelSolution(mMat, bVec, fitForBackground),
         _kernel(),
         _background(0.0),
         _kSum(0.0),
@@ -221,7 +235,7 @@ namespace diffim {
         }
 
         unsigned int const nParameters           = _sVec->size();
-        unsigned int const nBackgroundParameters = 1;
+        unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
         unsigned int const nKernelParameters     = 
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
         if (nParameters != (nKernelParameters + nBackgroundParameters)) 
@@ -238,12 +252,14 @@ namespace diffim {
         }
         _kernel->setKernelParameters(kValues);
         
-        if (std::isnan((*_sVec)(nParameters-1))) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
-                              str(boost::format("Unable to determine background solution %d (nan)") % 
-                                  (nParameters-1)));
+        if (_fitForBackground) {
+            if (std::isnan((*_sVec)(nParameters-1))) {
+                throw LSST_EXCEPT(pexExcept::Exception, 
+                                  str(boost::format("Unable to determine background solution %d (nan)") % 
+                                      (nParameters-1)));
+            }
+            _background = (*_sVec)(nParameters-1);
         }
-        _background = (*_sVec)(nParameters-1);
     }        
 
 
@@ -254,7 +270,7 @@ namespace diffim {
         }
 
         unsigned int const nParameters           = _sVec->size();
-        unsigned int const nBackgroundParameters = 1;
+        unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
         unsigned int const nKernelParameters     = 
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
 
@@ -298,17 +314,20 @@ namespace diffim {
         }
         _kernelErr->setKernelParameters(kErrValues);
         
-        /* Estimate of Background and Background Error */
-        if (std::isnan(Error2(nParameters-1, nParameters-1))) {
-            throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine background err (nan)");
+        if (_fitForBackground) {
+            /* Estimate of Background and Background Error */
+            if (std::isnan(Error2(nParameters-1, nParameters-1))) {
+                throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine bg err (nan)");
+            }
+            if (Error2(nParameters-1, nParameters-1) < 0.0) {
+                throw LSST_EXCEPT(pexExcept::Exception, 
+                                  str(boost::format("Unable to determine bg err, negative var (%.3e)") % 
+                                      Error2(nParameters-1, nParameters-1) 
+                                      ));
+            }
+            _backgroundErr = std::sqrt(Error2(nParameters-1, nParameters-1));
         }
-        if (Error2(nParameters-1, nParameters-1) < 0.0) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
-                              str(boost::format("Unable to determine background err, negative var (%.3e)") % 
-                                  Error2(nParameters-1, nParameters-1) 
-                                  ));
-        }
-        _backgroundErr = std::sqrt(Error2(nParameters-1, nParameters-1));
+
         _errCalculated = true;
     }
 
@@ -322,27 +341,179 @@ namespace diffim {
      */
 
     SpatialKernelSolution::SpatialKernelSolution(
-        boost::shared_ptr<Eigen::MatrixXd> mMat,
-        boost::shared_ptr<Eigen::VectorXd> bVec,
         lsst::afw::math::KernelList const& basisList,
-        lsst::afw::math::Kernel::SpatialFunctionPtr spatialKernelFunction,
-        lsst::afw::math::Kernel::SpatialFunctionPtr spatialBgFunction,
-        bool constantFirstTerm
+        lsst::pex::policy::Policy policy
         ) :
-        KernelSolution(mMat, bVec),
-        _spatialKernelFunction(spatialKernelFunction),
-        _spatialBgFunction(spatialBgFunction),
-        _constantFirstTerm(constantFirstTerm),
+        KernelSolution(),
+        _spatialKernelFunction(),
+        _spatialBgFunction(),
+        _constantFirstTerm(false),
         _kernel(),
         _background(),
+        _kSum(0.0),
         _kernelErr(),
         _backgroundErr(),
-        _errCalculated(false)
-    {
+        _errCalculated(false),
+        _policy(policy),
+        _nbases(0),
+        _nkt(0),
+        _nbt(0),
+        _nt(0) {
+
+        bool isAlardLupton    = _policy.getString("kernelBasisSet") == "alard-lupton";
+        bool usePca           = _policy.getBool("usePcaForSpatialKernel");
+        if (isAlardLupton || usePca) {
+            _constantFirstTerm = true;
+        }
+        
+        int spatialKernelOrder = policy.getInt("spatialKernelOrder");
+        _spatialKernelFunction = lsst::afw::math::Kernel::SpatialFunctionPtr(
+            new afwMath::PolynomialFunction2<double>(spatialKernelOrder)
+            );
+
+        int spatialBgOrder      = policy.getInt("spatialBgOrder");
+        this->_fitForBackground = _policy.getBool("fitForBackground");
+        if (_fitForBackground) 
+            _spatialBgFunction = lsst::afw::math::Kernel::SpatialFunctionPtr(
+                new afwMath::PolynomialFunction2<double>(spatialBgOrder)
+                );
+
+        _nbases = basisList.size();
+        _nkt = _spatialKernelFunction->getParameters().size();
+        _nbt = _fitForBackground ? _spatialBgFunction->getParameters().size() : 0;
+        _nt  = 0;
+        if (_constantFirstTerm) {
+            _nt = (_nbases - 1) * _nkt + 1 + _nbt;
+        } else {
+            _nt = _nbases * _nkt + _nbt;
+        }
+        
+        boost::shared_ptr<Eigen::MatrixXd> mMat (new Eigen::MatrixXd(_nt, _nt));
+        boost::shared_ptr<Eigen::VectorXd> bVec (new Eigen::VectorXd(_nt));
+        (*mMat).setZero();
+        (*bVec).setZero();
+
+        this->_mMat = mMat;
+        this->_bVec = bVec;
+
         _kernel = afwMath::LinearCombinationKernel::Ptr(
             new afwMath::LinearCombinationKernel(basisList, *_spatialKernelFunction)
             );
-    };
+
+        pexLog::TTrace<5>("lsst.ip.diffim.SpatialKernelSolution", 
+                          "Initializing with size %d %d %d and constant first term = %s",
+                          _nkt, _nbt, _nt,
+                          _constantFirstTerm ? "true" : "false");
+        
+    }
+
+    void SpatialKernelSolution::addConstraint(float xCenter, float yCenter,
+                                              boost::shared_ptr<Eigen::MatrixXd> qMat,
+                                              boost::shared_ptr<Eigen::VectorXd> wVec) {
+        
+        /* Calculate P matrices */
+        /* Pure kernel terms */
+        Eigen::VectorXd pK(_nkt);
+        std::vector<double> paramsK = _spatialKernelFunction->getParameters();
+        for (int idx = 0; idx < _nkt; idx++) { paramsK[idx] = 0.0; }
+        for (int idx = 0; idx < _nkt; idx++) {
+            paramsK[idx] = 1.0;
+            _spatialKernelFunction->setParameters(paramsK);
+            pK(idx) = (*_spatialKernelFunction)(xCenter, yCenter);
+            paramsK[idx] = 0.0;
+        }
+        Eigen::MatrixXd pKpKt = (pK * pK.transpose());
+        
+        Eigen::VectorXd pB(_nbt);
+        Eigen::MatrixXd pBpBt;
+        Eigen::MatrixXd pKpBt;
+        if (_fitForBackground) {
+            /* Pure background terms */
+            std::vector<double> paramsB = _spatialBgFunction->getParameters();
+            for (int idx = 0; idx < _nbt; idx++) { paramsB[idx] = 0.0; }
+            for (int idx = 0; idx < _nbt; idx++) {
+                paramsB[idx] = 1.0;
+                _spatialBgFunction->setParameters(paramsB);
+                pB(idx) = (*_spatialBgFunction)(xCenter, yCenter);
+                paramsB[idx] = 0.0;
+            }
+            pBpBt = (pB * pB.transpose());
+            
+            /* Cross terms */
+            pKpBt = (pK * pB.transpose());
+        }
+        
+        if (DEBUG_MATRIX) {
+            std::cout << "Spatial weights" << std::endl;
+            std::cout << "pKpKt " << pKpKt << std::endl;
+            if (_fitForBackground) {
+                std::cout << "pBpBt " << pBpBt << std::endl;
+                std::cout << "pKpBt " << pKpBt << std::endl;
+            }
+        }
+        
+        if (DEBUG_MATRIX) {
+            std::cout << "Spatial matrix inputs" << std::endl;
+            std::cout << "M " << (*qMat) << std::endl;
+            std::cout << "B " << (*wVec) << std::endl;
+        }
+
+        /* first index to start the spatial blocks; default=0 for non-constant first term */
+        int m0 = 0; 
+        /* how many rows/cols to adjust the matrices/vectors; default=0 for non-constant first term */
+        int dm = 0; 
+        /* where to start the background terms; this is always true */
+        int mb = _nt - _nbt;
+        
+        if (_constantFirstTerm) {
+            m0 = 1;       /* we need to manually fill in the first (non-spatial) terms below */
+            dm = _nkt-1;  /* need to shift terms due to lack of spatial variation in first term */
+            
+            (*_mMat)(0, 0) += (*qMat)(0,0);
+            for(int m2 = 1; m2 < _nbases; m2++)  {
+                (*_mMat).block(0, m2*_nkt-dm, 1, _nkt) += (*qMat)(0,m2) * pK.transpose();
+            }
+            (*_bVec)(0) += (*wVec)(0);
+            
+            if (_fitForBackground) {
+                (*_mMat).block(0, mb, 1, _nbt) += (*qMat)(0,_nbases) * pB.transpose();
+            }
+        }
+        
+        /* Fill in the spatial blocks */
+        for(int m1 = m0; m1 < _nbases; m1++)  {
+            /* Diagonal kernel-kernel term; only use upper triangular part of pKpKt */
+            (*_mMat).block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += (*qMat)(m1,m1) * 
+                pKpKt.part<Eigen::UpperTriangular>();
+            
+            /* Kernel-kernel terms */
+            for(int m2 = m1+1; m2 < _nbases; m2++)  {
+                (*_mMat).block(m1*_nkt-dm, m2*_nkt-dm, _nkt, _nkt) += (*qMat)(m1,m2) * pKpKt;
+            }
+
+            if (_fitForBackground) {
+                /* Kernel cross terms with background */
+                (*_mMat).block(m1*_nkt-dm, mb, _nkt, _nbt) += (*qMat)(m1,_nbases) * pKpBt;
+            }
+            
+            /* B vector */
+            (*_bVec).segment(m1*_nkt-dm, _nkt) += (*wVec)(m1) * pK;
+        }
+        
+        if (_fitForBackground) {
+            /* Background-background terms only */
+            (*_mMat).block(mb, mb, _nbt, _nbt) += (*qMat)(_nbases,_nbases) * 
+                pBpBt.part<Eigen::UpperTriangular>();
+            (*_bVec).segment(mb, _nbt)         += (*wVec)(_nbases) * pB;
+        }
+        
+        if (DEBUG_MATRIX) {
+            std::cout << "Spatial matrix outputs" << std::endl;
+            std::cout << "mMat " << (*_mMat) << std::endl;
+            std::cout << "bVec " << (*_bVec) << std::endl;
+        }
+
+    }
 
     KernelSolution::ImageT::Ptr SpatialKernelSolution::makeKernelImage() {
         if (_solvedBy == KernelSolution::NONE) {
@@ -365,9 +536,16 @@ namespace diffim {
         _kSum  = _kernel->computeImage(*image, false);              
     }
 
-    void SpatialKernelSolution::solve(bool calculateUncertainties) {
+    void SpatialKernelSolution::solve() {
+        /* Fill in the other half of mMat */
+        for (int i = 0; i < _nt; i++) {
+            for (int j = i+1; j < _nt; j++) {
+                (*_mMat)(j,i) = (*_mMat)(i,j);
+            }
+        }
+        
         try {
-            this->solve(calculateUncertainties);
+            this->solve();
         } catch (pexExcept::Exception &e) {
             LSST_EXCEPT_ADD(e, "Unable to solve spatial kernel matrix");
             throw e;
@@ -378,7 +556,7 @@ namespace diffim {
         /* set kernel sum */
         _setKernelSum();
 
-        if (calculateUncertainties) {
+        if (_policy.getBool("calculateUncertainties")) {
             _setKernelUncertainty();
         }
     }
@@ -395,7 +573,7 @@ namespace diffim {
     void SpatialKernelSolution::_setKernelSolution() {
         
         unsigned int nkt    = _spatialKernelFunction->getParameters().size();
-        unsigned int nbt    = _spatialBgFunction->getParameters().size();
+        unsigned int nbt    = _fitForBackground ? _spatialBgFunction->getParameters().size() : 1;
         unsigned int nt     = _sVec->size();
         unsigned int nbases = 
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
@@ -442,12 +620,14 @@ namespace diffim {
             _kernel->setSpatialParameters(kCoeffs);
         }
         
-        /* Set the background coefficients */
-        std::vector<double> bgCoeffs(nbt);
-        for (unsigned int i = 0; i < nbt; i++) {
-            bgCoeffs[i] = (*_sVec)(nt - nbt + i);
+        if (_fitForBackground) {
+            /* Set the background coefficients */
+            std::vector<double> bgCoeffs(nbt);
+            for (unsigned int i = 0; i < nbt; i++) {
+                bgCoeffs[i] = (*_sVec)(nt - nbt + i);
+            }
+            _background->setParameters(bgCoeffs);
         }
-        _background->setParameters(bgCoeffs);
     }
 
 

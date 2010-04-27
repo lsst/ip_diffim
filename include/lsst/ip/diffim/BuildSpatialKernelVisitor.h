@@ -31,7 +31,7 @@ namespace detail {
             lsst::pex::policy::Policy policy         ///< Policy file directing behavior
             );
 
-        int getNCandidates() { return _nCandidates; }
+        int getNCandidates() {return _nCandidates;}
 
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
 
@@ -41,19 +41,8 @@ namespace detail {
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getKernelSolution();
 
     private:
-        lsst::afw::math::KernelList const _basisList; ///< List of kernel basis functions
-        boost::shared_ptr<SpatialKernelSolution> _kernelSolution; ///< Spatial solution
-        int const _spatialKernelOrder;  ///< Spatial order of kernel variation
-        int const _spatialBgOrder;      ///< Spatial order of background variation
-        lsst::afw::math::Kernel::SpatialFunctionPtr _spatialKernelFunction; ///< Spatial kernel function
-        lsst::afw::math::Kernel::SpatialFunctionPtr _spatialBgFunction;     ///< Spatial bg function
-        int _nbases;      ///< Number of bases being fit for
-        int _nkt;         ///< Number of kernel terms in spatial model
-        int _nbt;         ///< Number of background terms in spatial model
-        int _nt;          ///< Total number of terms in the solution; also dimensions of matrices
-        lsst::pex::policy::Policy _policy; ///< Policy controlling behavior
-        bool _constantFirstTerm;   ///< Is the first term spatially invariant?
-        int _nCandidates;          ///< Number of candidates visited
+        boost::shared_ptr<SpatialKernelSolution> _kernelSolution;
+        int _nCandidates;                  ///< Number of candidates visited
     };
 
 }}}} // end of namespace lsst::ip::diffim::detail

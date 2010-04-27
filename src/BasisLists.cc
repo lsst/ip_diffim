@@ -215,15 +215,16 @@ namespace diffim {
         int width   = policy.getInt("kernelCols");
         int height  = policy.getInt("kernelRows");
         float borderPenalty  = policy.getDouble("regularizationBorderPenalty");
+        bool fitForBackground = policy.getBool("fitForBackground");
         
         boost::shared_ptr<Eigen::MatrixXd> bMat;
         if (regularizationType == "centralDifference") {
             int stencil = policy.getInt("centralRegularizationStencil");
-            bMat = makeCentralDifferenceMatrix(width, height, stencil, borderPenalty);
+            bMat = makeCentralDifferenceMatrix(width, height, stencil, borderPenalty, fitForBackground);
         }
         else if (regularizationType == "forwardDifference") {
             std::vector<int> orders = policy.getIntArray("forwardRegularizationOrders");
-            bMat = makeForwardDifferenceMatrix(width, height, orders, borderPenalty);
+            bMat = makeForwardDifferenceMatrix(width, height, orders, borderPenalty, fitForBackground);
         }
         else {
             throw LSST_EXCEPT(pexExcept::Exception, "regularizationType not recognized");
@@ -241,7 +242,8 @@ namespace diffim {
         int width,
         int height,
         int stencil,
-        float borderPenalty
+        float borderPenalty,
+        bool fitForBackground
         ) {
         
         /* 5- or 9-point stencil to approximate the Laplacian; i.e. this is a second
@@ -301,8 +303,9 @@ namespace diffim {
             throw LSST_EXCEPT(pexExcept::Exception, "Only 5- or 9-point Laplacian stencils allowed");
         }
         
-        Eigen::MatrixXd bMat = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
-        
+        int nBgTerms = fitForBackground ? 1 : 0;
+        Eigen::MatrixXd bMat = Eigen::MatrixXd::Zero(width * height + nBgTerms, width * height + nBgTerms);
+
         for (int i = 0; i < width*height; i++) {
             int const x0    = i % width;       // the x coord in the kernel image
             int const y0    = i / width;       // the y coord in the kernel image
@@ -320,13 +323,15 @@ namespace diffim {
                 bMat(i, i) = borderPenalty;
             }
         }
-        
-        /* Last row / col should have no regularization since its the background term */
-        if (bMat.col(width*height).sum() != 0.) {
-            throw LSST_EXCEPT(pexExcept::Exception, "Error 1 in regularization matrix");
-        }
-        if (bMat.row(width*height).sum() != 0.) {
-            throw LSST_EXCEPT(pexExcept::Exception, "Error 2 in regularization matrix");
+
+        if (fitForBackground) {
+            /* Last row / col should have no regularization since its the background term */
+            if (bMat.col(width*height).sum() != 0.) {
+                throw LSST_EXCEPT(pexExcept::Exception, "Error 1 in regularization matrix");
+            }
+            if (bMat.row(width*height).sum() != 0.) {
+                throw LSST_EXCEPT(pexExcept::Exception, "Error 2 in regularization matrix");
+            }
         }
         
         boost::shared_ptr<Eigen::MatrixXd> bMatPtr (new Eigen::MatrixXd(bMat));
@@ -341,7 +346,8 @@ namespace diffim {
         int width,
         int height,
         std::vector<int> const& orders,
-        float borderPenalty
+        float borderPenalty,
+        bool fitForBackground
         ) {
         
         /* 
@@ -384,15 +390,18 @@ namespace diffim {
         coeffs[3][2] = -3.;
         coeffs[3][3] = +1.;
         
-        Eigen::MatrixXd bTot  = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
+        int nBgTerms = fitForBackground ? 1 : 0;
+        Eigen::MatrixXd bTot  = Eigen::MatrixXd::Zero(width * height + nBgTerms, width * height + nBgTerms);
         
         std::vector<int>::const_iterator order;
         for (order = orders.begin(); order != orders.end(); order++) {
             if ((*order < 1) || (*order > 3)) 
                 throw LSST_EXCEPT(pexExcept::Exception, "Only orders 1..3 allowed");
             
-            Eigen::MatrixXd bMatX = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
-            Eigen::MatrixXd bMatY = Eigen::MatrixXd::Zero(width*height+1, width*height+1);
+            Eigen::MatrixXd bMatX = Eigen::MatrixXd::Zero(width * height + nBgTerms, 
+                                                          width * height + nBgTerms);
+            Eigen::MatrixXd bMatY = Eigen::MatrixXd::Zero(width * height + nBgTerms, 
+                                                          width * height + nBgTerms);
             
             for (int i = 0; i < width*height; i++) {
                 int const x0 = i % width;         // the x coord in the kernel image
@@ -414,12 +423,14 @@ namespace diffim {
             bTot += bMatY;
         }
         
-        /* Last row / col should have no regularization since its the background term */
-        if (bTot.col(width*height).sum() != 0.) {
-            throw LSST_EXCEPT(pexExcept::Exception, "Error in regularization matrix");
-        }
-        if (bTot.row(width*height).sum() != 0.) {
-            throw LSST_EXCEPT(pexExcept::Exception, "Error in regularization matrix");
+        if (fitForBackground) {
+            /* Last row / col should have no regularization since its the background term */
+            if (bTot.col(width*height).sum() != 0.) {
+                throw LSST_EXCEPT(pexExcept::Exception, "Error in regularization matrix");
+            }
+            if (bTot.row(width*height).sum() != 0.) {
+                throw LSST_EXCEPT(pexExcept::Exception, "Error in regularization matrix");
+            }
         }
         
         boost::shared_ptr<Eigen::MatrixXd> bMatPtr (new Eigen::MatrixXd(bTot));

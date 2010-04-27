@@ -69,7 +69,8 @@ namespace diffim {
         int width,
         int height,
         std::vector<int> const& orders,
-        float borderPenalty
+        float borderPenalty,
+        bool fitForBackground
         );
 
     /**
@@ -86,7 +87,8 @@ namespace diffim {
         int width,
         int height,
         int stencil,
-        float borderPenalty
+        float borderPenalty,
+        bool fitForBackground
         );
 
     /**

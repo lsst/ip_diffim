@@ -289,6 +289,11 @@ backgroundPolicy: {
 }
 
 ######
+# Include terms (including kernel cross terms) for background
+# 
+fitForBackground: true
+
+######
 # Control if we use afwMath.BackgroundControl to subtract off its own
 # determination of the background or not
 # 

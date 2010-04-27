@@ -41,7 +41,9 @@ namespace diffim {
         };
 
         explicit KernelSolution(boost::shared_ptr<Eigen::MatrixXd> mMat,
-                                boost::shared_ptr<Eigen::VectorXd> bVec);
+                                boost::shared_ptr<Eigen::VectorXd> bVec,
+                                bool fitForBackground);
+        explicit KernelSolution();
         virtual ~KernelSolution() {};
 
         void solve();
@@ -55,7 +57,9 @@ namespace diffim {
         boost::shared_ptr<Eigen::VectorXd> _bVec;               ///< Derived least squares B vector
         boost::shared_ptr<Eigen::VectorXd> _sVec;               ///< Derived least squares solution matrix
         KernelSolvedBy _solvedBy;                               ///< Type of algorithm used to make solution
+        bool _fitForBackground;                                 ///< Background terms included in fit
         static int _SolutionId;                                 ///< Unique identifier for solution
+
     };
 
     class StaticKernelSolution : public KernelSolution {
@@ -64,7 +68,9 @@ namespace diffim {
 
         StaticKernelSolution(boost::shared_ptr<Eigen::MatrixXd> mMat,
                              boost::shared_ptr<Eigen::VectorXd> bVec,
-                             lsst::afw::math::KernelList const& basisList);
+                             bool fitForBackground,
+                             lsst::afw::math::KernelList const& basisList
+                             );
         virtual ~StaticKernelSolution() {};
 
         void solve(bool calculateUncertainties);
@@ -93,16 +99,17 @@ namespace diffim {
     public:
         typedef boost::shared_ptr<SpatialKernelSolution> Ptr;
 
-        SpatialKernelSolution(boost::shared_ptr<Eigen::MatrixXd> mMat,
-                              boost::shared_ptr<Eigen::VectorXd> bVec,
-                              lsst::afw::math::KernelList const& basisList,
-                              lsst::afw::math::Kernel::SpatialFunctionPtr spatialKernelFunction,
-                              lsst::afw::math::Kernel::SpatialFunctionPtr spatialBgFunction,
-                              bool constantFirstTerm);
+        SpatialKernelSolution(lsst::afw::math::KernelList const& basisList,
+                              lsst::pex::policy::Policy policy
+            );
 
         virtual ~SpatialKernelSolution() {};
+        
+        void addConstraint(float xCenter, float yCenter,
+                           boost::shared_ptr<Eigen::MatrixXd> qMat,
+                           boost::shared_ptr<Eigen::VectorXd> wVec);
 
-        void solve(bool calculateUncertainties);
+        void solve();
         ImageT::Ptr makeKernelImage();
         std::pair<lsst::afw::math::LinearCombinationKernel::Ptr,
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getKernelSolution();
@@ -120,6 +127,12 @@ namespace diffim {
         lsst::afw::math::LinearCombinationKernel::Ptr _kernelErr;   ///< Kernel uncertainty
         lsst::afw::math::Kernel::SpatialFunctionPtr _backgroundErr; ///< Background uncertainty
         bool _errCalculated;                                        ///< Has the uncertainty been calculated?
+        
+        lsst::pex::policy::Policy _policy;
+        int _nbases;
+        int _nkt;
+        int _nbt;
+        int _nt;
 
         void _setKernelSolution();
         void _setKernelUncertainty();

@@ -179,6 +179,7 @@ namespace diffim {
         double _coreFlux;                                   ///< Mean S/N in the science image
         bool _isInitialized;                                ///< Has the kernel been built
         bool _useRegularization;                            ///< Use regularization?              
+        bool _fitForBackground;
 
         /* best single raw kernel */
         boost::shared_ptr<StaticKernelSolution> _kernelSolutionOrig;    ///< Original basis kernel solution

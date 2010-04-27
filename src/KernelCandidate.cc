@@ -47,6 +47,7 @@ namespace diffim {
         _coreFlux(),
         _isInitialized(false),
         _useRegularization(false),
+        _fitForBackground(_policy.getBool("fitForBackground")),
         _kernelSolutionOrig(),
         _kernelSolutionPca()
     {
@@ -56,7 +57,7 @@ namespace diffim {
         int candidateCoreRadius = _policy.getInt("candidateCoreRadius");
         imstats.apply(*_miToNotConvolvePtr, candidateCoreRadius);
         _coreFlux = imstats.getMean();
-        
+
         pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
                           "Candidate %d at %.2f %.2f with ranking %.2f", 
                           this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);
@@ -136,7 +137,7 @@ namespace diffim {
         lsst::afw::image::Image<PixelT> const &imageToNotConvolve = *(_miToNotConvolvePtr->getImage());
         
         unsigned int const nKernelParameters     = basisList.size();
-        unsigned int const nBackgroundParameters = 1;
+        unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
         unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
         std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
         
@@ -266,7 +267,8 @@ namespace diffim {
             cMat.col(kidxj) = (*eiterj)->col(0);
         }
         /* Treat the last "image" as all 1's to do the background calculation. */
-        cMat.col(nParameters-1).fill(1.);
+        if (_fitForBackground)
+            cMat.col(nParameters-1).fill(1.);
         
         /* Caculate the variance-weighted pixel values */
         Eigen::MatrixXd vcMat = eigeniVariance.col(0).asDiagonal() * cMat;
@@ -337,13 +339,13 @@ namespace diffim {
         
         if (_isInitialized) {
             _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution>(
-                new StaticKernelSolution(mMat, bVec, basisList)
+                new StaticKernelSolution(mMat, bVec, _fitForBackground, basisList)
                 );
             _kernelSolutionPca->solve(false);
         }
         else {
             _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution>(
-                new StaticKernelSolution(mMat, bVec, basisList)
+                new StaticKernelSolution(mMat, bVec, _fitForBackground, basisList)
                 );
             _kernelSolutionOrig->solve(false);
         }

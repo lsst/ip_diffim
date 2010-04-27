@@ -34,6 +34,208 @@ def imageFromVector(vec, width, height, retType=afwImage.ImageF):
     return im
 
 #######
+# Add noise
+#######
+
+def makeFlatNoiseImage(mi, seedStat = afwMath.MAX):
+    img       = mi.getImage()
+    seed      = int(10. * afwMath.makeStatistics(mi.getImage(), seedStat).getValue() + 1)
+    rdm       = afwMath.Random(afwMath.Random.MT19937, seed)
+    rdmImage  = img.Factory(img.getDimensions())
+    afwMath.randomGaussianImage(rdmImage, rdm)
+    return rdmImage
+
+def makePoissonNoiseImage(im):
+    # uses numpy
+    import numpy.random as rand
+    numpy.random.seed(666)
+    import lsst.afw.image.testUtils as testUtils
+    ndata = testUtils.arrayFromImage(im)
+    noise = rand.poisson(ndata)
+    return testUtils.imageFromArray(noise)
+
+#######
+# Make fake images for testing; one is a delta function (or narrow
+# gaussian) and the other is a convolution of this with a spatially
+# varying kernel.
+#######
+
+def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
+                      addNoise = False, bgValue = 100., display = True):
+    kSize    = policy.get('kernelRows')
+    assert(kSize == policy.get('kernelCols'))
+    sizeCell = policy.get('sizeCellX')
+    assert(sizeCell == policy.get('sizeCellY'))
+
+    # This sets the final extent of each convolved delta function
+    gaussKernelWidth   = sizeCell // 2
+
+    # This sets the scale over which pixels are correlated in the
+    # spatial convolution; should be at least as big as the kernel you
+    # are trying to fit for
+    spatialKernelWidth = kSize
+
+    # Number of bad pixels due to convolutions
+    border = (gaussKernelWidth + spatialKernelWidth)//2
+
+    # Make a fake image with a matrix of delta functions
+    totalSize = nCell * sizeCell + 2 * border
+    tim       = afwImage.ImageF(totalSize, totalSize)
+    for x in range(nCell):
+        for y in range(nCell):
+            tim.set(x * sizeCell + sizeCell // 2 + border - 1,
+                    y * sizeCell + sizeCell // 2 + border - 1,
+                    deltaFunctionCounts)
+
+    # Turn this into stars with a narrow width; conserve counts
+    gaussFunction = afwMath.GaussianFunction2D(tGaussianWidth, tGaussianWidth)
+    gaussKernel   = afwMath.AnalyticKernel(gaussKernelWidth, gaussKernelWidth, gaussFunction)
+    cim = afwImage.ImageF(tim.getDimensions())
+    afwMath.convolve(cim, tim, gaussKernel, True)
+    tim = cim
+
+    # Trim off border pixels
+    p0, p1   = getConvolvedImageLimits(gaussKernel, tim)
+    bbox     = afwImage.BBox(p0, p1)
+    tim      = afwImage.ImageF(tim, bbox)
+    # An estimate of its variance is itself
+    tvar     = afwImage.ImageF(tim, True)
+    # No mask
+    tmask = afwImage.MaskU(tim.getDimensions())
+    tmask.set(0x0)
+    
+    # Now make a science image which is this convolved with some
+    # spatial function.  Use input basis list.
+    #
+    # THIS SHOULD BE SOMETHING WHOSE FIRST COMPONENT DOES NOT VARY
+    # SPATIALLY, AND WHOSE OTHER COMPONENTS HAVE ZERO SUM.
+    sOrder   = policy.get('spatialKernelOrder')
+    polyFunc = afwMath.PolynomialFunction2D(sOrder)
+    nParams  = len(polyFunc.getParameters())
+    kCoeffs  = []
+    # First one does not vary spatially
+    kCoeffs.append([])
+    kCoeffs[0].append(1.)
+    for i in range(1, nParams):
+        kCoeffs[0].append(0.)
+    for i in range(1, len(basisList)):
+        kCoeffs.append([])
+        for j in range(nParams):
+            kCoeffs[i].append(0.001 * (1.5 * (-1)**j + i))
+
+    # Estimate of the image variance comes from convolution with main gaussian
+    svar = afwImage.ImageF(tim.getDimensions())
+    afwMath.convolve(svar, tim, basisList[0], False)
+    # No mask
+    smask = afwImage.MaskU(svar.getDimensions())
+    smask.set(0x0)
+    
+    # Make the full convolved image
+    sKernel = afwMath.LinearCombinationKernel(basisList, polyFunc)
+    sKernel.setSpatialParameters(kCoeffs)
+    cim = afwImage.ImageF(tim.getDimensions())
+    afwMath.convolve(cim, tim, sKernel, False)
+
+    # Get the good subregion
+    p0, p1 = getConvolvedImageLimits(sKernel, cim)
+    bbox   = afwImage.BBox(p0, p1)
+
+    # Add noise?
+    if addNoise:
+        svar += bgValue
+        snoi  = makePoissonNoiseImage(svar)
+        cim   = snoi # unfortunately this integerizes the image
+        cim  -= bgValue
+
+        # noiseless?
+        #tvar += bgValue
+        #tnoi  = makePoissonNoiseImage(tvar)
+        #tim  += tnoi
+
+    # And turn into MaskedImages
+    sim   = afwImage.ImageF(cim, bbox)
+    svar  = afwImage.ImageF(svar, bbox)
+    smask = afwImage.MaskU(smask, bbox)
+    sMi   = afwImage.MaskedImageF(sim, smask, svar)
+    
+    tim   = afwImage.ImageF(tim, bbox)
+    tvar  = afwImage.ImageF(tvar, bbox)
+    tmask = afwImage.MaskU(tmask, bbox)
+    tMi   = afwImage.MaskedImageF(tim, tmask, tvar)
+
+    sMi.writeFits('science.fits')
+    tMi.writeFits('template.fits')
+
+    # look at this
+    #import pylab
+    #simarr = vectorFromImage(sim)
+    #svararr = vectorFromImage(svar)
+    #ssig = simarr / numpy.sqrt(svararr)
+    #idx  = numpy.where(ssig < 10.)
+    #ssig = ssig[idx]
+    #pylab.figure()
+    #n1, b1, p1 = pylab.hist(ssig, bins=100, normed=True)
+    #ax2 = pylab.twinx()
+    #ax2.plot(0.5 * (b1[1:] + b1[:-1]), n1)
+
+    # no noise in template
+    #timarr = vectorFromImage(tim)
+    #tvararr = vectorFromImage(tvar)
+    #tsig = timarr / numpy.sqrt(tvararr)
+    #pylab.figure()
+    #n2, b2, p2 = pylab.hist(tsig, bins=100, normed=True)
+    #ax2 = pylab.twinx()
+    #ax2.plot(0.5 * (b2[1:] + b2[:-1]), n2)
+
+    #pylab.show()
+    
+
+    # No negative variance, which can screw things up
+    assert(afwMath.makeStatistics(sMi.getVariance(), afwMath.MIN).getValue() >= 0.0)
+    assert(afwMath.makeStatistics(tMi.getVariance(), afwMath.MIN).getValue() >= 0.0)
+
+    # Get rid of any coordinate funniness
+    sMi.setXY0(afwImage.PointI(0,0))
+    tMi.setXY0(afwImage.PointI(0,0))
+
+    if display:
+        import lsst.afw.display.ds9 as ds9
+        ds9.mtv(tMi.getImage(), frame=1)
+        ds9.mtv(tMi.getVariance(), frame=2)
+        ds9.mtv(sMi.getImage(), frame=3)
+        ds9.mtv(sMi.getVariance(), frame=4)
+
+    # Finally, make a kernelSet from these 2 images
+    kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(0, 0),
+                                                         sizeCell * nCell,
+                                                         sizeCell * nCell),
+                                           sizeCell,
+                                           sizeCell)
+    stampHalfWidth = 2 * kSize
+    for x in range(nCell):
+        for y in range(nCell):
+            xCoord = x * sizeCell + sizeCell // 2
+            yCoord = y * sizeCell + sizeCell // 2
+            p0 = afwImage.PointI(xCoord - stampHalfWidth,
+                                 yCoord - stampHalfWidth)
+            p1 = afwImage.PointI(xCoord + stampHalfWidth,
+                                 yCoord + stampHalfWidth)
+            bbox = afwImage.BBox(p0, p1)
+            tsi = afwImage.MaskedImageF(tMi, bbox)
+            ssi = afwImage.MaskedImageF(sMi, bbox)
+
+            kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policy)
+            kernelCellSet.insertCandidate(kc)
+
+            #if display:
+            #    ds9.mtv(tsi, frame=5)
+            #    ds9.mtv(ssi, frame=6)
+    
+    return tMi, sMi, sKernel, kernelCellSet
+    
+
+    
+#######
 # Limits of good pixels in a convolved image
 #######
 
