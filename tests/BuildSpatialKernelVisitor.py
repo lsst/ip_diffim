@@ -23,7 +23,7 @@ class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
         self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
-        self.kSize = 11
+        self.kSize = 19
         self.policy.set("kernelRows", self.kSize)
         self.policy.set("kernelCols", self.kSize)
         self.sizeCell = 64
@@ -39,6 +39,8 @@ class DiffimTestCases(unittest.TestCase):
             self.policy.add('alardSigGauss', wGauss[i])
             self.policy.add('alardDegGauss', 0)
 
+        self.policy.set('fitForBackground', False)
+
     def tearDown(self):
         del self.policy
 
@@ -48,19 +50,23 @@ class DiffimTestCases(unittest.TestCase):
     def testDeltaFunction(self):
         self.policy.set('kernelBasisSet', 'delta-function')
         self.policy.set('useRegularization', False)
-        self.runGaussianField(0, title = 'DF')
+        kset = self.runGaussianField(0, title = 'DF')
+        diffimTools.displayKernelMosaic(kset, 5)
 
     def testAlardLupton(self):
         self.policy.set('kernelBasisSet', 'alard-lupton')
         self.policy.set('useRegularization', False)
-        self.runGaussianField(0, title = 'AL')
+        kset = self.runGaussianField(0, title = 'AL')
+        diffimTools.displayKernelMosaic(kset, 6)
 
     def testRegularization(self):
         self.policy.set('kernelBasisSet', 'delta-function')
         self.policy.set('useRegularization', True)
-        self.runGaussianField(0, title = 'DFr')
+        self.policy.set('lambdaValue', 10.)
+        kset = self.runGaussianField(0, title = 'DFr')
+        diffimTools.displayKernelMosaic(kset, 7)
 
-    def testShow(self):
+    def xtestShow(self):
         pylab.show()  
     
     def runGaussianField(self, order, title):
@@ -105,6 +111,7 @@ class DiffimTestCases(unittest.TestCase):
         print '# CAW', title, s1i.mean(), s1i.std(), s1o.mean(), s1o.std(), \
               s2i.mean(), s2i.std(), s2o.mean(), s2o.std()
 
+        return kernelCellSet
 
     def compareNeighbors(self, kernelCellSet, title):
         # lotsa permutations here...
@@ -143,14 +150,14 @@ class DiffimTestCases(unittest.TestCase):
 
         allStats1 = numpy.ravel(allStats1) 
         pylab.figure()
-        n, b, p = pylab.hist(allStats1, bins=100, normed=True)
+        n, b, p = pylab.hist(allStats1, bins=50, normed=True)
         pylab.title('%s : For neighbors (output variance)' % (title))
         pylab.xlabel('N Sigma')
         pylab.ylabel('N Pix')
         
         allStats2 = numpy.ravel(allStats2) 
         pylab.figure()
-        n, b, p = pylab.hist(allStats2, bins=100, normed=True)
+        n, b, p = pylab.hist(allStats2, bins=50, normed=True)
         pylab.title('%s : For neighbors (input variance)' % (title))
         pylab.xlabel('N Sigma')
         pylab.ylabel('N Pix')
@@ -184,14 +191,14 @@ class DiffimTestCases(unittest.TestCase):
 
         allStats1 = numpy.ravel(allStats1) 
         pylab.figure()
-        n, b, p = pylab.hist(allStats1, bins=100, normed=True)
+        n, b, p = pylab.hist(allStats1, bins=50, normed=True)
         pylab.title('%s : For itself (output variance)' % (title))
         pylab.xlabel('N Sigma')
         pylab.ylabel('N Pix')
         
         allStats2 = numpy.ravel(allStats2) 
         pylab.figure()
-        n, b, p = pylab.hist(allStats2, bins=100, normed=True)
+        n, b, p = pylab.hist(allStats2, bins=50, normed=True)
         pylab.title('%s : For itself (input variance)' % (title))
         pylab.xlabel('N Sigma')
         pylab.ylabel('N Pix')

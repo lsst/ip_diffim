@@ -290,8 +290,12 @@ class DiffimTestCases(unittest.TestCase):
         #ds9.mtv(kImageIn, frame=3)
         #ds9.mtv(kImageOut, frame=4)
 
+
         soln = kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT)
         self.assertAlmostEqual(soln.getKsum(), kSumIn, 3)
+        if not (self.policy.get("fitForBackground")):
+            self.assertEqual(soln.getBackground(), 0.0)
+            
         for j in range(kImageOut.getHeight()):
             for i in range(kImageOut.getWidth()):
                 if kImageIn.get(i, j) > 1e-2:
@@ -348,11 +352,16 @@ class DiffimTestCases(unittest.TestCase):
         soln = kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT)
         self.assertAlmostEqual(soln.getKsum(), gscaling)
         self.assertAlmostEqual(soln.getBackground(), 0.0)
-        
+
         for j in range(kImageOut.getHeight()):
             for i in range(kImageOut.getWidth()):
                 self.assertAlmostEqual(kImageOut.get(i, j)/kImageIn.get(i, j), 1.0, 5)
 
+
+    def testNoBackgroundFit(self):
+        self.policy.set("fitForBackground", False)
+        self.testGaussian()
+        self.testGaussianWithNoise()
 
     def testInsert(self):
         mi = afwImage.MaskedImageF(10, 10)

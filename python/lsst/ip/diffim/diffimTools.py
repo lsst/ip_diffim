@@ -340,6 +340,21 @@ def displaySpatialKernelQuality(kernelCellSet, spatialKernel, spatialBg, frame):
 
                     
             
+def displayKernelMosaic(kernelCellSet, frame):
+    import lsst.afw.display.ds9 as ds9
+    import lsst.afw.display.utils as displayUtils
+
+    mos = displayUtils.Mosaic()
+    
+    for cell in kernelCellSet.getCellList():
+        for cand in cell.begin(False): # False = include bad candidates
+            cand = diffimLib.cast_KernelCandidateF(cand)
+            im = cand.getKernelImage(diffimLib.KernelCandidateF.ORIG)
+            mos.append(im)
+            
+    mosaic = mos.makeMosaic()
+    ds9.mtv(mosaic, frame=frame)
+
 def displaySpatialKernelMosaic(spatialKernel, width, height, frame, doNorm=False):
     import lsst.afw.display.ds9 as ds9
     import lsst.afw.display.utils as displayUtils
