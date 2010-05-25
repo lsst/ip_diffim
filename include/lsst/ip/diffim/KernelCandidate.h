@@ -94,7 +94,7 @@ namespace diffim {
         double getKsum(CandidateSwitch cand) const;
         typename ImageT::Ptr getKernelImage(CandidateSwitch cand) const;
         typename ImageT::ConstPtr getImage() const; // For SpatialCellImageCandidate
-        boost::shared_ptr<StaticKernelSolution> getKernelSolution(CandidateSwitch cand) const; 
+        boost::shared_ptr<StaticKernelSolution2<PixelT> > getKernelSolution(CandidateSwitch cand) const; 
         
         /** 
          * @brief Calculate associated difference image using internal solutions
@@ -182,13 +182,13 @@ namespace diffim {
         bool _fitForBackground;
 
         /* best single raw kernel */
-        boost::shared_ptr<StaticKernelSolution> _kernelSolutionOrig;    ///< Original basis kernel solution
+        boost::shared_ptr<StaticKernelSolution2<PixelT> > _kernelSolutionOrig; ///< Original basis solution
 
         /* with Pca basis */
-        boost::shared_ptr<StaticKernelSolution> _kernelSolutionPca;     ///< Most recent kernel solution
+        boost::shared_ptr<StaticKernelSolution2<PixelT> > _kernelSolutionPca;  ///< Most recent  solution
 
-        void buildEngine(lsst::afw::math::KernelList const& basisList,
-                         boost::shared_ptr<Eigen::MatrixXd> hMat);
+        //void buildEngine(lsst::afw::math::KernelList const& basisList,
+        //boost::shared_ptr<Eigen::MatrixXd> hMat);
     };
 
 

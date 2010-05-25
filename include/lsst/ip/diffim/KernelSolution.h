@@ -43,25 +43,30 @@ namespace diffim {
         explicit KernelSolution(boost::shared_ptr<Eigen::MatrixXd> mMat,
                                 boost::shared_ptr<Eigen::VectorXd> bVec,
                                 bool fitForBackground);
+        explicit KernelSolution(bool fitForBackground);
         explicit KernelSolution();
-        virtual ~KernelSolution() {};
 
-        void solve();
+        virtual ~KernelSolution() {};
+        virtual void solve();
+        virtual void solve(Eigen::MatrixXd _mMat, 
+                           Eigen::VectorXd _bVec);
+
         inline boost::shared_ptr<Eigen::MatrixXd> getM() {return _mMat;}
         inline boost::shared_ptr<Eigen::VectorXd> getB() {return _bVec;}
-        int getId() const { return _id; }
+        inline int getId() const { return _id; }
 
     protected:
         int _id;                                                ///< Unique ID for object
         boost::shared_ptr<Eigen::MatrixXd> _mMat;               ///< Derived least squares M matrix
         boost::shared_ptr<Eigen::VectorXd> _bVec;               ///< Derived least squares B vector
-        boost::shared_ptr<Eigen::VectorXd> _sVec;               ///< Derived least squares solution matrix
+        boost::shared_ptr<Eigen::VectorXd> _aVec;               ///< Derived least squares solution matrix
         KernelSolvedBy _solvedBy;                               ///< Type of algorithm used to make solution
         bool _fitForBackground;                                 ///< Background terms included in fit
         static int _SolutionId;                                 ///< Unique identifier for solution
 
     };
 
+    /* Soon to be deprecated as soon as I make sure the one below works */
     class StaticKernelSolution : public KernelSolution {
     public:
         typedef boost::shared_ptr<StaticKernelSolution> Ptr;
@@ -81,7 +86,7 @@ namespace diffim {
 
         std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getKernelSolution();
         std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getKernelUncertainty();
-    private:
+    protected:
         lsst::afw::math::Kernel::Ptr _kernel;                   ///< Derived single-object convolution kernel
         double _background;                                     ///< Derived differential background estimate
         double _kSum;                                           ///< Derived kernel sum
@@ -90,10 +95,74 @@ namespace diffim {
         double _backgroundErr;                                  ///< Uncertainty on the background values
         bool _errCalculated;                                    ///< Has the uncertainty been calculated?
 
-        void _setKernelSolution();
+        void _setKernel();
         void _setKernelUncertainty();
-        void _setKernelSum();
     };
+
+
+    template <typename InputT>
+    class StaticKernelSolution2 : public KernelSolution {
+    public:
+        typedef boost::shared_ptr<StaticKernelSolution2<InputT> > Ptr;
+
+        StaticKernelSolution2(lsst::afw::math::KernelList const& basisList,
+                              bool fitForBackground);
+        virtual ~StaticKernelSolution2() {};
+
+        /* Overrides KernelSolution */
+        void solve();
+        void solve(Eigen::MatrixXd _mMat, 
+                   Eigen::VectorXd _bVec);
+
+        /* Used by RegularizedKernelSolution */
+        virtual void build(lsst::afw::image::Image<InputT> const &imageToConvolve,
+                           lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+                           lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate);
+        virtual lsst::afw::math::Kernel::Ptr getKernel();
+        virtual ImageT::Ptr makeKernelImage();
+        virtual double getBackground();
+        virtual double getKsum();
+        virtual std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolutionPair();
+
+    protected:
+        boost::shared_ptr<Eigen::MatrixXd> _cMat;               ///< K_i x R
+        boost::shared_ptr<Eigen::VectorXd> _iVec;               ///< Vectorized I
+        boost::shared_ptr<Eigen::VectorXd> _vVec;               ///< Variance
+
+        lsst::afw::math::Kernel::Ptr _kernel;                   ///< Derived single-object convolution kernel
+        double _background;                                     ///< Derived differential background estimate
+        double _kSum;                                           ///< Derived kernel sum
+
+        void _setKernel();                                      ///< Set kernel after solution
+        void _setKernelUncertainty();                           ///< Not implemented
+    };
+
+
+    template <typename InputT>
+    class RegularizedKernelSolution : public StaticKernelSolution2<InputT> {
+    public:
+        typedef boost::shared_ptr<RegularizedKernelSolution<InputT> > Ptr;
+
+        RegularizedKernelSolution(lsst::afw::math::KernelList const& basisList,
+                                  bool fitForBackground,
+                                  boost::shared_ptr<Eigen::MatrixXd> hMat,
+                                  lsst::pex::policy::Policy policy
+                                  );
+        virtual ~RegularizedKernelSolution() {};
+        void solve();
+        void solve(Eigen::MatrixXd _mMat, 
+                   Eigen::VectorXd _bVec);
+        double estimateRisk();
+        double estimateGcv();
+
+    private:
+        boost::shared_ptr<Eigen::MatrixXd> _hMat;               ///< Regularization weights
+        lsst::pex::policy::Policy _policy;
+    };
+
+
+
+
 
     class SpatialKernelSolution : public KernelSolution {
     public:
@@ -109,7 +178,7 @@ namespace diffim {
                            boost::shared_ptr<Eigen::MatrixXd> qMat,
                            boost::shared_ptr<Eigen::VectorXd> wVec);
 
-        void solve();
+        virtual void solve();
         ImageT::Ptr makeKernelImage();
         std::pair<lsst::afw::math::LinearCombinationKernel::Ptr,
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getKernelSolution();
@@ -134,9 +203,8 @@ namespace diffim {
         int _nbt;
         int _nt;
 
-        void _setKernelSolution();
+        void _setKernel();
         void _setKernelUncertainty();
-        void _setKernelSum();
     };
 
 }}} // end of namespace lsst::ip::diffim

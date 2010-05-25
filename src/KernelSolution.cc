@@ -15,6 +15,7 @@
 #include "Eigen/Cholesky"
 #include "Eigen/QR"
 #include "Eigen/LU"
+#include "Eigen/SVD"
 
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
@@ -46,7 +47,18 @@ namespace diffim {
         _id(++_SolutionId),
         _mMat(mMat),
         _bVec(bVec),
-        _sVec(),
+        _aVec(),
+        _solvedBy(KernelSolution::NONE),
+        _fitForBackground(fitForBackground)
+    {};
+
+    KernelSolution::KernelSolution(
+        bool fitForBackground
+        ) :
+        _id(++_SolutionId),
+        _mMat(),
+        _bVec(),
+        _aVec(),
         _solvedBy(KernelSolution::NONE),
         _fitForBackground(fitForBackground)
     {};
@@ -55,13 +67,19 @@ namespace diffim {
         _id(++_SolutionId),
         _mMat(),
         _bVec(),
-        _sVec(),
+        _aVec(),
         _solvedBy(KernelSolution::NONE),
         _fitForBackground(true)
     {};
 
     void KernelSolution::solve() {
-        Eigen::VectorXd sVec = Eigen::VectorXd::Zero(_bVec->size());
+        solve(*_mMat, *_bVec);
+    }
+
+    void KernelSolution::solve(Eigen::MatrixXd mMat,
+                               Eigen::VectorXd bVec) {
+        
+        Eigen::VectorXd aVec = Eigen::VectorXd::Zero(bVec.size());
 
         boost::timer t;
         t.restart();
@@ -70,24 +88,24 @@ namespace diffim {
                           "Solving for kernel");
         
         _solvedBy = KernelSolution::CHOLESKY_LDLT;
-        if (!(_mMat->ldlt().solve(*_bVec, &sVec))) {
+        if (!(mMat.ldlt().solve(bVec, &aVec))) {
             pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                               "Unable to determine kernel via Cholesky LDL^T");
             
             _solvedBy = KernelSolution::CHOLESKY_LLT;
-            if (!(_mMat->llt().solve(*_bVec, &sVec))) {
+            if (!(mMat.llt().solve(bVec, &aVec))) {
                 pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                                   "Unable to determine kernel via Cholesky LL^T");
                 
                 _solvedBy = KernelSolution::LU;
-                if (!(_mMat->lu().solve(*_bVec, &sVec))) {
+                if (!(mMat.lu().solve(bVec, &aVec))) {
                     pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                                       "Unable to determine kernel via LU");
                     /* LAST RESORT */
                     try {
                         
                         _solvedBy = KernelSolution::EIGENVECTOR;
-                        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(*_mMat);
+                        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(mMat);
                         Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
                         Eigen::VectorXd eValues = eVecValues.eigenvalues();
                         
@@ -97,7 +115,7 @@ namespace diffim {
                             }
                         }
                         
-                        sVec = rMat*eValues.asDiagonal()*rMat.transpose()*(*_bVec);
+                        aVec = rMat * eValues.asDiagonal() * rMat.transpose() * bVec;
                     } catch (pexExcept::Exception& e) {
                         
                         _solvedBy = KernelSolution::NONE;
@@ -114,16 +132,10 @@ namespace diffim {
         pexLog::TTrace<3>("lsst.ip.diffim.KernelSolution.solve", 
                           "Compute time for matrix math : %.2f s", time);
 
-        _sVec = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(sVec));
+        _aVec = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(aVec));
     }
 
-    /* 
-     *
-     *
-     *
-     *
-     *
-     */
+    /*******************************************************************************************************/
 
     StaticKernelSolution::StaticKernelSolution(
         boost::shared_ptr<Eigen::MatrixXd> mMat,
@@ -193,7 +205,7 @@ namespace diffim {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
         }
-        if (_errCalculated = false) {
+        if (_errCalculated == false) {
             _setKernelUncertainty();
         }
 
@@ -208,33 +220,19 @@ namespace diffim {
             throw e;
         }
         /* Turn matrices into _kernel and _background */
-        _setKernelSolution();
-
-        /* set kernel sum */
-        _setKernelSum();
+        _setKernel();
 
         if (calculateUncertainties) {
             _setKernelUncertainty();
         }
     }
 
-    void StaticKernelSolution::_setKernelSum() {
-        if (_solvedBy == KernelSolution::NONE) {
-            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
-        }
-        ImageT::Ptr image (
-            new ImageT::Image(_kernel->getDimensions())
-            );
-        _kSum  = _kernel->computeImage(*image, false);              
-    }
-
-    void
-    StaticKernelSolution::_setKernelSolution() {
+    void StaticKernelSolution::_setKernel() {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot make solution");
         }
 
-        unsigned int const nParameters           = _sVec->size();
+        unsigned int const nParameters           = _aVec->size();
         unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
         unsigned int const nKernelParameters     = 
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
@@ -244,21 +242,26 @@ namespace diffim {
         /* Fill in the kernel results */
         std::vector<double> kValues(nKernelParameters);
         for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
-            if (std::isnan((*_sVec)(idx))) {
+            if (std::isnan((*_aVec)(idx))) {
                 throw LSST_EXCEPT(pexExcept::Exception, 
                                   str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
             }
-            kValues[idx] = (*_sVec)(idx);
+            kValues[idx] = (*_aVec)(idx);
         }
         _kernel->setKernelParameters(kValues);
+
+        ImageT::Ptr image (
+            new ImageT::Image(_kernel->getDimensions())
+            );
+        _kSum  = _kernel->computeImage(*image, false);              
         
         if (_fitForBackground) {
-            if (std::isnan((*_sVec)(nParameters-1))) {
+            if (std::isnan((*_aVec)(nParameters-1))) {
                 throw LSST_EXCEPT(pexExcept::Exception, 
                                   str(boost::format("Unable to determine background solution %d (nan)") % 
                                       (nParameters-1)));
             }
-            _background = (*_sVec)(nParameters-1);
+            _background = (*_aVec)(nParameters-1);
         }
     }        
 
@@ -269,7 +272,7 @@ namespace diffim {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return uncertainty");
         }
 
-        unsigned int const nParameters           = _sVec->size();
+        unsigned int const nParameters           = _aVec->size();
         unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
         unsigned int const nKernelParameters     = 
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
@@ -331,14 +334,449 @@ namespace diffim {
         _errCalculated = true;
     }
 
-    /* 
-     *
-     *
-     *
-     *
-     *
-     *
-     */
+    /*******************************************************************************************************/
+
+    template <typename InputT>
+    StaticKernelSolution2<InputT>::StaticKernelSolution2(
+        lsst::afw::math::KernelList const& basisList,
+        bool fitForBackground
+        ) 
+        :
+        KernelSolution(fitForBackground),
+        _cMat(),
+        _iVec(),
+        _vVec(),
+        _kernel(),
+        _background(0.0),
+        _kSum(0.0)
+    {
+        std::vector<double> kValues(basisList.size());
+        _kernel = boost::shared_ptr<afwMath::Kernel>( 
+            new afwMath::LinearCombinationKernel(basisList, kValues) 
+            );
+    };
+
+    template <typename InputT>
+    lsst::afw::math::Kernel::Ptr StaticKernelSolution2<InputT>::getKernel() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
+        }
+        return _kernel;
+    }
+
+    template <typename InputT>
+    KernelSolution::ImageT::Ptr StaticKernelSolution2<InputT>::makeKernelImage() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
+        }
+        ImageT::Ptr image (
+            new ImageT::Image(_kernel->getDimensions())
+            );
+        (void)_kernel->computeImage(*image, false);              
+        return image;
+    }
+
+    template <typename InputT>
+    double StaticKernelSolution2<InputT>::getBackground() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return background");
+        }
+        return _background;
+    }
+
+    template <typename InputT>
+    double StaticKernelSolution2<InputT>::getKsum() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return ksum");
+        }
+        return _kSum;
+    }
+
+    template <typename InputT>
+    std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
+    StaticKernelSolution2<InputT>::getSolutionPair() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
+        }
+
+        return std::make_pair(_kernel, _background);
+    }
+
+    template <typename InputT>
+    void StaticKernelSolution2<InputT>::build(
+        lsst::afw::image::Image<InputT> const &imageToConvolve,
+        lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+        lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate
+        ) {
+
+        lsst::afw::math::KernelList basisList = 
+            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
+        
+        unsigned int const nKernelParameters     = basisList.size();
+        unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
+        unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
+
+        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
+        
+        /* Ignore buffers around edge of convolved images :
+         * 
+         * If the kernel has width 5, it has center pixel 2.  The first good pixel
+         * is the (5-2)=3rd pixel, which is array index 2, and ends up being the
+         * index of the central pixel.
+         * 
+         * You also have a buffer of unusable pixels on the other side, numbered
+         * width-center-1.  The last good usable pixel is N-width+center+1.
+         * 
+         * Example : the kernel is width = 5, center = 2
+         * 
+         * ---|---|-c-|---|---|
+         * 
+         * the image is width = N
+         * convolve this with the kernel, and you get
+         * 
+         * |-x-|-x-|-g-|---|---| ... |---|---|-g-|-x-|-x-|
+         * 
+         * g = first/last good pixel
+         * x = bad
+         * 
+         * the first good pixel is the array index that has the value "center", 2
+         * the last good pixel has array index N-(5-2)+1
+         * eg. if N = 100, you want to use up to index 97
+         * 100-3+1 = 98, and the loops use i < 98, meaning the last
+         * index you address is 97.
+         */
+        unsigned int const startCol = (*kiter)->getCtrX();
+        unsigned int const startRow = (*kiter)->getCtrY();
+        unsigned int const endCol   = imageToConvolve.getWidth()  - 
+            ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
+        unsigned int const endRow   = imageToConvolve.getHeight() - 
+            ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
+        
+        boost::timer t;
+        t.restart();
+        
+        /* Eigen representation of input images; only the pixels that are unconvolved in cimage below */
+        Eigen::MatrixXd eigenToConvolve = imageToEigenMatrix(imageToConvolve).block(startRow, 
+                                                                                    startCol, 
+                                                                                    endRow-startRow, 
+                                                                                    endCol-startCol);
+        Eigen::MatrixXd eigenToNotConvolve = imageToEigenMatrix(imageToNotConvolve).block(startRow, 
+                                                                                          startCol, 
+                                                                                          endRow-startRow, 
+                                                                                          endCol-startCol);
+        Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(varianceEstimate).block(
+            startRow, startCol, endRow-startRow, endCol-startCol).cwise().inverse();
+
+        /* Resize into 1-D for later usage */
+        eigenToConvolve.resize(eigenToConvolve.rows()*eigenToConvolve.cols(), 1);
+        eigenToNotConvolve.resize(eigenToNotConvolve.rows()*eigenToNotConvolve.cols(), 1);
+        eigeniVariance.resize(eigeniVariance.rows()*eigeniVariance.cols(), 1);
+        
+        /* Holds image convolved with basis function */
+        afwImage::Image<PixelT> cimage(imageToConvolve.getDimensions());
+        
+        /* Holds eigen representation of image convolved with all basis functions */
+        std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
+        
+        /* Iterators over convolved image list and basis list */
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
+            convolvedEigenList.begin();
+        /* Create C_i in the formalism of Alard & Lupton */
+        for (; kiter != basisList.end(); ++kiter, ++eiter) {
+            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+            boost::shared_ptr<Eigen::MatrixXd> cMat (
+                new Eigen::MatrixXd(imageToEigenMatrix(cimage).block(startRow, 
+                                                                     startCol, 
+                                                                     endRow-startRow, 
+                                                                     endCol-startCol))
+                );
+            cMat->resize(cMat->rows()*cMat->cols(), 1);
+            *eiter = cMat;
+
+        } 
+
+        double time = t.elapsed();
+        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.build", 
+                          "Total compute time to do basis convolutions : %.2f s", time);
+        t.restart();
+        
+        /* 
+           Load matrix with all values from convolvedEigenList : all images
+           (eigeniVariance, convolvedEigenList) must be the same size
+        */
+        Eigen::MatrixXd cMat(eigenToConvolve.col(0).size(), nParameters);
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
+            convolvedEigenList.begin();
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
+            convolvedEigenList.end();
+        for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
+            cMat.col(kidxj) = (*eiterj)->col(0);
+        }
+        /* Treat the last "image" as all 1's to do the background calculation. */
+        if (_fitForBackground)
+            cMat.col(nParameters-1).fill(1.);
+
+        _cMat.reset(new Eigen::MatrixXd(cMat));
+        _vVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
+        _iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.col(0)));
+    }
+
+    template <typename InputT>
+    void StaticKernelSolution2<InputT>::solve() {
+        _mMat.reset(new Eigen::MatrixXd((*_cMat).transpose() * (*_aVec).asDiagonal() * (*_cMat)));
+        _bVec.reset(new Eigen::VectorXd((*_cMat).transpose() * (*_aVec) * (*_iVec)));
+
+        try {
+            KernelSolution::solve();
+        } catch (pexExcept::Exception &e) {
+            LSST_EXCEPT_ADD(e, "Unable to solve static kernel matrix");
+            throw e;
+        }
+        /* Turn matrices into _kernel and _background */
+        _setKernel();
+    }
+
+    template <typename InputT>
+    void StaticKernelSolution2<InputT>::_setKernel() {
+        if (_solvedBy == KernelSolution::NONE) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot make solution");
+        }
+
+        unsigned int const nParameters           = _aVec->size();
+        unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
+        unsigned int const nKernelParameters     = 
+            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
+        if (nParameters != (nKernelParameters + nBackgroundParameters)) 
+            throw LSST_EXCEPT(pexExcept::Exception, "Mismatched sizes in kernel solution");
+
+        /* Fill in the kernel results */
+        std::vector<double> kValues(nKernelParameters);
+        for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
+            if (std::isnan((*_aVec)(idx))) {
+                throw LSST_EXCEPT(pexExcept::Exception, 
+                                  str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
+            }
+            kValues[idx] = (*_aVec)(idx);
+        }
+        _kernel->setKernelParameters(kValues);
+
+        ImageT::Ptr image (
+            new ImageT::Image(_kernel->getDimensions())
+            );
+        _kSum  = _kernel->computeImage(*image, false);              
+        
+        if (_fitForBackground) {
+            if (std::isnan((*_aVec)(nParameters-1))) {
+                throw LSST_EXCEPT(pexExcept::Exception, 
+                                  str(boost::format("Unable to determine background solution %d (nan)") % 
+                                      (nParameters-1)));
+            }
+            _background = (*_aVec)(nParameters-1);
+        }
+    }        
+
+
+    template <typename InputT>
+    void StaticKernelSolution2<InputT>::_setKernelUncertainty() {
+        throw LSST_EXCEPT(pexExcept::Exception, "Uncertainty calculation not supported");
+
+        /* Estimate of parameter uncertainties comes from the inverse of the
+         * covariance matrix (noise spectrum).  
+         * N.R. 15.4.8 to 15.4.15
+         * 
+         * Since this is a linear problem no need to use Fisher matrix
+         * N.R. 15.5.8
+         *
+         * Although I might be able to take advantage of the solution above.
+         * Since this now works and is not the rate limiting step, keep as-is for DC3a.
+         *
+         * Use Cholesky decomposition again.
+         * Cholkesy:
+         * Cov       =  L L^t
+         * Cov^(-1)  = (L L^t)^(-1)
+         *           = (L^T)^-1 L^(-1)
+         * 
+         * Code would be:
+         * 
+         * Eigen::MatrixXd             cov    = (*_mMat).transpose() * (*_mMat);
+         * Eigen::LLT<Eigen::MatrixXd> llt    = cov.llt();
+         * Eigen::MatrixXd             error2 = llt.matrixL().transpose().inverse()*llt.matrixL().inverse();
+         */
+    }
+
+    /*******************************************************************************************************/
+
+    template <typename InputT>
+    RegularizedKernelSolution<InputT>::RegularizedKernelSolution(
+        lsst::afw::math::KernelList const& basisList,
+        bool fitForBackground,
+        boost::shared_ptr<Eigen::MatrixXd> hMat,
+        lsst::pex::policy::Policy policy
+        ) 
+        :
+        StaticKernelSolution2<InputT>(basisList, fitForBackground),
+        _hMat(hMat),
+        _policy(policy)
+    {};
+
+    template <typename InputT>
+    double RegularizedKernelSolution<InputT>::estimateRisk() {
+        double lambdaMin   = _policy.getDouble("lambdaMin");        
+        double lambdaMax   = _policy.getDouble("lambdaMax");
+        double lambdaStep  = _policy.getDouble("lambdaStep");
+
+        Eigen::SVD<Eigen::MatrixXd> svd(*(this->_cMat));
+        Eigen::MatrixXd vMat       = svd.matrixV();
+
+        /* Find pseudo inverse of mMat, which may be ill conditioned */
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(*(this->_mMat));
+        Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
+        Eigen::VectorXd eValues = eVecValues.eigenvalues();
+        Eigen::MatrixXd mInv    = rMat * eValues.asDiagonal() * rMat.transpose();
+
+        double lambda = 0.;
+        for (double l = lambdaMin; l < lambdaMax; l += lambdaStep) {
+            
+            try {
+                KernelSolution::solve(*(this->_mMat) + l * (*_hMat), *(this->_bVec));
+            } catch (pexExcept::Exception &e) {
+                LSST_EXCEPT_ADD(e, "Unable to solve regularized kernel matrix");
+                throw e;
+            }
+
+            double term1  = (this->_aVec->transpose() * vMat * vMat.transpose() * *(this->_aVec)).sum();
+            double term2a = (vMat * vMat.transpose() * (*(this->_mMat) + l * (*_hMat)).inverse()).trace();
+            double term2b = (this->_aVec->transpose() * (mInv * *(this->_bVec))).sum();
+            double risk   = term1 + 2 * (term2a - term2b);
+            pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateRisk", 
+                              "Lambda = %.2f, risk estimate = %.2e", lambda, risk);
+        }
+        return lambda;
+    }
+
+    template <typename InputT>
+    double RegularizedKernelSolution<InputT>::estimateGcv() {
+        double lambdaMin   = _policy.getDouble("lambdaMin");        
+        double lambdaMax   = _policy.getDouble("lambdaMax");
+        double lambdaStep  = _policy.getDouble("lambdaStep");
+
+        double lambda = 0.;
+        for (double l = lambdaMin; l < lambdaMax; l += lambdaStep) {
+
+            try {
+                KernelSolution::solve(*(this->_mMat) + l * *_hMat, *(this->_bVec));
+            } catch (pexExcept::Exception &e) {
+                LSST_EXCEPT_ADD(e, "Unable to solve regularized kernel matrix");
+                throw e;
+            }
+            double denominator = (Eigen::MatrixXd::Identity(this->_mMat->rows(), this->_mMat->cols()) - 
+                                  ((*this->_mMat) + l * (*_hMat)).inverse() * (*this->_mMat)).trace();
+            denominator *= denominator;
+
+            Eigen::VectorXd dVec = (*this->_iVec) - *(this->_cMat) * *(this->_aVec);
+            double numerator   = (dVec.transpose() * dVec).sum();
+            double gcv         = numerator / denominator;
+            pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateGcv", 
+                              "Lambda = %.2f, GCV = %.2e", lambda, gcv);
+        }
+        return lambda;
+    }
+        
+
+    template <typename InputT>
+    void RegularizedKernelSolution<InputT>::solve() {
+        this->_mMat.reset(
+            new Eigen::MatrixXd(this->_cMat->transpose() * this->_aVec->asDiagonal() * *(this->_cMat))
+            );
+        this->_bVec.reset(
+            new Eigen::VectorXd(this->_cMat->transpose() * *(this->_aVec) * *(this->_iVec))
+            );
+        
+        std::string lambdaType = _policy.getString("lambdaType");        
+        double lambdaValue     = _policy.getDouble("lambdaValue");
+        
+        /* See N.R. 18.5
+           
+           Matrix equation to solve is Y = C a + N
+           Y   = vectorized version of I (I = image to not convolve)
+           C_i = K_i (x) R (R = image to convolve)
+           a   = kernel coefficients
+           N   = noise
+           
+           If we reweight everything by the inverse square root of the noise
+           covariance, we get a linear model with the identity matrix for
+           the noise.  The problem can then be solved using least squares,
+           with the normal equations
+           
+              C^T Y = C^T C a
+
+           or 
+           
+              b = M a
+
+           with 
+
+              b = C^T Y
+              M = C^T C
+              a = (C^T C)^{-1} C^T Y
+
+
+           We can regularize the least square problem
+  
+              Y = C a + lambda a^T H a       (+ N, which can be ignored)
+
+           or the normal equations
+
+              (C^T C + lambda H) a = C^T Y
+ 
+              
+           The solution to the regularization of the least squares problem is
+
+              a = (C^T C + lambda H)^{-1} C^T Y
+
+           The approximation to Y is 
+
+              C a = C (C^T C + lambda H)^{-1} C^T Y
+ 
+           with smoothing matrix 
+
+              S = C (C^T C + lambda H)^{-1} C^T 
+
+        */
+        
+        double lambda;
+        if (lambdaType == "absolute") {
+            lambda = lambdaValue;
+        }
+        else if (lambdaType == "relative") {
+            lambda  = this->_mMat->trace() / this->_hMat->trace();
+            lambda *= lambdaValue;
+        }
+        else if (lambdaType == "minimizeRisk") {
+            lambda = estimateRisk();
+        }
+        else if (lambdaType == "minimizeGcv") {
+            lambda = estimateGcv();
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception, "lambdaType in Policy not recognized");
+        }
+        
+        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
+                          "Applying kernel regularization with lambda = %.2e", lambda);
+        
+        
+        try {
+            KernelSolution::solve(*(this->_mMat) + lambda * (*_hMat), *(this->_bVec));
+        } catch (pexExcept::Exception &e) {
+            LSST_EXCEPT_ADD(e, "Unable to solve static kernel matrix");
+            throw e;
+        }
+        /* Turn matrices into _kernel and _background */
+        StaticKernelSolution2<InputT>::_setKernel();
+    }
+
+    /*******************************************************************************************************/
 
     SpatialKernelSolution::SpatialKernelSolution(
         lsst::afw::math::KernelList const& basisList,
@@ -526,16 +964,6 @@ namespace diffim {
         return image;
     }
 
-    void SpatialKernelSolution::_setKernelSum() {
-        if (_solvedBy == KernelSolution::NONE) {
-            throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
-        }
-        ImageT::Ptr image (
-            new ImageT::Image(_kernel->getDimensions())
-            );
-        _kSum  = _kernel->computeImage(*image, false);              
-    }
-
     void SpatialKernelSolution::solve() {
         /* Fill in the other half of mMat */
         for (int i = 0; i < _nt; i++) {
@@ -545,17 +973,14 @@ namespace diffim {
         }
         
         try {
-            this->solve();
+            KernelSolution::solve();
         } catch (pexExcept::Exception &e) {
             LSST_EXCEPT_ADD(e, "Unable to solve spatial kernel matrix");
             throw e;
         }
         /* Turn matrices into _kernel and _background */
-        _setKernelSolution();
+        _setKernel();
         
-        /* set kernel sum */
-        _setKernelSum();
-
         if (_policy.getBool("calculateUncertainties")) {
             _setKernelUncertainty();
         }
@@ -570,11 +995,11 @@ namespace diffim {
         return std::make_pair(_kernel, _background);
     }
     
-    void SpatialKernelSolution::_setKernelSolution() {
+    void SpatialKernelSolution::_setKernel() {
         
         unsigned int nkt    = _spatialKernelFunction->getParameters().size();
         unsigned int nbt    = _fitForBackground ? _spatialBgFunction->getParameters().size() : 1;
-        unsigned int nt     = _sVec->size();
+        unsigned int nt     = _aVec->size();
         unsigned int nbases = 
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
 
@@ -591,7 +1016,7 @@ namespace diffim {
             /* Set the basis coefficients */
             std::vector<double> kCoeffs(nbases);
             for (unsigned int i = 0; i < nbases; i++) {
-                kCoeffs[i] = (*_sVec)(i);
+                kCoeffs[i] = (*_aVec)(i);
             }
             lsst::afw::math::KernelList basisList = 
                 boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
@@ -609,25 +1034,34 @@ namespace diffim {
                 
                 /* Deal with the possibility the first term doesn't vary spatially */
                 if ((i == 0) && (_constantFirstTerm)) {
-                    kCoeffs[i][0] = (*_sVec)(idx++);
+                    kCoeffs[i][0] = (*_aVec)(idx++);
                 }
                 else {
                     for (unsigned int j = 0; j < nkt; j++) {
-                        kCoeffs[i][j] = (*_sVec)(idx++);
+                        kCoeffs[i][j] = (*_aVec)(idx++);
                     }
                 }
             }
             _kernel->setSpatialParameters(kCoeffs);
         }
-        
+
+        /* Set kernel Sum */
+        ImageT::Ptr image (
+            new ImageT::Image(_kernel->getDimensions())
+            );
+        _kSum  = _kernel->computeImage(*image, false);              
+
+        /* Set background */
         if (_fitForBackground) {
             /* Set the background coefficients */
             std::vector<double> bgCoeffs(nbt);
             for (unsigned int i = 0; i < nbt; i++) {
-                bgCoeffs[i] = (*_sVec)(nt - nbt + i);
+                bgCoeffs[i] = (*_aVec)(nt - nbt + i);
             }
             _background->setParameters(bgCoeffs);
         }
+
+
     }
 
 
@@ -641,5 +1075,14 @@ namespace diffim {
         throw LSST_EXCEPT(pexExcept::Exception, 
                           "SpatialKernelSolution::getKernelUncertainty not implemented");
     }
+
+/***********************************************************************************************************/
+//
+// Explicit instantiations
+//
+    typedef float InputT;
+
+    template class StaticKernelSolution2<InputT>;
+    template class RegularizedKernelSolution<InputT>;
 
 }}} // end of namespace lsst::ip::diffim

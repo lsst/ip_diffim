@@ -14,7 +14,8 @@ Python bindings for lsst::ip::diffim code
 %ignore lsst::ip::diffim::ImageStatistics::operator();
 
 // Reference for this file is at http://dev.lsstcorp.org/trac/wiki/SwigFAQ 
-// Nice practical example is at http://dev.lsstcorp.org/trac/browser/DMS/afw/trunk/python/lsst/afw/image/imageLib.i 
+// Nice practical example is at 
+//     http://dev.lsstcorp.org/trac/browser/DMS/afw/trunk/python/lsst/afw/image/imageLib.i 
 
 // Suppress swig complaints
 #pragma SWIG nowarn=314                 // print is a python keyword (--> _print)
@@ -35,7 +36,6 @@ namespace boost {
 %{
 #include <boost/shared_ptr.hpp>
 
-//#include <lsst/afw.h>
 #include <lsst/afw/math.h>
 #include <lsst/afw/image.h>
 #include <lsst/afw/detection.h>
@@ -48,12 +48,16 @@ namespace boost {
 
 %include "lsst/p_lsstSwig.i"
 %include "lsst/daf/base/persistenceMacros.i"
+
 %import  "lsst/afw/image/imageLib.i"
 %import  "lsst/afw/math/mathLib.i"
 %import  "lsst/afw/math/objectVectors.i"
 %import  "lsst/afw/detection/detectionLib.i"
 
 %lsst_exceptions();
+
+%import "lsst/afw/eigen.i"
+%declareEigenMatrix(Eigen::Matrix2d);
 
 %pythoncode %{
 import lsst.utils
@@ -125,12 +129,29 @@ def version(HeadURL = r"$HeadURL$"):
 #include "lsst/ip/diffim/KernelSolution.h"
 %}
 
+
+%define %KernelSolutionPtrs(NAME, TYPE)
+SWIG_SHARED_PTR_DERIVED(StaticKernelSolution2##NAME,
+                        lsst::ip::diffim::KernelSolution,
+                        lsst::ip::diffim::StaticKernelSolution2<TYPE>);
+SWIG_SHARED_PTR_DERIVED(RegularizedKernelSolution##NAME,
+                        lsst::ip::diffim::StaticKernelSolution2<TYPE>,
+                        lsst::ip::diffim::RegularizedKernelSolution<TYPE>);
+%enddef
+
+%define %KernelCandidates(NAME, TYPE)
+%template(StaticKernelSolution2##NAME) lsst::ip::diffim::StaticKernelSolution2<TYPE>;
+%template(RegularizedKernelSolution##NAME) lsst::ip::diffim::RegularizedKernelSolution<TYPE>;
+%enddef
+
 SWIG_SHARED_PTR(KernelSolution, lsst::ip::diffim::KernelSolution);
 SWIG_SHARED_PTR(StaticKernelSolution, lsst::ip::diffim::StaticKernelSolution);
 SWIG_SHARED_PTR(SpatialKernelSolution, lsst::ip::diffim::SpatialKernelSolution);
+%KernelSolutionPtrs(F, float);
 
 %include "lsst/ip/diffim/KernelSolution.h"
 
+%KernelCandidates(F, float);
 
 /******************************************************************************/
 
@@ -202,10 +223,6 @@ makeKernelCandidateForSwig(float const xCenter,
 %}
 %enddef
 
-
-
-
-
 %KernelCandidatePtr(F, float);
 
 %include "lsst/ip/diffim/KernelCandidate.h"
@@ -223,19 +240,12 @@ makeKernelCandidateForSwig(float const xCenter,
 /******************************************************************************/
 /* I shouldn't have to do this but it exists noplace else, so... */
 
-%{
-#include "Eigen/Core"
-%}
-
-%template(eigenMatrixPtr) boost::shared_ptr<Eigen::MatrixXd>;
-%template(eigenVectorPtr) boost::shared_ptr<Eigen::VectorXd>;
-
-/******************************************************************************/
-
-%{
-#include "lsst/ip/diffim/foo.h"
-%}
-%include "lsst/ip/diffim/foo.h"
+//%{
+//#include "Eigen/Core"
+//%}
+//
+//%template(eigenMatrixPtr) boost::shared_ptr<Eigen::MatrixXd>;
+//%template(eigenVectorPtr) boost::shared_ptr<Eigen::VectorXd>;
 
 /******************************************************************************/
 
