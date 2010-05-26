@@ -278,10 +278,11 @@ class DiffimTestCases(unittest.TestCase):
         
 
         # now repeat with noise added; decrease precision of comparison
+        # use some regularization
         bkg = self.addNoise(smi2)
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
         self.policy.set("kernelBasisSet", "delta-function")
-        self.policy.set("useRegularization", True)
+        self.policy.set("useRegularization", False)
         kList = ipDiffim.makeKernelBasisList(self.policy)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)

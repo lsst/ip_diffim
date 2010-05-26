@@ -23,8 +23,6 @@ diffimPolicy = os.path.join(diffimDir, "pipeline", "ImageSubtractStageDictionary
 display = True
 writefits = False
 
-# This one just creates example convolution and deconvolution kernels
-
 class DiffimTestCases(unittest.TestCase):
     
     # D = I - (K.x.T + bg)

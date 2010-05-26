@@ -158,10 +158,10 @@ class DiffimTestCases(unittest.TestCase):
         # regularized delta function kernel
         results2 = self.apply(self.policy2, self.bskv2, xloc, yloc, tmi, smi)
         kSum2, bg2, dmean2, dstd2, vmean2, kImageOut2, diffIm2 = results2
-        print 'AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
-                                                                                    self.dStats.getRms(),
-                                                                                    kSum2, bg2,
-                                                                                    dmean2, dstd2, vmean2)
+        print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
+                                                                                     self.dStats.getRms(),
+                                                                                     kSum2, bg2,
+                                                                                     dmean2, dstd2, vmean2)
         if display:
             ds9.mtv(tmi, frame=4)
             ds9.mtv(smi, frame=5)
@@ -174,10 +174,10 @@ class DiffimTestCases(unittest.TestCase):
         # alard-lupton kernel
         results3 = self.apply(self.policy3, self.bskv3, xloc, yloc, tmi, smi)
         kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3 = results3
-        print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
-                                                                                     self.dStats.getRms(),
-                                                                                     kSum3, bg3,
-                                                                                     dmean3, dstd3, vmean3)
+        print 'AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
+                                                                                    self.dStats.getRms(),
+                                                                                    kSum3, bg3,
+                                                                                    dmean3, dstd3, vmean3)
         # outputs
         if display:
             ds9.mtv(tmi, frame=8)

@@ -91,6 +91,32 @@ namespace diffim {
         }
         _varianceEstimate = var.getVariance();
 
+        try {
+            _buildKernelSolution(basisList, hMat);
+        } catch (pexExcept::Exception &e) {
+            throw e;
+        }
+        
+
+        if (_policy.getBool("iterateSingleKernel") && (!(_policy.getBool("constantVarianceWeighting")))) {
+            afwImage::MaskedImage<PixelT> diffim = getDifferenceImage(KernelCandidate::RECENT);
+            _varianceEstimate = diffim.getVariance();
+
+            try {
+                _buildKernelSolution(basisList, hMat);
+            } catch (pexExcept::Exception &e) {
+                throw e;
+            }
+        }
+
+        _isInitialized = true;
+
+    }
+
+    template <typename PixelT>
+    void KernelCandidate<PixelT>::_buildKernelSolution(lsst::afw::math::KernelList const& basisList,
+                                                       boost::shared_ptr<Eigen::MatrixXd> hMat) 
+    {
         /* Do we have a regularization matrix?  If so use it */
         if (hMat) {
             _useRegularization = true;
@@ -98,7 +124,7 @@ namespace diffim {
                               "Using kernel regularization");
 
             if (_isInitialized) {
-                _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution2<PixelT> >(
+                _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution<PixelT> >(
                     new RegularizedKernelSolution<PixelT>(basisList, _fitForBackground, hMat, _policy)
                     );
                 _kernelSolutionPca->build(*(_miToConvolvePtr->getImage()),
@@ -107,7 +133,7 @@ namespace diffim {
                 _kernelSolutionPca->solve();
             }
             else {
-                _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution2<PixelT> >(
+                _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution<PixelT> >(
                     new RegularizedKernelSolution<PixelT>(basisList, _fitForBackground, hMat, _policy)
                     );
                 _kernelSolutionOrig->build(*(_miToConvolvePtr->getImage()),
@@ -121,8 +147,8 @@ namespace diffim {
             pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
                               "Not using kernel regularization");
             if (_isInitialized) {
-                _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution2<PixelT> >(
-                    new StaticKernelSolution2<PixelT>(basisList, _fitForBackground)
+                _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution<PixelT> >(
+                    new StaticKernelSolution<PixelT>(basisList, _fitForBackground)
                     );
                 _kernelSolutionPca->build(*(_miToConvolvePtr->getImage()),
                                           *(_miToNotConvolvePtr->getImage()),
@@ -130,8 +156,8 @@ namespace diffim {
                 _kernelSolutionPca->solve();
             }
             else {
-                _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution2<PixelT> >(
-                    new StaticKernelSolution2<PixelT>(basisList, _fitForBackground)
+                _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution<PixelT> >(
+                    new StaticKernelSolution<PixelT>(basisList, _fitForBackground)
                     );
                 _kernelSolutionOrig->build(*(_miToConvolvePtr->getImage()),
                                            *(_miToNotConvolvePtr->getImage()),
@@ -139,256 +165,8 @@ namespace diffim {
                 _kernelSolutionOrig->solve();
             }
         }
-
-        
-        /*
-        try {
-            buildEngine(basisList, hMat);
-        } catch (pexExcept::Exception &e) {
-            throw e;
-        }
-        */
-
-        if (_policy.getBool("iterateSingleKernel") && (!(_policy.getBool("constantVarianceWeighting")))) {
-            afwImage::MaskedImage<PixelT> diffim = getDifferenceImage(KernelCandidate::RECENT);
-            _varianceEstimate = diffim.getVariance();
-            //try {
-            //buildEngine(basisList, hMat);
-            //} catch (pexExcept::Exception &e) {
-            //throw e;
-            //}
-        }
-
-        /* Don't put this in buildEngine() since you might have to iterate the
-         * first kernel */
-        _isInitialized = true;
-
     }
             
-
-//    template <typename PixelT>
-//    void KernelCandidate<PixelT>::buildEngine(
-//        lsst::afw::math::KernelList const& basisList,
-//        boost::shared_ptr<Eigen::MatrixXd> hMat
-//        ) {
-//
-//        lsst::afw::image::Image<PixelT> const &imageToConvolve = *(_miToConvolvePtr->getImage());
-//        lsst::afw::image::Image<PixelT> const &imageToNotConvolve = *(_miToNotConvolvePtr->getImage());
-//        
-//        unsigned int const nKernelParameters     = basisList.size();
-//        unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
-//        unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
-//        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
-//        
-//        /* Ignore buffers around edge of convolved images :
-//         * 
-//         * If the kernel has width 5, it has center pixel 2.  The first good pixel
-//         * is the (5-2)=3rd pixel, which is array index 2, and ends up being the
-//         * index of the central pixel.
-//         * 
-//         * You also have a buffer of unusable pixels on the other side, numbered
-//         * width-center-1.  The last good usable pixel is N-width+center+1.
-//         * 
-//         * Example : the kernel is width = 5, center = 2
-//         * 
-//         * ---|---|-c-|---|---|
-//         * 
-//         * the image is width = N
-//         * convolve this with the kernel, and you get
-//         * 
-//         * |-x-|-x-|-g-|---|---| ... |---|---|-g-|-x-|-x-|
-//         * 
-//         * g = first/last good pixel
-//         * x = bad
-//         * 
-//         * the first good pixel is the array index that has the value "center", 2
-//         * the last good pixel has array index N-(5-2)+1
-//         * eg. if N = 100, you want to use up to index 97
-//         * 100-3+1 = 98, and the loops use i < 98, meaning the last
-//         * index you address is 97.
-//         */
-//        unsigned int const startCol = (*kiter)->getCtrX();
-//        unsigned int const startRow = (*kiter)->getCtrY();
-//        unsigned int const endCol   = imageToConvolve.getWidth()  - 
-//            ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
-//        unsigned int const endRow   = imageToConvolve.getHeight() - 
-//            ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
-//        
-//        boost::timer t;
-//        t.restart();
-//        
-//        /* Eigen representation of input images; only the pixels that are unconvolved in cimage below */
-//        Eigen::MatrixXd eigenToConvolve = imageToEigenMatrix(imageToConvolve).block(startRow, 
-//                                                                                    startCol, 
-//                                                                                    endRow-startRow, 
-//                                                                                    endCol-startCol);
-//        Eigen::MatrixXd eigenToNotConvolve = imageToEigenMatrix(imageToNotConvolve).block(startRow, 
-//                                                                                          startCol, 
-//                                                                                          endRow-startRow, 
-//                                                                                          endCol-startCol);
-//        Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(*_varianceEstimate).block(
-//            startRow, startCol, endRow-startRow, endCol-startCol).cwise().inverse();
-//
-//        /* Resize into 1-D for later usage */
-//        eigenToConvolve.resize(eigenToConvolve.rows()*eigenToConvolve.cols(), 1);
-//        eigenToNotConvolve.resize(eigenToNotConvolve.rows()*eigenToNotConvolve.cols(), 1);
-//        eigeniVariance.resize(eigeniVariance.rows()*eigeniVariance.cols(), 1);
-//        
-//        /* Holds image convolved with basis function */
-//        afwImage::Image<PixelT> cimage(imageToConvolve.getDimensions());
-//        
-//        /* Holds eigen representation of image convolved with all basis functions */
-//        std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
-//        
-//        /* Iterators over convolved image list and basis list */
-//        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
-//            convolvedEigenList.begin();
-//        /* Create C_i in the formalism of Alard & Lupton */
-//        for (; kiter != basisList.end(); ++kiter, ++eiter) {
-//            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
-//            boost::shared_ptr<Eigen::MatrixXd> cMat (
-//                new Eigen::MatrixXd(imageToEigenMatrix(cimage).block(startRow, 
-//                                                                     startCol, 
-//                                                                     endRow-startRow, 
-//                                                                     endCol-startCol))
-//                );
-//            cMat->resize(cMat->rows()*cMat->cols(), 1);
-//            *eiter = cMat;
-//
-//        } 
-//
-//        double time = t.elapsed();
-//        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
-//                          "Total compute time to do basis convolutions : %.2f s", time);
-//        t.restart();
-//        
-//        /* 
-//         * 
-//         * NOTE - 
-//         * 
-//         * Below is the original Eigen representation of the matrix math needed.
-//         * Its a bit more readable but 5-10% slower than the as-implemented Eigen
-//         * math.  Left here for reference as it nicely and simply outlines the math
-//         * that goes into the construction of M and B.
-//         * 
-//         
-//         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiteri = 
-//             convolvedEigenList.begin();
-//         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = 
-//             convolvedEigenList.end();
-//         for (unsigned int kidxi = 0; eiteri != eiterE; eiteri++, kidxi++) {
-//         Eigen::VectorXd eiteriDotiVariance = (*eiteri)->cwise() * eigeniVarianceV;
-//         
-//         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = eiteri;
-//         for (unsigned int kidxj = kidxi; eiterj != eiterE; eiterj++, kidxj++) {
-//         M(kidxi, kidxj) = (eiteriDotiVariance.cwise() * (**eiterj)).sum();
-//         M(kidxj, kidxi) = M(kidxi, kidxj);
-//         }
-//         B(kidxi)                 = (eiteriDotiVariance.cwise() * eigenToNotConvolveV).sum();
-//         M(kidxi, nParameters-1)  = eiteriDotiVariance.sum();
-//         M(nParameters-1, kidxi)  = M(kidxi, nParameters-1);
-//         }
-//         B(nParameters-1)                = (eigenToNotConvolveV.cwise() * eigeniVarianceV).sum();
-//         M(nParameters-1, nParameters-1) = eigeniVarianceV.sum();
-//         
-//        */
-//        
-//        /* 
-//           Load matrix with all values from convolvedEigenList : all images
-//           (eigeniVariance, convolvedEigenList) must be the same size
-//        */
-//        Eigen::MatrixXd cMat(eigeniVariance.col(0).size(), nParameters);
-//        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
-//            convolvedEigenList.begin();
-//        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
-//            convolvedEigenList.end();
-//        for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-//            cMat.col(kidxj) = (*eiterj)->col(0);
-//        }
-//        /* Treat the last "image" as all 1's to do the background calculation. */
-//        if (_fitForBackground)
-//            cMat.col(nParameters-1).fill(1.);
-//        
-//        /* Caculate the variance-weighted pixel values */
-//        Eigen::MatrixXd vcMat = eigeniVariance.col(0).asDiagonal() * cMat;
-//        
-//
-//        /* Calculate M as the variance-weighted inner product of C */
-//        boost::shared_ptr<Eigen::MatrixXd> mMat (
-//            new Eigen::MatrixXd(cMat.transpose() * vcMat)
-//            );
-//        boost::shared_ptr<Eigen::VectorXd> bVec (
-//            new Eigen::VectorXd(vcMat.transpose() * eigenToNotConvolve.col(0))
-//            );
-//        
-//        if (DEBUG_MATRIX) {
-//            std::cout << "M "    << std::endl;
-//            std::cout << (*mMat) << std::endl;
-//            std::cout << "B "    << std::endl;
-//            std::cout << (*bVec) << std::endl;
-//        }
-//        
-//        time = t.elapsed();
-//        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
-//                          "Total compute time to step through pixels : %.2f s", time);
-//        t.restart();
-//        
-//        /* If the regularization matrix is here and not null, we use it by default */
-//        if (_useRegularization) {
-//            std::string lambdaType = _policy.getString("lambdaType");        
-//            double lambdaValue  = _policy.getDouble("lambdaValue");
-//            
-//            /* See N.R. 18.5 */
-    //
-//            /* 
-//               We regularize the least squares problem:
-//               
-//               (M + lambda H) a = b
-//
-//               Regularizing the normal equations instead would suggest we make
-//               a new problem of the form:
-//
-//               (Mt M + lambda H) a = Mt b
-//
-//               which yields a slightly different effective noise weighting in
-//               the solution.
-//
-//            */
-//            
-//            double lambda;
-//            if (lambdaType == "absolute") {
-//                lambda = lambdaValue;
-//            }
-//            else if (lambdaType == "relative") {
-//                lambda  = mMat->trace() / hMat->trace();
-//                lambda *= lambdaValue;
-//            }
-//            else {
-//                throw LSST_EXCEPT(pexExcept::Exception, "lambdaType in Policy not recognized");
-//            }
-//            (*mMat) += lambda * (*hMat);
-//            
-//            pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
-//                              "Applying kernel regularization with lambda = %.2e", lambda);
-//            
-//        }
-//        
-//        if (_isInitialized) {
-//            _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution>(
-//                new StaticKernelSolution(mMat, bVec, _fitForBackground, basisList)
-//                );
-//            _kernelSolutionPca->solve(false);
-//        }
-//        else {
-//            _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution>(
-//                new StaticKernelSolution(mMat, bVec, _fitForBackground, basisList)
-//                );
-//            _kernelSolutionOrig->solve(false);
-//        }
-//    }
-    
-    
-    
     template <typename PixelT>
     lsst::afw::math::Kernel::Ptr KernelCandidate<PixelT>::getKernel(CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
@@ -504,7 +282,7 @@ namespace diffim {
     }
 
     template <typename PixelT>
-    boost::shared_ptr<StaticKernelSolution2<PixelT> > KernelCandidate<PixelT>::getKernelSolution(
+    boost::shared_ptr<StaticKernelSolution<PixelT> > KernelCandidate<PixelT>::getKernelSolution(
         CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
             if (_kernelSolutionOrig) 

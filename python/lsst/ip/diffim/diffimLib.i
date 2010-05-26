@@ -144,16 +144,16 @@ def version(HeadURL = r"$HeadURL$"):
 
 
 %define %KernelSolutionPtrs(NAME, TYPE)
-SWIG_SHARED_PTR_DERIVED(StaticKernelSolution2##NAME,
+SWIG_SHARED_PTR_DERIVED(StaticKernelSolution##NAME,
                         lsst::ip::diffim::KernelSolution,
-                        lsst::ip::diffim::StaticKernelSolution2<TYPE>);
+                        lsst::ip::diffim::StaticKernelSolution<TYPE>);
 SWIG_SHARED_PTR_DERIVED(RegularizedKernelSolution##NAME,
-                        lsst::ip::diffim::StaticKernelSolution2<TYPE>,
+                        lsst::ip::diffim::StaticKernelSolution<TYPE>,
                         lsst::ip::diffim::RegularizedKernelSolution<TYPE>);
 %enddef
 
 %define %KernelCandidates(NAME, TYPE)
-%template(StaticKernelSolution2##NAME) lsst::ip::diffim::StaticKernelSolution2<TYPE>;
+%template(StaticKernelSolution##NAME) lsst::ip::diffim::StaticKernelSolution<TYPE>;
 %template(RegularizedKernelSolution##NAME) lsst::ip::diffim::RegularizedKernelSolution<TYPE>;
 %enddef
 
