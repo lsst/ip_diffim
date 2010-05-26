@@ -45,6 +45,21 @@ namespace boost {
 
 /******************************************************************************/
 
+/* Eigen / numpy.  Info comes from $AFW_DIR/include/lsst/afw/numpyTypemaps.h */
+%{
+#define PY_ARRAY_UNIQUE_SYMBOL LSST_IP_DIFFIM_NUMPY_ARRAY_API
+#include "numpy/arrayobject.h"
+#include "lsst/afw/numpyTypemaps.h"
+%}
+
+%init %{
+    import_array();
+%}
+
+%include "lsst/afw/eigen.i"
+%declareEigenMatrix(Eigen::MatrixXd);
+%declareEigenMatrix(Eigen::VectorXd);
+/* Eigen / numpy.  Info comes from $AFW_DIR/include/lsst/afw/numpyTypemaps.h */
 
 %include "lsst/p_lsstSwig.i"
 %include "lsst/daf/base/persistenceMacros.i"
@@ -56,8 +71,6 @@ namespace boost {
 
 %lsst_exceptions();
 
-%import "lsst/afw/eigen.i"
-%declareEigenMatrix(Eigen::Matrix2d);
 
 %pythoncode %{
 import lsst.utils

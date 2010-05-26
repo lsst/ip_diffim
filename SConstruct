@@ -40,6 +40,13 @@ env = scons.makeEnv(
 #
 env.libs["ip_diffim"] += env.getlibs("boost wcslib cfitsio minuit2 utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy security afw gsl eigen sdqa")
 
+if True:
+    #
+    # Workaround SConsUtils failure to find numpy .h files. Fixed in sconsUtils >= 3.3.2
+    #
+    import numpy
+    env.Append(CCFLAGS = ["-I", numpy.get_include()])
+
 #
 # Build/install things
 #
