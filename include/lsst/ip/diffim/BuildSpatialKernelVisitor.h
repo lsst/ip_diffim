@@ -26,6 +26,8 @@ namespace detail {
     template<typename PixelT>
     class BuildSpatialKernelVisitor : public lsst::afw::math::CandidateVisitor {
     public:
+        typedef boost::shared_ptr<BuildSpatialKernelVisitor<PixelT> > Ptr;
+
         BuildSpatialKernelVisitor(
             lsst::afw::math::KernelList const& basisList,  ///< Basis functions
             lsst::pex::policy::Policy policy         ///< Policy file directing behavior
@@ -44,6 +46,18 @@ namespace detail {
         boost::shared_ptr<SpatialKernelSolution> _kernelSolution;
         int _nCandidates;                  ///< Number of candidates visited
     };
+
+    template<typename PixelT>
+    boost::shared_ptr<BuildSpatialKernelVisitor<PixelT> >
+    makeBuildSpatialKernelVisitor(
+        lsst::afw::math::KernelList const& basisList,
+        lsst::pex::policy::Policy policy
+        ) {
+
+        return typename BuildSpatialKernelVisitor<PixelT>::Ptr(
+            new BuildSpatialKernelVisitor<PixelT>(basisList, policy)
+            );
+    }
 
 }}}} // end of namespace lsst::ip::diffim::detail
 

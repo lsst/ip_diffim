@@ -90,8 +90,8 @@ class DiffimTestCases(unittest.TestCase):
     def testConstructor(self):
         # Original and uninitialized
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
-                                       self.scienceImage2.getMaskedImage(),
                                        self.templateImage2.getMaskedImage(),
+                                       self.scienceImage2.getMaskedImage(),
                                        self.policy)
 
         # Kernel not initialized

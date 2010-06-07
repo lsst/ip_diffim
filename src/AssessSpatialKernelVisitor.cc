@@ -61,7 +61,8 @@ namespace detail {
         _policy(policy),
         _imstats(ImageStatistics<PixelT>()),
         _nGood(0),
-        _nRejected(0) 
+        _nRejected(0),
+        _nProcessed(0)
     {};
 
     template<typename PixelT>
@@ -83,7 +84,7 @@ namespace detail {
         
         pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                               "Processing candidate %d", kCandidate->getId());
-        
+
         /* 
            Note - this is a hack until the Kernel API is upgraded by the
            Davis crew.  I need a "local" version of the spatially varying
@@ -108,10 +109,10 @@ namespace detail {
         
         /* Official resids */
         _imstats.apply(diffim);
-        kCandidate->setChi2(_imstats.getVariance());
+        _nProcessed += 1;
         
         pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                              "Chi2 = %.2f", kCandidate->getChi2());
+                              "Chi2 = %.2f", _imstats.getVariance());
         pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                               "X = %.2f Y = %.2f",
                               kCandidate->getXCenter(), 

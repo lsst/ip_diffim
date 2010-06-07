@@ -26,6 +26,7 @@ namespace detail {
     class AssessSpatialKernelVisitor : public lsst::afw::math::CandidateVisitor {
         typedef lsst::afw::image::MaskedImage<PixelT> MaskedImageT;
     public:
+        typedef boost::shared_ptr<AssessSpatialKernelVisitor<PixelT> > Ptr;
 
         AssessSpatialKernelVisitor(
             lsst::afw::math::LinearCombinationKernel::Ptr spatialKernel,   ///< Spatially varying kernel 
@@ -34,10 +35,11 @@ namespace detail {
             );
         virtual ~AssessSpatialKernelVisitor() {};
 
-        void reset() {_nGood = 0; _nRejected = 0;}
+        void reset() {_nGood = 0; _nRejected = 0; _nProcessed = 0;}
 
         int getNGood() {return _nGood;}
         int getNRejected() {return _nRejected;}
+        int getNProcessed() {return _nProcessed;}
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
 
     private:
@@ -47,7 +49,22 @@ namespace detail {
         ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
         int _nGood;                           ///< Number of good candidates remaining
         int _nRejected;                       ///< Number of candidates rejected during processCandidate()
+        int _nProcessed;                      ///< Number of candidates processed during processCandidate()
+       
     };
+
+    template<typename PixelT>
+    boost::shared_ptr<AssessSpatialKernelVisitor<PixelT> >
+    makeAssessSpatialKernelVisitor(
+        lsst::afw::math::LinearCombinationKernel::Ptr spatialKernel,   
+        lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground, 
+        lsst::pex::policy::Policy const& policy                        
+         ) {
+
+        return typename AssessSpatialKernelVisitor<PixelT>::Ptr(
+            new AssessSpatialKernelVisitor<PixelT>(spatialKernel, spatialBackground, policy)
+            );
+    }
 
 }}}} // end of namespace lsst::ip::diffim::detail
 
