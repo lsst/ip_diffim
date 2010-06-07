@@ -2,7 +2,6 @@
 from diffimLib import *
 
 # python code
-from makePsfMatchingFunctor import *
 from makePsfMatchingKernel import *
 from makeSdqaRatingVector import *
 from generatePolicy import *
