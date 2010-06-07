@@ -156,7 +156,7 @@ namespace diffim {
         KernelSolution(fitForBackground),
         _cMat(),
         _iVec(),
-        _vVec(),
+        _ivVec(),
         _kernel(),
         _background(0.0),
         _kSum(0.0)
@@ -328,7 +328,7 @@ namespace diffim {
             cMat.col(nParameters-1).fill(1.);
 
         _cMat.reset(new Eigen::MatrixXd(cMat));
-        _vVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
+        _ivVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
         _iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.col(0)));
     }
 
@@ -336,10 +336,10 @@ namespace diffim {
     void StaticKernelSolution<InputT>::solve() {
         pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.solve", 
                           "cMat is %d x %d; vVec is %d; iVec is %d", 
-                          (*_cMat).rows(), (*_cMat).cols(), (*_vVec).size(), (*_iVec).size());
+                          (*_cMat).rows(), (*_cMat).cols(), (*_ivVec).size(), (*_iVec).size());
 
-        _mMat.reset(new Eigen::MatrixXd((*_cMat).transpose() * ((*_vVec).asDiagonal() * (*_cMat))));
-        _bVec.reset(new Eigen::VectorXd((*_cMat).transpose() * ((*_vVec).asDiagonal() * (*_iVec))));
+        _mMat.reset(new Eigen::MatrixXd((*_cMat).transpose() * ((*_ivVec).asDiagonal() * (*_cMat))));
+        _bVec.reset(new Eigen::VectorXd((*_cMat).transpose() * ((*_ivVec).asDiagonal() * (*_iVec))));
 
         try {
             KernelSolution::solve();
@@ -440,15 +440,21 @@ namespace diffim {
         double lambdaMax   = _policy.getDouble("lambdaMax");
         double lambdaStep  = _policy.getDouble("lambdaStep");
 
-        Eigen::SVD<Eigen::MatrixXd> svd(*(this->_cMat));
-        Eigen::MatrixXd vMat       = svd.matrixV();
+        Eigen::MatrixXd vMat = (this->_cMat)->svd().matrixV();
+        
+        /* Find pseudo inverse of mMat, which may be ill conditioned */
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(*(this->_mMat));
+        Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
+        Eigen::VectorXd eValues = eVecValues.eigenvalues();
+        for (int i = 0; i != eValues.rows(); ++i) {
+            if (eValues(i) != 0.0) {
+                eValues(i) = 1.0/eValues(i);
+            }
+        }
+        Eigen::MatrixXd mInv    = rMat * eValues.asDiagonal() * rMat.transpose();
 
-        ///* Find pseudo inverse of mMat, which may be ill conditioned */
-        //Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(*(this->_mMat));
-        //Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
-        //Eigen::VectorXd eValues = eVecValues.eigenvalues();
-        //Eigen::MatrixXd mInv    = rMat * eValues.asDiagonal() * rMat.transpose();
-        Eigen::MatrixXd mInv = this->_mMat->inverse();
+        /* Instead of */
+        //Eigen::MatrixXd mInv = this->_mMat->inverse();
 
         std::vector<double> lambdas;
         std::vector<double> risks;
@@ -472,7 +478,7 @@ namespace diffim {
 
             double risk   = term1(0) + 2 * (term2a - term2b(0));
             pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateRisk", 
-                              "Lambda = %.2f, risk estimate = %.2e + 2 * (%.2e - %.2e) = %.5e", 
+                              "Lambda = %.2f, risk estimate = %.5e + 2 * (%.5e - %.5e) = %.5e", 
                               l, term1(0), term2a, term2b(0), risk);
             lambdas.push_back(l);
             risks.push_back(risk);
@@ -507,6 +513,7 @@ namespace diffim {
 
             Eigen::VectorXd dVec = (*this->_iVec) - *(this->_cMat) * *(this->_aVec);
             double numerator   = (dVec.transpose() * dVec).sum();
+            //double numerator   = (dVec.transpose() * this->_ivVec->asDiagonal() * dVec).sum();
             double gcv         = numerator / denominator;
             pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateGcv", 
                               "Lambda = %.2f, GCV = %.5e", l, gcv);
@@ -522,14 +529,44 @@ namespace diffim {
         return lambdas[index];
     }
         
+    template <typename InputT>
+    boost::shared_ptr<Eigen::MatrixXd> RegularizedKernelSolution<InputT>::getM(bool includeHmat) {
+        if (includeHmat == true) {
+            return (boost::shared_ptr<Eigen::MatrixXd>(
+                        new Eigen::MatrixXd(*(this->_mMat) + _lambda * (*_hMat))
+                        ));
+        }
+        else {
+            return this->_mMat;
+        }
+    }
 
     template <typename InputT>
     void RegularizedKernelSolution<InputT>::solve() {
+
+        pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.solve", 
+                          "cMat is %d x %d; vVec is %d; iVec is %d; hMat is %d x %d", 
+                          (*this->_cMat).rows(), (*this->_cMat).cols(), (*this->_ivVec).size(), 
+                          (*this->_iVec).size(), (*_hMat).rows(), (*_hMat).cols());
+
+        if (DEBUG_MATRIX) {
+            std::cout << "C:" << std::endl;
+            std::cout << (*this->_cMat) << std::endl;
+            std::cout << "Sigma^{-1}:" << std::endl;
+            std::cout << (*this->_ivVec).asDiagonal() << std::endl;
+            std::cout << "Y:" << std::endl;
+            std::cout << (*this->_iVec) << std::endl;
+            std::cout << "H:" << std::endl;
+            std::cout << (*_hMat) << std::endl;
+            throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution");
+        }
+
+
         this->_mMat.reset(
-            new Eigen::MatrixXd(this->_cMat->transpose() * this->_vVec->asDiagonal() * *(this->_cMat))
+            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
             );
         this->_bVec.reset(
-            new Eigen::VectorXd(this->_cMat->transpose() * this->_vVec->asDiagonal() * *(this->_iVec))
+            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
             );
         
         std::string lambdaType = _policy.getString("lambdaType");        
@@ -628,9 +665,6 @@ namespace diffim {
         _kernel(),
         _background(),
         _kSum(0.0),
-        _kernelErr(),
-        _backgroundErr(),
-        _errCalculated(false),
         _policy(policy),
         _nbases(0),
         _nkt(0),
@@ -819,14 +853,10 @@ namespace diffim {
         }
         /* Turn matrices into _kernel and _background */
         _setKernel();
-        
-        if (_policy.getBool("calculateUncertainties")) {
-            _setKernelUncertainty();
-        }
     }
 
     std::pair<afwMath::LinearCombinationKernel::Ptr, 
-            afwMath::Kernel::SpatialFunctionPtr> SpatialKernelSolution::getKernelSolution() {
+            afwMath::Kernel::SpatialFunctionPtr> SpatialKernelSolution::getSolutionPair() {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
         }
@@ -843,8 +873,7 @@ namespace diffim {
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
 
         if (nkt == 1) {
-            /* Not spatially varying; this fork is a specialization
-             * for convolution speed--up */
+            /* Not spatially varying; this fork is a specialization for convolution speed--up */
             
             /* Make sure the coefficients look right */
             if (nbases != (nt - nbt)) {
@@ -899,20 +928,6 @@ namespace diffim {
             }
             _background->setParameters(bgCoeffs);
         }
-
-
-    }
-
-
-    void SpatialKernelSolution::_setKernelUncertainty() {
-        throw LSST_EXCEPT(pexExcept::Exception, 
-                          "SpatialKernelSolution::_setKernelUncertainty not implemented");
-    }
-
-    std::pair<afwMath::LinearCombinationKernel::Ptr, 
-              afwMath::Kernel::SpatialFunctionPtr> SpatialKernelSolution::getKernelUncertainty() {
-        throw LSST_EXCEPT(pexExcept::Exception, 
-                          "SpatialKernelSolution::getKernelUncertainty not implemented");
     }
 
 /***********************************************************************************************************/

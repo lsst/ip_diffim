@@ -39,6 +39,11 @@ class DiffimTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.policy
+        del self.gaussFunction
+        del self.gaussKernel
+        if self.defDataDir:
+            del self.templateImage
+            del self.scienceImage 
 
     def testGetCollection(self):
         if not self.defDataDir:

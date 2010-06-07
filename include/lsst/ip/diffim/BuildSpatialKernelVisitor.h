@@ -38,7 +38,7 @@ namespace detail {
         void solveLinearEquation();
 
         std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, 
-                  lsst::afw::math::Kernel::SpatialFunctionPtr> getKernelSolution();
+                  lsst::afw::math::Kernel::SpatialFunctionPtr> getSolutionPair();
 
     private:
         boost::shared_ptr<SpatialKernelSolution> _kernelSolution;

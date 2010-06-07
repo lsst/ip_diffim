@@ -279,7 +279,7 @@ fitSpatialKernelFromCandidates(
                               spatialKernelFitter.getNCandidates());
 
             std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> kb =
-                spatialKernelFitter.getKernelSolution();
+                spatialKernelFitter.getSolutionPair();
 
             spatialKernel     = kb.first;
             spatialBackground = kb.second;

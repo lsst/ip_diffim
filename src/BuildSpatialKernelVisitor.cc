@@ -117,8 +117,8 @@ namespace detail {
 
     template<typename PixelT>
     std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr>
-    BuildSpatialKernelVisitor<PixelT>::getKernelSolution() {
-        return _kernelSolution->getKernelSolution();
+    BuildSpatialKernelVisitor<PixelT>::getSolutionPair() {
+        return _kernelSolution->getSolutionPair();
     }
 
     typedef float PixelT;

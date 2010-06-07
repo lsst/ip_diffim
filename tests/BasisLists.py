@@ -66,7 +66,7 @@ class DiffimTestCases(unittest.TestCase):
         ks = ipDiffim.makeKernelBasisList(self.policy)
 
         # right size
-        self.assertEqual(ks.size(), self.kCols * self.kRows)
+        self.assertEqual(len(ks), self.kCols * self.kRows)
 
         # right shape
         self.deltaFunctionTest(ks)
@@ -95,7 +95,7 @@ class DiffimTestCases(unittest.TestCase):
 
 
     def testAlardLupton(self):
-        self.policy.set("kernelBasisSet", "delta-function")
+        self.policy.set("kernelBasisSet", "alard-lupton")
         ks = ipDiffim.makeKernelBasisList(self.policy)
 
         # right size

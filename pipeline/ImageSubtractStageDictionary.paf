@@ -159,11 +159,19 @@ centralRegularizationStencil: 9
 forwardRegularizationOrders: 1 2 
 regularizationBorderPenalty: 3.
 
+######
+# How to choose the value of Lambda
+#  
+# lambdaType = "absolute" : use lambdaValue as the value of lambda
+#            = "relative" : use lambdaValue as a fraction of the default lambda strength (N.R. 18.5.8)
+#            = "minimizeRisk" : minimize risk estimate; scan all lambda from lambdaMin,lambdaMax,lambdaStep
+#            = "minimizeGcv" : minimize generalized cross-validation statistic; scan lambda
+# 
 lambdaType: "absolute" 
 lambdaValue: 1.0
-lambdaMin: 0.
-lambdaMax: 100.0
-lambdaStep: 1.
+lambdaMin: 1.
+lambdaMax: 500.0
+lambdaStep: 10.
 
 #lambdaType: "relative"
 #lambdaValue: 0.00001

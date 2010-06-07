@@ -91,7 +91,7 @@ namespace diffim {
     protected:
         boost::shared_ptr<Eigen::MatrixXd> _cMat;               ///< K_i x R
         boost::shared_ptr<Eigen::VectorXd> _iVec;               ///< Vectorized I
-        boost::shared_ptr<Eigen::VectorXd> _vVec;               ///< Variance
+        boost::shared_ptr<Eigen::VectorXd> _ivVec;              ///< Inverse variance
 
         lsst::afw::math::Kernel::Ptr _kernel;                   ///< Derived single-object convolution kernel
         double _background;                                     ///< Derived differential background estimate
@@ -117,14 +117,14 @@ namespace diffim {
         double estimateRisk();
         double estimateGcv();
 
+        /* Include additive term (_lambda * _hMat) in M matrix? */
+        boost::shared_ptr<Eigen::MatrixXd> getM(bool includeHmat = true);
+
     private:
         boost::shared_ptr<Eigen::MatrixXd> _hMat;               ///< Regularization weights
         double _lambda;                                         ///< Overall regularization strength
         lsst::pex::policy::Policy _policy;
     };
-
-
-
 
 
     class SpatialKernelSolution : public KernelSolution {
@@ -144,9 +144,8 @@ namespace diffim {
         void solve();
         ImageT::Ptr makeKernelImage();
         std::pair<lsst::afw::math::LinearCombinationKernel::Ptr,
-                  lsst::afw::math::Kernel::SpatialFunctionPtr> getKernelSolution();
-        std::pair<lsst::afw::math::LinearCombinationKernel::Ptr,
-                  lsst::afw::math::Kernel::SpatialFunctionPtr> getKernelUncertainty();
+                  lsst::afw::math::Kernel::SpatialFunctionPtr> getSolutionPair();
+
     private:
         lsst::afw::math::Kernel::SpatialFunctionPtr _spatialKernelFunction; ///< Spatial function for Kernel
         lsst::afw::math::Kernel::SpatialFunctionPtr _spatialBgFunction;     ///< Spatial function for Bg
@@ -154,20 +153,16 @@ namespace diffim {
 
         lsst::afw::math::LinearCombinationKernel::Ptr _kernel;   ///< Spatial convolution kernel
         lsst::afw::math::Kernel::SpatialFunctionPtr _background; ///< Spatial background model
-        double _kSum;                                           ///< Derived kernel sum
+        double _kSum;                                            ///< Derived kernel sum
 
-        lsst::afw::math::LinearCombinationKernel::Ptr _kernelErr;   ///< Kernel uncertainty
-        lsst::afw::math::Kernel::SpatialFunctionPtr _backgroundErr; ///< Background uncertainty
-        bool _errCalculated;                                        ///< Has the uncertainty been calculated?
-        
-        lsst::pex::policy::Policy _policy;
-        int _nbases;
-        int _nkt;
-        int _nbt;
-        int _nt;
+        lsst::pex::policy::Policy _policy;                       ///< Policy to control processing
+        int _nbases;                                             ///< Number of basis functions
+        int _nkt;                                                ///< Number of kernel terms
+        int _nbt;                                                ///< Number of background terms
+        int _nt;                                                 ///< Total number of terms
 
-        void _setKernel();
-        void _setKernelUncertainty();
+        void _setKernel();                                       ///< Set kernel after solution
+        void _setKernelUncertainty();                            ///< Not implemented
     };
 
 }}} // end of namespace lsst::ip::diffim
