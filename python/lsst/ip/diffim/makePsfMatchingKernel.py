@@ -1,9 +1,6 @@
 # all the c++ level classes and routines
 import diffimLib
 
-# all the other diffim routines
-from .makePsfMatchingFunctor import makePsfMatchingFunctor
-
 # all the other LSST packages
 import lsst.afw.image.imageLib as afwImage
 import lsst.afw.math.mathLib as afwMath
@@ -57,20 +54,9 @@ def makePsfMatchingKernel(maskedImageToConvolve,
         kernelCellSet.insertCandidate(cand)
 
 
-    #print "CAW CAW CAW"
-    ## ACB debugging
-    #from .diffimTools import displayFootprints
-    #ds9.mtv(maskedImageToConvolve, frame=2)
-    #ds9.mtv(maskedImageToNotConvolve, frame=3)
-    #displayFootprints(maskedImageToNotConvolve, footprints, frame=5)
-
-
-    # Object to perform the Psf matching on a source-by-source basis
-    kFunctor = makePsfMatchingFunctor(policy)
-
     # Create the Psf matching kernel
     try:
-        kb = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
+        kb = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet, policy)
     except pexExcept.LsstCppException, e:
         pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 1,
                      "ERROR: Unable to calculate psf matching kernel")
@@ -237,12 +223,9 @@ def makePsfMatchingKernelToGaussian(maskedImageToConvolve,
             ds9.mtv(kImageG, frame=3)
 
 
-    # Object to perform the Psf matching on a source-by-source basis
-    kFunctor = makePsfMatchingFunctor(policy)
-
     # Create the Psf matching kernel
     try:
-        kb = diffimLib.fitSpatialKernelFromCandidates(kFunctor, kernelCellSet, policy)
+        kb = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet, policy)
     except pexExcept.LsstCppException, e:
         pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 1,
                      "ERROR: Unable to calculate psf matching kernel")
