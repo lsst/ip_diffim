@@ -58,7 +58,7 @@ class DiffimTestCases(unittest.TestCase):
             im  = afwImage.ImageD(basisList0[order[i]].getDimensions())
             basisList0[order[i]].computeImage(im, False)
             im /= scaling[i]
-            im.writeFits('k%d.fits' % (i))
+            #im.writeFits('k%d.fits' % (i))
             k   = afwMath.FixedKernel(im)
             self.basisList.append(k)
 
