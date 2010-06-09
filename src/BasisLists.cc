@@ -511,7 +511,6 @@ namespace diffim {
                 image -= image0;
             }
             
-            
             /* Finally, rescale such that the inner product is 1 */
             kSum = 0.;
             for (int y = 0; y < image.getHeight(); y++) {

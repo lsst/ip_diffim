@@ -148,7 +148,6 @@ namespace diffim {
 
     private:
         lsst::afw::math::Kernel::SpatialFunctionPtr _spatialKernelFunction; ///< Spatial function for Kernel
-        lsst::afw::math::Kernel::SpatialFunctionPtr _spatialBgFunction;     ///< Spatial function for Bg
         bool _constantFirstTerm;                                            ///< Is the first term constant
 
         lsst::afw::math::LinearCombinationKernel::Ptr _kernel;   ///< Spatial convolution kernel

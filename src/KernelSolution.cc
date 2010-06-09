@@ -28,7 +28,7 @@
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
-#define DEBUG_MATRIX 0
+#define DEBUG_MATRIX 1
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
@@ -85,8 +85,12 @@ namespace diffim {
         if (DEBUG_MATRIX) {
             std::cout << "M " << std::endl;
             std::cout << mMat << std::endl;
-            std::cout << "B " << std::endl;
-            std::cout << bVec << std::endl;
+            //std::cout << "B " << std::endl;
+            //std::cout << bVec << std::endl;
+
+            for (int i = 0; i < bVec.size(); i++) {
+                fprintf(stderr, "B %d : %f\n", i, bVec(i));
+            }
         }
 
         Eigen::VectorXd aVec = Eigen::VectorXd::Zero(bVec.size());
@@ -141,6 +145,11 @@ namespace diffim {
         double time = t.elapsed();
         pexLog::TTrace<3>("lsst.ip.diffim.KernelSolution.solve", 
                           "Compute time for matrix math : %.2f s", time);
+       if (DEBUG_MATRIX) {
+            for (int i = 0; i < aVec.size(); i++) {
+                fprintf(stderr, "A %d : %f\n", i, aVec(i));
+            }
+        }
 
         _aVec = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(aVec));
     }
@@ -293,8 +302,13 @@ namespace diffim {
         typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
             convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
+        int foo = 0;
         for (; kiter != basisList.end(); ++kiter, ++eiter) {
             afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+
+            cimage.writeFits(str(boost::format("C%d.fits") % foo));    
+            foo += 1;
+
             boost::shared_ptr<Eigen::MatrixXd> cMat (
                 new Eigen::MatrixXd(imageToEigenMatrix(cimage).block(startRow, 
                                                                      startCol, 
@@ -330,6 +344,7 @@ namespace diffim {
         _cMat.reset(new Eigen::MatrixXd(cMat));
         _ivVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
         _iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.col(0)));
+
     }
 
     template <typename InputT>
@@ -660,7 +675,6 @@ namespace diffim {
         ) :
         KernelSolution(),
         _spatialKernelFunction(),
-        _spatialBgFunction(),
         _constantFirstTerm(false),
         _kernel(),
         _background(),
@@ -685,13 +699,13 @@ namespace diffim {
         int spatialBgOrder      = policy.getInt("spatialBgOrder");
         this->_fitForBackground = _policy.getBool("fitForBackground");
         if (_fitForBackground) 
-            _spatialBgFunction = lsst::afw::math::Kernel::SpatialFunctionPtr(
+            _background = lsst::afw::math::Kernel::SpatialFunctionPtr(
                 new afwMath::PolynomialFunction2<double>(spatialBgOrder)
                 );
 
         _nbases = basisList.size();
         _nkt = _spatialKernelFunction->getParameters().size();
-        _nbt = _fitForBackground ? _spatialBgFunction->getParameters().size() : 0;
+        _nbt = _fitForBackground ? _background->getParameters().size() : 0;
         _nt  = 0;
         if (_constantFirstTerm) {
             _nt = (_nbases - 1) * _nkt + 1 + _nbt;
@@ -730,7 +744,7 @@ namespace diffim {
         for (int idx = 0; idx < _nkt; idx++) {
             paramsK[idx] = 1.0;
             _spatialKernelFunction->setParameters(paramsK);
-            pK(idx) = (*_spatialKernelFunction)(xCenter, yCenter);
+            pK(idx) = (*_spatialKernelFunction)(xCenter, yCenter); /* Assume things don't vary over stamp */
             paramsK[idx] = 0.0;
         }
         Eigen::MatrixXd pKpKt = (pK * pK.transpose());
@@ -740,12 +754,12 @@ namespace diffim {
         Eigen::MatrixXd pKpBt;
         if (_fitForBackground) {
             /* Pure background terms */
-            std::vector<double> paramsB = _spatialBgFunction->getParameters();
+            std::vector<double> paramsB = _background->getParameters();
             for (int idx = 0; idx < _nbt; idx++) { paramsB[idx] = 0.0; }
             for (int idx = 0; idx < _nbt; idx++) {
                 paramsB[idx] = 1.0;
-                _spatialBgFunction->setParameters(paramsB);
-                pB(idx) = (*_spatialBgFunction)(xCenter, yCenter);
+                _background->setParameters(paramsB);
+                pB(idx) = (*_background)(xCenter, yCenter);       /* Assume things don't vary over stamp */
                 paramsB[idx] = 0.0;
             }
             pBpBt = (pB * pB.transpose());
@@ -821,7 +835,10 @@ namespace diffim {
         if (DEBUG_MATRIX) {
             std::cout << "Spatial matrix outputs" << std::endl;
             std::cout << "mMat " << (*_mMat) << std::endl;
-            std::cout << "bVec " << (*_bVec) << std::endl;
+            //std::cout << "bVec " << (*_bVec) << std::endl;
+            for (int i = 0; i < (*_bVec).size(); i++) {
+                fprintf(stderr, "B spatial %d : %f\n", i, (*_bVec)(i));
+            }
         }
 
     }
@@ -867,7 +884,7 @@ namespace diffim {
     void SpatialKernelSolution::_setKernel() {
         
         unsigned int nkt    = _spatialKernelFunction->getParameters().size();
-        unsigned int nbt    = _fitForBackground ? _spatialBgFunction->getParameters().size() : 1;
+        unsigned int nbt    = _fitForBackground ? _background->getParameters().size() : 1;
         unsigned int nt     = _aVec->size();
         unsigned int nbases = 
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
