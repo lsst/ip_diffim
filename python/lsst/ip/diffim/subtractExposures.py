@@ -5,7 +5,7 @@ import lsst.pex.logging as pexLog
 import lsst.afw.image as afwImage
 import lsst.afw.display.ds9 as ds9
 
-def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display=False):
+def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display=False, frame=0):
     # Make sure they end up the same dimensions on the sky
     templateWcs    = exposureToConvolve.getWcs() 
     scienceWcs     = exposureToNotConvolve.getWcs()
@@ -42,8 +42,8 @@ def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display
     maskedImageToNotConvolve = exposureToNotConvolve.getMaskedImage()
 
     if display:
-        ds9.mtv(maskedImageToConvolve, frame=0)
-        ds9.mtv(maskedImageToNotConvolve, frame=1)
+        ds9.mtv(maskedImageToConvolve, frame=frame)
+        ds9.mtv(maskedImageToNotConvolve, frame=frame+1)
 
     # Subtract their MaskedImages
     try:
@@ -58,7 +58,7 @@ def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display
         differenceMaskedImage, spatialKernel, spatialBg, kernelCellSet = result
         
     if display:
-        ds9.mtv(differenceMaskedImage, frame=2)
+        ds9.mtv(differenceMaskedImage, frame=frame+2)
         
     
     # Generate an exposure from the results

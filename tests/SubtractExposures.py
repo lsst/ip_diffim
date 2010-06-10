@@ -12,7 +12,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
 import lsst.ip.diffim.diffimTools as diffimTools
 
-verbosity = 3
+verbosity = 8
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
@@ -52,7 +52,22 @@ class DiffimTestCases(unittest.TestCase):
             del self.scienceImage
             del self.templateImage
 
-    def testXY0(self):
+    def testAL(self):
+        self.policy.set('kernelBasisSet', 'alard-lupton')
+        self.policy.set('spatialKernelOrder', 1)
+        self.policy.set('spatialBgOrder', 0) # already bg-subtracted
+        self.policy.set('usePcaForSpatialKernel', False)
+        self.runXY0()
+
+    def xtestDFr(self):
+        self.policy.set('kernelBasisSet', 'delta-function')
+        self.policy.set('spatialKernelOrder', 1)
+        self.policy.set('spatialBgOrder', 0) # already bg-subtracted
+        self.policy.set('usePcaForSpatialKernel', True)
+        self.policy.set('useRegularization', True)
+        self.runXY0()
+
+    def runXY0(self):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
@@ -60,7 +75,9 @@ class DiffimTestCases(unittest.TestCase):
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
 
-        results1 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy)
+        print "CAW", templateSubImage.getXY0(), scienceSubImage.getXY0()
+        results1 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
+                                              display=True, frame=0)
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 
         # take away XY0
@@ -68,13 +85,10 @@ class DiffimTestCases(unittest.TestCase):
         scienceSubImage.getMaskedImage().setXY0(0, 0)
 
         # redo
-        results2 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy)
+        print "CAW", templateSubImage.getXY0(), scienceSubImage.getXY0()
+        results2 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
+                                              display=True, frame=3)
         differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
-
-        kp1 = spatialKernel1.getKernelParameters()
-        kp2 = spatialKernel2.getKernelParameters()
-        for i in range(len(kp1)):
-            self.assertAlmostEqual(kp1[i], kp2[i])
 
         skp1 = spatialKernel1.getSpatialParameters()
         skp2 = spatialKernel2.getSpatialParameters()
@@ -82,6 +96,12 @@ class DiffimTestCases(unittest.TestCase):
         # different; at least the kernel sum (first coeff) should be
         # the same
         self.assertAlmostEqual(skp1[0][0], skp2[0][0])
+
+
+        sys.exit(1)
+        # DIES here 
+
+
 
         # and compare candidate quality
         kImage1 = afwImage.ImageD(spatialKernel1.getDimensions())

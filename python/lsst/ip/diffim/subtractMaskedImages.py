@@ -20,11 +20,6 @@ def subtractMaskedImages(maskedImageToConvolve,
     assert (maskedImageToConvolve.getDimensions() == \
             maskedImageToNotConvolve.getDimensions())
 
-    # We also assume that at this stage, they are aligned at the pixel level
-    # Assign to the coordinate system of the science image
-    maskedImageToConvolve.setXY0(maskedImageToNotConvolve.getXY0())
-
-
     try:
         result = makePsfMatchingKernel(maskedImageToConvolve,
                                        maskedImageToNotConvolve,

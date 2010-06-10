@@ -86,9 +86,6 @@ fitSpatialKernelFromCandidates(
      * 
      */
     
-    
-    int const maxKsumIterations       = policy.getInt("maxKsumIterations");
-    int const maxPcaIterations        = policy.getInt("maxPcaIterations");
     int const maxSpatialIterations    = policy.getInt("maxSpatialIterations");
     int const nStarPerCell            = policy.getInt("nStarPerCell");
     bool const usePcaForSpatialKernel = policy.getBool("usePcaForSpatialKernel");
@@ -128,21 +125,19 @@ fitSpatialKernelFromCandidates(
     
     /* Main loop; catch any exceptions */
     try {
-        int nRejected = -1;
-        int nPcaIterations = 0;   /* Number of Pca iterations within each spatial loop */
-        int nKsumIterations = 0;  /* Number of kernel sum iterations within each spatial loop */
-        for (int i = 0; i < maxSpatialIterations; i++) {
+        int totalIterations = 0;
+        for (int i = 0; i < maxSpatialIterations; i++, totalIterations++) {
 
             /* Make sure there are no uninitialized candidates as current occupant of Cell */
-            while (nRejected != 0) {
+            int nRejectedSkf = -1;
+            while (nRejectedSkf != 0) {
                 pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                   "Building single kernels...");
                 kernelCells.visitCandidates(&singleKernelFitter, nStarPerCell);
-                nRejected = singleKernelFitter.getNRejected();
+                nRejectedSkf = singleKernelFitter.getNRejected();
             }
             
             /* Reject outliers in kernel sum */
-            nKsumIterations += 1;
             kernelSumVisitor.resetKernelSum();
             kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::AGGREGATE);
             kernelCells.visitCandidates(&kernelSumVisitor, nStarPerCell);
@@ -150,16 +145,12 @@ fitSpatialKernelFromCandidates(
             kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::REJECT);
             kernelCells.visitCandidates(&kernelSumVisitor, nStarPerCell);
 
-            nRejected = kernelSumVisitor.getNRejected();
+            int nRejectedKsum = kernelSumVisitor.getNRejected();
             pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
-                              "Spatial iteration %d, Ksum Iteration %d, rejected %d Kernels", 
-                              i, nKsumIterations, nRejected);
+                              "Iteration %d, Spatial Iteration %d, rejected %d Kernels", 
+                              totalIterations, i, nRejectedKsum);
 
-            /* HEY CHIEF - THIS IS A BUG; SOMETIMES THE THINGS DON"T GET BUILT HERE IF YOU ARE
-               AT MAXIMUM ITERATIONS */
-
-            //if ((nRejected > 0) && (nKsumIterations < maxKsumIterations)) {
-            if (nRejected > 0) {
+            if (nRejectedKsum > 0) {
                 /* Jump back to the top; don't count against index i */
                 i -= 1;
                 continue;
@@ -172,8 +163,6 @@ fitSpatialKernelFromCandidates(
             */
             afwMath::KernelList spatialBasisList;
             if (usePcaForSpatialKernel) {
-                nPcaIterations += 1;
-
                 int const nComponents = policy.getInt("numPrincipalComponents");
                 
                 pexLog::TTrace<5>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
@@ -198,13 +187,13 @@ fitSpatialKernelFromCandidates(
                     static_cast<int>(eigenValues.size()) - 1 :
                     static_cast<int>(eigenValues.size());
                 int const ncomp  = (nComponents <= 0 || nEigen < nComponents) ? nEigen : nComponents;
-                //
-                afwMath::KernelList kernelListRaw;
+
+                afwMath::KernelList basisListRaw;
                 if (subtractMeanForPca) {
-                    kernelListRaw.push_back(afwMath::Kernel::Ptr(
-                                                new afwMath::FixedKernel(
-                                                    afwImage::Image<afwMath::Kernel::Pixel>
-                                                    (*(importStarVisitor.returnMean()), true))));
+                    basisListRaw.push_back(afwMath::Kernel::Ptr(
+                                               new afwMath::FixedKernel(
+                                                   afwImage::Image<afwMath::Kernel::Pixel>
+                                                   (*(importStarVisitor.returnMean()), true))));
                 }
                 for (int j = 0; j != ncomp; ++j) {
                     /* Any NaN? */
@@ -216,19 +205,16 @@ fitSpatialKernelFromCandidates(
                         pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                           "WARNING : NaN in principal component %d; skipping", j);
                     } else {
-                        kernelListRaw.push_back(afwMath::Kernel::Ptr(
-                                                    new afwMath::FixedKernel(img)
-                                                    ));
+                        basisListRaw.push_back(afwMath::Kernel::Ptr(
+                                                   new afwMath::FixedKernel(img)
+                                                   ));
                     }
                 }
                 /* Put all the power in the first kernel, which will not vary spatially */
-                afwMath::KernelList basisListPca = renormalizeKernelList(kernelListRaw);
+                afwMath::KernelList basisListPca = renormalizeKernelList(basisListRaw);
                 
                 /* New PsfMatchingFunctor and Kernel visitor for this new basis list */
                 detail::BuildSingleKernelVisitor<PixelT> singleKernelFitterPca(basisListPca, policy);
-                
-                /* Always true for Pca kernel; leave original kernel alone for future Pca iterations */
-                //singleKernelFitterPca.setCandidateKernel(false);
                 
                 pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                   "Rebuilding kernels using Pca basis");
@@ -240,22 +226,17 @@ fitSpatialKernelFromCandidates(
                 /* Once they are built we don't have to revisit */
                 singleKernelFitterPca.setSkipBuilt(true);
 
-                nRejected = singleKernelFitterPca.getNRejected();
+                int nRejectedPca = singleKernelFitterPca.getNRejected();
                 pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
-                                  "Spatial iteration %d, Pca Iteration %d, rejected %d Kernels", 
-                                  i, nPcaIterations, nRejected);
+                                  "Iteration %d, Spatial Iteration %d, rejected %d Kernels", 
+                                  totalIterations, i, nRejectedPca);
                 
-                //if ((nRejected > 0) && (nPcaIterations < maxPcaIterations)) {
-                if ((nRejected > 0)) {
+                if (nRejectedPca > 0) {
                     /* We don't want to continue on (yet) with the spatial modeling,
                      * because we have bad objects contributing to the Pca basis.
                      * We basically need to restart from the beginning of this loop,
                      * since the cell-mates of those objects that were rejected need
-                     * their original Kernels built by singleKernelFitter.  A
-                     * question is whether or not to count this against the
-                     * maxSpatialIterations.  We will say no for now, therefore i -=
-                     * 1.  But we do regulate the total number of times this can
-                     * happen within a spatial loop with nPcaIterations.
+                     * their original Kernels built by singleKernelFitter.  
                      */
 
                     /* Jump back to the top; don't count against index i */
@@ -289,22 +270,15 @@ fitSpatialKernelFromCandidates(
                                                                              spatialBackground, 
                                                                              policy);
             kernelCells.visitCandidates(&spatialKernelAssessor, nStarPerCell);
-            nRejected = spatialKernelAssessor.getNRejected();
+            int nRejectedSpatial = spatialKernelAssessor.getNRejected();
             pexLog::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                               "Spatial Kernel iteration %d, rejected %d Kernels, using %d Kernels", 
-                              i+1, nRejected, spatialKernelAssessor.getNGood());
+                              i+1, nRejectedSpatial, spatialKernelAssessor.getNGood());
 
-            if (nRejected == 0) {
+            if (nRejectedSpatial == 0) {
                 /* Nothing rejected, finished with spatial fit */
                 break;
             }
-            
-            /* If we got this far, we have naturally completed a single
-             * iteration over i, and we reset the intermediate counters over
-             * kernel sum and pca rejections
-             */
-            nPcaIterations = 0;
-            nKsumIterations = 0;
         }
     } catch (pexExcept::Exception &e) {
         LSST_EXCEPT_ADD(e, "Unable to calculate spatial kernel model");

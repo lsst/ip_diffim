@@ -38,6 +38,8 @@ def makePsfMatchingKernel(maskedImageToConvolve,
     for fp in footprints:
         bbox = fp.getBBox()
 
+        print 'FUCK', bbox.getX0(), bbox.getX1(), bbox.getY0(), bbox.getY1()
+
         # Grab the centers in the parent's coordinate system
         xC   = 0.5 * ( bbox.getX0() + bbox.getX1() )
         yC   = 0.5 * ( bbox.getY0() + bbox.getY1() )
@@ -51,6 +53,10 @@ def makePsfMatchingKernel(maskedImageToConvolve,
         smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox)
 
         cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, policy)
+
+        pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 5,
+                     "Candidate %d at %f, %f" % (cand.getId(), cand.getXCenter(), cand.getYCenter()))
+        
         kernelCellSet.insertCandidate(cand)
 
 
@@ -80,6 +86,20 @@ def makePsfMatchingKernel(maskedImageToConvolve,
                  "Used %d kernels for spatial fit" % (nGood))
                  
     return spatialKernel, spatialBg, kernelCellSet
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Matching an image to a Gaussian model

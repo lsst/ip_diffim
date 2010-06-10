@@ -28,7 +28,7 @@
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
-#define DEBUG_MATRIX 1
+#define DEBUG_MATRIX 0
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
@@ -85,12 +85,8 @@ namespace diffim {
         if (DEBUG_MATRIX) {
             std::cout << "M " << std::endl;
             std::cout << mMat << std::endl;
-            //std::cout << "B " << std::endl;
-            //std::cout << bVec << std::endl;
-
-            for (int i = 0; i < bVec.size(); i++) {
-                fprintf(stderr, "B %d : %f\n", i, bVec(i));
-            }
+            std::cout << "B " << std::endl;
+            std::cout << bVec << std::endl;
         }
 
         Eigen::VectorXd aVec = Eigen::VectorXd::Zero(bVec.size());
@@ -145,12 +141,12 @@ namespace diffim {
         double time = t.elapsed();
         pexLog::TTrace<3>("lsst.ip.diffim.KernelSolution.solve", 
                           "Compute time for matrix math : %.2f s", time);
-       if (DEBUG_MATRIX) {
-            for (int i = 0; i < aVec.size(); i++) {
-                fprintf(stderr, "A %d : %f\n", i, aVec(i));
-            }
-        }
 
+        if (DEBUG_MATRIX) {
+            std::cout << "A " << std::endl;
+            std::cout << aVec << std::endl;
+        }
+        
         _aVec = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(aVec));
     }
 
@@ -302,12 +298,8 @@ namespace diffim {
         typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
             convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
-        int foo = 0;
         for (; kiter != basisList.end(); ++kiter, ++eiter) {
             afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
-
-            cimage.writeFits(str(boost::format("C%d.fits") % foo));    
-            foo += 1;
 
             boost::shared_ptr<Eigen::MatrixXd> cMat (
                 new Eigen::MatrixXd(imageToEigenMatrix(cimage).block(startRow, 
@@ -835,10 +827,7 @@ namespace diffim {
         if (DEBUG_MATRIX) {
             std::cout << "Spatial matrix outputs" << std::endl;
             std::cout << "mMat " << (*_mMat) << std::endl;
-            //std::cout << "bVec " << (*_bVec) << std::endl;
-            for (int i = 0; i < (*_bVec).size(); i++) {
-                fprintf(stderr, "B spatial %d : %f\n", i, (*_bVec)(i));
-            }
+            std::cout << "bVec " << (*_bVec) << std::endl;
         }
 
     }
