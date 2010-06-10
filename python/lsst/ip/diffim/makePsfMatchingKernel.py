@@ -38,7 +38,7 @@ def makePsfMatchingKernel(maskedImageToConvolve,
     for fp in footprints:
         bbox = fp.getBBox()
 
-        print 'FUCK', bbox.getX0(), bbox.getX1(), bbox.getY0(), bbox.getY1()
+        print 'DEBUG', bbox.getX0(), bbox.getX1(), bbox.getY0(), bbox.getY1()
 
         # Grab the centers in the parent's coordinate system
         xC   = 0.5 * ( bbox.getX0() + bbox.getX1() )
