@@ -59,9 +59,10 @@ def subtractMaskedImages(maskedImageToConvolve,
         bctrl.setNySample(differenceMaskedImage.getHeight()//binsize + 1)
         bctrl.setUndersampleStyle(undersample)
 
-        image   = differenceMaskedImage.getImage() 
-        backobj = afwMath.makeBackground(image, bctrl)
-        image  -= backobj.getImageF()
+        image      = differenceMaskedImage.getImage() 
+        backobj    = afwMath.makeBackground(image, bctrl)
+        background = backobj.getImageF()
+        image     -= background
         del image
         del backobj
 
@@ -69,4 +70,5 @@ def subtractMaskedImages(maskedImageToConvolve,
     # Place holder for Sqda on diffim; diffim stats and kernel sum
     #
 
-    return differenceMaskedImage, spatialKernel, spatialBg, kernelCellSet
+    # background can be either an image or a polynomial
+    return differenceMaskedImage, spatialKernel, background, kernelCellSet
