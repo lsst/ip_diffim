@@ -343,7 +343,11 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
 
     afwImage::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    afwMath::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false);
+    afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
+    convolutionControl.setDoNormalize(false);
+    convolutionControl.setMaxInterpolationError(1.0e-3); // put in policy
+    afwMath::convolve(convolvedMaskedImage, imageToConvolve, 
+                      convolutionKernel, convolutionControl);
     
     /* Add in background */
     *(convolvedMaskedImage.getImage()) += background;
@@ -392,7 +396,11 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
 
     afwImage::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
     convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    afwMath::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, convolutionKernel, false);
+    afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
+    convolutionControl.setDoNormalize(false);
+    convolutionControl.setMaxInterpolationError(1.0e-3); // put in policy 
+    afwMath::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, 
+                      convolutionKernel, convolutionControl);
     
     /* Add in background */
     *(convolvedMaskedImage.getImage()) += background;

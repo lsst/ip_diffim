@@ -14,7 +14,7 @@ def subtractMaskedImages(maskedImageToConvolve,
                          maskedImageToNotConvolve, 
                          policy, 
                          footprints=None):
-    
+
     # Make sure they are the EXACT same dimensions in pixels
     # This is non-negotiable
     assert (maskedImageToConvolve.getDimensions() == \

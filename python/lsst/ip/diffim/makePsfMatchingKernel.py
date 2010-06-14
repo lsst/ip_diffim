@@ -38,8 +38,6 @@ def makePsfMatchingKernel(maskedImageToConvolve,
     for fp in footprints:
         bbox = fp.getBBox()
 
-        print 'DEBUG', bbox.getX0(), bbox.getX1(), bbox.getY0(), bbox.getY1()
-
         # Grab the centers in the parent's coordinate system
         xC   = 0.5 * ( bbox.getX0() + bbox.getX1() )
         yC   = 0.5 * ( bbox.getY0() + bbox.getY1() )
@@ -84,7 +82,7 @@ def makePsfMatchingKernel(maskedImageToConvolve,
         pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 1, "WARNING")
     pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 1,
                  "Used %d kernels for spatial fit" % (nGood))
-                 
+
     return spatialKernel, spatialBg, kernelCellSet
 
 

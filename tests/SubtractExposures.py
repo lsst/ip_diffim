@@ -75,17 +75,16 @@ class DiffimTestCases(unittest.TestCase):
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
 
-        print "CAW", templateSubImage.getXY0(), scienceSubImage.getXY0()
+        # Have an XY0
         results1 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
                                               display=True, frame=0)
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 
-        # take away XY0
+        # And then take away XY0
+        # Crap, the warping makes things slighly offset w.r.t. the previous run
+        # So you don't get *exact* same coords
         templateSubImage.getMaskedImage().setXY0(0, 0)
         scienceSubImage.getMaskedImage().setXY0(0, 0)
-
-        # redo
-        print "CAW", templateSubImage.getXY0(), scienceSubImage.getXY0()
         results2 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
                                               display=True, frame=3)
         differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2

@@ -185,6 +185,14 @@ namespace diffim {
                 );
             return growCandidate(fpCore, fpGrowPix, miToConvolvePtr, miToNotConvolvePtr);
         } 
+
+        afwImage::BBox fpBox = fp->getBBox();
+        pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
+                          "Original footprint in parent : %d,%d -> %d,%d -> %d,%d",
+                          fpBBox.getX0(), fpBBox.getY0(), 
+                          int(0.5 * (fpBBox.getX0() + fpBBox.getX1())),
+                          int(0.5 * (fpBBox.getY0() + fpBBox.getY1())),
+                          fpBBox.getX1(), fpBBox.getY1());
         
         /* Grow the footprint
          * flag true  = isotropic grow   = slow
@@ -214,7 +222,7 @@ namespace diffim {
          */
         afwImage::BBox fpGrowBBox = fpGrow->getBBox();
         pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                          "Footprint in parent : %d,%d -> %d,%d -> %d,%d",
+                          "Grown footprint in parent : %d,%d -> %d,%d -> %d,%d",
                           fpGrowBBox.getX0(), fpGrowBBox.getY0(), 
                           int(0.5 * (fpGrowBBox.getX0() + fpGrowBBox.getX1())),
                           int(0.5 * (fpGrowBBox.getY0() + fpGrowBBox.getY1())),
@@ -222,7 +230,7 @@ namespace diffim {
 
         fpGrowBBox.shift(-miToConvolvePtr->getX0(), -miToConvolvePtr->getY0());
         pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                          "Footprint in image : %d,%d -> %d,%d -> %d,%d",
+                          "Grown footprint in image : %d,%d -> %d,%d -> %d,%d",
                           fpGrowBBox.getX0(), fpGrowBBox.getY0(), 
                           int(0.5 * (fpGrowBBox.getX0() + fpGrowBBox.getX1())),
                           int(0.5 * (fpGrowBBox.getY0() + fpGrowBBox.getY1())),

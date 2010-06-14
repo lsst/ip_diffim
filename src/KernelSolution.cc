@@ -728,6 +728,9 @@ namespace diffim {
                                               boost::shared_ptr<Eigen::MatrixXd> qMat,
                                               boost::shared_ptr<Eigen::VectorXd> wVec) {
         
+        pexLog::TTrace<8>("lsst.ip.diffim.SpatialKernelSolution.addConstraint", 
+                          "Adding candidate at %f, %f", xCenter, yCenter);
+
         /* Calculate P matrices */
         /* Pure kernel terms */
         Eigen::VectorXd pK(_nkt);
