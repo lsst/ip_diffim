@@ -13,7 +13,7 @@ class DiffimTestCases(unittest.TestCase):
         self.p0           = pexPolicy.Policy.createPolicy(self.policyPath)
 
     def testNoModify(self):
-        p1 = ipDiffim.generateDefaultPolicy(self.policyPath, modify=False)
+        p1 = ipDiffim.createDefaultPolicy(self.policyPath, modify=False)
         self.assertEqual(self.p0.get("kernelRows"), p1.get("kernelRows"))
         self.assertEqual(self.p0.get("kernelCols"), p1.get("kernelCols"))
         self.assertEqual(self.p0.get("fpGrowPix"), p1.get("fpGrowPix"))
@@ -22,7 +22,7 @@ class DiffimTestCases(unittest.TestCase):
                              p1.getDoubleArray("alardSigGauss")[i])
 
     def testModifyGreater(self, fwhm=10.):
-        p1 = ipDiffim.generateDefaultPolicy(self.policyPath, fwhm=fwhm)
+        p1 = ipDiffim.createDefaultPolicy(self.policyPath, fwhm=fwhm)
         self.assertTrue(self.p0.get("kernelRows") < p1.get("kernelRows"))
         self.assertTrue(self.p0.get("kernelCols") < p1.get("kernelCols"))
         self.assertTrue(self.p0.get("fpGrowPix") < p1.get("fpGrowPix"))
@@ -36,7 +36,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertTrue(p1.get("kernelCols")//2 == self.p0.get("kernelRadiusMax"))
 
     def testModifyLesser(self, fwhm=1.):
-        p1 = ipDiffim.generateDefaultPolicy(self.policyPath, fwhm=fwhm)
+        p1 = ipDiffim.createDefaultPolicy(self.policyPath, fwhm=fwhm)
         self.assertTrue(self.p0.get("kernelRows") > p1.get("kernelRows"))
         self.assertTrue(self.p0.get("kernelCols") > p1.get("kernelCols"))
 

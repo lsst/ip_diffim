@@ -4,7 +4,7 @@ from diffimLib import *
 # python code
 from makePsfMatchingKernel import *
 from makeSdqaRatingVector import *
-from generatePolicy import *
+from createDefaultPolicy import *
 
 from subtractMaskedImages import *
 from subtractExposures import *

@@ -9,7 +9,7 @@ sigma2fwhm = 2. * math.sqrt(2. * math.log(2.))
 # A complication is that the "sigma" of the AL gaussians is related to
 # the FWHM through a scaling of 2.35.
 
-def generateDefaultPolicy(policyPath, modify=True, fwhm=3.5):
+def createDefaultPolicy(policyPath, modify=True, fwhm=3.5):
     policy = pexPolicy.Policy.createPolicy(policyPath)
     if modify:
         modifyKernelPolicy(policy, fwhm)
@@ -36,18 +36,18 @@ def modifyKernelPolicy(policy, fwhm=3.5):
     for sig in alardSig[1:]:
         policy.add("alardSigGauss", sig)
     
-    pexLog.Trace("lsst.ip.diffim.generateKernelPolicy", 2,
+    pexLog.Trace("lsst.ip.diffim.createDefaultPolicy.modifyKernelPolicy", 2,
                  "Using Psf Fwhm     : %.2f px" % (fwhm))
 
-    pexLog.Trace("lsst.ip.diffim.generateKernelPolicy", 2,
+    pexLog.Trace("lsst.ip.diffim.createDefaultPolicy.modifyKernelPolicy", 2,
                  "Kernel rows/cols   : %d x %d px" % (policy.getInt("kernelRows"),
                                                      policy.getInt("kernelCols")))
     
-    pexLog.Trace("lsst.ip.diffim.generateKernelPolicy", 2,
+    pexLog.Trace("lsst.ip.diffim.createDefaultPolicy.modifyKernelPolicy", 2,
                  "Footprint grow rad : %d px" % (policy.getInt("fpGrowPix")))
 
     outStr = ", ".join(["%.2f" % (x) for x in policy.getDoubleArray("alardSigGauss")])
-    pexLog.Trace("lsst.ip.diffim.generateKernelPolicy", 2,
+    pexLog.Trace("lsst.ip.diffim.createDefaultPolicy.modifyKernelPolicy", 2,
                  "A/L gaussian sig   : %s px" % (outStr))
 
 

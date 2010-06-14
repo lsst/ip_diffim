@@ -12,7 +12,7 @@ class DiffimTestCases(unittest.TestCase):
     def setUp(self):
         self.diffimDir    = eups.productDir('ip_diffim')
         self.diffimPolicy = os.path.join(self.diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-        self.policy       = ipDiffim.generateDefaultPolicy(self.diffimPolicy)
+        self.policy       = ipDiffim.createDefaultPolicy(self.diffimPolicy)
         
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:

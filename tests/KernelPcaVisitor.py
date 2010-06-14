@@ -17,7 +17,7 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.createDefaultPolicy(diffimPolicy)
         self.policy.set("kernelBasisSet", "delta-function")
         self.policy.set("useRegularization", False)
         self.kList = ipDiffim.makeKernelBasisList(self.policy)

@@ -19,7 +19,7 @@ diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.createDefaultPolicy(diffimPolicy)
         
     def tearDown(self):
         del self.policy

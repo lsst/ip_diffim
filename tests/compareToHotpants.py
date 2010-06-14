@@ -15,7 +15,7 @@ diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.createDefaultPolicy(diffimPolicy)
         self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
         self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')
         self.smi.setXY0(0,0)
