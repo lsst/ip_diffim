@@ -16,8 +16,8 @@ class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
         self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
-        self.smi = afwImage.MaskedImageF('compareToHotpants/scienceMI.fits')
-        self.tmi = afwImage.MaskedImageF('compareToHotpants/templateMI.fits')
+        self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
+        self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')
         self.smi.setXY0(0,0)
         self.tmi.setXY0(0,0)
 
