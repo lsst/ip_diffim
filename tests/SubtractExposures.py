@@ -12,13 +12,15 @@ import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
 import lsst.ip.diffim.diffimTools as diffimTools
 
-verbosity = 8
+verbosity = 3
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
 diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
 
 # This one tests convolve and subtract of subimages / XY0
+
+display = False
 
 class DiffimTestCases(unittest.TestCase):
     
@@ -42,8 +44,8 @@ class DiffimTestCases(unittest.TestCase):
             
             diffimTools.backgroundSubtract(self.policy, [self.templateImage.getMaskedImage(),
                                                          self.scienceImage.getMaskedImage()])
-
-            self.bbox     = afwImage.BBox(afwImage.PointI(0, 1500),
+            self.offset   = 1500
+            self.bbox     = afwImage.BBox(afwImage.PointI(0, self.offset),
                                           afwImage.PointI(511, 2046))
 
     def tearDown(self):
@@ -77,83 +79,55 @@ class DiffimTestCases(unittest.TestCase):
 
         # Have an XY0
         results1 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
-                                              display=True, frame=0)
+                                              display=display, frame=0)
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 
         # And then take away XY0
-        # Crap, the warping makes things slighly offset w.r.t. the previous run
-        # So you don't get *exact* same coords
-        templateSubImage.getMaskedImage().setXY0(0, 0)
-        scienceSubImage.getMaskedImage().setXY0(0, 0)
+        templateSubImage.setXY0(0, 0) # do it to the exposure so the Wcs gets modified too
+        scienceSubImage.setXY0(0, 0)
         results2 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
-                                              display=True, frame=3)
+                                              display=display, frame=3)
         differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
 
-        skp1 = spatialKernel1.getSpatialParameters()
-        skp2 = spatialKernel2.getSpatialParameters()
-        # not all these will be the same since the coords are
-        # different; at least the kernel sum (first coeff) should be
-        # the same
-        self.assertAlmostEqual(skp1[0][0], skp2[0][0])
-
-
-        sys.exit(1)
-        # DIES here 
-
-
-
-        # and compare candidate quality
-        kImage1 = afwImage.ImageD(spatialKernel1.getDimensions())
-        kImage2 = afwImage.ImageD(spatialKernel2.getDimensions())
-        imstats = ipDiffim.ImageStatisticsF()
         # need to count up the candidates first, since its a running tally
         count = 0
         for cell in kernelCellSet1.getCellList():
             for cand1 in cell.begin(False): 
                 count += 1
-                    
-        # Id in the second set is id+count
+
         for cell in kernelCellSet1.getCellList():
-            for cand1 in cell.begin(True): 
+            for cand1 in cell.begin(False): 
                 cand1 = ipDiffim.cast_KernelCandidateF(cand1)
-                
-                if cand1.getStatus() == afwMath.SpatialCellCandidate.GOOD:
-                    cand2 = kernelCellSet2.getCandidateById(cand1.getId() + count)
-                    cand2 = ipDiffim.cast_KernelCandidateF(cand2)
-                    
-                    # evaluate kernel and background at position of candidate 1
-                    xCand1 = int(cand1.getXCenter())
-                    yCand1 = int(cand1.getYCenter())
-                    kSum1  = spatialKernel1.computeImage(kImage1, False,
-                                                         afwImage.indexToPosition(xCand1),
-                                                         afwImage.indexToPosition(yCand1))
-                    kernel1 = afwMath.FixedKernel(kImage1)
-                    background1 = backgroundModel1(afwImage.indexToPosition(xCand1),
-                                                   afwImage.indexToPosition(yCand1))
-                    diffIm1 = cand1.returnDifferenceImage(kernel1, background1)
-                    imstats.apply(diffIm1)
-                    candMean1   = imstats.getMean()
-                    candRms1    = imstats.getRms()
+                cand2 = ipDiffim.cast_KernelCandidateF(kernelCellSet2.getCandidateById(cand1.getId() + count))
 
-                    # evaluate kernel and background at position of candidate 2
-                    xCand2 = int(cand2.getXCenter())
-                    yCand2 = int(cand2.getYCenter())
-                    kSum2  = spatialKernel2.computeImage(kImage2, False,
-                                                         afwImage.indexToPosition(xCand2),
-                                                         afwImage.indexToPosition(yCand2))
-                    kernel2 = afwMath.FixedKernel(kImage2)
-                    background2 = backgroundModel2(afwImage.indexToPosition(xCand2),
-                                                   afwImage.indexToPosition(yCand2))
-                    diffIm2 = cand2.returnDifferenceImage(kernel2, background2)
-                    imstats.apply(diffIm2)
-                    candMean2   = imstats.getMean()
-                    candRms2    = imstats.getRms()
+                # positions are the same
+                self.assertEqual(cand1.getXCenter(), cand2.getXCenter())
+                self.assertEqual(cand1.getYCenter(), cand2.getYCenter() + self.offset)
 
-                    self.assertAlmostEqual(candMean1, candMean2)
-                    self.assertAlmostEqual(candRms1, candRms2)
-                    self.assertAlmostEqual(kSum1, kSum2)
-                    self.assertAlmostEqual(background1, background2)
-        
+                # kernels are the same
+                im1   = cand1.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
+                im2   = cand2.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
+                for y in range(im1.getHeight()):
+                    for x in range(im1.getWidth()):
+                        self.assertAlmostEqual(im1.get(x, y), im2.get(x, y))
+
+        # Spatial fits are the same
+        skp1 = spatialKernel1.getSpatialParameters()
+        skp2 = spatialKernel2.getSpatialParameters()
+        bgp1 = backgroundModel1.getParameters()
+        bgp2 = backgroundModel2.getParameters()
+
+        # first term = kernel sum, 0, 0
+        self.assertAlmostEqual(skp1[0][0], skp2[0][0])
+        # on other terms, the spatial terms are the same, the zpt terms are different
+        for nk in range(1, len(skp1)):
+            self.assertNotEqual(skp1[nk][0], skp2[nk][0])
+            for np in range(1, len(skp1[nk])):
+                self.assertAlmostEqual(skp1[nk][np], skp2[nk][np])
+
+        for np in range(len(bgp1)):
+            self.assertAlmostEqual(bgp1[np], bgp2[np])
+
 #####
         
 def suite():

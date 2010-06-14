@@ -126,7 +126,7 @@ namespace diffim {
              i != footprintListIn.end(); ++i) {
             
             pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                              "Processing candidate %d", (*i)->getId());
+                              "Processing footprint %d", (*i)->getId());
             growCandidate((*i), fpGrowPix, miToConvolvePtr, miToNotConvolvePtr);
         }
         
