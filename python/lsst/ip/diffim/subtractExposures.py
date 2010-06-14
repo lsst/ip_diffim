@@ -2,10 +2,11 @@ from .subtractMaskedImages import subtractMaskedImages
 from .warpTemplateExposure import warpTemplateExposure
 
 import lsst.pex.logging as pexLog
+import lsst.pex.exceptions as pexExcept
 import lsst.afw.image as afwImage
 import lsst.afw.display.ds9 as ds9
 
-def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display=False, frame=0):
+def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display=False, frame=0, doWarping = True):
     # Make sure they end up the same dimensions on the sky
     templateWcs    = exposureToConvolve.getWcs() 
     scienceWcs     = exposureToNotConvolve.getWcs()
@@ -34,9 +35,15 @@ def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display
          (templateLimit  != scienceLimit)  or \
          (exposureToConvolve.getHeight() != exposureToNotConvolve.getHeight()) or \
          (exposureToConvolve.getWidth()  != exposureToNotConvolve.getWidth()) ):
-        pexLog.Trace("lsst.ip.diffim.subtractExposure", 1,
-                     "Astrometrically registering template to science image")
-        exposureToConvolve = warpTemplateExposure(exposureToConvolve, exposureToNotConvolve, policy)
+        if doWarping:
+            pexLog.Trace("lsst.ip.diffim.subtractExposure", 1,
+                         "Astrometrically registering template to science image")
+            exposureToConvolve = warpTemplateExposure(exposureToConvolve, exposureToNotConvolve, policy)
+        else:
+            pexLog.Trace("lsst.ip.diffim.subtractExposure", 1,
+                         "ERROR: Input images not registered")
+            raise RuntimeError, "Input images not registered"
+            
     
     maskedImageToConvolve = exposureToConvolve.getMaskedImage()
     maskedImageToNotConvolve = exposureToNotConvolve.getMaskedImage()

@@ -61,13 +61,20 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('usePcaForSpatialKernel', False)
         self.runXY0()
 
-    def xtestDFr(self):
-        self.policy.set('kernelBasisSet', 'delta-function')
-        self.policy.set('spatialKernelOrder', 1)
-        self.policy.set('spatialBgOrder', 0) # already bg-subtracted
-        self.policy.set('usePcaForSpatialKernel', True)
-        self.policy.set('useRegularization', True)
-        self.runXY0()
+    def testWarping(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
+        try:
+            ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy, doWarping = False)
+        except Exception, e:
+            pass
+        else:
+            self.fail()
+
 
     def runXY0(self):
         if not self.defDataDir:
