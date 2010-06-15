@@ -42,6 +42,24 @@ class DiffimTestCases(unittest.TestCase):
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
 
+    def testNoBg(self):
+        self.policy.set('kernelBasisSet', 'alard-lupton')
+        self.policy.set('spatialKernelOrder', 1)
+        self.policy.set('fitForBackground', False)
+        basisList = ipDiffim.makeKernelBasisList(self.policy)
+
+        bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, self.policy)
+        
+        for x in numpy.arange(1, self.size, 10):
+            for y in numpy.arange(1, self.size, 10):
+                cand = self.makeCandidate(1.0, x, y)
+                bsikv.processCandidate(cand)
+                bspkv.processCandidate(cand)
+                
+        bspkv.solveLinearEquation()
+        sk, sb = bspkv.getSolutionPair()
+
     def testAlSpatialModel(self):
         self.runAlSpatialModel(0, 0)
         self.runAlSpatialModel(1, 0)

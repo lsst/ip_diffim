@@ -75,6 +75,19 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.fail()
 
+    def testNoBg(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+        self.policy.set('fitForBackground', False)
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
+        try:
+            ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy)
+        except Exception, e:
+            self.fail()
+        else:
+            pass
 
     def runXY0(self):
         if not self.defDataDir:

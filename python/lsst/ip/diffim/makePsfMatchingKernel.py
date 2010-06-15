@@ -52,7 +52,7 @@ def makePsfMatchingKernel(maskedImageToConvolve,
 
         cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, policy)
 
-        pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 5,
+        pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 7,
                      "Candidate %d at %f, %f" % (cand.getId(), cand.getXCenter(), cand.getYCenter()))
         
         kernelCellSet.insertCandidate(cand)

@@ -107,9 +107,9 @@ namespace detail {
                 if (fabs(kSum - _kSumMean) > _dkSumMax) {
                     kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                     pexLogging::TTrace<4>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
-                                          "Rejecting candidate %d; bad source kernel sum : (%.2f %.2f %.2f)",
+                                          "Rejecting candidate %d; bad source kernel sum : (%.2f)",
                                           kCandidate->getId(),
-                                          kSum, _kSumMean, _dkSumMax);
+                                          kSum);
                     _nRejected += 1;
                 }
             }

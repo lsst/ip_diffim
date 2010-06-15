@@ -688,12 +688,11 @@ namespace diffim {
             new afwMath::PolynomialFunction2<double>(spatialKernelOrder)
             );
 
-        int spatialBgOrder      = policy.getInt("spatialBgOrder");
         this->_fitForBackground = _policy.getBool("fitForBackground");
-        if (_fitForBackground) 
-            _background = lsst::afw::math::Kernel::SpatialFunctionPtr(
-                new afwMath::PolynomialFunction2<double>(spatialBgOrder)
-                );
+        int spatialBgOrder      = this->_fitForBackground ? policy.getInt("spatialBgOrder") : 0;
+        _background = lsst::afw::math::Kernel::SpatialFunctionPtr(
+            new afwMath::PolynomialFunction2<double>(spatialBgOrder)
+            );
 
         _nbases = basisList.size();
         _nkt = _spatialKernelFunction->getParameters().size();
@@ -744,10 +743,12 @@ namespace diffim {
         }
         Eigen::MatrixXd pKpKt = (pK * pK.transpose());
         
-        Eigen::VectorXd pB(_nbt);
+        Eigen::VectorXd pB;
         Eigen::MatrixXd pBpBt;
         Eigen::MatrixXd pKpBt;
         if (_fitForBackground) {
+            pB = Eigen::VectorXd(_nbt);
+
             /* Pure background terms */
             std::vector<double> paramsB = _background->getParameters();
             for (int idx = 0; idx < _nbt; idx++) { paramsB[idx] = 0.0; }
@@ -928,15 +929,20 @@ namespace diffim {
             );
         _kSum  = _kernel->computeImage(*image, false);              
 
-        /* Set background */
+        /* Set the background coefficients */
+        std::vector<double> bgCoeffs(nbt);
+
         if (_fitForBackground) {
-            /* Set the background coefficients */
-            std::vector<double> bgCoeffs(nbt);
             for (unsigned int i = 0; i < nbt; i++) {
                 bgCoeffs[i] = (*_aVec)(nt - nbt + i);
             }
-            _background->setParameters(bgCoeffs);
         }
+        else {
+            for (unsigned int i = 0; i < nbt; i++) {
+                bgCoeffs[i] = 0.;
+            }
+        }
+        _background->setParameters(bgCoeffs);
     }
 
 /***********************************************************************************************************/
