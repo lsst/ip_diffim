@@ -199,6 +199,9 @@ fitSpatialKernelFromCandidates(
                     /* Any NaN? */
                     afwImage::Image<afwMath::Kernel::Pixel> img = 
                         afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[j], true);
+
+                    /* img.writeFits(str(boost::format("k%d_%d.fits") % totalIterations % j)); */
+
                     afwMath::Statistics stats = afwMath::makeStatistics(img, afwMath::SUM);
                     
                     if (std::isnan(stats.getValue(afwMath::SUM))) {

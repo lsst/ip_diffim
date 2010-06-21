@@ -496,6 +496,7 @@ namespace diffim {
             /* Don't normalize here */
             Image image(kernelListIn[i]->getDimensions());
             (void)kernelListIn[i]->computeImage(image, false);
+            /* image.writeFits(str(boost::format("in_k%d.fits") % i)); */
             
             /* Check the kernel sum; if its close to zero don't do anything */
             kSum = 0.;
@@ -506,7 +507,13 @@ namespace diffim {
                 }
             }
             
-            if (fabs(kSum) > std::numeric_limits<double>::epsilon()) {
+            /* std::numeric_limits<float>::epsilon() ~ e-7
+               std::numeric_limits<double>::epsilon() ~ e-16
+       
+               If we end up with 2e-16 kernel sum, this still blows up the kernel values.  
+               Even though the kernels are double, use the float limits instead
+            */
+            if (fabs(kSum) > std::numeric_limits<float>::epsilon()) {
                 image /= kSum;
                 image -= image0;
             }
@@ -520,7 +527,8 @@ namespace diffim {
                 }
             }
             image /= std::sqrt(kSum);
-            
+            /* image.writeFits(str(boost::format("out_k%d.fits") % i));  */
+
             boost::shared_ptr<afwMath::Kernel> 
                 kernelPtr(new afwMath::FixedKernel(image));
             kernelListOut.push_back(kernelPtr);
