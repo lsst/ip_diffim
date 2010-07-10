@@ -106,6 +106,7 @@ fitSpatialKernelFromCandidates(
             useRegularization = false;
         }
         else {
+            /* build once */
             hMat = makeRegularizationMatrix(policy);
         }
     }
@@ -118,7 +119,17 @@ fitSpatialKernelFromCandidates(
     afwMath::Kernel::SpatialFunctionPtr spatialBackground;
     
     /* Visitor for the single kernel fit */
-    detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter(basisList, policy);
+    boost::shared_ptr<detail::BuildSingleKernelVisitor<PixelT> > singleKernelFitter;
+    if (useRegularization) {
+        singleKernelFitter = boost::shared_ptr<detail::BuildSingleKernelVisitor<PixelT> >(
+            new detail::BuildSingleKernelVisitor<PixelT>(basisList, policy, hMat)
+            );
+    }
+    else {
+        singleKernelFitter = boost::shared_ptr<detail::BuildSingleKernelVisitor<PixelT> >(
+            new detail::BuildSingleKernelVisitor<PixelT>(basisList, policy)
+            );
+    }
     
     /* Visitor for the kernel sum rejection */
     detail::KernelSumVisitor<PixelT> kernelSumVisitor(policy);
@@ -133,8 +144,8 @@ fitSpatialKernelFromCandidates(
             while (nRejectedSkf != 0) {
                 pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                   "Building single kernels...");
-                kernelCells.visitCandidates(&singleKernelFitter, nStarPerCell);
-                nRejectedSkf = singleKernelFitter.getNRejected();
+                kernelCells.visitCandidates(&(*singleKernelFitter), nStarPerCell);
+                nRejectedSkf = singleKernelFitter->getNRejected();
             }
             
             /* Reject outliers in kernel sum */
@@ -345,7 +356,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     t.restart();
 
     afwImage::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
-    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
+    // convolvedMaskedImage.setXY0(imageToConvolve.getXY0()); // Fixed in afw ticket #1345
     afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
     convolutionControl.setDoNormalize(false);
     convolutionControl.setMaxInterpolationError(1.0e-3); // put in policy
@@ -398,7 +409,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     t.restart();
 
     afwImage::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
-    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
+    // convolvedMaskedImage.setXY0(imageToConvolve.getXY0()); // Fixed in afw ticket #1345
     afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
     convolutionControl.setDoNormalize(false);
     convolutionControl.setMaxInterpolationError(1.0e-3); // put in policy 

@@ -262,6 +262,10 @@ namespace detail {
 
     template boost::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor<PixelT>(lsst::afw::math::KernelList const&,
+                                         lsst::pex::policy::Policy const&);
+
+    template boost::shared_ptr<BuildSingleKernelVisitor<PixelT> >
+    makeBuildSingleKernelVisitor<PixelT>(lsst::afw::math::KernelList const&,
                                          lsst::pex::policy::Policy const&,
                                          boost::shared_ptr<Eigen::MatrixXd>);
 

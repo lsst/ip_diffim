@@ -114,7 +114,8 @@ namespace diffim {
                                   );
         virtual ~RegularizedKernelSolution() {};
         void solve();
-        double estimateRisk();
+        double estimateUnbiasedRisk();
+        double estimateBiasedRisk();
         double estimateGcv();
 
         /* Include additive term (_lambda * _hMat) in M matrix? */
