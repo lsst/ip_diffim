@@ -29,9 +29,9 @@ class DiffimTestCases(unittest.TestCase):
     
     # D = I - (K.x.T + bg)
     def setUp(self, CFHT=True):
-        self.policy1     = ipDiffim.generateDefaultPolicy(diffimPolicy)
-        self.policy2     = ipDiffim.generateDefaultPolicy(diffimPolicy)
-        self.policy3     = ipDiffim.generateDefaultPolicy(diffimPolicy)
+        self.policy1     = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy2     = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy3     = ipDiffim.createDefaultPolicy(diffimPolicy)
 
         self.policy1.set("kernelBasisSet", "delta-function")
         self.policy1.set("useRegularization", False)
@@ -113,7 +113,7 @@ class DiffimTestCases(unittest.TestCase):
         dmean = afwMath.makeStatistics(diffIm.getImage(),    afwMath.MEAN).getValue()
         dstd  = afwMath.makeStatistics(diffIm.getImage(),    afwMath.STDEV).getValue()
         vmean = afwMath.makeStatistics(diffIm.getVariance(), afwMath.MEAN).getValue()
-        return kSum, bg, dmean, dstd, vmean, kim, diffIm
+        return kSum, bg, dmean, dstd, vmean, kim, diffIm, kc
         
     def applyVisitor(self, invert=False, xloc=397, yloc=580):
         print '# %.2f %.2f' % (xloc, yloc)
@@ -139,7 +139,9 @@ class DiffimTestCases(unittest.TestCase):
 
         # delta function kernel
         results1 = self.apply(self.policy1, self.bskv1, xloc, yloc, tmi, smi)
-        kSum1, bg1, dmean1, dstd1, vmean1, kImageOut1, diffIm1 = results1
+        kSum1, bg1, dmean1, dstd1, vmean1, kImageOut1, diffIm1, kc1 = results1
+        kc1.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.EIGENVALUE)
+        kc1.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.SVD)
         print 'DF Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                     self.dStats.getRms(),
                                                                                     kSum1, bg1,
@@ -157,7 +159,9 @@ class DiffimTestCases(unittest.TestCase):
 
         # regularized delta function kernel
         results2 = self.apply(self.policy2, self.bskv2, xloc, yloc, tmi, smi)
-        kSum2, bg2, dmean2, dstd2, vmean2, kImageOut2, diffIm2 = results2
+        kSum2, bg2, dmean2, dstd2, vmean2, kImageOut2, diffIm2, kc2 = results2
+        kc2.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.EIGENVALUE)
+        kc2.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.SVD)
         print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                      self.dStats.getRms(),
                                                                                      kSum2, bg2,
@@ -173,7 +177,9 @@ class DiffimTestCases(unittest.TestCase):
 
         # alard-lupton kernel
         results3 = self.apply(self.policy3, self.bskv3, xloc, yloc, tmi, smi)
-        kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3 = results3
+        kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3, kc3 = results3
+        kc3.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.EIGENVALUE)
+        kc3.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.SVD)
         print 'AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                     self.dStats.getRms(),
                                                                                     kSum3, bg3,

@@ -359,7 +359,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     // convolvedMaskedImage.setXY0(imageToConvolve.getXY0()); // Fixed in afw ticket #1345
     afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
     convolutionControl.setDoNormalize(false);
-    convolutionControl.setMaxInterpolationError(1.0e-3); // put in policy
+    convolutionControl.setMaxInterpolationError(1.0e-1); // put in policy
     afwMath::convolve(convolvedMaskedImage, imageToConvolve, 
                       convolutionKernel, convolutionControl);
     
@@ -412,7 +412,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     // convolvedMaskedImage.setXY0(imageToConvolve.getXY0()); // Fixed in afw ticket #1345
     afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
     convolutionControl.setDoNormalize(false);
-    convolutionControl.setMaxInterpolationError(1.0e-3); // put in policy 
+    convolutionControl.setMaxInterpolationError(1.0e-1); // put in policy 
     afwMath::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, 
                       convolutionKernel, convolutionControl);
     

@@ -112,7 +112,7 @@ namespace detail {
         _nProcessed += 1;
         
         pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                              "Chi2 = %.2f", _imstats.getVariance());
+                              "Chi2 = %.3f", _imstats.getVariance());
         pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                               "X = %.2f Y = %.2f",
                               kCandidate->getXCenter(), 
@@ -122,7 +122,7 @@ namespace detail {
         pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                               "Background = %.3f", background);
         pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
-                              "Candidate %d resids = %.2f +/- %.2f sigma (%d pix)",
+                              "Candidate %d resids = %.3f +/- %.3f sigma (%d pix)",
                               kCandidate->getId(),
                               _imstats.getMean(),
                               _imstats.getRms(),
@@ -143,7 +143,7 @@ namespace detail {
             if (fabs(_imstats.getMean()) > _policy.getDouble("candidateResidualMeanMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                      "Rejecting candidate %d; bad mean residual : |%.2f| > %.2f",
+                                      "Rejecting candidate %d; bad mean residual : |%.3f| > %.3f",
                                       kCandidate->getId(),
                                       _imstats.getMean(),
                                       _policy.getDouble("candidateResidualMeanMax"));
@@ -152,7 +152,7 @@ namespace detail {
             else if (_imstats.getRms() > _policy.getDouble("candidateResidualStdMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                      "Rejecting candidate %d; bad residual rms : %.2f > %.2f",
+                                      "Rejecting candidate %d; bad residual rms : %.3f > %.3f",
                                       kCandidate->getId(),
                                       _imstats.getRms(),
                                       _policy.getDouble("candidateResidualStdMax"));
@@ -176,7 +176,7 @@ namespace detail {
         int candidateCoreRadius = _policy.getInt("candidateCoreRadius");
         _imstats.apply(diffim, candidateCoreRadius);
         pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
-                              "Candidate %d core resids = %.2f +/- %.2f sigma (%d pix)",
+                              "Candidate %d core resids = %.3f +/- %.3f sigma (%d pix)",
                               kCandidate->getId(),
                               _imstats.getMean(),
                               _imstats.getRms(),

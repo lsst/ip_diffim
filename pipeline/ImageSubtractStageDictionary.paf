@@ -160,7 +160,7 @@ regularizationType: centralDifference
 centralRegularizationStencil: 9
 forwardRegularizationOrders: 1 2 
 regularizationBorderPenalty: 3.
-regularizationConditionTolerance: 1.e6
+regularizationConditionTolerance: 1.e5
 ######
 # How to choose the value of Lambda
 #  
@@ -172,9 +172,13 @@ regularizationConditionTolerance: 1.e6
 # 
 lambdaType: "absolute" 
 lambdaValue: 1.0
-lambdaMin: 1.
-lambdaMax: 500.0
-lambdaStep: 10.
+lambdaStepType: "log" # "linear"
+lambdaLinMin: 1.
+lambdaLinMax: 500.0
+lambdaLinStep: 10.
+lambdaLogMin: -3.
+lambdaLogMax: +2.
+lambdaLogStep: 0.5
 
 #lambdaType: "relative"
 #lambdaValue: 0.00001

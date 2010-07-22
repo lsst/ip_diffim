@@ -10,6 +10,7 @@
  */
 
 #include <iterator>
+#include <cmath>
 #include <algorithm>
 
 #include "boost/timer.hpp" 
@@ -28,7 +29,8 @@
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
-#define DEBUG_MATRIX 0
+#define DEBUG_MATRIX  0
+#define DEBUG_MATRIX2 0
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
@@ -51,7 +53,7 @@ namespace diffim {
         _mMat(mMat),
         _bVec(bVec),
         _aVec(),
-        _solvedBy(KernelSolution::NONE),
+        _solvedBy(NONE),
         _fitForBackground(fitForBackground)
     {};
 
@@ -62,7 +64,7 @@ namespace diffim {
         _mMat(),
         _bVec(),
         _aVec(),
-        _solvedBy(KernelSolution::NONE),
+        _solvedBy(NONE),
         _fitForBackground(fitForBackground)
     {};
 
@@ -71,12 +73,49 @@ namespace diffim {
         _mMat(),
         _bVec(),
         _aVec(),
-        _solvedBy(KernelSolution::NONE),
+        _solvedBy(NONE),
         _fitForBackground(true)
     {};
 
     void KernelSolution::solve() {
         solve(*_mMat, *_bVec);
+    }
+
+    double KernelSolution::conditionNumber(ConditionNumberType conditionType) {
+        return conditionNumber(*_mMat, conditionType);
+    }
+
+    double KernelSolution::conditionNumber(Eigen::MatrixXd mMat, 
+                                           ConditionNumberType conditionType) {
+        switch (conditionType) {
+        case EIGENVALUE: 
+            {
+            Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(mMat);
+            Eigen::VectorXd eValues = eVecValues.eigenvalues();
+            double eMax = eValues.maxCoeff();
+            double eMin = eValues.minCoeff();
+            pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.conditionNumber", 
+                              "EIGENVALUE eMax / eMin = %.3e", eMax / eMin);
+            return (eMax / eMin);
+            break;
+            }
+        case SVD: 
+            {
+            Eigen::VectorXd sValues = mMat.svd().singularValues();
+            double sMax = sValues.maxCoeff();
+            double sMin = sValues.minCoeff();
+            pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.conditionNumber", 
+                              "SVD eMax / eMin = %.3e", sMax / sMin);
+            return (sMax / sMin);
+            break;
+            }
+        default:
+            {
+            throw LSST_EXCEPT(pexExcept::InvalidParameterException,
+                              "Undefined ConditionNumberType : only EIGENVALUE, SVD allowed.");
+            break;
+            }
+        }
     }
 
     void KernelSolution::solve(Eigen::MatrixXd mMat,
@@ -93,28 +132,54 @@ namespace diffim {
 
         boost::timer t;
         t.restart();
-        
+
+        /* 
+           Put a switch in to check conditioning of M; potentially reject if its
+           ill--conditioned.  It can hang here tho...
+        */
+        if (false) {
+            double cNumber = conditionNumber(EIGENVALUE);
+            /*
+            if Alard-lupton {
+                if (cNumber > 5e7) {
+                    _solvedBy = NONE;
+                    pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
+                                      "Ignoring, bad condition number (%.3e)", cNumber);
+                    return;
+                }
+            }
+            elif delta-function {
+                if (cNumber > 5e6) {
+                    _solvedBy = NONE;
+                    pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
+                                      "Ignoring, bad condition number (%.3e)", cNumber);
+                    return;
+                }
+            }
+            */
+        }
+
         pexLog::TTrace<2>("lsst.ip.diffim.KernelSolution.solve", 
                           "Solving for kernel");
         
-        _solvedBy = KernelSolution::CHOLESKY_LDLT;
+        _solvedBy = CHOLESKY_LDLT;
         if (!(mMat.ldlt().solve(bVec, &aVec))) {
             pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                               "Unable to determine kernel via Cholesky LDL^T");
             
-            _solvedBy = KernelSolution::CHOLESKY_LLT;
+            _solvedBy = CHOLESKY_LLT;
             if (!(mMat.llt().solve(bVec, &aVec))) {
                 pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                                   "Unable to determine kernel via Cholesky LL^T");
                 
-                _solvedBy = KernelSolution::LU;
+                _solvedBy = LU;
                 if (!(mMat.lu().solve(bVec, &aVec))) {
                     pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                                       "Unable to determine kernel via LU");
                     /* LAST RESORT */
                     try {
                         
-                        _solvedBy = KernelSolution::EIGENVECTOR;
+                        _solvedBy = EIGENVECTOR;
                         Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(mMat);
                         Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
                         Eigen::VectorXd eValues = eVecValues.eigenvalues();
@@ -128,7 +193,7 @@ namespace diffim {
                         aVec = rMat * eValues.asDiagonal() * rMat.transpose() * bVec;
                     } catch (pexExcept::Exception& e) {
                         
-                        _solvedBy = KernelSolution::NONE;
+                        _solvedBy = NONE;
                         pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                                           "Unable to determine kernel via eigen-values");
                         
@@ -465,9 +530,6 @@ namespace diffim {
         Eigen::MatrixXd mMatBiased = rMat * eValues.asDiagonal() * rMat.transpose();
 
         /* Then you estimate the unbiased risk */
-        double lambdaMin   = _policy.getDouble("lambdaMin");        
-        double lambdaMax   = _policy.getDouble("lambdaMax");
-        double lambdaStep  = _policy.getDouble("lambdaStep");
         Eigen::MatrixXd vMat      = (this->_cMat)->svd().matrixV();
         Eigen::MatrixXd vMatvMatT = vMat * vMat.transpose();
 
@@ -482,9 +544,10 @@ namespace diffim {
         }
         Eigen::MatrixXd mInvBiased = rMatBiased * eValuesBiased.asDiagonal() * rMatBiased.transpose();
 
-        std::vector<double> lambdas;
+        std::vector<double> lambdas = _createLambdaSteps();
         std::vector<double> risks;
-        for (double l = lambdaMin; l < lambdaMax; l += lambdaStep) {
+        for (unsigned int i = 0; i < lambdas.size(); i++) {
+            double l = lambdas[i];
             
             try {
                 KernelSolution::solve(*(this->_mMat) + l * (*_hMat), *(this->_bVec));
@@ -506,13 +569,12 @@ namespace diffim {
             pexLog::TTrace<6>("lsst.ip.diffim.RegularizedKernelSolution.estimateBiasedRisk", 
                               "Lambda = %.2f, risk estimate = %.5e + 2 * (%.5e - %.5e) = %.5e", 
                               l, term1(0), term2a, term2b(0), risk);
-            lambdas.push_back(l);
             risks.push_back(risk);
         }
         std::vector<double>::iterator it = min_element(risks.begin(), risks.end());
         int index = distance(risks.begin(), it);
         pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateBiasedRisk", 
-                          "Minimum risk = %.5e at lambda = %.2f", risks[index], lambdas[index]);
+                          "Minimum risk = %.3e at lambda = %.3e", risks[index], lambdas[index]);
 
         return lambdas[index];
     }
@@ -520,9 +582,6 @@ namespace diffim {
                 
     template <typename InputT>
     double RegularizedKernelSolution<InputT>::estimateUnbiasedRisk() {
-        double lambdaMin   = _policy.getDouble("lambdaMin");        
-        double lambdaMax   = _policy.getDouble("lambdaMax");
-        double lambdaStep  = _policy.getDouble("lambdaStep");
 
         Eigen::MatrixXd vMat      = (this->_cMat)->svd().matrixV();
         Eigen::MatrixXd vMatvMatT = vMat * vMat.transpose();
@@ -541,9 +600,10 @@ namespace diffim {
         /* Instead of */
         //Eigen::MatrixXd mInv = this->_mMat->inverse();
 
-        std::vector<double> lambdas;
+        std::vector<double> lambdas = _createLambdaSteps();
         std::vector<double> risks;
-        for (double l = lambdaMin; l < lambdaMax; l += lambdaStep) {
+        for (unsigned int i = 0; i < lambdas.size(); i++) {
+            double l = lambdas[i];
             
             try {
                 KernelSolution::solve(*(this->_mMat) + l * (*_hMat), *(this->_bVec));
@@ -565,26 +625,23 @@ namespace diffim {
             pexLog::TTrace<6>("lsst.ip.diffim.RegularizedKernelSolution.estimateUnbiasedRisk", 
                               "Lambda = %.2f, risk estimate = %.5e + 2 * (%.5e - %.5e) = %.5e", 
                               l, term1(0), term2a, term2b(0), risk);
-            lambdas.push_back(l);
             risks.push_back(risk);
         }
         std::vector<double>::iterator it = min_element(risks.begin(), risks.end());
         int index = distance(risks.begin(), it);
         pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateUnbiasedRisk", 
-                          "Minimum risk = %.5e at lambda = %.2f", risks[index], lambdas[index]);
+                          "Minimum risk = %.3e at lambda = %.3e", risks[index], lambdas[index]);
 
         return lambdas[index];
     }
 
     template <typename InputT>
     double RegularizedKernelSolution<InputT>::estimateGcv() {
-        double lambdaMin   = _policy.getDouble("lambdaMin");        
-        double lambdaMax   = _policy.getDouble("lambdaMax");
-        double lambdaStep  = _policy.getDouble("lambdaStep");
 
-        std::vector<double> lambdas;
+        std::vector<double> lambdas = _createLambdaSteps();
         std::vector<double> gcvs;
-        for (double l = lambdaMin; l < lambdaMax; l += lambdaStep) {
+        for (unsigned int i = 0; i < lambdas.size(); i++) {
+            double l = lambdas[i];
 
             try {
                 KernelSolution::solve(*(this->_mMat) + l * (*_hMat), *(this->_bVec));
@@ -603,13 +660,12 @@ namespace diffim {
             pexLog::TTrace<6>("lsst.ip.diffim.RegularizedKernelSolution.estimateGcv", 
                               "Lambda = %.2f, GCV = %.5e", l, gcv);
 
-            lambdas.push_back(l);
             gcvs.push_back(gcv);
         }
         std::vector<double>::iterator it = min_element(gcvs.begin(), gcvs.end());
         int index = distance(gcvs.begin(), it);
         pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateGcv", 
-                          "Minimum Gcv = %.5e at lambda = %.2f", gcvs[index], lambdas[index]);
+                          "Minimum Gcv = %.3e at lambda = %.3e", gcvs[index], lambdas[index]);
 
         return lambdas[index];
     }
@@ -634,7 +690,8 @@ namespace diffim {
                           (*this->_cMat).rows(), (*this->_cMat).cols(), (*this->_ivVec).size(), 
                           (*this->_iVec).size(), (*_hMat).rows(), (*_hMat).cols());
 
-        if (DEBUG_MATRIX) {
+        if (DEBUG_MATRIX2) {
+            std::cout << "ID: " << (this->_id) << std::endl;
             std::cout << "C:" << std::endl;
             std::cout << (*this->_cMat) << std::endl;
             std::cout << "Sigma^{-1}:" << std::endl;
@@ -643,7 +700,6 @@ namespace diffim {
             std::cout << (*this->_iVec) << std::endl;
             std::cout << "H:" << std::endl;
             std::cout << (*_hMat) << std::endl;
-            throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution");
         }
 
 
@@ -709,17 +765,17 @@ namespace diffim {
         if (lambdaType == "absolute") {
             _lambda = lambdaValue;
         }
-        else if (lambdaType == "relative") {
+        else if (lambdaType ==  "relative") {
             _lambda  = this->_mMat->trace() / this->_hMat->trace();
             _lambda *= lambdaValue;
         }
-        else if (lambdaType == "minimizeBiasedRisk") {
+        else if (lambdaType ==  "minimizeBiasedRisk") {
             _lambda = estimateBiasedRisk();
         }
-        else if (lambdaType == "minimizeUnbiasedRisk") {
+        else if (lambdaType ==  "minimizeUnbiasedRisk") {
             _lambda = estimateUnbiasedRisk();
         }
-        else if (lambdaType == "minimizeGcv") {
+        else if (lambdaType ==  "minimizeGcv") {
             _lambda = estimateGcv();
         }
         else {
@@ -738,6 +794,33 @@ namespace diffim {
         }
         /* Turn matrices into _kernel and _background */
         StaticKernelSolution<InputT>::_setKernel();
+    }
+
+    template <typename InputT>
+    std::vector<double> RegularizedKernelSolution<InputT>::_createLambdaSteps() {
+        std::vector<double> lambdas;
+
+        std::string lambdaStepType = _policy.getString("lambdaStepType");    
+        if (lambdaStepType == "linear") {
+            double lambdaLinMin   = _policy.getDouble("lambdaLinMin");        
+            double lambdaLinMax   = _policy.getDouble("lambdaLinMax");
+            double lambdaLinStep  = _policy.getDouble("lambdaLinStep");
+            for (double l = lambdaLinMin; l <= lambdaLinMax; l += lambdaLinStep) {
+                lambdas.push_back(l);
+            }
+        }
+        else if (lambdaStepType == "log") {
+            double lambdaLogMin   = _policy.getDouble("lambdaLogMin");        
+            double lambdaLogMax   = _policy.getDouble("lambdaLogMax");
+            double lambdaLogStep  = _policy.getDouble("lambdaLogStep");
+            for (double l = lambdaLogMin; l <= lambdaLogMax; l += lambdaLogStep) {
+                lambdas.push_back(pow(10, l));
+            }
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception, "lambdaStepType in Policy not recognized");
+        }
+        return lambdas;
     }
 
     /*******************************************************************************************************/

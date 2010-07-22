@@ -40,6 +40,11 @@ namespace diffim {
             EIGENVECTOR   = 4
         };
 
+        enum ConditionNumberType {
+            EIGENVALUE = 0,
+            SVD        = 1
+        };
+
         explicit KernelSolution(boost::shared_ptr<Eigen::MatrixXd> mMat,
                                 boost::shared_ptr<Eigen::VectorXd> bVec,
                                 bool fitForBackground);
@@ -48,8 +53,10 @@ namespace diffim {
 
         virtual ~KernelSolution() {};
         virtual void solve();
-        virtual void solve(Eigen::MatrixXd _mMat, 
-                           Eigen::VectorXd _bVec);
+        virtual void solve(Eigen::MatrixXd mMat, 
+                           Eigen::VectorXd bVec);
+        virtual double conditionNumber(ConditionNumberType conditionType);
+        virtual double conditionNumber(Eigen::MatrixXd mMat, ConditionNumberType conditionType);
 
         inline boost::shared_ptr<Eigen::MatrixXd> getM() {return _mMat;}
         inline boost::shared_ptr<Eigen::VectorXd> getB() {return _bVec;}
@@ -125,6 +132,8 @@ namespace diffim {
         boost::shared_ptr<Eigen::MatrixXd> _hMat;               ///< Regularization weights
         double _lambda;                                         ///< Overall regularization strength
         lsst::pex::policy::Policy _policy;
+
+        std::vector<double> _createLambdaSteps();
     };
 
 
