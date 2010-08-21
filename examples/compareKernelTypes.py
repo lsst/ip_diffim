@@ -35,16 +35,19 @@ class DiffimTestCases(unittest.TestCase):
 
         self.policy1.set("kernelBasisSet", "delta-function")
         self.policy1.set("useRegularization", False)
+        self.policy1.set("maxConditionNumber", 5.0e6)
         self.kList1 = ipDiffim.makeKernelBasisList(self.policy1)
         self.bskv1  = ipDiffim.BuildSingleKernelVisitorF(self.kList1, self.policy1)
         
         self.policy2.set("kernelBasisSet", "delta-function")
         self.policy2.set("useRegularization", True)
+        self.policy2.set("maxConditionNumber", 5.0e6)
         self.kList2 = ipDiffim.makeKernelBasisList(self.policy2)
         self.hMat2  = ipDiffim.makeRegularizationMatrix(self.policy2)
         self.bskv2  = ipDiffim.BuildSingleKernelVisitorF(self.kList2, self.policy2, self.hMat2)
         
         self.policy3.set("kernelBasisSet", "alard-lupton")
+        self.policy3.set("maxConditionNumber", 5.0e7)
         self.kList3 = ipDiffim.makeKernelBasisList(self.policy3)
         self.bskv3  = ipDiffim.BuildSingleKernelVisitorF(self.kList3, self.policy3)
 
@@ -140,8 +143,8 @@ class DiffimTestCases(unittest.TestCase):
         # delta function kernel
         results1 = self.apply(self.policy1, self.bskv1, xloc, yloc, tmi, smi)
         kSum1, bg1, dmean1, dstd1, vmean1, kImageOut1, diffIm1, kc1 = results1
-        kc1.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.EIGENVALUE)
-        kc1.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.SVD)
+        kc1.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(ipDiffim.KernelSolution.EIGENVALUE)
+        kc1.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(ipDiffim.KernelSolution.SVD)
         print 'DF Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                     self.dStats.getRms(),
                                                                                     kSum1, bg1,
@@ -160,8 +163,8 @@ class DiffimTestCases(unittest.TestCase):
         # regularized delta function kernel
         results2 = self.apply(self.policy2, self.bskv2, xloc, yloc, tmi, smi)
         kSum2, bg2, dmean2, dstd2, vmean2, kImageOut2, diffIm2, kc2 = results2
-        kc2.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.EIGENVALUE)
-        kc2.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.SVD)
+        kc2.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(ipDiffim.KernelSolution.EIGENVALUE)
+        kc2.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(ipDiffim.KernelSolution.SVD)
         print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                      self.dStats.getRms(),
                                                                                      kSum2, bg2,
@@ -178,8 +181,8 @@ class DiffimTestCases(unittest.TestCase):
         # alard-lupton kernel
         results3 = self.apply(self.policy3, self.bskv3, xloc, yloc, tmi, smi)
         kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3, kc3 = results3
-        kc3.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.EIGENVALUE)
-        kc3.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).conditionNumber(ipDiffim.KernelSolution.SVD)
+        kc3.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(ipDiffim.KernelSolution.EIGENVALUE)
+        kc3.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(ipDiffim.KernelSolution.SVD)
         print 'AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                     self.dStats.getRms(),
                                                                                     kSum3, bg3,

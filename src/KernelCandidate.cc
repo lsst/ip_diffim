@@ -117,6 +117,20 @@ namespace diffim {
     void KernelCandidate<PixelT>::_buildKernelSolution(lsst::afw::math::KernelList const& basisList,
                                                        boost::shared_ptr<Eigen::MatrixXd> hMat) 
     {
+        bool checkConditionNumber = _policy.getBool("checkConditionNumber");
+        double maxConditionNumber = _policy.getDouble("maxConditionNumber");
+        std::string conditionNumberType = _policy.getString("conditionNumberType");
+        KernelSolution::ConditionNumberType ctype;
+        if (conditionNumberType == "SVD") {
+            ctype = KernelSolution::SVD;
+        }
+        else if (conditionNumberType == "EIGENVALUE") {
+            ctype = KernelSolution::EIGENVALUE;
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception, "conditionNumberType not recognized");            
+        }
+        
         /* Do we have a regularization matrix?  If so use it */
         if (hMat) {
             _useRegularization = true;
@@ -130,6 +144,15 @@ namespace diffim {
                 _kernelSolutionPca->build(*(_miToConvolvePtr->getImage()),
                                           *(_miToNotConvolvePtr->getImage()),
                                           *_varianceEstimate);
+                if (checkConditionNumber) {
+                    if (_kernelSolutionPca->getConditionNumber(ctype) > maxConditionNumber) {
+                        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
+                                          "Candidate %d solution has bad condition number", 
+                                          this->getId());
+                        this->setStatus(afwMath::SpatialCellCandidate::BAD);
+                        return;
+                    }
+                }
                 _kernelSolutionPca->solve();
             }
             else {
@@ -139,6 +162,15 @@ namespace diffim {
                 _kernelSolutionOrig->build(*(_miToConvolvePtr->getImage()),
                                            *(_miToNotConvolvePtr->getImage()),
                                            *_varianceEstimate);
+                if (checkConditionNumber) {
+                    if (_kernelSolutionOrig->getConditionNumber(ctype) > maxConditionNumber) {
+                        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
+                                          "Candidate %d solution has bad condition number", 
+                                          this->getId());
+                        this->setStatus(afwMath::SpatialCellCandidate::BAD);
+                        return;
+                    }
+                }
                 _kernelSolutionOrig->solve();
             }
         }
@@ -153,6 +185,15 @@ namespace diffim {
                 _kernelSolutionPca->build(*(_miToConvolvePtr->getImage()),
                                           *(_miToNotConvolvePtr->getImage()),
                                           *_varianceEstimate);
+                if (checkConditionNumber) {
+                    if (_kernelSolutionPca->getConditionNumber(ctype) > maxConditionNumber) {
+                        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
+                                          "Candidate %d solution has bad condition number", 
+                                          this->getId());
+                        this->setStatus(afwMath::SpatialCellCandidate::BAD);
+                        return;
+                    }
+                }
                 _kernelSolutionPca->solve();
             }
             else {
@@ -162,6 +203,15 @@ namespace diffim {
                 _kernelSolutionOrig->build(*(_miToConvolvePtr->getImage()),
                                            *(_miToNotConvolvePtr->getImage()),
                                            *_varianceEstimate);
+                if (checkConditionNumber) {
+                    if (_kernelSolutionOrig->getConditionNumber(ctype) > maxConditionNumber) {
+                        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
+                                          "Candidate %d solution has bad condition number", 
+                                          this->getId());
+                        this->setStatus(afwMath::SpatialCellCandidate::BAD);
+                        return;
+                    }
+                }
                 _kernelSolutionOrig->solve();
             }
         }

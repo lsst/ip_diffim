@@ -178,7 +178,7 @@ lambdaLinMax: 500.0
 lambdaLinStep: 10.
 lambdaLogMin: -3.
 lambdaLogMax: +2.
-lambdaLogStep: 0.5
+lambdaLogStep: 0.1
 
 #lambdaType: "relative"
 #lambdaValue: 0.00001
@@ -236,6 +236,21 @@ spatialKernelClipping: true
 # KernelCandidates by their total flux in this core 
 #
 candidateCoreRadius: 3
+
+######
+
+# Maximum condition number when inverting a kernel matrix; anything
+# above this is not used and the candidate is set as BAD.  
+#
+# conditionNumberType: use singular values (SVD) or eigen values (EIGENVALUE)
+# maxConditionNumber: maximum values for a "well conditioned matrix.
+#                     5.0e6 for "delta-function" basis
+#                     5.0e7 for "alard-lupton" basis
+#
+checkConditionNumber: false
+maxConditionNumber: 5.0e7
+conditionNumberType: "SVD"
+
 
 ####################################
 # SINGLE KERNEL FITTING AROUND 1 SOURCE
