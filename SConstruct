@@ -27,6 +27,7 @@ dependencies = [
     ["pex_policy", "lsst/pex/policy/Policy.h", "pex_policy:C++"],
     ["daf_persistence", "lsst/daf/persistence.h", "daf_persistence:C++"],
     ["daf_data", "lsst/daf/data.h", "daf_data:C++"],
+    ["base", "lsst/base.h"],
     ["afw", "lsst/afw.h", "afw:C++"],
     ["sdqa", "lsst/sdqa/SdqaMetric.h", "sdqa:C++"],
     ]
