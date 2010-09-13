@@ -488,7 +488,7 @@ namespace diffim {
 
     template <typename InputT>
     double RegularizedKernelSolution<InputT>::estimateBiasedRisk() {
-        double tol = _policy.getDouble("regularizationConditionTolerance");
+        double tol = _policy.getDouble("maxConditionNumber");
 
         /* 
            MASSIVE WARNING : The eigenvalues returned by SelfAdjointEigenSolver
