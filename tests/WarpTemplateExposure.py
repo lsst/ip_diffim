@@ -75,20 +75,20 @@ class DiffimTestCases(unittest.TestCase):
         wcs1 = remappedImage.getWcs()
         wcs2 = self.scienceImage.getWcs()
 
-        self.assertEqual(wcs1.xyToRaDec(0, 0)[0],
-                         wcs2.xyToRaDec(0, 0)[0])
-        self.assertEqual(wcs1.xyToRaDec(0, 0)[1],
-                         wcs2.xyToRaDec(0, 0)[1])
+        self.assertEqual(wcs1.pixelToSky(0, 0)[0],
+                         wcs2.pixelToSky(0, 0)[0])
+        self.assertEqual(wcs1.pixelToSky(0, 0)[1],
+                         wcs2.pixelToSky(0, 0)[1])
 
 
-        self.assertEqual(wcs1.xyToRaDec(remappedImage.getWidth(),
-                                        remappedImage.getHeight())[0],
-                         wcs2.xyToRaDec(remappedImage.getWidth(),
-                                        remappedImage.getHeight())[0])
-        self.assertEqual(wcs1.xyToRaDec(remappedImage.getWidth(),
-                                        remappedImage.getHeight())[1],
-                         wcs2.xyToRaDec(remappedImage.getWidth(),
-                                        remappedImage.getHeight())[1])
+        self.assertEqual(wcs1.pixelToSky(remappedImage.getWidth(),
+                                         remappedImage.getHeight())[0],
+                         wcs2.pixelToSky(remappedImage.getWidth(),
+                                         remappedImage.getHeight())[0])
+        self.assertEqual(wcs1.pixelToSky(remappedImage.getWidth(),
+                                         remappedImage.getHeight())[1],
+                         wcs2.pixelToSky(remappedImage.getWidth(),
+                                         remappedImage.getHeight())[1])
                          
 
     def testXY0(self):
@@ -120,20 +120,20 @@ class DiffimTestCases(unittest.TestCase):
         wcs1 = remappedImage.getWcs()
         wcs2 = scienceSubImage.getWcs()
 
-        self.assertEqual(wcs1.xyToRaDec(0, 0)[0],
-                         wcs2.xyToRaDec(0, 0)[0])
-        self.assertEqual(wcs1.xyToRaDec(0, 0)[1],
-                         wcs2.xyToRaDec(0, 0)[1])
+        self.assertEqual(wcs1.pixelToSky(0, 0)[0],
+                         wcs2.pixelToSky(0, 0)[0])
+        self.assertEqual(wcs1.pixelToSky(0, 0)[1],
+                         wcs2.pixelToSky(0, 0)[1])
 
 
-        self.assertEqual(wcs1.xyToRaDec(remappedImage.getWidth(),
-                                        remappedImage.getHeight())[0],
-                         wcs2.xyToRaDec(remappedImage.getWidth(),
-                                        remappedImage.getHeight())[0])
-        self.assertEqual(wcs1.xyToRaDec(remappedImage.getWidth(),
-                                        remappedImage.getHeight())[1],
-                         wcs2.xyToRaDec(remappedImage.getWidth(),
-                                        remappedImage.getHeight())[1])
+        self.assertEqual(wcs1.pixelToSky(remappedImage.getWidth(),
+                                         remappedImage.getHeight())[0],
+                         wcs2.pixelToSky(remappedImage.getWidth(),
+                                         remappedImage.getHeight())[0])
+        self.assertEqual(wcs1.pixelToSky(remappedImage.getWidth(),
+                                         remappedImage.getHeight())[1],
+                         wcs2.pixelToSky(remappedImage.getWidth(),
+                                         remappedImage.getHeight())[1])
         
        
 #####
