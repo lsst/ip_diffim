@@ -158,6 +158,16 @@ namespace detail {
             return;
         } 
         _nProcessed += 1;
+
+        if (kCandidate->getStatus() == afwMath::SpatialCellCandidate::BAD) {
+            pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                                  "Candidate %d Returned BAD upon build, exiting", 
+                                  kCandidate->getId());
+            return;
+        }
+            
+        
+
         
         /* If we need to renormalize the kernel and its B matrix, do it here.
            This is particularly relevant when you are building a kernel matching
