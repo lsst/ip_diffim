@@ -317,7 +317,7 @@ spatialBgOrder:     0
 #
 backgroundPolicy: {
     algorithm:  "NATURAL_SPLINE" 
-    binsize:    512
+    binsize:    1024
     undersample: "REDUCE_INTERP_ORDER"
 }
 

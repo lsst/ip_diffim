@@ -23,6 +23,29 @@ class DiffimTestCases(unittest.TestCase):
     def tearDown(self):
         del self.policy
 
+    def testImageStatisticsNan(self, core=3):
+        numArray = num.zeros((20, 20))
+        mi       = afwImage.MaskedImageF(20, 20)
+        for j in range(mi.getHeight()):
+            for i in range(mi.getWidth()):
+                mi.set( i, j, (numArray[j][i], 0x0, 0) )
+
+        imstat = ipDiffim.ImageStatisticsF()
+        try:
+            imstat.apply(mi)
+        except Exception, e:
+            pass
+        else:
+            self.fail()
+
+        imstat = ipDiffim.ImageStatisticsF()
+        try:
+            imstat.apply(mi, core)
+        except Exception, e:
+            pass
+        else:
+            self.fail()
+
     def testImageStatisticsZero(self):
         numArray = num.zeros((20, 20))
         mi       = afwImage.MaskedImageF(20, 20)
@@ -50,6 +73,20 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(imstat.getMean(), 1)
         self.assertEqual(imstat.getRms(), 0)
         self.assertEqual(imstat.getNpix(), 20*20)
+
+    def testImageStatisticsCore(self, core=3):
+        numArray = num.ones((20, 20))
+        mi       = afwImage.MaskedImageF(20, 20)
+        for j in range(mi.getHeight()):
+            for i in range(mi.getWidth()):
+                mi.set( i, j, (numArray[j][i], 0x0, 1) )
+
+        imstat = ipDiffim.ImageStatisticsF()
+        imstat.apply(mi, core)
+
+        self.assertEqual(imstat.getMean(), 1)
+        self.assertEqual(imstat.getRms(), 0)
+        self.assertEqual(imstat.getNpix(), (2*core+1)**2 )
 
     def testImageStatisticsGeneral(self):
         numArray = num.ones((20, 20))

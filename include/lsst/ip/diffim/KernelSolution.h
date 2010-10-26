@@ -121,6 +121,7 @@ namespace diffim {
                                   );
         virtual ~RegularizedKernelSolution() {};
         void solve();
+        double getLambda() {return _lambda;}
         double estimateUnbiasedRisk();
         double estimateBiasedRisk();
         double estimateGcv();

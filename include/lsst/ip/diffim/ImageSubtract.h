@@ -22,7 +22,9 @@
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
+#include "lsst/pex/exceptions/Runtime.h"
 #include "lsst/afw/detection/Footprint.h"
+#include "lsst/utils/ieee.h"
 
 namespace lsst { 
 namespace ip { 
@@ -105,31 +107,42 @@ namespace diffim {
                 for (x_iterator ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
                     if (!((*ptr).mask() & _bpMask)) {
                         double const ivar = 1. / (*ptr).variance();
+
                         _xsum  += (*ptr).image() * sqrt(ivar);
                         _x2sum += (*ptr).image() * (*ptr).image() * ivar;
                         _npix  += 1;
                     }
                 }
             }
+
+            if ((!lsst::utils::lsst_isfinite(_xsum)) || (!lsst::utils::lsst_isfinite(_x2sum))) {
+                throw LSST_EXCEPT(pexExcept::Exception, 
+                                  "Nan/Inf in ImageStatistics.apply (check the variance for 0s)");
+            }
         }
 
         void apply(lsst::afw::image::MaskedImage<PixelT> const& image, int core) {
             reset();
             int y0 = std::max(0, image.getHeight()/2 - core);
-            int y1 = std::min(image.getHeight(), image.getHeight()/2 + core);
+            int y1 = std::min(image.getHeight(), image.getHeight()/2 + core + 1);
             int x0 = std::max(0, image.getWidth()/2 - core);
-            int x1 = std::min(image.getWidth(), image.getWidth()/2 + core);
+            int x1 = std::min(image.getWidth(), image.getWidth()/2 + core + 1);
 
             for (int y = y0; y != y1; ++y) {
                 for (x_iterator ptr = image.x_at(x0, y), end = image.x_at(x1, y); 
                      ptr != end; ++ptr) {
                     if (!((*ptr).mask() & _bpMask)) {
                         double const ivar = 1. / (*ptr).variance();
+
                         _xsum  += (*ptr).image() * sqrt(ivar);
                         _x2sum += (*ptr).image() * (*ptr).image() * ivar;
                         _npix  += 1;
                     }
                 }
+            }
+            if ((!lsst::utils::lsst_isfinite(_xsum)) || (!lsst::utils::lsst_isfinite(_x2sum))) {
+                throw LSST_EXCEPT(pexExcept::Exception, 
+                                  "Nan/Inf in ImageStatistics.apply (check the variance for 0s)");
             }
         }
 

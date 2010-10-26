@@ -157,7 +157,6 @@ namespace detail {
             _nRejected += 1;
             return;
         } 
-        _nProcessed += 1;
 
         if (kCandidate->getStatus() == afwMath::SpatialCellCandidate::BAD) {
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
@@ -187,7 +186,16 @@ namespace detail {
          * most recent kernel
          */
         MaskedImageT diffim = kCandidate->getDifferenceImage(ipDiffim::KernelCandidate<PixelT>::RECENT);
-        _imstats.apply(diffim);
+        try {
+            _imstats.apply(diffim);
+        } catch (pexExcept::Exception& e) {
+            pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                                  "Unable to calculate imstats for Candidate %d", kCandidate->getId()); 
+            kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
+            return;
+        }
+        _nProcessed += 1;
+
         kCandidate->setChi2(_imstats.getVariance());
         
         /* When using a Pca basis, we don't reset the kernel or background,

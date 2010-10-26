@@ -108,7 +108,15 @@ namespace detail {
         MaskedImageT diffim = kCandidate->getDifferenceImage(kernelPtr, background);
         
         /* Official resids */
-        _imstats.apply(diffim);
+        try {
+            _imstats.apply(diffim);
+        } catch (pexExcept::Exception& e) {
+            pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+                                  "Unable to calculate imstats for Candidate %d", kCandidate->getId()); 
+            kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
+            return;
+        }
+
         _nProcessed += 1;
         
         pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 

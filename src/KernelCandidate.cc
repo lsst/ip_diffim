@@ -26,6 +26,7 @@ namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
 namespace pexLog         = lsst::pex::logging; 
 namespace pexExcept      = lsst::pex::exceptions; 
+namespace pexLogging     = lsst::pex::logging; 
 
 namespace lsst { 
 namespace ip { 
@@ -55,9 +56,16 @@ namespace diffim {
         /* Rank by mean core S/N in science image */
         ImageStatistics<PixelT> imstats;
         int candidateCoreRadius = _policy.getInt("candidateCoreRadius");
-        imstats.apply(*_miToNotConvolvePtr, candidateCoreRadius);
-        _coreFlux = imstats.getMean();
+        try {
+            imstats.apply(*_miToNotConvolvePtr, candidateCoreRadius);
+        } catch (pexExcept::Exception& e) {
+            pexLogging::TTrace<3>("lsst.ip.diffim.KernelCandidate", 
+                                  "Unable to calculate core imstats for ranking Candidate %d", this->getId()); 
+            this->setStatus(afwMath::SpatialCellCandidate::BAD);
+            return;
+        }
 
+        _coreFlux = imstats.getMean();
         pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
                           "Candidate %d at %.2f %.2f with ranking %.2f", 
                           this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);

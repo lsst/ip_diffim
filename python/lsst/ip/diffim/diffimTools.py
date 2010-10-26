@@ -59,6 +59,39 @@ def makePoissonNoiseImage(im):
 # gaussian) and the other is a convolution of this with a spatially
 # varying kernel.
 #######
+def fakeCoeffs():
+    kCoeffs = ((  6.9843,  0.0,         0.0), 
+               (  3.2799, -0.0014,      0.0001), 
+               (  4.6735,  0.0004,      6.3735e-06), 
+               ( -6.4267, -0.0034,      0.0022), 
+               ( -5.7412,  0.0015,      0.0009), 
+               ( -4.0961, -0.0051,      0.0026), 
+               ( -3.4660,  0.0003,      0.0007), 
+               (  1.4134, -1.4700e-06, -0.0003), 
+               (  0.9112, -0.0002,     -7.3208e-05), 
+               ( -6.6402, -0.0025,      0.0003), 
+               ( -5.4063, -0.0067,      0.0049), 
+               (  2.7299,  0.0007,     -0.0008), 
+               ( -3.5498, -0.0027,      0.0029), 
+               ( -2.1196, -0.0013,      2.8696e-05), 
+               ( -3.4298, -0.0065,      0.0053), 
+               ( 37.9685,  0.0415,     -0.0314), 
+               (  0.3578,  0.0009,     -0.0008), 
+               (  1.7980,  0.0027,     -0.0002), 
+               (-15.7181, -0.0176,      0.0129), 
+               (  0.3994, -0.0005,      0.0003), 
+               (-16.4162, -0.0174,      0.0125), 
+               (  0.1032, -0.0002,      0.0002), 
+               ( -0.3409, -0.0005,      6.1906e-05), 
+               ( -0.3338, -0.0002,      0.0002), 
+               ( -0.3492, -0.0011,      0.0001), 
+               ( 14.6390,  0.0176,     -0.0119), 
+               (  0.0118, -3.5455e-06, -1.2296e-05), 
+               (  0.0662,  0.0002,     -8.8548e-05), 
+               ( -2.9271, -0.0036,      0.0023), 
+               (  0.0057,  0.0001,     -6.1779e-05), 
+               ( -2.8832, -0.0033,      0.0022))
+    return kCoeffs
 
 def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
                       addNoise = False, bgValue = 100., display = True):
@@ -112,16 +145,17 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
     sOrder   = policy.get('spatialKernelOrder')
     polyFunc = afwMath.PolynomialFunction2D(sOrder)
     nParams  = len(polyFunc.getParameters())
-    kCoeffs  = []
-    # First one does not vary spatially
-    kCoeffs.append([])
-    kCoeffs[0].append(1.)
-    for i in range(1, nParams):
-        kCoeffs[0].append(0.)
-    for i in range(1, len(basisList)):
-        kCoeffs.append([])
-        for j in range(nParams):
-            kCoeffs[i].append(0.001 * (1.5 * (-1)**j + i))
+    #kCoeffs  = []
+    ## First one does not vary spatially
+    #kCoeffs.append([])
+    #kCoeffs[0].append(1.)
+    #for i in range(1, nParams):
+    #    kCoeffs[0].append(0.)
+    #for i in range(1, len(basisList)):
+    #    kCoeffs.append([])
+    #    for j in range(nParams):
+    #        kCoeffs[i].append(0.001 * (1.5 * (-1)**j + i))
+    kCoeffs = fakeCoeffs()
 
     # Estimate of the image variance comes from convolution with main gaussian
     svar = afwImage.ImageF(tim.getDimensions())

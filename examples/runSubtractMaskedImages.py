@@ -10,7 +10,7 @@ import lsst.afw.display.ds9 as ds9
 from lsst.pex.logging import Trace
 from lsst.pex.logging import Log
 
-from lsst.ip.diffim import subtractMaskedImages, generateDefaultPolicy
+from lsst.ip.diffim import subtractMaskedImages, createDefaultPolicy
 import lsst.ip.diffim.diffimTools as diffimTools
 
 # For degugging needs
@@ -97,7 +97,7 @@ Notes:
         
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
-    policy              = generateDefaultPolicy(policyPath, fwhm=fwhm)
+    policy              = createDefaultPolicy(policyPath, fwhm=fwhm)
     
     if bgSub:
         diffimTools.backgroundSubtract(policy, [templateMaskedImage, scienceMaskedImage])
@@ -107,6 +107,9 @@ Notes:
                                    policy)
     differenceMaskedImage = results[0]
     differenceMaskedImage.writeFits(outputPath)
+
+    spatialKernel = results[1]
+    print spatialKernel.getSpatialParameters()
     
     if display:
         ds9.mtv(differenceMaskedImage)
