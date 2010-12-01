@@ -29,7 +29,7 @@ if True:
 #
 # Build/install things
 #
-for d in Split("doc examples lib src tests python/lsst/ip/diffim"):
+for d in Split("doc examples lib tests python/lsst/ip/diffim"):
     SConscript(os.path.join(d, "SConscript"))
 
 env['IgnoreFiles'] = r"(~$|\.pyc$|^\.svn$|\.o$)"

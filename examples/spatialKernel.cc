@@ -14,7 +14,7 @@ int main() {
     unsigned int nBases = kSize * kSize;
     int spatialKernelOrder = 2;
     
-    lsst::afw::math::KernelList basisList = generateDeltaFunctionBasisSet(kSize, kSize);
+    lsst::afw::math::KernelList basisList = makeDeltaFunctionBasisList(kSize, kSize);
     /* Spatial Kernel */
     afwMath::Kernel::SpatialFunctionPtr spatialKernelFunction(
         new afwMath::PolynomialFunction2<double>(spatialKernelOrder)

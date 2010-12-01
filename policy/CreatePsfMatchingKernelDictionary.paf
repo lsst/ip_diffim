@@ -1,6 +1,6 @@
 #<?cfg paf dictionary ?>
 #
-# This file should be moved back to coadd/psfmatched when #1035 is resolved
+# Dictionary for createPsfMatchingKernel
 #
 definitions: {
 
