@@ -29,6 +29,14 @@ definitions: {
         maxOccurs: 1
         default: 10.
     }
+
+    detOnTemplate: {
+        type: bool
+        description: "If true run detection on the template (imageToConvolve);
+            if false run detection on the science image (imageToNotConvolve)"
+        maxOccurs: 1
+        default: true
+    }
     
     detBadMaskPlanes: {
         type: string
