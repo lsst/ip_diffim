@@ -40,12 +40,9 @@ definitions: {
     
     detBadMaskPlanes: {
         type: string
-        description: """Mask planes that lead to an invalid detection
-
-Options: EDGE SAT BAD CR INTRP
- 
-E.g. : EDGE SAT BAD allows CR-masked and interpolated pixels
-"""
+        description: "Mask planes that lead to an invalid detection
+            Options: EDGE SAT BAD CR INTRP
+            E.g. : EDGE SAT BAD allows CR-masked and interpolated pixels"
        default: "EDGE" "SAT" "BAD"
     }
 
