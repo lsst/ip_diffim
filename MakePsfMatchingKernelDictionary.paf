@@ -1,6 +1,6 @@
 #<?cfg paf dictionary ?>
 #
-# Dictionary for createPsfMatchingKernel
+# Dictionary for makePsfMatchingKernel
 #
 definitions: {
 

@@ -35,7 +35,7 @@ for d in Split("doc examples lib tests python/lsst/ip/diffim"):
 env['IgnoreFiles'] = r"(~$|\.pyc$|^\.svn$|\.o$)"
 
 Alias("install", [
-    env.Install(env['prefix'], "doc"),
+#    env.Install(env['prefix'], "doc"),
     env.Install(env['prefix'], "etc"),
     env.Install(env['prefix'], "examples"),
     env.Install(env['prefix'], "include"),
