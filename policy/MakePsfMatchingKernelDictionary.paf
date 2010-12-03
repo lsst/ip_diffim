@@ -4,13 +4,6 @@
 #
 definitions: {
 
-     detThreshold: {
-        type: double
-        description: "value of footprint detection threshold"
-        maxOccurs: 1
-        default: 10.
-    }
-
     detThresholdType: {
         type: string
         description: "type of detection threshold"
@@ -29,6 +22,25 @@ definitions: {
            description:  "use variance as the detection threshold type"
         }
     }
+
+     detThreshold: {
+        type: double
+        description: "value of footprint detection threshold"
+        maxOccurs: 1
+        default: 10.
+    }
+    
+    detBadMaskPlanes: {
+        type: string
+        description: """Mask planes that lead to an invalid detection
+
+Options: EDGE SAT BAD CR INTRP
+ 
+E.g. : EDGE SAT BAD allows CR-masked and interpolated pixels
+"""
+       default: "EDGE" "SAT" "BAD"
+    }
+
 
     fpNpixMin: {
         type: int
@@ -182,97 +194,162 @@ definitions: {
         maxOccurs: 1
         default: true
     }
-
-    regularizationOrder: {
-        type: int
-        description: "Order of delta-function regularization"
+    
+    regularizationType: {
+        type: string
+        description: "Type of regularization."
         maxOccurs: 1
-        default: 2
+        default: "centralDifference"
         allowed: {
-            value:        0
-            description:  "penalize first derivative"
+            value:        "centralDifference"
+            description:  "Penalize second derivative using 2-D stencil"
         }
         allowed: {
-            value:        1
-            description:  "penalize second derivative"
-        }
-        allowed: {
-            value:        2
-            description:  "penalize third derivative"
+            value:        "forwardDifference"
+            description:  "Penalize first, second, third or combination of derivatives"
         }
     }
 
-    regularizationBoundary: {
+    centralRegularizationStencil: {
         type: int
-        description: "how to deal with boundaries in delta-function regularization"
-        maxOccurs: 1
-        default: 1
+        description: "5 or 9 point stencil (for centralDifference only)"
+        default: 9
         allowed: {
-            value:        0
-            description:  "no wrapping or tapering near boundary"
+            value:        5
         }
         allowed: {
-            value:        1
-            description:  "wrap regularization to other edge of image"
-        }
-        allowed: {
-            value:        2
-            description:  "taper the derivative as you approach the edge"
+            value:        9
         }
     }
 
-    regularizationDifference: {
+    forwardRegularizationOrders: {
         type: int
-        description: "type of derivative approximation for delta-function regularization"
+        description: "Array showing which order derivatives to penalize (for forwardDifference only)"
+        default: 1 2
+    }
+
+    regularizationBorderPenalty: {
+        type: double
+        description: "Penalty for value of kernel along its border"
         maxOccurs: 1
-        default: 0
-        allowed: {
-            value:        0
-            description:  "use forward derivative approximation"
-        }
-        allowed: {
-            value:        1
-            description:  "use central derivative approximation"
-        }
+        default: 3.0
     }
 
     regularizationScaling: {
         type: double
-        description: "Strength of delta-function regularization;
-            fraction of the default lambda calculation (N.R. 18.5.8) to use."
+        description: "Fraction of the default lambda strength (N.R. 18.5.8) to use. 
+                      somewhere around 1e-4 to 1e-5 seems to work.
+                      some kernels need high freq power"
         maxOccurs: 1
-        default: 0.0001
+        default: 1e-4
     }
 
+    lambdaType: {
+        type: string
+        maxOccurs: 1
+        default: "absolute"
+        allowed: {
+            value:        "absolute"
+            description:  "Use lambdaValue as the value of lambda"
+        }
+        allowed: {
+            value:        "relative"
+            description:  "lambdaValue as a fraction of the default lambda strength (N.R. 18.5.8)"
+        }
+        allowed: {
+            value:        "minimizeBiasedRisk"
+            description:  "Minimize biased risk estimate"
+        }
+        allowed: {
+            value:        "minimizeUnbiasedRisk"
+            description:  "Minimize unbiased risk estimate"
+        }
+        allowed: {
+            value:        "minimizeGcv"
+            description:  "Minimize generalized cross-validation statistic; scan lambda"
+        }
+    }
+    
+    lambdaValue: {
+        type: double
+        maxOccurs: 1
+        default: 1.0
+    }
+
+    lambdaStepType: {
+        type: string
+        maxOccurs: 1
+        default: "log"
+        allowed: {
+            value: "log"
+        }
+        allowed: {
+            value: "linear"
+        }
+    }
+    
+    lambdaLinMin: {
+        type: double
+        maxOccurs: 1
+        default: 1.0
+    }
+    
+    lambdaLinMax: {
+        type: double
+        maxOccurs: 1
+        default: 500.0
+    }
+    
+    lambdaLinStep: {
+        type: double
+        maxOccurs: 1
+        default: 10.0
+    }
+    
+    lambdaLogMin: {
+        type: double
+        maxOccurs: 1
+        default: -3.0
+    }
+    
+    lambdaLogMax: {
+        type: double
+        maxOccurs: 1
+        default: +2.0
+    }
+    
+    lambdaLogStep: {
+        type: double
+        maxOccurs: 1
+        default: 0.1
+    }
 
     ####################################
     # KERNEL QUALITY CONTROL
     #
-    maxKsumIterations: {
-        type: int
-        description: "maximum number of iterations to do maxKsumSigma-sigma clipping"
-        maxOccurs: 1
-        default: 5
-    }
-
     maxKsumSigma: {
         type: double
-        description: "maximum allowed sigma for outliers from kernel sum distribution"
+        description: "Maximum allowed sigma for outliers from kernel sum distribution"
         maxOccurs: 1
         default: 3.0
     }
 
     candidateResidualMeanMax: {
         type: double
-        description: "Maximum average of (residual/noise) in the difference image stamp
-            for an acceptable kernel; the expectation value is 0.0"
+        description: "Rejects objects with bad difference image quality
+            
+            This is used as a proxy for the quality of the kernel.  We look at
+            both the mean value of the residuals in the difference image
+            (normalized by the noise; expectation value is 0.0) as well as the
+            width of the distribution (expectation value 1.0)
+            
+            Maximum diffim average of (residual/noise) for an acceptable Kernel"
         maxOccurs: 1
         default: 0.25
     }
     candidateResidualStdMax: {
         type: double
-        description: "Maximum standard deviation of (residual/noise) in the difference image stamp
-            for an acceptable kernel; the expectation value is 1.0"
+        description: "Maximum diffim standard deviation of (residual/noise) for an acceptable Kernel"
         maxOccurs: 1
         default: 1.25
     }
@@ -309,6 +386,48 @@ definitions: {
         description: "Do sigma clipping on the spatial model?"
         maxOccurs: 1
         default: true
+    }
+
+    candidateCoreRadius: {
+        type: int
+        description: "Radius for calculation of stats in 'core' of KernelCandidate diffim.
+            Total number of pixels used will be (2*radius)**2. 
+            This is used both for 'core' diffim quality as well as ranking of
+            KernelCandidates by their total flux in this core"
+        maxOccurs: 1
+        default: 3
+    }
+
+    checkConditionNumber: {
+        type: bool
+        description: "Test for maximum condition number when inverting a kernel matrix?
+            Anything above the value is not used and the candidate is set as BAD.        
+            Also used to truncate inverse matrix in estimateBiasedRisk."
+        maxOccurs: 1
+        default: false
+    }
+
+    conditionNumberType: {
+        type: bool
+        description: 
+        allowed: {
+            value: "SVD"
+            description: "Use singular values"
+        }
+        allowed: {
+            value: "EIGENVALUE"
+            description: "Use eigen values"
+        }
+    }
+    
+    maxConditionNumber: {
+        type: double
+        description: "Maximum condition number for a well conditioned matrix.
+            Suggested value:
+            * 5.0e6 for 'delta-function' basis
+            * 5.0e7 for 'alard-lupton' basis"
+        maxOccurs: 1
+        default: 5.0e7
     }
 
 
@@ -432,12 +551,34 @@ definitions: {
         default: true
     }
 
+    subtractMeanForPca: {
+        type: bool
+        description: "Subtract off the mean feature before doing the Pca?"
+        maxOccurs: 1
+        default: true
+    }
+
     numPrincipalComponents: {
         type: int
         description: "Number of principal components to use for Pca basis, not counting the mean kernel.
             Thus you will have numPrincipalComponents + 1 basis functions for the decomposition."
         maxOccurs: 1
         default: 4
+    }
+
+    fracEigenVal: {
+        type: double
+        description: "At what fraction of the eigenvalues do you cut off the expansion?
+            Warning: not yet implemented"
+        maxOccurs: 1
+        default: 0.95
+    }
+
+    fitForBackground: {
+        type: bool
+        description: "Include terms (including kernel cross terms) for background"
+        maxOccurs: 1
+        default: true
     }
 
     useAfwBackground: {
