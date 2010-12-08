@@ -30,7 +30,7 @@ definitions: {
         type: policy
         description: "Policy in case diffim needs to do Afw background subtraction, e.g. for object detection
                       or when fitting for background using Afw exclusively (option useAfwBackground)"
-        dictionary: @AfwBackgroundPolicy
+        dictionary: @AfwBackgroundPolicy.paf
         maxOccurs: 1
     }
 
