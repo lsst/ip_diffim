@@ -11,7 +11,7 @@ definitions: {
     detectionPolicy: {
         type: policy
         description: "Policy for detection of objects for psf matching"
-        dictionary: @DetectionPolicy.paf
+        dictionary: @@ip_diffim:/policy/DetectionPolicy.paf
         maxOccurs: 1
     }
 
@@ -30,7 +30,7 @@ definitions: {
         type: policy
         description: "Policy in case diffim needs to do Afw background subtraction, e.g. for object detection
                       or when fitting for background using Afw exclusively (option useAfwBackground)"
-        dictionary: @AfwBackgroundPolicy.paf
+        dictionary: @@ip_diffim:/policy/AfwBackgroundPolicy.paf
         maxOccurs: 1
     }
 
@@ -54,6 +54,7 @@ definitions: {
         description: "Scale kernelSize, alardSigGauss, and fpGrowPix by input Fwhm"
         maxOccurs: 1
         default: true
+    }
 
     ######
     #
