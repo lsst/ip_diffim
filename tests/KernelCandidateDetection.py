@@ -19,11 +19,10 @@ class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
         self.policy      = ipDiffim.createDefaultPolicy(diffimPolicy)
-        self.kCols       = self.policy.getInt('kernelCols')
-        self.kRows       = self.policy.getInt('kernelRows')
+        self.kSize       = self.policy.getInt('kernelSize')
 
         # gaussian reference kernel
-        self.gSize         = self.kCols
+        self.gSize         = self.kSize
         self.gaussFunction = afwMath.GaussianFunction2D(2, 3)
         self.gaussKernel   = afwMath.AnalyticKernel(self.gSize, self.gSize, self.gaussFunction)
 

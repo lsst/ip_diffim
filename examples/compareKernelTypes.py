@@ -121,7 +121,7 @@ class DiffimTestCases(unittest.TestCase):
     def applyVisitor(self, invert=False, xloc=397, yloc=580):
         print '# %.2f %.2f' % (xloc, yloc)
         
-        imsize = int(3 * self.policy1.get("kernelCols"))
+        imsize = int(3 * self.policy1.get("kernelSize"))
 
         # chop out a region around a known object
         bbox = afwImage.BBox( afwImage.PointI(xloc - imsize/2,

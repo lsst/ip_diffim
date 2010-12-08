@@ -29,11 +29,10 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
     def setUp(self, CFHT=True):
         self.policy      = ipDiffim.createDefaultPolicy(diffimPolicy)
-        self.kCols       = self.policy.getInt('kernelCols')
-        self.kRows       = self.policy.getInt('kernelRows')
+        self.kSize       = self.policy.getInt('kernelSize')
 
         # Delta function basis set
-        self.basisList1  = ipDiffim.makeDeltaFunctionBasisSet(self.kCols, self.kRows)
+        self.basisList1  = ipDiffim.makeDeltaFunctionBasisSet(self.kSize, self.kSize)
         self.kFunctor1   = ipDiffim.PsfMatchingFunctorF(self.basisList1)
 
         # Alard-Lupton basis set
@@ -42,9 +41,8 @@ class DiffimTestCases(unittest.TestCase):
         degGauss = self.policy.getIntArray("alardDegGauss")
         assert len(sigGauss) == nGauss
         assert len(degGauss) == nGauss
-        assert self.kCols == self.kRows  # square
-        assert self.kCols % 2 == 1  # odd sized
-        kHalfWidth = int(self.kCols/2)
+        assert self.kSize % 2 == 1  # odd sized
+        kHalfWidth = iself.kSize // 2
         self.basisList2  = ipDiffim.makeAlardLuptonBasisSet(kHalfWidth, nGauss, sigGauss, degGauss)
         self.kFunctor2   = ipDiffim.PsfMatchingFunctorF(self.basisList2)
 
@@ -100,7 +98,7 @@ class DiffimTestCases(unittest.TestCase):
         pair      = functor.getSolution()
         kernel    = pair.first
         bg        = pair.second
-        kImageOut = afwImage.ImageD(self.kCols, self.kRows)
+        kImageOut = afwImage.ImageD(self.kSize, self.kSize)
         kSum      = kernel.computeImage(kImageOut, False)
         diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, bg)
         bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
@@ -123,7 +121,7 @@ class DiffimTestCases(unittest.TestCase):
             
         print '# %.2f %.2f %s' % (xloc, yloc, invert)
         
-        imsize = int(3 * self.kCols)
+        imsize = int(3 * self.kSize)
 
         # chop out a region around a known object
         bbox = afwImage.BBox( afwImage.PointI(xloc - imsize/2,

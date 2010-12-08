@@ -14,8 +14,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def testNoModify(self):
         p1 = ipDiffim.createDefaultPolicy(self.policyPath, modify=False)
-        self.assertEqual(self.p0.get("kernelRows"), p1.get("kernelRows"))
-        self.assertEqual(self.p0.get("kernelCols"), p1.get("kernelCols"))
+        self.assertEqual(self.p0.get("kernelSize"), p1.get("kernelSize"))
         self.assertEqual(self.p0.get("fpGrowPix"), p1.get("fpGrowPix"))
         for i in range(self.p0.get("alardNGauss")):
             self.assertEqual(self.p0.getDoubleArray("alardSigGauss")[i],
@@ -23,22 +22,19 @@ class DiffimTestCases(unittest.TestCase):
 
     def testModifyGreater(self, fwhm=10.):
         p1 = ipDiffim.createDefaultPolicy(self.policyPath, fwhm=fwhm)
-        self.assertTrue(self.p0.get("kernelRows") < p1.get("kernelRows"))
-        self.assertTrue(self.p0.get("kernelCols") < p1.get("kernelCols"))
+        self.assertTrue(self.p0.get("kernelSize") < p1.get("kernelSize"))
         self.assertTrue(self.p0.get("fpGrowPix") < p1.get("fpGrowPix"))
         for i in range(self.p0.get("alardNGauss")):
             self.assertTrue(self.p0.getDoubleArray("alardSigGauss")[i] <
                             p1.getDoubleArray("alardSigGauss")[i])
 
         # maxed out the sizes
-        self.assertTrue(p1.get("fpGrowPix") == self.p0.get("fpGrowMax"))
-        self.assertTrue(p1.get("kernelRows")//2 == self.p0.get("kernelRadiusMax"))
-        self.assertTrue(p1.get("kernelCols")//2 == self.p0.get("kernelRadiusMax"))
+        self.assertTrue(p1.get("fpGrowPix")  == self.p0.get("fpGrowMax"))
+        self.assertTrue(p1.get("kernelSize") == self.p0.get("kernelSizeMax"))
 
     def testModifyLesser(self, fwhm=1.):
         p1 = ipDiffim.createDefaultPolicy(self.policyPath, fwhm=fwhm)
-        self.assertTrue(self.p0.get("kernelRows") > p1.get("kernelRows"))
-        self.assertTrue(self.p0.get("kernelCols") > p1.get("kernelCols"))
+        self.assertTrue(self.p0.get("kernelSize") > p1.get("kernelSize"))
 
         self.assertTrue(self.p0.get("fpGrowPix") > p1.get("fpGrowPix"))
         for i in range(self.p0.get("alardNGauss")):
@@ -47,8 +43,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # minned out the sizes
         self.assertTrue(p1.get("fpGrowPix") == self.p0.get("fpGrowMin"))
-        self.assertTrue(p1.get("kernelRows")//2 == self.p0.get("kernelRadiusMin"))
-        self.assertTrue(p1.get("kernelCols")//2 == self.p0.get("kernelRadiusMin"))
+        self.assertTrue(p1.get("kernelSize") == self.p0.get("kernelSizeMin"))
 
     def tearDown(self):
         del self.p0

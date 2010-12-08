@@ -22,8 +22,7 @@ class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
         self.policy = ipDiffim.createDefaultPolicy(diffimPolicy, modify=False)
-        self.kCols  = self.policy.getInt("kernelCols")
-        self.kRows  = self.policy.getInt("kernelRows")
+        self.kSize  = self.policy.getInt("kernelSize")
 
     def tearDown(self):
         del self.policy
@@ -35,15 +34,15 @@ class DiffimTestCases(unittest.TestCase):
     def deltaFunctionTest(self, ks):
         # right shape
         nk  = 0
-        for rowi in range(self.kRows):
-            for colj in range(self.kCols):
+        for rowi in range(self.kSize):
+            for colj in range(self.kSize):
                 kernel = ks[nk]
                 kimage = afwImage.ImageD(kernel.getDimensions())
                 ksum   = kernel.computeImage(kimage, False)
                 self.assertEqual(ksum, 1.)
 
-                for rowk in range(self.kRows):
-                    for coll in range(self.kCols):
+                for rowk in range(self.kSize):
+                    for coll in range(self.kSize):
                         if (rowi == rowk) and (colj == coll):
                             self.assertEqual(kimage.get(coll, rowk), 1.)
                         else:
@@ -52,10 +51,10 @@ class DiffimTestCases(unittest.TestCase):
         
 
     def testMakeDeltaFunction(self):
-        ks = ipDiffim.makeDeltaFunctionBasisList(self.kCols, self.kRows)
+        ks = ipDiffim.makeDeltaFunctionBasisList(self.kSize, self.kSize)
 
         # right size
-        self.assertEqual(len(ks), self.kCols * self.kRows)
+        self.assertEqual(len(ks), self.kSize * self.kSize)
 
         # right shape
         self.deltaFunctionTest(ks)
@@ -66,7 +65,7 @@ class DiffimTestCases(unittest.TestCase):
         ks = ipDiffim.makeKernelBasisList(self.policy)
 
         # right size
-        self.assertEqual(len(ks), self.kCols * self.kRows)
+        self.assertEqual(len(ks), self.kSize * self.kSize)
 
         # right shape
         self.deltaFunctionTest(ks)
@@ -113,9 +112,8 @@ class DiffimTestCases(unittest.TestCase):
         degGauss = self.policy.getIntArray("alardDegGauss")
         self.assertEqual(len(sigGauss), nGauss)
         self.assertEqual(len(degGauss), nGauss)
-        self.assertEqual(self.kCols, self.kRows)  # square
-        self.assertEqual(self.kCols % 2, 1)       # odd sized
-        kHalfWidth = int(self.kCols/2)
+        self.assertEqual(self.kSize % 2, 1)       # odd sized
+        kHalfWidth = self.kSize // 2
 
         ks = ipDiffim.makeAlardLuptonBasisList(kHalfWidth, nGauss, sigGauss, degGauss)
 
@@ -137,9 +135,9 @@ class DiffimTestCases(unittest.TestCase):
         gauss1 = afwMath.GaussianFunction2D(2, 2)
         gauss2 = afwMath.GaussianFunction2D(3, 4)
         gauss3 = afwMath.GaussianFunction2D(0.2, 0.25)
-        gaussKernel1 = afwMath.AnalyticKernel(self.kCols, self.kRows, gauss1)
-        gaussKernel2 = afwMath.AnalyticKernel(self.kCols, self.kRows, gauss2)
-        gaussKernel3 = afwMath.AnalyticKernel(self.kCols, self.kRows, gauss3)
+        gaussKernel1 = afwMath.AnalyticKernel(self.kSize, self.kSize, gauss1)
+        gaussKernel2 = afwMath.AnalyticKernel(self.kSize, self.kSize, gauss2)
+        gaussKernel3 = afwMath.AnalyticKernel(self.kSize, self.kSize, gauss3)
         kimage1 = afwImage.ImageD(gaussKernel1.getDimensions())
         ksum1   = gaussKernel1.computeImage(kimage1, False)
         kimage2 = afwImage.ImageD(gaussKernel2.getDimensions())

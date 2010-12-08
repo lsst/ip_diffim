@@ -95,8 +95,7 @@ def fakeCoeffs():
 
 def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
                       addNoise = False, bgValue = 100., display = True):
-    kSize    = policy.get('kernelRows')
-    assert(kSize == policy.get('kernelCols'))
+    kSize    = policy.get('kernelSize')
     sizeCell = policy.get('sizeCellX')
     assert(sizeCell == policy.get('sizeCellY'))
 

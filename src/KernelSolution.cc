@@ -750,9 +750,9 @@ namespace diffim {
         else if (lambdaType ==  "minimizeUnbiasedRisk") {
             _lambda = estimateUnbiasedRisk();
         }
-        else if (lambdaType ==  "minimizeGcv") {
-            _lambda = estimateGcv();
-        }
+        //else if (lambdaType ==  "minimizeGcv") {
+        //_lambda = estimateGcv();
+        //}
         else {
             throw LSST_EXCEPT(pexExcept::Exception, "lambdaType in Policy not recognized");
         }

@@ -18,17 +18,16 @@ def createDefaultPolicy(policyPath, modify=True, fwhm=3.5):
 def modifyKernelPolicy(policy, fwhm=3.5):
     # Modify the kernel policy parameters based upon the images FWHM
 
-    kernelRadius = policy.getDouble("kernelRadiusFwhmScaling") * fwhm
-    kernelRadius = min(kernelRadius, policy.getInt("kernelRadiusMax"))
-    kernelRadius = max(kernelRadius, policy.getInt("kernelRadiusMin"))
-    kernelSize   = 2 * int(kernelRadius + 0.5) + 1
-    policy.set("kernelRows", kernelSize)
-    policy.set("kernelCols", kernelSize)
+    kernelSize  = policy.getDouble("kernelSizeFwhmScaling") * fwhm
+    kernelSize  = min(kernelRadius, policy.getInt("kernelSizeMax"))
+    kernelSize  = max(kernelRadius, policy.getInt("kernelSizeMin"))
+    kernelSize += (1 - kernelSize % 2) # make odd sized
+    policy.set("kernelSize", kernelSize)
 
-    fpGrow = policy.getDouble("fpGrowFwhmScaling") * fwhm
+    fpGrow = policy.getPolicy("detectionPolicy").getDouble("fpGrowFwhmScaling") * fwhm
     fpGrow = min(fpGrow, policy.getInt("fpGrowMax"))
     fpGrow = max(fpGrow, policy.getInt("fpGrowMin"))
-    policy.set("fpGrowPix", int(fpGrow))
+    policy.getPolicy("detectionPolicy").set("fpGrowPix", int(fpGrow))
 
     sigma = fwhm / sigma2fwhm
     alardSig = [x*sigma for x in policy.getDoubleArray("alardSigFwhmScaling")]
@@ -40,8 +39,8 @@ def modifyKernelPolicy(policy, fwhm=3.5):
                  "Using Psf Fwhm     : %.2f px" % (fwhm))
 
     pexLog.Trace("lsst.ip.diffim.createDefaultPolicy.modifyKernelPolicy", 2,
-                 "Kernel rows/cols   : %d x %d px" % (policy.getInt("kernelRows"),
-                                                     policy.getInt("kernelCols")))
+                 "Kernel size   : %d x %d px" % (policy.getInt("kernelSize"),
+                                                 policy.getInt("kernelSize")))
     
     pexLog.Trace("lsst.ip.diffim.createDefaultPolicy.modifyKernelPolicy", 2,
                  "Footprint grow rad : %d px" % (policy.getInt("fpGrowPix")))

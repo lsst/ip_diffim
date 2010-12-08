@@ -32,7 +32,7 @@ class DiffimTestCases(unittest.TestCase):
         kb         = kFunctor.getSolution()
         kernel     = kb.first
         background = kb.second
-        kImageOut  = afwImage.ImageD(self.kCols, self.kRows)
+        kImageOut  = afwImage.ImageD(self.kSize, self.kSize)
 
         kSum      = kernel.computeImage(kImageOut, False)
         diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, background)
@@ -53,9 +53,8 @@ class DiffimTestCases(unittest.TestCase):
         
     def setUp(self):
         self.policy      = ipDiffim.generateDefaultPolicy(diffimPolicy)
-        self.kCols       = self.policy.getInt("kernelCols")
-        self.kRows       = self.policy.getInt("kernelRows")
-        self.basisList   = ipDiffim.makeDeltaFunctionBasisSet(self.kCols, self.kRows)
+        self.kSize       = self.policy.getInt("kernelSize")
+        self.basisList   = ipDiffim.makeDeltaFunctionBasisSet(self.kSize, self.kSize)
 
         self.policy.set("kernelBasisSet", "delta-function")
         self.policy.set("useRegularization", True)
@@ -114,7 +113,7 @@ class DiffimTestCases(unittest.TestCase):
         del self.policy
 
     def applyFunctor(self, imscale=4, invert=False, foffset=0, xloc=397, yloc=580):
-        imsize = int(imscale * self.kCols)
+        imsize = int(imscale * self.kSize)
 
         # chop out a region around a known object
         bbox = afwImage.BBox( afwImage.PointI(xloc - imsize/2,

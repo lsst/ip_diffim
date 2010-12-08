@@ -33,28 +33,25 @@ namespace diffim {
         ) {
 
         std::string kernelBasisSet = policy.getString("kernelBasisSet");
-        int kCols = policy.getInt("kernelCols");
-        int kRows = policy.getInt("kernelRows");
-
+        int kSize = policy.getInt("kernelSize");
+        
         if (kernelBasisSet == "alard-lupton") {
             int alardNGauss                   = policy.getInt("alardNGauss");
             std::vector<double> alardSigGauss = policy.getDoubleArray("alardSigGauss");
             std::vector<int> alardDegGauss    = policy.getIntArray("alardDegGauss");
-
+            
             if (static_cast<int>(alardSigGauss.size()) != alardNGauss) 
                 throw LSST_EXCEPT(pexExcept::Exception, "alardSigGauss.size() != alardNGauss");
-                if (static_cast<int>(alardDegGauss.size()) != alardNGauss) 
+            if (static_cast<int>(alardDegGauss.size()) != alardNGauss) 
                 throw LSST_EXCEPT(pexExcept::Exception, "alardDegGauss.size() != alardNGauss");
-            if (kCols != kRows) 
-                throw LSST_EXCEPT(pexExcept::Exception, "Only square Alard-Lupton bases allowed");
-            if ((kCols % 2) != 1) {
+            if ((kSize % 2) != 1) {
                 throw LSST_EXCEPT(pexExcept::Exception, "Only odd-sized Alard-Lupton bases allowed");
             }
-
-            return makeAlardLuptonBasisList(kCols/2, alardNGauss, alardSigGauss, alardDegGauss);
-}
+            
+            return makeAlardLuptonBasisList(kSize/2, alardNGauss, alardSigGauss, alardDegGauss);
+        }
         else if (kernelBasisSet == "delta-function") {
-            return makeDeltaFunctionBasisList(kCols, kRows);
+            return makeDeltaFunctionBasisList(kSize, kSize);
         }
         else {
             throw LSST_EXCEPT(pexExcept::Exception, "Invalid basis set requested");
@@ -212,8 +209,8 @@ namespace diffim {
          */
         
         std::string regularizationType = policy.getString("regularizationType");
-        int width   = policy.getInt("kernelCols");
-        int height  = policy.getInt("kernelRows");
+        int width   = policy.getInt("kernelSize");
+        int height  = policy.getInt("kernelSize");
         float borderPenalty  = policy.getDouble("regularizationBorderPenalty");
         bool fitForBackground = policy.getBool("fitForBackground");
         

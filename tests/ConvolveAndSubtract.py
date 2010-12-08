@@ -26,11 +26,10 @@ class DiffimTestCases(unittest.TestCase):
         
     def setUp(self):
         self.policy      = ipDiffim.createDefaultPolicy(diffimPolicy)
-        self.kCols       = self.policy.getInt('kernelCols')
-        self.kRows       = self.policy.getInt('kernelRows')
+        self.kSize       = self.policy.getInt('kernelSize')
 
         # gaussian reference kernel
-        self.gSize         = self.kCols
+        self.gSize         = self.kSize
         self.gaussFunction = afwMath.GaussianFunction2D(2, 3)
         self.gaussKernel   = afwMath.AnalyticKernel(self.gSize, self.gSize, self.gaussFunction)
 
@@ -53,7 +52,7 @@ class DiffimTestCases(unittest.TestCase):
             del self.scienceImage
 
     def runConvolveAndSubtract1(self, bgVal = 0, xloc = 408, yloc = 580):
-        imsize = int(5 * self.kCols)
+        imsize = int(5 * self.kSize)
 
         p0 = afwImage.PointI(xloc - imsize/2, yloc - imsize/2)
         p1 = afwImage.PointI(xloc + imsize/2, yloc + imsize/2)
@@ -73,7 +72,7 @@ class DiffimTestCases(unittest.TestCase):
                 self.assertAlmostEqual(diffIm2.getImage().get(i, j), -1.*bgVal, 3)
 
     def runConvolveAndSubtract2(self, bgOrder=0, xloc = 408, yloc = 580):
-        imsize = int(5 * self.kCols)
+        imsize = int(5 * self.kSize)
 
         p0 = afwImage.PointI(xloc - imsize/2, yloc - imsize/2)
         p1 = afwImage.PointI(xloc + imsize/2, yloc + imsize/2)
