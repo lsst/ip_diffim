@@ -15,13 +15,10 @@ import lsst.afw.image.testUtils as imTestUtils
 verbosity = 4
 logging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 
-diffimDir    = eups.productDir("ip_diffim")
-diffimPolicy = os.path.join(diffimDir, "pipeline", "ImageSubtractStageDictionary.paf")
-
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy(diffimPolicy, modify=False)
+        self.policy = ipDiffim.createDefaultPolicy()
         self.kSize  = self.policy.getInt("kernelSize")
 
     def tearDown(self):
@@ -177,8 +174,8 @@ class DiffimTestCases(unittest.TestCase):
     def testCentralRegularization(self):
         # 
         self.policy.set("regularizationType", "centralDifference")
-        self.policy.set("centralRegularizationStencil", 1)
         try:
+            self.policy.set("centralRegularizationStencil", 1)
             h = ipDiffim.makeRegularizationMatrix(self.policy)
         except Exception, e: # stencil of 1 not allowed
             pass
@@ -258,11 +255,10 @@ class DiffimTestCases(unittest.TestCase):
             pass
 
     def testBadRegularization(self):
-        self.policy.set("regularizationType", "foo")
-
         try:
+            self.policy.set("regularizationType", "foo")
             h = ipDiffim.makeRegularizationMatrix(self.policy)
-        except Exception, e: # doesn't exist
+        except Exception, e: # invalid option
             pass
         else:
             self.fail()

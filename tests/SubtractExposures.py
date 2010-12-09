@@ -15,10 +15,6 @@ import lsst.ip.diffim.diffimTools as diffimTools
 verbosity = 3
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
-# This one tests convolve and subtract of subimages / XY0
 
 display = False
 
@@ -27,9 +23,7 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.diffimDir    = eups.productDir('ip_diffim')
-        self.diffimPolicy = os.path.join(self.diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-        self.policy       = ipDiffim.createDefaultPolicy(self.diffimPolicy)
+        self.policy       = ipDiffim.createDefaultPolicy()
         
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:

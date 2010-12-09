@@ -30,7 +30,7 @@ def makePsfMatchingKernel(maskedImageToConvolve,
     
     # Candidate source footprints to use for Psf matching
     if footprints == None:
-        kcDetect = diffimLib.KernelCandidateDetectionF(policy)
+        kcDetect = diffimLib.KernelCandidateDetectionF(policy.getPolicy("detectionPolicy"))
         kcDetect.apply(maskedImageToConvolve, maskedImageToNotConvolve)
         footprints = kcDetect.getFootprints()
 

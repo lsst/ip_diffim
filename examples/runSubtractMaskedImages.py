@@ -28,7 +28,7 @@ def main():
 
     defSciencePath  = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1')
     defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1_tmpl')
-    defPolicyPath   = os.path.join(imageProcDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
+    mergePolicyPath = None
     defOutputPath   = 'diffImage'
     defVerbosity    = 0
     defFwhm         = 3.5
@@ -44,10 +44,10 @@ Notes:
 - default templateMaskedImage=%s
 - default outputImage=%s 
 - default --policy=%s
-""" % (defSciencePath, defTemplatePath, defOutputPath, defPolicyPath)
+""" % (defSciencePath, defTemplatePath, defOutputPath, mergePolicyPath)
     
     parser = optparse.OptionParser(usage)
-    parser.add_option('-p', '--policy', default=defPolicyPath, help='policy file')
+    parser.add_option('-p', '--policy', default=mergePolicyPath, help='policy file')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
                       help='verbosity of Trace messages')
     parser.add_option('-d', '--display', action='store_true', default=False,
@@ -64,15 +64,15 @@ Notes:
             return args[ind]
         return defValue
     
-    sciencePath  = getArg(0, defSciencePath)
-    templatePath = getArg(1, defTemplatePath)
-    outputPath   = getArg(2, defOutputPath)
-    policyPath   = options.policy
+    sciencePath     = getArg(0, defSciencePath)
+    templatePath    = getArg(1, defTemplatePath)
+    outputPath      = getArg(2, defOutputPath)
+    mergePolicyPath = options.policy
     
     print 'Science image: ', sciencePath
     print 'Template image:', templatePath
     print 'Output image:  ', outputPath
-    print 'Policy file:   ', policyPath
+    print 'Policy file:   ', mergePolicyPath
 
     fwhm = defFwhm
     if options.fwhm:
@@ -97,7 +97,7 @@ Notes:
         
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
-    policy              = createDefaultPolicy(policyPath, fwhm=fwhm)
+    policy              = createDefaultPolicy(mergePolicyPath = mergePolicyPath, fwhm=fwhm)
     
     if bgSub:
         diffimTools.backgroundSubtract(policy, [templateMaskedImage, scienceMaskedImage])

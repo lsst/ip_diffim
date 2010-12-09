@@ -9,15 +9,12 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.createDefaultPolicy()
         self.policy.set("kernelBasisSet", "delta-function")
         self.policy.set("useRegularization", False)
         self.kList = ipDiffim.makeKernelBasisList(self.policy)

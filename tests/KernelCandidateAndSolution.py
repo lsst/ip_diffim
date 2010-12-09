@@ -12,15 +12,12 @@ import lsst.pex.logging as pexLog
 import lsst.afw.display.ds9 as ds9
 import numpy as num
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.createDefaultPolicy()
         
         # known input images
         self.defDataDir = eups.productDir('afwdata')
@@ -233,7 +230,7 @@ class DiffimTestCases(unittest.TestCase):
         # Convolve a real image with a gaussian and try and recover
         # it.  Add noise and perform the same test.
 
-        gsize = self.policy.getInt("kernelRows")
+        gsize = self.policy.getInt("kernelSize")
         gaussFunction = afwMath.GaussianFunction2D(2, 3)
         gaussKernel   = afwMath.AnalyticKernel(gsize, gsize, gaussFunction)
         kImageIn      = afwImage.ImageD(gsize, gsize)
@@ -306,7 +303,7 @@ class DiffimTestCases(unittest.TestCase):
         # Convolve a delta function with a known gaussian; try to
         # recover using delta-function basis
 
-        gsize = self.policy.getInt("kernelRows")
+        gsize = self.policy.getInt("kernelSize")
         tsize = imsize + gsize
 
         gaussFunction = afwMath.GaussianFunction2D(2, 3)

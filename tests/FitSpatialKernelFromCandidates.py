@@ -10,15 +10,12 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.createDefaultPolicy()
         self.size   = 30
         self.policy.set("sizeCellX", self.size//3)
         self.policy.set("sizeCellY", self.size//3)
@@ -108,11 +105,14 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('spatialBgOrder', bgo)
         self.policy.set('usePcaForSpatialKernel', True)
         self.policy.set('subtractMeanForPca', subtractMean)
-        
+
+        count = 0
         for x in numpy.arange(1, self.size, 10):
             for y in numpy.arange(1, self.size, 10):
                 cand = self.makeCandidate(1.0, x, y)
                 self.kernelCellSet.insertCandidate(cand)
+                count += 1
+        self.policy.set('numPrincipalComponents', count - 1)
 
         result = ipDiffim.fitSpatialKernelFromCandidates(self.kernelCellSet, self.policy)
         sk = result.first

@@ -7,7 +7,7 @@ def warpTemplateExposure(templateExposure, scienceExposure, policy):
     
     # The destination Wcs is in scienceExposure
     # Create the warping Kernel according to policy
-    warpingKernelName = policy.getString("warpingKernelName")
+    warpingKernelName = policy.getPolicy("warpingPolicy").getString("warpingKernelName")
     warpingKernel     = afwMath.makeWarpingKernel(warpingKernelName)
 
     # create a blank exposure to hold the remapped template exposure

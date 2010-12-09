@@ -10,15 +10,12 @@ import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy      = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy      = ipDiffim.createDefaultPolicy()
         self.kSize       = self.policy.getInt('kernelSize')
 
         # gaussian reference kernel
@@ -53,7 +50,7 @@ class DiffimTestCases(unittest.TestCase):
         # you run detection on.  Here it is the template.
         diffimTools.backgroundSubtract(self.policy, [self.templateImage,])
 
-        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy)
+        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy.getPolicy("detectionPolicy"))
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList1 = kcDetect.getFootprints()
 

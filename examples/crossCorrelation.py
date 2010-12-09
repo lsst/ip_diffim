@@ -189,7 +189,7 @@ def testAutoCorrelation(orderMake, orderFit, policy = None, inMi = None, display
 
     addNoise(inMi)
     
-    kSize = policy.get('kernelRows')
+    kSize = policy.get('kernelSize')
 
     basicGaussian1 = afwMath.GaussianFunction2D(2., 2., 0.)
     basicKernel1   = afwMath.AnalyticKernel(kSize, kSize, basicGaussian1)

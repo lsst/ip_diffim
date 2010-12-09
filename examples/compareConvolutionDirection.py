@@ -16,9 +16,6 @@ import lsst.afw.display.ds9 as ds9
 verbosity = 5
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
 display = True
 writefits = False
 
@@ -28,7 +25,7 @@ class DiffimTestCases(unittest.TestCase):
     
     # D = I - (K.x.T + bg)
     def setUp(self, CFHT=True):
-        self.policy      = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy      = ipDiffim.createDefaultPolicy()
         self.kSize       = self.policy.getInt('kernelSize')
 
         # Delta function basis set
@@ -86,7 +83,7 @@ class DiffimTestCases(unittest.TestCase):
         smi = self.scienceImage.getMaskedImage()
 
         self.policy.set("detThreshold", 100.)
-        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy)
+        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy.getPolicy("detectionPolicy"))
         kcDetect.apply(tmi, smi)
         self.footprints = kcDetect.getFootprints()
         

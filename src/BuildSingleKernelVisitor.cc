@@ -130,6 +130,9 @@ namespace detail {
         ipDiffim::KernelCandidate<PixelT> *kCandidate = 
             dynamic_cast<ipDiffim::KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
+            pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+                                  "Failed to cast SpatialCellCandidate to KernelCandidate %d", 
+                                  kCandidate->getId());
             throw LSST_EXCEPT(pexExcept::LogicErrorException,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
@@ -165,23 +168,8 @@ namespace detail {
             return;
         }
             
-        
-
-        
-        /* If we need to renormalize the kernel and its B matrix, do it here.
-           This is particularly relevant when you are building a kernel matching
-           an image to a Gaussian model, when each star is a different
-           brightness.  We don't want to have to scale each Gaussian model to
-           the flux of the star; we just scale all the kernels to have the same
-           kernel sum, but we have to also scale the B matrix so that this does
-           not go awry in the spatial modeling.
-        */
-        /* NOT IMPLEMENTED YET */
-        if (_policy.getBool("psfMatchToGaussian")) {
-            //_kFunctor.normalizeKernel();
-        }
-        
-        /* 
+         
+         /* 
          * Make diffim and set chi2 from result.  Note that you need to use the
          * most recent kernel
          */

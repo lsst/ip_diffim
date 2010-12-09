@@ -10,9 +10,7 @@ import sys
 
 class DiffimTestCases(unittest.TestCase):
     def setUp(self):
-        self.diffimDir    = eups.productDir('ip_diffim')
-        self.diffimPolicy = os.path.join(self.diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-        self.policy       = ipDiffim.createDefaultPolicy(self.diffimPolicy)
+        self.policy       = ipDiffim.createDefaultPolicy()
         
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
@@ -39,7 +37,7 @@ class DiffimTestCases(unittest.TestCase):
         # image 1 gets remapped to match up with image 2
         remappedImage = ipDiffim.warpTemplateExposure(self.templateImage,
                                                       self.scienceImage,
-                                                      self.policy)
+                                                      self.policy.getPolicy("warpingPolicy"))
 
 
         # sizes in pixels

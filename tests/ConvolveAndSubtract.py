@@ -15,9 +15,6 @@ import lsst.pex.logging as logging
 verbosity = 4
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
 # This one tests convolve and subtract
 
 class DiffimTestCases(unittest.TestCase):
@@ -25,7 +22,7 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.policy      = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy      = ipDiffim.createDefaultPolicy()
         self.kSize       = self.policy.getInt('kernelSize')
 
         # gaussian reference kernel

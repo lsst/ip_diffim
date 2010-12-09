@@ -13,18 +13,15 @@ import lsst.pex.logging as pexLog
 
 import lsst.afw.display.ds9 as ds9
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.createDefaultPolicy()
         self.policy.set("kernelBasisSet", "delta-function")
         self.policy.set("useRegularization", False)
-        self.ksize = self.policy.get('kernelRows')
+        self.ksize = self.policy.get('kernelSize')
         self.kList = ipDiffim.makeKernelBasisList(self.policy)
 
     def makeSpatialKernel(self, order):

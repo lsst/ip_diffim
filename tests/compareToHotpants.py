@@ -9,20 +9,17 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.createDefaultPolicy()
         self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
         self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')
         self.smi.setXY0(0,0)
         self.tmi.setXY0(0,0)
 
         # Run detection
-        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy)
+        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy.getPolicy("detectionPolicy"))
         kcDetect.apply(self.smi, self.tmi)
         self.footprints = kcDetect.getFootprints()
 

@@ -13,13 +13,10 @@ import lsst.pex.logging as logging
 verbosity = 1
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.createDefaultPolicy()
         
     def tearDown(self):
         del self.policy

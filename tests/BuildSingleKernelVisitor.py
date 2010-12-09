@@ -9,17 +9,16 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
+pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
+import lsst.afw.display.ds9 as ds9
 
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.createDefaultPolicy()
         self.policy.set("kernelBasisSet", "delta-function")
         self.policy.set("useRegularization", False)
+        self.policy.set("checkConditionNumber", False) # I am making shady kernels by hand
         self.kList = ipDiffim.makeKernelBasisList(self.policy)
         self.size = 51
         
@@ -31,6 +30,7 @@ class DiffimTestCases(unittest.TestCase):
         mi2.getVariance().set(0.1) # avoid NaNs
         mi2.set(self.size//2, self.size//2, (kSum, 0x0, 1))
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
+
         return kc
 
 
@@ -119,9 +119,9 @@ class DiffimTestCases(unittest.TestCase):
         kpv.processCandidate(kc3)
         kpv.subtractMean()
         imagePca.analyze()
-        eigenKernels = kpv.getEigenKernels()
-        self.assertEqual(len(eigenKernels), 4)
-
+        eigenKernels = afwMath.KernelList()
+        eigenKernels.push_back(kpv.getEigenKernels()[0])
+        self.assertEqual(len(eigenKernels), 1) # the other eKernels are 0.0 and you can't get their coeffs!
 
 
         # do twice to mimic a Pca loop
@@ -193,8 +193,9 @@ class DiffimTestCases(unittest.TestCase):
         kpv.processCandidate(kc3)
         kpv.subtractMean()
         imagePca.analyze()
-        eigenKernels = kpv.getEigenKernels()
-        self.assertEqual(len(eigenKernels), 4)
+        eigenKernels = afwMath.KernelList()
+        eigenKernels.push_back(kpv.getEigenKernels()[0])
+        self.assertEqual(len(eigenKernels), 1)
 
         # bogus candidate
         mi1 = afwImage.MaskedImageF(self.size, self.size)

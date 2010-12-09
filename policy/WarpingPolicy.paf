@@ -1,0 +1,17 @@
+definitions: {
+    warpingKernelName: {
+        type: "string"
+        description: "Type of resampling Kernel"
+        allowed: {
+            value: "lanczos3"
+        }
+        allowed: {
+            value: "lanczos4"
+        }
+        allowed: {
+            value: "lanczos5"
+        }
+        maxOccurs: 1
+        default: "lanczos4"
+    }
+}

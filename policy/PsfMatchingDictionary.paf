@@ -6,6 +6,17 @@ definitions: {
 
     ######
     #
+    # Warping for alignment of Exposures
+    #
+    warpingPolicy: {
+        type: policy
+        description: "Policy for image warping"
+        dictionary: @@ip_diffim:/policy/WarpingPolicy.paf
+        maxOccurs: 1
+    }
+
+    ######
+    #
     # Detection for Psf-matching objects
     #
     detectionPolicy: {
@@ -53,7 +64,7 @@ definitions: {
         type: bool
         description: "Scale kernelSize, alardSigGauss, and fpGrowPix by input Fwhm"
         maxOccurs: 1
-        default: true
+        default: false
     }
 
     ######
@@ -460,7 +471,7 @@ definitions: {
     }
 
     conditionNumberType: {
-        type: bool
+        type: string
         description: "Use singular values (SVD) or eigen values (EIGENVALUE) to determine condition number"
         allowed: {
             value: "SVD"
@@ -470,6 +481,8 @@ definitions: {
             value: "EIGENVALUE"
             description: "Use eigen values (faster)"
         }
+        maxOccurs: 1
+        default: "EIGENVALUE"
     }
     
     ######

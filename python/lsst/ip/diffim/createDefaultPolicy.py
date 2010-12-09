@@ -9,9 +9,17 @@ sigma2fwhm = 2. * math.sqrt(2. * math.log(2.))
 # A complication is that the "sigma" of the AL gaussians is related to
 # the FWHM through a scaling of 2.35.
 
-def createDefaultPolicy(policyPath, modify=True, fwhm=3.5):
-    policy = pexPolicy.Policy.createPolicy(policyPath)
-    if modify:
+def createDefaultPolicy(PolicyDictName = "PsfMatchingDictionary.paf", mergePolicyPath = None, fwhm=3.5):
+    if mergePolicyPath:
+        policy = pexPolicy.Policy(mergePolicyPath)
+    else:
+        policy = pexPolicy.Policy() 
+        
+    policyFile = pexPolicy.DefaultPolicyFile("ip_diffim", PolicyDictName, "policy")
+    defPolicy  = pexPolicy.Policy.createPolicy(policyFile, policyFile.getRepositoryPath(), True)
+    policy.mergeDefaults(defPolicy.getDictionary())
+
+    if policy.get("scaleByFwhm"):
         modifyKernelPolicy(policy, fwhm)
     return policy
 

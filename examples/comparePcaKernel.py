@@ -32,10 +32,7 @@ elif len(sys.argv) == 3:
 else:
     sys.exit(1)
     
-defPolicyPath   = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
-defOutputPath   = "diffImage"
-
-policy              = ipDiffim.generateDefaultPolicy(defPolicyPath)
+policy = ipDiffim.generateDefaultPolicy()
 
 
 # same for all kernels
@@ -47,7 +44,7 @@ policy.set("spatialBgOrder", 0)
 policy.set("usePcaForSpatialKernel", True)
 
 
-kcDetect = ipDiffim.KernelCandidateDetectionF(policy)
+kcDetect = ipDiffim.KernelCandidateDetectionF(policy.getPolicy("detectionPolicy"))
 kcDetect.apply(templateMaskedImage, scienceMaskedImage)
 footprints = kcDetect.getFootprints()
 
