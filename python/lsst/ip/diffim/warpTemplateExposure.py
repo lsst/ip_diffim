@@ -4,10 +4,10 @@ import lsst.pex.logging as pexLog
 
 def warpTemplateExposure(templateExposure, scienceExposure, policy):
     t0 = time.time()
-    
+
     # The destination Wcs is in scienceExposure
     # Create the warping Kernel according to policy
-    warpingKernelName = policy.getPolicy("warpingPolicy").getString("warpingKernelName")
+    warpingKernelName = policy.getString("warpingKernelName")
     warpingKernel     = afwMath.makeWarpingKernel(warpingKernelName)
 
     # create a blank exposure to hold the remapped template exposure

@@ -67,7 +67,7 @@ class DiffimTestCases(unittest.TestCase):
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
             self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage,
                                                                 self.scienceImage,
-                                                                self.policy1)
+                                                                self.policy1.getPolicy("warpingPolicy"))
 
 
         # image statistics

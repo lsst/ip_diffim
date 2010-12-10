@@ -289,9 +289,9 @@ def getConvolvedImageLimits(kernel, image):
 
 def backgroundSubtract(policy, maskedImages):
     t0 = time.time()
-    algorithm   = policy.get("backgroundPolicy.algorithm")
-    binsize     = policy.get("backgroundPolicy.binsize")
-    undersample = policy.get("backgroundPolicy.undersample")
+    algorithm   = policy.get("algorithm")
+    binsize     = policy.get("binsize")
+    undersample = policy.get("undersample")
     bctrl       = afwMath.BackgroundControl(algorithm)
     bctrl.setUndersampleStyle(undersample)
     for maskedImage in maskedImages:

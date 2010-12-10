@@ -96,8 +96,9 @@ Notes:
     policy           = createDefaultPolicy(mergePolicyPath = mergePolicyPath, fwhm=fwhm)
 
     if bgSub:
-        diffimTools.backgroundSubtract(policy, [templateExposure.getMaskedImage(),
-                                                scienceExposure.getMaskedImage()])
+        diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),
+                                       [templateExposure.getMaskedImage(),
+                                        scienceExposure.getMaskedImage()])
 
     results = subtractExposures(templateExposure,
                                 scienceExposure,

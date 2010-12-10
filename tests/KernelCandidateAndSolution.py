@@ -35,7 +35,7 @@ class DiffimTestCases(unittest.TestCase):
             # do the warping first so we don't have any masked pixels in the postage stamps
             templateImage = ipDiffim.warpTemplateExposure(templateImage,
                                                           scienceImage,
-                                                          self.policy)
+                                                          self.policy.getPolicy("warpingPolicy"))
 
             # Change xy0
             # Nice star at position 276, 717

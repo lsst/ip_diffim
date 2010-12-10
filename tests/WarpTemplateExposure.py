@@ -79,7 +79,7 @@ class DiffimTestCases(unittest.TestCase):
         # image 1 gets remapped to match up with image 2
         remappedImage = ipDiffim.warpTemplateExposure(templateSubImage,
                                                       scienceSubImage,
-                                                      self.policy)
+                                                      self.policy.getPolicy("warpingPolicy"))
 
 
         # sizes in pixels

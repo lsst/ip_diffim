@@ -48,7 +48,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # NOTE - you need to subtract off background from the image
         # you run detection on.  Here it is the template.
-        diffimTools.backgroundSubtract(self.policy, [self.templateImage,])
+        diffimTools.backgroundSubtract(self.policy.getPolicy("afwBackgroundPolicy"), [self.templateImage,])
 
         kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy.getPolicy("detectionPolicy"))
         kcDetect.apply(self.templateImage, self.scienceImage)

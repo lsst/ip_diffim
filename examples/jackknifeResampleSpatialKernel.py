@@ -17,9 +17,6 @@ import lsst.afw.display.ds9 as ds9
 verbosity = 3
 pexLog.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
-
 display   = False
 writefits = False
 
@@ -37,21 +34,22 @@ class DiffimTestCases(unittest.TestCase):
         if not defDataDir:
             return
         
-        self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.createDefaultPolicy()
         self.scienceImage   = afwImage.ExposureF(defSciencePath)
         self.templateImage  = afwImage.ExposureF(defTemplatePath)
         # takes forever to remap the CFHT images
         if defSciencePath.find('CFHT') == -1:
             self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage,
                                                                 self.scienceImage,
-                                                                self.policy)
+                                                                self.policy.getPolicy("warpingPolicy"))
             
         self.scienceMaskedImage = self.scienceImage.getMaskedImage()
         self.templateMaskedImage = self.templateImage.getMaskedImage()
         self.dStats = ipDiffim.ImageStatisticsF()
         
-        diffimTools.backgroundSubtract(self.policy, [self.templateMaskedImage,
-                                                     self.scienceMaskedImage])
+        diffimTools.backgroundSubtract(self.policy.getPolicy("afwBackgroundPolicy"),
+                                       [self.templateMaskedImage,
+                                        self.scienceMaskedImage])
 
     def stats(self, cid, diffim, size=5):
         bbox = afwImage.BBox(afwImage.PointI((diffim.getWidth() - size)//2,

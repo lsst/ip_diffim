@@ -36,8 +36,9 @@ class DiffimTestCases(unittest.TestCase):
             self.scienceImage   = afwImage.ExposureF(defSciencePath)
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
             
-            diffimTools.backgroundSubtract(self.policy, [self.templateImage.getMaskedImage(),
-                                                         self.scienceImage.getMaskedImage()])
+            diffimTools.backgroundSubtract(self.policy.getPolicy("afwBackgroundPolicy"),
+                                           [self.templateImage.getMaskedImage(),
+                                            self.scienceImage.getMaskedImage()])
             self.offset   = 1500
             self.bbox     = afwImage.BBox(afwImage.PointI(0, self.offset),
                                           afwImage.PointI(511, 2046))

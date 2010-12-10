@@ -38,7 +38,9 @@ def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display
         if doWarping:
             pexLog.Trace("lsst.ip.diffim.subtractExposure", 1,
                          "Astrometrically registering template to science image")
-            exposureToConvolve = warpTemplateExposure(exposureToConvolve, exposureToNotConvolve, policy)
+            exposureToConvolve = warpTemplateExposure(exposureToConvolve,
+                                                      exposureToNotConvolve,
+                                                      policy.getPolicy("warpingPolicy"))
         else:
             pexLog.Trace("lsst.ip.diffim.subtractExposure", 1,
                          "ERROR: Input images not registered")

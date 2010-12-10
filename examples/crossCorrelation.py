@@ -163,11 +163,7 @@ def addNoise(mi):
 
 def testAutoCorrelation(orderMake, orderFit, policy = None, inMi = None, display = False):
     if policy == None:
-        import eups
-        import os
-        imageProcDir  = eups.productDir("ip_diffim")
-        defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
-        policy        = ipDiffim.generateDefaultPolicy(defPolicyPath)
+        policy = ipDiffim.createDefaultPolicy()
 
     stride = 100
     

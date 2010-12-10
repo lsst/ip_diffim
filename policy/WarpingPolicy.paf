@@ -1,6 +1,6 @@
 definitions: {
     warpingKernelName: {
-        type: "string"
+        type: string
         description: "Type of resampling Kernel"
         allowed: {
             value: "lanczos3"

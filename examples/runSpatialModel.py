@@ -1,6 +1,5 @@
 import os
 import sys
-import eups
 import lsst.afw.image.imageLib as afwImage
 import lsst.afw.math.mathLib as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -30,17 +29,16 @@ elif len(sys.argv) == 3:
 else:
     sys.exit(1)
     
-defPolicyPath   = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
 defOutputPath   = "diffImage"
 
 templateImage = afwImage.ExposureF(defTemplatePath)
 scienceImage  = afwImage.ExposureF(defSciencePath)
-policy        = ipDiffim.generateDefaultPolicy(defPolicyPath, fwhm=fwhm)
+policy        = ipDiffim.createDefaultPolicy()
 
 if warp:
     templateImage = ipDiffim.warpTemplateExposure(templateImage,
                                                   scienceImage,
-                                                  policy)
+                                                  policy.getPolicy("warpingPolicy"))
     #policy.set("detThreshold", 5.)
     #policy.set("sizeCellX", 128)
     #policy.set("sizeCellY", 128)
@@ -48,8 +46,9 @@ if warp:
     #policy.set("useRegularization", False)
 
 if subBackground:
-    diffimTools.backgroundSubtract(policy, [templateImage.getMaskedImage(),
-                                            scienceImage.getMaskedImage()])
+    diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),
+                                   [templateImage.getMaskedImage(),
+                                    scienceImage.getMaskedImage()])
 
 frame  = 0
 ds9.mtv(templateImage, frame=frame)
