@@ -365,9 +365,8 @@ definitions: {
 
     numPrincipalComponents: {
         type: int
-        description: "Number of principal components to use for Pca basis, not counting the 
-                      mean kernel if requested.  Thus you will have numPrincipalComponents + 1 
-                      basis functions for the decomposition."
+        description: "Number of principal components to use for Pca basis, including the 
+                      mean kernel if requested."
         maxOccurs: 1
         default: 50
     }

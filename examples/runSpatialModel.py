@@ -55,9 +55,9 @@ ds9.mtv(templateImage, frame=frame)
 frame += 1
 ds9.mtv(scienceImage, frame=frame)
 
-spatialKernel, spatialBg, kernelCellSet = ipDiffim.makePsfMatchingKernel(templateImage.getMaskedImage(),
-                                                                         scienceImage.getMaskedImage(),
-                                                                         policy)
+spatialKernel, spatialBg, kernelCellSet = ipDiffim.psfMatchImageToImage(templateImage.getMaskedImage(),
+                                                                        scienceImage.getMaskedImage(),
+                                                                        policy)
 
 import pdb
 pdb.set_trace()

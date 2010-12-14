@@ -195,9 +195,9 @@ class DiffimTestCases(unittest.TestCase):
         else:
             raise
         
-        results = ipDiffim.makePsfMatchingKernel(self.templateMaskedImage,
-                                                 self.scienceMaskedImage,
-                                                 self.policy)
+        results = ipDiffim.psfMatchImageToImage(self.templateMaskedImage,
+                                                self.scienceMaskedImage,
+                                                self.policy)
         self.jackknifeResample(results)
         
     def test(self):

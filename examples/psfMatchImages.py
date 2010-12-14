@@ -17,9 +17,9 @@ policy.set("kernelBasisSet", "alard-lupton")
 policy.set("usePcaForSpatialKernel", True)
 policy.set("spatialKernelOrder", 1)
 
-spatialKernel, spatialBg, kernelCellSet = ipDiffim.makePsfMatchingKernel(imageToConvolve,
-                                                                         imageToNotConvolve,
-                                                                         policy)
+spatialKernel, spatialBg, kernelCellSet = ipDiffim.psfMatchImageToImage(imageToConvolve,
+                                                                        imageToNotConvolve,
+                                                                        policy)
  
 cMi = afwImage.MaskedImageF(imageToConvolve.getDimensions())
 afwMath.convolve(cMi, imageToConvolve, spatialKernel, False)

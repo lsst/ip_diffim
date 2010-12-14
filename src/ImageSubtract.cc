@@ -186,32 +186,36 @@ fitSpatialKernelFromCandidates(
                 }
                 imagePca.analyze();
                 std::vector<typename ImageT::Ptr> eigenImages = imagePca.getEigenImages();
-                std::vector<double> eigenValues = imagePca.getEigenValues();
-                
+                std::vector<double> eigenValues               = imagePca.getEigenValues();
+                afwMath::KernelList basisListRaw              = importStarVisitor.getEigenKernels();
+
+                if (false) {
+                    afwImage::Image<afwMath::Kernel::Pixel> img =
+                        afwImage::Image<afwMath::Kernel::Pixel>
+                        (*(importStarVisitor.returnMean()), true);
+                    img.writeFits(str(boost::format("k%d_M.fits") % totalIterations)); 
+
+                    for (int j = 0; j < eigenImages.size(); j++) {
+                        afwImage::Image<afwMath::Kernel::Pixel> img = 
+                            afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[j], true);
+                        img.writeFits(str(boost::format("k%d_%d.fits") % totalIterations % j)); 
+                    }
+                }
+
                 double eSum = std::accumulate(eigenValues.begin(), eigenValues.end(), 0.);
                 for(unsigned int j=0; j < eigenValues.size(); j++) {
                     pexLog::TTrace<6>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                       "Eigenvalue %d : %f (%f \%)", 
                                       j, eigenValues[j], eigenValues[j]/eSum);
                 }
-                int const nEigen = subtractMeanForPca ? 
-                    static_cast<int>(eigenValues.size()) - 1 :
-                    static_cast<int>(eigenValues.size());
-                int const ncomp  = (nComponents <= 0 || nEigen < nComponents) ? nEigen : nComponents;
+                int const nEigen = eigenValues.size();
+                int const nToUse = ((nComponents <= 0) || (nEigen < nComponents)) ? nEigen : nComponents;
 
-                afwMath::KernelList basisListRaw;
-                if (subtractMeanForPca) {
-                    basisListRaw.push_back(afwMath::Kernel::Ptr(
-                                               new afwMath::FixedKernel(
-                                                   afwImage::Image<afwMath::Kernel::Pixel>
-                                                   (*(importStarVisitor.returnMean()), true))));
-                }
-                for (int j = 0; j != ncomp; ++j) {
+                afwMath::KernelList basisListTrim;
+                for (int j = 0; j < nToUse; ++j) {
                     /* Any NaN? */
                     afwImage::Image<afwMath::Kernel::Pixel> img = 
                         afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[j], true);
-
-                    /* img.writeFits(str(boost::format("k%d_%d.fits") % totalIterations % j)); */
 
                     afwMath::Statistics stats = afwMath::makeStatistics(img, afwMath::SUM);
                     
@@ -219,13 +223,11 @@ fitSpatialKernelFromCandidates(
                         pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                           "WARNING : NaN in principal component %d; skipping", j);
                     } else {
-                        basisListRaw.push_back(afwMath::Kernel::Ptr(
-                                                   new afwMath::FixedKernel(img)
-                                                   ));
+                        basisListTrim.push_back(basisListRaw[j]);
                     }
                 }
                 /* Put all the power in the first kernel, which will not vary spatially */
-                afwMath::KernelList basisListPca = renormalizeKernelList(basisListRaw);
+                afwMath::KernelList basisListPca = renormalizeKernelList(basisListTrim);
                 
                 /* New PsfMatchingFunctor and Kernel visitor for this new basis list */
                 detail::BuildSingleKernelVisitor<PixelT> singleKernelFitterPca(basisListPca, policy);

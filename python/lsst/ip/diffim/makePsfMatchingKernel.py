@@ -14,7 +14,7 @@ if display:
     import diffimTools
 
 # Most general routine
-def makePsfMatchingKernel(maskedImageToConvolve,
+def psfMatchImageToImage(maskedImageToConvolve,
                           maskedImageToNotConvolve,
                           policy,
                           footprints=None):
@@ -52,7 +52,7 @@ def makePsfMatchingKernel(maskedImageToConvolve,
 
         cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, policy)
 
-        pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 7,
+        pexLog.Trace("lsst.ip.diffim.psfMatchImageToImage", 7,
                      "Candidate %d at %f, %f" % (cand.getId(), cand.getXCenter(), cand.getYCenter()))
         
         kernelCellSet.insertCandidate(cand)
@@ -62,9 +62,9 @@ def makePsfMatchingKernel(maskedImageToConvolve,
     try:
         kb = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet, policy)
     except pexExcept.LsstCppException, e:
-        pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 1,
+        pexLog.Trace("lsst.ip.diffim.psfMatchImageToImage", 1,
                      "ERROR: Unable to calculate psf matching kernel")
-        pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 2,
+        pexLog.Trace("lsst.ip.diffim.psfMatchImageToImage", 2,
                      e.args[0].what())
         raise
     else:
@@ -79,9 +79,79 @@ def makePsfMatchingKernel(maskedImageToConvolve,
             if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                 nGood += 1
     if nGood == 0:
-        pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 1, "WARNING")
-    pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 1,
+        pexLog.Trace("lsst.ip.diffim.psfMatchImageToImage", 1, "WARNING")
+    pexLog.Trace("lsst.ip.diffim.psfMatchImageToImage", 1,
                  "Used %d kernels for spatial fit" % (nGood))
+
+    return spatialKernel, spatialBg, kernelCellSet
+
+
+def psfMatchModelToModel(referenceMaskedImage, referencePsfModel,
+                         scienceMaskedImage, sciencePsfModel,
+                         policy, mergePolicy = True):
+
+    # Chanes to policy particular for matchPsfModels
+    if mergePolicy:
+        policyFile = pexPolicy.DefaultPolicyFile("ip_diffim", "MatchPsfModels.paf", "policy")
+        matchPolicy = pexPolicy.Policy.createPolicy(policyFile, policyFile.getRepositoryPath(), True)
+        matchPolicy.mergeDefaults(policy.getDictionary())
+        policy = matchPolicy
+    
+    regionSizeX, regionSizeY = scienceMaskedImage.getDimensions()
+    referenceX0, referenceY0 = referenceMaskedImage.getXY0()
+    scienceX0,   scienceY0   = scienceMaskedImage.getXY0()
+
+    sizeCellX = policy.get("sizeCellX")
+    sizeCellY = policy.get("sizeCellY")
+
+    kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(scienceX0, scienceY0),
+                                                         regionSizeX, regionSizeY),
+                                           sizeCellX, sizeCellY)
+
+    nCellX    = regionSizeX // sizeCellX
+    nCellY    = regionSizeY // sizeCellY
+
+    for row in range(nCellY):
+        # place at center of cell
+        posY = referenceMaskedImage.indexToPosition(sizeCellY * row + sizeCellY // 2, afwImage.Y)
+        
+        for col in range(nCellX):
+            # place at center of cell
+            posX = referenceMaskedImage.indexToPosition(sizeCellX * col + sizeCellX // 2, afwImage.X)
+
+            pexLog.Trace("lsst.ip.diffim.psfMatchModelToModel", 5,
+                         "Creating Psf candidate at %.1f %.1f" % (coordX, coordY))
+
+            # reference kernel image, at location of science subimage
+            kernelImageR = afwImage.ImageD(referencePsfModelR.getDimensions())
+            referencePsfModelR.computeImage(kernelImageR, False, posX, posY)
+            kernelMaskR  = afwImage.MaskU(referencePsfModelR.getDimenions())
+            kernelMaskR.set(0)
+            kernelVarR   = afwImage.ImageD(referencePsfModelR.getDimensions())
+            kernelVarR.set(1.0)
+
+            kernelImageS = afwImage.ImageD(sciencePsfModelS.getDimensions())
+            referencePsfModelS.computeImage(kernelImageS, False, posX, posY)
+            kernelMaskS  = afwImage.MaskU(sciencePsfModelS.getDimenions())
+            kernelMaskS.set(0)
+            kernelVarS   = afwImage.ImageD(sciencePsfModelS.getDimensions())
+            kernelVarS.set(1.0)
+
+            kc = diffimLib.makeKernelCandidate(posX, posY, kernelImageS, kernelImageR, policy)
+            kernelCellSet.insertCandidate(kc)
+
+    # Create the Psf matching kernel
+    try:
+        kb = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet, matchPolicy)
+    except pexExcept.LsstCppException, e:
+        pexLog.Trace("lsst.ip.diffim.psfMatchModelToModel", 1,
+                     "ERROR: Unable to calculate psf matching kernel")
+        pexLog.Trace("lsst.ip.diffim.psfMatchModelToModel", 2,
+                     e.args[0].what())
+        raise
+    else:
+        spatialKernel = kb.first
+        spatialBg     = kb.second    
 
     return spatialKernel, spatialBg, kernelCellSet
 
@@ -108,10 +178,12 @@ def makePsfMatchingKernel(maskedImageToConvolve,
 # list of isolated Psf star footprints (which we will centroid and
 # photometer ourselves).
 
-def makePsfMatchingKernelToGaussian(maskedImageToConvolve,
-                                    sigGauss,
-                                    policy,
-                                    footprints):
+# THIS IS NOT IMPLEMENTED
+
+def psfMatchImageToModel(maskedImageToConvolve,
+                         sigGauss,
+                         policy,
+                         footprints):
 
     # We must use alard-lupton here because the image we are applying
     # the kernel to is noisy
@@ -199,17 +271,17 @@ def makePsfMatchingKernelToGaussian(maskedImageToConvolve,
         cTest2 = afwImage.ImageF(kImageG, True)
         cTest2.setXY0(afwImage.PointI(0, 0))
         cen2   = centroider.apply(cTest2, cTest2.getWidth()//2, cTest2.getHeight()//2)
-        pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernelToGaussian", 5,
+        pexLog.Trace("lsst.ip.diffim.psfMatchImageToModel", 5,
                      "Resulting centroids : %.2f,%.2f vs. %.2f,%.2f" % (cen1.getX(), cen1.getY(),
                                                                         cen2.getX(), cen2.getY()))
         if abs(cen1.getX() - cen2.getX()) > maxCentroidShift:
-            pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernelToGaussian", 3,
+            pexLog.Trace("lsst.ip.diffim.psfMatchImageToModel", 3,
                          "X offset too large (%.2f > %.2f), rejecting" % (abs(cen1.getX() - cen2.getX()),
                                                                           maxCentroidShift))
             continue
                         
         if abs(cen1.getY() - cen2.getY()) > maxCentroidShift:
-            pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernelToGaussian", 3,
+            pexLog.Trace("lsst.ip.diffim.psfMatchImageToModel", 3,
                          "Y offset too large (%.2f > %.2f), rejecting" % (abs(cen1.getY() - cen2.getY()),
                                                                           maxCentroidShift))
             continue
@@ -245,9 +317,9 @@ def makePsfMatchingKernelToGaussian(maskedImageToConvolve,
     try:
         kb = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet, policy)
     except pexExcept.LsstCppException, e:
-        pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 1,
+        pexLog.Trace("lsst.ip.diffim.psfMatchImageToModel", 1,
                      "ERROR: Unable to calculate psf matching kernel")
-        pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 2,
+        pexLog.Trace("lsst.ip.diffim.psfMatchImageToModel", 2,
                      e.args[0].what())
         raise
     else:
@@ -262,8 +334,8 @@ def makePsfMatchingKernelToGaussian(maskedImageToConvolve,
             if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                 nGood += 1
     if nGood == 0:
-        pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 1, "WARNING")
-    pexLog.Trace("lsst.ip.diffim.makePsfMatchingKernel", 1,
+        pexLog.Trace("lsst.ip.diffim.psfMatchImageToModel", 1, "WARNING")
+    pexLog.Trace("lsst.ip.diffim.psfMatchImageToModel", 1,
                  "Used %d kernels for spatial fit" % (nGood))
 
     if display:
@@ -276,15 +348,3 @@ def makePsfMatchingKernelToGaussian(maskedImageToConvolve,
                  
     return spatialKernel, spatialBg, kernelCellSet
 
-
-# Specialized routines where I tweak the policy based on what you want done
-def makeMeanPsfMatchingKernel(maskedImageToConvolve,
-                              maskedImageToNotConvolve,
-                              policy):
-
-    policy.set("spatialKernelOrder", 0)
-    policy.set("singleKernelClipping", True)
-    policy.set("kernelSumClipping", True)
-    policy.set("spatialKernelClipping", False)
-
-    return makePsfMatchingKernel(maskedImageToConvolve, maskedImageToNotConvolve, policy)

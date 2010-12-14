@@ -9,7 +9,7 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
 
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
+pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
 class DiffimTestCases(unittest.TestCase):
     
@@ -32,6 +32,13 @@ class DiffimTestCases(unittest.TestCase):
         mi2.set(size//2, size//2, (kSum, 0x0, 1))
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
+
+    def testAlardLupton(self):
+        self.policy.set("kernelBasisSet", "alard-lupton")
+        self.kList = ipDiffim.makeKernelBasisList(self.policy)
+        nTerms = len(self.kList)
+        
+        
 
     def testEigenValues(self):
         kc1 = self.makeCandidate(1, 0.0, 0.0)

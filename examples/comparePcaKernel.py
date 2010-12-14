@@ -51,26 +51,26 @@ footprints = kcDetect.getFootprints()
 # specific to delta function
 policy.set("kernelBasisSet", "delta-function")
 policy.set("useRegularization", False)
-spatialKernel1, spatialBg1, kernelCellSet1 = ipDiffim.makePsfMatchingKernel(templateMaskedImage,
-                                                                            scienceMaskedImage,
-                                                                            policy,
-                                                                            footprints)
+spatialKernel1, spatialBg1, kernelCellSet1 = ipDiffim.psfMatchImageToImage(templateMaskedImage,
+                                                                           scienceMaskedImage,
+                                                                           policy,
+                                                                           footprints)
 
 # alard lupton
 policy.set("kernelBasisSet", "alard-lupton")
 policy.set("useRegularization", False)
-spatialKernel2, spatialBg2, kernelCellSet2 = ipDiffim.makePsfMatchingKernel(templateMaskedImage,
-                                                                            scienceMaskedImage,
-                                                                            policy,
-                                                                            footprints)
+spatialKernel2, spatialBg2, kernelCellSet2 = ipDiffim.psfMatchImageToImage(templateMaskedImage,
+                                                                           scienceMaskedImage,
+                                                                           policy,
+                                                                           footprints)
 
 # regularized delta function
 policy.set("kernelBasisSet", "delta-function")
 policy.set("useRegularization", True)
-spatialKernel3, spatialBg3, kernelCellSet3 = ipDiffim.makePsfMatchingKernel(templateMaskedImage,
-                                                                            scienceMaskedImage,
-                                                                            policy,
-                                                                            footprints)
+spatialKernel3, spatialBg3, kernelCellSet3 = ipDiffim.psfMatchImageToImage(templateMaskedImage,
+                                                                           scienceMaskedImage,
+                                                                           policy,
+                                                                           footprints)
 
 basisList1 = spatialKernel1.getKernelList()
 basisList2 = spatialKernel2.getKernelList()
