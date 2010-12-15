@@ -337,7 +337,7 @@ def displaySpatialKernelQuality(kernelCellSet, spatialKernel, spatialBg, frame):
             tmi = cand.getMiToConvolvePtr()
             smi = cand.getMiToNotConvolvePtr()
             ki  = cand.getImage()
-            dmi = cand.returnDifferenceImage()
+            dmi = cand.getDifferenceImage(diffimLib.KernelCandidateF.RECENT)
 
             # spatial model
             ski   = afwImage.ImageD(ki.getDimensions())
@@ -347,17 +347,17 @@ def displaySpatialKernelQuality(kernelCellSet, spatialKernel, spatialBg, frame):
             sk    = afwMath.FixedKernel(ski)
             sbg   = spatialBg(afwImage.indexToPosition(int(cand.getXCenter())),
                               afwImage.indexToPosition(int(cand.getYCenter())))
-            sdmi  = cand.returnDifferenceImage(sk, sbg)
+            sdmi  = cand.getDifferenceImage(sk, sbg)
 
-            ds9.mtv(tmi,  frame=frame+0)
-            ds9.mtv(smi,  frame=frame+1)
-            ds9.mtv(ki,   frame=frame+2)
-            ds9.mtv(dmi,  frame=frame+3)
-            ds9.mtv(ski,  frame=frame+4)
-            ds9.mtv(sdmi, frame=frame+5)
+            ds9.mtv(tmi,  frame=frame+0) # template image
+            ds9.mtv(smi,  frame=frame+1) # science image
+            ds9.mtv(ki,   frame=frame+2) # best-fit kernel
+            ds9.mtv(dmi,  frame=frame+3) # best-fit kernel diffim 
+            ds9.mtv(ski,  frame=frame+4) # spatial kernel
+            ds9.mtv(sdmi, frame=frame+5) # spatial kernel diffim
 
             ki -= ski
-            ds9.mtv(ki,   frame=frame+6)
+            ds9.mtv(ki,   frame=frame+6) # differnce in kernels
 
             imstat.apply(dmi)
             pexLog.Trace("lsst.ip.diffim.displaySpatialKernelQuality", 1,
@@ -369,7 +369,7 @@ def displaySpatialKernelQuality(kernelCellSet, spatialKernel, spatialBg, frame):
                          "Candidate %d sdiffim residuals = %.2f +/- %.2f sigma" % (cand.getId(),
                                                                                    imstat.getMean(),
                                                                                    imstat.getRms()))
-            #raw_input("Next: ")
+            raw_input("Next: ")
 
                     
             
@@ -382,6 +382,8 @@ def displayKernelMosaic(kernelCellSet, frame):
     for cell in kernelCellSet.getCellList():
         for cand in cell.begin(False): # False = include bad candidates
             cand = diffimLib.cast_KernelCandidateF(cand)
+            if not (cand.getStatus() == afwMath.SpatialCellCandidate.GOOD):
+                continue
             im = cand.getKernelImage(diffimLib.KernelCandidateF.ORIG)
             mos.append(im)
             

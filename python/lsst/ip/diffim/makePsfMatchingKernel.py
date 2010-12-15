@@ -3,7 +3,8 @@ import diffimLib
 
 # all the other LSST packages
 import lsst.afw.image.imageLib as afwImage
-import lsst.afw.math.mathLib as afwMath
+import lsst.afw.math as afwMath
+import lsst.afw.geom as afwGeom
 import lsst.pex.logging as pexLog
 import lsst.pex.exceptions as pexExcept
 import lsst.meas.algorithms as measAlgorithms
@@ -13,11 +14,12 @@ if display:
     import lsst.afw.display.ds9 as ds9
     import diffimTools
 
+
 # Most general routine
 def psfMatchImageToImage(maskedImageToConvolve,
-                          maskedImageToNotConvolve,
-                          policy,
-                          footprints=None):
+                         maskedImageToNotConvolve,
+                         policy,
+                         footprints=None):
 
 
     # Object to store the KernelCandidates for spatial modeling
@@ -88,7 +90,7 @@ def psfMatchImageToImage(maskedImageToConvolve,
 
 def psfMatchModelToModel(referenceMaskedImage, referencePsfModel,
                          scienceMaskedImage, sciencePsfModel,
-                         policy, mergePolicy = True):
+                         policy, mergePolicy = False):
 
     # Chanes to policy particular for matchPsfModels
     if mergePolicy:
@@ -111,6 +113,9 @@ def psfMatchModelToModel(referenceMaskedImage, referencePsfModel,
     nCellX    = regionSizeX // sizeCellX
     nCellY    = regionSizeY // sizeCellY
 
+    dimenR    = referencePsfModel.getKernel().getDimensions()
+    dimenS    = sciencePsfModel.getKernel().getDimensions()
+
     for row in range(nCellY):
         # place at center of cell
         posY = referenceMaskedImage.indexToPosition(sizeCellY * row + sizeCellY // 2, afwImage.Y)
@@ -120,29 +125,34 @@ def psfMatchModelToModel(referenceMaskedImage, referencePsfModel,
             posX = referenceMaskedImage.indexToPosition(sizeCellX * col + sizeCellX // 2, afwImage.X)
 
             pexLog.Trace("lsst.ip.diffim.psfMatchModelToModel", 5,
-                         "Creating Psf candidate at %.1f %.1f" % (coordX, coordY))
+                         "Creating Psf candidate at %.1f %.1f" % (posX, posY))
 
             # reference kernel image, at location of science subimage
-            kernelImageR = afwImage.ImageD(referencePsfModelR.getDimensions())
-            referencePsfModelR.computeImage(kernelImageR, False, posX, posY)
-            kernelMaskR  = afwImage.MaskU(referencePsfModelR.getDimenions())
+            kernelImageR = referencePsfModel.computeImage(afwGeom.makePointD(posX, posY), True).convertF()
+            sum = afwMath.makeStatistics(kernelImageR, afwMath.SUM).getValue(afwMath.SUM)
+            kernelImageR /= sum
+            kernelMaskR  = afwImage.MaskU(dimenR)
             kernelMaskR.set(0)
-            kernelVarR   = afwImage.ImageD(referencePsfModelR.getDimensions())
-            kernelVarR.set(1.0)
+            kernelVarR   = afwImage.ImageF(dimenR)
+            kernelVarR.set(0.01) # Total flux = 1, so this is order of magnitude
+            referenceMI = afwImage.MaskedImageF(kernelImageR, kernelMaskR, kernelVarR)
 
-            kernelImageS = afwImage.ImageD(sciencePsfModelS.getDimensions())
-            referencePsfModelS.computeImage(kernelImageS, False, posX, posY)
-            kernelMaskS  = afwImage.MaskU(sciencePsfModelS.getDimenions())
+            kernelImageS = sciencePsfModel.computeImage(afwGeom.makePointD(posX, posY), True).convertF()
+            sum = afwMath.makeStatistics(kernelImageS, afwMath.SUM).getValue(afwMath.SUM)
+            kernelImageS /= sum
+            kernelMaskS  = afwImage.MaskU(dimenS)
             kernelMaskS.set(0)
-            kernelVarS   = afwImage.ImageD(sciencePsfModelS.getDimensions())
-            kernelVarS.set(1.0)
+            kernelVarS   = afwImage.ImageF(dimenS)
+            kernelVarS.set(0.01) 
+            scienceMI = afwImage.MaskedImageF(kernelImageS, kernelMaskS, kernelVarS)
 
-            kc = diffimLib.makeKernelCandidate(posX, posY, kernelImageS, kernelImageR, policy)
+            # The image to convolve is the science image, to the reference Psf.
+            kc = diffimLib.makeKernelCandidate(posX, posY, scienceMI, referenceMI, policy)
             kernelCellSet.insertCandidate(kc)
 
     # Create the Psf matching kernel
     try:
-        kb = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet, matchPolicy)
+        kb = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet, policy)
     except pexExcept.LsstCppException, e:
         pexLog.Trace("lsst.ip.diffim.psfMatchModelToModel", 1,
                      "ERROR: Unable to calculate psf matching kernel")

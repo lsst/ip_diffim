@@ -454,7 +454,9 @@ definitions: {
         type: bool
         description: "Test for maximum condition number when inverting a kernel matrix?
                       Anything above the value is not used and the candidate is set as BAD.        
-                      Also used to truncate inverse matrix in estimateBiasedRisk."
+                      Also used to truncate inverse matrix in estimateBiasedRisk.  However,
+                      if you are doing any deconvolution you will want to turn this off, or use
+                      a large maxConditionNumber"
         maxOccurs: 1
         default: true
     }
