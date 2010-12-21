@@ -231,7 +231,7 @@ namespace diffim {
             if (_kernelSolutionOrig) 
                 return _kernelSolutionOrig->getKernel();
             else 
-                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+                throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
             if (_kernelSolutionPca) 
@@ -258,7 +258,7 @@ namespace diffim {
             if (_kernelSolutionOrig) 
                 return _kernelSolutionOrig->getBackground();
             else 
-                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+                throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
             if (_kernelSolutionPca) 
@@ -285,7 +285,7 @@ namespace diffim {
             if (_kernelSolutionOrig) 
                 return _kernelSolutionOrig->getKsum();
             else 
-                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+                throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
             if (_kernelSolutionPca) 
@@ -313,7 +313,7 @@ namespace diffim {
             if (_kernelSolutionOrig) 
                 return _kernelSolutionOrig->makeKernelImage();
             else 
-                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+                throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
             if (_kernelSolutionPca) 
@@ -346,7 +346,7 @@ namespace diffim {
             if (_kernelSolutionOrig) 
                 return _kernelSolutionOrig;
             else 
-                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+                throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
             if (_kernelSolutionPca) 
@@ -375,7 +375,7 @@ namespace diffim {
                 return getDifferenceImage(_kernelSolutionOrig->getKernel(),
                                           _kernelSolutionOrig->getBackground());
             else 
-                throw LSST_EXCEPT(pexExcept::Exception, "Orignal kernel does not exist");
+                throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
             if (_kernelSolutionPca) 

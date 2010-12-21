@@ -165,6 +165,7 @@ namespace detail {
             pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                   "Candidate %d Returned BAD upon build, exiting", 
                                   kCandidate->getId());
+            _nRejected += 1;
             return;
         }
             
