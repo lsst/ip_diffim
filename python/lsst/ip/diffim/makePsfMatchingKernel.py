@@ -88,8 +88,10 @@ def psfMatchImageToImage(maskedImageToConvolve,
     return spatialKernel, spatialBg, kernelCellSet
 
 
-def psfMatchModelToModel(referenceMaskedImage, referencePsfModel,
-                         scienceMaskedImage, sciencePsfModel,
+# Requires images to have been pre-registered.  Once this happens,
+# both the reference and the science image will have same XY0
+def psfMatchModelToModel(referencePsfModel,
+                         scienceBBox, sciencePsfModel,
                          policy, mergePolicy = False):
 
     # Chanes to policy particular for matchPsfModels
@@ -99,9 +101,8 @@ def psfMatchModelToModel(referenceMaskedImage, referencePsfModel,
         matchPolicy.mergeDefaults(policy.getDictionary())
         policy = matchPolicy
     
-    regionSizeX, regionSizeY = scienceMaskedImage.getDimensions()
-    referenceX0, referenceY0 = referenceMaskedImage.getXY0()
-    scienceX0,   scienceY0   = scienceMaskedImage.getXY0()
+    regionSizeX, regionSizeY = scienceBBox.getDimensions()
+    scienceX0,   scienceY0   = scienceBBox.getMin()
 
     sizeCellX = policy.get("sizeCellX")
     sizeCellY = policy.get("sizeCellY")
@@ -118,11 +119,11 @@ def psfMatchModelToModel(referenceMaskedImage, referencePsfModel,
 
     for row in range(nCellY):
         # place at center of cell
-        posY = referenceMaskedImage.indexToPosition(sizeCellY * row + sizeCellY // 2, afwImage.Y)
+        posY = afwImage.indexToPosition(sizeCellY * row + sizeCellY // 2 + scienceY0)
         
         for col in range(nCellX):
             # place at center of cell
-            posX = referenceMaskedImage.indexToPosition(sizeCellX * col + sizeCellX // 2, afwImage.X)
+            posX = afwImage.indexToPosition(sizeCellX * col + sizeCellX // 2 + scienceX0)
 
             pexLog.Trace("lsst.ip.diffim.psfMatchModelToModel", 5,
                          "Creating Psf candidate at %.1f %.1f" % (posX, posY))
