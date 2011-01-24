@@ -7,6 +7,7 @@ import lsst.daf.base                     as dafBase
 import lsst.daf.persistence              as dafPersist
 import lsst.afw.detection                as afwDet
 import lsst.afw.math                     as afwMath
+import lsst.afw.geom                     as afwGeom
 import lsst.afw.image                    as afwImage
 import lsst.pex.policy                   as pexPolicy
 import lsst.pex.logging                  as pexLog
@@ -109,10 +110,10 @@ if __name__ == '__main__':
     assert(order == order // 1) # Ditto
     policy.set("spatialKernelOrder", int(order))
 
-    
-    sk, sb, kcs = ipDiffim.psfMatchModelToModel(calexp.getMaskedImage(), gaussPsf,
-                                                calexp.getMaskedImage(), psf,
-                                                policy)
+
+    imageBBox = afwGeom.BoxI(afwGeom.makePointI(calexp.getX0(), calexp.getY0()),
+                             afwGeom.makeExtentI(calexp.getWidth(), calexp.getHeight()))
+    sk, sb, kcs = ipDiffim.psfMatchModelToModel(gaussPsf, imageBBox, psf, policy)
 
     cim = afwImage.MaskedImageF(calexp.getMaskedImage().getDimensions())
     afwMath.convolve(cim, calexp.getMaskedImage(), sk, False)

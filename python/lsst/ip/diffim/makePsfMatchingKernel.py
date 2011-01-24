@@ -5,6 +5,7 @@ import diffimLib
 import lsst.afw.image.imageLib as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
+import lsst.pex.policy as pexPolicy
 import lsst.pex.logging as pexLog
 import lsst.pex.exceptions as pexExcept
 import lsst.meas.algorithms as measAlgorithms
@@ -93,6 +94,11 @@ def psfMatchImageToImage(maskedImageToConvolve,
 def psfMatchModelToModel(referencePsfModel,
                          scienceBBox, sciencePsfModel,
                          policy, mergePolicy = False):
+
+    if (referencePsfModel.getKernel().getDimensions() != sciencePsfModel.getKernel().getDimensions()):
+        pexLog.Trace("lsst.ip.diffim.psfMatchModelToModel", 1,
+                     "ERROR: Dimensions of reference Psf and science Psf different; exiting")
+        raise RuntimeError, "ERROR: Dimensions of reference Psf and science Psf different; exiting"
 
     # Chanes to policy particular for matchPsfModels
     if mergePolicy:
