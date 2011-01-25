@@ -53,7 +53,7 @@ definitions: {
         type: bool
         description: "Include terms (including kernel cross terms) for background"
         maxOccurs: 1
-        default: true
+        default: false
     }
 
     ######
@@ -75,7 +75,7 @@ definitions: {
         type: string
         description: "Type of basis set for PSF matching kernel."
         maxOccurs: 1
-        default: "delta-function"
+        default: "alard-lupton"
         allowed: {
             value:        "alard-lupton"
             description:  "Alard-Lupton sum-of-gaussians basis set
@@ -353,7 +353,7 @@ definitions: {
                       If this option is used, the first term will have no spatial variation and the 
                       kernel sum will be conserved."
         maxOccurs: 1
-        default: true
+        default: false
     }
 
     subtractMeanForPca: {
