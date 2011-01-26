@@ -500,3 +500,29 @@ def displayFootprints(image, footprintList, frame):
     #        ds9.line([(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)], ctype=ds9.RED)
     
 
+def displayKernelCellSet(image, kernelCellSet, frame):
+    import lsst.afw.display.ds9 as ds9
+    import lsst.afw.display.utils as utils
+    
+    ds9.ds9Cmd("mask transparency 50")
+    ds9.mtv(image, frame = frame)
+
+    for cell in kernelCellSet.getCellList():
+        bbox = cell.getBBox()
+        utils.drawBBox(bbox, frame = frame, ctype = 'blue')
+        
+        for cand in cell.begin(False): # False = include bad candidates
+            cand  = diffimLib.cast_KernelCandidateF(cand)
+   
+            if (cand.getStatus() == afwMath.SpatialCellCandidate.GOOD):
+                color = 'green'
+            elif (cand.getStatus() == afwMath.SpatialCellCandidate.BAD):
+                color = 'red'
+            else:
+                color = 'yellow'
+            
+            xCenter = cand.getXCenter()
+            yCenter = cand.getYCenter()
+
+            cmd   = 'regions command { circle %g %g %g # color=%s};' % (xCenter, yCenter, 10, color)
+            ds9.ds9Cmd(cmd)

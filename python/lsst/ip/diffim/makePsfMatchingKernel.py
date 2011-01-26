@@ -100,6 +100,16 @@ def psfMatchModelToModel(referencePsfModel,
                      "ERROR: Dimensions of reference Psf and science Psf different; exiting")
         raise RuntimeError, "ERROR: Dimensions of reference Psf and science Psf different; exiting"
 
+    kernelWidth, kernelHeight = referencePsfModel.getKernel().getDimensions()
+    maxPsfMatchingKernelSize = 1 + (min(kernelWidth - 1, kernelHeight - 1) // 2)
+    if maxPsfMatchingKernelSize%2 == 0:
+        maxPsfMatchingKernelSize -= 1
+    if policy.get('kernelSize') > maxPsfMatchingKernelSize:
+        pexLog.Trace("lsst.ip.diffim.psfMatchModelToModel", 1,
+                     "WARNING: Resizing matching kernel to size %d x %d" % (maxPsfMatchingKernelSize,
+                                                                            maxPsfMatchingKernelSize))
+        policy.set('kernelSize', maxPsfMatchingKernelSize)
+
     # Chanes to policy particular for matchPsfModels
     if mergePolicy:
         policyFile = pexPolicy.DefaultPolicyFile("ip_diffim", "MatchPsfModels.paf", "policy")
