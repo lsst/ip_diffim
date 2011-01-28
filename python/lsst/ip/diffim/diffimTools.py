@@ -524,5 +524,6 @@ def displayKernelCellSet(image, kernelCellSet, frame):
             xCenter = cand.getXCenter()
             yCenter = cand.getYCenter()
 
-            cmd   = 'regions command { circle %g %g %g # color=%s};' % (xCenter, yCenter, 10, color)
+            cmd   = 'regions command { circle %g %g %g # color=%s text=\"%d\"};' % (
+                xCenter, yCenter, 10, color, cand.getId())
             ds9.ds9Cmd(cmd)
