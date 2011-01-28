@@ -62,7 +62,9 @@ namespace detail {
         _imstats(ImageStatistics<PixelT>()),
         _nGood(0),
         _nRejected(0),
-        _nProcessed(0)
+        _nProcessed(0),
+        _useCoreStats(_policy.getBool("useCoreStats")),
+        _coreRadius(_policy.getInt("candidateCoreRadius"))
     {};
 
     template<typename PixelT>
@@ -109,7 +111,10 @@ namespace detail {
         
         /* Official resids */
         try {
-            _imstats.apply(diffim);
+            if (_useCoreStats) 
+                _imstats.apply(diffim, _coreRadius);
+            else
+                _imstats.apply(diffim);
         } catch (pexExcept::Exception& e) {
             pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                                   "Unable to calculate imstats for Candidate %d", kCandidate->getId()); 
@@ -179,18 +184,25 @@ namespace detail {
                                   "Sigma clipping not enabled");
             _nGood += 1;
         }
-        
-        /* Core resids */
-        int candidateCoreRadius = _policy.getInt("candidateCoreRadius");
-        _imstats.apply(diffim, candidateCoreRadius);
-        pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
-                              "Candidate %d core resids = %.3f +/- %.3f sigma (%d pix)",
-                              kCandidate->getId(),
-                              _imstats.getMean(),
-                              _imstats.getRms(),
-                              _imstats.getNpix());
-        
-        
+
+        /* Core resids for debugging */
+        if (!(_useCoreStats)) {
+            try {
+                _imstats.apply(diffim, _coreRadius);
+            } catch (pexExcept::Exception& e) {
+                pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+                                      "Unable to calculate core imstats for Candidate %d", 
+                                      kCandidate->getId()); 
+                kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
+                return;
+            }
+            pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                                  "Candidate %d core resids = %.3f +/- %.3f sigma (%d pix)",
+                                  kCandidate->getId(),
+                                  _imstats.getMean(),
+                                  _imstats.getRms(),
+                                  _imstats.getNpix());
+        }
     }
 
     typedef float PixelT;

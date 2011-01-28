@@ -94,7 +94,7 @@ namespace diffim {
             Eigen::VectorXd eValues = eVecValues.eigenvalues();
             double eMax = eValues.maxCoeff();
             double eMin = eValues.minCoeff();
-            pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.conditionNumber", 
+            pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.getConditionNumber", 
                               "EIGENVALUE eMax / eMin = %.3e", eMax / eMin);
             return (eMax / eMin);
             break;
@@ -104,7 +104,7 @@ namespace diffim {
             Eigen::VectorXd sValues = mMat.svd().singularValues();
             double sMax = sValues.maxCoeff();
             double sMin = sValues.minCoeff();
-            pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.conditionNumber", 
+            pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.getConditionNumber", 
                               "SVD eMax / eMin = %.3e", sMax / sMin);
             return (sMax / sMin);
             break;
