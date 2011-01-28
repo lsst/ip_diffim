@@ -65,6 +65,9 @@ namespace detail {
         int _nRejected;                       ///< Number of candidates rejected during processCandidate()
         int _nProcessed;                      ///< Number of candidates processed during processCandidate()
         bool _useRegularization;              ///< Regularize if delta function basis
+
+        bool _useCoreStats;                   ///< Extracted from _policy
+        int _coreRadius;                      ///< Extracted from _policy
     };
     
     template<typename PixelT>

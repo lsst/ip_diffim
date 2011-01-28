@@ -51,6 +51,8 @@ namespace detail {
         int _nRejected;                       ///< Number of candidates rejected during processCandidate()
         int _nProcessed;                      ///< Number of candidates processed during processCandidate()
        
+        bool _useCoreStats;                   ///< Extracted from policy
+        int _coreRadius;                      ///< Extracted from policy
     };
 
     template<typename PixelT>
