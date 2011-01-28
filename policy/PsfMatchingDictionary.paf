@@ -141,7 +141,7 @@ definitions: {
     alardDegGauss: {
         type: int
         description: "Degree of spatial modification of gaussians in alard-lupton basis"
-        maxOccurs: 3
+        maxOccurs: 4
         default: 4 3 2
     }
 
@@ -149,14 +149,14 @@ definitions: {
         type: double
         description: "Sigma in pixels of gaussians in alard-lupton basis (note: FWHM = 2.35 sigma). 
                       Scaled by alardSigFwhmScaling if scaleByFwhm = true"
-        maxOccurs: 3
+        maxOccurs: 4
         default: 0.7 1.5 3.0
     }
 
     alardSigFwhmScaling: {
         type: double
         description: "Scaling of the alard-lupton gaussian sigmas.  Sets alardSigGauss"
-        maxOccurs: 3
+        maxOccurs: 4
         default: 0.50 1.00 2.00
     }
 
@@ -234,7 +234,7 @@ definitions: {
         }
         allowed: {
             value:        "relative"
-            description:  "Use lambdaValue as a fraction of the default regularization strength (N.R. 18.5.8)"
+            description:  "Use lambdaValue as fraction of the default regularization strength (N.R. 18.5.8)"
         }
         allowed: {
             value:        "minimizeBiasedRisk"
@@ -421,7 +421,14 @@ definitions: {
         description: "Rejects KernelCandidates yielding bad difference image quality.
                       Represents stddev over pixels of (image/sqrt(variance))."
         maxOccurs: 1
-        default: 1.25
+        default: 1.50
+    }
+
+    useCoreStats: {
+        type: bool
+        description: "Use the core of the stamp for the quality statistics, instead of the entire footprint"
+        maxOccurs: 1
+        default: true
     }
 
     candidateCoreRadius: {
