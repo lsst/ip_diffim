@@ -122,6 +122,10 @@ namespace detail {
     
     template<typename PixelT>
     void KernelSumVisitor<PixelT>::processKsumDistribution() {
+        if (_kSums.size() == 0) {
+            throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel sum; no candidates");
+        }
+
         try {
             afwMath::Statistics stats = afwMath::makeStatistics(_kSums, 
                                                                 afwMath::NPOINT | 
