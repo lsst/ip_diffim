@@ -16,6 +16,7 @@
 #include "Eigen/Core"
 
 #include "lsst/afw/math.h"
+#include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
 
 namespace lsst { 
@@ -107,6 +108,26 @@ namespace diffim {
         void _setKernel();                                      ///< Set kernel after solution
         void _setKernelUncertainty();                           ///< Not implemented
     };
+
+
+    template <typename InputT>
+    class MaskedKernelSolution : public StaticKernelSolution<InputT> {
+    public:
+        typedef boost::shared_ptr<MaskedKernelSolution<InputT> > Ptr;
+
+        MaskedKernelSolution(lsst::afw::math::KernelList const& basisList,
+                             bool fitForBackground);
+        virtual ~MaskedKernelSolution() {};
+        virtual void build(lsst::afw::image::Image<InputT> const &imageToConvolve,
+                           lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+                           lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
+                           lsst::afw::image::Mask<lsst::afw::image::MaskPixel> pixelMask);
+        virtual void buildSingleMask(lsst::afw::image::Image<InputT> const &imageToConvolve,
+                                     lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+                                     lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
+                                     lsst::afw::geom::BoxI maskBox);
+    };
+
 
 
     template <typename InputT>

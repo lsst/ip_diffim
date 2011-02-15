@@ -8,7 +8,6 @@
  *
  * @ingroup ip_diffim
  */
-
 #include <iterator>
 #include <cmath>
 #include <algorithm>
@@ -22,6 +21,7 @@
 #include "Eigen/SVD"
 
 #include "lsst/afw/math.h"
+#include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/pex/exceptions/Runtime.h"
 #include "lsst/pex/logging/Trace.h"
@@ -33,6 +33,7 @@
 #define DEBUG_MATRIX2 0
 
 namespace afwMath        = lsst::afw::math;
+namespace afwGeom        = lsst::afw::geom;
 namespace afwImage       = lsst::afw::image;
 namespace pexLog         = lsst::pex::logging; 
 namespace pexExcept      = lsst::pex::exceptions; 
@@ -302,11 +303,15 @@ namespace diffim {
          */
         unsigned int const startCol = (*kiter)->getCtrX();
         unsigned int const startRow = (*kiter)->getCtrY();
-        unsigned int const endCol   = imageToConvolve.getWidth()  - 
-            ((*kiter)->getWidth()  - (*kiter)->getCtrX()) + 1;
-        unsigned int const endRow   = imageToConvolve.getHeight() - 
-            ((*kiter)->getHeight() - (*kiter)->getCtrY()) + 1;
+        unsigned int endCol   = imageToConvolve.getWidth()  - 
+            ((*kiter)->getWidth()  - (*kiter)->getCtrX());
+        unsigned int endRow   = imageToConvolve.getHeight() - 
+            ((*kiter)->getHeight() - (*kiter)->getCtrY());
         
+        /* Needed for Eigen block slicing operation */
+        endCol += 1;
+        endRow += 1;
+
         boost::timer t;
         t.restart();
         
@@ -337,7 +342,7 @@ namespace diffim {
         typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
             convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
-        for (; kiter != basisList.end(); ++kiter, ++eiter) {
+        for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
             afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
 
             boost::shared_ptr<Eigen::MatrixXd> cMat (
@@ -384,7 +389,8 @@ namespace diffim {
     template <typename InputT>
     void StaticKernelSolution<InputT>::solve() {
         pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.solve", 
-                          "cMat is %d x %d; vVec is %d; iVec is %d", 
+                          "mMat is %d x %d; bVec is %d; cMat is %d x %d; vVec is %d; iVec is %d", 
+                          (*_mMat).rows(), (*_mMat).cols(), (*_bVec).size(),
                           (*_cMat).rows(), (*_cMat).cols(), (*_ivVec).size(), (*_iVec).size());
 
         /* If I put this here I can't check for condition number before solving */
@@ -392,6 +398,15 @@ namespace diffim {
         _mMat.reset(new Eigen::MatrixXd((*_cMat).transpose() * ((*_ivVec).asDiagonal() * (*_cMat))));
         _bVec.reset(new Eigen::VectorXd((*_cMat).transpose() * ((*_ivVec).asDiagonal() * (*_iVec))));
         */
+
+        if (DEBUG_MATRIX) {
+            std::cout << "C" << std::endl;
+            std::cout << (*_cMat) << std::endl;
+            std::cout << "iV" << std::endl;
+            std::cout << (*_ivVec) << std::endl;
+            std::cout << "I" << std::endl;
+            std::cout << (*_iVec) << std::endl;
+        }
 
         try {
             KernelSolution::solve();
@@ -472,6 +487,419 @@ namespace diffim {
     }
 
     /*******************************************************************************************************/
+
+    template <typename InputT>
+    MaskedKernelSolution<InputT>::MaskedKernelSolution(
+        lsst::afw::math::KernelList const& basisList,
+        bool fitForBackground
+        ) :
+        StaticKernelSolution<InputT>(basisList, fitForBackground)
+    {};
+
+    template <typename InputT>
+    void MaskedKernelSolution<InputT>::build(
+        lsst::afw::image::Image<InputT> const &imageToConvolve,
+        lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+        lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
+        lsst::afw::image::Mask<lsst::afw::image::MaskPixel> pixelMask
+        ) {
+
+        lsst::afw::math::KernelList basisList = 
+            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
+        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
+
+        /* Only BAD pixels marked in this mask */
+        lsst::afw::image::Mask<lsst::afw::image::MaskPixel> sMask(pixelMask, true);
+        afwImage::MaskPixel bitMask = 
+            (afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD") | 
+             afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("SAT") |
+             afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("EDGE"));
+        sMask &= bitMask;
+        /* TBD: Need to figure out a way to spread this; currently done in Python */
+
+        unsigned int const nKernelParameters     = basisList.size();
+        unsigned int const nBackgroundParameters = this->_fitForBackground ? 1 : 0;
+        unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
+
+        /* Ignore known EDGE pixels for speed */
+        afwGeom::BoxI fullBBox   = afwGeom::BoxI(afwGeom::makePointI(imageToConvolve.getX0(), 
+                                                                     imageToConvolve.getY0()),
+                                                 afwGeom::makeExtentI(imageToConvolve.getWidth(),
+                                                                      imageToConvolve.getHeight()));
+        afwGeom::BoxI shrunkBBox = (*kiter)->shrinkBBox(fullBBox);
+        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
+                          "Limits of good pixels after convolution: %d,%d -> %d,%d", 
+                          shrunkBBox.getMinX(), shrunkBBox.getMinY(), 
+                          shrunkBBox.getMaxX(), shrunkBBox.getMaxY());
+
+        /* Subimages are addressed in raw pixel coordiantes */
+        shrunkBBox.shift(afwGeom::makeExtentI(-imageToConvolve.getX0(), -imageToConvolve.getY0()));
+        unsigned int startCol = shrunkBBox.getMinX();
+        unsigned int startRow = shrunkBBox.getMinY();
+        unsigned int endCol   = shrunkBBox.getMaxX();
+        unsigned int endRow   = shrunkBBox.getMaxY();
+        /* Needed for Eigen block slicing operation */
+        endCol += 1;
+        endRow += 1;
+
+        boost::timer t;
+        t.restart();
+
+        /* Eigen representation of input images; only the pixels that are unconvolved in cimage below */
+        Eigen::MatrixXi eMask = maskToEigenMatrix(sMask).block(startRow, 
+                                                               startCol, 
+                                                               endRow-startRow, 
+                                                               endCol-startCol);
+
+        Eigen::MatrixXd eigenToConvolve = imageToEigenMatrix(imageToConvolve).block(startRow, 
+                                                                                    startCol, 
+                                                                                    endRow-startRow, 
+                                                                                    endCol-startCol);
+        Eigen::MatrixXd eigenToNotConvolve = imageToEigenMatrix(imageToNotConvolve).block(startRow, 
+                                                                                          startCol, 
+                                                                                          endRow-startRow, 
+                                                                                          endCol-startCol);
+        Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(varianceEstimate).block(
+            startRow, startCol, endRow-startRow, endCol-startCol).cwise().inverse();
+
+        /* Resize into 1-D for later usage */
+        eMask.resize(eMask.rows()*eMask.cols(), 1);
+        eigenToConvolve.resize(eigenToConvolve.rows()*eigenToConvolve.cols(), 1);
+        eigenToNotConvolve.resize(eigenToNotConvolve.rows()*eigenToNotConvolve.cols(), 1);
+        eigeniVariance.resize(eigeniVariance.rows()*eigeniVariance.cols(), 1);
+
+        /* Do the masking, slowly for now... */
+        Eigen::MatrixXd maskedEigenToConvolve(eigenToConvolve.rows(), 1);
+        Eigen::MatrixXd maskedEigenToNotConvolve(eigenToNotConvolve.rows(), 1);
+        Eigen::MatrixXd maskedEigeniVariance(eigeniVariance.rows(), 1);
+        int nGood = 0;
+        for (int i = 0; i < eMask.rows(); i++) {
+            if (eMask(i, 0) == 0) {
+                maskedEigenToConvolve(nGood, 0) = eigenToConvolve(i, 0);
+                maskedEigenToNotConvolve(nGood, 0) = eigenToNotConvolve(i, 0);
+                maskedEigeniVariance(nGood, 0) = eigeniVariance(i, 0);
+                nGood += 1;
+            }
+        }
+        /* Can't resize() since all values are lost; use blocks */
+        eigenToConvolve    = maskedEigenToConvolve.block(0, 0, nGood, 1);
+        eigenToNotConvolve = maskedEigenToNotConvolve.block(0, 0, nGood, 1);
+        eigeniVariance     = maskedEigeniVariance.block(0, 0, nGood, 1);
+
+
+        /* Holds image convolved with basis function */
+        afwImage::Image<InputT> cimage(imageToConvolve.getDimensions());
+        
+        /* Holds eigen representation of image convolved with all basis functions */
+        std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
+        
+        /* Iterators over convolved image list and basis list */
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
+            convolvedEigenList.begin();
+        /* Create C_i in the formalism of Alard & Lupton */
+        for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
+            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+            
+            Eigen::MatrixXd cMat = imageToEigenMatrix(cimage).block(startRow, 
+                                                                    startCol, 
+                                                                    endRow-startRow, 
+                                                                    endCol-startCol);
+            cMat.resize(cMat.rows() * cMat.cols(), 1);
+
+            /* Do masking */
+            Eigen::MatrixXd maskedcMat(cMat.rows(), 1);
+            int nGood = 0;
+            for (int i = 0; i < eMask.rows(); i++) {
+                if (eMask(i, 0) == 0) {
+                    maskedcMat(nGood, 0) = cMat(i, 0);
+                    nGood += 1;
+                }
+            }
+            cMat = maskedcMat.block(0, 0, nGood, 1);
+            boost::shared_ptr<Eigen::MatrixXd> cMatPtr (new Eigen::MatrixXd(cMat));
+            *eiter = cMatPtr;
+        } 
+
+        double time = t.elapsed();
+        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.build", 
+                          "Total compute time to do basis convolutions : %.2f s", time);
+        t.restart();
+        
+        /* 
+           Load matrix with all values from convolvedEigenList : all images
+           (eigeniVariance, convolvedEigenList) must be the same size
+        */
+        Eigen::MatrixXd cMat(eigenToConvolve.col(0).size(), nParameters);
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
+            convolvedEigenList.begin();
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
+            convolvedEigenList.end();
+        for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
+            cMat.col(kidxj) = (*eiterj)->col(0);
+        }
+        /* Treat the last "image" as all 1's to do the background calculation. */
+        if (this->_fitForBackground)
+            cMat.col(nParameters-1).fill(1.);
+
+        this->_cMat.reset(new Eigen::MatrixXd(cMat));
+        this->_ivVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
+        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.col(0)));
+
+        /* Make these outside of solve() so I can check condition number */
+        this->_mMat.reset(
+            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
+            );
+        this->_bVec.reset(
+            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
+            );
+        
+    }
+
+    template <typename InputT>
+    void MaskedKernelSolution<InputT>::buildSingleMask(
+        lsst::afw::image::Image<InputT> const &imageToConvolve,
+        lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+        lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
+        lsst::afw::geom::BoxI maskBox
+        ) {
+
+        lsst::afw::math::KernelList basisList = 
+            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
+
+        unsigned int const nKernelParameters     = basisList.size();
+        unsigned int const nBackgroundParameters = this->_fitForBackground ? 1 : 0;
+        unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
+
+        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
+
+        /* 
+           NOTE : If we are using these views in Afw's Image space, we need to
+           make sure and compensate for the XY0 of the image:
+
+           afwGeom::BoxI fullBBox   = afwGeom::BoxI(afwGeom::makePointI(imageToConvolve.getX0(), 
+                                                                        imageToConvolve.getY0()),
+                                                    afwGeom::makeExtentI(imageToConvolve.getWidth(),
+                                                                         imageToConvolve.getHeight()));
+           int maskStartCol = maskBox.getMinX();
+           int maskStartRow = maskBox.getMinY();
+           int maskEndCol   = maskBox.getMaxX();
+           int maskEndRow   = maskBox.getMaxY();
+
+        
+          If we are going to be doing the slicing in Eigen matrices derived from
+          the images, ignore the XY0.
+
+           afwGeom::BoxI fullBBox   = afwGeom::BoxI(afwGeom::makePointI(0, 0),
+                                                    afwGeom::makeExtentI(imageToConvolve.getWidth(),
+                                                                         imageToConvolve.getHeight()));
+
+           int maskStartCol = maskBox.getMinX() - imageToConvolve.getX0();
+           int maskStartRow = maskBox.getMinY() - imageToConvolve.getY0();
+           int maskEndCol   = maskBox.getMaxX() - imageToConvolve.getX0();
+           int maskEndRow   = maskBox.getMaxY() - imageToConvolve.getY0();
+
+        */
+
+                                                                         
+        afwGeom::BoxI fullBBox   = afwGeom::BoxI(afwGeom::makePointI(imageToConvolve.getX0(), 
+                                                                     imageToConvolve.getY0()),
+                                                 afwGeom::makeExtentI(imageToConvolve.getWidth(),
+                                                                      imageToConvolve.getHeight()));
+        afwGeom::BoxI shrunkBBox = (*kiter)->shrinkBBox(fullBBox);
+
+        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
+                          "Limits of good pixels after convolution: %d,%d -> %d,%d", 
+                          shrunkBBox.getMinX(), shrunkBBox.getMinY(), 
+                          shrunkBBox.getMaxX(), shrunkBBox.getMaxY());
+
+        unsigned int const startCol = shrunkBBox.getMinX();
+        unsigned int const startRow = shrunkBBox.getMinY();
+        unsigned int const endCol   = shrunkBBox.getMaxX();
+        unsigned int const endRow   = shrunkBBox.getMaxY();
+
+        /* NOTE: no endCol/endRow += 1 for block slicing, since we are doing the
+           slicing using Afw, not Eigen
+
+           Eigen arrays have index 0,0 in the upper right, while LSST images
+           have 0,0 in the lower left.  The y-axis is flipped.  When translating
+           Images to Eigen matrices in ipDiffim::imageToEigenMatrix this is
+           accounted for.  However, we still need to be aware of this fact if
+           addressing subregions of an Eigen matrix.  This is why the slicing is
+           done in Afw, its cleaner.
+           
+           Please see examples/maskedKernel.cc for elaboration on some of the
+           tests done to make sure this indexing gets done right.
+
+        */
+
+
+        /* Inner limits; of mask box */
+        int maskStartCol = maskBox.getMinX();
+        int maskStartRow = maskBox.getMinY();
+        int maskEndCol   = maskBox.getMaxX();
+        int maskEndRow   = maskBox.getMaxY();
+
+        /* 
+
+        |---------------------------|
+        |      Kernel Boundary      |
+        |  |---------------------|  |
+        |  |         Top         |  |
+        |  |......_________......|  |
+        |  |      |       |      |  |
+        |  |  L   |  Box  |  R   |  |
+        |  |      |       |      |  |
+        |  |......---------......|  |
+        |  |        Bottom       |  |
+        |  |---------------------|  |
+        |                           |
+        |---------------------------|
+       
+        4 regions we want to extract from the pixels: top bottom left right
+
+        */
+        afwImage::BBox tBox = afwImage::BBox(afwImage::PointI(startCol, maskEndRow + 1),
+                                             afwImage::PointI(endCol, endRow));
+        
+        afwImage::BBox bBox = afwImage::BBox(afwImage::PointI(startCol, startRow),
+                                             afwImage::PointI(endCol, maskStartRow - 1));
+        
+        afwImage::BBox lBox = afwImage::BBox(afwImage::PointI(startCol, maskStartRow),
+                                             afwImage::PointI(maskStartCol - 1, maskEndRow));
+        
+        afwImage::BBox rBox = afwImage::BBox(afwImage::PointI(maskEndCol + 1, maskStartRow),
+                                             afwImage::PointI(endCol, maskEndRow));
+
+        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
+                          "Upper good pixel region: %d,%d -> %d,%d", 
+                          tBox.getX0(), tBox.getY0(), tBox.getX1(), tBox.getY1());
+        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
+                          "Bottom good pixel region: %d,%d -> %d,%d", 
+                          bBox.getX0(), bBox.getY0(), bBox.getX1(), bBox.getY1());
+        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
+                          "Left good pixel region: %d,%d -> %d,%d", 
+                          lBox.getX0(), lBox.getY0(), lBox.getX1(), lBox.getY1());
+        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
+                          "Right good pixel region: %d,%d -> %d,%d", 
+                          rBox.getX0(), rBox.getY0(), rBox.getX1(), rBox.getY1());
+
+        /* We need to subtract of XY0 for the pixel access; if I understood XY0
+         * better I could design around this but it kills me... */
+        tBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
+        bBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
+        lBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
+        rBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
+
+        std::vector<afwImage::BBox> boxArray;
+        boxArray.push_back(tBox);
+        boxArray.push_back(bBox);
+        boxArray.push_back(lBox);
+        boxArray.push_back(rBox);        
+
+        int totalSize = tBox.getWidth() * tBox.getHeight();
+        totalSize    += bBox.getWidth() * bBox.getHeight();
+        totalSize    += lBox.getWidth() * lBox.getHeight();
+        totalSize    += rBox.getWidth() * rBox.getHeight();
+
+        Eigen::MatrixXd eigenToConvolve(totalSize, 1);
+        Eigen::MatrixXd eigenToNotConvolve(totalSize, 1);
+        Eigen::MatrixXd eigeniVariance(totalSize, 1);
+        eigenToConvolve.setZero();
+        eigenToNotConvolve.setZero();
+        eigeniVariance.setZero();
+        
+        boost::timer t;
+        t.restart();
+ 
+        int nTerms = 0;
+        typename std::vector<afwImage::BBox>::iterator biter = boxArray.begin();
+        for (; biter != boxArray.end(); ++biter) {
+            int area = (*biter).getWidth() * (*biter).getHeight();
+
+            afwImage::Image<InputT> siToConvolve    = afwImage::Image<InputT>(imageToConvolve, (*biter));
+            afwImage::Image<InputT> siToNotConvolve = afwImage::Image<InputT>(imageToNotConvolve, (*biter));
+            afwImage::Image<InputT> sVarEstimate    = afwImage::Image<InputT>(varianceEstimate, (*biter));
+
+            Eigen::MatrixXd eToConvolve = imageToEigenMatrix(siToConvolve);
+            Eigen::MatrixXd eToNotConvolve = imageToEigenMatrix(siToNotConvolve);
+            Eigen::MatrixXd eiVarEstimate = imageToEigenMatrix(sVarEstimate).cwise().inverse();
+            
+            eToConvolve.resize(area, 1);
+            eToNotConvolve.resize(area, 1);
+            eiVarEstimate.resize(area, 1);
+
+            eigenToConvolve.block(nTerms, 0, area, 1) = eToConvolve;
+            eigenToNotConvolve.block(nTerms, 0, area, 1) = eToNotConvolve;
+            eigeniVariance.block(nTerms, 0, area, 1) = eiVarEstimate;
+
+            nTerms += area;
+        }
+
+        afwImage::Image<InputT> cimage(imageToConvolve.getDimensions());
+
+        std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
+            convolvedEigenList.begin();
+        /* Create C_i in the formalism of Alard & Lupton */
+        for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
+            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+            Eigen::MatrixXd cMat(totalSize, 1);
+            cMat.setZero();
+
+            int nTerms = 0;
+            typename std::vector<afwImage::BBox>::iterator biter = boxArray.begin();
+            for (; biter != boxArray.end(); ++biter) {
+                int area = (*biter).getWidth() * (*biter).getHeight();
+
+                afwImage::Image<InputT> csubimage  = afwImage::Image<InputT>(cimage, (*biter));
+                Eigen::MatrixXd esubimage = imageToEigenMatrix(csubimage);
+                esubimage.resize(area, 1);
+                cMat.block(nTerms, 0, area, 1) = esubimage;
+
+                nTerms += area;
+            }
+            
+            boost::shared_ptr<Eigen::MatrixXd> cMatPtr (new Eigen::MatrixXd(cMat));
+            *eiter = cMatPtr;
+            
+        } 
+        
+        double time = t.elapsed();
+        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
+                          "Total compute time to do basis convolutions : %.2f s", time);
+        t.restart();
+
+        /* 
+           Load matrix with all values from convolvedEigenList : all images
+           (eigeniVariance, convolvedEigenList) must be the same size
+        */
+        Eigen::MatrixXd cMat(eigenToConvolve.col(0).size(), nParameters);
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
+            convolvedEigenList.begin();
+        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
+            convolvedEigenList.end();
+        for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
+            cMat.col(kidxj) = (*eiterj)->col(0);
+        }
+        /* Treat the last "image" as all 1's to do the background calculation. */
+        if (this->_fitForBackground)
+            cMat.col(nParameters-1).fill(1.);
+
+        this->_cMat.reset(new Eigen::MatrixXd(cMat));
+        this->_ivVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
+        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.col(0)));
+
+        /* Make these outside of solve() so I can check condition number */
+        this->_mMat.reset(
+            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
+            );
+        this->_bVec.reset(
+            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
+            );
+        
+    }
+    /*******************************************************************************************************/
+
 
     template <typename InputT>
     RegularizedKernelSolution<InputT>::RegularizedKernelSolution(
@@ -1091,6 +1519,7 @@ namespace diffim {
     typedef float InputT;
 
     template class StaticKernelSolution<InputT>;
+    template class MaskedKernelSolution<InputT>;
     template class RegularizedKernelSolution<InputT>;
 
 }}} // end of namespace lsst::ip::diffim

@@ -322,8 +322,27 @@ Eigen::MatrixXd imageToEigenMatrix(
         int x = 0;
         for (typename afwImage::Image<PixelT>::x_iterator ptr = img.row_begin(y); 
              ptr != img.row_end(y); ++ptr, ++x) {
-            // M is addressed row, col
-            M(y,x) = *ptr;
+            // M is addressed row, col.  Need to invert y-axis.
+            // WARNING : CHECK UNIT TESTS BEFORE YOU COMMIT THIS (-y-1) INVERSION
+            M(rows-y-1,x) = *ptr;
+        }
+    }
+    return M;
+}
+
+Eigen::MatrixXi maskToEigenMatrix(
+    lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const& mask
+    ) {
+    unsigned int rows = mask.getHeight();
+    unsigned int cols = mask.getWidth();
+    Eigen::MatrixXi M = Eigen::MatrixXi::Zero(rows, cols);
+    for (int y = 0; y != mask.getHeight(); ++y) {
+        int x = 0;
+        for (afwImage::Mask<lsst::afw::image::MaskPixel>::x_iterator ptr = mask.row_begin(y); 
+             ptr != mask.row_end(y); ++ptr, ++x) {
+            // M is addressed row, col.  Need to invert y-axis.
+            // WARNING : CHECK UNIT TESTS BEFORE YOU COMMIT THIS (-y-1) INVERSION
+            M(rows-y-1,x) = *ptr;
         }
     }
     return M;

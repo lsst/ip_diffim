@@ -6,6 +6,8 @@ env.Program("pixelAccess", ["pixelAccess.cc"], LIBS=env.getlibs("afw", "ip_diffi
 env.Program("testSpatialCell", ["testSpatialCell.cc"], LIBS=env.getlibs("afw", "ip_diffim"))
 env.Program("spatialKernel", ["spatialKernel.cc"], LIBS=env.getlibs("afw", "ip_diffim"))
 
+env.Program("maskedKernel", ["maskedKernel.cc"], LIBS=env.getlibs("afw", "eigen", "ip_diffim"))
+env.Program("trace", ["trace.cc"], LIBS=env.getlibs("pex_logging", "pex_exceptions"))
 
 #
 # Tests

@@ -250,6 +250,10 @@ namespace diffim {
     Eigen::MatrixXd imageToEigenMatrix(
         lsst::afw::image::Image<PixelT> const& img
         );
+
+    Eigen::MatrixXi maskToEigenMatrix(
+        lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const& mask
+        );
     
 }}} // end of namespace lsst::ip::diffim
 
