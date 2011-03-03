@@ -25,7 +25,7 @@ writefits = False
 class DiffimTestCases(unittest.TestCase):
     
     # D = I - (K.x.T + bg)
-    def setUp(self, CFHT=True):
+    def setUp(self, CFHT=False):
         self.policy1     = ipDiffim.createDefaultPolicy()
         self.policy2     = ipDiffim.createDefaultPolicy()
         self.policy3     = ipDiffim.createDefaultPolicy()
@@ -33,18 +33,28 @@ class DiffimTestCases(unittest.TestCase):
         self.policy1.set("kernelBasisSet", "delta-function")
         self.policy1.set("useRegularization", False)
         self.policy1.set("maxConditionNumber", 5.0e6)
+        self.policy1.set("checkConditionNumber", False)
+        self.policy1.set('fitForBackground', False)
+        self.policy1.set('constantVarianceWeighting', True)
         self.kList1 = ipDiffim.makeKernelBasisList(self.policy1)
         self.bskv1  = ipDiffim.BuildSingleKernelVisitorF(self.kList1, self.policy1)
         
         self.policy2.set("kernelBasisSet", "delta-function")
         self.policy2.set("useRegularization", True)
         self.policy2.set("maxConditionNumber", 5.0e6)
+        self.policy2.set("checkConditionNumber", False)
+        self.policy2.set('fitForBackground', False)
+        self.policy2.set('lambdaValue', 1000.0)
+        self.policy2.set('constantVarianceWeighting', True)
         self.kList2 = ipDiffim.makeKernelBasisList(self.policy2)
         self.hMat2  = ipDiffim.makeRegularizationMatrix(self.policy2)
         self.bskv2  = ipDiffim.BuildSingleKernelVisitorF(self.kList2, self.policy2, self.hMat2)
         
         self.policy3.set("kernelBasisSet", "alard-lupton")
         self.policy3.set("maxConditionNumber", 5.0e7)
+        self.policy3.set("checkConditionNumber", False)
+        self.policy3.set('fitForBackground', False)
+        self.policy3.set('constantVarianceWeighting', True)
         self.kList3 = ipDiffim.makeKernelBasisList(self.policy3)
         self.bskv3  = ipDiffim.BuildSingleKernelVisitorF(self.kList3, self.policy3)
 
@@ -57,6 +67,21 @@ class DiffimTestCases(unittest.TestCase):
             # no need to remap
             self.scienceImage   = afwImage.ExposureF(defSciencePath)
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
+        elif True:
+            #self.scienceImage  = afwImage.ExposureF('s2L006430_0106g4TANSIPwInv.fits')
+            #self.templateImage = afwImage.ExposureF('s2L200006_00770078g4.fits')
+            self.scienceImage  = afwImage.ExposureF('s2L007173_0100g4TANSIPwInv.fits')
+            self.templateImage = afwImage.ExposureF('oneTemplate100006_0072g4.fits')
+            diffimTools.backgroundSubtract(self.policy1.getPolicy("afwBackgroundPolicy"),
+                                           [self.scienceImage.getMaskedImage(),])
+            self.templateImage = ipDiffim.warpTemplateExposure(self.templateImage,
+                                                               self.scienceImage,
+                                                               self.policy1.getPolicy("warpingPolicy"))
+            ### reverse order!
+            #foo = self.templateImage
+            #self.templateImage = self.scienceImage
+            #self.scienceImage = foo
+            
         else:
             defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a00.sci")
@@ -77,8 +102,10 @@ class DiffimTestCases(unittest.TestCase):
         tmi = self.templateImage.getMaskedImage()
         smi = self.scienceImage.getMaskedImage()
 
-        self.policy1.set("detThreshold", 100.)
-        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy1.getPolicy("detectionPolicy"))
+        detPolicy = self.policy1.getPolicy("detectionPolicy")
+        detPolicy.set("detThreshold", 100.)
+        detPolicy.set("detOnTemplate", False)
+        kcDetect = ipDiffim.KernelCandidateDetectionF(detPolicy)
         kcDetect.apply(tmi, smi)
         self.footprints = kcDetect.getFootprints()
 
@@ -117,7 +144,10 @@ class DiffimTestCases(unittest.TestCase):
         
     def applyVisitor(self, invert=False, xloc=397, yloc=580):
         print '# %.2f %.2f' % (xloc, yloc)
-        
+
+        #if (int(xloc) != 1149) and (int(yloc) != 179):
+        #    return
+            
         imsize = int(3 * self.policy1.get("kernelSize"))
 
         # chop out a region around a known object

@@ -102,7 +102,7 @@ def psfMatchModelToModel(referencePsfModel,
 
     kernelWidth, kernelHeight = referencePsfModel.getKernel().getDimensions()
     maxPsfMatchingKernelSize = 1 + (min(kernelWidth - 1, kernelHeight - 1) // 2)
-    if maxPsfMatchingKernelSize%2 == 0:
+    if maxPsfMatchingKernelSize % 2 == 0:
         maxPsfMatchingKernelSize -= 1
     if policy.get('kernelSize') > maxPsfMatchingKernelSize:
         pexLog.Trace("lsst.ip.diffim.psfMatchModelToModel", 1,
