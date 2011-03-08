@@ -1,0 +1,708 @@
+#<?cfg paf dictionary ?>
+#
+# This file should be moved back to ip/diffim when #1035 is resolved
+#
+target: diffImPolicy
+
+definitions: {
+
+    ####################################
+    # DEBUGGING INFO
+    #
+    debugIO: {
+        type: bool
+        description: "write intermediate fits files for debugging"
+        maxOccurs: 1
+        default: false
+    }
+    debugPlot: {
+        type: bool
+        description: "write intermediate plots for debugging"
+        maxOccurs: 1
+        default: false
+    }
+
+
+    ####################################
+    # ASTROMETRICALLY WARPING THE TEMPLATE IMAGE TO MATCH THE SCIENCE IMAGE
+    #
+    ######
+    # 
+    # Options are : bilinear, lanczos#
+    #
+    warpingKernelName: {
+        type: string
+        description: "warping kernel for warping template Exposure"
+        maxOccurs: 1
+        default: "lanczos4"
+        allowed: {
+            value:        "bilinear"
+            description:  "bilinear interpolation"
+        }
+        allowed: {
+            value:        "lanczos3"
+            description:  "lanczos kernel of order 3"
+        }
+        allowed: {
+            value:        "lanczos4"
+            description:  "lanczos kernel of order 4"
+        }
+        allowed: {
+            value:        "lanczos5"
+            description:  "lanczos kernel of order 5"
+        }
+    }
+
+
+    ####################################
+    # RUNNING DETECTION TO FIND GOOD FOOTPRINTS
+    #
+    ######
+    #
+    # For standard processing a value like 10 stdev would be acceptable
+    # 
+    detThreshold: {
+        type: double
+        description: "value of footprint detection threshold"
+        maxOccurs: 1
+        default: 10.
+    }
+
+    ######
+    #
+    # Allowed values : value, stdev, variance
+    #
+    detThresholdType: {
+        type: string
+        description: "type of detection threshold"
+        maxOccurs: 1
+        default: "stdev"
+        allowed: {
+            value:        "value"
+            description:  "use counts as the detection threshold type"
+        }
+        allowed: {
+            value:        "stdev"
+            description:  "use standard deviation as the detection threshold type"
+        }
+        allowed: {
+            value:        "variance"
+            description:  "use variance as the detection threshold type"
+        }
+    }
+
+    ######
+    # 
+    #
+    fpNpixMin: {
+        type: int
+        description: "minimum number of pixels in an acceptible Footprint"
+        maxOccurs: 1
+        default: 5
+    }
+
+    ######
+    # 
+    # Too big and the subsequent convolutions become unwieldy 
+    #
+    fpNpixMax: {
+        type: int
+        description: "maximum number of pixels in an acceptible Footprint"
+        maxOccurs: 1
+        default: 500
+    }
+
+    ######
+    # 
+    # Should be larger than kernelRadiusFwhmScaling
+    #
+    fpGrowFwhmScaling: {
+        type: double
+        description: "grow the footprint based on the Psf Fwhm"
+        maxOccurs: 1
+        default: 10.
+    }
+
+    ######
+    # 
+    #
+    fpGrowMin: {
+        type: int
+        description: "minimum amount to grow the footprint"
+        maxOccurs: 1
+        default: 20
+    }
+
+    ######
+    # 
+    #
+    fpGrowMax: {
+        type: int
+        description: "maximum amount to grow the footprint"
+        maxOccurs: 1
+        default: 40
+    }
+
+    ######
+    # 
+    # The smaller the faster; however the kernel sum does not converge if
+    # the stamp is too small; and the kernel is not constrained at all if
+    # the stamp is the size of the kernel.  Rule of thumb is at least 1.5
+    # times the kernel size
+    #
+    # The grown stamp is ~2*fpGrowPix pixels larger in each dimension.
+    #
+    fpGrowPix: {
+        type: int
+        description: "grow each raw detection footprint by this many pixels"
+        maxOccurs: 1
+        default: 30
+    }
+
+
+    ####################################
+    # BASIS SET FOR KERNEL FITTING
+    #
+    ######
+    # 
+    # Options are : delta-function, alard-lupton
+    #
+    # If alard-lupton is used, the first term will have no spatial
+    # variation and the kernel sum will be conserved.  If delta-function
+    # is used, you have the option to "useRegularization", and might also
+    # want to seriously consider "usePcaForSpatialKernel" which will also
+    # enable kernel sum conservation for the delta function kernels.
+    #
+    # NOTE : if "alard-lupton" you might want to turn off
+    # "usePcaForSpatialKernel" down below.  
+    #
+    kernelBasisSet: {
+        type: string
+        description: "type of basis set for PSF matching kernel"
+        maxOccurs: 1
+        default: "delta-function"
+        allowed: {
+            value:        "alard-lupton"
+            description:  "sum-of-gaussians basis set"
+        }
+        allowed: {
+            value:        "delta-function"
+            description:  "digital kernel basis set"
+        }
+    }
+
+    ######
+    #
+    # For delta function kernels there are kernelRows.x.kernelCols bases
+    # For alard lupton kernel, the half width is kernelRows//2, kernelCols//2
+    #
+    kernelRows: {
+        type: int
+        description: "number of rows in convolution kernel"
+        maxOccurs: 1
+        default: 19
+    }
+    kernelCols: {
+        type: int
+        description: "number of cols in convolution kernel"
+        maxOccurs: 1
+        default: 19
+    }
+
+    ######
+    #
+    # Should be smaller than fpGrowFwhmScaling
+    #
+    kernelRadiusFwhmScaling: {
+        type: double
+        description: "how much to scale the kernel size based on the Psf Fwhm"
+        maxOccurs: 1
+        default: 2.5
+    }
+
+    ######
+    #
+    # kernelRows,kernelCols = 2 * kernelRadius + 1
+    #
+    kernelRadiusMin: {
+        type: int
+        description: "minimum kernel radius"
+        maxOccurs: 1
+        default: 7
+    }
+
+    ######
+    #
+    # kernelRows,kernelCols = 2 * kernelRadius + 1
+    #
+    kernelRadiusMax: {
+        type: int
+        description: "maximum kernel radius"
+        maxOccurs: 1
+        default: 15
+    }
+
+    ######
+    #
+    # Default Alard-Lupton Parameters
+    # 
+    # Note that the widths are in sigma, not FWHM (FWHM = 2.35 sigma)
+    # len(alardSigGauss) and len(alardDegGauss) must equal alardNGauss
+    #
+    alardNGauss: {
+        type: int
+        description: "number of gaussians in alard-lupton basis"
+        maxOccurs: 1
+        default: 3
+    }
+    alardDegGauss: {
+        type: int
+        description: "degree of spatial modification of gaussians in alard-lupton basis"
+        maxOccurs: 3
+        default: 4 3 2
+    }
+    alardSigGauss: {
+        type: double
+        description: "sigma of gaussians in alard-lupton basis"
+        maxOccurs: 3
+        default: 0.7 1.5 3.0
+    }
+    alardSigFwhmScaling: {
+        type: double
+        description: "scaling of the alard-lupton gaussian sigmas by Fwhm/2.35"
+        maxOccurs: 3
+        default: 0.50 1.00 2.00
+    }
+
+    ######
+    #
+    # Default Regularized Delta Function Parameters
+    #
+    useRegularization: {
+        type: bool
+        description: "use regularization to smooth the delta function kernels"
+        maxOccurs: 1
+        default: true
+    }
+
+    ######
+    #
+    # Which derivative you expect to be smooth (e.g. for order=0, first derivative is penalized)
+    #     
+    regularizationOrder: {
+        type: int
+        description: "order of delta-function regularization"
+        maxOccurs: 1
+        default: 2
+        allowed: {
+            value:        0
+            description:  "penalize first derivative"
+        }
+        allowed: {
+            value:        1
+            description:  "penalize second derivative"
+        }
+        allowed: {
+            value:        2
+            description:  "penalize third derivative"
+        }
+    }
+
+    ######
+    #
+    # 0 = unwrapped, 1 = wrapped, 2 = order-tapered ('order' is highest used) 
+    #     
+    regularizationBoundary: {
+        type: int
+        description: "how to deal with boundaries in delta-function regularization"
+        maxOccurs: 1
+        default: 1
+        allowed: {
+            value:        0
+            description:  "no wrapping or tapering near boundary"
+        }
+        allowed: {
+            value:        1
+            description:  "wrap regularization to other edge of image"
+        }
+        allowed: {
+            value:        2
+            description:  "taper the derivative as you approach the edge"
+        }
+    }
+
+    ######
+    #
+    # 0 = forward, 1 = central
+    #     
+    regularizationDifference: {
+        type: int
+        description: "type of derivative approximation for delta-function regularization"
+        maxOccurs: 1
+        default: 0
+        allowed: {
+            value:        0
+            description:  "use forward derivative approximation"
+        }
+        allowed: {
+            value:        1
+            description:  "use central derivative approximation"
+        }
+    }
+
+    ######
+    #
+    # Fraction of the default lambda calculation (N.R. 18.5.8) to use
+    #     
+    regularizationScaling: {
+        type: double
+        description: "strength of delta-function regularization"
+        maxOccurs: 1
+        default: 0.0001
+    }
+
+
+    ####################################
+    # KERNEL QUALITY CONTROL
+    #
+    ######
+    #
+    #
+    maxKsumIterations: {
+        type: int
+        description: "maximum number of iterations to do maxKsumSigma-sigma clipping"
+        maxOccurs: 1
+        default: 5
+    }
+
+    ######
+    #
+    #
+    maxKsumSigma: {
+        type: double
+        description: "maximum allowed sigma for outliers from kernel sum distribution"
+        maxOccurs: 1
+        default: 3.0
+    }
+
+    ######
+    #
+    # Quality of the resulting difference image is used as a proxy for
+    # the quality of the kernel.  We look at both the mean value of
+    # the residuals in the difference image (normalized by the noise;
+    # expectation value is 0.0) as well as the width of the
+    # distribution (expectation value 1.0)
+    #
+    candidateResidualMeanMax: {
+        type: double
+        description: "maximum average(residual/noise) for an acceptible diffim stamp"
+        maxOccurs: 1
+        default: 0.25
+    }
+    candidateResidualStdMax: {
+        type: double
+        description: "maximum standard deviation(residual/noise) for an acceptible diffim stamp"
+        maxOccurs: 1
+        default: 1.25
+    }
+
+    ######
+    # 
+    # What types of sigma clipping to enable
+    #
+    # If you want sigma clipping at each step along the way, it should be:
+    #   singleKernelClipping:  true
+    #   kernelSumClipping:     true
+    #   spatialKernelClipping: true
+    #
+    # If you only care about the final spatial kernel quality it should be:
+    #   singleKernelClipping:  false
+    #   kernelSumClipping:     false
+    #   spatialKernelClipping: true
+    #
+    #
+    singleKernelClipping: {
+        type: bool
+        description: "do sigma clipping on each raw kernel candidate"
+        maxOccurs: 1
+        default: true
+    }
+    kernelSumClipping: {
+        type: bool
+        description: "do sigma clipping on the ensemble of kernel sums"
+        maxOccurs: 1
+        default: true
+    }
+    spatialKernelClipping: {
+        type: bool
+        description: "do sigma clipping on the spatial model"
+        maxOccurs: 1
+        default: true
+    }
+
+
+    ####################################
+    # SINGLE KERNEL FITTING AROUND 1 SOURCE
+    #
+    ######
+    #
+    # Primarily useful when convolving a single-depth image,
+    # otherwise not necessary
+    #
+    iterateSingleKernel: {
+        type: bool
+        description: "remake single kernel using better variance estimate after first pass"
+        maxOccurs: 1
+        default: false
+    }
+
+    ######
+    #
+    # In some cases this is better for bright star residuals
+    #
+    constantVarianceWeighting: {
+        type: bool
+        description: "use constant variance weighting in single kernel fitting"
+        maxOccurs: 1
+        default: false
+    }
+
+    ######
+    #
+    # Comes from inverse of the covariance matrix
+    # NOTE: Regularization can cause this step problems
+    #
+    calculateKernelUncertainty: {
+        type: bool
+        description: "calculate kernel and background uncertainties for each kernel candidate"
+        maxOccurs: 1
+        default: false
+    }
+
+    ######
+    # 
+    # Requires that the user locate the Footprints of isolated stars 
+    #
+    psfMatchToGaussian: {
+        type: bool
+        description: "Psf match to an idealized Gaussian instead of another image"
+        maxOccurs: 1
+        default: false
+    }
+    psfMatchToGaussianSigma1: {
+        type: double
+        description: "width of first gaussian in double-gaussian Psf model"
+        maxOccurs: 1
+        default: 3.0
+    }
+    psfMatchToGaussianFlux1: {
+        type: double
+        description: "fraction of flux in first gaussian in double-gaussian Psf model"
+        maxOccurs: 1
+        default: 0.9
+    }
+    psfMatchToGaussianSigma2: {
+        type: double
+        description: "width of second gaussian in double-gaussian Psf model"
+        maxOccurs: 1
+        default: 5.0
+    }
+    psfMatchToGaussianFlux2: {
+        type: double
+        description: "fraction of flux in second gaussian in double-gaussian Psf model"
+        maxOccurs: 1
+        default: 0.1
+    }
+
+
+    ####################################
+    # SPATIAL KERNEL FITTING
+    #
+    ######
+    #
+    # If you are using a large image, spatialKernelOrder=0, and a constant
+    # kernel is a bad approximation, you probably want to use the
+    # following configuration for the sigma clipping above:
+    #
+    #   singleKernelClipping:  true
+    #   kernelSumClipping:     true
+    #   spatialKernelClipping: false
+    # 
+    spatialKernelOrder: {
+        type: int
+        description: "spatial order of convolution kernel variation"
+        maxOccurs: 1
+        default: 1
+    }
+    spatialBgOrder: {
+        type: int
+        description: "spatial order of differential background variation"
+        maxOccurs: 1
+        default: 0
+    }
+
+    #####
+    #
+    # Used to initialize afwMath::SpatialCellSet class 
+    #
+    sizeCellX: {
+        type: int
+        description: "size (rows) in pixels of each SpatialCell for spatial modeling"
+        maxOccurs: 1
+        default: 256
+    }
+    sizeCellY: {
+        type: int
+        description: "size (cols) in pixels of each SpatialCell for spatial modeling"
+        maxOccurs: 1
+        default: 256
+    }
+    nStarPerCell: {
+        type: int
+        description: "number of candidates in each SpatialCell to use in the spatial fitting"
+        maxOccurs: 1
+        default: 1
+    }
+
+    ######
+    #
+    # Maximum number of iterations to reject bad footprints in the spatial fitting
+    #
+    maxSpatialIterations: {
+        type: int
+        description: "maxmium number of iterations for spatialKernelClipping"
+        maxOccurs: 1
+        default: 5
+    }
+
+    ######
+    #
+    # This is particularly useful for delta-function kernels;
+    # functionally, all the Cells have their raw kernels determined, we
+    # run a PCA on these Kernels, and then re-fit the Cells using the
+    # eigenKernels which are then fit for spatial variation using the same
+    # technique as for the non-PCA delta-function and Alard-Lupton kernels
+    # 
+    # If this option is used, the first term (mean kernel) will have no
+    # spatial variation and the kernel sum will be conserved
+    #
+    # May also work with Alard-Lupton kernels
+    # 
+    usePcaForSpatialKernel: {
+        type: bool
+        description: "use Pca to reduce the dimensionality of the kernel basis sets"
+        maxOccurs: 1
+        default: true
+    }
+
+    ######
+    #
+    #
+    subtractMeanForPca: {
+        type: bool
+        description: "subtract off the mean feature before doing the Pca"
+        maxOccurs: 1
+        default: true
+    }
+
+    ######
+    #
+    #
+    maxPcaIterations: {
+        type: int
+        description: "maximum number of iterations to do Pca-based clipping"
+        maxOccurs: 1
+        default: 5
+    }
+
+    ######
+    #
+    # This is defined to be the number to use *_in addition to_*
+    # the mean kernel, so in total you use N+1 basis functions for the
+    # decomposition.
+    # 
+    numPrincipalComponents: {
+        type: int
+        description: "number of principal components to use for Pca basis"
+        maxOccurs: 1
+        default: 4
+    }
+
+
+    ####################################
+    # ADDITIONAL BACKGROUND FITTING
+    #
+    ######
+    #
+    # 
+    useAfwBackground: {
+        type: bool
+        description: "yse afw background subtraction instead of ip_diffim"
+        maxOccurs: 1
+        default: false
+    }
+
+    ######
+    #
+    # 
+    backgroundPolicy: {
+        type: policy
+        description: "policy in case diffim needs to do background subtraction"
+        dictionary: {
+            definitions: {
+                algorithm: {
+                    type: string
+                    description: "how to interpolate the background values"
+                    maxOccurs: 1
+                    default: "NATURAL_SPLINE" 
+                    allowed: {
+                        value: "CONSTANT"
+                    }
+                    allowed: {
+                        value: "LINEAR"
+                    }
+                    allowed: {
+                        value: "NATURAL_SPLINE"
+                    }
+                    allowed: {
+                        value: "CUBIC_SPLINE"
+                    }
+                    allowed: {
+                        value: "CUBIC_SPLINE_PERIODIC"
+                    }
+                    allowed: {
+                        value: "AKIMA_SPLINE"
+                    }
+                    allowed: {
+                        value: "AKIMA_SPLINE_PERIODIC"
+                    }
+                }
+
+                binsize: {
+                    type: int
+                    description: "how large regions should be used for each background point"
+                    maxOccurs: 1
+                    default: 512
+                }
+
+                undersample: {
+                    type: string
+                    description: "what to do if there are not enough regions for the interpolation"
+                    maxOccurs: 1
+                    default: "REDUCE_INTERP_ORDER"
+                    allowed: {
+                        value: "THROW_EXCEPTION"
+                    }
+                    allowed: {
+                        value: "REDUCE_INTERP_ORDER"
+                    }
+                    allowed: {
+                        value: "INCREASE_NXNYSAMPLE"
+                    }
+                }
+            }
+        }
+        maxOccurs: 1
+    }
+
+}
