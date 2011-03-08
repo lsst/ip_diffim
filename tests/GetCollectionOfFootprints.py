@@ -33,7 +33,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 
 diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
+diffimPolicy = os.path.join(diffimDir, 'policy', 'ImageSubtractStageDictionary.paf')
 
 class DiffimTestCases(unittest.TestCase):
     

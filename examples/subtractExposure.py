@@ -46,7 +46,7 @@ def main():
 
     defSciencePath  = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1')
     defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1_tmpl')
-    defPolicyPath   = os.path.join(imageProcDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
+    defPolicyPath   = os.path.join(imageProcDir, 'policy', 'ImageSubtractStageDictionary.paf')
     defOutputPath   = 'diffExposure'
     defVerbosity    = 0
     

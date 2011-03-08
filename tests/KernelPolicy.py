@@ -32,7 +32,7 @@ import lsst.pex.policy as pexPolicy
 class DiffimTestCases(unittest.TestCase):
     def setUp(self):
         diffimDir         = eups.productDir('ip_diffim')
-        self.policyPath   = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
+        self.policyPath   = os.path.join(diffimDir, 'policy', 'ImageSubtractStageDictionary.paf')
         self.p0           = pexPolicy.Policy.createPolicy(self.policyPath)
 
     def tearDown(self):

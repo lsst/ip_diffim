@@ -37,7 +37,7 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class DiffimTestCases(unittest.TestCase):
     def setUp(self):
         self.diffimDir    = eups.productDir('ip_diffim')
-        self.diffimPolicy = os.path.join(self.diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
+        self.diffimPolicy = os.path.join(self.diffimDir, 'policy', 'ImageSubtractStageDictionary.paf')
         self.policy       = ipDiffim.generateDefaultPolicy(self.diffimPolicy, fwhm=5)
         
         self.defDataDir = eups.productDir('afwdata')

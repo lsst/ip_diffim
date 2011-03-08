@@ -47,7 +47,7 @@ elif len(sys.argv) == 3:
 else:
     sys.exit(1)
     
-defPolicyPath   = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
+defPolicyPath   = os.path.join(imageProcDir, "policy", "ImageSubtractStageDictionary.paf")
 defOutputPath   = "diffImage"
 
 templateMaskedImage = afwImage.MaskedImageF(defTemplatePath)

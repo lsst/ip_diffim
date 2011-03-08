@@ -41,7 +41,7 @@ verbosity = 3
 pexLog.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
+diffimPolicy = os.path.join(diffimDir, 'policy', 'ImageSubtractStageDictionary.paf')
 
 display   = False
 writefits = False

@@ -38,7 +38,7 @@ verbosity = 1
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'pipeline', 'ImageSubtractStageDictionary.paf')
+diffimPolicy = os.path.join(diffimDir, 'policy', 'ImageSubtractStageDictionary.paf')
 
 # This tests delta function kernels with delta-function images, and
 # known gaussian smoothing kernels

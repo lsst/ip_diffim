@@ -31,7 +31,7 @@ verbosity = 3
 pexLog.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 imageProcDir  = eups.productDir("ip_diffim")
-defPolicyPath = os.path.join(imageProcDir, "pipeline", "ImageSubtractStageDictionary.paf")
+defPolicyPath = os.path.join(imageProcDir, "policy", "ImageSubtractStageDictionary.paf")
 
 imageToConvolve     = afwImage.MaskedImageF(sys.argv[1])
 imageToNotConvolve  = afwImage.MaskedImageF(sys.argv[2])
