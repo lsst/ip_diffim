@@ -38,7 +38,7 @@ def makePoissonNoiseImage(im):
     noiseIm = im.Factory(im.getBBox(afwImage.PARENT))
     noiseArr = noiseIm.getArray()
 
-    intNoiseArr = rand.poisson(imArr, imArr.shape)
+    intNoiseArr = rand.poisson(imArr)
     noiseArr[:, :] = intNoiseArr.astype(noiseArr.dtype)
     return noiseIm
 
