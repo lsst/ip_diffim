@@ -38,7 +38,6 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.display.ds9 as ds9
 import lsst.ip.diffim as ipDiffim
-import lsst.coadd.utils as coaddUtils
 
 PsfTypeName = "pcaPsf"
 
@@ -47,9 +46,9 @@ PolicyDictName = "PsfMatchingDictionary.paf"
 
 FWHMPerSigma = 2 * math.sqrt(2 * math.log(2))
 
-# set BBox to an afwGeom.BoxI to process a subframe of each input exposure
+# set BBox to an afwGeom.Box2I to process a subframe of each input exposure
 # set to an empty bbox to process the whole image
-BBox = afwImage.BBox(afwImage.PointI(0, 0), 1024, 1024)
+BBox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(1024, 1024))
 
 def psfFromBoost(psfPath, typeName):
     """Unpersist a PSF from a boost file.
@@ -113,7 +112,7 @@ def psfMatchToModel(exposurePath, psfPath, desFwhm, policy):
 
     print "Compute PSF-matching kernel"
     psfMatchingKernel, backgroundModel, kernelCellSet = ipDiffim.psfMatchModelToModel(
-        modelPsf, coaddUtils.bboxFromImage(exposure), exposurePsf, policy)
+        modelPsf, exposure.getBBox(afwImage.PARENT), exposurePsf, policy)
 
     psfMatchingKernelImage = afwImage.ImageD(
         psfMatchingKernel.getWidth(), psfMatchingKernel.getHeight())
@@ -134,7 +133,6 @@ def psfMatchToModel(exposurePath, psfPath, desFwhm, policy):
 
 
 if __name__ == "__main__":
-    pexLog.Trace.setVerbosity('lsst.coadd', 5)
     pexLog.Trace.setVerbosity('lsst.ip.diffim', 5)
 
     helpStr = """Usage: warpPsfMatchToModelAndCoadd.py exposurePath psfPath desFwhm [policy]

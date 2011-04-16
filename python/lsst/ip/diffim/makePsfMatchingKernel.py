@@ -24,10 +24,7 @@ def psfMatchImageToImage(maskedImageToConvolve,
 
 
     # Object to store the KernelCandidates for spatial modeling
-    kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(maskedImageToConvolve.getX0(),
-                                                                         maskedImageToConvolve.getY0()),
-                                                         maskedImageToConvolve.getWidth(),
-                                                         maskedImageToConvolve.getHeight()),
+    kernelCellSet = afwMath.SpatialCellSet(maskedImageToConvolve.getBBox(afwImage.PARENT),
                                            policy.getInt("sizeCellX"),
                                            policy.getInt("sizeCellY"))
     
@@ -42,8 +39,8 @@ def psfMatchImageToImage(maskedImageToConvolve,
         bbox = fp.getBBox()
 
         # Grab the centers in the parent's coordinate system
-        xC   = 0.5 * ( bbox.getX0() + bbox.getX1() )
-        yC   = 0.5 * ( bbox.getY0() + bbox.getY1() )
+        xC   = 0.5 * ( bbox.getMinX() + bbox.getMaxX() )
+        yC   = 0.5 * ( bbox.getMinY() + bbox.getMaxY() )
 
         # Since the footprint is in the parent's coordinate system,
         # while the BBox uses the child's coordinate system.
@@ -123,8 +120,8 @@ def psfMatchModelToModel(referencePsfModel,
     sizeCellX = policy.get("sizeCellX")
     sizeCellY = policy.get("sizeCellY")
 
-    kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(scienceX0, scienceY0),
-                                                         regionSizeX, regionSizeY),
+    kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(scienceX0, scienceY0),
+                                                         afwGeom.Extent2I(regionSizeX, regionSizeY)),
                                            sizeCellX, sizeCellY)
 
     nCellX    = regionSizeX // sizeCellX
@@ -145,7 +142,7 @@ def psfMatchModelToModel(referencePsfModel,
                          "Creating Psf candidate at %.1f %.1f" % (posX, posY))
 
             # reference kernel image, at location of science subimage
-            kernelImageR = referencePsfModel.computeImage(afwGeom.makePointD(posX, posY), True).convertF()
+            kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY), True).convertF()
             sum = afwMath.makeStatistics(kernelImageR, afwMath.SUM).getValue(afwMath.SUM)
             kernelImageR /= sum
             kernelMaskR  = afwImage.MaskU(dimenR)
@@ -154,7 +151,7 @@ def psfMatchModelToModel(referencePsfModel,
             kernelVarR.set(0.01) # Total flux = 1, so this is order of magnitude
             referenceMI = afwImage.MaskedImageF(kernelImageR, kernelMaskR, kernelVarR)
 
-            kernelImageS = sciencePsfModel.computeImage(afwGeom.makePointD(posX, posY), True).convertF()
+            kernelImageS = sciencePsfModel.computeImage(afwGeom.Point2D(posX, posY), True).convertF()
             sum = afwMath.makeStatistics(kernelImageS, afwMath.SUM).getValue(afwMath.SUM)
             kernelImageS /= sum
             kernelMaskS  = afwImage.MaskU(dimenS)
@@ -250,18 +247,15 @@ def psfMatchImageToModel(maskedImageToConvolve,
     #                                                    policy.get("photometryAperture"))
 
     # Object to store the KernelCandidates for spatial modeling
-    kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(maskedImageToConvolve.getX0(),
-                                                                         maskedImageToConvolve.getY0()),
-                                                         maskedImageToConvolve.getWidth(),
-                                                         maskedImageToConvolve.getHeight()),
+    kernelCellSet = afwMath.SpatialCellSet(maskedImageToConvolve.getBBox(afwImage.PARENT),
                                            policy.getInt("sizeCellX"),
                                            policy.getInt("sizeCellY"))
 
     # Place candidate footprints within the spatial grid
     for fp in footprints:
         bbox = fp.getBBox()
-        xC   = 0.5 * (bbox.getX0() + bbox.getX1())
-        yC   = 0.5 * (bbox.getY0() + bbox.getY1())
+        xC   = 0.5 * (bbox.getMinX() + bbox.getMaxX())
+        yC   = 0.5 * (bbox.getMinY() + bbox.getMaxY())
         tmi  = afwImage.MaskedImageF(maskedImageToConvolve,  bbox)
 
         # Find object flux so we can center the Gaussian
@@ -293,10 +287,10 @@ def psfMatchImageToModel(maskedImageToConvolve,
 
         # Did our centroiding work out?
         cTest1 = afwImage.ImageF(tmi.getImage(), True)
-        cTest1.setXY0(afwImage.PointI(0, 0))
+        cTest1.setXY0(afwGeom.Point2I(0, 0))
         cen1   = centroider.apply(cTest1, cTest1.getWidth()//2, cTest1.getHeight()//2)
         cTest2 = afwImage.ImageF(kImageG, True)
-        cTest2.setXY0(afwImage.PointI(0, 0))
+        cTest2.setXY0(afwGeom.Point2I(0, 0))
         cen2   = centroider.apply(cTest2, cTest2.getWidth()//2, cTest2.getHeight()//2)
         pexLog.Trace("lsst.ip.diffim.psfMatchImageToModel", 5,
                      "Resulting centroids : %.2f,%.2f vs. %.2f,%.2f" % (cen1.getX(), cen1.getY(),

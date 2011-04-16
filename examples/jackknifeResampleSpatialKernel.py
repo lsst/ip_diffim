@@ -52,9 +52,9 @@ class DiffimTestCases(unittest.TestCase):
                                         self.scienceMaskedImage])
 
     def stats(self, cid, diffim, size=5):
-        bbox = afwImage.BBox(afwImage.PointI((diffim.getWidth() - size)//2,
+        bbox = afwGeom.Box2I(afwGeom.Point2I((diffim.getWidth() - size)//2,
                                              (diffim.getHeight() - size)//2),
-                             afwImage.PointI((diffim.getWidth() + size)//2,
+                             afwGeom.Point2I((diffim.getWidth() + size)//2,
                                              (diffim.getHeight() + size)//2))
         self.dStats.apply(diffim)
         pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,

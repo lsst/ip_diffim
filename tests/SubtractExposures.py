@@ -40,8 +40,8 @@ class DiffimTestCases(unittest.TestCase):
                                            [self.templateImage.getMaskedImage(),
                                             self.scienceImage.getMaskedImage()])
             self.offset   = 1500
-            self.bbox     = afwImage.BBox(afwImage.PointI(0, self.offset),
-                                          afwImage.PointI(511, 2046))
+            self.bbox     = afwGeom.Box2I(afwGeom.Point2I(0, self.offset),
+                                          afwGeom.Point2I(511, 2046))
 
     def tearDown(self):
         del self.policy

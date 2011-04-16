@@ -10,7 +10,6 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
-import lsst.afw.image.testUtils as imTestUtils
 
 verbosity = 4
 logging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
@@ -77,16 +76,16 @@ class DiffimTestCases(unittest.TestCase):
 
         # the first one sums to 1; the rest sum to 0
         ks[0].computeImage(kim, False)
-        self.assertAlmostEqual(num.sum(num.ravel(imTestUtils.arrayFromImage(kim))), 1.0)
+        self.assertAlmostEqual(num.sum(num.ravel(kim.getArray())), 1.0)
         
         for k in range(1, nBasis):
             ks[k].computeImage(kim, False)
-            self.assertAlmostEqual(num.sum(num.ravel(imTestUtils.arrayFromImage(kim))), 0.0)
+            self.assertAlmostEqual(num.sum(num.ravel(kim.getArray())), 0.0)
 
         # the images dotted with themselves is 1, except for the first
         for k in range(1, nBasis):
             ks[k].computeImage(kim, False)
-            arr = imTestUtils.arrayFromImage(kim)
+            arr = kim.getArray()
             self.assertAlmostEqual(num.sum(arr*arr), 1.0)
 
 

@@ -98,12 +98,9 @@ class DiffimTestCases(unittest.TestCase):
         kImageOut = afwImage.ImageD(self.kSize, self.kSize)
         kSum      = kernel.computeImage(kImageOut, False)
         diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, bg)
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth()-(kernel.getWidth()-kernel.getCtrX()),
-                                                  diffIm.getHeight()-(kernel.getHeight()-kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
-        self.dStats.apply( diffIm2 )
+        goodBBox  = kernel.shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
+        diffIm2   = afwImage.MaskedImageF(diffIm, goodBBox)
+        self.dStats.apply(diffIm2)
         
         dmean = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
         dstd  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
@@ -121,10 +118,10 @@ class DiffimTestCases(unittest.TestCase):
         imsize = int(3 * self.kSize)
 
         # chop out a region around a known object
-        bbox = afwImage.BBox( afwImage.PointI(xloc - imsize/2,
-                                              yloc - imsize/2),
-                              afwImage.PointI(xloc + imsize/2,
-                                              yloc + imsize/2) )
+        bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize/2,
+                                             yloc - imsize/2),
+                             afwGeom.Point2I(xloc + imsize/2,
+                                             yloc + imsize/2) )
 
         # sometimes the box goes off the image; no big deal...
         try:
@@ -209,11 +206,11 @@ class DiffimTestCases(unittest.TestCase):
         for fp in self.footprints:
             # note this returns the kernel images
             self.applyFunctor(invert=False, 
-                              xloc= int(0.5 * ( fp.getBBox().getX0() + fp.getBBox().getX1() )),
-                              yloc= int(0.5 * ( fp.getBBox().getY0() + fp.getBBox().getY1() )))
+                              xloc= int(0.5 * ( fp.getBBox().getMinX() + fp.getBBox().getMaxX() )),
+                              yloc= int(0.5 * ( fp.getBBox().getMinY() + fp.getBBox().getMaxY() )))
             self.applyFunctor(invert=True, 
-                              xloc= int(0.5 * ( fp.getBBox().getX0() + fp.getBBox().getX1() )),
-                              yloc= int(0.5 * ( fp.getBBox().getY0() + fp.getBBox().getY1() )))
+                              xloc= int(0.5 * ( fp.getBBox().getMinX() + fp.getBBox().getMaxX() )),
+                              yloc= int(0.5 * ( fp.getBBox().getMinY() + fp.getBBox().getMaxY() )))
             raw_input('Next: ')
 
        

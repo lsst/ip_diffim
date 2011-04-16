@@ -134,8 +134,7 @@ class DiffimTestCases(unittest.TestCase):
         kSum   = kc.getKsum(ipDiffim.KernelCandidateF.RECENT)
         bg     = kc.getBackground(ipDiffim.KernelCandidateF.RECENT)
 
-        p0, p1 = diffimTools.getConvolvedImageLimits(kc.getKernel(ipDiffim.KernelCandidateF.RECENT), diffIm)
-        bbox   = afwImage.BBox(p0, p1)
+        bbox = kc.getKernel(ipDiffim.KernelCandidateF.RECENT).shrinkBBox(diffim.getBBox(afwImage.LOCAL))
         diffIm = afwImage.MaskedImageF(diffIm, bbox)
         self.dStats.apply(diffIm)
         
@@ -152,10 +151,10 @@ class DiffimTestCases(unittest.TestCase):
         imsize = int(3 * self.policy1.get("kernelSize"))
 
         # chop out a region around a known object
-        bbox = afwImage.BBox( afwImage.PointI(xloc - imsize/2,
-                                              yloc - imsize/2),
-                              afwImage.PointI(xloc + imsize/2,
-                                              yloc + imsize/2) )
+        bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize/2,
+                                             yloc - imsize/2),
+                             afwGeom.Point2I(xloc + imsize/2,
+                                             yloc + imsize/2) )
 
         # sometimes the box goes off the image; no big deal...
         try:
@@ -262,8 +261,8 @@ class DiffimTestCases(unittest.TestCase):
         for fp in self.footprints:
             # note this returns the kernel images
             self.applyVisitor(invert=False, 
-                              xloc= int(0.5 * ( fp.getBBox().getX0() + fp.getBBox().getX1() )),
-                              yloc= int(0.5 * ( fp.getBBox().getY0() + fp.getBBox().getY1() )))
+                              xloc= int(0.5 * ( fp.getBBox().getMinX() + fp.getBBox().getMaxX() )),
+                              yloc= int(0.5 * ( fp.getBBox().getMinY() + fp.getBBox().getMaxY() )))
        
 #####
         

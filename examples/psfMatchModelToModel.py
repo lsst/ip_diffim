@@ -111,8 +111,8 @@ if __name__ == '__main__':
     policy.set("spatialKernelOrder", int(order))
 
 
-    imageBBox = afwGeom.BoxI(afwGeom.makePointI(calexp.getX0(), calexp.getY0()),
-                             afwGeom.makeExtentI(calexp.getWidth(), calexp.getHeight()))
+    imageBBox = afwGeom.Box2I(afwGeom.Point2I(calexp.getX0(), calexp.getY0()),
+                              afwGeom.Extent2I(calexp.getWidth(), calexp.getHeight()))
     sk, sb, kcs = ipDiffim.psfMatchModelToModel(gaussPsf, imageBBox, psf, policy)
 
     cim = afwImage.MaskedImageF(calexp.getMaskedImage().getDimensions())

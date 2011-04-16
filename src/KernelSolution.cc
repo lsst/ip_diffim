@@ -301,16 +301,12 @@ namespace diffim {
          * 100-3+1 = 98, and the loops use i < 98, meaning the last
          * index you address is 97.
          */
-        unsigned int const startCol = (*kiter)->getCtrX();
-        unsigned int const startRow = (*kiter)->getCtrY();
-        unsigned int endCol   = imageToConvolve.getWidth()  - 
-            ((*kiter)->getWidth()  - (*kiter)->getCtrX());
-        unsigned int endRow   = imageToConvolve.getHeight() - 
-            ((*kiter)->getHeight() - (*kiter)->getCtrY());
-        
-        /* Needed for Eigen block slicing operation */
-        endCol += 1;
-        endRow += 1;
+        afwGeom::Box2I goodBBox = (*kiter)->shrinkBBox(imageToConvolve.getBBox(afwImage::LOCAL));
+        unsigned int const startCol = goodBBox.getMinX();
+        unsigned int const startRow = goodBBox.getMinY();
+        // endCol/Row is one past the index of the last good col/row
+        unsigned int endCol = goodBBox.getMaxX() + 1;
+        unsigned int endRow = goodBBox.getMaxX() + 1;
 
         boost::timer t;
         t.restart();
@@ -522,18 +518,14 @@ namespace diffim {
         unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
 
         /* Ignore known EDGE pixels for speed */
-        afwGeom::BoxI fullBBox   = afwGeom::BoxI(afwGeom::makePointI(imageToConvolve.getX0(), 
-                                                                     imageToConvolve.getY0()),
-                                                 afwGeom::makeExtentI(imageToConvolve.getWidth(),
-                                                                      imageToConvolve.getHeight()));
-        afwGeom::BoxI shrunkBBox = (*kiter)->shrinkBBox(fullBBox);
+        afwGeom::Box2I shrunkBBox = (*kiter)->shrinkBBox(imageToConvolve.getBBox(afwImage::PARENT));
         pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
                           "Limits of good pixels after convolution: %d,%d -> %d,%d", 
                           shrunkBBox.getMinX(), shrunkBBox.getMinY(), 
                           shrunkBBox.getMaxX(), shrunkBBox.getMaxY());
 
-        /* Subimages are addressed in raw pixel coordiantes */
-        shrunkBBox.shift(afwGeom::makeExtentI(-imageToConvolve.getX0(), -imageToConvolve.getY0()));
+        /* Subimages are addressed in raw pixel coordinates */
+        shrunkBBox.shift(afwGeom::Extent2I(-imageToConvolve.getX0(), -imageToConvolve.getY0()));
         unsigned int startCol = shrunkBBox.getMinX();
         unsigned int startRow = shrunkBBox.getMinY();
         unsigned int endCol   = shrunkBBox.getMaxX();
@@ -660,7 +652,7 @@ namespace diffim {
         lsst::afw::image::Image<InputT> const &imageToConvolve,
         lsst::afw::image::Image<InputT> const &imageToNotConvolve,
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
-        lsst::afw::geom::BoxI maskBox
+        lsst::afw::geom::Box2I maskBox
         ) {
 
         lsst::afw::math::KernelList basisList = 
@@ -676,10 +668,7 @@ namespace diffim {
            NOTE : If we are using these views in Afw's Image space, we need to
            make sure and compensate for the XY0 of the image:
 
-           afwGeom::BoxI fullBBox   = afwGeom::BoxI(afwGeom::makePointI(imageToConvolve.getX0(), 
-                                                                        imageToConvolve.getY0()),
-                                                    afwGeom::makeExtentI(imageToConvolve.getWidth(),
-                                                                         imageToConvolve.getHeight()));
+           afwGeom::Box2I fullBBox = imageToConvolve.getBBox(afwImage::PARENT);
            int maskStartCol = maskBox.getMinX();
            int maskStartRow = maskBox.getMinY();
            int maskEndCol   = maskBox.getMaxX();
@@ -689,9 +678,7 @@ namespace diffim {
           If we are going to be doing the slicing in Eigen matrices derived from
           the images, ignore the XY0.
 
-           afwGeom::BoxI fullBBox   = afwGeom::BoxI(afwGeom::makePointI(0, 0),
-                                                    afwGeom::makeExtentI(imageToConvolve.getWidth(),
-                                                                         imageToConvolve.getHeight()));
+           afwGeom::Box2I fullBBox = imageToConvolve.getBBox(afwImage::LOCAL);
 
            int maskStartCol = maskBox.getMinX() - imageToConvolve.getX0();
            int maskStartRow = maskBox.getMinY() - imageToConvolve.getY0();
@@ -701,11 +688,7 @@ namespace diffim {
         */
 
                                                                          
-        afwGeom::BoxI fullBBox   = afwGeom::BoxI(afwGeom::makePointI(imageToConvolve.getX0(), 
-                                                                     imageToConvolve.getY0()),
-                                                 afwGeom::makeExtentI(imageToConvolve.getWidth(),
-                                                                      imageToConvolve.getHeight()));
-        afwGeom::BoxI shrunkBBox = (*kiter)->shrinkBBox(fullBBox);
+        afwGeom::Box2I shrunkBBox = (*kiter)->shrinkBBox(imageToConvolve.getBBox(afwImage::PARENT));
 
         pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
                           "Limits of good pixels after convolution: %d,%d -> %d,%d", 
@@ -758,30 +741,30 @@ namespace diffim {
         4 regions we want to extract from the pixels: top bottom left right
 
         */
-        afwImage::BBox tBox = afwImage::BBox(afwImage::PointI(startCol, maskEndRow + 1),
-                                             afwImage::PointI(endCol, endRow));
+        afwGeom::Box2I tBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskEndRow + 1),
+                                             afwGeom::Point2I(endCol, endRow));
         
-        afwImage::BBox bBox = afwImage::BBox(afwImage::PointI(startCol, startRow),
-                                             afwImage::PointI(endCol, maskStartRow - 1));
+        afwGeom::Box2I bBox = afwGeom::Box2I(afwGeom::Point2I(startCol, startRow),
+                                             afwGeom::Point2I(endCol, maskStartRow - 1));
         
-        afwImage::BBox lBox = afwImage::BBox(afwImage::PointI(startCol, maskStartRow),
-                                             afwImage::PointI(maskStartCol - 1, maskEndRow));
+        afwGeom::Box2I lBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskStartRow),
+                                             afwGeom::Point2I(maskStartCol - 1, maskEndRow));
         
-        afwImage::BBox rBox = afwImage::BBox(afwImage::PointI(maskEndCol + 1, maskStartRow),
-                                             afwImage::PointI(endCol, maskEndRow));
+        afwGeom::Box2I rBox = afwGeom::Box2I(afwGeom::Point2I(maskEndCol + 1, maskStartRow),
+                                             afwGeom::Point2I(endCol, maskEndRow));
 
         pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
                           "Upper good pixel region: %d,%d -> %d,%d", 
-                          tBox.getX0(), tBox.getY0(), tBox.getX1(), tBox.getY1());
+                          tBox.getMinX(), tBox.getMinY(), tBox.getMaxX(), tBox.getMaxY());
         pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
                           "Bottom good pixel region: %d,%d -> %d,%d", 
-                          bBox.getX0(), bBox.getY0(), bBox.getX1(), bBox.getY1());
+                          bBox.getMinX(), bBox.getMinY(), bBox.getMaxX(), bBox.getMaxY());
         pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
                           "Left good pixel region: %d,%d -> %d,%d", 
-                          lBox.getX0(), lBox.getY0(), lBox.getX1(), lBox.getY1());
+                          lBox.getMinX(), lBox.getMinY(), lBox.getMaxX(), lBox.getMaxY());
         pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
                           "Right good pixel region: %d,%d -> %d,%d", 
-                          rBox.getX0(), rBox.getY0(), rBox.getX1(), rBox.getY1());
+                          rBox.getMinX(), rBox.getMinY(), rBox.getMaxX(), rBox.getMaxY());
 
         /* We need to subtract of XY0 for the pixel access; if I understood XY0
          * better I could design around this but it kills me... */
@@ -790,7 +773,7 @@ namespace diffim {
         lBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
         rBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
 
-        std::vector<afwImage::BBox> boxArray;
+        std::vector<afwGeom::Box2I> boxArray;
         boxArray.push_back(tBox);
         boxArray.push_back(bBox);
         boxArray.push_back(lBox);
@@ -812,7 +795,7 @@ namespace diffim {
         t.restart();
  
         int nTerms = 0;
-        typename std::vector<afwImage::BBox>::iterator biter = boxArray.begin();
+        typename std::vector<afwGeom::Box2I>::iterator biter = boxArray.begin();
         for (; biter != boxArray.end(); ++biter) {
             int area = (*biter).getWidth() * (*biter).getHeight();
 
@@ -847,7 +830,7 @@ namespace diffim {
             cMat.setZero();
 
             int nTerms = 0;
-            typename std::vector<afwImage::BBox>::iterator biter = boxArray.begin();
+            typename std::vector<afwGeom::Box2I>::iterator biter = boxArray.begin();
             for (; biter != boxArray.end(); ++biter) {
                 int area = (*biter).getWidth() * (*biter).getHeight();
 

@@ -14,9 +14,6 @@ k     = afwMath.FixedKernel(kImg)
 cMi   = afwImage.MaskedImageF(tMi.getDimensions())
 afwMath.convolve(cMi, tMi, k, False)
 
-bbox      = afwImage.BBox(afwImage.PointI(k.getCtrX(),
-                                          k.getCtrY()) ,
-                          afwImage.PointI(cMi.getWidth() - (k.getWidth() - k.getCtrX()),
-                                          cMi.getHeight() - (k.getHeight() - k.getCtrY())))
-cMi2 = afwImage.MaskedImageF(cMi, bbox)
+goodBBox = k.shrinkBBox(cMi.getBBox(afwImage.LOCAL))
+cMi2 = afwImage.MaskedImageF(cMi, goodBBox)
 cMi2.writeFits('conv')

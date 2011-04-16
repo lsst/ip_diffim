@@ -125,7 +125,7 @@ namespace diffim {
         virtual void buildSingleMask(lsst::afw::image::Image<InputT> const &imageToConvolve,
                                      lsst::afw::image::Image<InputT> const &imageToNotConvolve,
                                      lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
-                                     lsst::afw::geom::BoxI maskBox);
+                                     lsst::afw::geom::Box2I maskBox);
     };
 
 

@@ -30,8 +30,8 @@ class DiffimTestCases(unittest.TestCase):
             scienceImage  = afwImage.ExposureF(defSciencePath)
             templateImage = afwImage.ExposureF(defTemplatePath)
             # set XY0 = 0
-            scienceImage.getMaskedImage().setXY0(afwImage.PointI(0, 0))
-            templateImage.getMaskedImage().setXY0(afwImage.PointI(0, 0))
+            scienceImage.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
+            templateImage.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
             # do the warping first so we don't have any masked pixels in the postage stamps
             templateImage = ipDiffim.warpTemplateExposure(templateImage,
                                                           scienceImage,
@@ -44,8 +44,8 @@ class DiffimTestCases(unittest.TestCase):
             self.x02 = 276
             self.y02 = 717
             size     = 40
-            bbox2 = afwImage.BBox( afwImage.PointI(self.x02 - size, self.y02 - size),
-                                   afwImage.PointI(self.x02 + size, self.y02 + size) )
+            bbox2 = afwGeom.Box2I(afwGeom.Point2I(self.x02 - size, self.y02 - size),
+                                  afwGeom.Point2I(self.x02 + size, self.y02 + size))
             self.scienceImage2  = afwImage.ExposureF(scienceImage, bbox2)
             self.templateImage2 = afwImage.ExposureF(templateImage, bbox2)
 
@@ -240,8 +240,7 @@ class DiffimTestCases(unittest.TestCase):
         smi = afwImage.MaskedImageF(imX, imY)
         afwMath.convolve(smi, self.templateImage2.getMaskedImage(), gaussKernel, False)
 
-        p0, p1   = diffimTools.getConvolvedImageLimits(gaussKernel, smi)
-        bbox     = afwImage.BBox(p0, p1)
+        bbox = gaussKernel.shrinkBBox(smi.getBBox(afwImage.LOCAL))
 
         tmi2 = afwImage.MaskedImageF(self.templateImage2.getMaskedImage(), bbox)
         smi2 = afwImage.MaskedImageF(smi, bbox)
@@ -325,8 +324,7 @@ class DiffimTestCases(unittest.TestCase):
         gscaling = afwMath.makeStatistics(smi, afwMath.SUM).getValue(afwMath.SUM)
 
         # grab only the non-masked subregion
-        p0, p1   = diffimTools.getConvolvedImageLimits(gaussKernel, smi)
-        bbox     = afwImage.BBox(p0, p1)
+        bbox = gaussKernel.shrinkBBox(smi.getBBox(afwImage.LOCAL))
 
         tmi2 = afwImage.MaskedImageF(tmi, bbox)
         smi2 = afwImage.MaskedImageF(smi, bbox)
@@ -367,7 +365,8 @@ class DiffimTestCases(unittest.TestCase):
         
         sizeCellX = self.policy.get("sizeCellX")
         sizeCellY = self.policy.get("sizeCellY")
-        kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(0, 0)), sizeCellX, sizeCellY)
+        kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0)),
+                                                             afwGeom.Extent2I(sizeCellX, sizeCellY))
         kernelCellSet.insertCandidate(kc)
         nSeen = 0
         for cell in kernelCellSet.getCellList():

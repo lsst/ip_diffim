@@ -87,7 +87,7 @@ namespace diffim {
         for (int row = 0; row < signedHeight; ++row) {
             for (int col = 0; col < signedWidth; ++col) {
                 boost::shared_ptr<afwMath::Kernel> 
-                    kernelPtr(new afwMath::DeltaFunctionKernel(width, height, afwImage::PointI(col,row)));
+                    kernelPtr(new afwMath::DeltaFunctionKernel(width, height, afwGeom::Point2I(col,row)));
                 kernelBasisList.push_back(kernelPtr);
             }
         }

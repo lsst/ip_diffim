@@ -51,16 +51,15 @@ class DiffimTestCases(unittest.TestCase):
     def runConvolveAndSubtract1(self, bgVal = 0, xloc = 408, yloc = 580):
         imsize = int(5 * self.kSize)
 
-        p0 = afwImage.PointI(xloc - imsize/2, yloc - imsize/2)
-        p1 = afwImage.PointI(xloc + imsize/2, yloc + imsize/2)
-        bbox = afwImage.BBox(p0, p1)
+        p0 = afwGeom.Point2I(xloc - imsize/2, yloc - imsize/2)
+        p1 = afwGeom.Point2I(xloc + imsize/2, yloc + imsize/2)
+        bbox = afwImage.Box2I(p0, p1)
 
         tmi     = afwImage.MaskedImageF(self.templateImage, bbox)
         smi     = afwImage.MaskedImageF(self.scienceImage, bbox)
         diffIm  = ipDiffim.convolveAndSubtract(tmi, smi, self.gaussKernel, bgVal)
 
-        p0, p1  = diffimTools.getConvolvedImageLimits(self.gaussKernel, diffIm)
-        bbox    = afwImage.BBox(p0, p1)
+        bbox = self.gaussKernel.shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
         diffIm2 = afwImage.MaskedImageF(diffIm, bbox)
 
         # image is empty (or the additional background you subtracted off)
@@ -71,17 +70,16 @@ class DiffimTestCases(unittest.TestCase):
     def runConvolveAndSubtract2(self, bgOrder=0, xloc = 408, yloc = 580):
         imsize = int(5 * self.kSize)
 
-        p0 = afwImage.PointI(xloc - imsize/2, yloc - imsize/2)
-        p1 = afwImage.PointI(xloc + imsize/2, yloc + imsize/2)
-        bbox = afwImage.BBox(p0, p1)
+        p0 = afwGeom.Point2I(xloc - imsize/2, yloc - imsize/2)
+        p1 = afwGeom.Point2I(xloc + imsize/2, yloc + imsize/2)
+        bbox = afwImage.Box2I(p0, p1)
 
         tmi     = afwImage.MaskedImageF(self.templateImage, bbox)
         smi     = afwImage.MaskedImageF(self.scienceImage, bbox)
         bgFunc  = afwMath.PolynomialFunction2D(bgOrder)  # coeffs are 0. by default
         diffIm  = ipDiffim.convolveAndSubtract(tmi, smi, self.gaussKernel, bgFunc)
 
-        p0, p1  = diffimTools.getConvolvedImageLimits(self.gaussKernel, diffIm)
-        bbox    = afwImage.BBox(p0, p1)
+        bbox = self.gaussKernel.shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
         diffIm2 = afwImage.MaskedImageF(diffIm, bbox)
         for j in range(diffIm2.getHeight()):
             for i in range(diffIm2.getWidth()):

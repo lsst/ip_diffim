@@ -42,12 +42,12 @@ yCenter       = 106
 ##### TO DO; DEAL WITH EDGE NANS; REALLY NEED TO SPREAD MASK...
 stampSize     = 200
 maskSize      = 10
-candBBox      = afwImage.BBox(afwImage.PointI(xCenter - stampSize//2, yCenter - stampSize//2),
-                              stampSize, stampSize)
-maskBBox      = afwGeom.BoxI(afwGeom.makePointI(xCenter - maskSize//2, yCenter - maskSize//2),
-                             afwGeom.makeExtentI(maskSize, maskSize))
+candBBox      = afwGeom.Box2I(afwGeom.Point2I(xCenter - stampSize//2, yCenter - stampSize//2),
+                              afwGeom.Extent2I(stampSize, stampSize))
+maskBBox      = afwGeom.Box2I(afwGeom.Point2I(xCenter - maskSize//2, yCenter - maskSize//2),
+                              afwGeom.Extent2I(maskSize, maskSize))
 
-#print 'A', candBBox.getX0(), candBBox.getY0(), candBBox.getX1(), candBBox.getY1()
+#print 'A', candBBox.getMinX(), candBBox.getMinY(), candBBox.getMaxX(), candBBox.getMaxY()
 #print 'B', maskBBox.getMinX(), maskBBox.getMinY(), maskBBox.getMaxX(), maskBBox.getMaxY()
 
 diffimTools.backgroundSubtract(policy1.getPolicy("afwBackgroundPolicy"),

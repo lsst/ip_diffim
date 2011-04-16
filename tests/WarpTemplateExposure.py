@@ -71,8 +71,8 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata not set up; not running WarpTemplateExposure.py"
             return
 
-        bbox     = afwImage.BBox(afwImage.PointI(7, 900),
-                                 afwImage.PointI(102, 1000))
+        bbox = afwGeom.Box2I(afwGeom.Point2I(7, 900),
+                             afwGeom.Point2I(102, 1000))
         templateSubImage = afwImage.ExposureF(self.templateImage, bbox)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, bbox)
 

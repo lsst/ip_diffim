@@ -11,29 +11,6 @@ import numpy
 import time
 
 #######
-# Expansions of functionality found in lsst.afw.image.testUtils
-#######
-
-def vectorFromImage(im, dtype=float):
-    vec = numpy.zeros(im.getWidth()*im.getHeight(), dtype=dtype)
-    idx = 0
-    for row in range(im.getHeight()):
-        for col in range(im.getWidth()):
-            vec[idx] = im.get(col, row)
-            idx     += 1
-    return vec
-
-def imageFromVector(vec, width, height, retType=afwImage.ImageF):
-    im  = retType(width, height)
-    idx = 0
-    for row in range(height):
-        for col in range(width):
-            # need to cast numpy.float64 as float
-            im.set(col, row, float(vec[idx]))
-            idx     += 1
-    return im
-
-#######
 # Add noise
 #######
 
@@ -46,13 +23,24 @@ def makeFlatNoiseImage(mi, seedStat = afwMath.MAX):
     return rdmImage
 
 def makePoissonNoiseImage(im):
-    # uses numpy
+    """Return a Poisson noise image based on im
+    
+    Uses numpy.random; you may wish to call numpy.random.seed first.
+    
+    @warning This uses an undocumented numpy API (the documented API
+    uses a single float expectation value instead of an array).
+    
+    @param[in] im image; the output image has the same dimensions and shape
+        and its expectation value is the value of im at each pixel
+    """
     import numpy.random as rand
-    numpy.random.seed(666)
-    import lsst.afw.image.testUtils as testUtils
-    ndata = testUtils.arrayFromImage(im)
-    noise = rand.poisson(ndata)
-    return testUtils.imageFromArray(noise)
+    imArr = im.getArray()
+    noiseIm = im.Factory(im.getBBox(afwImage.PARENT))
+    noiseArr = noiseIm.getArray()
+
+    intNoiseArr = rand.poisson(imArr, imArr.shape)
+    noiseArr[:, :] = intNoiseArr.astype(noiseArr.dtype)
+    return noiseIm
 
 #######
 # Make fake images for testing; one is a delta function (or narrow
@@ -127,8 +115,7 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
     tim = cim
 
     # Trim off border pixels
-    p0, p1   = getConvolvedImageLimits(gaussKernel, tim)
-    bbox     = afwImage.BBox(p0, p1)
+    bbox = gaussKernel.shrinkBBox(tim.getBBox(afwImage.LOCAL))
     tim      = afwImage.ImageF(tim, bbox)
     # An estimate of its variance is itself
     tvar     = afwImage.ImageF(tim, True)
@@ -170,14 +157,13 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
     afwMath.convolve(cim, tim, sKernel, False)
 
     # Get the good subregion
-    p0, p1 = getConvolvedImageLimits(sKernel, cim)
-    bbox   = afwImage.BBox(p0, p1)
+    bbox = sKernel.shrinkBBox(cim.getBBox(afwImage.LOCAL))
 
     # Add noise?
     if addNoise:
         svar += bgValue
         snoi  = makePoissonNoiseImage(svar)
-        cim   = snoi # unfortunately this integerizes the image
+        cim   = snoi
         cim  -= bgValue
 
         # noiseless?
@@ -228,8 +214,8 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
     assert(afwMath.makeStatistics(tMi.getVariance(), afwMath.MIN).getValue() >= 0.0)
 
     # Get rid of any coordinate funniness
-    sMi.setXY0(afwImage.PointI(0,0))
-    tMi.setXY0(afwImage.PointI(0,0))
+    sMi.setXY0(afwGeom.Point2I(0,0))
+    tMi.setXY0(afwGeom.Point2I(0,0))
 
     if display:
         import lsst.afw.display.ds9 as ds9
@@ -239,9 +225,9 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
         ds9.mtv(sMi.getVariance(), frame=4)
 
     # Finally, make a kernelSet from these 2 images
-    kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(0, 0),
-                                                         sizeCell * nCell,
-                                                         sizeCell * nCell),
+    kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0),
+                                                         afwGeom.Extent2I(sizeCell * nCell,
+                                                                          sizeCell * nCell)),
                                            sizeCell,
                                            sizeCell)
     stampHalfWidth = 2 * kSize
@@ -249,11 +235,11 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
         for y in range(nCell):
             xCoord = x * sizeCell + sizeCell // 2
             yCoord = y * sizeCell + sizeCell // 2
-            p0 = afwImage.PointI(xCoord - stampHalfWidth,
+            p0 = afwGeom.Point2I(xCoord - stampHalfWidth,
                                  yCoord - stampHalfWidth)
-            p1 = afwImage.PointI(xCoord + stampHalfWidth,
+            p1 = afwGeom.Point2I(xCoord + stampHalfWidth,
                                  yCoord + stampHalfWidth)
-            bbox = afwImage.BBox(p0, p1)
+            bbox = afwGeom.Box2I(p0, p1)
             tsi = afwImage.MaskedImageF(tMi, bbox)
             ssi = afwImage.MaskedImageF(sMi, bbox)
 
@@ -266,22 +252,6 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
     
     return tMi, sMi, sKernel, kernelCellSet
     
-
-    
-#######
-# Limits of good pixels in a convolved image
-#######
-
-def getConvolvedImageLimits(kernel, image):
-    # first good pixel
-    p0 = afwImage.PointI(kernel.getCtrX(),
-                         kernel.getCtrY())
-
-    # last good pixel
-    p1 = afwImage.PointI(image.getWidth() - (kernel.getWidth()  - kernel.getCtrX()),
-                         image.getHeight() - (kernel.getHeight() - kernel.getCtrY()))
-
-    return p0, p1
 
 #######
 # Background subtraction for ip_diffim
@@ -492,7 +462,7 @@ def displayFootprints(image, footprintList, frame):
     #    for bbox in bboxes:
     #        bbox.shift(-image.getX0(),-image.getY0())
     #        
-    #        x0, y0, x1, y1 = bbox.getX0(), bbox.getY0(), bbox.getX1(), bbox.getY1()
+    #        x0, y0, x1, y1 = bbox.getMinX(), bbox.getMinY(), bbox.getMaxX(), bbox.getMaxY()
     #        
     #        x0 -= 0.5; y0 -= 0.5
     #        x1 += 0.5; y1 += 0.5

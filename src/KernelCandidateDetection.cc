@@ -165,7 +165,7 @@ namespace diffim {
          */
         FindSetBits<afwImage::Mask<afwImage::MaskPixel> > fsb;
         
-        afwImage::BBox fpBBox = fp->getBBox();
+        afwGeom::Box2I fpBBox = fp->getBBox();
         /* Failure Condition 1) 
          * 
          * Footprint has too many pixels off the bat.  We don't want to throw
@@ -178,21 +178,21 @@ namespace diffim {
                               "Footprint has too many pix: %d (max =%d)", 
                               fp->getNpix(), fpNpixMax);
             
-            int xc = int(0.5 * (fpBBox.getX0() + fpBBox.getX1()));
-            int yc = int(0.5 * (fpBBox.getY0() + fpBBox.getY1()));
+            int xc = int(0.5 * (fpBBox.getMinX() + fpBBox.getMaxX()));
+            int yc = int(0.5 * (fpBBox.getMinY() + fpBBox.getMaxY()));
             afwDetect::Footprint::Ptr fpCore(
-                new afwDetect::Footprint(afwImage::BBox(afwImage::PointI(xc, yc)))
+                new afwDetect::Footprint(afwGeom::Box2I(afwGeom::Point2I(xc, yc), afwGeom::Extent2I(1,1)))
                 );
             return growCandidate(fpCore, fpGrowPix, miToConvolvePtr, miToNotConvolvePtr);
         } 
 
-        afwImage::BBox fpBox = fp->getBBox();
+        afwGeom::Box2I fpBox = fp->getBBox();
         pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                           "Original footprint in parent : %d,%d -> %d,%d -> %d,%d",
-                          fpBBox.getX0(), fpBBox.getY0(), 
-                          int(0.5 * (fpBBox.getX0() + fpBBox.getX1())),
-                          int(0.5 * (fpBBox.getY0() + fpBBox.getY1())),
-                          fpBBox.getX1(), fpBBox.getY1());
+                          fpBBox.getMinX(), fpBBox.getMinY(), 
+                          int(0.5 * (fpBBox.getMinX() + fpBBox.getMaxX())),
+                          int(0.5 * (fpBBox.getMinY() + fpBBox.getMaxY())),
+                          fpBBox.getMaxX(), fpBBox.getMaxY());
         
         /* Grow the footprint
          * flag true  = isotropic grow   = slow
@@ -216,33 +216,33 @@ namespace diffim {
             afwDetect::growFootprint(fp, fpGrowPix, false);
         
         /* Next we look at the image within this Footprint.  To do this we
-         * create a subimage using a BBox.  When this happens, the BBox
+         * create a subimage using a bounding box.  When this happens, the bounding box
          * addresses the image in its own coordinate system, not the parent
-         * coordinate system.  Therefore you need to shift the BBox by its XY0.
+         * coordinate system.  Therefore you need to shift the bounding box by its XY0.
          */
-        afwImage::BBox fpGrowBBox = fpGrow->getBBox();
+        afwGeom::Box2I fpGrowBBox = fpGrow->getBBox();
         pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                           "Grown footprint in parent : %d,%d -> %d,%d -> %d,%d",
-                          fpGrowBBox.getX0(), fpGrowBBox.getY0(), 
-                          int(0.5 * (fpGrowBBox.getX0() + fpGrowBBox.getX1())),
-                          int(0.5 * (fpGrowBBox.getY0() + fpGrowBBox.getY1())),
-                          fpGrowBBox.getX1(), fpGrowBBox.getY1());
+                          fpGrowBBox.getMinX(), fpGrowBBox.getMinY(), 
+                          int(0.5 * (fpGrowBBox.getMinX() + fpGrowBBox.getMaxX())),
+                          int(0.5 * (fpGrowBBox.getMinY() + fpGrowBBox.getMaxY())),
+                          fpGrowBBox.getMaxX(), fpGrowBBox.getMaxY());
 
         fpGrowBBox.shift(-miToConvolvePtr->getX0(), -miToConvolvePtr->getY0());
         pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                           "Grown footprint in image : %d,%d -> %d,%d -> %d,%d",
-                          fpGrowBBox.getX0(), fpGrowBBox.getY0(), 
-                          int(0.5 * (fpGrowBBox.getX0() + fpGrowBBox.getX1())),
-                          int(0.5 * (fpGrowBBox.getY0() + fpGrowBBox.getY1())),
-                          fpGrowBBox.getX1(), fpGrowBBox.getY1());
+                          fpGrowBBox.getMinX(), fpGrowBBox.getMinY(), 
+                          int(0.5 * (fpGrowBBox.getMinX() + fpGrowBBox.getMaxX())),
+                          int(0.5 * (fpGrowBBox.getMinY() + fpGrowBBox.getMaxY())),
+                          fpGrowBBox.getMaxX(), fpGrowBBox.getMaxY());
 
         /* Failure Condition 2) 
          * Grown off the image
          */
-        bool belowOriginX = fpGrowBBox.getX0() < 0;
-        bool belowOriginY = fpGrowBBox.getY0() < 0;
-        bool offImageX    = fpGrowBBox.getX1() > (miToConvolvePtr->getWidth() - 1);
-        bool offImageY    = fpGrowBBox.getY1() > (miToConvolvePtr->getHeight() - 1);
+        bool belowOriginX = fpGrowBBox.getMinX() < 0;
+        bool belowOriginY = fpGrowBBox.getMinY() < 0;
+        bool offImageX    = fpGrowBBox.getMaxX() > (miToConvolvePtr->getWidth() - 1);
+        bool offImageY    = fpGrowBBox.getMaxY() > (miToConvolvePtr->getHeight() - 1);
         if (belowOriginX || belowOriginY || offImageX || offImageY) {
             pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                               "Footprint grown off image"); 

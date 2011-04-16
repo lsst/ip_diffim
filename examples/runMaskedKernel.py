@@ -62,8 +62,8 @@ for line in open(infile).readlines():
     minY = max(yCenter - stampSize//2, 0)
     maxX = min(xCenter + stampSize//2, scienceExposure.getWidth())
     maxY = min(yCenter + stampSize//2, scienceExposure.getHeight())
-    candBBox = afwImage.BBox(afwImage.PointI(minX, minY),
-                             afwImage.PointI(maxX, maxY))
+    candBBox = afwGeom.Box2I(afwGeom.Point2I(minX, minY),
+                             afwGeom.Point2I(maxX, maxY))
     
     minX = max(xCenter - maskSize//2, 0)
     minY = max(yCenter - maskSize//2, 0)

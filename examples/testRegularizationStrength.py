@@ -33,13 +33,8 @@ class DiffimTestCases(unittest.TestCase):
 
         kSum      = kernel.computeImage(kImageOut, False)
         diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, background)
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth() - (kernel.getWidth()  -
-                                                                       kernel.getCtrX()),
-                                                  diffIm.getHeight() - (kernel.getHeight() -
-                                                                        kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
+        goodBBox  = kernel.shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
+        diffIm2   = afwImage.MaskedImageF(diffIm, goodBBox)
         self.dStats.apply( diffIm2 )
 
         if display:
@@ -113,10 +108,10 @@ class DiffimTestCases(unittest.TestCase):
         imsize = int(imscale * self.kSize)
 
         # chop out a region around a known object
-        bbox = afwImage.BBox( afwImage.PointI(xloc - imsize/2,
-                                              yloc - imsize/2),
-                              afwImage.PointI(xloc + imsize/2,
-                                              yloc + imsize/2) )
+        bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize/2,
+                                             yloc - imsize/2),
+                             afwGeom.Point2I(xloc + imsize/2,
+                                             yloc + imsize/2))
 
         if invert:
             tmi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(),  bbox)

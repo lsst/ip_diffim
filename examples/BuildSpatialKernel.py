@@ -178,8 +178,7 @@ class DiffimTestCases(unittest.TestCase):
                         itcv   = cand2.getMiToConvolvePtr().getVariance()
                         itncv  = cand2.getMiToNotConvolvePtr().getVariance()
 
-                        p0, p1 = diffimTools.getConvolvedImageLimits(kernel1, diffim)
-                        bbox   = afwImage.BBox(p0, p1)
+                        bbox = kernel1.shrinkBBox(diffim.getBBox(afwImage.LOCAL))
                         diffim = afwImage.MaskedImageF(diffim, bbox)
                         itcv   = afwImage.ImageF(itcv, bbox)
                         itncv  = afwImage.ImageF(itncv, bbox)
@@ -221,8 +220,7 @@ class DiffimTestCases(unittest.TestCase):
                 itncv  = cand.getMiToNotConvolvePtr().getVariance()
                 
                 
-                p0, p1 = diffimTools.getConvolvedImageLimits(kernel, diffim)
-                bbox   = afwImage.BBox(p0, p1)
+                bbox = kernel.shrinkBBox(diffim.getBBox(afwImage.LOCAL))
                 diffim = afwImage.MaskedImageF(diffim, bbox)
                 itcv   = afwImage.ImageF(itcv, bbox)
                 itncv  = afwImage.ImageF(itncv, bbox)

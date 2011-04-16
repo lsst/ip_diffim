@@ -27,7 +27,7 @@ void test() {
         new afwImage::MaskedImage<PixelT>(stampSize, stampSize) 
         );
 
-    afwImage::BBox          bbox    = afwImage::BBox(afwImage::PointI(0, 0), fullSize, fullSize);
+    afwGeom::Box2I bbox = afwGeom::Box2I(afwGeom::Point2I(0, 0), afwGeom::Extent2I(fullSize, fullSize));
     afwMath::SpatialCellSet cellSet = afwMath::SpatialCellSet(bbox, cellSize, cellSize);
     
     Policy::Ptr policy(new Policy);

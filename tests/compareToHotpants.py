@@ -63,9 +63,9 @@ class DiffimTestCases(unittest.TestCase):
             self.basisList.append(k)
 
         # And a place to put candidates
-        self.kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(0,0),
-                                                                  self.smi.getWidth(),
-                                                                  self.smi.getHeight()),
+        self.kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0,0),
+                                                                  afwGeom.Extent2I(self.smi.getWidth(),
+                                                                                   self.smi.getHeight())),
                                                     self.policy.getInt("sizeCellX"),
                                                     self.policy.getInt("sizeCellY"))
 
@@ -93,11 +93,10 @@ class DiffimTestCases(unittest.TestCase):
             bbox = fp.getBBox()
         
             # Grab the centers in the parent's coordinate system
-            xC   = int(0.5 * ( bbox.getX0() + bbox.getX1() ))
-            yC   = int(0.5 * ( bbox.getY0() + bbox.getY1() ))
+            xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
+            yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
         
-            bbox = afwImage.BBox(afwImage.PointI(int(xC)-24, int(yC)-24),
-                                 49, 49)
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox)
@@ -158,11 +157,10 @@ class DiffimTestCases(unittest.TestCase):
             bbox = fp.getBBox()
         
             # Grab the centers in the parent's coordinate system
-            xC   = int(0.5 * ( bbox.getX0() + bbox.getX1() ))
-            yC   = int(0.5 * ( bbox.getY0() + bbox.getY1() ))
+            xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
+            yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
         
-            bbox = afwImage.BBox(afwImage.PointI(int(xC)-24, int(yC)-24),
-                                 49, 49)
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox)
@@ -216,11 +214,10 @@ class DiffimTestCases(unittest.TestCase):
             bbox = fp.getBBox()
         
             # Grab the centers in the parent's coordinate system
-            xC   = int(0.5 * ( bbox.getX0() + bbox.getX1() ))
-            yC   = int(0.5 * ( bbox.getY0() + bbox.getY1() ))
+            xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
+            yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
         
-            bbox = afwImage.BBox(afwImage.PointI(int(xC)-24, int(yC)-24),
-                                 49, 49)
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox)
@@ -315,11 +312,10 @@ class DiffimTestCases(unittest.TestCase):
             bbox = fp.getBBox()
         
             # Grab the centers in the parent's coordinate system
-            xC   = int(0.5 * ( bbox.getX0() + bbox.getX1() ))
-            yC   = int(0.5 * ( bbox.getY0() + bbox.getY1() ))
+            xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
+            yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
         
-            bbox = afwImage.BBox(afwImage.PointI(int(xC)-24, int(yC)-24),
-                                 49, 49)
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox)
@@ -379,11 +375,10 @@ class DiffimTestCases(unittest.TestCase):
             bbox = fp.getBBox()
         
             # Grab the centers in the parent's coordinate system
-            xC   = int(0.5 * ( bbox.getX0() + bbox.getX1() ))
-            yC   = int(0.5 * ( bbox.getY0() + bbox.getY1() ))
+            xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
+            yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
         
-            bbox = afwImage.BBox(afwImage.PointI(int(xC)-24, int(yC)-24),
-                                 49, 49)
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox)
@@ -469,11 +464,10 @@ class DiffimTestCases(unittest.TestCase):
             bbox = fp.getBBox()
         
             # Grab the centers in the parent's coordinate system
-            xC   = int(0.5 * ( bbox.getX0() + bbox.getX1() ))
-            yC   = int(0.5 * ( bbox.getY0() + bbox.getY1() ))
+            xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
+            yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
         
-            bbox = afwImage.BBox(afwImage.PointI(int(xC)-24, int(yC)-24),
-                                 49, 49)
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox)
@@ -540,11 +534,10 @@ class DiffimTestCases(unittest.TestCase):
             bbox = fp.getBBox()
         
             # Grab the centers in the parent's coordinate system
-            xC   = int(0.5 * ( bbox.getX0() + bbox.getX1() ))
-            yC   = int(0.5 * ( bbox.getY0() + bbox.getY1() ))
+            xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
+            yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
         
-            bbox = afwImage.BBox(afwImage.PointI(int(xC)-24, int(yC)-24),
-                                 49, 49)
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox)
@@ -655,11 +648,10 @@ class DiffimTestCases(unittest.TestCase):
             bbox = fp.getBBox()
         
             # Grab the centers in the parent's coordinate system
-            xC   = int(0.5 * ( bbox.getX0() + bbox.getX1() ))
-            yC   = int(0.5 * ( bbox.getY0() + bbox.getY1() ))
+            xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
+            yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
         
-            bbox = afwImage.BBox(afwImage.PointI(int(xC)-24, int(yC)-24),
-                                 49, 49)
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox)

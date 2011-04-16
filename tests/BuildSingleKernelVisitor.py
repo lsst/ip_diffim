@@ -233,10 +233,9 @@ class DiffimTestCases(unittest.TestCase):
         sizeCellX = self.policy.get("sizeCellX")
         sizeCellY = self.policy.get("sizeCellY")
         
-        kernelCellSet = afwMath.SpatialCellSet(afwImage.BBox(afwImage.PointI(0,
-                                                                             0),
-                                                             sizeCellX * nCell,
-                                                             sizeCellY * nCell),
+        kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0),
+                                                             afwGeom.Extent2I(sizeCellX * nCell,
+                                                                              sizeCellY * nCell)),
                                                sizeCellX,
                                                sizeCellY)
         nTot = 0

@@ -11,7 +11,7 @@ coord     = 7.
 tmi = afwImage.MaskedImageF(stampSize, stampSize)
 smi = afwImage.MaskedImageF(stampSize, stampSize)
 
-bbox    = afwImage.BBox(afwImage.PointI(0, 0), fullSize, fullSize)
+bbox    = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(fullSize, fullSize))
 cellSet = afwMath.SpatialCellSet(bbox, cellSize, cellSize)
 policy  = pexPolicy.Policy()
 policy.set("candidateCoreRadius", 3)
