@@ -56,12 +56,12 @@ namespace boost {
     import_array();
 %}
 
-%include "lsst/afw/eigen.i"
+%include "lsst/p_lsstSwig.i"
+
 %declareEigenMatrix(Eigen::MatrixXd);
 %declareEigenMatrix(Eigen::VectorXd);
 /* Eigen / numpy.  Info comes from $AFW_DIR/include/lsst/afw/numpyTypemaps.h */
 
-%include "lsst/p_lsstSwig.i"
 %include "lsst/daf/base/persistenceMacros.i"
 
 %import  "lsst/afw/image/imageLib.i"

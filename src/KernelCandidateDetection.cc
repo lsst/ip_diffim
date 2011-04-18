@@ -9,8 +9,9 @@
  * @ingroup ip_diffim
  */
 
-#include "lsst/afw/image/Image.h"
-#include "lsst/afw/detection/Footprint.h"
+#include "lsst/afw/geom.h"
+#include "lsst/afw/image.h"
+#include "lsst/afw/detection.h"
 #include "lsst/pex/exceptions/Exception.h"
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/logging/Trace.h"
@@ -18,6 +19,7 @@
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelCandidateDetection.h"
 
+namespace afwGeom   = lsst::afw::geom;
 namespace afwImage  = lsst::afw::image;
 namespace afwDetect = lsst::afw::detection;
 namespace pexLog    = lsst::pex::logging; 
@@ -90,7 +92,7 @@ namespace diffim {
         _footprints.clear();
 
         // List of Footprints
-        std::vector<afwDetect::Footprint::Ptr> footprintListIn;
+        boost::shared_ptr<std::vector<afwDetect::Footprint::Ptr> > footprintListInPtr;
         
         // Find detections
         afwDetect::Threshold threshold = 
@@ -103,10 +105,10 @@ namespace diffim {
                 "",
                 fpNpixMin);
             // Get the associated footprints
-            footprintListIn = footprintSet.getFootprints();
+            footprintListInPtr = footprintSet.getFootprints();
             pexLog::TTrace<4>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                               "Found %d total footprints in template above %.3f %s",
-                              footprintListIn.size(), detThreshold, detThresholdType.c_str());
+                              footprintListInPtr->size(), detThreshold, detThresholdType.c_str());
         }
         else {
             afwDetect::FootprintSet<PixelT> footprintSet(
@@ -115,15 +117,15 @@ namespace diffim {
                 "",
                 fpNpixMin);
             
-            footprintListIn = footprintSet.getFootprints();
+            footprintListInPtr = footprintSet.getFootprints();
             pexLog::TTrace<4>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                               "Found %d total footprints in science image above %.3f %s",
-                              footprintListIn.size(), detThreshold, detThresholdType.c_str());
+                              footprintListInPtr->size(), detThreshold, detThresholdType.c_str());
         }    
         
         // Iterate over footprints, look for "good" ones
-        for (std::vector<afwDetect::Footprint::Ptr>::iterator i = footprintListIn.begin(); 
-             i != footprintListIn.end(); ++i) {
+        for (std::vector<afwDetect::Footprint::Ptr>::iterator i = footprintListInPtr->begin(); 
+             i != footprintListInPtr->end(); ++i) {
             
             pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                               "Processing footprint %d", (*i)->getId());
@@ -228,7 +230,7 @@ namespace diffim {
                           int(0.5 * (fpGrowBBox.getMinY() + fpGrowBBox.getMaxY())),
                           fpGrowBBox.getMaxX(), fpGrowBBox.getMaxY());
 
-        fpGrowBBox.shift(-miToConvolvePtr->getX0(), -miToConvolvePtr->getY0());
+        fpGrowBBox.shift(-afwGeom::Extent2I(miToConvolvePtr->getXY0()));
         pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                           "Grown footprint in image : %d,%d -> %d,%d -> %d,%d",
                           fpGrowBBox.getMinX(), fpGrowBBox.getMinY(), 
@@ -258,8 +260,8 @@ namespace diffim {
         /* Grab subimages; report any exception */
         bool subimageHasFailed = false;
         try {
-            afwImage::MaskedImage<PixelT> subImageToConvolve(*(miToConvolvePtr), fpGrowBBox);
-            afwImage::MaskedImage<PixelT> subImageToNotConvolve(*(miToNotConvolvePtr), fpGrowBBox);
+            afwImage::MaskedImage<PixelT> subImageToConvolve(*miToConvolvePtr, fpGrowBBox, afwImage::LOCAL);
+            afwImage::MaskedImage<PixelT> subImageToNotConvolve(*miToNotConvolvePtr, fpGrowBBox, afwImage::LOCAL);
             
             // Search for any masked pixels within the footprint
             fsb.apply(*(subImageToConvolve.getMask()));

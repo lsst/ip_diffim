@@ -1,12 +1,14 @@
 #include <stdexcept>
 
-#include <boost/shared_ptr.hpp>
+#include "boost/shared_ptr.hpp"
 
-#include <lsst/afw/image.h>
-#include <lsst/afw/math.h>
-#include <lsst/ip/diffim.h>
-#include <lsst/pex/policy/Policy.h>
+#include "lsst/afw/geom.h"
+#include "lsst/afw/image.h"
+#include "lsst/afw/math.h"
+#include "lsst/ip/diffim.h"
+#include "lsst/pex/policy/Policy.h"
 
+namespace afwGeom = lsst::afw::geom;
 namespace afwImage = lsst::afw::image;
 namespace afwMath  = lsst::afw::math;
 namespace ipDiffim = lsst::ip::diffim;
@@ -21,10 +23,10 @@ void test() {
     float coord    = 7.;
     
     boost::shared_ptr<afwImage::MaskedImage<PixelT> > tmi( 
-        new afwImage::MaskedImage<PixelT>(stampSize, stampSize) 
+        new afwImage::MaskedImage<PixelT>(afwGeom::Extent2I(stampSize, stampSize))
         );
     boost::shared_ptr<afwImage::MaskedImage<PixelT> > smi( 
-        new afwImage::MaskedImage<PixelT>(stampSize, stampSize) 
+        new afwImage::MaskedImage<PixelT>(afwGeom::Extent2I(stampSize, stampSize))
         );
 
     afwGeom::Box2I bbox = afwGeom::Box2I(afwGeom::Point2I(0, 0), afwGeom::Extent2I(fullSize, fullSize));

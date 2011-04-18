@@ -15,11 +15,13 @@
 
 #include "lsst/pex/exceptions/Exception.h"
 #include "lsst/pex/policy/Policy.h"
+#include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
 #include "lsst/ip/diffim/BasisLists.h"
 
-namespace pexExcept  = lsst::pex::exceptions; 
+namespace pexExcept  = lsst::pex::exceptions;
+namespace afwGeom    = lsst::afw::geom;
 namespace afwImage   = lsst::afw::image;
 namespace afwMath    = lsst::afw::math;
 
@@ -124,7 +126,7 @@ namespace diffim {
             throw LSST_EXCEPT(pexExcept::Exception, "degGauss does not have enough entries");
         }
         int fullWidth = 2 * halfWidth + 1;
-        Image image(fullWidth, fullWidth);
+        Image image(afwGeom::Extent2I(fullWidth, fullWidth));
         
         afwMath::KernelList kernelBasisList;
         for (int i = 0; i < nGauss; i++) {

@@ -10,7 +10,7 @@ namespace afwGeom        = lsst::afw::geom;
 namespace afwImage       = lsst::afw::image;
 int main() {
     int dimen = 11;
-    afwImage::Image<float> foo(dimen,dimen);
+    afwImage::Image<float> foo(afwGeom::Extent2I(dimen,dimen));
     for (int y = 0, n = 0; y < dimen; y++) {
         for (int x = 0; x < dimen; x++, n++) {
             foo(x,y) = n;
@@ -32,11 +32,11 @@ int main() {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9;
     */
 
-    afwImage::Image<double> kImage(5, 5);
+    afwImage::Image<double> kImage(afwGeom::Extent2I(5, 5));
     afwMath::FixedKernel kernel(kImage);
 
     std::cout << "All data:" << std::endl << test << std::endl << std::endl;
-    afwGeom::goodBBox = kernel.shrinkBBox(foo.getBBox(afwImage::LOCAL));
+    afwGeom::Box2I goodBBox = kernel.shrinkBBox(foo.getBBox(afwImage::LOCAL));
     int startCol = goodBBox.getMinX();
     int startRow = goodBBox.getMinY();
     // endCol/Row is one past the index of the last good col/row
@@ -99,7 +99,7 @@ int main() {
     std::vector<afwGeom::Box2I>::iterator biter = boxArray.begin();
     for (; biter != boxArray.end(); ++biter) {
         int area = (*biter).getWidth() * (*biter).getHeight();
-        afwImage::Image<float> subimage = afwImage::Image<float>(foo, (*biter));
+        afwImage::Image<float> subimage = afwImage::Image<float>(foo, *biter, afwImage::LOCAL);
         Eigen::MatrixXd subeigen = ipDiffim::imageToEigenMatrix(subimage);
         std::cout << area << std::endl;
         std::cout << subeigen << std::endl << std::endl;

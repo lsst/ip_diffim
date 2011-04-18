@@ -1,10 +1,13 @@
 #include <cmath> 
-#include <lsst/afw/math.h>
-#include <lsst/afw/image.h>
-#include <lsst/ip/diffim.h>
 
+#include "lsst/afw/geom.h"
+#include "lsst/afw/math.h"
+#include "lsst/afw/image.h"
+#include "lsst/ip/diffim.h"
+
+namespace afwGeom = lsst::afw::geom;
 namespace afwImage = lsst::afw::image;
-namespace afwMath  = lsst::afw::math;
+namespace afwMath = lsst::afw::math;
 using namespace lsst::ip::diffim;
 
 typedef float PixelT;
@@ -41,7 +44,7 @@ int main() {
     
     unsigned int loc = 50;
     afwImage::MaskedImage<PixelT>::Ptr mimg1(
-        new afwImage::MaskedImage<PixelT>(100,100)
+        new afwImage::MaskedImage<PixelT>(afwGeom::Extent2I(100,100))
         );
     *mimg1->at(loc, loc) = afwImage::MaskedImage<PixelT>::Pixel(1, 0x0, 1);
     afwImage::MaskedImage<PixelT>::Ptr mimg2(

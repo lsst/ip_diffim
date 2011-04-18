@@ -518,18 +518,17 @@ namespace diffim {
         unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
 
         /* Ignore known EDGE pixels for speed */
-        afwGeom::Box2I shrunkBBox = (*kiter)->shrinkBBox(imageToConvolve.getBBox(afwImage::PARENT));
+        afwGeom::Box2I shrunkLocalBBox = (*kiter)->shrinkBBox(imageToConvolve.getBBox(afwImage::LOCAL));
         pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
-                          "Limits of good pixels after convolution: %d,%d -> %d,%d", 
-                          shrunkBBox.getMinX(), shrunkBBox.getMinY(), 
-                          shrunkBBox.getMaxX(), shrunkBBox.getMaxY());
+                          "Limits of good pixels after convolution: %d,%d -> %d,%d (local)", 
+                          shrunkLocalBBox.getMinX(), shrunkLocalBBox.getMinY(), 
+                          shrunkLocalBBox.getMaxX(), shrunkLocalBBox.getMaxY());
 
         /* Subimages are addressed in raw pixel coordinates */
-        shrunkBBox.shift(afwGeom::Extent2I(-imageToConvolve.getX0(), -imageToConvolve.getY0()));
-        unsigned int startCol = shrunkBBox.getMinX();
-        unsigned int startRow = shrunkBBox.getMinY();
-        unsigned int endCol   = shrunkBBox.getMaxX();
-        unsigned int endRow   = shrunkBBox.getMaxY();
+        unsigned int startCol = shrunkLocalBBox.getMinX();
+        unsigned int startRow = shrunkLocalBBox.getMinY();
+        unsigned int endCol   = shrunkLocalBBox.getMaxX();
+        unsigned int endRow   = shrunkLocalBBox.getMaxY();
         /* Needed for Eigen block slicing operation */
         endCol += 1;
         endRow += 1;
@@ -768,10 +767,11 @@ namespace diffim {
 
         /* We need to subtract of XY0 for the pixel access; if I understood XY0
          * better I could design around this but it kills me... */
-        tBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
-        bBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
-        lBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
-        rBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
+        afwGeom::Extent2I shiftAmt = -afwGeom::Extent2I(imageToConvolve.getXY0());
+        tBox.shift(shiftAmt);
+        bBox.shift(shiftAmt);
+        lBox.shift(shiftAmt);
+        rBox.shift(shiftAmt);
 
         std::vector<afwGeom::Box2I> boxArray;
         boxArray.push_back(tBox);
@@ -799,9 +799,9 @@ namespace diffim {
         for (; biter != boxArray.end(); ++biter) {
             int area = (*biter).getWidth() * (*biter).getHeight();
 
-            afwImage::Image<InputT> siToConvolve    = afwImage::Image<InputT>(imageToConvolve, (*biter));
-            afwImage::Image<InputT> siToNotConvolve = afwImage::Image<InputT>(imageToNotConvolve, (*biter));
-            afwImage::Image<InputT> sVarEstimate    = afwImage::Image<InputT>(varianceEstimate, (*biter));
+            afwImage::Image<InputT> siToConvolve(imageToConvolve, *biter, afwImage::LOCAL);
+            afwImage::Image<InputT> siToNotConvolve(imageToNotConvolve, *biter, afwImage::LOCAL);
+            afwImage::Image<InputT> sVarEstimate(varianceEstimate, *biter, afwImage::LOCAL);
 
             Eigen::MatrixXd eToConvolve = imageToEigenMatrix(siToConvolve);
             Eigen::MatrixXd eToNotConvolve = imageToEigenMatrix(siToNotConvolve);
@@ -834,7 +834,7 @@ namespace diffim {
             for (; biter != boxArray.end(); ++biter) {
                 int area = (*biter).getWidth() * (*biter).getHeight();
 
-                afwImage::Image<InputT> csubimage  = afwImage::Image<InputT>(cimage, (*biter));
+                afwImage::Image<InputT> csubimage(cimage, *biter, afwImage::LOCAL);
                 Eigen::MatrixXd esubimage = imageToEigenMatrix(csubimage);
                 esubimage.resize(area, 1);
                 cMat.block(nTerms, 0, area, 1) = esubimage;
