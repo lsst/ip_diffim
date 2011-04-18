@@ -34,13 +34,13 @@ namespace boost {
 %apply double& OUTPUT { double& };
 
 %{
-#include <boost/shared_ptr.hpp>
+#include "boost/shared_ptr.hpp"
 
-#include <lsst/afw/math.h>
-#include <lsst/afw/image.h>
-#include <lsst/afw/detection.h>
+#include "lsst/afw/math.h"
+#include "lsst/afw/image.h"
+#include "lsst/afw/detection.h"
 
-#include <lsst/pex/policy/Policy.h>
+#include "lsst/pex/policy/Policy.h"
 %}
 
 /******************************************************************************/
@@ -49,7 +49,8 @@ namespace boost {
 %{
 #define PY_ARRAY_UNIQUE_SYMBOL LSST_IP_DIFFIM_NUMPY_ARRAY_API
 #include "numpy/arrayobject.h"
-#include "lsst/afw/numpyTypemaps.h"
+#include "lsst/ndarray/python.h"
+#include "lsst/ndarray/python/eigen.h"
 %}
 
 %init %{

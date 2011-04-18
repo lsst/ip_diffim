@@ -4,6 +4,7 @@ import unittest
 import lsst.utils.tests as tests
 
 import eups
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -98,8 +99,8 @@ class DiffimTestCases(unittest.TestCase):
         
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
-            tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
-            ssmi  = afwImage.MaskedImageF(self.smi, bbox)
+            tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
+            ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
         
             # Hotpants centroids go from -1 to 1
             # Only one passes
@@ -162,8 +163,8 @@ class DiffimTestCases(unittest.TestCase):
         
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
-            tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
-            ssmi  = afwImage.MaskedImageF(self.smi, bbox)
+            tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
+            ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
         
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
@@ -219,8 +220,8 @@ class DiffimTestCases(unittest.TestCase):
         
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
-            tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
-            ssmi  = afwImage.MaskedImageF(self.smi, bbox)
+            tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
+            ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
         
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
@@ -317,8 +318,8 @@ class DiffimTestCases(unittest.TestCase):
         
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
-            tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
-            ssmi  = afwImage.MaskedImageF(self.smi, bbox)
+            tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
+            ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
         
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
@@ -380,8 +381,8 @@ class DiffimTestCases(unittest.TestCase):
         
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
-            tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
-            ssmi  = afwImage.MaskedImageF(self.smi, bbox)
+            tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
+            ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
         
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
@@ -469,8 +470,8 @@ class DiffimTestCases(unittest.TestCase):
         
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
-            tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
-            ssmi  = afwImage.MaskedImageF(self.smi, bbox)
+            tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
+            ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
         
             # Hotpants centroids go from -1 to 1
             cand = ipDiffim.makeKernelCandidate( (xC - 0.5 * self.smi.getWidth()) /
@@ -539,8 +540,8 @@ class DiffimTestCases(unittest.TestCase):
         
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
-            tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
-            ssmi  = afwImage.MaskedImageF(self.smi, bbox)
+            tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
+            ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
         
             # Hotpants centroids go from -1 to 1
             cand = ipDiffim.makeKernelCandidate( (xC - 0.5 * self.smi.getWidth()) /
@@ -653,8 +654,8 @@ class DiffimTestCases(unittest.TestCase):
         
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
         
-            tsmi  = afwImage.MaskedImageF(self.tmi, bbox)
-            ssmi  = afwImage.MaskedImageF(self.smi, bbox)
+            tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
+            ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
         
             # Hotpants centroids go from -1 to 1
             cand = ipDiffim.makeKernelCandidate( (xC - 0.5 * self.smi.getWidth()) /

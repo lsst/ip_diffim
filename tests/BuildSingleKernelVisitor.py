@@ -4,6 +4,7 @@ import unittest
 import lsst.utils.tests as tests
 
 import eups
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -23,10 +24,10 @@ class DiffimTestCases(unittest.TestCase):
         self.size = 51
         
     def makeCandidate(self, kSum, x, y):
-        mi1 = afwImage.MaskedImageF(self.size, self.size)
+        mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
         mi1.getVariance().set(0.1) # avoid NaNs
         mi1.set(self.size//2, self.size//2, (1, 0x0, 1))
-        mi2 = afwImage.MaskedImageF(self.size, self.size)
+        mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
         mi2.getVariance().set(0.1) # avoid NaNs
         mi2.set(self.size//2, self.size//2, (kSum, 0x0, 1))
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
@@ -198,10 +199,10 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(len(eigenKernels), 1)
 
         # bogus candidate
-        mi1 = afwImage.MaskedImageF(self.size, self.size)
+        mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
         mi1.getVariance().set(0.1)
         mi1.set(self.size//2, self.size//2, (1, 0x0, 1))
-        mi2 = afwImage.MaskedImageF(self.size, self.size)
+        mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
         mi2.getVariance().set(0.1)
         # make it high enough to make the mean resids large
         mi2.set(self.size//3, self.size//3, (self.size**2, 0x0, 1)) 

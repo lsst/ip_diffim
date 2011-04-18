@@ -144,8 +144,8 @@ class DiffimTestCases(unittest.TestCase):
         self.assertTrue(ksum2 != 1.)
         self.assertTrue(ksum3 != 1.)
         # no constraints on first kernels norm
-        self.assertTrue(num.sum( num.ravel(ipDiffim.vectorFromImage(kimage2))**2 ) != 1.)
-        self.assertTrue(num.sum( num.ravel(ipDiffim.vectorFromImage(kimage3))**2 ) != 1.)
+        self.assertTrue(num.sum(num.ravel(kimage2.getArray())**2 ) != 1.)
+        self.assertTrue(num.sum(num.ravel(kimage3.getArray())**2 ) != 1.)
         basisListIn = afwMath.KernelList()
         basisListIn.push_back(gaussKernel1)
         basisListIn.push_back(gaussKernel2)
@@ -163,8 +163,8 @@ class DiffimTestCases(unittest.TestCase):
         self.assertAlmostEqual(ksum2, 0.)
         self.assertAlmostEqual(ksum3, 0.)
         # no constraints on first kernels norm
-        self.assertAlmostEqual(num.sum( num.ravel(ipDiffim.vectorFromImage(kimage2))**2 ), 1.)
-        self.assertAlmostEqual(num.sum( num.ravel(ipDiffim.vectorFromImage(kimage3))**2 ), 1.)
+        self.assertAlmostEqual(num.sum(num.ravel(kimage2.getArray())**2 ), 1.)
+        self.assertAlmostEqual(num.sum(num.ravel(kimage3.getArray())**2 ), 1.)
 
     #
     ### Regularize

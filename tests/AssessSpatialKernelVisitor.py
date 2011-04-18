@@ -6,6 +6,7 @@ import numpy as num
 import lsst.utils.tests as tests
 
 import eups
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -49,7 +50,7 @@ class DiffimTestCases(unittest.TestCase):
         del self.kList
 
     def testGood(self):
-        ti = afwImage.MaskedImageF(100, 100)
+        ti = afwImage.MaskedImageF(afwGeom.Extent2I(100, 100))
         ti.getVariance().set(0.1)
         ti.set(50, 50, (1., 0x0, 1.))
         sKernel = self.makeSpatialKernel(2)
@@ -58,8 +59,8 @@ class DiffimTestCases(unittest.TestCase):
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(25, 25),
                              afwGeom.Point2I(75, 75))
-        si   = afwImage.MaskedImageF(si, bbox)
-        ti   = afwImage.MaskedImageF(ti, bbox)
+        si   = afwImage.MaskedImageF(si, bbox, afwImage.LOCAL)
+        ti   = afwImage.MaskedImageF(ti, bbox, afwImage.LOCAL)
         kc   = ipDiffim.KernelCandidateF(50., 50., ti, si, self.policy)
 
         sBg      = afwMath.PolynomialFunction2D(1)
@@ -83,7 +84,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(kc.getStatus(), afwMath.SpatialCellCandidate.GOOD)
         
     def testBad(self):
-        ti = afwImage.MaskedImageF(100, 100)
+        ti = afwImage.MaskedImageF(afwGeom.Extent2I(100, 100))
         ti.getVariance().set(0.1)
         ti.set(50, 50, (1., 0x0, 1.))
         sKernel = self.makeSpatialKernel(2)
@@ -92,8 +93,8 @@ class DiffimTestCases(unittest.TestCase):
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(25, 25),
                              afwGeom.Point2I(75, 75))
-        si   = afwImage.MaskedImageF(si, bbox)
-        ti   = afwImage.MaskedImageF(ti, bbox)
+        si   = afwImage.MaskedImageF(si, bbox, afwImage.LOCAL)
+        ti   = afwImage.MaskedImageF(ti, bbox, afwImage.LOCAL)
         kc   = ipDiffim.KernelCandidateF(50., 50., ti, si, self.policy)
 
         badGaussian = afwMath.GaussianFunction2D(1., 1., 0.)
