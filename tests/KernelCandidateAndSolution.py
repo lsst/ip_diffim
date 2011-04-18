@@ -4,6 +4,7 @@ import unittest
 import lsst.utils.tests as tests
 
 import eups
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -46,8 +47,8 @@ class DiffimTestCases(unittest.TestCase):
             size     = 40
             bbox2 = afwGeom.Box2I(afwGeom.Point2I(self.x02 - size, self.y02 - size),
                                   afwGeom.Point2I(self.x02 + size, self.y02 + size))
-            self.scienceImage2  = afwImage.ExposureF(scienceImage, bbox2)
-            self.templateImage2 = afwImage.ExposureF(templateImage, bbox2)
+            self.scienceImage2  = afwImage.ExposureF(scienceImage, bbox2, afwImage.LOCAL)
+            self.templateImage2 = afwImage.ExposureF(templateImage, bbox2, afwImage.LOCAL)
 
     def addNoise(self, mi):
         img       = mi.getImage()
@@ -242,8 +243,8 @@ class DiffimTestCases(unittest.TestCase):
 
         bbox = gaussKernel.shrinkBBox(smi.getBBox(afwImage.LOCAL))
 
-        tmi2 = afwImage.MaskedImageF(self.templateImage2.getMaskedImage(), bbox)
-        smi2 = afwImage.MaskedImageF(smi, bbox)
+        tmi2 = afwImage.MaskedImageF(self.templateImage2.getMaskedImage(), bbox, afwImage.LOCAL)
+        smi2 = afwImage.MaskedImageF(smi, bbox, afwImage.LOCAL)
 
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
         self.policy.set("kernelBasisSet", "delta-function")
@@ -326,8 +327,8 @@ class DiffimTestCases(unittest.TestCase):
         # grab only the non-masked subregion
         bbox = gaussKernel.shrinkBBox(smi.getBBox(afwImage.LOCAL))
 
-        tmi2 = afwImage.MaskedImageF(tmi, bbox)
-        smi2 = afwImage.MaskedImageF(smi, bbox)
+        tmi2 = afwImage.MaskedImageF(tmi, bbox, afwImage.LOCAL)
+        smi2 = afwImage.MaskedImageF(smi, bbox, afwImage.LOCAL)
 
         # make sure its a valid subregion!
         for j in range(tmi2.getHeight()):

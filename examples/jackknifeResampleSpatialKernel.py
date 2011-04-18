@@ -6,6 +6,7 @@ import unittest
 import lsst.utils.tests as tests
  
 import eups
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -64,7 +65,7 @@ class DiffimTestCases(unittest.TestCase):
                                                                               self.dStats.getRms()))
 
         
-        diffim2 = afwImage.MaskedImageF(diffim, bbox)
+        diffim2 = afwImage.MaskedImageF(diffim, bbox, afwImage.LOCAL)
         self.dStats.apply(diffim2)
         pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
                      "Candidate %d : Residuals core (%d px): %.3f +/- %.3f" % (cid,

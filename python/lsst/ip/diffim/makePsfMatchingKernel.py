@@ -47,8 +47,8 @@ def psfMatchImageToImage(maskedImageToConvolve,
         bbox.shift(-maskedImageToConvolve.getX0(),
                    -maskedImageToConvolve.getY0())
         
-        tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox)
-        smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox)
+        tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox, afwImage.LOCAL)
+        smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox, afwImage.LOCAL)
 
         cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, policy)
 
@@ -256,7 +256,7 @@ def psfMatchImageToModel(maskedImageToConvolve,
         bbox = fp.getBBox()
         xC   = 0.5 * (bbox.getMinX() + bbox.getMaxX())
         yC   = 0.5 * (bbox.getMinY() + bbox.getMaxY())
-        tmi  = afwImage.MaskedImageF(maskedImageToConvolve,  bbox)
+        tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox, afwImage.LOCAL)
 
         # Find object flux so we can center the Gaussian
         #phot  = photometer.apply(maskedImageToConvolve, xC, yC, psf, 0.0)

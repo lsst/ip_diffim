@@ -6,6 +6,7 @@ import unittest
 import lsst.utils.tests as tests
 
 import eups
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -61,8 +62,8 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
-        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
         try:
             ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy, doWarping = False)
         except Exception, e:
@@ -75,8 +76,8 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
         self.policy.set('fitForBackground', False)
-        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
         try:
             ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy)
         except Exception, e:
@@ -89,8 +90,8 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
-        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
 
         # Have an XY0
         results1 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,

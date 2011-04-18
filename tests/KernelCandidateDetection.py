@@ -58,8 +58,8 @@ class DiffimTestCases(unittest.TestCase):
 
         for fp in fpList1:
             bbox = fp.getBBox()
-            tmi  = afwImage.MaskedImageF(self.templateImage, bbox)
-            smi  = afwImage.MaskedImageF(self.scienceImage, bbox)
+            tmi  = afwImage.MaskedImageF(self.templateImage, bbox, afwImage.LOCAL)
+            smi  = afwImage.MaskedImageF(self.scienceImage, bbox, afwImage.LOCAL)
             tmask = tmi.getMask()
             smask = smi.getMask()
 

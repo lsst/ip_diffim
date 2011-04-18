@@ -2,6 +2,7 @@
 import diffimLib
 
 # all the other LSST packages
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
@@ -240,8 +241,8 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
             p1 = afwGeom.Point2I(xCoord + stampHalfWidth,
                                  yCoord + stampHalfWidth)
             bbox = afwGeom.Box2I(p0, p1)
-            tsi = afwImage.MaskedImageF(tMi, bbox)
-            ssi = afwImage.MaskedImageF(sMi, bbox)
+            tsi = afwImage.MaskedImageF(tMi, bbox, afwImage.LOCAL)
+            ssi = afwImage.MaskedImageF(sMi, bbox, afwImage.LOCAL)
 
             kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policy)
             kernelCellSet.insertCandidate(kc)

@@ -6,6 +6,7 @@ import unittest
 import lsst.utils.tests as tests
 
 import eups
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -133,7 +134,7 @@ class DiffimTestCases(unittest.TestCase):
         bg     = kc.getBackground(ipDiffim.KernelCandidateF.RECENT)
 
         bbox = kc.getKernel(ipDiffim.KernelCandidateF.RECENT).shrinkBBox(diffim.getBBox(afwImage.LOCAL))
-        diffIm = afwImage.MaskedImageF(diffIm, bbox)
+        diffIm = afwImage.MaskedImageF(diffIm, bbox, afwImage.LOCAL)
         self.dStats.apply(diffIm)
         
         dmean = afwMath.makeStatistics(diffIm.getImage(),    afwMath.MEAN).getValue()
@@ -158,11 +159,11 @@ class DiffimTestCases(unittest.TestCase):
         # sometimes the box goes off the image; no big deal...
         try:
             if invert:
-                tmi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(),  bbox)
-                smi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox)
+                tmi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(), bbox, afwImage.LOCAL)
+                smi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox, afwImage.LOCAL)
             else:
-                smi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(),  bbox)
-                tmi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox)
+                smi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(), bbox, afwImage.LOCAL)
+                tmi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox, afwImage.LOCAL)
         except Exception, e:
             return None
 

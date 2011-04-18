@@ -2,6 +2,7 @@
 import unittest
 import lsst.utils.tests as tests
 import lsst.ip.diffim as ipDiffim
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import eups
 import os
@@ -73,8 +74,8 @@ class DiffimTestCases(unittest.TestCase):
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(7, 900),
                              afwGeom.Point2I(102, 1000))
-        templateSubImage = afwImage.ExposureF(self.templateImage, bbox)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, bbox)
+        templateSubImage = afwImage.ExposureF(self.templateImage, bbox, afwImage.LOCAL)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, bbox, afwImage.LOCAL)
 
         # image 1 gets remapped to match up with image 2
         remappedImage = ipDiffim.warpTemplateExposure(templateSubImage,

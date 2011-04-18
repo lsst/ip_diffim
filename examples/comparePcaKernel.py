@@ -2,6 +2,7 @@
 import os
 import sys
 import eups
+import lsst.afw.geom as afwGeom
 import lsst.afw.image.imageLib as afwImage
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLogging
@@ -21,8 +22,8 @@ if len(sys.argv) == 1:
     templateMaskedImage = afwImage.MaskedImageF(defTemplatePath)
     scienceMaskedImage  = afwImage.MaskedImageF(defSciencePath)
     bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(512, 512))
-    templateMaskedImage = afwImage.MaskedImageF(templateMaskedImage, bbox)
-    scienceMaskedImage  = afwImage.MaskedImageF(scienceMaskedImage, bbox)
+    templateMaskedImage = afwImage.MaskedImageF(templateMaskedImage, bbox, afwImage.LOCAL)
+    scienceMaskedImage  = afwImage.MaskedImageF(scienceMaskedImage, bbox, afwImage.LOCAL)
     
 elif len(sys.argv) == 3:
     defTemplatePath = sys.argv[1]

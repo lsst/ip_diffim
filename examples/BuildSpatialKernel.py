@@ -174,14 +174,14 @@ class DiffimTestCases(unittest.TestCase):
                         if cand1.getId() == cand2.getId():
                             continue
 
-                        diffim = cand2.getDifferenceImage(kernel1, 0.0)
-                        itcv   = cand2.getMiToConvolvePtr().getVariance()
-                        itncv  = cand2.getMiToNotConvolvePtr().getVariance()
+                        diffimFull = cand2.getDifferenceImage(kernel1, 0.0)
+                        itcvFull   = cand2.getMiToConvolvePtr().getVariance()
+                        itncvFull  = cand2.getMiToNotConvolvePtr().getVariance()
 
                         bbox = kernel1.shrinkBBox(diffim.getBBox(afwImage.LOCAL))
-                        diffim = afwImage.MaskedImageF(diffim, bbox)
-                        itcv   = afwImage.ImageF(itcv, bbox)
-                        itncv  = afwImage.ImageF(itncv, bbox)
+                        diffim = afwImage.MaskedImageF(diffimFull, bbox, afwImage.LOCAL)
+                        itcv   = afwImage.ImageF(itcvFull, bbox)
+                        itncv  = afwImage.ImageF(itncvFull, bbox)
                 
                         pval   = diffimTools.vectorFromImage(diffim.getImage())
                         vval   = diffimTools.vectorFromImage(diffim.getVariance())
@@ -221,7 +221,7 @@ class DiffimTestCases(unittest.TestCase):
                 
                 
                 bbox = kernel.shrinkBBox(diffim.getBBox(afwImage.LOCAL))
-                diffim = afwImage.MaskedImageF(diffim, bbox)
+                diffim = afwImage.MaskedImageF(diffim, bbox, afwImage.LOCAL)
                 itcv   = afwImage.ImageF(itcv, bbox)
                 itncv  = afwImage.ImageF(itncv, bbox)
                 
