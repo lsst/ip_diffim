@@ -461,7 +461,7 @@ def displayFootprints(image, footprintList, frame):
     #for fp in footprintList:
     #    bboxes = afwDetection.footprintToBBoxList(fp)
     #    for bbox in bboxes:
-    #        bbox.shift(-image.getX0(),-image.getY0())
+    #        bbox.shift(-afwGeom.Extent2I(image.getXY0()))
     #        
     #        x0, y0, x1, y1 = bbox.getMinX(), bbox.getMinY(), bbox.getMaxX(), bbox.getMaxY()
     #        

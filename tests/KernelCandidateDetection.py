@@ -70,20 +70,17 @@ class DiffimTestCases(unittest.TestCase):
                     self.assertEqual(smask.get(i, j), 0)
 
         # add a masked pixel to the template image and make sure you don't get it
-        afwImage.MaskedImageF(self.templateImage, fpList1[0].getBBox()).getMask().set(tmask.getWidth()//2,
-                                                                                      tmask.getHeight()//2,
-                                                                                      0x1)
+        afwImage.MaskedImageF(self.templateImage, fpList1[0].getBBox(), afwImage.LOCAL).getMask().set(
+            tmask.getWidth()//2, tmask.getHeight()//2, 0x1)
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList2 = kcDetect.getFootprints()
         self.assertTrue(len(fpList2) == (len(fpList1)-1))
 
         # add a masked pixel to the science image and make sure you don't get it
-        afwImage.MaskedImageF(self.scienceImage, fpList1[1].getBBox()).getMask().set(smask.getWidth()//2,
-                                                                                     smask.getHeight()//2,
-                                                                                     0x1)
-        afwImage.MaskedImageF(self.scienceImage, fpList1[2].getBBox()).getMask().set(smask.getWidth()//2,
-                                                                                     smask.getHeight()//2,
-                                                                                     0x1)
+        afwImage.MaskedImageF(self.scienceImage, fpList1[1].getBBox(), afwImage.LOCAL).getMask().set(
+            smask.getWidth()//2, smask.getHeight()//2, 0x1)
+        afwImage.MaskedImageF(self.scienceImage, fpList1[2].getBBox(), afwImage.LOCAL).getMask().set(
+            smask.getWidth()//2, smask.getHeight()//2, 0x1)
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList3 = kcDetect.getFootprints()
         self.assertTrue(len(fpList3) == (len(fpList1)-3))

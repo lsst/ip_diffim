@@ -44,8 +44,7 @@ def psfMatchImageToImage(maskedImageToConvolve,
 
         # Since the footprint is in the parent's coordinate system,
         # while the BBox uses the child's coordinate system.
-        bbox.shift(-maskedImageToConvolve.getX0(),
-                   -maskedImageToConvolve.getY0())
+        bbox.shift(-afwGeom.Extent2I(maskedImageToConvolve.getXY0()))
         
         tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox, afwImage.LOCAL)
         smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox, afwImage.LOCAL)
@@ -270,7 +269,7 @@ def psfMatchImageToModel(maskedImageToConvolve,
         dy    = cen.getY() - yC
 
         # Evaluate the gaussian slightly shifted
-        kImageG = afwImage.ImageF(tmi.getWidth(), tmi.getHeight())
+        kImageG = afwImage.ImageF(tmi.getDimensions())
         for y in range(tmi.getHeight()):
             yg = tmi.getHeight()//2 - y
             

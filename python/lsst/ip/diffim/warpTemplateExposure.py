@@ -1,4 +1,5 @@
 import time
+import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.pex.logging as pexLog
 
@@ -12,12 +13,8 @@ def warpTemplateExposure(templateExposure, scienceExposure, policy):
 
     # create a blank exposure to hold the remapped template exposure
     remappedTemplateExposure = templateExposure.Factory(
-        scienceExposure.getWidth(), 
-        scienceExposure.getHeight(),
+        scienceExposure.getBBox(afwImage.PARENT), 
         scienceExposure.getWcs())
-    scienceMaskedImage = scienceExposure.getMaskedImage()
-    remappedMaskedImage = remappedTemplateExposure.getMaskedImage()
-    remappedMaskedImage.setXY0(scienceMaskedImage.getXY0())
 
     # warp the template exposure
     afwMath.warpExposure(remappedTemplateExposure, 
