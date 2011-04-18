@@ -234,11 +234,11 @@ class DiffimTestCases(unittest.TestCase):
         gsize = self.policy.getInt("kernelSize")
         gaussFunction = afwMath.GaussianFunction2D(2, 3)
         gaussKernel   = afwMath.AnalyticKernel(gsize, gsize, gaussFunction)
-        kImageIn      = afwImage.ImageD(gsize, gsize)
+        kImageIn      = afwImage.ImageD(afwGeom.Extent2I(gsize, gsize))
         kSumIn        = gaussKernel.computeImage(kImageIn, False)
 
         imX, imY = self.templateImage2.getMaskedImage().getDimensions()
-        smi = afwImage.MaskedImageF(imX, imY)
+        smi = afwImage.MaskedImageF(afwGeom.Extent2I(imX, imY))
         afwMath.convolve(smi, self.templateImage2.getMaskedImage(), gaussKernel, False)
 
         bbox = gaussKernel.shrinkBBox(smi.getBBox(afwImage.LOCAL))
@@ -308,11 +308,11 @@ class DiffimTestCases(unittest.TestCase):
 
         gaussFunction = afwMath.GaussianFunction2D(2, 3)
         gaussKernel   = afwMath.AnalyticKernel(gsize, gsize, gaussFunction)
-        kImageIn      = afwImage.ImageD(gsize, gsize)
+        kImageIn      = afwImage.ImageD(afwGeom.Extent2I(gsize, gsize))
         gaussKernel.computeImage(kImageIn, False)
 
         # template image with a single hot pixel in the exact center
-        tmi = afwImage.MaskedImageF(tsize, tsize)
+        tmi = afwImage.MaskedImageF(afwGeom.Extent2I(tsize, tsize))
         tmi.set(0, 0x0, 1e-4)
         cpix = tsize // 2
         tmi.set(cpix, cpix, (1, 0x0, 1))
@@ -360,14 +360,14 @@ class DiffimTestCases(unittest.TestCase):
         self.testGaussianWithNoise()
 
     def testInsert(self):
-        mi = afwImage.MaskedImageF(10, 10)
+        mi = afwImage.MaskedImageF(afwGeom.Extent2I(10, 10))
         kc = ipDiffim.makeKernelCandidate(0., 0., mi, mi, self.policy)
         kc.setStatus(afwMath.SpatialCellCandidate.GOOD)
         
         sizeCellX = self.policy.get("sizeCellX")
         sizeCellY = self.policy.get("sizeCellY")
-        kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0)),
-                                                             afwGeom.Extent2I(sizeCellX, sizeCellY))
+        kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(1, 1)),
+                                               sizeCellX, sizeCellY)
         kernelCellSet.insertCandidate(kc)
         nSeen = 0
         for cell in kernelCellSet.getCellList():

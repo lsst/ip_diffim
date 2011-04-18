@@ -99,8 +99,8 @@ class DiffimTestCases(unittest.TestCase):
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 
         # And then take away XY0
-        templateSubImage.setXY0(0, 0) # do it to the exposure so the Wcs gets modified too
-        scienceSubImage.setXY0(0, 0)
+        templateSubImage.setXY0(afwGeom.Point2I(0, 0)) # do it to the exposure so the Wcs gets modified too
+        scienceSubImage.setXY0(afwGeom.Point2I(0, 0))
         results2 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
                                               display=display, frame=3)
         differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
