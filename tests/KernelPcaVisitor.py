@@ -6,6 +6,7 @@ import lsst.utils.tests as tests
 import eups
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.afw.geom as afwGeom
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
 
@@ -24,10 +25,10 @@ class DiffimTestCases(unittest.TestCase):
         del self.kList
 
     def makeCandidate(self, kSum, x, y, size = 51):
-        mi1 = afwImage.MaskedImageF(size, size)
+        mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
         mi1.getVariance().set(0.1) # avoid NaNs
         mi1.set(size//2, size//2, (1, 0x0, 1))
-        mi2 = afwImage.MaskedImageF(size, size)
+        mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
         mi2.getVariance().set(0.1) # avoid NaNs
         mi2.set(size//2, size//2, (kSum, 0x0, 1))
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
