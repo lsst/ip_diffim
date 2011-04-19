@@ -42,12 +42,8 @@ def psfMatchImageToImage(maskedImageToConvolve,
         xC   = 0.5 * ( bbox.getMinX() + bbox.getMaxX() )
         yC   = 0.5 * ( bbox.getMinY() + bbox.getMaxY() )
 
-        # Since the footprint is in the parent's coordinate system,
-        # while the BBox uses the child's coordinate system.
-        bbox.shift(-afwGeom.Extent2I(maskedImageToConvolve.getXY0()))
-        
-        tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox, afwImage.LOCAL)
-        smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox, afwImage.LOCAL)
+        tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox, afwImage.PARENT)
+        smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox, afwImage.PARENT)
 
         cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, policy)
 

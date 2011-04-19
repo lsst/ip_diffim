@@ -765,14 +765,6 @@ namespace diffim {
                           "Right good pixel region: %d,%d -> %d,%d", 
                           rBox.getMinX(), rBox.getMinY(), rBox.getMaxX(), rBox.getMaxY());
 
-        /* We need to subtract of XY0 for the pixel access; if I understood XY0
-         * better I could design around this but it kills me... */
-        afwGeom::Extent2I shiftAmt = -afwGeom::Extent2I(imageToConvolve.getXY0());
-        tBox.shift(shiftAmt);
-        bBox.shift(shiftAmt);
-        lBox.shift(shiftAmt);
-        rBox.shift(shiftAmt);
-
         std::vector<afwGeom::Box2I> boxArray;
         boxArray.push_back(tBox);
         boxArray.push_back(bBox);
@@ -799,9 +791,9 @@ namespace diffim {
         for (; biter != boxArray.end(); ++biter) {
             int area = (*biter).getWidth() * (*biter).getHeight();
 
-            afwImage::Image<InputT> siToConvolve(imageToConvolve, *biter, afwImage::LOCAL);
-            afwImage::Image<InputT> siToNotConvolve(imageToNotConvolve, *biter, afwImage::LOCAL);
-            afwImage::Image<InputT> sVarEstimate(varianceEstimate, *biter, afwImage::LOCAL);
+            afwImage::Image<InputT> siToConvolve(imageToConvolve, *biter, afwImage::PARENT);
+            afwImage::Image<InputT> siToNotConvolve(imageToNotConvolve, *biter, afwImage::PARENT);
+            afwImage::Image<InputT> sVarEstimate(varianceEstimate, *biter, afwImage::PARENT);
 
             Eigen::MatrixXd eToConvolve = imageToEigenMatrix(siToConvolve);
             Eigen::MatrixXd eToNotConvolve = imageToEigenMatrix(siToNotConvolve);

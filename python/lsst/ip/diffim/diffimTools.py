@@ -457,6 +457,8 @@ def displayFootprints(image, footprintList, frame):
 
     ds9.mtv(image, frame=frame)
 
+    # ANOTHER WAY TO DO IT
+    #
     #ds9.mtv(image, frame=frame)
     #for fp in footprintList:
     #    bboxes = afwDetection.footprintToBBoxList(fp)

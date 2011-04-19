@@ -217,10 +217,7 @@ namespace diffim {
         afwDetect::Footprint::Ptr fpGrow = 
             afwDetect::growFootprint(fp, fpGrowPix, false);
         
-        /* Next we look at the image within this Footprint.  To do this we
-         * create a subimage using a bounding box.  When this happens, the bounding box
-         * addresses the image in its own coordinate system, not the parent
-         * coordinate system.  Therefore you need to shift the bounding box by its XY0.
+        /* Next we look at the image within this Footprint.  
          */
         afwGeom::Box2I fpGrowBBox = fpGrow->getBBox();
         pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
@@ -230,22 +227,10 @@ namespace diffim {
                           int(0.5 * (fpGrowBBox.getMinY() + fpGrowBBox.getMaxY())),
                           fpGrowBBox.getMaxX(), fpGrowBBox.getMaxY());
 
-        fpGrowBBox.shift(-afwGeom::Extent2I(miToConvolvePtr->getXY0()));
-        pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                          "Grown footprint in image : %d,%d -> %d,%d -> %d,%d",
-                          fpGrowBBox.getMinX(), fpGrowBBox.getMinY(), 
-                          int(0.5 * (fpGrowBBox.getMinX() + fpGrowBBox.getMaxX())),
-                          int(0.5 * (fpGrowBBox.getMinY() + fpGrowBBox.getMaxY())),
-                          fpGrowBBox.getMaxX(), fpGrowBBox.getMaxY());
-
         /* Failure Condition 2) 
          * Grown off the image
          */
-        bool belowOriginX = fpGrowBBox.getMinX() < 0;
-        bool belowOriginY = fpGrowBBox.getMinY() < 0;
-        bool offImageX    = fpGrowBBox.getMaxX() > (miToConvolvePtr->getWidth() - 1);
-        bool offImageY    = fpGrowBBox.getMaxY() > (miToConvolvePtr->getHeight() - 1);
-        if (belowOriginX || belowOriginY || offImageX || offImageY) {
+        if (!(miToConvolvePtr->getBBox(afwImage::PARENT).contains(fpGrowBBox))) {
             pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                               "Footprint grown off image"); 
 
@@ -260,8 +245,10 @@ namespace diffim {
         /* Grab subimages; report any exception */
         bool subimageHasFailed = false;
         try {
-            afwImage::MaskedImage<PixelT> subImageToConvolve(*miToConvolvePtr, fpGrowBBox, afwImage::LOCAL);
-            afwImage::MaskedImage<PixelT> subImageToNotConvolve(*miToNotConvolvePtr, fpGrowBBox, afwImage::LOCAL);
+            afwImage::MaskedImage<PixelT> subImageToConvolve(*miToConvolvePtr, fpGrowBBox, 
+                                                             afwImage::PARENT);
+            afwImage::MaskedImage<PixelT> subImageToNotConvolve(*miToNotConvolvePtr, fpGrowBBox, 
+                                                                afwImage::PARENT);
             
             // Search for any masked pixels within the footprint
             fsb.apply(*(subImageToConvolve.getMask()));
