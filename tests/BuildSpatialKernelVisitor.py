@@ -41,8 +41,13 @@ class DiffimTestCases(unittest.TestCase):
         return kc
 
     def testNoBg(self):
+        self.runNoBg(0)
+        self.runNoBg(1)
+        self.runNoBg(2)
+
+    def runNoBg(self, sko):
         self.policy.set('kernelBasisSet', 'alard-lupton')
-        self.policy.set('spatialKernelOrder', 1)
+        self.policy.set('spatialKernelOrder', sko)
         self.policy.set('fitForBackground', False)
         basisList = ipDiffim.makeKernelBasisList(self.policy)
 
@@ -58,6 +63,32 @@ class DiffimTestCases(unittest.TestCase):
         bspkv.solveLinearEquation()
         sk, sb = bspkv.getSolutionPair()
 
+        # Kernel
+        if sko == 0:
+            # Specialization for speedup
+            spatialKernelSolution = sk.getKernelParameters()
+
+            # One term for each basis function
+            self.assertEqual(len(spatialKernelSolution), len(basisList))
+            
+        else:
+            spatialKernelSolution = sk.getSpatialParameters()
+
+            nSpatialTerms = int(0.5 * (sko + 1) * (sko + 2))
+            # One model for each basis function
+            self.assertEqual(len(spatialKernelSolution), len(basisList))
+            # First basis has no spatial variation
+            for i in range(1, nSpatialTerms):
+                self.assertEqual(spatialKernelSolution[0][i], 0.)
+            # All bases have correct number of terms
+            for i in range(len(spatialKernelSolution)):
+                self.assertEqual(len(spatialKernelSolution[i]), nSpatialTerms)
+
+        # Background
+        spatialBgSolution = sb.getParameters()
+        nBgTerms = 1
+        self.assertEqual(len(spatialBgSolution), nBgTerms)
+
     def testAlSpatialModel(self):
         self.runAlSpatialModel(0, 0)
         self.runAlSpatialModel(1, 0)
@@ -69,6 +100,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('kernelBasisSet', 'alard-lupton')
         self.policy.set('spatialKernelOrder', sko)
         self.policy.set('spatialBgOrder', bgo)
+        self.policy.set('fitForBackground', True)
         basisList = ipDiffim.makeKernelBasisList(self.policy)
 
         bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
