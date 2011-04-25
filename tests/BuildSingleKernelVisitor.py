@@ -16,10 +16,11 @@ import lsst.afw.display.ds9 as ds9
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy()
+        self.policy = ipDiffim.makeDefaultPolicy()
         self.policy.set("kernelBasisSet", "delta-function")
         self.policy.set("useRegularization", False)
         self.policy.set("checkConditionNumber", False) # I am making shady kernels by hand
+        self.policy.set("useCoreStats", False) # I am making off-center resids
         self.kList = ipDiffim.makeKernelBasisList(self.policy)
         self.size = 51
         

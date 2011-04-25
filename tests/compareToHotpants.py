@@ -15,7 +15,7 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy()
+        self.policy = ipDiffim.makeDefaultPolicy()
         self.policy.set("checkConditionNumber", False) # these images have been hand-constructed
         self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
         self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')

@@ -24,8 +24,8 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy()
-        self.size   = 50
+        self.policy = ipDiffim.makeDefaultPolicy()
+        self.size   = 51
 
     def tearDown(self):
         del self.policy

@@ -17,7 +17,7 @@ logging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy()
+        self.policy = ipDiffim.makeDefaultPolicy()
         self.kSize  = self.policy.getInt("kernelSize")
 
     def tearDown(self):

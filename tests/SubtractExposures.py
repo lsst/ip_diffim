@@ -24,7 +24,7 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.policy       = ipDiffim.createDefaultPolicy()
+        self.policy       = ipDiffim.makeDefaultPolicy()
         
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:

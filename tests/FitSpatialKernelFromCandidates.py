@@ -16,7 +16,7 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 7)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy()
+        self.policy = ipDiffim.makeDefaultPolicy()
         self.policy.set("checkConditionNumber", False) # these images have been hand-constructed
         self.size   = 30
         self.policy.set("sizeCellX", self.size//3)
