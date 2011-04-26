@@ -465,7 +465,7 @@ definitions: {
                       if you are doing any deconvolution you will want to turn this off, or use
                       a large maxConditionNumber"
         maxOccurs: 1
-        default: true
+        default: false
     }
 
     maxConditionNumber: {

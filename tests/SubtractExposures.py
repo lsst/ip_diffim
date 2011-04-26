@@ -13,7 +13,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
 import lsst.ip.diffim.diffimTools as diffimTools
 
-verbosity = 3
+verbosity = 5
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 display = False
@@ -54,7 +54,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('spatialKernelOrder', 1)
         self.policy.set('spatialBgOrder', 0) # already bg-subtracted
         self.policy.set('usePcaForSpatialKernel', False)
-        self.runXY0()
+        self.runXY0(fitForBackground = True)
+        self.runXY0(fitForBackground = False)
 
     def testWarping(self):
         # Should fail since images are not aligned
@@ -86,10 +87,12 @@ class DiffimTestCases(unittest.TestCase):
         else:
             pass
 
-    def runXY0(self):
+    def runXY0(self, fitForBackground):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
+
+        self.policy.set('fitForBackground', fitForBackground)
 
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
@@ -117,6 +120,8 @@ class DiffimTestCases(unittest.TestCase):
         for cell in kernelCellSet1.getCellList():
             for cand1 in cell.begin(False):
                 if cand1.getStatus() == afwMath.SpatialCellCandidate.UNKNOWN:
+                    continue
+                if cand1.getStatus() == afwMath.SpatialCellCandidate.BAD:
                     continue
                 
                 cand1 = ipDiffim.cast_KernelCandidateF(cand1)

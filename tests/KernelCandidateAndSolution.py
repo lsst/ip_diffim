@@ -19,7 +19,9 @@ class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
         self.policy = ipDiffim.makeDefaultPolicy()
-        
+        self.policy.set('fitForBackground', True) # we are testing known background recovery here
+        self.policy.set('checkConditionNumber', False) # just in case
+
         # known input images
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
