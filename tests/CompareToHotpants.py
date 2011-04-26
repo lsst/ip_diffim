@@ -17,6 +17,7 @@ class DiffimTestCases(unittest.TestCase):
     def setUp(self):
         self.policy = ipDiffim.makeDefaultPolicy()
         self.policy.set("checkConditionNumber", False) # these images have been hand-constructed
+        self.policy.set("fitForBackground", True) # and hotpants subtracts background
         self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
         self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')
         self.smi.setXY0(0,0)
