@@ -43,6 +43,7 @@ policy.set("spatialKernelClipping", False)
 policy.set("spatialKernelOrder", 0)
 policy.set("spatialBgOrder", 0)
 policy.set("usePcaForSpatialKernel", True)
+policy.set("fitForBackground", True)
 
 
 kcDetect = ipDiffim.KernelCandidateDetectionF(policy.getPolicy("detectionPolicy"))

@@ -189,7 +189,7 @@ fitSpatialKernelFromCandidates(
                 std::vector<double> eigenValues               = imagePca.getEigenValues();
                 afwMath::KernelList basisListRaw              = importStarVisitor.getEigenKernels();
 
-                if (false) {
+                if (true) {
                     afwImage::Image<afwMath::Kernel::Pixel> img =
                         afwImage::Image<afwMath::Kernel::Pixel>
                         (*(importStarVisitor.returnMean()), true);

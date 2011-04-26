@@ -18,6 +18,7 @@ class DiffimTestCases(unittest.TestCase):
     def setUp(self):
         self.policy = ipDiffim.makeDefaultPolicy()
         self.policy.set("checkConditionNumber", False) # these images have been hand-constructed
+        self.policy.set("fitForBackground", True)      # with background testing
         self.size   = 30
         self.policy.set("sizeCellX", self.size//3)
         self.policy.set("sizeCellY", self.size//3)
@@ -54,6 +55,7 @@ class DiffimTestCases(unittest.TestCase):
     def testAlardLupton(self):
         #self.runAlardLupton(0, 0)
         #self.runAlardLupton(1, 1)
+
         #self.runAlardLuptonPca(False)
         self.runAlardLuptonPca(True)
 
@@ -113,14 +115,12 @@ class DiffimTestCases(unittest.TestCase):
                 cand = self.makeCandidate(1.0, x, y)
                 self.kernelCellSet.insertCandidate(cand)
                 count += 1
-        #if subtractMean:
-        #    # all the components are the same!  just keep mean and first component
-        #    self.policy.set('numPrincipalComponents', 2)
-        #else:
-        #    self.policy.set('numPrincipalComponents', count)
+        if subtractMean:
+            # all the components are the same!  just keep mean and first component
+            self.policy.set('numPrincipalComponents', 2)
+        else:
+            self.policy.set('numPrincipalComponents', count)
             
-        self.policy.set('numPrincipalComponents', count)
-
         result = ipDiffim.fitSpatialKernelFromCandidates(self.kernelCellSet, self.policy)
         sk = result.first
         sb = result.second

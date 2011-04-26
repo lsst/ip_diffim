@@ -101,7 +101,7 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
 
     # Make a fake image with a matrix of delta functions
     totalSize = nCell * sizeCell + 2 * border
-    tim       = afwImage.ImageF(totalSize, totalSize)
+    tim       = afwImage.ImageF(afwGeom.Extent2I(totalSize, totalSize))
     for x in range(nCell):
         for y in range(nCell):
             tim.set(x * sizeCell + sizeCell // 2 + border - 1,
@@ -117,7 +117,7 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
 
     # Trim off border pixels
     bbox = gaussKernel.shrinkBBox(tim.getBBox(afwImage.LOCAL))
-    tim      = afwImage.ImageF(tim, bbox)
+    tim      = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
     # An estimate of its variance is itself
     tvar     = afwImage.ImageF(tim, True)
     # No mask
@@ -173,14 +173,14 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
         #tim  += tnoi
 
     # And turn into MaskedImages
-    sim   = afwImage.ImageF(cim, bbox)
-    svar  = afwImage.ImageF(svar, bbox)
-    smask = afwImage.MaskU(smask, bbox)
+    sim   = afwImage.ImageF(cim, bbox, afwImage.LOCAL)
+    svar  = afwImage.ImageF(svar, bbox, afwImage.LOCAL)
+    smask = afwImage.MaskU(smask, bbox, afwImage.LOCAL)
     sMi   = afwImage.MaskedImageF(sim, smask, svar)
     
-    tim   = afwImage.ImageF(tim, bbox)
-    tvar  = afwImage.ImageF(tvar, bbox)
-    tmask = afwImage.MaskU(tmask, bbox)
+    tim   = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
+    tvar  = afwImage.ImageF(tvar, bbox, afwImage.LOCAL)
+    tmask = afwImage.MaskU(tmask, bbox, afwImage.LOCAL)
     tMi   = afwImage.MaskedImageF(tim, tmask, tvar)
 
     sMi.writeFits('science.fits')

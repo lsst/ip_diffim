@@ -18,7 +18,7 @@ import lsst.afw.display.ds9 as ds9
 verbosity = 7
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
-display = False
+display = True
 writefits = False
 
 # This one compares DeltaFunction and AlardLupton kernels
@@ -39,35 +39,39 @@ class DiffimTestCases(unittest.TestCase):
         self.policy1.set("fitForBackground", False)
         self.kList1 = ipDiffim.makeKernelBasisList(self.policy1)
         self.bskv1  = ipDiffim.BuildSingleKernelVisitorF(self.kList1, self.policy1)
+
+        lambdaVal = 1.0
         
         self.policy2.set("kernelBasisSet", "delta-function")
         self.policy2.set("useRegularization", True)
-        self.policy2.set("lambdaType", "absolute")
-        self.policy2.set("lambdaValue", 1.0)
-        self.policy2.set("regularizationType", "centralDifference")
-        self.policy2.set("centralRegularizationStencil", 9)
         self.policy2.set("fitForBackground", False)
+        self.policy2.set("lambdaType", "absolute")
+        self.policy2.set("lambdaValue", lambdaVal)
+        self.policy2.set("regularizationType", "centralDifference")
+        self.policy2.set("centralRegularizationStencil", 5)
         self.kList2 = ipDiffim.makeKernelBasisList(self.policy2)
         self.hMat2  = ipDiffim.makeRegularizationMatrix(self.policy2)
         self.bskv2  = ipDiffim.BuildSingleKernelVisitorF(self.kList2, self.policy2, self.hMat2)
 
         self.policy3.set("kernelBasisSet", "delta-function")
         self.policy3.set("useRegularization", True)
-        self.policy3.set("lambdaType", "minimizeBiasedRisk")
-        self.policy3.set("regularizationConditionTolerance", 1.e5)
+        self.policy3.set("fitForBackground", False)
+        self.policy3.set("lambdaType", "absolute")
+        self.policy3.set("lambdaValue", lambdaVal)
         self.policy3.set("regularizationType", "centralDifference")
         self.policy3.set("centralRegularizationStencil", 9)
-        self.policy3.set("fitForBackground", False)
         self.kList3 = ipDiffim.makeKernelBasisList(self.policy3)
         self.hMat3  = ipDiffim.makeRegularizationMatrix(self.policy3)
         self.bskv3  = ipDiffim.BuildSingleKernelVisitorF(self.kList3, self.policy3, self.hMat3)
 
         self.policy4.set("kernelBasisSet", "delta-function")
         self.policy4.set("useRegularization", True)
-        self.policy4.set("lambdaType", "minimizeUnbiasedRisk")
-        self.policy4.set("regularizationType", "centralDifference")
-        self.policy4.set("centralRegularizationStencil", 9)
         self.policy4.set("fitForBackground", False)
+        self.policy4.set("lambdaType", "absolute")
+        self.policy4.set("lambdaValue", lambdaVal)
+        self.policy4.set("regularizationType", "forwardDifference")
+        self.policy4.set("forwardRegularizationOrders", 1)
+        self.policy4.add("forwardRegularizationOrders", 2)
         self.kList4 = ipDiffim.makeKernelBasisList(self.policy4)
         self.hMat4  = ipDiffim.makeRegularizationMatrix(self.policy4)
         self.bskv4  = ipDiffim.BuildSingleKernelVisitorF(self.kList4, self.policy4, self.hMat4)
@@ -103,12 +107,13 @@ class DiffimTestCases(unittest.TestCase):
         #
         tmi = self.templateImage.getMaskedImage()
         smi = self.scienceImage.getMaskedImage()
-
-        self.policy1.set("detThreshold", 100.)
-        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy1.getPolicy("detectionPolicy"))
+        
+        detPolicy = self.policy1.getPolicy("detectionPolicy")
+        detPolicy.set("detThreshold", 50.)
+        detPolicy.set("detOnTemplate", False)
+        kcDetect = ipDiffim.KernelCandidateDetectionF(detPolicy)
         kcDetect.apply(tmi, smi)
         self.footprints = kcDetect.getFootprints()
-
         
     def tearDown(self):
         del self.policy1
@@ -135,7 +140,7 @@ class DiffimTestCases(unittest.TestCase):
         kSum   = kc.getKsum(ipDiffim.KernelCandidateF.RECENT)
         bg     = kc.getBackground(ipDiffim.KernelCandidateF.RECENT)
 
-        bbox = kc.getKernel(ipDiffim.KernelCandidateF.RECENT).shrinkBBox(diffim.getBBox(afwImage.LOCAL))
+        bbox = kc.getKernel(ipDiffim.KernelCandidateF.RECENT).shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
         diffIm = afwImage.MaskedImageF(diffIm, bbox, afwImage.LOCAL)
         self.dStats.apply(diffIm)
         
@@ -172,14 +177,11 @@ class DiffimTestCases(unittest.TestCase):
         logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DF run')
         results1 = self.apply(self.policy1, self.bskv1, xloc, yloc, tmi, smi)
         kSum1, bg1, dmean1, dstd1, vmean1, kImageOut1, diffIm1, kc1 = results1
-        kc1.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(ipDiffim.KernelSolution.EIGENVALUE)
-        kc1.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(ipDiffim.KernelSolution.SVD)
         res = 'DF residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                              self.dStats.getRms(),
                                                                              kSum1, bg1,
                                                                              dmean1, dstd1, vmean1)
         logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, res)
-
         if display:
             ds9.mtv(tmi, frame=1) # ds9 switches frame 0 and 1 for some reason
             ds9.mtv(smi, frame=0)
@@ -192,15 +194,14 @@ class DiffimTestCases(unittest.TestCase):
             diffIm1.writeFits('d1.fits')
 
         # regularized delta function kernel
-        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFr1 run')
+        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFrC5 run')
         results2 = self.apply(self.policy2, self.bskv2, xloc, yloc, tmi, smi)
         kSum2, bg2, dmean2, dstd2, vmean2, kImageOut2, diffIm2, kc2 = results2
-        res = 'DFr1 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
-                                                                               self.dStats.getRms(),
-                                                                               kSum2, bg2,
-                                                                               dmean2, dstd2, vmean2)
+        res = 'DFrC5 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
+                                                                                self.dStats.getRms(),
+                                                                                kSum2, bg2,
+                                                                                dmean2, dstd2, vmean2)
         logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, res)
-        
         if display:
             ds9.mtv(tmi, frame=4)
             ds9.mtv(smi, frame=5)
@@ -211,52 +212,44 @@ class DiffimTestCases(unittest.TestCase):
             diffIm2.writeFits('d2')
 
 
-        # minimize Biased Risk
-        for logTol in num.arange(4, 6, 0.1):
-            self.policy3.set("regularizationConditionTolerance", 10**logTol)
-            logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1,
-                         'DFrBr run %.3e' % (self.policy3.get("regularizationConditionTolerance")))
-            results3 = self.apply(self.policy3, self.bskv3, xloc, yloc, tmi, smi)
-            kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3, kc3 = results3
-            res = 'DFrBr %.3e : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.policy3.get("regularizationConditionTolerance"),
-                                                                               self.dStats.getMean(),
-                                                                               self.dStats.getRms(),
-                                                                               kSum3, bg3,
-                                                                               dmean3, dstd3, vmean3)
-            logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, res)
- 
-        # outputs
+        # regularized delta function kernel
+        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFrC9 run')
+        results3 = self.apply(self.policy3, self.bskv3, xloc, yloc, tmi, smi)
+        kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3, kc3 = results3
+        res = 'DFrC9 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
+                                                                                self.dStats.getRms(),
+                                                                                kSum3, bg3,
+                                                                                dmean3, dstd3, vmean3)
+        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, res)
         if display:
             ds9.mtv(tmi, frame=8)
             ds9.mtv(smi, frame=9)
             ds9.mtv(kImageOut3, frame=10)
             ds9.mtv(diffIm3, frame=11)
         if writefits:
-            kImageOut3.writeFits('k3.fits')
-            diffIm3.writeFits('d3')
+            kImageOut2.writeFits('k3.fits')
+            diffIm2.writeFits('d3')
 
-
-        # Minimize Unbised Rick
-        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFrUr run')
+        # regularized delta function kernel
+        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFrF12 run')
         results4 = self.apply(self.policy4, self.bskv4, xloc, yloc, tmi, smi)
         kSum4, bg4, dmean4, dstd4, vmean4, kImageOut4, diffIm4, kc4 = results4
-        res = 'DFrUr residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
-                                                                                self.dStats.getRms(),
-                                                                                kSum4, bg4,
-                                                                                dmean4, dstd4, vmean4)
+        res = 'DFrF12 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
+                                                                                 self.dStats.getRms(),
+                                                                                 kSum4, bg4,
+                                                                                 dmean4, dstd4, vmean4)
         logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, res)
-
-        # outputs
         if display:
             ds9.mtv(tmi, frame=12)
             ds9.mtv(smi, frame=13)
             ds9.mtv(kImageOut4, frame=14)
             ds9.mtv(diffIm4, frame=15)
         if writefits:
-            kImageOut4.writeFits('k4.fits')
-            diffIm4.writeFits('d4')
+            kImageOut2.writeFits('k4.fits')
+            diffIm2.writeFits('d4')
 
-        #raw_input('Next: ')
+
+        raw_input('Next: ')
 
     def testFunctor(self):
         for fp in self.footprints:

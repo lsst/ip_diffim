@@ -34,14 +34,34 @@ class DiffimTestCases(unittest.TestCase):
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
 
-    def testAlardLupton(self):
+    def testImagePca(self):
+        # Test out the ImagePca behavior
+        kc1 = self.makeCandidate(1, 0.0, 0.0)
+        kc1.build(self.kList)
+        kc2 = self.makeCandidate(2, 0.0, 0.0)
+        kc2.build(self.kList)
+        kc3 = self.makeCandidate(3, 0.0, 0.0)
+        kc3.build(self.kList)
+
+        imagePca = afwImage.ImagePcaD()
+        kpv = ipDiffim.KernelPcaVisitorF(imagePca)
+        kpv.processCandidate(kc1)
+        kpv.processCandidate(kc2)
+        kpv.processCandidate(kc3)
+
+        imagePca.analyze()
+        eigenImages = imagePca.getEigenImages()
+        for i in range(len(eigenImages)):
+            for j in range(i, len(eigenImages)):
+                print i, j, afwImage.innerProduct(eigenImages[i], eigenImages[j])
+        
+
+    def xtestAlardLupton(self):
         self.policy.set("kernelBasisSet", "alard-lupton")
         self.kList = ipDiffim.makeKernelBasisList(self.policy)
         nTerms = len(self.kList)
         
-        
-
-    def testEigenValues(self):
+    def xtestEigenValues(self):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc1.build(self.kList)
 
@@ -70,7 +90,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertAlmostEqual(eigenValues[1], 0.0)
         self.assertAlmostEqual(eigenValues[2], 0.0)
         
-    def testMeanSubtraction(self):
+    def xtestMeanSubtraction(self):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc1.build(self.kList)
 
