@@ -41,7 +41,7 @@ if __name__ == '__main__':
     gaussPsf = afwDet.createPsf("DoubleGaussian", psf.getKernel().getWidth(),
                                 psf.getKernel().getHeight(), sigGauss)
 
-    policy = ipDiffim.createDefaultPolicy()
+    policy = ipDiffim.makeDefaultPolicy()
 
     # Some policy specializations for model matching
 

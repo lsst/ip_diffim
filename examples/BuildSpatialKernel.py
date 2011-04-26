@@ -19,7 +19,7 @@ display = False
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.createDefaultPolicy()
+        self.policy = ipDiffim.makeDefaultPolicy()
         self.kSize = 19
         self.policy.set("kernelSize", self.kSize)
         self.sizeCell = 64

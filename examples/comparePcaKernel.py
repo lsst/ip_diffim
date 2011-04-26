@@ -33,7 +33,7 @@ elif len(sys.argv) == 3:
 else:
     sys.exit(1)
     
-policy = ipDiffim.createDefaultPolicy()
+policy = ipDiffim.makeDefaultPolicy()
 
 
 # same for all kernels

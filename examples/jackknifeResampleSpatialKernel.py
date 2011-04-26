@@ -35,7 +35,7 @@ class DiffimTestCases(unittest.TestCase):
         if not defDataDir:
             return
         
-        self.policy = ipDiffim.createDefaultPolicy()
+        self.policy = ipDiffim.makeDefaultPolicy()
         self.scienceImage   = afwImage.ExposureF(defSciencePath)
         self.templateImage  = afwImage.ExposureF(defTemplatePath)
         # takes forever to remap the CFHT images

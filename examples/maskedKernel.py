@@ -11,19 +11,19 @@ import lsst.pex.logging as pexLogging
 verbosity = 5
 pexLogging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
-policy1  = ipDiffim.createDefaultPolicy()
+policy1  = ipDiffim.makeDefaultPolicy()
 policy1.set("kernelBasisSet", "delta-function")
 policy1.set("useRegularization", False)
 kList1 = ipDiffim.makeKernelBasisList(policy1)
 soln1  = ipDiffim.MaskedKernelSolutionF(kList1, False)
 
-policy2  = ipDiffim.createDefaultPolicy()
+policy2  = ipDiffim.makeDefaultPolicy()
 policy2.set("kernelBasisSet", "delta-function")
 policy2.set("useRegularization", True)
 kList2 = ipDiffim.makeKernelBasisList(policy2)
 soln2  = ipDiffim.MaskedKernelSolutionF(kList2, False)
 
-policy3  = ipDiffim.createDefaultPolicy()
+policy3  = ipDiffim.makeDefaultPolicy()
 policy3.set("kernelBasisSet", "alard-lupton")
 kList3 = ipDiffim.makeKernelBasisList(policy3)
 soln3  = ipDiffim.MaskedKernelSolutionF(kList3, False)

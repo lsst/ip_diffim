@@ -1418,24 +1418,12 @@ namespace diffim {
     
     void SpatialKernelSolution::_setKernel() {
         
-        unsigned int nkt    = _spatialKernelFunction->getParameters().size();
-        unsigned int nbt    = _fitForBackground ? _background->getParameters().size() : 1;
-        unsigned int nt     = _aVec->size();
-        unsigned int nbases = 
-            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
-
-        if (nkt == 1) {
+        if (_nkt == 1) {
             /* Not spatially varying; this fork is a specialization for convolution speed--up */
             
-            /* Make sure the coefficients look right */
-            if (nbases != (nt - nbt)) {
-                throw LSST_EXCEPT(pexExcept::Exception, 
-                                  "Wrong number of terms for non spatially varying kernel");
-            }
-            
             /* Set the basis coefficients */
-            std::vector<double> kCoeffs(nbases);
-            for (unsigned int i = 0; i < nbases; i++) {
+            std::vector<double> kCoeffs(_nbases);
+            for (int i = 0; i < _nbases; i++) {
                 kCoeffs[i] = (*_aVec)(i);
             }
             lsst::afw::math::KernelList basisList = 
@@ -1448,16 +1436,16 @@ namespace diffim {
             
             /* Set the kernel coefficients */
             std::vector<std::vector<double> > kCoeffs;
-            kCoeffs.reserve(nbases);
-            for (unsigned int i = 0, idx = 0; i < nbases; i++) {
-                kCoeffs.push_back(std::vector<double>(nkt));
+            kCoeffs.reserve(_nbases);
+            for (int i = 0, idx = 0; i < _nbases; i++) {
+                kCoeffs.push_back(std::vector<double>(_nkt));
                 
                 /* Deal with the possibility the first term doesn't vary spatially */
                 if ((i == 0) && (_constantFirstTerm)) {
                     kCoeffs[i][0] = (*_aVec)(idx++);
                 }
                 else {
-                    for (unsigned int j = 0; j < nkt; j++) {
+                    for (int j = 0; j < _nkt; j++) {
                         kCoeffs[i][j] = (*_aVec)(idx++);
                     }
                 }
@@ -1472,17 +1460,14 @@ namespace diffim {
         _kSum  = _kernel->computeImage(*image, false);              
 
         /* Set the background coefficients */
-        std::vector<double> bgCoeffs(nbt);
-
+        std::vector<double> bgCoeffs(_fitForBackground ? _nbt : 1);
         if (_fitForBackground) {
-            for (unsigned int i = 0; i < nbt; i++) {
-                bgCoeffs[i] = (*_aVec)(nt - nbt + i);
+            for (int i = 0; i < _nbt; i++) {
+                bgCoeffs[i] = (*_aVec)(_nt - _nbt + i);
             }
         }
         else {
-            for (unsigned int i = 0; i < nbt; i++) {
-                bgCoeffs[i] = 0.;
-            }
+            bgCoeffs[0] = 0.;
         }
         _background->setParameters(bgCoeffs);
     }

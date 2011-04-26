@@ -16,7 +16,7 @@ pexLogging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 infile = sys.argv[1]
 
 # Diffim policy
-policy  = ipDiffim.createDefaultPolicy()
+policy  = ipDiffim.makeDefaultPolicy()
 #policy.set("kernelBasisSet", "delta-function")
 #policy.set("useRegularization", False)
 policy.set("kernelBasisSet", "alard-lupton")

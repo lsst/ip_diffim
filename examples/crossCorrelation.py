@@ -163,7 +163,7 @@ def addNoise(mi):
 
 def testAutoCorrelation(orderMake, orderFit, policy = None, inMi = None, display = False):
     if policy == None:
-        policy = ipDiffim.createDefaultPolicy()
+        policy = ipDiffim.makeDefaultPolicy()
 
     stride = 100
     

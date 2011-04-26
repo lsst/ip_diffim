@@ -27,9 +27,9 @@ class DiffimTestCases(unittest.TestCase):
     
     # D = I - (K.x.T + bg)
     def setUp(self, CFHT=False):
-        self.policy1     = ipDiffim.createDefaultPolicy()
-        self.policy2     = ipDiffim.createDefaultPolicy()
-        self.policy3     = ipDiffim.createDefaultPolicy()
+        self.policy1     = ipDiffim.makeDefaultPolicy()
+        self.policy2     = ipDiffim.makeDefaultPolicy()
+        self.policy3     = ipDiffim.makeDefaultPolicy()
 
         self.policy1.set("kernelBasisSet", "delta-function")
         self.policy1.set("useRegularization", False)

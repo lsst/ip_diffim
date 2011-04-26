@@ -11,7 +11,7 @@ imageToConvolve     = afwImage.MaskedImageF(sys.argv[1])
 imageToNotConvolve  = afwImage.MaskedImageF(sys.argv[2])
 outputImage         = sys.argv[3]
 
-policy              = ipDiffim.createDefaultPolicy()
+policy              = ipDiffim.makeDefaultPolicy()
 policy.set("detThreshold", 5.0)
 policy.set("kernelBasisSet", "alard-lupton")
 policy.set("usePcaForSpatialKernel", True)

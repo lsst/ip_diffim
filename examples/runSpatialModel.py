@@ -33,7 +33,7 @@ defOutputPath   = "diffImage"
 
 templateImage = afwImage.ExposureF(defTemplatePath)
 scienceImage  = afwImage.ExposureF(defSciencePath)
-policy        = ipDiffim.createDefaultPolicy()
+policy        = ipDiffim.makeDefaultPolicy()
 
 if warp:
     templateImage = ipDiffim.warpTemplateExposure(templateImage,

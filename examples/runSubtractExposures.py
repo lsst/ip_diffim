@@ -9,7 +9,7 @@ import lsst.afw.image as afwImage
 from lsst.pex.logging import Trace
 from lsst.pex.logging import Log
 
-from lsst.ip.diffim import subtractExposures, createDefaultPolicy
+from lsst.ip.diffim import subtractExposures, makeDefaultPolicy
 import lsst.ip.diffim.diffimTools as diffimTools
 
 def main():
@@ -93,7 +93,7 @@ Notes:
         
     templateExposure = afwImage.ExposureF(templatePath)
     scienceExposure  = afwImage.ExposureF(sciencePath)
-    policy           = createDefaultPolicy(mergePolicyPath = mergePolicyPath, fwhm=fwhm)
+    policy           = makeDefaultPolicy(mergePolicyPath = mergePolicyPath, fwhm=fwhm)
 
     if bgSub:
         diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),
