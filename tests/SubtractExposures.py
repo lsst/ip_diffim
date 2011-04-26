@@ -16,7 +16,6 @@ import lsst.ip.diffim.diffimTools as diffimTools
 verbosity = 3
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
-
 display = False
 
 class DiffimTestCases(unittest.TestCase):
@@ -58,6 +57,7 @@ class DiffimTestCases(unittest.TestCase):
         self.runXY0()
 
     def testWarping(self):
+        # Should fail since images are not aligned
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
@@ -72,6 +72,7 @@ class DiffimTestCases(unittest.TestCase):
             self.fail()
 
     def testNoBg(self):
+        # Test not subtracting off the background
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
@@ -95,26 +96,31 @@ class DiffimTestCases(unittest.TestCase):
 
         # Have an XY0
         results1 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
-                                              display=display, frame=0)
+                                              doWarping = True,
+                                              display = display, frame = 0)
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 
         # And then take away XY0
         templateSubImage.setXY0(afwGeom.Point2I(0, 0)) # do it to the exposure so the Wcs gets modified too
         scienceSubImage.setXY0(afwGeom.Point2I(0, 0))
         results2 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
-                                              display=display, frame=3)
+                                              doWarping = True, 
+                                              display = display, frame = 3)
         differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
 
         # need to count up the candidates first, since its a running tally
         count = 0
         for cell in kernelCellSet1.getCellList():
-            for cand1 in cell.begin(False): 
+            for cand1 in cell.begin(False):
                 count += 1
 
         for cell in kernelCellSet1.getCellList():
-            for cand1 in cell.begin(False): 
+            for cand1 in cell.begin(False):
+                if cand1.getStatus() == afwMath.SpatialCellCandidate.UNKNOWN:
+                    continue
+                
                 cand1 = ipDiffim.cast_KernelCandidateF(cand1)
-                cand2 = ipDiffim.cast_KernelCandidateF(kernelCellSet2.getCandidateById(cand1.getId() + count))
+                cand2 = ipDiffim.cast_KernelCandidateF(kernelCellSet2.getCandidateById(cand1.getId()+count))
 
                 # positions are the same
                 self.assertEqual(cand1.getXCenter(), cand2.getXCenter())

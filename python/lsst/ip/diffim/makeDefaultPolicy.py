@@ -12,7 +12,7 @@ POLICY_DEFAULT_FWHM = 3.5
 # the FWHM through a scaling of 2.35.
 
 def makeDefaultPolicy(PolicyDictName = "PsfMatchingDictionary.paf", mergePolicyPath = None,
-                      fwhm = POLICY_DEFAULT_FWHM, modify = True): 
+                      fwhm = POLICY_DEFAULT_FWHM, modify = False): 
     if mergePolicyPath:
         policy = pexPolicy.Policy(mergePolicyPath)
     else:
@@ -29,16 +29,16 @@ def makeDefaultPolicy(PolicyDictName = "PsfMatchingDictionary.paf", mergePolicyP
 def modifyKernelPolicy(policy, fwhm = POLICY_DEFAULT_FWHM):
     # Modify the kernel policy parameters based upon the images FWHM
 
-    kernelSize  = policy.getDouble("kernelSizeFwhmScaling") * fwhm
+    kernelSize  = int(policy.getDouble("kernelSizeFwhmScaling") * fwhm)
     kernelSize  = min(kernelSize, policy.getInt("kernelSizeMax"))
     kernelSize  = max(kernelSize, policy.getInt("kernelSizeMin"))
     kernelSize += (1 - kernelSize % 2) # make odd sized
     policy.set("kernelSize", kernelSize)
 
-    fpGrow = policy.getPolicy("detectionPolicy").getDouble("fpGrowFwhmScaling") * fwhm
+    fpGrow = int(policy.getPolicy("detectionPolicy").getDouble("fpGrowFwhmScaling") * fwhm)
     fpGrow = min(fpGrow, policy.getPolicy("detectionPolicy").getInt("fpGrowMax"))
     fpGrow = max(fpGrow, policy.getPolicy("detectionPolicy").getInt("fpGrowMin"))
-    policy.getPolicy("detectionPolicy").set("fpGrowPix", int(fpGrow))
+    policy.getPolicy("detectionPolicy").set("fpGrowPix", fpGrow)
 
     sigma = fwhm / sigma2fwhm
     alardSig = [x*sigma for x in policy.getDoubleArray("alardSigFwhmScaling")]

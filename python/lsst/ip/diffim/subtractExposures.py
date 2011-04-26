@@ -6,7 +6,8 @@ import lsst.pex.exceptions as pexExcept
 import lsst.afw.image as afwImage
 import lsst.afw.display.ds9 as ds9
 
-def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, display=False, frame=0, doWarping = True):
+def subtractExposures(exposureToConvolve, exposureToNotConvolve, policy, doWarping = True,
+                      display=False, frame=0):
     # Make sure they end up the same dimensions on the sky
     templateWcs    = exposureToConvolve.getWcs() 
     scienceWcs     = exposureToNotConvolve.getWcs()
