@@ -13,9 +13,6 @@ from lsst.pex.logging import Log
 from lsst.ip.diffim import subtractMaskedImages, makeDefaultPolicy
 import lsst.ip.diffim.diffimTools as diffimTools
 
-# For degugging needs
-import pdb
-
 def main():
     defDataDir = eups.productDir('afwdata') 
     if defDataDir == None:
@@ -26,8 +23,8 @@ def main():
         print 'Error: could not set up ip_diffim'
         sys.exit(1)
 
-    defSciencePath  = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1')
-    defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1_tmpl')
+    defSciencePath  = None
+    defTemplatePath = None
     mergePolicyPath = None
     defOutputPath   = 'diffImage'
     defVerbosity    = 0
@@ -68,6 +65,10 @@ Notes:
     templatePath    = getArg(1, defTemplatePath)
     outputPath      = getArg(2, defOutputPath)
     mergePolicyPath = options.policy
+
+    if sciencePath == None or templatePath == None:
+        parser.print_help()
+        sys.exit(1)
     
     print 'Science image: ', sciencePath
     print 'Template image:', templatePath

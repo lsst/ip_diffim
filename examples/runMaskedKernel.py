@@ -72,8 +72,8 @@ for line in open(infile).readlines():
 
     templateImage = templateExposure.getMaskedImage()
     scienceImage  = scienceExposure.getMaskedImage()
-    ds9.mtv(afwImage.MaskedImageF(templateImage, candBBox), frame = 1)
-    ds9.mtv(afwImage.MaskedImageF(scienceImage, candBBox), frame = 2)
+    ds9.mtv(afwImage.MaskedImageF(templateImage, candBBox, afwImage.LOCAL), frame = 1)
+    ds9.mtv(afwImage.MaskedImageF(scienceImage, candBBox, afwImage.LOCAL), frame = 2)
 
     # Create deep copy since this will be modified
     pixelMask  = afwImage.MaskU(scienceImage.getMask(), True)
@@ -87,9 +87,9 @@ for line in open(infile).readlines():
             pixelMask.set(x, y, maskVal)
 
     # Sub image for speed
-    templateSubimage = afwImage.MaskedImageF(templateImage, candBBox)
-    scienceSubimage  = afwImage.MaskedImageF(scienceImage, candBBox)
-    maskSubmask      = afwImage.MaskU(pixelMask, candBBox)
+    templateSubimage = afwImage.MaskedImageF(templateImage, candBBox, afwImage.LOCAL)
+    scienceSubimage  = afwImage.MaskedImageF(scienceImage, candBBox, afwImage.LOCAL)
+    maskSubmask      = afwImage.MaskU(pixelMask, candBBox, afwImage.LOCAL)
             
     # Spread it here
     #fooMi  = afwImage.MaskedImageF(scienceSubimage.getImage(),

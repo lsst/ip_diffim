@@ -6,32 +6,3 @@ env.Program("pixelAccess", ["pixelAccess.cc"], LIBS=env.getlibs("afw", "ip_diffi
 env.Program("spatialKernel", ["spatialKernel.cc"], LIBS=env.getlibs("afw", "ip_diffim"))
 env.Program("maskedKernel", ["maskedKernel.cc"], LIBS=env.getlibs("afw", "eigen", "ip_diffim"))
 
-#
-# Tests
-#
-if False:
-    import lsst.tests
-    
-    import lsst.SConsUtils as scons         # scons 1.17 supports "env.ProductDir", but for now use scons.ProductDir
-    dataDir = scons.ProductDir("afwdata")
-    args = {
-    }
-    #
-    # Tests
-    #
-    ignoreList = [
-        "runImageSubtract.py",
-        "runManyImageSubtract.py",
-        "runWcsMatch.py",
-        "SplitCFHT.py",
-        "SplitCFHT2.py",
-    ]
-    
-    if not dataDir:
-        sys.stderr.write("afwdata is not set up; skipping tests requiring data\n")
-        ignoreList += args.keys()
-    
-    tests = lsst.tests.Control(env, args=args, ignoreList=ignoreList, verbose=True)
-    tests.run("*.cc")
-    for target in tests.run("*.py"):
-        env.Depends(target, "../python/lsst/ip/diffim/_diffimLib%s" % (env["LDMODULESUFFIX"]))
