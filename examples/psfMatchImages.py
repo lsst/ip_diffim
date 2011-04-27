@@ -12,10 +12,11 @@ imageToNotConvolve  = afwImage.MaskedImageF(sys.argv[2])
 outputImage         = sys.argv[3]
 
 policy              = ipDiffim.makeDefaultPolicy()
-policy.set("detThreshold", 5.0)
+policy.getPolicy("detectionPolicy").set("detThreshold", 5.0)
 policy.set("kernelBasisSet", "alard-lupton")
-policy.set("usePcaForSpatialKernel", True)
+policy.set("usePcaForSpatialKernel", False)
 policy.set("spatialKernelOrder", 1)
+policy.set('fitForBackground', True)
 
 spatialKernel, spatialBg, kernelCellSet = ipDiffim.psfMatchImageToImage(imageToConvolve,
                                                                         imageToNotConvolve,

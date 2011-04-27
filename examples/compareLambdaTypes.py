@@ -21,7 +21,7 @@ logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 display = True
 writefits = False
 
-# This one compares DeltaFunction and AlardLupton kernels
+# This one compares DeltaFunction kernels of different types; iterate lambdaVal for different strengths
 
 CFHTTORUN = 'cal-53535-i-797722_1'
 

@@ -36,6 +36,8 @@ class DiffimTestCases(unittest.TestCase):
             return
         
         self.policy = ipDiffim.makeDefaultPolicy()
+        self.policy.set("fitForBackground", True)
+        
         self.scienceImage   = afwImage.ExposureF(defSciencePath)
         self.templateImage  = afwImage.ExposureF(defTemplatePath)
         # takes forever to remap the CFHT images
@@ -135,8 +137,6 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set("spatialKernelClipping", False)
         
         kernel, bg, cellSet = results
-        basisList   = kernel.getKernelList()
-        kFunctor    = ipDiffim.PsfMatchingFunctorF(basisList)
         
         goodList = []
         for cell in cellSet.getCellList():
@@ -159,8 +159,7 @@ class DiffimTestCases(unittest.TestCase):
             
             cand = self.setStatus(cellSet, cid, afwMath.SpatialCellCandidate.BAD)
 
-            jkResults = ipDiffim.fitSpatialKernelFromCandidates(kFunctor,
-                                                                cellSet,
+            jkResults = ipDiffim.fitSpatialKernelFromCandidates(cellSet,
                                                                 self.policy)
             jkKernel  = jkResults[0]
             jkBg      = jkResults[1]
@@ -206,8 +205,15 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata not set up; not running JackknifeResampleSpatialKernel.py"
             return
         
-        self.runTest(mode="DFr")
+        self.runTest(mode="AL")
 
+    def tearDown(self):
+        del self.policy
+        del self.scienceImage
+        del self.templateImage
+        del self.scienceMaskedImage
+        del self.templateMaskedImage
+        del self.dStats
 #####
 
 def suite():

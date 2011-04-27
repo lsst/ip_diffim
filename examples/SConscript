@@ -3,7 +3,6 @@ import sys
 Import("env")
 
 env.Program("pixelAccess", ["pixelAccess.cc"], LIBS=env.getlibs("afw", "ip_diffim"))
-env.Program("testSpatialCell", ["testSpatialCell.cc"], LIBS=env.getlibs("afw", "ip_diffim"))
 env.Program("spatialKernel", ["spatialKernel.cc"], LIBS=env.getlibs("afw", "ip_diffim"))
 env.Program("maskedKernel", ["maskedKernel.cc"], LIBS=env.getlibs("afw", "eigen", "ip_diffim"))
 

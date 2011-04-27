@@ -22,8 +22,9 @@ def main():
         print 'Error: could not set up ip_diffim'
         sys.exit(1)
 
-    defSciencePath  = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1')
-    defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1_tmpl')
+    defSciencePath  = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0", "v26-e0-c011-a10.sci")
+    defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0", "v5-e0-c011-a10.sci")
+
     mergePolicyPath = None
     defOutputPath   = 'diffExposure'
     defVerbosity    = 0
@@ -48,7 +49,7 @@ Notes:
                       help='verbosity of Trace messages')
     parser.add_option('-d', '--display', action='store_true', default=False,
                       help='display the images')
-    parser.add_option('-b', '--bg', action='store_true', default=False,
+    parser.add_option('-b', '--bg', action='store_true', default=True,
                       help='subtract backgrounds')
     parser.add_option('-f', '--fwhm', type=float,
                       help='Psf Fwhm (pixel)')
@@ -103,7 +104,7 @@ Notes:
     results = subtractExposures(templateExposure,
                                 scienceExposure,
                                 policy,
-                                display)
+                                display = display)
     differenceExposure = results[0]
     differenceExposure.writeFits(outputPath)
 

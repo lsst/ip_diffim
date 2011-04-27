@@ -1,5 +1,6 @@
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.ip.diffim as ipDiffim
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.pex.logging as pexLogging
@@ -40,7 +41,7 @@ def makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot = False):
 
         # Original kernel
         kImage1  = afwImage.ImageD(spatialKernel.getDimensions())
-        cand1.getKernel().computeImage(kImage1, False)
+        cand1.getKernel(ipDiffim.KernelCandidateF.ORIG).computeImage(kImage1, False)
 
         # Spatial approximation
         ksImage1 = afwImage.ImageD(spatialKernel.getDimensions())
@@ -49,8 +50,8 @@ def makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot = False):
                                    afwImage.indexToPosition(int(y1)))
 
         # Turn into numarrays for dot product
-        ksVector1 = diffimTools.vectorFromImage(ksImage1)
-        kVector1  = diffimTools.vectorFromImage(kImage1)
+        ksVector1 = ksImage1.getArray().ravel()
+        kVector1  = kImage1.getArray().ravel()
         
         for j in range(i+1, len(candList)):
             cand2    = ipDiffim.cast_KernelCandidateF(kernelCellSet.getCandidateById(candList[j]))
@@ -59,7 +60,7 @@ def makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot = False):
             
             # Original kernel
             kImage2  = afwImage.ImageD(spatialKernel.getDimensions())
-            cand2.getKernel().computeImage(kImage2, False)
+            cand2.getKernel(ipDiffim.KernelCandidateF.ORIG).computeImage(kImage2, False)
             
             # Spatial approximation
             ksImage2 = afwImage.ImageD(spatialKernel.getDimensions())
@@ -68,8 +69,8 @@ def makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot = False):
                                        afwImage.indexToPosition(int(y2)))
 
             # Turn into numarrays for dot product
-            ksVector2 = diffimTools.vectorFromImage(ksImage2)
-            kVector2  = diffimTools.vectorFromImage(kImage2)
+            ksVector2 = ksImage2.getArray().ravel()
+            kVector2  = kImage2.getArray().ravel()
 
             ###
 
@@ -164,13 +165,14 @@ def addNoise(mi):
 def testAutoCorrelation(orderMake, orderFit, policy = None, inMi = None, display = False):
     if policy == None:
         policy = ipDiffim.makeDefaultPolicy()
+    policy.set("fitForBackground", True)
 
     stride = 100
     
     if inMi == None:
         width  = 512
         height = 2048
-        inMi = afwImage.MaskedImageF(width, height)
+        inMi = afwImage.MaskedImageF(afwGeom.Extent2I(width, height))
         for j in num.arange(stride//2, height, stride):
             for i in num.arange(stride//2, width, stride):
                 inMi.set(i-1, j-1, (100, 0x0, 1))
@@ -213,16 +215,6 @@ def testAutoCorrelation(orderMake, orderFit, policy = None, inMi = None, display
         ds9.mtv(cMi.getImage(), frame=3)
         ds9.mtv(cMi.getVariance(), frame=4)
         
-        #ds9.mtv(inMi, frame=1)
-        #ds9.mtv(cMi, frame=2)
-
-        #kImage = afwImage.ImageD(spatialKernel.getDimensions())
-        #spatialKernel.computeImage(kImage, True, 1, 1)
-        #ds9.mtv(kImage, frame=3)
-
-        #spatialKernel.computeImage(kImage, True, spatialKernel.getWidth(), spatialKernel.getHeight())
-        #ds9.mtv(kImage, frame=4)
-
     policy.set("spatialKernelOrder", orderFit)
     policy.set("sizeCellX", stride)
     policy.set("sizeCellY", stride)
@@ -242,5 +234,5 @@ def doUnderConstrained(policy = None, inMi = None, display = False):
     
 
 if __name__ == '__main__':
-    #doOverConstrained(display = True)
+    doOverConstrained(display = True)
     doUnderConstrained(display = True)

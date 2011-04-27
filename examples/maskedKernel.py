@@ -47,9 +47,6 @@ candBBox      = afwGeom.Box2I(afwGeom.Point2I(xCenter - stampSize//2, yCenter - 
 maskBBox      = afwGeom.Box2I(afwGeom.Point2I(xCenter - maskSize//2, yCenter - maskSize//2),
                               afwGeom.Extent2I(maskSize, maskSize))
 
-#print 'A', candBBox.getMinX(), candBBox.getMinY(), candBBox.getMaxX(), candBBox.getMaxY()
-#print 'B', maskBBox.getMinX(), maskBBox.getMinY(), maskBBox.getMaxX(), maskBBox.getMaxY()
-
 diffimTools.backgroundSubtract(policy1.getPolicy("afwBackgroundPolicy"),
                                [scienceImage.getMaskedImage(),])
 templateImage = ipDiffim.warpTemplateExposure(templateImage,
@@ -71,48 +68,45 @@ for y in range(yCenter - maskSize//2, yCenter + maskSize//2):
         maskVal |= afwImage.MaskU_getPlaneBitMask("BAD")
         pixelMask.set(x, y, maskVal)
 
-ds9.mtv(afwImage.MaskedImageF(templateImage, candBBox), frame = 1)
-ds9.mtv(afwImage.MaskedImageF(scienceImage, candBBox), frame = 2)
+tsi = afwImage.MaskedImageF(templateImage, candBBox, afwImage.LOCAL)
+ssi = afwImage.MaskedImageF(scienceImage, candBBox, afwImage.LOCAL)
+
+ds9.mtv(tsi, frame = 1)
+ds9.mtv(ssi, frame = 2)
 
 for soln in (soln1, soln2, soln3): # soln2, soln3):
-    #soln.buildSingleMask(afwImage.MaskedImageF(templateImage, candBBox).getImage(),
-    #                     afwImage.MaskedImageF(scienceImage, candBBox).getImage(),
-    #                     afwImage.MaskedImageF(scienceImage, candBBox).getVariance(),
-    #                     maskBBox)
-    #soln.solve()
-
-    soln.build(afwImage.MaskedImageF(templateImage, candBBox).getImage(),
-               afwImage.MaskedImageF(scienceImage, candBBox).getImage(),
-               afwImage.MaskedImageF(scienceImage, candBBox).getVariance(),
-               afwImage.MaskU(pixelMask, candBBox))
+    soln.buildSingleMask(tsi.getImage(),
+                         ssi.getImage(),
+                         ssi.getVariance(),
+                         maskBBox)
     soln.solve()
+
+    #soln.build(tsi.getImage(),
+    #           ssi.getImage(),
+    #           ssi.getVariance(),
+    #           afwImage.MaskU(pixelMask, candBBox))
+    #soln.solve()
     
 k1 = soln1.getKernel()
 k2 = soln2.getKernel()
 k3 = soln3.getKernel()
 
-d1 = ipDiffim.convolveAndSubtract(afwImage.MaskedImageF(templateImage, candBBox),
-                                  afwImage.MaskedImageF(scienceImage, candBBox),
-                                  k1, 0)
-d2 = ipDiffim.convolveAndSubtract(afwImage.MaskedImageF(templateImage, candBBox),
-                                  afwImage.MaskedImageF(scienceImage, candBBox),
-                                  k2, 0)
-d3 = ipDiffim.convolveAndSubtract(afwImage.MaskedImageF(templateImage, candBBox),
-                                  afwImage.MaskedImageF(scienceImage, candBBox),
-                                  k3, 0)
+d1 = ipDiffim.convolveAndSubtract(tsi, ssi, k1, 0)
+d2 = ipDiffim.convolveAndSubtract(tsi, ssi, k2, 0)
+d3 = ipDiffim.convolveAndSubtract(tsi, ssi, k3, 0)
                                   
 
-ds9.mtv(afwImage.MaskedImageF(templateImage, candBBox), frame = 1)
-ds9.mtv(afwImage.MaskedImageF(scienceImage, candBBox), frame = 2)
+ds9.mtv(tsi, frame = 1)
+ds9.mtv(ssi, frame = 2)
 ds9.mtv(soln1.makeKernelImage(), frame = 3)
 ds9.mtv(d1, frame = 4)
 #
-ds9.mtv(afwImage.MaskedImageF(templateImage, candBBox), frame = 5)
-ds9.mtv(afwImage.MaskedImageF(scienceImage, candBBox), frame = 6)
+ds9.mtv(tsi, frame = 5)
+ds9.mtv(ssi, frame = 6)
 ds9.mtv(soln2.makeKernelImage(), frame = 7)
 ds9.mtv(d2, frame = 8)
 #
-ds9.mtv(afwImage.MaskedImageF(templateImage, candBBox), frame = 9)
-ds9.mtv(afwImage.MaskedImageF(scienceImage, candBBox), frame = 10)
+ds9.mtv(tsi, frame = 9)
+ds9.mtv(ssi, frame = 10)
 ds9.mtv(soln3.makeKernelImage(), frame = 11)
 ds9.mtv(d3, frame = 12)

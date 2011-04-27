@@ -20,13 +20,13 @@ for k1 in range(0, len(klist)):
     
 for k1 in range(0, len(klist)):
     klist[k1].computeImage(kim1, False)
-    arr1 = kim1.getArray()
+    arr1 = kim1.getArray().ravel()
     
     for k2 in range(k1, len(klist)):
         klist[k2].computeImage(kim2, False)
-        arr2 = kim2.getArray()
+        arr2 = kim2.getArray().ravel()
 
-        #print k1, k2, num.sum(arr1*arr2)
+        print k1, k2, num.inner(arr1, arr2)
         
         
         
