@@ -15,13 +15,15 @@ import lsst.pex.logging                  as pexLog
 import lsst.afw.display.ds9              as ds9
 
 def pcapsf_read_boost(fn):
+    import lsst.meas.algorithms as measAlgorithms # needed to register pcaPsf formatter
+    
     print '# Reading', fn, 
     loc = dafPersist.LogicalLocation(fn)
     storageList = dafPersist.StorageList()
     additionalData = dafBase.PropertySet()
     persistence = dafPersist.Persistence.getPersistence(pexPolicy.Policy())
     storageList.append(persistence.getRetrieveStorage("BoostStorage", loc))
-    psfptr = persistence.unsafeRetrieve("pcaPsf", storageList, additionalData)
+    psfptr = persistence.unsafeRetrieve("Psf", storageList, additionalData)
     psf = afwDet.Psf.swigConvert(psfptr)
     return psf
 
@@ -134,7 +136,4 @@ if __name__ == '__main__':
         diffimTools.displaySpatialKernelMosaic(sk, calexp.getWidth(), calexp.getHeight(), frame = 6)
         ds9.mtv(cim, frame = 7)
     
-
-# foreach i ( 85501910 85563260 85597903 85656377 85661696 )
-# python examples/psfMatchModelToModel.py ~/LSST/PT1/psfMatch/pt1prod_im0133/update/calexp/v"$i"-fr/R13/S11.fits ~/LSST/PT1/psfMatch/pt1prod_im0133/update/psf/v"$i"-fr/R13/S11.boost
-# end
+# python examples/psfMatchModelToModel.py ~/LSST/PT1/psfMatch/wp_trunk_2011_0420_195756/update/calexp/v856880811-fg/R22/S20.fits ~/LSST/PT1/psfMatch/wp_trunk_2011_0420_195756/update/psf/v856880811-fg/R22/S20.boost
