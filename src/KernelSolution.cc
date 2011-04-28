@@ -23,20 +23,25 @@
 #include "lsst/afw/math.h"
 #include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
+#include "lsst/afw/detection.h"
 #include "lsst/pex/exceptions/Runtime.h"
 #include "lsst/pex/logging/Trace.h"
 
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
+#include "lsst/ndarray/eigen.h"
+
 #define DEBUG_MATRIX  0
 #define DEBUG_MATRIX2 0
 
+namespace afwDet         = lsst::afw::detection;
 namespace afwMath        = lsst::afw::math;
 namespace afwGeom        = lsst::afw::geom;
 namespace afwImage       = lsst::afw::image;
 namespace pexLog         = lsst::pex::logging; 
 namespace pexExcept      = lsst::pex::exceptions; 
+namespace ndarray        = lsst::ndarray;
 
 namespace lsst { 
 namespace ip { 
@@ -301,6 +306,11 @@ namespace diffim {
          * 100-3+1 = 98, and the loops use i < 98, meaning the last
          * index you address is 97.
          */
+
+        /* NOTE - we are accessing particular elements of Eigen arrays using
+           these coordinates, therefore they need to be in LOCAL coordinates.
+           This was written before ndarray unification.
+        */
         afwGeom::Box2I goodBBox = (*kiter)->shrinkBBox(imageToConvolve.getBBox(afwImage::LOCAL));
         unsigned int const startCol = goodBBox.getMinX();
         unsigned int const startRow = goodBBox.getMinY();
@@ -497,6 +507,115 @@ namespace diffim {
         lsst::afw::image::Image<InputT> const &imageToConvolve,
         lsst::afw::image::Image<InputT> const &imageToNotConvolve,
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
+        lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const &pixelMask
+        ) {
+
+        /* Full footprint of all input images */
+        afwDet::Footprint::Ptr fullFp(new afwDet::Footprint(imageToConvolve.getBBox(afwImage::PARENT)));
+
+        afwMath::KernelList basisList = 
+            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
+        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
+
+        /* Only BAD pixels marked in this mask */
+        afwImage::Mask<afwImage::MaskPixel> sMask(pixelMask, true);
+        afwImage::MaskPixel bitMask = 
+            (afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD") | 
+             afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("SAT") |
+             afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("EDGE"));
+        sMask &= bitMask;
+
+        /* Create a Footprint that contains all the masked pixels set above */
+        afwDet::Footprint::Ptr maskedFp = afwDet::footprintAndMask(fullFp, sMask, ~0x0);
+        /* OR */
+        //afwDet::Footprint::Ptr maskedFp2 = afwDet::footprintAndMask(fullFp, pixelMask, sMask);
+        
+        /* And spread it by the kernel size */
+        int growPix = (*kiter)->getWidth();
+        afwDet::Footprint::Ptr maskedFpGrow = afwDet::growFootprint(maskedFp, growPix, false);
+        /* These will be pixels we *DONT* use in the computation below */
+
+        ndarray::Array<InputT, 1, 1> arrayToConvolve = 
+            afwDet::flattenArray(*maskedFpGrow, imageToConvolve.getArray(), imageToConvolve.getXY0());
+        ndarray::EigenView<InputT, 1, 1> eigenToConvolve = 
+            ndarray::viewAsEigen(arrayToConvolve);
+
+        ndarray::Array<InputT, 1, 1> arrayToNotConvolve = 
+            afwDet::flattenArray(*maskedFpGrow, imageToNotConvolve.getArray(), imageToNotConvolve.getXY0());
+        ndarray::EigenView<InputT, 1, 1> eigenToNotConvolve = 
+            ndarray::viewAsEigen(arrayToNotConvolve);
+
+        ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance =
+            afwDet::flattenArray(*maskedFpGrow, varianceEstimate.getArray(), varianceEstimate.getXY0());
+        ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance =
+            ndarray::viewAsEigen(arrayVariance);
+
+        boost::timer t;
+        t.restart();
+
+        unsigned int const nKernelParameters     = basisList.size();
+        unsigned int const nBackgroundParameters = this->_fitForBackground ? 1 : 0;
+        unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
+
+        /* Holds image convolved with basis function */
+        afwImage::Image<InputT> cimage(imageToConvolve.getDimensions());
+        
+        /* Holds eigen representation of image convolved with all basis functions */
+        std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >
+            convolvedEigenList(nKernelParameters);
+        
+        /* Iterators over convolved image list and basis list */
+        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiter = 
+            convolvedEigenList.begin();
+
+        /* Create C_i in the formalism of Alard & Lupton */
+        for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
+            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+
+            ndarray::Array<InputT, 1, 1> arrayC = 
+                afwDet::flattenArray(*maskedFpGrow, cimage.getArray(), cimage.getXY0());
+            boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > 
+                eigenC (new ndarray::EigenView<InputT, 1, 1>(ndarray::viewAsEigen(arrayC)));
+            
+            *eiter = eigenC;
+        }
+        double time = t.elapsed();
+        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.build", 
+                          "Total compute time to do basis convolutions : %.2f s", time);
+        t.restart();
+
+        
+        /* Load matrix with all convolved images */
+        Eigen::MatrixXd cMat(eigenToConvolve.size(), nParameters);
+        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiterj = 
+            convolvedEigenList.begin();
+        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiterE = 
+            convolvedEigenList.end();
+        for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
+            cMat.col(kidxj) = (*eiterj)->cast<double>();
+        }
+        /* Treat the last "image" as all 1's to do the background calculation. */
+        if (this->_fitForBackground)
+            cMat.col(nParameters-1).fill(1.);
+
+        this->_cMat.reset(new Eigen::MatrixXd(cMat));
+        this->_ivVec.reset(new Eigen::VectorXd(eigenVariance.cast<double>()).cwise().inverse());
+        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.cast<double>()));
+
+        /* Make these outside of solve() so I can check condition number */
+        this->_mMat.reset(
+            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
+            );
+        this->_bVec.reset(
+            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
+            );
+    }
+
+    template <typename InputT>
+    void MaskedKernelSolution<InputT>::buildOrig(
+        lsst::afw::image::Image<InputT> const &imageToConvolve,
+        lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+        lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
         lsst::afw::image::Mask<lsst::afw::image::MaskPixel> pixelMask
         ) {
 
@@ -517,6 +636,10 @@ namespace diffim {
         unsigned int const nBackgroundParameters = this->_fitForBackground ? 1 : 0;
         unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
 
+        /* NOTE - we are accessing particular elements of Eigen arrays using
+           these coordinates, therefore they need to be in LOCAL coordinates.
+           This was written before ndarray unification.
+        */
         /* Ignore known EDGE pixels for speed */
         afwGeom::Box2I shrunkLocalBBox = (*kiter)->shrinkBBox(imageToConvolve.getBBox(afwImage::LOCAL));
         pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
@@ -646,8 +769,10 @@ namespace diffim {
         
     }
 
+    /* NOTE - this was written before the ndarray unification.  I am rewriting
+       buildSingleMask to use the ndarray stuff */
     template <typename InputT>
-    void MaskedKernelSolution<InputT>::buildSingleMask(
+    void MaskedKernelSolution<InputT>::buildSingleMaskOrig(
         lsst::afw::image::Image<InputT> const &imageToConvolve,
         lsst::afw::image::Image<InputT> const &imageToNotConvolve,
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
@@ -826,7 +951,7 @@ namespace diffim {
             for (; biter != boxArray.end(); ++biter) {
                 int area = (*biter).getWidth() * (*biter).getHeight();
 
-                afwImage::Image<InputT> csubimage(cimage, *biter, afwImage::LOCAL);
+                afwImage::Image<InputT> csubimage(cimage, *biter, afwImage::PARENT);
                 Eigen::MatrixXd esubimage = imageToEigenMatrix(csubimage);
                 esubimage.resize(area, 1);
                 cMat.block(nTerms, 0, area, 1) = esubimage;

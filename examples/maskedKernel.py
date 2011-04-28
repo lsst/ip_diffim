@@ -68,24 +68,28 @@ for y in range(yCenter - maskSize//2, yCenter + maskSize//2):
         maskVal |= afwImage.MaskU_getPlaneBitMask("BAD")
         pixelMask.set(x, y, maskVal)
 
-tsi = afwImage.MaskedImageF(templateImage, candBBox, afwImage.LOCAL)
-ssi = afwImage.MaskedImageF(scienceImage, candBBox, afwImage.LOCAL)
+# I found these centroids looking in ds9 and using pixel coords; therefore LOCAL 
+tsi = afwImage.MaskedImageF(templateImage, candBBox, afwImage.PARENT)
+ssi = afwImage.MaskedImageF(scienceImage, candBBox, afwImage.PARENT)
+
+print 'cand', candBBox
+print 'mask', maskBBox
 
 ds9.mtv(tsi, frame = 1)
 ds9.mtv(ssi, frame = 2)
 
 for soln in (soln1, soln2, soln3): # soln2, soln3):
-    soln.buildSingleMask(tsi.getImage(),
-                         ssi.getImage(),
-                         ssi.getVariance(),
-                         maskBBox)
-    soln.solve()
-
-    #soln.build(tsi.getImage(),
-    #           ssi.getImage(),
-    #           ssi.getVariance(),
-    #           afwImage.MaskU(pixelMask, candBBox))
+    #soln.buildSingleMaskOrig(tsi.getImage(),
+    #                         ssi.getImage(),
+    #                         ssi.getVariance(),
+    #                         maskBBox)
     #soln.solve()
+
+    soln.build(tsi.getImage(),
+               ssi.getImage(),
+               ssi.getVariance(),
+               afwImage.MaskU(pixelMask, candBBox, afwImage.PARENT))
+    soln.solve()
     
 k1 = soln1.getKernel()
 k2 = soln2.getKernel()

@@ -15,9 +15,7 @@ env = scons.makeEnv("ip_diffim",
                     r"$HeadURL$",
                     scons.ConfigureDependentProducts("ip_diffim"))
 
-env.libs["ip_diffim"] +=  env.getlibs("boost eigen afw sdqa")
-
-#env.libs["ip_diffim"] += env.getlibs("boost wcslib cfitsio minuit2 utils daf_base daf_data daf_persistence pex_exceptions pex_logging pex_policy security afw gsl eigen sdqa")
+env.libs["ip_diffim"] +=  env.getlibs("boost eigen afw sdqa ndarray")
 
 if True:
     #
