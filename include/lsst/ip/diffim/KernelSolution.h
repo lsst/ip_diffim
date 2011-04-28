@@ -123,11 +123,13 @@ namespace diffim {
                                lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
                                const &varianceEstimate,
                                lsst::afw::image::Mask<lsst::afw::image::MaskPixel> pixelMask);
+
         virtual void build(lsst::afw::image::Image<InputT> const &imageToConvolve,
                            lsst::afw::image::Image<InputT> const &imageToNotConvolve,
                            lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
                            const &varianceEstimate,
-                           lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const &pixelMask);
+                           lsst::afw::image::Mask<> const &pixelMask);
+
         virtual void buildSingleMaskOrig(lsst::afw::image::Image<InputT> const &imageToConvolve,
                                          lsst::afw::image::Image<InputT> const &imageToNotConvolve,
                                          lsst::afw::image::Image<lsst::afw::image::VariancePixel> 

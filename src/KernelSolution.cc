@@ -30,6 +30,7 @@
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
+#include "lsst/ndarray.h"
 #include "lsst/ndarray/eigen.h"
 
 #define DEBUG_MATRIX  0
@@ -518,21 +519,29 @@ namespace diffim {
         std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
 
         /* Only BAD pixels marked in this mask */
-        afwImage::Mask<afwImage::MaskPixel> sMask(pixelMask, true);
+        afwImage::Mask<lsst::afw::image::MaskPixel>::Ptr 
+            sMask(new afwImage::Mask<lsst::afw::image::MaskPixel>(pixelMask, true));
         afwImage::MaskPixel bitMask = 
-            (afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD") | 
-             afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("SAT") |
-             afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("EDGE"));
-        sMask &= bitMask;
+            (afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("BAD") | 
+             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("SAT") |
+             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("EDGE"));
+        (*sMask) &= bitMask;
+
+        afwImage::Mask<int>::Ptr 
+            sMask1(new afwImage::Mask<int>(imageToConvolve.getDimensions()));
+        afwDet::Footprint::Ptr maskedFp1 = afwDet::footprintAndMask(fullFp, sMask1, ~0x0);
+        //afwImage::Mask<lsst::afw::image::MaskPixel>::Ptr 
+        //sMask2(new afwImage::Mask<lsst::afw::image::MaskPixel>(imageToConvolve.getDimensions()));
+        //afwDet::Footprint::Ptr maskedFp2 = afwDet::footprintAndMask(fullFp, sMask2, ~0x0);
 
         /* Create a Footprint that contains all the masked pixels set above */
-        afwDet::Footprint::Ptr maskedFp = afwDet::footprintAndMask(fullFp, sMask, ~0x0);
+        //afwDet::Footprint::Ptr maskedFp = afwDet::footprintAndMask(fullFp, sMask, ~0x0);
         /* OR */
         //afwDet::Footprint::Ptr maskedFp2 = afwDet::footprintAndMask(fullFp, pixelMask, sMask);
         
         /* And spread it by the kernel size */
         int growPix = (*kiter)->getWidth();
-        afwDet::Footprint::Ptr maskedFpGrow = afwDet::growFootprint(maskedFp, growPix, false);
+        afwDet::Footprint::Ptr maskedFpGrow; // = afwDet::growFootprint(maskedFp, growPix, false);
         /* These will be pixels we *DONT* use in the computation below */
 
         ndarray::Array<InputT, 1, 1> arrayToConvolve = 
@@ -583,7 +592,6 @@ namespace diffim {
         pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.build", 
                           "Total compute time to do basis convolutions : %.2f s", time);
         t.restart();
-
         
         /* Load matrix with all convolved images */
         Eigen::MatrixXd cMat(eigenToConvolve.size(), nParameters);
@@ -592,15 +600,15 @@ namespace diffim {
         typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiterE = 
             convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-            cMat.col(kidxj) = (*eiterj)->cast<double>();
+            cMat.col(kidxj) = (*eiterj)->template cast<double>();
         }
         /* Treat the last "image" as all 1's to do the background calculation. */
         if (this->_fitForBackground)
             cMat.col(nParameters-1).fill(1.);
-
+        
         this->_cMat.reset(new Eigen::MatrixXd(cMat));
-        this->_ivVec.reset(new Eigen::VectorXd(eigenVariance.cast<double>()).cwise().inverse());
-        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.cast<double>()));
+        this->_ivVec.reset(new Eigen::VectorXd((eigenVariance.template cast<double>()).cwise().inverse()));
+        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.template cast<double>()));
 
         /* Make these outside of solve() so I can check condition number */
         this->_mMat.reset(
