@@ -87,17 +87,17 @@ namespace diffim {
         ) {
 
         /* Examine the policy for control over the variance estimate */
-        afwImage::MaskedImage<PixelT> var = 
-            afwImage::MaskedImage<PixelT>(*(_miToNotConvolvePtr), true);
+        afwImage::Image<afwImage::VariancePixel> var = 
+            afwImage::Image<afwImage::VariancePixel>(*(_miToNotConvolvePtr->getVariance()), true);
         if (_policy.getBool("constantVarianceWeighting")) {
             /* Constant variance weighting */
-            *var.getVariance() = 1.;
+            var = 1.;
         }
         else {
-            /* Variance estimate comes from the straight difference */
-            var -= *(_miToConvolvePtr);
+            /* Variance estimate comes from sum of image variances */
+            var += (*(_miToConvolvePtr->getVariance()));
         }
-        _varianceEstimate = var.getVariance();
+        _varianceEstimate = VariancePtr( new afwImage::Image<afwImage::VariancePixel>(var) );
 
         try {
             _buildKernelSolution(basisList, hMat);

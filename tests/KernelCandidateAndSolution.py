@@ -355,11 +355,14 @@ class DiffimTestCases(unittest.TestCase):
             for i in range(kImageOut.getWidth()):
                 self.assertAlmostEqual(kImageOut.get(i, j)/kImageIn.get(i, j), 1.0, 5)
 
-
-    def testNoBackgroundFit(self):
+    def testConstantWeighting(self):
         self.policy.set("fitForBackground", False)
         self.testGaussian()
         self.testGaussianWithNoise()
+        
+    def testNoBackgroundFit(self):
+        self.policy.set("constantVarianceWeighting", True)
+        self.testGaussian()
 
     def testInsert(self):
         mi = afwImage.MaskedImageF(afwGeom.Extent2I(10, 10))

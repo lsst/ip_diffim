@@ -1,4 +1,5 @@
 import lsst.afw.image as afwImage
+import lsst.afw.detection as afwDet
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -61,16 +62,23 @@ pixelMask  = afwImage.MaskU(scienceImage.getMask(), True)
 # Add in template mask
 pixelMask |= templateImage.getMask()
 # And mask out the variability!
-# just hack it for now since its late
-for y in range(yCenter - maskSize//2, yCenter + maskSize//2):
-    for x in range(xCenter - maskSize//2, xCenter + maskSize//2):
-        maskVal  = pixelMask.get(x,y)
-        maskVal |= afwImage.MaskU_getPlaneBitMask("BAD")
-        pixelMask.set(x, y, maskVal)
+afwDet.setMaskFromFootprint(pixelMask, afwDet.Footprint(maskBBox), afwImage.MaskU_getPlaneBitMask("BAD"))
 
-# I found these centroids looking in ds9 and using pixel coords; therefore LOCAL 
+# Grab subimages
 tsi = afwImage.MaskedImageF(templateImage, candBBox, afwImage.PARENT)
 ssi = afwImage.MaskedImageF(scienceImage, candBBox, afwImage.PARENT)
+msi = afwImage.MaskU(pixelMask, candBBox, afwImage.PARENT)
+
+import pdb; pdb.set_trace()
+bbox   = ssi.getBBox(afwImage.PARENT)
+fp     = afwDet.Footprint(bbox)
+isbad  = afwImage.MaskU_getPlaneBitMask("BAD")
+ds9.mtv(afwImage.ImageU(msi.getArray()), frame=0)
+
+mask   = afwDet.footprintAndMask(fp, msi, 0x2)
+m2 = msi.Factory(msi.getBBox(afwImage.PARENT))
+afwDet.setMaskFromFootprint(m2, mask, isbad)
+ds9.mtv(afwImage.ImageU(m2.getArray()), frame=1)
 
 print 'cand', candBBox
 print 'mask', maskBBox
@@ -79,16 +87,10 @@ ds9.mtv(tsi, frame = 1)
 ds9.mtv(ssi, frame = 2)
 
 for soln in (soln1, soln2, soln3): # soln2, soln3):
-    #soln.buildSingleMaskOrig(tsi.getImage(),
-    #                         ssi.getImage(),
-    #                         ssi.getVariance(),
-    #                         maskBBox)
-    #soln.solve()
-
     soln.build(tsi.getImage(),
                ssi.getImage(),
                ssi.getVariance(),
-               afwImage.MaskU(pixelMask, candBBox, afwImage.PARENT))
+               msi)
     soln.solve()
     
 k1 = soln1.getKernel()

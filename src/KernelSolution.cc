@@ -24,6 +24,7 @@
 #include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/detection.h"
+#include "lsst/afw/detection/FootprintArray.cc"
 #include "lsst/pex/exceptions/Runtime.h"
 #include "lsst/pex/logging/Trace.h"
 
@@ -527,36 +528,85 @@ namespace diffim {
              afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("EDGE"));
         (*sMask) &= bitMask;
 
-        afwImage::Mask<int>::Ptr 
-            sMask1(new afwImage::Mask<int>(imageToConvolve.getDimensions()));
-        afwDet::Footprint::Ptr maskedFp1 = afwDet::footprintAndMask(fullFp, sMask1, ~0x0);
-        //afwImage::Mask<lsst::afw::image::MaskPixel>::Ptr 
-        //sMask2(new afwImage::Mask<lsst::afw::image::MaskPixel>(imageToConvolve.getDimensions()));
-        //afwDet::Footprint::Ptr maskedFp2 = afwDet::footprintAndMask(fullFp, sMask2, ~0x0);
-
         /* Create a Footprint that contains all the masked pixels set above */
-        //afwDet::Footprint::Ptr maskedFp = afwDet::footprintAndMask(fullFp, sMask, ~0x0);
-        /* OR */
-        //afwDet::Footprint::Ptr maskedFp2 = afwDet::footprintAndMask(fullFp, pixelMask, sMask);
-        
+        afwDet::Footprint::Ptr maskedFp = afwDet::footprintAndMask<afwImage::MaskPixel>(
+            fullFp, sMask, 0x0);
+        /* OR */ 
+        afwImage::Mask<lsst::afw::image::MaskPixel>::Ptr 
+            pMask(new afwImage::Mask<lsst::afw::image::MaskPixel>(pixelMask, true));
+        afwDet::Footprint::Ptr maskedFp2 = afwDet::footprintAndMask<afwImage::MaskPixel>(
+            fullFp, pMask, bitMask);
+
+        /* Debugging */
+        pixelMask.writeFits("m0.fits");
+        sMask->writeFits("ms.fits");
+        afwImage::Mask<lsst::afw::image::MaskPixel> m1(pixelMask.getDimensions());
+        m1.setXY0(imageToConvolve.getXY0());
+        (void)afwDet::setMaskFromFootprint<lsst::afw::image::MaskPixel>(&m1,
+                                                                  *maskedFp, 
+                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
+        m1.writeFits("m1.fits");
+        afwImage::Mask<lsst::afw::image::MaskPixel> m2(pixelMask.getDimensions());
+        m2.setXY0(imageToConvolve.getXY0());
+        (void)afwDet::setMaskFromFootprint<lsst::afw::image::MaskPixel>(&m2,
+                                                                  *maskedFp2, 
+                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
+        m2.writeFits("m2.fits");
+
         /* And spread it by the kernel size */
         int growPix = (*kiter)->getWidth();
-        afwDet::Footprint::Ptr maskedFpGrow; // = afwDet::growFootprint(maskedFp, growPix, false);
+        afwDet::Footprint::Ptr maskedFpGrow = afwDet::growFootprint(maskedFp, growPix, true);
+
+        afwDet::Footprint::Ptr maskedFpGrow2 = afwDet::growFootprint(maskedFp2, growPix, true);
+
+        afwImage::Mask<lsst::afw::image::MaskPixel> m3(pixelMask.getDimensions());
+        m3.setXY0(imageToConvolve.getXY0());
+        (void)afwDet::setMaskFromFootprint<lsst::afw::image::MaskPixel>(&m3,
+                                                                  *maskedFpGrow, 
+                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
+        m3.writeFits("m3.fits");
+        afwImage::Mask<lsst::afw::image::MaskPixel> m4(pixelMask.getDimensions());
+        m4.setXY0(imageToConvolve.getXY0());
+        (void)afwDet::setMaskFromFootprint<lsst::afw::image::MaskPixel>(&m4,
+                                                                  *maskedFpGrow2, 
+                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
+        m4.writeFits("m4.fits");
+
+        /* Debugging */
+        /*
+        sMask->writeFits("beforeGrow.fits");
+        afwImage::Mask<lsst::afw::image::MaskPixel> m1 = 
+            afwDet::setMaskFromFootprint(&sMask, 
+                                         maskedFp, 
+                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
+        m1.writeFits("beforeGrowM1.fits");
+        afwImage::Mask<lsst::afw::image::MaskPixel> m2 = 
+            afwDet::setMaskFromFootprint(&sMask, 
+                                         &maskedFpGrow, 
+                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
+        m2.writeFits("afterGrow.fits");
+        */  
         /* These will be pixels we *DONT* use in the computation below */
 
         ndarray::Array<InputT, 1, 1> arrayToConvolve = 
-            afwDet::flattenArray(*maskedFpGrow, imageToConvolve.getArray(), imageToConvolve.getXY0());
+            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
+        afwDet::flattenArray(*maskedFpGrow, imageToConvolve.getArray(), 
+                             arrayToConvolve, imageToConvolve.getXY0());
         ndarray::EigenView<InputT, 1, 1> eigenToConvolve = 
             ndarray::viewAsEigen(arrayToConvolve);
 
         ndarray::Array<InputT, 1, 1> arrayToNotConvolve = 
-            afwDet::flattenArray(*maskedFpGrow, imageToNotConvolve.getArray(), imageToNotConvolve.getXY0());
+            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
+        afwDet::flattenArray(*maskedFpGrow, imageToNotConvolve.getArray(), 
+                             arrayToNotConvolve, imageToNotConvolve.getXY0());
         ndarray::EigenView<InputT, 1, 1> eigenToNotConvolve = 
             ndarray::viewAsEigen(arrayToNotConvolve);
 
-        ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance =
-            afwDet::flattenArray(*maskedFpGrow, varianceEstimate.getArray(), varianceEstimate.getXY0());
-        ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance =
+        ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance = 
+            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
+        afwDet::flattenArray(*maskedFpGrow, varianceEstimate.getArray(), 
+                             arrayVariance, varianceEstimate.getXY0());
+        ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance = 
             ndarray::viewAsEigen(arrayVariance);
 
         boost::timer t;
@@ -582,7 +632,9 @@ namespace diffim {
             afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
 
             ndarray::Array<InputT, 1, 1> arrayC = 
-                afwDet::flattenArray(*maskedFpGrow, cimage.getArray(), cimage.getXY0());
+                lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
+            afwDet::flattenArray(*maskedFpGrow, cimage.getArray(), 
+                                 arrayC, cimage.getXY0());
             boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > 
                 eigenC (new ndarray::EigenView<InputT, 1, 1>(ndarray::viewAsEigen(arrayC)));
             
