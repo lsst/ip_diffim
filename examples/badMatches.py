@@ -123,6 +123,7 @@ if __name__ == '__main__':
         elif switch == 'C':
             # Delta function
             policy.set("kernelBasisSet", "delta-function")
+            policy.set("useRegularization", False)
     
         kList = ipDiffim.makeKernelBasisList(policy)
         bskv  = ipDiffim.BuildSingleKernelVisitorF(kList, policy)

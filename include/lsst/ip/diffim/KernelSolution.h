@@ -152,9 +152,7 @@ namespace diffim {
         virtual ~RegularizedKernelSolution() {};
         void solve();
         double getLambda() {return _lambda;}
-        double estimateUnbiasedRisk();
-        double estimateBiasedRisk();
-        double estimateGcv();
+        double estimateRisk(double maxCond);
 
         /* Include additive term (_lambda * _hMat) in M matrix? */
         boost::shared_ptr<Eigen::MatrixXd> getM(bool includeHmat = true);

@@ -195,7 +195,7 @@ fitSpatialKernelFromCandidates(
                         (*(importStarVisitor.returnMean()), true);
                     img.writeFits(str(boost::format("k%d_M.fits") % totalIterations)); 
 
-                    for (int j = 0; j < eigenImages.size(); j++) {
+                    for (unsigned int j = 0; j < eigenImages.size(); j++) {
                         afwImage::Image<afwMath::Kernel::Pixel> img = 
                             afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[j], true);
                         img.writeFits(str(boost::format("k%d_%d.fits") % totalIterations % j)); 

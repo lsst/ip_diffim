@@ -11,6 +11,7 @@
 #include <iterator>
 #include <cmath>
 #include <algorithm>
+#include <limits>
 
 #include "boost/timer.hpp" 
 
@@ -520,156 +521,105 @@ namespace diffim {
         std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
 
         /* Only BAD pixels marked in this mask */
-        afwImage::Mask<lsst::afw::image::MaskPixel>::Ptr 
-            sMask(new afwImage::Mask<lsst::afw::image::MaskPixel>(pixelMask, true));
         afwImage::MaskPixel bitMask = 
             (afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("BAD") | 
              afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("SAT") |
              afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("EDGE"));
-        (*sMask) &= bitMask;
 
         /* Create a Footprint that contains all the masked pixels set above */
-        afwDet::Footprint::Ptr maskedFp = afwDet::footprintAndMask<afwImage::MaskPixel>(
-            fullFp, sMask, 0x0);
-        /* OR */ 
-        afwImage::Mask<lsst::afw::image::MaskPixel>::Ptr 
-            pMask(new afwImage::Mask<lsst::afw::image::MaskPixel>(pixelMask, true));
-        afwDet::Footprint::Ptr maskedFp2 = afwDet::footprintAndMask<afwImage::MaskPixel>(
-            fullFp, pMask, bitMask);
+        afwDet::Threshold threshold = afwDet::Threshold(bitMask, afwDet::Threshold::BITMASK, true);
+        afwDet::FootprintSet<InputT, lsst::afw::image::MaskPixel> maskFpSet(pixelMask, threshold, true);
 
-        /* Debugging */
-        pixelMask.writeFits("m0.fits");
-        sMask->writeFits("ms.fits");
-        afwImage::Mask<lsst::afw::image::MaskPixel> m1(pixelMask.getDimensions());
-        m1.setXY0(imageToConvolve.getXY0());
-        (void)afwDet::setMaskFromFootprint<lsst::afw::image::MaskPixel>(&m1,
-                                                                  *maskedFp, 
-                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
-        m1.writeFits("m1.fits");
-        afwImage::Mask<lsst::afw::image::MaskPixel> m2(pixelMask.getDimensions());
-        m2.setXY0(imageToConvolve.getXY0());
-        (void)afwDet::setMaskFromFootprint<lsst::afw::image::MaskPixel>(&m2,
-                                                                  *maskedFp2, 
-                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
-        m2.writeFits("m2.fits");
+        /* And spread it by the kernel half width */
+        int growPix = (*kiter)->getCtr().getX();
+        afwDet::FootprintSet<InputT, lsst::afw::image::MaskPixel> maskedFpSetGrown = 
+            afwDet::FootprintSet<InputT, lsst::afw::image::MaskPixel>(maskFpSet, growPix, true);
 
-        /* And spread it by the kernel size */
-        int growPix = (*kiter)->getWidth();
-        afwDet::Footprint::Ptr maskedFpGrow = afwDet::growFootprint(maskedFp, growPix, true);
-
-        afwDet::Footprint::Ptr maskedFpGrow2 = afwDet::growFootprint(maskedFp2, growPix, true);
-
-        afwImage::Mask<lsst::afw::image::MaskPixel> m3(pixelMask.getDimensions());
-        m3.setXY0(imageToConvolve.getXY0());
-        (void)afwDet::setMaskFromFootprint<lsst::afw::image::MaskPixel>(&m3,
-                                                                  *maskedFpGrow, 
-                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
-        m3.writeFits("m3.fits");
-        afwImage::Mask<lsst::afw::image::MaskPixel> m4(pixelMask.getDimensions());
-        m4.setXY0(imageToConvolve.getXY0());
-        (void)afwDet::setMaskFromFootprint<lsst::afw::image::MaskPixel>(&m4,
-                                                                  *maskedFpGrow2, 
-                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
-        m4.writeFits("m4.fits");
-
-        /* Debugging */
-        /*
-        sMask->writeFits("beforeGrow.fits");
-        afwImage::Mask<lsst::afw::image::MaskPixel> m1 = 
-            afwDet::setMaskFromFootprint(&sMask, 
-                                         maskedFp, 
-                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
-        m1.writeFits("beforeGrowM1.fits");
-        afwImage::Mask<lsst::afw::image::MaskPixel> m2 = 
-            afwDet::setMaskFromFootprint(&sMask, 
-                                         &maskedFpGrow, 
-                             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("DETECTED"));
-        m2.writeFits("afterGrow.fits");
-        */  
-        /* These will be pixels we *DONT* use in the computation below */
-
-        ndarray::Array<InputT, 1, 1> arrayToConvolve = 
-            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
-        afwDet::flattenArray(*maskedFpGrow, imageToConvolve.getArray(), 
-                             arrayToConvolve, imageToConvolve.getXY0());
-        ndarray::EigenView<InputT, 1, 1> eigenToConvolve = 
-            ndarray::viewAsEigen(arrayToConvolve);
-
-        ndarray::Array<InputT, 1, 1> arrayToNotConvolve = 
-            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
-        afwDet::flattenArray(*maskedFpGrow, imageToNotConvolve.getArray(), 
-                             arrayToNotConvolve, imageToNotConvolve.getXY0());
-        ndarray::EigenView<InputT, 1, 1> eigenToNotConvolve = 
-            ndarray::viewAsEigen(arrayToNotConvolve);
-
-        ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance = 
-            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
-        afwDet::flattenArray(*maskedFpGrow, varianceEstimate.getArray(), 
-                             arrayVariance, varianceEstimate.getXY0());
-        ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance = 
-            ndarray::viewAsEigen(arrayVariance);
-
-        boost::timer t;
-        t.restart();
-
-        unsigned int const nKernelParameters     = basisList.size();
-        unsigned int const nBackgroundParameters = this->_fitForBackground ? 1 : 0;
-        unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
-
-        /* Holds image convolved with basis function */
-        afwImage::Image<InputT> cimage(imageToConvolve.getDimensions());
-        
-        /* Holds eigen representation of image convolved with all basis functions */
-        std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >
-            convolvedEigenList(nKernelParameters);
-        
-        /* Iterators over convolved image list and basis list */
-        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiter = 
-            convolvedEigenList.begin();
-
-        /* Create C_i in the formalism of Alard & Lupton */
-        for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
-            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
-
-            ndarray::Array<InputT, 1, 1> arrayC = 
-                lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
-            afwDet::flattenArray(*maskedFpGrow, cimage.getArray(), 
-                                 arrayC, cimage.getXY0());
-            boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > 
-                eigenC (new ndarray::EigenView<InputT, 1, 1>(ndarray::viewAsEigen(arrayC)));
-            
-            *eiter = eigenC;
-        }
-        double time = t.elapsed();
-        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.build", 
-                          "Total compute time to do basis convolutions : %.2f s", time);
-        t.restart();
-        
-        /* Load matrix with all convolved images */
-        Eigen::MatrixXd cMat(eigenToConvolve.size(), nParameters);
-        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiterj = 
-            convolvedEigenList.begin();
-        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiterE = 
-            convolvedEigenList.end();
-        for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-            cMat.col(kidxj) = (*eiterj)->template cast<double>();
-        }
-        /* Treat the last "image" as all 1's to do the background calculation. */
-        if (this->_fitForBackground)
-            cMat.col(nParameters-1).fill(1.);
-        
-        this->_cMat.reset(new Eigen::MatrixXd(cMat));
-        this->_ivVec.reset(new Eigen::VectorXd((eigenVariance.template cast<double>()).cwise().inverse()));
-        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.template cast<double>()));
-
-        /* Make these outside of solve() so I can check condition number */
-        this->_mMat.reset(
-            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
-            );
-        this->_bVec.reset(
-            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
-            );
     }
+
+//        ndarray::Array<InputT, 1, 1> arrayToConvolve = 
+//            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
+//        afwDet::flattenArray(*maskedFpGrow, imageToConvolve.getArray(), 
+//                             arrayToConvolve, imageToConvolve.getXY0());
+//        ndarray::EigenView<InputT, 1, 1> eigenToConvolve = 
+//            ndarray::viewAsEigen(arrayToConvolve);
+//
+//        ndarray::Array<InputT, 1, 1> arrayToNotConvolve = 
+//            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
+//        afwDet::flattenArray(*maskedFpGrow, imageToNotConvolve.getArray(), 
+//                             arrayToNotConvolve, imageToNotConvolve.getXY0());
+//        ndarray::EigenView<InputT, 1, 1> eigenToNotConvolve = 
+//            ndarray::viewAsEigen(arrayToNotConvolve);
+//
+//        ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance = 
+//            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
+//        afwDet::flattenArray(*maskedFpGrow, varianceEstimate.getArray(), 
+//                             arrayVariance, varianceEstimate.getXY0());
+//        ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance = 
+//            ndarray::viewAsEigen(arrayVariance);
+//
+//        boost::timer t;
+//        t.restart();
+//
+//        unsigned int const nKernelParameters     = basisList.size();
+//        unsigned int const nBackgroundParameters = this->_fitForBackground ? 1 : 0;
+//        unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
+//
+//        /* Holds image convolved with basis function */
+//        afwImage::Image<InputT> cimage(imageToConvolve.getDimensions());
+//        
+//        /* Holds eigen representation of image convolved with all basis functions */
+//        std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >
+//            convolvedEigenList(nKernelParameters);
+//        
+//        /* Iterators over convolved image list and basis list */
+//        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiter = 
+//            convolvedEigenList.begin();
+//
+//        /* Create C_i in the formalism of Alard & Lupton */
+//        for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
+//            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+//
+//            ndarray::Array<InputT, 1, 1> arrayC = 
+//                lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
+//            afwDet::flattenArray(*maskedFpGrow, cimage.getArray(), 
+//                                 arrayC, cimage.getXY0());
+//            boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > 
+//                eigenC (new ndarray::EigenView<InputT, 1, 1>(ndarray::viewAsEigen(arrayC)));
+//            
+//            *eiter = eigenC;
+//        }
+//        double time = t.elapsed();
+//        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.build", 
+//                          "Total compute time to do basis convolutions : %.2f s", time);
+//        t.restart();
+//        
+//        /* Load matrix with all convolved images */
+//        Eigen::MatrixXd cMat(eigenToConvolve.size(), nParameters);
+//        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiterj = 
+//            convolvedEigenList.begin();
+//        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiterE = 
+//            convolvedEigenList.end();
+//        for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
+//            cMat.col(kidxj) = (*eiterj)->template cast<double>();
+//        }
+//        /* Treat the last "image" as all 1's to do the background calculation. */
+//        if (this->_fitForBackground)
+//            cMat.col(nParameters-1).fill(1.);
+//        
+//        this->_cMat.reset(new Eigen::MatrixXd(cMat));
+//        this->_ivVec.reset(new Eigen::VectorXd((eigenVariance.template cast<double>()).cwise().inverse()));
+//        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.template cast<double>()));
+//
+//        /* Make these outside of solve() so I can check condition number */
+//        this->_mMat.reset(
+//            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
+//            );
+//        this->_bVec.reset(
+//            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
+//            );
+        //}
+
 
     template <typename InputT>
     void MaskedKernelSolution<InputT>::buildOrig(
@@ -1075,76 +1025,7 @@ namespace diffim {
     {};
 
     template <typename InputT>
-    double RegularizedKernelSolution<InputT>::estimateBiasedRisk() {
-        double tol = _policy.getDouble("maxConditionNumber");
-
-        /* 
-           MASSIVE WARNING : The eigenvalues returned by SelfAdjointEigenSolver
-           are sorted SMALLEST to LARGEST.  Yikes...
-        */
-        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(*(this->_mMat));
-        Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
-        Eigen::VectorXd eValues = eVecValues.eigenvalues();
-        double eMax = eValues.maxCoeff();
-        
-        for (int i = 0; i < eValues.rows(); ++i) {
-            if ((eMax / eValues(i)) > tol) {
-                pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateBiasedRisk", 
-                                  "Truncating eValue %d; %.5e / %.5e = %.5e vs. %.5e",
-                                  i, eMax, eValues(i), eMax / eValues(i), tol);
-                eValues(i) = 0.;
-            }
-            else {
-                eValues(i) = 1.0 / eValues(i);
-            }
-        }
-        Eigen::MatrixXd mInvBiased = rMat * eValues.asDiagonal() * rMat.transpose();
-        Eigen::MatrixXd vMat       = (this->_cMat)->svd().matrixV();
-        Eigen::MatrixXd vMatvMatT  = vMat * vMat.transpose();
-
-        std::vector<double> lambdas = _createLambdaSteps();
-        std::vector<double> risks;
-        for (unsigned int i = 0; i < lambdas.size(); i++) {
-            double l = lambdas[i];
-            Eigen::MatrixXd mLambda    = *(this->_mMat) + l * (*_hMat);
-            
-            try {
-                KernelSolution::solve(mLambda, *(this->_bVec));
-            } catch (pexExcept::Exception &e) {
-                LSST_EXCEPT_ADD(e, "Unable to solve regularized kernel matrix");
-                throw e;
-            }
-            Eigen::VectorXd term1 = (this->_aVec->transpose() * vMatvMatT * *(this->_aVec));
-            if (term1.size() != 1)
-                throw LSST_EXCEPT(pexExcept::Exception, "Matrix size mismatch");
-
-            double term2a = (vMatvMatT * mLambda.inverse()).trace();
-
-            Eigen::VectorXd term2b = (this->_aVec->transpose() * (mInvBiased * *(this->_bVec)));
-            if (term2b.size() != 1)
-                throw LSST_EXCEPT(pexExcept::Exception, "Matrix size mismatch");
-
-            double risk   = term1(0) + 2 * (term2a - term2b(0));
-            pexLog::TTrace<6>("lsst.ip.diffim.RegularizedKernelSolution.estimateBiasedRisk", 
-                              "Lambda = %.3f, Risk = %.5e", 
-                              l, risk);
-            pexLog::TTrace<7>("lsst.ip.diffim.RegularizedKernelSolution.estimateBiasedRisk", 
-                              "%.5e + 2 * (%.5e - %.5e)", 
-                              term1(0), term2a, term2b(0));
-            risks.push_back(risk);
-        }
-        std::vector<double>::iterator it = min_element(risks.begin(), risks.end());
-        int index = distance(risks.begin(), it);
-        pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateBiasedRisk", 
-                          "Minimum Risk = %.3e at lambda = %.3e", risks[index], lambdas[index]);
-
-        return lambdas[index];
-    }
-        
-                
-    template <typename InputT>
-    double RegularizedKernelSolution<InputT>::estimateUnbiasedRisk() {
-
+    double RegularizedKernelSolution<InputT>::estimateRisk(double maxCond) {
         Eigen::MatrixXd vMat      = (this->_cMat)->svd().matrixV();
         Eigen::MatrixXd vMatvMatT = vMat * vMat.transpose();
 
@@ -1152,9 +1033,19 @@ namespace diffim {
         Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(*(this->_mMat));
         Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
         Eigen::VectorXd eValues = eVecValues.eigenvalues();
+        double eMax = eValues.maxCoeff();
         for (int i = 0; i != eValues.rows(); ++i) {
-            if (eValues(i) != 0.0) {
-                eValues(i) = 1.0/eValues(i);
+            if (eValues(i) == 0.0) {
+                eValues(i) = 0.0;
+            }
+            else if ((eMax / eValues(i)) > maxCond) {
+                pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateRisk", 
+                                  "Truncating eValue %d; %.5e / %.5e = %.5e vs. %.5e",
+                                  i, eMax, eValues(i), eMax / eValues(i), maxCond);
+                eValues(i) = 0.0;
+            }
+            else {
+                eValues(i) = 1.0 / eValues(i);
             }
         }
         Eigen::MatrixXd mInv    = rMat * eValues.asDiagonal() * rMat.transpose();
@@ -1182,57 +1073,23 @@ namespace diffim {
                 throw LSST_EXCEPT(pexExcept::Exception, "Matrix size mismatch");
 
             double risk   = term1(0) + 2 * (term2a - term2b(0));
-            pexLog::TTrace<6>("lsst.ip.diffim.RegularizedKernelSolution.estimateUnbiasedRisk", 
+            pexLog::TTrace<6>("lsst.ip.diffim.RegularizedKernelSolution.estimateRisk", 
                               "Lambda = %.3f, Risk = %.5e", 
                               l, risk);
-            pexLog::TTrace<7>("lsst.ip.diffim.RegularizedKernelSolution.estimateUnbiasedRisk", 
+            pexLog::TTrace<7>("lsst.ip.diffim.RegularizedKernelSolution.estimateRisk", 
                               "%.5e + 2 * (%.5e - %.5e)", 
                               term1(0), term2a, term2b(0));
             risks.push_back(risk);
         }
         std::vector<double>::iterator it = min_element(risks.begin(), risks.end());
         int index = distance(risks.begin(), it);
-        pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateUnbiasedRisk", 
+        pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateRisk", 
                           "Minimum Risk = %.3e at lambda = %.3e", risks[index], lambdas[index]);
 
         return lambdas[index];
-    }
-
-    template <typename InputT>
-    double RegularizedKernelSolution<InputT>::estimateGcv() {
-
-        std::vector<double> lambdas = _createLambdaSteps();
-        std::vector<double> gcvs;
-        for (unsigned int i = 0; i < lambdas.size(); i++) {
-            double l = lambdas[i];
-
-            try {
-                KernelSolution::solve(*(this->_mMat) + l * (*_hMat), *(this->_bVec));
-            } catch (pexExcept::Exception &e) {
-                LSST_EXCEPT_ADD(e, "Unable to solve regularized kernel matrix");
-                throw e;
-            }
-            double denominator = (Eigen::MatrixXd::Identity(this->_mMat->rows(), this->_mMat->cols()) - 
-                                  ((*this->_mMat) + l * (*_hMat)).inverse() * (*this->_mMat)).trace();
-            denominator *= denominator;
-
-            Eigen::VectorXd dVec = (*this->_iVec) - *(this->_cMat) * *(this->_aVec);
-            double numerator   = (dVec.transpose() * dVec).sum();
-            //double numerator   = (dVec.transpose() * this->_ivVec->asDiagonal() * dVec).sum();
-            double gcv         = numerator / denominator;
-            pexLog::TTrace<6>("lsst.ip.diffim.RegularizedKernelSolution.estimateGcv", 
-                              "Lambda = %.3f, GCV = %.5e", l, gcv);
-
-            gcvs.push_back(gcv);
-        }
-        std::vector<double>::iterator it = min_element(gcvs.begin(), gcvs.end());
-        int index = distance(gcvs.begin(), it);
-        pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateGcv", 
-                          "Minimum Gcv = %.3e at lambda = %.3e", gcvs[index], lambdas[index]);
-
-        return lambdas[index];
-    }
         
+    }
+
     template <typename InputT>
     boost::shared_ptr<Eigen::MatrixXd> RegularizedKernelSolution<InputT>::getM(bool includeHmat) {
         if (includeHmat == true) {
@@ -1333,14 +1190,12 @@ namespace diffim {
             _lambda *= lambdaValue;
         }
         else if (lambdaType ==  "minimizeBiasedRisk") {
-            _lambda = estimateBiasedRisk();
+            double tol = _policy.getDouble("maxConditionNumber");
+            _lambda = estimateRisk(tol);
         }
         else if (lambdaType ==  "minimizeUnbiasedRisk") {
-            _lambda = estimateUnbiasedRisk();
+            _lambda = estimateRisk(std::numeric_limits<double>::max());
         }
-        //else if (lambdaType ==  "minimizeGcv") {
-        //_lambda = estimateGcv();
-        //}
         else {
             throw LSST_EXCEPT(pexExcept::Exception, "lambdaType in Policy not recognized");
         }

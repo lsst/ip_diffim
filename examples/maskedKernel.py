@@ -69,7 +69,7 @@ tsi = afwImage.MaskedImageF(templateImage, candBBox, afwImage.PARENT)
 ssi = afwImage.MaskedImageF(scienceImage, candBBox, afwImage.PARENT)
 msi = afwImage.MaskU(pixelMask, candBBox, afwImage.PARENT)
 
-import pdb; pdb.set_trace()
+#import pdb; pdb.set_trace()
 bbox   = ssi.getBBox(afwImage.PARENT)
 fp     = afwDet.Footprint(bbox)
 isbad  = afwImage.MaskU_getPlaneBitMask("BAD")
