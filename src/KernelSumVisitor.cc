@@ -8,6 +8,7 @@
  *
  * @ingroup ip_diffim
  */
+#include <limits>
 
 #include "lsst/afw/math.h"
 #include "lsst/pex/policy/Policy.h"
@@ -138,6 +139,15 @@ namespace detail {
             LSST_EXCEPT_ADD(e, "Unable to calculate kernel sum statistics");
             throw e;
         }
+        if (std::isnan(_kSumMean)) {
+            throw LSST_EXCEPT(pexExcept::Exception, 
+                              str(boost::format("Mean kernel sum returns NaN (%d points)") % _kSumNpts));
+        }
+        if (std::isnan(_kSumStd)) {
+            throw LSST_EXCEPT(pexExcept::Exception, 
+                              str(boost::format("Kernel sum stdev returns NaN (%d points)") % _kSumNpts));
+        }
+
         _dkSumMax = _policy.getDouble("maxKsumSigma") * _kSumStd;
         pexLogging::TTrace<2>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
                               "Kernel Sum Distribution : %.3f +/- %.3f (%d points)", 

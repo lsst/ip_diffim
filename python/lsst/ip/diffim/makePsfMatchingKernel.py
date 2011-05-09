@@ -22,7 +22,17 @@ def psfMatchImageToImage(maskedImageToConvolve,
                          policy,
                          footprints=None):
 
+    # Reminder about background subtraction
+    median1 = afwMath.makeStatistics(maskedImageToConvolve, afwMath.MEDIAN).getValue(afwMath.MEDIAN)
+    median2 = afwMath.makeStatistics(maskedImageToNotConvolve, afwMath.MEDIAN).getValue(afwMath.MEDIAN)
+    doBg    = policy.get("fitForBackground")
+    if (not doBg) and abs(median1 - median2) > 10.0:
+        pexLog.Trace("lsst.ip.diffim.psfMatchImageToImage", 1,
+                     "WARNING: fitForBackground = False but background1 = %.1f, background2 = %.1f" %
+                     median1, median2)
+        
 
+    
     # Object to store the KernelCandidates for spatial modeling
     kernelCellSet = afwMath.SpatialCellSet(maskedImageToConvolve.getBBox(afwImage.PARENT),
                                            policy.getInt("sizeCellX"),
