@@ -273,6 +273,16 @@ namespace diffim {
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate
         ) {
 
+        afwMath::Statistics varStats = afwMath::makeStatistics(varianceEstimate, afwMath::MIN);
+        if (varStats.getValue(afwMath::MIN) < 0.0) {
+            throw LSST_EXCEPT(pexExcept::Exception, 
+                              "Error: variance less than 0.0");
+        }
+        if (varStats.getValue(afwMath::MIN) == 0.0) {
+            throw LSST_EXCEPT(pexExcept::Exception, 
+                              "Error: variance equals 0.0, cannot inverse variance weight");
+        }
+
         lsst::afw::math::KernelList basisList = 
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
         
@@ -513,6 +523,16 @@ namespace diffim {
         lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const &pixelMask
         ) {
 
+        afwMath::Statistics varStats = afwMath::makeStatistics(varianceEstimate, afwMath::MIN);
+        if (varStats.getValue(afwMath::MIN) < 0.0) {
+            throw LSST_EXCEPT(pexExcept::Exception, 
+                              "Error: variance less than 0.0");
+        }
+        if (varStats.getValue(afwMath::MIN) == 0.0) {
+            throw LSST_EXCEPT(pexExcept::Exception, 
+                              "Error: variance equals 0.0, cannot inverse variance weight");
+        }
+
         /* Full footprint of all input images */
         afwDet::Footprint::Ptr fullFp(new afwDet::Footprint(imageToConvolve.getBBox(afwImage::PARENT)));
 
@@ -628,6 +648,16 @@ namespace diffim {
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
         lsst::afw::image::Mask<lsst::afw::image::MaskPixel> pixelMask
         ) {
+
+        afwMath::Statistics varStats = afwMath::makeStatistics(varianceEstimate, afwMath::MIN);
+        if (varStats.getValue(afwMath::MIN) < 0.0) {
+            throw LSST_EXCEPT(pexExcept::Exception, 
+                              "Error: variance less than 0.0");
+        }
+        if (varStats.getValue(afwMath::MIN) == 0.0) {
+            throw LSST_EXCEPT(pexExcept::Exception, 
+                              "Error: variance equals 0.0, cannot inverse variance weight");
+        }
 
         lsst::afw::math::KernelList basisList = 
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
@@ -788,6 +818,16 @@ namespace diffim {
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
         lsst::afw::geom::Box2I maskBox
         ) {
+
+        afwMath::Statistics varStats = afwMath::makeStatistics(varianceEstimate, afwMath::MIN);
+        if (varStats.getValue(afwMath::MIN) < 0.0) {
+            throw LSST_EXCEPT(pexExcept::Exception, 
+                              "Error: variance less than 0.0");
+        }
+        if (varStats.getValue(afwMath::MIN) == 0.0) {
+            throw LSST_EXCEPT(pexExcept::Exception, 
+                              "Error: variance equals 0.0, cannot inverse variance weight");
+        }
 
         lsst::afw::math::KernelList basisList = 
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();

@@ -355,6 +355,24 @@ class DiffimTestCases(unittest.TestCase):
             for i in range(kImageOut.getWidth()):
                 self.assertAlmostEqual(kImageOut.get(i, j)/kImageIn.get(i, j), 1.0, 5)
 
+    def testZeroVariance(self, imsize = 50):
+        gsize = self.policy.getInt("kernelSize")
+        tsize = imsize + gsize
+
+        self.policy.set("kernelBasisSet", "delta-function")
+        
+        tmi = afwImage.MaskedImageF(afwGeom.Extent2I(tsize, tsize))
+        tmi.set(0, 0x0, 1.0)
+        cpix = tsize // 2
+        tmi.set(cpix, cpix, (1, 0x0, 0.0))
+        smi = afwImage.MaskedImageF(afwGeom.Extent2I(tsize, tsize))
+        smi.set(0, 0x0, 1.0)
+        smi.set(cpix, cpix, (1, 0x0, 0.0))
+
+        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi, smi, self.policy)
+        kc.build(kList)
+        
     def testConstantWeighting(self):
         self.policy.set("fitForBackground", False)
         self.testGaussian()
