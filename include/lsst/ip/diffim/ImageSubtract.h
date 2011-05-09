@@ -117,7 +117,7 @@ namespace diffim {
 
             if ((!lsst::utils::lsst_isfinite(_xsum)) || (!lsst::utils::lsst_isfinite(_x2sum))) {
                 throw LSST_EXCEPT(pexExcept::Exception, 
-                                  "Nan/Inf in ImageStatistics.apply (check the variance for 0s)");
+                                  "Nan/Inf in ImageStatistics.apply (check the variance for zeroes)");
             }
         }
 

@@ -20,7 +20,8 @@ if display:
 def psfMatchImageToImage(maskedImageToConvolve,
                          maskedImageToNotConvolve,
                          policy,
-                         footprints=None):
+                         footprints = None,
+                         returnOnExcept = False):
 
     # Reminder about background subtraction
     median1 = afwMath.makeStatistics(maskedImageToConvolve, afwMath.MEDIAN).getValue(afwMath.MEDIAN)
@@ -28,7 +29,7 @@ def psfMatchImageToImage(maskedImageToConvolve,
     doBg    = policy.get("fitForBackground")
     if (not doBg) and abs(median1 - median2) > 10.0:
         pexLog.Trace("lsst.ip.diffim.psfMatchImageToImage", 1,
-                     "WARNING: fitForBackground = False but background1 = %.1f, background2 = %.1f" %
+                     "WARNING: fitForBackground = False, but background1 = %.1f, background2 = %.1f" %
                      median1, median2)
         
 
@@ -71,7 +72,11 @@ def psfMatchImageToImage(maskedImageToConvolve,
                      "ERROR: Unable to calculate psf matching kernel")
         pexLog.Trace("lsst.ip.diffim.psfMatchImageToImage", 2,
                      e.args[0].what())
-        raise
+
+        if returnOnExcept:
+            return None, None, kernelCellSet
+        else:
+            raise
     else:
         spatialKernel = kb.first
         spatialBg     = kb.second

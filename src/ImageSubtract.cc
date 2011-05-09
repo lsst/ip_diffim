@@ -290,7 +290,9 @@ fitSpatialKernelFromCandidates(
             pexLog::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                               "Spatial Kernel iteration %d, rejected %d Kernels, using %d Kernels", 
                               i+1, nRejectedSpatial, spatialKernelAssessor.getNGood());
-
+            if (spatialKernelAssessor.getNGood() == 0) {
+                throw LSST_EXCEPT(pexExcept::Exception, "No good candidates for spatial model");            
+            }
             if (nRejectedSpatial == 0) {
                 /* Nothing rejected, finished with spatial fit */
                 break;
