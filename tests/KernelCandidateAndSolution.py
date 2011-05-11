@@ -371,7 +371,12 @@ class DiffimTestCases(unittest.TestCase):
 
         kList = ipDiffim.makeKernelBasisList(self.policy)
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi, smi, self.policy)
-        kc.build(kList)
+        try:
+            kc.build(kList)
+        except Exception, e:
+            pass
+        else:
+            self.fail()
         
     def testConstantWeighting(self):
         self.policy.set("fitForBackground", False)
