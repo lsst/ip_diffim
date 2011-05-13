@@ -18,6 +18,7 @@
 
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
+#include "lsst/afw/geom.h"
 
 #include "lsst/pex/logging/Trace.h"
 #include "lsst/pex/logging/Log.h"
@@ -26,6 +27,7 @@
 
 #include "lsst/ip/diffim.h"
 
+namespace afwGeom    = lsst::afw::geom;
 namespace afwImage   = lsst::afw::image;
 namespace afwMath    = lsst::afw::math;
 namespace pexExcept  = lsst::pex::exceptions; 
@@ -267,7 +269,9 @@ fitSpatialKernelFromCandidates(
 
                 
             /* We have gotten on to the spatial modeling part */
+            afwGeom::Box2I regionBBox = kernelCells.getBBox();
             detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(spatialBasisList, 
+                                                                          regionBBox,
                                                                           policy);
             kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
             spatialKernelFitter.solveLinearEquation();

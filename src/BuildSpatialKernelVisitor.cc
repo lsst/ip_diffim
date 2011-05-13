@@ -71,12 +71,66 @@ namespace detail {
     template<typename PixelT>
     BuildSpatialKernelVisitor<PixelT>::BuildSpatialKernelVisitor(
         lsst::afw::math::KernelList const& basisList, ///< Basis functions used in the fit
-        lsst::pex::policy::Policy policy         ///< Policy file directing behavior
+        lsst::afw::geom::Box2I const& regionBBox,     ///< Spatial region over which the function is fit
+        lsst::pex::policy::Policy policy              ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
-        _kernelSolution(new SpatialKernelSolution(basisList, policy)),
+        _kernelSolution(),
         _nCandidates(0) 
-    {};
+    {
+        int spatialKernelOrder = policy.getInt("spatialKernelOrder");
+        afwMath::Kernel::SpatialFunctionPtr spatialKernelFunction;
+
+        std::string spatialKernelType = policy.getString("spatialKernelType");
+        if (spatialKernelType == "chebyshev1") {
+            spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
+                new afwMath::Chebyshev1Function2<double>(spatialKernelOrder,
+                                                         regionBBox.getBeginX(),
+                                                         regionBBox.getBeginY(),
+                                                         regionBBox.getEndX(),
+                                                         regionBBox.getEndY())
+                );
+        }
+        else if (spatialKernelType == "polynomial") {
+            spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
+                new afwMath::PolynomialFunction2<double>(spatialKernelOrder)
+                );
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception,
+                              str(boost::format("Invalid type (%s) for spatial kernel model") % 
+                                  spatialKernelType));
+        }
+        
+        /* */
+
+        int fitForBackground = policy.getBool("fitForBackground");
+        int spatialBgOrder   = fitForBackground ? policy.getInt("spatialBgOrder") : 0;
+        afwMath::Kernel::SpatialFunctionPtr background;
+
+        std::string spatialBgType = policy.getString("spatialBgType");
+        if (spatialBgType == "chebyshev1") {
+            background = afwMath::Kernel::SpatialFunctionPtr(
+                new afwMath::Chebyshev1Function2<double>(spatialBgOrder,
+                                                         regionBBox.getBeginX(),
+                                                         regionBBox.getBeginY(),
+                                                         regionBBox.getEndX(),
+                                                         regionBBox.getEndY())
+                );
+        }
+        else if (spatialBgType == "polynomial") {
+            background = afwMath::Kernel::SpatialFunctionPtr(
+                new afwMath::PolynomialFunction2<double>(spatialBgOrder)
+                );
+        }
+        else {
+            throw LSST_EXCEPT(pexExcept::Exception,
+                              str(boost::format("Invalid type (%s) for spatial background model") % 
+                                  spatialBgType));
+        }
+        _kernelSolution = boost::shared_ptr<SpatialKernelSolution>(
+            new SpatialKernelSolution(basisList, spatialKernelFunction, background, policy));
+    };
     
     
     template<typename PixelT>

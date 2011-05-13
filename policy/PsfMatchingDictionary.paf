@@ -297,11 +297,41 @@ definitions: {
     #
     # Spatial modeling
     #
+    spatialKernelType: {
+        type: string
+        description: "Type of spatial function for kernel"
+        maxOccurs: 1
+        default: "polynomial"
+        allowed: {
+            value:        "chebyshev1"
+            description:  "Chebyshev polynomial of the first kind"
+        }
+        allowed: {
+            value:        "polynomial"
+            description:  "Standard x,y polynomial"
+        }
+    }
+
     spatialKernelOrder: {
         type: int
         description: "Spatial order of convolution kernel variation"
         maxOccurs: 1
         default: 1
+    }
+
+    spatialBgType: {
+        type: string
+        description: "Type of spatial function for kernel"
+        maxOccurs: 1
+        default: "polynomial"
+        allowed: {
+            value:        "chebyshev1"
+            description:  "Chebyshev polynomial of the first kind"
+        }
+        allowed: {
+            value:        "polynomial"
+            description:  "Standard x,y polynomial"
+        }
     }
 
     spatialBgOrder: {

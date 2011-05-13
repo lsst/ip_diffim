@@ -51,8 +51,11 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('fitForBackground', False)
         basisList = ipDiffim.makeKernelBasisList(self.policy)
 
+        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0),
+                             afwGeom.Extent2I(self.size*10, self.size*10))
+
         bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, self.policy)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
         
         for x in numpy.arange(1, self.size, 10):
             for y in numpy.arange(1, self.size, 10):
@@ -89,6 +92,32 @@ class DiffimTestCases(unittest.TestCase):
         nBgTerms = 1
         self.assertEqual(len(spatialBgSolution), nBgTerms)
 
+    def testModelType(self):
+        bbox = afwGeom.Box2I(afwGeom.Point2I(10, 10),
+                             afwGeom.Extent2I(10, 10))
+        basisList = ipDiffim.makeKernelBasisList(self.policy)
+        
+        self.policy.set("spatialKernelType", "polynomial") 
+        self.policy.set("spatialBgType", "polynomial")
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
+
+        self.policy.set("spatialKernelType", "chebyshev1") 
+        self.policy.set("spatialBgType", "chebyshev1")
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
+
+        try:
+            self.policy.set("spatialKernelType", "foo") 
+            self.policy.set("spatialBgType", "foo")
+            bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
+        except:
+            pass
+        else:
+            self.fail()
+            
+        
+    def runModelType(self, kmodel, bgmodel):
+        caw
+
     def testAlSpatialModel(self):
         self.runAlSpatialModel(0, 0)
         self.runAlSpatialModel(1, 0)
@@ -103,8 +132,11 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('fitForBackground', True)
         basisList = ipDiffim.makeKernelBasisList(self.policy)
 
+        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0),
+                             afwGeom.Extent2I(self.size*10, self.size*10))
+
         bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, self.policy)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
         
         for x in numpy.arange(1, self.size, 10):
             for y in numpy.arange(1, self.size, 10):

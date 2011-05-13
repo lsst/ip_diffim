@@ -156,7 +156,7 @@ SWIG_SHARED_PTR_DERIVED(RegularizedKernelSolution##NAME,
                         lsst::ip::diffim::RegularizedKernelSolution<TYPE>);
 %enddef
 
-%define %KernelCandidates(NAME, TYPE)
+%define %KernelSolutions(NAME, TYPE)
 %template(StaticKernelSolution##NAME) lsst::ip::diffim::StaticKernelSolution<TYPE>;
 %template(MaskedKernelSolution##NAME) lsst::ip::diffim::MaskedKernelSolution<TYPE>;
 %template(RegularizedKernelSolution##NAME) lsst::ip::diffim::RegularizedKernelSolution<TYPE>;
@@ -164,12 +164,15 @@ SWIG_SHARED_PTR_DERIVED(RegularizedKernelSolution##NAME,
 
 SWIG_SHARED_PTR(KernelSolution, lsst::ip::diffim::KernelSolution);
 SWIG_SHARED_PTR(StaticKernelSolution, lsst::ip::diffim::StaticKernelSolution);
+SWIG_SHARED_PTR(MaskedKernelSolution, lsst::ip::diffim::MaskedKernelSolution);
+SWIG_SHARED_PTR(RegularizedKernelSolution, lsst::ip::diffim::RegularizedKernelSolution);
 SWIG_SHARED_PTR(SpatialKernelSolution, lsst::ip::diffim::SpatialKernelSolution);
+
 %KernelSolutionPtrs(F, float);
 
 %include "lsst/ip/diffim/KernelSolution.h"
 
-%KernelCandidates(F, float);
+%KernelSolutions(F, float);
 
 /******************************************************************************/
 

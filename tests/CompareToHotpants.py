@@ -18,6 +18,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policy = ipDiffim.makeDefaultPolicy()
         self.policy.set("checkConditionNumber", False) # these images have been hand-constructed
         self.policy.set("fitForBackground", True) # and hotpants subtracts background
+        self.policy.set("spatialKernelType", "polynomial") 
+        self.policy.set("spatialBgType", "polynomial") 
         self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
         self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')
         self.smi.setXY0(0,0)
@@ -114,8 +116,9 @@ class DiffimTestCases(unittest.TestCase):
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
+        bbox  = self.kernelCellSet.getBBox()
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, self.policy)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False): # False = include bad candidates
@@ -177,8 +180,9 @@ class DiffimTestCases(unittest.TestCase):
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
+        bbox  = self.kernelCellSet.getBBox()        
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, self.policy)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False): # False = include bad candidates
@@ -234,8 +238,9 @@ class DiffimTestCases(unittest.TestCase):
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
+        bbox  = self.kernelCellSet.getBBox()
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, self.policy)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False): # False = include bad candidates
@@ -333,8 +338,9 @@ class DiffimTestCases(unittest.TestCase):
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
+        bbox  = self.kernelCellSet.getBBox()
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, self.policy)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False): # False = include bad candidates
@@ -395,8 +401,9 @@ class DiffimTestCases(unittest.TestCase):
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
+        bbox  = self.kernelCellSet.getBBox()        
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, self.policy)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False): # False = include bad candidates
@@ -483,8 +490,9 @@ class DiffimTestCases(unittest.TestCase):
             cands.append(cand)
 
         # Visitors
+        bbox  = self.kernelCellSet.getBBox()        
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, self.policy)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
         for cand in cands:
             bsikv.processCandidate(cand)
@@ -553,8 +561,9 @@ class DiffimTestCases(unittest.TestCase):
             cands.append(cand)
 
         # Visitors
+        bbox  = self.kernelCellSet.getBBox()        
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, self.policy)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
         for cand in cands:
             bsikv.processCandidate(cand)
@@ -667,8 +676,9 @@ class DiffimTestCases(unittest.TestCase):
             cands.append(cand)
 
         # Visitors
+        bbox  = self.kernelCellSet.getBBox()
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, self.policy)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
         for cand in cands:
             bsikv.processCandidate(cand)

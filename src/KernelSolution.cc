@@ -1285,13 +1285,15 @@ namespace diffim {
 
     SpatialKernelSolution::SpatialKernelSolution(
         lsst::afw::math::KernelList const& basisList,
+        lsst::afw::math::Kernel::SpatialFunctionPtr spatialKernelFunction,
+        lsst::afw::math::Kernel::SpatialFunctionPtr background,
         lsst::pex::policy::Policy policy
         ) :
         KernelSolution(),
-        _spatialKernelFunction(),
+        _spatialKernelFunction(spatialKernelFunction),
         _constantFirstTerm(false),
         _kernel(),
-        _background(),
+        _background(background),
         _kSum(0.0),
         _policy(policy),
         _nbases(0),
@@ -1304,17 +1306,7 @@ namespace diffim {
         if (isAlardLupton || usePca) {
             _constantFirstTerm = true;
         }
-        
-        int spatialKernelOrder = policy.getInt("spatialKernelOrder");
-        _spatialKernelFunction = lsst::afw::math::Kernel::SpatialFunctionPtr(
-            new afwMath::PolynomialFunction2<double>(spatialKernelOrder)
-            );
-
         this->_fitForBackground = _policy.getBool("fitForBackground");
-        int spatialBgOrder      = this->_fitForBackground ? policy.getInt("spatialBgOrder") : 0;
-        _background = lsst::afw::math::Kernel::SpatialFunctionPtr(
-            new afwMath::PolynomialFunction2<double>(spatialBgOrder)
-            );
 
         _nbases = basisList.size();
         _nkt = _spatialKernelFunction->getParameters().size();

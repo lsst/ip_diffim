@@ -170,7 +170,10 @@ namespace diffim {
     public:
         typedef boost::shared_ptr<SpatialKernelSolution> Ptr;
 
+        /* Creates a polynomial SpatialFunction */
         SpatialKernelSolution(lsst::afw::math::KernelList const& basisList,
+                              lsst::afw::math::Kernel::SpatialFunctionPtr spatialKernelFunction,
+                              lsst::afw::math::Kernel::SpatialFunctionPtr background,
                               lsst::pex::policy::Policy policy
             );
 

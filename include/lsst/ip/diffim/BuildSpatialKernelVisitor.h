@@ -30,7 +30,8 @@ namespace detail {
 
         BuildSpatialKernelVisitor(
             lsst::afw::math::KernelList const& basisList,  ///< Basis functions
-            lsst::pex::policy::Policy policy         ///< Policy file directing behavior
+            lsst::afw::geom::Box2I const& regionBBox,  ///< Spatial region over which the function is fit
+            lsst::pex::policy::Policy policy           ///< Policy file directing behavior
             );
 
         int getNCandidates() {return _nCandidates;}
@@ -51,11 +52,12 @@ namespace detail {
     boost::shared_ptr<BuildSpatialKernelVisitor<PixelT> >
     makeBuildSpatialKernelVisitor(
         lsst::afw::math::KernelList const& basisList,
+        lsst::afw::geom::Box2I const& regionBBox,
         lsst::pex::policy::Policy policy
         ) {
 
         return typename BuildSpatialKernelVisitor<PixelT>::Ptr(
-            new BuildSpatialKernelVisitor<PixelT>(basisList, policy)
+            new BuildSpatialKernelVisitor<PixelT>(basisList, regionBBox, policy)
             );
     }
 
