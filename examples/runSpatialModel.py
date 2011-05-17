@@ -63,9 +63,16 @@ ds9.mtv(templateImage, frame=frame)
 frame += 1
 ds9.mtv(scienceImage, frame=frame)
 
-spatialKernel, spatialBg, kernelCellSet = ipDiffim.psfMatchImageToImage(templateImage.getMaskedImage(),
-                                                                        scienceImage.getMaskedImage(),
-                                                                        policy)
+#policy.set("spatialKernelType", "chebyshev1")
+policy.set("spatialKernelOrder", 2)
+policy.set("spatialKernelClipping", False)
+try:
+    spatialKernel, spatialBg, kernelCellSet = ipDiffim.psfMatchImageToImage(templateImage.getMaskedImage(),
+                                                                            scienceImage.getMaskedImage(),
+                                                                            policy,
+                                                                            returnOnExcept = True)
+except:
+    pass
 
 # Lets see what we got
 if display:

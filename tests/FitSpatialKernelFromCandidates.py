@@ -56,8 +56,8 @@ class DiffimTestCases(unittest.TestCase):
         #self.runAlardLupton(0, 0)
         #self.runAlardLupton(1, 1)
 
-        #self.runAlardLuptonPca(False)
-        self.runAlardLuptonPca(True)
+        self.runAlardLuptonPca(False)
+        #self.runAlardLuptonPca(True)
 
     def runAlardLupton(self, sko, bgo):
         self.policy.set('kernelBasisSet', 'alard-lupton')

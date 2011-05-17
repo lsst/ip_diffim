@@ -313,11 +313,11 @@ def displaySpatialKernelQuality(kernelCellSet, spatialKernel, spatialBg, frame):
             # spatial model
             ski   = afwImage.ImageD(ki.getDimensions())
             spatialKernel.computeImage(ski, False,
-                                       afwImage.indexToPosition(int(cand.getXCenter())),
-                                       afwImage.indexToPosition(int(cand.getYCenter())))
+                                       int(cand.getXCenter()),
+                                       int(cand.getYCenter()))
             sk    = afwMath.FixedKernel(ski)
-            sbg   = spatialBg(afwImage.indexToPosition(int(cand.getXCenter())),
-                              afwImage.indexToPosition(int(cand.getYCenter())))
+            sbg   = spatialBg(int(cand.getXCenter()),
+                              int(cand.getYCenter()))
             sdmi  = cand.getDifferenceImage(sk, sbg)
 
             ds9.mtv(tmi,  frame=frame+0) # template image
@@ -370,10 +370,8 @@ def displaySpatialKernelMosaic(spatialKernel, width, height, frame, doNorm=False
     for y in (0, height//2, height):
         for x in (0, width//2, width):
             im   = afwImage.ImageD(spatialKernel.getDimensions())
-            ksum = spatialKernel.computeImage(im,
-                                              doNorm,
-                                              afwImage.indexToPosition(x),
-                                              afwImage.indexToPosition(y))
+            ksum = spatialKernel.computeImage(im, doNorm, x, y)
+
             mos.append(im, "x=%d y=%d kSum=%.2f" % (x, y, ksum))
     
     mosaic = mos.makeMosaic()

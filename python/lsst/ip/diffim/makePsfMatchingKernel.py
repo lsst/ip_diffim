@@ -142,11 +142,11 @@ def psfMatchModelToModel(referencePsfModel,
 
     for row in range(nCellY):
         # place at center of cell
-        posY = afwImage.indexToPosition(sizeCellY * row + sizeCellY // 2 + scienceY0)
+        posY = sizeCellY * row + sizeCellY // 2 + scienceY0
         
         for col in range(nCellX):
             # place at center of cell
-            posX = afwImage.indexToPosition(sizeCellX * col + sizeCellX // 2 + scienceX0)
+            posX = sizeCellX * col + sizeCellX // 2 + scienceX0
 
             pexLog.Trace("lsst.ip.diffim.psfMatchModelToModel", 5,
                          "Creating Psf candidate at %.1f %.1f" % (posX, posY))

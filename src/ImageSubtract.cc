@@ -191,6 +191,7 @@ fitSpatialKernelFromCandidates(
                 std::vector<double> eigenValues               = imagePca.getEigenValues();
                 afwMath::KernelList basisListRaw              = importStarVisitor.getEigenKernels();
 
+                /*
                 if (true) {
                     afwImage::Image<afwMath::Kernel::Pixel> img =
                         afwImage::Image<afwMath::Kernel::Pixel>
@@ -203,6 +204,7 @@ fitSpatialKernelFromCandidates(
                         img.writeFits(str(boost::format("k%d_%d.fits") % totalIterations % j)); 
                     }
                 }
+                */
 
                 double eSum = std::accumulate(eigenValues.begin(), eigenValues.end(), 0.);
                 for(unsigned int j=0; j < eigenValues.size(); j++) {
@@ -215,12 +217,11 @@ fitSpatialKernelFromCandidates(
 
                 afwMath::KernelList basisListTrim;
                 for (int j = 0; j < nToUse; ++j) {
-                    /* Any NaN? */
-                    afwImage::Image<afwMath::Kernel::Pixel> img = 
-                        afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[j], true);
-
+                    /* Check for NaN */
+                    afwImage::Image<afwMath::Kernel::Pixel> 
+                        img(afwGeom::Extent2I(basisListRaw[j]->getDimensions()));
+                    (void)basisListRaw[j]->computeImage(img, true);
                     afwMath::Statistics stats = afwMath::makeStatistics(img, afwMath::SUM);
-                    
                     if (std::isnan(stats.getValue(afwMath::SUM))) {
                         pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
                                           "WARNING : NaN in principal component %d; skipping", j);

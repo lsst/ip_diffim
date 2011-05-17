@@ -103,7 +103,7 @@ class DiffimTestCases(unittest.TestCase):
     def xtestShow(self):
         pylab.show()  
     
-    def runGaussianField(self, order, title, writeIm = True, writeKern = True):
+    def runGaussianField(self, order, title, writeIm = False, writeKern = False):
         self.policy.set('spatialKernelOrder', order)
         
         # set up basis list
