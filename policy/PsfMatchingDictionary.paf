@@ -160,6 +160,22 @@ definitions: {
         default: 0.50 1.00 2.00
     }
 
+    alardDegGaussDeconvolution: {
+        type: int
+        description: "Degree of spatial modification of gaussians in alard-lupton basis.
+                      Optimized for deconvolution."
+        maxOccurs: 4
+        default: 6 4 2
+    }
+
+    alardSigGaussDeconvolution: {
+        type: double
+        description: "Sigma in pixels of gaussians in alard-lupton basis (note: FWHM = 2.35 sigma). 
+                      Optimized for deconvolution."
+        maxOccurs: 4
+        default: 0.7 1.0 1.25
+    }
+
     ######
     #
     # Delta Function Basis Parameters

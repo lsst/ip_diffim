@@ -30,8 +30,9 @@ def makeSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg, scope=sdqa.Sdq
     sdqaVector.append(kSumRating)
 
     nGood = 0
+    nBad  = 0
     for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(True): # only look at non-bad candidates
+        for cand in cell.begin(False): # False = include bad candidates
             cand = diffimLib.cast_KernelCandidateF(cand)
             if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                 # this has been used for processing
@@ -53,9 +54,13 @@ def makeSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg, scope=sdqa.Sdq
                 candRating = sdqa.SdqaRating("lsst.ip.diffim.residuals_%d_%d" % (xCand, yCand),
                                              candMean, candRms, scope)
                 sdqaVector.append(candRating)
+            elif cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
+                nBad += 1
 
     nGoodRating = sdqa.SdqaRating("lsst.ip.diffim.nCandGood", nGood, 0, scope)
     sdqaVector.append(nGoodRating)
+    nBadRating = sdqa.SdqaRating("lsst.ip.diffim.nCandBad", nBad, 0, scope)
+    sdqaVector.append(nBadRating)
 
     nKernelTerms = spatialKernel.getNSpatialParameters()
     if nKernelTerms == 0: # order 0
@@ -66,14 +71,30 @@ def makeSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg, scope=sdqa.Sdq
     sdqaVector.append(nKernRating)
     sdqaVector.append(nBgRating)
 
+    # Some judgements on conv vs. deconv (many candidates fail QC in the latter case)
+    if nBad > 2*nGood:
+        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
+                     "WARNING: many more candidates rejected than accepted; %d rejected, %d used" % (
+            nBad, nGood))
+        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 2,
+                     "Consider switching which image is convolved, or call ipDiffim.modifyForDeconvolution")
+    else:
+        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
+                     "NOTE: %d candidates rejected, %d used" % (nBad, nGood))
+        
+    # Some judgements on the quality of the spatial model
     if nGood < nKernelTerms:
         pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
                      "WARNING: spatial kernel model underconstrained; %d candidates, %d terms" % (
             nGood, nKernelTerms))
+        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 2,
+                     "Consider lowering the spatial order")
     elif nGood <= 2*nKernelTerms:
         pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
                      "WARNING: spatial kernel model poorly constrained; %d candidates, %d terms" % (
             nGood, nKernelTerms))
+        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 2,
+                     "Consider lowering the spatial order")
     else:
         pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
                      "NOTE: spatial kernel model appears well constrained; %d candidates, %d terms" % (

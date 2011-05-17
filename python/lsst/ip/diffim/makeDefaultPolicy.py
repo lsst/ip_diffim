@@ -61,3 +61,27 @@ def modifyKernelPolicy(policy, fwhm = POLICY_DEFAULT_FWHM):
                  "A/L gaussian sig   : %s px" % (outStr))
 
 
+
+def modifyForDeconvolution(policy):
+
+    # Modify AL shapes
+    degGauss = policy.getIntArray("alardDegGaussDeconvolution")
+    policy.set("alardDegGauss", degGauss[0])
+    for deg in degGauss[1:]:
+        policy.add("alardDegGauss", deg)
+        
+    sigGauss = policy.getDoubleArray("alardSigGaussDeconvolution")
+    policy.set("alardSigGauss", sigGauss[0])
+    for sig in sigGauss[1:]:
+        policy.add("alardSigGauss", sig)
+
+    outStr = ", ".join(["%.2f" % (x) for x in policy.getDoubleArray("alardSigGauss")])
+    pexLog.Trace("lsst.ip.diffim.makeDefaultPolicy.modifyForDeconvolution", 2,
+                 "A/L gaussian sig   : %s px" % (outStr))
+    outStr = ", ".join(["%.2f" % (x) for x in policy.getIntArray("alardDegGauss")])
+    pexLog.Trace("lsst.ip.diffim.makeDefaultPolicy.modifyForDeconvolution", 2,
+                 "A/L gaussian deg   : %s px" % (outStr))
+
+    # Don't use core stats (core has large resids)
+    policy.set("useCoreStats", False)
+

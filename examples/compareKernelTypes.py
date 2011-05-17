@@ -22,11 +22,12 @@ display = True
 writefits = False
 
 # This one compares DeltaFunction and AlardLupton kernels
+defSciencePath = None
+defTemplatePath = None
 
 class DiffimTestCases(unittest.TestCase):
-    
     # D = I - (K.x.T + bg)
-    def setUp(self, CFHT=False):
+    def setUp(self):
         self.policy1     = ipDiffim.makeDefaultPolicy()
         self.policy2     = ipDiffim.makeDefaultPolicy()
         self.policy3     = ipDiffim.makeDefaultPolicy()
@@ -56,34 +57,27 @@ class DiffimTestCases(unittest.TestCase):
         self.policy3.set("checkConditionNumber", False)
         self.policy3.set('fitForBackground', False)
         self.policy3.set('constantVarianceWeighting', True)
+
+        # lets look at deconvolution kernels
+        ipDiffim.modifyForDeconvolution(self.policy3)
+        print self.policy3
+        #self.policy3.set("alardSigGauss", 0.75)
+        #self.policy3.add("alardSigGauss", 1.0)
+        #self.policy3.add("alardSigGauss", 1.25)
+        #self.policy3.set("alardDegGauss", 6)
+        #self.policy3.add("alardDegGauss", 4)
+        #self.policy3.add("alardDegGauss", 2)
+        
         self.kList3 = ipDiffim.makeKernelBasisList(self.policy3)
         self.bskv3  = ipDiffim.BuildSingleKernelVisitorF(self.kList3, self.policy3)
 
-        # known input images
-        defDataDir = eups.productDir('afwdata')
-        if CFHT:
-            defSciencePath  = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1')
-            defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1_tmpl')
-
-            # no need to remap
+        defSciencePath = globals()['defSciencePath']
+        defTemplatePath = globals()['defTemplatePath']
+        if defSciencePath and defTemplatePath:
             self.scienceImage   = afwImage.ExposureF(defSciencePath)
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
-        elif False:
-            #self.scienceImage  = afwImage.ExposureF('s2L006430_0106g4TANSIPwInv.fits')
-            #self.templateImage = afwImage.ExposureF('s2L200006_00770078g4.fits')
-            self.scienceImage  = afwImage.ExposureF('s2L007173_0100g4TANSIPwInv.fits')
-            self.templateImage = afwImage.ExposureF('oneTemplate100006_0072g4.fits')
-            diffimTools.backgroundSubtract(self.policy1.getPolicy("afwBackgroundPolicy"),
-                                           [self.scienceImage.getMaskedImage(),])
-            self.templateImage = ipDiffim.warpTemplateExposure(self.templateImage,
-                                                               self.scienceImage,
-                                                               self.policy1.getPolicy("warpingPolicy"))
-            ### reverse order!
-            #foo = self.templateImage
-            #self.templateImage = self.scienceImage
-            #self.scienceImage = foo
-            
         else:
+            defDataDir = eups.productDir('afwdata')
             defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a00.sci")
             defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
@@ -252,9 +246,18 @@ def run(doExit=False):
     tests.run(suite(), doExit)
 
 if __name__ == "__main__":
-    if '-d' in sys.argv:
-        display = True
-    if '-w' in sys.argv:
-        writefits = True
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option('-n', dest='nodisplay', action='store_true', default=False)
+    parser.add_option('-w', dest='writefits', action='store_true', default=False)
+    parser.add_option('-t', dest='defTemplatePath')
+    parser.add_option('-i', dest='defSciencePath')
+    (opt, args) = parser.parse_args()
+
+    display = not opt.nodisplay
+    writefits = opt.writefits
+    if opt.defTemplatePath and opt.defSciencePath:
+        defTemplatePath = opt.defTemplatePath
+        defSciencePath = opt.defSciencePath
         
     run(True)
