@@ -70,7 +70,7 @@ def makeSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg, scope=sdqa.Sdq
         pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
                      "WARNING: spatial kernel model underconstrained; %d candidates, %d terms" % (
             nGood, nKernelTerms))
-    elif nGood < 2*nKernelTerms:
+    elif nGood <= 2*nKernelTerms:
         pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
                      "WARNING: spatial kernel model poorly constrained; %d candidates, %d terms" % (
             nGood, nKernelTerms))
