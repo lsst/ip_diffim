@@ -65,15 +65,23 @@ ds9.mtv(scienceImage, frame=frame)
 
 #policy.set("spatialKernelType", "chebyshev1")
 policy.set("spatialKernelOrder", 2)
-policy.set("spatialKernelClipping", False)
+policy.getPolicy('detectionPolicy').set("detThreshold", 3.)
 try:
     spatialKernel, spatialBg, kernelCellSet = ipDiffim.psfMatchImageToImage(templateImage.getMaskedImage(),
                                                                             scienceImage.getMaskedImage(),
                                                                             policy,
                                                                             returnOnExcept = True)
-except:
-    pass
+except Exception, e:
+    print 'FAIL'
+    sys.exit(1)
 
+ratings = ipDiffim.makeSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg)
+
+print spatialKernel.getSpatialFunctionList()[0].toString()
+print spatialKernel.getKernelParameters()
+print spatialKernel.getSpatialParameters()
+
+import pdb; pdb.set_trace()
 # Lets see what we got
 if display:
     mos = displayUtils.Mosaic()

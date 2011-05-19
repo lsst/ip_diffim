@@ -18,6 +18,7 @@
 #include "Eigen/QR"
 
 #include "lsst/afw/math.h"
+#include "lsst/afw/geom.h"
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/exceptions/Runtime.h"
 #include "lsst/pex/logging/Trace.h"
@@ -27,6 +28,7 @@
 #include "lsst/ip/diffim/BuildSpatialKernelVisitor.h"
 
 namespace afwMath        = lsst::afw::math;
+namespace afwGeom        = lsst::afw::geom;
 namespace pexLogging     = lsst::pex::logging; 
 namespace pexPolicy      = lsst::pex::policy; 
 namespace pexExcept      = lsst::pex::exceptions; 
@@ -84,11 +86,7 @@ namespace detail {
         std::string spatialKernelType = policy.getString("spatialKernelType");
         if (spatialKernelType == "chebyshev1") {
             spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
-                new afwMath::Chebyshev1Function2<double>(spatialKernelOrder,
-                                                         regionBBox.getBeginX(),
-                                                         regionBBox.getBeginY(),
-                                                         regionBBox.getEndX(),
-                                                         regionBBox.getEndY())
+                new afwMath::Chebyshev1Function2<double>(spatialKernelOrder, afwGeom::Box2D(regionBBox))
                 );
         }
         else if (spatialKernelType == "polynomial") {
@@ -111,11 +109,7 @@ namespace detail {
         std::string spatialBgType = policy.getString("spatialBgType");
         if (spatialBgType == "chebyshev1") {
             background = afwMath::Kernel::SpatialFunctionPtr(
-                new afwMath::Chebyshev1Function2<double>(spatialBgOrder,
-                                                         regionBBox.getBeginX(),
-                                                         regionBBox.getBeginY(),
-                                                         regionBBox.getEndX(),
-                                                         regionBBox.getEndY())
+                new afwMath::Chebyshev1Function2<double>(spatialBgOrder, afwGeom::Box2D(regionBBox))
                 );
         }
         else if (spatialBgType == "polynomial") {

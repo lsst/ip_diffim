@@ -53,11 +53,10 @@ class DiffimTestCases(unittest.TestCase):
         return kc
 
     def testAlardLupton(self):
-        #self.runAlardLupton(0, 0)
-        #self.runAlardLupton(1, 1)
-
+        self.runAlardLupton(0, 0)
+        self.runAlardLupton(1, 1)
         self.runAlardLuptonPca(False)
-        #self.runAlardLuptonPca(True)
+        self.runAlardLuptonPca(True)
 
     def runAlardLupton(self, sko, bgo):
         self.policy.set('kernelBasisSet', 'alard-lupton')
@@ -143,7 +142,7 @@ class DiffimTestCases(unittest.TestCase):
         nBgTerms = int(0.5 * (bgo + 1) * (bgo + 2))
         self.assertEqual(len(spatialBgSolution), nBgTerms)
 
-    def xtestDf(self):
+    def testDf(self):
         self.runDfPca(False, False)
         self.runDfPca(False, True)
         self.runDfPca(True, False)

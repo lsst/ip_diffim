@@ -329,7 +329,7 @@ namespace diffim {
         unsigned int const startRow = goodBBox.getMinY();
         // endCol/Row is one past the index of the last good col/row
         unsigned int endCol = goodBBox.getMaxX() + 1;
-        unsigned int endRow = goodBBox.getMaxX() + 1;
+        unsigned int endRow = goodBBox.getMaxY() + 1;
 
         boost::timer t;
         t.restart();

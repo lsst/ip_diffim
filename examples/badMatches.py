@@ -35,7 +35,7 @@ def makeTest1(doAddNoise):
     if doAddNoise: addNoise(mi2)
     return mi1, mi2
 
-def makeTest2(doAddNoise):
+def makeTest2(doAddNoise, shiftX = 5, shiftY = 3):
     gaussian1 = afwMath.GaussianFunction2D(1., 1., 0.)
     kernel1   = afwMath.AnalyticKernel(imSize, imSize, gaussian1)
     image1    = afwImage.ImageD(kernel1.getDimensions())
@@ -45,7 +45,7 @@ def makeTest2(doAddNoise):
     ####
     boxA     = afwGeom.Box2I(afwGeom.PointI(imSize//2, imSize//2),
                              afwGeom.ExtentI(imSize//2, imSize//2))
-    boxB     = afwGeom.Box2I(afwGeom.PointI(imSize//2 - 5, imSize//2 - 3),
+    boxB     = afwGeom.Box2I(afwGeom.PointI(imSize//2 - shiftX, imSize//2 - shiftY),
                              afwGeom.ExtentI(imSize//2, imSize//2))
     subregA   = afwImage.ImageF(image1, boxA, afwImage.PARENT)
     subregB   = afwImage.ImageF(image1, boxB, afwImage.PARENT, True)
@@ -144,7 +144,7 @@ if __name__ == '__main__':
         ds9.mtv(diffim, frame = fnum) ; fnum += 1
     
         # TEST 2
-        tmi, smi = makeTest2(doAddNoise)
+        tmi, smi = makeTest2(doAddNoise, shiftX = 2, shiftY = 2)
         kc       = ipDiffim.makeKernelCandidate(0.0, 0.0, tmi, smi, policy)
         bskv.processCandidate(kc)
     

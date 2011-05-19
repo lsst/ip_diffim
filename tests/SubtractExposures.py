@@ -49,6 +49,33 @@ class DiffimTestCases(unittest.TestCase):
             del self.scienceImage
             del self.templateImage
 
+    def testModel(self):
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
+
+        self.policy.set('spatialKernelType', 'chebyshev1')
+        results1 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
+                                              doWarping = True)
+        differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
+
+        self.policy.set('spatialKernelType', 'polynomial')
+        results2 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
+                                              doWarping = True)
+        differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
+
+        kp1 = spatialKernel1.getKernelParameters()
+        kp2 = spatialKernel2.getKernelParameters()
+        # Solutions should evaluate to the same values at coordinate 0, 0
+        for i in range(len(kp1)):
+            self.assertAlmostEqual(kp1[i], kp2[i])
+
+        self.assertTrue(
+            spatialKernel1.getSpatialFunctionList()[0].toString().startswith('Chebyshev1Function2')
+            )
+        self.assertTrue(
+            spatialKernel2.getSpatialFunctionList()[0].toString().startswith('PolynomialFunction2')
+            )
+        
     def testAL(self):
         self.policy.set('kernelBasisSet', 'alard-lupton')
         self.policy.set('spatialKernelOrder', 1)

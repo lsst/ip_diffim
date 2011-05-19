@@ -95,6 +95,11 @@ def psfMatchImageToImage(maskedImageToConvolve,
 
     return spatialKernel, spatialBg, kernelCellSet
 
+#def resetKernelCandidates(kernelCellSet):
+#    for cell in kernelCellSet.getCellList():
+#        for cand in cell.begin(False): # False = include bad candidates
+#            cand = diffimLib.cast_KernelCandidateF(cand)
+#            cand.setStatus(afwMath.SpatialCellCandidate.UNKNOWN)
 
 # Requires images to have been pre-registered.  Once this happens,
 # both the reference and the science image will have same XY0
