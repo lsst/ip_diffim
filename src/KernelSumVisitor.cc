@@ -88,7 +88,8 @@ namespace detail {
     }
 
     template<typename PixelT>
-    void KernelSumVisitor<PixelT>::processCandidate(lsst::afw::math::SpatialCellCandidate *candidate) {
+    void KernelSumVisitor<PixelT>::processCandidate(lsst::afw::math::SpatialCellCandidate 
+                                                    *candidate) {
 
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
@@ -104,7 +105,9 @@ namespace detail {
         }
         else if (_mode == REJECT) {
             if (_policy.getBool("kernelSumClipping")) {
-                double kSum = kCandidate->getKernelSolution(KernelCandidate<PixelT>::ORIG)->getKsum();
+                double kSum = 
+                    kCandidate->getKernelSolution(KernelCandidate<PixelT>::ORIG)->getKsum();
+
                 if (fabs(kSum - _kSumMean) > _dkSumMax) {
                     kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                     pexLogging::TTrace<4>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
@@ -124,30 +127,41 @@ namespace detail {
     template<typename PixelT>
     void KernelSumVisitor<PixelT>::processKsumDistribution() {
         if (_kSums.size() == 0) {
-            throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel sum; no candidates");
-        }
-
-        try {
-            afwMath::Statistics stats = afwMath::makeStatistics(_kSums, 
-                                                                afwMath::NPOINT | 
-                                                                afwMath::MEANCLIP | 
-                                                                afwMath::STDEVCLIP); 
-            _kSumMean = stats.getValue(afwMath::MEANCLIP);
-            _kSumStd  = stats.getValue(afwMath::STDEVCLIP);
-            _kSumNpts = static_cast<int>(stats.getValue(afwMath::NPOINT));
-        } catch (pexExcept::Exception &e) {
-            LSST_EXCEPT_ADD(e, "Unable to calculate kernel sum statistics");
-            throw e;
-        }
-        if (std::isnan(_kSumMean)) {
             throw LSST_EXCEPT(pexExcept::Exception, 
-                              str(boost::format("Mean kernel sum returns NaN (%d points)") % _kSumNpts));
+                              "Unable to determine kernel sum; 0 candidates");
         }
-        if (std::isnan(_kSumStd)) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
-                              str(boost::format("Kernel sum stdev returns NaN (%d points)") % _kSumNpts));
+        else if (_kSums.size() == 1) {
+            pexLogging::TTrace<2>("lsst.ip.diffim.KernelSumVisitor.processKsumDistribution", 
+                                  "WARNING: only 1 kernel candidate");
+            
+            _kSumMean = _kSums[0];
+            _kSumStd  = 0.0;
+            _kSumNpts = 1;
         }
-
+        else {
+            try {
+                afwMath::Statistics stats = afwMath::makeStatistics(_kSums, 
+                                                                    afwMath::NPOINT | 
+                                                                    afwMath::MEANCLIP | 
+                                                                    afwMath::STDEVCLIP); 
+                _kSumMean = stats.getValue(afwMath::MEANCLIP);
+                _kSumStd  = stats.getValue(afwMath::STDEVCLIP);
+                _kSumNpts = static_cast<int>(stats.getValue(afwMath::NPOINT));
+            } catch (pexExcept::Exception &e) {
+                LSST_EXCEPT_ADD(e, "Unable to calculate kernel sum statistics");
+                throw e;
+            }
+            if (std::isnan(_kSumMean)) {
+                throw LSST_EXCEPT(pexExcept::Exception, 
+                                  str(boost::format("Mean kernel sum returns NaN (%d points)") 
+                                      % _kSumNpts));
+            }
+            if (std::isnan(_kSumStd)) {
+                throw LSST_EXCEPT(pexExcept::Exception, 
+                                  str(boost::format("Kernel sum stdev returns NaN (%d points)") 
+                                      % _kSumNpts));
+            }
+        }
         _dkSumMax = _policy.getDouble("maxKsumSigma") * _kSumStd;
         pexLogging::TTrace<2>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
                               "Kernel Sum Distribution : %.3f +/- %.3f (%d points)", 
