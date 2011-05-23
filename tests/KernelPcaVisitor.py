@@ -26,11 +26,11 @@ class DiffimTestCases(unittest.TestCase):
 
     def makeCandidate(self, kSum, x, y, size = 51):
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
-        mi1.getVariance().set(0.1) # avoid NaNs
+        mi1.getVariance().set(1.0) # avoid NaNs
         mi1.set(size//2, size//2, (1, 0x0, 1))
         mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
-        mi2.getVariance().set(0.1) # avoid NaNs
-        mi2.set(size//2, size//2, (kSum, 0x0, 1))
+        mi2.getVariance().set(1.0) # avoid NaNs
+        mi2.set(size//2, size//2, (kSum, 0x0, kSum))
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
 
@@ -51,6 +51,7 @@ class DiffimTestCases(unittest.TestCase):
 
         imagePca.analyze()
         eigenImages = imagePca.getEigenImages()
+        # NOTE : this needs to be changed once ticket #1649 is resolved
         for i in range(len(eigenImages)):
             for j in range(i, len(eigenImages)):
                 print i, j, afwImage.innerProduct(eigenImages[i], eigenImages[j])

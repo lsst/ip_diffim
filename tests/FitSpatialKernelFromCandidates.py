@@ -11,7 +11,8 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
 
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 7)
+pexLog.Trace_setVerbosity('lsst.ip.diffim', 9)
+rdm = afwMath.Random(afwMath.Random.MT19937, 10101)
 
 class DiffimTestCases(unittest.TestCase):
     
@@ -19,9 +20,15 @@ class DiffimTestCases(unittest.TestCase):
         self.policy = ipDiffim.makeDefaultPolicy()
         self.policy.set("checkConditionNumber", False) # these images have been hand-constructed
         self.policy.set("fitForBackground", True)      # with background testing
-        self.size   = 30
-        self.policy.set("sizeCellX", self.size//3)
-        self.policy.set("sizeCellY", self.size//3)
+        self.size   = 50
+        self.policy.set("sizeCellX", 1)
+        self.policy.set("sizeCellY", 1)
+
+        # Don't let the random noise we add cause any problems
+        self.policy.set("singleKernelClipping", False)        
+        self.policy.set("kernelSumClipping", False)        
+        self.policy.set("spatialKernelClipping", False)        
+        
         self.kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0,0),
                                                                   afwGeom.Extent2I(self.size, self.size)),
                                                     self.policy.getInt("sizeCellX"),
@@ -33,19 +40,17 @@ class DiffimTestCases(unittest.TestCase):
         
     def addNoise(self, mi):
         img       = mi.getImage()
-        seed      = int(afwMath.makeStatistics(mi.getVariance(), afwMath.MAX).getValue())
-        rdm       = afwMath.Random(afwMath.Random.MT19937, seed)
         rdmImage  = img.Factory(img.getDimensions())
         afwMath.randomGaussianImage(rdmImage, rdm)
         img      += rdmImage
 
     def makeCandidate(self, kSum, x, y, addNoise = True):
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
-        mi1.getVariance().set(0.1) # avoid NaNs
-        mi1.set(self.size//2, self.size//2, (1, 0x0, 1))
+        mi1.getVariance().set(1.0) # level of addNoise
+        mi1.set(self.size//2, self.size//2, (5.0, 0x0, 5.0))
         mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
-        mi2.getVariance().set(0.1) # avoid NaNs
-        mi2.set(self.size//2, self.size//2, (kSum, 0x0, 1))
+        mi2.getVariance().set(1.0) # level of addNoise
+        mi2.set(self.size//2, self.size//2, (kSum, 0x0, kSum))
         if addNoise:
             self.addNoise(mi1)
             self.addNoise(mi2)
@@ -67,7 +72,7 @@ class DiffimTestCases(unittest.TestCase):
         
         for x in numpy.arange(1, self.size, 10):
             for y in numpy.arange(1, self.size, 10):
-                cand = self.makeCandidate(1.0, x, y)
+                cand = self.makeCandidate(10.0, x, y)
                 self.kernelCellSet.insertCandidate(cand)
 
         result = ipDiffim.fitSpatialKernelFromCandidates(self.kernelCellSet, self.policy)
@@ -111,7 +116,7 @@ class DiffimTestCases(unittest.TestCase):
         count = 0
         for x in numpy.arange(1, self.size, 10):
             for y in numpy.arange(1, self.size, 10):
-                cand = self.makeCandidate(1.0, x, y)
+                cand = self.makeCandidate(10.0, x, y)
                 self.kernelCellSet.insertCandidate(cand)
                 count += 1
         if subtractMean:
@@ -142,29 +147,48 @@ class DiffimTestCases(unittest.TestCase):
         nBgTerms = int(0.5 * (bgo + 1) * (bgo + 2))
         self.assertEqual(len(spatialBgSolution), nBgTerms)
 
+    def testDfTooSmall(self):
+        # Test too small of stamp size for kernel size
+        self.size = self.policy.get('kernelSize')
+        try:
+            self.runDfPca(False, False)
+        except Exception, e:
+            pass
+        else:
+            self.fail()
+        
     def testDf(self):
         self.runDfPca(False, False)
         self.runDfPca(False, True)
         self.runDfPca(True, False)
         self.runDfPca(True, True)
-   
+
+
     def runDfPca(self, useRegularization, subtractMean, sko = 1, bgo = 1):
         # Just test the Pca part
         self.policy.set('kernelBasisSet', 'delta-function')
         self.policy.set('spatialKernelOrder', sko)
         self.policy.set('spatialBgOrder', bgo)
         self.policy.set('usePcaForSpatialKernel', True)
+        basisList = ipDiffim.makeKernelBasisList(self.policy)
         
+        # Switched on and off
         self.policy.set('subtractMeanForPca', subtractMean)
         self.policy.set('useRegularization', useRegularization)
 
         # We need to add noise to create some variation of the kernels for Pca
-        kSum = 1.
+        count = 0
         for x in numpy.arange(1, self.size, 10):
             for y in numpy.arange(1, self.size, 10):
-                cand = self.makeCandidate(kSum, x, y, True)
+                cand = self.makeCandidate(10.0, x, y)
                 self.kernelCellSet.insertCandidate(cand)
-                kSum += 1
+                count += 1
+
+        if subtractMean:
+            # all the components are the same!  just keep mean and first component
+            self.policy.set('numPrincipalComponents', 2)
+        else:
+            self.policy.set('numPrincipalComponents', count)
 
         result = ipDiffim.fitSpatialKernelFromCandidates(self.kernelCellSet, self.policy)
         sk = result.first
@@ -173,8 +197,6 @@ class DiffimTestCases(unittest.TestCase):
         spatialKernelSolution = sk.getSpatialParameters()
 
         nPca = self.policy.get('numPrincipalComponents')
-        if subtractMean:
-            nPca += 1
         self.assertEqual(len(spatialKernelSolution), nPca)
         
         nSpatialTerms = int(0.5 * (sko + 1) * (sko + 2))
