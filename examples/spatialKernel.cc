@@ -21,12 +21,15 @@
  */
  
 #include <cmath> 
-#include <lsst/afw/math.h>
-#include <lsst/afw/image.h>
-#include <lsst/ip/diffim.h>
 
+#include "lsst/afw/geom.h"
+#include "lsst/afw/math.h"
+#include "lsst/afw/image.h"
+#include "lsst/ip/diffim.h"
+
+namespace afwGeom = lsst::afw::geom;
 namespace afwImage = lsst::afw::image;
-namespace afwMath  = lsst::afw::math;
+namespace afwMath = lsst::afw::math;
 using namespace lsst::ip::diffim;
 
 typedef float PixelT;
@@ -36,7 +39,7 @@ int main() {
     unsigned int nBases = kSize * kSize;
     int spatialKernelOrder = 2;
     
-    lsst::afw::math::KernelList basisList = generateDeltaFunctionBasisSet(kSize, kSize);
+    lsst::afw::math::KernelList basisList = makeDeltaFunctionBasisList(kSize, kSize);
     /* Spatial Kernel */
     afwMath::Kernel::SpatialFunctionPtr spatialKernelFunction(
         new afwMath::PolynomialFunction2<double>(spatialKernelOrder)
@@ -63,7 +66,7 @@ int main() {
     
     unsigned int loc = 50;
     afwImage::MaskedImage<PixelT>::Ptr mimg1(
-        new afwImage::MaskedImage<PixelT>(100,100)
+        new afwImage::MaskedImage<PixelT>(afwGeom::Extent2I(100,100))
         );
     *mimg1->at(loc, loc) = afwImage::MaskedImage<PixelT>::Pixel(1, 0x0, 1);
     afwImage::MaskedImage<PixelT>::Ptr mimg2(
@@ -79,5 +82,5 @@ int main() {
                                       afwImage::indexToPosition(loc), 
                                       afwImage::indexToPosition(loc));
     kImage.writeFits("kernel.fits");
-    
+
 }

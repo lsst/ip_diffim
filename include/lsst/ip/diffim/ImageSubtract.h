@@ -45,16 +45,14 @@
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
+#include "lsst/pex/exceptions/Runtime.h"
 #include "lsst/afw/detection/Footprint.h"
+#include "lsst/utils/ieee.h"
 
 namespace lsst { 
 namespace ip { 
 namespace diffim {
 
-    
-    /** Mask plane definitions */
-    std::string const diffimStampCandidateStr = "DIFFIM_STAMP_CANDIDATE";
-    std::string const diffimStampUsedStr      = "DIFFIM_STAMP_USED";
     
     /**
      * @brief Class to accumulate Mask bits
@@ -107,7 +105,19 @@ namespace diffim {
         typedef typename lsst::afw::image::MaskedImage<PixelT>::x_iterator x_iterator;
 
         ImageStatistics() : 
-            _xsum(0.), _x2sum(0.), _npix(0) {} ;
+            _xsum(0.), _x2sum(0.), _npix(0) {
+            lsst::afw::image::MaskPixel const edgeMask   = 
+                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("EDGE");
+            lsst::afw::image::MaskPixel const crMask     = 
+                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("CR");
+            lsst::afw::image::MaskPixel const satMask    = 
+                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("SAT");
+            lsst::afw::image::MaskPixel const badMask    = 
+                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("BAD");
+            lsst::afw::image::MaskPixel const interpMask = 
+                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("INTRP");
+            _bpMask = edgeMask | crMask | satMask | badMask | interpMask;
+        } ;
         virtual ~ImageStatistics() {} ;
 
         // Clear the accumulators
@@ -118,16 +128,50 @@ namespace diffim {
             reset();
             for (int y = 0; y != image.getHeight(); ++y) {
                 for (x_iterator ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
-		    if ((*ptr).mask() == 0) {
+                    if (!((*ptr).mask() & _bpMask)) {
                         double const ivar = 1. / (*ptr).variance();
+
                         _xsum  += (*ptr).image() * sqrt(ivar);
                         _x2sum += (*ptr).image() * (*ptr).image() * ivar;
                         _npix  += 1;
                     }
                 }
             }
+
+            if ((!lsst::utils::lsst_isfinite(_xsum)) || (!lsst::utils::lsst_isfinite(_x2sum))) {
+                throw LSST_EXCEPT(pexExcept::Exception, 
+                                  "Nan/Inf in ImageStatistics.apply (check the variance for zeroes)");
+            }
         }
-        
+
+        void apply(lsst::afw::image::MaskedImage<PixelT> const& image, int core) {
+            reset();
+            int y0 = std::max(0, image.getHeight()/2 - core);
+            int y1 = std::min(image.getHeight(), image.getHeight()/2 + core + 1);
+            int x0 = std::max(0, image.getWidth()/2 - core);
+            int x1 = std::min(image.getWidth(), image.getWidth()/2 + core + 1);
+
+            for (int y = y0; y != y1; ++y) {
+                for (x_iterator ptr = image.x_at(x0, y), end = image.x_at(x1, y); 
+                     ptr != end; ++ptr) {
+                    if (!((*ptr).mask() & _bpMask)) {
+                        double const ivar = 1. / (*ptr).variance();
+
+                        _xsum  += (*ptr).image() * sqrt(ivar);
+                        _x2sum += (*ptr).image() * (*ptr).image() * ivar;
+                        _npix  += 1;
+                    }
+                }
+            }
+            if ((!lsst::utils::lsst_isfinite(_xsum)) || (!lsst::utils::lsst_isfinite(_x2sum))) {
+                throw LSST_EXCEPT(pexExcept::Exception, 
+                                  "Nan/Inf in ImageStatistics.apply (check the variance for 0s)");
+            }
+        }
+
+        void setBpMask(lsst::afw::image::MaskPixel bpMask) {_bpMask = bpMask;}
+        lsst::afw::image::MaskPixel getBpMask() {return _bpMask;}
+
         // Mean of distribution
         double getMean() const { 
             return (_npix > 0) ? _xsum/_npix : std::numeric_limits<double>::quiet_NaN(); 
@@ -155,6 +199,7 @@ namespace diffim {
         double _xsum;
         double _x2sum;
         int    _npix;
+        lsst::afw::image::MaskPixel _bpMask;
     };
 
 
@@ -203,21 +248,18 @@ namespace diffim {
         );
 
     /**
-     * @brief Search through images for Footprints with no masked pixels
+     * @brief Fit for a spatial model of the kernel and background
      *
-     * @note Runs detection on the template; searches through both images for masked pixels
-     *
-     * @param imageToConvolve  MaskedImage that will be convolved with kernel; detection is run on this image
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
-     * @param policy  Policy for operations; in particular object detection
+     * @param kernelCells  SpatialCellSet containing the candidate kernels
+     * @param policy  Policy for configuration
      *
      * @ingroup ip_diffim
-     */    
-    template <typename PixelT>
-    std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-        lsst::afw::image::MaskedImage<PixelT> const& imageToConvolve,
-        lsst::afw::image::MaskedImage<PixelT> const& imageToNotConvolve,
-        lsst::pex::policy::Policy             const& policy
+     */
+    template<typename PixelT>
+    std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
+    fitSpatialKernelFromCandidates(
+        lsst::afw::math::SpatialCellSet &kernelCells,
+        lsst::pex::policy::Policy const& policy
         );
 
     /**
@@ -230,6 +272,10 @@ namespace diffim {
     template <typename PixelT>
     Eigen::MatrixXd imageToEigenMatrix(
         lsst::afw::image::Image<PixelT> const& img
+        );
+
+    Eigen::MatrixXi maskToEigenMatrix(
+        lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const& mask
         );
     
 }}} // end of namespace lsst::ip::diffim

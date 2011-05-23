@@ -29,9 +29,11 @@ import unittest
 import lsst.utils.tests as tests
 
 import eups
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
+import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
@@ -39,52 +41,66 @@ import lsst.afw.display.ds9 as ds9
 verbosity = 5
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'policy', 'ImageSubtractStageDictionary.paf')
-
 display = True
 writefits = False
 
 # This one compares DeltaFunction and AlardLupton kernels
+defSciencePath = None
+defTemplatePath = None
 
 class DiffimTestCases(unittest.TestCase):
-    
     # D = I - (K.x.T + bg)
-    def setUp(self, CFHT=True):
-        self.policy      = ipDiffim.generateDefaultPolicy(diffimPolicy)
-        self.kCols       = self.policy.getInt('kernelCols')
-        self.kRows       = self.policy.getInt('kernelRows')
+    def setUp(self):
+        self.policy1     = ipDiffim.makeDefaultPolicy()
+        self.policy2     = ipDiffim.makeDefaultPolicy()
+        self.policy3     = ipDiffim.makeDefaultPolicy()
 
-        # Delta function basis set
-        self.basisList1  = ipDiffim.generateDeltaFunctionBasisSet(self.kCols, self.kRows)
-        self.kFunctor1   = ipDiffim.PsfMatchingFunctorF(self.basisList1)
+        self.policy1.set("kernelBasisSet", "delta-function")
+        self.policy1.set("useRegularization", False)
+        self.policy1.set("maxConditionNumber", 5.0e6)
+        self.policy1.set("checkConditionNumber", False)
+        self.policy1.set('fitForBackground', False)
+        self.policy1.set('constantVarianceWeighting', True)
+        self.kList1 = ipDiffim.makeKernelBasisList(self.policy1)
+        self.bskv1  = ipDiffim.BuildSingleKernelVisitorF(self.kList1, self.policy1)
+        
+        self.policy2.set("kernelBasisSet", "delta-function")
+        self.policy2.set("useRegularization", True)
+        self.policy2.set("maxConditionNumber", 5.0e6)
+        self.policy2.set("checkConditionNumber", False)
+        self.policy2.set('fitForBackground', False)
+        self.policy2.set('lambdaValue', 1000.0)
+        self.policy2.set('constantVarianceWeighting', True)
+        self.kList2 = ipDiffim.makeKernelBasisList(self.policy2)
+        self.hMat2  = ipDiffim.makeRegularizationMatrix(self.policy2)
+        self.bskv2  = ipDiffim.BuildSingleKernelVisitorF(self.kList2, self.policy2, self.hMat2)
+        
+        self.policy3.set("kernelBasisSet", "alard-lupton")
+        self.policy3.set("maxConditionNumber", 5.0e7)
+        self.policy3.set("checkConditionNumber", False)
+        self.policy3.set('fitForBackground', False)
+        self.policy3.set('constantVarianceWeighting', True)
 
-        # Alard-Lupton basis set
-        nGauss   = self.policy.get("alardNGauss")
-        sigGauss = self.policy.getDoubleArray("alardSigGauss")
-        degGauss = self.policy.getIntArray("alardDegGauss")
-        assert len(sigGauss) == nGauss
-        assert len(degGauss) == nGauss
-        assert self.kCols == self.kRows  # square
-        assert self.kCols % 2 == 1  # odd sized
-        kHalfWidth = int(self.kCols/2)
-        self.basisList2  = ipDiffim.generateAlardLuptonBasisSet(kHalfWidth, nGauss, sigGauss, degGauss)
-        self.kFunctor2   = ipDiffim.PsfMatchingFunctorF(self.basisList2)
+        # lets look at deconvolution kernels
+        ipDiffim.modifyForDeconvolution(self.policy3)
+        print self.policy3
+        #self.policy3.set("alardSigGauss", 0.75)
+        #self.policy3.add("alardSigGauss", 1.0)
+        #self.policy3.add("alardSigGauss", 1.25)
+        #self.policy3.set("alardDegGauss", 6)
+        #self.policy3.add("alardDegGauss", 4)
+        #self.policy3.add("alardDegGauss", 2)
+        
+        self.kList3 = ipDiffim.makeKernelBasisList(self.policy3)
+        self.bskv3  = ipDiffim.BuildSingleKernelVisitorF(self.kList3, self.policy3)
 
-        # Regularized delta function basis set
-        self.h = ipDiffim.generateFiniteDifferenceRegularization(self.kCols, self.kRows, 2, 1, 0)
-        self.kFunctor3   = ipDiffim.PsfMatchingFunctorF(self.basisList1, self.h)
-
-        # known input images
-        defDataDir = eups.productDir('afwdata')
-        if CFHT:
-            defSciencePath  = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1')
-            defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', 'cal-53535-i-797722_1_tmpl')
-
-            # no need to remap
+        defSciencePath = globals()['defSciencePath']
+        defTemplatePath = globals()['defTemplatePath']
+        if defSciencePath and defTemplatePath:
             self.scienceImage   = afwImage.ExposureF(defSciencePath)
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
         else:
+            defDataDir = eups.productDir('afwdata')
             defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a00.sci")
             defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
@@ -94,7 +110,7 @@ class DiffimTestCases(unittest.TestCase):
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
             self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage,
                                                                 self.scienceImage,
-                                                                self.policy)
+                                                                self.policy1.getPolicy("warpingPolicy"))
 
 
         # image statistics
@@ -103,59 +119,75 @@ class DiffimTestCases(unittest.TestCase):
         #
         tmi = self.templateImage.getMaskedImage()
         smi = self.scienceImage.getMaskedImage()
-        self.footprints = ipDiffim.getCollectionOfFootprintsForPsfMatching(tmi, smi, self.policy)
+
+        detPolicy = self.policy1.getPolicy("detectionPolicy")
+        detPolicy.set("detThreshold", 50.)
+        detPolicy.set("detOnTemplate", False)
+        kcDetect = ipDiffim.KernelCandidateDetectionF(detPolicy)
+        kcDetect.apply(tmi, smi)
+        self.footprints = kcDetect.getFootprints()
+
         
     def tearDown(self):
-        del self.policy
+        del self.policy1
+        del self.policy2
+        del self.policy3
+        del self.kList1
+        del self.kList2
+        del self.kList3
+        del self.hMat2
+        del self.bskv1
+        del self.bskv2
+        del self.bskv3
+        del self.scienceImage
+        del self.templateImage
 
-    def apply(self, functor, tmi, smi, var):
-        functor.apply(tmi.getImage(), smi.getImage(), var.getVariance(), self.policy)
-        pair      = functor.getSolution()
-        kernel    = pair.first
-        bg        = pair.second
-        kImageOut = afwImage.ImageD(self.kCols, self.kRows)
-        kSum      = kernel.computeImage(kImageOut, False)
-        diffIm    = ipDiffim.convolveAndSubtract(tmi, smi, kernel, bg)
-        bbox      = afwImage.BBox(afwImage.PointI(kernel.getCtrX(),
-                                                  kernel.getCtrY()) ,
-                                  afwImage.PointI(diffIm.getWidth()-(kernel.getWidth()-kernel.getCtrX()),
-                                                  diffIm.getHeight()-(kernel.getHeight()-kernel.getCtrY())))
-        diffIm2   = afwImage.MaskedImageF(diffIm, bbox)
-        self.dStats.apply( diffIm2 )
+    def apply(self, policy, visitor, xloc, yloc, tmi, smi):
+        kc     = ipDiffim.makeKernelCandidate(xloc, yloc, tmi, smi, policy)
+        visitor.processCandidate(kc)
+        kim    = kc.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
+        diffIm = kc.getDifferenceImage(ipDiffim.KernelCandidateF.RECENT)
+        kSum   = kc.getKsum(ipDiffim.KernelCandidateF.RECENT)
+        bg     = kc.getBackground(ipDiffim.KernelCandidateF.RECENT)
+
+        bbox = kc.getKernel(ipDiffim.KernelCandidateF.RECENT).shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
+        diffIm = afwImage.MaskedImageF(diffIm, bbox, afwImage.LOCAL)
+        self.dStats.apply(diffIm)
         
-        dmean = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.MEAN).getValue()
-        dstd  = afwMath.makeStatistics(diffIm2.getImage(),    afwMath.STDEV).getValue()
-        vmean = afwMath.makeStatistics(diffIm2.getVariance(), afwMath.MEAN).getValue()
-        return kSum, bg, dmean, dstd, vmean, kImageOut, diffIm2
+        dmean = afwMath.makeStatistics(diffIm.getImage(),    afwMath.MEAN).getValue()
+        dstd  = afwMath.makeStatistics(diffIm.getImage(),    afwMath.STDEV).getValue()
+        vmean = afwMath.makeStatistics(diffIm.getVariance(), afwMath.MEAN).getValue()
+        return kSum, bg, dmean, dstd, vmean, kim, diffIm, kc
         
-    def applyFunctor(self, invert=False, xloc=397, yloc=580):
+    def applyVisitor(self, invert=False, xloc=397, yloc=580):
         print '# %.2f %.2f' % (xloc, yloc)
-        
-        imsize = int(3 * self.kCols)
+
+        imsize = int(3 * self.policy1.get("kernelSize"))
 
         # chop out a region around a known object
-        bbox = afwImage.BBox( afwImage.PointI(xloc - imsize/2,
-                                              yloc - imsize/2),
-                              afwImage.PointI(xloc + imsize/2,
-                                              yloc + imsize/2) )
+        bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize/2,
+                                             yloc - imsize/2),
+                             afwGeom.Point2I(xloc + imsize/2,
+                                             yloc + imsize/2) )
 
         # sometimes the box goes off the image; no big deal...
         try:
             if invert:
-                tmi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(),  bbox)
-                smi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox)
+                tmi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(), bbox, afwImage.LOCAL)
+                smi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox, afwImage.LOCAL)
             else:
-                smi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(),  bbox)
-                tmi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox)
+                smi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(), bbox, afwImage.LOCAL)
+                tmi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox, afwImage.LOCAL)
         except Exception, e:
             return None
 
-        # estimate of the variance
-        var  = afwImage.MaskedImageF(smi, True)
-        var -= tmi
-
         # delta function kernel
-        kSum1, bg1, dmean1, dstd1, vmean1, kImageOut1, diffIm1 = self.apply(self.kFunctor1, tmi, smi, var)
+        results1 = self.apply(self.policy1, self.bskv1, xloc, yloc, tmi, smi)
+        kSum1, bg1, dmean1, dstd1, vmean1, kImageOut1, diffIm1, kc1 = results1
+        kc1.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
+            ipDiffim.KernelSolution.EIGENVALUE)
+        kc1.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
+            ipDiffim.KernelSolution.SVD)
         print 'DF Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                     self.dStats.getRms(),
                                                                                     kSum1, bg1,
@@ -171,12 +203,17 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut1.writeFits('k1.fits')
             diffIm1.writeFits('d1')
 
-        # alard-lupton kernel
-        kSum2, bg2, dmean2, dstd2, vmean2, kImageOut2, diffIm2 = self.apply(self.kFunctor2, tmi, smi, var)
-        print 'AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
-                                                                                    self.dStats.getRms(),
-                                                                                    kSum2, bg2,
-                                                                                    dmean2, dstd2, vmean2)
+        # regularized delta function kernel
+        results2 = self.apply(self.policy2, self.bskv2, xloc, yloc, tmi, smi)
+        kSum2, bg2, dmean2, dstd2, vmean2, kImageOut2, diffIm2, kc2 = results2
+        kc2.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
+            ipDiffim.KernelSolution.EIGENVALUE)
+        kc2.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
+            ipDiffim.KernelSolution.SVD)
+        print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
+                                                                                     self.dStats.getRms(),
+                                                                                     kSum2, bg2,
+                                                                                     dmean2, dstd2, vmean2)
         if display:
             ds9.mtv(tmi, frame=4)
             ds9.mtv(smi, frame=5)
@@ -186,12 +223,17 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut2.writeFits('k2.fits')
             diffIm2.writeFits('d2')
 
-        # regularized delta function kernel
-        kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3 = self.apply(self.kFunctor3, tmi, smi, var)
-        print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
-                                                                                     self.dStats.getRms(),
-                                                                                     kSum3, bg3,
-                                                                                     dmean3, dstd3, vmean3)
+        # alard-lupton kernel
+        results3 = self.apply(self.policy3, self.bskv3, xloc, yloc, tmi, smi)
+        kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3, kc3 = results3
+        kc3.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
+            ipDiffim.KernelSolution.EIGENVALUE)
+        kc3.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
+            ipDiffim.KernelSolution.SVD)
+        print 'AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
+                                                                                    self.dStats.getRms(),
+                                                                                    kSum3, bg3,
+                                                                                    dmean3, dstd3, vmean3)
         # outputs
         if display:
             ds9.mtv(tmi, frame=8)
@@ -207,9 +249,9 @@ class DiffimTestCases(unittest.TestCase):
     def testFunctor(self):
         for fp in self.footprints:
             # note this returns the kernel images
-            self.applyFunctor(invert=False, 
-                              xloc= int(0.5 * ( fp.getBBox().getX0() + fp.getBBox().getX1() )),
-                              yloc= int(0.5 * ( fp.getBBox().getY0() + fp.getBBox().getY1() )))
+            self.applyVisitor(invert=False, 
+                              xloc= int(0.5 * ( fp.getBBox().getMinX() + fp.getBBox().getMaxX() )),
+                              yloc= int(0.5 * ( fp.getBBox().getMinY() + fp.getBBox().getMaxY() )))
        
 #####
         
@@ -227,9 +269,18 @@ def run(doExit=False):
     tests.run(suite(), doExit)
 
 if __name__ == "__main__":
-    if '-d' in sys.argv:
-        display = True
-    if '-w' in sys.argv:
-        writefits = True
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option('-n', dest='nodisplay', action='store_true', default=False)
+    parser.add_option('-w', dest='writefits', action='store_true', default=False)
+    parser.add_option('-t', dest='defTemplatePath')
+    parser.add_option('-i', dest='defSciencePath')
+    (opt, args) = parser.parse_args()
+
+    display = not opt.nodisplay
+    writefits = opt.writefits
+    if opt.defTemplatePath and opt.defSciencePath:
+        defTemplatePath = opt.defTemplatePath
+        defSciencePath = opt.defSciencePath
         
     run(True)

@@ -25,6 +25,7 @@
 import unittest
 import lsst.utils.tests as tests
 import lsst.ip.diffim as ipDiffim
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import eups
 import os
@@ -33,9 +34,7 @@ import sys
 
 class DiffimTestCases(unittest.TestCase):
     def setUp(self):
-        self.diffimDir    = eups.productDir('ip_diffim')
-        self.diffimPolicy = os.path.join(self.diffimDir, 'policy', 'ImageSubtractStageDictionary.paf')
-        self.policy       = ipDiffim.generateDefaultPolicy(self.diffimPolicy)
+        self.policy       = ipDiffim.makeDefaultPolicy()
         
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
@@ -62,7 +61,7 @@ class DiffimTestCases(unittest.TestCase):
         # image 1 gets remapped to match up with image 2
         remappedImage = ipDiffim.warpTemplateExposure(self.templateImage,
                                                       self.scienceImage,
-                                                      self.policy)
+                                                      self.policy.getPolicy("warpingPolicy"))
 
 
         # sizes in pixels
@@ -96,15 +95,15 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata not set up; not running WarpTemplateExposure.py"
             return
 
-        bbox     = afwImage.BBox(afwImage.PointI(2, 900),
-                                 afwImage.PointI(102, 1000))
-        templateSubImage = afwImage.ExposureF(self.templateImage, bbox)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, bbox)
+        bbox = afwGeom.Box2I(afwGeom.Point2I(7, 900),
+                             afwGeom.Point2I(102, 1000))
+        templateSubImage = afwImage.ExposureF(self.templateImage, bbox, afwImage.LOCAL)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, bbox, afwImage.LOCAL)
 
         # image 1 gets remapped to match up with image 2
         remappedImage = ipDiffim.warpTemplateExposure(templateSubImage,
                                                       scienceSubImage,
-                                                      self.policy)
+                                                      self.policy.getPolicy("warpingPolicy"))
 
 
         # sizes in pixels
@@ -113,9 +112,6 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(remappedImage.getWidth(),
                          scienceSubImage.getWidth())
 
-        #ds9.mtv(scienceSubImage, frame=1)
-        #ds9.mtv(remappedImage, frame=2)
-        
         # sizes on the sky
         wcs1 = remappedImage.getWcs()
         wcs2 = scienceSubImage.getWcs()

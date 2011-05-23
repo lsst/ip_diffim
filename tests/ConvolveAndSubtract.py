@@ -29,16 +29,15 @@ import unittest
 import lsst.utils.tests as tests
 
 import eups
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
+import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as logging
 
 verbosity = 4
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
-
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'policy', 'ImageSubtractStageDictionary.paf')
 
 # This one tests convolve and subtract
 
@@ -47,12 +46,11 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.policy      = ipDiffim.generateDefaultPolicy(diffimPolicy)
-        self.kCols       = self.policy.getInt('kernelCols')
-        self.kRows       = self.policy.getInt('kernelRows')
+        self.policy      = ipDiffim.makeDefaultPolicy()
+        self.kSize       = self.policy.getInt('kernelSize')
 
         # gaussian reference kernel
-        self.gSize         = self.kCols
+        self.gSize         = self.kSize
         self.gaussFunction = afwMath.GaussianFunction2D(2, 3)
         self.gaussKernel   = afwMath.AnalyticKernel(self.gSize, self.gSize, self.gaussFunction)
 
@@ -75,22 +73,18 @@ class DiffimTestCases(unittest.TestCase):
             del self.scienceImage
 
     def runConvolveAndSubtract1(self, bgVal = 0, xloc = 408, yloc = 580):
-        imsize = int(5 * self.kCols)
+        imsize = int(5 * self.kSize)
 
-        p0 = afwImage.PointI(xloc - imsize/2, yloc - imsize/2)
-        p1 = afwImage.PointI(xloc + imsize/2, yloc + imsize/2)
-        bbox = afwImage.BBox(p0, p1)
+        p0 = afwGeom.Point2I(xloc - imsize/2, yloc - imsize/2)
+        p1 = afwGeom.Point2I(xloc + imsize/2, yloc + imsize/2)
+        bbox = afwGeom.Box2I(p0, p1)
 
-        tmi     = afwImage.MaskedImageF(self.templateImage, bbox)
-        smi     = afwImage.MaskedImageF(self.scienceImage, bbox)
+        tmi     = afwImage.MaskedImageF(self.templateImage, bbox, afwImage.LOCAL)
+        smi     = afwImage.MaskedImageF(self.scienceImage, bbox, afwImage.LOCAL)
         diffIm  = ipDiffim.convolveAndSubtract(tmi, smi, self.gaussKernel, bgVal)
 
-        p0 = afwImage.PointI(self.gaussKernel.getCtrX(),
-                             self.gaussKernel.getCtrY())
-        p1 = afwImage.PointI(imsize - (self.gaussKernel.getWidth()  - self.gaussKernel.getCtrX()),
-                             imsize - (self.gaussKernel.getHeight() - self.gaussKernel.getCtrY()))
-        bbox    = afwImage.BBox(p0, p1)
-        diffIm2 = afwImage.MaskedImageF(diffIm, bbox)
+        bbox = self.gaussKernel.shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
+        diffIm2 = afwImage.MaskedImageF(diffIm, bbox, afwImage.LOCAL)
 
         # image is empty (or the additional background you subtracted off)
         for j in range(diffIm2.getHeight()):
@@ -98,23 +92,19 @@ class DiffimTestCases(unittest.TestCase):
                 self.assertAlmostEqual(diffIm2.getImage().get(i, j), -1.*bgVal, 3)
 
     def runConvolveAndSubtract2(self, bgOrder=0, xloc = 408, yloc = 580):
-        imsize = int(5 * self.kCols)
+        imsize = int(5 * self.kSize)
 
-        p0 = afwImage.PointI(xloc - imsize/2, yloc - imsize/2)
-        p1 = afwImage.PointI(xloc + imsize/2, yloc + imsize/2)
-        bbox = afwImage.BBox(p0, p1)
+        p0 = afwGeom.Point2I(xloc - imsize/2, yloc - imsize/2)
+        p1 = afwGeom.Point2I(xloc + imsize/2, yloc + imsize/2)
+        bbox = afwGeom.Box2I(p0, p1)
 
-        tmi     = afwImage.MaskedImageF(self.templateImage, bbox)
-        smi     = afwImage.MaskedImageF(self.scienceImage, bbox)
+        tmi     = afwImage.MaskedImageF(self.templateImage, bbox, afwImage.LOCAL)
+        smi     = afwImage.MaskedImageF(self.scienceImage, bbox, afwImage.LOCAL)
         bgFunc  = afwMath.PolynomialFunction2D(bgOrder)  # coeffs are 0. by default
         diffIm  = ipDiffim.convolveAndSubtract(tmi, smi, self.gaussKernel, bgFunc)
 
-        p0 = afwImage.PointI(self.gaussKernel.getCtrX(),
-                             self.gaussKernel.getCtrY())
-        p1 = afwImage.PointI(imsize - (self.gaussKernel.getWidth()  - self.gaussKernel.getCtrX()),
-                             imsize - (self.gaussKernel.getHeight() - self.gaussKernel.getCtrY()))
-        bbox    = afwImage.BBox(p0, p1)
-        diffIm2 = afwImage.MaskedImageF(diffIm, bbox)
+        bbox = self.gaussKernel.shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
+        diffIm2 = afwImage.MaskedImageF(diffIm, bbox, afwImage.LOCAL)
         for j in range(diffIm2.getHeight()):
             for i in range(diffIm2.getWidth()):
                 self.assertAlmostEqual(diffIm2.getImage().get(i, j), 0., 4)

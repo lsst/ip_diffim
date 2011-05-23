@@ -29,6 +29,7 @@ import unittest
 import lsst.utils.tests as tests
  
 import eups
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -39,9 +40,6 @@ import lsst.afw.display.ds9 as ds9
 
 verbosity = 3
 pexLog.Trace_setVerbosity('lsst.ip.diffim', verbosity)
-
-diffimDir    = eups.productDir('ip_diffim')
-diffimPolicy = os.path.join(diffimDir, 'policy', 'ImageSubtractStageDictionary.paf')
 
 display   = False
 writefits = False
@@ -60,26 +58,29 @@ class DiffimTestCases(unittest.TestCase):
         if not defDataDir:
             return
         
-        self.policy = ipDiffim.generateDefaultPolicy(diffimPolicy)
+        self.policy = ipDiffim.makeDefaultPolicy()
+        self.policy.set("fitForBackground", True)
+        
         self.scienceImage   = afwImage.ExposureF(defSciencePath)
         self.templateImage  = afwImage.ExposureF(defTemplatePath)
         # takes forever to remap the CFHT images
         if defSciencePath.find('CFHT') == -1:
             self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage,
                                                                 self.scienceImage,
-                                                                self.policy)
+                                                                self.policy.getPolicy("warpingPolicy"))
             
         self.scienceMaskedImage = self.scienceImage.getMaskedImage()
         self.templateMaskedImage = self.templateImage.getMaskedImage()
         self.dStats = ipDiffim.ImageStatisticsF()
         
-        diffimTools.backgroundSubtract(self.policy, [self.templateMaskedImage,
-                                                     self.scienceMaskedImage])
+        diffimTools.backgroundSubtract(self.policy.getPolicy("afwBackgroundPolicy"),
+                                       [self.templateMaskedImage,
+                                        self.scienceMaskedImage])
 
     def stats(self, cid, diffim, size=5):
-        bbox = afwImage.BBox(afwImage.PointI((diffim.getWidth() - size)//2,
+        bbox = afwGeom.Box2I(afwGeom.Point2I((diffim.getWidth() - size)//2,
                                              (diffim.getHeight() - size)//2),
-                             afwImage.PointI((diffim.getWidth() + size)//2,
+                             afwGeom.Point2I((diffim.getWidth() + size)//2,
                                              (diffim.getHeight() + size)//2))
         self.dStats.apply(diffim)
         pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
@@ -89,7 +90,7 @@ class DiffimTestCases(unittest.TestCase):
                                                                               self.dStats.getRms()))
 
         
-        diffim2 = afwImage.MaskedImageF(diffim, bbox)
+        diffim2 = afwImage.MaskedImageF(diffim, bbox, afwImage.LOCAL)
         self.dStats.apply(diffim2)
         pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
                      "Candidate %d : Residuals core (%d px): %.3f +/- %.3f" % (cid,
@@ -159,8 +160,6 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set("spatialKernelClipping", False)
         
         kernel, bg, cellSet = results
-        basisList   = kernel.getKernelList()
-        kFunctor    = ipDiffim.PsfMatchingFunctorF(basisList)
         
         goodList = []
         for cell in cellSet.getCellList():
@@ -183,8 +182,7 @@ class DiffimTestCases(unittest.TestCase):
             
             cand = self.setStatus(cellSet, cid, afwMath.SpatialCellCandidate.BAD)
 
-            jkResults = ipDiffim.fitSpatialKernelFromCandidates(kFunctor,
-                                                                cellSet,
+            jkResults = ipDiffim.fitSpatialKernelFromCandidates(cellSet,
                                                                 self.policy)
             jkKernel  = jkResults[0]
             jkBg      = jkResults[1]
@@ -220,9 +218,9 @@ class DiffimTestCases(unittest.TestCase):
         else:
             raise
         
-        results = ipDiffim.createPsfMatchingKernel(self.templateMaskedImage,
-                                                   self.scienceMaskedImage,
-                                                   self.policy)
+        results = ipDiffim.psfMatchImageToImage(self.templateMaskedImage,
+                                                self.scienceMaskedImage,
+                                                self.policy)
         self.jackknifeResample(results)
         
     def test(self):
@@ -230,8 +228,15 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata not set up; not running JackknifeResampleSpatialKernel.py"
             return
         
-        self.runTest(mode="DFr")
+        self.runTest(mode="AL")
 
+    def tearDown(self):
+        del self.policy
+        del self.scienceImage
+        del self.templateImage
+        del self.scienceMaskedImage
+        del self.templateMaskedImage
+        del self.dStats
 #####
 
 def suite():

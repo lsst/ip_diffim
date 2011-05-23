@@ -32,33 +32,311 @@
  * @ingroup ip_diffim
  */
 #include <iostream>
+#include <numeric>
 #include <limits>
 
 #include "boost/timer.hpp" 
 
 #include "Eigen/Core"
 
-// NOTE -  trace statements >= 6 can ENTIRELY kill the run time
-// #define LSST_MAX_TRACE 5
-
-#include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
-#include "lsst/afw/detection/Footprint.h"
-#include "lsst/pex/exceptions/Exception.h"
+#include "lsst/afw/geom.h"
+
 #include "lsst/pex/logging/Trace.h"
 #include "lsst/pex/logging/Log.h"
+#include "lsst/pex/policy/Policy.h"
+#include "lsst/pex/exceptions/Runtime.h"
 
+#include "lsst/ip/diffim.h"
+
+namespace afwGeom    = lsst::afw::geom;
+namespace afwImage   = lsst::afw::image;
+namespace afwMath    = lsst::afw::math;
 namespace pexExcept  = lsst::pex::exceptions; 
 namespace pexLog     = lsst::pex::logging; 
 namespace pexPolicy  = lsst::pex::policy; 
-namespace afwImage   = lsst::afw::image;
-namespace afwMath    = lsst::afw::math;
-namespace afwDetect  = lsst::afw::detection;
 
 namespace lsst { 
 namespace ip { 
 namespace diffim {
+
+template<typename PixelT>
+std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
+fitSpatialKernelFromCandidates(
+    lsst::afw::math::SpatialCellSet &kernelCells,       ///< A SpatialCellSet containing KernelCandidates
+    lsst::pex::policy::Policy const& policy             ///< Policy to control the processing
+    ) {
+    typedef typename afwImage::Image<afwMath::Kernel::Pixel> ImageT;
+    
+    /* There are a variety of recipes for creating a spatial kernel which I will
+     * outline here :
+     *
+     * 1a) Using unregularized delta function kernels, run a full spatial model
+     where effectively each delta function basis varies spatially
+     individually.  While this is the most general solution and may be
+     fast due to the specialization of delta-function convolution, it has
+     also been shown to lead to noisy kernels.  This is not recommended.
+     
+     * 1b) Using unregularized delta function kernels, do a PCA of the returned
+     Kernels, and use these to create a new basis set.  This requires a
+     first call to singleKernelFitter, then an instance of
+     KernelPcaVisitor() to do the PCA, creation of a new kFunctor with
+     the eigenBases, a new call to singleKernelFitter using these new
+     bases then a call to spatialKernelFitter.  It appears that the
+     kernels are not self-similar enough to make this a viable solution.
+     
+     * 2a) Using regularized delta function kernels, run a full spatial model
+     where effectively each delta function basis varies spatially
+     individually.  This merely requires repeated calls to
+     singleKernelFitter and spatialKernelFitter with the supplied
+     kFunctor, same as option 1a) and 3).  While this is general and may
+     be fast due to the specialized delta-function convolution, we cannot
+     enforce that the kernel sum does not vary spatially.
+     
+     * 2b) Using regularized delta function kernels, do a PCA of the returned
+     Kernels, and use these to create a new basis set.  This requires a
+     first call to singleKernelFitter, then an instance of
+     KernelPcaVisitor() to do the PCA, creation of a new kFunctor with
+     the eigenBases, a new call to singleKernelFitter using these new
+     bases then a call to spatialKernelFitter.  While this seems somewhat
+     circuitous, we should be able to use many fewer basis functions,
+     making the final image convolution faster.  We can also enforce that
+     the kernel sum does not vary spatially by modifying the eigenBases.
+     
+     * 3)  Use Alard Lupton basis set.  This merely requires repeated calls to
+     singleKernelFitter and spatialKernelFitter with the supplied
+     kFunctor.  With these we can enforce that the kernel sum does not
+     vary spatially.
+     * 
+     */
+    
+    int const maxSpatialIterations    = policy.getInt("maxSpatialIterations");
+    int const nStarPerCell            = policy.getInt("nStarPerCell");
+    bool const usePcaForSpatialKernel = policy.getBool("usePcaForSpatialKernel");
+    bool const subtractMeanForPca     = policy.getBool("subtractMeanForPca");
+    
+    /* Build basis list here */
+    lsst::afw::math::KernelList basisList = makeKernelBasisList(policy);
+
+    /* Build regularization matrix here */
+    boost::shared_ptr<Eigen::MatrixXd> hMat;
+    bool useRegularization     = policy.getBool("useRegularization");
+    std::string kernelBasisSet = policy.getString("kernelBasisSet");
+
+    if (useRegularization) {
+        if (kernelBasisSet == "alard-lupton") {
+            pexLog::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                              "Regularization not enabled for Alard-Lupton kernels");
+            useRegularization = false;
+        }
+        else {
+            /* build once */
+            hMat = makeRegularizationMatrix(policy);
+        }
+    }
+        
+
+    boost::timer t;
+    t.restart();
+    
+    afwMath::LinearCombinationKernel::Ptr spatialKernel;
+    afwMath::Kernel::SpatialFunctionPtr spatialBackground;
+    
+    /* Visitor for the single kernel fit */
+    boost::shared_ptr<detail::BuildSingleKernelVisitor<PixelT> > singleKernelFitter;
+    if (useRegularization) {
+        singleKernelFitter = boost::shared_ptr<detail::BuildSingleKernelVisitor<PixelT> >(
+            new detail::BuildSingleKernelVisitor<PixelT>(basisList, policy, hMat)
+            );
+    }
+    else {
+        singleKernelFitter = boost::shared_ptr<detail::BuildSingleKernelVisitor<PixelT> >(
+            new detail::BuildSingleKernelVisitor<PixelT>(basisList, policy)
+            );
+    }
+    
+    /* Visitor for the kernel sum rejection */
+    detail::KernelSumVisitor<PixelT> kernelSumVisitor(policy);
+    
+    /* Main loop; catch any exceptions */
+    try {
+        int totalIterations = 0;
+        for (int i = 0; i < maxSpatialIterations; i++, totalIterations++) {
+
+            /* Make sure there are no uninitialized candidates as current occupant of Cell */
+            int nRejectedSkf = -1;
+            while (nRejectedSkf != 0) {
+                pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                                  "Building single kernels...");
+                kernelCells.visitCandidates(&(*singleKernelFitter), nStarPerCell);
+                nRejectedSkf = singleKernelFitter->getNRejected();
+            }
+            
+            /* Reject outliers in kernel sum */
+            kernelSumVisitor.resetKernelSum();
+            kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::AGGREGATE);
+            kernelCells.visitCandidates(&kernelSumVisitor, nStarPerCell);
+            kernelSumVisitor.processKsumDistribution();
+            kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::REJECT);
+            kernelCells.visitCandidates(&kernelSumVisitor, nStarPerCell);
+
+            int nRejectedKsum = kernelSumVisitor.getNRejected();
+            pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                              "Iteration %d, Spatial Iteration %d, rejected %d Kernels", 
+                              totalIterations, i, nRejectedKsum);
+
+            if (nRejectedKsum > 0) {
+                /* Jump back to the top; don't count against index i */
+                i -= 1;
+                continue;
+            }
+                
+            /* 
+               At this stage we can either apply the spatial fit to the kernels, or
+               we run a PCA, use these as a *new* basis set with lower
+               dimensionality, and then apply the spatial fit to these kernels 
+            */
+            afwMath::KernelList spatialBasisList;
+            if (usePcaForSpatialKernel) {
+                int const nComponents = policy.getInt("numPrincipalComponents");
+                
+                pexLog::TTrace<5>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                                  "Building Pca Basis");
+                afwImage::ImagePca<ImageT> imagePca;
+                detail::KernelPcaVisitor<PixelT> importStarVisitor(&imagePca);
+                kernelCells.visitCandidates(&importStarVisitor, nStarPerCell);
+                if (subtractMeanForPca) {
+                    importStarVisitor.subtractMean();
+                }
+                imagePca.analyze();
+                std::vector<typename ImageT::Ptr> eigenImages = imagePca.getEigenImages();
+                std::vector<double> eigenValues               = imagePca.getEigenValues();
+                afwMath::KernelList basisListRaw              = importStarVisitor.getEigenKernels();
+
+                /*
+                if (true) {
+                    afwImage::Image<afwMath::Kernel::Pixel> img =
+                        afwImage::Image<afwMath::Kernel::Pixel>
+                        (*(importStarVisitor.returnMean()), true);
+                    img.writeFits(str(boost::format("k%d_M.fits") % totalIterations)); 
+
+                    for (unsigned int j = 0; j < eigenImages.size(); j++) {
+                        afwImage::Image<afwMath::Kernel::Pixel> img = 
+                            afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[j], true);
+                        img.writeFits(str(boost::format("k%d_%d.fits") % totalIterations % j)); 
+                    }
+                }
+                */
+
+                double eSum = std::accumulate(eigenValues.begin(), eigenValues.end(), 0.);
+                for(unsigned int j=0; j < eigenValues.size(); j++) {
+                    pexLog::TTrace<6>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                                      "Eigenvalue %d : %f (%f \%)", 
+                                      j, eigenValues[j], eigenValues[j]/eSum);
+                }
+                int const nEigen = eigenValues.size();
+                int const nToUse = ((nComponents <= 0) || (nEigen < nComponents)) ? nEigen : nComponents;
+
+                afwMath::KernelList basisListTrim;
+                for (int j = 0; j < nToUse; ++j) {
+                    /* Check for NaN */
+                    afwImage::Image<afwMath::Kernel::Pixel> 
+                        img(afwGeom::Extent2I(basisListRaw[j]->getDimensions()));
+                    (void)basisListRaw[j]->computeImage(img, true);
+                    afwMath::Statistics stats = afwMath::makeStatistics(img, afwMath::SUM);
+                    if (std::isnan(stats.getValue(afwMath::SUM))) {
+                        pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                                          "WARNING : NaN in principal component %d; skipping", j);
+                    } else {
+                        basisListTrim.push_back(basisListRaw[j]);
+                    }
+                }
+                /* Put all the power in the first kernel, which will not vary spatially */
+                afwMath::KernelList basisListPca = renormalizeKernelList(basisListTrim);
+                
+                /* New PsfMatchingFunctor and Kernel visitor for this new basis list */
+                detail::BuildSingleKernelVisitor<PixelT> singleKernelFitterPca(basisListPca, policy);
+                
+                pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                                  "Rebuilding kernels using Pca basis");
+                
+                /* Only true for the first visit so we rebuild each good kernel with
+                 * its PcaBasis representation */
+                singleKernelFitterPca.setSkipBuilt(false);
+                kernelCells.visitCandidates(&singleKernelFitterPca, nStarPerCell);
+                /* Once they are built we don't have to revisit */
+                singleKernelFitterPca.setSkipBuilt(true);
+
+                int nRejectedPca = singleKernelFitterPca.getNRejected();
+                pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                                  "Iteration %d, Spatial Iteration %d, rejected %d Kernels", 
+                                  totalIterations, i, nRejectedPca);
+                
+                if (nRejectedPca > 0) {
+                    /* We don't want to continue on (yet) with the spatial modeling,
+                     * because we have bad objects contributing to the Pca basis.
+                     * We basically need to restart from the beginning of this loop,
+                     * since the cell-mates of those objects that were rejected need
+                     * their original Kernels built by singleKernelFitter.  
+                     */
+
+                    /* Jump back to the top; don't count against index i */
+                    i -= 1;
+                    continue;
+                }
+                spatialBasisList = basisListPca;
+            }
+            else {
+                spatialBasisList = basisList;
+            }
+
+                
+            /* We have gotten on to the spatial modeling part */
+            afwGeom::Box2I regionBBox = kernelCells.getBBox();
+            detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(spatialBasisList, 
+                                                                          regionBBox,
+                                                                          policy);
+            kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
+            spatialKernelFitter.solveLinearEquation();
+            pexLog::TTrace<3>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                              "Spatial kernel built with %d candidates", 
+                              spatialKernelFitter.getNCandidates());
+
+            std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr> kb =
+                spatialKernelFitter.getSolutionPair();
+
+            spatialKernel     = kb.first;
+            spatialBackground = kb.second;
+            
+            /* Visitor for the spatial kernel result */
+            detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel, 
+                                                                             spatialBackground, 
+                                                                             policy);
+            kernelCells.visitCandidates(&spatialKernelAssessor, nStarPerCell);
+            int nRejectedSpatial = spatialKernelAssessor.getNRejected();
+            pexLog::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                              "Spatial Kernel iteration %d, rejected %d Kernels, using %d Kernels", 
+                              i+1, nRejectedSpatial, spatialKernelAssessor.getNGood());
+            if (spatialKernelAssessor.getNGood() == 0) {
+                throw LSST_EXCEPT(pexExcept::Exception, "No good candidates for spatial model");            
+            }
+            if (nRejectedSpatial == 0) {
+                /* Nothing rejected, finished with spatial fit */
+                break;
+            }
+        }
+    } catch (pexExcept::Exception &e) {
+        LSST_EXCEPT_ADD(e, "Unable to calculate spatial kernel model");
+        throw e; 
+    }
+    double time = t.elapsed();
+    pexLog::TTrace<1>("lsst.ip.diffim.fitSpatialKernelFromCandidates", 
+                      "Total time to compute the spatial kernel : %.2f s", time);
+    pexLog::TTrace<2>("lsst.ip.diffim.fitSpatialKernelFromCandidates", "");
+    
+    return std::make_pair(spatialKernel, spatialBackground);
+}
 
 /**
  * @brief Turns Image into a 2-D Eigen Matrix
@@ -74,8 +352,27 @@ Eigen::MatrixXd imageToEigenMatrix(
         int x = 0;
         for (typename afwImage::Image<PixelT>::x_iterator ptr = img.row_begin(y); 
              ptr != img.row_end(y); ++ptr, ++x) {
-            // M is addressed row, col
-            M(y,x) = *ptr;
+            // M is addressed row, col.  Need to invert y-axis.
+            // WARNING : CHECK UNIT TESTS BEFORE YOU COMMIT THIS (-y-1) INVERSION
+            M(rows-y-1,x) = *ptr;
+        }
+    }
+    return M;
+}
+
+Eigen::MatrixXi maskToEigenMatrix(
+    lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const& mask
+    ) {
+    unsigned int rows = mask.getHeight();
+    unsigned int cols = mask.getWidth();
+    Eigen::MatrixXi M = Eigen::MatrixXi::Zero(rows, cols);
+    for (int y = 0; y != mask.getHeight(); ++y) {
+        int x = 0;
+        for (afwImage::Mask<lsst::afw::image::MaskPixel>::x_iterator ptr = mask.row_begin(y); 
+             ptr != mask.row_end(y); ++ptr, ++x) {
+            // M is addressed row, col.  Need to invert y-axis.
+            // WARNING : CHECK UNIT TESTS BEFORE YOU COMMIT THIS (-y-1) INVERSION
+            M(rows-y-1,x) = *ptr;
         }
     }
     return M;
@@ -110,8 +407,10 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     t.restart();
 
     afwImage::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
-    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    afwMath::convolve(convolvedMaskedImage, imageToConvolve, convolutionKernel, false);
+    afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
+    convolutionControl.setDoNormalize(false);
+    afwMath::convolve(convolvedMaskedImage, imageToConvolve, 
+                      convolutionKernel, convolutionControl);
     
     /* Add in background */
     *(convolvedMaskedImage.getImage()) += background;
@@ -159,8 +458,10 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     t.restart();
 
     afwImage::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
-    convolvedMaskedImage.setXY0(imageToConvolve.getXY0());
-    afwMath::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, convolutionKernel, false);
+    afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
+    convolutionControl.setDoNormalize(false);
+    afwMath::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, 
+                      convolutionKernel, convolutionControl);
     
     /* Add in background */
     *(convolvedMaskedImage.getImage()) += background;
@@ -182,206 +483,11 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     return convolvedMaskedImage;
 }
 
-/** 
- * @brief Runs Detection on a single image for significant peaks, and checks
- * returned Footprints for Masked pixels.
- *
- * @note Accepts two MaskedImages, one of which is to be convolved to match the
- * other.  The Detection package is run on the image to be convolved
- * (assumed to be higher S/N than the other image).  The subimages
- * associated with each returned Footprint in both images are checked for
- * Masked pixels; Footprints containing Masked pixels are rejected.  The
- * Footprints are grown by an amount specified in the Policy.  The
- * acceptible Footprints are returned in a vector.
- *
- * @return Vector of "clean" Footprints around which Image Subtraction
- * Kernels will be built.
- *
- */
-template <typename PixelT>
-std::vector<afwDetect::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::image::MaskedImage<PixelT> const &imageToConvolve,    
-    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, 
-    lsst::pex::policy::Policy             const &policy                                       
-    ) {
-    
-    // Parse the Policy
-    unsigned int fpNpixMin      = policy.getInt("fpNpixMin");
-    unsigned int fpNpixMax      = policy.getInt("fpNpixMax");
-    int fpGrowPix               = policy.getInt("fpGrowPix");
-
-    double detThreshold         = policy.getDouble("detThreshold");
-    std::string detThresholdType = policy.getString("detThresholdType");
-
-    // New mask plane that tells us which pixels are already in sources
-    // Add to both images so mask planes are aligned
-    int diffimMaskPlane = imageToConvolve.getMask()->addMaskPlane(diffimStampCandidateStr);
-    (void)imageToNotConvolve.getMask()->addMaskPlane(diffimStampCandidateStr);
-    afwImage::MaskPixel const diffimBitMask = 
-        imageToConvolve.getMask()->getPlaneBitMask(diffimStampCandidateStr);
-
-    // Add in new plane that will tell us which ones are used
-    (void)imageToConvolve.getMask()->addMaskPlane(diffimStampUsedStr);
-    (void)imageToNotConvolve.getMask()->addMaskPlane(diffimStampUsedStr);
-
-    // List of Footprints
-    std::vector<afwDetect::Footprint::Ptr> footprintListIn;
-    std::vector<afwDetect::Footprint::Ptr> footprintListOut;
-
-    // Functors to search through the images for masked pixels within candidate footprints
-    FindSetBits<afwImage::Mask<afwImage::MaskPixel> > fsb;
- 
-    int nCleanFp = 0;
-    imageToConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
-    imageToNotConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
-    
-    footprintListIn.clear();
-    footprintListOut.clear();
-    
-    // Find detections
-    afwDetect::Threshold threshold = 
-        afwDetect::createThreshold(detThreshold, detThresholdType);
-    afwDetect::FootprintSet<PixelT> footprintSet(
-        imageToConvolve, 
-        threshold,
-        "",
-        fpNpixMin);
-    
-    // Get the associated footprints
-    footprintListIn = footprintSet.getFootprints();
-    pexLog::TTrace<4>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                      "Found %d total footprints above threshold %.3f",
-                      footprintListIn.size(), detThreshold);
-    
-    // Iterate over footprints, look for "good" ones
-    nCleanFp = 0;
-    for (std::vector<afwDetect::Footprint::Ptr>::iterator i = footprintListIn.begin(); 
-         i != footprintListIn.end(); ++i) {
-        // footprint has too many pixels
-        if (static_cast<unsigned int>((*i)->getNpix()) > fpNpixMax) {
-            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                              "Footprint has too many pix: %d (max =%d)", 
-                              (*i)->getNpix(), fpNpixMax);
-            continue;
-        } 
-        
-        pexLog::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                          "Footprint in : %d,%d -> %d,%d",
-                          (*i)->getBBox().getX0(), (*i)->getBBox().getY0(), 
-                          (*i)->getBBox().getX1(), (*i)->getBBox().getY1());
-        
-        pexLog::TTrace<8>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                          "Grow by : %d pixels", fpGrowPix);
-        
-        /* Grow the footprint
-           flag true  = isotropic grow   = slow
-           flag false = 'manhattan grow' = fast
-           
-           The manhattan masks are rotated 45 degree w.r.t. the coordinate
-           system.  They intersect the vertices of the rectangle that would
-           connect pixels (X0,Y0) (X1,Y0), (X0,Y1), (X1,Y1).
-           
-           The isotropic masks do take considerably longer to grow and are
-           basically elliptical.  X0, X1, Y0, Y1 delimit the extent of the
-           ellipse.
-           
-           In both cases, since the masks aren't rectangles oriented with
-           the image coordinate system, when we DO extract such rectangles
-           as subimages for kernel fitting, some corner pixels can be found
-           in multiple subimages.
-           
-        */
-        afwDetect::Footprint::Ptr fpGrow = 
-            afwDetect::growFootprint(*i, fpGrowPix, false);
-
-        /* Operate on the BBox when grabbing sub images from the main image */
-        afwImage::BBox fpBBox = fpGrow->getBBox();
-        
-        pexLog::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                          "Footprint out : %d,%d -> %d,%d (center %d,%d)",
-                          fpBBox.getX0(), fpBBox.getY0(),
-                          fpBBox.getX1(), fpBBox.getY1(),
-                          int(0.5 * (fpBBox.getX0() + fpBBox.getX1())),
-                          int(0.5 * (fpBBox.getY0() + fpBBox.getY1())));
-        
-        
-        /* 
-           Note we need to translate to pixel coordinates here since thats how
-           BBoxes address (sub)images.  This does not affect the Footprint.  
-        */
-        fpBBox.shift(-imageToConvolve.getX0(), -imageToConvolve.getY0());
-
-        pexLog::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                          "Footprint shifted : %d,%d -> %d,%d (center %d,%d)",
-                          fpBBox.getX0(), fpBBox.getY0(),
-                          fpBBox.getX1(), fpBBox.getY1(),
-                          int(0.5 * (fpBBox.getX0() + fpBBox.getX1())),
-                          int(0.5 * (fpBBox.getY0() + fpBBox.getY1())));
-
-        // Ignore if its too close to the edge of the image 
-        bool belowOriginX = fpBBox.getX0() < 0;
-        bool belowOriginY = fpBBox.getY0() < 0;
-        bool offImageX    = fpBBox.getX1() > imageToConvolve.getWidth();
-        bool offImageY    = fpBBox.getY1() > imageToConvolve.getHeight();
-        if (belowOriginX || belowOriginY || offImageX || offImageY) {
-            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                              "Footprint grown off image"); 
-            continue;
-        }
-        
-        // Grab a subimage; report any exception
-        try {
-            afwImage::MaskedImage<PixelT> subImageToConvolve(imageToConvolve, fpBBox);
-            afwImage::MaskedImage<PixelT> subImageToNotConvolve(imageToNotConvolve, fpBBox);
-            
-            // Search for any masked pixels within the footprint
-            fsb.apply(*(subImageToConvolve.getMask()));
-            if (fsb.getBits() > 0) {
-                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                                  "Footprint has masked pix (val=%d) in image to convolve", 
-                                  fsb.getBits()); 
-                continue;
-            }
-            
-            fsb.apply(*(subImageToNotConvolve.getMask()));
-            if (fsb.getBits() > 0) {
-                pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                                  "Footprint has masked pix (val=%d) in image not to convolve", 
-                                  fsb.getBits());
-                continue;
-            }
-            
-        } catch (pexExcept::Exception& e) {
-            pexLog::TTrace<6>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
-                              "Exception caught extracting Footprint");
-            pexLog::TTrace<7>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching",
-                              e.what());
-            continue;
-        }
-
-        // If we get this far, we have a clean footprint
-        footprintListOut.push_back(fpGrow);
-        (void)afwDetect::setMaskFromFootprint(&(*imageToConvolve.getMask()), *fpGrow, diffimBitMask);
-        (void)afwDetect::setMaskFromFootprint(&(*imageToNotConvolve.getMask()), *fpGrow, diffimBitMask);
-        nCleanFp += 1;
-    }
-    
-    imageToConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
-    imageToNotConvolve.getMask()->clearMaskPlane(diffimMaskPlane);
-    
-    if (footprintListOut.size() == 0) {
-      throw LSST_EXCEPT(pexExcept::Exception, 
-                        "Unable to find any footprints for Psf matching");
-    }
-
-    pexLog::TTrace<1>("lsst.ip.diffim.getCollectionOfFootprintsForPsfMatching", 
-                      "Found %d clean footprints above threshold %.3f",
-                      footprintListOut.size(), detThreshold);
-    
-    return footprintListOut;
-}
-
+/***********************************************************************************************************/
+//
 // Explicit instantiations
+//
+
 template 
 Eigen::MatrixXd imageToEigenMatrix(lsst::afw::image::Image<float> const &);
 
@@ -423,19 +529,9 @@ p_INSTANTIATE_convolveAndSubtract(MaskedImage, TYPE)
 INSTANTIATE_convolveAndSubtract(float);
 INSTANTIATE_convolveAndSubtract(double);
 
-/* */
-
-
 template
-std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::image::MaskedImage<float> const &,
-    lsst::afw::image::MaskedImage<float> const &,
-    lsst::pex::policy::Policy const &);
-
-template
-std::vector<lsst::afw::detection::Footprint::Ptr> getCollectionOfFootprintsForPsfMatching(
-    lsst::afw::image::MaskedImage<double> const &,
-    lsst::afw::image::MaskedImage<double> const &,
-    pexPolicy::Policy  const &);
+std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
+fitSpatialKernelFromCandidates<float>(lsst::afw::math::SpatialCellSet &,
+                                      lsst::pex::policy::Policy const&);
 
 }}} // end of namespace lsst::ip::diffim

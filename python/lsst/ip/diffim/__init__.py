@@ -24,13 +24,12 @@
 from diffimLib import *
 
 # python code
-from createKernelFunctor import *
-from createPsfMatchingKernel import *
-from createSdqaRatingVector import *
-from generatePolicy import *
+from makePsfMatchingKernel import *
+from makeSdqaRatingVector import *
+from makeDefaultPolicy import *
 
-from subtractMaskedImage import *
-from subtractExposure import *
+from subtractMaskedImages import *
+from subtractExposures import *
 
 from warpTemplateExposure import *
 

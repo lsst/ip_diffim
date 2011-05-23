@@ -1,37 +1,18 @@
-/* 
- * LSST Data Management System
- * Copyright 2008, 2009, 2010 LSST Corporation.
- * 
- * This product includes software developed by the
- * LSST Project (http://www.lsst.org/).
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the LSST License Statement and 
- * the GNU General Public License along with this program.  If not, 
- * see <http://www.lsstcorp.org/LegalNotices/>.
- */
- 
-#include <Eigen/Core>
-#include <Eigen/Array>
-#include <boost/shared_ptr.hpp>
-#include <boost/timer.hpp> 
-#include <lsst/afw/image.h>
-#include <lsst/ip/diffim/ImageSubtract.h>
+#include "Eigen/Core"
+#include "Eigen/Array"
+#include "boost/shared_ptr.hpp"
+#include "boost/timer.hpp"
 
-namespace image   = lsst::afw::image;
-namespace diffim  = lsst::ip::diffim;
+#include "lsst/afw/geom.h"
+#include "lsst/afw/image.h"
+#include "lsst/ip/diffim/ImageSubtract.h"
+
+namespace afwGeom = lsst::afw::geom;
+namespace afwImage = lsst::afw::image;
+namespace diffim = lsst::ip::diffim;
 
 template <typename ImageT>
-Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
+Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
                      int cswitch) 
 {
     
@@ -58,7 +39,7 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
         /* a list of images - in diffim each one of these is associated with a basis function */
         std::vector<boost::shared_ptr<Eigen::VectorXd> > imageList(nParameters);
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiter = imageList.begin();
-        image::Image<ImageT> cimage(varianceEstimate.getDimensions());
+        afwImage::Image<ImageT> cimage(varianceEstimate.getDimensions());
         for (int i = 1; eiter != imageList.end(); ++eiter, ++i) {
             cimage = i; /* give it a value */
             Eigen::MatrixXd cMat = diffim::imageToEigenMatrix(cimage).block(startRow, startCol, 
@@ -96,7 +77,7 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
         /* a list of images - in diffim each one of these is associated with a basis function */
         std::vector<boost::shared_ptr<Eigen::VectorXd> > imageList(nParameters);
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiter = imageList.begin();
-        image::Image<ImageT> cimage(varianceEstimate.getDimensions());
+        afwImage::Image<ImageT> cimage(varianceEstimate.getDimensions());
         for (int i = 1; eiter != imageList.end(); ++eiter, ++i) {
             cimage = i; /* give it a value */
             Eigen::MatrixXd cMat = diffim::imageToEigenMatrix(cimage).block(startRow, 
@@ -132,21 +113,21 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
     else {
         
         /* a list of images - in diffim each one of these is associated with a basis function */
-        std::vector<boost::shared_ptr<image::Image<ImageT> > > imageList(nParameters);
-        typename std::vector<boost::shared_ptr<image::Image<ImageT> > >::iterator citer = imageList.begin();
+        std::vector<boost::shared_ptr<afwImage::Image<ImageT> > > imageList(nParameters);
+        typename std::vector<boost::shared_ptr<afwImage::Image<ImageT> > >::iterator citer=imageList.begin();
         for (int i = 1; citer != imageList.end(); ++citer, ++i) {
-            *citer = typename image::Image<ImageT>::Ptr(
-                new image::Image<ImageT>(varianceEstimate.getDimensions())
+            *citer = typename afwImage::Image<ImageT>::Ptr(
+                new afwImage::Image<ImageT>(varianceEstimate.getDimensions())
                 );
             **citer = i; /* give it a value */
         } 
         
         /* pixel locators */
-        std::vector<typename image::Image<ImageT>::xy_locator> locatorList;
+        std::vector<typename afwImage::Image<ImageT>::xy_locator> locatorList;
         for (citer = imageList.begin(); citer != imageList.end(); ++citer) {
             locatorList.push_back( (**citer).xy_at(startCol,startRow) );
         }
-        typename image::Image<ImageT>::xy_locator varianceLocator = 
+        typename afwImage::Image<ImageT>::xy_locator varianceLocator = 
             varianceEstimate.xy_at(startCol, startRow);
         
         /* at end of each row, this steps in column back to starting col pixel of next row */
@@ -157,14 +138,14 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
             for (int col = startCol; col < endCol; ++col) {
                 double const iVariance        = 1.0 / *varianceLocator;
                 
-                typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citeri = 
+                typename std::vector<typename afwImage::Image<ImageT>::xy_locator>::iterator citeri = 
                     locatorList.begin();
-                typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citerE = 
+                typename std::vector<typename afwImage::Image<ImageT>::xy_locator>::iterator citerE = 
                     locatorList.end();
                 for (int kidxi = 0; citeri != citerE; ++citeri, ++kidxi) {
                     ImageT const cdImagei = **citeri * iVariance;
                     
-                    typename std::vector<typename image::Image<ImageT>::xy_locator>::iterator citerj = 
+                    typename std::vector<typename afwImage::Image<ImageT>::xy_locator>::iterator citerj = 
                         citeri;
                     for (int kidxj = kidxi; citerj != citerE; ++citerj, ++kidxj) {
                         mMat(kidxi, kidxj) += cdImagei * **citerj;
@@ -198,7 +179,7 @@ Eigen::MatrixXd test(lsst::afw::image::Image<ImageT> varianceEstimate,
 int main() {
     boost::timer t;
 
-    lsst::afw::image::Image<float> varianceEstimate(100, 100);
+    afwImage::Image<float> varianceEstimate(afwGeom::Extent2I(100, 100));
     varianceEstimate = 1;
     
     t.restart();

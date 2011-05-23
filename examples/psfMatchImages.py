@@ -21,7 +21,6 @@
 #
 
 import sys, os
-import eups
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -30,22 +29,20 @@ import lsst.pex.logging as pexLog
 verbosity = 3
 pexLog.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
-imageProcDir  = eups.productDir("ip_diffim")
-defPolicyPath = os.path.join(imageProcDir, "policy", "ImageSubtractStageDictionary.paf")
-
 imageToConvolve     = afwImage.MaskedImageF(sys.argv[1])
 imageToNotConvolve  = afwImage.MaskedImageF(sys.argv[2])
 outputImage         = sys.argv[3]
 
-policy              = ipDiffim.generateDefaultPolicy(defPolicyPath)
-policy.set("detThreshold", 5.0)
+policy              = ipDiffim.makeDefaultPolicy()
+policy.getPolicy("detectionPolicy").set("detThreshold", 5.0)
 policy.set("kernelBasisSet", "alard-lupton")
-policy.set("usePcaForSpatialKernel", True)
+policy.set("usePcaForSpatialKernel", False)
 policy.set("spatialKernelOrder", 1)
+policy.set('fitForBackground', True)
 
-spatialKernel, spatialBg, kernelCellSet = ipDiffim.createPsfMatchingKernel(imageToConvolve,
-                                                                           imageToNotConvolve,
-                                                                           policy)
+spatialKernel, spatialBg, kernelCellSet = ipDiffim.psfMatchImageToImage(imageToConvolve,
+                                                                        imageToNotConvolve,
+                                                                        policy)
  
 cMi = afwImage.MaskedImageF(imageToConvolve.getDimensions())
 afwMath.convolve(cMi, imageToConvolve, spatialKernel, False)
