@@ -9,7 +9,7 @@ import lsst.afw.image as afwImage
 from lsst.pex.logging import Trace
 from lsst.pex.logging import Log
 
-from lsst.ip.diffim import subtractExposures, makeDefaultPolicy
+from lsst.ip.diffim import PsfMatch, makeDefaultPolicy
 import lsst.ip.diffim.diffimTools as diffimTools
 
 def main():
@@ -26,7 +26,7 @@ def main():
     defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0", "v5-e0-c011-a10.sci")
 
     mergePolicyPath = None
-    defOutputPath   = 'diffExposure'
+    defOutputPath   = 'diffExposure.fits'
     defVerbosity    = 0
     defFwhm         = 3.5
     
@@ -49,8 +49,8 @@ Notes:
                       help='verbosity of Trace messages')
     parser.add_option('-d', '--display', action='store_true', default=False,
                       help='display the images')
-    parser.add_option('-b', '--bg', action='store_true', default=True,
-                      help='subtract backgrounds')
+    parser.add_option('-b', '--bg', action='store_true', default=False,
+                      help='subtract backgrounds using afw')
     parser.add_option('-f', '--fwhm', type=float,
                       help='Psf Fwhm (pixel)')
 
@@ -100,11 +100,15 @@ Notes:
         diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),
                                        [templateExposure.getMaskedImage(),
                                         scienceExposure.getMaskedImage()])
+    else:
+        policy.set('fitForBackground', True)
+        if policy.get('fitForBackground') == False:
+            print 'NOTE: no background subtraction at all is requested'
 
-    results = subtractExposures(templateExposure,
-                                scienceExposure,
-                                policy,
-                                display = display)
+        
+    psfmatch = PsfMatch.ImagePsfMatch(policy)
+    results  = psfmatch.subtractExposures(templateExposure, scienceExposure)
+
     differenceExposure = results[0]
     differenceExposure.writeFits(outputPath)
 

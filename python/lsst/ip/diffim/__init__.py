@@ -24,12 +24,9 @@
 from diffimLib import *
 
 # python code
-from makePsfMatchingKernel import *
+from PsfMatch import *
 from makeSdqaRatingVector import *
 from makeDefaultPolicy import *
-
-from subtractMaskedImages import *
-from subtractExposures import *
 
 from warpTemplateExposure import *
 

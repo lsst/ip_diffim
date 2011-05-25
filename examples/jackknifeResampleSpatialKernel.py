@@ -159,7 +159,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set("kernelSumClipping", False)
         self.policy.set("spatialKernelClipping", False)
         
-        kernel, bg, cellSet = results
+        diffim, kernel, bg, cellSet = results
         
         goodList = []
         for cell in cellSet.getCellList():
@@ -217,10 +217,10 @@ class DiffimTestCases(unittest.TestCase):
             self.policy.set("usePcaForSpatialKernel", True)
         else:
             raise
-        
-        results = ipDiffim.psfMatchImageToImage(self.templateMaskedImage,
-                                                self.scienceMaskedImage,
-                                                self.policy)
+
+        psfmatch = ipDiffim.ImagePsfMatch(self.policy)
+        results  = psfmatch.subtractMaskedImages(self.templateMaskedImage,
+                                                 self.scienceMaskedImage,
         self.jackknifeResample(results)
         
     def test(self):

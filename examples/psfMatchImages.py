@@ -40,11 +40,8 @@ policy.set("usePcaForSpatialKernel", False)
 policy.set("spatialKernelOrder", 1)
 policy.set('fitForBackground', True)
 
-spatialKernel, spatialBg, kernelCellSet = ipDiffim.psfMatchImageToImage(imageToConvolve,
-                                                                        imageToNotConvolve,
-                                                                        policy)
- 
-cMi = afwImage.MaskedImageF(imageToConvolve.getDimensions())
-afwMath.convolve(cMi, imageToConvolve, spatialKernel, False)
+psfmatch = ipDiffim.ImagePsfMatch(policy)
+results  = psfmatch.matchMaskedImages(imageToConvolve, imageToNotConvolve)
+cMi, spatialKernel, spatialBg, kernelCellSet = results
 cMi.writeFits(outputImage)
 

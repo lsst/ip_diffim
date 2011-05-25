@@ -281,6 +281,7 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
 #######
 
 def backgroundSubtract(policy, maskedImages):
+    backgrounds = []
     t0 = time.time()
     algorithm   = policy.get("algorithm")
     binsize     = policy.get("binsize")
@@ -294,13 +295,14 @@ def backgroundSubtract(policy, maskedImages):
         image   = maskedImage.getImage() 
         backobj = afwMath.makeBackground(image, bctrl)
         image  -= backobj.getImageF()
+        backgrounds.append(backobj.getImageF())
         del image
         del backobj
         
     t1 = time.time()
     pexLog.Trace("lsst.ip.diffim.backgroundSubtract", 1,
                  "Total time for background subtraction : %.2f s" % (t1-t0))
-    
+    return backgrounds
 
 #######
 # Visualization of kernels

@@ -88,11 +88,12 @@ ds9.mtv(scienceImage, frame=frame)
 #policy.set("spatialKernelType", "chebyshev1")
 policy.set("spatialKernelOrder", 2)
 policy.getPolicy('detectionPolicy').set("detThreshold", 3.)
+psfmatch = ipDiffim.ImagePsfMatch(policy)
 try:
-    spatialKernel, spatialBg, kernelCellSet = ipDiffim.psfMatchImageToImage(templateImage.getMaskedImage(),
-                                                                            scienceImage.getMaskedImage(),
-                                                                            policy,
-                                                                            returnOnExcept = True)
+    results = psfmatch.matchMaskedImages(templateImage.getMaskedImage(),
+                                         scienceImage.getMaskedImage())
+    
+    diffim, spatialKernel, spatialBg, kernelCellSet = results
 except Exception, e:
     print 'FAIL'
     sys.exit(1)
