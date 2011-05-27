@@ -26,7 +26,7 @@ def main():
     defSciencePath  = None
     defTemplatePath = None
     mergePolicyPath = None
-    defOutputPath   = 'diffImage'
+    defOutputPath   = 'diffImage.fits'
     defVerbosity    = 0
     defFwhm         = 3.5
     
@@ -103,10 +103,13 @@ Notes:
     if bgSub:
         diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),
                                        [templateMaskedImage, scienceMaskedImage])
+    else:
+        if policy.get('fitForBackground') == False:
+            print 'NOTE: no background subtraction at all is requested'
 
-    results = subtractMaskedImages(templateMaskedImage,
-                                   scienceMaskedImage,
-                                   policy)
+    psfmatch = PsfMatch.ImagePsfMatch(policy)
+    results  = psfmatch.subtractMaskedImages(templateMaskedImage, scienceMaskedImage)
+
     differenceMaskedImage = results[0]
     differenceMaskedImage.writeFits(outputPath)
 

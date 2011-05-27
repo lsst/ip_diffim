@@ -71,44 +71,21 @@ def makePoissonNoiseImage(im):
 # varying kernel.
 #######
 def fakeCoeffs():
-    kCoeffs = ((  6.9843,  0.0,         0.0), 
-               (  3.2799, -0.0014,      0.0001), 
-               (  4.6735,  0.0004,      6.3735e-06), 
-               ( -6.4267, -0.0034,      0.0022), 
-               ( -5.7412,  0.0015,      0.0009), 
-               ( -4.0961, -0.0051,      0.0026), 
-               ( -3.4660,  0.0003,      0.0007), 
-               (  1.4134, -1.4700e-06, -0.0003), 
-               (  0.9112, -0.0002,     -7.3208e-05), 
-               ( -6.6402, -0.0025,      0.0003), 
-               ( -5.4063, -0.0067,      0.0049), 
-               (  2.7299,  0.0007,     -0.0008), 
-               ( -3.5498, -0.0027,      0.0029), 
-               ( -2.1196, -0.0013,      2.8696e-05), 
-               ( -3.4298, -0.0065,      0.0053), 
-               ( 37.9685,  0.0415,     -0.0314), 
-               (  0.3578,  0.0009,     -0.0008), 
-               (  1.7980,  0.0027,     -0.0002), 
-               (-15.7181, -0.0176,      0.0129), 
-               (  0.3994, -0.0005,      0.0003), 
-               (-16.4162, -0.0174,      0.0125), 
-               (  0.1032, -0.0002,      0.0002), 
-               ( -0.3409, -0.0005,      6.1906e-05), 
-               ( -0.3338, -0.0002,      0.0002), 
-               ( -0.3492, -0.0011,      0.0001), 
-               ( 14.6390,  0.0176,     -0.0119), 
-               (  0.0118, -3.5455e-06, -1.2296e-05), 
-               (  0.0662,  0.0002,     -8.8548e-05), 
-               ( -2.9271, -0.0036,      0.0023), 
-               (  0.0057,  0.0001,     -6.1779e-05), 
-               ( -2.8832, -0.0033,      0.0022))
+    kCoeffs = ((  1.0,     0.0,       0.0), 
+               (  0.005,  -0.000001,  0.000001), 
+               (  0.005,   0.000004,  0.000004), 
+               ( -0.001,  -0.000030,  0.000030), 
+               ( -0.001,   0.000015,  0.000015), 
+               ( -0.005,  -0.000050,  0.000050))
     return kCoeffs
 
-def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
-                      addNoise = False, bgValue = 100., display = True):
+def makeFakeKernelSet(policy, basisList,
+                      sizeCell = 128, nCell = 3,
+                      deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
+                      addNoise = True, bgValue = 100., display = False):
     kSize    = policy.get('kernelSize')
-    sizeCell = policy.get('sizeCellX')
-    assert(sizeCell == policy.get('sizeCellY'))
+    policy.set('sizeCellX', sizeCell)
+    policy.set('sizeCellY', sizeCell)
 
     # This sets the final extent of each convolved delta function
     gaussKernelWidth   = sizeCell // 2
@@ -139,113 +116,53 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
 
     # Trim off border pixels
     bbox = gaussKernel.shrinkBBox(tim.getBBox(afwImage.LOCAL))
-    tim      = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
-    # An estimate of its variance is itself
-    tvar     = afwImage.ImageF(tim, True)
-    # No mask
-    tmask = afwImage.MaskU(tim.getDimensions())
-    tmask.set(0x0)
+    tim  = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
     
     # Now make a science image which is this convolved with some
     # spatial function.  Use input basis list.
-    #
-    # THIS SHOULD BE SOMETHING WHOSE FIRST COMPONENT DOES NOT VARY
-    # SPATIALLY, AND WHOSE OTHER COMPONENTS HAVE ZERO SUM.
-    sOrder   = policy.get('spatialKernelOrder')
-    polyFunc = afwMath.PolynomialFunction2D(sOrder)
-    nParams  = len(polyFunc.getParameters())
-    #kCoeffs  = []
-    ## First one does not vary spatially
-    #kCoeffs.append([])
-    #kCoeffs[0].append(1.)
-    #for i in range(1, nParams):
-    #    kCoeffs[0].append(0.)
-    #for i in range(1, len(basisList)):
-    #    kCoeffs.append([])
-    #    for j in range(nParams):
-    #        kCoeffs[i].append(0.001 * (1.5 * (-1)**j + i))
-    kCoeffs = fakeCoeffs()
+    sOrder   = 1
+    polyFunc = afwMath.PolynomialFunction2D(1)
+    kCoeffs  = fakeCoeffs()
+    nToUse   = min(len(kCoeffs), len(basisList))
 
-    # Estimate of the image variance comes from convolution with main gaussian
-    svar = afwImage.ImageF(tim.getDimensions())
-    afwMath.convolve(svar, tim, basisList[0], False)
-    # No mask
-    smask = afwImage.MaskU(svar.getDimensions())
-    smask.set(0x0)
-    
-    # Make the full convolved image
-    sKernel = afwMath.LinearCombinationKernel(basisList, polyFunc)
-    sKernel.setSpatialParameters(kCoeffs)
-    cim = afwImage.ImageF(tim.getDimensions())
-    afwMath.convolve(cim, tim, sKernel, False)
+    # Make the full convolved science image
+    sKernel = afwMath.LinearCombinationKernel(afwMath.KernelList(basisList[:nToUse]), polyFunc)
+    sKernel.setSpatialParameters(kCoeffs[:nToUse])
+    sim = afwImage.ImageF(tim.getDimensions())
+    afwMath.convolve(sim, tim, sKernel, True)
 
     # Get the good subregion
-    bbox = sKernel.shrinkBBox(cim.getBBox(afwImage.LOCAL))
+    bbox = sKernel.shrinkBBox(sim.getBBox(afwImage.LOCAL))
 
+    # Add background
+    sim  += bgValue
+    
     # Add noise?
     if addNoise:
-        svar += bgValue
-        snoi  = makePoissonNoiseImage(svar)
-        cim   = snoi
-        cim  -= bgValue
+        sim   = makePoissonNoiseImage(sim)
 
-        # noiseless?
-        #tvar += bgValue
-        #tnoi  = makePoissonNoiseImage(tvar)
-        #tim  += tnoi
-
+    # ALWAYS!
+    tim  += 1.0   # Otherwise makePoissonNoiseImage adds no noise
+    tim   = makePoissonNoiseImage(tim) # Needed to stdev for detection
+        
     # And turn into MaskedImages
-    sim   = afwImage.ImageF(cim, bbox, afwImage.LOCAL)
-    svar  = afwImage.ImageF(svar, bbox, afwImage.LOCAL)
-    smask = afwImage.MaskU(smask, bbox, afwImage.LOCAL)
+    sim   = afwImage.ImageF(sim, bbox, afwImage.LOCAL)
+    svar  = afwImage.ImageF(sim, True)
+    smask = afwImage.MaskU(sim.getDimensions())
+    smask.set(0x0)
     sMi   = afwImage.MaskedImageF(sim, smask, svar)
     
     tim   = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
-    tvar  = afwImage.ImageF(tvar, bbox, afwImage.LOCAL)
-    tmask = afwImage.MaskU(tmask, bbox, afwImage.LOCAL)
+    tvar  = afwImage.ImageF(tim, True)
+    #tvar += 1.0 # So no negative variance ever
+    tmask = afwImage.MaskU(tim.getDimensions())
+    tmask.set(0x0)
     tMi   = afwImage.MaskedImageF(tim, tmask, tvar)
-
-    sMi.writeFits('science.fits')
-    tMi.writeFits('template.fits')
-
-    # look at this
-    #import pylab
-    #simarr = vectorFromImage(sim)
-    #svararr = vectorFromImage(svar)
-    #ssig = simarr / numpy.sqrt(svararr)
-    #idx  = numpy.where(ssig < 10.)
-    #ssig = ssig[idx]
-    #pylab.figure()
-    #n1, b1, p1 = pylab.hist(ssig, bins=100, normed=True)
-    #ax2 = pylab.twinx()
-    #ax2.plot(0.5 * (b1[1:] + b1[:-1]), n1)
-
-    # no noise in template
-    #timarr = vectorFromImage(tim)
-    #tvararr = vectorFromImage(tvar)
-    #tsig = timarr / numpy.sqrt(tvararr)
-    #pylab.figure()
-    #n2, b2, p2 = pylab.hist(tsig, bins=100, normed=True)
-    #ax2 = pylab.twinx()
-    #ax2.plot(0.5 * (b2[1:] + b2[:-1]), n2)
-
-    #pylab.show()
-    
-
-    # No negative variance, which can screw things up
-    assert(afwMath.makeStatistics(sMi.getVariance(), afwMath.MIN).getValue() >= 0.0)
-    assert(afwMath.makeStatistics(tMi.getVariance(), afwMath.MIN).getValue() >= 0.0)
-
-    # Get rid of any coordinate funniness
-    sMi.setXY0(afwGeom.Point2I(0,0))
-    tMi.setXY0(afwGeom.Point2I(0,0))
 
     if display:
         import lsst.afw.display.ds9 as ds9
-        ds9.mtv(tMi.getImage(), frame=1)
-        ds9.mtv(tMi.getVariance(), frame=2)
-        ds9.mtv(sMi.getImage(), frame=3)
-        ds9.mtv(sMi.getVariance(), frame=4)
+        ds9.mtv(tMi, frame=1)
+        ds9.mtv(sMi, frame=2)
 
     # Finally, make a kernelSet from these 2 images
     kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0),
@@ -269,10 +186,6 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
             kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policy)
             kernelCellSet.insertCandidate(kc)
 
-            #if display:
-            #    ds9.mtv(tsi, frame=5)
-            #    ds9.mtv(ssi, frame=6)
-    
     return tMi, sMi, sKernel, kernelCellSet
     
 
@@ -281,6 +194,7 @@ def makeFakeKernelSet(policy, basisList, nCell = 5, deltaFunctionCounts = 1.e4, 
 #######
 
 def backgroundSubtract(policy, maskedImages):
+    backgrounds = []
     t0 = time.time()
     algorithm   = policy.get("algorithm")
     binsize     = policy.get("binsize")
@@ -294,13 +208,14 @@ def backgroundSubtract(policy, maskedImages):
         image   = maskedImage.getImage() 
         backobj = afwMath.makeBackground(image, bctrl)
         image  -= backobj.getImageF()
+        backgrounds.append(backobj.getImageF())
         del image
         del backobj
         
     t1 = time.time()
     pexLog.Trace("lsst.ip.diffim.backgroundSubtract", 1,
                  "Total time for background subtraction : %.2f s" % (t1-t0))
-    
+    return backgrounds
 
 #######
 # Visualization of kernels

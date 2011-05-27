@@ -76,26 +76,24 @@ footprints = kcDetect.getFootprints()
 # specific to delta function
 policy.set("kernelBasisSet", "delta-function")
 policy.set("useRegularization", False)
-spatialKernel1, spatialBg1, kernelCellSet1 = ipDiffim.psfMatchImageToImage(templateMaskedImage,
-                                                                           scienceMaskedImage,
-                                                                           policy,
-                                                                           footprints)
+psfmatch1 = ipDiffim.ImagePsfMatch(policy)
+results1  = psfmatch1.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
+diffim1, spatialKernel1, spatialBg1, kernelCellSet1 = results1
 
 # alard lupton
 policy.set("kernelBasisSet", "alard-lupton")
 policy.set("useRegularization", False)
-spatialKernel2, spatialBg2, kernelCellSet2 = ipDiffim.psfMatchImageToImage(templateMaskedImage,
-                                                                           scienceMaskedImage,
-                                                                           policy,
-                                                                           footprints)
+psfmatch2 = ipDiffim.ImagePsfMatch(policy)
+results2  = psfmatch2.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
+diffim2, spatialKernel2, spatialBg2, kernelCellSet2 = results2
 
 # regularized delta function
 policy.set("kernelBasisSet", "delta-function")
 policy.set("useRegularization", True)
-spatialKernel3, spatialBg3, kernelCellSet3 = ipDiffim.psfMatchImageToImage(templateMaskedImage,
-                                                                           scienceMaskedImage,
-                                                                           policy,
-                                                                           footprints)
+psfmatch3 = ipDiffim.ImagePsfMatch(policy)
+results3  = psfmatch3.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
+diffim3, spatialKernel3, spatialBg3, kernelCellSet3 = results3
+
 
 basisList1 = spatialKernel1.getKernelList()
 basisList2 = spatialKernel2.getKernelList()

@@ -54,13 +54,13 @@ class DiffimTestCases(unittest.TestCase):
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
 
         self.policy.set('spatialKernelType', 'chebyshev1')
-        results1 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
-                                              doWarping = True)
+        psfmatch1 = ipDiffim.ImagePsfMatch(self.policy)
+        results1 = psfmatch1.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 
         self.policy.set('spatialKernelType', 'polynomial')
-        results2 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
-                                              doWarping = True)
+        psfmatch2 = ipDiffim.ImagePsfMatch(self.policy)
+        results2 = psfmatch2.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
 
         kp1 = spatialKernel1.getKernelParameters()
@@ -92,8 +92,9 @@ class DiffimTestCases(unittest.TestCase):
 
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
+        psfmatch = ipDiffim.ImagePsfMatch(self.policy)
         try:
-            ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy, doWarping = False)
+            psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = False)
         except Exception, e:
             pass
         else:
@@ -107,8 +108,9 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('fitForBackground', False)
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
+        psfmatch = ipDiffim.ImagePsfMatch(self.policy)
         try:
-            ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy)
+            psfmatch.subtractExposures(templateSubImage, scienceSubImage)
         except Exception, e:
             self.fail()
         else:
@@ -125,17 +127,14 @@ class DiffimTestCases(unittest.TestCase):
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
 
         # Have an XY0
-        results1 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
-                                              doWarping = True,
-                                              display = display, frame = 0)
+        psfmatch  = ipDiffim.ImagePsfMatch(self.policy)
+        results1  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 
         # And then take away XY0
         templateSubImage.setXY0(afwGeom.Point2I(0, 0)) # do it to the exposure so the Wcs gets modified too
         scienceSubImage.setXY0(afwGeom.Point2I(0, 0))
-        results2 = ipDiffim.subtractExposures(templateSubImage, scienceSubImage, self.policy,
-                                              doWarping = True, 
-                                              display = display, frame = 3)
+        results2  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
 
         # need to count up the candidates first, since its a running tally

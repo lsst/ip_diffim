@@ -45,8 +45,9 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
-        results = ipDiffim.subtractExposures(self.templateImage, self.scienceImage,
-                                             self.policy, doWarping = True)
+        psfmatch = ipDiffim.ImagePsfMatch(self.policy)
+        results  = psfmatch.subtractExposures(self.templateImage, self.scienceImage,
+                                              doWarping = True)
         differenceExposure, spatialKernel, backgroundModel, kernelCellSet = results
         ratings = ipDiffim.makeSdqaRatingVector(kernelCellSet, spatialKernel, backgroundModel)
 

@@ -115,7 +115,10 @@ if __name__ == '__main__':
 
     imageBBox = afwGeom.Box2I(afwGeom.Point2I(calexp.getX0(), calexp.getY0()),
                               afwGeom.Extent2I(calexp.getWidth(), calexp.getHeight()))
-    sk, sb, kcs = ipDiffim.psfMatchModelToModel(gaussPsf, imageBBox, psf, policy)
+
+    psfMatch = ipDiffim.ModelPsfMatch(policy)
+    ksc = psfMatch._buildCellSet(gaussPsf, imageBBox, psf)
+    sk, sb = psfMatch.solve(kcs)
 
     cim = afwImage.MaskedImageF(calexp.getMaskedImage().getDimensions())
     afwMath.convolve(cim, calexp.getMaskedImage(), sk, False)
