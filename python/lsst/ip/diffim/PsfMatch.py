@@ -34,7 +34,7 @@ __all__ = ["PsfMatch", "ImagePsfMatch", "ModelPsfMatch"]
 class PsfMatch(object):
     """Base class for PSF matching
     """
-    def __init__(self, policy, logName="ip.diffim.PsfMatch"):
+    def __init__(self, policy, logName="lsst.ip.diffim.PsfMatch"):
         """Create a PsfMatchToImage
         
         @param policy: see lsst/ip/diffim/policy/PsfMatchingDictionary.paf
@@ -75,7 +75,7 @@ class PsfMatch(object):
 class ImagePsfMatch(PsfMatch):
     """PSF-match images to reference images
     """
-    def __init__(self, policy, logName="ip.diffim.ImagePsfMatch"):
+    def __init__(self, policy, logName="lsst.ip.diffim.ImagePsfMatch"):
         """Create a PsfMatchToImage
         
         @param policy: see lsst/ip/diffim/policy/PsfMatchingDictionary.paf
@@ -110,8 +110,8 @@ class ImagePsfMatch(PsfMatch):
                      (scienceOrigin[0], scienceOrigin[1],
                       scienceLimit[0], scienceLimit[1]))
 
-        if ( (templateOrigin != scienceOrigin) or \
-             (templateLimit  != scienceLimit)  or \
+        if ( (templateOrigin.getPosition() != scienceOrigin.getPosition()) or \
+             (templateLimit.getPosition()  != scienceLimit.getPosition())  or \
              (exposureToConvolve.getHeight() != exposureToNotConvolve.getHeight()) or \
              (exposureToConvolve.getWidth()  != exposureToNotConvolve.getWidth()) ):
             return False
@@ -145,6 +145,7 @@ class ImagePsfMatch(PsfMatch):
             There is no psf because the PSF-matching process does not compute one.
         - psfMatchingKernel: the PSF matching kernel
         """
+
         if not self.validateWcs(exposureToConvolve, exposureToNotConvolve):
             if doWarping:
                 pexLog.Trace(self._log.getName(), 1,
@@ -252,7 +253,7 @@ class ImagePsfMatch(PsfMatch):
 class ModelPsfMatch(PsfMatch):
     """PSF-match PSF models to reference PSF models
     """
-    def __init__(self, policy, logName="ip.diffim.ModelPsfMatch"):
+    def __init__(self, policy, logName="lsst.ip.diffim.ModelPsfMatch"):
         """Create a PsfMatchToModel
         
         @param policy: see lsst/ip/diffim/policy/PsfMatchingDictionary.paf
