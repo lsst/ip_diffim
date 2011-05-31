@@ -44,21 +44,30 @@ class PsfMatch(object):
         self._policy = policy
         self._log = pexLog.Log(pexLog.Log.getDefaultLog(), logName)
 
-    def solve(self, kernelCellSet, returnOnExcept = False):
-        # Create the Psf matching kernel
+    def _solve(self, kernelCellSet, returnOnExcept = False):
+        """Determine the PSF matching kernel
+        
+        @param kernelCellSet: a SpatialCellSet to use in determining the PSF matching kernel
+            as provided by self._buildCellSet
+        @param returnOnExcept: if True then return (None, None) if an error occurs, else raise an exception
+        
+        @return
+        - psfMatchingKernel: PSF matching kernel
+        - backgroundModel: differential background model
+        
+        @raise Exception if unable to determine PSF matching kernel and returnOnExcept False
+        """
         try:
-            kb = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet, self._policy)
+            psfMatchingKernel, backgroundModel = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet,
+                                                                                          self._policy)
         except pexExcept.LsstCppException, e:
             pexLog.Trace(self._log.getName(), 1, "ERROR: Unable to calculate psf matching kernel")
             pexLog.Trace(self._log.getName(), 2, e.args[0].what())
     
             if returnOnExcept:
-                return None, None
+                return (None, None)
             else:
                 raise
-        else:
-            spatialKernel = kb.first
-            spatialBg     = kb.second
     
         # What is the status of the processing?
         nGood = 0
@@ -71,10 +80,14 @@ class PsfMatch(object):
             pexLog.Trace(self._log.getName(), 1, "WARNING")
         pexLog.Trace(self._log.getName(), 1, "Used %d kernels for spatial fit" % (nGood))
     
-        return spatialKernel, spatialBg
-            
+        return (psfMatchingKernel, backgroundModel)
+
+
 class ImagePsfMatch(PsfMatch):
     """PSF-match images to reference images
+
+    Fits the following model:
+    image to not convolve = (image to convolve convolved with PSF matching kernel) + background model
     """
     def __init__(self, policy, logName="lsst.ip.diffim.ImagePsfMatch"):
         """Create a PsfMatchToImage
@@ -84,12 +97,14 @@ class ImagePsfMatch(PsfMatch):
         """
         PsfMatch.__init__(self, policy, logName)
 
-    def validateSize(self, maskedImageToConvolve, maskedImageToNotConvolve):
-        # Make sure they are the same size
+    def _validateSize(self, maskedImageToConvolve, maskedImageToNotConvolve):
+        """Return True if two image-like objects are the same size
+        """
         return maskedImageToConvolve.getDimensions() == maskedImageToNotConvolve.getDimensions()
     
-    def validateWcs(self, exposureToConvolve, exposureToNotConvolve):
-        # Make sure they end up the same dimensions on the sky
+    def _validateWcs(self, exposureToConvolve, exposureToNotConvolve):
+        """Return True if two Exposures have the same WCS
+        """
         templateWcs    = exposureToConvolve.getWcs() 
         scienceWcs     = exposureToNotConvolve.getWcs()
         
@@ -113,41 +128,40 @@ class ImagePsfMatch(PsfMatch):
 
         if ( (templateOrigin.getPosition() != scienceOrigin.getPosition()) or \
              (templateLimit.getPosition()  != scienceLimit.getPosition())  or \
-             (exposureToConvolve.getHeight() != exposureToNotConvolve.getHeight()) or \
-             (exposureToConvolve.getWidth()  != exposureToNotConvolve.getWidth()) ):
+             (exposureToConvolve.getDimensions() != exposureToNotConvolve.getDimensions())):
             return False
         return True
-
-    def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
-                          footprints = None, doWarping = True):
-
-        results = self.matchExposures(exposureToConvolve, exposureToNotConvolve,
-                                      footprints = footprints,
-                                      doWarping = doWarping)
-
-        psfMatchedExposure, psfMatchingKernel, backgroundModel, kernelCellSet = results
-        subtractedExposure  = afwImage.ExposureF(exposureToNotConvolve, True)
-        smi  = subtractedExposure.getMaskedImage()
-        smi -= psfMatchedExposure.getMaskedImage()
-        smi -= backgroundModel
-        return (subtractedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)
         
     def matchExposures(self, exposureToConvolve, exposureToNotConvolve,
                        footprints = None, doWarping = True):
         """Match an exposure to the reference
+
+        Do the following, in order:
+        - Warp exposureToConvolve to match exposureToNotConvolve, if their WCSs do not already match
+        - Determine a PSF matching kernel and differential background model
+            that matches exposureToConvolve to exposureToNotConvolve
+        - Convolve exposureToConvolve by PSF matching kernel
         
-        @param exposure: Exposure to PSF-match to the reference masked image;
-            must be warped to match the reference masked image
+        @param exposure: Exposure to warp and PSF-match to the reference masked image
         @param referenceMaskedImage: maskedImage whose PSF is to be matched
+        @param footprints: a list of footprints of sources; if None then source detection is run
+        @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
+            - if True then warp exposureToConvolve to match exposureToNotConvolve
+            - if False then raise an Exception
         
-        @returns
-        - psfMatchedExposure: the PSF-matched exposure.
-            This has the same xy0, dimensions and wcs as exposure but no psf.
+        @return
+        - psfMatchedExposure: the PSF-matched exposure =
+            warped exposureToConvolve convolved by psfMatchingKernel.
+            This has the same xy0, dimensions and wcs as exposureToNotConvolve, but no Psf, Calib or Filter.
             There is no psf because the PSF-matching process does not compute one.
         - psfMatchingKernel: the PSF matching kernel
+        - backgroundModel: differential background model
+        - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
+        
+        @raise RuntimeError if doWarping is False and exposureToConvolve's and exposureToNotConvolve's
+            WCSs do not match
         """
-
-        if not self.validateWcs(exposureToConvolve, exposureToNotConvolve):
+        if not self._validateWcs(exposureToConvolve, exposureToNotConvolve):
             if doWarping:
                 pexLog.Trace(self._log.getName(), 1,
                              "Astrometrically registering template to science image")
@@ -165,32 +179,31 @@ class ImagePsfMatch(PsfMatch):
         
         psfMatchedExposure = afwImage.makeExposure(psfMatchedMaskedImage, exposureToNotConvolve.getWcs())
         return (psfMatchedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)
-
-    def subtractMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve,
-                             footprints = None):
-
-        results = self.matchMaskedImages(maskedImageToConvolve,
-                                         maskedImageToNotConvolve,
-                                         footprints = footprints)
-        
-        psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet = results 
-        subtractedMaskedImage  = afwImage.MaskedImageF(maskedImageToNotConvolve, True)
-        subtractedMaskedImage -= psfMatchedMaskedImage
-        subtractedMaskedImage -= backgroundModel
-        return (subtractedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet)
     
     def matchMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve, footprints = None):
-        """PSF-match a Masked Image to a reference MaskedImage
+        """PSF-match a MaskedImage to a reference MaskedImage
+
+        Do the following, in order:
+        - Determine a PSF matching kernel and differential background model
+            that matches maskedImageToConvolve to maskedImageToNotConvolve
+        - Convolve maskedImageToConvolve by the PSF matching kernel
         
-        @param maskedImage: masked image to PSF-match to the reference masked image;
+        @param maskedImageToConvolve: masked image to PSF-match to the reference masked image;
             must be warped to match the reference masked image
-        @param referenceMaskedImage: maskedImage whose PSF is to be matched
+        @param maskedImageToNotConvolve: maskedImage whose PSF is to be matched
+        @param footprints: a list of footprints of sources; if None then source detection is run
         
-        @returns
-        - psfMatchedMaskedImage: the PSF-matched masked image
+        @return
+        - psfMatchedMaskedImage: the PSF-matched masked image =
+            maskedImageToConvolve convolved with psfMatchingKernel.
+            This has the same xy0, dimensions and wcs as maskedImageToNotConvolve.
         - psfMatchingKernel: the PSF matching kernel
+        - backgroundModel: differential background model
+        - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
+        
+        @raise RuntimeError if input images have different dimensions
         """
-        if not self.validateSize(maskedImageToConvolve, maskedImageToNotConvolve):
+        if not self._validateSize(maskedImageToConvolve, maskedImageToNotConvolve):
             pexLog.Trace(self._log.getName(), 1, "ERROR: Input images different size")
             raise RuntimeError, "Input images different size"
             
@@ -207,8 +220,79 @@ class ImagePsfMatch(PsfMatch):
         self._log.log(pexLog.Log.INFO, "done")
         return (psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet)
 
+    def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
+                          footprints = None, doWarping = True):
+        """Subtract two Exposures
+        
+        Do the following, in order:
+        - Warp exposureToConvolve to match exposureToNotConvolve, if their WCSs do not already match
+        - Determine a PSF matching kernel and differential background model
+            that matches exposureToConvolve to exposureToNotConvolve
+        - PSF-match exposureToConvolve to exposureToNotConvolve
+        - Compute subtracted exposure (see return values for equation).
+
+        @param exposureToConvolve: exposure to PSF-matched to exposureToNotConvolve
+        @param exposureToNotConvolve: reference Exposure
+        
+        @return
+        - subtractedExposure: subtracted Exposure = exposureToNotConvolve -
+            ((warped exposureToConvolve convolved with psfMatchingKernel) + backgroundModel)
+        - psfMatchingKernel: PSF matching kernel
+        - backgroundModel: differential background model
+        - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
+        """
+        results = self.matchExposures(exposureToConvolve, exposureToNotConvolve,
+                                      footprints = footprints,
+                                      doWarping = doWarping)
+
+        psfMatchedExposure, psfMatchingKernel, backgroundModel, kernelCellSet = results
+        subtractedExposure  = afwImage.ExposureF(exposureToNotConvolve, True)
+        smi  = subtractedExposure.getMaskedImage()
+        smi -= psfMatchedExposure.getMaskedImage()
+        smi -= backgroundModel
+        return (subtractedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)
+
+    def subtractMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve,
+                             footprints = None):
+        """Subtract two MaskedImages
+        
+        Do the following, in order:
+        - PSF-match maskedImageToConvolve to maskedImageToNotConvolve
+        - Determine the differential background
+        - Return the difference: maskedImageToNotConvolve -
+            ((warped maskedImageToConvolve convolved with psfMatchingKernel) + backgroundModel)
+        
+        @param maskedImageToConvolve: MaskedImage to PSF-matched to maskedImageToNotConvolve
+        @param maskedImageToNotConvolve: reference MaskedImage
+        @param footprints: a list of footprints of sources; if None then source detection is run
+        
+        @return
+        - subtractedMaskedImage = maskedImageToNotConvolve -
+            ((maskedImageToConvolve convolved with psfMatchingKernel) + backgroundModel)
+        - psfMatchingKernel: PSF matching kernel
+        - backgroundModel: differential background model
+        - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
+        """
+
+        results = self.matchMaskedImages(maskedImageToConvolve,
+                                         maskedImageToNotConvolve,
+                                         footprints = footprints)
+        
+        psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet = results 
+        subtractedMaskedImage  = afwImage.MaskedImageF(maskedImageToNotConvolve, True)
+        subtractedMaskedImage -= psfMatchedMaskedImage
+        subtractedMaskedImage -= backgroundModel
+        return (subtractedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet)
 
     def _buildCellSet(self, maskedImageToConvolve, maskedImageToNotConvolve, footprints = None):
+        """Build a SpatialCellSet for use with the solve method
+
+        @param maskedImageToConvolve: MaskedImage to PSF-matched to maskedImageToNotConvolve
+        @param maskedImageToNotConvolve: reference MaskedImage
+        @param footprints: a list of footprints of sources; if None then source detection is run
+        
+        @return kernelCellSet: a SpatialCellSet for use with self._solve
+        """
         # Object to store the KernelCandidates for spatial modeling
         kernelCellSet = afwMath.SpatialCellSet(maskedImageToConvolve.getBBox(afwImage.PARENT),
                                                self._policy.getInt("sizeCellX"),
@@ -249,31 +333,42 @@ class ImagePsfMatch(PsfMatch):
 
         return kernelCellSet
         
-        
 
 class ModelPsfMatch(PsfMatch):
     """PSF-match PSF models to reference PSF models
     """
-    def __init__(self, policy, logName="lsst.ip.diffim.ModelPsfMatch"):
+    def __init__(self, policy, logName="lsst.ip.diffim.ModelPsfMatch", mergePolicy = False):
         """Create a PsfMatchToModel
         
         @param policy: see lsst/ip/diffim/policy/PsfMatchingDictionary.paf
         @param logName: name by which messages are logged
+        @param mergePolicy: merge ip_diffim/policy/MatchPsfModels.paf into existing policy;
+            this is a temporary hack
         """
         PsfMatch.__init__(self, policy, logName)
+
+        # Changes to policy particular to matchPsfModels
+        if mergePolicy:
+            policyFile = pexPolicy.DefaultPolicyFile("ip_diffim", "MatchPsfModels.paf", "policy")
+            matchPolicy = pexPolicy.Policy.createPolicy(policyFile, policyFile.getRepositoryPath(), True)
+            matchPolicy.mergeDefaults(self._policy.getDictionary())
+            self._policy = matchPolicy
     
     def matchExposure(self, exposure, referencePsfModel):
-        """PSF-match an exposure to a model.
+        """PSF-match an exposure to a PSF model.
         
         @param exposure: Exposure to PSF-match to the reference masked image;
             must contain a PSF model and must be warped to match the reference masked image
         @param referencePsfModel: PSF model to match (an afwDetection.Psf)
         
-        @returns
+        @return
         - psfMatchedExposure: the PSF-matched exposure.
             This has the same xy0, dimensions and wcs as exposure but no psf.
             In theory the psf should equal referencePsfModel but the match is likely not exact.
         - psfMatchingKernel: the PSF matching kernel
+        - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
+        
+        @raise RuntimeError if exposure does not contain a PSF model"
         """
         if not exposure.hasPsf():
             raise RuntimeError("exposure does not contain a PSF model")
@@ -298,8 +393,17 @@ class ModelPsfMatch(PsfMatch):
         self._log.log(pexLog.Log.INFO, "done")
         return (psfMatchedExposure, psfMatchingKernel, kernelCellSet)
 
-    def _buildCellSet(self, referencePsfModel, scienceBBox, sciencePsfModel, mergePolicy = False):
+    def _buildCellSet(self, referencePsfModel, scienceBBox, sciencePsfModel):
+        """Build a SpatialCellSet for use with the solve method
+
+        @param referencePsfModel: PSF model to match (an afwDetection.Psf)
+        @param scienceBBox: parent bounding box on science image
+        @param sciencePsfModel: PSF model for science image
         
+        @return kernelCellSet: a SpatialCellSet for use with self._solve
+        
+        @raise RuntimeError if reference PSF model and science PSF model have different dimensions
+        """
         if (referencePsfModel.getKernel().getDimensions() != sciencePsfModel.getKernel().getDimensions()):
             pexLog.Trace(self._log.getName(), 1,
                          "ERROR: Dimensions of reference Psf and science Psf different; exiting")
@@ -314,13 +418,6 @@ class ModelPsfMatch(PsfMatch):
                          "WARNING: Resizing matching kernel to size %d x %d" % (maxPsfMatchingKernelSize,
                                                                                 maxPsfMatchingKernelSize))
             self._policy.set('kernelSize', maxPsfMatchingKernelSize)
-    
-        # Chanes to policy particular for matchPsfModels
-        if mergePolicy:
-            policyFile = pexPolicy.DefaultPolicyFile("ip_diffim", "MatchPsfModels.paf", "policy")
-            matchPolicy = pexPolicy.Policy.createPolicy(policyFile, policyFile.getRepositoryPath(), True)
-            matchPolicy.mergeDefaults(self._policy.getDictionary())
-            self._policy = matchPolicy
         
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0,   scienceY0   = scienceBBox.getMin()
@@ -371,6 +468,3 @@ class ModelPsfMatch(PsfMatch):
                 kernelCellSet.insertCandidate(kc)
 
         return kernelCellSet
-            
-            
-    
