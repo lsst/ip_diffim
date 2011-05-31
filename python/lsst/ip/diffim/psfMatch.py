@@ -58,8 +58,7 @@ class PsfMatch(object):
         @raise Exception if unable to determine PSF matching kernel and returnOnExcept False
         """
         try:
-            psfMatchingKernel, backgroundModel = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet,
-                                                                                          self._policy)
+            kb = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet, self._policy)
         except pexExcept.LsstCppException, e:
             pexLog.Trace(self._log.getName(), 1, "ERROR: Unable to calculate psf matching kernel")
             pexLog.Trace(self._log.getName(), 2, e.args[0].what())
@@ -68,6 +67,9 @@ class PsfMatch(object):
                 return (None, None)
             else:
                 raise
+
+        psfMatchingKernel = kb[0]
+        backgroundModel   = kb[1]
     
         # What is the status of the processing?
         nGood = 0
@@ -211,7 +213,7 @@ class ImagePsfMatch(PsfMatch):
         kernelCellSet = self._buildCellSet(maskedImageToConvolve,
                                            maskedImageToNotConvolve,
                                            footprints = footprints)
-        psfMatchingKernel, backgroundModel = self.solve(kernelCellSet)
+        psfMatchingKernel, backgroundModel = self._solve(kernelCellSet)
     
         self._log.log(pexLog.Log.INFO, "PSF-match science MaskedImage to reference")
         psfMatchedMaskedImage = afwImage.MaskedImageF(maskedImageToConvolve.getBBox(afwImage.PARENT))
@@ -379,7 +381,7 @@ class ModelPsfMatch(PsfMatch):
         kernelCellSet = self._buildCellSet(referencePsfModel,
                                            exposure.getBBox(afwImage.PARENT),
                                            exposure.getPsf())
-        psfMatchingKernel, backgroundModel = self.solve(kernelCellSet)
+        psfMatchingKernel, backgroundModel = self._solve(kernelCellSet)
         
         self._log.log(pexLog.Log.INFO, "PSF-match science exposure to reference")
         psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(afwImage.PARENT), exposure.getWcs())
