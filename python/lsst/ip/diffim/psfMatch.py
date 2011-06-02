@@ -385,6 +385,8 @@ class ModelPsfMatch(PsfMatch):
         
         self._log.log(pexLog.Log.INFO, "PSF-match science exposure to reference")
         psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(afwImage.PARENT), exposure.getWcs())
+        psfMatchedExposure.setFilter(exposure.getFilter())
+        psfMatchedExposure.setCalib(exposure.getCalib())
         psfMatchedMaskedImage = psfMatchedExposure.getMaskedImage()
 
         # Normalize the psf-matching kernel while convolving since its magnitude is meaningless

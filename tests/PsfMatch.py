@@ -2,10 +2,12 @@
 import unittest
 import lsst.utils.tests as tests
 import lsst.afw.image as afwImage
+import lsst.afw.image.utils as imageUtils
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.daf.base as dafBase
+import lsst.pex.policy as pexPolicy
 
 import lsst.pex.logging as pexLog
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
@@ -74,14 +76,25 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(type(results[1]), afwMath.LinearCombinationKernel)
         self.assertEqual(type(results[2]), afwMath.Function2D)
         self.assertEqual(type(results[3]), afwMath.SpatialCellSet)
-        
+
     def testMatchExposures(self, background = 100.):
+        filterPolicyFile = pexPolicy.DefaultPolicyFile("afw", "SdssFilters.paf", "tests")
+        filterPolicy = pexPolicy.Policy.createPolicy(filterPolicyFile, filterPolicyFile.getRepositoryPath(), True)
+        imageUtils.defineFiltersFromPolicy(filterPolicy, reset=True)
+
         tMi, sMi, sK, kcs = diffimTools.makeFakeKernelSet(self.policy, self.basisList,
                                                           bgValue = background)
         tWcs = self.makeWcs(offset = 0)
         sWcs = self.makeWcs(offset = 0)
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
+
+        commonFilter = afwImage.Filter("r")
+        tCalib = afwImage.Calib()
+        tCalib.setFluxMag0(1.0e5, 1.0e3)
+        tExp.setFilter(commonFilter)
+        sExp.setFilter(commonFilter)
+        tExp.setCalib(tCalib)
 
         self.policy.set("fitForBackground", True)
         self.policy.set("spatialKernelOrder", 1)
@@ -94,12 +107,15 @@ class DiffimTestCases(unittest.TestCase):
 
         # Should also work
         results = psfmatch.matchExposures(tExp, sExp, doWarping = True)
+        psfMatchedExp = results[0]
 
         self.assertEqual(len(results), 4)
         self.assertEqual(type(results[0]), afwImage.ExposureF)
         self.assertEqual(type(results[1]), afwMath.LinearCombinationKernel)
         self.assertEqual(type(results[2]), afwMath.Function2D)
         self.assertEqual(type(results[3]), afwMath.SpatialCellSet)
+        self.assertEqual(psfMatchedExp.getFilter().getName(), commonFilter.getName())
+        print "Warning: testMatchExposures should test Calib object"
 
     def testSubtractMaskedImages(self, background = 100.):
         tMi, sMi, sK, kcs = diffimTools.makeFakeKernelSet(self.policy, self.basisList,
@@ -152,6 +168,7 @@ class DiffimTestCases(unittest.TestCase):
     def testModelMatch(self):
         # Remains to be written
         psfmatch = ipDiffim.ModelPsfMatch(self.policy)
+        print "Warning: ModelPsfMatch test not written"
     
     def tearDown(self):
         del self.policy
