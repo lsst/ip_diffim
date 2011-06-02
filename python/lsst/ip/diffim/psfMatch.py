@@ -27,7 +27,6 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 
-from .warpTemplateExposure import warpTemplateExposure
 import diffimTools
 
 __all__ = ["PsfMatch", "ImagePsfMatch", "ModelPsfMatch"]
@@ -98,6 +97,7 @@ class ImagePsfMatch(PsfMatch):
         @param logName: name by which messages are logged
         """
         PsfMatch.__init__(self, policy, logName)
+        self._warper = afwMath.Warper.fromPolicy(policy.getPolicy("warpingPolicy"))
 
     def _validateSize(self, maskedImageToConvolve, maskedImageToNotConvolve):
         """Return True if two image-like objects are the same size
@@ -136,10 +136,11 @@ class ImagePsfMatch(PsfMatch):
         
     def matchExposures(self, exposureToConvolve, exposureToNotConvolve,
                        footprints = None, doWarping = True):
-        """Match an exposure to the reference
+        """Warp and PSF-match an exposure to the reference
 
         Do the following, in order:
-        - Warp exposureToConvolve to match exposureToNotConvolve, if their WCSs do not already match
+        - Warp exposureToConvolve to match exposureToNotConvolve,
+            if doWarping True and their WCSs do not already match
         - Determine a PSF matching kernel and differential background model
             that matches exposureToConvolve to exposureToNotConvolve
         - Convolve exposureToConvolve by PSF matching kernel
@@ -165,11 +166,8 @@ class ImagePsfMatch(PsfMatch):
         """
         if not self._validateWcs(exposureToConvolve, exposureToNotConvolve):
             if doWarping:
-                pexLog.Trace(self._log.getName(), 1,
-                             "Astrometrically registering template to science image")
-                exposureToConvolve = warpTemplateExposure(exposureToConvolve,
-                                                          exposureToNotConvolve,
-                                                          self._policy.getPolicy("warpingPolicy"))
+                pexLog.Trace(self._log.getName(), 1, "Astrometrically registering template to science image")
+                exposureToConvolve = self._warper(exposureToNotConvolve.getWcs(), exposureToConvolve)
             else:
                 pexLog.Trace(self._log.getName(), 1, "ERROR: Input images not registered")
                 raise RuntimeError, "Input images not registered"

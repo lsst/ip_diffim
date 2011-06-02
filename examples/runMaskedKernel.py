@@ -43,9 +43,8 @@ for line in open(infile).readlines():
     
     #diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),
     #                               [scienceExposure.getMaskedImage(),])
-    templateExposure = ipDiffim.warpTemplateExposure(templateExposure,
-                                                  scienceExposure,
-                                                  policy.getPolicy("warpingPolicy"))
+    warper = afwMath.Warper.fromPolicy(policy.getPolicy("warpingPolicy"))
+    templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure)
 
     xCenter, yCenter = map(int, scienceExposure.getWcs().skyToPixel(ra, decl))
 

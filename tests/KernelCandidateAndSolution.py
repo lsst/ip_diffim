@@ -30,15 +30,14 @@ class DiffimTestCases(unittest.TestCase):
             defTemplatePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
                                            "v5-e0-c011-a10.sci")
 
-            scienceImage  = afwImage.ExposureF(defSciencePath)
-            templateImage = afwImage.ExposureF(defTemplatePath)
+            scienceExposure  = afwImage.ExposureF(defSciencePath)
+            templateExposure = afwImage.ExposureF(defTemplatePath)
             # set XY0 = 0
-            scienceImage.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
-            templateImage.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
+            scienceExposure.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
+            templateExposure.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
             # do the warping first so we don't have any masked pixels in the postage stamps
-            templateImage = ipDiffim.warpTemplateExposure(templateImage,
-                                                          scienceImage,
-                                                          self.policy.getPolicy("warpingPolicy"))
+            warper = afwMath.Warper.fromPolicy(self.policy.getPolicy("warpingPolicy"))
+            templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure)
 
             # Change xy0
             # Nice star at position 276, 717
@@ -49,8 +48,8 @@ class DiffimTestCases(unittest.TestCase):
             size     = 40
             bbox2 = afwGeom.Box2I(afwGeom.Point2I(self.x02 - size, self.y02 - size),
                                   afwGeom.Point2I(self.x02 + size, self.y02 + size))
-            self.scienceImage2  = afwImage.ExposureF(scienceImage, bbox2, afwImage.LOCAL)
-            self.templateImage2 = afwImage.ExposureF(templateImage, bbox2, afwImage.LOCAL)
+            self.scienceImage2  = afwImage.ExposureF(scienceExposure, bbox2, afwImage.LOCAL)
+            self.templateExposure2 = afwImage.ExposureF(templateExposure, bbox2, afwImage.LOCAL)
 
     def addNoise(self, mi):
         img       = mi.getImage()
@@ -90,7 +89,7 @@ class DiffimTestCases(unittest.TestCase):
     def testConstructor(self):
         # Original and uninitialized
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
-                                       self.templateImage2.getMaskedImage(),
+                                       self.templateExposure2.getMaskedImage(),
                                        self.scienceImage2.getMaskedImage(),
                                        self.policy)
 
@@ -140,10 +139,10 @@ class DiffimTestCases(unittest.TestCase):
             self.fail()
 
     def testDeltaFunctionScaled(self, scaling = 2.7, bg = 11.3):
-        sIm  = afwImage.MaskedImageF(self.templateImage2.getMaskedImage(), True)
+        sIm  = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), True)
         sIm *= scaling
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
-                                       self.templateImage2.getMaskedImage(),
+                                       self.templateExposure2.getMaskedImage(),
                                        sIm,
                                        self.policy)
 
@@ -155,10 +154,10 @@ class DiffimTestCases(unittest.TestCase):
                                          kSum = scaling)
 
 
-        sIm  = afwImage.MaskedImageF(self.templateImage2.getMaskedImage(), True)
+        sIm  = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), True)
         sIm += bg
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
-                                       self.templateImage2.getMaskedImage(),
+                                       self.templateExposure2.getMaskedImage(),
                                        sIm,
                                        self.policy)
 
@@ -175,8 +174,8 @@ class DiffimTestCases(unittest.TestCase):
         # Match an image to itself, with delta-function basis set
         # No regularization
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
-                                       self.templateImage2.getMaskedImage(),
-                                       self.templateImage2.getMaskedImage(),
+                                       self.templateExposure2.getMaskedImage(),
+                                       self.templateExposure2.getMaskedImage(),
                                        self.policy)
 
         self.policy.set("kernelBasisSet", "delta-function")
@@ -239,13 +238,13 @@ class DiffimTestCases(unittest.TestCase):
         kImageIn      = afwImage.ImageD(afwGeom.Extent2I(gsize, gsize))
         kSumIn        = gaussKernel.computeImage(kImageIn, False)
 
-        imX, imY = self.templateImage2.getMaskedImage().getDimensions()
+        imX, imY = self.templateExposure2.getMaskedImage().getDimensions()
         smi = afwImage.MaskedImageF(afwGeom.Extent2I(imX, imY))
-        afwMath.convolve(smi, self.templateImage2.getMaskedImage(), gaussKernel, False)
+        afwMath.convolve(smi, self.templateExposure2.getMaskedImage(), gaussKernel, False)
 
         bbox = gaussKernel.shrinkBBox(smi.getBBox(afwImage.LOCAL))
 
-        tmi2 = afwImage.MaskedImageF(self.templateImage2.getMaskedImage(), bbox, afwImage.LOCAL)
+        tmi2 = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), bbox, afwImage.LOCAL)
         smi2 = afwImage.MaskedImageF(smi, bbox, afwImage.LOCAL)
 
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
@@ -407,14 +406,14 @@ class DiffimTestCases(unittest.TestCase):
         
     def xtestDisp(self):
         ds9.mtv(self.scienceImage2, frame=1)
-        ds9.mtv(self.templateImage2, frame=2)
+        ds9.mtv(self.templateExposure2, frame=2)
         
 
     def tearDown(self):
         del self.policy
         if self.defDataDir:
             del self.scienceImage2
-            del self.templateImage2
+            del self.templateExposure2
         
 #####
         
