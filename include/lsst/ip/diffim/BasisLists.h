@@ -48,7 +48,7 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      *
-     * @notes Calls either makeForwardDifferenceMatrix or
+     * @note Calls either makeForwardDifferenceMatrix or
      * makeCentralDifferenceMatrix based on the policy file.
      */    
     boost::shared_ptr<Eigen::MatrixXd> makeRegularizationMatrix(
