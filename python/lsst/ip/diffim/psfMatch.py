@@ -167,15 +167,15 @@ class ImagePsfMatch(PsfMatch):
         if not self._validateWcs(exposureToConvolve, exposureToNotConvolve):
             if doWarping:
                 pexLog.Trace(self._log.getName(), 1, "Astrometrically registering template to science image")
-                exposureToConvolve = self._warper(exposureToNotConvolve.getWcs(), exposureToConvolve)
+                exposureToConvolve = self._warper.warpExposure(exposureToNotConvolve.getWcs(), 
+                    exposureToConvolve, destBBox = exposureToNotConvolve.getBBox(afwImage.PARENT))
             else:
                 pexLog.Trace(self._log.getName(), 1, "ERROR: Input images not registered")
                 raise RuntimeError, "Input images not registered"
                 
         psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet = self.matchMaskedImages(
             exposureToConvolve.getMaskedImage(), exposureToNotConvolve.getMaskedImage(),
-            footprints = footprints
-            )
+            footprints = footprints)
         
         psfMatchedExposure = afwImage.makeExposure(psfMatchedMaskedImage, exposureToNotConvolve.getWcs())
         return (psfMatchedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)

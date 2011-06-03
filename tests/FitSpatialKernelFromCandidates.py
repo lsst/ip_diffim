@@ -75,9 +75,7 @@ class DiffimTestCases(unittest.TestCase):
                 cand = self.makeCandidate(10.0, x, y)
                 self.kernelCellSet.insertCandidate(cand)
 
-        result = ipDiffim.fitSpatialKernelFromCandidates(self.kernelCellSet, self.policy)
-        sk = result.first
-        sb = result.second
+        sk, sb = ipDiffim.fitSpatialKernelFromCandidates(self.kernelCellSet, self.policy)
 
         # Kernel
         if sko == 0:
@@ -125,9 +123,7 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.policy.set('numPrincipalComponents', count)
             
-        result = ipDiffim.fitSpatialKernelFromCandidates(self.kernelCellSet, self.policy)
-        sk = result.first
-        sb = result.second
+        sk, sb = ipDiffim.fitSpatialKernelFromCandidates(self.kernelCellSet, self.policy)
 
         spatialKernelSolution = sk.getSpatialParameters()
 
@@ -190,9 +186,7 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.policy.set('numPrincipalComponents', count)
 
-        result = ipDiffim.fitSpatialKernelFromCandidates(self.kernelCellSet, self.policy)
-        sk = result.first
-        sb = result.second
+        sk, sb = ipDiffim.fitSpatialKernelFromCandidates(self.kernelCellSet, self.policy)
 
         spatialKernelSolution = sk.getSpatialParameters()
 
