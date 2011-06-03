@@ -63,7 +63,8 @@ policy           = ipDiffim.makeDefaultPolicy()
 
 if warp:
     warper = afwMath.Warper.fromPolicy(policy.getPolicy("warpingPolicy"))
-    templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure)
+    templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
+            destBBox = scienceExposure.getBBox(afwImage.PARENT))
     #policy.set("detThreshold", 5.)
     #policy.set("sizeCellX", 128)
     #policy.set("sizeCellY", 128)

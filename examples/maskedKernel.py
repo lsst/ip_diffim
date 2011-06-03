@@ -52,7 +52,8 @@ diffimTools.backgroundSubtract(policy1.getPolicy("afwBackgroundPolicy"),
                                [scienceExposure.getMaskedImage(),])
 
 warper = afwMath.Warper.fromPolicy(policy1.getPolicy("warpingPolicy"))
-templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure)
+templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
+                destBBox = scienceExposure.getBBox(afwImage.PARENT))
 
 templateExposure = templateExposure.getMaskedImage()
 scienceExposure = scienceExposure.getMaskedImage()

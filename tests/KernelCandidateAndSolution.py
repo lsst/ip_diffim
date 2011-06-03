@@ -37,7 +37,8 @@ class DiffimTestCases(unittest.TestCase):
             templateExposure.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
             # do the warping first so we don't have any masked pixels in the postage stamps
             warper = afwMath.Warper.fromPolicy(self.policy.getPolicy("warpingPolicy"))
-            templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure)
+            templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
+                destBBox = scienceExposure.getBBox(afwImage.PARENT))
 
             # Change xy0
             # Nice star at position 276, 717

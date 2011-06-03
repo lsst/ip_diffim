@@ -94,7 +94,8 @@ class DiffimTestCases(unittest.TestCase):
             self.scienceExposure   = afwImage.ExposureF(defSciencePath)
             self.templateExposure  = afwImage.ExposureF(defTemplatePath)
             warper = afwMath.Warper.fromPolicy(policy1.getPolicy("warpingPolicy"))
-            self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure)
+            self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
+                destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
 
         diffimTools.backgroundSubtract(self.policy1.getPolicy("afwBackgroundPolicy"),
                                        [self.scienceExposure.getMaskedImage(),

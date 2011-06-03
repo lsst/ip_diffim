@@ -66,7 +66,8 @@ class DiffimTestCases(unittest.TestCase):
         # takes forever to remap the CFHT images
         if defSciencePath.find('CFHT') == -1:
             warper = afwMath.Warper.fromPolicy(policy.getPolicy("warpingPolicy"))
-            self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure)
+            self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
+                destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
             
         self.scienceMaskedImage = self.scienceExposure.getMaskedImage()
         self.templateMaskedImage = self.templateExposure.getMaskedImage()
