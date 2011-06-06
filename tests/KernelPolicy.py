@@ -82,6 +82,12 @@ class DiffimTestCases(unittest.TestCase):
                         p1.getPolicy("detectionPolicy").get("fpGrowMin"))
         self.assertTrue(p1.get("kernelSize") == p1.get("kernelSizeMin"))
 
+    def testModify1(self):
+        ipDiffim.modifyForDeconvolution(self.p0)
+        
+    def testModify2(self):
+        ipDiffim.modifyForModelPsfMatch(self.p0)
+
     def tearDown(self):
         del self.p0
         

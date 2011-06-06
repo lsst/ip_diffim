@@ -1,0 +1,10 @@
+#<?cfg paf policy ?>
+
+# Overrides for Deconvolution, in particular the Alard-Lupton basis
+# set.  Gives us most of the power at small scales.
+alardNGauss: 3
+alardDegGauss: 6 4 2
+alardSigGauss: 0.7 1.0 1.25
+
+# Typically large residuals right in the core
+useCoreStats: false

@@ -1,0 +1,15 @@
+#<?cfg paf policy ?>
+
+# Overrides for ModelPsfMatch
+
+# We will be doing no clipping since all objects are legitimate candidates
+singleKernelClipping: false
+kernelSumClipping: false
+spatialKernelClipping: false
+
+# The variance is ill-defined in this case
+constantVarianceWeighting: true
+
+# Do not check condition number since the variance is ill-defined
+checkConditionNumber: false
+
