@@ -12,7 +12,7 @@ import lsst.pex.policy as pexPolicy
 import lsst.pex.logging as pexLog
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
-class DiffimTestCases(unittest.TestCase):
+class PsfMatchTestCases(unittest.TestCase):
 
     def setUp(self):
         self.policy = ipDiffim.makeDefaultPolicy()
@@ -95,6 +95,9 @@ class DiffimTestCases(unittest.TestCase):
         tExp.setFilter(commonFilter)
         sExp.setFilter(commonFilter)
         tExp.setCalib(tCalib)
+        sCalib = afwImage.Calib()
+        sCalib.setFluxMag0(1.1e5, 1.1e3)
+        sExp.setCalib(sCalib)
 
         self.policy.set("fitForBackground", True)
         self.policy.set("spatialKernelOrder", 1)
@@ -115,7 +118,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(type(results[2]), afwMath.Function2D)
         self.assertEqual(type(results[3]), afwMath.SpatialCellSet)
         self.assertEqual(psfMatchedExp.getFilter().getName(), commonFilter.getName())
-        print "Warning: testMatchExposures should test Calib object"
+        self.assertEqual(psfMatchedExp.getCalib().getFluxMag0(), sCalib.getFluxMag0())
 
     def testSubtractMaskedImages(self, background = 100.):
         tMi, sMi, sK, kcs = diffimTools.makeFakeKernelSet(self.policy, self.basisList,
@@ -179,7 +182,7 @@ def suite():
     tests.init()
 
     suites = []
-    suites += unittest.makeSuite(DiffimTestCases)
+    suites += unittest.makeSuite(PsfMatchTestCases)
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 

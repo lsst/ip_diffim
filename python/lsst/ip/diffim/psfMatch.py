@@ -154,9 +154,10 @@ class ImagePsfMatch(PsfMatch):
         
         @return
         - psfMatchedExposure: the PSF-matched exposure =
-            warped exposureToConvolve convolved by psfMatchingKernel.
-            This has the same xy0, dimensions and wcs as exposureToNotConvolve, but no Psf, Calib or Filter.
-            There is no psf because the PSF-matching process does not compute one.
+            warped exposureToConvolve convolved by psfMatchingKernel. This has:
+            - the same parent bbox, Wcs and Calib as exposureToNotConvolve
+            - the same filter as exposureToConvolve
+            - no Psf (because the PSF-matching process does not compute one)
         - psfMatchingKernel: the PSF matching kernel
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
@@ -178,6 +179,9 @@ class ImagePsfMatch(PsfMatch):
             footprints = footprints)
         
         psfMatchedExposure = afwImage.makeExposure(psfMatchedMaskedImage, exposureToNotConvolve.getWcs())
+        psfMatchedExposure.setFilter(exposureToConvolve.getFilter())
+        psfMatchedExposure.setCalib(exposureToNotConvolve.getCalib())
+
         return (psfMatchedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)
     
     def matchMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve, footprints = None):
@@ -363,7 +367,7 @@ class ModelPsfMatch(PsfMatch):
         
         @return
         - psfMatchedExposure: the PSF-matched exposure.
-            This has the same xy0, dimensions and wcs as exposure but no psf.
+            This has the same parent bbox, Wcs, Calib and Filter as exposure but no psf.
             In theory the psf should equal referencePsfModel but the match is likely not exact.
         - psfMatchingKernel: the PSF matching kernel
         - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
