@@ -67,11 +67,11 @@ def modifyForDeconvolution(defaultPolicy):
         os.path.join(os.getenv("IP_DIFFIM_DIR"), "policy", "DeconvolutionPolicy.paf")
         )
     deconvPolicy.mergeDefaults(defaultPolicy)
-    defaultPolicy = deconvPolicy
+    return deconvPolicy
 
 def modifyForModelPsfMatch(defaultPolicy):
     psfMatchPolicy = pexPolicy.Policy(
         os.path.join(os.getenv("IP_DIFFIM_DIR"), "policy", "ModelPsfMatchPolicy.paf")
         )
     psfMatchPolicy.mergeDefaults(defaultPolicy)
-    defaultPolicy = psfMatchPolicy
+    return psfMatchPolicy

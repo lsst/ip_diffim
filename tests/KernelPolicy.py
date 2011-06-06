@@ -83,11 +83,13 @@ class DiffimTestCases(unittest.TestCase):
         self.assertTrue(p1.get("kernelSize") == p1.get("kernelSizeMin"))
 
     def testModify1(self):
-        ipDiffim.modifyForDeconvolution(self.p0)
+        p1 = ipDiffim.modifyForDeconvolution(self.p0)
+        self.assertTrue(self.p0.getIntArray('alardDegGauss') != p1.getIntArray('alardDegGauss'))
         
     def testModify2(self):
-        ipDiffim.modifyForModelPsfMatch(self.p0)
-
+        p1 = ipDiffim.modifyForModelPsfMatch(self.p0)
+        self.assertTrue(self.p0.get('singleKernelClipping') != p1.get('singleKernelClipping'))
+        
     def tearDown(self):
         del self.p0
         
