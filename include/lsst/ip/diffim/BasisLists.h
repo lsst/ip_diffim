@@ -48,7 +48,7 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      *
-     * @notes Calls either makeForwardDifferenceMatrix or
+     * @note Calls either makeForwardDifferenceMatrix or
      * makeCentralDifferenceMatrix based on the policy file.
      */    
     boost::shared_ptr<Eigen::MatrixXd> makeRegularizationMatrix(
@@ -62,6 +62,7 @@ namespace diffim {
      * @param height           Height of basis set you want to regularize
      * @param orders           Which derivatives to penalize (1,2,3)
      * @param borderPenalty    Amount of penalty (if any) to apply to border pixels; > 0
+     * @param fitForBackground Fit for differential background?
      *
      * @ingroup ip_diffim
      */    
@@ -80,6 +81,7 @@ namespace diffim {
      * @param height           Height of basis set you want to regularize
      * @param stencil          Which type of Laplacian approximation to use
      * @param borderPenalty    Amount of penalty (if any) to apply to border pixels; > 0
+     * @param fitForBackground Fit for differential background?
      *
      * @ingroup ip_diffim
      */    

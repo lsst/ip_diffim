@@ -61,16 +61,16 @@ class DiffimTestCases(unittest.TestCase):
         self.policy = ipDiffim.makeDefaultPolicy()
         self.policy.set("fitForBackground", True)
         
-        self.scienceImage   = afwImage.ExposureF(defSciencePath)
-        self.templateImage  = afwImage.ExposureF(defTemplatePath)
+        self.scienceExposure   = afwImage.ExposureF(defSciencePath)
+        self.templateExposure  = afwImage.ExposureF(defTemplatePath)
         # takes forever to remap the CFHT images
         if defSciencePath.find('CFHT') == -1:
-            self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage,
-                                                                self.scienceImage,
-                                                                self.policy.getPolicy("warpingPolicy"))
+            warper = afwMath.Warper.fromPolicy(policy.getPolicy("warpingPolicy"))
+            self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
+                destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
             
-        self.scienceMaskedImage = self.scienceImage.getMaskedImage()
-        self.templateMaskedImage = self.templateImage.getMaskedImage()
+        self.scienceMaskedImage = self.scienceExposure.getMaskedImage()
+        self.templateMaskedImage = self.templateExposure.getMaskedImage()
         self.dStats = ipDiffim.ImageStatisticsF()
         
         diffimTools.backgroundSubtract(self.policy.getPolicy("afwBackgroundPolicy"),
@@ -232,8 +232,8 @@ class DiffimTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.policy
-        del self.scienceImage
-        del self.templateImage
+        del self.scienceExposure
+        del self.templateExposure
         del self.scienceMaskedImage
         del self.templateMaskedImage
         del self.dStats

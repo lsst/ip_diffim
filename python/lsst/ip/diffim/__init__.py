@@ -28,7 +28,5 @@ from psfMatch import *
 from makeSdqaRatingVector import *
 from makeDefaultPolicy import *
 
-from warpTemplateExposure import *
-
 from diffimTools import *
 

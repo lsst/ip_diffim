@@ -83,30 +83,30 @@ class DiffimTestCases(unittest.TestCase):
             defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', CFHTTORUN+'_tmpl')
 
             # no need to remap
-            self.scienceImage   = afwImage.ExposureF(defSciencePath)
-            self.templateImage  = afwImage.ExposureF(defTemplatePath)
+            self.scienceExposure   = afwImage.ExposureF(defSciencePath)
+            self.templateExposure  = afwImage.ExposureF(defTemplatePath)
         else:
             defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a00.sci")
             defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
                                            "v5-e0-c011-a00.sci")
             
-            self.scienceImage   = afwImage.ExposureF(defSciencePath)
-            self.templateImage  = afwImage.ExposureF(defTemplatePath)
-            self.templateImage  = ipDiffim.warpTemplateExposure(self.templateImage,
-                                                                self.scienceImage,
-                                                                self.policy1.getPolicy("warpingPolicy"))
+            self.scienceExposure   = afwImage.ExposureF(defSciencePath)
+            self.templateExposure  = afwImage.ExposureF(defTemplatePath)
+            warper = afwMath.Warper.fromPolicy(policy1.getPolicy("warpingPolicy"))
+            self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
+                destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
 
         diffimTools.backgroundSubtract(self.policy1.getPolicy("afwBackgroundPolicy"),
-                                       [self.scienceImage.getMaskedImage(),
-                                        self.templateImage.getMaskedImage()])
+                                       [self.scienceExposure.getMaskedImage(),
+                                        self.templateExposure.getMaskedImage()])
 
         # image statistics
         self.dStats  = ipDiffim.ImageStatisticsF()
 
         #
-        tmi = self.templateImage.getMaskedImage()
-        smi = self.scienceImage.getMaskedImage()
+        tmi = self.templateExposure.getMaskedImage()
+        smi = self.scienceExposure.getMaskedImage()
         
         detPolicy = self.policy1.getPolicy("detectionPolicy")
         detPolicy.set("detThreshold", 50.)
@@ -129,8 +129,8 @@ class DiffimTestCases(unittest.TestCase):
         del self.bskv2
         del self.bskv3
         del self.bskv4
-        del self.scienceImage
-        del self.templateImage
+        del self.scienceExposure
+        del self.templateExposure
 
     def apply(self, policy, visitor, xloc, yloc, tmi, smi):
         kc     = ipDiffim.makeKernelCandidate(xloc, yloc, tmi, smi, policy)
@@ -165,11 +165,11 @@ class DiffimTestCases(unittest.TestCase):
         # sometimes the box goes off the image; no big deal...
         try:
             if invert:
-                tmi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(), bbox, afwImage.LOCAL)
-                smi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox, afwImage.LOCAL)
+                tmi  = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                smi  = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
             else:
-                smi  = afwImage.MaskedImageF(self.scienceImage.getMaskedImage(), bbox, afwImage.LOCAL)
-                tmi  = afwImage.MaskedImageF(self.templateImage.getMaskedImage(), bbox, afwImage.LOCAL)
+                smi  = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                tmi  = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
         except Exception, e:
             return None
 

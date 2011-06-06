@@ -64,7 +64,7 @@ namespace detail {
      */
     template<typename PixelT>
     KernelSumVisitor<PixelT>::KernelSumVisitor(
-        pexPolicy::Policy const& policy ///< Policy file directing behavior
+        lsst::pex::policy::Policy const& policy ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _mode(AGGREGATE),

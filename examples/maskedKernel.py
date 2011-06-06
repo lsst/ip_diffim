@@ -29,13 +29,13 @@ policy3.set("kernelBasisSet", "alard-lupton")
 kList3 = ipDiffim.makeKernelBasisList(policy3)
 soln3  = ipDiffim.MaskedKernelSolutionF(kList3, False)
 
-#scienceImage  = afwImage.ExposureF('s2L007173_0100g4TANSIPwInv.fits')
-#templateImage = afwImage.ExposureF('oneTemplate100006_0072g4.fits')
+#scienceExposure  = afwImage.ExposureF('s2L007173_0100g4TANSIPwInv.fits')
+#templateExposure = afwImage.ExposureF('oneTemplate100006_0072g4.fits')
 #xCenter       = 713
 #yCenter       = 641
 
-scienceImage  = afwImage.ExposureF('s2L006417_0516g4TANSIPwInv.fits')
-templateImage = afwImage.ExposureF('s2L100006_05000501g4.fits')
+scienceExposure  = afwImage.ExposureF('s2L006417_0516g4TANSIPwInv.fits')
+templateExposure = afwImage.ExposureF('s2L100006_05000501g4.fits')
 xCenter       = 572
 yCenter       = 106
 
@@ -49,24 +49,25 @@ maskBBox      = afwGeom.Box2I(afwGeom.Point2I(xCenter - maskSize//2, yCenter - m
                               afwGeom.Extent2I(maskSize, maskSize))
 
 diffimTools.backgroundSubtract(policy1.getPolicy("afwBackgroundPolicy"),
-                               [scienceImage.getMaskedImage(),])
-templateImage = ipDiffim.warpTemplateExposure(templateImage,
-                                              scienceImage,
-                                              policy1.getPolicy("warpingPolicy"))
+                               [scienceExposure.getMaskedImage(),])
 
-templateImage = templateImage.getMaskedImage()
-scienceImage = scienceImage.getMaskedImage()
+warper = afwMath.Warper.fromPolicy(policy1.getPolicy("warpingPolicy"))
+templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
+                destBBox = scienceExposure.getBBox(afwImage.PARENT))
+
+templateExposure = templateExposure.getMaskedImage()
+scienceExposure = scienceExposure.getMaskedImage()
 
 # Create deep copy since this will be modified
-pixelMask  = afwImage.MaskU(scienceImage.getMask(), True)
+pixelMask  = afwImage.MaskU(scienceExposure.getMask(), True)
 # Add in template mask
-pixelMask |= templateImage.getMask()
+pixelMask |= templateExposure.getMask()
 # And mask out the variability!
 afwDet.setMaskFromFootprint(pixelMask, afwDet.Footprint(maskBBox), afwImage.MaskU_getPlaneBitMask("BAD"))
 
 # Grab subimages
-tsi = afwImage.MaskedImageF(templateImage, candBBox, afwImage.PARENT)
-ssi = afwImage.MaskedImageF(scienceImage, candBBox, afwImage.PARENT)
+tsi = afwImage.MaskedImageF(templateExposure, candBBox, afwImage.PARENT)
+ssi = afwImage.MaskedImageF(scienceExposure, candBBox, afwImage.PARENT)
 msi = afwImage.MaskU(pixelMask, candBBox, afwImage.PARENT)
 
 #import pdb; pdb.set_trace()

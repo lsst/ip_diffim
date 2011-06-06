@@ -57,14 +57,14 @@ else:
     
 defOutputPath   = "diffImage"
 
-templateImage = afwImage.ExposureF(defTemplatePath)
-scienceImage  = afwImage.ExposureF(defSciencePath)
-policy        = ipDiffim.makeDefaultPolicy()
+templateExposure = afwImage.ExposureF(defTemplatePath)
+scienceExposure  = afwImage.ExposureF(defSciencePath)
+policy           = ipDiffim.makeDefaultPolicy()
 
 if warp:
-    templateImage = ipDiffim.warpTemplateExposure(templateImage,
-                                                  scienceImage,
-                                                  policy.getPolicy("warpingPolicy"))
+    warper = afwMath.Warper.fromPolicy(policy.getPolicy("warpingPolicy"))
+    templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
+            destBBox = scienceExposure.getBBox(afwImage.PARENT))
     #policy.set("detThreshold", 5.)
     #policy.set("sizeCellX", 128)
     #policy.set("sizeCellY", 128)
@@ -73,25 +73,25 @@ if warp:
 
 if subBackground:
     diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),
-                                   [templateImage.getMaskedImage(),
-                                    scienceImage.getMaskedImage()])
+                                   [templateExposure.getMaskedImage(),
+                                    scienceExposure.getMaskedImage()])
     policy.set('fitForBackground', False)
 else:
     policy.set('fitForBackground', True)
     
 
 frame  = 0
-ds9.mtv(templateImage, frame=frame)
+ds9.mtv(templateExposure, frame=frame)
 frame += 1
-ds9.mtv(scienceImage, frame=frame)
+ds9.mtv(scienceExposure, frame=frame)
 
 #policy.set("spatialKernelType", "chebyshev1")
 policy.set("spatialKernelOrder", 2)
 policy.getPolicy('detectionPolicy').set("detThreshold", 3.)
 psfmatch = ipDiffim.ImagePsfMatch(policy)
 try:
-    results = psfmatch.matchMaskedImages(templateImage.getMaskedImage(),
-                                         scienceImage.getMaskedImage())
+    results = psfmatch.matchMaskedImages(templateExposure.getMaskedImage(),
+                                         scienceExposure.getMaskedImage())
     
     diffim, spatialKernel, spatialBg, kernelCellSet = results
 except Exception, e:
@@ -155,8 +155,8 @@ if display:
 
     # Spatial model
     mos.reset()
-    width = templateImage.getWidth()
-    height = templateImage.getHeight()
+    width = templateExposure.getWidth()
+    height = templateExposure.getHeight()
     stamps = []
     stampInfo = []
     for x in (0, width//2, width):
@@ -175,14 +175,14 @@ if display:
             
 
     # Background
-    backgroundIm  = afwImage.ImageF(afwGeom.Extent2I(templateImage.getWidth(), templateImage.getHeight()), 0)
+    backgroundIm  = afwImage.ImageF(afwGeom.Extent2I(templateExposure.getWidth(), templateExposure.getHeight()), 0)
     backgroundIm += spatialBg
     frame += 1
     ds9.mtv(backgroundIm, frame=frame)
 
     # Diffim!
-    diffIm = ipDiffim.convolveAndSubtract(templateImage.getMaskedImage(),
-                                          scienceImage.getMaskedImage(),
+    diffIm = ipDiffim.convolveAndSubtract(templateExposure.getMaskedImage(),
+                                          scienceExposure.getMaskedImage(),
                                           spatialKernel,
                                           spatialBg)
     frame += 1

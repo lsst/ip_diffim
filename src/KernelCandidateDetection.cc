@@ -145,7 +145,7 @@ namespace diffim {
     
     template <typename PixelT>
     bool KernelCandidateDetection<PixelT>::growCandidate(
-        afwDetect::Footprint::Ptr fp, 
+        lsst::afw::detection::Footprint::Ptr fp, 
         int fpGrowPix,
         MaskedImagePtr const& miToConvolvePtr,
         MaskedImagePtr const& miToNotConvolvePtr

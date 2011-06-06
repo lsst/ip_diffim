@@ -11,7 +11,7 @@ definitions: {
     warpingPolicy: {
         type: policy
         description: "Policy for image warping"
-        dictionary: @@ip_diffim:/policy/WarpingPolicy.paf
+        dictionary: @@afw:/policy/WarpDictionary.paf
         maxOccurs: 1
     }
 

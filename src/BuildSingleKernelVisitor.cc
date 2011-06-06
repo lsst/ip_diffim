@@ -88,7 +88,8 @@ namespace detail {
      */
     template<typename PixelT>
     BuildSingleKernelVisitor<PixelT>::BuildSingleKernelVisitor(
-        lsst::afw::math::KernelList const& basisList,
+        lsst::afw::math::KernelList const& basisList,   ///< List of basis kernels
+            ///< for resulting LinearCombinationKernel
         lsst::pex::policy::Policy const& policy  ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
@@ -106,9 +107,10 @@ namespace detail {
 
     template<typename PixelT>
     BuildSingleKernelVisitor<PixelT>::BuildSingleKernelVisitor(
-        lsst::afw::math::KernelList const& basisList,
+        lsst::afw::math::KernelList const& basisList,   ///< List of basis kernels
+            ///< for resulting LinearCombinationKernel
         lsst::pex::policy::Policy const& policy,  ///< Policy file directing behavior
-        boost::shared_ptr<Eigen::MatrixXd> hMat
+        boost::shared_ptr<Eigen::MatrixXd> hMat   ///< Regularization matrix
         ) :
         afwMath::CandidateVisitor(),
         _basisList(basisList),

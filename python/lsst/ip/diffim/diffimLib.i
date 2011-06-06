@@ -124,6 +124,8 @@ def version(HeadURL = r"$HeadURL$"):
 /******************************************************************************/
 
 %template(pair_Kernel_double)   std::pair<lsst::afw::math::Kernel::Ptr, double>;
+%template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, 
+                                          lsst::afw::math::Kernel::SpatialFunctionPtr>;
 
 /******************************************************************************/
 
@@ -134,9 +136,6 @@ def version(HeadURL = r"$HeadURL$"):
 %include "lsst/ip/diffim/ImageSubtract.h"
 
 %template(fitSpatialKernelFromCandidates) lsst::ip::diffim::fitSpatialKernelFromCandidates<float>;
-
-%template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, 
-                                          lsst::afw::math::Kernel::SpatialFunctionPtr>;
 
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
