@@ -1,3 +1,4 @@
+import sys
 import lsst.afw.image as afwImage
 import lsst.afw.detection as afwDet
 import lsst.afw.geom as afwGeom
@@ -29,19 +30,19 @@ policy3.set("kernelBasisSet", "alard-lupton")
 kList3 = ipDiffim.makeKernelBasisList(policy3)
 soln3  = ipDiffim.MaskedKernelSolutionF(kList3, False)
 
-#scienceExposure  = afwImage.ExposureF('s2L007173_0100g4TANSIPwInv.fits')
-#templateExposure = afwImage.ExposureF('oneTemplate100006_0072g4.fits')
-#xCenter       = 713
-#yCenter       = 641
+scienceExposure  = afwImage.ExposureF(sys.argv[1])
+scienceFwhm      = float(sys.argv[2])
+templateExposure = afwImage.ExposureF(sys.argv[3])
+templateFwhm     = float(sys.argv[4])
 
-scienceExposure  = afwImage.ExposureF('s2L006417_0516g4TANSIPwInv.fits')
-templateExposure = afwImage.ExposureF('s2L100006_05000501g4.fits')
-xCenter       = 572
-yCenter       = 106
+raCenter         = float(sys.argv[5])
+declCenter       = float(sys.argv[6])
+xCenter, yCenter = map(int, scienceExposure.getWcs().skyToPixel(raCenter, declCenter))
 
+policy3          = ipDiffim.modifyForImagePsfMatch(policy3, templateFwhm, scienceFwhm)
 
 ##### TO DO; DEAL WITH EDGE NANS; REALLY NEED TO SPREAD MASK...
-stampSize     = 200
+stampSize     = 300
 maskSize      = 10
 candBBox      = afwGeom.Box2I(afwGeom.Point2I(xCenter - stampSize//2, yCenter - stampSize//2),
                               afwGeom.Extent2I(stampSize, stampSize))
@@ -49,11 +50,12 @@ maskBBox      = afwGeom.Box2I(afwGeom.Point2I(xCenter - maskSize//2, yCenter - m
                               afwGeom.Extent2I(maskSize, maskSize))
 
 diffimTools.backgroundSubtract(policy1.getPolicy("afwBackgroundPolicy"),
-                               [scienceExposure.getMaskedImage(),])
+                               [scienceExposure.getMaskedImage(),
+                                templateExposure.getMaskedImage()])
 
 warper = afwMath.Warper.fromPolicy(policy1.getPolicy("warpingPolicy"))
 templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
-                destBBox = scienceExposure.getBBox(afwImage.PARENT))
+                                       destBBox = scienceExposure.getBBox(afwImage.PARENT))
 
 templateExposure = templateExposure.getMaskedImage()
 scienceExposure = scienceExposure.getMaskedImage()

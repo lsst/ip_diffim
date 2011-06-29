@@ -2,6 +2,7 @@ import eups
 import sys
 import os
 import optparse
+import re
 
 import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
@@ -9,7 +10,7 @@ import lsst.afw.image as afwImage
 from lsst.pex.logging import Trace
 from lsst.pex.logging import Log
 
-from lsst.ip.diffim import PsfMatch, makeDefaultPolicy
+from lsst.ip.diffim import psfMatch, makeDefaultPolicy, modifyForImagePsfMatch, makeSdqaRatingVector
 import lsst.ip.diffim.diffimTools as diffimTools
 
 def main():
@@ -27,7 +28,7 @@ def main():
 
     mergePolicyPath = None
     defOutputPath   = 'diffExposure.fits'
-    defVerbosity    = 0
+    defVerbosity    = 5
     defFwhm         = 3.5
     
     usage = """usage: %%prog [options] [scienceExposure [templateExposure [outputExposure]]]]
@@ -51,8 +52,11 @@ Notes:
                       help='display the images')
     parser.add_option('-b', '--bg', action='store_true', default=False,
                       help='subtract backgrounds using afw')
-    parser.add_option('-f', '--fwhm', type=float,
-                      help='Psf Fwhm (pixel)')
+
+    parser.add_option('-t', '--fwhmTemplate', type=float,
+                      help='Template Psf Fwhm (pixel)')
+    parser.add_option('-i', '--fwhmImage', type=float,
+                      help='Image Psf Fwhm (pixel)')
 
     (options, args) = parser.parse_args()
     
@@ -71,10 +75,17 @@ Notes:
     print 'Output exposure:  ', outputPath
     print 'Policy file:      ', mergePolicyPath
 
-    fwhm = defFwhm
-    if options.fwhm:
-        print 'Fwhm =', options.fwhm
-        fwhm = options.fwhm
+    if options.fwhmTemplate:
+        fwhmTemplate = options.fwhmTemplate
+        print 'Fwhm Template =', fwhmTemplate
+    else:
+        fwhmTemplate = defFwhm
+
+    if options.fwhmImage:
+        fwhmImage = options.fwhmImage
+        print 'Fwhm Image =', fwhmImage
+    else:
+        fwhmImage = defFwhm
 
     display = False
     if options.display:
@@ -94,8 +105,10 @@ Notes:
         
     templateExposure = afwImage.ExposureF(templatePath)
     scienceExposure  = afwImage.ExposureF(sciencePath)
-    policy           = makeDefaultPolicy(mergePolicyPath = mergePolicyPath, fwhm=fwhm)
-
+    policy           = makeDefaultPolicy(mergePolicyPath = mergePolicyPath)
+    policy           = modifyForImagePsfMatch(policy, fwhmTemplate, fwhmImage)
+    print policy
+    
     if bgSub:
         diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),
                                        [templateExposure.getMaskedImage(),
@@ -106,11 +119,19 @@ Notes:
             print 'NOTE: no background subtraction at all is requested'
 
         
-    psfmatch = PsfMatch.ImagePsfMatch(policy)
+    psfmatch = psfMatch.ImagePsfMatch(policy)
     results  = psfmatch.subtractExposures(templateExposure, scienceExposure)
 
     differenceExposure = results[0]
     differenceExposure.writeFits(outputPath)
+
+    psfMatchingKernel = results[1]
+    backgroundModel   = results[2]
+    kernelCellSet     = results[3]
+    makeSdqaRatingVector(kernelCellSet, psfMatchingKernel, backgroundModel)
+
+    diffimTools.writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel,
+                                   re.sub('.fits', '', outputPath))
 
 def run():
     Log.getDefaultLog()

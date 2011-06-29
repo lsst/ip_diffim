@@ -89,6 +89,10 @@ class DiffimTestCases(unittest.TestCase):
 
     def testConstructor(self):
         # Original and uninitialized
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+        
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.templateExposure2.getMaskedImage(),
                                        self.scienceImage2.getMaskedImage(),
@@ -140,6 +144,10 @@ class DiffimTestCases(unittest.TestCase):
             self.fail()
 
     def testDeltaFunctionScaled(self, scaling = 2.7, bg = 11.3):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+
         sIm  = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), True)
         sIm *= scaling
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
@@ -172,6 +180,10 @@ class DiffimTestCases(unittest.TestCase):
         
 
     def testDeltaFunction(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+
         # Match an image to itself, with delta-function basis set
         # No regularization
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
@@ -230,6 +242,10 @@ class DiffimTestCases(unittest.TestCase):
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT))
 
     def testGaussianWithNoise(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+
         # Convolve a real image with a gaussian and try and recover
         # it.  Add noise and perform the same test.
 
@@ -379,11 +395,19 @@ class DiffimTestCases(unittest.TestCase):
             self.fail()
         
     def testConstantWeighting(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+
         self.policy.set("fitForBackground", False)
         self.testGaussian()
         self.testGaussianWithNoise()
         
     def testNoBackgroundFit(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+
         self.policy.set("constantVarianceWeighting", True)
         self.testGaussian()
 

@@ -12,7 +12,6 @@ import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
 
 import numpy
-import pylab
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 

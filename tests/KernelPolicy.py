@@ -32,63 +32,56 @@ import lsst.pex.policy as pexPolicy
 class DiffimTestCases(unittest.TestCase):
     def setUp(self):
         self.p0      = pexPolicy.Policy()
-        diffimDir    = eups.productDir('ip_diffim')
-        policyPath   = os.path.join(diffimDir, 'policy', 'PsfMatchingDictionary.paf')
+        diffimDir    = eups.productDir("ip_diffim")
+        policyPath   = os.path.join(diffimDir, "policy", "PsfMatchingDictionary.paf")
         defPolicy    = pexPolicy.Policy.createPolicy(policyPath)
         self.p0.mergeDefaults(defPolicy.getDictionary())
 
     def tearDown(self):
         del self.p0
         
-    def testNoModify(self):
-        p1 = ipDiffim.makeDefaultPolicy(modify=False)
-        self.assertEqual(self.p0.get("kernelSize"), p1.get("kernelSize"))
-        self.assertEqual(self.p0.getPolicy("detectionPolicy").get("fpGrowPix"),
-                         p1.getPolicy("detectionPolicy").get("fpGrowPix"))
-        
-        for i in range(self.p0.get("alardNGauss")):
-            self.assertEqual(self.p0.getDoubleArray("alardSigGauss")[i],
-                             p1.getDoubleArray("alardSigGauss")[i])
+    def testMerge(self):
+        # Invalid; parameter does not exist
+        mergePolicy = pexPolicy.Policy()
+        mergePolicy.set("testMerge", True)
+        try:
+            p1 = ipDiffim.makeDefaultPolicy(mergePolicy = mergePolicy)
+        except:
+            pass
+        else:
+            self.fail()
 
-    def testModifyGreater(self, fwhm=20.):
-        p1 = ipDiffim.makeDefaultPolicy(fwhm = fwhm, modify = True)
-        
-        self.assertTrue(self.p0.get("kernelSize") < p1.get("kernelSize"))
-        self.assertTrue(self.p0.getPolicy("detectionPolicy").get("fpGrowPix") <
-                        p1.getPolicy("detectionPolicy").get("fpGrowPix"))
+        # Change parameter by sending policy
+        mergePolicy = pexPolicy.Policy()
+        mergePolicy.set("fitForBackground", not self.p0.get("fitForBackground"))
+        p2 = ipDiffim.makeDefaultPolicy(mergePolicy = mergePolicy)
+        self.assertTrue(p2.get("fitForBackground") == (not self.p0.get("fitForBackground")))
 
-        for i in range(self.p0.get("alardNGauss")):
-            self.assertTrue(self.p0.getDoubleArray("alardSigGauss")[i] <
-                            p1.getDoubleArray("alardSigGauss")[i])
+        # Change parameter by sending path
+        mergePolicyPath = os.path.join(os.getenv("IP_DIFFIM_DIR"), "policy", "DeconvolutionPolicy.paf")
+        p3 = ipDiffim.makeDefaultPolicy(mergePolicy = mergePolicyPath)
+        self.assertTrue(p3.get("modifyForDeconvolution") == True)
 
-        # maxed out the sizes
-        self.assertTrue(p1.getPolicy("detectionPolicy").get("fpGrowPix") ==
-                        p1.getPolicy("detectionPolicy").get("fpGrowMax"))
-        self.assertTrue(p1.get("kernelSize") == p1.get("kernelSizeMax"))
 
-    def testModifyLesser(self, fwhm=1.):
-        p1 = ipDiffim.makeDefaultPolicy(fwhm = fwhm, modify = True)
+    def testModifyImagePsfMatch(self):
+        p1 = ipDiffim.modifyForImagePsfMatch(self.p0, 3, 4)
+        self.assertTrue(p1.get("modifyForImagePsfMatch") == True)
 
-        self.assertTrue(self.p0.get("kernelSize") > p1.get("kernelSize"))
-        self.assertTrue(self.p0.getPolicy("detectionPolicy").get("fpGrowPix") >
-                        p1.getPolicy("detectionPolicy").get("fpGrowPix"))
-        
-        for i in range(self.p0.get("alardNGauss")):
-            self.assertTrue(self.p0.getDoubleArray("alardSigGauss")[i] >
-                            p1.getDoubleArray("alardSigGauss")[i])
+        p2 = ipDiffim.modifyForImagePsfMatch(self.p0, 4, 3)
+        self.assertTrue(p2.get("modifyForImagePsfMatch") == True)
+        self.assertTrue(p2.get("modifyForDeconvolution") == True)
 
-        # minned out the sizes
-        self.assertTrue(p1.getPolicy("detectionPolicy").get("fpGrowPix") ==
-                        p1.getPolicy("detectionPolicy").get("fpGrowMin"))
-        self.assertTrue(p1.get("kernelSize") == p1.get("kernelSizeMin"))
-
-    def testModify1(self):
+    def testModifyDeconv(self):
         p1 = ipDiffim.modifyForDeconvolution(self.p0)
-        self.assertTrue(self.p0.getIntArray('alardDegGauss') != p1.getIntArray('alardDegGauss'))
+        self.assertTrue(p1.get("modifyForDeconvolution") == True)
         
-    def testModify2(self):
+    def testModifyModelPsfMatch(self):
         p1 = ipDiffim.modifyForModelPsfMatch(self.p0)
-        self.assertTrue(self.p0.get('singleKernelClipping') != p1.get('singleKernelClipping'))
+        self.assertTrue(p1.get("modifyForModelPsfMatch") == True)
+
+    def testModifySnap(self):
+        p1 = ipDiffim.modifyForSnapSubtraction(self.p0)
+        self.assertTrue(p1.get("modifyForSnapSubtraction") == True)
         
     def tearDown(self):
         del self.p0

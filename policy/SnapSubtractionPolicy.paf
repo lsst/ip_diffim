@@ -1,0 +1,7 @@
+#<?cfg paf policy ?>
+
+# Overrides for Snap subtraction
+spatialKernelOrder: 0
+
+# Record it being used
+modifyForSnapSubtraction: true

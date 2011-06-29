@@ -32,6 +32,7 @@ import lsst.pex.logging as pexLog
 # third party
 import numpy
 import time
+import os
 
 #######
 # Add noise
@@ -408,6 +409,30 @@ def displayFootprints(image, footprintList, frame):
     #        ds9.line([(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)], ctype=ds9.RED)
     
 
+def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir):
+    if not os.path.isdir(outdir):
+        os.makedirs(outdir)
+        
+    for cell in kernelCellSet.getCellList():
+        for cand in cell.begin(False): # False = include bad candidates
+            cand = diffimLib.cast_KernelCandidateF(cand)
+            if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
+                xCand = int(cand.getXCenter())
+                yCand = int(cand.getYCenter())
+                idCand = cand.getId()
+                diffIm = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
+                kernel = cand.getKernelImage(diffimLib.KernelCandidateF.ORIG)
+                diffIm.writeFits(os.path.join(outdir, 'diffim_c%d_x%d_y%d.fits' % (idCand, xCand, yCand)))
+                kernel.writeFits(os.path.join(outdir, 'kernel_c%d_x%d_y%d.fits' % (idCand, xCand, yCand)))
+
+                # Diffim from spatial model
+                ski   = afwImage.ImageD(kernel.getDimensions())
+                psfMatchingKernel.computeImage(ski, False, xCand, yCand)
+                sk    = afwMath.FixedKernel(ski)
+                sbg   = backgroundModel(xCand, yCand)
+                sdmi  = cand.getDifferenceImage(sk, sbg)
+                sdmi.writeFits(os.path.join(outdir, 'sdiffim_c%d_x%d_y%d.fits' % (idCand, xCand, yCand)))
+                                
 def displayKernelCellSet(image, kernelCellSet, frame):
     import lsst.afw.display.ds9 as ds9
     import lsst.afw.display.utils as utils

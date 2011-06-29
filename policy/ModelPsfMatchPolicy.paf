@@ -13,3 +13,5 @@ constantVarianceWeighting: true
 # Do not check condition number since the variance is ill-defined
 checkConditionNumber: false
 
+# Record it being used
+modifyForModelPsfMatch: true
