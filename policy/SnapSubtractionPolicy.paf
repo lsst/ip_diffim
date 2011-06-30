@@ -3,5 +3,11 @@
 # Overrides for Snap subtraction
 spatialKernelOrder: 0
 
+# Requires some actual testing:
+alardNGauss: 2
+alardDegGauss: 4 2
+alardSigGauss: 0.5 1.0
+kernelSize: 7
+
 # Record it being used
 modifyForSnapSubtraction: true
