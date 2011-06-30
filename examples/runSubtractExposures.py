@@ -105,7 +105,7 @@ Notes:
         
     templateExposure = afwImage.ExposureF(templatePath)
     scienceExposure  = afwImage.ExposureF(sciencePath)
-    policy           = makeDefaultPolicy(mergePolicyPath = mergePolicyPath)
+    policy           = makeDefaultPolicy(mergePolicy = mergePolicyPath)
     policy           = modifyForImagePsfMatch(policy, fwhmTemplate, fwhmImage)
     print policy
     
