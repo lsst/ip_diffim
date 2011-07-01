@@ -8,4 +8,4 @@ spatialKernelOrder: 2
 spatialKernelClipping: false
 
 # Record it being used
-modifyForImagePsfMatch: true
+modifiedForImagePsfMatch: true

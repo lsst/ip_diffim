@@ -556,14 +556,14 @@ definitions: {
     # 
     # Any modifications by subpolicies
     #
-    modifyForImagePsfMatch: {
+    modifiedForImagePsfMatch: {
         type: bool
         description: "Policy modified for ImagePsfMatch class"
         maxOccurs: 1
         default: false
     }
 
-    modifyForDeconvolution: {
+    modifiedForDeconvolution: {
         type: bool
         description: "Policy modified for deconvolution"
         maxOccurs: 1
@@ -577,14 +577,14 @@ definitions: {
         default: false
     }
 
-    modifyForModelPsfMatch: {
+    modifiedForModelPsfMatch: {
         type: bool
         description: "Policy modified for ModelPsfMatch class"
         maxOccurs: 1
         default: false
     }
 
-    modifyForSnapSubtraction: {
+    modifiedForSnapSubtraction: {
         type: bool
         description: "Policy modified for subtraction of back-to-back snaps"
         maxOccurs: 1

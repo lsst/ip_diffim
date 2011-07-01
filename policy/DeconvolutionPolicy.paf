@@ -13,4 +13,4 @@ useCoreStats: false
 useOuterForDeconv: false
 
 # Record it being used
-modifyForDeconvolution: true
+modifiedForDeconvolution: true

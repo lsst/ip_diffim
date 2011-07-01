@@ -10,4 +10,4 @@ alardSigGauss: 0.5 1.0
 kernelSize: 7
 
 # Record it being used
-modifyForSnapSubtraction: true
+modifiedForSnapSubtraction: true

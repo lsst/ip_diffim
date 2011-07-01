@@ -14,4 +14,4 @@ constantVarianceWeighting: true
 checkConditionNumber: false
 
 # Record it being used
-modifyForModelPsfMatch: true
+modifiedForModelPsfMatch: true

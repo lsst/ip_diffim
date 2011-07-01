@@ -60,28 +60,28 @@ class DiffimTestCases(unittest.TestCase):
         # Change parameter by sending path
         mergePolicyPath = os.path.join(os.getenv("IP_DIFFIM_DIR"), "policy", "DeconvolutionPolicy.paf")
         p3 = ipDiffim.makeDefaultPolicy(mergePolicy = mergePolicyPath)
-        self.assertTrue(p3.get("modifyForDeconvolution") == True)
+        self.assertTrue(p3.get("modifiedForDeconvolution") == True)
 
 
     def testModifyImagePsfMatch(self):
         p1 = ipDiffim.modifyForImagePsfMatch(self.p0, 3, 4)
-        self.assertTrue(p1.get("modifyForImagePsfMatch") == True)
+        self.assertTrue(p1.get("modifiedForImagePsfMatch") == True)
 
         p2 = ipDiffim.modifyForImagePsfMatch(self.p0, 4, 3)
-        self.assertTrue(p2.get("modifyForImagePsfMatch") == True)
-        self.assertTrue(p2.get("modifyForDeconvolution") == True)
+        self.assertTrue(p2.get("modifiedForImagePsfMatch") == True)
+        self.assertTrue(p2.get("modifiedForDeconvolution") == True)
 
     def testModifyDeconv(self):
         p1 = ipDiffim.modifyForDeconvolution(self.p0)
-        self.assertTrue(p1.get("modifyForDeconvolution") == True)
+        self.assertTrue(p1.get("modifiedForDeconvolution") == True)
         
     def testModifyModelPsfMatch(self):
         p1 = ipDiffim.modifyForModelPsfMatch(self.p0)
-        self.assertTrue(p1.get("modifyForModelPsfMatch") == True)
+        self.assertTrue(p1.get("modifiedForModelPsfMatch") == True)
 
     def testModifySnap(self):
         p1 = ipDiffim.modifyForSnapSubtraction(self.p0)
-        self.assertTrue(p1.get("modifyForSnapSubtraction") == True)
+        self.assertTrue(p1.get("modifiedForSnapSubtraction") == True)
         
     def tearDown(self):
         del self.p0
