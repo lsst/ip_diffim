@@ -27,7 +27,8 @@ def makeDefaultPolicy(mergePolicy = None, PolicyDictName = "PsfMatchingDictionar
 
     return policy
 
-def modifyForImagePsfMatch(defaultPolicy, templateFwhmPix, scienceFwhmPix, minSigma = 0.4):
+def modifyForImagePsfMatch(defaultPolicy, templateFwhmPix, scienceFwhmPix,
+                           minSigma = 0.4, minRatio = 1.25):
     psfMatchPolicy = pexPolicy.Policy(
         os.path.join(os.getenv("IP_DIFFIM_DIR"), "policy", "ImagePsfMatchPolicy.paf")
         )
@@ -49,7 +50,13 @@ def modifyForImagePsfMatch(defaultPolicy, templateFwhmPix, scienceFwhmPix, minSi
         # cores, central Gaussian is geometric mean.
         kernelCoreSigma   = templateFwhmPix / sigma2fwhm
         kernelOuterSigma  = num.sqrt(scienceFwhmPix**2 - templateFwhmPix**2) / sigma2fwhm
+
+        # Minimum ratio
+        ratio             = num.sqrt(kernelOuterSigma / kernelCoreSigma)
+        if ratio < minRatio:
+            kernelOuterSigma = minRatio**2 * kernelCoreSigma
         kernelMiddleSigma = num.sqrt(kernelCoreSigma * kernelOuterSigma)
+        
         if psfMatchPolicy.get("alardNGauss") == 3:
             psfMatchPolicy.set("alardSigGauss", kernelCoreSigma)
             psfMatchPolicy.add("alardSigGauss", kernelMiddleSigma)
@@ -65,7 +72,13 @@ def modifyForImagePsfMatch(defaultPolicy, templateFwhmPix, scienceFwhmPix, minSi
         kernelCoreFwhm    = num.sqrt(scienceFwhmPix**2 - templateFwhmPix**2)
         kernelCoreSigma   = max(minSigma, kernelCoreFwhm / sigma2fwhm)
         kernelOuterSigma  = scienceFwhmPix / sigma2fwhm
+
+        # Minimum ratio
+        ratio             = num.sqrt(kernelOuterSigma / kernelCoreSigma)
+        if ratio < minRatio:
+            kernelOuterSigma = minRatio**2 * kernelCoreSigma
         kernelMiddleSigma = num.sqrt(kernelCoreSigma * kernelOuterSigma)
+        
         if psfMatchPolicy.get("alardNGauss") == 3:
             psfMatchPolicy.set("alardSigGauss", kernelCoreSigma)
             psfMatchPolicy.add("alardSigGauss", kernelMiddleSigma)
@@ -86,7 +99,12 @@ def modifyForImagePsfMatch(defaultPolicy, templateFwhmPix, scienceFwhmPix, minSi
         kernelDeconvSigma = minSigma
         kernelCoreSigma   = minSigma
         kernelOuterSigma  = templateFwhmPix / sigma2fwhm
-        kernelMiddleSigma = 0.5 * (kernelCoreSigma + kernelOuterSigma)
+        # Minimum ratio
+        ratio             = num.sqrt(kernelOuterSigma / kernelCoreSigma)
+        if ratio < minRatio:
+            kernelOuterSigma = minRatio**2 * kernelCoreSigma
+        kernelMiddleSigma = num.sqrt(kernelCoreSigma * kernelOuterSigma)
+
         if psfMatchPolicy.get("alardNGauss") != 4:
             # Deal with this
             pass
@@ -125,6 +143,14 @@ def modifyForImagePsfMatch(defaultPolicy, templateFwhmPix, scienceFwhmPix, minSi
     psfMatchPolicy.getPolicy("detectionPolicy").set("fpGrowPix", fpGrow)
     
     return psfMatchPolicy
+
+
+def modifyAlardLuptonOrder(defaultPolicy, increment = 1):
+    degGauss = defaultPolicy.getIntArray("alardDegGauss")
+    defaultPolicy.set("alardDegGauss", degGauss[0] + increment)
+    for deg in degGauss[1:]:
+        defaultPolicy.add("alardDegGauss", deg + increment)
+
 
 def modifyForDeconvolution(defaultPolicy):
     deconvPolicy = pexPolicy.Policy(
