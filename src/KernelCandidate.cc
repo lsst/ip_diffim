@@ -20,8 +20,6 @@
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
-#define DEBUG_MATRIX 0
-
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
 namespace pexLog         = lsst::pex::logging; 

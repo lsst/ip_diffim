@@ -19,6 +19,8 @@
 #include "lsst/ip/diffim/KernelCandidate.h"
 #include "lsst/ip/diffim/AssessSpatialKernelVisitor.h"
 
+#define DEBUG_IMAGES 0
+
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
 namespace pexLogging     = lsst::pex::logging; 
@@ -102,7 +104,12 @@ namespace detail {
         double background = (*_spatialBackground)(kCandidate->getXCenter(), kCandidate->getYCenter());
         
         MaskedImageT diffim = kCandidate->getDifferenceImage(kernelPtr, background);
-        
+
+        if (DEBUG_IMAGES) {
+            kImage.writeFits(str(boost::format("askv_k%d.fits") % kCandidate->getId()));
+            diffim.writeFits(str(boost::format("askv_d%d.fits") % kCandidate->getId()));
+        }
+
         /* Official resids */
         try {
             if (_useCoreStats) 

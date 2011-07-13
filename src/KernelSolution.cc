@@ -1529,7 +1529,7 @@ namespace diffim {
                 (*_mMat)(j,i) = (*_mMat)(i,j);
             }
         }
-        
+
         try {
             KernelSolution::solve();
         } catch (pexExcept::Exception &e) {
@@ -1550,6 +1550,8 @@ namespace diffim {
     }
     
     void SpatialKernelSolution::_setKernel() {
+        /* Report on condition number */
+        double cNumber = this->getConditionNumber(EIGENVALUE);
         
         if (_nkt == 1) {
             /* Not spatially varying; this fork is a specialization for convolution speed--up */
@@ -1557,6 +1559,12 @@ namespace diffim {
             /* Set the basis coefficients */
             std::vector<double> kCoeffs(_nbases);
             for (int i = 0; i < _nbases; i++) {
+                if (std::isnan((*_aVec)(i))) {
+                    throw LSST_EXCEPT(
+                        pexExcept::Exception, 
+                        str(boost::format(
+                                "I. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % i % cNumber));
+                }
                 kCoeffs[i] = (*_aVec)(i);
             }
             lsst::afw::math::KernelList basisList = 
@@ -1572,13 +1580,25 @@ namespace diffim {
             kCoeffs.reserve(_nbases);
             for (int i = 0, idx = 0; i < _nbases; i++) {
                 kCoeffs.push_back(std::vector<double>(_nkt));
-                
+
                 /* Deal with the possibility the first term doesn't vary spatially */
                 if ((i == 0) && (_constantFirstTerm)) {
+                    if (std::isnan((*_aVec)(idx))) {
+                        throw LSST_EXCEPT(
+                            pexExcept::Exception, 
+                            str(boost::format(
+                                    "II. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % idx % cNumber));
+                    }
                     kCoeffs[i][0] = (*_aVec)(idx++);
                 }
                 else {
                     for (int j = 0; j < _nkt; j++) {
+                        if (std::isnan((*_aVec)(idx))) {
+                            throw LSST_EXCEPT(
+                                pexExcept::Exception, 
+                                str(boost::format(
+                                        "III. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % idx % cNumber));
+                        }
                         kCoeffs[i][j] = (*_aVec)(idx++);
                     }
                 }
@@ -1596,7 +1616,13 @@ namespace diffim {
         std::vector<double> bgCoeffs(_fitForBackground ? _nbt : 1);
         if (_fitForBackground) {
             for (int i = 0; i < _nbt; i++) {
-                bgCoeffs[i] = (*_aVec)(_nt - _nbt + i);
+                int idx = _nt - _nbt + i;
+                if (std::isnan((*_aVec)(idx))) {
+                    throw LSST_EXCEPT(pexExcept::Exception, 
+                                      str(boost::format(
+                           "Unable to determine spatial background solution %d (nan)") % (idx)));
+                }
+                bgCoeffs[i] = (*_aVec)(idx);
             }
         }
         else {
