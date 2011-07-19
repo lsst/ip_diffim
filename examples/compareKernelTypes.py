@@ -82,8 +82,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policy3.set('constantVarianceWeighting', True)
 
         # lets look at deconvolution kernels
-        ipDiffim.modifyForDeconvolution(self.policy3)
-        print self.policy3
+        #ipDiffim.modifyForDeconvolution(self.policy3)
+        #print self.policy3
         #self.policy3.set("alardSigGauss", 0.75)
         #self.policy3.add("alardSigGauss", 1.0)
         #self.policy3.add("alardSigGauss", 1.25)
@@ -108,7 +108,7 @@ class DiffimTestCases(unittest.TestCase):
             
             self.scienceExposure   = afwImage.ExposureF(defSciencePath)
             self.templateExposure  = afwImage.ExposureF(defTemplatePath)
-            warper = afwMath.Warper.fromPolicy(policy1.getPolicy("warpingPolicy"))
+            warper = afwMath.Warper.fromPolicy(self.policy1.getPolicy("warpingPolicy"))
             self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
                 destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
 

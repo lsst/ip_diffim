@@ -98,7 +98,7 @@ Notes:
         
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
-    policy              = makeDefaultPolicy(mergePolicyPath = mergePolicyPath, fwhm=fwhm)
+    policy              = makeDefaultPolicy(mergePolicy = mergePolicyPath, fwhm=fwhm)
     
     if bgSub:
         diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),

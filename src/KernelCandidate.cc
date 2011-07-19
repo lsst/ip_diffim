@@ -20,8 +20,6 @@
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
-#define DEBUG_MATRIX 0
-
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
 namespace pexLog         = lsst::pex::logging; 
@@ -89,14 +87,18 @@ namespace diffim {
         /* Examine the policy for control over the variance estimate */
         afwImage::Image<afwImage::VariancePixel> var = 
             afwImage::Image<afwImage::VariancePixel>(*(_miToNotConvolvePtr->getVariance()), true);
+        /* Variance estimate comes from sum of image variances */
+        var += (*(_miToConvolvePtr->getVariance()));
+
         if (_policy.getBool("constantVarianceWeighting")) {
             /* Constant variance weighting */
-            var = 1.;
+            afwMath::Statistics varStats = afwMath::makeStatistics(var, afwMath::MEDIAN);
+            if (varStats.getValue(afwMath::MEDIAN) <= 0.0)
+                var = 1.0;
+            else
+                var = varStats.getValue(afwMath::MEDIAN);
         }
-        else {
-            /* Variance estimate comes from sum of image variances */
-            var += (*(_miToConvolvePtr->getVariance()));
-        }
+
         _varianceEstimate = VariancePtr( new afwImage::Image<afwImage::VariancePixel>(var) );
 
         try {

@@ -50,6 +50,10 @@ class DiffimTestCases(unittest.TestCase):
             del self.templateImage
 
     def testModel(self):
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
 
@@ -81,8 +85,10 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('spatialKernelOrder', 1)
         self.policy.set('spatialBgOrder', 0) # already bg-subtracted
         self.policy.set('usePcaForSpatialKernel', False)
-        self.runXY0(fitForBackground = True)
-        self.runXY0(fitForBackground = False)
+        self.runXY0(fitForBackground = True, poly = 'polynomial')
+        self.runXY0(fitForBackground = False, poly = 'polynomial')
+        self.runXY0(fitForBackground = True, poly = 'chebyshev1')
+        self.runXY0(fitForBackground = False, poly = 'chebyshev1')
 
     def testWarping(self):
         # Should fail since images are not aligned
@@ -116,15 +122,19 @@ class DiffimTestCases(unittest.TestCase):
         else:
             pass
 
-    def runXY0(self, fitForBackground):
+    def runXY0(self, fitForBackground, poly):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
         self.policy.set('fitForBackground', fitForBackground)
 
-        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
+        # Since Chebyshev1 remaps the coordinates, the spatial terms don't change!
+        self.policy.set('spatialKernelType', poly)
+        self.policy.set('spatialBgType', poly)
+        
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.PARENT)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
 
         # Have an XY0
         psfmatch  = ipDiffim.ImagePsfMatch(self.policy)
@@ -174,7 +184,14 @@ class DiffimTestCases(unittest.TestCase):
         self.assertAlmostEqual(skp1[0][0], skp2[0][0])
         # on other terms, the spatial terms are the same, the zpt terms are different
         for nk in range(1, len(skp1)):
-            self.assertNotEqual(skp1[nk][0], skp2[nk][0])
+
+            if poly == 'polynomial':
+                self.assertNotEqual(skp1[nk][0], skp2[nk][0])
+            elif poly == 'chebyshev1':
+                self.assertAlmostEqual(skp1[nk][0], skp2[nk][0])
+            else:
+                self.fail()
+                
             for np in range(1, len(skp1[nk])):
                 self.assertAlmostEqual(skp1[nk][np], skp2[nk][np])
 

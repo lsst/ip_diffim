@@ -99,7 +99,7 @@ namespace detail {
                               str(boost::format("Invalid type (%s) for spatial kernel model") % 
                                   spatialKernelType));
         }
-        
+
         /* */
 
         int fitForBackground = policy.getBool("fitForBackground");
@@ -147,6 +147,11 @@ namespace detail {
                               "Processing candidate %d", kCandidate->getId());
         _nCandidates += 1;
 
+        /* 
+           Build the spatial kernel from the most recent fit, e.g. if its Pca
+           you want to build a spatial model on the Pca basis, not original
+           basis 
+        */
         _kernelSolution->addConstraint(kCandidate->getXCenter(),
                                        kCandidate->getYCenter(),
                                        kCandidate->getKernelSolution(

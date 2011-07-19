@@ -542,103 +542,164 @@ namespace diffim {
 
         /* Only BAD pixels marked in this mask */
         afwImage::MaskPixel bitMask = 
-            (afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("BAD") | 
-             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("SAT") |
-             afwImage::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("EDGE"));
+            (afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD") | 
+             afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("SAT") |
+             afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("EDGE"));
 
         /* Create a Footprint that contains all the masked pixels set above */
         afwDet::Threshold threshold = afwDet::Threshold(bitMask, afwDet::Threshold::BITMASK, true);
-        afwDet::FootprintSet<InputT, lsst::afw::image::MaskPixel> maskFpSet(pixelMask, threshold, true);
+        afwDet::FootprintSet<InputT, afwImage::MaskPixel> maskFpSet(pixelMask, threshold, true);
 
         /* And spread it by the kernel half width */
         int growPix = (*kiter)->getCtr().getX();
-        afwDet::FootprintSet<InputT, lsst::afw::image::MaskPixel> maskedFpSetGrown = 
-            afwDet::FootprintSet<InputT, lsst::afw::image::MaskPixel>(maskFpSet, growPix, true);
+        afwDet::FootprintSet<InputT, afwImage::MaskPixel> maskedFpSetGrown = 
+            afwDet::FootprintSet<InputT, afwImage::MaskPixel>(maskFpSet, growPix, true);
+        
+        /*
+        for (typename afwDet::FootprintSet<InputT, afwImage::MaskPixel>::FootprintList::iterator 
+                 ptr = maskedFpSetGrown.getFootprints()->begin(),
+                 end = maskedFpSetGrown.getFootprints()->end(); 
+             ptr != end; 
+             ++ptr) {
+            
+            afwDet::setMaskFromFootprint(finalMask, 
+                                         (**ptr),
+                                         afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD"));
+        }
+        */
 
+        afwImage::Mask<afwImage::MaskPixel> finalMask(pixelMask.getDimensions());
+        afwDet::setMaskFromFootprintList(&finalMask, 
+                                         *(maskedFpSetGrown.getFootprints()),
+                                         afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD"));
+        pixelMask.writeFits("pixelmask.fits");
+        finalMask.writeFits("finalmask.fits");
+
+
+        ndarray::Array<int, 1, 1> maskArray = 
+            lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
+        afwDet::flattenArray(*fullFp, finalMask.getArray(), 
+                             maskArray, imageToConvolve.getXY0()); /* Need to fake the XY0 */
+        ndarray::EigenView<int, 1, 1> maskEigen = 
+            ndarray::viewAsEigen(maskArray);
+
+        ndarray::Array<InputT, 1, 1> arrayToConvolve = 
+            lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
+        afwDet::flattenArray(*fullFp, imageToConvolve.getArray(), 
+                             arrayToConvolve, imageToConvolve.getXY0());
+        ndarray::EigenView<InputT, 1, 1> eigenToConvolve0 = 
+            ndarray::viewAsEigen(arrayToConvolve);
+
+        ndarray::Array<InputT, 1, 1> arrayToNotConvolve = 
+            lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
+        afwDet::flattenArray(*fullFp, imageToNotConvolve.getArray(), 
+                             arrayToNotConvolve, imageToNotConvolve.getXY0());
+        ndarray::EigenView<InputT, 1, 1> eigenToNotConvolve0 = 
+            ndarray::viewAsEigen(arrayToNotConvolve);
+
+        ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance = 
+            lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
+        afwDet::flattenArray(*fullFp, varianceEstimate.getArray(), 
+                             arrayVariance, varianceEstimate.getXY0());
+        ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance0 = 
+            ndarray::viewAsEigen(arrayVariance);
+
+        int nGood = 0;
+        for (int i = 0; i < maskEigen.size(); i++) {
+            if (maskEigen(i) == 0.0)
+                nGood += 1;
+        }
+
+        Eigen::VectorXd eigenToConvolve(nGood);
+        Eigen::VectorXd eigenToNotConvolve(nGood);
+        Eigen::VectorXd eigenVariance(nGood);
+        int nUsed = 0;
+        for (int i = 0; i < maskEigen.size(); i++) {
+            if (maskEigen(i) == 0.0) {
+                eigenToConvolve(nUsed) = eigenToConvolve0(i);
+                eigenToNotConvolve(nUsed) = eigenToNotConvolve0(i);
+                eigenVariance(nUsed) = eigenVariance0(i);
+                nUsed += 1;
+            }
+        }
+
+
+        boost::timer t;
+        t.restart();
+
+        unsigned int const nKernelParameters     = basisList.size();
+        unsigned int const nBackgroundParameters = this->_fitForBackground ? 1 : 0;
+        unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
+
+        /* Holds image convolved with basis function */
+        afwImage::Image<InputT> cimage(imageToConvolve.getDimensions());
+        
+        /* Holds eigen representation of image convolved with all basis functions */
+        std::vector<boost::shared_ptr<Eigen::VectorXd> >
+            convolvedEigenList(nKernelParameters);
+        
+        /* Iterators over convolved image list and basis list */
+        typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiter = 
+            convolvedEigenList.begin();
+
+        /* Create C_i in the formalism of Alard & Lupton */
+        for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
+            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+
+            ndarray::Array<InputT, 1, 1> arrayC = 
+                lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
+            afwDet::flattenArray(*fullFp, cimage.getArray(), 
+                                 arrayC, cimage.getXY0());
+            ndarray::EigenView<InputT, 1, 1> eigenC0 = 
+                ndarray::viewAsEigen(arrayC);
+
+            Eigen::VectorXd eigenC(nGood);
+            int nUsed = 0;
+            for (int i = 0; i < maskEigen.size(); i++) {
+                if (maskEigen(i) == 0.0) {
+                    eigenC(nUsed) = eigenC0(i);
+                    nUsed += 1;
+                }
+            }
+
+            boost::shared_ptr<Eigen::VectorXd> 
+                eigenCptr (new Eigen::VectorXd(eigenC));
+            
+            *eiter = eigenCptr;
+        }
+        double time = t.elapsed();
+        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.build", 
+                          "Total compute time to do basis convolutions : %.2f s", time);
+        t.restart();
+        
+        /* Load matrix with all convolved images */
+        Eigen::MatrixXd cMat(eigenToConvolve.size(), nParameters);
+        typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = 
+            convolvedEigenList.begin();
+        typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = 
+            convolvedEigenList.end();
+        for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
+            //cMat.col(kidxj) = (*eiterj)->template cast<double>();
+            cMat.col(kidxj) = (**eiterj);
+        }
+        /* Treat the last "image" as all 1's to do the background calculation. */
+        if (this->_fitForBackground)
+            cMat.col(nParameters-1).fill(1.);
+        
+        this->_cMat.reset(new Eigen::MatrixXd(cMat));
+        //this->_ivVec.reset(new Eigen::VectorXd((eigenVariance.template cast<double>()).cwise().inverse()));
+        //this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.template cast<double>()));
+        this->_ivVec.reset(new Eigen::VectorXd(eigenVariance.cwise().inverse()));
+        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve));
+
+        /* Make these outside of solve() so I can check condition number */
+        this->_mMat.reset(
+            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
+            );
+        this->_bVec.reset(
+            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
+            );
     }
-
-//        ndarray::Array<InputT, 1, 1> arrayToConvolve = 
-//            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
-//        afwDet::flattenArray(*maskedFpGrow, imageToConvolve.getArray(), 
-//                             arrayToConvolve, imageToConvolve.getXY0());
-//        ndarray::EigenView<InputT, 1, 1> eigenToConvolve = 
-//            ndarray::viewAsEigen(arrayToConvolve);
-//
-//        ndarray::Array<InputT, 1, 1> arrayToNotConvolve = 
-//            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
-//        afwDet::flattenArray(*maskedFpGrow, imageToNotConvolve.getArray(), 
-//                             arrayToNotConvolve, imageToNotConvolve.getXY0());
-//        ndarray::EigenView<InputT, 1, 1> eigenToNotConvolve = 
-//            ndarray::viewAsEigen(arrayToNotConvolve);
-//
-//        ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance = 
-//            lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
-//        afwDet::flattenArray(*maskedFpGrow, varianceEstimate.getArray(), 
-//                             arrayVariance, varianceEstimate.getXY0());
-//        ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance = 
-//            ndarray::viewAsEigen(arrayVariance);
-//
-//        boost::timer t;
-//        t.restart();
-//
-//        unsigned int const nKernelParameters     = basisList.size();
-//        unsigned int const nBackgroundParameters = this->_fitForBackground ? 1 : 0;
-//        unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
-//
-//        /* Holds image convolved with basis function */
-//        afwImage::Image<InputT> cimage(imageToConvolve.getDimensions());
-//        
-//        /* Holds eigen representation of image convolved with all basis functions */
-//        std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >
-//            convolvedEigenList(nKernelParameters);
-//        
-//        /* Iterators over convolved image list and basis list */
-//        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiter = 
-//            convolvedEigenList.begin();
-//
-//        /* Create C_i in the formalism of Alard & Lupton */
-//        for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
-//            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
-//
-//            ndarray::Array<InputT, 1, 1> arrayC = 
-//                lsst::ndarray::allocate(lsst::ndarray::makeVector(maskedFpGrow->getArea()));
-//            afwDet::flattenArray(*maskedFpGrow, cimage.getArray(), 
-//                                 arrayC, cimage.getXY0());
-//            boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > 
-//                eigenC (new ndarray::EigenView<InputT, 1, 1>(ndarray::viewAsEigen(arrayC)));
-//            
-//            *eiter = eigenC;
-//        }
-//        double time = t.elapsed();
-//        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.build", 
-//                          "Total compute time to do basis convolutions : %.2f s", time);
-//        t.restart();
-//        
-//        /* Load matrix with all convolved images */
-//        Eigen::MatrixXd cMat(eigenToConvolve.size(), nParameters);
-//        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiterj = 
-//            convolvedEigenList.begin();
-//        typename std::vector<boost::shared_ptr<ndarray::EigenView<InputT, 1, 1> > >::iterator eiterE = 
-//            convolvedEigenList.end();
-//        for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-//            cMat.col(kidxj) = (*eiterj)->template cast<double>();
-//        }
-//        /* Treat the last "image" as all 1's to do the background calculation. */
-//        if (this->_fitForBackground)
-//            cMat.col(nParameters-1).fill(1.);
-//        
-//        this->_cMat.reset(new Eigen::MatrixXd(cMat));
-//        this->_ivVec.reset(new Eigen::VectorXd((eigenVariance.template cast<double>()).cwise().inverse()));
-//        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.template cast<double>()));
-//
-//        /* Make these outside of solve() so I can check condition number */
-//        this->_mMat.reset(
-//            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
-//            );
-//        this->_bVec.reset(
-//            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
-//            );
-        //}
 
 
     template <typename InputT>
@@ -1468,7 +1529,7 @@ namespace diffim {
                 (*_mMat)(j,i) = (*_mMat)(i,j);
             }
         }
-        
+
         try {
             KernelSolution::solve();
         } catch (pexExcept::Exception &e) {
@@ -1489,6 +1550,8 @@ namespace diffim {
     }
     
     void SpatialKernelSolution::_setKernel() {
+        /* Report on condition number */
+        double cNumber = this->getConditionNumber(EIGENVALUE);
         
         if (_nkt == 1) {
             /* Not spatially varying; this fork is a specialization for convolution speed--up */
@@ -1496,6 +1559,12 @@ namespace diffim {
             /* Set the basis coefficients */
             std::vector<double> kCoeffs(_nbases);
             for (int i = 0; i < _nbases; i++) {
+                if (std::isnan((*_aVec)(i))) {
+                    throw LSST_EXCEPT(
+                        pexExcept::Exception, 
+                        str(boost::format(
+                                "I. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % i % cNumber));
+                }
                 kCoeffs[i] = (*_aVec)(i);
             }
             lsst::afw::math::KernelList basisList = 
@@ -1511,13 +1580,25 @@ namespace diffim {
             kCoeffs.reserve(_nbases);
             for (int i = 0, idx = 0; i < _nbases; i++) {
                 kCoeffs.push_back(std::vector<double>(_nkt));
-                
+
                 /* Deal with the possibility the first term doesn't vary spatially */
                 if ((i == 0) && (_constantFirstTerm)) {
+                    if (std::isnan((*_aVec)(idx))) {
+                        throw LSST_EXCEPT(
+                            pexExcept::Exception, 
+                            str(boost::format(
+                                    "II. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % idx % cNumber));
+                    }
                     kCoeffs[i][0] = (*_aVec)(idx++);
                 }
                 else {
                     for (int j = 0; j < _nkt; j++) {
+                        if (std::isnan((*_aVec)(idx))) {
+                            throw LSST_EXCEPT(
+                                pexExcept::Exception, 
+                                str(boost::format(
+                                        "III. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % idx % cNumber));
+                        }
                         kCoeffs[i][j] = (*_aVec)(idx++);
                     }
                 }
@@ -1535,7 +1616,13 @@ namespace diffim {
         std::vector<double> bgCoeffs(_fitForBackground ? _nbt : 1);
         if (_fitForBackground) {
             for (int i = 0; i < _nbt; i++) {
-                bgCoeffs[i] = (*_aVec)(_nt - _nbt + i);
+                int idx = _nt - _nbt + i;
+                if (std::isnan((*_aVec)(idx))) {
+                    throw LSST_EXCEPT(pexExcept::Exception, 
+                                      str(boost::format(
+                           "Unable to determine spatial background solution %d (nan)") % (idx)));
+                }
+                bgCoeffs[i] = (*_aVec)(idx);
             }
         }
         else {

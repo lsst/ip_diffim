@@ -110,7 +110,7 @@ definitions: {
         description: "How much to scale the kernel size based on the Psf Fwhm;
                       should be smaller than fpGrowFwhmScaling.  Sets kernelSize."
         maxOccurs: 1
-        default: 2.5
+        default: 4.0
     }
 
     kernelSizeMin: {
@@ -141,7 +141,7 @@ definitions: {
     alardDegGauss: {
         type: int
         description: "Degree of spatial modification of gaussians in alard-lupton basis"
-        maxOccurs: 4
+        maxOccurs: 5
         default: 4 3 2
     }
 
@@ -149,31 +149,15 @@ definitions: {
         type: double
         description: "Sigma in pixels of gaussians in alard-lupton basis (note: FWHM = 2.35 sigma). 
                       Scaled by alardSigFwhmScaling if scaleByFwhm = true"
-        maxOccurs: 4
+        maxOccurs: 5
         default: 0.7 1.5 3.0
     }
 
     alardSigFwhmScaling: {
         type: double
         description: "Scaling of the alard-lupton gaussian sigmas.  Sets alardSigGauss"
-        maxOccurs: 4
+        maxOccurs: 5
         default: 0.50 1.00 2.00
-    }
-
-    alardDegGaussDeconvolution: {
-        type: int
-        description: "Degree of spatial modification of gaussians in alard-lupton basis.
-                      Optimized for deconvolution."
-        maxOccurs: 4
-        default: 6 4 2
-    }
-
-    alardSigGaussDeconvolution: {
-        type: double
-        description: "Sigma in pixels of gaussians in alard-lupton basis (note: FWHM = 2.35 sigma). 
-                      Optimized for deconvolution."
-        maxOccurs: 4
-        default: 0.7 1.0 1.25
     }
 
     ######
@@ -317,7 +301,7 @@ definitions: {
         type: string
         description: "Type of spatial function for kernel"
         maxOccurs: 1
-        default: "polynomial"
+        default: "chebyshev1"
         allowed: {
             value:        "chebyshev1"
             description:  "Chebyshev polynomial of the first kind"
@@ -339,7 +323,7 @@ definitions: {
         type: string
         description: "Type of spatial function for kernel"
         maxOccurs: 1
-        default: "polynomial"
+        default: "chebyshev1"
         allowed: {
             value:        "chebyshev1"
             description:  "Chebyshev polynomial of the first kind"
@@ -380,7 +364,7 @@ definitions: {
 
     maxSpatialIterations: {
         type: int
-        description: "Maximum number of iterations for rejecting bad KernelCandidates in the spatial fitting"
+        description: "Maximum number of iterations for rejecting bad KernelCandidates in spatial fitting"
         maxOccurs: 1
         default: 3
     }
@@ -567,4 +551,44 @@ definitions: {
         maxOccurs: 1
         default: false
     }
+
+    ######
+    # 
+    # Any modifications by subpolicies
+    #
+    modifiedForImagePsfMatch: {
+        type: bool
+        description: "Policy modified for ImagePsfMatch class"
+        maxOccurs: 1
+        default: false
+    }
+
+    modifiedForDeconvolution: {
+        type: bool
+        description: "Policy modified for deconvolution"
+        maxOccurs: 1
+        default: false
+    }
+
+    useOuterForDeconv: {
+        type: bool
+        description: "Use outer fifth gaussian"
+        maxOccurs: 1
+        default: false
+    }
+
+    modifiedForModelPsfMatch: {
+        type: bool
+        description: "Policy modified for ModelPsfMatch class"
+        maxOccurs: 1
+        default: false
+    }
+
+    modifiedForSnapSubtraction: {
+        type: bool
+        description: "Policy modified for subtraction of back-to-back snaps"
+        maxOccurs: 1
+        default: false
+    }
+
 }

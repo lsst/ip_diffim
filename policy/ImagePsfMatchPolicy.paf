@@ -1,0 +1,11 @@
+#<?cfg paf dictionary ?>
+
+# Overrides for ImagePsfMatch
+nStarPerCell: 3
+spatialKernelOrder: 2
+
+# If it makes it to the spatial fitting part, gotta use it
+spatialKernelClipping: false
+
+# Record it being used
+modifiedForImagePsfMatch: true

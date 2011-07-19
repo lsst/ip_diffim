@@ -220,7 +220,7 @@ class DiffimTestCases(unittest.TestCase):
 
         psfmatch = ipDiffim.ImagePsfMatch(self.policy)
         results  = psfmatch.subtractMaskedImages(self.templateMaskedImage,
-                                                 self.scienceMaskedImage,
+                                                 self.scienceMaskedImage)
         self.jackknifeResample(results)
         
     def test(self):
