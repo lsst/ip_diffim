@@ -147,7 +147,11 @@ namespace detail {
         
         pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                               "Processing candidate %d", kCandidate->getId());
-        
+        pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
+                              "X = %.2f Y = %.2f",
+                              kCandidate->getXCenter(), 
+                              kCandidate->getYCenter());
+                              
         /* Build its kernel here */
         try {
             if (_useRegularization)
@@ -201,10 +205,6 @@ namespace detail {
         
         pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                               "Chi2 = %.3f", kCandidate->getChi2());
-        pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
-                              "X = %.2f Y = %.2f",
-                              kCandidate->getXCenter(), 
-                              kCandidate->getYCenter());
         pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                               "Kernel Sum = %.3f", kSum);
         pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
