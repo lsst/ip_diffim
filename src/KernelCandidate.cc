@@ -93,10 +93,15 @@ namespace diffim {
         if (_policy.getBool("constantVarianceWeighting")) {
             /* Constant variance weighting */
             afwMath::Statistics varStats = afwMath::makeStatistics(var, afwMath::MEDIAN);
+            float varValue;
             if (varStats.getValue(afwMath::MEDIAN) <= 0.0)
-                var = 1.0;
+                varValue = 1.0;
             else
-                var = varStats.getValue(afwMath::MEDIAN);
+                varValue = varStats.getValue(afwMath::MEDIAN);
+            pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
+                              "Candidate %d using constant variance of %.2f", varValue);
+            var = varValue;
+
         }
 
         _varianceEstimate = VariancePtr( new afwImage::Image<afwImage::VariancePixel>(var) );
