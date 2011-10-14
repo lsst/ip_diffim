@@ -3,11 +3,30 @@
 # Overrides for Snap subtraction
 spatialKernelOrder: 0
 
+# fitForBackground never
+fitForBackground: false
+
+# small kernels
+kernelSize: 7
+
 # Requires some actual testing:
+kernelBasisSet: "alard-lupton"
 alardNGauss: 2
 alardDegGauss: 4 2
-alardSigGauss: 0.5 1.0
-kernelSize: 7
+alardSigGauss: 1.0 2.5
+
+# NOTE: the delta function kernels look very similar to the AL kernels
+# With no spatial variation we might be able to use these just as well.
+# Also useful if we need to deal with astrometric misregistration in sims.
+# 
+# kernelBasisSet: "delta-function"
+# useRegularization: false
+
+# Just make sure you have enough constraints to best down noise
+nStarPerCell: 3
+
+# Spatial model should not have failures
+spatialKernelClipping: false
 
 # Record it being used
 modifiedForSnapSubtraction: true
