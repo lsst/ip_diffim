@@ -8,7 +8,7 @@ import lsst.afw.display.ds9 as ds9
 verbosity = 5
 pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 
-imSize         = 51
+imSize         = 75
 rdm            = afwMath.Random(afwMath.Random.MT19937, 10101)
 
 def makeTest1(doAddNoise):
@@ -110,7 +110,8 @@ if __name__ == '__main__':
     policy.set("constantVarianceWeighting", True)
     fnum = 1
     
-    for switch in ['A', 'B', 'C']:
+#    for switch in ['A', 'B', 'C']:
+    for switch in ['C',]:
 
         if switch == 'A':
             # Default Alard Lupton
@@ -143,6 +144,11 @@ if __name__ == '__main__':
         ds9.mtv(kimage, frame = fnum) ; fnum += 1
         ds9.mtv(diffim, frame = fnum) ; fnum += 1
     
+        tmi.writeFits("template1.fits")
+        smi.writeFits("science1.fits")
+        kimage.writeFits("kernel1.fits")
+        diffim.writeFits("diffim1.fits")
+        
         # TEST 2
         tmi, smi = makeTest2(doAddNoise, shiftX = 2, shiftY = 2)
         kc       = ipDiffim.makeKernelCandidate(0.0, 0.0, tmi, smi, policy)
@@ -157,5 +163,10 @@ if __name__ == '__main__':
         ds9.mtv(smi,    frame = fnum) ; fnum += 1
         ds9.mtv(kimage, frame = fnum) ; fnum += 1
         ds9.mtv(diffim, frame = fnum) ; fnum += 1
+        
+        tmi.writeFits("template2.fits")
+        smi.writeFits("science2.fits")
+        kimage.writeFits("kernel2.fits")
+        diffim.writeFits("diffim2.fits")
         
     
