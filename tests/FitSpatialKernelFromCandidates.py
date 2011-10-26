@@ -70,8 +70,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('usePcaForSpatialKernel', False)
         basisList = ipDiffim.makeKernelBasisList(self.policy)
         
-        for x in numpy.arange(1, self.size, 10):
-            for y in numpy.arange(1, self.size, 10):
+        for x in range(1, self.size, 10):
+            for y in range(1, self.size, 10):
                 cand = self.makeCandidate(10.0, x, y)
                 self.kernelCellSet.insertCandidate(cand)
 
@@ -112,8 +112,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('subtractMeanForPca', subtractMean)
 
         count = 0
-        for x in numpy.arange(1, self.size, 10):
-            for y in numpy.arange(1, self.size, 10):
+        for x in range(1, self.size, 10):
+            for y in range(1, self.size, 10):
                 cand = self.makeCandidate(10.0, x, y)
                 self.kernelCellSet.insertCandidate(cand)
                 count += 1
@@ -174,8 +174,8 @@ class DiffimTestCases(unittest.TestCase):
 
         # We need to add noise to create some variation of the kernels for Pca
         count = 0
-        for x in numpy.arange(1, self.size, 10):
-            for y in numpy.arange(1, self.size, 10):
+        for x in range(1, self.size, 10):
+            for y in range(1, self.size, 10):
                 cand = self.makeCandidate(10.0, x, y)
                 self.kernelCellSet.insertCandidate(cand)
                 count += 1
