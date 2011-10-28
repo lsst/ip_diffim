@@ -19,6 +19,7 @@
 #include "Eigen/Cholesky"
 #include "Eigen/QR"
 #include "Eigen/LU"
+#include "Eigen/Eigenvalues"
 #include "Eigen/SVD"
 
 #include "lsst/afw/math.h"
@@ -110,7 +111,7 @@ namespace diffim {
             }
         case SVD: 
             {
-            Eigen::VectorXd sValues = mMat.svd().singularValues();
+            Eigen::VectorXd sValues = mMat.jacobiSvd().singularValues();
             double sMax = sValues.maxCoeff();
             double sMin = sValues.minCoeff();
             pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.getConditionNumber", 
@@ -144,54 +145,44 @@ namespace diffim {
 
         pexLog::TTrace<2>("lsst.ip.diffim.KernelSolution.solve", 
                           "Solving for kernel");
-        
-        _solvedBy = CHOLESKY_LDLT;
-        if (!(mMat.ldlt().solve(bVec, &aVec))) {
-            pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
-                              "Unable to determine kernel via Cholesky LDL^T");
-            
-            _solvedBy = CHOLESKY_LLT;
-            if (!(mMat.llt().solve(bVec, &aVec))) {
-                pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
-                                  "Unable to determine kernel via Cholesky LL^T");
-                
-                _solvedBy = LU;
-                if (!(mMat.lu().solve(bVec, &aVec))) {
-                    pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
-                                      "Unable to determine kernel via LU");
-                    /* LAST RESORT */
-                    try {
-                        
-                        _solvedBy = EIGENVECTOR;
-                        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(mMat);
-                        Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
-                        Eigen::VectorXd eValues = eVecValues.eigenvalues();
-                        
-                        for (int i = 0; i != eValues.rows(); ++i) {
-                            if (eValues(i) != 0.0) {
-                                eValues(i) = 1.0/eValues(i);
-                            }
-                        }
-                        
-                        aVec = rMat * eValues.asDiagonal() * rMat.transpose() * bVec;
-                    } catch (pexExcept::Exception& e) {
-                        
-                        _solvedBy = NONE;
-                        pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
-                                          "Unable to determine kernel via eigen-values");
-                        
-                        throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution");
-                    }
-                }
-            }
-        }
+		_solvedBy = LU;
+		Eigen::FullPivLU<Eigen::MatrixXd> lu(mMat);
+		if (lu.isInvertible()) {
+			aVec = lu.solve(bVec);
+		} else {
+			pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
+							  "Unable to determine kernel via LU");
+			/* LAST RESORT */
+			try {
+				
+				_solvedBy = EIGENVECTOR;
+				Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(mMat);
+				Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
+				Eigen::VectorXd eValues = eVecValues.eigenvalues();
+				
+				for (int i = 0; i != eValues.rows(); ++i) {
+					if (eValues(i) != 0.0) {
+						eValues(i) = 1.0/eValues(i);
+					}
+				}
+				
+				aVec = rMat * eValues.asDiagonal() * rMat.transpose() * bVec;
+			} catch (pexExcept::Exception& e) {
+				
+				_solvedBy = NONE;
+				pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
+								  "Unable to determine kernel via eigen-values");
+				
+				throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution");
+			}
+		}
 
         double time = t.elapsed();
         pexLog::TTrace<3>("lsst.ip.diffim.KernelSolution.solve", 
                           "Compute time for matrix math : %.2f s", time);
 
         if (DEBUG_MATRIX) {
-            std::cout << "A " << std::endl;
+		  std::cout << "A " << std::endl;
             std::cout << aVec << std::endl;
         }
         
@@ -344,7 +335,8 @@ namespace diffim {
                                                                                           endRow-startRow, 
                                                                                           endCol-startCol);
         Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(varianceEstimate).block(
-            startRow, startCol, endRow-startRow, endCol-startCol).cwise().inverse();
+	    startRow, startCol, endRow-startRow, endCol-startCol
+	).array().inverse().matrix();
 
         /* Resize into 1-D for later usage */
         eigenToConvolve.resize(eigenToConvolve.rows()*eigenToConvolve.cols(), 1);
@@ -580,29 +572,25 @@ namespace diffim {
             lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
         afwDet::flattenArray(*fullFp, finalMask.getArray(), 
                              maskArray, imageToConvolve.getXY0()); /* Need to fake the XY0 */
-        ndarray::EigenView<int, 1, 1> maskEigen = 
-            ndarray::viewAsEigen(maskArray);
+        ndarray::EigenView<int, 1, 1> maskEigen(maskArray);
 
         ndarray::Array<InputT, 1, 1> arrayToConvolve = 
             lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
         afwDet::flattenArray(*fullFp, imageToConvolve.getArray(), 
                              arrayToConvolve, imageToConvolve.getXY0());
-        ndarray::EigenView<InputT, 1, 1> eigenToConvolve0 = 
-            ndarray::viewAsEigen(arrayToConvolve);
+        ndarray::EigenView<InputT, 1, 1> eigenToConvolve0(arrayToConvolve);
 
         ndarray::Array<InputT, 1, 1> arrayToNotConvolve = 
             lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
         afwDet::flattenArray(*fullFp, imageToNotConvolve.getArray(), 
                              arrayToNotConvolve, imageToNotConvolve.getXY0());
-        ndarray::EigenView<InputT, 1, 1> eigenToNotConvolve0 = 
-            ndarray::viewAsEigen(arrayToNotConvolve);
+        ndarray::EigenView<InputT, 1, 1> eigenToNotConvolve0(arrayToNotConvolve);
 
         ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance = 
             lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
         afwDet::flattenArray(*fullFp, varianceEstimate.getArray(), 
                              arrayVariance, varianceEstimate.getXY0());
-        ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance0 = 
-            ndarray::viewAsEigen(arrayVariance);
+        ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance0(arrayVariance);
 
         int nGood = 0;
         for (int i = 0; i < maskEigen.size(); i++) {
@@ -650,8 +638,7 @@ namespace diffim {
                 lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
             afwDet::flattenArray(*fullFp, cimage.getArray(), 
                                  arrayC, cimage.getXY0());
-            ndarray::EigenView<InputT, 1, 1> eigenC0 = 
-                ndarray::viewAsEigen(arrayC);
+            ndarray::EigenView<InputT, 1, 1> eigenC0(arrayC);
 
             Eigen::VectorXd eigenC(nGood);
             int nUsed = 0;
@@ -689,7 +676,7 @@ namespace diffim {
         this->_cMat.reset(new Eigen::MatrixXd(cMat));
         //this->_ivVec.reset(new Eigen::VectorXd((eigenVariance.template cast<double>()).cwise().inverse()));
         //this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.template cast<double>()));
-        this->_ivVec.reset(new Eigen::VectorXd(eigenVariance.cwise().inverse()));
+        this->_ivVec.reset(new Eigen::VectorXd(eigenVariance.array().inverse().matrix()));
         this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve));
 
         /* Make these outside of solve() so I can check condition number */
@@ -775,7 +762,8 @@ namespace diffim {
                                                                                           endRow-startRow, 
                                                                                           endCol-startCol);
         Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(varianceEstimate).block(
-            startRow, startCol, endRow-startRow, endCol-startCol).cwise().inverse();
+	    startRow, startCol, endRow-startRow, endCol-startCol
+	).array().inverse().matrix();
 
         /* Resize into 1-D for later usage */
         eMask.resize(eMask.rows()*eMask.cols(), 1);
@@ -1033,7 +1021,7 @@ namespace diffim {
 
             Eigen::MatrixXd eToConvolve = imageToEigenMatrix(siToConvolve);
             Eigen::MatrixXd eToNotConvolve = imageToEigenMatrix(siToNotConvolve);
-            Eigen::MatrixXd eiVarEstimate = imageToEigenMatrix(sVarEstimate).cwise().inverse();
+            Eigen::MatrixXd eiVarEstimate = imageToEigenMatrix(sVarEstimate).array().inverse().matrix();
             
             eToConvolve.resize(area, 1);
             eToNotConvolve.resize(area, 1);
@@ -1127,7 +1115,7 @@ namespace diffim {
 
     template <typename InputT>
     double RegularizedKernelSolution<InputT>::estimateRisk(double maxCond) {
-        Eigen::MatrixXd vMat      = (this->_cMat)->svd().matrixV();
+        Eigen::MatrixXd vMat      = (this->_cMat)->jacobiSvd().matrixV();
         Eigen::MatrixXd vMatvMatT = vMat * vMat.transpose();
 
         /* Find pseudo inverse of mMat, which may be ill conditioned */
@@ -1216,7 +1204,7 @@ namespace diffim {
             std::cout << "C:" << std::endl;
             std::cout << (*this->_cMat) << std::endl;
             std::cout << "Sigma^{-1}:" << std::endl;
-            std::cout << (*this->_ivVec).asDiagonal() << std::endl;
+            std::cout << Eigen::MatrixXd((*this->_ivVec).asDiagonal()) << std::endl;
             std::cout << "Y:" << std::endl;
             std::cout << (*this->_iVec) << std::endl;
             std::cout << "H:" << std::endl;
@@ -1479,8 +1467,9 @@ namespace diffim {
         /* Fill in the spatial blocks */
         for(int m1 = m0; m1 < _nbases; m1++)  {
             /* Diagonal kernel-kernel term; only use upper triangular part of pKpKt */
-            (*_mMat).block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += (*qMat)(m1,m1) * 
-                pKpKt.part<Eigen::UpperTriangular>();
+            (*_mMat).block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += 
+				// Eigen 3 bug: no triangular * scalar product; hopefully fixed soon.
+                Eigen::MatrixXd(pKpKt.triangularView<Eigen::Upper>()) * (*qMat)(m1,m1);
             
             /* Kernel-kernel terms */
             for(int m2 = m1+1; m2 < _nbases; m2++)  {
@@ -1498,8 +1487,9 @@ namespace diffim {
         
         if (_fitForBackground) {
             /* Background-background terms only */
-            (*_mMat).block(mb, mb, _nbt, _nbt) += (*qMat)(_nbases,_nbases) * 
-                pBpBt.part<Eigen::UpperTriangular>();
+            (*_mMat).block(mb, mb, _nbt, _nbt) +=  
+				// Eigen 3 bug: no triangular * scalar product; hopefully fixed soon.
+                Eigen::MatrixXd(pBpBt.triangularView<Eigen::Upper>()) * (*qMat)(_nbases,_nbases);
             (*_bVec).segment(mb, _nbt)         += (*wVec)(_nbases) * pB;
         }
         

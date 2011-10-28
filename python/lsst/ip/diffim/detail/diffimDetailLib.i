@@ -32,7 +32,7 @@ SWIG_SHARED_PTR(AssessSpatialKernelVisitor, lsst::ip::diffim::detail::AssessSpat
 SWIG_SHARED_PTR(BuildSingleKernelVisitor, lsst::ip::diffim::detail::BuildSingleKernelVisitor);
 SWIG_SHARED_PTR(BuildSpatialKernelVisitor, lsst::ip::diffim::detail::BuildSpatialKernelVisitor);
 SWIG_SHARED_PTR(KernelPcaVisitor, lsst::ip::diffim::detail::KernelPcaVisitor);
-SWIG_SHARED_PTR(KernelSumVisitor, lsst::ip::diffim::detail::KernelSumVisitor);
+SWIG_SHARED_PTR(KernelSumVisitorF, lsst::ip::diffim::detail::KernelSumVisitor<float>);
 
 %include "lsst/ip/diffim/AssessSpatialKernelVisitor.h"
 %include "lsst/ip/diffim/BuildSingleKernelVisitor.h"
