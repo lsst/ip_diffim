@@ -1468,8 +1468,7 @@ namespace diffim {
         for(int m1 = m0; m1 < _nbases; m1++)  {
             /* Diagonal kernel-kernel term; only use upper triangular part of pKpKt */
             (*_mMat).block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += 
-				// Eigen 3 bug: no triangular * scalar product; hopefully fixed soon.
-                Eigen::MatrixXd(pKpKt.triangularView<Eigen::Upper>()) * (*qMat)(m1,m1);
+                (pKpKt * (*qMat)(m1,m1)).triangularView<Eigen::Upper>();
             
             /* Kernel-kernel terms */
             for(int m2 = m1+1; m2 < _nbases; m2++)  {
@@ -1488,8 +1487,7 @@ namespace diffim {
         if (_fitForBackground) {
             /* Background-background terms only */
             (*_mMat).block(mb, mb, _nbt, _nbt) +=  
-				// Eigen 3 bug: no triangular * scalar product; hopefully fixed soon.
-                Eigen::MatrixXd(pBpBt.triangularView<Eigen::Upper>()) * (*qMat)(_nbases,_nbases);
+                (pBpBt * (*qMat)(_nbases,_nbases)).triangularView<Eigen::Upper>();
             (*_bVec).segment(mb, _nbt)         += (*wVec)(_nbases) * pB;
         }
         
