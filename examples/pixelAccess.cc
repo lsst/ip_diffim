@@ -1,5 +1,4 @@
 #include "Eigen/Core"
-#include "Eigen/Array"
 #include "boost/shared_ptr.hpp"
 #include "boost/timer.hpp"
 
@@ -54,7 +53,7 @@ Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
         Eigen::MatrixXd eigeniVarianceM = 
             diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
                                                                endRow-startRow, 
-                                                               endCol-startCol).cwise().inverse();
+                                                               endCol-startCol).array().inverse().matrix();
         eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
         Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
         
@@ -93,18 +92,18 @@ Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
         Eigen::MatrixXd eigeniVarianceM = 
             diffim::imageToEigenMatrix(varianceEstimate).block(startRow, startCol, 
                                                                endRow-startRow, 
-                                                               endCol-startCol).cwise().inverse();
+                                                               endCol-startCol).array().inverse().matrix();
         eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
         Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
         
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiteri = imageList.begin();
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = imageList.end();
         for (unsigned int kidxi = 0; eiteri != eiterE; eiteri++, kidxi++) {
-            Eigen::VectorXd eiteriDotiVariance = (*eiteri)->cwise() * eigeniVarianceV;
+            Eigen::VectorXd eiteriDotiVariance = ((*eiteri)->array() * eigeniVarianceV.array()).matrix();
             
             typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = eiteri;
             for (unsigned int kidxj = kidxi; eiterj != eiterE; eiterj++, kidxj++) {
-                mMat(kidxi, kidxj) = (eiteriDotiVariance.cwise() * (**eiterj)).sum();
+                mMat(kidxi, kidxj) = (eiteriDotiVariance.array() * (**eiterj).array()).sum();
                 mMat(kidxj, kidxi) = mMat(kidxi, kidxj);
             }
         }
