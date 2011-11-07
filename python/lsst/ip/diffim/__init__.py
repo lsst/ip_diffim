@@ -25,7 +25,7 @@ from diffimLib import *
 
 # python code
 from psfMatch import *
-from makeSdqaRatingVector import *
+from makeRatingVector import *
 from makeDefaultPolicy import *
 
 from diffimTools import *
