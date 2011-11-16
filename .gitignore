@@ -1,0 +1,38 @@
+
+# /
+/.sconsign.dblite
+/config.log
+/.sconf_temp
+/TAGS
+/*.fits
+
+# /doc/
+/doc/htmlDir
+
+# /examples/
+/examples/maskedKernel
+/examples/pixelAccess
+/examples/spatialKernel
+/examples/testSpatialCell
+
+# /lib/
+/lib/*.dylib
+/lib/*.so
+
+# /python/lsst/ip/
+/python/lsst/ip/*.pyc
+
+# /python/lsst/ip/diffim/
+/python/lsst/ip/diffim/diffimLib.py
+/python/lsst/ip/diffim/*.pyc
+/python/lsst/ip/diffim/*_wrap.cc
+/python/lsst/ip/diffim/_diffimLib.*
+/python/lsst/ip/diffim/*.os
+
+# /src/
+/src/*.os
+
+# /tests/
+/tests/.tests
+/tests/SpatialModelVisitors_1
+/tests/basisSetRegMatrix
