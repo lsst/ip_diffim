@@ -1,17 +1,14 @@
 # all the c++ level classes and routines
 import diffimLib
 
-# all the other diffim routines
-import lsst.sdqa as sdqa
-
 # all the other LSST packages
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.pex.logging as pexLog
 
-def makeSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg, scope=sdqa.SdqaRating.AMP):
+def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
     imstats    = diffimLib.ImageStatisticsF()
-    sdqaVector = sdqa.SdqaRatingSet()
+    #sdqaVector = sdqa.SdqaRatingSet()
 
     width, height = spatialKernel.getDimensions()
     kImage        = afwImage.ImageD(width, height)
@@ -23,11 +20,11 @@ def makeSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg, scope=sdqa.Sdq
             kSums.push_back(kSum)
             
     afwStat    = afwMath.makeStatistics(kSums, afwMath.MEAN | afwMath.STDEV)
-    kSumRating = sdqa.SdqaRating("lsst.ip.diffim.kernel_sum",
-                                 afwStat.getValue(afwMath.MEAN),
-                                 afwStat.getValue(afwMath.STDEV),
-                                 scope)
-    sdqaVector.append(kSumRating)
+    #kSumRating = sdqa.SdqaRating("lsst.ip.diffim.kernel_sum",
+    #                             afwStat.getValue(afwMath.MEAN),
+    #                             afwStat.getValue(afwMath.STDEV),
+    #                             scope)
+    #sdqaVector.append(kSumRating)
 
     nGood = 0
     nBad  = 0
@@ -51,25 +48,25 @@ def makeSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg, scope=sdqa.Sdq
                 
                 candMean   = imstats.getMean()
                 candRms    = imstats.getRms()
-                candRating = sdqa.SdqaRating("lsst.ip.diffim.residuals_%d_%d" % (xCand, yCand),
-                                             candMean, candRms, scope)
-                sdqaVector.append(candRating)
+                #candRating = sdqa.SdqaRating("lsst.ip.diffim.residuals_%d_%d" % (xCand, yCand),
+                #                             candMean, candRms, scope)
+                #sdqaVector.append(candRating)
             elif cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
                 nBad += 1
 
-    nGoodRating = sdqa.SdqaRating("lsst.ip.diffim.nCandGood", nGood, 0, scope)
-    sdqaVector.append(nGoodRating)
-    nBadRating = sdqa.SdqaRating("lsst.ip.diffim.nCandBad", nBad, 0, scope)
-    sdqaVector.append(nBadRating)
+    #nGoodRating = sdqa.SdqaRating("lsst.ip.diffim.nCandGood", nGood, 0, scope)
+    #sdqaVector.append(nGoodRating)
+    #nBadRating = sdqa.SdqaRating("lsst.ip.diffim.nCandBad", nBad, 0, scope)
+    #sdqaVector.append(nBadRating)
 
     nKernelTerms = spatialKernel.getNSpatialParameters()
     if nKernelTerms == 0: # order 0
         nKernelTerms = 1
     nBgTerms     = len(spatialBg.getParameters())
-    nKernRating  = sdqa.SdqaRating("lsst.ip.diffim.nTermsSpatialKernel", nKernelTerms, 0, scope)
-    nBgRating    = sdqa.SdqaRating("lsst.ip.diffim.nTermsSpatialBg", nBgTerms, 0, scope)
-    sdqaVector.append(nKernRating)
-    sdqaVector.append(nBgRating)
+    #nKernRating  = sdqa.SdqaRating("lsst.ip.diffim.nTermsSpatialKernel", nKernelTerms, 0, scope)
+    #nBgRating    = sdqa.SdqaRating("lsst.ip.diffim.nTermsSpatialBg", nBgTerms, 0, scope)
+    #sdqaVector.append(nKernRating)
+    #sdqaVector.append(nBgRating)
 
     # Some judgements on conv vs. deconv (many candidates fail QC in the latter case)
     if nBad > 2*nGood:
@@ -100,10 +97,10 @@ def makeSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg, scope=sdqa.Sdq
                      "NOTE: spatial kernel model appears well constrained; %d candidates, %d terms" % (
             nGood, nKernelTerms))
     
-    for i in range(sdqaVector.size()):
-        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 5,
-                     "Sdqa Rating %s : %.2f %.2f" % (sdqaVector[i].getName(),
-                                                     sdqaVector[i].getValue(),
-                                                     sdqaVector[i].getErr()))
-                     
-    return sdqaVector
+    #for i in range(sdqaVector.size()):
+    #    pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 5,
+    #                 "Sdqa Rating %s : %.2f %.2f" % (sdqaVector[i].getName(),
+    #                                                 sdqaVector[i].getValue(),
+    #                                                 sdqaVector[i].getErr()))
+    #                 
+    #return sdqaVector

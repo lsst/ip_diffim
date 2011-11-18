@@ -56,8 +56,8 @@ class DiffimTestCases(unittest.TestCase):
         bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
         bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
         
-        for x in numpy.arange(1, self.size, 10):
-            for y in numpy.arange(1, self.size, 10):
+        for x in range(1, self.size, 10):
+            for y in range(1, self.size, 10):
                 cand = self.makeCandidate(1.0, x, y)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
@@ -137,8 +137,8 @@ class DiffimTestCases(unittest.TestCase):
         bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
         bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
         
-        for x in numpy.arange(1, self.size, 10):
-            for y in numpy.arange(1, self.size, 10):
+        for x in range(1, self.size, 10):
+            for y in range(1, self.size, 10):
                 cand = self.makeCandidate(1.0, x, y)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
