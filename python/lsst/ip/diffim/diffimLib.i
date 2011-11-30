@@ -48,7 +48,6 @@ Python bindings for lsst::ip::diffim code
 // Nothing known about 'boost::bad_any_cast'
 namespace boost {
     class bad_any_cast; 
-    //typedef unsigned short boost::uint16_t;
 }
 
 /* handle C++ arguments that should be outputs in python */
@@ -59,17 +58,14 @@ namespace boost {
 %{
 #include "boost/shared_ptr.hpp"
 
+#include "lsst/pex/logging.h"
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
+#include "lsst/afw/cameraGeom.h"
 #include "lsst/afw/detection.h"
-
-#include "lsst/pex/policy/Policy.h"
-%}
-
-/******************************************************************************/
+#include "lsst/afw/detection/AperturePhotometry.h"
 
 /* Eigen / numpy.  Info comes from $AFW_DIR/include/lsst/afw/numpyTypemaps.h */
-%{
 #define PY_ARRAY_UNIQUE_SYMBOL LSST_IP_DIFFIM_NUMPY_ARRAY_API
 #include "numpy/arrayobject.h"
 #include "lsst/ndarray/python.h"
@@ -84,7 +80,6 @@ namespace boost {
 
 %declareEigenMatrix(Eigen::MatrixXd);
 %declareEigenMatrix(Eigen::VectorXd);
-/* Eigen / numpy.  Info comes from $AFW_DIR/include/lsst/afw/numpyTypemaps.h */
 
 %include "lsst/daf/base/persistenceMacros.i"
 
@@ -166,31 +161,25 @@ def version(HeadURL = r"$HeadURL$"):
 %}
 
 
-%define %KernelSolutionPtrs(NAME, TYPE)
-SWIG_SHARED_PTR_DERIVED(StaticKernelSolution##NAME,
-                        lsst::ip::diffim::KernelSolution,
-                        lsst::ip::diffim::StaticKernelSolution<TYPE>);
-SWIG_SHARED_PTR_DERIVED(MaskedKernelSolution##NAME,
-                        lsst::ip::diffim::StaticKernelSolution<TYPE>,
-                        lsst::ip::diffim::MaskedKernelSolution<TYPE>);
-SWIG_SHARED_PTR_DERIVED(RegularizedKernelSolution##NAME,
-                        lsst::ip::diffim::StaticKernelSolution<TYPE>,
-                        lsst::ip::diffim::RegularizedKernelSolution<TYPE>);
+%define %KernelSolutionPtrs(TYPE)
+    %shared_ptr(lsst::ip::diffim::StaticKernelSolution<TYPE>);
+    %shared_ptr(lsst::ip::diffim::MaskedKernelSolution<TYPE>);
+    %shared_ptr(lsst::ip::diffim::RegularizedKernelSolution<TYPE>);
 %enddef
 
 %define %KernelSolutions(NAME, TYPE)
-%template(StaticKernelSolution##NAME) lsst::ip::diffim::StaticKernelSolution<TYPE>;
-%template(MaskedKernelSolution##NAME) lsst::ip::diffim::MaskedKernelSolution<TYPE>;
-%template(RegularizedKernelSolution##NAME) lsst::ip::diffim::RegularizedKernelSolution<TYPE>;
+    %template(StaticKernelSolution##NAME) lsst::ip::diffim::StaticKernelSolution<TYPE>;
+    %template(MaskedKernelSolution##NAME) lsst::ip::diffim::MaskedKernelSolution<TYPE>;
+    %template(RegularizedKernelSolution##NAME) lsst::ip::diffim::RegularizedKernelSolution<TYPE>;
 %enddef
 
-SWIG_SHARED_PTR(KernelSolution, lsst::ip::diffim::KernelSolution);
-SWIG_SHARED_PTR(StaticKernelSolution, lsst::ip::diffim::StaticKernelSolution);
-SWIG_SHARED_PTR(MaskedKernelSolution, lsst::ip::diffim::MaskedKernelSolution);
-SWIG_SHARED_PTR(RegularizedKernelSolution, lsst::ip::diffim::RegularizedKernelSolution);
-SWIG_SHARED_PTR(SpatialKernelSolution, lsst::ip::diffim::SpatialKernelSolution);
+%shared_ptr(lsst::ip::diffim::KernelSolution);
+%shared_ptr(lsst::ip::diffim::StaticKernelSolution);
+%shared_ptr(lsst::ip::diffim::MaskedKernelSolution);
+%shared_ptr(lsst::ip::diffim::RegularizedKernelSolution);
+%shared_ptr(lsst::ip::diffim::SpatialKernelSolution);
 
-%KernelSolutionPtrs(F, float);
+%KernelSolutionPtrs(float);
 
 %include "lsst/ip/diffim/KernelSolution.h"
 
@@ -202,54 +191,48 @@ SWIG_SHARED_PTR(SpatialKernelSolution, lsst::ip::diffim::SpatialKernelSolution);
 #include "lsst/ip/diffim/KernelCandidateDetection.h"
 %}
 
-%define %KernelCandidateDetectionPtr(NAME, TYPE)
-SWIG_SHARED_PTR(KernelCandidateDetection##NAME,
-                lsst::ip::diffim::KernelCandidateDetection<TYPE>);
+%define %KernelCandidateDetectionPtr(TYPE)
+    %shared_ptr(lsst::ip::diffim::KernelCandidateDetection<TYPE>);
 %enddef
 
 %define %KernelCandidateDetection(NAME, TYPE)
-%template(KernelCandidateDetection##NAME) lsst::ip::diffim::KernelCandidateDetection<TYPE>;
+    %template(KernelCandidateDetection##NAME) lsst::ip::diffim::KernelCandidateDetection<TYPE>;
 %enddef
 
-%KernelCandidateDetectionPtr(F, float);
+%KernelCandidateDetectionPtr(float);
 
 %include "lsst/ip/diffim/KernelCandidateDetection.h"
 
 %KernelCandidateDetection(F, float);
+
 /******************************************************************************/
 
 %{
 #include "lsst/ip/diffim/KernelCandidate.h"
 %}
 
-%define %IMAGE(PIXTYPE)
-lsst::afw::image::Image<PIXTYPE>
-%enddef
+%define %KernelCandidatePtr(TYPE)
+    %shared_ptr(lsst::ip::diffim::KernelCandidate<TYPE>);
 
-%define %KernelCandidatePtr(NAME, TYPE)
-SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
-                        lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::Pixel)>,
-                        lsst::ip::diffim::KernelCandidate<TYPE>);
-
-/* Same problem as with meas algorithms makePsfCandidate */
-%inline %{
-namespace lsst { namespace ip { namespace diffim { namespace lsstSwig {
-template <typename PixelT>
-typename KernelCandidate<PixelT>::Ptr
-makeKernelCandidateForSwig(float const xCenter,
-                           float const yCenter, 
-                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
-                               miToConvolvePtr,
-                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
-                               miToNotConvolvePtr,
-                           lsst::pex::policy::Policy const& policy) {
+    /* Same problem as with meas algorithms makePsfCandidate */
+    %inline %{
+    namespace lsst { namespace ip { namespace diffim { namespace lsstSwig {
+    template <typename PixelT>
+    typename KernelCandidate<PixelT>::Ptr
+    makeKernelCandidateForSwig(float const xCenter,
+                               float const yCenter,
+                               boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const&
+                                   miToConvolvePtr,
+                               boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const&
+                                   miToNotConvolvePtr,
+                               lsst::pex::policy::Policy const& policy) {
     
-    return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
-                                                                             miToConvolvePtr,
-                                                                             miToNotConvolvePtr,
-                                                                             policy));
-}
-}}}}
+        return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
+                                                                                 miToConvolvePtr,
+                                                                                 miToNotConvolvePtr,
+                                                                                 policy));
+    }
+    }}}}
 %}
 
 %ignore makeKernelCandidate;
@@ -266,7 +249,7 @@ makeKernelCandidateForSwig(float const xCenter,
 %}
 %enddef
 
-%KernelCandidatePtr(F, float);
+%KernelCandidatePtr(float);
 
 %include "lsst/ip/diffim/KernelCandidate.h"
 
@@ -279,16 +262,6 @@ makeKernelCandidateForSwig(float const xCenter,
 %}
 
 %include "lsst/ip/diffim/BasisLists.h"
-
-/******************************************************************************/
-/* I shouldn't have to do this but it exists noplace else, so... */
-
-//%{
-//#include "Eigen/Core"
-//%}
-//
-//%template(eigenMatrixPtr) boost::shared_ptr<Eigen::MatrixXd>;
-//%template(eigenVectorPtr) boost::shared_ptr<Eigen::VectorXd>;
 
 /******************************************************************************/
 
