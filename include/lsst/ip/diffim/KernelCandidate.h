@@ -92,8 +92,8 @@ namespace diffim {
         lsst::afw::math::Kernel::Ptr getKernel(CandidateSwitch cand) const;
         double getBackground(CandidateSwitch cand) const;
         double getKsum(CandidateSwitch cand) const;
-        typename ImageT::Ptr getKernelImage(CandidateSwitch cand) const;
-        typename ImageT::ConstPtr getImage() const; // For SpatialCellImageCandidate
+        PTR(ImageT) getKernelImage(CandidateSwitch cand) const;
+        CONST_PTR(ImageT) getImage() const; // For SpatialCellImageCandidate
         boost::shared_ptr<StaticKernelSolution<PixelT> > getKernelSolution(CandidateSwitch cand) const; 
         
         /** 
