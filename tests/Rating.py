@@ -49,7 +49,7 @@ class DiffimTestCases(unittest.TestCase):
         results  = psfmatch.subtractExposures(self.templateImage, self.scienceImage,
                                               doWarping = True)
         differenceExposure, spatialKernel, backgroundModel, kernelCellSet = results
-        ratings = ipDiffim.makeSdqaRatingVector(kernelCellSet, spatialKernel, backgroundModel)
+        ratings = ipDiffim.makeRatingVector(kernelCellSet, spatialKernel, backgroundModel)
 
 #####
 

@@ -71,7 +71,7 @@ class DiffimTestCases(unittest.TestCase):
         kp2 = spatialKernel2.getKernelParameters()
         # Solutions should evaluate to the same values at coordinate 0, 0
         for i in range(len(kp1)):
-            self.assertAlmostEqual(kp1[i], kp2[i], places=5)
+            self.assertAlmostEqual(kp1[i], kp2[i], places=2)
 
         self.assertTrue(
             spatialKernel1.getSpatialFunctionList()[0].toString().startswith('Chebyshev1Function2')
@@ -193,10 +193,10 @@ class DiffimTestCases(unittest.TestCase):
                 self.fail()
                 
             for np in range(1, len(skp1[nk])):
-                self.assertAlmostEqual(skp1[nk][np], skp2[nk][np])
+                self.assertAlmostEqual(skp1[nk][np], skp2[nk][np], 4)
 
         for np in range(len(bgp1)):
-            self.assertAlmostEqual(bgp1[np], bgp2[np])
+            self.assertAlmostEqual(bgp1[np], bgp2[np], 4)
 
 #####
         
