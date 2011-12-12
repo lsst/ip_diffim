@@ -358,12 +358,14 @@ class ModelPsfMatch(PsfMatch):
             matchPolicy.mergeDefaults(self._policy.getDictionary())
             self._policy = matchPolicy
     
-    def matchExposure(self, exposure, referencePsfModel):
+    def matchExposure(self, exposure, referencePsfModel, kernelSum=1.0):
         """PSF-match an exposure to a PSF model.
         
         @param exposure: Exposure to PSF-match to the reference masked image;
             must contain a PSF model and must be warped to match the reference masked image
         @param referencePsfModel: PSF model to match (an afwDetection.Psf)
+        @param kernelSum: A multipicative factor reflecting the difference in 
+            zeropoints between the images; kernelSum = zpt(science) / zpt(ref)
         
         @return
         - psfMatchedExposure: the PSF-matched exposure.
@@ -382,7 +384,7 @@ class ModelPsfMatch(PsfMatch):
         self._log.log(pexLog.Log.INFO, "compute PSF-matching kernel")
         kernelCellSet = self._buildCellSet(referencePsfModel,
                                            exposure.getBBox(afwImage.PARENT),
-                                           exposure.getPsf())
+                                           exposure.getPsf(), kernelSum)
         psfMatchingKernel, backgroundModel = self._solve(kernelCellSet)
         
         self._log.log(pexLog.Log.INFO, "PSF-match science exposure to reference")
@@ -399,7 +401,7 @@ class ModelPsfMatch(PsfMatch):
         self._log.log(pexLog.Log.INFO, "done")
         return (psfMatchedExposure, psfMatchingKernel, kernelCellSet)
 
-    def _buildCellSet(self, referencePsfModel, scienceBBox, sciencePsfModel):
+    def _buildCellSet(self, referencePsfModel, scienceBBox, sciencePsfModel, kernelSum = 1.0):
         """Build a SpatialCellSet for use with the solve method
 
         @param referencePsfModel: PSF model to match (an afwDetection.Psf)
@@ -454,8 +456,9 @@ class ModelPsfMatch(PsfMatch):
     
                 # reference kernel image, at location of science subimage
                 kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY), True).convertF()
-                sum = afwMath.makeStatistics(kernelImageR, afwMath.SUM).getValue(afwMath.SUM)
-                kernelImageR /= sum
+                imsum = afwMath.makeStatistics(kernelImageR, afwMath.SUM).getValue(afwMath.SUM)
+                kernelImageR /= imsum         # image sums to 1.0 
+                kernelImageR /= kernelSum     # image sums to 1/kernelSum
                 kernelMaskR   = afwImage.MaskU(dimenR)
                 kernelMaskR.set(0)
                 kernelVarR    = afwImage.ImageF(dimenR)
@@ -463,8 +466,8 @@ class ModelPsfMatch(PsfMatch):
                 referenceMI   = afwImage.MaskedImageF(kernelImageR, kernelMaskR, kernelVarR)
      
                 kernelImageS = sciencePsfModel.computeImage(afwGeom.Point2D(posX, posY), True).convertF()
-                sum = afwMath.makeStatistics(kernelImageS, afwMath.SUM).getValue(afwMath.SUM)
-                kernelImageS /= sum
+                imsum = afwMath.makeStatistics(kernelImageS, afwMath.SUM).getValue(afwMath.SUM)
+                kernelImageS /= imsum
                 kernelMaskS   = afwImage.MaskU(dimenS)
                 kernelMaskS.set(0)
                 kernelVarS    = afwImage.ImageF(dimenS)
