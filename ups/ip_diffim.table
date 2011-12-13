@@ -1,4 +1,4 @@
-setupRequired(afw >= 4.6.0.0)
+setupRequired(afw >= 4.7.3.0)
 setupRequired(numpy)
 
 setupOptional(afwdata)
