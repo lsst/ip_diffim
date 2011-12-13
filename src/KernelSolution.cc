@@ -1503,10 +1503,7 @@ namespace diffim {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
         }
-        
-        ImageT::Ptr image (
-                           new ImageT::Image(_kernel->getDimensions())
-                          );
+        ImageT::Ptr image(new ImageT(_kernel->getDimensions()));
         (void)_kernel->computeImage(*image, false);              
         return image;
     }
@@ -1596,9 +1593,7 @@ namespace diffim {
         }
 
         /* Set kernel Sum */
-        ImageT::Ptr image (
-                           new ImageT::Image(_kernel->getDimensions())
-                          );
+        ImageT::Ptr image (new ImageT(_kernel->getDimensions()));
         _kSum  = _kernel->computeImage(*image, false);              
 
         /* Set the background coefficients */
