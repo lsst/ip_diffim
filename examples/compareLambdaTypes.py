@@ -33,6 +33,11 @@ class DiffimTestCases(unittest.TestCase):
         self.policy2     = ipDiffim.makeDefaultPolicy()
         self.policy3     = ipDiffim.makeDefaultPolicy()
         self.policy4     = ipDiffim.makeDefaultPolicy()
+        
+        #self.policy1.set("constantVarianceWeighting", True)
+        #self.policy2.set("constantVarianceWeighting", True)
+        #self.policy3.set("constantVarianceWeighting", True)
+        #self.policy4.set("constantVarianceWeighting", True)
 
         self.policy1.set("kernelBasisSet", "delta-function")
         self.policy1.set("useRegularization", False)
