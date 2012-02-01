@@ -59,11 +59,16 @@ namespace boost {
 %{
 #include "boost/shared_ptr.hpp"
 
-#include "lsst/afw/math.h"
-#include "lsst/afw/image.h"
-#include "lsst/afw/detection.h"
 
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/pex/exceptions.h"
+#include "lsst/pex/logging.h"
+#include "lsst/afw/detection.h"
+#include "lsst/afw/math.h"
+#include "lsst/afw/geom.h" 
+#include "lsst/afw/image.h"
+#include "lsst/afw/cameraGeom.h"
+
+#include "lsst/ip/diffim.h"
 %}
 
 /******************************************************************************/
@@ -184,11 +189,11 @@ SWIG_SHARED_PTR_DERIVED(RegularizedKernelSolution##NAME,
 %template(RegularizedKernelSolution##NAME) lsst::ip::diffim::RegularizedKernelSolution<TYPE>;
 %enddef
 
-SWIG_SHARED_PTR(KernelSolution, lsst::ip::diffim::KernelSolution);
-SWIG_SHARED_PTR(StaticKernelSolution, lsst::ip::diffim::StaticKernelSolution);
-SWIG_SHARED_PTR(MaskedKernelSolution, lsst::ip::diffim::MaskedKernelSolution);
-SWIG_SHARED_PTR(RegularizedKernelSolution, lsst::ip::diffim::RegularizedKernelSolution);
-SWIG_SHARED_PTR(SpatialKernelSolution, lsst::ip::diffim::SpatialKernelSolution);
+%shared_ptr(lsst::ip::diffim::KernelSolution);
+%shared_ptr(lsst::ip::diffim::StaticKernelSolution);
+%shared_ptr(lsst::ip::diffim::MaskedKernelSolution);
+%shared_ptr(lsst::ip::diffim::RegularizedKernelSolution);
+%shared_ptr(lsst::ip::diffim::SpatialKernelSolution);
 
 %KernelSolutionPtrs(F, float);
 

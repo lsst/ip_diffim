@@ -8,17 +8,25 @@ Python bindings for lsst::ip::diffim::detail code
 %feature("autodoc", "1");
 %module(docstring=diffimDetailLib_DOCSTRING, package="lsst.ip.diffim.detail") diffimDetailLib
 
-//%{
-//#include <boost/shared_ptr.hpp>
-//#include <lsst/pex/policy/Policy.h>
-//#include <lsst/afw.h>
-//#include <lsst/ip/diffim.h>
-//%}
+// Everything we will need in the _wrap.cc file
+%{
+#include "boost/shared_ptr.hpp"
+
+#include "lsst/pex/exceptions.h"
+#include "lsst/pex/logging.h"
+#include "lsst/afw/detection.h"
+#include "lsst/afw/math.h"
+#include "lsst/afw/geom.h" 
+#include "lsst/afw/image.h"
+#include "lsst/afw/cameraGeom.h"
+
+#include "lsst/ip/diffim.h"
+%}
 
 %include "lsst/p_lsstSwig.i"
 %import  "lsst/afw/image/imageLib.i"
 %import  "lsst/afw/math/mathLib.i"
-//%lsst_exceptions();
+%lsst_exceptions();
 
 %{
 #include "lsst/ip/diffim/AssessSpatialKernelVisitor.h"
@@ -28,11 +36,11 @@ Python bindings for lsst::ip::diffim::detail code
 #include "lsst/ip/diffim/KernelSumVisitor.h"
 %}
 
-SWIG_SHARED_PTR(AssessSpatialKernelVisitor, lsst::ip::diffim::detail::AssessSpatialKernelVisitor);
-SWIG_SHARED_PTR(BuildSingleKernelVisitor, lsst::ip::diffim::detail::BuildSingleKernelVisitor);
-SWIG_SHARED_PTR(BuildSpatialKernelVisitor, lsst::ip::diffim::detail::BuildSpatialKernelVisitor);
-SWIG_SHARED_PTR(KernelPcaVisitor, lsst::ip::diffim::detail::KernelPcaVisitor);
-SWIG_SHARED_PTR(KernelSumVisitorF, lsst::ip::diffim::detail::KernelSumVisitor<float>);
+%shared_ptr(lsst::ip::diffim::detail::AssessSpatialKernelVisitor);
+%shared_ptr(lsst::ip::diffim::detail::BuildSingleKernelVisitor);
+%shared_ptr(lsst::ip::diffim::detail::BuildSpatialKernelVisitor);
+%shared_ptr(lsst::ip::diffim::detail::KernelPcaVisitor);
+%shared_ptr(lsst::ip::diffim::detail::KernelSumVisitor<float>);
 
 %include "lsst/ip/diffim/AssessSpatialKernelVisitor.h"
 %include "lsst/ip/diffim/BuildSingleKernelVisitor.h"
