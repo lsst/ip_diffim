@@ -46,8 +46,8 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.policy      = ipDiffim.makeDefaultPolicy()
-        self.kSize       = self.policy.getInt('kernelSize')
+        self.config      = ipDiffim.PsfMatchConfig()
+        self.kSize       = self.config.kernelSize
 
         # gaussian reference kernel
         self.gSize         = self.kSize
@@ -65,7 +65,7 @@ class DiffimTestCases(unittest.TestCase):
             afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False)
 
     def tearDown(self):
-        del self.policy
+        del self.config
         del self.gaussFunction
         del self.gaussKernel
         if self.defDataDir:
