@@ -18,6 +18,7 @@
 
 #include "lsst/ip/diffim/KernelCandidate.h"
 #include "lsst/ip/diffim/ImageSubtract.h"
+#include "lsst/ip/diffim/ImageStatistics.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
 namespace afwMath        = lsst::afw::math;

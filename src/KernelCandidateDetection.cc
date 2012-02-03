@@ -16,7 +16,7 @@
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/logging/Trace.h"
 
-#include "lsst/ip/diffim/ImageSubtract.h"
+#include "lsst/ip/diffim/FindSetBits.h"
 #include "lsst/ip/diffim/KernelCandidateDetection.h"
 
 namespace afwGeom   = lsst::afw::geom;

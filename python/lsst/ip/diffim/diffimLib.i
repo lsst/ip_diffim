@@ -135,13 +135,21 @@ def version(HeadURL = r"$HeadURL$"):
 /******************************************************************************/
 
 %{
-#include "lsst/ip/diffim/ImageSubtract.h"
+#include "lsst/ip/diffim/FindSetBits.h"
 %}
 
-%include "lsst/ip/diffim/ImageSubtract.h"
+%include "lsst/ip/diffim/FindSetBits.h"
 
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
+
+/******************************************************************************/
+
+%{
+#include "lsst/ip/diffim/ImageStatistics.h"
+%}
+
+%include "lsst/ip/diffim/ImageStatistics.h"
 
 %template(ImageStatisticsI)
     lsst::ip::diffim::ImageStatistics<int>;
@@ -149,6 +157,15 @@ def version(HeadURL = r"$HeadURL$"):
     lsst::ip::diffim::ImageStatistics<float>;
 %template(ImageStatisticsD)
     lsst::ip::diffim::ImageStatistics<double>;
+
+/******************************************************************************/
+
+%{
+#include "lsst/ip/diffim/ImageSubtract.h"
+%}
+
+%include "lsst/ip/diffim/ImageSubtract.h"
+
 
 %define %convolveAndSubtract(PIXEL_T)
    %template(convolveAndSubtract)

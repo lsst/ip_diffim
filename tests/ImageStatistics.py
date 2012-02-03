@@ -39,10 +39,10 @@ logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
+        pass
         
     def tearDown(self):
-        del self.policy
+        pass
 
     def testImageStatisticsNan(self, core=3):
         numArray = num.zeros((20, 20))

@@ -12,12 +12,14 @@
 #ifndef LSST_IP_DIFFIM_BUILDSINGLEKERNELVISITOR_H
 #define LSST_IP_DIFFIM_BUILDSINGLEKERNELVISITOR_H
 
+#include "boost/shared_ptr.hpp"
+
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
 
 #include "lsst/pex/policy/Policy.h"
 
-#include "lsst/ip/diffim/ImageSubtract.h"
+#include "lsst/ip/diffim/ImageStatistics.h"
 
 namespace lsst { 
 namespace ip { 
