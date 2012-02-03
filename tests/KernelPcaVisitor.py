@@ -9,18 +9,20 @@ import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
-        self.policy.set("kernelBasisSet", "delta-function")
+        self.config = ipDiffim.PsfMatchConfigDF()
+        self.policy = pexConfig.makePolicy(self.config)
         self.policy.set("useRegularization", False)
-        self.kList = ipDiffim.makeKernelBasisList(self.policy)
+        self.kList  = ipDiffim.makeKernelBasisList(self.policy)
 
     def tearDown(self):
+        del self.config
         del self.policy
         del self.kList
 
@@ -56,13 +58,8 @@ class DiffimTestCases(unittest.TestCase):
             for j in range(i, len(eigenImages)):
                 print i, j, afwImage.innerProduct(eigenImages[i], eigenImages[j])
         
-
-    def xtestAlardLupton(self):
-        self.policy.set("kernelBasisSet", "alard-lupton")
-        self.kList = ipDiffim.makeKernelBasisList(self.policy)
-        nTerms = len(self.kList)
-        
-    def xtestEigenValues(self):
+       
+    def testEigenValues(self):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc1.build(self.kList)
 
@@ -91,7 +88,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertAlmostEqual(eigenValues[1], 0.0)
         self.assertAlmostEqual(eigenValues[2], 0.0)
         
-    def xtestMeanSubtraction(self):
+    def testMeanSubtraction(self):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc1.build(self.kList)
 
@@ -133,9 +130,7 @@ class DiffimTestCases(unittest.TestCase):
                 else:
                     self.assertAlmostEqual(imageMean.get(x, y), 0.0)
 
-    def xtestVisit(self, nCell = 3):
-        # This currently fails since I can't get visitCandidates to
-        # tell this is a pointer
+    def testVisit(self, nCell = 3):
         imagePca = afwImage.ImagePcaD()
         kpv = ipDiffim.makeKernelPcaVisitor(imagePca)
 
@@ -168,8 +163,8 @@ class DiffimTestCases(unittest.TestCase):
         eigenValues = imagePca.getEigenValues()
 
         # took in 3 images
-        self.assertEqual(len(eigenImages), 3)
-        self.assertEqual(len(eigenValues), 3)
+        self.assertEqual(len(eigenImages), nCell * nCell)
+        self.assertEqual(len(eigenValues), nCell * nCell)
 
         # all the same shape, only 1 eigenvalue
         self.assertAlmostEqual(eigenValues[0], 1.0)

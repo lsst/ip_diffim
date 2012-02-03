@@ -11,6 +11,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
 
 import lsst.afw.display.ds9 as ds9
 
@@ -19,11 +20,10 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
-        self.policy.set("kernelBasisSet", "delta-function")
-        self.policy.set("useRegularization", False)
-        self.ksize = self.policy.get('kernelSize')
-        self.kList = ipDiffim.makeKernelBasisList(self.policy)
+        self.config = ipDiffim.PsfMatchConfigAL()
+        self.policy = pexConfig.makePolicy(self.config)
+        self.ksize  = self.policy.get('kernelSize')
+        self.kList  = ipDiffim.makeKernelBasisList(self.policy)
 
     def makeSpatialKernel(self, order):
         basicGaussian1 = afwMath.GaussianFunction2D(2., 2., 0.)

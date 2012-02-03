@@ -261,7 +261,7 @@ class PsfMatchConfig(pexConfig.Config):
     spatialKernelClipping = pexConfig.Field(
         dtype = bool,
         doc = "Do sigma clipping after building the spatial model",
-        default = False,
+        default = True,
     )
     checkConditionNumber = pexConfig.Field(
         dtype = bool,

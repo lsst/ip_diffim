@@ -9,16 +9,16 @@ import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
-        self.policy.set("kernelBasisSet", "delta-function")
-        self.policy.set("useRegularization", False)
-        self.kList = ipDiffim.makeKernelBasisList(self.policy)
+        self.config = ipDiffim.PsfMatchConfigDF()
+        self.policy = pexConfig.makePolicy(self.config)
+        self.kList  = ipDiffim.makeKernelBasisList(self.policy)
 
     def makeCandidate(self, kSum, x, y, size = 51):
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
@@ -106,9 +106,7 @@ class DiffimTestCases(unittest.TestCase):
             self.assertEqual(ksv.getNRejected(), 0)
 
 
-    def xtestVisit(self, nCell = 3):
-        # This currently fails since I can't get visitCandidates to
-        # tell this is a pointer
+    def testVisit(self, nCell = 3):
         ksv = ipDiffim.makeKernelSumVisitor(self.policy)
 
         sizeCellX = self.policy.get("sizeCellX")
