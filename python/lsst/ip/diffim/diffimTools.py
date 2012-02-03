@@ -34,6 +34,9 @@ import numpy
 import time
 import os
 
+# Helper functions for ipDiffim; mostly viewing of results and writing
+# debugging info to disk.
+
 #######
 # Add noise
 #######

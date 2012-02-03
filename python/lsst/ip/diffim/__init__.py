@@ -27,6 +27,8 @@ from diffimLib import *
 
 # python code
 from psfMatch import *
+from imagePsfMatch import *
+from modelPsfMatch import *
 from makeRatingVector import *
 from makeDefaultPolicy import *
 

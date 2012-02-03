@@ -1,4 +1,3 @@
- 
 # LSST Data Management System
 # Copyright 2008, 2009, 2010 LSST Corporation.
 # 
@@ -19,7 +18,10 @@
 # the GNU General Public License along with this program.  If not, 
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
+import diffimLib
+import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
+from psfMatch import  PsfMatch, PsfMatchConfig, PsfMatchConfigDF, PsfMatchConfigAL
 
 class ModelPsfMatchConfig(PsfMatchConfig):
     def __init__(self):
@@ -37,22 +39,13 @@ class ModelPsfMatchConfig(PsfMatchConfig):
 class ModelPsfMatch(PsfMatch):
     """PSF-match PSF models to reference PSF models
     """
-    def __init__(self, policy, logName="lsst.ip.diffim.ModelPsfMatch", mergePolicy = False):
+    def __init__(self, config, logName="lsst.ip.diffim.ModelPsfMatch"):
         """Create a PsfMatchToModel
         
-        @param policy: see lsst/ip/diffim/policy/PsfMatchingDictionary.paf
+        @param config: see lsst.ip.diffim.PsfMatchConfig
         @param logName: name by which messages are logged
-        @param mergePolicy: merge ip_diffim/policy/MatchPsfModels.paf into existing policy;
-            this is a temporary hack
         """
-        PsfMatch.__init__(self, policy, logName)
-
-        # Changes to policy particular to matchPsfModels
-        if mergePolicy:
-            policyFile = pexPolicy.DefaultPolicyFile("ip_diffim", "MatchPsfModels.paf", "policy")
-            matchPolicy = pexPolicy.Policy.createPolicy(policyFile, policyFile.getRepositoryPath(), True)
-            matchPolicy.mergeDefaults(self._policy.getDictionary())
-            self._policy = matchPolicy
+        PsfMatch.__init__(self, config, logName)
     
     def matchExposure(self, exposure, referencePsfModel, kernelSum=1.0):
         """PSF-match an exposure to a PSF model.
@@ -117,17 +110,17 @@ class ModelPsfMatch(PsfMatch):
         maxPsfMatchingKernelSize = 1 + (min(kernelWidth - 1, kernelHeight - 1) // 2)
         if maxPsfMatchingKernelSize % 2 == 0:
             maxPsfMatchingKernelSize -= 1
-        if self._policy.get('kernelSize') > maxPsfMatchingKernelSize:
+        if self._config.kernelSize > maxPsfMatchingKernelSize:
             pexLog.Trace(self._log.getName(), 1,
                          "WARNING: Resizing matching kernel to size %d x %d" % (maxPsfMatchingKernelSize,
                                                                                 maxPsfMatchingKernelSize))
-            self._policy.set('kernelSize', maxPsfMatchingKernelSize)
+            self._config.kernelSize = maxPsfMatchingKernelSize
         
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0,   scienceY0   = scienceBBox.getMin()
     
-        sizeCellX = self._policy.get("sizeCellX")
-        sizeCellY = self._policy.get("sizeCellY")
+        sizeCellX = self._config.sizeCellX
+        sizeCellY = self._config.sizeCellY
     
         kernelCellSet = afwMath.SpatialCellSet(
             afwGeom.Box2I(afwGeom.Point2I(scienceX0, scienceY0),
@@ -174,7 +167,7 @@ class ModelPsfMatch(PsfMatch):
                 #scienceMI.writeFits('sci_%d_%d.fits' % (row, col))
  
                 # The image to convolve is the science image, to the reference Psf.
-                kc = diffimLib.makeKernelCandidate(posX, posY, scienceMI, referenceMI, self._policy)
+                kc = diffimLib.makeKernelCandidate(posX, posY, scienceMI, referenceMI, self._config)
                 kernelCellSet.insertCandidate(kc)
 
         return kernelCellSet

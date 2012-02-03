@@ -24,6 +24,7 @@ import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+from psfMatch import PsfMatch, PsfMatchConfig, PsfMatchConfigDF, PsfMatchConfigAL
 
 class ImagePsfMatchConfig(PsfMatchConfig):
     """The default config is basically designed for Image Psf matching"""
@@ -82,14 +83,14 @@ class ImagePsfMatch(PsfMatch):
     Fits the following model:
     image to not convolve = (image to convolve convolved with PSF matching kernel) + background model
     """
-    def __init__(self, policy, logName="lsst.ip.diffim.ImagePsfMatch"):
+    def __init__(self, config, logName="lsst.ip.diffim.ImagePsfMatch"):
         """Create a PsfMatchToImage
         
-        @param policy: see lsst/ip/diffim/policy/PsfMatchingDictionary.paf
+        @param config: see lsst.ip.diffim.PsfMatchConfig
         @param logName: name by which messages are logged
         """
-        PsfMatch.__init__(self, policy, logName)
-        self._warper = afwMath.Warper.fromPolicy(policy.getPolicy("warpingPolicy"))
+        PsfMatch.__init__(self, config, logName)
+        self._warper = afwMath.Warper.fromConfig(self._config.warpingConfig)
 
     def _validateSize(self, maskedImageToConvolve, maskedImageToNotConvolve):
         """Return True if two image-like objects are the same size
@@ -291,23 +292,22 @@ class ImagePsfMatch(PsfMatch):
         """
         # Object to store the KernelCandidates for spatial modeling
         kernelCellSet = afwMath.SpatialCellSet(maskedImageToConvolve.getBBox(afwImage.PARENT),
-                                               self._policy.getInt("sizeCellX"),
-                                               self._policy.getInt("sizeCellY"))
+                                               self._config.sizeCellX, self._config.sizeCellY)
         
         # Candidate source footprints to use for Psf matching
         if footprints == None:
             # If you need to fit for background in ip_diffim, we need
             # to subtract it off before running detection
-            if self._policy.get("fitForBackground"):
+            if self._config.fitForBackground:
                 self._log.log(pexLog.Log.INFO, "temporarily subtracting backgrounds for detection")
-                bkgds = diffimTools.backgroundSubtract(self._policy.getPolicy("afwBackgroundPolicy"),
+                bkgds = diffimTools.backgroundSubtract(self._config.afwBackgroundConfig,
                                                        [maskedImageToConvolve, maskedImageToNotConvolve])
             
-            kcDetect = diffimLib.KernelCandidateDetectionF(self._policy.getPolicy("detectionPolicy"))
+            kcDetect = diffimLib.KernelCandidateDetectionF(self._config.detectionConfig)
             kcDetect.apply(maskedImageToConvolve, maskedImageToNotConvolve)
             footprints = kcDetect.getFootprints()
 
-            if self._policy.get("fitForBackground"):
+            if self._config.fitForBackground:
                 maskedImageToConvolve += bkgds[0]
                 maskedImageToNotConvolve += bkgds[1]
 
@@ -321,7 +321,7 @@ class ImagePsfMatch(PsfMatch):
             
             tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox, afwImage.PARENT)
             smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox, afwImage.PARENT)
-            cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, self._policy)
+            cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, self._config)
             
             pexLog.Trace(self._log.getName(), 5,
                          "Candidate %d at %f, %f" % (cand.getId(), cand.getXCenter(), cand.getYCenter()))

@@ -27,7 +27,7 @@ import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
 
 #
-# Use afwMath.WarpConfig
+# Use afwMath.warper.WarperConfig
 #
 #class WarpConfig(pexConfig.Config):
 #    warpingKernelName = pexConfig.ChoiceField(
@@ -55,30 +55,30 @@ import lsst.afw.math as afwMath
 class DetectionConfig(pexConfig.Config):
     detThreshold = pexConfig.Field(
         dtype = float,
-        doc = "Value of footprint detection threshold"
+        doc = "Value of footprint detection threshold",
         default = 10.0
     )
     detThresholdType = pexConfig.ChoiceField(
         dtype = str,
-        doc = "Type of detection threshold"
-        default = "stdev"
+        doc = "Type of detection threshold",
+        default = "stdev",
         allowed = {
            "value"    : "Use counts as the detection threshold type",
-           "stdev"    : "Use standard deviation as the detection threshold type"
+           "stdev"    : "Use standard deviation as the detection threshold type",
            "variance" : "Use variance as the detection threshold type"
         }
     )
     detOnTemplate = pexConfig.Field(
         dtype = bool,
-        doc = "If true run detection on the template (imageToConvolve); 
-               if false run detection on the science image (imageToNotConvolve)"
+        doc = """If true run detection on the template (imageToConvolve); 
+                 if false run detection on the science image (imageToNotConvolve)""",
         default = True
     )
     detBadMaskPlanes = pexConfig.ListField(
         dtype = str,
-        doc = "Mask planes that lead to an invalid detection.
-               Options: EDGE SAT BAD CR INTRP
-               E.g. : EDGE SAT BAD allows CR-masked and interpolated pixels",
+        doc = """Mask planes that lead to an invalid detection.
+                 Options: EDGE SAT BAD CR INTRP
+                 E.g. : EDGE SAT BAD allows CR-masked and interpolated pixels""",
         default = ("EDGE", "SAT", "BAD")
     )
     fpNpixMin = pexConfig.Field(
@@ -87,27 +87,27 @@ class DetectionConfig(pexConfig.Config):
         default = 5
     )
     fpNpixMax = pexConfig.Field(
-        dtype = int
-        doc = "Maximum number of pixels in an acceptable Footprint;
-               too big and the subsequent convolutions become unwieldy",
+        dtype = int,
+        doc = """Maximum number of pixels in an acceptable Footprint;
+                 too big and the subsequent convolutions become unwieldy""",
         default = 500
     )
     fpGrowFwhmScaling = pexConfig.Field(
         dtype = float,
-        doc = "Grow the footprint based on the Psf Fwhm;
-               should be larger than kernelRadiusFwhmScaling",
+        doc = """Grow the footprint based on the Psf Fwhm;
+                 should be larger than kernelRadiusFwhmScaling""",
         default = 10.
     )
     fpGrowPix = pexConfig.Field(
         dtype = int,
-        doc = "Grow each raw detection footprint by
-               this many pixels.  The smaller the faster; however the kernel sum does
-               not converge if the stamp is too small; and the kernel is not
-               constrained at all if the stamp is the size of the kernel.  Rule of
-               thumb is at least 1.5 times the kernel size.  The grown stamp is
-               ~2*fpGrowPix pixels larger in each dimension.",
+        doc = """Grow each raw detection footprint by
+                 this many pixels.  The smaller the faster; however the kernel sum does
+                 not converge if the stamp is too small; and the kernel is not
+                 constrained at all if the stamp is the size of the kernel.  Rule of
+                 thumb is at least 1.5 times the kernel size.  The grown stamp is
+                 ~2*fpGrowPix pixels larger in each dimension.""",
         default = 30,
-        check = lambda x: (x >= 20) && (x <= 40)
+        check = lambda x: (x >= 20) and (x <= 40)
     )
     
 class AfwBackgroundConfig(pexConfig.Config):
@@ -141,150 +141,10 @@ class AfwBackgroundConfig(pexConfig.Config):
         }
     )
 
-class PsfMatchConfigAL(PsfMatchConfig):
-    def __init__(self):
-        PsfMatchConfig.__init__(self)
-        self.kernelBasisSet = "alard-lupton"
-        self.maxConditionNumber = 5.0e7
-
-    #####
-    # Alard-Lupton Basis Parameters
-    alardNGauss = pexConfig.Field(
-        dtype = int,
-        doc = "Number of gaussians in alard-lupton basis",
-        default = 3,
-    )
-    alardDegGauss = pexConfig.ListField(
-        dtype = int,
-        doc = "Degree of spatial modification of gaussians in alard-lupton basis",
-        default = (4, 3, 2),
-    )
-    alardSigGauss = pexConfig.ListField(
-        dtype = float,
-        doc = """Sigma in pixels of gaussians in alard-lupton basis (note: FWHM = 2.35 sigma)."""
-        default = (0.7, 1.5, 3.0),
-    )
-
-    alardNGaussDeconv = pexConfig.Field(
-        dtype = int,
-        doc = "Number of gaussians in deconvolving alard-lupton basis",
-        default = 4,
-    )
-    alardDegGaussDeconv = pexConfig.ListField(
-        dtype = int,
-        doc = """Degree of spatial modification of gaussians in alard-lupton basis during deconvolution"""
-        default = (5, 5, 3, 3,),
-    )
-
-
-    
-class PsfMatchConfigDF(PsfMatchConfig):
-    def __init__(self):
-        PsfMatchConfig.__init__(self)
-        self.kernelBasisSet = "delta-function"
-        self.maxConditionNumber = 5.0e6
-
-    #####
-    # Delta Function Basis Parameters
-    useRegularization = pexConfig.Field(
-        dtype = bool,
-        doc = "Use regularization to smooth the delta function kernels",
-        default = True,
-    )
-
-    #####
-    # Regularization shape
-    regularizationType = pexConfig.ChoiceField(
-        dtype = str,
-        doc = "Type of regularization.",
-        default = "centralDifference",
-        allowed = {
-            "centralDifference": "Penalize second derivative using 2-D stencil of central finite difference",
-            "forwardDifference": "Penalize first, second, third or combination of derivatives using forward finite differeces"
-        }
-    )
-    centralRegularizationStencil = pexConfig.Field(
-        dtype = int,
-        doc = "Type of stencil to approximate central derivative (for centralDifference only)",
-        default = 9,
-        allowed = { 
-            5 : "5-point stencil including only adjacent-in-x,y elements",
-            9 : "9-point stencil including diagonal elements"
-        }
-    )
-    forwardRegularizationOrders = pexConfig.ListField(
-        dtype = int,
-        doc = "Array showing which order derivatives to penalize (for forwardDifference only)",
-        default = (1, 2),
-        check = lambda x: (x > 0) && (x < 4)
-    )
-    regularizationBorderPenalty = pexConfig.Field(
-        dtype = float,
-        doc = "Value of the penalty for kernel border pixels",
-        default = 3.0,
-    )
-
-    #####
-    # Regularization strength
-    lambdaType = pexConfig.ChoiceField(
-        dtype = str,
-        doc = "How to choose the value of the regularization strength",
-        default = "absolute",
-        allowed = {
-            "absolute" : "Use lambdaValue as the value of regularization strength",
-            "relative" : "Use lambdaValue as fraction of the default regularization strength (N.R. 18.5.8)",
-            "minimizeBiasedRisk" : "Minimize biased risk estimate",
-            "minimizeUnbiasedRisk" : "Minimize unbiased risk estimate",
-        }
-    )
-    lambdaValue = pexConfig.Field(
-        dtype = float,
-        doc = "Value used for absolute determinations of regularization strength",
-        default = 0.2,
-    )
-    lambdaScaling = pexConfig.Field(
-        dtype = float,
-        doc = "Fraction of the default lambda strength (N.R. 18.5.8) to use.  1e-4 or 1e-5"
-        default = 1e-4,
-    )
-    lambdaStepType = pexConfig.ChoiceField(
-        dtype = str,
-        doc = """If a scan through lambda is needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
-                 use log or linear steps"""
-        default = "log",
-        allowed = {
-            "log" : "Step in log intervals; e.g. lambdaMin, lambdaMax, lambdaStep = -1.0, 2.0, 0.1",
-            "linear" : "Step in linear intervals; e.g. lambdaMin, lambdaMax, lambdaStep = 0.1, 100, 0.1",
-        }
-    )
-    lambdaMin = pexConfig.Field(
-        dtype = float,
-        doc = """If scan through lambda needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
-                 start at this value.  If lambdaStepType = log:linear, suggest -1:0.1"""
-        default = -1.0,
-    )
-    lambdaMax = pexConfig.Field(
-        dtype = float,
-        doc = """If scan through lambda needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
-                 stop at this value.  If lambdaStepType = log:linear, suggest 2:100"""
-        default = 2.0,
-    )
-    lambdaStep = pexConfig.Field(
-        dtype = float,
-        doc = """If scan through lambda needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
-                 step in these increments.  If lambdaStepType = log:linear, suggest 0.1:0.1"""
-        default = 0.1,
-    )
-
-
 class PsfMatchConfig(pexConfig.Config):
-    warpingConfig = pexConfig.ConfigField(
-        afwMath.WarpConfig,
-        doc = "Config for warping exposures to a common alignment",
-        optional=False,
-    )
-    detectionConfig = pexConfig.ConfigField("Controlling the detection of sources for kernel building", ipDiffim.DetectionConfig)
-    afwBackgroundConfig = pexConfig.ConfigField("Controlling the Afw background fitting", ipDiffim.AfwBackgroundConfig)
+    warpingConfig = pexConfig.ConfigField("Config for warping exposures to a common alignment", afwMath.warper.WarperConfig)
+    detectionConfig = pexConfig.ConfigField("Controlling the detection of sources for kernel building", DetectionConfig)
+    afwBackgroundConfig = pexConfig.ConfigField("Controlling the Afw background fitting", AfwBackgroundConfig)
 
     ####
     # Background fitting
@@ -322,19 +182,19 @@ class PsfMatchConfig(pexConfig.Config):
     kernelSize = pexConfig.Field(
         dtype = int,
         doc = """Number of rows/columns in the convolution kernel; should be odd-valued.
-                 Modified by kernelSizeFwhmScaling if scaleByFwhm = true"""
+                 Modified by kernelSizeFwhmScaling if scaleByFwhm = true""",
         default = 19,
-        check = lambda x: (x >= 7) && (x <= 31)
+        check = lambda x: (x >= 7) and (x <= 31)
     )
     scaleByFwhm = pexConfig.Field(
         dtype = bool,
         doc = "Scale kernelSize, alardSigGauss, and fpGrowPix by input Fwhm",
-        default = false,
+        default = False,
     )
     kernelSizeFwhmScaling = pexConfig.Field(
         dtype = float,
         doc = """How much to scale the kernel size based on the Psf Fwhm;,
-                 should be smaller than fpGrowFwhmScaling.  Sets kernelSize."""
+                 should be smaller than fpGrowFwhmScaling.  Sets kernelSize.""",
         default = 4.0,
     )
 
@@ -392,8 +252,8 @@ class PsfMatchConfig(pexConfig.Config):
                  a Pca on these Kernels, re-fit the Cells using the eigenKernels and then 
                  fit those for spatial variation using the same technique as for Alard-Lupton kernels.
                  If this option is used, the first term will have no spatial variation and the 
-                 kernel sum will be conserved."""
-        default = false,
+                 kernel sum will be conserved.""",
+        default = False,
     )
     subtractMeanForPca = pexConfig.Field(
         dtype = bool,
@@ -403,12 +263,12 @@ class PsfMatchConfig(pexConfig.Config):
     numPrincipalComponents = pexConfig.Field(
         dtype = int,
         doc = """Number of principal components to use for Pca basis, including the
-                 mean kernel if requested."""
+                 mean kernel if requested.""",
         default = 5,
     )
     fracEigenVal = pexConfig.Field(
         dtype = float,
-        doc = "At what fraction of the eigenvalues do you cut off the expansion. Warning: not yet implemented"
+        doc = "At what fraction of the eigenvalues do you cut off the expansion. Warning: not yet implemented",
         default = 0.99,
     )
 
@@ -435,7 +295,7 @@ class PsfMatchConfig(pexConfig.Config):
                  Anything above maxConditionNumber is not used and the candidate is set as BAD.        
                  Also used to truncate inverse matrix in estimateBiasedRisk.  However,
                  if you are doing any deconvolution you will want to turn this off, or use
-                 a large maxConditionNumber"""
+                 a large maxConditionNumber""",
         default = False,
     )
 
@@ -445,14 +305,14 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = float,
         doc = """Rejects KernelCandidates yielding bad difference image quality.
                  Used by BuildSingleKernelVisitor, AssessSpatialKernelVisitor.
-                 Represents average over pixels of (image/sqrt(variance))."""
+                 Represents average over pixels of (image/sqrt(variance)).""",
         default = 0.25,
     )
     candidateResidualStdMax = pexConfig.Field(
         dtype = float,
         doc = """Rejects KernelCandidates yielding bad difference image quality.
                  Used by BuildSingleKernelVisitor, AssessSpatialKernelVisitor.
-                 Represents stddev over pixels of (image/sqrt(variance))."""
+                 Represents stddev over pixels of (image/sqrt(variance)).""",
         default = 1.50,
     )
     useCoreStats = pexConfig.Field(
@@ -466,7 +326,7 @@ class PsfMatchConfig(pexConfig.Config):
         doc = """Radius for calculation of stats in 'core' of KernelCandidate diffim.
                  Total number of pixels used will be (2*radius)**2. 
                  This is used both for 'core' diffim quality as well as ranking of
-                 KernelCandidates by their total flux in this core"""
+                 KernelCandidates by their total flux in this core""",
         default = 3,
     )
 
@@ -475,7 +335,7 @@ class PsfMatchConfig(pexConfig.Config):
     maxKsumSigma = pexConfig.Field(
         dtype = float,
         doc = """Maximum allowed sigma for outliers from kernel sum distribution.
-                 Used to reject variable objects from the kernel model"""
+                 Used to reject variable objects from the kernel model""",
         default = 3.0,
     )
 
@@ -484,7 +344,7 @@ class PsfMatchConfig(pexConfig.Config):
     # Clipping of KernelCandidates based on condition number
     maxConditionNumber = pexConfig.Field(
         dtype = float,
-        doc = "Maximum condition number for a well conditioned matrix"
+        doc = "Maximum condition number for a well conditioned matrix",
         default = 5.0e7,
     )
     conditionNumberType = pexConfig.ChoiceField(
@@ -502,24 +362,159 @@ class PsfMatchConfig(pexConfig.Config):
     iterateSingleKernel = pexConfig.Field(
         dtype = bool,
         doc = """Remake KernelCandidate using better variance estimate after first pass?
-                 Primarily useful when convolving a single-depth image, otherwise not necessary."""
+                 Primarily useful when convolving a single-depth image, otherwise not necessary.""",
         default = False,
     )
     constantVarianceWeighting = pexConfig.Field(
         dtype = bool,
         doc = """Use constant variance weighting in single kernel fitting?
-                 In some cases this is better for bright star residuals."""
+                 In some cases this is better for bright star residuals.""",
         default = False,
     )
     calculateKernelUncertainty = pexConfig.Field(
         dtype = bool,
         doc = """Calculate kernel and background uncertainties for each kernel candidate?
                  This comes from the inverse of the covariance matrix.
-                 Warning: regularization can cause problems for this step."""
+                 Warning: regularization can cause problems for this step.""",
         default = False,
     )
 
+
+class PsfMatchConfigAL(PsfMatchConfig):
+    def __init__(self):
+        PsfMatchConfig.__init__(self)
+        self.kernelBasisSet = "alard-lupton"
+        self.maxConditionNumber = 5.0e7
+
+    #####
+    # Alard-Lupton Basis Parameters
+    alardNGauss = pexConfig.Field(
+        dtype = int,
+        doc = "Number of gaussians in alard-lupton basis",
+        default = 3,
+    )
+    alardDegGauss = pexConfig.ListField(
+        dtype = int,
+        doc = "Degree of spatial modification of gaussians in alard-lupton basis",
+        default = (4, 3, 2),
+    )
+    alardSigGauss = pexConfig.ListField(
+        dtype = float,
+        doc = """Sigma in pixels of gaussians in alard-lupton basis (note: FWHM = 2.35 sigma).""",
+        default = (0.7, 1.5, 3.0),
+    )
+
+    alardNGaussDeconv = pexConfig.Field(
+        dtype = int,
+        doc = "Number of gaussians in deconvolving alard-lupton basis",
+        default = 4,
+    )
+    alardDegGaussDeconv = pexConfig.ListField(
+        dtype = int,
+        doc = """Degree of spatial modification of gaussians in alard-lupton basis during deconvolution""",
+        default = (5, 5, 3, 3,),
+    )
+
+
     
+class PsfMatchConfigDF(PsfMatchConfig):
+    def __init__(self):
+        PsfMatchConfig.__init__(self)
+        self.kernelBasisSet = "delta-function"
+        self.maxConditionNumber = 5.0e6
+
+    #####
+    # Delta Function Basis Parameters
+    useRegularization = pexConfig.Field(
+        dtype = bool,
+        doc = "Use regularization to smooth the delta function kernels",
+        default = True,
+    )
+
+    #####
+    # Regularization shape
+    regularizationType = pexConfig.ChoiceField(
+        dtype = str,
+        doc = "Type of regularization.",
+        default = "centralDifference",
+        allowed = {
+            "centralDifference": "Penalize second derivative using 2-D stencil of central finite difference",
+            "forwardDifference": "Penalize first, second, third or combination of derivatives using forward finite differeces"
+        }
+    )
+    centralRegularizationStencil = pexConfig.ChoiceField(
+        dtype = int,
+        doc = "Type of stencil to approximate central derivative (for centralDifference only)",
+        default = 9,
+        allowed = { 
+            5 : "5-point stencil including only adjacent-in-x,y elements",
+            9 : "9-point stencil including diagonal elements"
+        }
+    )
+    forwardRegularizationOrders = pexConfig.ListField(
+        dtype = int,
+        doc = "Array showing which order derivatives to penalize (for forwardDifference only)",
+        default = (1, 2),
+        itemCheck = lambda x: (x > 0) and (x < 4)
+    )
+    regularizationBorderPenalty = pexConfig.Field(
+        dtype = float,
+        doc = "Value of the penalty for kernel border pixels",
+        default = 3.0,
+    )
+
+    #####
+    # Regularization strength
+    lambdaType = pexConfig.ChoiceField(
+        dtype = str,
+        doc = "How to choose the value of the regularization strength",
+        default = "absolute",
+        allowed = {
+            "absolute" : "Use lambdaValue as the value of regularization strength",
+            "relative" : "Use lambdaValue as fraction of the default regularization strength (N.R. 18.5.8)",
+            "minimizeBiasedRisk" : "Minimize biased risk estimate",
+            "minimizeUnbiasedRisk" : "Minimize unbiased risk estimate",
+        }
+    )
+    lambdaValue = pexConfig.Field(
+        dtype = float,
+        doc = "Value used for absolute determinations of regularization strength",
+        default = 0.2,
+    )
+    lambdaScaling = pexConfig.Field(
+        dtype = float,
+        doc = "Fraction of the default lambda strength (N.R. 18.5.8) to use.  1e-4 or 1e-5",
+        default = 1e-4,
+    )
+    lambdaStepType = pexConfig.ChoiceField(
+        dtype = str,
+        doc = """If a scan through lambda is needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
+                 use log or linear steps""",
+        default = "log",
+        allowed = {
+            "log" : "Step in log intervals; e.g. lambdaMin, lambdaMax, lambdaStep = -1.0, 2.0, 0.1",
+            "linear" : "Step in linear intervals; e.g. lambdaMin, lambdaMax, lambdaStep = 0.1, 100, 0.1",
+        }
+    )
+    lambdaMin = pexConfig.Field(
+        dtype = float,
+        doc = """If scan through lambda needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
+                 start at this value.  If lambdaStepType = log:linear, suggest -1:0.1""",
+        default = -1.0,
+    )
+    lambdaMax = pexConfig.Field(
+        dtype = float,
+        doc = """If scan through lambda needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
+                 stop at this value.  If lambdaStepType = log:linear, suggest 2:100""",
+        default = 2.0,
+    )
+    lambdaStep = pexConfig.Field(
+        dtype = float,
+        doc = """If scan through lambda needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
+                 step in these increments.  If lambdaStepType = log:linear, suggest 0.1:0.1""",
+        default = 0.1,
+    )
+
 
 class PsfMatch(object):
     """Base class for PSF matching
@@ -533,6 +528,65 @@ class PsfMatch(object):
         self._config = config
         self._log = pexLog.Log(pexLog.Log.getDefaultLog(), logName)
 
+    def _diagnostic(self, kernelCellSet, spatialKernel, spatialBg):
+        # Look at how well the solution is constrained
+
+        nKernelTerms = spatialKernel.getNSpatialParameters()
+        if nKernelTerms == 0: # order 0
+            nKernelTerms = 1
+        nBgTerms     = len(spatialBg.getParameters())
+        
+        nGood = 0
+        nBad  = 0
+        nTot  = 0
+        for cell in kernelCellSet.getCellList():
+            for cand in cell.begin(False): # False = include bad candidates
+                cand = diffimLib.cast_KernelCandidateF(cand)
+                nTot += 1
+                if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
+                    nGood += 1
+                if cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
+                    nBad += 1
+
+        # Counting statistics
+        if nBad > 2*nGood:
+            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+                         "WARNING: many more candidates rejected than accepted; %d total, %d rejected, %d used" % (
+                          nTot, nBad, nGood) )
+        else:
+            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+                         "NOTE: %d candidates total, %d rejected, %d used" % (nTot, nBad, nGood))
+            
+        # Some judgements on the quality of the spatial models
+        if nGood < nKernelTerms:
+            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+                         "WARNING: spatial kernel model underconstrained; %d candidates, %d terms" % (nGood, nKernelTerms))
+            pexLog.Trace(self._log.getName()+"._diagnostic", 2,
+                         "Consider lowering the spatial order")
+        elif nGood <= 2*nKernelTerms:
+            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+                         "WARNING: spatial kernel model poorly constrained; %d candidates, %d terms" % (nGood, nKernelTerms))
+            pexLog.Trace(self._log.getName()+"._diagnostic", 2,
+                         "Consider lowering the spatial order")
+        else:
+            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+                         "NOTE: spatial kernel model appears well constrained; %d candidates, %d terms" % (nGood, nKernelTerms))
+
+        if nGood < nBgTerms:
+            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+                         "WARNING: spatial background model underconstrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            pexLog.Trace(self._log.getName()+"._diagnostic", 2,
+                         "Consider lowering the spatial order")
+        elif nGood <= 2*nBgTerms:
+            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+                         "WARNING: spatial background model poorly constrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            pexLog.Trace(self._log.getName()+"._diagnostic", 2,
+                         "Consider lowering the spatial order")
+        else:
+            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+                         "NOTE: spatial background model appears well constrained; %d candidates, %d terms" % (nGood, nBgTerms))
+        
+    
     def _solve(self, kernelCellSet, basisList, hMat = None, returnOnExcept = False):
         """Determine the PSF matching kernel
         
@@ -546,35 +600,8 @@ class PsfMatch(object):
         
         @raise Exception if unable to determine PSF matching kernel and returnOnExcept False
         """
-        try:
-            kb = self._fitSpatialKernelFromCandidates(kernelCellSet, basisList, hMat)
-        except pexExcept.LsstCppException, e:
-            pexLog.Trace(self._log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
-            pexLog.Trace(self._log.getName()+"._solve", 2, e.args[0].what())
-    
-            if returnOnExcept:
-                return (None, None)
-            else:
-                raise
-
-        psfMatchingKernel = kb[0]
-        backgroundModel   = kb[1]
-    
-        # What is the status of the processing?
-        nGood = 0
-        for cell in kernelCellSet.getCellList():
-            for cand in cell.begin(True):
-                cand = diffimLib.cast_KernelCandidateF(cand)
-                if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
-                    nGood += 1
-        if nGood == 0:
-            pexLog.Trace(self._log.getName()+"._solve", 1, "WARNING")
-        pexLog.Trace(self._log.getName()+"._solve", 1, "Used %d kernels for spatial fit" % (nGood))
-    
-        return (psfMatchingKernel, backgroundModel)
 
 
-    def _fitSpatialKernelFromCandidates(self, kernelCellSet, basisList, hMat = None):
         maxSpatialIterations   = self._config.maxSpatialIterations
         nStarPerCell           = self._config.nStarPerCell
         usePcaForSpatialKernel = self._config.usePcaForSpatialKernel
@@ -600,11 +627,11 @@ class PsfMatch(object):
                 # Make sure there are no uninitialized candidates as active occupants of Cell
                 nRejectedSkf = -1
                 while (nRejectedSkf != 0):
-                    pexLog.Trace(self._log.getName()+"._fitSpatialKernelFromCandidates", 2, 
+                    pexLog.Trace(self._log.getName()+"._solve", 2, 
                                  "Building single kernels...")
                     kernelCells.visitCandidates(singlekv, nStarPerCell)
                     nRejectedSkf = singleKernelFitter.getNRejected()
-                    pexLog.Trace(self._log.getName()+"._fitSpatialKernelFromCandidates", 2, 
+                    pexLog.Trace(self._log.getName()+"._solve", 2, 
                                  "Iteration %d, rejected %d candidates due to initial kernel fit" % (thisIteration, nRejectedKsum))
 
                 # Reject outliers in kernel sum 
@@ -616,7 +643,7 @@ class PsfMatch(object):
                 kernelCells.visitCandidates(ksv, nStarPerCell)      
 
                 nRejectedKsum = ksv.getNRejected()
-                pexLog.Trace(self._log.getName()+"._fitSpatialKernelFromCandidates", 2, 
+                pexLog.Trace(self._log.getName()+"._solve", 2, 
                              "Iteration %d, rejected %d candidates due to kernel sum" % (thisIteration, nRejectedKsum))
 
 
@@ -631,7 +658,7 @@ class PsfMatch(object):
                 # the spatial fit to these kernels
                 
                 if (usePcaForSpatialKernel):
-                    pexLog.Trace(self._log.getName()+"._fitSpatialKernelFromCandidates", 5, 
+                    pexLog.Trace(self._log.getName()+"._solve", 5, 
                                  "Building Pca basis")
 
                     nComponents       = self._config.numPrincipalComponents
@@ -648,7 +675,7 @@ class PsfMatch(object):
 
                     eSum = num.sum(eigenValues)
                     for j in range(len(eSum)):
-                        pexLog.Trace(self._log.getName()+"._fitSpatialKernelFromCandidates", 6, 
+                        pexLog.Trace(self._log.getName()+"._solve", 6, 
                                      "Eigenvalue %d : %f (%f \%)" % (j, eigenValues[j], eigenValues[j]/eSum))
                                      
                     nToUse = min(nComponents, len(eigenValues))
@@ -667,7 +694,7 @@ class PsfMatch(object):
                     kernelCells.visitCandidates(singlekvPca, nStarPerCell)
                     singlekvPca.setSkipBuilt(True)
                     nRejectedPca = singlekvPca.getNRejected()
-                    pexLog.Trace(self._log.getName()+"._fitSpatialKernelFromCandidates", 2, 
+                    pexLog.Trace(self._log.getName()+"._solve", 2, 
                                  "Iteration %d, rejected %d candidates due to Pca kernel fit" % (thisIteration, nRejectedPca))
                     
                     # We don't want to continue on (yet) with the
@@ -690,7 +717,7 @@ class PsfMatch(object):
                 spatialkv  = ipDiffim.BuildSpatialKernelVisitor(spatialBasisList, regionBBox, self._config)
                 kernelCells.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
-                pexLog.Trace(self._log.getName()+"._fitSpatialKernelFromCandidates", 3, 
+                pexLog.Trace(self._log.getName()+"._solve", 3, 
                              "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
                 spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
@@ -699,9 +726,9 @@ class PsfMatch(object):
                 kernelCells.visitCandidates(assesskv, nStarPerCell)
                 nRejectedSpatial = assesskv.getNRejected()
                 nGoodSpatial     = assesskv.getNGood()
-                pexLog.Trace(self._log.getName()+"._fitSpatialKernelFromCandidates", 2, 
+                pexLog.Trace(self._log.getName()+"._solve", 2, 
                              "Iteration %d, rejected %d candidates due to spatial kernel fit" % (thisIteration, nRejectedPca))
-                pexLog.Trace(self._log.getName()+"._fitSpatialKernelFromCandidates", 2, 
+                pexLog.Trace(self._log.getName()+"._solve", 2, 
                              "%d candidates used in fit" % (nGoodSpatial))
 
                 if nGoodSpatial == 0:
@@ -719,14 +746,12 @@ class PsfMatch(object):
             pexLog.Trace(self._log.getName()+"._solve", 2, e.args[0].what())
             raise e
             
-        except pexExcept.LsstCppException, e:
-            pexLog.Trace(self._log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
-            pexLog.Trace(self._log.getName()+"._solve", 2, e.args[0].what())
-            raise e
-        
+      
         t1 = time.time()
-        pexLog.Trace(self._log.getName()+"._fitSpatialKernelFromCandidates", 1, 
+        pexLog.Trace(self._log.getName()+"._solve", 1, 
                      "Total time to compute the spatial kernel : %.2f s" % (t1 - t0))
-        pexLog.Trace(self._log.getName()+"._fitSpatialKernelFromCandidates", 2, "")
+        pexLog.Trace(self._log.getName()+"._solve", 2, "")
 
+        self._diagnostic(spatialKernel, spatialBackground)
+        
         return spatialKernel, spatialBackground
