@@ -83,13 +83,13 @@ def fakeCoeffs():
                ( -0.005,  -0.000050,  0.000050))
     return kCoeffs
 
-def makeFakeKernelSet(policy, basisList,
+def makeFakeKernelSet(config, basisList,
                       sizeCell = 128, nCell = 3,
                       deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
                       addNoise = True, bgValue = 100., display = False):
-    kSize    = policy.get('kernelSize')
-    policy.set('sizeCellX', sizeCell)
-    policy.set('sizeCellY', sizeCell)
+    kSize    = config.kernelSize
+    config.sizeCellX = sizeCell
+    config.sizeCellY = sizeCell
 
     # This sets the final extent of each convolved delta function
     gaussKernelWidth   = sizeCell // 2
@@ -187,7 +187,7 @@ def makeFakeKernelSet(policy, basisList,
             tsi = afwImage.MaskedImageF(tMi, bbox, afwImage.LOCAL)
             ssi = afwImage.MaskedImageF(sMi, bbox, afwImage.LOCAL)
 
-            kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policy)
+            kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, config)
             kernelCellSet.insertCandidate(kc)
 
     return tMi, sMi, sKernel, kernelCellSet
@@ -197,12 +197,12 @@ def makeFakeKernelSet(policy, basisList,
 # Background subtraction for ip_diffim
 #######
 
-def backgroundSubtract(policy, maskedImages):
+def backgroundSubtract(config, maskedImages):
     backgrounds = []
     t0 = time.time()
-    algorithm   = policy.get("algorithm")
-    binsize     = policy.get("binsize")
-    undersample = policy.get("undersample")
+    algorithm   = config.algorithmName
+    binsize     = config.binsize
+    undersample = config.undersample
     bctrl       = afwMath.BackgroundControl(algorithm)
     bctrl.setUndersampleStyle(undersample)
     for maskedImage in maskedImages:
