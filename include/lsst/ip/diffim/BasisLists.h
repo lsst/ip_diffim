@@ -23,9 +23,6 @@ namespace lsst {
 namespace ip { 
 namespace diffim {
 
-    lsst::afw::math::KernelList
-    makeKernelBasisList(lsst::pex::policy::Policy policy);
-   
     /**
      * @brief Build a set of Delta Function basis kernels
      * 
@@ -130,18 +127,6 @@ namespace diffim {
         int nGauss,                   ///< number of gaussians
         std::vector<double> const& sigGauss,   ///< width of the gaussians
         std::vector<int>    const& degGauss    ///< local spatial variation of gaussians
-        );
-
-
-
-
-    boost::shared_ptr<Eigen::MatrixXd> makeFiniteDifferenceRegularizationDeprecated(
-        unsigned int width,
-        unsigned int height,
-        unsigned int order,
-	unsigned int boundary_style = 1, 
-	unsigned int difference_style = 0,
-	bool printB=false
         );
 
 }}} // end of namespace lsst::ip::diffim

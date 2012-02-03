@@ -29,39 +29,6 @@ namespace lsst {
 namespace ip { 
 namespace diffim {
 
-    lsst::afw::math::KernelList
-    makeKernelBasisList(
-        lsst::pex::policy::Policy policy
-        ) {
-
-        std::string kernelBasisSet = policy.getString("kernelBasisSet");
-        int kSize = policy.getInt("kernelSize");
-        
-        if (kernelBasisSet == "alard-lupton") {
-            int alardNGauss                   = policy.getInt("alardNGauss");
-            std::vector<double> alardSigGauss = policy.getDoubleArray("alardSigGauss");
-            std::vector<int> alardDegGauss    = policy.getIntArray("alardDegGauss");
-            
-            if (static_cast<int>(alardSigGauss.size()) != alardNGauss) 
-                throw LSST_EXCEPT(pexExcept::Exception, "alardSigGauss.size() != alardNGauss");
-            if (static_cast<int>(alardDegGauss.size()) != alardNGauss) 
-                throw LSST_EXCEPT(pexExcept::Exception, "alardDegGauss.size() != alardNGauss");
-            if ((kSize % 2) != 1) {
-                throw LSST_EXCEPT(pexExcept::Exception, "Only odd-sized Alard-Lupton bases allowed");
-            }
-            
-            return makeAlardLuptonBasisList(kSize/2, alardNGauss, alardSigGauss, alardDegGauss);
-        }
-        else if (kernelBasisSet == "delta-function") {
-            return makeDeltaFunctionBasisList(kSize, kSize);
-        }
-        else {
-            throw LSST_EXCEPT(pexExcept::Exception, "Invalid basis set requested");
-        }
-        
-    }
-    
-    
    /** 
     * @brief Generate a basis set of delta function Kernels.
     *

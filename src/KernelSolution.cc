@@ -1219,8 +1219,6 @@ namespace diffim {
             new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
             );
         
-        std::string lambdaType = _policy.getString("lambdaType");        
-        double lambdaValue     = _policy.getDouble("lambdaValue");
         
         /* See N.R. 18.5
            
@@ -1271,12 +1269,13 @@ namespace diffim {
 
         */
         
+        std::string lambdaType = _policy.getString("lambdaType");        
         if (lambdaType == "absolute") {
-            _lambda = lambdaValue;
+            _lambda = _policy.getDouble("lambdaValue");
         }
         else if (lambdaType ==  "relative") {
             _lambda  = this->_mMat->trace() / this->_hMat->trace();
-            _lambda *= lambdaValue;
+            _lambda *= _policy.getDouble("lambdaScaling");
         }
         else if (lambdaType ==  "minimizeBiasedRisk") {
             double tol = _policy.getDouble("maxConditionNumber");
