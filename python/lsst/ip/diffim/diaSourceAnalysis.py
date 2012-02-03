@@ -34,6 +34,7 @@ import lsst.daf.persistence              as dafPersist
 import lsst.daf.base                     as dafBase
 import numpy as num
 import lsst.afw.display.ds9 as ds9
+import lsst.pex.config as pexConfig
 
 scaling = 5
 pexLog.Trace_setVerbosity("lsst.ip.diffim", 5)
@@ -58,16 +59,48 @@ def readSourceSet(boostFile):
     psvptr = persistence.unsafeRetrieve("PersistableSourceVector", storageList, additionalData)
     psv = afwDet.PersistableSourceVector.swigConvert(psvptr)
     return psv.getSources()
-    
+
+class DiaSourceAnalystConfig(pexConfig.Config):
+    srcBadMaskPlanes = pexConfig.ListField(
+        dtype = str,
+        doc = """Mask planes that lead to an invalid detection.
+                 Options: EDGE SAT BAD CR INTRP
+                 E.g. : EDGE SAT BAD allows CR-masked and interpolated pixels""",
+        default = ("EDGE", "SAT", "BAD")
+    )
+    fBadPixels = pexConfig.Field(
+        dtype = float,
+        doc = "Fraction of bad pixels allowed in footprint",
+        default = 0.1
+    )
+    fluxPolarityRatio = pexConfig.Field(
+        dtype = float,
+        doc = "Minimum fraction of flux in correct-polarity pixels",
+        default = 0.75
+    )
+    nPolarityRatio = pexConfig.Field(
+        dtype = float,
+        doc = "Minimum fraction of correct-polarity pixels in unmasked subset",
+        default = 0.7
+    )
+    nMaskedRatio = pexConfig.Field(
+        dtype = float,
+        doc = "Minimum fraction of correct-polarity unmasked to masked pixels",
+        default = 0.6,
+    )
+    nGoodRatio =  pexConfig.Field(
+        dtype = float,
+        doc = "Minimum fraction of correct-polarity unmasked to all pixels",
+        default = 0.5
+    )
+
+
 class DiaSourceAnalyst(object):
-    def __init__(self, defaultPolicy = None):
-        policyFile  = pexPolicy.DefaultPolicyFile("ip_diffim", "DiaSourceAnalysisDictionary.paf", "policy")
-        self.policy = pexPolicy.Policy.createPolicy(policyFile, policyFile.getRepositoryPath(), True)
-        if defaultPolicy:
-            self.policy.mergeDefaults(defaultPolicy)
+    def __init__(self, config):
+        self.config = config
             
         self.bitMask = 0
-        srcBadMaskPlanes = self.policy.getStringArray("srcBadMaskPlanes")
+        srcBadMaskPlanes = self.config.srcBadMaskPlanes
         for maskPlane in srcBadMaskPlanes:
             self.bitMask |= afwImage.MaskU_getPlaneBitMask(maskPlane) 
         
@@ -101,7 +134,7 @@ class DiaSourceAnalyst(object):
         
         # 1) Too many pixels in the detection are masked  
         fMasked    = (nMasked / nPixels)
-        fMaskedTol = self.policy.get("fBadPixels")
+        fMaskedTol = self.config.fBadPixels
         if fMasked > fMaskedTol:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
                 "Candidate %d : BAD fBadPixels %.2f > %.2f" % (source.getId(), fMasked, fMaskedTol))
@@ -121,7 +154,7 @@ class DiaSourceAnalyst(object):
             npolRatio  = nNeg / (nNeg + nPos)
         
         # 2) Not enough flux in unmasked correct-polarity pixels
-        fluxRatioTolerance = self.policy.get("fluxPolarityRatio")
+        fluxRatioTolerance = self.config.fluxPolarityRatio
         if fluxRatio < fluxRatioTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
                 "Candidate %d : BAD flux polarity %.2f < %.2f (pos=%.2f neg=%.2f)" % (source.getId(), 
@@ -129,7 +162,7 @@ class DiaSourceAnalyst(object):
             return False
         
         # 3) Not enough unmasked pixels of correct polarity
-        polarityTolerance = self.policy.get("nPolarityRatio")
+        polarityTolerance = self.config.nPolarityRatio
         if npolRatio < polarityTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
                 "Candidate %d : BAD polarity count %.2f < %.2f (pos=%d neg=%d)" % (source.getId(), 
@@ -137,7 +170,7 @@ class DiaSourceAnalyst(object):
             return False
             
         # 4) Too many masked vs. correct polarity pixels
-        maskedTolerance = self.policy.get("nMaskedRatio")
+        maskedTolerance = self.config.nMaskedRatio
         if maskRatio < maskedTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
                 "Candidate %d : BAD unmasked count %.2f < %.2f (pos=%d neg=%d mask=%d)" % (source.getId(), 
@@ -145,7 +178,7 @@ class DiaSourceAnalyst(object):
             return False
 
         # 5) Too few unmasked, correct polarity pixels
-        ngoodTolerance = self.policy.get("nGoodRatio")
+        ngoodTolerance = self.config.nGoodRatio
         if ngoodRatio < ngoodTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
                 "Candidate %d : BAD good pixel count %.2f < %.2f (pos=%d neg=%d tot=%d)" % (source.getId(), 
