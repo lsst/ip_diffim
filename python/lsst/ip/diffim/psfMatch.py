@@ -583,13 +583,14 @@ class PsfMatch(object):
         useRegularization      = self._config.useRegularization
 
         # Visitor for the single kernel fit
+        policy = pexConfig.makePolicy(self._config)
         if useRegularization:
-            singlekv = ipDiffim.BuildSingleKernelVisitorF(basisList, self._config)
+            singlekv = ipDiffim.BuildSingleKernelVisitorF(basisList, policy)
         else:
-            singlekv = ipDiffim.BuildSingleKernelVisitorF(basisList, self._config, hMat)
+            singlekv = ipDiffim.BuildSingleKernelVisitorF(basisList, policy, hMat)
 
         # Visitor for the kernel sum rejection
-        ksv = ipDiffim.kernelSumVisitorF(self._config)
+        ksv = ipDiffim.kernelSumVisitorF(policy)
         
         # Main loop
         t0 = time.time()
@@ -663,7 +664,7 @@ class PsfMatch(object):
                     spatialBasisList = ipDiffim.renormalizeKernelList(trimBasisList)
 
                     # New Kernel visitor for this new basis list (no regularization explicitly)
-                    singlekvPca = ipDiffim.BuildSingleKernelVisitorF(spatialBasisList, self._config)
+                    singlekvPca = ipDiffim.BuildSingleKernelVisitorF(spatialBasisList, policy)
                     singlekvPca.setSkipBuilt(False)
                     kernelCells.visitCandidates(singlekvPca, nStarPerCell)
                     singlekvPca.setSkipBuilt(True)
@@ -688,7 +689,7 @@ class PsfMatch(object):
 
                 # We have gotten on to the spatial modeling part
                 regionBBox = kernelCells.getBBox()
-                spatialkv  = ipDiffim.BuildSpatialKernelVisitor(spatialBasisList, regionBBox, self._config)
+                spatialkv  = ipDiffim.BuildSpatialKernelVisitor(spatialBasisList, regionBBox, policy)
                 kernelCells.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
                 pexLog.Trace(self._log.getName()+"._solve", 3, 
@@ -696,7 +697,7 @@ class PsfMatch(object):
                 spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
                 # Check the quality of the spatial fit (look at residuals)
-                assesskv   = ipDiffim.AssessSpatialKernelVisitor(spatialKernel, spatialBackground, self._config)
+                assesskv   = ipDiffim.AssessSpatialKernelVisitor(spatialKernel, spatialBackground, policy)
                 kernelCells.visitCandidates(assesskv, nStarPerCell)
                 nRejectedSpatial = assesskv.getNRejected()
                 nGoodSpatial     = assesskv.getNGood()
