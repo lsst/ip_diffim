@@ -252,9 +252,4 @@ p_INSTANTIATE_convolveAndSubtract(MaskedImage, TYPE)
 INSTANTIATE_convolveAndSubtract(float);
 INSTANTIATE_convolveAndSubtract(double);
 
-template
-std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, lsst::afw::math::Kernel::SpatialFunctionPtr>
-fitSpatialKernelFromCandidates<float>(lsst::afw::math::SpatialCellSet &,
-                                      lsst::pex::policy::Policy const&);
-
 }}} // end of namespace lsst::ip::diffim

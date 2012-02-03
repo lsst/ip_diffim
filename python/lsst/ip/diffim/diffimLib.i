@@ -140,8 +140,6 @@ def version(HeadURL = r"$HeadURL$"):
 
 %include "lsst/ip/diffim/ImageSubtract.h"
 
-%template(fitSpatialKernelFromCandidates) lsst::ip::diffim::fitSpatialKernelFromCandidates<float>;
-
 %template(FindSetBitsU)
     lsst::ip::diffim::FindSetBits<lsst::afw::image::Mask<lsst::afw::image::MaskPixel> >;
 

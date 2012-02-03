@@ -27,65 +27,44 @@ import eups
 import os
 import lsst.utils.tests as tests
 import lsst.ip.diffim as ipDiffim
-import lsst.pex.policy as pexPolicy
 
 class DiffimTestCases(unittest.TestCase):
     def setUp(self):
-        self.p0      = pexPolicy.Policy()
-        diffimDir    = eups.productDir("ip_diffim")
-        policyPath   = os.path.join(diffimDir, "policy", "PsfMatchingDictionary.paf")
-        defPolicy    = pexPolicy.Policy.createPolicy(policyPath)
-        self.p0.mergeDefaults(defPolicy.getDictionary())
+        pass
 
     def tearDown(self):
-        del self.p0
-        
-    def testMerge(self):
-        # Invalid; parameter does not exist
-        mergePolicy = pexPolicy.Policy()
-        mergePolicy.set("testMerge", True)
-        try:
-            p1 = ipDiffim.makeDefaultPolicy(mergePolicy = mergePolicy)
-        except:
-            pass
-        else:
-            self.fail()
+        pass
 
-        # Change parameter by sending policy
-        mergePolicy = pexPolicy.Policy()
-        mergePolicy.set("fitForBackground", not self.p0.get("fitForBackground"))
-        p2 = ipDiffim.makeDefaultPolicy(mergePolicy = mergePolicy)
-        self.assertTrue(p2.get("fitForBackground") == (not self.p0.get("fitForBackground")))
+    def testDiaSourceAnalystConfig(self):
+        config = ipDiffim.DiaSourceAnalystConfig()
 
-        # Change parameter by sending path
-        mergePolicyPath = os.path.join(os.getenv("IP_DIFFIM_DIR"), "policy", "DeconvolutionPolicy.paf")
-        p3 = ipDiffim.makeDefaultPolicy(mergePolicy = mergePolicyPath)
-        self.assertTrue(p3.get("modifiedForDeconvolution") == True)
+    def testImagePsfMatchConfig(self):
+        config = ipDiffim.ImagePsfMatchConfig()
 
+    def testSnapPsfMatchConfigDF(self):
+        config = ipDiffim.SnapPsfMatchConfigDF()
 
-    def testModifyImagePsfMatch(self):
-        p1 = ipDiffim.modifyForImagePsfMatch(self.p0, 3, 4)
-        self.assertTrue(p1.get("modifiedForImagePsfMatch") == True)
+    def testSnapPsfMatchConfigAL(self):
+        config = ipDiffim.SnapPsfMatchConfigAL()
 
-        p2 = ipDiffim.modifyForImagePsfMatch(self.p0, 4, 3)
-        self.assertTrue(p2.get("modifiedForImagePsfMatch") == True)
-        self.assertTrue(p2.get("modifiedForDeconvolution") == True)
+    def testModelPsfMatchConfig(self):
+        config = ipDiffim.ModelPsfMatchConfig()
 
-    def testModifyDeconv(self):
-        p1 = ipDiffim.modifyForDeconvolution(self.p0)
-        self.assertTrue(p1.get("modifiedForDeconvolution") == True)
-        
-    def testModifyModelPsfMatch(self):
-        p1 = ipDiffim.modifyForModelPsfMatch(self.p0)
-        self.assertTrue(p1.get("modifiedForModelPsfMatch") == True)
+    def testDetectionConfig(self):
+        config = ipDiffim.DetectionConfig()
 
-    def testModifySnap(self):
-        p1 = ipDiffim.modifyForSnapSubtraction(self.p0)
-        self.assertTrue(p1.get("modifiedForSnapSubtraction") == True)
-        
-    def tearDown(self):
-        del self.p0
-        
+    def testAfwBackgroundConfig(self):
+        config = ipDiffim.AfwBackgroundConfig()
+
+    def testPsfMatchConfig(self):
+        config = ipDiffim.PsfMatchConfig()
+
+    def testPsfMatchConfigAL(self):
+        config = ipDiffim.PsfMatchConfigAL()
+
+    def testPsfMatchConfigDF(self):
+        config = ipDiffim.PsfMatchConfigDF()
+
 #####
         
 def suite():

@@ -29,8 +29,7 @@ from diffimLib import *
 from psfMatch import *
 from imagePsfMatch import *
 from modelPsfMatch import *
-from makeRatingVector import *
-from makeDefaultPolicy import *
+from diaSourceAnalysis import *
 
 from diffimTools import *
 
