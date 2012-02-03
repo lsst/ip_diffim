@@ -26,32 +26,6 @@ import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
 
-#
-# Use afwMath.warper.WarperConfig
-#
-#class WarpConfig(pexConfig.Config):
-#    warpingKernelName = pexConfig.ChoiceField(
-#        dtype = str,
-#        doc = "Warping kernel",
-#        default = "lanczos4",
-#        allowed = {
-#            "bilinear": "bilinear interpolation",
-#            "lanczos3": "Lanczos kernel of order 3",
-#            "lanczos4": "Lanczos kernel of order 4",
-#            "lanczos5": "Lanczos kernel of order 5",
-#        }
-#    )
-#    interpLength = pexConfig.Field(
-#        dtype = int,
-#        doc = "interpLength argument to lsst.afw.math.warpExposure",
-#        default = 10
-#    )
-#    cacheSize = pexConfig.Field(
-#        dtype = int,
-#        doc = "cacheSize argument to lsst.afw.math.SeparableKernel.computeCache",
-#        default = 0
-#    )
-
 class DetectionConfig(pexConfig.Config):
     detThreshold = pexConfig.Field(
         dtype = float,
