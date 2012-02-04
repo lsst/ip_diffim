@@ -83,6 +83,23 @@ class DetectionConfig(pexConfig.Config):
         default = 30,
         check = lambda x: (x >= 20) and (x <= 40)
     )
+    fpGrowMin = pexConfig.Field(
+        dtype = int,
+        doc = """Minimum number of pixels to grow""",
+        default = 20,
+    )
+    fpGrowMax = pexConfig.Field(
+        dtype = int,
+        doc = """Maximum number of pixels to grow.""",
+        default = 40,
+    )
+
+    def validate(self):
+        pexConfig.Config.validate(self)
+        if (self.fpGrowPix < self.fpGrowMin) or (self.fpGrowPix > self.fpGrowMax):
+            return False
+        return True
+        
     
 class AfwBackgroundConfig(pexConfig.Config):
     algorithmName = pexConfig.ChoiceField(

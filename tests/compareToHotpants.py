@@ -2,37 +2,36 @@
 import os, sys
 import unittest
 import lsst.utils.tests as tests
-
+import numpy as num
 import eups
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
-        self.policy.set("checkConditionNumber", False) # these images have been hand-constructed
-        self.policy.set("fitForBackground", True) # and hotpants subtracts background
-        self.policy.set("spatialKernelType", "polynomial") 
-        self.policy.set("spatialBgType", "polynomial") 
+        self.config = ipDiffim.PsfMatchConfigAL()
+        self.policy = pexConfig.makePolicy(self.config)
+        self.policy.set("fitForBackground", True) # hotpants subtracts background
+        self.policy.set("spatialModelType", "polynomial") 
         self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
         self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')
         self.smi.setXY0(0,0)
         self.tmi.setXY0(0,0)
 
         # Run detection
-        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy.getPolicy("detectionPolicy"))
+        detConfig = self.config.detectionConfig
+        kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
         kcDetect.apply(self.smi, self.tmi)
         self.footprints = kcDetect.getFootprints()
 
         # Make a basis list that hotpants has been run with
-        self.policy.set('kernelBasisSet', 'alard-lupton')
-        self.policy.set('useRegularization', False)
         nGauss = 1
         sGauss = [3.]
         dGauss = [3]

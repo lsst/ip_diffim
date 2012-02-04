@@ -187,15 +187,18 @@ def version(HeadURL = r"$HeadURL$"):
 
 
 %define %KernelSolutionPtrs(NAME, TYPE)
-SWIG_SHARED_PTR_DERIVED(StaticKernelSolution##NAME,
-                        lsst::ip::diffim::KernelSolution,
-                        lsst::ip::diffim::StaticKernelSolution<TYPE>);
-SWIG_SHARED_PTR_DERIVED(MaskedKernelSolution##NAME,
-                        lsst::ip::diffim::StaticKernelSolution<TYPE>,
-                        lsst::ip::diffim::MaskedKernelSolution<TYPE>);
-SWIG_SHARED_PTR_DERIVED(RegularizedKernelSolution##NAME,
-                        lsst::ip::diffim::StaticKernelSolution<TYPE>,
-                        lsst::ip::diffim::RegularizedKernelSolution<TYPE>);
+//SWIG_SHARED_PTR_DERIVED(StaticKernelSolution##NAME,
+//                        lsst::ip::diffim::KernelSolution,
+//                        lsst::ip::diffim::StaticKernelSolution<TYPE>);
+//SWIG_SHARED_PTR_DERIVED(MaskedKernelSolution##NAME,
+//                        lsst::ip::diffim::StaticKernelSolution<TYPE>,
+//                        lsst::ip::diffim::MaskedKernelSolution<TYPE>);
+//SWIG_SHARED_PTR_DERIVED(RegularizedKernelSolution##NAME,
+//                        lsst::ip::diffim::StaticKernelSolution<TYPE>,
+//                        lsst::ip::diffim::RegularizedKernelSolution<TYPE>);
+%shared_ptr(lsst::ip::diffim::StaticKernelSolution<TYPE>);
+%shared_ptr(lsst::ip::diffim::MaskedKernelSolution<TYPE>);
+%shared_ptr(lsst::ip::diffim::RegularizedKernelSolution<TYPE>);
 %enddef
 
 %define %KernelSolutions(NAME, TYPE)
@@ -205,9 +208,6 @@ SWIG_SHARED_PTR_DERIVED(RegularizedKernelSolution##NAME,
 %enddef
 
 %shared_ptr(lsst::ip::diffim::KernelSolution);
-%shared_ptr(lsst::ip::diffim::StaticKernelSolution);
-%shared_ptr(lsst::ip::diffim::MaskedKernelSolution);
-%shared_ptr(lsst::ip::diffim::RegularizedKernelSolution);
 %shared_ptr(lsst::ip::diffim::SpatialKernelSolution);
 
 %KernelSolutionPtrs(F, float);
@@ -223,8 +223,9 @@ SWIG_SHARED_PTR_DERIVED(RegularizedKernelSolution##NAME,
 %}
 
 %define %KernelCandidateDetectionPtr(NAME, TYPE)
-SWIG_SHARED_PTR(KernelCandidateDetection##NAME,
-                lsst::ip::diffim::KernelCandidateDetection<TYPE>);
+//SWIG_SHARED_PTR(KernelCandidateDetection##NAME,
+//                lsst::ip::diffim::KernelCandidateDetection<TYPE>);
+%shared_ptr(lsst::ip::diffim::KernelCandidateDetection<TYPE>);
 %enddef
 
 %define %KernelCandidateDetection(NAME, TYPE)
@@ -247,9 +248,10 @@ lsst::afw::image::Image<PIXTYPE>
 %enddef
 
 %define %KernelCandidatePtr(NAME, TYPE)
-SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
-                        lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::Pixel)>,
-                        lsst::ip::diffim::KernelCandidate<TYPE>);
+ //SWIG_SHARED_PTR_DERIVED(KernelCandidate##NAME,
+ //                        lsst::afw::math::SpatialCellImageCandidate<%IMAGE(lsst::afw::math::Kernel::Pixel)>,
+ //                        lsst::ip::diffim::KernelCandidate<TYPE>);
+%shared_ptr(lsst::ip::diffim::KernelCandidate<TYPE>);
 
 /* Same problem as with meas algorithms makePsfCandidate */
 %inline %{

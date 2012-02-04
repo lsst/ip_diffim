@@ -37,33 +37,51 @@ class DiffimTestCases(unittest.TestCase):
 
     def testDiaSourceAnalystConfig(self):
         config = ipDiffim.DiaSourceAnalystConfig()
+        config.validate()
 
     def testImagePsfMatchConfig(self):
         config = ipDiffim.ImagePsfMatchConfig()
+        config.validate()
 
     def testSnapPsfMatchConfigDF(self):
         config = ipDiffim.SnapPsfMatchConfigDF()
+        config.validate()
 
     def testSnapPsfMatchConfigAL(self):
         config = ipDiffim.SnapPsfMatchConfigAL()
+        config.validate()
 
     def testModelPsfMatchConfig(self):
         config = ipDiffim.ModelPsfMatchConfig()
 
     def testDetectionConfig(self):
         config = ipDiffim.DetectionConfig()
+        config.validate()
+
+        # Try invalid entry
+        config.fpGrowPix = 1
+        try:
+            config.validate()
+        except:
+            pass
+        else:
+            self.fail()
 
     def testAfwBackgroundConfig(self):
         config = ipDiffim.AfwBackgroundConfig()
+        config.validate()
 
     def testPsfMatchConfig(self):
         config = ipDiffim.PsfMatchConfig()
+        config.validate()
 
     def testPsfMatchConfigAL(self):
         config = ipDiffim.PsfMatchConfigAL()
+        config.validate()
 
     def testPsfMatchConfigDF(self):
         config = ipDiffim.PsfMatchConfigDF()
+        config.validate()
 
 #####
         
