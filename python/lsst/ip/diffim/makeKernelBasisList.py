@@ -19,7 +19,7 @@
 # the GNU General Public License along with this program.  If not, 
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-import diffimLib as ipDiffim
+import diffimLib 
 import lsst.pex.config as pexConfig
 import numpy as num
 sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
@@ -29,11 +29,11 @@ def makeKernelBasisList(config, templateFwhmPix = None, scienceFwhmPix = None):
         return generateAlardLuptonBasisList(config, templateFwhmPix, scienceFwhmPix)
     elif config.kernelBasisSet == "delta-function":
         kernelSize = config.kernelSize
-        return ipDiffim.makeDeltaFunctionBasisList(kernelSize, kernelSize)
+        return diffimLib.makeDeltaFunctionBasisList(kernelSize, kernelSize)
     else:
         raise ValueError("Cannot generate %s basis set" % (config.kernelBasisSet))
 
-def generateAlardLuptonBasisList(config, templateFwhmPix, scienceFwhmPix, minSigma = 0.4, minRatio = 1.25):
+def generateAlardLuptonBasisList(config, templateFwhmPix = None, scienceFwhmPix = None, minSigma = 0.4, minRatio = 1.25):
     if config.kernelBasisSet != "alard-lupton":
         raise RuntimeError("Cannot generate %s basis within generateAlardLuptonBasisList" % (config.kernelBasisSet))
 
@@ -50,10 +50,10 @@ def generateAlardLuptonBasisList(config, templateFwhmPix, scienceFwhmPix, minSig
         raise ValueError("Only odd-sized Alard-Lupton bases allowed")
         
     if not config.scaleByFwhm:
-        return ipDiffim.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
+        return diffimLib.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
     
     if (templateFwhmPix == None) or (scienceFwhmPix == None):
-        return ipDiffim.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
+        return diffimLib.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
         
 
     # Modify the size of Alard Lupton kernels based upon the images FWHM
@@ -131,5 +131,5 @@ def generateAlardLuptonBasisList(config, templateFwhmPix, scienceFwhmPix, minSig
                 sigmajn   = num.sqrt(sigma2jn)
                 alardSigGauss.append(sigmajn)
 
-    return ipDiffim.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
+    return diffimLib.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
 

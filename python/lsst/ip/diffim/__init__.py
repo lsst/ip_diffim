@@ -30,6 +30,7 @@ from psfMatch import *
 from imagePsfMatch import *
 from modelPsfMatch import *
 from diaSourceAnalysis import *
+from makeKernelBasisList import *
 
 from diffimTools import *
 

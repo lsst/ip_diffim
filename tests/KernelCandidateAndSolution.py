@@ -83,8 +83,6 @@ class DiffimTestCases(unittest.TestCase):
 
 
         kImage = solution.makeKernelImage()
-#        import pdb; pdb.set_trace()
-
         for j in range(kImage.getHeight()):
             for i in range(kImage.getWidth()):
 
@@ -93,7 +91,7 @@ class DiffimTestCases(unittest.TestCase):
                 else:
                     self.assertAlmostEqual(kImage.get(i, j), 0., 5)
 
-    def xtestConstructor(self):
+    def testConstructor(self):
         # Original and uninitialized
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
@@ -149,7 +147,7 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.fail()
 
-    def xtestDeltaFunctionScaled(self, scaling = 2.7, bg = 11.3):
+    def testDeltaFunctionScaled(self, scaling = 2.7, bg = 11.3):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
@@ -241,7 +239,7 @@ class DiffimTestCases(unittest.TestCase):
         
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT))
 
-    def xtestGaussianWithNoise(self):
+    def testGaussianWithNoise(self):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
@@ -313,7 +311,7 @@ class DiffimTestCases(unittest.TestCase):
                     self.assertAlmostEqual(kImageOut.get(i, j), kImageIn.get(i, j), 2)
         
 
-    def xtestGaussian(self, imsize = 50):
+    def testGaussian(self, imsize = 50):
         # Convolve a delta function with a known gaussian; try to
         # recover using delta-function basis
 
@@ -365,7 +363,7 @@ class DiffimTestCases(unittest.TestCase):
             for i in range(kImageOut.getWidth()):
                 self.assertAlmostEqual(kImageOut.get(i, j)/kImageIn.get(i, j), 1.0, 5)
 
-    def xtestZeroVariance(self, imsize = 50):
+    def testZeroVariance(self, imsize = 50):
         gsize = self.policy.getInt("kernelSize")
         tsize = imsize + gsize
 
@@ -386,7 +384,7 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.fail()
         
-    def xtestConstantWeighting(self):
+    def testConstantWeighting(self):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
@@ -395,7 +393,7 @@ class DiffimTestCases(unittest.TestCase):
         self.testGaussian()
         self.testGaussianWithNoise()
         
-    def xtestNoBackgroundFit(self):
+    def testNoBackgroundFit(self):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
@@ -403,7 +401,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set("constantVarianceWeighting", True)
         self.testGaussian()
 
-    def xtestInsert(self):
+    def testInsert(self):
         mi = afwImage.MaskedImageF(afwGeom.Extent2I(10, 10))
         kc = ipDiffim.makeKernelCandidate(0., 0., mi, mi, self.policy)
         kc.setStatus(afwMath.SpatialCellCandidate.GOOD)
@@ -421,7 +419,7 @@ class DiffimTestCases(unittest.TestCase):
                 nSeen += 1
         self.assertEqual(nSeen, 1)
         
-    def xtestDisp(self):
+    def dontTestDisp(self):
         ds9.mtv(self.scienceImage2, frame=1)
         ds9.mtv(self.templateExposure2, frame=2)
         

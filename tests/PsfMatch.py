@@ -15,14 +15,31 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class PsfMatchTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
+        self.configAL  = ipDiffim.PsfMatchConfigAL()
+        self.configDF  = ipDiffim.PsfMatchConfigDF()
+        self.configDFr = ipDiffim.PsfMatchConfigDF()
 
-        self.policy.set("kernelBasisSet", "alard-lupton")
-        self.policy.set("alardNGauss", 1)
-        self.policy.set("alardSigGauss", 2.5)
-        self.policy.set("alardDegGauss", 2)
-        self.basisList = ipDiffim.makeKernelBasisList(self.policy)
+        self.configDF.useRegularization = False
+        self.configDFr.useRegularization = True
 
+    def testImagePsfMatch(self):
+        tMi, sMi, sK, kcs = diffimTools.makeFakeKernelSet()
+        tWcs = self.makeWcs(offset = 0)
+        sWcs = self.makeWcs(offset = 1)
+        tExp = afwImage.ExposureF(tMi, tWcs)
+        sExp = afwImage.ExposureF(sMi, sWcs)
+
+        psfMatchAL  = ipDiffim.ImagePsfMatch(self.configAL)
+        psfMatchDF  = ipDiffim.ImagePsfMatch(self.configDF)
+        psfMatchDFr = ipDiffim.ImagePsfMatch(self.configDFr)
+
+        self.assertEqual(psfMatchAL.useRegularization, False)
+        self.assertEqual(psfMatchDF.useRegularization, False)
+        self.assertEqual(psfMatchDFr.useRegularization, True)
+
+        resultsAL  = psfmatchAL.subtractExposures(tExp, sExp, doWarping = True)
+        resultsDF  = psfmatchDF.subtractExposures(tExp, sExp, doWarping = True)
+        resultsDFr = psfmatchDFr.subtractExposures(tExp, sExp, doWarping = True)
 
     def makeWcs(self, offset = 0):
         # taken from $AFW_DIR/tests/testMakeWcs.py

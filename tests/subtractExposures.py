@@ -11,6 +11,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
+import lsst.pex.config as pexConfig
 import lsst.ip.diffim.diffimTools as diffimTools
 
 verbosity = 5
@@ -23,7 +24,7 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.policy       = ipDiffim.makeDefaultPolicy()
+        self.config = ipDiffim.PsfMatchConfigAL()
 
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
@@ -35,8 +36,9 @@ class DiffimTestCases(unittest.TestCase):
             
             self.scienceImage   = afwImage.ExposureF(defSciencePath)
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
-            
-            diffimTools.backgroundSubtract(self.policy.getPolicy("afwBackgroundPolicy"),
+
+            bgConfig = self.config.afwBackgroundConfig
+            diffimTools.backgroundSubtract(bgConfig,
                                            [self.templateImage.getMaskedImage(),
                                             self.scienceImage.getMaskedImage()])
             self.offset   = 1500
@@ -44,12 +46,12 @@ class DiffimTestCases(unittest.TestCase):
                                           afwGeom.Point2I(511, 2046))
 
     def tearDown(self):
-        del self.policy
+        del self.config
         if self.defDataDir:
             del self.scienceImage
             del self.templateImage
 
-    def testModel(self):
+    def testModelType(self):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
@@ -57,13 +59,13 @@ class DiffimTestCases(unittest.TestCase):
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
 
-        self.policy.set('spatialKernelType', 'chebyshev1')
-        psfmatch1 = ipDiffim.ImagePsfMatch(self.policy)
+        self.config.spatialModelType = 'chebyshev1'
+        psfmatch1 = ipDiffim.ImagePsfMatch(self.config)
         results1 = psfmatch1.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 
-        self.policy.set('spatialKernelType', 'polynomial')
-        psfmatch2 = ipDiffim.ImagePsfMatch(self.policy)
+        self.config.spatialModelType = 'polynomial'
+        psfmatch2 = ipDiffim.ImagePsfMatch(self.config)
         results2 = psfmatch2.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
 
@@ -81,10 +83,8 @@ class DiffimTestCases(unittest.TestCase):
             )
         
     def testAL(self):
-        self.policy.set('kernelBasisSet', 'alard-lupton')
-        self.policy.set('spatialKernelOrder', 1)
-        self.policy.set('spatialBgOrder', 0) # already bg-subtracted
-        self.policy.set('usePcaForSpatialKernel', False)
+        self.config.spatialKernelOrder = 1
+        self.config.spatialBgOrder = 0 # already bg-subtracted
         self.runXY0(fitForBackground = True, poly = 'polynomial')
         self.runXY0(fitForBackground = False, poly = 'polynomial')
         self.runXY0(fitForBackground = True, poly = 'chebyshev1')
@@ -98,7 +98,7 @@ class DiffimTestCases(unittest.TestCase):
 
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
-        psfmatch = ipDiffim.ImagePsfMatch(self.policy)
+        psfmatch = ipDiffim.ImagePsfMatch(self.config)
         try:
             psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = False)
         except Exception, e:
@@ -111,10 +111,10 @@ class DiffimTestCases(unittest.TestCase):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
-        self.policy.set('fitForBackground', False)
+        self.config.fitForBackground = False
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
-        psfmatch = ipDiffim.ImagePsfMatch(self.policy)
+        psfmatch = ipDiffim.ImagePsfMatch(self.config)
         try:
             psfmatch.subtractExposures(templateSubImage, scienceSubImage)
         except Exception, e:
@@ -127,17 +127,16 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
-        self.policy.set('fitForBackground', fitForBackground)
+        self.config.fitForBackground = fitForBackground
 
         # Since Chebyshev1 remaps the coordinates, the spatial terms don't change!
-        self.policy.set('spatialKernelType', poly)
-        self.policy.set('spatialBgType', poly)
+        self.config.spatialModelType = poly
         
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.PARENT)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
 
         # Have an XY0
-        psfmatch  = ipDiffim.ImagePsfMatch(self.policy)
+        psfmatch  = ipDiffim.ImagePsfMatch(self.config)
         results1  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 

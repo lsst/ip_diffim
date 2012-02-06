@@ -105,6 +105,26 @@ class DiffimTestCases(unittest.TestCase):
 
         # right orthogonality
         self.alardLuptonTest(ks)
+
+    def testGenerateAlardLupton(self):
+        # defaults
+        ks = ipDiffim.generateAlardLuptonBasisList(self.configAL)
+        self.alardLuptonTest(ks)
+
+        # send FWHM
+        ks = ipDiffim.generateAlardLuptonBasisList(self.configAL, templateFwhmPix = 3.0, scienceFwhmPix = 4.0)
+        self.alardLuptonTest(ks)
+
+        
+    #
+    ### Make
+    #
+    def testMakeKernelBasisList(self):
+        ks = ipDiffim.makeKernelBasisList(self.configAL)
+        self.alardLuptonTest(ks)
+
+        ks = ipDiffim.makeKernelBasisList(self.configDF)
+        self.deltaFunctionTest(ks)
         
     #
     ### Renormalize

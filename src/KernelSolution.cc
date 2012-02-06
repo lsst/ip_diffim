@@ -220,12 +220,12 @@ namespace diffim {
     }
 
     template <typename InputT>
-    KernelSolution::ImageT::Ptr StaticKernelSolution<InputT>::makeKernelImage() {
+    lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr StaticKernelSolution<InputT>::makeKernelImage() {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
         }
-        ImageT::Ptr image (
-            new ImageT::Image(_kernel->getDimensions())
+        afwImage::Image<afwMath::Kernel::Pixel>::Ptr image(
+            new afwImage::Image<afwMath::Kernel::Pixel>(_kernel->getDimensions())
             );
         (void)_kernel->computeImage(*image, false);              
         return image;
@@ -1498,15 +1498,14 @@ namespace diffim {
 
     }
 
-    KernelSolution::ImageT::Ptr SpatialKernelSolution::makeKernelImage() {
+    lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr SpatialKernelSolution::makeKernelImage(afwGeom::Point2D const& pos) {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
         }
-        
-        ImageT::Ptr image (
-                           new ImageT::Image(_kernel->getDimensions())
-                          );
-        (void)_kernel->computeImage(*image, false);              
+        afwImage::Image<afwMath::Kernel::Pixel>::Ptr image(
+            new afwImage::Image<afwMath::Kernel::Pixel>(_kernel->getDimensions())
+            );
+        (void)_kernel->computeImage(*image, false, pos[0], pos[1]);              
         return image;
     }
 

@@ -29,6 +29,7 @@ namespace lsst {
 namespace ip { 
 namespace diffim {
 
+    /*
     lsst::afw::math::KernelList
     makeKernelBasisList(
         lsst::pex::policy::Policy policy
@@ -59,6 +60,7 @@ namespace diffim {
             throw LSST_EXCEPT(pexExcept::Exception, "Invalid basis set requested");
         }
     }
+    */
 
 
    /** 

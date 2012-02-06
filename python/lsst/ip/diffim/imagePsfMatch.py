@@ -19,11 +19,13 @@
 # the GNU General Public License along with this program.  If not, 
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-import diffimLib
+import diffimLib 
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import diffimTools
+from makeKernelBasisList import makeKernelBasisList
 from psfMatch import PsfMatch, PsfMatchConfig, PsfMatchConfigDF, PsfMatchConfigAL
 
 class ImagePsfMatchConfig(PsfMatchConfig):
@@ -128,6 +130,7 @@ class ImagePsfMatch(PsfMatch):
         return True
         
     def matchExposures(self, exposureToConvolve, exposureToNotConvolve,
+                       psfFwhmPixEtc = None, psfFwhmPixEtnc = None,
                        footprints = None, doWarping = True):
         """Warp and PSF-match an exposure to the reference
 
@@ -169,6 +172,7 @@ class ImagePsfMatch(PsfMatch):
                 
         psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet = self.matchMaskedImages(
             exposureToConvolve.getMaskedImage(), exposureToNotConvolve.getMaskedImage(),
+            psfFwhmPixEtc = psfFwhmPixEtc, psfFwhmPixEtnc = psfFwhmPixEtnc,
             footprints = footprints)
         
         psfMatchedExposure = afwImage.makeExposure(psfMatchedMaskedImage, exposureToNotConvolve.getWcs())
@@ -177,7 +181,8 @@ class ImagePsfMatch(PsfMatch):
 
         return (psfMatchedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)
     
-    def matchMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve, footprints = None):
+    def matchMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve, 
+                          psfFwhmPixEtc = None, psfFwhmPixEtnc = None, footprints = None):
         """PSF-match a MaskedImage to a reference MaskedImage
 
         Do the following, in order:
@@ -208,7 +213,8 @@ class ImagePsfMatch(PsfMatch):
         kernelCellSet = self._buildCellSet(maskedImageToConvolve,
                                            maskedImageToNotConvolve,
                                            footprints = footprints)
-        psfMatchingKernel, backgroundModel = self._solve(kernelCellSet)
+        basisList = makeKernelBasisList(self._config, psfFwhmPixEtc, psfFwhmPixEtnc)
+        psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
     
         self._log.log(pexLog.Log.INFO, "PSF-match science MaskedImage to reference")
         psfMatchedMaskedImage = afwImage.MaskedImageF(maskedImageToConvolve.getBBox(afwImage.PARENT))
@@ -303,14 +309,16 @@ class ImagePsfMatch(PsfMatch):
                 bkgds = diffimTools.backgroundSubtract(self._config.afwBackgroundConfig,
                                                        [maskedImageToConvolve, maskedImageToNotConvolve])
             
-            kcDetect = diffimLib.KernelCandidateDetectionF(self._config.detectionConfig)
+            detConfig = self._config.detectionConfig
+            kcDetect = diffimLib.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
             kcDetect.apply(maskedImageToConvolve, maskedImageToNotConvolve)
             footprints = kcDetect.getFootprints()
 
             if self._config.fitForBackground:
                 maskedImageToConvolve += bkgds[0]
                 maskedImageToNotConvolve += bkgds[1]
-
+            
+        policy = pexConfig.makePolicy(self._config)
         # Place candidate footprints within the spatial grid
         for fp in footprints:
             bbox = fp.getBBox()
@@ -321,7 +329,7 @@ class ImagePsfMatch(PsfMatch):
             
             tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox, afwImage.PARENT)
             smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox, afwImage.PARENT)
-            cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, self._config)
+            cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, policy)
             
             pexLog.Trace(self._log.getName(), 5,
                          "Candidate %d at %f, %f" % (cand.getId(), cand.getXCenter(), cand.getYCenter()))

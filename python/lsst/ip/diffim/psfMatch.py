@@ -511,13 +511,22 @@ class PsfMatch(object):
     """Base class for PSF matching
     """
     def __init__(self, config, logName="lsst.ip.diffim.PsfMatch"):
-        """Create a PsfMatchToImage
+        """Create a PsfMatch
         
         @param config: configuration for ip_diffim
         @param logName: name by which messages are logged
         """
         self._config = config
         self._log = pexLog.Log(pexLog.Log.getDefaultLog(), logName)
+        
+        #
+        if 'useRegularization' in self._config.keys():
+            self.useRegularization = self._config.useRegularization
+        else:
+            self.useRegularization = False
+
+        if (self.useRegularization):
+            self.hMat = diffimLib.makeRegularizationMatrix(pexConfig.makePolicy(self._config))
 
     def _diagnostic(self, kernelCellSet, spatialKernel, spatialBg):
         # Look at how well the solution is constrained
@@ -578,7 +587,7 @@ class PsfMatch(object):
                          "NOTE: spatial background model appears well constrained; %d candidates, %d terms" % (nGood, nBgTerms))
         
     
-    def _solve(self, kernelCellSet, basisList, hMat = None, returnOnExcept = False):
+    def _solve(self, kernelCellSet, basisList, returnOnExcept = False):
         """Determine the PSF matching kernel
         
         @param kernelCellSet: a SpatialCellSet to use in determining the PSF matching kernel
@@ -597,17 +606,16 @@ class PsfMatch(object):
         nStarPerCell           = self._config.nStarPerCell
         usePcaForSpatialKernel = self._config.usePcaForSpatialKernel
         subtractMeanForPca     = self._config.subtractMeanForPca
-        useRegularization      = self._config.useRegularization
 
         # Visitor for the single kernel fit
         policy = pexConfig.makePolicy(self._config)
-        if useRegularization:
-            singlekv = ipDiffim.BuildSingleKernelVisitorF(basisList, policy)
+        if self.useRegularization:
+            singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy)
         else:
-            singlekv = ipDiffim.BuildSingleKernelVisitorF(basisList, policy, hMat)
+            singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy, self.hMat)
 
         # Visitor for the kernel sum rejection
-        ksv = ipDiffim.kernelSumVisitorF(policy)
+        ksv = diffimLib.kernelSumVisitorF(policy)
         
         # Main loop
         t0 = time.time()
@@ -655,7 +663,7 @@ class PsfMatch(object):
 
                     nComponents       = self._config.numPrincipalComponents
                     imagePca          = afwImage.ImagePcaF()
-                    importStarVisitor = ipDiffim.KernelPcaVisitor(imagePca)
+                    importStarVisitor = diffimLib.KernelPcaVisitor(imagePca)
                     kernelCells.visitCandidates(importStarVisitor, nStarPerCell)
                     if self._config.subtractMeanForPca:
                         importStarVisitor.subtractMean()
@@ -678,10 +686,10 @@ class PsfMatch(object):
                             trimBasisList.push_back(pcaBasisList[j])
                             
                     # Put all the power in the first kernel, which will not vary spatially
-                    spatialBasisList = ipDiffim.renormalizeKernelList(trimBasisList)
+                    spatialBasisList = diffimLib.renormalizeKernelList(trimBasisList)
 
                     # New Kernel visitor for this new basis list (no regularization explicitly)
-                    singlekvPca = ipDiffim.BuildSingleKernelVisitorF(spatialBasisList, policy)
+                    singlekvPca = diffimLib.BuildSingleKernelVisitorF(spatialBasisList, policy)
                     singlekvPca.setSkipBuilt(False)
                     kernelCells.visitCandidates(singlekvPca, nStarPerCell)
                     singlekvPca.setSkipBuilt(True)
@@ -706,7 +714,7 @@ class PsfMatch(object):
 
                 # We have gotten on to the spatial modeling part
                 regionBBox = kernelCells.getBBox()
-                spatialkv  = ipDiffim.BuildSpatialKernelVisitor(spatialBasisList, regionBBox, policy)
+                spatialkv  = diffimLib.BuildSpatialKernelVisitor(spatialBasisList, regionBBox, policy)
                 kernelCells.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
                 pexLog.Trace(self._log.getName()+"._solve", 3, 
@@ -714,7 +722,7 @@ class PsfMatch(object):
                 spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
                 # Check the quality of the spatial fit (look at residuals)
-                assesskv   = ipDiffim.AssessSpatialKernelVisitor(spatialKernel, spatialBackground, policy)
+                assesskv   = diffimLib.AssessSpatialKernelVisitor(spatialKernel, spatialBackground, policy)
                 kernelCells.visitCandidates(assesskv, nStarPerCell)
                 nRejectedSpatial = assesskv.getNRejected()
                 nGoodSpatial     = assesskv.getNGood()
