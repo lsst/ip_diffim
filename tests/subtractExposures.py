@@ -41,9 +41,12 @@ class DiffimTestCases(unittest.TestCase):
             diffimTools.backgroundSubtract(bgConfig,
                                            [self.templateImage.getMaskedImage(),
                                             self.scienceImage.getMaskedImage()])
+
             self.offset   = 1500
             self.bbox     = afwGeom.Box2I(afwGeom.Point2I(0, self.offset),
                                           afwGeom.Point2I(511, 2046))
+            self.config.spatialKernelOrder = 1
+            self.config.spatialBgOrder = 0
 
     def tearDown(self):
         del self.config
@@ -52,10 +55,16 @@ class DiffimTestCases(unittest.TestCase):
             del self.templateImage
 
     def testModelType(self):
+        self.runModelType(fitForBackground = True)
+        self.runModelType(fitForBackground = False)
+        
+    def runModelType(self, fitForBackground):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
+        self.config.fitForBackground = fitForBackground
+            
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
 
@@ -69,27 +78,61 @@ class DiffimTestCases(unittest.TestCase):
         results2 = psfmatch2.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
 
-        kp1 = spatialKernel1.getKernelParameters()
-        kp2 = spatialKernel2.getKernelParameters()
-        # Solutions should evaluate to the same values at coordinate 0, 0
-        for i in range(len(kp1)):
-            self.assertAlmostEqual(kp1[i], kp2[i], places=2)
-
+        # Got the types right?
         self.assertTrue(
             spatialKernel1.getSpatialFunctionList()[0].toString().startswith('Chebyshev1Function2')
             )
         self.assertTrue(
             spatialKernel2.getSpatialFunctionList()[0].toString().startswith('PolynomialFunction2')
             )
-        
-    def testAL(self):
-        self.config.spatialKernelOrder = 1
-        self.config.spatialBgOrder = 0 # already bg-subtracted
-        self.runXY0(fitForBackground = True, poly = 'polynomial')
-        self.runXY0(fitForBackground = False, poly = 'polynomial')
-        self.runXY0(fitForBackground = True, poly = 'chebyshev1')
-        self.runXY0(fitForBackground = False, poly = 'chebyshev1')
 
+        # First order term has zero spatial variation and sum = kernel sum
+        kp1par0 = spatialKernel1.getSpatialFunctionList()[0].getParameters()
+        kp2par0 = spatialKernel2.getSpatialFunctionList()[0].getParameters()
+        self.assertAlmostEqual(kp1par0[0], kp2par0[0], 5)
+        for i in range(1, len(kp1par0)):
+            self.assertAlmostEqual(kp1par0[i], 0.0, 5)
+            self.assertAlmostEqual(kp1par0[i], kp2par0[i], 5)
+            
+        # The other terms won't have the same spatial weights.
+        # However, if you evaluate the two functions at the same
+        # location, the *weights of each kernel* should be the same!
+        kp1 = spatialKernel1.getKernelParameters()
+        kp2 = spatialKernel2.getKernelParameters()
+        for i in range(len(kp1)):
+            self.assertAlmostEqual(kp1[i], kp2[i], 2) # Is same to 3 with not fitting for background
+
+        if fitForBackground:
+            # Nterms (zeroth order model)
+            self.assertEqual(backgroundModel1.getNParameters(), 1)
+            self.assertEqual(backgroundModel2.getNParameters(), 1)
+
+            # Same value in function
+            self.assertAlmostEqual(backgroundModel1.getParameters()[0], backgroundModel2.getParameters()[0], 5)
+
+            # Functions evaluates to each other
+            self.assertAlmostEqual(backgroundModel1(0, 0), backgroundModel2(0, 0), 5)
+            
+            # Spatially...
+            self.assertAlmostEqual(backgroundModel1(10, 10), backgroundModel2(10, 10), 5)
+
+        else:
+            # Nterms (zeroth order)
+            self.assertEqual(backgroundModel1.getNParameters(), 1)
+            self.assertEqual(backgroundModel2.getNParameters(), 1)
+
+            # Zero value in function
+            self.assertAlmostEqual(backgroundModel1.getParameters()[0], 0.0)
+            self.assertAlmostEqual(backgroundModel2.getParameters()[0], 0.0)
+
+            # Function evaluates to zero
+            self.assertAlmostEqual(backgroundModel1(0, 0), 0.0)
+            self.assertAlmostEqual(backgroundModel2(0, 0), 0.0)
+            
+            # Spatially...
+            self.assertAlmostEqual(backgroundModel1(10, 10), 0.0)
+            self.assertAlmostEqual(backgroundModel2(10, 10), 0.0)
+        
     def testWarping(self):
         # Should fail since images are not aligned
         if not self.defDataDir:
@@ -106,32 +149,18 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.fail()
 
-    def testNoBg(self):
-        # Test not subtracting off the background
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
-        self.config.fitForBackground = False
-        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
-        psfmatch = ipDiffim.ImagePsfMatch(self.config)
-        try:
-            psfmatch.subtractExposures(templateSubImage, scienceSubImage)
-        except Exception, e:
-            self.fail()
-        else:
-            pass
+    def testXY0(self):
+        self.runXY0('polynomial')
+        self.runXY0('chebyshev1')
 
-    def runXY0(self, fitForBackground, poly):
+    def runXY0(self, poly, fitForBackground = False):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
+        self.config.spatialModelType = poly
         self.config.fitForBackground = fitForBackground
 
-        # Since Chebyshev1 remaps the coordinates, the spatial terms don't change!
-        self.config.spatialModelType = poly
-        
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.PARENT)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
 
@@ -181,16 +210,20 @@ class DiffimTestCases(unittest.TestCase):
 
         # first term = kernel sum, 0, 0
         self.assertAlmostEqual(skp1[0][0], skp2[0][0])
-        # on other terms, the spatial terms are the same, the zpt terms are different
+
+        # On other terms, the spatial terms are the same, the zpt terms are different
         for nk in range(1, len(skp1)):
 
+            # Zeropoint
             if poly == 'polynomial':
                 self.assertNotEqual(skp1[nk][0], skp2[nk][0])
             elif poly == 'chebyshev1':
+                # Cheby remaps coords, so model should be the same!
                 self.assertAlmostEqual(skp1[nk][0], skp2[nk][0])
             else:
                 self.fail()
-                
+
+            # Spatial terms
             for np in range(1, len(skp1[nk])):
                 self.assertAlmostEqual(skp1[nk][np], skp2[nk][np], 4)
 
