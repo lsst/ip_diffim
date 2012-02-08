@@ -28,6 +28,9 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
+from psfMatch import PsfMatchConfigAL
+from makeKernelBasisList import makeKernelBasisList 
 
 # third party
 import numpy
@@ -83,13 +86,27 @@ def fakeCoeffs():
                ( -0.005,  -0.000050,  0.000050))
     return kCoeffs
 
-def makeFakeKernelSet(config, basisList,
-                      sizeCell = 128, nCell = 3,
+def makeFakeKernelSet(sizeCell = 128, nCell = 3,
                       deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
                       addNoise = True, bgValue = 100., display = False):
-    kSize    = config.kernelSize
-    config.sizeCellX = sizeCell
-    config.sizeCellY = sizeCell
+
+    configFake               = PsfMatchConfigAL()
+    configFake.alardNGauss   = 1
+    configFake.alardSigGauss = [2.5,]
+    configFake.alardDegGauss = [2,]
+    configFake.sizeCellX     = sizeCell
+    configFake.sizeCellY     = sizeCell
+    configFake.spatialKernelOrder = 1.0
+    configFake.spatialModelType = "polynomial"
+    configFake.singleKernelClipping = False   # variance is a hack
+    configFake.spatialKernelClipping = False  # variance is a hack
+    if bgValue > 0.0:
+        configFake.fitForBackground = True
+
+    policyFake = pexConfig.makePolicy(configFake)
+
+    basisList = makeKernelBasisList(configFake)
+    kSize     = configFake.kernelSize
 
     # This sets the final extent of each convolved delta function
     gaussKernelWidth   = sizeCell // 2
@@ -140,25 +157,26 @@ def makeFakeKernelSet(config, basisList,
 
     # Add background
     sim  += bgValue
+
+    # Watch out for negative values
+    tim  += 2 * numpy.abs(numpy.min(tim.getArray()))
     
     # Add noise?
     if addNoise:
         sim   = makePoissonNoiseImage(sim)
-
-    # ALWAYS!
-    tim  += 1.0   # Otherwise makePoissonNoiseImage adds no noise
-    tim   = makePoissonNoiseImage(tim) # Needed to stdev for detection
-        
+        tim   = makePoissonNoiseImage(tim) 
+    
     # And turn into MaskedImages
     sim   = afwImage.ImageF(sim, bbox, afwImage.LOCAL)
     svar  = afwImage.ImageF(sim, True)
+    svar.set(1.0)
     smask = afwImage.MaskU(sim.getDimensions())
     smask.set(0x0)
     sMi   = afwImage.MaskedImageF(sim, smask, svar)
     
     tim   = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
     tvar  = afwImage.ImageF(tim, True)
-    #tvar += 1.0 # So no negative variance ever
+    tvar.set(1.0)
     tmask = afwImage.MaskU(tim.getDimensions())
     tmask.set(0x0)
     tMi   = afwImage.MaskedImageF(tim, tmask, tvar)
@@ -187,10 +205,10 @@ def makeFakeKernelSet(config, basisList,
             tsi = afwImage.MaskedImageF(tMi, bbox, afwImage.LOCAL)
             ssi = afwImage.MaskedImageF(sMi, bbox, afwImage.LOCAL)
 
-            kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, config)
+            kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policyFake)
             kernelCellSet.insertCandidate(kc)
 
-    return tMi, sMi, sKernel, kernelCellSet
+    return tMi, sMi, sKernel, kernelCellSet, configFake
     
 
 #######

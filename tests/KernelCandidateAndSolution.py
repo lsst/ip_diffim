@@ -159,7 +159,7 @@ class DiffimTestCases(unittest.TestCase):
                                        sIm,
                                        self.policy)
 
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         kc.build(kList)
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
                                          kSum = scaling)
@@ -172,7 +172,7 @@ class DiffimTestCases(unittest.TestCase):
                                        sIm,
                                        self.policy)
 
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         kc.build(kList)
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
                                          bg = bg)
@@ -191,7 +191,7 @@ class DiffimTestCases(unittest.TestCase):
                                        self.templateExposure2.getMaskedImage(),
                                        self.policy)
 
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.config)
 
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
@@ -263,7 +263,7 @@ class DiffimTestCases(unittest.TestCase):
         smi2 = afwImage.MaskedImageF(smi, bbox, afwImage.LOCAL)
 
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -291,7 +291,7 @@ class DiffimTestCases(unittest.TestCase):
         # now repeat with noise added; decrease precision of comparison
         bkg = self.addNoise(smi2)
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -350,7 +350,7 @@ class DiffimTestCases(unittest.TestCase):
  
 
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi2, smi2, self.policy)
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -375,7 +375,7 @@ class DiffimTestCases(unittest.TestCase):
         smi.set(0, 0x0, 1.0)
         smi.set(cpix, cpix, (1, 0x0, 0.0))
 
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi, smi, self.policy)
         try:
             kc.build(kList)

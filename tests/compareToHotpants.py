@@ -17,9 +17,10 @@ class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
         self.config = ipDiffim.PsfMatchConfigAL()
+        self.config.fitForBackground = True
+        self.config.spatialModelType = "polynomial"
         self.policy = pexConfig.makePolicy(self.config)
-        self.policy.set("fitForBackground", True) # hotpants subtracts background
-        self.policy.set("spatialModelType", "polynomial") 
+
         self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
         self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')
         self.smi.setXY0(0,0)
@@ -35,13 +36,10 @@ class DiffimTestCases(unittest.TestCase):
         nGauss = 1
         sGauss = [3.]
         dGauss = [3]
-        self.policy.set('alardNGauss', nGauss)
-        self.policy.set('alardSigGauss', sGauss[0])
-        self.policy.set('alardDegGauss', dGauss[0])
-        for i in range(1, nGauss):
-            self.policy.add('alardSigGauss', sGauss[i])
-            self.policy.add('alardDegGauss', dGauss[i])
-        basisList0 = ipDiffim.makeKernelBasisList(self.policy)
+        self.config.alardNGauss = nGauss
+        self.config.alardSigGauss = sGauss
+        self.config.alardDegGauss = dGauss
+        basisList0 = ipDiffim.makeKernelBasisList(self.config)
         
         # HP does things in a different order, and with different normalization, so reorder list
         order   = [0, 2, 5, 9, 1, 4, 8, 3, 7, 6]

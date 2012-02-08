@@ -20,7 +20,9 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import time
+import numpy as num
 import diffimLib
+import lsst.afw.image as afwImage
 import lsst.pex.logging as pexLog
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
@@ -35,11 +37,12 @@ class DetectionConfig(pexConfig.Config):
     detThresholdType = pexConfig.ChoiceField(
         dtype = str,
         doc = "Type of detection threshold",
-        default = "stdev",
+        default = "pixel_stdev",
         allowed = {
-           "value"    : "Use counts as the detection threshold type",
-           "stdev"    : "Use standard deviation as the detection threshold type",
-           "variance" : "Use variance as the detection threshold type"
+           "value"       : "Use counts as the detection threshold type",
+           "stdev"       : "Use standard deviation of image plane",
+           "variance"    : "Use variance of image plane",
+           "pixel_stdev" : "Use stdev derived from variance plane"
         }
     )
     detOnTemplate = pexConfig.Field(
@@ -179,7 +182,7 @@ class PsfMatchConfig(pexConfig.Config):
     )
     scaleByFwhm = pexConfig.Field(
         dtype = bool,
-        doc = "Scale kernelSize, alardSigGauss, and fpGrowPix by input Fwhm",
+        doc = "Scale kernelSize, fpGrowPix by input Fwhm",
         default = False,
     )
     kernelSizeFwhmScaling = pexConfig.Field(
@@ -310,7 +313,7 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = bool,
         doc = """Use the core of the footprint for the quality statistics, instead of the entire footprint.
                  WARNING: if there is deconvolution we probably will need to turn this off""",
-        default = True,
+        default = False,
     )
     candidateCoreRadius = pexConfig.Field(
         dtype = int,
@@ -413,6 +416,8 @@ class PsfMatchConfigDF(PsfMatchConfig):
         PsfMatchConfig.__init__(self)
         self.kernelBasisSet = "delta-function"
         self.maxConditionNumber = 5.0e6
+        self.usePcaForSpatialKernel = True
+        self.subtractMeanForPca = True
 
     #####
     # Delta Function Basis Parameters
@@ -525,7 +530,7 @@ class PsfMatch(object):
         else:
             self.useRegularization = False
 
-        if (self.useRegularization):
+        if self.useRegularization:
             self.hMat = diffimLib.makeRegularizationMatrix(pexConfig.makePolicy(self._config))
 
     def _diagnostic(self, kernelCellSet, spatialKernel, spatialBg):
@@ -601,7 +606,6 @@ class PsfMatch(object):
         @raise Exception if unable to determine PSF matching kernel and returnOnExcept False
         """
 
-
         maxSpatialIterations   = self._config.maxSpatialIterations
         nStarPerCell           = self._config.nStarPerCell
         usePcaForSpatialKernel = self._config.usePcaForSpatialKernel
@@ -610,12 +614,12 @@ class PsfMatch(object):
         # Visitor for the single kernel fit
         policy = pexConfig.makePolicy(self._config)
         if self.useRegularization:
-            singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy)
-        else:
             singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy, self.hMat)
+        else:
+            singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy)
 
         # Visitor for the kernel sum rejection
-        ksv = diffimLib.kernelSumVisitorF(policy)
+        ksv = diffimLib.KernelSumVisitorF(policy)
         
         # Main loop
         t0 = time.time()
@@ -629,18 +633,18 @@ class PsfMatch(object):
                 while (nRejectedSkf != 0):
                     pexLog.Trace(self._log.getName()+"._solve", 2, 
                                  "Building single kernels...")
-                    kernelCells.visitCandidates(singlekv, nStarPerCell)
-                    nRejectedSkf = singleKernelFitter.getNRejected()
+                    kernelCellSet.visitCandidates(singlekv, nStarPerCell)
+                    nRejectedSkf = singlekv.getNRejected()
                     pexLog.Trace(self._log.getName()+"._solve", 2, 
-                                 "Iteration %d, rejected %d candidates due to initial kernel fit" % (thisIteration, nRejectedKsum))
+                                 "Iteration %d, rejected %d candidates due to initial kernel fit" % (thisIteration, nRejectedSkf))
 
                 # Reject outliers in kernel sum 
                 ksv.resetKernelSum()
-                ksv.setMode(ipDiffimDetail.AGGREGATE)
-                kernelCells.visitCandidates(ksv, nStarPerCell)
+                ksv.setMode(diffimLib.KernelSumVisitorF.AGGREGATE)
+                kernelCellSet.visitCandidates(ksv, nStarPerCell)
                 ksv.processKsumDistribution()
-                ksv.setMode(ipDiffimDetail.REJECT)
-                kernelCells.visitCandidates(ksv, nStarPerCell)      
+                ksv.setMode(diffimLib.KernelSumVisitorF.REJECT)
+                kernelCellSet.visitCandidates(ksv, nStarPerCell)      
 
                 nRejectedKsum = ksv.getNRejected()
                 pexLog.Trace(self._log.getName()+"._solve", 2, 
@@ -662,27 +666,28 @@ class PsfMatch(object):
                                  "Building Pca basis")
 
                     nComponents       = self._config.numPrincipalComponents
-                    imagePca          = afwImage.ImagePcaF()
-                    importStarVisitor = diffimLib.KernelPcaVisitor(imagePca)
-                    kernelCells.visitCandidates(importStarVisitor, nStarPerCell)
+                    imagePca          = afwImage.ImagePcaD()
+                    importStarVisitor = diffimLib.KernelPcaVisitorF(imagePca)
+                    kernelCellSet.visitCandidates(importStarVisitor, nStarPerCell)
                     if self._config.subtractMeanForPca:
                         importStarVisitor.subtractMean()
                     imagePca.analyze()
 
-                    # eigenImages  = imagePca.getEigenImages()
                     eigenValues  = imagePca.getEigenValues()
                     pcaBasisList = importStarVisitor.getEigenKernels()
 
                     eSum = num.sum(eigenValues)
-                    for j in range(len(eSum)):
+                    for j in range(len(eigenValues)):
                         pexLog.Trace(self._log.getName()+"._solve", 6, 
-                                     "Eigenvalue %d : %f (%f \%)" % (j, eigenValues[j], eigenValues[j]/eSum))
+                                     "Eigenvalue %d : %f (%f)" % (j, eigenValues[j], eigenValues[j]/eSum))
                                      
                     nToUse = min(nComponents, len(eigenValues))
                     trimBasisList = afwMath.KernelList()
                     for j in range(nToUse):
-                        # Check for NaNs!
-                        if not (True in num.isnan(pcaBasisList[j])[0]):
+                        # Check for NaNs?
+                        kimage = afwImage.ImageD(pcaBasisList[j].getDimensions())
+                        pcaBasisList[j].computeImage(kimage, False)
+                        if not (True in num.isnan(kimage.getArray())):
                             trimBasisList.push_back(pcaBasisList[j])
                             
                     # Put all the power in the first kernel, which will not vary spatially
@@ -691,7 +696,7 @@ class PsfMatch(object):
                     # New Kernel visitor for this new basis list (no regularization explicitly)
                     singlekvPca = diffimLib.BuildSingleKernelVisitorF(spatialBasisList, policy)
                     singlekvPca.setSkipBuilt(False)
-                    kernelCells.visitCandidates(singlekvPca, nStarPerCell)
+                    kernelCellSet.visitCandidates(singlekvPca, nStarPerCell)
                     singlekvPca.setSkipBuilt(True)
                     nRejectedPca = singlekvPca.getNRejected()
                     pexLog.Trace(self._log.getName()+"._solve", 2, 
@@ -713,21 +718,21 @@ class PsfMatch(object):
                     spatialBasisList = basisList
 
                 # We have gotten on to the spatial modeling part
-                regionBBox = kernelCells.getBBox()
-                spatialkv  = diffimLib.BuildSpatialKernelVisitor(spatialBasisList, regionBBox, policy)
-                kernelCells.visitCandidates(spatialkv, nStarPerCell)
+                regionBBox = kernelCellSet.getBBox()
+                spatialkv  = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, policy)
+                kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
                 pexLog.Trace(self._log.getName()+"._solve", 3, 
                              "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
                 spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
                 # Check the quality of the spatial fit (look at residuals)
-                assesskv   = diffimLib.AssessSpatialKernelVisitor(spatialKernel, spatialBackground, policy)
-                kernelCells.visitCandidates(assesskv, nStarPerCell)
+                assesskv   = diffimLib.AssessSpatialKernelVisitorF(spatialKernel, spatialBackground, policy)
+                kernelCellSet.visitCandidates(assesskv, nStarPerCell)
                 nRejectedSpatial = assesskv.getNRejected()
                 nGoodSpatial     = assesskv.getNGood()
                 pexLog.Trace(self._log.getName()+"._solve", 2, 
-                             "Iteration %d, rejected %d candidates due to spatial kernel fit" % (thisIteration, nRejectedPca))
+                             "Iteration %d, rejected %d candidates due to spatial kernel fit" % (thisIteration, nRejectedSpatial))
                 pexLog.Trace(self._log.getName()+"._solve", 2, 
                              "%d candidates used in fit" % (nGoodSpatial))
 
@@ -741,9 +746,13 @@ class PsfMatch(object):
                 # Otherwise, iterate on...
                 thisIteration   += 1
 
-        except Exception, e:
+        except pexExcept.LsstCppException, e:
             pexLog.Trace(self._log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
             pexLog.Trace(self._log.getName()+"._solve", 2, e.args[0].what())
+            raise e
+        except Exception, e:
+            pexLog.Trace(self._log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
+            pexLog.Trace(self._log.getName()+"._solve", 2, e.args[0])
             raise e
             
       
@@ -752,6 +761,6 @@ class PsfMatch(object):
                      "Total time to compute the spatial kernel : %.2f s" % (t1 - t0))
         pexLog.Trace(self._log.getName()+"._solve", 2, "")
 
-        self._diagnostic(spatialKernel, spatialBackground)
+        self._diagnostic(kernelCellSet, spatialKernel, spatialBackground)
         
         return spatialKernel, spatialBackground

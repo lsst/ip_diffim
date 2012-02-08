@@ -23,7 +23,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set("useRegularization", False)
         self.policy.set("checkConditionNumber", False) # I am making shady kernels by hand
         self.policy.set("useCoreStats", False) # I am making off-center resids
-        self.kList = ipDiffim.makeKernelBasisList(self.policy)
+        self.kList = ipDiffim.makeKernelBasisList(self.config)
         self.size = 51
         
     def makeCandidate(self, kSum, x, y):

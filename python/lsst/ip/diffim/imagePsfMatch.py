@@ -182,7 +182,8 @@ class ImagePsfMatch(PsfMatch):
         return (psfMatchedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)
     
     def matchMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve, 
-                          psfFwhmPixEtc = None, psfFwhmPixEtnc = None, footprints = None):
+                          psfFwhmPixEtc = None, psfFwhmPixEtnc = None, 
+                          footprints = None):
         """PSF-match a MaskedImage to a reference MaskedImage
 
         Do the following, in order:
@@ -224,6 +225,7 @@ class ImagePsfMatch(PsfMatch):
         return (psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet)
 
     def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
+                          psfFwhmPixEtc = None, psfFwhmPixEtnc = None,
                           footprints = None, doWarping = True):
         """Subtract two Exposures
         
@@ -245,6 +247,8 @@ class ImagePsfMatch(PsfMatch):
         - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
         """
         results = self.matchExposures(exposureToConvolve, exposureToNotConvolve,
+                                      psfFwhmPixEtc = psfFwhmPixEtc,
+                                      psfFwhmPixEtnc = psfFwhmPixEtnc,
                                       footprints = footprints,
                                       doWarping = doWarping)
 
@@ -256,6 +260,7 @@ class ImagePsfMatch(PsfMatch):
         return (subtractedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)
 
     def subtractMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve,
+                             psfFwhmPixEtc = None, psfFwhmPixEtnc = None,
                              footprints = None):
         """Subtract two MaskedImages
         
@@ -279,6 +284,8 @@ class ImagePsfMatch(PsfMatch):
 
         results = self.matchMaskedImages(maskedImageToConvolve,
                                          maskedImageToNotConvolve,
+                                         psfFwhmPixEtc = psfFwhmPixEtc,
+                                         psfFwhmPixEtnc = psfFwhmPixEtnc,
                                          footprints = footprints)
         
         psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet = results 
@@ -311,6 +318,10 @@ class ImagePsfMatch(PsfMatch):
             
             detConfig = self._config.detectionConfig
             kcDetect = diffimLib.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
+
+            maskedImageToConvolve.writeFits("mitc.fits")
+            maskedImageToNotConvolve.writeFits("mitnc.fits")
+
             kcDetect.apply(maskedImageToConvolve, maskedImageToNotConvolve)
             footprints = kcDetect.getFootprints()
 

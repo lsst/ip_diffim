@@ -86,7 +86,7 @@ namespace detail {
             return;
         }
         
-        pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
+        pexLogging::TTrace<2>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
                               "Processing candidate %d", kCandidate->getId());
 
         /* 

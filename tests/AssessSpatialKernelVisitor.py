@@ -23,7 +23,7 @@ class DiffimTestCases(unittest.TestCase):
         self.config = ipDiffim.PsfMatchConfigAL()
         self.policy = pexConfig.makePolicy(self.config)
         self.ksize  = self.policy.get('kernelSize')
-        self.kList  = ipDiffim.makeKernelBasisList(self.policy)
+        self.kList  = ipDiffim.makeKernelBasisList(self.config)
 
     def makeSpatialKernel(self, order):
         basicGaussian1 = afwMath.GaussianFunction2D(2., 2., 0.)

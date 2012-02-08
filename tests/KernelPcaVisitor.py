@@ -19,7 +19,7 @@ class DiffimTestCases(unittest.TestCase):
         self.config = ipDiffim.PsfMatchConfigDF()
         self.policy = pexConfig.makePolicy(self.config)
         self.policy.set("useRegularization", False)
-        self.kList  = ipDiffim.makeKernelBasisList(self.policy)
+        self.kList  = ipDiffim.makeKernelBasisList(self.config)
 
     def tearDown(self):
         del self.config

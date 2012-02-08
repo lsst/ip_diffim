@@ -97,6 +97,8 @@ class DiffimTestCases(unittest.TestCase):
         # The other terms won't have the same spatial weights.
         # However, if you evaluate the two functions at the same
         # location, the *weights of each kernel* should be the same!
+
+        # NOTE - WE actually want computeKernelParametersFromSpatialModel here
         kp1 = spatialKernel1.getKernelParameters()
         kp2 = spatialKernel2.getKernelParameters()
         for i in range(len(kp1)):

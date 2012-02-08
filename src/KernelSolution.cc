@@ -143,7 +143,7 @@ namespace diffim {
         boost::timer t;
         t.restart();
 
-        pexLog::TTrace<2>("lsst.ip.diffim.KernelSolution.solve", 
+        pexLog::TTrace<4>("lsst.ip.difim.KernelSolution.solve", 
                           "Solving for kernel");
 		_solvedBy = LU;
 		Eigen::FullPivLU<Eigen::MatrixXd> lu(mMat);

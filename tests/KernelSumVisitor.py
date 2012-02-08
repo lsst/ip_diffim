@@ -18,7 +18,7 @@ class DiffimTestCases(unittest.TestCase):
     def setUp(self):
         self.config = ipDiffim.PsfMatchConfigDF()
         self.policy = pexConfig.makePolicy(self.config)
-        self.kList  = ipDiffim.makeKernelBasisList(self.policy)
+        self.kList  = ipDiffim.makeKernelBasisList(self.config)
 
     def makeCandidate(self, kSum, x, y, size = 51):
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))

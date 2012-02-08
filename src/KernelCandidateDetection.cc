@@ -93,11 +93,11 @@ namespace diffim {
 
         // List of Footprints
         boost::shared_ptr<std::vector<afwDetect::Footprint::Ptr> > footprintListInPtr;
-        
+
         // Find detections
         afwDetect::Threshold threshold = 
             afwDetect::createThreshold(detThreshold, detThresholdType);
-        
+
         if (detOnTemplate == true) {
             afwDetect::FootprintSet<PixelT> footprintSet(
                 *(miToConvolvePtr), 
@@ -105,6 +105,7 @@ namespace diffim {
                 "",
                 fpNpixMin);
             // Get the associated footprints
+
             footprintListInPtr = footprintSet.getFootprints();
             pexLog::TTrace<4>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                               "Found %d total footprints in template above %.3f %s",

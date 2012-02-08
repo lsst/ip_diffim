@@ -145,7 +145,7 @@ namespace detail {
             return;
         }
         
-        pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
+        pexLogging::TTrace<2>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                               "Processing candidate %d", kCandidate->getId());
         pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                               "X = %.2f Y = %.2f",
