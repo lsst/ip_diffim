@@ -1,13 +1,10 @@
 #!/usr/bin/env python
 import unittest
 import lsst.utils.tests as tests
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
-import lsst.afw.image.utils as imageUtils
-import lsst.afw.math as afwMath
+import lsst.afw.detection as afwDet
 import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimTools as diffimTools
-import lsst.daf.base as dafBase
-import lsst.pex.policy as pexPolicy
 
 import lsst.pex.logging as pexLog
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
@@ -15,181 +12,22 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class PsfMatchTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.configAL  = ipDiffim.PsfMatchConfigAL()
-        self.configDF  = ipDiffim.PsfMatchConfigDF()
-        self.configDFr = ipDiffim.PsfMatchConfigDF()
+        self.config = ipDiffim.ModelPsfMatchConfig()
+        self.size   = 100
+        self.exp    = afwImage.ExposureF(afwGeom.Extent2I(self.size, self.size))
+        self.exp.setPsf(afwDet.createPsf("DoubleGaussian", 11, 11, 1.0))
 
-        self.configDF.useRegularization = False
-        self.configDFr.useRegularization = True
+    def testMatch(self):
+        psf = afwDet.createPsf("DoubleGaussian", 11, 11, 3.0)
+        psfMatch = ipDiffim.ModelPsfMatch(self.config)
+        psfMatch.matchExposure(self.exp, psf)
 
-    def testImagePsfMatch(self):
-        tMi, sMi, sK, kcs = diffimTools.makeFakeKernelSet()
-        tWcs = self.makeWcs(offset = 0)
-        sWcs = self.makeWcs(offset = 1)
-        tExp = afwImage.ExposureF(tMi, tWcs)
-        sExp = afwImage.ExposureF(sMi, sWcs)
-
-        psfMatchAL  = ipDiffim.ImagePsfMatch(self.configAL)
-        psfMatchDF  = ipDiffim.ImagePsfMatch(self.configDF)
-        psfMatchDFr = ipDiffim.ImagePsfMatch(self.configDFr)
-
-        self.assertEqual(psfMatchAL.useRegularization, False)
-        self.assertEqual(psfMatchDF.useRegularization, False)
-        self.assertEqual(psfMatchDFr.useRegularization, True)
-
-        resultsAL  = psfmatchAL.subtractExposures(tExp, sExp, doWarping = True)
-        resultsDF  = psfmatchDF.subtractExposures(tExp, sExp, doWarping = True)
-        resultsDFr = psfmatchDFr.subtractExposures(tExp, sExp, doWarping = True)
-
-
-    def makeWcs(self, offset = 0):
-        # taken from $AFW_DIR/tests/testMakeWcs.py
-        metadata = dafBase.PropertySet()
-        metadata.set("SIMPLE",                    "T") 
-        metadata.set("BITPIX",                  -32) 
-        metadata.set("NAXIS",                    2) 
-        metadata.set("NAXIS1",                 1024) 
-        metadata.set("NAXIS2",                 1153) 
-        metadata.set("RADECSYS", 'FK5')
-        metadata.set("EQUINOX",                2000.)
-        metadata.setDouble("CRVAL1",     215.604025685476)
-        metadata.setDouble("CRVAL2",     53.1595451514076)
-        metadata.setDouble("CRPIX1",     1109.99981456774 + offset)
-        metadata.setDouble("CRPIX2",     560.018167811613 + offset)
-        metadata.set("CTYPE1", 'RA---SIN')
-        metadata.set("CTYPE2", 'DEC--SIN')
-        metadata.setDouble("CD1_1", 5.10808596133527E-05)
-        metadata.setDouble("CD1_2", 1.85579539217196E-07)
-        metadata.setDouble("CD2_2", -5.10281493481982E-05)
-        metadata.setDouble("CD2_1", -8.27440751733828E-07)
-        return afwImage.makeWcs(metadata)
-        
-    def xtestSubtractExposures(self, background = 100.):
-        tMi, sMi, sK, kcs = diffimTools.makeFakeKernelSet(self.policy, self.basisList,
-                                                          bgValue = background)
-        tWcs = self.makeWcs(offset = 0)
-        sWcs = self.makeWcs(offset = 1)
-        tExp = afwImage.ExposureF(tMi, tWcs)
-        sExp = afwImage.ExposureF(sMi, sWcs)
-
-        self.policy.set("fitForBackground", True)
-        self.policy.set("spatialKernelOrder", 1)
-        self.policy.set("spatialBgOrder", 0)
-        self.policy.set("spatialKernelType", "polynomial") # since that is the known function
-        psfmatch = ipDiffim.ImagePsfMatch(self.policy)
-
-        # Should fail due to registration problem
-        try:
-            results = psfmatch.subtractExposures(tExp, sExp, doWarping = False)
-        except:
-            pass
-        else:
-            self.fail()
-
-        # Should work
-        results = psfmatch.subtractExposures(tExp, sExp, doWarping = True)
-
-        self.assertEqual(len(results), 4)
-        self.assertEqual(type(results[0]), afwImage.ExposureF)
-        self.assertEqual(type(results[1]), afwMath.LinearCombinationKernel)
-        self.assertEqual(type(results[2]), afwMath.Function2D)
-        self.assertEqual(type(results[3]), afwMath.SpatialCellSet)
-
-    def xtestMatchExposures(self, background = 100.):
-        filterPolicyFile = pexPolicy.DefaultPolicyFile("afw", "SdssFilters.paf", "tests")
-        filterPolicy = pexPolicy.Policy.createPolicy(filterPolicyFile, filterPolicyFile.getRepositoryPath(), True)
-        imageUtils.defineFiltersFromPolicy(filterPolicy, reset=True)
-
-        tMi, sMi, sK, kcs = diffimTools.makeFakeKernelSet(self.policy, self.basisList,
-                                                          bgValue = background)
-        tWcs = self.makeWcs(offset = 0)
-        sWcs = self.makeWcs(offset = 0)
-        tExp = afwImage.ExposureF(tMi, tWcs)
-        sExp = afwImage.ExposureF(sMi, sWcs)
-
-        commonFilter = afwImage.Filter("r")
-        tCalib = afwImage.Calib()
-        tCalib.setFluxMag0(1.0e5, 1.0e3)
-        tExp.setFilter(commonFilter)
-        sExp.setFilter(commonFilter)
-        tExp.setCalib(tCalib)
-        sCalib = afwImage.Calib()
-        sCalib.setFluxMag0(1.1e5, 1.1e3)
-        sExp.setCalib(sCalib)
-
-        self.policy.set("fitForBackground", True)
-        self.policy.set("spatialKernelOrder", 1)
-        self.policy.set("spatialBgOrder", 0)
-        self.policy.set("spatialKernelType", "polynomial") # since that is the known function
-        psfmatch = ipDiffim.ImagePsfMatch(self.policy)
-
-        # Should work since already registered
-        results = psfmatch.matchExposures(tExp, sExp, doWarping = False)
-
-        # Should also work
-        results = psfmatch.matchExposures(tExp, sExp, doWarping = True)
-        psfMatchedExp = results[0]
-
-        self.assertEqual(len(results), 4)
-        self.assertEqual(type(results[0]), afwImage.ExposureF)
-        self.assertEqual(type(results[1]), afwMath.LinearCombinationKernel)
-        self.assertEqual(type(results[2]), afwMath.Function2D)
-        self.assertEqual(type(results[3]), afwMath.SpatialCellSet)
-        self.assertEqual(psfMatchedExp.getFilter().getName(), commonFilter.getName())
-        self.assertEqual(psfMatchedExp.getCalib().getFluxMag0(), sCalib.getFluxMag0())
-
-    def xtestSubtractMaskedImages(self, background = 100.):
-        tMi, sMi, sK, kcs = diffimTools.makeFakeKernelSet(self.policy, self.basisList,
-                                                          bgValue = background,
-                                                          nCell = 9)
-        self.policy.set("fitForBackground", True)
-        self.policy.set("spatialKernelOrder", 1)
-        self.policy.set("spatialBgOrder", 0)
-        self.policy.set("spatialKernelType", "polynomial") # since that is the known function
-        psfmatch = ipDiffim.ImagePsfMatch(self.policy)
-        results = psfmatch.subtractMaskedImages(tMi, sMi)
-
-        self.assertEqual(len(results), 4)
-        self.assertEqual(type(tMi), type(results[0]))
-        imstat = ipDiffim.ImageStatisticsF()
-        imstat.apply(results[0])
-        self.assertAlmostEqual(imstat.getRms(), 1.0, 1)
-        self.assertEqual(type(results[1]), afwMath.LinearCombinationKernel)
-        self.assertEqual(type(results[2]), afwMath.Function2D)
-        self.assertEqual(type(results[3]), afwMath.SpatialCellSet)
-
-        # Test the values of the known spatial coefficients.  Its a
-        # bit tricky since noise is added and skews the results
-        knownCoeffs = diffimTools.fakeCoeffs()
-        fitCoeffs   = results[1].getSpatialParameters()
-
-        for b in range(len(knownCoeffs)):
-            for s in range(len(knownCoeffs[b])):
-                self.assertAlmostEqual(knownCoeffs[b][s], fitCoeffs[b][s], 1)
-        
-    def xtestMatchMaskedImages(self, background = 100.):
-        tMi, sMi, sK, kcs = diffimTools.makeFakeKernelSet(self.policy, self.basisList,
-                                                          bgValue = background)
-        self.policy.set("fitForBackground", True)
-        self.policy.set("spatialKernelOrder", 1)
-        self.policy.set("spatialBgOrder", 0)
-        self.policy.set("spatialKernelType", "polynomial") # since that is the known function
-        psfmatch = ipDiffim.ImagePsfMatch(self.policy)
-        results = psfmatch.matchMaskedImages(tMi, sMi)
-
-        self.assertEqual(len(results), 4)
-        self.assertEqual(type(tMi), type(results[0]))
-        self.assertAlmostEqual(afwMath.makeStatistics(results[0].getImage(), afwMath.MEDIAN).getValue(),
-                               afwMath.makeStatistics(tMi.getImage(), afwMath.MEDIAN).getValue(), 1)
-        self.assertEqual(type(results[1]), afwMath.LinearCombinationKernel)
-        self.assertEqual(type(results[2]), afwMath.Function2D)
-        self.assertEqual(type(results[3]), afwMath.SpatialCellSet)
-
+    def testKsum(self):
+        pass
 
     def tearDown(self):
-        del self.configAL 
-        del self.configDF 
-        del self.configDFr
+        del self.exp
+        del self.config
 
 def suite():
     """Returns a suite containing all the test cases in this module."""

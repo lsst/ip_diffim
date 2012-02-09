@@ -18,10 +18,18 @@
 # the GNU General Public License along with this program.  If not, 
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
+import numpy as num
 import diffimLib
+import lsst.afw.geom as afwGeom
+import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
-from psfMatch import  PsfMatch, PsfMatchConfig, PsfMatchConfigDF, PsfMatchConfigAL
+import lsst.meas.algorithms as measAlg
+from makeKernelBasisList import makeKernelBasisList
+from psfMatch import PsfMatch, PsfMatchConfig, PsfMatchConfigDF, PsfMatchConfigAL
+
+sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
 class ModelPsfMatchConfig(PsfMatchConfig):
     def __init__(self):
@@ -74,7 +82,17 @@ class ModelPsfMatch(PsfMatch):
         kernelCellSet = self._buildCellSet(referencePsfModel,
                                            exposure.getBBox(afwImage.PARENT),
                                            exposure.getPsf(), kernelSum)
-        psfMatchingKernel, backgroundModel = self._solve(kernelCellSet)
+        
+        width, height = referencePsfModel.getKernel().getDimensions()
+        psfAttr1 = measAlg.PsfAttributes(exposure.getPsf(), width//2, height//2)
+        psfAttr2 = measAlg.PsfAttributes(referencePsfModel, width//2, height//2)
+        s1 = psfAttr1.computeGaussianWidth(psfAttr1.ADAPTIVE_MOMENT) # gaussian sigma
+        s2 = psfAttr2.computeGaussianWidth(psfAttr2.ADAPTIVE_MOMENT) # gaussian sigma
+        fwhm1 = s1 * sigma2fwhm
+        fwhm2 = s2 * sigma2fwhm
+
+        basisList = makeKernelBasisList(self._config, fwhm1, fwhm2)
+        psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
         
         self._log.log(pexLog.Log.INFO, "PSF-match science exposure to reference")
         psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(afwImage.PARENT), exposure.getWcs())
