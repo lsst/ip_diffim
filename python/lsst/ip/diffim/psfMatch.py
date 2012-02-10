@@ -182,8 +182,8 @@ class PsfMatchConfig(pexConfig.Config):
     )
     scaleByFwhm = pexConfig.Field(
         dtype = bool,
-        doc = "Scale kernelSize, fpGrowPix by input Fwhm",
-        default = False,
+        doc = "Scale kernelSize, fpGrowPix, alardGaussians by input Fwhm",
+        default = True,
     )
     kernelSizeFwhmScaling = pexConfig.Field(
         dtype = float,

@@ -5,6 +5,8 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.detection as afwDet
 import lsst.ip.diffim as ipDiffim
+import lsst.ip.diffim.diffimTools as diffimTools
+import lsst.meas.algorithms as measAlg
 
 import lsst.pex.logging as pexLog
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
@@ -13,17 +15,43 @@ class PsfMatchTestCases(unittest.TestCase):
 
     def setUp(self):
         self.config = ipDiffim.ModelPsfMatchConfig()
-        self.size   = 100
-        self.exp    = afwImage.ExposureF(afwGeom.Extent2I(self.size, self.size))
-        self.exp.setPsf(afwDet.createPsf("DoubleGaussian", 11, 11, 1.0))
+        self.config.scaleByFwhm = True
+
+        self.imsize = 2 * self.config.sizeCellX
+        self.ksize  = 21
+        self.sigma1 = 2.0
+        self.sigma2 = 3.7
+        self.exp    = afwImage.ExposureF(afwGeom.Extent2I(self.imsize, self.imsize))
+        self.exp.setPsf(afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma1))
+
+    def testTooBig(self):
+        self.config.kernelSize = self.ksize
+        psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma2)
+        psfMatch = ipDiffim.ModelPsfMatch(self.config)
+        try:
+            results = psfMatch.matchExposure(self.exp, psf)
+        except:
+            pass
+        else:
+            self.fail()
 
     def testMatch(self):
-        psf = afwDet.createPsf("DoubleGaussian", 11, 11, 3.0)
-        psfMatch = ipDiffim.ModelPsfMatch(self.config)
-        psfMatch.matchExposure(self.exp, psf)
+        for order in (0, 1):
+            for ksum in (0.5, 1.0, 2.7):
+                self.runMatch(kOrder = order, kSumIn = ksum)
+        
+    def runMatch(self, kOrder = 0, kSumIn = 3.7):
+        self.config.spatialKernelOrder = kOrder 
 
-    def testKsum(self):
-        pass
+        psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma2)
+        psfMatch = ipDiffim.ModelPsfMatch(self.config)
+        results = psfMatch.matchExposure(self.exp, psf, kernelSum = kSumIn)
+        matchedIm, matchingKernel, cellSet = results
+
+        kImage = afwImage.ImageD(matchingKernel.getDimensions())
+        kSumOut = matchingKernel.computeImage(kImage, False)
+
+        self.assertAlmostEqual(kSumIn, kSumOut)
 
     def tearDown(self):
         del self.exp

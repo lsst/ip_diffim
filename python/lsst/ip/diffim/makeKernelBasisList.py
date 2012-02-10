@@ -21,19 +21,20 @@
 #
 import diffimLib 
 import lsst.pex.config as pexConfig
+import lsst.pex.logging as pexLog
 import numpy as num
 sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
-def makeKernelBasisList(config, templateFwhmPix = None, scienceFwhmPix = None):
+def makeKernelBasisList(config, targetFwhmPix = None, referenceFwhmPix = None):
     if config.kernelBasisSet == "alard-lupton":
-        return generateAlardLuptonBasisList(config, templateFwhmPix, scienceFwhmPix)
+        return generateAlardLuptonBasisList(config, targetFwhmPix=targetFwhmPix, referenceFwhmPix=referenceFwhmPix)
     elif config.kernelBasisSet == "delta-function":
         kernelSize = config.kernelSize
         return diffimLib.makeDeltaFunctionBasisList(kernelSize, kernelSize)
     else:
         raise ValueError("Cannot generate %s basis set" % (config.kernelBasisSet))
 
-def generateAlardLuptonBasisList(config, templateFwhmPix = None, scienceFwhmPix = None, minSigma = 0.4, minRatio = 1.25):
+def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix = None, minSigma = 0.4, minRatio = 1.25):
     if config.kernelBasisSet != "alard-lupton":
         raise RuntimeError("Cannot generate %s basis within generateAlardLuptonBasisList" % (config.kernelBasisSet))
 
@@ -49,12 +50,17 @@ def generateAlardLuptonBasisList(config, templateFwhmPix = None, scienceFwhmPix 
     if (kernelSize % 2) != 1:
         raise ValueError("Only odd-sized Alard-Lupton bases allowed")
         
+    if (targetFwhmPix == None) or (referenceFwhmPix == None):
+        return diffimLib.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
+
+    targetSigma    = targetFwhmPix / sigma2fwhm
+    referenceSigma = referenceFwhmPix / sigma2fwhm
+    pexLog.Trace("lsst.ip.diffim.generateAlardLuptonBasisList", 2,
+                 "Generating matching bases for sigma %.2f pix -> %.2f pix" % (targetSigma, referenceSigma))
+        
     if not config.scaleByFwhm:
         return diffimLib.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
     
-    if (templateFwhmPix == None) or (scienceFwhmPix == None):
-        return diffimLib.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
-        
 
     # Modify the size of Alard Lupton kernels based upon the images FWHM
     #
@@ -63,15 +69,15 @@ def generateAlardLuptonBasisList(config, templateFwhmPix = None, scienceFwhmPix 
     # Assuming the template and science image Psfs are Gaussians with
     # the Fwhm above, Fwhm_T **2 + Fwhm_K **2 = Fwhm_S **2
     #
-    if templateFwhmPix == scienceFwhmPix:
+    if targetSigma == referenceSigma:
         # Leave defaults as-is
         pass
-    elif float(scienceFwhmPix) / float(templateFwhmPix) > 2.0:
+    elif float(referenceSigma) / float(targetSigma) > 2.0:
         # Extreme convolution; central Gaussian is at the template
         # scale, outer Gaussian is at the scale to match the two
         # cores, central Gaussian is geometric mean.
-        kernelCoreSigma   = templateFwhmPix / sigma2fwhm
-        kernelOuterSigma  = num.sqrt(scienceFwhmPix**2 - templateFwhmPix**2) / sigma2fwhm
+        kernelCoreSigma   = targetSigma
+        kernelOuterSigma  = num.sqrt(referenceSigma**2 - targetSigma**2)
 
         # Minimum ratio
         ratio             = num.sqrt(kernelOuterSigma / kernelCoreSigma)
@@ -83,17 +89,33 @@ def generateAlardLuptonBasisList(config, templateFwhmPix = None, scienceFwhmPix 
         alardSigGauss = (kernelCoreSigma, kernelMiddleSigma, kernelOuterSigma)
         alardDegGauss = alardDegGauss[:3]
 
-    elif scienceFwhmPix > templateFwhmPix:
+    elif (referenceSigma > targetSigma) and False:
+        # Did not work as well as intended...
+
         # Normal convolution; put the bulk of the power in the Gaussian
         # that matches the core Fwhms.  Outer gaussian corresponds to
         # the science image's Fwhm.  Middle is geometric mean to create
         # geometric progression of Gaussian sizes
-        kernelCoreFwhm    = num.sqrt(scienceFwhmPix**2 - templateFwhmPix**2)
-        kernelCoreSigma   = max(minSigma, kernelCoreFwhm / sigma2fwhm)
-        kernelOuterSigma  = scienceFwhmPix / sigma2fwhm
+        kernelCoreSigma   = max(minSigma, num.sqrt(referenceSigma**2 - targetSigma**2))
+        kernelOuterSigma  = referenceSigma
 
         # Minimum ratio
         ratio             = num.sqrt(kernelOuterSigma / kernelCoreSigma)
+        if ratio < minRatio:
+            kernelOuterSigma = minRatio**2 * kernelCoreSigma
+        kernelMiddleSigma = num.sqrt(kernelCoreSigma * kernelOuterSigma)
+
+        alardNGauss   = 3
+        alardSigGauss = (kernelCoreSigma, kernelMiddleSigma, kernelOuterSigma)
+        alardDegGauss = alardDegGauss[:3]
+
+    elif referenceSigma > targetSigma:
+        # Normal convolution
+        kernelCoreSigma  = max(minSigma, 0.33 * targetSigma)
+        kernelOuterSigma = num.sqrt(referenceSigma**2 - targetSigma**2)
+
+        # Minimum ratio
+        ratio            = num.sqrt(kernelOuterSigma / kernelCoreSigma)
         if ratio < minRatio:
             kernelOuterSigma = minRatio**2 * kernelCoreSigma
         kernelMiddleSigma = num.sqrt(kernelCoreSigma * kernelOuterSigma)
@@ -111,7 +133,7 @@ def generateAlardLuptonBasisList(config, templateFwhmPix = None, scienceFwhmPix 
         # http://iopscience.iop.org/0266-5611/26/8/085002  Equation 40
         kernelDeconvSigma = minSigma
         kernelCoreSigma   = minSigma
-        kernelOuterSigma  = templateFwhmPix / sigma2fwhm
+        kernelOuterSigma  = targetSigma
 
         # Minimum ratio
         ratio             = num.sqrt(kernelOuterSigma / kernelCoreSigma)

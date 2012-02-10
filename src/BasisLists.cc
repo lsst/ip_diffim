@@ -15,6 +15,7 @@
 
 #include "lsst/pex/exceptions/Exception.h"
 #include "lsst/pex/policy/Policy.h"
+#include "lsst/pex/logging/Trace.h"
 #include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
@@ -24,44 +25,11 @@ namespace pexExcept  = lsst::pex::exceptions;
 namespace afwGeom    = lsst::afw::geom;
 namespace afwImage   = lsst::afw::image;
 namespace afwMath    = lsst::afw::math;
+namespace pexLogging     = lsst::pex::logging; 
 
 namespace lsst { 
 namespace ip { 
 namespace diffim {
-
-    /*
-    lsst::afw::math::KernelList
-    makeKernelBasisList(
-        lsst::pex::policy::Policy policy
-        ) {
-        
-        std::string kernelBasisSet = policy.getString("kernelBasisSet");
-        int kSize = policy.getInt("kernelSize");
-        
-        if (kernelBasisSet == "alard-lupton") {
-            int alardNGauss                   = policy.getInt("alardNGauss");
-            std::vector<double> alardSigGauss = policy.getDoubleArray("alardSigGauss");
-            std::vector<int> alardDegGauss    = policy.getIntArray("alardDegGauss");
-            
-            if (static_cast<int>(alardSigGauss.size()) != alardNGauss) 
-                throw LSST_EXCEPT(pexExcept::Exception, "alardSigGauss.size() != alardNGauss");
-            if (static_cast<int>(alardDegGauss.size()) != alardNGauss) 
-                throw LSST_EXCEPT(pexExcept::Exception, "alardDegGauss.size() != alardNGauss");
-            if ((kSize % 2) != 1) {
-                throw LSST_EXCEPT(pexExcept::Exception, "Only odd-sized Alard-Lupton bases allowed");
-            }
-            
-            return makeAlardLuptonBasisList(kSize/2, alardNGauss, alardSigGauss, alardDegGauss);
-        }
-        else if (kernelBasisSet == "delta-function") {
-            return makeDeltaFunctionBasisList(kSize, kSize);
-        }
-        else {
-            throw LSST_EXCEPT(pexExcept::Exception, "Invalid basis set requested");
-        }
-    }
-    */
-
 
    /** 
     * @brief Generate a basis set of delta function Kernels.
@@ -136,6 +104,9 @@ namespace diffim {
             */
             double sig  = sigGauss[i];
             int deg     = degGauss[i];
+
+            pexLogging::TTrace<2>("lsst.ip.diffim.BasisLists.makeAlardLuptonBasisList", 
+                                  "Gaussian %d : sigma %.2f degree %d", i, sig, deg);
             
             afwMath::GaussianFunction2<Pixel> gaussian(sig, sig);
             afwMath::AnalyticKernel kernel(fullWidth, fullWidth, gaussian);

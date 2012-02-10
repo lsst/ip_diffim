@@ -22,11 +22,6 @@
 namespace lsst { 
 namespace ip { 
 namespace diffim {
-    /*
-    lsst::afw::math::KernelList
-    makeKernelBasisList(lsst::pex::policy::Policy policy);
-    */
-
 
     /**
      * @brief Build a set of Delta Function basis kernels

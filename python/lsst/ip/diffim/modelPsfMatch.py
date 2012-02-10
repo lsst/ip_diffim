@@ -26,14 +26,18 @@ import lsst.afw.math as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.meas.algorithms as measAlg
+import diffimTools
 from makeKernelBasisList import makeKernelBasisList
-from psfMatch import PsfMatch, PsfMatchConfig, PsfMatchConfigDF, PsfMatchConfigAL
+from psfMatch import PsfMatch, PsfMatchConfigAL
 
 sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
-class ModelPsfMatchConfig(PsfMatchConfig):
+class ModelPsfMatchConfig(PsfMatchConfigAL):
+    # We can determine the widths of the Psfs, thus can optmize the
+    # Alard-Lupton gaussian widths, so make this a subclass of
+    # PsfMatchConfigAL
     def __init__(self):
-        PsfMatchConfig.__init__(self)
+        PsfMatchConfigAL.__init__(self)
 
         # No sigma clipping
         self.singleKernelClipping = False
@@ -43,6 +47,9 @@ class ModelPsfMatchConfig(PsfMatchConfig):
         
         # Variance is ill defined
         self.constantVarianceWeighting = True
+
+        # Psfs are typically small; reduce the kernel size
+        self.kernelSize = 11
 
 class ModelPsfMatch(PsfMatch):
     """PSF-match PSF models to reference PSF models
@@ -60,7 +67,7 @@ class ModelPsfMatch(PsfMatch):
         
         @param exposure: Exposure to PSF-match to the reference masked image;
             must contain a PSF model and must be warped to match the reference masked image
-        @param referencePsfModel: PSF model to match (an afwDetection.Psf)
+        @param referencePsfModel: PSF model to match to (an afwDetection.Psf)
         @param kernelSum: A multipicative factor reflecting the difference in 
             zeropoints between the images; kernelSum = zpt(science) / zpt(ref)
         
@@ -81,19 +88,28 @@ class ModelPsfMatch(PsfMatch):
         self._log.log(pexLog.Log.INFO, "compute PSF-matching kernel")
         kernelCellSet = self._buildCellSet(referencePsfModel,
                                            exposure.getBBox(afwImage.PARENT),
-                                           exposure.getPsf(), kernelSum)
+                                           exposure.getPsf())
         
         width, height = referencePsfModel.getKernel().getDimensions()
         psfAttr1 = measAlg.PsfAttributes(exposure.getPsf(), width//2, height//2)
         psfAttr2 = measAlg.PsfAttributes(referencePsfModel, width//2, height//2)
-        s1 = psfAttr1.computeGaussianWidth(psfAttr1.ADAPTIVE_MOMENT) # gaussian sigma
-        s2 = psfAttr2.computeGaussianWidth(psfAttr2.ADAPTIVE_MOMENT) # gaussian sigma
+        s1 = psfAttr1.computeGaussianWidth(psfAttr1.ADAPTIVE_MOMENT) # gaussian sigma in pixels
+        s2 = psfAttr2.computeGaussianWidth(psfAttr2.ADAPTIVE_MOMENT) # gaussian sigma in pixels
         fwhm1 = s1 * sigma2fwhm
         fwhm2 = s2 * sigma2fwhm
 
         basisList = makeKernelBasisList(self._config, fwhm1, fwhm2)
         psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
         
+        if psfMatchingKernel.isSpatiallyVarying():
+            sParameters = num.array(psfMatchingKernel.getSpatialParameters())
+            sParameters[0][0] = kernelSum
+            psfMatchingKernel.setSpatialParameters(sParameters)
+        else:
+            kParameters = num.array(psfMatchingKernel.getKernelParameters())
+            kParameters[0] = kernelSum
+            psfMatchingKernel.setKernelParameters(kParameters)
+            
         self._log.log(pexLog.Log.INFO, "PSF-match science exposure to reference")
         psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(afwImage.PARENT), exposure.getWcs())
         psfMatchedExposure.setFilter(exposure.getFilter())
@@ -108,10 +124,10 @@ class ModelPsfMatch(PsfMatch):
         self._log.log(pexLog.Log.INFO, "done")
         return (psfMatchedExposure, psfMatchingKernel, kernelCellSet)
 
-    def _buildCellSet(self, referencePsfModel, scienceBBox, sciencePsfModel, kernelSum = 1.0):
+    def _buildCellSet(self, referencePsfModel, scienceBBox, sciencePsfModel):
         """Build a SpatialCellSet for use with the solve method
 
-        @param referencePsfModel: PSF model to match (an afwDetection.Psf)
+        @param referencePsfModel: PSF model to match to (an afwDetection.Psf)
         @param scienceBBox: parent bounding box on science image
         @param sciencePsfModel: PSF model for science image
         
@@ -124,15 +140,13 @@ class ModelPsfMatch(PsfMatch):
                          "ERROR: Dimensions of reference Psf and science Psf different; exiting")
             raise RuntimeError, "ERROR: Dimensions of reference Psf and science Psf different; exiting"
     
-        kernelWidth, kernelHeight = referencePsfModel.getKernel().getDimensions()
-        maxPsfMatchingKernelSize = 1 + (min(kernelWidth - 1, kernelHeight - 1) // 2)
-        if maxPsfMatchingKernelSize % 2 == 0:
-            maxPsfMatchingKernelSize -= 1
-        if self._config.kernelSize > maxPsfMatchingKernelSize:
-            pexLog.Trace(self._log.getName(), 1,
-                         "WARNING: Resizing matching kernel to size %d x %d" % (maxPsfMatchingKernelSize,
-                                                                                maxPsfMatchingKernelSize))
-            self._config.kernelSize = maxPsfMatchingKernelSize
+        psfWidth, psfHeight = referencePsfModel.getKernel().getDimensions()
+        maxKernelSize = 1 + (min(psfWidth - 1, psfHeight - 1) // 2)
+        if maxKernelSize % 2 == 0:
+            maxKernelSize -= 1
+        if self._config.kernelSize > maxKernelSize:
+            raise ValueError, "Kernel size (%d) too big to match Psfs of size %d; reduce to at least %d" % (
+                self._config.kernelSize, psfWidth, maxKernelSize)
         
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0,   scienceY0   = scienceBBox.getMin()
@@ -166,16 +180,16 @@ class ModelPsfMatch(PsfMatch):
                 kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY), True).convertF()
                 imsum = afwMath.makeStatistics(kernelImageR, afwMath.SUM).getValue(afwMath.SUM)
                 kernelImageR /= imsum         # image sums to 1.0 
-                kernelImageR /= kernelSum     # image sums to 1/kernelSum
                 kernelMaskR   = afwImage.MaskU(dimenR)
                 kernelMaskR.set(0)
                 kernelVarR    = afwImage.ImageF(dimenR)
                 kernelVarR.set(1.0)
                 referenceMI   = afwImage.MaskedImageF(kernelImageR, kernelMaskR, kernelVarR)
      
+                # kernel image we are going to convolve
                 kernelImageS = sciencePsfModel.computeImage(afwGeom.Point2D(posX, posY), True).convertF()
                 imsum = afwMath.makeStatistics(kernelImageS, afwMath.SUM).getValue(afwMath.SUM)
-                kernelImageS /= imsum
+                kernelImageS /= imsum         # image sums to 1.0 
                 kernelMaskS   = afwImage.MaskU(dimenS)
                 kernelMaskS.set(0)
                 kernelVarS    = afwImage.ImageF(dimenS)
