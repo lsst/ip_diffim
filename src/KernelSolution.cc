@@ -178,7 +178,7 @@ namespace diffim {
 		}
 
         double time = t.elapsed();
-        pexLog::TTrace<3>("lsst.ip.diffim.KernelSolution.solve", 
+        pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                           "Compute time for matrix math : %.2f s", time);
 
         if (DEBUG_MATRIX) {

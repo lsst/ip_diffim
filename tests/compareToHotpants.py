@@ -28,6 +28,23 @@ class DiffimTestCases(unittest.TestCase):
 
         # Run detection
         detConfig = self.config.detectionConfig
+        # Note here regarding detConfig:
+        #
+        # If I set detThresholdType = "pixel_stdev", I get slightly
+        # different centroids than if I use "stdev".  These different
+        # centroids screw up the testing since hotpants was hardcoded to
+        # use the "stdev" centroids.  For completeness these are:
+        #
+        # 32 32
+        # 96 32
+        # 160 32
+        # 96 95
+        # 31 96
+        # 160 96
+        # 96 160
+        # 160 160
+        # 32 160
+        detConfig.detThresholdType = "stdev"
         kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
         kcDetect.apply(self.smi, self.tmi)
         self.footprints = kcDetect.getFootprints()
@@ -166,7 +183,7 @@ class DiffimTestCases(unittest.TestCase):
         
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
-        
+
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
                 cand = ipDiffim.makeKernelCandidate( (xC - 0.5 * self.smi.getWidth()) /
@@ -174,6 +191,7 @@ class DiffimTestCases(unittest.TestCase):
                                                      (yC - 0.5 * self.smi.getHeight()) /
                                                      (0.5 * self.smi.getHeight()),
                                                      tsmi, ssmi, self.policy)
+
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors

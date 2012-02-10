@@ -112,7 +112,7 @@ class DiffimTestCases(unittest.TestCase):
         self.alardLuptonTest(ks)
 
         # send FWHM
-        ks = ipDiffim.generateAlardLuptonBasisList(self.configAL, templateFwhmPix = 3.0, scienceFwhmPix = 4.0)
+        ks = ipDiffim.generateAlardLuptonBasisList(self.configAL, targetFwhmPix = 3.0, referenceFwhmPix = 4.0)
         self.alardLuptonTest(ks)
 
         

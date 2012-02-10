@@ -26,6 +26,10 @@ class DiffimTestCases(unittest.TestCase):
     def setUp(self):
         self.config = ipDiffim.PsfMatchConfigAL()
 
+        # Some of the tests are sensitive to the centroids returned by
+        # "stdev" vs "pixel_stdev"
+        self.config.detectionConfig.detThresholdType = "stdev"
+
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
 
