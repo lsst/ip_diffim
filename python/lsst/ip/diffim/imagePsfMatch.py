@@ -319,9 +319,6 @@ class ImagePsfMatch(PsfMatch):
             detConfig = self._config.detectionConfig
             kcDetect = diffimLib.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
 
-            maskedImageToConvolve.writeFits("mitc.fits")
-            maskedImageToNotConvolve.writeFits("mitnc.fits")
-
             kcDetect.apply(maskedImageToConvolve, maskedImageToNotConvolve)
             footprints = kcDetect.getFootprints()
 
