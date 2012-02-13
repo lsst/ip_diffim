@@ -124,7 +124,7 @@ class PsfMatchTestCases(unittest.TestCase):
         sExp = afwImage.ExposureF(sMi, sWcs)
 
         psfMatchAL  = ipDiffim.ImagePsfMatch(self.configAL)
-        resultsAL  = psfMatchAL.matchExposures(tExp, sExp, psfFwhmPixEtc = 2.0, psfFwhmPixEtnc = 3.0, doWarping = True)
+        resultsAL  = psfMatchAL.matchExposures(tExp, sExp, psfFwhmPixTc = 2.0, psfFwhmPixTnc = 3.0, doWarping = True)
         self.assertEqual(len(resultsAL), 4)
         self.assertEqual(type(resultsAL[0]), afwImage.ExposureF)
         self.assertEqual(type(resultsAL[1]), afwMath.LinearCombinationKernel)

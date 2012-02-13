@@ -27,8 +27,8 @@ import lsst.ip.diffim as ipDiffim
 from lsst.pex.logging import Log, Trace
 
 
-def subtractSnaps(snap1, snap2, policy, doWarping = False):
-    psfmatch = ipDiffim.ImagePsfMatch(policy)
+def subtractSnaps(snap1, snap2, config, doWarping = False):
+    psfmatch = ipDiffim.ImagePsfMatch(config)
     results  = psfmatch.subtractExposures(snap1, snap2, doWarping = doWarping)
     snapDiff, kernelModel, bgModel, kernelCellSet = results
     return snapDiff
@@ -46,7 +46,6 @@ def main():
     parser.add_option('--s1', help='snap1')
     parser.add_option('--s2', help='snap2')
     parser.add_option('--sdiff', help='snap2 - snap1.x.kernel')
-    parser.add_option('--policy', help='user override policy file')
     parser.add_option('--warp', action='store_true', default=False, help='astrometrically warp snap1')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
                       help='verbosity of Trace messages')
@@ -61,10 +60,8 @@ def main():
          
     snap1Exp   = afwImage.ExposureF(options.s1)
     snap2Exp   = afwImage.ExposureF(options.s2)
-    policy     = ipDiffim.makeDefaultPolicy(mergePolicy = options.policy)
-    snapPolicy = ipDiffim.modifyForSnapSubtraction(policy)
-
-    snapDiff   = subtractSnaps(snap1Exp, snap2Exp, snapPolicy, doWarping = options.warp)
+    config     = ipDiffim.SnapPsfMatchConfigAL()
+    snapDiff   = subtractSnaps(snap1Exp, snap2Exp, config, doWarping = options.warp)
     snapDiff.writeFits(options.sdiff)
     
 def run():
@@ -81,4 +78,4 @@ if __name__ == '__main__':
 
 # For debugging script:
 # 
-# python examples/subtractSnaps.py --s1    /home/becker/LSST/PT1/psfMatch/wp_trunk_2011_0601_171743/update/calexp/v885335911-fr/R22/S11.fits --s2  /home/becker/LSST/PT1/psfMatch/wp_trunk_2011_0601_171743/update/calexp/v886257211-fr/R22/S11.fits --sdiff sdiff.fits --warp
+# python examples/subtractSnaps.py --s1 ~/LSST/becker_2012_0209_181253/update/calexp/v886894611-fr/R22/S11.fits --s2 ~/LSST/becker_2012_0209_181253/update/calexp/v886264371-fr/R22/S11.fits --sdiff sdiff.fits --warp

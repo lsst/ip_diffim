@@ -38,8 +38,11 @@ kim2 = afwImage.ImageD(klist[0].getDimensions())
 
 for k1 in range(0, len(klist)):
     klist[k1].computeImage(kim1, False)
+    # Only first term should have sum != 0.0
     print k1, num.sum(num.ravel(kim1.getArray()))
     
+print
+
 for k1 in range(0, len(klist)):
     klist[k1].computeImage(kim1, False)
     arr1 = kim1.getArray().ravel()
@@ -47,7 +50,7 @@ for k1 in range(0, len(klist)):
     for k2 in range(k1, len(klist)):
         klist[k2].computeImage(kim2, False)
         arr2 = kim2.getArray().ravel()
-
+        # Not orthonormal tho
         print k1, k2, num.inner(arr1, arr2)
         
         

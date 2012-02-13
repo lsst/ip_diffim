@@ -10,14 +10,10 @@ import lsst.afw.display.ds9 as ds9
 from lsst.pex.logging import Trace
 from lsst.pex.logging import Log
 
-from lsst.ip.diffim import subtractMaskedImages, makeDefaultPolicy
+import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 
 def main():
-    defDataDir = eups.productDir('afwdata') 
-    if defDataDir == None:
-        print 'Error: afwdata not set up'
-        sys.exit(1)
     imageProcDir = eups.productDir('ip_diffim')
     if imageProcDir == None:
         print 'Error: could not set up ip_diffim'
@@ -25,9 +21,8 @@ def main():
 
     defSciencePath  = None
     defTemplatePath = None
-    mergePolicyPath = None
     defOutputPath   = 'diffImage.fits'
-    defVerbosity    = 0
+    defVerbosity    = 5
     defFwhm         = 3.5
     
     usage = """usage: %%prog [options] [scienceImage [templateImage [outputImage]]]]
@@ -40,19 +35,19 @@ Notes:
 - default scienceMaskedImage=%s
 - default templateMaskedImage=%s
 - default outputImage=%s 
-- default --policy=%s
-""" % (defSciencePath, defTemplatePath, defOutputPath, mergePolicyPath)
+""" % (defSciencePath, defTemplatePath, defOutputPath)
     
     parser = optparse.OptionParser(usage)
-    parser.add_option('-p', '--policy', default=mergePolicyPath, help='policy file')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
                       help='verbosity of Trace messages')
     parser.add_option('-d', '--display', action='store_true', default=False,
                       help='display the images')
     parser.add_option('-b', '--bg', action='store_true', default=False,
                       help='subtract backgrounds')
-    parser.add_option('-f', '--fwhm', type=float,
-                      help='Psf Fwhm (pixel)')
+    parser.add_option('--fwhmS', type=float,
+                      help='Science Image Psf Fwhm (pixel)')
+    parser.add_option('--fwhmT', type=float,
+                      help='Template Image Psf Fwhm (pixel)')
                       
     (options, args) = parser.parse_args()
     
@@ -64,7 +59,6 @@ Notes:
     sciencePath     = getArg(0, defSciencePath)
     templatePath    = getArg(1, defTemplatePath)
     outputPath      = getArg(2, defOutputPath)
-    mergePolicyPath = options.policy
 
     if sciencePath == None or templatePath == None:
         parser.print_help()
@@ -73,12 +67,16 @@ Notes:
     print 'Science image: ', sciencePath
     print 'Template image:', templatePath
     print 'Output image:  ', outputPath
-    print 'Policy file:   ', mergePolicyPath
 
-    fwhm = defFwhm
-    if options.fwhm:
-        print 'Fwhm =', options.fwhm
-        fwhm = options.fwhm
+    fwhmS = defFwhm
+    if options.fwhmS:
+        print 'FwhmS =', options.fwhmS
+        fwhmS = options.fwhmS
+
+    fwhmT = defFwhm
+    if options.fwhmT:
+        print 'Fwhmt =', options.fwhmT
+        fwhmT = options.fwhmT
 
     display = False
     if options.display:
@@ -98,23 +96,25 @@ Notes:
         
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
-    policy              = makeDefaultPolicy(mergePolicy = mergePolicyPath, fwhm=fwhm)
-    
+    config              = ipDiffim.PsfMatchConfigAL()
+
     if bgSub:
-        diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),
+        diffimTools.backgroundSubtract(config.afwBackgroundConfig,
                                        [templateMaskedImage, scienceMaskedImage])
     else:
-        if policy.get('fitForBackground') == False:
+        if config.fitForBackground == False:
             print 'NOTE: no background subtraction at all is requested'
 
-    psfmatch = PsfMatch.ImagePsfMatch(policy)
-    results  = psfmatch.subtractMaskedImages(templateMaskedImage, scienceMaskedImage)
+    psfmatch = imDiffim.ImagePsfMatch(config)
+    results  = psfmatch.subtractMaskedImages(templateMaskedImage, scienceMaskedImage,
+                                             psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
 
     differenceMaskedImage = results[0]
     differenceMaskedImage.writeFits(outputPath)
 
-    spatialKernel = results[1]
-    print spatialKernel.getSpatialParameters()
+    if False:
+        spatialKernel = results[1]
+        print spatialKernel.getSpatialParameters()
     
     if display:
         ds9.mtv(differenceMaskedImage)

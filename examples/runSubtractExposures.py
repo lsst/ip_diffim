@@ -3,14 +3,16 @@ import sys
 import os
 import optparse
 import re
+import numpy as num
 
 import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
 
 from lsst.pex.logging import Trace
 from lsst.pex.logging import Log
+import lsst.meas.algorithms as measAlg
 
-from lsst.ip.diffim import psfMatch, makeDefaultPolicy, modifyForImagePsfMatch, makeSdqaRatingVector
+import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 
 def main():
@@ -26,11 +28,11 @@ def main():
     defSciencePath  = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0", "v26-e0-c011-a10.sci")
     defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0", "v5-e0-c011-a10.sci")
 
-    mergePolicyPath = None
     defOutputPath   = 'diffExposure.fits'
     defVerbosity    = 5
     defFwhm         = 3.5
-    
+    sigma2fwhm      = 2. * num.sqrt(2. * num.log(2.))
+
     usage = """usage: %%prog [options] [scienceExposure [templateExposure [outputExposure]]]]
 
 Notes:
@@ -41,22 +43,19 @@ Notes:
 - default scienceExposure=%s
 - default templateExposure=%s
 - default outputExposure=%s 
-- default --policy=%s
-""" % (defSciencePath, defTemplatePath, defOutputPath, mergePolicyPath)
+""" % (defSciencePath, defTemplatePath, defOutputPath)
     
     parser = optparse.OptionParser(usage)
-    parser.add_option('-p', '--policy', default=mergePolicyPath, help='policy file to merge with defaults')
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
                       help='verbosity of Trace messages')
     parser.add_option('-d', '--display', action='store_true', default=False,
                       help='display the images')
     parser.add_option('-b', '--bg', action='store_true', default=False,
                       help='subtract backgrounds using afw')
-
-    parser.add_option('-t', '--fwhmTemplate', type=float,
-                      help='Template Psf Fwhm (pixel)')
-    parser.add_option('-i', '--fwhmImage', type=float,
-                      help='Image Psf Fwhm (pixel)')
+    parser.add_option('--fwhmS', type=float,
+                      help='Science Image Psf Fwhm (pixel)')
+    parser.add_option('--fwhmT', type=float,
+                      help='Template Image Psf Fwhm (pixel)')
 
     (options, args) = parser.parse_args()
     
@@ -68,24 +67,40 @@ Notes:
     sciencePath     = getArg(0, defSciencePath)
     templatePath    = getArg(1, defTemplatePath)
     outputPath      = getArg(2, defOutputPath)
-    mergePolicyPath = options.policy
     
+    if sciencePath == None or templatePath == None:
+        parser.print_help()
+        sys.exit(1)
+
     print 'Science exposure: ', sciencePath
     print 'Template exposure:', templatePath
     print 'Output exposure:  ', outputPath
-    print 'Policy file:      ', mergePolicyPath
 
-    if options.fwhmTemplate:
-        fwhmTemplate = options.fwhmTemplate
-        print 'Fwhm Template =', fwhmTemplate
-    else:
-        fwhmTemplate = defFwhm
+    templateExposure = afwImage.ExposureF(templatePath)
+    scienceExposure  = afwImage.ExposureF(sciencePath)
+    config           = ipDiffim.PsfMatchConfigAL()
+    
+    fwhmS = defFwhm
+    if options.fwhmS:
+        if scienceExposure.hasPsf():
+            width, height = scienceExposure.getPsf().getKernel().getDimensions()
+            psfAttr = measAlg.PsfAttributes(scienceExposure.getPsf(), width//2, height//2)
+            s = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT) # gaussian sigma in pixels
+            fwhm = s * sigma2fwhm
+            print 'NOTE: Embedded Psf has FwhmS =', fwhm
+        print 'USING: FwhmS =', options.fwhmS
+        fwhmS = options.fwhmS
 
-    if options.fwhmImage:
-        fwhmImage = options.fwhmImage
-        print 'Fwhm Image =', fwhmImage
-    else:
-        fwhmImage = defFwhm
+    fwhmT = defFwhm
+    if options.fwhmT:
+        if templateExposure.hasPsf():
+            width, height = templateExposure.getPsf().getKernel().getDimensions()
+            psfAttr = measAlg.PsfAttributes(templateExposure.getPsf(), width//2, height//2)
+            s = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT) # gaussian sigma in pixels
+            fwhm = s * sigma2fwhm
+            print 'NOTE: Embedded Psf has FwhmT =', fwhm
+        print 'USING: FwhmT =', options.fwhmT
+        fwhmT = options.fwhmT
 
     display = False
     if options.display:
@@ -103,36 +118,29 @@ Notes:
 
     ####
         
-    templateExposure = afwImage.ExposureF(templatePath)
-    scienceExposure  = afwImage.ExposureF(sciencePath)
-    policy           = makeDefaultPolicy(mergePolicy = mergePolicyPath)
-    policy           = modifyForImagePsfMatch(policy, fwhmTemplate, fwhmImage)
-    print policy
-    
     if bgSub:
-        diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),
+        diffimTools.backgroundSubtract(config.afwBackgroundConfig,
                                        [templateExposure.getMaskedImage(),
                                         scienceExposure.getMaskedImage()])
     else:
-        policy.set('fitForBackground', True)
-        if policy.get('fitForBackground') == False:
+        if config.fitForBackground == False:
             print 'NOTE: no background subtraction at all is requested'
 
-        
-    psfmatch = psfMatch.ImagePsfMatch(policy)
-    results  = psfmatch.subtractExposures(templateExposure, scienceExposure)
+    psfmatch = ipDiffim.ImagePsfMatch(config)
+    results  = psfmatch.subtractExposures(templateExposure, scienceExposure,
+                                          psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
 
     differenceExposure = results[0]
     differenceExposure.writeFits(outputPath)
 
-    psfMatchingKernel = results[1]
-    backgroundModel   = results[2]
-    kernelCellSet     = results[3]
-    makeSdqaRatingVector(kernelCellSet, psfMatchingKernel, backgroundModel)
-
-    diffimTools.writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel,
-                                   re.sub('.fits', '', outputPath))
-
+    if False:
+        psfMatchingKernel = results[1]
+        backgroundModel   = results[2]
+        kernelCellSet     = results[3]
+        
+        diffimTools.writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel,
+                                       re.sub('.fits', '', outputPath))
+        
 def run():
     Log.getDefaultLog()
     memId0 = dafBase.Citizen_getNextMemId()
