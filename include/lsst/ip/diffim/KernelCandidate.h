@@ -34,15 +34,14 @@ namespace diffim {
      * @ingroup ip_diffim
      */    
     template <typename _PixelT>
-    class KernelCandidate : public lsst::afw::math::SpatialCellImageCandidate<
-        lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> 
-        > {
+    class KernelCandidate :
+        public lsst::afw::math::SpatialCellImageCandidate<lsst::afw::math::Kernel::Pixel> {
     public: 
         typedef lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> ImageT;
         typedef _PixelT PixelT;         // _after_ lsst::afw::math::Kernel::Pixel
 
     private:
-        using lsst::afw::math::SpatialCellImageCandidate<ImageT>::_image;
+        using lsst::afw::math::SpatialCellImageCandidate<lsst::afw::math::Kernel::Pixel>::_image;
 
     public:
         typedef boost::shared_ptr<KernelCandidate> Ptr;
