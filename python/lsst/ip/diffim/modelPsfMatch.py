@@ -147,6 +147,27 @@ class ModelPsfMatch(PsfMatch):
         if self._config.kernelSize > maxKernelSize:
             raise ValueError, "Kernel size (%d) too big to match Psfs of size %d; reduce to at least %d" % (
                 self._config.kernelSize, psfWidth, maxKernelSize)
+
+        # Infer spatial order of Psf model!
+        #
+        # Infer from the number of spatial parameters.
+        # (O + 1) * (O + 2) / 2 = N
+        # O^2 + 3 * O + 2 * (1 - N) = 0
+        #
+        # Roots are [-3 +/- sqrt(9 - 8 * (1 - N))] / 2
+        #
+        nParameters = sciencePsfModel.getKernel().getNSpatialParameters()
+        root        = num.sqrt(9 - 8 * (1 - nParameters))
+        if (root != root // 1):            # We know its an integer solution
+            pexLog.Trace(self._log.getName(), 3, "Problem inferring spatial order of image's Psf")
+        else:
+            order       = (root - 3) / 2
+            if (order != order // 1):
+                pexLog.Trace(self._log.getName(), 3, "Problem inferring spatial order of image's Psf")
+            else:
+                pexLog.Trace(self._log.getName(), 2, "Spatial order of Psf = %d; matching kernel order = %d" % (
+                        order, self._config.spatialKernelOrder))
+            
         
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0,   scienceY0   = scienceBBox.getMin()

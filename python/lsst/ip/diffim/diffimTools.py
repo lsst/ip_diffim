@@ -403,7 +403,7 @@ def displayCandidateResults(kernelCellSet, frame, goodOnly = True):
                 mos.append(dmi.getImage())
                 
     mosaic = mos.makeMosaic(mode=4)
-    ds9.mtv(mosaic, frame=frame)
+    ds9.mtv(mosaic, frame=frame, title = "Kernel Candidates")
 
 def displayFootprints(image, footprintList, frame):
     import lsst.afw.display.ds9 as ds9

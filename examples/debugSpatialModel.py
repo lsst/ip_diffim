@@ -24,11 +24,12 @@ import os
 import sys
 import eups
 import lsst.afw.geom as afwGeom
-import lsst.afw.image.imageLib as afwImage
-import lsst.afw.math.mathLib as afwMath
+import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLogging
+import lsst.pex.config as pexConfig
 
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.display.utils as displayUtils
@@ -55,56 +56,47 @@ elif len(sys.argv) == 3:
 else:
     sys.exit(1)
     
-defOutputPath   = "diffImage"
-
+defOutputPath    = "diffImage"
 templateExposure = afwImage.ExposureF(defTemplatePath)
 scienceExposure  = afwImage.ExposureF(defSciencePath)
-policy           = ipDiffim.makeDefaultPolicy()
+config           = ipDiffim.PsfMatchConfigAL()
+
 
 if warp:
-    warper = afwMath.Warper.fromPolicy(policy.getPolicy("warpingPolicy"))
+    warper = afwMath.Warper.fromConfig(config.warpingConfig)
     templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
-            destBBox = scienceExposure.getBBox(afwImage.PARENT))
-    #policy.set("detThreshold", 5.)
-    #policy.set("sizeCellX", 128)
-    #policy.set("sizeCellY", 128)
-    #policy.set("kernelBasisSet", "alard-lupton")
-    #policy.set("useRegularization", False)
-
+                                           destBBox = scienceExposure.getBBox(afwImage.PARENT))
 if subBackground:
-    diffimTools.backgroundSubtract(policy.getPolicy("afwBackgroundPolicy"),
+    # Do in AFW
+    diffimTools.backgroundSubtract(config.afwBackgroundConfig,
                                    [templateExposure.getMaskedImage(),
                                     scienceExposure.getMaskedImage()])
-    policy.set('fitForBackground', False)
+    config.fitForBackground = False
 else:
-    policy.set('fitForBackground', True)
+    # Do in IP_DIFFIM
+    config.fitForBackground = True
     
 
 frame  = 0
-ds9.mtv(templateExposure, frame=frame)
+ds9.mtv(templateExposure, frame=frame, title = "Template")
 frame += 1
-ds9.mtv(scienceExposure, frame=frame)
+ds9.mtv(scienceExposure, frame=frame, title = "Sci Im")
 
-#policy.set("spatialKernelType", "chebyshev1")
-policy.set("spatialKernelOrder", 2)
-policy.getPolicy('detectionPolicy').set("detThreshold", 3.)
-psfmatch = ipDiffim.ImagePsfMatch(policy)
+psfmatch = ipDiffim.ImagePsfMatch(config)
 try:
-    results = psfmatch.matchMaskedImages(templateExposure.getMaskedImage(),
-                                         scienceExposure.getMaskedImage())
-    
+    results = psfmatch.subtractMaskedImages(templateExposure.getMaskedImage(),
+                                            scienceExposure.getMaskedImage())
     diffim, spatialKernel, spatialBg, kernelCellSet = results
 except Exception, e:
     print 'FAIL'
     sys.exit(1)
 
-ratings = ipDiffim.makeSdqaRatingVector(kernelCellSet, spatialKernel, spatialBg)
+if False:
+    print spatialKernel.getSpatialFunctionList()[0].toString()
+    print spatialKernel.getKernelParameters()
+    print spatialKernel.getSpatialParameters()
+    import pdb; pdb.set_trace()
 
-print spatialKernel.getSpatialFunctionList()[0].toString()
-print spatialKernel.getKernelParameters()
-print spatialKernel.getSpatialParameters()
-
-import pdb; pdb.set_trace()
 # Lets see what we got
 if display:
     mos = displayUtils.Mosaic()
@@ -132,7 +124,7 @@ if display:
 
     mosaic = mos.makeMosaic()
     frame += 1
-    ds9.mtv(mosaic, frame=frame)
+    ds9.mtv(mosaic, frame=frame, title = "Raw Kernels")
     mos.drawLabels(frame=frame)
 
     # KernelCandidates
@@ -149,7 +141,7 @@ if display:
         mos.append(im, "K%d" % (idx))
     mosaic = mos.makeMosaic()
     frame += 1
-    ds9.mtv(mosaic, frame=frame)
+    ds9.mtv(mosaic, frame=frame, title = "Kernel Bases")
     mos.drawLabels(frame=frame)
         
 
@@ -170,7 +162,7 @@ if display:
 
     mosaic = mos.makeMosaic()
     frame += 1
-    ds9.mtv(mosaic, frame=frame)
+    ds9.mtv(mosaic, frame=frame, title = "Spatial Kernels")
     mos.drawLabels(frame=frame)
             
 
@@ -178,7 +170,7 @@ if display:
     backgroundIm  = afwImage.ImageF(afwGeom.Extent2I(templateExposure.getWidth(), templateExposure.getHeight()), 0)
     backgroundIm += spatialBg
     frame += 1
-    ds9.mtv(backgroundIm, frame=frame)
+    ds9.mtv(backgroundIm, frame=frame, title = "Background model")
 
     # Diffim!
     diffIm = ipDiffim.convolveAndSubtract(templateExposure.getMaskedImage(),
@@ -186,7 +178,7 @@ if display:
                                           spatialKernel,
                                           spatialBg)
     frame += 1
-    ds9.mtv(diffIm, frame=frame)
+    ds9.mtv(diffIm, frame=frame, title = "Diffim")
 
 
 # examples/runSpatialModel.py $AFWDATA_DIR/DC3a-Sim/sci/v5-e0/v5-e0-c011-a00.sci
