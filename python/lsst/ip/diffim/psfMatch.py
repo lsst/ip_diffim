@@ -592,6 +592,44 @@ class PsfMatch(object):
                          "NOTE: spatial background model appears well constrained; %d candidates, %d terms" % (nGood, nBgTerms))
         
     
+    def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
+        nComponents       = self._config.numPrincipalComponents
+        imagePca          = afwImage.ImagePcaD()
+        importStarVisitor = diffimLib.KernelPcaVisitorF(imagePca)
+        kernelCellSet.visitCandidates(importStarVisitor, nStarPerCell)
+        if self._config.subtractMeanForPca:
+            importStarVisitor.subtractMean()
+        imagePca.analyze()
+
+        eigenValues  = imagePca.getEigenValues()
+        pcaBasisList = importStarVisitor.getEigenKernels()
+
+        eSum = num.sum(eigenValues)
+        for j in range(len(eigenValues)):
+            pexLog.Trace(self._log.getName()+"._solve", 6, 
+                         "Eigenvalue %d : %f (%f)" % (j, eigenValues[j], eigenValues[j]/eSum))
+                                     
+        nToUse = min(nComponents, len(eigenValues))
+        trimBasisList = afwMath.KernelList()
+        for j in range(nToUse):
+            # Check for NaNs?
+            kimage = afwImage.ImageD(pcaBasisList[j].getDimensions())
+            pcaBasisList[j].computeImage(kimage, False)
+            if not (True in num.isnan(kimage.getArray())):
+                trimBasisList.push_back(pcaBasisList[j])
+                            
+        # Put all the power in the first kernel, which will not vary spatially
+        spatialBasisList = diffimLib.renormalizeKernelList(trimBasisList)
+
+        # New Kernel visitor for this new basis list (no regularization explicitly)
+        singlekvPca = diffimLib.BuildSingleKernelVisitorF(spatialBasisList, policy)
+        singlekvPca.setSkipBuilt(False)
+        kernelCellSet.visitCandidates(singlekvPca, nStarPerCell)
+        singlekvPca.setSkipBuilt(True)
+        nRejectedPca = singlekvPca.getNRejected()
+                    
+        return nRejectedPca, spatialBasisList
+        
     def _solve(self, kernelCellSet, basisList, returnOnExcept = False):
         """Determine the PSF matching kernel
         
@@ -662,43 +700,9 @@ class PsfMatch(object):
                 # the spatial fit to these kernels
                 
                 if (usePcaForSpatialKernel):
-                    pexLog.Trace(self._log.getName()+"._solve", 5, 
-                                 "Building Pca basis")
+                    pexLog.Trace(self._log.getName()+"._solve", 5, "Building Pca basis")
 
-                    nComponents       = self._config.numPrincipalComponents
-                    imagePca          = afwImage.ImagePcaD()
-                    importStarVisitor = diffimLib.KernelPcaVisitorF(imagePca)
-                    kernelCellSet.visitCandidates(importStarVisitor, nStarPerCell)
-                    if self._config.subtractMeanForPca:
-                        importStarVisitor.subtractMean()
-                    imagePca.analyze()
-
-                    eigenValues  = imagePca.getEigenValues()
-                    pcaBasisList = importStarVisitor.getEigenKernels()
-
-                    eSum = num.sum(eigenValues)
-                    for j in range(len(eigenValues)):
-                        pexLog.Trace(self._log.getName()+"._solve", 6, 
-                                     "Eigenvalue %d : %f (%f)" % (j, eigenValues[j], eigenValues[j]/eSum))
-                                     
-                    nToUse = min(nComponents, len(eigenValues))
-                    trimBasisList = afwMath.KernelList()
-                    for j in range(nToUse):
-                        # Check for NaNs?
-                        kimage = afwImage.ImageD(pcaBasisList[j].getDimensions())
-                        pcaBasisList[j].computeImage(kimage, False)
-                        if not (True in num.isnan(kimage.getArray())):
-                            trimBasisList.push_back(pcaBasisList[j])
-                            
-                    # Put all the power in the first kernel, which will not vary spatially
-                    spatialBasisList = diffimLib.renormalizeKernelList(trimBasisList)
-
-                    # New Kernel visitor for this new basis list (no regularization explicitly)
-                    singlekvPca = diffimLib.BuildSingleKernelVisitorF(spatialBasisList, policy)
-                    singlekvPca.setSkipBuilt(False)
-                    kernelCellSet.visitCandidates(singlekvPca, nStarPerCell)
-                    singlekvPca.setSkipBuilt(True)
-                    nRejectedPca = singlekvPca.getNRejected()
+                    nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
                     pexLog.Trace(self._log.getName()+"._solve", 2, 
                                  "Iteration %d, rejected %d candidates due to Pca kernel fit" % (thisIteration, nRejectedPca))
                     
@@ -735,9 +739,10 @@ class PsfMatch(object):
                              "Iteration %d, rejected %d candidates due to spatial kernel fit" % (thisIteration, nRejectedSpatial))
                 pexLog.Trace(self._log.getName()+"._solve", 2, 
                              "%d candidates used in fit" % (nGoodSpatial))
-
-                if nGoodSpatial == 0:
-                    raise RuntimeError("No kernel candidates for spatial fit")
+                
+                # Not the case! might be other candidates in the cells
+                #if nGoodSpatial == 0:
+                #    raise RuntimeError("No kernel candidates for spatial fit")
 
                 if nRejectedSpatial == 0:
                     # Nothing rejected, finished with spatial fit
@@ -745,6 +750,20 @@ class PsfMatch(object):
                 
                 # Otherwise, iterate on...
                 thisIteration   += 1
+
+            # Final fit if above did not converge
+            if (nRejectedSpatial > 0) and (thisIteration == maxSpatialIterations):
+                pexLog.Trace(self._log.getName()+"._solve", 2, "Final spatial fit")
+                if (usePcaForSpatialKernel):
+                    nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
+                regionBBox = kernelCellSet.getBBox()
+                spatialkv  = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, policy)
+                kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
+                spatialkv.solveLinearEquation()
+                pexLog.Trace(self._log.getName()+"._solve", 3, 
+                             "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
+                spatialKernel, spatialBacakground = spatialkv.getSolutionPair()
+
 
         except pexExcept.LsstCppException, e:
             pexLog.Trace(self._log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")

@@ -29,6 +29,7 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image.imageLib as afwImage
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLogging
+import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
 
 display = True
@@ -56,41 +57,39 @@ elif len(sys.argv) == 3:
 else:
     sys.exit(1)
     
-policy = ipDiffim.makeDefaultPolicy()
 
+configAL  = ipDiffim.PsfMatchConfigAL()
+configDF  = ipDiffim.PsfMatchConfigDF()
+configDFr = ipDiffim.PsfMatchConfigDF()
 
-# same for all kernels
-policy.set("singleKernelClipping", True)
-policy.set("kernelSumClipping", True)
-policy.set("spatialKernelClipping", False)
-policy.set("spatialKernelOrder", 0)
-policy.set("spatialBgOrder", 0)
-policy.set("usePcaForSpatialKernel", True)
-policy.set("fitForBackground", True)
+configDF.useRegularization  = False
+configDFr.useRegularization = True
 
+for param in [["spatialKernelOrder", 0],
+              ["spatialBgOrder", 0],
+              ["usePcaForSpatialKernel", True],
+              ["fitForBackground", True]]:
+    exec("configAL.%s = %s" % (param[0], param[1]))
+    exec("configDF.%s = %s" % (param[0], param[1]))
+    exec("configDFr.%s = %s" % (param[0], param[1]))
 
-kcDetect = ipDiffim.KernelCandidateDetectionF(policy.getPolicy("detectionPolicy"))
+detConfig = configAL.detectionConfig
+kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
 kcDetect.apply(templateMaskedImage, scienceMaskedImage)
 footprints = kcDetect.getFootprints()
 
-# specific to delta function
-policy.set("kernelBasisSet", "delta-function")
-policy.set("useRegularization", False)
-psfmatch1 = ipDiffim.ImagePsfMatch(policy)
+# delta function
+psfmatch1 = ipDiffim.ImagePsfMatch(configDF)
 results1  = psfmatch1.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
 diffim1, spatialKernel1, spatialBg1, kernelCellSet1 = results1
 
 # alard lupton
-policy.set("kernelBasisSet", "alard-lupton")
-policy.set("useRegularization", False)
-psfmatch2 = ipDiffim.ImagePsfMatch(policy)
+psfmatch2 = ipDiffim.ImagePsfMatch(configAL)
 results2  = psfmatch2.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
 diffim2, spatialKernel2, spatialBg2, kernelCellSet2 = results2
 
 # regularized delta function
-policy.set("kernelBasisSet", "delta-function")
-policy.set("useRegularization", True)
-psfmatch3 = ipDiffim.ImagePsfMatch(policy)
+psfmatch3 = ipDiffim.ImagePsfMatch(configDFr)
 results3  = psfmatch3.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
 diffim3, spatialKernel3, spatialBg3, kernelCellSet3 = results3
 

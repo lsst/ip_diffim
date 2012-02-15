@@ -79,47 +79,41 @@ namespace diffim {
 
         // Work your magic
         void apply(lsst::afw::image::MaskedImage<PixelT> const& image) {
-            reset();
-            for (int y = 0; y != image.getHeight(); ++y) {
-                for (x_iterator ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
-                    if (!((*ptr).mask() & _bpMask)) {
-                        double const ivar = 1. / (*ptr).variance();
-
-                        _xsum  += (*ptr).image() * sqrt(ivar);
-                        _x2sum += (*ptr).image() * (*ptr).image() * ivar;
-                        _npix  += 1;
-                    }
-                }
-            }
-
-            if ((!lsst::utils::lsst_isfinite(_xsum)) || (!lsst::utils::lsst_isfinite(_x2sum))) {
-                throw LSST_EXCEPT(pexExcept::Exception, 
-                                  "Nan/Inf in ImageStatistics.apply (check the variance for zeroes)");
-            }
+            apply(image, -1);
         }
 
         void apply(lsst::afw::image::MaskedImage<PixelT> const& image, int core) {
             reset();
-            int y0 = std::max(0, image.getHeight()/2 - core);
-            int y1 = std::min(image.getHeight(), image.getHeight()/2 + core + 1);
-            int x0 = std::max(0, image.getWidth()/2 - core);
-            int x1 = std::min(image.getWidth(), image.getWidth()/2 + core + 1);
-
+            int y0, y1, x0, x1;
+            if (core == -1) {
+                y0 = 0;
+                y1 = image.getHeight();
+                x0 = 0;
+                x1 = image.getWidth();
+            }
+            else {
+                y0 = std::max(0, image.getHeight()/2 - core);
+                y1 = std::min(image.getHeight(), image.getHeight()/2 + core + 1);
+                x0 = std::max(0, image.getWidth()/2 - core);
+                x1 = std::min(image.getWidth(), image.getWidth()/2 + core + 1);
+            }
+                
             for (int y = y0; y != y1; ++y) {
                 for (x_iterator ptr = image.x_at(x0, y), end = image.x_at(x1, y); 
                      ptr != end; ++ptr) {
                     if (!((*ptr).mask() & _bpMask)) {
                         double const ivar = 1. / (*ptr).variance();
-
-                        _xsum  += (*ptr).image() * sqrt(ivar);
-                        _x2sum += (*ptr).image() * (*ptr).image() * ivar;
-                        _npix  += 1;
+                        if (lsst::utils::lsst_isfinite(ivar)) {
+                            _xsum  += (*ptr).image() * sqrt(ivar);
+                            _x2sum += (*ptr).image() * (*ptr).image() * ivar;
+                            _npix  += 1;
+                        }
                     }
                 }
             }
             if ((!lsst::utils::lsst_isfinite(_xsum)) || (!lsst::utils::lsst_isfinite(_x2sum))) {
                 throw LSST_EXCEPT(pexExcept::Exception, 
-                                  "Nan/Inf in ImageStatistics.apply (check the variance for 0s)");
+                                  "Nan/Inf in ImageStatistics.apply");
             }
         }
 

@@ -294,6 +294,11 @@ class ImagePsfMatch(PsfMatch):
         subtractedMaskedImage -= backgroundModel
         return (subtractedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet)
 
+    def _adaptCellSize(self, footprints):
+        """ NOT IMPLEMENTED YET"""
+        nFp = len(footprints)
+        return self._config.sizeCellX, self._config.sizeCellY
+
     def _buildCellSet(self, maskedImageToConvolve, maskedImageToNotConvolve, footprints = None):
         """Build a SpatialCellSet for use with the solve method
 
@@ -303,10 +308,7 @@ class ImagePsfMatch(PsfMatch):
         
         @return kernelCellSet: a SpatialCellSet for use with self._solve
         """
-        # Object to store the KernelCandidates for spatial modeling
-        kernelCellSet = afwMath.SpatialCellSet(maskedImageToConvolve.getBBox(afwImage.PARENT),
-                                               self._config.sizeCellX, self._config.sizeCellY)
-        
+
         # Candidate source footprints to use for Psf matching
         if footprints == None:
             # If you need to fit for background in ip_diffim, we need
@@ -325,6 +327,13 @@ class ImagePsfMatch(PsfMatch):
             if self._config.fitForBackground:
                 maskedImageToConvolve += bkgds[0]
                 maskedImageToNotConvolve += bkgds[1]
+
+        sizeCellX, sizeCellY = self._adaptCellSize(footprints)
+
+        # Object to store the KernelCandidates for spatial modeling
+        kernelCellSet = afwMath.SpatialCellSet(maskedImageToConvolve.getBBox(afwImage.PARENT),
+                                               sizeCellX, sizeCellY)
+        
             
         policy = pexConfig.makePolicy(self._config)
         # Place candidate footprints within the spatial grid
