@@ -4,6 +4,7 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import numpy as num
 import lsst.pex.logging as pexLogging
+import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
 verbosity = 5
 pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
@@ -17,7 +18,8 @@ doNorm         = True
 gScale         = 5.0 # FFT fails!?
 
 doAddNoise     = False
-    
+writeFits      = False
+
 
 def makeTest1(doAddNoise):
     gaussian1 = afwMath.GaussianFunction2D(1. * gScale, 1. * gScale, 0.)
@@ -50,15 +52,12 @@ def makeTest2(doAddNoise, shiftX = int(2.0 * gScale), shiftY = int(1.0 * gScale)
     kernel1.computeImage(image1, doNorm)
     image1    = image1.convertF()
     ####
-    print 'CAW', shiftX, shiftY
     boxA      = afwGeom.Box2I(afwGeom.PointI(0, 0),
                               afwGeom.ExtentI(imSize-shiftX, imSize - shiftY))
     boxB      = afwGeom.Box2I(afwGeom.PointI(shiftX, shiftY),
                               afwGeom.ExtentI(imSize-shiftX, imSize - shiftY))
     subregA   = afwImage.ImageF(image1, boxA, afwImage.PARENT)
     subregB   = afwImage.ImageF(image1, boxB, afwImage.PARENT, True)
-    subregA.writeFits("A.fits")
-    subregB.writeFits("B.fits")
     subregA  += subregB
     # this messes up the total counts so rescale
     counts    = afwMath.makeStatistics(image1, afwMath.SUM).getValue()
@@ -132,6 +131,7 @@ def fft(im1, im2, fftSize):
     rat  = fft2 / fft1
 
     kfft = num.fft.irfft2(rat, s=fftSize)
+    kfft = num.fft.fftshift(kfft)
     kim  = afwImage.ImageF(fftSize)
     kim.getArray()[:] = kfft
     
@@ -156,36 +156,39 @@ def addNoise(mi):
 
 if __name__ == '__main__':
 
-    policy = ipDiffim.makeDefaultPolicy()
-    policy.set("fitForBackground", False)
-    policy.set("checkConditionNumber", False)
-    policy.set("constantVarianceWeighting", True)
-    policy.set("kernelSize", kSize)
+    configAL = ipDiffim.PsfMatchConfigAL()
+    configDF = ipDiffim.PsfMatchConfigDF()
 
-    alardSigGauss = policy.getArray("alardSigGauss")
-    policy.set("alardSigGauss", alardSigGauss[0] * gScale)
-    policy.add("alardSigGauss", alardSigGauss[1] * gScale)
-    policy.add("alardSigGauss", alardSigGauss[2] * gScale)
+    configAL.fitForBackground = False
+    configDF.fitForBackground = False
+
+    # Super-important for these faked-up kernels...
+    configAL.constantVarianceWeighting = True
+    configDF.constantVarianceWeighting = True
+
+    configAL.kernelSize = kSize
+    configDF.kernelSize = kSize
+
+    alardSigGauss = configAL.alardSigGauss
+    configAL.alardSigGauss = [x * gScale for x in alardSigGauss]
     
     fnum = 1
     
-#    for switch in ['A', 'B', 'C']:
-    for switch in ['A',]:
-
+    for switch in ['A', 'B', 'C']:
         if switch == 'A':
             # Default Alard Lupton
-            pass
+            config = configAL
         elif switch == 'B':
             # Add more AL bases (typically 4 3 2)
-            policy.set("alardDegGauss", 8)
-            policy.add("alardDegGauss", 6)
-            policy.add("alardDegGauss", 4)
+            config = configAL
+            config.alardDegGauss = (8, 6, 4)
         elif switch == 'C':
             # Delta function
-            policy.set("kernelBasisSet", "delta-function")
-            policy.set("useRegularization", False)
+            config = configDF
+            config.useRegularization = False
+        kList  = ipDiffim.makeKernelBasisList(config)
     
-        kList = ipDiffim.makeKernelBasisList(policy)
+        policy = pexConfig.makePolicy(config)
         bskv  = ipDiffim.BuildSingleKernelVisitorF(kList, policy)
     
         # TEST 1
@@ -203,10 +206,11 @@ if __name__ == '__main__':
         ds9.mtv(kimage, frame = fnum) ; fnum += 1
         ds9.mtv(diffim, frame = fnum) ; fnum += 1
     
-        tmi.writeFits("template1.fits")
-        smi.writeFits("science1.fits")
-        kimage.writeFits("kernel1.fits")
-        diffim.writeFits("diffim1.fits")
+        if writeFits:
+            tmi.writeFits("template1.fits")
+            smi.writeFits("science1.fits")
+            kimage.writeFits("kernel1.fits")
+            diffim.writeFits("diffim1.fits")
         
         # TEST 2
         tmi, smi = makeTest2(doAddNoise)
@@ -222,11 +226,12 @@ if __name__ == '__main__':
         ds9.mtv(smi,    frame = fnum) ; fnum += 1
         ds9.mtv(kimage, frame = fnum) ; fnum += 1
         ds9.mtv(diffim, frame = fnum) ; fnum += 1
-        
-        tmi.writeFits("template2.fits")
-        smi.writeFits("science2.fits")
-        kimage.writeFits("kernel2.fits")
-        diffim.writeFits("diffim2.fits")
+
+        if writeFits:
+            tmi.writeFits("template2.fits")
+            smi.writeFits("science2.fits")
+            kimage.writeFits("kernel2.fits")
+            diffim.writeFits("diffim2.fits")
         
     
         # TEST 3
@@ -256,12 +261,13 @@ if __name__ == '__main__':
         ds9.mtv(kimage2, frame = fnum) ; fnum += 1
         ds9.mtv(diffim2, frame = fnum) ; fnum += 1
         
-        tmi.writeFits("template3a.fits")
-        smi1.writeFits("science3a.fits")
-        kimage1.writeFits("kernel3a.fits")
-        diffim1.writeFits("diffim3a.fits")
-
-        tmi.writeFits("template3b.fits")
-        smi2.writeFits("science3b.fits")
-        kimage2.writeFits("kernel3b.fits")
-        diffim2.writeFits("diffim3b.fits")
+        if writeFits:
+            tmi.writeFits("template3a.fits")
+            smi1.writeFits("science3a.fits")
+            kimage1.writeFits("kernel3a.fits")
+            diffim1.writeFits("diffim3a.fits")
+            
+            tmi.writeFits("template3b.fits")
+            smi2.writeFits("science3b.fits")
+            kimage2.writeFits("kernel3b.fits")
+            diffim2.writeFits("diffim3b.fits")
