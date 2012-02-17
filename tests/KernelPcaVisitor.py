@@ -8,8 +8,10 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.ip.diffim as ipDiffim
+import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
+import lsst.afw.display.ds9 as ds9
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
@@ -35,6 +37,72 @@ class DiffimTestCases(unittest.TestCase):
         mi2.set(size//2, size//2, (kSum, 0x0, kSum))
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
+
+    def testGaussian(self, size = 51):
+        gaussFunction = afwMath.GaussianFunction2D(2, 3)
+        gaussKernel   = afwMath.AnalyticKernel(size, size, gaussFunction)
+        
+        imagePca1 = afwImage.ImagePcaD()  # mean subtract
+        imagePca2 = afwImage.ImagePcaD()  # don't mean subtract
+        kpv1      = ipDiffim.KernelPcaVisitorF(imagePca1)
+        kpv2      = ipDiffim.KernelPcaVisitorF(imagePca2)
+
+        kRefIm    = None
+
+        frame = 0
+        for i in range(100):
+            kImage1 = afwImage.ImageD(gaussKernel.getDimensions())
+            gaussKernel.computeImage(kImage1, False)
+            kImage1 *= 10000  # to get some decent peak source counts
+            kImage1 += 10     # to get some sky background noise
+
+            if kRefIm == None:
+                kRefIm = kImage1
+
+            kImage1 = diffimTools.makePoissonNoiseImage(kImage1)
+            kImage2 = afwImage.ImageD(kImage1, True)
+
+            imagePca1.addImage(kImage1, 1.0)
+            imagePca2.addImage(kImage2, 1.0)
+                           
+        kpv1.subtractMean()
+
+        imagePca1.analyze()
+        imagePca2.analyze()
+
+        pcaBasisList1 = kpv1.getEigenKernels()
+        pcaBasisList2 = kpv2.getEigenKernels()
+        
+        eVal1 = imagePca1.getEigenValues()
+        eVal2 = imagePca2.getEigenValues()
+
+        # First term is far more signficant without mean subtraction
+        self.assertTrue(eVal2[0] > eVal1[0])
+
+        # Last term basically zero with mean subtraction
+        self.assertAlmostEqual(eVal1[-1], 0.0)
+
+        # Extra image with mean subtraction
+        self.assertTrue(len(pcaBasisList1) == (len(eVal1) + 1))
+
+        # Same shape
+        self.assertTrue(len(pcaBasisList2) == len(eVal2))
+
+        # Mean kernel close to kRefIm
+        kImageM = afwImage.ImageD(gaussKernel.getDimensions())
+        pcaBasisList1[0].computeImage(kImageM, False)
+        for y in range(kRefIm.getHeight()):
+            for x in range(kRefIm.getWidth()):
+                self.assertTrue( abs(kRefIm.get(x, y) - kImageM.get(x, y)) / kRefIm.get(x, y) < 0.2 )
+
+        # First mean-unsubtracted Pca kernel close to kRefIm (normalized to peak of 1.0)
+        kImage0 = afwImage.ImageD(gaussKernel.getDimensions())
+        pcaBasisList2[0].computeImage(kImage0, False)
+        maxVal  = afwMath.makeStatistics(kRefIm, afwMath.MAX).getValue(afwMath.MAX)
+        kRefIm /= maxVal
+        for y in range(kRefIm.getHeight()):
+            for x in range(kRefIm.getWidth()):
+                self.assertTrue( abs(kRefIm.get(x, y) - kImage0.get(x, y)) / kRefIm.get(x, y) < 0.2 )
 
     def testImagePca(self):
         # Test out the ImagePca behavior
