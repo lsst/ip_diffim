@@ -163,8 +163,11 @@ def addNoise(mi):
     var += 1.0
 
 def testAutoCorrelation(orderMake, orderFit, inMi = None, display = False):
-    config = ipDiffim.PsfMatchConfigAL()
-    config.fitForBackground = True
+    config = ipDiffim.ImagePsfMatch.ConfigClass()
+    config.kernel.name = "AL"
+    subconfig = config.kernel.active
+
+    subconfig.fitForBackground = True
 
     stride = 100
     
@@ -188,7 +191,7 @@ def testAutoCorrelation(orderMake, orderFit, inMi = None, display = False):
 
     addNoise(inMi)
     
-    kSize = config.kernelSize
+    kSize = subconfig.kernelSize
 
     basicGaussian1 = afwMath.GaussianFunction2D(2., 2., 0.)
     basicKernel1   = afwMath.AnalyticKernel(kSize, kSize, basicGaussian1)
@@ -216,10 +219,10 @@ def testAutoCorrelation(orderMake, orderFit, inMi = None, display = False):
         ds9.mtv(cMi.getImage(), frame=3)
         ds9.mtv(cMi.getVariance(), frame=4)
         
-    config.spatialKernelOrder = orderFit
-    config.sizeCellX = stride
-    config.sizeCellY = stride
-    psfmatch = ipDiffim.ImagePsfMatch(config)
+    subconfig.spatialKernelOrder = orderFit
+    subconfig.sizeCellX = stride
+    subconfig.sizeCellY = stride
+    psfmatch = ipDiffim.ImagePsfMatch(subconfig)
     result = psfmatch.subtractMaskedImages(inMi, cMi)
 
     differenceMaskedImage, spatialKernel, spatialBg, kernelCellSet = result

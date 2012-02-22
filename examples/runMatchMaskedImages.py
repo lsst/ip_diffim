@@ -96,16 +96,19 @@ Notes:
         
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
-    config              = ipDiffim.PsfMatchConfigAL()
+
+    config = ipDiffim.ImagePsfMatch.ConfigClass()
+    config.kernel.name = "AL"
+    subconfig = config.kernel.active
 
     if bgSub:
-        diffimTools.backgroundSubtract(config.afwBackgroundConfig,
+        diffimTools.backgroundSubtract(subconfig.afwBackgroundConfig,
                                        [templateMaskedImage, scienceMaskedImage])
     else:
-        if config.fitForBackground == False:
+        if subconfig.fitForBackground == False:
             print 'NOTE: no background subtraction at all is requested'
 
-    psfmatch = imDiffim.ImagePsfMatch(config)
+    psfmatch = imDiffim.ImagePsfMatch(subconfig)
     results  = psfmatch.matchMaskedImages(templateMaskedImage, scienceMaskedImage,
                                           psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
 

@@ -27,8 +27,8 @@ import lsst.ip.diffim as ipDiffim
 from lsst.pex.logging import Log, Trace
 
 
-def subtractSnaps(snap1, snap2, config, doWarping = False):
-    psfmatch = ipDiffim.ImagePsfMatch(config)
+def subtractSnaps(snap1, snap2, subconfig, doWarping = False):
+    psfmatch = ipDiffim.ImagePsfMatch(subconfig)
     results  = psfmatch.subtractExposures(snap1, snap2, doWarping = doWarping)
     snapDiff, kernelModel, bgModel, kernelCellSet = results
     return snapDiff
@@ -60,8 +60,12 @@ def main():
          
     snap1Exp   = afwImage.ExposureF(options.s1)
     snap2Exp   = afwImage.ExposureF(options.s2)
-    config     = ipDiffim.SnapPsfMatchConfigAL()
-    snapDiff   = subtractSnaps(snap1Exp, snap2Exp, config, doWarping = options.warp)
+
+    config     = ipDiffim.SnapPsfMatch.ConfigClass()
+    config.kernel.name = "AL"
+    subconfig  = config.kernel.active
+
+    snapDiff   = subtractSnaps(snap1Exp, snap2Exp, subconfig, doWarping = options.warp)
     snapDiff.writeFits(options.sdiff)
     
 def run():

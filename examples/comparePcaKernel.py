@@ -58,38 +58,46 @@ else:
     sys.exit(1)
     
 
-configAL  = ipDiffim.PsfMatchConfigAL()
-configDF  = ipDiffim.PsfMatchConfigDF()
-configDFr = ipDiffim.PsfMatchConfigDF()
+configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+configAL.kernel.name = "AL"
+subconfigAL = configAL.kernel.active
 
-configDF.useRegularization  = False
-configDFr.useRegularization = True
+configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+configDF.kernel.name = "DF"
+subconfigDF = configDF.kernel.active
+
+configDFr    = ipDiffim.ImagePsfMatch.ConfigClass()
+configDFr.kernel.name = "DF"
+subconfigDFr = configDFr.kernel.active
+
+subconfigDF.useRegularization  = False
+subconfigDFr.useRegularization = True
 
 for param in [["spatialKernelOrder", 0],
               ["spatialBgOrder", 0],
               ["usePcaForSpatialKernel", True],
               ["fitForBackground", True]]:
-    exec("configAL.%s = %s" % (param[0], param[1]))
-    exec("configDF.%s = %s" % (param[0], param[1]))
-    exec("configDFr.%s = %s" % (param[0], param[1]))
+    exec("subconfigAL.%s = %s" % (param[0], param[1]))
+    exec("subconfigDF.%s = %s" % (param[0], param[1]))
+    exec("subconfigDFr.%s = %s" % (param[0], param[1]))
 
-detConfig = configAL.detectionConfig
+detConfig = subconfigAL.detectionConfig
 kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
 kcDetect.apply(templateMaskedImage, scienceMaskedImage)
 footprints = kcDetect.getFootprints()
 
 # delta function
-psfmatch1 = ipDiffim.ImagePsfMatch(configDF)
+psfmatch1 = ipDiffim.ImagePsfMatch(subconfigDF)
 results1  = psfmatch1.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
 diffim1, spatialKernel1, spatialBg1, kernelCellSet1 = results1
 
 # alard lupton
-psfmatch2 = ipDiffim.ImagePsfMatch(configAL)
+psfmatch2 = ipDiffim.ImagePsfMatch(subconfigAL)
 results2  = psfmatch2.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
 diffim2, spatialKernel2, spatialBg2, kernelCellSet2 = results2
 
 # regularized delta function
-psfmatch3 = ipDiffim.ImagePsfMatch(configDFr)
+psfmatch3 = ipDiffim.ImagePsfMatch(subconfigDFr)
 results3  = psfmatch3.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
 diffim3, spatialKernel3, spatialBg3, kernelCellSet3 = results3
 

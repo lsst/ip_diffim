@@ -59,22 +59,25 @@ else:
 defOutputPath    = "diffImage"
 templateExposure = afwImage.ExposureF(defTemplatePath)
 scienceExposure  = afwImage.ExposureF(defSciencePath)
-config           = ipDiffim.PsfMatchConfigAL()
+
+config    = ipDiffim.ImagePsfMatch.ConfigClass()
+config.kernel.name = "AL"
+subconfig = config.kernel.active
 
 
 if warp:
-    warper = afwMath.Warper.fromConfig(config.warpingConfig)
+    warper = afwMath.Warper.fromConfig(subconfig.warpingConfig)
     templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
                                            destBBox = scienceExposure.getBBox(afwImage.PARENT))
 if subBackground:
     # Do in AFW
-    diffimTools.backgroundSubtract(config.afwBackgroundConfig,
+    diffimTools.backgroundSubtract(subconfig.afwBackgroundConfig,
                                    [templateExposure.getMaskedImage(),
                                     scienceExposure.getMaskedImage()])
-    config.fitForBackground = False
+    subconfig.fitForBackground = False
 else:
     # Do in IP_DIFFIM
-    config.fitForBackground = True
+    subconfig.fitForBackground = True
     
 
 frame  = 0
@@ -82,7 +85,7 @@ ds9.mtv(templateExposure, frame=frame, title = "Template")
 frame += 1
 ds9.mtv(scienceExposure, frame=frame, title = "Sci Im")
 
-psfmatch = ipDiffim.ImagePsfMatch(config)
+psfmatch = ipDiffim.ImagePsfMatch(subconfig)
 try:
     results = psfmatch.subtractMaskedImages(templateExposure.getMaskedImage(),
                                             scienceExposure.getMaskedImage())

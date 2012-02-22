@@ -45,8 +45,9 @@ if __name__ == '__main__':
     gaussPsf = afwDet.createPsf("DoubleGaussian", psf.getKernel().getWidth(),
                                 psf.getKernel().getHeight(), sigGauss)
 
-    config = ipDiffim.ModelPsfMatchConfig()
-    psfMatch = ipDiffim.ModelPsfMatch(config)
+    config = ipDiffim.ModelPsfMatch.ConfigClass()
+    subconfig = config.kernel
+    psfMatch = ipDiffim.ModelPsfMatch(subconfig)
     results = psfMatch.matchExposure(calexp, gaussPsf)
     cim, sk, kcs = results
 
