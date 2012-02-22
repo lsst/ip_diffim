@@ -454,7 +454,7 @@ namespace diffim {
         _kernel->setKernelParameters(kValues);
 
         ImageT::Ptr image (
-            new ImageT::Image(_kernel->getDimensions())
+            new ImageT(_kernel->getDimensions())
             );
         _kSum  = _kernel->computeImage(*image, false);              
         
@@ -1594,9 +1594,7 @@ namespace diffim {
         }
 
         /* Set kernel Sum */
-        ImageT::Ptr image (
-                           new ImageT::Image(_kernel->getDimensions())
-                          );
+        ImageT::Ptr image (new ImageT(_kernel->getDimensions()));
         _kSum  = _kernel->computeImage(*image, false);              
 
         /* Set the background coefficients */

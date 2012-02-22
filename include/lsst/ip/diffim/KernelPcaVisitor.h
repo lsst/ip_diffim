@@ -32,7 +32,7 @@ namespace detail {
         lsst::afw::math::KernelList getEigenKernels();
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
         void subtractMean();
-        ImageT::Ptr returnMean() {return _mean;}
+        PTR(ImageT) returnMean() {return _mean;}
     private:
         lsst::afw::image::ImagePca<ImageT> *_imagePca; ///< Structure to fill with images
         ImageT::Ptr _mean;                             ///< Mean image calculated before Pca
