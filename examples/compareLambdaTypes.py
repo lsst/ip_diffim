@@ -32,47 +32,58 @@ class DiffimTestCases(unittest.TestCase):
     def setUp(self, CFHT=True):
         lambdaValue = 1.0
 
-        self.config1 = ipDiffim.PsfMatchConfigDF()
-        self.config2 = ipDiffim.PsfMatchConfigDF()
-        self.config3 = ipDiffim.PsfMatchConfigDF()
-        self.config4 = ipDiffim.PsfMatchConfigDF()
+        self.config1    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config1.kernel.name = "DF"
+        self.subconfig1 = self.config1.kernel.active
 
-        self.config1.useRegularization = False
+        self.config2    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config2.kernel.name = "DF"
+        self.subconfig2 = self.config2.kernel.active
+
+        self.config3    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config3.kernel.name = "DF"
+        self.subconfig3 = self.config3.kernel.active
+
+        self.config4    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config4.kernel.name = "DF"
+        self.subconfig4 = self.config4.kernel.active
+
+        self.subconfig1.useRegularization = False
         
-        self.config2.useRegularization = True
-        self.config2.lambdaType = "absolute"
-        self.config2.lambdaValue = lambdaValue
-        self.config2.regularizationType = "centralDifference"
-        self.config2.centralRegularizationStencil = 5
+        self.subconfig2.useRegularization = True
+        self.subconfig2.lambdaType = "absolute"
+        self.subconfig2.lambdaValue = lambdaValue
+        self.subconfig2.regularizationType = "centralDifference"
+        self.subconfig2.centralRegularizationStencil = 5
 
-        self.config3.useRegularization = True
-        self.config3.lambdaType = "absolute"
-        self.config3.lambdaValue = lambdaValue
-        self.config3.regularizationType = "centralDifference"
-        self.config3.centralRegularizationStencil = 9
+        self.subconfig3.useRegularization = True
+        self.subconfig3.lambdaType = "absolute"
+        self.subconfig3.lambdaValue = lambdaValue
+        self.subconfig3.regularizationType = "centralDifference"
+        self.subconfig3.centralRegularizationStencil = 9
 
-        self.config4.useRegularization = True
-        self.config4.lambdaType = "absolute"
-        self.config4.lambdaValue = lambdaValue
-        self.config4.regularizationType = "forwardDifference"
-        self.config4.forwardRegularizationOrders = [1, 2]
+        self.subconfig4.useRegularization = True
+        self.subconfig4.lambdaType = "absolute"
+        self.subconfig4.lambdaValue = lambdaValue
+        self.subconfig4.regularizationType = "forwardDifference"
+        self.subconfig4.forwardRegularizationOrders = [1, 2]
 
         
 
-        self.kList1 = ipDiffim.makeKernelBasisList(self.config1)
-        self.bskv1  = ipDiffim.BuildSingleKernelVisitorF(self.kList1, pexConfig.makePolicy(self.config1))
+        self.kList1 = ipDiffim.makeKernelBasisList(self.subconfig1)
+        self.bskv1  = ipDiffim.BuildSingleKernelVisitorF(self.kList1, pexConfig.makePolicy(self.subconfig1))
 
-        self.kList2 = ipDiffim.makeKernelBasisList(self.config2)
-        self.hMat2  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.config2))
-        self.bskv2  = ipDiffim.BuildSingleKernelVisitorF(self.kList2, pexConfig.makePolicy(self.config2), self.hMat2)
+        self.kList2 = ipDiffim.makeKernelBasisList(self.subconfig2)
+        self.hMat2  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig2))
+        self.bskv2  = ipDiffim.BuildSingleKernelVisitorF(self.kList2, pexConfig.makePolicy(self.subconfig2), self.hMat2)
 
-        self.kList3 = ipDiffim.makeKernelBasisList(self.config3)
-        self.hMat3  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.config3))
-        self.bskv3  = ipDiffim.BuildSingleKernelVisitorF(self.kList3, pexConfig.makePolicy(self.config3), self.hMat3)
+        self.kList3 = ipDiffim.makeKernelBasisList(self.subconfig3)
+        self.hMat3  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig3))
+        self.bskv3  = ipDiffim.BuildSingleKernelVisitorF(self.kList3, pexConfig.makePolicy(self.subconfig3), self.hMat3)
 
-        self.kList4 = ipDiffim.makeKernelBasisList(self.config4)
-        self.hMat4  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.config4))
-        self.bskv4  = ipDiffim.BuildSingleKernelVisitorF(self.kList4, pexConfig.makePolicy(self.config4), self.hMat4)
+        self.kList4 = ipDiffim.makeKernelBasisList(self.subconfig4)
+        self.hMat4  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig4))
+        self.bskv4  = ipDiffim.BuildSingleKernelVisitorF(self.kList4, pexConfig.makePolicy(self.subconfig4), self.hMat4)
 
         # known input images
         defDataDir = eups.productDir('afwdata')
@@ -91,11 +102,11 @@ class DiffimTestCases(unittest.TestCase):
             
             self.scienceExposure   = afwImage.ExposureF(defSciencePath)
             self.templateExposure  = afwImage.ExposureF(defTemplatePath)
-            warper = afwMath.Warper.fromConfig(self.config1.warpingConfig)
+            warper = afwMath.Warper.fromConfig(self.subconfig1.warpingConfig)
             self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
                                                         destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
 
-        diffimTools.backgroundSubtract(self.config1.afwBackgroundConfig,
+        diffimTools.backgroundSubtract(self.subconfig1.afwBackgroundConfig,
                                        [self.scienceExposure.getMaskedImage(),
                                         self.templateExposure.getMaskedImage()])
 
@@ -106,7 +117,7 @@ class DiffimTestCases(unittest.TestCase):
         tmi = self.templateExposure.getMaskedImage()
         smi = self.scienceExposure.getMaskedImage()
         
-        detConfig = self.config1.detectionConfig
+        detConfig = self.subconfig1.detectionConfig
         detPolicy = pexConfig.makePolicy(detConfig)
         detPolicy.set("detThreshold", 50.)
         detPolicy.set("detOnTemplate", False)
@@ -115,10 +126,10 @@ class DiffimTestCases(unittest.TestCase):
         self.footprints = kcDetect.getFootprints()
         
     def tearDown(self):
-        del self.config1
-        del self.config2
-        del self.config3
-        del self.config4
+        del self.subconfig1
+        del self.subconfig2
+        del self.subconfig3
+        del self.subconfig4
         del self.kList1
         del self.kList2
         del self.kList3
@@ -153,7 +164,7 @@ class DiffimTestCases(unittest.TestCase):
         #if xloc != 1312 and yloc != 160:
         #    return
         
-        imsize = int(3 * self.config1.kernelSize)
+        imsize = int(3 * self.subconfig1.kernelSize)
 
         # chop out a region around a known object
         bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize/2,
@@ -174,7 +185,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # delta function kernel
         logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DF run')
-        results1 = self.apply(pexConfig.makePolicy(self.config1), self.bskv1, xloc, yloc, tmi, smi)
+        results1 = self.apply(pexConfig.makePolicy(self.subconfig1), self.bskv1, xloc, yloc, tmi, smi)
         kSum1, bg1, dmean1, dstd1, vmean1, kImageOut1, diffIm1, kc1 = results1
         res = 'DF residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                              self.dStats.getRms(),
@@ -194,7 +205,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # regularized delta function kernel
         logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFrC5 run')
-        results2 = self.apply(pexConfig.makePolicy(self.config2), self.bskv2, xloc, yloc, tmi, smi)
+        results2 = self.apply(pexConfig.makePolicy(self.subconfig2), self.bskv2, xloc, yloc, tmi, smi)
         kSum2, bg2, dmean2, dstd2, vmean2, kImageOut2, diffIm2, kc2 = results2
         res = 'DFrC5 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                 self.dStats.getRms(),
@@ -213,7 +224,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # regularized delta function kernel
         logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFrC9 run')
-        results3 = self.apply(pexConfig.makePolicy(self.config3), self.bskv3, xloc, yloc, tmi, smi)
+        results3 = self.apply(pexConfig.makePolicy(self.subconfig3), self.bskv3, xloc, yloc, tmi, smi)
         kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3, kc3 = results3
         res = 'DFrC9 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                 self.dStats.getRms(),
@@ -231,7 +242,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # regularized delta function kernel
         logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFrF12 run')
-        results4 = self.apply(pexConfig.makePolicy(self.config4), self.bskv4, xloc, yloc, tmi, smi)
+        results4 = self.apply(pexConfig.makePolicy(self.subconfig4), self.bskv4, xloc, yloc, tmi, smi)
         kSum4, bg4, dmean4, dstd4, vmean4, kImageOut4, diffIm4, kc4 = results4
         res = 'DFrF12 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                  self.dStats.getRms(),

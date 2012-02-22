@@ -18,10 +18,16 @@ logging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.configAL = ipDiffim.PsfMatchConfigAL()
-        self.policyAL = pexConfig.makePolicy(self.configAL)
-        self.configDF = ipDiffim.PsfMatchConfigDF()
-        self.policyDF = pexConfig.makePolicy(self.configDF)
+        self.configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configAL.kernel.name = "AL"
+        self.subconfigAL = self.configAL.kernel.active
+
+        self.configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDF.kernel.name = "DF"
+        self.subconfigDF = self.configDF.kernel.active
+
+        self.policyAL = pexConfig.makePolicy(self.subconfigAL)
+        self.policyDF = pexConfig.makePolicy(self.subconfigDF)
 
         self.kSize    = self.policyAL.getInt("kernelSize")
 
@@ -108,11 +114,11 @@ class DiffimTestCases(unittest.TestCase):
 
     def testGenerateAlardLupton(self):
         # defaults
-        ks = ipDiffim.generateAlardLuptonBasisList(self.configAL)
+        ks = ipDiffim.generateAlardLuptonBasisList(self.subconfigAL)
         self.alardLuptonTest(ks)
 
         # send FWHM
-        ks = ipDiffim.generateAlardLuptonBasisList(self.configAL, targetFwhmPix = 3.0, referenceFwhmPix = 4.0)
+        ks = ipDiffim.generateAlardLuptonBasisList(self.subconfigAL, targetFwhmPix = 3.0, referenceFwhmPix = 4.0)
         self.alardLuptonTest(ks)
 
         
@@ -120,10 +126,10 @@ class DiffimTestCases(unittest.TestCase):
     ### Make
     #
     def testMakeKernelBasisList(self):
-        ks = ipDiffim.makeKernelBasisList(self.configAL)
+        ks = ipDiffim.makeKernelBasisList(self.subconfigAL)
         self.alardLuptonTest(ks)
 
-        ks = ipDiffim.makeKernelBasisList(self.configDF)
+        ks = ipDiffim.makeKernelBasisList(self.subconfigDF)
         self.deltaFunctionTest(ks)
         
     #

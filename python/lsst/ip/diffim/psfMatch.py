@@ -740,9 +740,9 @@ class PsfMatch(object):
                 pexLog.Trace(self._log.getName()+"._solve", 2, 
                              "%d candidates used in fit" % (nGoodSpatial))
                 
-                # Not the case! might be other candidates in the cells
-                #if nGoodSpatial == 0:
-                #    raise RuntimeError("No kernel candidates for spatial fit")
+                # If only nGoodSpatial == 0, might be other candidates in the cells
+                if nGoodSpatial == 0 and nRejectedSpatial == 0:
+                    raise RuntimeError("No kernel candidates for spatial fit")
 
                 if nRejectedSpatial == 0:
                     # Nothing rejected, finished with spatial fit

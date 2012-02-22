@@ -16,9 +16,10 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.config = ipDiffim.PsfMatchConfig()
-        self.policy = pexConfig.makePolicy(self.config)
-        self.kSize  = self.policy.getInt('kernelSize')
+        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.subconfig = self.config.kernel.active
+        self.policy    = pexConfig.makePolicy(self.subconfig)
+        self.kSize     = self.policy.getInt('kernelSize')
 
         # gaussian reference kernel
         self.gSize         = self.kSize
@@ -51,10 +52,10 @@ class DiffimTestCases(unittest.TestCase):
 
         # NOTE - you need to subtract off background from the image
         # you run detection on.  Here it is the template.
-        bgConfig = self.config.afwBackgroundConfig
+        bgConfig = self.subconfig.afwBackgroundConfig
         diffimTools.backgroundSubtract(bgConfig, [self.templateImage,])
 
-        detConfig = self.config.detectionConfig
+        detConfig = self.subconfig.detectionConfig
         kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList1 = kcDetect.getFootprints()

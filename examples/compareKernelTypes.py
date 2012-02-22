@@ -55,30 +55,38 @@ defTemplatePath = None
 class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
     def setUp(self):
-        self.configAL  = ipDiffim.PsfMatchConfigAL()
-        self.configDF  = ipDiffim.PsfMatchConfigDF()
-        self.configDFr = ipDiffim.PsfMatchConfigDF()
+        self.configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configAL.kernel.name = "AL"
+        self.subconfigAL = self.configAL.kernel.active
 
-        self.configDF.useRegularization  = False
-        self.configDFr.useRegularization = True
-        self.configDFr.lambdaValue       = 1000.0
+        self.configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDF.kernel.name = "DF"
+        self.subconfigDF = self.configDF.kernel.active
 
-        self.configAL.fitForBackground  = fitForBackground
-        self.configDF.fitForBackground  = fitForBackground
-        self.configDFr.fitForBackground = fitForBackground
+        self.configDFr    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDFr.kernel.name = "DF"
+        self.subconfigDFr = self.configDFr.kernel.active
 
-        self.configAL.constantVarianceWeighting  = constantVarianceWeighting
-        self.configDF.constantVarianceWeighting  = constantVarianceWeighting 
-        self.configDFr.constantVarianceWeighting = constantVarianceWeighting
+        self.subconfigDF.useRegularization  = False
+        self.subconfigDFr.useRegularization = True
+        self.subconfigDFr.lambdaValue       = 1000.0
 
-        self.kListAL  = ipDiffim.makeKernelBasisList(self.configAL)
-        self.kListDF  = ipDiffim.makeKernelBasisList(self.configDF)
-        self.kListDFr = ipDiffim.makeKernelBasisList(self.configDFr)
-        self.hMatDFr  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.configDFr))
+        self.subconfigAL.fitForBackground  = fitForBackground
+        self.subconfigDF.fitForBackground  = fitForBackground
+        self.subconfigDFr.fitForBackground = fitForBackground
 
-        self.bskvAL  = ipDiffim.BuildSingleKernelVisitorF(self.kListAL, pexConfig.makePolicy(self.configAL))
-        self.bskvDF  = ipDiffim.BuildSingleKernelVisitorF(self.kListDF, pexConfig.makePolicy(self.configDF))
-        self.bskvDFr = ipDiffim.BuildSingleKernelVisitorF(self.kListDFr,  pexConfig.makePolicy(self.configDF), 
+        self.subconfigAL.constantVarianceWeighting  = constantVarianceWeighting
+        self.subconfigDF.constantVarianceWeighting  = constantVarianceWeighting 
+        self.subconfigDFr.constantVarianceWeighting = constantVarianceWeighting
+
+        self.kListAL  = ipDiffim.makeKernelBasisList(self.subconfigAL)
+        self.kListDF  = ipDiffim.makeKernelBasisList(self.subconfigDF)
+        self.kListDFr = ipDiffim.makeKernelBasisList(self.subconfigDFr)
+        self.hMatDFr  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfigDFr))
+
+        self.bskvAL  = ipDiffim.BuildSingleKernelVisitorF(self.kListAL, pexConfig.makePolicy(self.subconfigAL))
+        self.bskvDF  = ipDiffim.BuildSingleKernelVisitorF(self.kListDF, pexConfig.makePolicy(self.subconfigDF))
+        self.bskvDFr = ipDiffim.BuildSingleKernelVisitorF(self.kListDFr,  pexConfig.makePolicy(self.subconfigDF), 
                                                           self.hMatDFr) 
 
         defSciencePath = globals()['defSciencePath']
@@ -95,7 +103,7 @@ class DiffimTestCases(unittest.TestCase):
             
             self.scienceExposure   = afwImage.ExposureF(defSciencePath)
             self.templateExposure  = afwImage.ExposureF(defTemplatePath)
-            warper = afwMath.Warper.fromConfig(self.configAL.warpingConfig)
+            warper = afwMath.Warper.fromConfig(self.subconfigAL.warpingConfig)
             self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
                                                         destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
 
@@ -109,7 +117,7 @@ class DiffimTestCases(unittest.TestCase):
 
 
         # Object detection
-        detConfig = self.configAL.detectionConfig
+        detConfig = self.subconfigAL.detectionConfig
         detPolicy = pexConfig.makePolicy(detConfig)
         detPolicy.set("detThreshold", 50.)
         detPolicy.set("detThresholdType", "stdev")
@@ -151,7 +159,7 @@ class DiffimTestCases(unittest.TestCase):
     def applyVisitor(self, invert=False, xloc=397, yloc=580):
         print '# %.2f %.2f' % (xloc, yloc)
 
-        imsize = int(3 * self.configAL.kernelSize)
+        imsize = int(3 * self.subconfigAL.kernelSize)
 
         # chop out a region around a known object
         bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize/2,
@@ -175,7 +183,7 @@ class DiffimTestCases(unittest.TestCase):
         #
 
         # delta function kernel
-        resultsDF = self.apply(pexConfig.makePolicy(self.configDF), self.bskvDF, xloc, yloc, tmi, smi)
+        resultsDF = self.apply(pexConfig.makePolicy(self.subconfigDF), self.bskvDF, xloc, yloc, tmi, smi)
         kSumDF, bgDF, dmeanDF, dstdDF, vmeanDF, kImageOutDF, diffImDF, kcDF = resultsDF
         kcDF.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
             ipDiffim.KernelSolution.EIGENVALUE)
@@ -201,7 +209,7 @@ class DiffimTestCases(unittest.TestCase):
         #
 
         # regularized delta function kernel
-        resultsDFr = self.apply(pexConfig.makePolicy(self.configDFr), self.bskvDFr, xloc, yloc, tmi, smi)
+        resultsDFr = self.apply(pexConfig.makePolicy(self.subconfigDFr), self.bskvDFr, xloc, yloc, tmi, smi)
         kSumDFr, bgDFr, dmeanDFr, dstdDFr, vmeanDFr, kImageOutDFr, diffImDFr, kcDFr = resultsDFr
         kcDFr.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
             ipDiffim.KernelSolution.EIGENVALUE)
@@ -225,7 +233,7 @@ class DiffimTestCases(unittest.TestCase):
         #
 
         # alard-lupton kernel
-        resultsAL = self.apply(pexConfig.makePolicy(self.configAL), self.bskvAL, xloc, yloc, tmi, smi)
+        resultsAL = self.apply(pexConfig.makePolicy(self.subconfigAL), self.bskvAL, xloc, yloc, tmi, smi)
         kSumAL, bgAL, dmeanAL, dstdAL, vmeanAL, kImageOutAL, diffImAL, kcAL = resultsAL
         kcAL.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
             ipDiffim.KernelSolution.EIGENVALUE)

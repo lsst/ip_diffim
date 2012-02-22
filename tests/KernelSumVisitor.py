@@ -16,9 +16,12 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.config = ipDiffim.PsfMatchConfigDF()
-        self.policy = pexConfig.makePolicy(self.config)
-        self.kList  = ipDiffim.makeKernelBasisList(self.config)
+        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config.kernel.name = "DF"
+        self.subconfig = self.config.kernel.active
+
+        self.policy = pexConfig.makePolicy(self.subconfig)
+        self.kList  = ipDiffim.makeKernelBasisList(self.subconfig)
 
     def makeCandidate(self, kSum, x, y, size = 51):
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))

@@ -19,9 +19,11 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.config = ipDiffim.PsfMatchConfigDF()
-        self.policy = pexConfig.makePolicy(self.config)
+        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config.kernel.name = "DF"
+        self.subconfig = self.config.kernel.active
 
+        self.policy = pexConfig.makePolicy(self.subconfig)
         self.policy.set('fitForBackground', True) # we are testing known background recovery here
         self.policy.set('checkConditionNumber', False) # just in case
         self.policy.set("useRegularization", False)
@@ -40,7 +42,7 @@ class DiffimTestCases(unittest.TestCase):
             scienceExposure.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
             templateExposure.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
             # do the warping first so we don't have any masked pixels in the postage stamps
-            warper = afwMath.Warper.fromConfig(self.config.warpingConfig)
+            warper = afwMath.Warper.fromConfig(self.subconfig.warpingConfig)
             templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
                 destBBox = scienceExposure.getBBox(afwImage.PARENT))
 
@@ -159,7 +161,7 @@ class DiffimTestCases(unittest.TestCase):
                                        sIm,
                                        self.policy)
 
-        kList = ipDiffim.makeKernelBasisList(self.config)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
                                          kSum = scaling)
@@ -172,7 +174,7 @@ class DiffimTestCases(unittest.TestCase):
                                        sIm,
                                        self.policy)
 
-        kList = ipDiffim.makeKernelBasisList(self.config)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
                                          bg = bg)
@@ -191,7 +193,7 @@ class DiffimTestCases(unittest.TestCase):
                                        self.templateExposure2.getMaskedImage(),
                                        self.policy)
 
-        kList = ipDiffim.makeKernelBasisList(self.config)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
 
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
@@ -263,7 +265,7 @@ class DiffimTestCases(unittest.TestCase):
         smi2 = afwImage.MaskedImageF(smi, bbox, afwImage.LOCAL)
 
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
-        kList = ipDiffim.makeKernelBasisList(self.config)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -291,7 +293,7 @@ class DiffimTestCases(unittest.TestCase):
         # now repeat with noise added; decrease precision of comparison
         bkg = self.addNoise(smi2)
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
-        kList = ipDiffim.makeKernelBasisList(self.config)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -350,7 +352,7 @@ class DiffimTestCases(unittest.TestCase):
  
 
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi2, smi2, self.policy)
-        kList = ipDiffim.makeKernelBasisList(self.config)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -375,7 +377,7 @@ class DiffimTestCases(unittest.TestCase):
         smi.set(0, 0x0, 1.0)
         smi.set(cpix, cpix, (1, 0x0, 0.0))
 
-        kList = ipDiffim.makeKernelBasisList(self.config)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi, smi, self.policy)
         try:
             kc.build(kList)

@@ -17,13 +17,16 @@ import lsst.afw.display.ds9 as ds9
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.config = ipDiffim.PsfMatchConfigDF()
-        self.policy = pexConfig.makePolicy(self.config)
+        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config.kernel.name = "DF"
+        self.subconfig = self.config.kernel.active
+
+        self.policy = pexConfig.makePolicy(self.subconfig)
 
         self.policy.set("useRegularization", False)
         self.policy.set("checkConditionNumber", False) # I am making shady kernels by hand
         self.policy.set("useCoreStats", False) # I am making off-center resids
-        self.kList = ipDiffim.makeKernelBasisList(self.config)
+        self.kList = ipDiffim.makeKernelBasisList(self.subconfig)
         self.size = 51
         
     def makeCandidate(self, kSum, x, y):

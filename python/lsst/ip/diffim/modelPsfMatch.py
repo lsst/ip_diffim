@@ -32,28 +32,33 @@ from psfMatch import PsfMatch, PsfMatchConfigAL
 
 sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
-class ModelPsfMatchConfig(PsfMatchConfigAL):
+class ModelPsfMatchConfig(pexConfig.Config):
     # We can determine the widths of the Psfs, thus can optmize the
-    # Alard-Lupton gaussian widths, so make this a subclass of
-    # PsfMatchConfigAL
-    def __init__(self):
-        PsfMatchConfigAL.__init__(self)
+    # Alard-Lupton gaussian widths
 
+    kernel = PsfMatchConfigAL()
+
+    def __init__(self):
         # No sigma clipping
-        self.singleKernelClipping = False
-        self.kernelSumClipping = False
-        self.spatialKernelClipping = False
-        self.checkConditionNumber = False
+        self.kernel.singleKernelClipping = False
+        self.kernel.kernelSumClipping = False
+        self.kernel.spatialKernelClipping = False
+        self.kernel.checkConditionNumber = False
         
         # Variance is ill defined
-        self.constantVarianceWeighting = True
+        self.kernel.constantVarianceWeighting = True
 
         # Psfs are typically small; reduce the kernel size
-        self.kernelSize = 11
+        self.kernel.kernelSize = 11
+
+
+
 
 class ModelPsfMatch(PsfMatch):
     """PSF-match PSF models to reference PSF models
     """
+    ConfigClass = ModelPsfMatchConfig
+
     def __init__(self, config, logName="lsst.ip.diffim.ModelPsfMatch"):
         """Create a PsfMatchToModel
         

@@ -103,32 +103,37 @@ def addNoise(mi):
 
 
 if __name__ == '__main__':
-
     doAddNoise = True
-    
-    configAL = ipDiffim.PsfMatchConfigAL()
-    configDF = ipDiffim.PsfMatchConfigDF()
 
-    configAL.fitForBackground = False
-    configDF.fitForBackground = False
+    configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+    configAL.kernel.name = "AL"
+    subconfigAL = configAL.kernel.active
+    
+    configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+    configDF.kernel.name = "DF"
+    subconfigDF = configDF.kernel.active
+
+    subconfigAL.fitForBackground = False
+    subconfigDF.fitForBackground = False
 
     # Super-important for these faked-up kernels...
-    configAL.constantVarianceWeighting = True
-    configDF.constantVarianceWeighting = True
+    subconfigAL.constantVarianceWeighting = True
+    subconfigDF.constantVarianceWeighting = True
 
     fnum = 1
     
     for switch in ['A', 'B', 'C']:
         if switch == 'A':
             # AL 
-            config = configAL
+            config = subconfigAL
         elif switch == 'B':
             # AL with ~320 bases
-            config = configAL
+            config = subconfigAL
             config.alardDegGauss = (15, 10, 5)
         elif switch == 'C':
-            config = configDF
+            config = subconfigDF
             config.useRegularization = False
+
         kList  = ipDiffim.makeKernelBasisList(config)
 
         policy = pexConfig.makePolicy(config)

@@ -15,26 +15,34 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class PsfMatchTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.configAL  = ipDiffim.PsfMatchConfigAL()
-        self.configDF  = ipDiffim.PsfMatchConfigDF()
-        self.configDFr = ipDiffim.PsfMatchConfigDF()
+        self.configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configAL.kernel.name = "AL"
+        self.subconfigAL = self.configAL.kernel.active
 
-        self.configDF.useRegularization = False
-        self.configDFr.useRegularization = True
+        self.configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDF.kernel.name = "DF"
+        self.subconfigDF = self.configDF.kernel.active
+
+        self.configDFr    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDFr.kernel.name = "DF"
+        self.subconfigDFr = self.configDFr.kernel.active
+
+        self.subconfigDF.useRegularization = False
+        self.subconfigDFr.useRegularization = True
 
         # variance is a hack
-        self.configAL.singleKernelClipping   = False   
-        self.configAL.spatialKernelClipping  = False  
-        self.configDF.singleKernelClipping   = False   
-        self.configDF.spatialKernelClipping  = False  
-        self.configDFr.singleKernelClipping  = False   
-        self.configDFr.spatialKernelClipping = False  
+        self.subconfigAL.singleKernelClipping   = False   
+        self.subconfigAL.spatialKernelClipping  = False  
+        self.subconfigDF.singleKernelClipping   = False   
+        self.subconfigDF.spatialKernelClipping  = False  
+        self.subconfigDFr.singleKernelClipping  = False   
+        self.subconfigDFr.spatialKernelClipping = False  
 
         # Send fake kernel a differential background
         self.bgValue = 100.
-        self.configAL.fitForBackground = True
-        self.configDF.fitForBackground = True
-        self.configDFr.fitForBackground = True
+        self.subconfigAL.fitForBackground = True
+        self.subconfigDF.fitForBackground = True
+        self.subconfigDFr.fitForBackground = True
 
     def makeWcs(self, offset = 0):
         # taken from $AFW_DIR/tests/testMakeWcs.py
@@ -83,9 +91,9 @@ class PsfMatchTestCases(unittest.TestCase):
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
 
-        psfMatchAL  = ipDiffim.ImagePsfMatch(self.configAL)
-        psfMatchDF  = ipDiffim.ImagePsfMatch(self.configDF)
-        psfMatchDFr = ipDiffim.ImagePsfMatch(self.configDFr)
+        psfMatchAL  = ipDiffim.ImagePsfMatch(self.subconfigAL)
+        psfMatchDF  = ipDiffim.ImagePsfMatch(self.subconfigDF)
+        psfMatchDFr = ipDiffim.ImagePsfMatch(self.subconfigDFr)
 
         self.assertEqual(psfMatchAL.useRegularization, False)
         self.assertEqual(psfMatchDF.useRegularization, False)
@@ -123,7 +131,7 @@ class PsfMatchTestCases(unittest.TestCase):
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
 
-        psfMatchAL  = ipDiffim.ImagePsfMatch(self.configAL)
+        psfMatchAL  = ipDiffim.ImagePsfMatch(self.subconfigAL)
         resultsAL  = psfMatchAL.matchExposures(tExp, sExp, psfFwhmPixTc = 2.0, psfFwhmPixTnc = 3.0, doWarping = True)
         self.assertEqual(len(resultsAL), 4)
         self.assertEqual(type(resultsAL[0]), afwImage.ExposureF)
@@ -131,34 +139,13 @@ class PsfMatchTestCases(unittest.TestCase):
         self.assertEqual(type(resultsAL[2]), afwMath.Function2D)
         self.assertEqual(type(resultsAL[3]), afwMath.SpatialCellSet)
 
-    def testSnap(self):
-        # Just test that it functionally works
-        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
-
-        snapconfigAL = ipDiffim.SnapPsfMatchConfigAL()
-        snapconfigDF = ipDiffim.SnapPsfMatchConfigDF()
-
-        snapconfigAL.fitForBackground = True
-        snapconfigDF.fitForBackground = True
-
-        snapconfigAL.singleKernelClipping   = False   
-        snapconfigDF.singleKernelClipping   = False   
-
-        snapconfigAL.spatialKernelClipping  = False  
-        snapconfigDF.spatialKernelClipping  = False  
-
-        psfMatchAL   = ipDiffim.ImagePsfMatch(snapconfigAL)
-        psfMatchDF   = ipDiffim.ImagePsfMatch(snapconfigDF)
-        resultsAL    = psfMatchAL.subtractMaskedImages(tMi, sMi)
-        resultsDF    = psfMatchDF.subtractMaskedImages(tMi, sMi)
-
     def testPca(self, nTerms = 3):
         tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
         
-        self.configDF.usePcaForSpatialKernel = True
-        self.configDF.numPrincipalComponents = nTerms
+        self.subconfigDF.usePcaForSpatialKernel = True
+        self.subconfigDF.numPrincipalComponents = nTerms
         
-        psfMatchDF  = ipDiffim.ImagePsfMatch(self.configDF)
+        psfMatchDF  = ipDiffim.ImagePsfMatch(self.subconfigDF)
         resultsDF   = psfMatchDF.subtractMaskedImages(tMi, sMi)
         
         spatialKernel = resultsDF[1]
@@ -170,14 +157,14 @@ class PsfMatchTestCases(unittest.TestCase):
             self.assertEqual(spatialKernelSolution[0][i], 0.)
 
         # All bases have correct number of terms
-        sko = self.configDF.spatialKernelOrder
+        sko = self.subconfigDF.spatialKernelOrder
         nSpatialTerms = int(0.5 * (sko + 1) * (sko + 2))
         for i in range(len(spatialKernelSolution)):
             self.assertEqual(len(spatialKernelSolution[i]), nSpatialTerms)
 
         spatialBg = resultsDF[2]
         spatialBgSolution = spatialBg.getParameters()
-        bgo = self.configDF.spatialBgOrder
+        bgo = self.subconfigDF.spatialBgOrder
         nBgTerms = int(0.5 * (bgo + 1) * (bgo + 2))
         self.assertEqual(len(spatialBgSolution), nBgTerms)
 

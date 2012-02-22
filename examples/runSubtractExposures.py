@@ -78,8 +78,11 @@ Notes:
 
     templateExposure = afwImage.ExposureF(templatePath)
     scienceExposure  = afwImage.ExposureF(sciencePath)
-    config           = ipDiffim.PsfMatchConfigAL()
     
+    config = ipDiffim.ImagePsfMatch.ConfigClass()
+    config.kernel.name = "AL"
+    subconfig = config.kernel.active
+
     fwhmS = defFwhm
     if options.fwhmS:
         if scienceExposure.hasPsf():
@@ -119,14 +122,14 @@ Notes:
     ####
         
     if bgSub:
-        diffimTools.backgroundSubtract(config.afwBackgroundConfig,
+        diffimTools.backgroundSubtract(subconfig.afwBackgroundConfig,
                                        [templateExposure.getMaskedImage(),
                                         scienceExposure.getMaskedImage()])
     else:
-        if config.fitForBackground == False:
+        if subconfig.fitForBackground == False:
             print 'NOTE: no background subtraction at all is requested'
 
-    psfmatch = ipDiffim.ImagePsfMatch(config)
+    psfmatch = ipDiffim.ImagePsfMatch(subconfig)
     results  = psfmatch.subtractExposures(templateExposure, scienceExposure,
                                           psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
 

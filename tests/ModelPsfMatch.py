@@ -14,10 +14,11 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class PsfMatchTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.config = ipDiffim.ModelPsfMatchConfig()
-        self.config.scaleByFwhm = True
+        self.config    = ipDiffim.ModelPsfMatch.ConfigClass()
+        self.subconfig = self.config.kernel
+        self.subconfig.scaleByFwhm = True
 
-        self.imsize = 2 * self.config.sizeCellX
+        self.imsize = 2 * self.subconfig.sizeCellX
         self.ksize  = 21
         self.sigma1 = 2.0
         self.sigma2 = 3.7
@@ -25,9 +26,9 @@ class PsfMatchTestCases(unittest.TestCase):
         self.exp.setPsf(afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma1))
 
     def testTooBig(self):
-        self.config.kernelSize = self.ksize
+        self.subconfig.kernelSize = self.ksize
         psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma2)
-        psfMatch = ipDiffim.ModelPsfMatch(self.config)
+        psfMatch = ipDiffim.ModelPsfMatch(self.subconfig)
         try:
             results = psfMatch.matchExposure(self.exp, psf)
         except:
@@ -41,10 +42,10 @@ class PsfMatchTestCases(unittest.TestCase):
                 self.runMatch(kOrder = order, kSumIn = ksum)
         
     def runMatch(self, kOrder = 0, kSumIn = 3.7):
-        self.config.spatialKernelOrder = kOrder 
+        self.subconfig.spatialKernelOrder = kOrder 
 
         psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma2)
-        psfMatch = ipDiffim.ModelPsfMatch(self.config)
+        psfMatch = ipDiffim.ModelPsfMatch(self.subconfig)
         results = psfMatch.matchExposure(self.exp, psf, kernelSum = kSumIn)
         matchedIm, matchingKernel, cellSet = results
 
@@ -55,7 +56,7 @@ class PsfMatchTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.exp
-        del self.config
+        del self.subconfig
 
 def suite():
     """Returns a suite containing all the test cases in this module."""

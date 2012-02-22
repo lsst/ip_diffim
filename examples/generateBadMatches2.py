@@ -156,36 +156,42 @@ def addNoise(mi):
 
 if __name__ == '__main__':
 
-    configAL = ipDiffim.PsfMatchConfigAL()
-    configDF = ipDiffim.PsfMatchConfigDF()
+    configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+    configAL.kernel.name = "AL"
+    subconfigAL = configAL.kernel.active
 
-    configAL.fitForBackground = False
-    configDF.fitForBackground = False
+    configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+    configDF.kernel.name = "DF"
+    subconfigDF = configDF.kernel.active
+
+    subconfigAL.fitForBackground = False
+    subconfigDF.fitForBackground = False
 
     # Super-important for these faked-up kernels...
-    configAL.constantVarianceWeighting = True
-    configDF.constantVarianceWeighting = True
+    subconfigAL.constantVarianceWeighting = True
+    subconfigDF.constantVarianceWeighting = True
 
-    configAL.kernelSize = kSize
-    configDF.kernelSize = kSize
+    subconfigAL.kernelSize = kSize
+    subconfigDF.kernelSize = kSize
 
-    alardSigGauss = configAL.alardSigGauss
-    configAL.alardSigGauss = [x * gScale for x in alardSigGauss]
+    alardSigGauss = subconfigAL.alardSigGauss
+    subconfigAL.alardSigGauss = [x * gScale for x in alardSigGauss]
     
     fnum = 1
     
     for switch in ['A', 'B', 'C']:
         if switch == 'A':
             # Default Alard Lupton
-            config = configAL
+            config = subconfigAL
         elif switch == 'B':
             # Add more AL bases (typically 4 3 2)
-            config = configAL
+            config = subconfigAL
             config.alardDegGauss = (8, 6, 4)
         elif switch == 'C':
             # Delta function
-            config = configDF
+            config = subconfigDF
             config.useRegularization = False
+
         kList  = ipDiffim.makeKernelBasisList(config)
     
         policy = pexConfig.makePolicy(config)

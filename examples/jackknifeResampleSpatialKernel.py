@@ -59,17 +59,25 @@ class DiffimTestCases(unittest.TestCase):
         if not defDataDir:
             return
         
-        self.configAL  = ipDiffim.PsfMatchConfigAL()
-        self.configDF  = ipDiffim.PsfMatchConfigDF()
-        self.configDFr = ipDiffim.PsfMatchConfigDF()
+        self.configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configAL.kernel.name = "AL"
+        self.subconfigAL = self.configAL.kernel.active
 
-        self.configDF.useRegularization = False
-        self.configDFr.useRegularization = True
+        self.configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDF.kernel.name = "DF"
+        self.subconfigDF = self.configDF.kernel.active
+
+        self.configDFr    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDFr.kernel.name = "DF"
+        self.subconfigDFr = self.configDFr.kernel.active
+
+        self.subconfigDF.useRegularization = False
+        self.subconfigDFr.useRegularization = True
         
         self.scienceExposure   = afwImage.ExposureF(defSciencePath)
         self.templateExposure  = afwImage.ExposureF(defTemplatePath)
 
-        warper = afwMath.Warper.fromConfig(self.configAL.warpingConfig)
+        warper = afwMath.Warper.fromConfig(self.subconfigAL.warpingConfig)
         self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
                                                     destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
 
@@ -77,7 +85,7 @@ class DiffimTestCases(unittest.TestCase):
         self.templateMaskedImage = self.templateExposure.getMaskedImage()
         self.dStats = ipDiffim.ImageStatisticsF()
         
-        bgConfig = self.configAL.afwBackgroundConfig
+        bgConfig = self.subconfigAL.afwBackgroundConfig
         diffimTools.backgroundSubtract(bgConfig,[self.templateMaskedImage,
                                                  self.scienceMaskedImage])
 
@@ -199,11 +207,11 @@ class DiffimTestCases(unittest.TestCase):
         pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
                      "Mode %s" % (mode))
         if mode == "DF":
-            self.config = self.configDF
+            self.config = self.subconfigDF
         elif mode == "DFr":
-            self.config = self.configDFr
+            self.config = self.subconfigDFr
         elif mode == "AL":
-            self.config = self.configAL
+            self.config = self.subconfigAL
         else:
             raise
 
@@ -220,9 +228,9 @@ class DiffimTestCases(unittest.TestCase):
         self.runTest(mode="AL")
 
     def tearDown(self):
-        del self.configAL
-        del self.configDF
-        del self.configDFr
+        del self.subconfigAL
+        del self.subconfigDF
+        del self.subconfigDFr
         del self.scienceExposure
         del self.templateExposure
         del self.scienceMaskedImage
