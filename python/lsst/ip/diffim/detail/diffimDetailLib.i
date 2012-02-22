@@ -28,6 +28,14 @@ Python bindings for lsst::ip::diffim::detail code
 %import  "lsst/afw/math/mathLib.i"
 %lsst_exceptions();
 
+%{
+#include "lsst/ip/diffim/AssessSpatialKernelVisitor.h"
+#include "lsst/ip/diffim/BuildSingleKernelVisitor.h"
+#include "lsst/ip/diffim/BuildSpatialKernelVisitor.h"
+#include "lsst/ip/diffim/KernelPcaVisitor.h"
+#include "lsst/ip/diffim/KernelSumVisitor.h"
+%}
+
 %shared_ptr(lsst::ip::diffim::detail::AssessSpatialKernelVisitor);
 %shared_ptr(lsst::ip::diffim::detail::BuildSingleKernelVisitor);
 %shared_ptr(lsst::ip::diffim::detail::BuildSpatialKernelVisitor);
