@@ -18,10 +18,13 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.config = ipDiffim.PsfMatchConfigDF()
-        self.policy = pexConfig.makePolicy(self.config)
+        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config.kernel.name = "DF"
+        self.subconfig = self.config.kernel.active
+
+        self.kList  = ipDiffim.makeKernelBasisList(self.subconfig)
+        self.policy = pexConfig.makePolicy(self.subconfig)
         self.policy.set("useRegularization", False)
-        self.kList  = ipDiffim.makeKernelBasisList(self.config)
 
     def tearDown(self):
         del self.config

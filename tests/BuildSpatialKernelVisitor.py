@@ -24,8 +24,11 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.config = ipDiffim.PsfMatchConfigAL()
-        self.policy = pexConfig.makePolicy(self.config)
+        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config.kernel.name = "AL"
+        self.subconfig = self.config.kernel.active
+
+        self.policy = pexConfig.makePolicy(self.subconfig)
         self.size   = 51
 
     def tearDown(self):
@@ -47,7 +50,7 @@ class DiffimTestCases(unittest.TestCase):
         self.runNoBg(2)
 
     def runNoBg(self, sko):
-        basisList = ipDiffim.makeKernelBasisList(self.config)
+        basisList = ipDiffim.makeKernelBasisList(self.subconfig)
         self.policy.set('spatialKernelOrder', sko)
         self.policy.set('fitForBackground', False)
 
@@ -95,7 +98,7 @@ class DiffimTestCases(unittest.TestCase):
     def testModelType(self):
         bbox = afwGeom.Box2I(afwGeom.Point2I(10, 10),
                              afwGeom.Extent2I(10, 10))
-        basisList = ipDiffim.makeKernelBasisList(self.config)
+        basisList = ipDiffim.makeKernelBasisList(self.subconfig)
         
         self.policy.set("spatialModelType", "polynomial") 
         bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
@@ -120,7 +123,7 @@ class DiffimTestCases(unittest.TestCase):
         self.runAlSpatialModel(2, 2)
         
     def runAlSpatialModel(self, sko, bgo):
-        basisList = ipDiffim.makeKernelBasisList(self.config)
+        basisList = ipDiffim.makeKernelBasisList(self.subconfig)
         self.policy.set('spatialKernelOrder', sko)
         self.policy.set('spatialBgOrder', bgo)
         self.policy.set('fitForBackground', True)

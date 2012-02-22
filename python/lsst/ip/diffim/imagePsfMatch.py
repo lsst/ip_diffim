@@ -26,58 +26,17 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import diffimTools
 from makeKernelBasisList import makeKernelBasisList
-from psfMatch import PsfMatch, PsfMatchConfig, PsfMatchConfigDF, PsfMatchConfigAL
+from psfMatch import PsfMatch, PsfMatchConfigDF, PsfMatchConfigAL
 
-class ImagePsfMatchConfig(PsfMatchConfig):
-    """The default config is basically designed for Image Psf matching"""
-    def __init__(self):
-        PsfMatchConfig.__init__(self)
-
-class SnapPsfMatchConfigDF(PsfMatchConfigDF):
-    """Version of Psf Matching optimized for snap subtraction"""
-    def __init__(self):
-        PsfMatchConfigDF.__init__(self)
-        
-        # No spatial variation in model
-        self.spatialKernelOrder = 0
-        
-        # Don't fit for differential background
-        self.fitForBackground = False
-
-        # Small kernel size
-        self.kernelSize = 7
-
-        # With zero spatial order don't worry about spatial clipping
-        self.spatialKernelClipping = False
-
-        # No regularization
-        self.useRegularization = False
-            
-        
-class SnapPsfMatchConfigAL(PsfMatchConfigAL):
-    """Version of Psf Matching optimized for snap subtraction"""
-    def __init__(self):
-        PsfMatchConfigAL.__init__(self)
-        
-        # No spatial variation in model
-        self.spatialKernelOrder = 0
-        
-        # Don't fit for differential background
-        self.fitForBackground = False
-
-        # Small kernel size
-        self.kernelSize = 7
-
-        # With zero spatial order don't worry about spatial clipping
-        self.spatialKernelClipping = False
-
-        # Simple basis set
-        self.kernelBasisSet = "alard-lupton"
-        self.alardNGauss = 2
-        self.alardDegGauss = (4, 2)
-        self.alardSigGauss = (1.0, 2.5)
-            
-        
+class ImagePsfMatchConfig(pexConfig.Config):
+    kernel = pexConfig.ConfigChoiceField(
+        doc = "kernel type",
+        typemap = dict(
+            AL = PsfMatchConfigAL,
+            DF = PsfMatchConfigDF
+        ),
+        default = "AL",
+    )
 
 class ImagePsfMatch(PsfMatch):
     """PSF-match images to reference images
@@ -85,6 +44,8 @@ class ImagePsfMatch(PsfMatch):
     Fits the following model:
     image to not convolve = (image to convolve convolved with PSF matching kernel) + background model
     """
+    ConfigClass = ImagePsfMatchConfig
+
     def __init__(self, config, logName="lsst.ip.diffim.ImagePsfMatch"):
         """Create a PsfMatchToImage
         

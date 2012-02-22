@@ -24,11 +24,13 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.config = ipDiffim.PsfMatchConfigAL()
+        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config.kernel.name = "AL"
+        self.subconfig = self.config.kernel.active
 
         # Some of the tests are sensitive to the centroids returned by
         # "stdev" vs "pixel_stdev"
-        self.config.detectionConfig.detThresholdType = "stdev"
+        self.subconfig.detectionConfig.detThresholdType = "stdev"
 
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
@@ -41,7 +43,7 @@ class DiffimTestCases(unittest.TestCase):
             self.scienceImage   = afwImage.ExposureF(defSciencePath)
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
 
-            bgConfig = self.config.afwBackgroundConfig
+            bgConfig = self.subconfig.afwBackgroundConfig
             diffimTools.backgroundSubtract(bgConfig,
                                            [self.templateImage.getMaskedImage(),
                                             self.scienceImage.getMaskedImage()])
@@ -49,8 +51,8 @@ class DiffimTestCases(unittest.TestCase):
             self.offset   = 1500
             self.bbox     = afwGeom.Box2I(afwGeom.Point2I(0, self.offset),
                                           afwGeom.Point2I(511, 2046))
-            self.config.spatialKernelOrder = 1
-            self.config.spatialBgOrder = 0
+            self.subconfig.spatialKernelOrder = 1
+            self.subconfig.spatialBgOrder = 0
 
     def tearDown(self):
         del self.config
@@ -67,18 +69,18 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
-        self.config.fitForBackground = fitForBackground
+        self.subconfig.fitForBackground = fitForBackground
             
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
 
-        self.config.spatialModelType = 'chebyshev1'
-        psfmatch1 = ipDiffim.ImagePsfMatch(self.config)
+        self.subconfig.spatialModelType = 'chebyshev1'
+        psfmatch1 = ipDiffim.ImagePsfMatch(self.subconfig)
         results1 = psfmatch1.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 
-        self.config.spatialModelType = 'polynomial'
-        psfmatch2 = ipDiffim.ImagePsfMatch(self.config)
+        self.subconfig.spatialModelType = 'polynomial'
+        psfmatch2 = ipDiffim.ImagePsfMatch(self.subconfig)
         results2 = psfmatch2.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
 
@@ -147,7 +149,7 @@ class DiffimTestCases(unittest.TestCase):
 
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
-        psfmatch = ipDiffim.ImagePsfMatch(self.config)
+        psfmatch = ipDiffim.ImagePsfMatch(self.subconfig)
         try:
             psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = False)
         except Exception, e:
@@ -164,14 +166,14 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
-        self.config.spatialModelType = poly
-        self.config.fitForBackground = fitForBackground
+        self.subconfig.spatialModelType = poly
+        self.subconfig.fitForBackground = fitForBackground
 
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.PARENT)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
 
         # Have an XY0
-        psfmatch  = ipDiffim.ImagePsfMatch(self.config)
+        psfmatch  = ipDiffim.ImagePsfMatch(self.subconfig)
         results1  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
 

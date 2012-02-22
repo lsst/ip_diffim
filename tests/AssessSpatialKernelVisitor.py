@@ -20,10 +20,14 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.config = ipDiffim.PsfMatchConfigAL()
-        self.policy = pexConfig.makePolicy(self.config)
+        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config.kernel.name = "AL"
+        self.subconfig = self.config.kernel.active
+
+        self.policy = pexConfig.makePolicy(self.subconfig)
+        self.kList  = ipDiffim.makeKernelBasisList(self.subconfig)
+
         self.ksize  = self.policy.get('kernelSize')
-        self.kList  = ipDiffim.makeKernelBasisList(self.config)
 
     def makeSpatialKernel(self, order):
         basicGaussian1 = afwMath.GaussianFunction2D(2., 2., 0.)

@@ -71,6 +71,8 @@ class DiffimTestCases(unittest.TestCase):
         config = ipDiffim.AfwBackgroundConfig()
         config.validate()
 
+    #
+
     def testPsfMatchConfig(self):
         config = ipDiffim.PsfMatchConfig()
         config.validate()
@@ -81,6 +83,20 @@ class DiffimTestCases(unittest.TestCase):
 
     def testPsfMatchConfigDF(self):
         config = ipDiffim.PsfMatchConfigDF()
+        config.validate()
+
+    #
+
+    def testSnapPsfMatchConfig(self):
+        config = ipDiffim.SnapPsfMatchConfig()
+        config.validate()
+
+    def testSnapPsfMatchConfigAL(self):
+        config = ipDiffim.SnapPsfMatchConfigAL()
+        config.validate()
+
+    def testSnapPsfMatchConfigDF(self):
+        config = ipDiffim.SnapPsfMatchConfigDF()
         config.validate()
 
 #####

@@ -16,10 +16,13 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.config = ipDiffim.PsfMatchConfigAL()
-        self.config.fitForBackground = True
-        self.config.spatialModelType = "polynomial"
-        self.policy = pexConfig.makePolicy(self.config)
+        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config.kernel.name = "AL"
+        self.subconfig = self.config.kernel.active
+
+        self.subconfig.fitForBackground = True
+        self.subconfig.spatialModelType = "polynomial"
+        self.policy = pexConfig.makePolicy(self.subconfig)
 
         self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
         self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')
@@ -27,7 +30,7 @@ class DiffimTestCases(unittest.TestCase):
         self.tmi.setXY0(0,0)
 
         # Run detection
-        detConfig = self.config.detectionConfig
+        detConfig = self.subconfig.detectionConfig
         # Note here regarding detConfig:
         #
         # If I set detThresholdType = "pixel_stdev", I get slightly
@@ -53,10 +56,10 @@ class DiffimTestCases(unittest.TestCase):
         nGauss = 1
         sGauss = [3.]
         dGauss = [3]
-        self.config.alardNGauss = nGauss
-        self.config.alardSigGauss = sGauss
-        self.config.alardDegGauss = dGauss
-        basisList0 = ipDiffim.makeKernelBasisList(self.config)
+        self.subconfig.alardNGauss = nGauss
+        self.subconfig.alardSigGauss = sGauss
+        self.subconfig.alardDegGauss = dGauss
+        basisList0 = ipDiffim.makeKernelBasisList(self.subconfig)
         
         # HP does things in a different order, and with different normalization, so reorder list
         order   = [0, 2, 5, 9, 1, 4, 8, 3, 7, 6]
