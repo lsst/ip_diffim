@@ -39,7 +39,7 @@ namespace diffim {
         MaskedImagePtr const& miToNotConvolvePtr,
         lsst::pex::policy::Policy const& policy
         ) :
-        lsst::afw::math::SpatialCellImageCandidate<ImageT>(xCenter, yCenter),
+        lsst::afw::math::SpatialCellImageCandidate<lsst::afw::math::Kernel::Pixel>(xCenter, yCenter),
         _miToConvolvePtr(miToConvolvePtr),
         _miToNotConvolvePtr(miToNotConvolvePtr),
         _varianceEstimate(),

@@ -59,9 +59,8 @@ class DiffimTestCases(unittest.TestCase):
         config.validate()
 
         # Try invalid entry
-        config.fpGrowPix = 1
         try:
-            config.validate()
+            config.fpGrowPix = 1
         except:
             pass
         else:
