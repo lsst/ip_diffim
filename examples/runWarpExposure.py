@@ -29,7 +29,7 @@ def main():
     refWcsExposure = afwImage.ExposureF(refWcsPath)
     toWarpExposure = afwImage.ExposureF(toWarpPath)
 
-    config = ipDiffim.ImagePsfMatch.ConfigClass()
+    config = ipDiffim.ImagePsfMatchTask.ConfigClass()
     subconfig = config.kernel.active
     warper = afwMath.Warper.fromConfig(subconfig.warpingConfig)
     warpedExposure = warper.warpExposure(refWcsExposure.getWcs(), 

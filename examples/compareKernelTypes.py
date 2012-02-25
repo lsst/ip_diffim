@@ -55,15 +55,15 @@ defTemplatePath = None
 class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
     def setUp(self):
-        self.configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configAL    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configAL.kernel.name = "AL"
         self.subconfigAL = self.configAL.kernel.active
 
-        self.configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDF    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configDF.kernel.name = "DF"
         self.subconfigDF = self.configDF.kernel.active
 
-        self.configDFr    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDFr    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configDFr.kernel.name = "DF"
         self.subconfigDFr = self.configDFr.kernel.active
 

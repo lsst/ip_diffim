@@ -179,7 +179,7 @@ class PsfMatchConfig(pexConfig.Config):
         doc = """Number of rows/columns in the convolution kernel; should be odd-valued.
                  Modified by kernelSizeFwhmScaling if scaleByFwhm = true""",
         default = 19,
-        check = lambda x: (x >= 7) and (x <= 31)
+        check = lambda x: (x >= 7) and (x <= 33)
     )
     scaleByFwhm = pexConfig.Field(
         dtype = bool,

@@ -156,11 +156,11 @@ def addNoise(mi):
 
 if __name__ == '__main__':
 
-    configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+    configAL    = ipDiffim.ImagePsfMatchTask.ConfigClass()
     configAL.kernel.name = "AL"
     subconfigAL = configAL.kernel.active
 
-    configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+    configDF    = ipDiffim.ImagePsfMatchTask.ConfigClass()
     configDF.kernel.name = "DF"
     subconfigDF = configDF.kernel.active
 

@@ -45,24 +45,28 @@ if __name__ == '__main__':
     gaussPsf = afwDet.createPsf("DoubleGaussian", psf.getKernel().getWidth(),
                                 psf.getKernel().getHeight(), sigGauss)
 
-    config = ipDiffim.ModelPsfMatch.ConfigClass()
+    config = ipDiffim.ModelPsfMatchTask.ConfigClass()
     subconfig = config.kernel
-    psfMatch = ipDiffim.ModelPsfMatch(subconfig)
-    results = psfMatch.matchExposure(calexp, gaussPsf)
-    cim, sk, kcs = results
+    psfMatch = ipDiffim.ModelPsfMatchTask(subconfig)
+    results = psfMatch.run(calexp, gaussPsf)
+    cim = results.psfMatchedExposure
+    sk  = results.psfMatchingKernel
+    kcs = results.kernelCellSet
 
     if 0:
         diffimTools.displaySpatialKernelQuality(kcs, sk, sb, frame = 1)
     else:
         ds9.setMaskPlaneVisibility("DETECTED", False)
         ds9.mtv(calexp, frame = 1)
-        diffimTools.displaySpatialKernelMosaic(psf.getKernel(), calexp.getWidth(), calexp.getHeight(),
+        diffimTools.displaySpatialKernelMosaic(psf.getKernel(), calexp.getWidth(), 
+                                               calexp.getHeight(),
                                                frame = 2)
-        diffimTools.displaySpatialKernelMosaic(gaussPsf.getKernel(), calexp.getWidth(), calexp.getHeight(),
+        diffimTools.displaySpatialKernelMosaic(gaussPsf.getKernel(), calexp.getWidth(), 
+                                               calexp.getHeight(),
                                                frame = 3)
         diffimTools.displayKernelMosaic(kcs, frame = 4)
         diffimTools.displayCandidateMosaic(kcs, frame = 5)
         diffimTools.displaySpatialKernelMosaic(sk, calexp.getWidth(), calexp.getHeight(), frame = 6)
         ds9.mtv(cim, frame = 7)
     
-# python examples/psfMatchModelToModel.py ~/LSST/PT1/psfMatch/wp_trunk_2011_0420_195756/update/calexp/v856880811-fg/R22/S20.fits ~/LSST/PT1/psfMatch/wp_trunk_2011_0420_195756/update/psf/v856880811-fg/R22/S20.boost
+# python examples/runModelToModel.py ~/LSST/PT1/psfMatch/wp_trunk_2011_0420_195756/update/calexp/v856880811-fg/R22/S20.fits ~/LSST/PT1/psfMatch/wp_trunk_2011_0420_195756/update/psf/v856880811-fg/R22/S20.boost 4.0

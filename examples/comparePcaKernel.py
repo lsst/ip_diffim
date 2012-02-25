@@ -58,15 +58,15 @@ else:
     sys.exit(1)
     
 
-configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+configAL    = ipDiffim.ImagePsfMatchTask.ConfigClass()
 configAL.kernel.name = "AL"
 subconfigAL = configAL.kernel.active
 
-configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+configDF    = ipDiffim.ImagePsfMatchTask.ConfigClass()
 configDF.kernel.name = "DF"
 subconfigDF = configDF.kernel.active
 
-configDFr    = ipDiffim.ImagePsfMatch.ConfigClass()
+configDFr    = ipDiffim.ImagePsfMatchTask.ConfigClass()
 configDFr.kernel.name = "DF"
 subconfigDFr = configDFr.kernel.active
 
@@ -87,19 +87,31 @@ kcDetect.apply(templateMaskedImage, scienceMaskedImage)
 footprints = kcDetect.getFootprints()
 
 # delta function
-psfmatch1 = ipDiffim.ImagePsfMatch(subconfigDF)
-results1  = psfmatch1.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
-diffim1, spatialKernel1, spatialBg1, kernelCellSet1 = results1
+psfmatch1 = ipDiffim.ImagePsfMatchTask(subconfigDF)
+results1  = psfmatch1.run(templateMaskedImage, scienceMaskedImage, 
+                          "subtractMaskedImages", footprints = footprints)
+diffim1        = results1.matchedImage
+spatialKernel1 = results1.psfMatchingKernel
+spatialBg1     = results1.backgroundModel
+kernelCellSet1 = results1.kernelCellSet
 
 # alard lupton
-psfmatch2 = ipDiffim.ImagePsfMatch(subconfigAL)
-results2  = psfmatch2.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
-diffim2, spatialKernel2, spatialBg2, kernelCellSet2 = results2
+psfmatch2 = ipDiffim.ImagePsfMatchTask(subconfigAL)
+results2  = psfmatch2.run(templateMaskedImage, scienceMaskedImage, 
+                          "subtractMaskedImages", footprints = footprints)
+diffim2        = results2.matchedImage
+spatialKernel2 = results2.psfMatchingKernel
+spatialBg2     = results2.backgroundModel
+kernelCellSet2 = results2.kernelCellSet
 
 # regularized delta function
-psfmatch3 = ipDiffim.ImagePsfMatch(subconfigDFr)
-results3  = psfmatch3.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, footprints = footprints)
-diffim3, spatialKernel3, spatialBg3, kernelCellSet3 = results3
+psfmatch3 = ipDiffim.ImagePsfMatchTask(subconfigDFr)
+results3  = psfmatch3.run(templateMaskedImage, scienceMaskedImage, 
+                          "subtractMaskedImages", footprints = footprints)
+diffim3        = results3.matchedImage
+spatialKernel3 = results3.psfMatchingKernel
+spatialBg3     = results3.backgroundModel
+kernelCellSet3 = results3.kernelCellSet
 
 
 basisList1 = spatialKernel1.getKernelList()
