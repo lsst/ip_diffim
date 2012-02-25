@@ -52,22 +52,21 @@ class ModelPsfMatchConfig(pexConfig.Config):
         self.kernel.kernelSize = 11
 
 
-
-
-class ModelPsfMatch(PsfMatch):
+class ModelPsfMatchTask(PsfMatch):
     """PSF-match PSF models to reference PSF models
     """
     ConfigClass = ModelPsfMatchConfig
 
-    def __init__(self, config, logName="lsst.ip.diffim.ModelPsfMatch"):
+    def __init__(self, *args, **kwargs):
         """Create a PsfMatchToModel
         
         @param config: see lsst.ip.diffim.PsfMatchConfig
         @param logName: name by which messages are logged
         """
-        PsfMatch.__init__(self, config, logName)
-    
-    def matchExposure(self, exposure, referencePsfModel, kernelSum=1.0):
+        PsfMatch.__init__(self, *args, **kwargs)
+
+        
+    def run(self, exposure, referencePsfModel, kernelSum=1.0):
         """PSF-match an exposure to a PSF model.
         
         @param exposure: Exposure to PSF-match to the reference masked image;
@@ -90,7 +89,7 @@ class ModelPsfMatch(PsfMatch):
 
         maskedImage = exposure.getMaskedImage()
 
-        self._log.log(pexLog.Log.INFO, "compute PSF-matching kernel")
+        self.log.log(pexLog.Log.INFO, "compute PSF-matching kernel")
         kernelCellSet = self._buildCellSet(referencePsfModel,
                                            exposure.getBBox(afwImage.PARENT),
                                            exposure.getPsf())
@@ -115,7 +114,7 @@ class ModelPsfMatch(PsfMatch):
             kParameters[0] = kernelSum
             psfMatchingKernel.setKernelParameters(kParameters)
             
-        self._log.log(pexLog.Log.INFO, "PSF-match science exposure to reference")
+        self.log.log(pexLog.Log.INFO, "PSF-match science exposure to reference")
         psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(afwImage.PARENT), exposure.getWcs())
         psfMatchedExposure.setFilter(exposure.getFilter())
         psfMatchedExposure.setCalib(exposure.getCalib())
@@ -126,8 +125,11 @@ class ModelPsfMatch(PsfMatch):
         doNormalize = True
         afwMath.convolve(psfMatchedMaskedImage, maskedImage, psfMatchingKernel, doNormalize)
         
-        self._log.log(pexLog.Log.INFO, "done")
-        return (psfMatchedExposure, psfMatchingKernel, kernelCellSet)
+        self.log.log(pexLog.Log.INFO, "done")
+        return pipeBase.Struct(psfMatchedExposure=psfMatchedExposure, 
+                               psfMatchingKernel=psfMatchingKernel, 
+                               kernelCellSet=kernelCellSet,
+                               metadata=self.metadata)
 
     def _buildCellSet(self, referencePsfModel, scienceBBox, sciencePsfModel):
         """Build a SpatialCellSet for use with the solve method
@@ -141,7 +143,7 @@ class ModelPsfMatch(PsfMatch):
         @raise RuntimeError if reference PSF model and science PSF model have different dimensions
         """
         if (referencePsfModel.getKernel().getDimensions() != sciencePsfModel.getKernel().getDimensions()):
-            pexLog.Trace(self._log.getName(), 1,
+            pexLog.Trace(self.log.getName(), 1,
                          "ERROR: Dimensions of reference Psf and science Psf different; exiting")
             raise RuntimeError, "ERROR: Dimensions of reference Psf and science Psf different; exiting"
     
@@ -164,14 +166,14 @@ class ModelPsfMatch(PsfMatch):
         nParameters = sciencePsfModel.getKernel().getNSpatialParameters()
         root        = num.sqrt(9 - 8 * (1 - nParameters))
         if (root != root // 1):            # We know its an integer solution
-            pexLog.Trace(self._log.getName(), 3, "Problem inferring spatial order of image's Psf")
+            pexLog.Trace(self.log.getName(), 3, "Problem inferring spatial order of image's Psf")
         else:
             order       = (root - 3) / 2
             if (order != order // 1):
-                pexLog.Trace(self._log.getName(), 3, "Problem inferring spatial order of image's Psf")
+                pexLog.Trace(self.log.getName(), 3, "Problem inferring spatial order of image's Psf")
             else:
-                pexLog.Trace(self._log.getName(), 2, "Spatial order of Psf = %d; matching kernel order = %d" % (
-                        order, self._config.spatialKernelOrder))
+                pexLog.Trace(self.log.getName(), 2, "Spatial order of Psf = %d; matching kernel order = %d" % (
+                        order, self.config.spatialKernelOrder))
             
         
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
@@ -200,7 +202,7 @@ class ModelPsfMatch(PsfMatch):
                 # place at center of cell
                 posX = sizeCellX * col + sizeCellX // 2 + scienceX0
     
-                pexLog.Trace(self._log.getName(), 5, "Creating Psf candidate at %.1f %.1f" % (posX, posY))
+                pexLog.Trace(self.log.getName(), 5, "Creating Psf candidate at %.1f %.1f" % (posX, posY))
     
                 # reference kernel image, at location of science subimage
                 kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY), True).convertF()

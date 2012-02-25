@@ -77,5 +77,5 @@ class SnapPsfMatchConfig(pexConfig.Config):
         default = "AL",
     )
             
-class SnapPsfMatch(ImagePsfMatch):
+class SnapPsfMatchTask(ImagePsfMatch):
     ConfigClass = SnapPsfMatchConfig
