@@ -26,6 +26,7 @@ import lsst.afw.math as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.meas.algorithms as measAlg
+import lsst.pipe.base as pipeBase
 import diffimTools
 from makeKernelBasisList import makeKernelBasisList
 from psfMatch import PsfMatch, PsfMatchConfigAL
@@ -102,7 +103,7 @@ class ModelPsfMatchTask(PsfMatch):
         fwhm1 = s1 * sigma2fwhm
         fwhm2 = s2 * sigma2fwhm
 
-        basisList = makeKernelBasisList(self._config, fwhm1, fwhm2)
+        basisList = makeKernelBasisList(self.config, fwhm1, fwhm2)
         psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
         
         if psfMatchingKernel.isSpatiallyVarying():
@@ -151,9 +152,9 @@ class ModelPsfMatchTask(PsfMatch):
         maxKernelSize = 1 + (min(psfWidth - 1, psfHeight - 1) // 2)
         if maxKernelSize % 2 == 0:
             maxKernelSize -= 1
-        if self._config.kernelSize > maxKernelSize:
+        if self.config.kernelSize > maxKernelSize:
             raise ValueError, "Kernel size (%d) too big to match Psfs of size %d; reduce to at least %d" % (
-                self._config.kernelSize, psfWidth, maxKernelSize)
+                self.config.kernelSize, psfWidth, maxKernelSize)
 
         # Infer spatial order of Psf model!
         #
@@ -179,8 +180,8 @@ class ModelPsfMatchTask(PsfMatch):
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0,   scienceY0   = scienceBBox.getMin()
     
-        sizeCellX = self._config.sizeCellX
-        sizeCellY = self._config.sizeCellY
+        sizeCellX = self.config.sizeCellX
+        sizeCellY = self.config.sizeCellY
     
         kernelCellSet = afwMath.SpatialCellSet(
             afwGeom.Box2I(afwGeom.Point2I(scienceX0, scienceY0),
@@ -193,7 +194,7 @@ class ModelPsfMatchTask(PsfMatch):
         dimenR    = referencePsfModel.getKernel().getDimensions()
         dimenS    = sciencePsfModel.getKernel().getDimensions()
         
-        policy = pexConfig.makePolicy(self._config)
+        policy = pexConfig.makePolicy(self.config)
         for row in range(nCellY):
             # place at center of cell
             posY = sizeCellY * row + sizeCellY // 2 + scienceY0

@@ -47,7 +47,10 @@ class PsfMatchTestCases(unittest.TestCase):
         psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma2)
         psfMatch = ipDiffim.ModelPsfMatchTask(config=self.subconfig)
         results = psfMatch.run(self.exp, psf, kernelSum = kSumIn)
-        matchedIm, matchingKernel, cellSet = results
+
+        matchedExp     = results.psfMatchedExposure
+        matchingKernel = results.psfMatchingKernel
+        kernelCellSet  = results.kernelCellSet
 
         kImage = afwImage.ImageD(matchingKernel.getDimensions())
         kSumOut = matchingKernel.computeImage(kImage, False)
