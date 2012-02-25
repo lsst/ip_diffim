@@ -59,15 +59,15 @@ class DiffimTestCases(unittest.TestCase):
         if not defDataDir:
             return
         
-        self.configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configAL    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configAL.kernel.name = "AL"
         self.subconfigAL = self.configAL.kernel.active
 
-        self.configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDF    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configDF.kernel.name = "DF"
         self.subconfigDF = self.configDF.kernel.active
 
-        self.configDFr    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDFr    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configDFr.kernel.name = "DF"
         self.subconfigDFr = self.configDFr.kernel.active
 
@@ -158,7 +158,11 @@ class DiffimTestCases(unittest.TestCase):
                     return cand
 
     def jackknifeResample(self, psfmatch, results):
-        diffim, kernel, bg, cellSet = results
+        
+        diffim  = results.matchedImage
+        kernel  = results.psfMatchingKernel
+        bg      = results.backgroundModel
+        cellSet = results.kernelCellSet
         
         goodList = []
         for cell in cellSet.getCellList():
@@ -215,9 +219,10 @@ class DiffimTestCases(unittest.TestCase):
         else:
             raise
 
-        psfmatch = ipDiffim.ImagePsfMatch(self.config)
-        results  = psfmatch.subtractMaskedImages(self.templateMaskedImage,
-                                                 self.scienceMaskedImage)
+        psfmatch = ipDiffim.ImagePsfMatchTask(self.config)
+        results  = psfmatch.run(self.templateMaskedImage,
+                                self.scienceMaskedImage, 
+                                "subtractMaskedImages")
         self.jackknifeResample(psfmatch, results)
         
     def test(self):

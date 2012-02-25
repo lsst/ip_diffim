@@ -5,7 +5,6 @@ import optparse
 import re
 import numpy as num
 
-import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
 
 from lsst.pex.logging import Trace
@@ -71,7 +70,7 @@ Notes:
     if sciencePath == None or templatePath == None:
         parser.print_help()
         sys.exit(1)
-
+g
     print 'Science exposure: ', sciencePath
     print 'Template exposure:', templatePath
     print 'Output exposure:  ', outputPath
@@ -79,7 +78,7 @@ Notes:
     templateExposure = afwImage.ExposureF(templatePath)
     scienceExposure  = afwImage.ExposureF(sciencePath)
     
-    config = ipDiffim.ImagePsfMatch.ConfigClass()
+    config = ipDiffim.ImagePsfMatchTask.ConfigClass()
     config.kernel.name = "AL"
     subconfig = config.kernel.active
 
@@ -129,29 +128,24 @@ Notes:
         if subconfig.fitForBackground == False:
             print 'NOTE: no background subtraction at all is requested'
 
-    psfmatch = ipDiffim.ImagePsfMatch(subconfig)
-    results  = psfmatch.subtractExposures(templateExposure, scienceExposure,
-                                          psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
+    psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
+    results  = psfmatch.run(templateExposure, scienceExposure, "subtractExposures",
+                            psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
 
-    differenceExposure = results[0]
+    differenceExposure = results.matchedImage
     differenceExposure.writeFits(outputPath)
 
     if False:
-        psfMatchingKernel = results[1]
-        backgroundModel   = results[2]
-        kernelCellSet     = results[3]
+        psfMatchingKernel = results.psfMatchingKernel
+        backgroundModel   = results.backgroundModel
+        kernelCellSet     = results.kernelCellSet
         
         diffimTools.writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel,
                                        re.sub('.fits', '', outputPath))
         
 def run():
     Log.getDefaultLog()
-    memId0 = dafBase.Citizen_getNextMemId()
     main()
-    # check for memory leaks
-    if dafBase.Citizen_census(0, memId0) != 0:
-        print dafBase.Citizen_census(0, memId0), 'Objects leaked:'
-        print dafBase.Citizen_census(dafBase.cout, memId0)
 
 if __name__ == '__main__':
     run()

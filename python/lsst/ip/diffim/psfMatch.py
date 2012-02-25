@@ -27,6 +27,7 @@ import lsst.pex.logging as pexLog
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
+import lsst.pipe.base as pipeBase
 
 class DetectionConfig(pexConfig.Config):
     detThreshold = pexConfig.Field(
@@ -178,7 +179,7 @@ class PsfMatchConfig(pexConfig.Config):
         doc = """Number of rows/columns in the convolution kernel; should be odd-valued.
                  Modified by kernelSizeFwhmScaling if scaleByFwhm = true""",
         default = 19,
-        check = lambda x: (x >= 7) and (x <= 31)
+        check = lambda x: (x >= 7) and (x <= 33)
     )
     scaleByFwhm = pexConfig.Field(
         dtype = bool,
@@ -512,26 +513,21 @@ class PsfMatchConfigDF(PsfMatchConfig):
     )
 
 
-class PsfMatch(object):
-    """Base class for PSF matching
+class PsfMatch(pipeBase.Task):
+    """Base class for PSF matching task.  Has no run method; hence should not be called!
     """
-    def __init__(self, config, logName="lsst.ip.diffim.PsfMatch"):
-        """Create a PsfMatch
-        
-        @param config: configuration for ip_diffim
-        @param logName: name by which messages are logged
-        """
-        self._config = config
-        self._log = pexLog.Log(pexLog.Log.getDefaultLog(), logName)
-        
+    ConfigClass = PsfMatchConfig
+    def __init__(self, *args, **kwargs):
+        pipeBase.Task.__init__(self, *args, **kwargs)
+
         #
-        if 'useRegularization' in self._config.keys():
-            self.useRegularization = self._config.useRegularization
+        if 'useRegularization' in self.config.keys():
+            self.useRegularization = self.config.useRegularization
         else:
             self.useRegularization = False
 
         if self.useRegularization:
-            self.hMat = diffimLib.makeRegularizationMatrix(pexConfig.makePolicy(self._config))
+            self.hMat = diffimLib.makeRegularizationMatrix(pexConfig.makePolicy(self.config))
 
     def _diagnostic(self, kernelCellSet, spatialKernel, spatialBg):
         # Look at how well the solution is constrained
@@ -555,49 +551,49 @@ class PsfMatch(object):
 
         # Counting statistics
         if nBad > 2*nGood:
-            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
                          "WARNING: many more candidates rejected than accepted; %d total, %d rejected, %d used" % (
                           nTot, nBad, nGood) )
         else:
-            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
                          "NOTE: %d candidates total, %d rejected, %d used" % (nTot, nBad, nGood))
             
         # Some judgements on the quality of the spatial models
         if nGood < nKernelTerms:
-            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
                          "WARNING: spatial kernel model underconstrained; %d candidates, %d terms" % (nGood, nKernelTerms))
-            pexLog.Trace(self._log.getName()+"._diagnostic", 2,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
                          "Consider lowering the spatial order")
         elif nGood <= 2*nKernelTerms:
-            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
                          "WARNING: spatial kernel model poorly constrained; %d candidates, %d terms" % (nGood, nKernelTerms))
-            pexLog.Trace(self._log.getName()+"._diagnostic", 2,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
                          "Consider lowering the spatial order")
         else:
-            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
                          "NOTE: spatial kernel model appears well constrained; %d candidates, %d terms" % (nGood, nKernelTerms))
 
         if nGood < nBgTerms:
-            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
                          "WARNING: spatial background model underconstrained; %d candidates, %d terms" % (nGood, nBgTerms))
-            pexLog.Trace(self._log.getName()+"._diagnostic", 2,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
                          "Consider lowering the spatial order")
         elif nGood <= 2*nBgTerms:
-            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
                          "WARNING: spatial background model poorly constrained; %d candidates, %d terms" % (nGood, nBgTerms))
-            pexLog.Trace(self._log.getName()+"._diagnostic", 2,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
                          "Consider lowering the spatial order")
         else:
-            pexLog.Trace(self._log.getName()+"._diagnostic", 1,
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
                          "NOTE: spatial background model appears well constrained; %d candidates, %d terms" % (nGood, nBgTerms))
         
     
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
-        nComponents       = self._config.numPrincipalComponents
+        nComponents       = self.config.numPrincipalComponents
         imagePca          = afwImage.ImagePcaD()
         importStarVisitor = diffimLib.KernelPcaVisitorF(imagePca)
         kernelCellSet.visitCandidates(importStarVisitor, nStarPerCell)
-        if self._config.subtractMeanForPca:
+        if self.config.subtractMeanForPca:
             importStarVisitor.subtractMean()
         imagePca.analyze()
 
@@ -606,7 +602,7 @@ class PsfMatch(object):
 
         eSum = num.sum(eigenValues)
         for j in range(len(eigenValues)):
-            pexLog.Trace(self._log.getName()+"._solve", 6, 
+            pexLog.Trace(self.log.getName()+"._solve", 6, 
                          "Eigenvalue %d : %f (%f)" % (j, eigenValues[j], eigenValues[j]/eSum))
                                      
         nToUse = min(nComponents, len(eigenValues))
@@ -644,13 +640,13 @@ class PsfMatch(object):
         @raise Exception if unable to determine PSF matching kernel and returnOnExcept False
         """
 
-        maxSpatialIterations   = self._config.maxSpatialIterations
-        nStarPerCell           = self._config.nStarPerCell
-        usePcaForSpatialKernel = self._config.usePcaForSpatialKernel
-        subtractMeanForPca     = self._config.subtractMeanForPca
+        maxSpatialIterations   = self.config.maxSpatialIterations
+        nStarPerCell           = self.config.nStarPerCell
+        usePcaForSpatialKernel = self.config.usePcaForSpatialKernel
+        subtractMeanForPca     = self.config.subtractMeanForPca
 
         # Visitor for the single kernel fit
-        policy = pexConfig.makePolicy(self._config)
+        policy = pexConfig.makePolicy(self.config)
         if self.useRegularization:
             singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy, self.hMat)
         else:
@@ -669,11 +665,11 @@ class PsfMatch(object):
                 # Make sure there are no uninitialized candidates as active occupants of Cell
                 nRejectedSkf = -1
                 while (nRejectedSkf != 0):
-                    pexLog.Trace(self._log.getName()+"._solve", 2, 
+                    pexLog.Trace(self.log.getName()+"._solve", 2, 
                                  "Building single kernels...")
                     kernelCellSet.visitCandidates(singlekv, nStarPerCell)
                     nRejectedSkf = singlekv.getNRejected()
-                    pexLog.Trace(self._log.getName()+"._solve", 2, 
+                    pexLog.Trace(self.log.getName()+"._solve", 2, 
                                  "Iteration %d, rejected %d candidates due to initial kernel fit" % (thisIteration, nRejectedSkf))
 
                 # Reject outliers in kernel sum 
@@ -685,7 +681,7 @@ class PsfMatch(object):
                 kernelCellSet.visitCandidates(ksv, nStarPerCell)      
 
                 nRejectedKsum = ksv.getNRejected()
-                pexLog.Trace(self._log.getName()+"._solve", 2, 
+                pexLog.Trace(self.log.getName()+"._solve", 2, 
                              "Iteration %d, rejected %d candidates due to kernel sum" % (thisIteration, nRejectedKsum))
 
 
@@ -700,10 +696,10 @@ class PsfMatch(object):
                 # the spatial fit to these kernels
                 
                 if (usePcaForSpatialKernel):
-                    pexLog.Trace(self._log.getName()+"._solve", 5, "Building Pca basis")
+                    pexLog.Trace(self.log.getName()+"._solve", 5, "Building Pca basis")
 
                     nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
-                    pexLog.Trace(self._log.getName()+"._solve", 2, 
+                    pexLog.Trace(self.log.getName()+"._solve", 2, 
                                  "Iteration %d, rejected %d candidates due to Pca kernel fit" % (thisIteration, nRejectedPca))
                     
                     # We don't want to continue on (yet) with the
@@ -726,7 +722,7 @@ class PsfMatch(object):
                 spatialkv  = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, policy)
                 kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
-                pexLog.Trace(self._log.getName()+"._solve", 3, 
+                pexLog.Trace(self.log.getName()+"._solve", 3, 
                              "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
                 spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
@@ -735,9 +731,9 @@ class PsfMatch(object):
                 kernelCellSet.visitCandidates(assesskv, nStarPerCell)
                 nRejectedSpatial = assesskv.getNRejected()
                 nGoodSpatial     = assesskv.getNGood()
-                pexLog.Trace(self._log.getName()+"._solve", 2, 
+                pexLog.Trace(self.log.getName()+"._solve", 2, 
                              "Iteration %d, rejected %d candidates due to spatial kernel fit" % (thisIteration, nRejectedSpatial))
-                pexLog.Trace(self._log.getName()+"._solve", 2, 
+                pexLog.Trace(self.log.getName()+"._solve", 2, 
                              "%d candidates used in fit" % (nGoodSpatial))
                 
                 # If only nGoodSpatial == 0, might be other candidates in the cells
@@ -753,32 +749,32 @@ class PsfMatch(object):
 
             # Final fit if above did not converge
             if (nRejectedSpatial > 0) and (thisIteration == maxSpatialIterations):
-                pexLog.Trace(self._log.getName()+"._solve", 2, "Final spatial fit")
+                pexLog.Trace(self.log.getName()+"._solve", 2, "Final spatial fit")
                 if (usePcaForSpatialKernel):
                     nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
                 regionBBox = kernelCellSet.getBBox()
                 spatialkv  = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, policy)
                 kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
-                pexLog.Trace(self._log.getName()+"._solve", 3, 
+                pexLog.Trace(self.log.getName()+"._solve", 3, 
                              "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
                 spatialKernel, spatialBacakground = spatialkv.getSolutionPair()
 
 
         except pexExcept.LsstCppException, e:
-            pexLog.Trace(self._log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
-            pexLog.Trace(self._log.getName()+"._solve", 2, e.args[0].what())
+            pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
+            pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0].what())
             raise e
         except Exception, e:
-            pexLog.Trace(self._log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
-            pexLog.Trace(self._log.getName()+"._solve", 2, e.args[0])
+            pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
+            pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0])
             raise e
             
       
         t1 = time.time()
-        pexLog.Trace(self._log.getName()+"._solve", 1, 
+        pexLog.Trace(self.log.getName()+"._solve", 1, 
                      "Total time to compute the spatial kernel : %.2f s" % (t1 - t0))
-        pexLog.Trace(self._log.getName()+"._solve", 2, "")
+        pexLog.Trace(self.log.getName()+"._solve", 2, "")
 
         self._diagnostic(kernelCellSet, spatialKernel, spatialBackground)
         

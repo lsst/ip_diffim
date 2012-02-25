@@ -3,7 +3,6 @@ import sys
 import os
 import optparse
 
-import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
 import lsst.afw.display.ds9 as ds9
 
@@ -124,12 +123,7 @@ Notes:
 
 def run():
     Log.getDefaultLog()
-    memId0 = dafBase.Citizen_getNextMemId()
     main()
-    # check for memory leaks
-    if dafBase.Citizen_census(0, memId0) != 0:
-        print dafBase.Citizen_census(0, memId0), 'Objects leaked:'
-        print dafBase.Citizen_census(dafBase.cout, memId0)
 
 if __name__ == '__main__':
     run()

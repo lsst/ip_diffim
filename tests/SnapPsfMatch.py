@@ -15,15 +15,15 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class PsfMatchTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.configAL    = ipDiffim.SnapPsfMatch.ConfigClass()
+        self.configAL    = ipDiffim.SnapPsfMatchTask.ConfigClass()
         self.configAL.kernel.name = "AL"
         self.subconfigAL = self.configAL.kernel.active
 
-        self.configDF    = ipDiffim.SnapPsfMatch.ConfigClass()
+        self.configDF    = ipDiffim.SnapPsfMatchTask.ConfigClass()
         self.configDF.kernel.name = "DF"
         self.subconfigDF = self.configDF.kernel.active
 
-        self.configDFr    = ipDiffim.SnapPsfMatch.ConfigClass()
+        self.configDFr    = ipDiffim.SnapPsfMatchTask.ConfigClass()
         self.configDFr.kernel.name = "DF"
         self.subconfigDFr = self.configDFr.kernel.active
 
@@ -47,12 +47,12 @@ class PsfMatchTestCases(unittest.TestCase):
     def testSnap(self):
         tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
 
-        psfMatchAL   = ipDiffim.SnapPsfMatch(self.subconfigAL)
-        psfMatchDF   = ipDiffim.SnapPsfMatch(self.subconfigDF)
-        psfMatchDFr  = ipDiffim.SnapPsfMatch(self.subconfigDFr)
-        resultsAL    = psfMatchAL.subtractMaskedImages(tMi, sMi)
-        resultsDF    = psfMatchDF.subtractMaskedImages(tMi, sMi)
-        resultsDFr   = psfMatchDFr.subtractMaskedImages(tMi, sMi)
+        psfMatchAL   = ipDiffim.SnapPsfMatchTask(self.subconfigAL)
+        psfMatchDF   = ipDiffim.SnapPsfMatchTask(self.subconfigDF)
+        psfMatchDFr  = ipDiffim.SnapPsfMatchTask(self.subconfigDFr)
+        resultsAL    = psfMatchAL.run(tMi, sMi, "subtractMaskedImages")
+        resultsDF    = psfMatchDF.run(tMi, sMi, "subtractMaskedImages")
+        resultsDFr   = psfMatchDFr.run(tMi, sMi, "subtractMaskedImages")
 
     def tearDown(self):
         del self.configAL 

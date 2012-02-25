@@ -18,11 +18,11 @@ logging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.configAL    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configAL    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configAL.kernel.name = "AL"
         self.subconfigAL = self.configAL.kernel.active
 
-        self.configDF    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.configDF    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configDF.kernel.name = "DF"
         self.subconfigDF = self.configDF.kernel.active
 

@@ -60,7 +60,7 @@ defOutputPath    = "diffImage"
 templateExposure = afwImage.ExposureF(defTemplatePath)
 scienceExposure  = afwImage.ExposureF(defSciencePath)
 
-config    = ipDiffim.ImagePsfMatch.ConfigClass()
+config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
 config.kernel.name = "AL"
 subconfig = config.kernel.active
 
@@ -85,11 +85,15 @@ ds9.mtv(templateExposure, frame=frame, title = "Template")
 frame += 1
 ds9.mtv(scienceExposure, frame=frame, title = "Sci Im")
 
-psfmatch = ipDiffim.ImagePsfMatch(subconfig)
+psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
 try:
-    results = psfmatch.subtractMaskedImages(templateExposure.getMaskedImage(),
-                                            scienceExposure.getMaskedImage())
-    diffim, spatialKernel, spatialBg, kernelCellSet = results
+    results = psfmatch.run(templateExposure.getMaskedImage(),
+                           scienceExposure.getMaskedImage(),
+                           "subtractMaskedImages")
+    diffim        = results.matchedImage
+    spatialKernel = results.psfMatchingKernel
+    spatialBg     = results.backgroundModel
+    kernelCellSet = results.kernelCellSet
 except Exception, e:
     print 'FAIL'
     sys.exit(1)

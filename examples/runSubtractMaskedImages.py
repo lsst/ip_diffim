@@ -97,7 +97,7 @@ Notes:
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
     scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
 
-    config = ipDiffim.ImagePsfMatch.ConfigClass()
+    config = ipDiffim.ImagePsfMatchTask.ConfigClass()
     config.kernel.name = "AL"
     subconfig = config.kernel.active
 
@@ -108,15 +108,15 @@ Notes:
         if subconfig.fitForBackground == False:
             print 'NOTE: no background subtraction at all is requested'
 
-    psfmatch = imDiffim.ImagePsfMatch(subconfig)
-    results  = psfmatch.subtractMaskedImages(templateMaskedImage, scienceMaskedImage,
-                                             psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
+    psfmatch = imDiffim.ImagePsfMatchTask(subconfig)
+    results  = psfmatch.run(templateMaskedImage, scienceMaskedImage, "subtractMaskedImages",
+                            psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
 
-    differenceMaskedImage = results[0]
+    differenceMaskedImage = results.matchedImage
     differenceMaskedImage.writeFits(outputPath)
 
     if False:
-        spatialKernel = results[1]
+        spatialKernel = results.psfMatchingKernel
         print spatialKernel.getSpatialParameters()
     
     if display:

@@ -24,7 +24,7 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config.kernel.name = "AL"
         self.subconfig = self.config.kernel.active
 
@@ -75,14 +75,22 @@ class DiffimTestCases(unittest.TestCase):
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
 
         self.subconfig.spatialModelType = 'chebyshev1'
-        psfmatch1 = ipDiffim.ImagePsfMatch(self.subconfig)
-        results1 = psfmatch1.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
-        differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
+        psfmatch1 = ipDiffim.ImagePsfMatchTask(self.subconfig)
+        results1 = psfmatch1.run(templateSubImage, scienceSubImage, "subtractExposures", 
+                                 doWarping = True)
+        differenceExposure1 = results1.matchedImage
+        spatialKernel1      = results1.psfMatchingKernel
+        backgroundModel1    = results1.backgroundModel
+        kernelCellSet1      = results1.kernelCellSet
 
         self.subconfig.spatialModelType = 'polynomial'
-        psfmatch2 = ipDiffim.ImagePsfMatch(self.subconfig)
-        results2 = psfmatch2.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
-        differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
+        psfmatch2 = ipDiffim.ImagePsfMatchTask(self.subconfig)
+        results2 = psfmatch2.run(templateSubImage, scienceSubImage, "subtractExposures",
+                                 doWarping = True)
+        differenceExposure2 = results2.matchedImage
+        spatialKernel2      = results2.psfMatchingKernel
+        backgroundModel2    = results2.backgroundModel
+        kernelCellSet2      = results2.kernelCellSet
 
         # Got the types right?
         self.assertTrue(
@@ -116,7 +124,8 @@ class DiffimTestCases(unittest.TestCase):
             self.assertEqual(backgroundModel2.getNParameters(), 1)
 
             # Same value in function
-            self.assertAlmostEqual(backgroundModel1.getParameters()[0], backgroundModel2.getParameters()[0], 5)
+            self.assertAlmostEqual(backgroundModel1.getParameters()[0], 
+                                   backgroundModel2.getParameters()[0], 5)
 
             # Functions evaluates to each other
             self.assertAlmostEqual(backgroundModel1(0, 0), backgroundModel2(0, 0), 5)
@@ -149,9 +158,9 @@ class DiffimTestCases(unittest.TestCase):
 
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
-        psfmatch = ipDiffim.ImagePsfMatch(self.subconfig)
+        psfmatch = ipDiffim.ImagePsfMatchTask(self.subconfig)
         try:
-            psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = False)
+            psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures", doWarping = False)
         except Exception, e:
             pass
         else:
@@ -173,15 +182,23 @@ class DiffimTestCases(unittest.TestCase):
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
 
         # Have an XY0
-        psfmatch  = ipDiffim.ImagePsfMatch(self.subconfig)
-        results1  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
-        differenceExposure1, spatialKernel1, backgroundModel1, kernelCellSet1 = results1
+        psfmatch  = ipDiffim.ImagePsfMatchTask(self.subconfig)
+        results1  = psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures",
+                                 doWarping = True)
+        differenceExposure1 = results1.matchedImage
+        spatialKernel1      = results1.psfMatchingKernel
+        backgroundModel1    = results1.backgroundModel
+        kernelCellSet1      = results1.kernelCellSet
 
         # And then take away XY0
-        templateSubImage.setXY0(afwGeom.Point2I(0, 0)) # do it to the exposure so the Wcs gets modified too
+        templateSubImage.setXY0(afwGeom.Point2I(0, 0)) 
         scienceSubImage.setXY0(afwGeom.Point2I(0, 0))
-        results2  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
-        differenceExposure2, spatialKernel2, backgroundModel2, kernelCellSet2 = results2
+        results2  = psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures",
+                                 doWarping = True)
+        differenceExposure2 = results2.matchedImage
+        spatialKernel2      = results2.psfMatchingKernel
+        backgroundModel2    = results2.backgroundModel
+        kernelCellSet2      = results2.kernelCellSet
 
         # need to count up the candidates first, since its a running tally
         count = 0

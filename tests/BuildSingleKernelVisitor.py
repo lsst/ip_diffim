@@ -17,7 +17,7 @@ import lsst.afw.display.ds9 as ds9
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config.kernel.name = "DF"
         self.subconfig = self.config.kernel.active
 

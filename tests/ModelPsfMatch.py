@@ -14,7 +14,7 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class PsfMatchTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.config    = ipDiffim.ModelPsfMatch.ConfigClass()
+        self.config    = ipDiffim.ModelPsfMatchTask.ConfigClass()
         self.subconfig = self.config.kernel
         self.subconfig.scaleByFwhm = True
 
@@ -28,9 +28,9 @@ class PsfMatchTestCases(unittest.TestCase):
     def testTooBig(self):
         self.subconfig.kernelSize = self.ksize
         psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma2)
-        psfMatch = ipDiffim.ModelPsfMatch(self.subconfig)
+        psfMatch = ipDiffim.ModelPsfMatchTask(config=self.subconfig)
         try:
-            results = psfMatch.matchExposure(self.exp, psf)
+            results = psfMatch.run(self.exp, psf)
         except:
             pass
         else:
@@ -45,9 +45,12 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfig.spatialKernelOrder = kOrder 
 
         psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma2)
-        psfMatch = ipDiffim.ModelPsfMatch(self.subconfig)
-        results = psfMatch.matchExposure(self.exp, psf, kernelSum = kSumIn)
-        matchedIm, matchingKernel, cellSet = results
+        psfMatch = ipDiffim.ModelPsfMatchTask(config=self.subconfig)
+        results = psfMatch.run(self.exp, psf, kernelSum = kSumIn)
+
+        matchedExp     = results.psfMatchedExposure
+        matchingKernel = results.psfMatchingKernel
+        kernelCellSet  = results.kernelCellSet
 
         kImage = afwImage.ImageD(matchingKernel.getDimensions())
         kSumOut = matchingKernel.computeImage(kImage, False)

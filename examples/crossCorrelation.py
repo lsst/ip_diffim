@@ -163,7 +163,7 @@ def addNoise(mi):
     var += 1.0
 
 def testAutoCorrelation(orderMake, orderFit, inMi = None, display = False):
-    config = ipDiffim.ImagePsfMatch.ConfigClass()
+    config = ipDiffim.ImagePsfMatchTask.ConfigClass()
     config.kernel.name = "AL"
     subconfig = config.kernel.active
 
@@ -222,10 +222,13 @@ def testAutoCorrelation(orderMake, orderFit, inMi = None, display = False):
     subconfig.spatialKernelOrder = orderFit
     subconfig.sizeCellX = stride
     subconfig.sizeCellY = stride
-    psfmatch = ipDiffim.ImagePsfMatch(subconfig)
-    result = psfmatch.subtractMaskedImages(inMi, cMi)
+    psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
+    result = psfmatch.run(inMi, cMi, "subtractMaskedImages")
 
-    differenceMaskedImage, spatialKernel, spatialBg, kernelCellSet = result
+    differenceMaskedImage = result.matchedImage
+    spatialKernel         = result.psfMatchingKernel
+    spatialBg             = result.backgroundModel
+    kernelCellSet         = result.kernelCellSet
     makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot = True)
 
 def doOverConstrained(inMi = None, display = False):

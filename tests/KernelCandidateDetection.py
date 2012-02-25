@@ -16,7 +16,7 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.subconfig = self.config.kernel.active
         self.policy    = pexConfig.makePolicy(self.subconfig)
         self.kSize     = self.policy.getInt('kernelSize')

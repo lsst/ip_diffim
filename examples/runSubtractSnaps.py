@@ -21,17 +21,15 @@
 import sys
 import optparse
 
-import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
 from lsst.pex.logging import Log, Trace
 
 
 def subtractSnaps(snap1, snap2, subconfig, doWarping = False):
-    psfmatch = ipDiffim.ImagePsfMatch(subconfig)
-    results  = psfmatch.subtractExposures(snap1, snap2, doWarping = doWarping)
-    snapDiff, kernelModel, bgModel, kernelCellSet = results
-    return snapDiff
+    psfmatch = ipDiffim.SnapPsfMatchTask(subconfig)
+    results  = psfmatch.run(snap1, snap2, "subtractExposures", doWarping = doWarping)
+    return results.matchedImage
     
 def main():
     defVerbosity = 5
@@ -61,7 +59,7 @@ def main():
     snap1Exp   = afwImage.ExposureF(options.s1)
     snap2Exp   = afwImage.ExposureF(options.s2)
 
-    config     = ipDiffim.SnapPsfMatch.ConfigClass()
+    config     = ipDiffim.SnapPsfMatchTask.ConfigClass()
     config.kernel.name = "AL"
     subconfig  = config.kernel.active
 
@@ -70,16 +68,11 @@ def main():
     
 def run():
     Log.getDefaultLog()
-    memId0 = dafBase.Citizen_getNextMemId()
     main()
-    # check for memory leaks
-    if dafBase.Citizen_census(0, memId0) != 0:
-        print dafBase.Citizen_census(0, memId0), 'Objects leaked:'
-        print dafBase.Citizen_census(dafBase.cout, memId0)
 
 if __name__ == '__main__':
     run()
 
 # For debugging script:
 # 
-# python examples/subtractSnaps.py --s1 ~/LSST/becker_2012_0209_181253/update/calexp/v886894611-fr/R22/S11.fits --s2 ~/LSST/becker_2012_0209_181253/update/calexp/v886264371-fr/R22/S11.fits --sdiff sdiff.fits --warp
+# python examples/runSubtractSnaps.py --s1 ~/LSST/becker_2012_0209_181253/update/calexp/v886894611-fr/R22/S11.fits --s2 ~/LSST/becker_2012_0209_181253/update/calexp/v886264371-fr/R22/S11.fits --sdiff sdiff.fits --warp

@@ -32,19 +32,19 @@ class DiffimTestCases(unittest.TestCase):
     def setUp(self, CFHT=True):
         lambdaValue = 1.0
 
-        self.config1    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config1    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config1.kernel.name = "DF"
         self.subconfig1 = self.config1.kernel.active
 
-        self.config2    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config2    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config2.kernel.name = "DF"
         self.subconfig2 = self.config2.kernel.active
 
-        self.config3    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config3    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config3.kernel.name = "DF"
         self.subconfig3 = self.config3.kernel.active
 
-        self.config4    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config4    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config4.kernel.name = "DF"
         self.subconfig4 = self.config4.kernel.active
 
