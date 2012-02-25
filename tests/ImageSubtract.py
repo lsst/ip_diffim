@@ -46,7 +46,7 @@ class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
         
     def setUp(self):
-        self.config    = ipDiffim.ImagePsfMatch.ConfigClass()
+        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config.kernel.name = "AL"
         self.subconfig = self.config.kernel.active
         self.kSize     = self.subconfig.kernelSize

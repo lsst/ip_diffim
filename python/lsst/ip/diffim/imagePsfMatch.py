@@ -24,6 +24,7 @@ import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.pipe.base as pipeBase
 import diffimTools
 from makeKernelBasisList import makeKernelBasisList
 from psfMatch import PsfMatch, PsfMatchConfigDF, PsfMatchConfigAL
