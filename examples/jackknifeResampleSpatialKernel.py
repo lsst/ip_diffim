@@ -159,7 +159,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def jackknifeResample(self, psfmatch, results):
         
-        diffim  = results.matchedImage
+        diffim  = results.subtractedImage
         kernel  = results.psfMatchingKernel
         bg      = results.backgroundModel
         cellSet = results.kernelCellSet

@@ -90,7 +90,7 @@ try:
     results = psfmatch.run(templateExposure.getMaskedImage(),
                            scienceExposure.getMaskedImage(),
                            "subtractMaskedImages")
-    diffim        = results.matchedImage
+    diffim        = results.subtractedImage
     spatialKernel = results.psfMatchingKernel
     spatialBg     = results.backgroundModel
     kernelCellSet = results.kernelCellSet

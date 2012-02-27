@@ -120,7 +120,7 @@ class PsfMatchTestCases(unittest.TestCase):
 
 
         self.assertEqual(len(resultsAL), 4+1) # include metadata
-        self.assertEqual(type(resultsAL.matchedImage), afwImage.ExposureF)
+        self.assertEqual(type(resultsAL.subtractedImage), afwImage.ExposureF)
         self.assertEqual(type(resultsAL.psfMatchingKernel), afwMath.LinearCombinationKernel)
         self.assertEqual(type(resultsAL.backgroundModel), afwMath.Function2D)
         self.assertEqual(type(resultsAL.kernelCellSet), afwMath.SpatialCellSet)

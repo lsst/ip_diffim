@@ -112,7 +112,7 @@ Notes:
     results  = psfmatch.run(templateMaskedImage, scienceMaskedImage, "subtractMaskedImages",
                             psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
 
-    differenceMaskedImage = results.matchedImage
+    differenceMaskedImage = results.subtractedImage
     differenceMaskedImage.writeFits(outputPath)
 
     if False:

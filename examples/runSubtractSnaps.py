@@ -29,7 +29,7 @@ from lsst.pex.logging import Log, Trace
 def subtractSnaps(snap1, snap2, subconfig, doWarping = False):
     psfmatch = ipDiffim.SnapPsfMatchTask(subconfig)
     results  = psfmatch.run(snap1, snap2, "subtractExposures", doWarping = doWarping)
-    return results.matchedImage
+    return results.subtractedImage
     
 def main():
     defVerbosity = 5

@@ -132,7 +132,7 @@ g
     results  = psfmatch.run(templateExposure, scienceExposure, "subtractExposures",
                             psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
 
-    differenceExposure = results.matchedImage
+    differenceExposure = results.subtractedImage
     differenceExposure.writeFits(outputPath)
 
     if False:

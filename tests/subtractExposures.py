@@ -78,7 +78,7 @@ class DiffimTestCases(unittest.TestCase):
         psfmatch1 = ipDiffim.ImagePsfMatchTask(self.subconfig)
         results1 = psfmatch1.run(templateSubImage, scienceSubImage, "subtractExposures", 
                                  doWarping = True)
-        differenceExposure1 = results1.matchedImage
+        differenceExposure1 = results1.subtractedImage
         spatialKernel1      = results1.psfMatchingKernel
         backgroundModel1    = results1.backgroundModel
         kernelCellSet1      = results1.kernelCellSet
@@ -87,7 +87,7 @@ class DiffimTestCases(unittest.TestCase):
         psfmatch2 = ipDiffim.ImagePsfMatchTask(self.subconfig)
         results2 = psfmatch2.run(templateSubImage, scienceSubImage, "subtractExposures",
                                  doWarping = True)
-        differenceExposure2 = results2.matchedImage
+        differenceExposure2 = results2.subtractedImage
         spatialKernel2      = results2.psfMatchingKernel
         backgroundModel2    = results2.backgroundModel
         kernelCellSet2      = results2.kernelCellSet
@@ -185,7 +185,7 @@ class DiffimTestCases(unittest.TestCase):
         psfmatch  = ipDiffim.ImagePsfMatchTask(self.subconfig)
         results1  = psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures",
                                  doWarping = True)
-        differenceExposure1 = results1.matchedImage
+        differenceExposure1 = results1.subtractedImage
         spatialKernel1      = results1.psfMatchingKernel
         backgroundModel1    = results1.backgroundModel
         kernelCellSet1      = results1.kernelCellSet
@@ -195,7 +195,7 @@ class DiffimTestCases(unittest.TestCase):
         scienceSubImage.setXY0(afwGeom.Point2I(0, 0))
         results2  = psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures",
                                  doWarping = True)
-        differenceExposure2 = results2.matchedImage
+        differenceExposure2 = results2.subtractedImage
         spatialKernel2      = results2.psfMatchingKernel
         backgroundModel2    = results2.backgroundModel
         kernelCellSet2      = results2.kernelCellSet

@@ -60,20 +60,38 @@ class ImagePsfMatchTask(PsfMatch):
     def run(self, imageToConvolve, imageToNotConvolve, mode, **kwargs):
         if mode == "matchExposures":
             results = self.matchExposures(imageToConvolve, imageToNotConvolve, **kwargs)
+            return pipeBase.Struct(matchedImage=results[0],
+                                   psfMatchingKernel=results[1],
+                                   backgroundModel=results[2],
+                                   kernelCellSet=results[3],
+                                   metadata=self.metadata)
+
         elif mode == "matchMaskedImages":
             results = self.matchMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
+            return pipeBase.Struct(matchedImage=results[0],
+                                   psfMatchingKernel=results[1],
+                                   backgroundModel=results[2],
+                                   kernelCellSet=results[3],
+                                   metadata=self.metadata)
+
         elif mode == "subtractExposures":
             results = self.subtractExposures(imageToConvolve, imageToNotConvolve, **kwargs)
+            return pipeBase.Struct(subtractedImage=results[0],
+                                   psfMatchingKernel=results[1],
+                                   backgroundModel=results[2],
+                                   kernelCellSet=results[3],
+                                   metadata=self.metadata)
+
         elif mode == "subtractMaskedImages":
             results = self.subtractMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
+            return pipeBase.Struct(subtractedImage=results[0],
+                                   psfMatchingKernel=results[1],
+                                   backgroundModel=results[2],
+                                   kernelCellSet=results[3],
+                                   metadata=self.metadata)
         else:
             raise ValueError("Invalid mode requested")
 
-        return pipeBase.Struct(matchedImage=results[0],
-                               psfMatchingKernel=results[1],
-                               backgroundModel=results[2],
-                               kernelCellSet=results[3],
-                               metadata=self.metadata)
 
     def _validateSize(self, maskedImageToConvolve, maskedImageToNotConvolve):
         """Return True if two image-like objects are the same size

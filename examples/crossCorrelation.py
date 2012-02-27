@@ -225,7 +225,7 @@ def testAutoCorrelation(orderMake, orderFit, inMi = None, display = False):
     psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
     result = psfmatch.run(inMi, cMi, "subtractMaskedImages")
 
-    differenceMaskedImage = result.matchedImage
+    differenceMaskedImage = result.subtractedImage
     spatialKernel         = result.psfMatchingKernel
     spatialBg             = result.backgroundModel
     kernelCellSet         = result.kernelCellSet
