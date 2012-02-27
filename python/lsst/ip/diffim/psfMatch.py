@@ -625,7 +625,8 @@ class PsfMatch(pipeBase.Task):
         nRejectedPca = singlekvPca.getNRejected()
                     
         return nRejectedPca, spatialBasisList
-        
+
+    @pipeBase.timeMethod
     def _solve(self, kernelCellSet, basisList, returnOnExcept = False):
         """Determine the PSF matching kernel
         

@@ -66,7 +66,7 @@ class ModelPsfMatchTask(PsfMatch):
         """
         PsfMatch.__init__(self, *args, **kwargs)
 
-        
+    @pipeBase.timeMethod
     def run(self, exposure, referencePsfModel, kernelSum=1.0):
         """PSF-match an exposure to a PSF model.
         

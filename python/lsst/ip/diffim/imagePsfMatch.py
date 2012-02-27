@@ -56,6 +56,7 @@ class ImagePsfMatchTask(PsfMatch):
         PsfMatch.__init__(self, *args, **kwargs)
         self._warper = afwMath.Warper.fromConfig(self.config.warpingConfig)
 
+    @pipeBase.timeMethod
     def run(self, imageToConvolve, imageToNotConvolve, mode, **kwargs):
         if mode == "matchExposures":
             results = self.matchExposures(imageToConvolve, imageToNotConvolve, **kwargs)
