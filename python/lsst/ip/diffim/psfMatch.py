@@ -519,23 +519,35 @@ class PsfMatch(pipeBase.Task):
     ConfigClass = PsfMatchConfig
     def __init__(self, *args, **kwargs):
         pipeBase.Task.__init__(self, *args, **kwargs)
+        self.kconfig = self.config.kernel.active
 
         #
-        if 'useRegularization' in self.config.keys():
-            self.useRegularization = self.config.useRegularization
+        if 'useRegularization' in self.kconfig.keys():
+            self.useRegularization = self.kconfig.useRegularization
         else:
             self.useRegularization = False
 
         if self.useRegularization:
-            self.hMat = diffimLib.makeRegularizationMatrix(pexConfig.makePolicy(self.config))
+            self.hMat = diffimLib.makeRegularizationMatrix(pexConfig.makePolicy(self.kconfig))
 
     def _diagnostic(self, kernelCellSet, spatialKernel, spatialBg):
-        # Look at how well the solution is constrained
+        # What is the final kernel sum
+        kImage = afwImage.ImageD(spatialKernel.getDimensions())
+        kSum = spatialKernel.computeImage(kImage, False)
+        pexLog.Trace(self.log.getName()+"._diagnostic", 1,
+                     "Final spatial kernel sum %.3f" % (kSum))
 
-        nKernelTerms = spatialKernel.getNSpatialParameters()
+        # Look at how well the solution is constrained
+        nBasisKernels = spatialKernel.getNBasisKernels()
+        nKernelTerms  = spatialKernel.getNSpatialParameters()
         if nKernelTerms == 0: # order 0
             nKernelTerms = 1
-        nBgTerms     = len(spatialBg.getParameters())
+
+        # Not fit for
+        nBgTerms     = spatialBg.getNParameters()
+        if nBgTerms == 1:
+            if spatialBg.getParameters()[0] == 0.0:
+                nBgTerms = 0
         
         nGood = 0
         nBad  = 0
@@ -561,17 +573,17 @@ class PsfMatch(pipeBase.Task):
         # Some judgements on the quality of the spatial models
         if nGood < nKernelTerms:
             pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: spatial kernel model underconstrained; %d candidates, %d terms" % (nGood, nKernelTerms))
+                         "WARNING: spatial kernel model underconstrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
             pexLog.Trace(self.log.getName()+"._diagnostic", 2,
                          "Consider lowering the spatial order")
         elif nGood <= 2*nKernelTerms:
             pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: spatial kernel model poorly constrained; %d candidates, %d terms" % (nGood, nKernelTerms))
+                         "WARNING: spatial kernel model poorly constrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
             pexLog.Trace(self.log.getName()+"._diagnostic", 2,
                          "Consider lowering the spatial order")
         else:
             pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "NOTE: spatial kernel model appears well constrained; %d candidates, %d terms" % (nGood, nKernelTerms))
+                         "NOTE: spatial kernel model appears well constrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
 
         if nGood < nBgTerms:
             pexLog.Trace(self.log.getName()+"._diagnostic", 1,
@@ -589,11 +601,11 @@ class PsfMatch(pipeBase.Task):
         
     
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
-        nComponents       = self.config.numPrincipalComponents
+        nComponents       = self.kconfig.numPrincipalComponents
         imagePca          = afwImage.ImagePcaD()
         importStarVisitor = diffimLib.KernelPcaVisitorF(imagePca)
         kernelCellSet.visitCandidates(importStarVisitor, nStarPerCell)
-        if self.config.subtractMeanForPca:
+        if self.kconfig.subtractMeanForPca:
             importStarVisitor.subtractMean()
         imagePca.analyze()
 
@@ -641,13 +653,13 @@ class PsfMatch(pipeBase.Task):
         @raise Exception if unable to determine PSF matching kernel and returnOnExcept False
         """
 
-        maxSpatialIterations   = self.config.maxSpatialIterations
-        nStarPerCell           = self.config.nStarPerCell
-        usePcaForSpatialKernel = self.config.usePcaForSpatialKernel
-        subtractMeanForPca     = self.config.subtractMeanForPca
+        maxSpatialIterations   = self.kconfig.maxSpatialIterations
+        nStarPerCell           = self.kconfig.nStarPerCell
+        usePcaForSpatialKernel = self.kconfig.usePcaForSpatialKernel
+        subtractMeanForPca     = self.kconfig.subtractMeanForPca
 
         # Visitor for the single kernel fit
-        policy = pexConfig.makePolicy(self.config)
+        policy = pexConfig.makePolicy(self.kconfig)
         if self.useRegularization:
             singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy, self.hMat)
         else:
@@ -697,7 +709,7 @@ class PsfMatch(pipeBase.Task):
                 # the spatial fit to these kernels
                 
                 if (usePcaForSpatialKernel):
-                    pexLog.Trace(self.log.getName()+"._solve", 5, "Building Pca basis")
+                    pexLog.Trace(self.log.getName()+"._solve", 1, "Building Pca basis")
 
                     nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
                     pexLog.Trace(self.log.getName()+"._solve", 2, 

@@ -29,8 +29,8 @@ import lsst.afw.image as afwImage
 import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
-from psfMatch import PsfMatchConfigAL
-from makeKernelBasisList import makeKernelBasisList 
+import imagePsfMatch
+from .makeKernelBasisList import makeKernelBasisList 
 
 # third party
 import numpy
@@ -90,23 +90,25 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
                       deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
                       addNoise = True, bgValue = 100., display = False):
 
-    configFake               = PsfMatchConfigAL()
-    configFake.alardNGauss   = 1
-    configFake.alardSigGauss = [2.5,]
-    configFake.alardDegGauss = [2,]
-    configFake.sizeCellX     = sizeCell
-    configFake.sizeCellY     = sizeCell
-    configFake.spatialKernelOrder = 1.0
-    configFake.spatialModelType = "polynomial"
-    configFake.singleKernelClipping = False   # variance is a hack
-    configFake.spatialKernelClipping = False  # variance is a hack
+    configFake               = imagePsfMatch.ImagePsfMatchConfig()
+    configFake.kernel.name   = "AL"
+    subconfigFake            = configFake.kernel.active
+    subconfigFake.alardNGauss   = 1
+    subconfigFake.alardSigGauss = [2.5,]
+    subconfigFake.alardDegGauss = [2,]
+    subconfigFake.sizeCellX     = sizeCell
+    subconfigFake.sizeCellY     = sizeCell
+    subconfigFake.spatialKernelOrder = 1.0
+    subconfigFake.spatialModelType = "polynomial"
+    subconfigFake.singleKernelClipping = False   # variance is a hack
+    subconfigFake.spatialKernelClipping = False  # variance is a hack
     if bgValue > 0.0:
-        configFake.fitForBackground = True
+        subconfigFake.fitForBackground = True
 
-    policyFake = pexConfig.makePolicy(configFake)
+    policyFake = pexConfig.makePolicy(subconfigFake)
 
-    basisList = makeKernelBasisList(configFake)
-    kSize     = configFake.kernelSize
+    basisList = makeKernelBasisList(subconfigFake)
+    kSize     = subconfigFake.kernelSize
 
     # This sets the final extent of each convolved delta function
     gaussKernelWidth   = sizeCell // 2
@@ -226,14 +228,13 @@ def backgroundSubtract(config, maskedImages):
     for maskedImage in maskedImages:
         bctrl.setNxSample(maskedImage.getWidth()//binsize + 1)
         bctrl.setNySample(maskedImage.getHeight()//binsize + 1)
-        
         image   = maskedImage.getImage() 
         backobj = afwMath.makeBackground(image, bctrl)
+
         image  -= backobj.getImageF()
         backgrounds.append(backobj.getImageF())
-        del image
         del backobj
-        
+
     t1 = time.time()
     pexLog.Trace("lsst.ip.diffim.backgroundSubtract", 1,
                  "Total time for background subtraction : %.2f s" % (t1-t0))

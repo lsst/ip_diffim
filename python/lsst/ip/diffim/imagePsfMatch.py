@@ -26,8 +26,8 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.pipe.base as pipeBase
 import diffimTools
-from makeKernelBasisList import makeKernelBasisList
-from psfMatch import PsfMatch, PsfMatchConfigDF, PsfMatchConfigAL
+from .makeKernelBasisList import makeKernelBasisList
+from .psfMatch import PsfMatch, PsfMatchConfigDF, PsfMatchConfigAL
 
 class ImagePsfMatchConfig(pexConfig.Config):
     kernel = pexConfig.ConfigChoiceField(
@@ -54,10 +54,12 @@ class ImagePsfMatchTask(PsfMatch):
         @param logName: name by which messages are logged
         """
         PsfMatch.__init__(self, *args, **kwargs)
-        self._warper = afwMath.Warper.fromConfig(self.config.warpingConfig)
+        self.kconfig = self.config.kernel.active
+        self._warper = afwMath.Warper.fromConfig(self.kconfig.warpingConfig)
 
     @pipeBase.timeMethod
     def run(self, imageToConvolve, imageToNotConvolve, mode, **kwargs):
+
         if mode == "matchExposures":
             results = self.matchExposures(imageToConvolve, imageToNotConvolve, **kwargs)
             return pipeBase.Struct(matchedImage=results[0],
@@ -168,7 +170,7 @@ class ImagePsfMatchTask(PsfMatch):
             else:
                 pexLog.Trace(self.log.getName(), 1, "ERROR: Input images not registered")
                 raise RuntimeError, "Input images not registered"
-                
+
         psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet = self.matchMaskedImages(
             exposureToConvolve.getMaskedImage(), exposureToNotConvolve.getMaskedImage(),
             psfFwhmPixTc = psfFwhmPixTc, psfFwhmPixTnc = psfFwhmPixTnc,
@@ -205,6 +207,7 @@ class ImagePsfMatchTask(PsfMatch):
         
         @raise RuntimeError if input images have different dimensions
         """
+
         if not self._validateSize(maskedImageToConvolve, maskedImageToNotConvolve):
             pexLog.Trace(self.log.getName(), 1, "ERROR: Input images different size")
             raise RuntimeError, "Input images different size"
@@ -213,7 +216,7 @@ class ImagePsfMatchTask(PsfMatch):
         kernelCellSet = self._buildCellSet(maskedImageToConvolve,
                                            maskedImageToNotConvolve,
                                            footprints = footprints)
-        basisList = makeKernelBasisList(self.config, psfFwhmPixTc, psfFwhmPixTnc)
+        basisList = makeKernelBasisList(self.kconfig, psfFwhmPixTc, psfFwhmPixTnc)
         psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
     
         self.log.log(pexLog.Log.INFO, "PSF-match science MaskedImage to reference")
@@ -296,7 +299,7 @@ class ImagePsfMatchTask(PsfMatch):
     def _adaptCellSize(self, footprints):
         """ NOT IMPLEMENTED YET"""
         nFp = len(footprints)
-        return self.config.sizeCellX, self.config.sizeCellY
+        return self.kconfig.sizeCellX, self.kconfig.sizeCellY
 
     def _buildCellSet(self, maskedImageToConvolve, maskedImageToNotConvolve, footprints = None):
         """Build a SpatialCellSet for use with the solve method
@@ -307,25 +310,18 @@ class ImagePsfMatchTask(PsfMatch):
         
         @return kernelCellSet: a SpatialCellSet for use with self._solve
         """
-
+        
         # Candidate source footprints to use for Psf matching
         if footprints == None:
-            # If you need to fit for background in ip_diffim, we need
-            # to subtract it off before running detection
-            if self.config.fitForBackground:
-                self.log.log(pexLog.Log.INFO, "temporarily subtracting backgrounds for detection")
-                bkgds = diffimTools.backgroundSubtract(self.config.afwBackgroundConfig,
-                                                       [maskedImageToConvolve, maskedImageToNotConvolve])
+            self.log.log(pexLog.Log.INFO, "temporarily subtracting backgrounds for detection")
+            mi1 = maskedImageToConvolve.Factory(maskedImageToConvolve, True)
+            mi2 = maskedImageToNotConvolve.Factory(maskedImageToNotConvolve, True)
+            tmp = diffimTools.backgroundSubtract(self.kconfig.afwBackgroundConfig, [mi1, mi2])
             
-            detConfig = self.config.detectionConfig
+            detConfig = self.kconfig.detectionConfig
             kcDetect = diffimLib.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
-
-            kcDetect.apply(maskedImageToConvolve, maskedImageToNotConvolve)
+            kcDetect.apply(mi1, mi2)
             footprints = kcDetect.getFootprints()
-
-            if self.config.fitForBackground:
-                maskedImageToConvolve += bkgds[0]
-                maskedImageToNotConvolve += bkgds[1]
 
         sizeCellX, sizeCellY = self._adaptCellSize(footprints)
 
@@ -334,7 +330,7 @@ class ImagePsfMatchTask(PsfMatch):
                                                sizeCellX, sizeCellY)
         
             
-        policy = pexConfig.makePolicy(self.config)
+        policy = pexConfig.makePolicy(self.kconfig)
         # Place candidate footprints within the spatial grid
         for fp in footprints:
             bbox = fp.getBBox()

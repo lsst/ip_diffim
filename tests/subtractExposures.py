@@ -16,6 +16,7 @@ import lsst.ip.diffim.diffimTools as diffimTools
 
 verbosity = 5
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
+logging.Trace_setVerbosity('ImagePsfMatchTask', verbosity)
 
 display = False
 
@@ -75,7 +76,7 @@ class DiffimTestCases(unittest.TestCase):
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
 
         self.subconfig.spatialModelType = 'chebyshev1'
-        psfmatch1 = ipDiffim.ImagePsfMatchTask(self.subconfig)
+        psfmatch1 = ipDiffim.ImagePsfMatchTask(config=self.config)
         results1 = psfmatch1.run(templateSubImage, scienceSubImage, "subtractExposures", 
                                  doWarping = True)
         differenceExposure1 = results1.subtractedImage
@@ -84,7 +85,7 @@ class DiffimTestCases(unittest.TestCase):
         kernelCellSet1      = results1.kernelCellSet
 
         self.subconfig.spatialModelType = 'polynomial'
-        psfmatch2 = ipDiffim.ImagePsfMatchTask(self.subconfig)
+        psfmatch2 = ipDiffim.ImagePsfMatchTask(config=self.config)
         results2 = psfmatch2.run(templateSubImage, scienceSubImage, "subtractExposures",
                                  doWarping = True)
         differenceExposure2 = results2.subtractedImage
@@ -108,16 +109,6 @@ class DiffimTestCases(unittest.TestCase):
             self.assertAlmostEqual(kp1par0[i], 0.0, 5)
             self.assertAlmostEqual(kp1par0[i], kp2par0[i], 5)
             
-        # The other terms won't have the same spatial weights.
-        # However, if you evaluate the two functions at the same
-        # location, the *weights of each kernel* should be the same!
-
-        # NOTE - WE actually want computeKernelParametersFromSpatialModel here
-        kp1 = spatialKernel1.getKernelParameters()
-        kp2 = spatialKernel2.getKernelParameters()
-        for i in range(len(kp1)):
-            self.assertAlmostEqual(kp1[i], kp2[i], 2) # Is same to 3 with not fitting for background
-
         if fitForBackground:
             # Nterms (zeroth order model)
             self.assertEqual(backgroundModel1.getNParameters(), 1)
@@ -125,15 +116,25 @@ class DiffimTestCases(unittest.TestCase):
 
             # Same value in function
             self.assertAlmostEqual(backgroundModel1.getParameters()[0], 
-                                   backgroundModel2.getParameters()[0], 5)
+                                   backgroundModel2.getParameters()[0], 4)
 
             # Functions evaluates to each other
-            self.assertAlmostEqual(backgroundModel1(0, 0), backgroundModel2(0, 0), 5)
+            self.assertAlmostEqual(backgroundModel1(0, 0), backgroundModel2(0, 0), 4)
             
             # Spatially...
-            self.assertAlmostEqual(backgroundModel1(10, 10), backgroundModel2(10, 10), 5)
+            self.assertAlmostEqual(backgroundModel1(10, 10), backgroundModel2(10, 10), 4)
 
         else:
+            # Kernel weights (end up different when fitting for background)
+            nPar1 = len(spatialKernel1.getKernelParameters())    
+            nPar2 = len(spatialKernel2.getKernelParameters())    
+            kp1   = afwMath.vectorD(nPar1)
+            kp2   = afwMath.vectorD(nPar2)
+            spatialKernel1.computeKernelParametersFromSpatialModel(kp1, 0.0, 0.0)
+            spatialKernel2.computeKernelParametersFromSpatialModel(kp2, 0.0, 0.0)
+            for i in range(len(kp1)):
+                self.assertAlmostEqual(kp1[i], kp2[i], 2)
+
             # Nterms (zeroth order)
             self.assertEqual(backgroundModel1.getNParameters(), 1)
             self.assertEqual(backgroundModel2.getNParameters(), 1)
@@ -158,7 +159,7 @@ class DiffimTestCases(unittest.TestCase):
 
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
-        psfmatch = ipDiffim.ImagePsfMatchTask(self.subconfig)
+        psfmatch = ipDiffim.ImagePsfMatchTask(config=self.config)
         try:
             psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures", doWarping = False)
         except Exception, e:
@@ -182,7 +183,7 @@ class DiffimTestCases(unittest.TestCase):
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
 
         # Have an XY0
-        psfmatch  = ipDiffim.ImagePsfMatchTask(self.subconfig)
+        psfmatch  = ipDiffim.ImagePsfMatchTask(config=self.config)
         results1  = psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures",
                                  doWarping = True)
         differenceExposure1 = results1.subtractedImage

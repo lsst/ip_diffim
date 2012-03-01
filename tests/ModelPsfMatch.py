@@ -15,7 +15,7 @@ class PsfMatchTestCases(unittest.TestCase):
 
     def setUp(self):
         self.config    = ipDiffim.ModelPsfMatchTask.ConfigClass()
-        self.subconfig = self.config.kernel
+        self.subconfig = self.config.kernel.active
         self.subconfig.scaleByFwhm = True
 
         self.imsize = 2 * self.subconfig.sizeCellX
@@ -28,7 +28,7 @@ class PsfMatchTestCases(unittest.TestCase):
     def testTooBig(self):
         self.subconfig.kernelSize = self.ksize
         psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma2)
-        psfMatch = ipDiffim.ModelPsfMatchTask(config=self.subconfig)
+        psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
         try:
             results = psfMatch.run(self.exp, psf)
         except:
@@ -45,7 +45,7 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfig.spatialKernelOrder = kOrder 
 
         psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma2)
-        psfMatch = ipDiffim.ModelPsfMatchTask(config=self.subconfig)
+        psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
         results = psfMatch.run(self.exp, psf, kernelSum = kSumIn)
 
         matchedExp     = results.psfMatchedExposure

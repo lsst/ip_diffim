@@ -209,7 +209,7 @@ namespace detail {
                               "Kernel Sum = %.3f", kSum);
         pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                               "Background = %.3f", background);
-        pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
+        pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                               "Candidate %d resids = %.3f +/- %.3f sigma (%d pix)",
                               kCandidate->getId(),
                               _imstats.getMean(),
@@ -269,7 +269,7 @@ namespace detail {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 return;
             }
-            pexLogging::TTrace<5>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
+            pexLogging::TTrace<4>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                                   "Candidate %d core resids = %.3f +/- %.3f sigma (%d pix)",
                                   kCandidate->getId(),
                                   _imstats.getMean(),

@@ -91,9 +91,9 @@ class PsfMatchTestCases(unittest.TestCase):
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
 
-        psfMatchAL  = ipDiffim.ImagePsfMatchTask(self.subconfigAL)
-        psfMatchDF  = ipDiffim.ImagePsfMatchTask(self.subconfigDF)
-        psfMatchDFr = ipDiffim.ImagePsfMatchTask(self.subconfigDFr)
+        psfMatchAL  = ipDiffim.ImagePsfMatchTask(config=self.configAL)
+        psfMatchDF  = ipDiffim.ImagePsfMatchTask(config=self.configDF)
+        psfMatchDFr = ipDiffim.ImagePsfMatchTask(config=self.configDFr)
 
         self.assertEqual(psfMatchAL.useRegularization, False)
         self.assertEqual(psfMatchDF.useRegularization, False)
@@ -134,7 +134,7 @@ class PsfMatchTestCases(unittest.TestCase):
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
 
-        psfMatchAL = ipDiffim.ImagePsfMatchTask(self.subconfigAL)
+        psfMatchAL = ipDiffim.ImagePsfMatchTask(config=self.configAL)
         resultsAL  = psfMatchAL.run(tExp, sExp, "matchExposures", 
                                     psfFwhmPixTc = 2.0, psfFwhmPixTnc = 3.0, doWarping = True)
         self.assertEqual(len(resultsAL), 4+1) # include metadata
@@ -149,7 +149,7 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfigDF.usePcaForSpatialKernel = True
         self.subconfigDF.numPrincipalComponents = nTerms
         
-        psfMatchDF  = ipDiffim.ImagePsfMatchTask(self.subconfigDF)
+        psfMatchDF  = ipDiffim.ImagePsfMatchTask(config=self.configDF)
         resultsDF   = psfMatchDF.run(tMi, sMi, "subtractMaskedImages")
         
         spatialKernel = resultsDF.psfMatchingKernel
@@ -185,8 +185,8 @@ class PsfMatchTestCases(unittest.TestCase):
         # makeFakeKernelSet
         tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = 0.0, addNoise = False)
         
-        basisList = ipDiffim.makeKernelBasisList(confake)
-        psfMatchAL = ipDiffim.ImagePsfMatchTask(confake)
+        basisList = ipDiffim.makeKernelBasisList(confake.kernel.active)
+        psfMatchAL = ipDiffim.ImagePsfMatchTask(config=confake)
         psfMatchingKernel, backgroundModel = psfMatchAL._solve(kcs, basisList)
         
         fitCoeffs = psfMatchingKernel.getSpatialParameters()

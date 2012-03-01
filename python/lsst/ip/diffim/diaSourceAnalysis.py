@@ -37,7 +37,6 @@ import lsst.afw.display.ds9 as ds9
 import lsst.pex.config as pexConfig
 
 scaling = 5
-pexLog.Trace_setVerbosity("lsst.ip.diffim", 5)
 
 def parseOptions():
     """Parse the command line options."""

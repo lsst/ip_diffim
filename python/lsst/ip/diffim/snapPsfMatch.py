@@ -42,7 +42,11 @@ class SnapPsfMatchConfigDF(PsfMatchConfigDF):
 
         # No regularization
         self.useRegularization = False
-            
+
+        # Pca
+        self.usePcaForSpatialKernel = True
+        self.subtractMeanForPca = True
+        self.numPrincipalComponents = 5
         
 class SnapPsfMatchConfigAL(PsfMatchConfigAL):
     """Version of Psf Matching optimized for snap subtraction"""
@@ -77,5 +81,20 @@ class SnapPsfMatchConfig(pexConfig.Config):
         default = "AL",
     )
             
+    doWarping = pexConfig.Field(
+        dtype = bool, 
+        doc   = "Warp the snaps?",
+        default = False
+    )
+
 class SnapPsfMatchTask(ImagePsfMatchTask):
     ConfigClass = SnapPsfMatchConfig
+
+    # Override ImagePsfMatchTask method; don't validate WCS by default
+    def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
+                          psfFwhmPixTc = None, psfFwhmPixTnc = None,
+                          footprints = None, doWarping = ConfigClass().doWarping):
+        return ImagePsfMatchTask.subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
+                                                   psfFwhmPixTc = psfFwhmPixTc, psfFwhmPixTnc = psfFwhmPixTnc,
+                                                   footprints = footprints, doWarping = doWarping)
+

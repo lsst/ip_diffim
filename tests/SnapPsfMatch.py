@@ -47,9 +47,9 @@ class PsfMatchTestCases(unittest.TestCase):
     def testSnap(self):
         tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
 
-        psfMatchAL   = ipDiffim.SnapPsfMatchTask(self.subconfigAL)
-        psfMatchDF   = ipDiffim.SnapPsfMatchTask(self.subconfigDF)
-        psfMatchDFr  = ipDiffim.SnapPsfMatchTask(self.subconfigDFr)
+        psfMatchAL   = ipDiffim.SnapPsfMatchTask(config=self.configAL)
+        psfMatchDF   = ipDiffim.SnapPsfMatchTask(config=self.configDF)
+        psfMatchDFr  = ipDiffim.SnapPsfMatchTask(config=self.configDFr)
         resultsAL    = psfMatchAL.run(tMi, sMi, "subtractMaskedImages")
         resultsDF    = psfMatchDF.run(tMi, sMi, "subtractMaskedImages")
         resultsDFr   = psfMatchDFr.run(tMi, sMi, "subtractMaskedImages")

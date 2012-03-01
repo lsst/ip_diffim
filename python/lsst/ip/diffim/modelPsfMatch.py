@@ -35,22 +35,29 @@ sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
 class ModelPsfMatchConfig(pexConfig.Config):
     # We can determine the widths of the Psfs, thus can optmize the
-    # Alard-Lupton gaussian widths
-
-    kernel = PsfMatchConfigAL()
+    # Alard-Lupton gaussian widths. 
+    kernel = pexConfig.ConfigChoiceField(
+        doc = "kernel type",
+        typemap = dict(
+            AL = PsfMatchConfigAL,
+            ),
+        default = "AL",
+    )
 
     def __init__(self):
+        pexConfig.Config.__init__(self)
+
         # No sigma clipping
-        self.kernel.singleKernelClipping = False
-        self.kernel.kernelSumClipping = False
-        self.kernel.spatialKernelClipping = False
-        self.kernel.checkConditionNumber = False
+        self.kernel.active.singleKernelClipping = False
+        self.kernel.active.kernelSumClipping = False
+        self.kernel.active.spatialKernelClipping = False
+        self.kernel.active.checkConditionNumber = False
         
         # Variance is ill defined
-        self.kernel.constantVarianceWeighting = True
+        self.kernel.active.constantVarianceWeighting = True
 
         # Psfs are typically small; reduce the kernel size
-        self.kernel.kernelSize = 11
+        self.kernel.active.kernelSize = 11
 
 
 class ModelPsfMatchTask(PsfMatch):
@@ -65,6 +72,7 @@ class ModelPsfMatchTask(PsfMatch):
         @param logName: name by which messages are logged
         """
         PsfMatch.__init__(self, *args, **kwargs)
+        self.kconfig = self.config.kernel.active
 
     @pipeBase.timeMethod
     def run(self, exposure, referencePsfModel, kernelSum=1.0):
@@ -103,7 +111,7 @@ class ModelPsfMatchTask(PsfMatch):
         fwhm1 = s1 * sigma2fwhm
         fwhm2 = s2 * sigma2fwhm
 
-        basisList = makeKernelBasisList(self.config, fwhm1, fwhm2)
+        basisList = makeKernelBasisList(self.kconfig, fwhm1, fwhm2)
         psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
         
         if psfMatchingKernel.isSpatiallyVarying():
@@ -152,9 +160,9 @@ class ModelPsfMatchTask(PsfMatch):
         maxKernelSize = 1 + (min(psfWidth - 1, psfHeight - 1) // 2)
         if maxKernelSize % 2 == 0:
             maxKernelSize -= 1
-        if self.config.kernelSize > maxKernelSize:
+        if self.kconfig.kernelSize > maxKernelSize:
             raise ValueError, "Kernel size (%d) too big to match Psfs of size %d; reduce to at least %d" % (
-                self.config.kernelSize, psfWidth, maxKernelSize)
+                self.kconfig.kernelSize, psfWidth, maxKernelSize)
 
         # Infer spatial order of Psf model!
         #
@@ -174,14 +182,14 @@ class ModelPsfMatchTask(PsfMatch):
                 pexLog.Trace(self.log.getName(), 3, "Problem inferring spatial order of image's Psf")
             else:
                 pexLog.Trace(self.log.getName(), 2, "Spatial order of Psf = %d; matching kernel order = %d" % (
-                        order, self.config.spatialKernelOrder))
+                        order, self.kconfig.spatialKernelOrder))
             
         
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0,   scienceY0   = scienceBBox.getMin()
     
-        sizeCellX = self.config.sizeCellX
-        sizeCellY = self.config.sizeCellY
+        sizeCellX = self.kconfig.sizeCellX
+        sizeCellY = self.kconfig.sizeCellY
     
         kernelCellSet = afwMath.SpatialCellSet(
             afwGeom.Box2I(afwGeom.Point2I(scienceX0, scienceY0),
@@ -194,7 +202,7 @@ class ModelPsfMatchTask(PsfMatch):
         dimenR    = referencePsfModel.getKernel().getDimensions()
         dimenS    = sciencePsfModel.getKernel().getDimensions()
         
-        policy = pexConfig.makePolicy(self.config)
+        policy = pexConfig.makePolicy(self.kconfig)
         for row in range(nCellY):
             # place at center of cell
             posY = sizeCellY * row + sizeCellY // 2 + scienceY0
