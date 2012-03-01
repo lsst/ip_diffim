@@ -85,7 +85,7 @@ ds9.mtv(templateExposure, frame=frame, title = "Template")
 frame += 1
 ds9.mtv(scienceExposure, frame=frame, title = "Sci Im")
 
-psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
+psfmatch = ipDiffim.ImagePsfMatchTask(config=config)
 try:
     results = psfmatch.run(templateExposure.getMaskedImage(),
                            scienceExposure.getMaskedImage(),

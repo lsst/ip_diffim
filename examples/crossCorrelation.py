@@ -222,7 +222,7 @@ def testAutoCorrelation(orderMake, orderFit, inMi = None, display = False):
     subconfig.spatialKernelOrder = orderFit
     subconfig.sizeCellX = stride
     subconfig.sizeCellY = stride
-    psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
+    psfmatch = ipDiffim.ImagePsfMatchTask(config=config)
     result = psfmatch.run(inMi, cMi, "subtractMaskedImages")
 
     differenceMaskedImage = result.subtractedImage
