@@ -98,7 +98,7 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     subconfigFake.alardDegGauss = [2,]
     subconfigFake.sizeCellX     = sizeCell
     subconfigFake.sizeCellY     = sizeCell
-    subconfigFake.spatialKernelOrder = 1.0
+    subconfigFake.spatialKernelOrder = 1
     subconfigFake.spatialModelType = "polynomial"
     subconfigFake.singleKernelClipping = False   # variance is a hack
     subconfigFake.spatialKernelClipping = False  # variance is a hack

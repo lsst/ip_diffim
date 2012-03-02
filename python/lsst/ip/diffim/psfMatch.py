@@ -376,8 +376,8 @@ class PsfMatchConfig(pexConfig.Config):
 
 
 class PsfMatchConfigAL(PsfMatchConfig):
-    def __init__(self):
-        PsfMatchConfig.__init__(self)
+    def setDefaults(self): 
+        PsfMatchConfig.setDefaults(self)
         self.kernelBasisSet = "alard-lupton"
         self.maxConditionNumber = 5.0e7
 
@@ -413,8 +413,8 @@ class PsfMatchConfigAL(PsfMatchConfig):
 
     
 class PsfMatchConfigDF(PsfMatchConfig):
-    def __init__(self):
-        PsfMatchConfig.__init__(self)
+    def setDefaults(self):
+        PsfMatchConfig.setDefaults(self)
         self.kernelBasisSet = "delta-function"
         self.maxConditionNumber = 5.0e6
         self.usePcaForSpatialKernel = True

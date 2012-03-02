@@ -25,9 +25,9 @@ from imagePsfMatch import ImagePsfMatchTask
 
 class SnapPsfMatchConfigDF(PsfMatchConfigDF):
     """Version of Psf Matching optimized for snap subtraction"""
-    def __init__(self):
-        PsfMatchConfigDF.__init__(self)
-        
+    def setDefaults(self):
+        PsfMatchConfigDF.setDefaults(self)
+
         # No spatial variation in model
         self.spatialKernelOrder = 0
         
@@ -50,9 +50,9 @@ class SnapPsfMatchConfigDF(PsfMatchConfigDF):
         
 class SnapPsfMatchConfigAL(PsfMatchConfigAL):
     """Version of Psf Matching optimized for snap subtraction"""
-    def __init__(self):
-        PsfMatchConfigAL.__init__(self)
-        
+    def setDefaults(self):
+        PsfMatchConfigAL.setDefaults(self)
+
         # No spatial variation in model
         self.spatialKernelOrder = 0
         
@@ -66,7 +66,6 @@ class SnapPsfMatchConfigAL(PsfMatchConfigAL):
         self.spatialKernelClipping = False
 
         # Simple basis set
-        self.kernelBasisSet = "alard-lupton"
         self.alardNGauss = 2
         self.alardDegGauss = (4, 2)
         self.alardSigGauss = (1.0, 2.5)
@@ -93,7 +92,8 @@ class SnapPsfMatchTask(ImagePsfMatchTask):
     # Override ImagePsfMatchTask method; don't validate WCS by default
     def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
                           psfFwhmPixTc = None, psfFwhmPixTnc = None,
-                          footprints = None, doWarping = ConfigClass().doWarping):
+                          footprints = None):
+        doWarping = self.config.doWarping
         return ImagePsfMatchTask.subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
                                                    psfFwhmPixTc = psfFwhmPixTc, psfFwhmPixTnc = psfFwhmPixTnc,
                                                    footprints = footprints, doWarping = doWarping)

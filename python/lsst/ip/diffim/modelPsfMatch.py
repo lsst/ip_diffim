@@ -44,9 +44,7 @@ class ModelPsfMatchConfig(pexConfig.Config):
         default = "AL",
     )
 
-    def __init__(self):
-        pexConfig.Config.__init__(self)
-
+    def setDefaults(self):
         # No sigma clipping
         self.kernel.active.singleKernelClipping = False
         self.kernel.active.kernelSumClipping = False
