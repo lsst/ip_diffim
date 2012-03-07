@@ -1,5 +1,6 @@
 setupRequired(afw >= 4.7.3.0)
 setupRequired(numpy)
+setupRequired(pex_config)
 setupRequired(pipe_base)
 
 setupOptional(afwdata)
