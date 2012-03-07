@@ -39,10 +39,10 @@ logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
+        pass
         
     def tearDown(self):
-        del self.policy
+        pass
 
     def testImageStatisticsNan(self, core=3):
         numArray = num.zeros((20, 20))
@@ -51,21 +51,14 @@ class DiffimTestCases(unittest.TestCase):
             for i in range(mi.getWidth()):
                 mi.set( i, j, (numArray[j][i], 0x0, 0) )
 
+        # inverse variance weight of 0 is NaN
         imstat = ipDiffim.ImageStatisticsF()
-        try:
-            imstat.apply(mi)
-        except Exception, e:
-            pass
-        else:
-            self.fail()
+        imstat.apply(mi)
+        self.assertEqual(imstat.getNpix(), 0)
 
         imstat = ipDiffim.ImageStatisticsF()
-        try:
-            imstat.apply(mi, core)
-        except Exception, e:
-            pass
-        else:
-            self.fail()
+        imstat.apply(mi, core)
+        self.assertEqual(imstat.getNpix(), 0)
 
     def testImageStatisticsZero(self):
         numArray = num.zeros((20, 20))

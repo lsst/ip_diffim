@@ -6,6 +6,8 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.pex.logging as pexLog
 
+# Basically deprecated until SDQA is replaced
+
 def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
     imstats    = diffimLib.ImageStatisticsF()
     #sdqaVector = sdqa.SdqaRatingSet()
@@ -68,35 +70,6 @@ def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
     #sdqaVector.append(nKernRating)
     #sdqaVector.append(nBgRating)
 
-    # Some judgements on conv vs. deconv (many candidates fail QC in the latter case)
-    if nBad > 2*nGood:
-        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
-                     "WARNING: many more candidates rejected than accepted; %d rejected, %d used" % (
-            nBad, nGood))
-        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 2,
-                     "Consider switching which image is convolved, or call ipDiffim.modifyForDeconvolution")
-    else:
-        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
-                     "NOTE: %d candidates rejected, %d used" % (nBad, nGood))
-        
-    # Some judgements on the quality of the spatial model
-    if nGood < nKernelTerms:
-        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
-                     "WARNING: spatial kernel model underconstrained; %d candidates, %d terms" % (
-            nGood, nKernelTerms))
-        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 2,
-                     "Consider lowering the spatial order")
-    elif nGood <= 2*nKernelTerms:
-        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
-                     "WARNING: spatial kernel model poorly constrained; %d candidates, %d terms" % (
-            nGood, nKernelTerms))
-        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 2,
-                     "Consider lowering the spatial order")
-    else:
-        pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 1,
-                     "NOTE: spatial kernel model appears well constrained; %d candidates, %d terms" % (
-            nGood, nKernelTerms))
-    
     #for i in range(sdqaVector.size()):
     #    pexLog.Trace("lsst.ip.diffim.makeSdqaRatingVector", 5,
     #                 "Sdqa Rating %s : %.2f %.2f" % (sdqaVector[i].getName(),

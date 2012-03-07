@@ -2,47 +2,64 @@
 import os, sys
 import unittest
 import lsst.utils.tests as tests
-
+import numpy as num
 import eups
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
-        self.policy.set("checkConditionNumber", False) # these images have been hand-constructed
-        self.policy.set("fitForBackground", True) # and hotpants subtracts background
-        self.policy.set("spatialKernelType", "polynomial") 
-        self.policy.set("spatialBgType", "polynomial") 
+        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config.kernel.name = "AL"
+        self.subconfig = self.config.kernel.active
+
+        self.subconfig.fitForBackground = True
+        self.subconfig.spatialModelType = "polynomial"
+        self.policy = pexConfig.makePolicy(self.subconfig)
+
         self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
         self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')
         self.smi.setXY0(0,0)
         self.tmi.setXY0(0,0)
 
         # Run detection
-        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy.getPolicy("detectionPolicy"))
+        detConfig = self.subconfig.detectionConfig
+        # Note here regarding detConfig:
+        #
+        # If I set detThresholdType = "pixel_stdev", I get slightly
+        # different centroids than if I use "stdev".  These different
+        # centroids screw up the testing since hotpants was hardcoded to
+        # use the "stdev" centroids.  For completeness these are:
+        #
+        # 32 32
+        # 96 32
+        # 160 32
+        # 96 95
+        # 31 96
+        # 160 96
+        # 96 160
+        # 160 160
+        # 32 160
+        detConfig.detThresholdType = "stdev"
+        kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
         kcDetect.apply(self.smi, self.tmi)
         self.footprints = kcDetect.getFootprints()
 
         # Make a basis list that hotpants has been run with
-        self.policy.set('kernelBasisSet', 'alard-lupton')
-        self.policy.set('useRegularization', False)
         nGauss = 1
         sGauss = [3.]
         dGauss = [3]
-        self.policy.set('alardNGauss', nGauss)
-        self.policy.set('alardSigGauss', sGauss[0])
-        self.policy.set('alardDegGauss', dGauss[0])
-        for i in range(1, nGauss):
-            self.policy.add('alardSigGauss', sGauss[i])
-            self.policy.add('alardDegGauss', dGauss[i])
-        basisList0 = ipDiffim.makeKernelBasisList(self.policy)
+        self.subconfig.alardNGauss = nGauss
+        self.subconfig.alardSigGauss = sGauss
+        self.subconfig.alardDegGauss = dGauss
+        basisList0 = ipDiffim.makeKernelBasisList(self.subconfig)
         
         # HP does things in a different order, and with different normalization, so reorder list
         order   = [0, 2, 5, 9, 1, 4, 8, 3, 7, 6]
@@ -169,7 +186,7 @@ class DiffimTestCases(unittest.TestCase):
         
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
-        
+
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
                 cand = ipDiffim.makeKernelCandidate( (xC - 0.5 * self.smi.getWidth()) /
@@ -177,6 +194,7 @@ class DiffimTestCases(unittest.TestCase):
                                                      (yC - 0.5 * self.smi.getHeight()) /
                                                      (0.5 * self.smi.getHeight()),
                                                      tsmi, ssmi, self.policy)
+
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors

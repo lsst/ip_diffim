@@ -4,12 +4,14 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import numpy as num
 import lsst.pex.logging as pexLogging
+import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
 verbosity = 5
 pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 
 imSize         = 75
 rdm            = afwMath.Random(afwMath.Random.MT19937, 10101)
+writeFits      = False
 
 def makeTest1(doAddNoise):
     gaussian1 = afwMath.GaussianFunction2D(1., 1., 0.)
@@ -101,33 +103,41 @@ def addNoise(mi):
 
 
 if __name__ == '__main__':
-
     doAddNoise = True
+
+    configAL    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+    configAL.kernel.name = "AL"
+    subconfigAL = configAL.kernel.active
     
-    policy = ipDiffim.makeDefaultPolicy()
-    policy.set("fitForBackground", False)
-    policy.set("checkConditionNumber", False)
-    policy.set("constantVarianceWeighting", True)
+    configDF    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+    configDF.kernel.name = "DF"
+    subconfigDF = configDF.kernel.active
+
+    subconfigAL.fitForBackground = False
+    subconfigDF.fitForBackground = False
+
+    # Super-important for these faked-up kernels...
+    subconfigAL.constantVarianceWeighting = True
+    subconfigDF.constantVarianceWeighting = True
+
     fnum = 1
     
-#    for switch in ['A', 'B', 'C']:
-    for switch in ['C',]:
-
+    for switch in ['A', 'B', 'C']:
         if switch == 'A':
-            # Default Alard Lupton
-            pass
+            # AL 
+            config = subconfigAL
         elif switch == 'B':
             # AL with ~320 bases
-            policy.set("alardDegGauss", 15)
-            policy.add("alardDegGauss", 10)
-            policy.add("alardDegGauss", 5)
+            config = subconfigAL
+            config.alardDegGauss = (15, 10, 5)
         elif switch == 'C':
-            # Delta function
-            policy.set("kernelBasisSet", "delta-function")
-            policy.set("useRegularization", False)
-    
-        kList = ipDiffim.makeKernelBasisList(policy)
-        bskv  = ipDiffim.BuildSingleKernelVisitorF(kList, policy)
+            config = subconfigDF
+            config.useRegularization = False
+
+        kList  = ipDiffim.makeKernelBasisList(config)
+
+        policy = pexConfig.makePolicy(config)
+        bskv   = ipDiffim.BuildSingleKernelVisitorF(kList, policy)
     
         # TEST 1
         tmi, smi = makeTest1(doAddNoise)
@@ -144,10 +154,11 @@ if __name__ == '__main__':
         ds9.mtv(kimage, frame = fnum) ; fnum += 1
         ds9.mtv(diffim, frame = fnum) ; fnum += 1
     
-        tmi.writeFits("template1.fits")
-        smi.writeFits("science1.fits")
-        kimage.writeFits("kernel1.fits")
-        diffim.writeFits("diffim1.fits")
+        if writeFits:
+            tmi.writeFits("template1.fits")
+            smi.writeFits("science1.fits")
+            kimage.writeFits("kernel1.fits")
+            diffim.writeFits("diffim1.fits")
         
         # TEST 2
         tmi, smi = makeTest2(doAddNoise, shiftX = 2, shiftY = 2)
@@ -163,10 +174,11 @@ if __name__ == '__main__':
         ds9.mtv(smi,    frame = fnum) ; fnum += 1
         ds9.mtv(kimage, frame = fnum) ; fnum += 1
         ds9.mtv(diffim, frame = fnum) ; fnum += 1
-        
-        tmi.writeFits("template2.fits")
-        smi.writeFits("science2.fits")
-        kimage.writeFits("kernel2.fits")
-        diffim.writeFits("diffim2.fits")
+
+        if writeFits:
+            tmi.writeFits("template2.fits")
+            smi.writeFits("science2.fits")
+            kimage.writeFits("kernel2.fits")
+            diffim.writeFits("diffim2.fits")
         
     

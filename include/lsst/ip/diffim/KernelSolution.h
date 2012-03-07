@@ -91,7 +91,7 @@ namespace diffim {
                            lsst::afw::image::Image<InputT> const &imageToNotConvolve,
                            lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate);
         virtual lsst::afw::math::Kernel::Ptr getKernel();
-        virtual PTR(ImageT) makeKernelImage();
+        virtual lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr makeKernelImage();
         virtual double getBackground();
         virtual double getKsum();
         virtual std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolutionPair();
@@ -184,7 +184,7 @@ namespace diffim {
                            boost::shared_ptr<Eigen::VectorXd> wVec);
 
         void solve();
-        PTR(ImageT) makeKernelImage();
+        lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr makeKernelImage(lsst::afw::geom::Point2D const& pos);
         std::pair<lsst::afw::math::LinearCombinationKernel::Ptr,
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getSolutionPair();
 

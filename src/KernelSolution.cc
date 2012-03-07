@@ -143,7 +143,7 @@ namespace diffim {
         boost::timer t;
         t.restart();
 
-        pexLog::TTrace<2>("lsst.ip.diffim.KernelSolution.solve", 
+        pexLog::TTrace<4>("lsst.ip.difim.KernelSolution.solve", 
                           "Solving for kernel");
 		_solvedBy = LU;
 		Eigen::FullPivLU<Eigen::MatrixXd> lu(mMat);
@@ -178,7 +178,7 @@ namespace diffim {
 		}
 
         double time = t.elapsed();
-        pexLog::TTrace<3>("lsst.ip.diffim.KernelSolution.solve", 
+        pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
                           "Compute time for matrix math : %.2f s", time);
 
         if (DEBUG_MATRIX) {
@@ -220,12 +220,12 @@ namespace diffim {
     }
 
     template <typename InputT>
-    KernelSolution::ImageT::Ptr StaticKernelSolution<InputT>::makeKernelImage() {
+    lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr StaticKernelSolution<InputT>::makeKernelImage() {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
         }
-        ImageT::Ptr image (
-            new ImageT(_kernel->getDimensions())
+        afwImage::Image<afwMath::Kernel::Pixel>::Ptr image(
+            new afwImage::Image<afwMath::Kernel::Pixel>(_kernel->getDimensions())
             );
         (void)_kernel->computeImage(*image, false);              
         return image;
@@ -1219,8 +1219,6 @@ namespace diffim {
             new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
             );
         
-        std::string lambdaType = _policy.getString("lambdaType");        
-        double lambdaValue     = _policy.getDouble("lambdaValue");
         
         /* See N.R. 18.5
            
@@ -1271,12 +1269,13 @@ namespace diffim {
 
         */
         
+        std::string lambdaType = _policy.getString("lambdaType");        
         if (lambdaType == "absolute") {
-            _lambda = lambdaValue;
+            _lambda = _policy.getDouble("lambdaValue");
         }
         else if (lambdaType ==  "relative") {
             _lambda  = this->_mMat->trace() / this->_hMat->trace();
-            _lambda *= lambdaValue;
+            _lambda *= _policy.getDouble("lambdaScaling");
         }
         else if (lambdaType ==  "minimizeBiasedRisk") {
             double tol = _policy.getDouble("maxConditionNumber");
@@ -1499,12 +1498,14 @@ namespace diffim {
 
     }
 
-    KernelSolution::ImageT::Ptr SpatialKernelSolution::makeKernelImage() {
+    lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr SpatialKernelSolution::makeKernelImage(afwGeom::Point2D const& pos) {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
         }
-        ImageT::Ptr image(new ImageT(_kernel->getDimensions()));
-        (void)_kernel->computeImage(*image, false);              
+        afwImage::Image<afwMath::Kernel::Pixel>::Ptr image(
+            new afwImage::Image<afwMath::Kernel::Pixel>(_kernel->getDimensions())
+            );
+        (void)_kernel->computeImage(*image, false, pos[0], pos[1]);              
         return image;
     }
 

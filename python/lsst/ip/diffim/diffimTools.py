@@ -28,11 +28,17 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
+import imagePsfMatch
+from .makeKernelBasisList import makeKernelBasisList 
 
 # third party
 import numpy
 import time
 import os
+
+# Helper functions for ipDiffim; mostly viewing of results and writing
+# debugging info to disk.
 
 #######
 # Add noise
@@ -80,13 +86,29 @@ def fakeCoeffs():
                ( -0.005,  -0.000050,  0.000050))
     return kCoeffs
 
-def makeFakeKernelSet(policy, basisList,
-                      sizeCell = 128, nCell = 3,
+def makeFakeKernelSet(sizeCell = 128, nCell = 3,
                       deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
                       addNoise = True, bgValue = 100., display = False):
-    kSize    = policy.get('kernelSize')
-    policy.set('sizeCellX', sizeCell)
-    policy.set('sizeCellY', sizeCell)
+
+    configFake               = imagePsfMatch.ImagePsfMatchConfig()
+    configFake.kernel.name   = "AL"
+    subconfigFake            = configFake.kernel.active
+    subconfigFake.alardNGauss   = 1
+    subconfigFake.alardSigGauss = [2.5,]
+    subconfigFake.alardDegGauss = [2,]
+    subconfigFake.sizeCellX     = sizeCell
+    subconfigFake.sizeCellY     = sizeCell
+    subconfigFake.spatialKernelOrder = 1
+    subconfigFake.spatialModelType = "polynomial"
+    subconfigFake.singleKernelClipping = False   # variance is a hack
+    subconfigFake.spatialKernelClipping = False  # variance is a hack
+    if bgValue > 0.0:
+        subconfigFake.fitForBackground = True
+
+    policyFake = pexConfig.makePolicy(subconfigFake)
+
+    basisList = makeKernelBasisList(subconfigFake)
+    kSize     = subconfigFake.kernelSize
 
     # This sets the final extent of each convolved delta function
     gaussKernelWidth   = sizeCell // 2
@@ -137,25 +159,26 @@ def makeFakeKernelSet(policy, basisList,
 
     # Add background
     sim  += bgValue
+
+    # Watch out for negative values
+    tim  += 2 * numpy.abs(numpy.min(tim.getArray()))
     
     # Add noise?
     if addNoise:
         sim   = makePoissonNoiseImage(sim)
-
-    # ALWAYS!
-    tim  += 1.0   # Otherwise makePoissonNoiseImage adds no noise
-    tim   = makePoissonNoiseImage(tim) # Needed to stdev for detection
-        
+        tim   = makePoissonNoiseImage(tim) 
+    
     # And turn into MaskedImages
     sim   = afwImage.ImageF(sim, bbox, afwImage.LOCAL)
     svar  = afwImage.ImageF(sim, True)
+    svar.set(1.0)
     smask = afwImage.MaskU(sim.getDimensions())
     smask.set(0x0)
     sMi   = afwImage.MaskedImageF(sim, smask, svar)
     
     tim   = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
     tvar  = afwImage.ImageF(tim, True)
-    #tvar += 1.0 # So no negative variance ever
+    tvar.set(1.0)
     tmask = afwImage.MaskU(tim.getDimensions())
     tmask.set(0x0)
     tMi   = afwImage.MaskedImageF(tim, tmask, tvar)
@@ -184,35 +207,34 @@ def makeFakeKernelSet(policy, basisList,
             tsi = afwImage.MaskedImageF(tMi, bbox, afwImage.LOCAL)
             ssi = afwImage.MaskedImageF(sMi, bbox, afwImage.LOCAL)
 
-            kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policy)
+            kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policyFake)
             kernelCellSet.insertCandidate(kc)
 
-    return tMi, sMi, sKernel, kernelCellSet
+    return tMi, sMi, sKernel, kernelCellSet, configFake
     
 
 #######
 # Background subtraction for ip_diffim
 #######
 
-def backgroundSubtract(policy, maskedImages):
+def backgroundSubtract(config, maskedImages):
     backgrounds = []
     t0 = time.time()
-    algorithm   = policy.get("algorithm")
-    binsize     = policy.get("binsize")
-    undersample = policy.get("undersample")
+    algorithm   = config.algorithmName
+    binsize     = config.binsize
+    undersample = config.undersample
     bctrl       = afwMath.BackgroundControl(algorithm)
     bctrl.setUndersampleStyle(undersample)
     for maskedImage in maskedImages:
         bctrl.setNxSample(maskedImage.getWidth()//binsize + 1)
         bctrl.setNySample(maskedImage.getHeight()//binsize + 1)
-        
         image   = maskedImage.getImage() 
         backobj = afwMath.makeBackground(image, bctrl)
+
         image  -= backobj.getImageF()
         backgrounds.append(backobj.getImageF())
-        del image
         del backobj
-        
+
     t1 = time.time()
     pexLog.Trace("lsst.ip.diffim.backgroundSubtract", 1,
                  "Total time for background subtraction : %.2f s" % (t1-t0))
@@ -382,7 +404,7 @@ def displayCandidateResults(kernelCellSet, frame, goodOnly = True):
                 mos.append(dmi.getImage())
                 
     mosaic = mos.makeMosaic(mode=4)
-    ds9.mtv(mosaic, frame=frame)
+    ds9.mtv(mosaic, frame=frame, title = "Kernel Candidates")
 
 def displayFootprints(image, footprintList, frame):
     import lsst.afw.display.ds9 as ds9

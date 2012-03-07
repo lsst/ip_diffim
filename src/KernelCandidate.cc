@@ -18,6 +18,7 @@
 
 #include "lsst/ip/diffim/KernelCandidate.h"
 #include "lsst/ip/diffim/ImageSubtract.h"
+#include "lsst/ip/diffim/ImageStatistics.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
 namespace afwMath        = lsst::afw::math;
@@ -38,7 +39,7 @@ namespace diffim {
         MaskedImagePtr const& miToNotConvolvePtr,
         lsst::pex::policy::Policy const& policy
         ) :
-        lsst::afw::math::SpatialCellImageCandidate<ImageT>(xCenter, yCenter),
+        lsst::afw::math::SpatialCellImageCandidate<lsst::afw::math::Kernel::Pixel>(xCenter, yCenter),
         _miToConvolvePtr(miToConvolvePtr),
         _miToNotConvolvePtr(miToNotConvolvePtr),
         _varianceEstimate(),

@@ -9,6 +9,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 import lsst.afw.display.ds9 as ds9
@@ -16,12 +17,16 @@ import lsst.afw.display.ds9 as ds9
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
-        self.policy.set("kernelBasisSet", "delta-function")
+        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config.kernel.name = "DF"
+        self.subconfig = self.config.kernel.active
+
+        self.policy = pexConfig.makePolicy(self.subconfig)
+
         self.policy.set("useRegularization", False)
         self.policy.set("checkConditionNumber", False) # I am making shady kernels by hand
         self.policy.set("useCoreStats", False) # I am making off-center resids
-        self.kList = ipDiffim.makeKernelBasisList(self.policy)
+        self.kList = ipDiffim.makeKernelBasisList(self.subconfig)
         self.size = 51
         
     def makeCandidate(self, kSum, x, y):
@@ -227,9 +232,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(kc4.getStatus(), afwMath.SpatialCellCandidate.BAD)
 
         
-    def xtestVisit(self, nCell = 3):
-        # This currently fails since I can't get visitCandidates to
-        # tell this is a pointer
+    def testVisit(self, nCell = 3):
         bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy)
 
         sizeCellX = self.policy.get("sizeCellX")
@@ -255,8 +258,8 @@ class DiffimTestCases(unittest.TestCase):
                 nTot += 1
                 
         kernelCellSet.visitCandidates(bskv, 1)
-        self.assertEqual(bskv1.getNProcessed(), nTot)
-        self.assertEqual(bskv2.getNRejected(), 0)
+        self.assertEqual(bskv.getNProcessed(), nTot)
+        self.assertEqual(bskv.getNRejected(), 0)
 
         for cell in kernelCellSet.getCellList():
             for cand in cell.begin(False):
@@ -265,6 +268,7 @@ class DiffimTestCases(unittest.TestCase):
 
 
     def tearDown(self):
+        del self.config
         del self.policy
         del self.kList
 

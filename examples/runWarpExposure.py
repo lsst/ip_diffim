@@ -4,7 +4,6 @@ import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
 import lsst.daf.base as dafBase
 from lsst.pex.logging import Log
-from lsst.ip.diffim import makeDefaultPolicy
 
 def main():
     usage = """runWarpExposure.py refExposure towarpExposure outputExposure"""
@@ -23,7 +22,6 @@ def main():
         parser.print_help()
         sys.exit(1)
          
-
     print 'Reference exposure: ', refWcsPath
     print 'Exposure to be warped: ', toWarpPath
     print 'Output exposure:  ', warpedPath
@@ -31,8 +29,9 @@ def main():
     refWcsExposure = afwImage.ExposureF(refWcsPath)
     toWarpExposure = afwImage.ExposureF(toWarpPath)
 
-    policy = makeDefaultPolicy()
-    warper = afwMath.Warper.fromPolicy(policy.getPolicy("warpingPolicy"))
+    config = ipDiffim.ImagePsfMatchTask.ConfigClass()
+    subconfig = config.kernel.active
+    warper = afwMath.Warper.fromConfig(subconfig.warpingConfig)
     warpedExposure = warper.warpExposure(refWcsExposure.getWcs(), 
                                          toWarpExposure,
                                          destBBox = refWcsExposure.getBBox(afwImage.PARENT))

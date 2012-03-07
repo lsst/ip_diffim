@@ -35,6 +35,7 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
 
 import lsst.afw.display.ds9 as ds9
 
@@ -58,30 +59,37 @@ class DiffimTestCases(unittest.TestCase):
         if not defDataDir:
             return
         
-        self.policy = ipDiffim.makeDefaultPolicy()
-        self.policy.set("fitForBackground", True)
+        self.configAL    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.configAL.kernel.name = "AL"
+        self.subconfigAL = self.configAL.kernel.active
+
+        self.configDF    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.configDF.kernel.name = "DF"
+        self.subconfigDF = self.configDF.kernel.active
+
+        self.configDFr    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.configDFr.kernel.name = "DF"
+        self.subconfigDFr = self.configDFr.kernel.active
+
+        self.subconfigDF.useRegularization = False
+        self.subconfigDFr.useRegularization = True
         
         self.scienceExposure   = afwImage.ExposureF(defSciencePath)
         self.templateExposure  = afwImage.ExposureF(defTemplatePath)
-        # takes forever to remap the CFHT images
-        if defSciencePath.find('CFHT') == -1:
-            warper = afwMath.Warper.fromPolicy(policy.getPolicy("warpingPolicy"))
-            self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
-                destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
-            
+
+        warper = afwMath.Warper.fromConfig(self.subconfigAL.warpingConfig)
+        self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
+                                                    destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
+
         self.scienceMaskedImage = self.scienceExposure.getMaskedImage()
         self.templateMaskedImage = self.templateExposure.getMaskedImage()
         self.dStats = ipDiffim.ImageStatisticsF()
         
-        diffimTools.backgroundSubtract(self.policy.getPolicy("afwBackgroundPolicy"),
-                                       [self.templateMaskedImage,
-                                        self.scienceMaskedImage])
+        bgConfig = self.subconfigAL.afwBackgroundConfig
+        diffimTools.backgroundSubtract(bgConfig,[self.templateMaskedImage,
+                                                 self.scienceMaskedImage])
 
-    def stats(self, cid, diffim, size=5):
-        bbox = afwGeom.Box2I(afwGeom.Point2I((diffim.getWidth() - size)//2,
-                                             (diffim.getHeight() - size)//2),
-                             afwGeom.Point2I((diffim.getWidth() + size)//2,
-                                             (diffim.getHeight() + size)//2))
+    def stats(self, cid, diffim, core=5):
         self.dStats.apply(diffim)
         pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
                      "Candidate %d : Residuals all (%d px): %.3f +/- %.3f" % (cid,
@@ -90,16 +98,12 @@ class DiffimTestCases(unittest.TestCase):
                                                                               self.dStats.getRms()))
 
         
-        diffim2 = afwImage.MaskedImageF(diffim, bbox, afwImage.LOCAL)
-        self.dStats.apply(diffim2)
+        self.dStats.apply(diffim, core)
         pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
                      "Candidate %d : Residuals core (%d px): %.3f +/- %.3f" % (cid,
                                                                                self.dStats.getNpix(),
                                                                                self.dStats.getMean(),
                                                                                self.dStats.getRms()))
-        
-                             
-                                             
         
     def assess(self, cand, kFn1, bgFn1, kFn2, bgFn2, frame0):
         tmi   = cand.getMiToConvolvePtr()
@@ -153,13 +157,12 @@ class DiffimTestCases(unittest.TestCase):
                     cand.setStatus(value)
                     return cand
 
-    def jackknifeResample(self, results):
-        # do as little re-processing as possible
-        self.policy.set("singleKernelClipping", False)
-        self.policy.set("kernelSumClipping", False)
-        self.policy.set("spatialKernelClipping", False)
+    def jackknifeResample(self, psfmatch, results):
         
-        diffim, kernel, bg, cellSet = results
+        diffim  = results.subtractedImage
+        kernel  = results.psfMatchingKernel
+        bg      = results.backgroundModel
+        cellSet = results.kernelCellSet
         
         goodList = []
         for cell in cellSet.getCellList():
@@ -173,6 +176,8 @@ class DiffimTestCases(unittest.TestCase):
                     # This is so that UNKNOWNs are not processed
                     cand.setStatus(afwMath.SpatialCellCandidate.BAD)
 
+        nStarPerCell = self.config.nStarPerCell
+        policy = pexConfig.makePolicy(self.config)
         for idx in range(len(goodList)):
             cid   = goodList[idx]
 
@@ -182,8 +187,14 @@ class DiffimTestCases(unittest.TestCase):
             
             cand = self.setStatus(cellSet, cid, afwMath.SpatialCellCandidate.BAD)
 
-            jkResults = ipDiffim.fitSpatialKernelFromCandidates(cellSet,
-                                                                self.policy)
+            # From _solve
+            regionBBox = cellSet.getBBox()
+            spatialkv  = ipDiffim.BuildSpatialKernelVisitorF(kernel.getKernelList(), regionBBox, policy)
+            cellSet.visitCandidates(spatialkv, nStarPerCell)
+            spatialkv.solveLinearEquation()
+            jkKernel, jkBg = spatialkv.getSolutionPair()
+
+            jkResults = psfmatch._solve(cellSet, kernel.getKernelList())
             jkKernel  = jkResults[0]
             jkBg      = jkResults[1]
 
@@ -200,28 +211,19 @@ class DiffimTestCases(unittest.TestCase):
         pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
                      "Mode %s" % (mode))
         if mode == "DF":
-            self.policy.set("kernelBasisSet", "delta-function")
-            self.policy.set("useRegularization", False)
-            self.policy.set("usePcaForSpatialKernel", True)
+            self.config = self.subconfigDF
         elif mode == "DFr":
-            self.policy.set("kernelBasisSet", "delta-function")
-            self.policy.set("useRegularization", True)
-            self.policy.set("usePcaForSpatialKernel", True)
+            self.config = self.subconfigDFr
         elif mode == "AL":
-            self.policy.set("kernelBasisSet", "alard-lupton")
-            self.policy.set("useRegularization", False)
-            self.policy.set("usePcaForSpatialKernel", False)
-        elif mode == "ALp":
-            self.policy.set("kernelBasisSet", "alard-lupton")
-            self.policy.set("useRegularization", False)
-            self.policy.set("usePcaForSpatialKernel", True)
+            self.config = self.subconfigAL
         else:
             raise
 
-        psfmatch = ipDiffim.ImagePsfMatch(self.policy)
-        results  = psfmatch.subtractMaskedImages(self.templateMaskedImage,
-                                                 self.scienceMaskedImage)
-        self.jackknifeResample(results)
+        psfmatch = ipDiffim.ImagePsfMatchTask(self.config)
+        results  = psfmatch.run(self.templateMaskedImage,
+                                self.scienceMaskedImage, 
+                                "subtractMaskedImages")
+        self.jackknifeResample(psfmatch, results)
         
     def test(self):
         if not defDataDir:
@@ -231,7 +233,9 @@ class DiffimTestCases(unittest.TestCase):
         self.runTest(mode="AL")
 
     def tearDown(self):
-        del self.policy
+        del self.subconfigAL
+        del self.subconfigDF
+        del self.subconfigDFr
         del self.scienceExposure
         del self.templateExposure
         del self.scienceMaskedImage

@@ -83,45 +83,36 @@ namespace detail {
         int spatialKernelOrder = policy.getInt("spatialKernelOrder");
         afwMath::Kernel::SpatialFunctionPtr spatialKernelFunction;
 
-        std::string spatialKernelType = policy.getString("spatialKernelType");
-        if (spatialKernelType == "chebyshev1") {
-            spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
-                new afwMath::Chebyshev1Function2<double>(spatialKernelOrder, afwGeom::Box2D(regionBBox))
-                );
-        }
-        else if (spatialKernelType == "polynomial") {
-            spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
-                new afwMath::PolynomialFunction2<double>(spatialKernelOrder)
-                );
-        }
-        else {
-            throw LSST_EXCEPT(pexExcept::Exception,
-                              str(boost::format("Invalid type (%s) for spatial kernel model") % 
-                                  spatialKernelType));
-        }
-
-        /* */
-
         int fitForBackground = policy.getBool("fitForBackground");
         int spatialBgOrder   = fitForBackground ? policy.getInt("spatialBgOrder") : 0;
         afwMath::Kernel::SpatialFunctionPtr background;
 
-        std::string spatialBgType = policy.getString("spatialBgType");
-        if (spatialBgType == "chebyshev1") {
+        std::string spatialModelType = policy.getString("spatialModelType");
+        if (spatialModelType == "chebyshev1") {
+            spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
+                new afwMath::Chebyshev1Function2<double>(spatialKernelOrder, afwGeom::Box2D(regionBBox))
+                );
             background = afwMath::Kernel::SpatialFunctionPtr(
                 new afwMath::Chebyshev1Function2<double>(spatialBgOrder, afwGeom::Box2D(regionBBox))
                 );
+
         }
-        else if (spatialBgType == "polynomial") {
+        else if (spatialModelType == "polynomial") {
+            spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
+                new afwMath::PolynomialFunction2<double>(spatialKernelOrder)
+                );
             background = afwMath::Kernel::SpatialFunctionPtr(
                 new afwMath::PolynomialFunction2<double>(spatialBgOrder)
                 );
         }
         else {
             throw LSST_EXCEPT(pexExcept::Exception,
-                              str(boost::format("Invalid type (%s) for spatial background model") % 
-                                  spatialBgType));
+                              str(boost::format("Invalid type (%s) for spatial models") % 
+                                  spatialModelType));
         }
+
+        /* */
+
         _kernelSolution = boost::shared_ptr<SpatialKernelSolution>(
             new SpatialKernelSolution(basisList, spatialKernelFunction, background, policy));
     };

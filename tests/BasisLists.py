@@ -10,6 +10,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
+import lsst.pex.config as pexConfig
 
 verbosity = 4
 logging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
@@ -17,11 +18,24 @@ logging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
-        self.kSize  = self.policy.getInt("kernelSize")
+        self.configAL    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.configAL.kernel.name = "AL"
+        self.subconfigAL = self.configAL.kernel.active
+
+        self.configDF    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.configDF.kernel.name = "DF"
+        self.subconfigDF = self.configDF.kernel.active
+
+        self.policyAL = pexConfig.makePolicy(self.subconfigAL)
+        self.policyDF = pexConfig.makePolicy(self.subconfigDF)
+
+        self.kSize    = self.policyAL.getInt("kernelSize")
 
     def tearDown(self):
-        del self.policy
+        del self.configAL
+        del self.policyAL
+        del self.configDF
+        del self.policyDF
 
     #
     ### Delta function
@@ -56,16 +70,6 @@ class DiffimTestCases(unittest.TestCase):
         self.deltaFunctionTest(ks)
 
 
-    def testDeltaFunction(self):
-        self.policy.set("kernelBasisSet", "delta-function")
-        ks = ipDiffim.makeKernelBasisList(self.policy)
-
-        # right size
-        self.assertEqual(len(ks), self.kSize * self.kSize)
-
-        # right shape
-        self.deltaFunctionTest(ks)
-
     #
     ### Alard Lupton
     #
@@ -88,24 +92,10 @@ class DiffimTestCases(unittest.TestCase):
             arr = kim.getArray()
             self.assertAlmostEqual(num.sum(arr*arr), 1.0)
 
-
-    def testAlardLupton(self):
-        self.policy.set("kernelBasisSet", "alard-lupton")
-        ks = ipDiffim.makeKernelBasisList(self.policy)
-
-        # right size
-        nTot = 0
-        for deg in self.policy.getIntArray("alardDegGauss"):
-            nTot += (deg + 1) * (deg + 2) / 2
-        self.assertEqual(len(ks), nTot)
-
-        # right orthogonality
-        self.alardLuptonTest(ks)
-
     def testMakeAlardLupton(self):
-        nGauss   = self.policy.get("alardNGauss")
-        sigGauss = self.policy.getDoubleArray("alardSigGauss")
-        degGauss = self.policy.getIntArray("alardDegGauss")
+        nGauss   = self.policyAL.get("alardNGauss")
+        sigGauss = self.policyAL.getDoubleArray("alardSigGauss")
+        degGauss = self.policyAL.getIntArray("alardDegGauss")
         self.assertEqual(len(sigGauss), nGauss)
         self.assertEqual(len(degGauss), nGauss)
         self.assertEqual(self.kSize % 2, 1)       # odd sized
@@ -121,6 +111,26 @@ class DiffimTestCases(unittest.TestCase):
 
         # right orthogonality
         self.alardLuptonTest(ks)
+
+    def testGenerateAlardLupton(self):
+        # defaults
+        ks = ipDiffim.generateAlardLuptonBasisList(self.subconfigAL)
+        self.alardLuptonTest(ks)
+
+        # send FWHM
+        ks = ipDiffim.generateAlardLuptonBasisList(self.subconfigAL, targetFwhmPix = 3.0, referenceFwhmPix = 4.0)
+        self.alardLuptonTest(ks)
+
+        
+    #
+    ### Make
+    #
+    def testMakeKernelBasisList(self):
+        ks = ipDiffim.makeKernelBasisList(self.subconfigAL)
+        self.alardLuptonTest(ks)
+
+        ks = ipDiffim.makeKernelBasisList(self.subconfigDF)
+        self.deltaFunctionTest(ks)
         
     #
     ### Renormalize
@@ -172,44 +182,44 @@ class DiffimTestCases(unittest.TestCase):
 
     def testCentralRegularization(self):
         # 
-        self.policy.set("regularizationType", "centralDifference")
+        self.policyDF.set("regularizationType", "centralDifference")
         try:
-            self.policy.set("centralRegularizationStencil", 1)
-            h = ipDiffim.makeRegularizationMatrix(self.policy)
+            self.policyDF.set("centralRegularizationStencil", 1)
+            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # stencil of 1 not allowed
             pass
         else:
             self.fail()
             
-        self.policy.set("centralRegularizationStencil", 5)
+        self.policyDF.set("centralRegularizationStencil", 5)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policy)
+            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # stencil of 5 allowed
             print e
             self.fail()
         else:
             pass
 
-        self.policy.set("centralRegularizationStencil", 9)
+        self.policyDF.set("centralRegularizationStencil", 9)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policy)
+            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # stencil of 9 allowed
             print e
             self.fail()
         else:
             pass
 
-        self.policy.set("regularizationBorderPenalty", -1.0)
+        self.policyDF.set("regularizationBorderPenalty", -1.0)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policy)
+            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # border penalty > 0
             pass
         else:
             self.fail()
 
-        self.policy.set("regularizationBorderPenalty", 0.0)
+        self.policyDF.set("regularizationBorderPenalty", 0.0)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policy)
+            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # border penalty > 0
             print e
             self.fail()
@@ -217,36 +227,36 @@ class DiffimTestCases(unittest.TestCase):
             pass
 
     def testForwardRegularization(self):
-        self.policy.set("regularizationType", "forwardDifference")
-        self.policy.set("forwardRegularizationOrders", 0)
+        self.policyDF.set("regularizationType", "forwardDifference")
+        self.policyDF.set("forwardRegularizationOrders", 0)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policy)
+            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # order 1..3 allowed
             pass
         else:
             self.fail()
 
-        self.policy.set("forwardRegularizationOrders", 1)
+        self.policyDF.set("forwardRegularizationOrders", 1)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policy)
+            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # order 1..3 allowed
             print e
             self.fail()
         else:
             pass
 
-        self.policy.set("forwardRegularizationOrders", 4)
+        self.policyDF.set("forwardRegularizationOrders", 4)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policy)
+            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # order 1..3 allowed
             pass
         else:
             self.fail()
 
-        self.policy.set("forwardRegularizationOrders", 1)
-        self.policy.add("forwardRegularizationOrders", 2)
+        self.policyDF.set("forwardRegularizationOrders", 1)
+        self.policyDF.add("forwardRegularizationOrders", 2)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policy)
+            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # order 1..3 allowed
             print e
             self.fail()
@@ -255,8 +265,8 @@ class DiffimTestCases(unittest.TestCase):
 
     def testBadRegularization(self):
         try:
-            self.policy.set("regularizationType", "foo")
-            h = ipDiffim.makeRegularizationMatrix(self.policy)
+            self.policyDF.set("regularizationType", "foo")
+            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # invalid option
             pass
         else:

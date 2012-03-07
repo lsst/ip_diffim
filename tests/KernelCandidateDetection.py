@@ -9,14 +9,17 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy      = ipDiffim.makeDefaultPolicy()
-        self.kSize       = self.policy.getInt('kernelSize')
+        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.subconfig = self.config.kernel.active
+        self.policy    = pexConfig.makePolicy(self.subconfig)
+        self.kSize     = self.policy.getInt('kernelSize')
 
         # gaussian reference kernel
         self.gSize         = self.kSize
@@ -34,6 +37,7 @@ class DiffimTestCases(unittest.TestCase):
             afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False)
 
     def tearDown(self):
+        del self.config
         del self.policy
         del self.gaussFunction
         del self.gaussKernel
@@ -48,9 +52,11 @@ class DiffimTestCases(unittest.TestCase):
 
         # NOTE - you need to subtract off background from the image
         # you run detection on.  Here it is the template.
-        diffimTools.backgroundSubtract(self.policy.getPolicy("afwBackgroundPolicy"), [self.templateImage,])
+        bgConfig = self.subconfig.afwBackgroundConfig
+        diffimTools.backgroundSubtract(bgConfig, [self.templateImage,])
 
-        kcDetect = ipDiffim.KernelCandidateDetectionF(self.policy.getPolicy("detectionPolicy"))
+        detConfig = self.subconfig.detectionConfig
+        kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList1 = kcDetect.getFootprints()
 

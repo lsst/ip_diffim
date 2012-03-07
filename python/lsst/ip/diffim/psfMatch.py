@@ -19,36 +19,632 @@
 # the GNU General Public License along with this program.  If not, 
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-import sys
+import time
+import numpy as num
 import diffimLib
+import lsst.afw.image as afwImage
 import lsst.pex.logging as pexLog
 import lsst.pex.exceptions as pexExcept
-import lsst.afw.geom as afwGeom
-import lsst.afw.image as afwImage
+import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
+import lsst.pipe.base as pipeBase
 
-import diffimTools
+class DetectionConfig(pexConfig.Config):
+    detThreshold = pexConfig.Field(
+        dtype = float,
+        doc = "Value of footprint detection threshold",
+        default = 10.0
+    )
+    detThresholdType = pexConfig.ChoiceField(
+        dtype = str,
+        doc = "Type of detection threshold",
+        default = "pixel_stdev",
+        allowed = {
+           "value"       : "Use counts as the detection threshold type",
+           "stdev"       : "Use standard deviation of image plane",
+           "variance"    : "Use variance of image plane",
+           "pixel_stdev" : "Use stdev derived from variance plane"
+        }
+    )
+    detOnTemplate = pexConfig.Field(
+        dtype = bool,
+        doc = """If true run detection on the template (imageToConvolve); 
+                 if false run detection on the science image (imageToNotConvolve)""",
+        default = True
+    )
+    detBadMaskPlanes = pexConfig.ListField(
+        dtype = str,
+        doc = """Mask planes that lead to an invalid detection.
+                 Options: EDGE SAT BAD CR INTRP
+                 E.g. : EDGE SAT BAD allows CR-masked and interpolated pixels""",
+        default = ("EDGE", "SAT", "BAD")
+    )
+    fpNpixMin = pexConfig.Field(
+        dtype = int,
+        doc = "Minimum number of pixels in an acceptable Footprint",
+        default = 5
+    )
+    fpNpixMax = pexConfig.Field(
+        dtype = int,
+        doc = """Maximum number of pixels in an acceptable Footprint;
+                 too big and the subsequent convolutions become unwieldy""",
+        default = 500
+    )
+    fpGrowFwhmScaling = pexConfig.Field(
+        dtype = float,
+        doc = """Grow the footprint based on the Psf Fwhm;
+                 should be larger than kernelRadiusFwhmScaling""",
+        default = 10.
+    )
+    fpGrowPix = pexConfig.Field(
+        dtype = int,
+        doc = """Grow each raw detection footprint by
+                 this many pixels.  The smaller the faster; however the kernel sum does
+                 not converge if the stamp is too small; and the kernel is not
+                 constrained at all if the stamp is the size of the kernel.  Rule of
+                 thumb is at least 1.5 times the kernel size.  The grown stamp is
+                 ~2*fpGrowPix pixels larger in each dimension.""",
+        default = 30,
+        check = lambda x: (x >= 20) and (x <= 40)
+    )
+    fpGrowMin = pexConfig.Field(
+        dtype = int,
+        doc = """Minimum number of pixels to grow""",
+        default = 20,
+    )
+    fpGrowMax = pexConfig.Field(
+        dtype = int,
+        doc = """Maximum number of pixels to grow.""",
+        default = 40,
+    )
 
-__all__ = ["PsfMatch", "ImagePsfMatch", "ModelPsfMatch"]
-
-class PsfMatch(object):
-    """Base class for PSF matching
-    """
-    def __init__(self, policy, logName="lsst.ip.diffim.PsfMatch"):
-        """Create a PsfMatchToImage
+    def validate(self):
+        pexConfig.Config.validate(self)
+        if (self.fpGrowPix < self.fpGrowMin) or (self.fpGrowPix > self.fpGrowMax):
+            return False
+        return True
         
-        @param policy: see lsst/ip/diffim/policy/PsfMatchingDictionary.paf
-        @param logName: name by which messages are logged
-        """
-        self._policy = policy
-        self._log = pexLog.Log(pexLog.Log.getDefaultLog(), logName)
+    
+class AfwBackgroundConfig(pexConfig.Config):
+    algorithmName = pexConfig.ChoiceField(
+        dtype = str,
+        doc = "How to interpolate the background values",
+        default = "NATURAL_SPLINE",
+        allowed = {
+            "CONSTANT": "CONSTANT",
+            "LINEAR": "LINEAR",
+            "NATURAL_SPLINE": "NATURAL_SPLINE",
+            "CUBIC_SPLINE": "CUBIC_SPLINE",
+            "CUBIC_SPLINE_PERIODIC": "CUBIC_SPLINE_PERIODIC",
+            "AKIMA_SPLINE": "AKIMA_SPLINE",
+            "AKIMA_SPLINE_PERIODIC": "AKIMA_SPLINE_PERIODIC"
+        }
+    )
+    binsize = pexConfig.Field(
+        dtype = int,
+        doc = "How large of regions should be used for each background point",
+        default = 2048
+    )
+    undersample = pexConfig.ChoiceField(
+        dtype = str,
+        doc = "What to do if there are not enough regions for the interpolation",
+        default = "REDUCE_INTERP_ORDER",
+        allowed = {
+            "THROW_EXCEPTION" : "THROW_EXCEPTION",
+            "REDUCE_INTERP_ORDER" : "REDUCE_INTERP_ORDER",
+            "INCREASE_NXNYSAMPLE" : "INCREASE_NXNYSAMPLE"
+        }
+    )
 
-    def _solve(self, kernelCellSet, returnOnExcept = False):
+class PsfMatchConfig(pexConfig.Config):
+    warpingConfig = pexConfig.ConfigField("Config for warping exposures to a common alignment", afwMath.warper.WarperConfig)
+    detectionConfig = pexConfig.ConfigField("Controlling the detection of sources for kernel building", DetectionConfig)
+    afwBackgroundConfig = pexConfig.ConfigField("Controlling the Afw background fitting", AfwBackgroundConfig)
+
+    ####
+    # Background fitting
+    useAfwBackground = pexConfig.Field(
+        dtype = bool,
+        doc = "Use afw background subtraction instead of ip_diffim",
+        default = False,
+    )
+    fitForBackground = pexConfig.Field(
+        dtype = bool,
+        doc = "Include terms (including kernel cross terms) for background in ip_diffim",
+        default = False,
+    )
+
+    ####
+    # Basis set selection
+    kernelBasisSet = pexConfig.ChoiceField(
+        dtype = str,
+        doc = "Type of basis set for PSF matching kernel.",
+        default = "alard-lupton",
+        allowed = {
+            "alard-lupton" : """Alard-Lupton sum-of-gaussians basis set,
+                           * The first term has no spatial variation
+                           * The kernel sum is conserved
+                           * You may want to turn off 'usePcaForSpatialKernel'""",
+            "delta-function" : """Delta-function kernel basis set,
+                           * You may enable the option useRegularization
+                           * You should seriously consider usePcaForSpatialKernel, which will also
+                             enable kernel sum conservation for the delta function kernels"""
+        }
+    )
+
+    ####
+    # Kernel size
+    kernelSize = pexConfig.Field(
+        dtype = int,
+        doc = """Number of rows/columns in the convolution kernel; should be odd-valued.
+                 Modified by kernelSizeFwhmScaling if scaleByFwhm = true""",
+        default = 19,
+        check = lambda x: (x >= 7) and (x <= 33)
+    )
+    scaleByFwhm = pexConfig.Field(
+        dtype = bool,
+        doc = "Scale kernelSize, fpGrowPix, alardGaussians by input Fwhm",
+        default = True,
+    )
+    kernelSizeFwhmScaling = pexConfig.Field(
+        dtype = float,
+        doc = """How much to scale the kernel size based on the Psf Fwhm;,
+                 should be smaller than fpGrowFwhmScaling.  Sets kernelSize.""",
+        default = 4.0,
+    )
+
+    #####
+    # Spatial modeling
+    spatialModelType = pexConfig.ChoiceField(
+        dtype = str,
+        doc = "Type of spatial functions for kernel and background",
+        default = "chebyshev1",
+        allowed = {
+            "chebyshev1" : "Chebyshev polynomial of the first kind",
+            "polynomial" : "Standard x,y polynomial",
+        }
+    )
+    spatialKernelOrder = pexConfig.Field(
+        dtype = int,
+        doc = "Spatial order of convolution kernel variation",
+        default = 2,
+        check = lambda x : x >= 0
+    )
+    spatialBgOrder = pexConfig.Field(
+        dtype = int,
+        doc = "Spatial order of differential background variation",
+        default = 1,
+        check = lambda x : x >= 0
+    )
+    sizeCellX = pexConfig.Field(
+        dtype = int,
+        doc = "Size (rows) in pixels of each SpatialCell for spatial modeling",
+        default = 128,
+    )
+    sizeCellY = pexConfig.Field(
+        dtype = int,
+        doc = "Size (columns) in pixels of each SpatialCell for spatial modeling",
+        default = 128,
+    )
+    nStarPerCell = pexConfig.Field(
+        dtype = int,
+        doc = "Number of KernelCandidates in each SpatialCell to use in the spatial fitting",
+        default = 3,
+    )
+    maxSpatialIterations = pexConfig.Field(
+        dtype = int,
+        doc = "Maximum number of iterations for rejecting bad KernelCandidates in spatial fitting",
+        default = 3,
+    )
+
+    ####
+    # Spatial modeling; Pca
+    usePcaForSpatialKernel = pexConfig.Field(
+        dtype = bool,
+        doc = """Use Pca to reduce the dimensionality of the kernel basis sets.
+                 This is particularly useful for delta-function kernels.
+                 Functionally, after all Cells have their raw kernels determined, we run 
+                 a Pca on these Kernels, re-fit the Cells using the eigenKernels and then 
+                 fit those for spatial variation using the same technique as for Alard-Lupton kernels.
+                 If this option is used, the first term will have no spatial variation and the 
+                 kernel sum will be conserved.""",
+        default = False,
+    )
+    subtractMeanForPca = pexConfig.Field(
+        dtype = bool,
+        doc = "Subtract off the mean feature before doing the Pca",
+        default = True,
+    )
+    numPrincipalComponents = pexConfig.Field(
+        dtype = int,
+        doc = """Number of principal components to use for Pca basis, including the
+                 mean kernel if requested.""",
+        default = 5,
+    )
+    fracEigenVal = pexConfig.Field(
+        dtype = float,
+        doc = "At what fraction of the eigenvalues do you cut off the expansion. Warning: not yet implemented",
+        default = 0.99,
+    )
+
+    ####
+    # What types of clipping of KernelCandidates to enable
+    singleKernelClipping = pexConfig.Field(
+        dtype = bool,
+        doc = "Do sigma clipping on each raw kernel candidate",
+        default = True,
+    )
+    kernelSumClipping = pexConfig.Field(
+        dtype = bool,
+        doc = "Do sigma clipping on the ensemble of kernel sums",
+        default = True,
+    )
+    spatialKernelClipping = pexConfig.Field(
+        dtype = bool,
+        doc = "Do sigma clipping after building the spatial model",
+        default = True,
+    )
+    checkConditionNumber = pexConfig.Field(
+        dtype = bool,
+        doc = """Test for maximum condition number when inverting a kernel matrix.
+                 Anything above maxConditionNumber is not used and the candidate is set as BAD.        
+                 Also used to truncate inverse matrix in estimateBiasedRisk.  However,
+                 if you are doing any deconvolution you will want to turn this off, or use
+                 a large maxConditionNumber""",
+        default = False,
+    )
+
+    ####
+    # Clipping of KernelCandidates based on diffim residuals; used with singleKernelClipping and spatialKernelClipping
+    candidateResidualMeanMax = pexConfig.Field(
+        dtype = float,
+        doc = """Rejects KernelCandidates yielding bad difference image quality.
+                 Used by BuildSingleKernelVisitor, AssessSpatialKernelVisitor.
+                 Represents average over pixels of (image/sqrt(variance)).""",
+        default = 0.25,
+    )
+    candidateResidualStdMax = pexConfig.Field(
+        dtype = float,
+        doc = """Rejects KernelCandidates yielding bad difference image quality.
+                 Used by BuildSingleKernelVisitor, AssessSpatialKernelVisitor.
+                 Represents stddev over pixels of (image/sqrt(variance)).""",
+        default = 1.50,
+    )
+    useCoreStats = pexConfig.Field(
+        dtype = bool,
+        doc = """Use the core of the footprint for the quality statistics, instead of the entire footprint.
+                 WARNING: if there is deconvolution we probably will need to turn this off""",
+        default = False,
+    )
+    candidateCoreRadius = pexConfig.Field(
+        dtype = int,
+        doc = """Radius for calculation of stats in 'core' of KernelCandidate diffim.
+                 Total number of pixels used will be (2*radius)**2. 
+                 This is used both for 'core' diffim quality as well as ranking of
+                 KernelCandidates by their total flux in this core""",
+        default = 3,
+    )
+
+    ####
+    # Clipping of KernelCandidates based on kernel sum distribution
+    maxKsumSigma = pexConfig.Field(
+        dtype = float,
+        doc = """Maximum allowed sigma for outliers from kernel sum distribution.
+                 Used to reject variable objects from the kernel model""",
+        default = 3.0,
+    )
+
+
+    ####
+    # Clipping of KernelCandidates based on condition number
+    maxConditionNumber = pexConfig.Field(
+        dtype = float,
+        doc = "Maximum condition number for a well conditioned matrix",
+        default = 5.0e7,
+    )
+    conditionNumberType = pexConfig.ChoiceField(
+        dtype = str,
+        doc = "Use singular values (SVD) or eigen values (EIGENVALUE) to determine condition number",
+        default = "EIGENVALUE",
+        allowed = {
+            "SVD" : "Use singular values",
+            "EIGENVALUE" : "Use eigen values (faster)",
+        }
+    )
+    
+    ####
+    # Fitting of single kernel to object pair in KernelCandidate
+    iterateSingleKernel = pexConfig.Field(
+        dtype = bool,
+        doc = """Remake KernelCandidate using better variance estimate after first pass?
+                 Primarily useful when convolving a single-depth image, otherwise not necessary.""",
+        default = False,
+    )
+    constantVarianceWeighting = pexConfig.Field(
+        dtype = bool,
+        doc = """Use constant variance weighting in single kernel fitting?
+                 In some cases this is better for bright star residuals.""",
+        default = False,
+    )
+    calculateKernelUncertainty = pexConfig.Field(
+        dtype = bool,
+        doc = """Calculate kernel and background uncertainties for each kernel candidate?
+                 This comes from the inverse of the covariance matrix.
+                 Warning: regularization can cause problems for this step.""",
+        default = False,
+    )
+
+
+class PsfMatchConfigAL(PsfMatchConfig):
+    def setDefaults(self): 
+        PsfMatchConfig.setDefaults(self)
+        self.kernelBasisSet = "alard-lupton"
+        self.maxConditionNumber = 5.0e7
+
+    #####
+    # Alard-Lupton Basis Parameters
+    alardNGauss = pexConfig.Field(
+        dtype = int,
+        doc = "Number of gaussians in alard-lupton basis",
+        default = 3,
+    )
+    alardDegGauss = pexConfig.ListField(
+        dtype = int,
+        doc = "Degree of spatial modification of gaussians in alard-lupton basis",
+        default = (4, 3, 2),
+    )
+    alardSigGauss = pexConfig.ListField(
+        dtype = float,
+        doc = """Sigma in pixels of gaussians in alard-lupton basis (note: FWHM = 2.35 sigma).""",
+        default = (0.7, 1.5, 3.0),
+    )
+
+    alardNGaussDeconv = pexConfig.Field(
+        dtype = int,
+        doc = "Number of gaussians in deconvolving alard-lupton basis",
+        default = 4,
+    )
+    alardDegGaussDeconv = pexConfig.ListField(
+        dtype = int,
+        doc = """Degree of spatial modification of gaussians in alard-lupton basis during deconvolution""",
+        default = (5, 5, 3, 3,),
+    )
+
+
+    
+class PsfMatchConfigDF(PsfMatchConfig):
+    def setDefaults(self):
+        PsfMatchConfig.setDefaults(self)
+        self.kernelBasisSet = "delta-function"
+        self.maxConditionNumber = 5.0e6
+        self.usePcaForSpatialKernel = True
+        self.subtractMeanForPca = True
+
+    #####
+    # Delta Function Basis Parameters
+    useRegularization = pexConfig.Field(
+        dtype = bool,
+        doc = "Use regularization to smooth the delta function kernels",
+        default = True,
+    )
+
+    #####
+    # Regularization shape
+    regularizationType = pexConfig.ChoiceField(
+        dtype = str,
+        doc = "Type of regularization.",
+        default = "centralDifference",
+        allowed = {
+            "centralDifference": "Penalize second derivative using 2-D stencil of central finite difference",
+            "forwardDifference": "Penalize first, second, third or combination of derivatives using forward finite differeces"
+        }
+    )
+    centralRegularizationStencil = pexConfig.ChoiceField(
+        dtype = int,
+        doc = "Type of stencil to approximate central derivative (for centralDifference only)",
+        default = 9,
+        allowed = { 
+            5 : "5-point stencil including only adjacent-in-x,y elements",
+            9 : "9-point stencil including diagonal elements"
+        }
+    )
+    forwardRegularizationOrders = pexConfig.ListField(
+        dtype = int,
+        doc = "Array showing which order derivatives to penalize (for forwardDifference only)",
+        default = (1, 2),
+        itemCheck = lambda x: (x > 0) and (x < 4)
+    )
+    regularizationBorderPenalty = pexConfig.Field(
+        dtype = float,
+        doc = "Value of the penalty for kernel border pixels",
+        default = 3.0,
+    )
+
+    #####
+    # Regularization strength
+    lambdaType = pexConfig.ChoiceField(
+        dtype = str,
+        doc = "How to choose the value of the regularization strength",
+        default = "absolute",
+        allowed = {
+            "absolute" : "Use lambdaValue as the value of regularization strength",
+            "relative" : "Use lambdaValue as fraction of the default regularization strength (N.R. 18.5.8)",
+            "minimizeBiasedRisk" : "Minimize biased risk estimate",
+            "minimizeUnbiasedRisk" : "Minimize unbiased risk estimate",
+        }
+    )
+    lambdaValue = pexConfig.Field(
+        dtype = float,
+        doc = "Value used for absolute determinations of regularization strength",
+        default = 0.2,
+    )
+    lambdaScaling = pexConfig.Field(
+        dtype = float,
+        doc = "Fraction of the default lambda strength (N.R. 18.5.8) to use.  1e-4 or 1e-5",
+        default = 1e-4,
+    )
+    lambdaStepType = pexConfig.ChoiceField(
+        dtype = str,
+        doc = """If a scan through lambda is needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
+                 use log or linear steps""",
+        default = "log",
+        allowed = {
+            "log" : "Step in log intervals; e.g. lambdaMin, lambdaMax, lambdaStep = -1.0, 2.0, 0.1",
+            "linear" : "Step in linear intervals; e.g. lambdaMin, lambdaMax, lambdaStep = 0.1, 100, 0.1",
+        }
+    )
+    lambdaMin = pexConfig.Field(
+        dtype = float,
+        doc = """If scan through lambda needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
+                 start at this value.  If lambdaStepType = log:linear, suggest -1:0.1""",
+        default = -1.0,
+    )
+    lambdaMax = pexConfig.Field(
+        dtype = float,
+        doc = """If scan through lambda needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
+                 stop at this value.  If lambdaStepType = log:linear, suggest 2:100""",
+        default = 2.0,
+    )
+    lambdaStep = pexConfig.Field(
+        dtype = float,
+        doc = """If scan through lambda needed (minimizeBiasedRisk, minimizeUnbiasedRisk),
+                 step in these increments.  If lambdaStepType = log:linear, suggest 0.1:0.1""",
+        default = 0.1,
+    )
+
+
+class PsfMatch(pipeBase.Task):
+    """Base class for PSF matching task.  Has no run method; hence should not be called!
+    """
+    ConfigClass = PsfMatchConfig
+    def __init__(self, *args, **kwargs):
+        pipeBase.Task.__init__(self, *args, **kwargs)
+        self.kconfig = self.config.kernel.active
+
+        #
+        if 'useRegularization' in self.kconfig.keys():
+            self.useRegularization = self.kconfig.useRegularization
+        else:
+            self.useRegularization = False
+
+        if self.useRegularization:
+            self.hMat = diffimLib.makeRegularizationMatrix(pexConfig.makePolicy(self.kconfig))
+
+    def _diagnostic(self, kernelCellSet, spatialKernel, spatialBg):
+        # What is the final kernel sum
+        kImage = afwImage.ImageD(spatialKernel.getDimensions())
+        kSum = spatialKernel.computeImage(kImage, False)
+        pexLog.Trace(self.log.getName()+"._diagnostic", 1,
+                     "Final spatial kernel sum %.3f" % (kSum))
+
+        # Look at how well the solution is constrained
+        nBasisKernels = spatialKernel.getNBasisKernels()
+        nKernelTerms  = spatialKernel.getNSpatialParameters()
+        if nKernelTerms == 0: # order 0
+            nKernelTerms = 1
+
+        # Not fit for
+        nBgTerms     = spatialBg.getNParameters()
+        if nBgTerms == 1:
+            if spatialBg.getParameters()[0] == 0.0:
+                nBgTerms = 0
+        
+        nGood = 0
+        nBad  = 0
+        nTot  = 0
+        for cell in kernelCellSet.getCellList():
+            for cand in cell.begin(False): # False = include bad candidates
+                cand = diffimLib.cast_KernelCandidateF(cand)
+                nTot += 1
+                if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
+                    nGood += 1
+                if cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
+                    nBad += 1
+
+        # Counting statistics
+        if nBad > 2*nGood:
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
+                         "WARNING: many more candidates rejected than accepted; %d total, %d rejected, %d used" % (
+                          nTot, nBad, nGood) )
+        else:
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
+                         "NOTE: %d candidates total, %d rejected, %d used" % (nTot, nBad, nGood))
+            
+        # Some judgements on the quality of the spatial models
+        if nGood < nKernelTerms:
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
+                         "WARNING: spatial kernel model underconstrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
+            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
+                         "Consider lowering the spatial order")
+        elif nGood <= 2*nKernelTerms:
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
+                         "WARNING: spatial kernel model poorly constrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
+            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
+                         "Consider lowering the spatial order")
+        else:
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
+                         "NOTE: spatial kernel model appears well constrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
+
+        if nGood < nBgTerms:
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
+                         "WARNING: spatial background model underconstrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
+                         "Consider lowering the spatial order")
+        elif nGood <= 2*nBgTerms:
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
+                         "WARNING: spatial background model poorly constrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
+                         "Consider lowering the spatial order")
+        else:
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
+                         "NOTE: spatial background model appears well constrained; %d candidates, %d terms" % (nGood, nBgTerms))
+        
+    
+    def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
+        nComponents       = self.kconfig.numPrincipalComponents
+        imagePca          = afwImage.ImagePcaD()
+        importStarVisitor = diffimLib.KernelPcaVisitorF(imagePca)
+        kernelCellSet.visitCandidates(importStarVisitor, nStarPerCell)
+        if self.kconfig.subtractMeanForPca:
+            importStarVisitor.subtractMean()
+        imagePca.analyze()
+
+        eigenValues  = imagePca.getEigenValues()
+        pcaBasisList = importStarVisitor.getEigenKernels()
+
+        eSum = num.sum(eigenValues)
+        for j in range(len(eigenValues)):
+            pexLog.Trace(self.log.getName()+"._solve", 6, 
+                         "Eigenvalue %d : %f (%f)" % (j, eigenValues[j], eigenValues[j]/eSum))
+                                     
+        nToUse = min(nComponents, len(eigenValues))
+        trimBasisList = afwMath.KernelList()
+        for j in range(nToUse):
+            # Check for NaNs?
+            kimage = afwImage.ImageD(pcaBasisList[j].getDimensions())
+            pcaBasisList[j].computeImage(kimage, False)
+            if not (True in num.isnan(kimage.getArray())):
+                trimBasisList.push_back(pcaBasisList[j])
+                            
+        # Put all the power in the first kernel, which will not vary spatially
+        spatialBasisList = diffimLib.renormalizeKernelList(trimBasisList)
+
+        # New Kernel visitor for this new basis list (no regularization explicitly)
+        singlekvPca = diffimLib.BuildSingleKernelVisitorF(spatialBasisList, policy)
+        singlekvPca.setSkipBuilt(False)
+        kernelCellSet.visitCandidates(singlekvPca, nStarPerCell)
+        singlekvPca.setSkipBuilt(True)
+        nRejectedPca = singlekvPca.getNRejected()
+                    
+        return nRejectedPca, spatialBasisList
+
+    @pipeBase.timeMethod
+    def _solve(self, kernelCellSet, basisList, returnOnExcept = False):
         """Determine the PSF matching kernel
         
         @param kernelCellSet: a SpatialCellSet to use in determining the PSF matching kernel
             as provided by self._buildCellSet
-        @param returnOnExcept: if True then return (None, None) if an error occurs, else raise an exception
+        @param returnOnExcept: if True then return (None, None) if an error occurs, else raise the exception
         
         @return
         - psfMatchingKernel: PSF matching kernel
@@ -56,429 +652,143 @@ class PsfMatch(object):
         
         @raise Exception if unable to determine PSF matching kernel and returnOnExcept False
         """
+
+        maxSpatialIterations   = self.kconfig.maxSpatialIterations
+        nStarPerCell           = self.kconfig.nStarPerCell
+        usePcaForSpatialKernel = self.kconfig.usePcaForSpatialKernel
+        subtractMeanForPca     = self.kconfig.subtractMeanForPca
+
+        # Visitor for the single kernel fit
+        policy = pexConfig.makePolicy(self.kconfig)
+        if self.useRegularization:
+            singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy, self.hMat)
+        else:
+            singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy)
+
+        # Visitor for the kernel sum rejection
+        ksv = diffimLib.KernelSumVisitorF(policy)
+        
+        # Main loop
+        t0 = time.time()
         try:
-            kb = diffimLib.fitSpatialKernelFromCandidates(kernelCellSet, self._policy)
-        except pexExcept.LsstCppException, e:
-            pexLog.Trace(self._log.getName(), 1, "ERROR: Unable to calculate psf matching kernel")
-            pexLog.Trace(self._log.getName(), 2, e.args[0].what())
-    
-            if returnOnExcept:
-                return (None, None)
-            else:
-                raise
+            totalIterations = 0
+            thisIteration   = 0
+            while (thisIteration < maxSpatialIterations):
 
-        psfMatchingKernel = kb[0]
-        backgroundModel   = kb[1]
-    
-        # What is the status of the processing?
-        nGood = 0
-        for cell in kernelCellSet.getCellList():
-            for cand in cell.begin(True):
-                cand = diffimLib.cast_KernelCandidateF(cand)
-                if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
-                    nGood += 1
-        if nGood == 0:
-            pexLog.Trace(self._log.getName(), 1, "WARNING")
-        pexLog.Trace(self._log.getName(), 1, "Used %d kernels for spatial fit" % (nGood))
-    
-        return (psfMatchingKernel, backgroundModel)
+                # Make sure there are no uninitialized candidates as active occupants of Cell
+                nRejectedSkf = -1
+                while (nRejectedSkf != 0):
+                    pexLog.Trace(self.log.getName()+"._solve", 2, 
+                                 "Building single kernels...")
+                    kernelCellSet.visitCandidates(singlekv, nStarPerCell)
+                    nRejectedSkf = singlekv.getNRejected()
+                    pexLog.Trace(self.log.getName()+"._solve", 2, 
+                                 "Iteration %d, rejected %d candidates due to initial kernel fit" % (thisIteration, nRejectedSkf))
+
+                # Reject outliers in kernel sum 
+                ksv.resetKernelSum()
+                ksv.setMode(diffimLib.KernelSumVisitorF.AGGREGATE)
+                kernelCellSet.visitCandidates(ksv, nStarPerCell)
+                ksv.processKsumDistribution()
+                ksv.setMode(diffimLib.KernelSumVisitorF.REJECT)
+                kernelCellSet.visitCandidates(ksv, nStarPerCell)      
+
+                nRejectedKsum = ksv.getNRejected()
+                pexLog.Trace(self.log.getName()+"._solve", 2, 
+                             "Iteration %d, rejected %d candidates due to kernel sum" % (thisIteration, nRejectedKsum))
 
 
-class ImagePsfMatch(PsfMatch):
-    """PSF-match images to reference images
+                # Do we jump back to the top without incrementing thisIteration?
+                if nRejectedKsum > 0:
+                    totalIterations += 1
+                    continue
 
-    Fits the following model:
-    image to not convolve = (image to convolve convolved with PSF matching kernel) + background model
-    """
-    def __init__(self, policy, logName="lsst.ip.diffim.ImagePsfMatch"):
-        """Create a PsfMatchToImage
-        
-        @param policy: see lsst/ip/diffim/policy/PsfMatchingDictionary.paf
-        @param logName: name by which messages are logged
-        """
-        PsfMatch.__init__(self, policy, logName)
-        self._warper = afwMath.Warper.fromPolicy(policy.getPolicy("warpingPolicy"))
-
-    def _validateSize(self, maskedImageToConvolve, maskedImageToNotConvolve):
-        """Return True if two image-like objects are the same size
-        """
-        return maskedImageToConvolve.getDimensions() == maskedImageToNotConvolve.getDimensions()
-    
-    def _validateWcs(self, exposureToConvolve, exposureToNotConvolve):
-        """Return True if two Exposures have the same WCS
-        """
-        templateWcs    = exposureToConvolve.getWcs() 
-        scienceWcs     = exposureToNotConvolve.getWcs()
-        
-        # LLC
-        templateOrigin = templateWcs.pixelToSky(0, 0)
-        scienceOrigin  = scienceWcs.pixelToSky(0, 0)
-        # URC
-        templateLimit  = templateWcs.pixelToSky(exposureToConvolve.getWidth(),
-                                                exposureToConvolve.getHeight())
-        scienceLimit   = scienceWcs.pixelToSky(exposureToNotConvolve.getWidth(),
-                                               exposureToNotConvolve.getHeight())
-        
-        pexLog.Trace(self._log.getName(), 2,
-                     "Template limits : %f,%f -> %f,%f" %
-                     (templateOrigin[0], templateOrigin[1],
-                      templateLimit[0], templateLimit[1]))
-        pexLog.Trace(self._log.getName(), 2,
-                     "Science limits : %f,%f -> %f,%f" %
-                     (scienceOrigin[0], scienceOrigin[1],
-                      scienceLimit[0], scienceLimit[1]))
-
-        if ( (templateOrigin.getPosition() != scienceOrigin.getPosition()) or \
-             (templateLimit.getPosition()  != scienceLimit.getPosition())  or \
-             (exposureToConvolve.getDimensions() != exposureToNotConvolve.getDimensions())):
-            return False
-        return True
-        
-    def matchExposures(self, exposureToConvolve, exposureToNotConvolve,
-                       footprints = None, doWarping = True):
-        """Warp and PSF-match an exposure to the reference
-
-        Do the following, in order:
-        - Warp exposureToConvolve to match exposureToNotConvolve,
-            if doWarping True and their WCSs do not already match
-        - Determine a PSF matching kernel and differential background model
-            that matches exposureToConvolve to exposureToNotConvolve
-        - Convolve exposureToConvolve by PSF matching kernel
-        
-        @param exposure: Exposure to warp and PSF-match to the reference masked image
-        @param referenceMaskedImage: maskedImage whose PSF is to be matched
-        @param footprints: a list of footprints of sources; if None then source detection is run
-        @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
-            - if True then warp exposureToConvolve to match exposureToNotConvolve
-            - if False then raise an Exception
-        
-        @return
-        - psfMatchedExposure: the PSF-matched exposure =
-            warped exposureToConvolve convolved by psfMatchingKernel. This has:
-            - the same parent bbox, Wcs and Calib as exposureToNotConvolve
-            - the same filter as exposureToConvolve
-            - no Psf (because the PSF-matching process does not compute one)
-        - psfMatchingKernel: the PSF matching kernel
-        - backgroundModel: differential background model
-        - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
-        
-        @raise RuntimeError if doWarping is False and exposureToConvolve's and exposureToNotConvolve's
-            WCSs do not match
-        """
-        if not self._validateWcs(exposureToConvolve, exposureToNotConvolve):
-            if doWarping:
-                pexLog.Trace(self._log.getName(), 1, "Astrometrically registering template to science image")
-                exposureToConvolve = self._warper.warpExposure(exposureToNotConvolve.getWcs(), 
-                    exposureToConvolve, destBBox = exposureToNotConvolve.getBBox(afwImage.PARENT))
-            else:
-                pexLog.Trace(self._log.getName(), 1, "ERROR: Input images not registered")
-                raise RuntimeError, "Input images not registered"
+                # At this stage we can either apply the spatial fit to
+                # the kernels, or we run a PCA, use these as a *new*
+                # basis set with lower dimensionality, and then apply
+                # the spatial fit to these kernels
                 
-        psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet = self.matchMaskedImages(
-            exposureToConvolve.getMaskedImage(), exposureToNotConvolve.getMaskedImage(),
-            footprints = footprints)
-        
-        psfMatchedExposure = afwImage.makeExposure(psfMatchedMaskedImage, exposureToNotConvolve.getWcs())
-        psfMatchedExposure.setFilter(exposureToConvolve.getFilter())
-        psfMatchedExposure.setCalib(exposureToNotConvolve.getCalib())
+                if (usePcaForSpatialKernel):
+                    pexLog.Trace(self.log.getName()+"._solve", 1, "Building Pca basis")
 
-        return (psfMatchedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)
-    
-    def matchMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve, footprints = None):
-        """PSF-match a MaskedImage to a reference MaskedImage
+                    nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
+                    pexLog.Trace(self.log.getName()+"._solve", 2, 
+                                 "Iteration %d, rejected %d candidates due to Pca kernel fit" % (thisIteration, nRejectedPca))
+                    
+                    # We don't want to continue on (yet) with the
+                    # spatial modeling, because we have bad objects
+                    # contributing to the Pca basis.  We basically
+                    # need to restart from the beginning of this loop,
+                    # since the cell-mates of those objects that were
+                    # rejected need their original Kernels built by
+                    # singleKernelFitter.
 
-        Do the following, in order:
-        - Determine a PSF matching kernel and differential background model
-            that matches maskedImageToConvolve to maskedImageToNotConvolve
-        - Convolve maskedImageToConvolve by the PSF matching kernel
-        
-        @param maskedImageToConvolve: masked image to PSF-match to the reference masked image;
-            must be warped to match the reference masked image
-        @param maskedImageToNotConvolve: maskedImage whose PSF is to be matched
-        @param footprints: a list of footprints of sources; if None then source detection is run
-        
-        @return
-        - psfMatchedMaskedImage: the PSF-matched masked image =
-            maskedImageToConvolve convolved with psfMatchingKernel.
-            This has the same xy0, dimensions and wcs as maskedImageToNotConvolve.
-        - psfMatchingKernel: the PSF matching kernel
-        - backgroundModel: differential background model
-        - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
-        
-        @raise RuntimeError if input images have different dimensions
-        """
-        if not self._validateSize(maskedImageToConvolve, maskedImageToNotConvolve):
-            pexLog.Trace(self._log.getName(), 1, "ERROR: Input images different size")
-            raise RuntimeError, "Input images different size"
+                    # Don't count against thisIteration
+                    if (nRejectedPca > 0):
+                        totalIterations += 1
+                        continue
+                else:
+                    spatialBasisList = basisList
+
+                # We have gotten on to the spatial modeling part
+                regionBBox = kernelCellSet.getBBox()
+                spatialkv  = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, policy)
+                kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
+                spatialkv.solveLinearEquation()
+                pexLog.Trace(self.log.getName()+"._solve", 3, 
+                             "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
+                spatialKernel, spatialBackground = spatialkv.getSolutionPair()
+
+                # Check the quality of the spatial fit (look at residuals)
+                assesskv   = diffimLib.AssessSpatialKernelVisitorF(spatialKernel, spatialBackground, policy)
+                kernelCellSet.visitCandidates(assesskv, nStarPerCell)
+                nRejectedSpatial = assesskv.getNRejected()
+                nGoodSpatial     = assesskv.getNGood()
+                pexLog.Trace(self.log.getName()+"._solve", 2, 
+                             "Iteration %d, rejected %d candidates due to spatial kernel fit" % (thisIteration, nRejectedSpatial))
+                pexLog.Trace(self.log.getName()+"._solve", 2, 
+                             "%d candidates used in fit" % (nGoodSpatial))
+                
+                # If only nGoodSpatial == 0, might be other candidates in the cells
+                if nGoodSpatial == 0 and nRejectedSpatial == 0:
+                    raise RuntimeError("No kernel candidates for spatial fit")
+
+                if nRejectedSpatial == 0:
+                    # Nothing rejected, finished with spatial fit
+                    break
+                
+                # Otherwise, iterate on...
+                thisIteration   += 1
+
+            # Final fit if above did not converge
+            if (nRejectedSpatial > 0) and (thisIteration == maxSpatialIterations):
+                pexLog.Trace(self.log.getName()+"._solve", 2, "Final spatial fit")
+                if (usePcaForSpatialKernel):
+                    nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
+                regionBBox = kernelCellSet.getBBox()
+                spatialkv  = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, policy)
+                kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
+                spatialkv.solveLinearEquation()
+                pexLog.Trace(self.log.getName()+"._solve", 3, 
+                             "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
+                spatialKernel, spatialBacakground = spatialkv.getSolutionPair()
+
+
+        except pexExcept.LsstCppException, e:
+            pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
+            pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0].what())
+            raise e
+        except Exception, e:
+            pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
+            pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0])
+            raise e
             
-        self._log.log(pexLog.Log.INFO, "compute PSF-matching kernel")
-        kernelCellSet = self._buildCellSet(maskedImageToConvolve,
-                                           maskedImageToNotConvolve,
-                                           footprints = footprints)
-        psfMatchingKernel, backgroundModel = self._solve(kernelCellSet)
-    
-        self._log.log(pexLog.Log.INFO, "PSF-match science MaskedImage to reference")
-        psfMatchedMaskedImage = afwImage.MaskedImageF(maskedImageToConvolve.getBBox(afwImage.PARENT))
-        doNormalize = False
-        afwMath.convolve(psfMatchedMaskedImage, maskedImageToConvolve, psfMatchingKernel, doNormalize)
-        self._log.log(pexLog.Log.INFO, "done")
-        return (psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet)
+      
+        t1 = time.time()
+        pexLog.Trace(self.log.getName()+"._solve", 1, 
+                     "Total time to compute the spatial kernel : %.2f s" % (t1 - t0))
+        pexLog.Trace(self.log.getName()+"._solve", 2, "")
 
-    def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
-                          footprints = None, doWarping = True):
-        """Subtract two Exposures
+        self._diagnostic(kernelCellSet, spatialKernel, spatialBackground)
         
-        Do the following, in order:
-        - Warp exposureToConvolve to match exposureToNotConvolve, if their WCSs do not already match
-        - Determine a PSF matching kernel and differential background model
-            that matches exposureToConvolve to exposureToNotConvolve
-        - PSF-match exposureToConvolve to exposureToNotConvolve
-        - Compute subtracted exposure (see return values for equation).
-
-        @param exposureToConvolve: exposure to PSF-matched to exposureToNotConvolve
-        @param exposureToNotConvolve: reference Exposure
-        
-        @return
-        - subtractedExposure: subtracted Exposure = exposureToNotConvolve -
-            ((warped exposureToConvolve convolved with psfMatchingKernel) + backgroundModel)
-        - psfMatchingKernel: PSF matching kernel
-        - backgroundModel: differential background model
-        - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
-        """
-        results = self.matchExposures(exposureToConvolve, exposureToNotConvolve,
-                                      footprints = footprints,
-                                      doWarping = doWarping)
-
-        psfMatchedExposure, psfMatchingKernel, backgroundModel, kernelCellSet = results
-        subtractedExposure  = afwImage.ExposureF(exposureToNotConvolve, True)
-        smi  = subtractedExposure.getMaskedImage()
-        smi -= psfMatchedExposure.getMaskedImage()
-        smi -= backgroundModel
-        return (subtractedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)
-
-    def subtractMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve,
-                             footprints = None):
-        """Subtract two MaskedImages
-        
-        Do the following, in order:
-        - PSF-match maskedImageToConvolve to maskedImageToNotConvolve
-        - Determine the differential background
-        - Return the difference: maskedImageToNotConvolve -
-            ((warped maskedImageToConvolve convolved with psfMatchingKernel) + backgroundModel)
-        
-        @param maskedImageToConvolve: MaskedImage to PSF-matched to maskedImageToNotConvolve
-        @param maskedImageToNotConvolve: reference MaskedImage
-        @param footprints: a list of footprints of sources; if None then source detection is run
-        
-        @return
-        - subtractedMaskedImage = maskedImageToNotConvolve -
-            ((maskedImageToConvolve convolved with psfMatchingKernel) + backgroundModel)
-        - psfMatchingKernel: PSF matching kernel
-        - backgroundModel: differential background model
-        - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
-        """
-
-        results = self.matchMaskedImages(maskedImageToConvolve,
-                                         maskedImageToNotConvolve,
-                                         footprints = footprints)
-        
-        psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet = results 
-        subtractedMaskedImage  = afwImage.MaskedImageF(maskedImageToNotConvolve, True)
-        subtractedMaskedImage -= psfMatchedMaskedImage
-        subtractedMaskedImage -= backgroundModel
-        return (subtractedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet)
-
-    def _buildCellSet(self, maskedImageToConvolve, maskedImageToNotConvolve, footprints = None):
-        """Build a SpatialCellSet for use with the solve method
-
-        @param maskedImageToConvolve: MaskedImage to PSF-matched to maskedImageToNotConvolve
-        @param maskedImageToNotConvolve: reference MaskedImage
-        @param footprints: a list of footprints of sources; if None then source detection is run
-        
-        @return kernelCellSet: a SpatialCellSet for use with self._solve
-        """
-        # Object to store the KernelCandidates for spatial modeling
-        kernelCellSet = afwMath.SpatialCellSet(maskedImageToConvolve.getBBox(afwImage.PARENT),
-                                               self._policy.getInt("sizeCellX"),
-                                               self._policy.getInt("sizeCellY"))
-        
-        # Candidate source footprints to use for Psf matching
-        if footprints == None:
-            # If you need to fit for background in ip_diffim, we need
-            # to subtract it off before running detection
-            if self._policy.get("fitForBackground"):
-                self._log.log(pexLog.Log.INFO, "temporarily subtracting backgrounds for detection")
-                bkgds = diffimTools.backgroundSubtract(self._policy.getPolicy("afwBackgroundPolicy"),
-                                                       [maskedImageToConvolve, maskedImageToNotConvolve])
-            
-            kcDetect = diffimLib.KernelCandidateDetectionF(self._policy.getPolicy("detectionPolicy"))
-            kcDetect.apply(maskedImageToConvolve, maskedImageToNotConvolve)
-            footprints = kcDetect.getFootprints()
-
-            if self._policy.get("fitForBackground"):
-                maskedImageToConvolve += bkgds[0]
-                maskedImageToNotConvolve += bkgds[1]
-
-        # Place candidate footprints within the spatial grid
-        for fp in footprints:
-            bbox = fp.getBBox()
-            
-            # Grab the centers in the parent's coordinate system
-            xC   = 0.5 * ( bbox.getMinX() + bbox.getMaxX() )
-            yC   = 0.5 * ( bbox.getMinY() + bbox.getMaxY() )
-            
-            tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox, afwImage.PARENT)
-            smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox, afwImage.PARENT)
-            cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, self._policy)
-            
-            pexLog.Trace(self._log.getName(), 5,
-                         "Candidate %d at %f, %f" % (cand.getId(), cand.getXCenter(), cand.getYCenter()))
-            kernelCellSet.insertCandidate(cand)
-
-        return kernelCellSet
-        
-
-class ModelPsfMatch(PsfMatch):
-    """PSF-match PSF models to reference PSF models
-    """
-    def __init__(self, policy, logName="lsst.ip.diffim.ModelPsfMatch", mergePolicy = False):
-        """Create a PsfMatchToModel
-        
-        @param policy: see lsst/ip/diffim/policy/PsfMatchingDictionary.paf
-        @param logName: name by which messages are logged
-        @param mergePolicy: merge ip_diffim/policy/MatchPsfModels.paf into existing policy;
-            this is a temporary hack
-        """
-        PsfMatch.__init__(self, policy, logName)
-
-        # Changes to policy particular to matchPsfModels
-        if mergePolicy:
-            policyFile = pexPolicy.DefaultPolicyFile("ip_diffim", "MatchPsfModels.paf", "policy")
-            matchPolicy = pexPolicy.Policy.createPolicy(policyFile, policyFile.getRepositoryPath(), True)
-            matchPolicy.mergeDefaults(self._policy.getDictionary())
-            self._policy = matchPolicy
-    
-    def matchExposure(self, exposure, referencePsfModel, kernelSum=1.0):
-        """PSF-match an exposure to a PSF model.
-        
-        @param exposure: Exposure to PSF-match to the reference masked image;
-            must contain a PSF model and must be warped to match the reference masked image
-        @param referencePsfModel: PSF model to match (an afwDetection.Psf)
-        @param kernelSum: A multipicative factor reflecting the difference in 
-            zeropoints between the images; kernelSum = zpt(science) / zpt(ref)
-        
-        @return
-        - psfMatchedExposure: the PSF-matched exposure.
-            This has the same parent bbox, Wcs, Calib and Filter as exposure but no psf.
-            In theory the psf should equal referencePsfModel but the match is likely not exact.
-        - psfMatchingKernel: the PSF matching kernel
-        - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
-        
-        @raise RuntimeError if exposure does not contain a PSF model"
-        """
-        if not exposure.hasPsf():
-            raise RuntimeError("exposure does not contain a PSF model")
-
-        maskedImage = exposure.getMaskedImage()
-
-        self._log.log(pexLog.Log.INFO, "compute PSF-matching kernel")
-        kernelCellSet = self._buildCellSet(referencePsfModel,
-                                           exposure.getBBox(afwImage.PARENT),
-                                           exposure.getPsf(), kernelSum)
-        psfMatchingKernel, backgroundModel = self._solve(kernelCellSet)
-        
-        self._log.log(pexLog.Log.INFO, "PSF-match science exposure to reference")
-        psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(afwImage.PARENT), exposure.getWcs())
-        psfMatchedExposure.setFilter(exposure.getFilter())
-        psfMatchedExposure.setCalib(exposure.getCalib())
-        psfMatchedMaskedImage = psfMatchedExposure.getMaskedImage()
-
-        # Normalize the psf-matching kernel while convolving since its magnitude is meaningless
-        # when PSF-matching one model to another.
-        doNormalize = True
-        afwMath.convolve(psfMatchedMaskedImage, maskedImage, psfMatchingKernel, doNormalize)
-        
-        self._log.log(pexLog.Log.INFO, "done")
-        return (psfMatchedExposure, psfMatchingKernel, kernelCellSet)
-
-    def _buildCellSet(self, referencePsfModel, scienceBBox, sciencePsfModel, kernelSum = 1.0):
-        """Build a SpatialCellSet for use with the solve method
-
-        @param referencePsfModel: PSF model to match (an afwDetection.Psf)
-        @param scienceBBox: parent bounding box on science image
-        @param sciencePsfModel: PSF model for science image
-        
-        @return kernelCellSet: a SpatialCellSet for use with self._solve
-        
-        @raise RuntimeError if reference PSF model and science PSF model have different dimensions
-        """
-        if (referencePsfModel.getKernel().getDimensions() != sciencePsfModel.getKernel().getDimensions()):
-            pexLog.Trace(self._log.getName(), 1,
-                         "ERROR: Dimensions of reference Psf and science Psf different; exiting")
-            raise RuntimeError, "ERROR: Dimensions of reference Psf and science Psf different; exiting"
-    
-        kernelWidth, kernelHeight = referencePsfModel.getKernel().getDimensions()
-        maxPsfMatchingKernelSize = 1 + (min(kernelWidth - 1, kernelHeight - 1) // 2)
-        if maxPsfMatchingKernelSize % 2 == 0:
-            maxPsfMatchingKernelSize -= 1
-        if self._policy.get('kernelSize') > maxPsfMatchingKernelSize:
-            pexLog.Trace(self._log.getName(), 1,
-                         "WARNING: Resizing matching kernel to size %d x %d" % (maxPsfMatchingKernelSize,
-                                                                                maxPsfMatchingKernelSize))
-            self._policy.set('kernelSize', maxPsfMatchingKernelSize)
-        
-        regionSizeX, regionSizeY = scienceBBox.getDimensions()
-        scienceX0,   scienceY0   = scienceBBox.getMin()
-    
-        sizeCellX = self._policy.get("sizeCellX")
-        sizeCellY = self._policy.get("sizeCellY")
-    
-        kernelCellSet = afwMath.SpatialCellSet(
-            afwGeom.Box2I(afwGeom.Point2I(scienceX0, scienceY0),
-                          afwGeom.Extent2I(regionSizeX, regionSizeY)),
-            sizeCellX, sizeCellY
-            )
-    
-        nCellX    = regionSizeX // sizeCellX
-        nCellY    = regionSizeY // sizeCellY
-        dimenR    = referencePsfModel.getKernel().getDimensions()
-        dimenS    = sciencePsfModel.getKernel().getDimensions()
-    
-        for row in range(nCellY):
-            # place at center of cell
-            posY = sizeCellY * row + sizeCellY // 2 + scienceY0
-            
-            for col in range(nCellX):
-                # place at center of cell
-                posX = sizeCellX * col + sizeCellX // 2 + scienceX0
-    
-                pexLog.Trace(self._log.getName(), 5, "Creating Psf candidate at %.1f %.1f" % (posX, posY))
-    
-                # reference kernel image, at location of science subimage
-                kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY), True).convertF()
-                imsum = afwMath.makeStatistics(kernelImageR, afwMath.SUM).getValue(afwMath.SUM)
-                kernelImageR /= imsum         # image sums to 1.0 
-                kernelImageR /= kernelSum     # image sums to 1/kernelSum
-                kernelMaskR   = afwImage.MaskU(dimenR)
-                kernelMaskR.set(0)
-                kernelVarR    = afwImage.ImageF(dimenR)
-                kernelVarR.set(1.0)
-                referenceMI   = afwImage.MaskedImageF(kernelImageR, kernelMaskR, kernelVarR)
-     
-                kernelImageS = sciencePsfModel.computeImage(afwGeom.Point2D(posX, posY), True).convertF()
-                imsum = afwMath.makeStatistics(kernelImageS, afwMath.SUM).getValue(afwMath.SUM)
-                kernelImageS /= imsum
-                kernelMaskS   = afwImage.MaskU(dimenS)
-                kernelMaskS.set(0)
-                kernelVarS    = afwImage.ImageF(dimenS)
-                kernelVarS.set(1.0)
-                scienceMI     = afwImage.MaskedImageF(kernelImageS, kernelMaskS, kernelVarS)
-
-                #referenceMI.writeFits('ref_%d_%d.fits' % (row, col))
-                #scienceMI.writeFits('sci_%d_%d.fits' % (row, col))
- 
-                # The image to convolve is the science image, to the reference Psf.
-                kc = diffimLib.makeKernelCandidate(posX, posY, scienceMI, referenceMI, self._policy)
-                kernelCellSet.insertCandidate(kc)
-
-        return kernelCellSet
+        return spatialKernel, spatialBackground

@@ -162,10 +162,12 @@ def addNoise(mi):
     var  = mi.getVariance()
     var += 1.0
 
-def testAutoCorrelation(orderMake, orderFit, policy = None, inMi = None, display = False):
-    if policy == None:
-        policy = ipDiffim.makeDefaultPolicy()
-    policy.set("fitForBackground", True)
+def testAutoCorrelation(orderMake, orderFit, inMi = None, display = False):
+    config = ipDiffim.ImagePsfMatchTask.ConfigClass()
+    config.kernel.name = "AL"
+    subconfig = config.kernel.active
+
+    subconfig.fitForBackground = True
 
     stride = 100
     
@@ -174,20 +176,22 @@ def testAutoCorrelation(orderMake, orderFit, policy = None, inMi = None, display
         height = 2048
         inMi = afwImage.MaskedImageF(afwGeom.Extent2I(width, height))
         for j in num.arange(stride//2, height, stride):
+            j = int(j)
             for i in num.arange(stride//2, width, stride):
-                inMi.set(i-1, j-1, (100, 0x0, 1))
-                inMi.set(i-1, j+0, (100, 0x0, 1))
-                inMi.set(i-1, j+1, (100, 0x0, 1))
-                inMi.set(i+0, j-1, (100, 0x0, 1))
-                inMi.set(i+0, j+0, (100, 0x0, 1))
-                inMi.set(i+0, j+1, (100, 0x0, 1))
-                inMi.set(i+1, j-1, (100, 0x0, 1))
-                inMi.set(i+1, j+0, (100, 0x0, 1))
-                inMi.set(i+1, j+1, (100, 0x0, 1))
+                i = int(i)
+                inMi.set(i-1, j-1, (100., 0x0, 1.))
+                inMi.set(i-1, j+0, (100., 0x0, 1.))
+                inMi.set(i-1, j+1, (100., 0x0, 1.))
+                inMi.set(i+0, j-1, (100., 0x0, 1.))
+                inMi.set(i+0, j+0, (100., 0x0, 1.))
+                inMi.set(i+0, j+1, (100., 0x0, 1.))
+                inMi.set(i+1, j-1, (100., 0x0, 1.))
+                inMi.set(i+1, j+0, (100., 0x0, 1.))
+                inMi.set(i+1, j+1, (100., 0x0, 1.))
 
     addNoise(inMi)
     
-    kSize = policy.get('kernelSize')
+    kSize = subconfig.kernelSize
 
     basicGaussian1 = afwMath.GaussianFunction2D(2., 2., 0.)
     basicKernel1   = afwMath.AnalyticKernel(kSize, kSize, basicGaussian1)
@@ -215,23 +219,23 @@ def testAutoCorrelation(orderMake, orderFit, policy = None, inMi = None, display
         ds9.mtv(cMi.getImage(), frame=3)
         ds9.mtv(cMi.getVariance(), frame=4)
         
-    policy.set("spatialKernelOrder", orderFit)
-    policy.set("sizeCellX", stride)
-    policy.set("sizeCellY", stride)
-    #policy.set("kernelBasisSet", "alard-lupton")
-    
-    result = ipDiffim.subtractMaskedImages(inMi, cMi, policy)
-    differenceMaskedImage, spatialKernel, spatialBg, kernelCellSet = result
+    subconfig.spatialKernelOrder = orderFit
+    subconfig.sizeCellX = stride
+    subconfig.sizeCellY = stride
+    psfmatch = ipDiffim.ImagePsfMatchTask(config=config)
+    result = psfmatch.run(inMi, cMi, "subtractMaskedImages")
+
+    differenceMaskedImage = result.subtractedImage
+    spatialKernel         = result.psfMatchingKernel
+    spatialBg             = result.backgroundModel
+    kernelCellSet         = result.kernelCellSet
     makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot = True)
 
-def doOverConstrained(policy = None, inMi = None, display = False):
-    testAutoCorrelation(orderMake = 1, orderFit = 3, policy = policy, inMi = inMi, display = display)
+def doOverConstrained(inMi = None, display = False):
+    testAutoCorrelation(orderMake = 1, orderFit = 3, inMi = inMi, display = display)
 
-
-def doUnderConstrained(policy = None, inMi = None, display = False):
-    testAutoCorrelation(orderMake = 2, orderFit = 0, policy = policy, inMi = inMi, display = display)
-
-    
+def doUnderConstrained(inMi = None, display = False):
+    testAutoCorrelation(orderMake = 2, orderFit = 0, inMi = inMi, display = display)
 
 if __name__ == '__main__':
     doOverConstrained(display = True)

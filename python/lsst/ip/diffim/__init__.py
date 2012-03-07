@@ -27,8 +27,11 @@ from diffimLib import *
 
 # python code
 from psfMatch import *
-from makeRatingVector import *
-from makeDefaultPolicy import *
+from imagePsfMatch import *
+from modelPsfMatch import *
+from snapPsfMatch import *
+from diaSourceAnalysis import *
+from makeKernelBasisList import *
 
 from diffimTools import *
 

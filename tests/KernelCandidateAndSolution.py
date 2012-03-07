@@ -10,6 +10,7 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
 import numpy as num
 
@@ -18,9 +19,14 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
+        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config.kernel.name = "DF"
+        self.subconfig = self.config.kernel.active
+
+        self.policy = pexConfig.makePolicy(self.subconfig)
         self.policy.set('fitForBackground', True) # we are testing known background recovery here
         self.policy.set('checkConditionNumber', False) # just in case
+        self.policy.set("useRegularization", False)
 
         # known input images
         self.defDataDir = eups.productDir('afwdata')
@@ -36,7 +42,7 @@ class DiffimTestCases(unittest.TestCase):
             scienceExposure.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
             templateExposure.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
             # do the warping first so we don't have any masked pixels in the postage stamps
-            warper = afwMath.Warper.fromPolicy(self.policy.getPolicy("warpingPolicy"))
+            warper = afwMath.Warper.fromConfig(self.subconfig.warpingConfig)
             templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
                 destBBox = scienceExposure.getBBox(afwImage.PARENT))
 
@@ -155,9 +161,7 @@ class DiffimTestCases(unittest.TestCase):
                                        sIm,
                                        self.policy)
 
-        self.policy.set("kernelBasisSet", "delta-function")
-        self.policy.set("useRegularization", False)
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
                                          kSum = scaling)
@@ -170,9 +174,7 @@ class DiffimTestCases(unittest.TestCase):
                                        sIm,
                                        self.policy)
 
-        self.policy.set("kernelBasisSet", "delta-function")
-        self.policy.set("useRegularization", False)
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
                                          bg = bg)
@@ -191,9 +193,7 @@ class DiffimTestCases(unittest.TestCase):
                                        self.templateExposure2.getMaskedImage(),
                                        self.policy)
 
-        self.policy.set("kernelBasisSet", "delta-function")
-        self.policy.set("useRegularization", False)
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
 
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
@@ -265,9 +265,7 @@ class DiffimTestCases(unittest.TestCase):
         smi2 = afwImage.MaskedImageF(smi, bbox, afwImage.LOCAL)
 
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
-        self.policy.set("kernelBasisSet", "delta-function")
-        self.policy.set("useRegularization", False)
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -295,9 +293,7 @@ class DiffimTestCases(unittest.TestCase):
         # now repeat with noise added; decrease precision of comparison
         bkg = self.addNoise(smi2)
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
-        self.policy.set("kernelBasisSet", "delta-function")
-        self.policy.set("useRegularization", False)
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -356,9 +352,7 @@ class DiffimTestCases(unittest.TestCase):
  
 
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi2, smi2, self.policy)
-        self.policy.set("kernelBasisSet", "delta-function")
-        self.policy.set("useRegularization", False)
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -375,8 +369,6 @@ class DiffimTestCases(unittest.TestCase):
         gsize = self.policy.getInt("kernelSize")
         tsize = imsize + gsize
 
-        self.policy.set("kernelBasisSet", "delta-function")
-        
         tmi = afwImage.MaskedImageF(afwGeom.Extent2I(tsize, tsize))
         tmi.set(0, 0x0, 1.0)
         cpix = tsize // 2
@@ -385,7 +377,7 @@ class DiffimTestCases(unittest.TestCase):
         smi.set(0, 0x0, 1.0)
         smi.set(cpix, cpix, (1, 0x0, 0.0))
 
-        kList = ipDiffim.makeKernelBasisList(self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi, smi, self.policy)
         try:
             kc.build(kList)
@@ -429,7 +421,7 @@ class DiffimTestCases(unittest.TestCase):
                 nSeen += 1
         self.assertEqual(nSeen, 1)
         
-    def xtestDisp(self):
+    def dontTestDisp(self):
         ds9.mtv(self.scienceImage2, frame=1)
         ds9.mtv(self.templateExposure2, frame=2)
         

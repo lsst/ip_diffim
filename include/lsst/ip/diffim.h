@@ -29,6 +29,9 @@
 
 #include "lsst/ip/diffim/BasisLists.h"
 #include "lsst/ip/diffim/ImageSubtract.h"
+#include "lsst/ip/diffim/ImageStatistics.h"
+#include "lsst/ip/diffim/FindSetBits.h"
+
 #include "lsst/ip/diffim/KernelSolution.h"
 #include "lsst/ip/diffim/KernelCandidate.h"
 #include "lsst/ip/diffim/KernelCandidateDetection.h"

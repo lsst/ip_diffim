@@ -8,19 +8,26 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.ip.diffim as ipDiffim
+import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
+import lsst.pex.config as pexConfig
+import lsst.afw.display.ds9 as ds9
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
-        self.policy = ipDiffim.makeDefaultPolicy()
-        self.policy.set("kernelBasisSet", "delta-function")
+        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config.kernel.name = "DF"
+        self.subconfig = self.config.kernel.active
+
+        self.kList  = ipDiffim.makeKernelBasisList(self.subconfig)
+        self.policy = pexConfig.makePolicy(self.subconfig)
         self.policy.set("useRegularization", False)
-        self.kList = ipDiffim.makeKernelBasisList(self.policy)
 
     def tearDown(self):
+        del self.config
         del self.policy
         del self.kList
 
@@ -33,6 +40,72 @@ class DiffimTestCases(unittest.TestCase):
         mi2.set(size//2, size//2, (kSum, 0x0, kSum))
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
+
+    def testGaussian(self, size = 51):
+        gaussFunction = afwMath.GaussianFunction2D(2, 3)
+        gaussKernel   = afwMath.AnalyticKernel(size, size, gaussFunction)
+        
+        imagePca1 = afwImage.ImagePcaD()  # mean subtract
+        imagePca2 = afwImage.ImagePcaD()  # don't mean subtract
+        kpv1      = ipDiffim.KernelPcaVisitorF(imagePca1)
+        kpv2      = ipDiffim.KernelPcaVisitorF(imagePca2)
+
+        kRefIm    = None
+
+        frame = 0
+        for i in range(100):
+            kImage1 = afwImage.ImageD(gaussKernel.getDimensions())
+            gaussKernel.computeImage(kImage1, False)
+            kImage1 *= 10000  # to get some decent peak source counts
+            kImage1 += 10     # to get some sky background noise
+
+            if kRefIm == None:
+                kRefIm = kImage1
+
+            kImage1 = diffimTools.makePoissonNoiseImage(kImage1)
+            kImage2 = afwImage.ImageD(kImage1, True)
+
+            imagePca1.addImage(kImage1, 1.0)
+            imagePca2.addImage(kImage2, 1.0)
+                           
+        kpv1.subtractMean()
+
+        imagePca1.analyze()
+        imagePca2.analyze()
+
+        pcaBasisList1 = kpv1.getEigenKernels()
+        pcaBasisList2 = kpv2.getEigenKernels()
+        
+        eVal1 = imagePca1.getEigenValues()
+        eVal2 = imagePca2.getEigenValues()
+
+        # First term is far more signficant without mean subtraction
+        self.assertTrue(eVal2[0] > eVal1[0])
+
+        # Last term basically zero with mean subtraction
+        self.assertAlmostEqual(eVal1[-1], 0.0)
+
+        # Extra image with mean subtraction
+        self.assertTrue(len(pcaBasisList1) == (len(eVal1) + 1))
+
+        # Same shape
+        self.assertTrue(len(pcaBasisList2) == len(eVal2))
+
+        # Mean kernel close to kRefIm
+        kImageM = afwImage.ImageD(gaussKernel.getDimensions())
+        pcaBasisList1[0].computeImage(kImageM, False)
+        for y in range(kRefIm.getHeight()):
+            for x in range(kRefIm.getWidth()):
+                self.assertTrue( abs(kRefIm.get(x, y) - kImageM.get(x, y)) / kRefIm.get(x, y) < 0.2 )
+
+        # First mean-unsubtracted Pca kernel close to kRefIm (normalized to peak of 1.0)
+        kImage0 = afwImage.ImageD(gaussKernel.getDimensions())
+        pcaBasisList2[0].computeImage(kImage0, False)
+        maxVal  = afwMath.makeStatistics(kRefIm, afwMath.MAX).getValue(afwMath.MAX)
+        kRefIm /= maxVal
+        for y in range(kRefIm.getHeight()):
+            for x in range(kRefIm.getWidth()):
+                self.assertTrue( abs(kRefIm.get(x, y) - kImage0.get(x, y)) / kRefIm.get(x, y) < 0.2 )
 
     def testImagePca(self):
         # Test out the ImagePca behavior
@@ -56,13 +129,8 @@ class DiffimTestCases(unittest.TestCase):
             for j in range(i, len(eigenImages)):
                 print i, j, afwImage.innerProduct(eigenImages[i], eigenImages[j])
         
-
-    def xtestAlardLupton(self):
-        self.policy.set("kernelBasisSet", "alard-lupton")
-        self.kList = ipDiffim.makeKernelBasisList(self.policy)
-        nTerms = len(self.kList)
-        
-    def xtestEigenValues(self):
+       
+    def testEigenValues(self):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc1.build(self.kList)
 
@@ -91,7 +159,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertAlmostEqual(eigenValues[1], 0.0)
         self.assertAlmostEqual(eigenValues[2], 0.0)
         
-    def xtestMeanSubtraction(self):
+    def testMeanSubtraction(self):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc1.build(self.kList)
 
@@ -133,9 +201,7 @@ class DiffimTestCases(unittest.TestCase):
                 else:
                     self.assertAlmostEqual(imageMean.get(x, y), 0.0)
 
-    def xtestVisit(self, nCell = 3):
-        # This currently fails since I can't get visitCandidates to
-        # tell this is a pointer
+    def testVisit(self, nCell = 3):
         imagePca = afwImage.ImagePcaD()
         kpv = ipDiffim.makeKernelPcaVisitor(imagePca)
 
@@ -168,8 +234,8 @@ class DiffimTestCases(unittest.TestCase):
         eigenValues = imagePca.getEigenValues()
 
         # took in 3 images
-        self.assertEqual(len(eigenImages), 3)
-        self.assertEqual(len(eigenValues), 3)
+        self.assertEqual(len(eigenImages), nCell * nCell)
+        self.assertEqual(len(eigenValues), nCell * nCell)
 
         # all the same shape, only 1 eigenvalue
         self.assertAlmostEqual(eigenValues[0], 1.0)
