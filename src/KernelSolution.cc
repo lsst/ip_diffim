@@ -540,15 +540,14 @@ namespace diffim {
 
         /* Create a Footprint that contains all the masked pixels set above */
         afwDet::Threshold threshold = afwDet::Threshold(bitMask, afwDet::Threshold::BITMASK, true);
-        afwDet::FootprintSet<InputT, afwImage::MaskPixel> maskFpSet(pixelMask, threshold, true);
+        afwDet::FootprintSet maskFpSet(pixelMask, threshold, true);
 
         /* And spread it by the kernel half width */
         int growPix = (*kiter)->getCtr().getX();
-        afwDet::FootprintSet<InputT, afwImage::MaskPixel> maskedFpSetGrown = 
-            afwDet::FootprintSet<InputT, afwImage::MaskPixel>(maskFpSet, growPix, true);
+        afwDet::FootprintSet maskedFpSetGrown(maskFpSet, growPix, true);
         
-        /*
-        for (typename afwDet::FootprintSet<InputT, afwImage::MaskPixel>::FootprintList::iterator 
+#if 0
+        for (typename afwDet::FootprintSet::FootprintList::iterator 
                  ptr = maskedFpSetGrown.getFootprints()->begin(),
                  end = maskedFpSetGrown.getFootprints()->end(); 
              ptr != end; 
@@ -558,7 +557,7 @@ namespace diffim {
                                          (**ptr),
                                          afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD"));
         }
-        */
+#endif
 
         afwImage::Mask<afwImage::MaskPixel> finalMask(pixelMask.getDimensions());
         afwDet::setMaskFromFootprintList(&finalMask, 
