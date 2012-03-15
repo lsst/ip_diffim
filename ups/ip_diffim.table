@@ -1,4 +1,4 @@
-setupRequired(afw >= 4.7.3.0)
+setupRequired(afw >= 5.0.1.0)
 setupRequired(numpy)
 setupRequired(pex_config)
 setupRequired(pipe_base)
