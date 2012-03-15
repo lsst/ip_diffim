@@ -99,7 +99,7 @@ namespace diffim {
             afwDetect::createThreshold(detThreshold, detThresholdType);
 
         if (detOnTemplate == true) {
-            afwDetect::FootprintSet<PixelT> footprintSet(
+            afwDetect::FootprintSet footprintSet(
                 *(miToConvolvePtr), 
                 threshold,
                 "",
@@ -112,7 +112,7 @@ namespace diffim {
                               footprintListInPtr->size(), detThreshold, detThresholdType.c_str());
         }
         else {
-            afwDetect::FootprintSet<PixelT> footprintSet(
+            afwDetect::FootprintSet footprintSet(
                 *(miToNotConvolvePtr), 
                 threshold,
                 "",
