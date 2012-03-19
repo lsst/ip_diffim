@@ -33,8 +33,8 @@
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
-#include "lsst/ndarray.h"
-#include "lsst/ndarray/eigen.h"
+#include "ndarray.h"
+#include "ndarray/eigen.h"
 
 #define DEBUG_MATRIX  0
 #define DEBUG_MATRIX2 0
@@ -44,8 +44,7 @@ namespace afwMath        = lsst::afw::math;
 namespace afwGeom        = lsst::afw::geom;
 namespace afwImage       = lsst::afw::image;
 namespace pexLog         = lsst::pex::logging; 
-namespace pexExcept      = lsst::pex::exceptions; 
-namespace ndarray        = lsst::ndarray;
+namespace pexExcept      = lsst::pex::exceptions;
 
 namespace lsst { 
 namespace ip { 
@@ -568,25 +567,25 @@ namespace diffim {
 
 
         ndarray::Array<int, 1, 1> maskArray = 
-            lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
+            ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
         afwDet::flattenArray(*fullFp, finalMask.getArray(), 
                              maskArray, imageToConvolve.getXY0()); /* Need to fake the XY0 */
         ndarray::EigenView<int, 1, 1> maskEigen(maskArray);
 
         ndarray::Array<InputT, 1, 1> arrayToConvolve = 
-            lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
+            ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
         afwDet::flattenArray(*fullFp, imageToConvolve.getArray(), 
                              arrayToConvolve, imageToConvolve.getXY0());
         ndarray::EigenView<InputT, 1, 1> eigenToConvolve0(arrayToConvolve);
 
         ndarray::Array<InputT, 1, 1> arrayToNotConvolve = 
-            lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
+            ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
         afwDet::flattenArray(*fullFp, imageToNotConvolve.getArray(), 
                              arrayToNotConvolve, imageToNotConvolve.getXY0());
         ndarray::EigenView<InputT, 1, 1> eigenToNotConvolve0(arrayToNotConvolve);
 
         ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance = 
-            lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
+            ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
         afwDet::flattenArray(*fullFp, varianceEstimate.getArray(), 
                              arrayVariance, varianceEstimate.getXY0());
         ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance0(arrayVariance);
@@ -634,7 +633,7 @@ namespace diffim {
             afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
 
             ndarray::Array<InputT, 1, 1> arrayC = 
-                lsst::ndarray::allocate(lsst::ndarray::makeVector(fullFp->getArea()));
+                ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
             afwDet::flattenArray(*fullFp, cimage.getArray(), 
                                  arrayC, cimage.getXY0());
             ndarray::EigenView<InputT, 1, 1> eigenC0(arrayC);
