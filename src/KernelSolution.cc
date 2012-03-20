@@ -664,8 +664,7 @@ namespace diffim {
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = 
             convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-            cMat.block(0, kidxj, eigenToConvolve.size(), 1) = 
-                Eigen::MatrixXd(**eiterj).block(0, 0, eigenToConvolve.size(), 1);
+            cMat.col(kidxj) = (**eiterj).head(eigenToConvolve.size());
         }
         /* Treat the last "image" as all 1's to do the background calculation. */
         if (this->_fitForBackground)
