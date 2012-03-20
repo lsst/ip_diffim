@@ -665,8 +665,8 @@ namespace diffim {
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = 
             convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-            //cMat.col(kidxj) = (*eiterj)->template cast<double>();
-            cMat.col(kidxj) = (**eiterj);
+            cMat.block(0, kidxj, eigenToConvolve.size(), 1) = 
+                Eigen::MatrixXd(**eiterj).block(0, 0, eigenToConvolve.size(), 1);
         }
         /* Treat the last "image" as all 1's to do the background calculation. */
         if (this->_fitForBackground)
@@ -1026,9 +1026,9 @@ namespace diffim {
             eToNotConvolve.resize(area, 1);
             eiVarEstimate.resize(area, 1);
 
-            eigenToConvolve.block(nTerms, 0, area, 1) = eToConvolve;
-            eigenToNotConvolve.block(nTerms, 0, area, 1) = eToNotConvolve;
-            eigeniVariance.block(nTerms, 0, area, 1) = eiVarEstimate;
+            eigenToConvolve.block(nTerms, 0, area, 1) = eToConvolve.block(0, 0, area, 1);
+            eigenToNotConvolve.block(nTerms, 0, area, 1) = eToNotConvolve.block(0, 0, area, 1);
+            eigeniVariance.block(nTerms, 0, area, 1) = eiVarEstimate.block(0, 0, area, 1);
 
             nTerms += area;
         }
@@ -1052,7 +1052,7 @@ namespace diffim {
                 afwImage::Image<InputT> csubimage(cimage, *biter, afwImage::PARENT);
                 Eigen::MatrixXd esubimage = imageToEigenMatrix(csubimage);
                 esubimage.resize(area, 1);
-                cMat.block(nTerms, 0, area, 1) = esubimage;
+                cMat.block(nTerms, 0, area, 1) = esubimage.block(0, 0, area, 1);
 
                 nTerms += area;
             }
