@@ -351,6 +351,11 @@ class PsfMatchConfig(pexConfig.Config):
             "EIGENVALUE" : "Use eigen values (faster)",
         }
     )
+    maxSpatialConditionNumber = pexConfig.Field(
+        dtype = float,
+        doc = "Maximum condition number for a well conditioned spatial matrix",
+        default = 1.0e10,
+    )
     
     ####
     # Fitting of single kernel to object pair in KernelCandidate
@@ -530,13 +535,21 @@ class PsfMatch(pipeBase.Task):
         if self.useRegularization:
             self.hMat = diffimLib.makeRegularizationMatrix(pexConfig.makePolicy(self.kconfig))
 
-    def _diagnostic(self, kernelCellSet, spatialKernel, spatialBg):
+    def _diagnostic(self, kernelCellSet, spatialSolution, spatialKernel, spatialBg):
         # What is the final kernel sum
         kImage = afwImage.ImageD(spatialKernel.getDimensions())
         kSum = spatialKernel.computeImage(kImage, False)
         pexLog.Trace(self.log.getName()+"._diagnostic", 1,
                      "Final spatial kernel sum %.3f" % (kSum))
 
+        # Look at how well conditioned the matrix is
+        conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))
+        pexLog.Trace(self.log.getName()+"._diagnostic", 0, 
+                     "Spatial model condition number : %.3e" % (conditionNum))
+        if conditionNum > self.kconfig.maxSpatialConditionNumber:
+            pexLog.Trace(self.log.getName()+"._diagnostic", 0, 
+                         "WARNING: Spatial solution exceeds max condition number (%.3e > %.3e)" % (conditionNum, self.kconfig.maxSpatialConditionNumber))
+ 
         # Look at how well the solution is constrained
         nBasisKernels = spatialKernel.getNBasisKernels()
         nKernelTerms  = spatialKernel.getNSpatialParameters()
@@ -773,6 +786,7 @@ class PsfMatch(pipeBase.Task):
                              "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
                 spatialKernel, spatialBacakground = spatialkv.getSolutionPair()
 
+            spatialSolution = spatialkv.getKernelSolution()
 
         except pexExcept.LsstCppException, e:
             pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
@@ -789,6 +803,6 @@ class PsfMatch(pipeBase.Task):
                      "Total time to compute the spatial kernel : %.2f s" % (t1 - t0))
         pexLog.Trace(self.log.getName()+"._solve", 2, "")
 
-        self._diagnostic(kernelCellSet, spatialKernel, spatialBackground)
+        self._diagnostic(kernelCellSet, spatialSolution, spatialKernel, spatialBackground)
         
-        return spatialKernel, spatialBackground
+        return spatialSolution, spatialKernel, spatialBackground

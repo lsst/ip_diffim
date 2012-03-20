@@ -217,7 +217,9 @@ class ImagePsfMatchTask(PsfMatch):
                                            maskedImageToNotConvolve,
                                            footprints = footprints)
         basisList = makeKernelBasisList(self.kconfig, psfFwhmPixTc, psfFwhmPixTnc)
-        psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
+        spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
+        conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))        
+        self.metadata.set("spatialConditionNum", conditionNum)
     
         self.log.log(pexLog.Log.INFO, "PSF-match science MaskedImage to reference")
         psfMatchedMaskedImage = afwImage.MaskedImageF(maskedImageToConvolve.getBBox(afwImage.PARENT))

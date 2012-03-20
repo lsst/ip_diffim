@@ -187,7 +187,7 @@ class PsfMatchTestCases(unittest.TestCase):
         
         basisList = ipDiffim.makeKernelBasisList(confake.kernel.active)
         psfMatchAL = ipDiffim.ImagePsfMatchTask(config=confake)
-        psfMatchingKernel, backgroundModel = psfMatchAL._solve(kcs, basisList)
+        spatialSolution, psfMatchingKernel, backgroundModel = psfMatchAL._solve(kcs, basisList)
         
         fitCoeffs = psfMatchingKernel.getSpatialParameters()
 
