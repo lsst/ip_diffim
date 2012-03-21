@@ -61,7 +61,8 @@ Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = imageList.begin();
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = imageList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-            cMat.col(kidxj) = **eiterj;
+            cMat.block(0, kidxj, eigeniVarianceV.size(), 1) = 
+                Eigen::MatrixXd(**eiterj).block(0, 0, eigeniVarianceV.size(), 1);
         }
         
         // Caculate the variance-weighted pixel values
