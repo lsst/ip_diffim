@@ -56,11 +56,15 @@ namespace diffim {
         virtual void solve();
         virtual void solve(Eigen::MatrixXd mMat, 
                            Eigen::VectorXd bVec);
+        KernelSolvedBy getSolvedBy() {return _solvedBy;} 
         virtual double getConditionNumber(ConditionNumberType conditionType);
         virtual double getConditionNumber(Eigen::MatrixXd mMat, ConditionNumberType conditionType);
 
         inline boost::shared_ptr<Eigen::MatrixXd> getM() {return _mMat;}
         inline boost::shared_ptr<Eigen::VectorXd> getB() {return _bVec;}
+        void printM() {std::cout << *_mMat << std::endl;}
+        void printB() {std::cout << *_bVec << std::endl;}
+        void printA() {std::cout << *_aVec << std::endl;}
         inline int getId() const { return _id; }
 
     protected:

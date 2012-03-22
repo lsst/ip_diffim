@@ -194,9 +194,9 @@ class DiffimTestCases(unittest.TestCase):
             spatialkv.solveLinearEquation()
             jkKernel, jkBg = spatialkv.getSolutionPair()
 
-            jkResults = psfmatch._solve(cellSet, kernel.getKernelList())
-            jkKernel  = jkResults[0]
-            jkBg      = jkResults[1]
+            #jkResults = psfmatch._solve(cellSet, kernel.getKernelList())
+            #jkKernel  = jkResults[1]
+            #jkBg      = jkResults[2]
 
             # lots of windows
             # self.assess(cand, kernel, bg, jkKernel, jkBg, 6*idx+1)

@@ -77,8 +77,8 @@ namespace boost {
 %{
 #define PY_ARRAY_UNIQUE_SYMBOL LSST_IP_DIFFIM_NUMPY_ARRAY_API
 #include "numpy/arrayobject.h"
-#include "lsst/ndarray/python.h"
-#include "lsst/ndarray/python/eigen.h"
+#include "ndarray/swig.h"
+#include "ndarray/swig/eigen.h"
 %}
 
 %init %{
@@ -86,6 +86,7 @@ namespace boost {
 %}
 
 %include "lsst/p_lsstSwig.i"
+%include "ndarray.i"
 
 %declareEigenMatrix(Eigen::MatrixXd);
 %declareEigenMatrix(Eigen::VectorXd);

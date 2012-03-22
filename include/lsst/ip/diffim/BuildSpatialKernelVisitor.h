@@ -39,6 +39,8 @@ namespace detail {
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
 
         void solveLinearEquation();
+  
+        inline boost::shared_ptr<SpatialKernelSolution> getKernelSolution() {return _kernelSolution;}
 
         std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, 
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getSolutionPair();
