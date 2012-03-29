@@ -522,6 +522,8 @@ class PsfMatch(pipeBase.Task):
     """Base class for PSF matching task.  Has no run method; hence should not be called!
     """
     ConfigClass = PsfMatchConfig
+    _DefaultName = "psfMatch"
+
     def __init__(self, *args, **kwargs):
         pipeBase.Task.__init__(self, *args, **kwargs)
         self.kconfig = self.config.kernel.active
