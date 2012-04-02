@@ -725,7 +725,9 @@ namespace diffim {
                     if (boundary_style == 0) {
                         x = x0 + dx - x_cen;
                         y = y0 + dy - y_cen;
-                        if ((y < 0) || (y > height - 1) || (x < 0) || (x > width - 1)) { continue; }
+                        if (y > height - 1 || x > width - 1) {
+                            continue;
+                        }
                         this_coeff = coeffs[order][dx][dy];
                         
                         // wrapping at edges
