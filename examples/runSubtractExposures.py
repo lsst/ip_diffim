@@ -128,7 +128,7 @@ Notes:
         if subconfig.fitForBackground == False:
             print 'NOTE: no background subtraction at all is requested'
 
-    psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
+    psfmatch = ipDiffim.ImagePsfMatchTask(config)
     results  = psfmatch.run(templateExposure, scienceExposure, "subtractExposures",
                             psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
 
