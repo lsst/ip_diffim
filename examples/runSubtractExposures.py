@@ -70,7 +70,7 @@ Notes:
     if sciencePath == None or templatePath == None:
         parser.print_help()
         sys.exit(1)
-g
+
     print 'Science exposure: ', sciencePath
     print 'Template exposure:', templatePath
     print 'Output exposure:  ', outputPath
