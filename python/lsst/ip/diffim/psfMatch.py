@@ -541,15 +541,15 @@ class PsfMatch(pipeBase.Task):
         # What is the final kernel sum
         kImage = afwImage.ImageD(spatialKernel.getDimensions())
         kSum = spatialKernel.computeImage(kImage, False)
-        pexLog.Trace(self.log.getName()+"._diagnostic", 1,
+        pexLog.Trace(self.log.getName()+"._diagnostic", 0,
                      "Final spatial kernel sum %.3f" % (kSum))
 
         # Look at how well conditioned the matrix is
         conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))
-        pexLog.Trace(self.log.getName()+"._diagnostic", 0, 
+        pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
                      "Spatial model condition number : %.3e" % (conditionNum))
         if conditionNum > self.kconfig.maxSpatialConditionNumber:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 0, 
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
                          "WARNING: Spatial solution exceeds max condition number (%.3e > %.3e)" % (conditionNum, self.kconfig.maxSpatialConditionNumber))
  
         # Look at how well the solution is constrained

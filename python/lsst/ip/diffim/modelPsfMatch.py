@@ -137,6 +137,10 @@ class ModelPsfMatchTask(PsfMatch):
                                psfMatchingKernel=psfMatchingKernel, 
                                kernelCellSet=kernelCellSet,
                                metadata=self.metadata)
+    
+    def _diagnostic(self,kernelCellSet, spatialSolution, spatialKernel, spatialBg):
+        """The debugging diagnostics are not really useful here, since we have no variance"""
+        return
 
     def _buildCellSet(self, referencePsfModel, scienceBBox, sciencePsfModel):
         """Build a SpatialCellSet for use with the solve method
