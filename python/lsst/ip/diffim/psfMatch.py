@@ -803,7 +803,6 @@ class PsfMatch(pipeBase.Task):
         t1 = time.time()
         pexLog.Trace(self.log.getName()+"._solve", 1, 
                      "Total time to compute the spatial kernel : %.2f s" % (t1 - t0))
-        pexLog.Trace(self.log.getName()+"._solve", 2, "")
 
         self._diagnostic(kernelCellSet, spatialSolution, spatialKernel, spatialBackground)
         
