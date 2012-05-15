@@ -115,12 +115,10 @@ class ImagePsfMatchTask(PsfMatch):
         scienceLimit   = scienceWcs.pixelToSky(exposureToNotConvolve.getWidth(),
                                                exposureToNotConvolve.getHeight())
         
-        pexLog.Trace(self.log.getName(), 2,
-                     "Template limits : %f,%f -> %f,%f" %
+        print ("Template limits : %f,%f -> %f,%f" %
                      (templateOrigin[0], templateOrigin[1],
                       templateLimit[0], templateLimit[1]))
-        pexLog.Trace(self.log.getName(), 2,
-                     "Science limits : %f,%f -> %f,%f" %
+        print ("Science limits : %f,%f -> %f,%f" %
                      (scienceOrigin[0], scienceOrigin[1],
                       scienceLimit[0], scienceLimit[1]))
 
