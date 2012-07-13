@@ -100,7 +100,6 @@ class ModelPsfMatchTask(PsfMatch):
         kernelCellSet = self._buildCellSet(referencePsfModel,
                                            exposure.getBBox(afwImage.PARENT),
                                            exposure.getPsf())
-        
         width, height = referencePsfModel.getKernel().getDimensions()
         psfAttr1 = measAlg.PsfAttributes(exposure.getPsf(), width//2, height//2)
         psfAttr2 = measAlg.PsfAttributes(referencePsfModel, width//2, height//2)
@@ -159,7 +158,7 @@ class ModelPsfMatchTask(PsfMatch):
             raise RuntimeError, "ERROR: Dimensions of reference Psf and science Psf different; exiting"
     
         psfWidth, psfHeight = referencePsfModel.getKernel().getDimensions()
-        maxKernelSize = 1 + (min(psfWidth - 1, psfHeight - 1) // 2)
+        maxKernelSize = min(psfWidth, psfHeight) - 1 
         if maxKernelSize % 2 == 0:
             maxKernelSize -= 1
         if self.kconfig.kernelSize > maxKernelSize:
