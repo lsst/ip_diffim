@@ -106,16 +106,16 @@ class ImagePsfMatchTask(PsfMatch):
         """
         templateWcs    = exposureToConvolve.getWcs() 
         scienceWcs     = exposureToNotConvolve.getWcs()
+        templateBBox   = exposureToConvolve.getBBox(afwImage.PARENT)
+        scienceBBox    = exposureToNotConvolve.getBBox(afwImage.PARENT)
 
-        
         # LLC
-        templateOrigin = templateWcs.pixelToSky(0, 0)
-        scienceOrigin  = scienceWcs.pixelToSky(0, 0)
+        templateOrigin = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getBegin()))
+        scienceOrigin  = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getBegin()))
+
         # URC
-        templateLimit  = templateWcs.pixelToSky(exposureToConvolve.getWidth(),
-                                                exposureToConvolve.getHeight())
-        scienceLimit   = scienceWcs.pixelToSky(exposureToNotConvolve.getWidth(),
-                                               exposureToNotConvolve.getHeight())
+        templateLimit  = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getEnd()))
+        scienceLimit   = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getEnd()))
         
         print ("Template limits : %f,%f -> %f,%f" %
                      (templateOrigin[0], templateOrigin[1],
