@@ -24,6 +24,7 @@ import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.afw.geom as afwGeom
 import lsst.pipe.base as pipeBase
 import diffimTools
 from .makeKernelBasisList import makeKernelBasisList
@@ -105,6 +106,7 @@ class ImagePsfMatchTask(PsfMatch):
         """
         templateWcs    = exposureToConvolve.getWcs() 
         scienceWcs     = exposureToNotConvolve.getWcs()
+
         
         # LLC
         templateOrigin = templateWcs.pixelToSky(0, 0)
@@ -121,6 +123,12 @@ class ImagePsfMatchTask(PsfMatch):
         print ("Science limits : %f,%f -> %f,%f" %
                      (scienceOrigin[0], scienceOrigin[1],
                       scienceLimit[0], scienceLimit[1]))
+
+        templateBBox = afwGeom.Box2D(templateOrigin.getPosition(), templateLimit.getPosition())
+        scienceBBox  = afwGeom.Box2D(scienceOrigin.getPosition(), scienceLimit.getPosition())
+        if not (templateBBox.overlaps(scienceBBox)):
+            raise RuntimeError, "Input images do not overlap at all"
+            
 
         if ( (templateOrigin.getPosition() != scienceOrigin.getPosition()) or \
              (templateLimit.getPosition()  != scienceLimit.getPosition())  or \
