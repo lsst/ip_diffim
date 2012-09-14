@@ -99,9 +99,9 @@ class PsfMatchTestCases(unittest.TestCase):
         self.assertEqual(psfMatchDF.useRegularization, False)
         self.assertEqual(psfMatchDFr.useRegularization, True)
 
-        resultsAL  = psfMatchAL.run(tExp, sExp, "subtractExposures", doWarping = True)
-        resultsDF  = psfMatchDF.run(tExp, sExp, "subtractExposures", doWarping = True)
-        resultsDFr = psfMatchDFr.run(tExp, sExp, "subtractExposures", doWarping = True)
+        resultsAL  = psfMatchAL.subtractExposures(tExp, sExp, doWarping = True)
+        resultsDF  = psfMatchDF.subtractExposures(tExp, sExp, doWarping = True)
+        resultsDFr = psfMatchDFr.subtractExposures(tExp, sExp, doWarping = True)
 
         # Some tests
         if False:
@@ -135,9 +135,8 @@ class PsfMatchTestCases(unittest.TestCase):
         sExp = afwImage.ExposureF(sMi, sWcs)
 
         psfMatchAL = ipDiffim.ImagePsfMatchTask(config=self.configAL)
-        resultsAL  = psfMatchAL.run(tExp, sExp, "matchExposures", 
+        resultsAL  = psfMatchAL.matchExposures(tExp, sExp,
                                     psfFwhmPixTc = 2.0, psfFwhmPixTnc = 3.0, doWarping = True)
-        self.assertEqual(len(resultsAL), 4+1) # include metadata
         self.assertEqual(type(resultsAL.matchedImage), afwImage.ExposureF)
         self.assertEqual(type(resultsAL.psfMatchingKernel), afwMath.LinearCombinationKernel)
         self.assertEqual(type(resultsAL.backgroundModel), afwMath.Function2D)
@@ -150,7 +149,7 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfigDF.numPrincipalComponents = nTerms
         
         psfMatchDF  = ipDiffim.ImagePsfMatchTask(config=self.configDF)
-        resultsDF   = psfMatchDF.run(tMi, sMi, "subtractMaskedImages")
+        resultsDF   = psfMatchDF.subtractMaskedImages(tMi, sMi)
         
         spatialKernel = resultsDF.psfMatchingKernel
         spatialKernelSolution = spatialKernel.getSpatialParameters()

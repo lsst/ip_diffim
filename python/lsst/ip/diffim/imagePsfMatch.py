@@ -58,84 +58,25 @@ class ImagePsfMatchTask(PsfMatch):
         self.kconfig = self.config.kernel.active
         self._warper = afwMath.Warper.fromConfig(self.kconfig.warpingConfig)
 
+#     @pipeBase.timeMethod
+#     def run(self, imageToConvolve, imageToNotConvolve, mode, **kwargs):
+#         self.log.warn("run is deprecated; call the appropriate method directly")
+# 
+#         if mode == "matchExposures":
+#             return self.matchExposures(imageToConvolve, imageToNotConvolve, **kwargs)
+# 
+#         elif mode == "matchMaskedImages":
+#             return self.matchMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
+# 
+#         elif mode == "subtractExposures":
+#             return self.subtractExposures(imageToConvolve, imageToNotConvolve, **kwargs)
+# 
+#         elif mode == "subtractMaskedImages":
+#             return self.subtractMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
+#         else:
+#             raise ValueError("Invalid mode requested")
+        
     @pipeBase.timeMethod
-    def run(self, imageToConvolve, imageToNotConvolve, mode, **kwargs):
-
-        if mode == "matchExposures":
-            results = self.matchExposures(imageToConvolve, imageToNotConvolve, **kwargs)
-            return pipeBase.Struct(matchedImage=results[0],
-                                   psfMatchingKernel=results[1],
-                                   backgroundModel=results[2],
-                                   kernelCellSet=results[3],
-                                   metadata=self.metadata)
-
-        elif mode == "matchMaskedImages":
-            results = self.matchMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
-            return pipeBase.Struct(matchedImage=results[0],
-                                   psfMatchingKernel=results[1],
-                                   backgroundModel=results[2],
-                                   kernelCellSet=results[3],
-                                   metadata=self.metadata)
-
-        elif mode == "subtractExposures":
-            results = self.subtractExposures(imageToConvolve, imageToNotConvolve, **kwargs)
-            return pipeBase.Struct(subtractedImage=results[0],
-                                   psfMatchingKernel=results[1],
-                                   backgroundModel=results[2],
-                                   kernelCellSet=results[3],
-                                   metadata=self.metadata)
-
-        elif mode == "subtractMaskedImages":
-            results = self.subtractMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
-            return pipeBase.Struct(subtractedImage=results[0],
-                                   psfMatchingKernel=results[1],
-                                   backgroundModel=results[2],
-                                   kernelCellSet=results[3],
-                                   metadata=self.metadata)
-        else:
-            raise ValueError("Invalid mode requested")
-
-
-    def _validateSize(self, maskedImageToConvolve, maskedImageToNotConvolve):
-        """Return True if two image-like objects are the same size
-        """
-        return maskedImageToConvolve.getDimensions() == maskedImageToNotConvolve.getDimensions()
-    
-    def _validateWcs(self, exposureToConvolve, exposureToNotConvolve):
-        """Return True if two Exposures have the same WCS
-        """
-        templateWcs    = exposureToConvolve.getWcs() 
-        scienceWcs     = exposureToNotConvolve.getWcs()
-        templateBBox   = exposureToConvolve.getBBox(afwImage.PARENT)
-        scienceBBox    = exposureToNotConvolve.getBBox(afwImage.PARENT)
-
-        # LLC
-        templateOrigin = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getBegin()))
-        scienceOrigin  = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getBegin()))
-
-        # URC
-        templateLimit  = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getEnd()))
-        scienceLimit   = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getEnd()))
-        
-        print ("Template limits : %f,%f -> %f,%f" %
-                     (templateOrigin[0], templateOrigin[1],
-                      templateLimit[0], templateLimit[1]))
-        print ("Science limits : %f,%f -> %f,%f" %
-                     (scienceOrigin[0], scienceOrigin[1],
-                      scienceLimit[0], scienceLimit[1]))
-
-        templateBBox = afwGeom.Box2D(templateOrigin.getPosition(), templateLimit.getPosition())
-        scienceBBox  = afwGeom.Box2D(scienceOrigin.getPosition(), scienceLimit.getPosition())
-        if not (templateBBox.overlaps(scienceBBox)):
-            raise RuntimeError, "Input images do not overlap at all"
-            
-
-        if ( (templateOrigin.getPosition() != scienceOrigin.getPosition()) or \
-             (templateLimit.getPosition()  != scienceLimit.getPosition())  or \
-             (exposureToConvolve.getDimensions() != exposureToNotConvolve.getDimensions())):
-            return False
-        return True
-        
     def matchExposures(self, exposureToConvolve, exposureToNotConvolve,
                        psfFwhmPixTc = None, psfFwhmPixTnc = None,
                        footprints = None, doWarping = True):
@@ -148,14 +89,16 @@ class ImagePsfMatchTask(PsfMatch):
             that matches exposureToConvolve to exposureToNotConvolve
         - Convolve exposureToConvolve by PSF matching kernel
         
-        @param exposure: Exposure to warp and PSF-match to the reference masked image
-        @param referenceMaskedImage: maskedImage whose PSF is to be matched
+        @param exposureToConvolve: Exposure to warp and PSF-match to the reference masked image
+        @param exposureToNotConvolve: Exposure whose WCS and PSF are to be matched
+        @param psfFwhmPixTc: see ip_diffim.generateAlardLuptonBasisList code
+        @param psfFwhmPixTnc: see ip_diffim.generateAlardLuptonBasisList code
         @param footprints: a list of footprints of sources; if None then source detection is run
         @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
             - if True then warp exposureToConvolve to match exposureToNotConvolve
             - if False then raise an Exception
         
-        @return
+        @return a pipeBase.Struct containing these fields:
         - psfMatchedExposure: the PSF-matched exposure =
             warped exposureToConvolve convolved by psfMatchingKernel. This has:
             - the same parent bbox, Wcs and Calib as exposureToNotConvolve
@@ -164,7 +107,7 @@ class ImagePsfMatchTask(PsfMatch):
         - psfMatchingKernel: the PSF matching kernel
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
-        
+
         @raise RuntimeError if doWarping is False and exposureToConvolve's and exposureToNotConvolve's
             WCSs do not match
         """
@@ -177,17 +120,37 @@ class ImagePsfMatchTask(PsfMatch):
                 pexLog.Trace(self.log.getName(), 1, "ERROR: Input images not registered")
                 raise RuntimeError, "Input images not registered"
 
-        psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet = self.matchMaskedImages(
+
+        results = self.matchMaskedImages(
             exposureToConvolve.getMaskedImage(), exposureToNotConvolve.getMaskedImage(),
             psfFwhmPixTc = psfFwhmPixTc, psfFwhmPixTnc = psfFwhmPixTnc,
             footprints = footprints)
         
-        psfMatchedExposure = afwImage.makeExposure(psfMatchedMaskedImage, exposureToNotConvolve.getWcs())
+        psfMatchedExposure = afwImage.makeExposure(results.matchedImage, exposureToNotConvolve.getWcs())
         psfMatchedExposure.setFilter(exposureToConvolve.getFilter())
         psfMatchedExposure.setCalib(exposureToNotConvolve.getCalib())
+        results.matchedImage = psfMatchedExposure
+        return results
 
-        return (psfMatchedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)
-    
+    @pipeBase.timeMethod
+    def run(self, imageToConvolve, imageToNotConvolve, mode, **kwargs):
+        """Warning: this method is deprecated
+        """
+        if mode == "matchExposures":
+            return self.matchExposures(imageToConvolve, imageToNotConvolve, **kwargs)
+
+        elif mode == "matchMaskedImages":
+            return self.matchMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
+
+        elif mode == "subtractExposures":
+            return self.subtractExposures(imageToConvolve, imageToNotConvolve, **kwargs)
+
+        elif mode == "subtractMaskedImages":
+            return self.subtractMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
+        else:
+            raise ValueError("Invalid mode requested")
+
+    @pipeBase.timeMethod
     def matchMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve, 
                           psfFwhmPixTc = None, psfFwhmPixTnc = None, 
                           footprints = None):
@@ -201,9 +164,11 @@ class ImagePsfMatchTask(PsfMatch):
         @param maskedImageToConvolve: masked image to PSF-match to the reference masked image;
             must be warped to match the reference masked image
         @param maskedImageToNotConvolve: maskedImage whose PSF is to be matched
+        @param psfFwhmPixTc: see ip_diffim.generateAlardLuptonBasisList code
+        @param psfFwhmPixTnc: see ip_diffim.generateAlardLuptonBasisList code
         @param footprints: a list of footprints of sources; if None then source detection is run
         
-        @return
+        @return a pipeBase.Struct containing these fields:
         - psfMatchedMaskedImage: the PSF-matched masked image =
             maskedImageToConvolve convolved with psfMatchingKernel.
             This has the same xy0, dimensions and wcs as maskedImageToNotConvolve.
@@ -232,8 +197,14 @@ class ImagePsfMatchTask(PsfMatch):
         doNormalize = False
         afwMath.convolve(psfMatchedMaskedImage, maskedImageToConvolve, psfMatchingKernel, doNormalize)
         self.log.log(pexLog.Log.INFO, "done")
-        return (psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet)
+        return pipeBase.Struct(
+            matchedImage = psfMatchedMaskedImage,
+            psfMatchingKernel = psfMatchingKernel,
+            backgroundModel = backgroundModel,
+            kernelCellSet = kernelCellSet,
+        )
 
+    @pipeBase.timeMethod
     def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
                           psfFwhmPixTc = None, psfFwhmPixTnc = None,
                           footprints = None, doWarping = True):
@@ -248,27 +219,38 @@ class ImagePsfMatchTask(PsfMatch):
 
         @param exposureToConvolve: exposure to PSF-matched to exposureToNotConvolve
         @param exposureToNotConvolve: reference Exposure
+        @param psfFwhmPixTc: see ip_diffim.generateAlardLuptonBasisList code
+        @param psfFwhmPixTnc: see ip_diffim.generateAlardLuptonBasisList code
+        @param footprints: a list of footprints of sources; if None then source detection is run
+        @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
+            - if True then warp exposureToConvolve to match exposureToNotConvolve
+            - if False then raise an Exception
         
-        @return
-        - subtractedExposure: subtracted Exposure = exposureToNotConvolve -
-            ((warped exposureToConvolve convolved with psfMatchingKernel) + backgroundModel)
+        @return a pipeBase.Struct containing these fields:
+        - subtractedExposure: subtracted Exposure = exposureToNotConvolve - (matchedImage + backgroundModel)
+        - matchedImage: exposureToConvolve after warping to match exposureToConvolve (if doWarping true),
+            and convolving with psfMatchingKernel
         - psfMatchingKernel: PSF matching kernel
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
         """
-        results = self.matchExposures(exposureToConvolve, exposureToNotConvolve,
-                                      psfFwhmPixTc = psfFwhmPixTc,
-                                      psfFwhmPixTnc = psfFwhmPixTnc,
-                                      footprints = footprints,
-                                      doWarping = doWarping)
+        results = self.matchExposures(
+            exposureToConvolve = exposureToConvolve,
+            exposureToNotConvolve = exposureToNotConvolve,
+            psfFwhmPixTc = psfFwhmPixTc,
+            psfFwhmPixTnc = psfFwhmPixTnc,
+            footprints = footprints,
+            doWarping = doWarping,
+        )
 
-        psfMatchedExposure, psfMatchingKernel, backgroundModel, kernelCellSet = results
         subtractedExposure  = afwImage.ExposureF(exposureToNotConvolve, True)
         smi  = subtractedExposure.getMaskedImage()
-        smi -= psfMatchedExposure.getMaskedImage()
-        smi -= backgroundModel
-        return (subtractedExposure, psfMatchingKernel, backgroundModel, kernelCellSet)
+        smi -= results.matchedImage.getMaskedImage()
+        smi -= results.backgroundModel
+        results.subtractedImage = subtractedExposure
+        return results
 
+    @pipeBase.timeMethod
     def subtractMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve,
                              psfFwhmPixTc = None, psfFwhmPixTnc = None,
                              footprints = None):
@@ -282,27 +264,30 @@ class ImagePsfMatchTask(PsfMatch):
         
         @param maskedImageToConvolve: MaskedImage to PSF-matched to maskedImageToNotConvolve
         @param maskedImageToNotConvolve: reference MaskedImage
+        @param psfFwhmPixTc: see ip_diffim.generateAlardLuptonBasisList code
+        @param psfFwhmPixTnc: see ip_diffim.generateAlardLuptonBasisList code
         @param footprints: a list of footprints of sources; if None then source detection is run
         
-        @return
-        - subtractedMaskedImage = maskedImageToNotConvolve -
-            ((maskedImageToConvolve convolved with psfMatchingKernel) + backgroundModel)
+        @return a pipeBase.Struct containing these fields:
+        - subtractedMaskedImage = maskedImageToNotConvolve - (matchedImage + backgroundModel)
+        - matchedImage: maskedImageToConvolve convolved with psfMatchingKernel
         - psfMatchingKernel: PSF matching kernel
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
         """
-
-        results = self.matchMaskedImages(maskedImageToConvolve,
-                                         maskedImageToNotConvolve,
-                                         psfFwhmPixTc = psfFwhmPixTc,
-                                         psfFwhmPixTnc = psfFwhmPixTnc,
-                                         footprints = footprints)
+        results = self.matchMaskedImages(
+            maskedImageToConvolve = maskedImageToConvolve,
+            maskedImageToNotConvolve = maskedImageToNotConvolve,
+            psfFwhmPixTc = psfFwhmPixTc,
+            psfFwhmPixTnc = psfFwhmPixTnc,
+            footprints = footprints,
+        )
         
-        psfMatchedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet = results 
         subtractedMaskedImage  = afwImage.MaskedImageF(maskedImageToNotConvolve, True)
-        subtractedMaskedImage -= psfMatchedMaskedImage
-        subtractedMaskedImage -= backgroundModel
-        return (subtractedMaskedImage, psfMatchingKernel, backgroundModel, kernelCellSet)
+        subtractedMaskedImage -= results.matchedImage
+        subtractedMaskedImage -= results.backgroundModel
+        results.subtractedMaskedImage = subtractedMaskedImage
+        return results
 
     def _adaptCellSize(self, footprints):
         """ NOT IMPLEMENTED YET"""
@@ -356,5 +341,43 @@ class ImagePsfMatchTask(PsfMatch):
             kernelCellSet.insertCandidate(cand)
 
         return kernelCellSet
-        
 
+    def _validateSize(self, maskedImageToConvolve, maskedImageToNotConvolve):
+        """Return True if two image-like objects are the same size
+        """
+        return maskedImageToConvolve.getDimensions() == maskedImageToNotConvolve.getDimensions()
+    
+    def _validateWcs(self, exposureToConvolve, exposureToNotConvolve):
+        """Return True if two Exposures have the same WCS
+        """
+        templateWcs    = exposureToConvolve.getWcs() 
+        scienceWcs     = exposureToNotConvolve.getWcs()
+        templateBBox   = exposureToConvolve.getBBox(afwImage.PARENT)
+        scienceBBox    = exposureToNotConvolve.getBBox(afwImage.PARENT)
+
+        # LLC
+        templateOrigin = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getBegin()))
+        scienceOrigin  = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getBegin()))
+
+        # URC
+        templateLimit  = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getEnd()))
+        scienceLimit   = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getEnd()))
+        
+        print ("Template limits : %f,%f -> %f,%f" %
+                     (templateOrigin[0], templateOrigin[1],
+                      templateLimit[0], templateLimit[1]))
+        print ("Science limits : %f,%f -> %f,%f" %
+                     (scienceOrigin[0], scienceOrigin[1],
+                      scienceLimit[0], scienceLimit[1]))
+
+        templateBBox = afwGeom.Box2D(templateOrigin.getPosition(), templateLimit.getPosition())
+        scienceBBox  = afwGeom.Box2D(scienceOrigin.getPosition(), scienceLimit.getPosition())
+        if not (templateBBox.overlaps(scienceBBox)):
+            raise RuntimeError, "Input images do not overlap at all"
+            
+
+        if ( (templateOrigin.getPosition() != scienceOrigin.getPosition()) or \
+             (templateLimit.getPosition()  != scienceLimit.getPosition())  or \
+             (exposureToConvolve.getDimensions() != exposureToNotConvolve.getDimensions())):
+            return False
+        return True
