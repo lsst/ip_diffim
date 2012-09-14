@@ -99,7 +99,7 @@ class ImagePsfMatchTask(PsfMatch):
             - if False then raise an Exception
         
         @return a pipeBase.Struct containing these fields:
-        - psfMatchedExposure: the PSF-matched exposure =
+        - matchedImage: the PSF-matched exposure =
             warped exposureToConvolve convolved by psfMatchingKernel. This has:
             - the same parent bbox, Wcs and Calib as exposureToNotConvolve
             - the same filter as exposureToConvolve
@@ -131,24 +131,6 @@ class ImagePsfMatchTask(PsfMatch):
         psfMatchedExposure.setCalib(exposureToNotConvolve.getCalib())
         results.matchedImage = psfMatchedExposure
         return results
-
-    @pipeBase.timeMethod
-    def run(self, imageToConvolve, imageToNotConvolve, mode, **kwargs):
-        """Warning: this method is deprecated
-        """
-        if mode == "matchExposures":
-            return self.matchExposures(imageToConvolve, imageToNotConvolve, **kwargs)
-
-        elif mode == "matchMaskedImages":
-            return self.matchMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
-
-        elif mode == "subtractExposures":
-            return self.subtractExposures(imageToConvolve, imageToNotConvolve, **kwargs)
-
-        elif mode == "subtractMaskedImages":
-            return self.subtractMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
-        else:
-            raise ValueError("Invalid mode requested")
 
     @pipeBase.timeMethod
     def matchMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve, 
