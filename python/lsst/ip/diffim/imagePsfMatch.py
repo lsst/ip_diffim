@@ -58,23 +58,23 @@ class ImagePsfMatchTask(PsfMatch):
         self.kconfig = self.config.kernel.active
         self._warper = afwMath.Warper.fromConfig(self.kconfig.warpingConfig)
 
-#     @pipeBase.timeMethod
-#     def run(self, imageToConvolve, imageToNotConvolve, mode, **kwargs):
-#         self.log.warn("run is deprecated; call the appropriate method directly")
-# 
-#         if mode == "matchExposures":
-#             return self.matchExposures(imageToConvolve, imageToNotConvolve, **kwargs)
-# 
-#         elif mode == "matchMaskedImages":
-#             return self.matchMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
-# 
-#         elif mode == "subtractExposures":
-#             return self.subtractExposures(imageToConvolve, imageToNotConvolve, **kwargs)
-# 
-#         elif mode == "subtractMaskedImages":
-#             return self.subtractMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
-#         else:
-#             raise ValueError("Invalid mode requested")
+    @pipeBase.timeMethod
+    def run(self, imageToConvolve, imageToNotConvolve, mode, **kwargs):
+        self.log.warn("run is deprecated; call the appropriate method directly")
+
+        if mode == "matchExposures":
+            return self.matchExposures(imageToConvolve, imageToNotConvolve, **kwargs)
+
+        elif mode == "matchMaskedImages":
+            return self.matchMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
+
+        elif mode == "subtractExposures":
+            return self.subtractExposures(imageToConvolve, imageToNotConvolve, **kwargs)
+
+        elif mode == "subtractMaskedImages":
+            return self.subtractMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
+        else:
+            raise ValueError("Invalid mode requested")
         
     @pipeBase.timeMethod
     def matchExposures(self, exposureToConvolve, exposureToNotConvolve,
