@@ -88,9 +88,12 @@ namespace boost {
 %include "lsst/p_lsstSwig.i"
 %include "ndarray.i"
 
-%declareEigenMatrix(Eigen::MatrixXd);
-%declareEigenMatrix(Eigen::VectorXd);
-/* Eigen / numpy.  Info comes from $AFW_DIR/include/lsst/afw/numpyTypemaps.h */
+%template(PtrEigenMatrixXd) boost::shared_ptr<Eigen::MatrixXd>;
+%template(PtrEigenVectorXd) boost::shared_ptr<Eigen::VectorXd>;
+%declareNumPyConverters(Eigen::MatrixXd);
+%declareNumPyConverters(Eigen::VectorXd);
+%shared_ptr(Eigen::MatrixXd);
+%shared_ptr(Eigen::VectorXd);
 
 %include "lsst/daf/base/persistenceMacros.i"
 
