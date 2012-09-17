@@ -91,8 +91,8 @@ class ImagePsfMatchTask(PsfMatch):
         
         @param exposureToConvolve: Exposure to warp and PSF-match to the reference masked image
         @param exposureToNotConvolve: Exposure whose WCS and PSF are to be matched
-        @param psfFwhmPixTc: see ip_diffim.generateAlardLuptonBasisList code
-        @param psfFwhmPixTnc: see ip_diffim.generateAlardLuptonBasisList code
+        @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
+        @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
         @param footprints: a list of footprints of sources; if None then source detection is run
         @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
             - if True then warp exposureToConvolve to match exposureToNotConvolve
@@ -146,8 +146,8 @@ class ImagePsfMatchTask(PsfMatch):
         @param maskedImageToConvolve: masked image to PSF-match to the reference masked image;
             must be warped to match the reference masked image
         @param maskedImageToNotConvolve: maskedImage whose PSF is to be matched
-        @param psfFwhmPixTc: see ip_diffim.generateAlardLuptonBasisList code
-        @param psfFwhmPixTnc: see ip_diffim.generateAlardLuptonBasisList code
+        @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
+        @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
         @param footprints: a list of footprints of sources; if None then source detection is run
         
         @return a pipeBase.Struct containing these fields:
@@ -201,8 +201,8 @@ class ImagePsfMatchTask(PsfMatch):
 
         @param exposureToConvolve: exposure to PSF-matched to exposureToNotConvolve
         @param exposureToNotConvolve: reference Exposure
-        @param psfFwhmPixTc: see ip_diffim.generateAlardLuptonBasisList code
-        @param psfFwhmPixTnc: see ip_diffim.generateAlardLuptonBasisList code
+        @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
+        @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
         @param footprints: a list of footprints of sources; if None then source detection is run
         @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
             - if True then warp exposureToConvolve to match exposureToNotConvolve
@@ -246,8 +246,8 @@ class ImagePsfMatchTask(PsfMatch):
         
         @param maskedImageToConvolve: MaskedImage to PSF-matched to maskedImageToNotConvolve
         @param maskedImageToNotConvolve: reference MaskedImage
-        @param psfFwhmPixTc: see ip_diffim.generateAlardLuptonBasisList code
-        @param psfFwhmPixTnc: see ip_diffim.generateAlardLuptonBasisList code
+        @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
+        @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
         @param footprints: a list of footprints of sources; if None then source detection is run
         
         @return a pipeBase.Struct containing these fields:
