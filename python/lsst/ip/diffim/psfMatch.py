@@ -550,7 +550,7 @@ class PsfMatch(pipeBase.Task):
                      "Spatial model condition number : %.3e" % (conditionNum))
         if conditionNum < 0.0:
             pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
-                         "WARNING: Condition number is negative)" % (conditionNum))
+                         "WARNING: Condition number is negative (%.3e)" % (conditionNum))
         if conditionNum > self.kconfig.maxSpatialConditionNumber:
             pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
                          "WARNING: Spatial solution exceeds max condition number (%.3e > %.3e)" % (conditionNum, self.kconfig.maxSpatialConditionNumber))
