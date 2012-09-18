@@ -19,6 +19,7 @@
 # the GNU General Public License along with this program.  If not, 
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
+import numpy as num
 import diffimLib 
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
@@ -26,9 +27,12 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.pipe.base as pipeBase
+import lsst.meas.algorithms as measAlg
 import diffimTools
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatch, PsfMatchConfigDF, PsfMatchConfigAL
+
+sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
 class ImagePsfMatchConfig(pexConfig.Config):
     kernel = pexConfig.ConfigChoiceField(
@@ -120,6 +124,27 @@ class ImagePsfMatchTask(PsfMatch):
                 pexLog.Trace(self.log.getName(), 1, "ERROR: Input images not registered")
                 raise RuntimeError, "Input images not registered"
 
+        if psfFwhmPixTc is None:
+            if not exposureToConvolve.hasPsf():
+                pexLog.Trace(self.log.getName(), 1, "WARNING: no estimate of Psf FWHM for template image")
+            else:
+                psf = exposureToConvolve.getPsf()
+                width, height = psf.getKernel().getDimensions()
+                psfAttr = measAlg.PsfAttributes(psf, width//2, height//2)
+                psfSigPixTc = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
+                psfFwhmPixTc = psfSigPixTc * sigma2fwhm 
+        if psfFwhmPixTnc is None:
+            if not exposureToNotConvolve.hasPsf():
+                pexLog.Trace(self.log.getName(), 1, "WARNING: no estimate of Psf FWHM for science image")
+            else:
+                psf = exposureToNotConvolve.getPsf()
+                width, height = psf.getKernel().getDimensions()
+                psfAttr = measAlg.PsfAttributes(psf, width//2, height//2)
+                psfSigPixTnc = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
+                psfFwhmPixTnc = psfSigPixTnc * sigma2fwhm 
+            
+        if psfFwhmPixTc and psfFwhmPixTnc:
+            pexLog.Trace(self.log.getName(), 2, "Matching Psf FWHM %.2f -> %.2f pix" % (psfFwhmPixTc, psfFwhmPixTnc))
 
         results = self.matchMaskedImages(
             exposureToConvolve.getMaskedImage(), exposureToNotConvolve.getMaskedImage(),
