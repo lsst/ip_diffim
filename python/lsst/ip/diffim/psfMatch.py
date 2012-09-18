@@ -55,8 +55,7 @@ class DetectionConfig(pexConfig.Config):
     badMaskPlanes = pexConfig.ListField(
         dtype = str,
         doc = """Mask planes that lead to an invalid detection.
-                 Options: EDGE SAT BAD CR INTRP
-                 E.g. : EDGE SAT allows CR-masked and interpolated pixels""",
+                 Options: EDGE SAT BAD CR INTRP""",
         default = ("EDGE", "SAT")
     )
     fpNpixMin = pexConfig.Field(
