@@ -56,6 +56,9 @@ class DiffimTestCases(unittest.TestCase):
         diffimTools.backgroundSubtract(bgConfig, [self.templateImage,])
 
         detConfig = self.subconfig.detectionConfig
+        maskPlane = detConfig.badMaskPlanes[0]
+        maskVal   = afwImage.MaskU.getPlaneBitMask(maskPlane)
+
         kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList1 = kcDetect.getFootprints()
@@ -77,16 +80,16 @@ class DiffimTestCases(unittest.TestCase):
 
         # add a masked pixel to the template image and make sure you don't get it
         afwImage.MaskedImageF(self.templateImage, fpList1[0].getBBox(), afwImage.LOCAL).getMask().set(
-            tmask.getWidth()//2, tmask.getHeight()//2, 0x1)
+            tmask.getWidth()//2, tmask.getHeight()//2, maskVal)
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList2 = kcDetect.getFootprints()
         self.assertTrue(len(fpList2) == (len(fpList1)-1))
 
         # add a masked pixel to the science image and make sure you don't get it
         afwImage.MaskedImageF(self.scienceImage, fpList1[1].getBBox(), afwImage.LOCAL).getMask().set(
-            smask.getWidth()//2, smask.getHeight()//2, 0x1)
+            smask.getWidth()//2, smask.getHeight()//2, maskVal)
         afwImage.MaskedImageF(self.scienceImage, fpList1[2].getBBox(), afwImage.LOCAL).getMask().set(
-            smask.getWidth()//2, smask.getHeight()//2, 0x1)
+            smask.getWidth()//2, smask.getHeight()//2, maskVal)
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList3 = kcDetect.getFootprints()
         self.assertTrue(len(fpList3) == (len(fpList1)-3))
