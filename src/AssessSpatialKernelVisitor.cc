@@ -61,7 +61,7 @@ namespace detail {
         _spatialKernel(spatialKernel),
         _spatialBackground(spatialBackground),
         _policy(policy),
-        _imstats(ImageStatistics<PixelT>()),
+        _imstats(ImageStatistics<PixelT>(_policy)),
         _nGood(0),
         _nRejected(0),
         _nProcessed(0),
