@@ -548,6 +548,9 @@ class PsfMatch(pipeBase.Task):
         conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))
         pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
                      "Spatial model condition number : %.3e" % (conditionNum))
+        if conditionNum < 0.0:
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
+                         "WARNING: Condition number is negative)" % (conditionNum))
         if conditionNum > self.kconfig.maxSpatialConditionNumber:
             pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
                          "WARNING: Spatial solution exceeds max condition number (%.3e > %.3e)" % (conditionNum, self.kconfig.maxSpatialConditionNumber))
