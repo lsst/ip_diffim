@@ -52,12 +52,11 @@ class DetectionConfig(pexConfig.Config):
                  if false run detection on the science image (imageToNotConvolve)""",
         default = True
     )
-    detBadMaskPlanes = pexConfig.ListField(
+    badMaskPlanes = pexConfig.ListField(
         dtype = str,
         doc = """Mask planes that lead to an invalid detection.
-                 Options: EDGE SAT BAD CR INTRP
-                 E.g. : EDGE SAT BAD allows CR-masked and interpolated pixels""",
-        default = ("EDGE", "SAT", "BAD")
+                 Options: EDGE SAT BAD CR INTRP""",
+        default = ("EDGE", "SAT")
     )
     fpNpixMin = pexConfig.Field(
         dtype = int,
@@ -296,6 +295,12 @@ class PsfMatchConfig(pexConfig.Config):
 
     ####
     # Clipping of KernelCandidates based on diffim residuals; used with singleKernelClipping and spatialKernelClipping
+    badMaskPlanes = pexConfig.ListField(
+        dtype = str,
+        doc = """Mask planes to ignore when calculating diffim statistics
+                 Options: EDGE SAT BAD CR INTRP""",
+        default = ("EDGE", "SAT")
+    )
     candidateResidualMeanMax = pexConfig.Field(
         dtype = float,
         doc = """Rejects KernelCandidates yielding bad difference image quality.
