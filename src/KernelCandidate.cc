@@ -53,7 +53,7 @@ namespace diffim {
     {
         
         /* Rank by mean core S/N in science image */
-        ImageStatistics<PixelT> imstats;
+        ImageStatistics<PixelT> imstats(_policy);
         int candidateCoreRadius = _policy.getInt("candidateCoreRadius");
         try {
             imstats.apply(*_miToNotConvolvePtr, candidateCoreRadius);

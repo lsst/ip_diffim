@@ -38,6 +38,8 @@
 #include <limits>
 #include "boost/shared_ptr.hpp"
 #include "lsst/afw/image.h"
+#include "lsst/pex/policy/Policy.h"
+#include "lsst/pex/logging/Trace.h"
 #include "lsst/utils/ieee.h"
 
 namespace lsst { 
@@ -58,19 +60,22 @@ namespace diffim {
         typedef boost::shared_ptr<ImageStatistics> Ptr;
         typedef typename lsst::afw::image::MaskedImage<PixelT>::x_iterator x_iterator;
 
-        ImageStatistics() : 
-            _xsum(0.), _x2sum(0.), _npix(0) {
-            lsst::afw::image::MaskPixel const edgeMask   = 
-                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("EDGE");
-            lsst::afw::image::MaskPixel const crMask     = 
-                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("CR");
-            lsst::afw::image::MaskPixel const satMask    = 
-                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("SAT");
-            lsst::afw::image::MaskPixel const badMask    = 
-                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("BAD");
-            lsst::afw::image::MaskPixel const interpMask = 
-                lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask("INTRP");
-            _bpMask = edgeMask | crMask | satMask | badMask | interpMask;
+        ImageStatistics(lsst::pex::policy::Policy const& policy) : 
+        _xsum(0.), _x2sum(0.), _npix(0), _bpMask(0) {
+            
+            std::vector<std::string> detBadMaskPlanes = policy.getStringArray("badMaskPlanes");
+            for (std::vector<std::string>::iterator mi = detBadMaskPlanes.begin();
+                 mi != detBadMaskPlanes.end(); ++mi){
+
+                try {
+                    _bpMask |= lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask(*mi);
+                } catch (pexExcept::Exception& e) {
+                    lsst::pex::logging::TTrace<6>("lsst.ip.diffim.ImageStatistics",
+                                                  "Cannot update bad bit mask with %s", (*mi).c_str());
+                    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.ImageStatistics",
+                                                  e.what());
+                }
+            }
         } ;
         virtual ~ImageStatistics() {} ;
 
