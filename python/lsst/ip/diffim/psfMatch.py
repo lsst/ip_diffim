@@ -374,7 +374,7 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = bool,
         doc = """Use constant variance weighting in single kernel fitting?
                  In some cases this is better for bright star residuals.""",
-        default = False,
+        default = True,
     )
     calculateKernelUncertainty = pexConfig.Field(
         dtype = bool,

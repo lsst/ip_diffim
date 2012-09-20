@@ -100,7 +100,7 @@ namespace diffim {
             else
                 varValue = varStats.getValue(afwMath::MEDIAN);
             pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                              "Candidate %d using constant variance of %.2f", varValue);
+                              "Candidate %d using constant variance of %.2f", this->getId(), varValue);
             var = varValue;
 
         }
