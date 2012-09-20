@@ -83,7 +83,7 @@ class ImagePsfMatchTask(PsfMatch):
     @pipeBase.timeMethod
     def matchExposures(self, exposureToConvolve, exposureToNotConvolve,
                        psfFwhmPixTc = None, psfFwhmPixTnc = None,
-                       footprints = None, doWarping = True, swapImageToConvolve = False):
+                       candidateList = None, doWarping = True, swapImageToConvolve = False):
         """Warp and PSF-match an exposure to the reference
 
         Do the following, in order:
@@ -97,7 +97,8 @@ class ImagePsfMatchTask(PsfMatch):
         @param exposureToNotConvolve: Exposure whose WCS and PSF are to be matched
         @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
         @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
-        @param footprints: a list of footprints of sources; if None then source detection is run
+        @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
+            - Requires method getBBox() for each element of list
         @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
             - if True then warp exposureToConvolve to match exposureToNotConvolve
             - if False then raise an Exception
@@ -151,12 +152,12 @@ class ImagePsfMatchTask(PsfMatch):
             results = self.matchMaskedImages(
                 exposureToNotConvolve.getMaskedImage(), exposureToConvolve.getMaskedImage(),
                 psfFwhmPixTc = psfFwhmPixTnc, psfFwhmPixTnc = psfFwhmPixTc,
-                footprints = footprints)
+                candidateList = candidateList)
         else:
             results = self.matchMaskedImages(
                 exposureToConvolve.getMaskedImage(), exposureToNotConvolve.getMaskedImage(),
                 psfFwhmPixTc = psfFwhmPixTc, psfFwhmPixTnc = psfFwhmPixTnc,
-                footprints = footprints)
+                candidateList = candidateList)
         
         psfMatchedExposure = afwImage.makeExposure(results.matchedImage, exposureToNotConvolve.getWcs())
         psfMatchedExposure.setFilter(exposureToConvolve.getFilter())
@@ -168,7 +169,7 @@ class ImagePsfMatchTask(PsfMatch):
     @pipeBase.timeMethod
     def matchMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve, 
                           psfFwhmPixTc = None, psfFwhmPixTnc = None, 
-                          footprints = None):
+                          candidateList = None):
         """PSF-match a MaskedImage to a reference MaskedImage
 
         Do the following, in order:
@@ -181,7 +182,8 @@ class ImagePsfMatchTask(PsfMatch):
         @param maskedImageToNotConvolve: maskedImage whose PSF is to be matched
         @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
         @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
-        @param footprints: a list of footprints of sources; if None then source detection is run
+        @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
+            - Requires method getBBox() for each element of list
         
         @return a pipeBase.Struct containing these fields:
         - psfMatchedMaskedImage: the PSF-matched masked image =
@@ -202,7 +204,7 @@ class ImagePsfMatchTask(PsfMatch):
         self.log.log(pexLog.Log.INFO, "compute PSF-matching kernel")
         kernelCellSet = self._buildCellSet(maskedImageToConvolve,
                                            maskedImageToNotConvolve,
-                                           footprints = footprints)
+                                           candidateList = candidateList)
 
         if psfFwhmPixTc and psfFwhmPixTnc:
             pexLog.Trace(self.log.getName(), 2, "Matching Psf FWHM %.2f -> %.2f pix" % (psfFwhmPixTc, psfFwhmPixTnc))
@@ -226,7 +228,7 @@ class ImagePsfMatchTask(PsfMatch):
     @pipeBase.timeMethod
     def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
                           psfFwhmPixTc = None, psfFwhmPixTnc = None,
-                          footprints = None, doWarping = True, swapImageToConvolve = False):
+                          candidateList = None, doWarping = True, swapImageToConvolve = False):
         """Subtract two Exposures
         
         Do the following, in order:
@@ -240,7 +242,8 @@ class ImagePsfMatchTask(PsfMatch):
         @param exposureToNotConvolve: reference Exposure
         @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
         @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
-        @param footprints: a list of footprints of sources; if None then source detection is run
+        @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
+            - Requires method getBBox() for each element of list
         @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
             - if True then warp exposureToConvolve to match exposureToNotConvolve
             - if False then raise an Exception
@@ -261,7 +264,7 @@ class ImagePsfMatchTask(PsfMatch):
             exposureToNotConvolve = exposureToNotConvolve,
             psfFwhmPixTc = psfFwhmPixTc,
             psfFwhmPixTnc = psfFwhmPixTnc,
-            footprints = footprints,
+            candidateList = candidateList,
             doWarping = doWarping,
             swapImageToConvolve = swapImageToConvolve
         )
@@ -290,7 +293,7 @@ class ImagePsfMatchTask(PsfMatch):
     @pipeBase.timeMethod
     def subtractMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve,
                              psfFwhmPixTc = None, psfFwhmPixTnc = None,
-                             footprints = None):
+                             candidateList = None):
         """Subtract two MaskedImages
         
         Do the following, in order:
@@ -303,7 +306,8 @@ class ImagePsfMatchTask(PsfMatch):
         @param maskedImageToNotConvolve: reference MaskedImage
         @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
         @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
-        @param footprints: a list of footprints of sources; if None then source detection is run
+        @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
+            - Requires method getBBox() for each element of list
         
         @return a pipeBase.Struct containing these fields:
         - subtractedMaskedImage = maskedImageToNotConvolve - (matchedImage + backgroundModel)
@@ -317,7 +321,7 @@ class ImagePsfMatchTask(PsfMatch):
             maskedImageToNotConvolve = maskedImageToConvolve,
             psfFwhmPixTc = psfFwhmPixTnc,
             psfFwhmPixTnc = psfFwhmPixTc,
-            footprints = footprints,
+            candidateList = candidateList,
             )
 
         subtractedMaskedImage  = afwImage.MaskedImageF(maskedImageToNotConvolve, True)
@@ -326,23 +330,24 @@ class ImagePsfMatchTask(PsfMatch):
         results.subtractedMaskedImage = subtractedMaskedImage
         return results
 
-    def _adaptCellSize(self, footprints):
+    def _adaptCellSize(self, candidateList):
         """ NOT IMPLEMENTED YET"""
-        nFp = len(footprints)
+        nCand = len(candidateList)
         return self.kconfig.sizeCellX, self.kconfig.sizeCellY
 
-    def _buildCellSet(self, maskedImageToConvolve, maskedImageToNotConvolve, footprints = None):
+    def _buildCellSet(self, maskedImageToConvolve, maskedImageToNotConvolve, candidateList = None):
         """Build a SpatialCellSet for use with the solve method
 
         @param maskedImageToConvolve: MaskedImage to PSF-matched to maskedImageToNotConvolve
         @param maskedImageToNotConvolve: reference MaskedImage
-        @param footprints: a list of footprints of sources; if None then source detection is run
+        @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
+            - Requires method getBBox() for each element of list
         
         @return kernelCellSet: a SpatialCellSet for use with self._solve
         """
         
         # Candidate source footprints to use for Psf matching
-        if footprints == None:
+        if candidateList == None:
             self.log.log(pexLog.Log.INFO, "temporarily subtracting backgrounds for detection")
             mi1 = maskedImageToConvolve.Factory(maskedImageToConvolve, True)
             mi2 = maskedImageToNotConvolve.Factory(maskedImageToNotConvolve, True)
@@ -351,9 +356,9 @@ class ImagePsfMatchTask(PsfMatch):
             detConfig = self.kconfig.detectionConfig
             kcDetect = diffimLib.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
             kcDetect.apply(mi1, mi2)
-            footprints = kcDetect.getFootprints()
+            candidateList = kcDetect.getFootprints()
 
-        sizeCellX, sizeCellY = self._adaptCellSize(footprints)
+        sizeCellX, sizeCellY = self._adaptCellSize(candidateList)
 
         # Object to store the KernelCandidates for spatial modeling
         kernelCellSet = afwMath.SpatialCellSet(maskedImageToConvolve.getBBox(afwImage.PARENT),
@@ -361,9 +366,9 @@ class ImagePsfMatchTask(PsfMatch):
         
             
         policy = pexConfig.makePolicy(self.kconfig)
-        # Place candidate footprints within the spatial grid
-        for fp in footprints:
-            bbox = fp.getBBox()
+        # Place candidates within the spatial grid
+        for cand in candidateList:
+            bbox = cand.getBBox()
             
             # Grab the centers in the parent's coordinate system
             xC   = 0.5 * ( bbox.getMinX() + bbox.getMaxX() )

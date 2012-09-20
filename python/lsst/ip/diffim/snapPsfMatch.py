@@ -92,13 +92,13 @@ class SnapPsfMatchTask(ImagePsfMatchTask):
     # Override ImagePsfMatchTask.subtractExposures to set doWarping on config.doWarping
     def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
                           psfFwhmPixTc = None, psfFwhmPixTnc = None,
-                          footprints = None):
+                          candidateList = None):
         return ImagePsfMatchTask.subtractExposures(self,
             exposureToConvolve = exposureToConvolve,
             exposureToNotConvolve = exposureToNotConvolve,
             psfFwhmPixTc = psfFwhmPixTc,
             psfFwhmPixTnc = psfFwhmPixTnc,
-            footprints = footprints,
+            candidateList = candidateList,
             doWarping = self.config.doWarping,
         )
 
