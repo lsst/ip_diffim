@@ -318,7 +318,6 @@ class ImagePsfMatchTask(PsfMatch):
             psfFwhmPixTc = psfFwhmPixTnc,
             psfFwhmPixTnc = psfFwhmPixTc,
             footprints = footprints,
-            swapImageToConvolve = swapImageToConvolve
             )
 
         subtractedMaskedImage  = afwImage.MaskedImageF(maskedImageToNotConvolve, True)
