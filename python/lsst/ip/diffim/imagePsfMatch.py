@@ -26,12 +26,13 @@ import lsst.pex.config as pexConfig
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
+import lsst.afw.detection as afwDetect
 import lsst.pipe.base as pipeBase
 import lsst.meas.algorithms as measAlg
 import diffimTools
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatch, PsfMatchConfigDF, PsfMatchConfigAL
-
+import lsst.afw.display.ds9 as ds9
 sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
 class ImagePsfMatchConfig(pexConfig.Config):
@@ -98,7 +99,7 @@ class ImagePsfMatchTask(PsfMatch):
         @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
         @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
         @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
-            - Requires method getBBox() for each element of list
+            - Currently supported: list of Footprints or measAlg.PsfCandidateF
         @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
             - if True then warp exposureToConvolve to match exposureToNotConvolve
             - if False then raise an Exception
@@ -146,7 +147,63 @@ class ImagePsfMatchTask(PsfMatch):
                 psfAttr = measAlg.PsfAttributes(psf, width//2, height//2)
                 psfSigPixTnc = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
                 psfFwhmPixTnc = psfSigPixTnc * sigma2fwhm 
-            
+
+        if candidateList != None:
+            if type(candidateList[0]) == measAlg.PsfCandidateF:
+                kernelCandidateOutList = []
+                fsb = diffimLib.FindSetBitsU()
+                badBitMask = 0
+                for mp in self.config.kernel.active.detectionConfig.badMaskPlanes: 
+                    badBitMask |= afwImage.MaskU.getPlaneBitMask(mp)
+                self.log.info("Growing %d kernel candidate stars" % (len(candidateList)))
+                bbox = exposureToNotConvolve.getBBox()
+                for kernelCandidate in candidateList:
+                    bm1 = 0
+                    bm2 = 0
+                    ra  = kernelCandidate.getSource().getRa()
+                    dec = kernelCandidate.getSource().getDec()
+                    center = afwGeom.Point2I(exposureToNotConvolve.getWcs().skyToPixel(kernelCandidate.getSource().getCoord()))
+                    if center[0] < bbox.getMinX() or center[0] > bbox.getMaxX():
+                        continue
+                    if center[1] < bbox.getMinY() or center[1] > bbox.getMaxY():
+                        continue
+                    xmin   = center[0] - self.config.kernel.active.detectionConfig.fpGrowPix
+                    xmax   = center[0] + self.config.kernel.active.detectionConfig.fpGrowPix
+                    ymin   = center[1] - self.config.kernel.active.detectionConfig.fpGrowPix
+                    ymax   = center[1] + self.config.kernel.active.detectionConfig.fpGrowPix
+
+                    # Keep object centered
+                    if (xmin - bbox.getMinX()) < 0:
+                        xmax += (xmin - bbox.getMinX())
+                        xmin -= (xmin - bbox.getMinX())
+                    if (ymin - bbox.getMinY()) < 0:
+                        ymax += (ymin - bbox.getMinY())
+                        ymin -= (ymin - bbox.getMinY())
+                    if (bbox.getMaxX() - xmax) < 0:
+                        xmin -= (bbox.getMaxX() - xmax)
+                        xmax += (bbox.getMaxX() - xmax)
+                    if (bbox.getMaxY() - ymax) < 0:
+                        ymin -= (bbox.getMaxY() - ymax)
+                        ymax += (bbox.getMaxY() - ymax)
+                    if xmin > xmax or ymin > ymax:
+                        continue
+                        
+                    kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
+                    try:
+                        #ds9.mtv(afwImage.MaskedImageF(exposureToConvolve.getMaskedImage(), kbbox, False), frame = 1)
+                        #ds9.mtv(afwImage.MaskedImageF(exposureToNotConvolve.getMaskedImage(), kbbox, False), frame = 2)
+
+                        fsb.apply(afwImage.MaskedImageF(exposureToConvolve.getMaskedImage(), kbbox, False).getMask())
+                        bm1 = fsb.getBits()
+                        fsb.apply(afwImage.MaskedImageF(exposureToNotConvolve.getMaskedImage(), kbbox, False).getMask())
+                        bm2 = fsb.getBits()
+                    except:
+                        pass
+                    else:
+                        if not((bm1 & badBitMask) or (bm2 & badBitMask)):
+                            kernelCandidateOutList.append(afwDetect.Footprint(kbbox))
+                self.log.info("Using %d kernel candidate stars" % (len(kernelCandidateOutList))) 
+                candidateList = kernelCandidateOutList
 
         if swapImageToConvolve:
             results = self.matchMaskedImages(
@@ -183,7 +240,7 @@ class ImagePsfMatchTask(PsfMatch):
         @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
         @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
         @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
-            - Requires method getBBox() for each element of list
+            - Currently supported: list of Footprints or measAlg.PsfCandidateF
         
         @return a pipeBase.Struct containing these fields:
         - psfMatchedMaskedImage: the PSF-matched masked image =
@@ -243,7 +300,7 @@ class ImagePsfMatchTask(PsfMatch):
         @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
         @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
         @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
-            - Requires method getBBox() for each element of list
+            - Currently supported: list of Footprints or measAlg.PsfCandidateF
         @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
             - if True then warp exposureToConvolve to match exposureToNotConvolve
             - if False then raise an Exception
@@ -258,7 +315,7 @@ class ImagePsfMatchTask(PsfMatch):
         - psfMatchingKernel: PSF matching kernel
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
-        """
+        """     
         results = self.matchExposures(
             exposureToConvolve = exposureToConvolve,
             exposureToNotConvolve = exposureToNotConvolve,
@@ -307,7 +364,7 @@ class ImagePsfMatchTask(PsfMatch):
         @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
         @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
         @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
-            - Requires method getBBox() for each element of list
+            - Currently supported: list of Footprints or measAlg.PsfCandidateF
         
         @return a pipeBase.Struct containing these fields:
         - subtractedMaskedImage = maskedImageToNotConvolve - (matchedImage + backgroundModel)
@@ -341,7 +398,7 @@ class ImagePsfMatchTask(PsfMatch):
         @param maskedImageToConvolve: MaskedImage to PSF-matched to maskedImageToNotConvolve
         @param maskedImageToNotConvolve: reference MaskedImage
         @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
-            - Requires method getBBox() for each element of list
+            - Currently supported: list of Footprints or measAlg.PsfCandidateF
         
         @return kernelCellSet: a SpatialCellSet for use with self._solve
         """
