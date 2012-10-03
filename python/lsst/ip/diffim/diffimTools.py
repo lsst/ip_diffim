@@ -26,10 +26,11 @@ import diffimLib
 # all the other LSST packages
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
+import lsst.afw.table as afwTable
+import lsst.afw.detection as afwDetect
 import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
-import imagePsfMatch
 from .makeKernelBasisList import makeKernelBasisList 
 
 # third party
@@ -90,6 +91,7 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
                       deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
                       addNoise = True, bgValue = 100., display = False):
 
+    from . import imagePsfMatch
     configFake               = imagePsfMatch.ImagePsfMatchConfig()
     configFake.kernel.name   = "AL"
     subconfigFake            = configFake.kernel.active
@@ -482,3 +484,65 @@ def displayKernelCellSet(image, kernelCellSet, frame):
             cmd   = 'regions command { circle %g %g %g # color=%s text=\"%d\"};' % (
                 xCenter, yCenter, 10, color, cand.getId())
             ds9.ds9Cmd(cmd)
+
+#######
+# Converting types
+#######
+
+def sourceToFootprintList(candidateInList, exposureToConvolve, exposureToNotConvolve, config, log):
+    candidateOutList = []
+    fsb = diffimLib.FindSetBitsU()
+    badBitMask = 0
+    for mp in config.badMaskPlanes: 
+        badBitMask |= afwImage.MaskU.getPlaneBitMask(mp)
+    log.info("Growing %d kernel candidate stars" % (len(candidateInList)))
+    bbox = exposureToNotConvolve.getBBox()
+    for kernelCandidate in candidateInList:
+        if not type(kernelCandidate) == afwTable.SourceRecord:
+            raise RuntimeError, ("Candiate not of type afwTable.SourceRecord")
+        bm1 = 0
+        bm2 = 0
+        ra  = kernelCandidate.getRa()
+        dec = kernelCandidate.getDec()
+        center = afwGeom.Point2I(exposureToNotConvolve.getWcs().skyToPixel(kernelCandidate.getCoord()))
+        if center[0] < bbox.getMinX() or center[0] > bbox.getMaxX():
+            continue
+        if center[1] < bbox.getMinY() or center[1] > bbox.getMaxY():
+            continue
+        # Only stars, grow only a little
+        xmin   = center[0] - config.fpGrowPix // 2
+        xmax   = center[0] + config.fpGrowPix // 2
+        ymin   = center[1] - config.fpGrowPix // 2
+        ymax   = center[1] + config.fpGrowPix // 2
+
+        # Keep object centered
+        if (xmin - bbox.getMinX()) < 0:
+            xmax += (xmin - bbox.getMinX())
+            xmin -= (xmin - bbox.getMinX())
+        if (ymin - bbox.getMinY()) < 0:
+            ymax += (ymin - bbox.getMinY())
+            ymin -= (ymin - bbox.getMinY())
+        if (bbox.getMaxX() - xmax) < 0:
+            xmin -= (bbox.getMaxX() - xmax)
+            xmax += (bbox.getMaxX() - xmax)
+        if (bbox.getMaxY() - ymax) < 0:
+            ymin -= (bbox.getMaxY() - ymax)
+            ymax += (bbox.getMaxY() - ymax)
+        if xmin > xmax or ymin > ymax:
+            continue
+            
+        kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
+        try:
+            fsb.apply(afwImage.MaskedImageF(exposureToConvolve.getMaskedImage(), kbbox, False).getMask())
+            bm1 = fsb.getBits()
+            fsb.apply(afwImage.MaskedImageF(exposureToNotConvolve.getMaskedImage(), kbbox, False).getMask())
+            bm2 = fsb.getBits()
+        except Exception, e:
+            pass
+        else:
+            if not((bm1 & badBitMask) or (bm2 & badBitMask)):
+                candidateOutList.append(afwDetect.Footprint(kbbox))
+    log.info("Using %d kernel candidate stars" % (len(candidateOutList))) 
+    return candidateOutList
+    
+    

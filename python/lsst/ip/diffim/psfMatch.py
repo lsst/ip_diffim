@@ -854,3 +854,4 @@ class PsfMatch(pipeBase.Task):
         self._diagnostic(kernelCellSet, spatialSolution, spatialKernel, spatialBackground)
         
         return spatialSolution, spatialKernel, spatialBackground
+

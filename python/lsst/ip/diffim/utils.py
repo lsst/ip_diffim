@@ -28,6 +28,7 @@ import sys
 import numpy as num
 
 import lsst.pex.exceptions as pexExcept
+import lsst.pex.logging as pexLog
 import lsst.daf.base as dafBase
 import lsst.afw.detection as afwDet
 import lsst.afw.geom as afwGeom
@@ -38,6 +39,7 @@ import lsst.afw.display.ds9 as ds9
 import lsst.afw.display.utils as displayUtils
 import lsst.meas.algorithms as measAlg
 from . import diffimLib
+from . import diffimTools
 
 keptPlots = False                       # Have we arranged to keep spatial plots open?
     
@@ -435,3 +437,135 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None, showCe
                     ds9.dot("@:%g,%g,%g" % (ixx, ixy, iyy), xc, yc, frame=frame, ctype=ds9.RED)
 
     return mos
+
+def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCellSet, kernel, background, testSources, config, 
+                       origVariance = False, nptsFull = 1e6, keepPlots = True, titleFs=14):
+    candidateResids = []
+    spatialResids   = []
+    nonfitResids    = []
+
+    for cell in kernelCellSet.getCellList():
+        for cand in cell.begin(True): # only look at good ones
+            # Be sure
+            if not (cand.getStatus() == afwMath.SpatialCellCandidate.GOOD):
+                continue
+
+            cand    = diffimLib.cast_KernelCandidateF(cand)
+            diffim  = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
+            orig    = cand.getMiToNotConvolvePtr()
+
+            ski     = afwImage.ImageD(kernel.getDimensions())
+            kernel.computeImage(ski, False, int(cand.getXCenter()), int(cand.getYCenter()))
+            sk      = afwMath.FixedKernel(ski)
+            sbg     = background(int(cand.getXCenter()), int(cand.getYCenter()))
+            sdiffim = cand.getDifferenceImage(sk, sbg)
+
+            # trim edgs due to convolution
+            bbox    = kernel.shrinkBBox(diffim.getBBox())
+            tdiffim  = type(diffim)(diffim, bbox)
+            torig    = type(orig)(orig, bbox)
+            tsdiffim = type(sdiffim)(sdiffim, bbox)
+
+            if origVariance:
+                candidateResids.append(num.ravel(tdiffim.getImage().getArray() / num.sqrt(torig.getVariance().getArray())))
+                spatialResids.append(num.ravel(tsdiffim.getImage().getArray() / num.sqrt(torig.getVariance().getArray())))
+            else:
+                candidateResids.append(num.ravel(tdiffim.getImage().getArray() / num.sqrt(tdiffim.getVariance().getArray())))
+                spatialResids.append(num.ravel(tsdiffim.getImage().getArray() / num.sqrt(tsdiffim.getVariance().getArray())))
+
+    fullIm   = diffExposure.getMaskedImage().getImage().getArray()
+    fullMask = diffExposure.getMaskedImage().getMask().getArray()
+    if origVariance:
+        fullVar  = exposure.getMaskedImage().getVariance().getArray()
+    else:
+        fullVar  = diffExposure.getMaskedImage().getVariance().getArray()
+
+    bitmaskBad  = 0
+    bitmaskBad |= afwImage.MaskU.getPlaneBitMask('EDGE')
+    bitmaskBad |= afwImage.MaskU.getPlaneBitMask('SAT')
+    idx = num.where((fullMask & bitmaskBad) == 0)
+    stride = int(len(idx[0]) // nptsFull)
+    sidx = idx[0][::stride], idx[1][::stride]
+    allResids = fullIm[sidx] / num.sqrt(fullVar[sidx])
+
+    testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure, exposure, config, pexLog.getDefaultLog())
+    for fp in testFootprints:
+        subexp = type(diffExposure)(diffExposure, fp.getBBox())
+        subim  = subexp.getMaskedImage().getImage()
+        if origVariance:
+            subvar = afwImage.ExposureF(exposure, fp.getBBox()).getMaskedImage().getVariance()
+        else:
+            subvar = subexp.getMaskedImage().getVariance()
+        nonfitResids.append(num.ravel(subim.getArray() / num.sqrt(subvar.getArray())))
+
+    candidateResids = num.ravel(num.array(candidateResids))
+    spatialResids   = num.ravel(num.array(spatialResids))
+    nonfitResids    = num.ravel(num.array(nonfitResids))
+
+    try:
+        import pylab
+        from matplotlib.font_manager import FontProperties
+    except ImportError, e:
+        print "Unable to import pylab: %s" % e
+        return
+    
+    fig = pylab.figure()
+    fig.clf()
+    try:
+        fig.canvas._tkcanvas._root().lift() # == Tk's raise, but raise is a python reserved word
+    except:                                 # protect against API changes
+        pass
+    if origVariance:
+        fig.suptitle("Diffim residuals: Normalized by sqrt(input variance)", fontsize=titleFs)
+    else:
+        fig.suptitle("Diffim residuals: Normalized by sqrt(diffim variance)", fontsize=titleFs)
+
+    sp1 = pylab.subplot(221)
+    sp2 = pylab.subplot(222, sharex=sp1, sharey=sp1)
+    sp3 = pylab.subplot(223, sharex=sp1, sharey=sp1)
+    sp4 = pylab.subplot(224, sharex=sp1, sharey=sp1)
+    xs  = num.arange(-5, 5.05, 0.1)
+    ys  = 1. / num.sqrt(2 * num.pi) * num.exp( -0.5 * xs**2 )
+
+    sp1.hist(candidateResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" % (num.mean(candidateResids), num.var(candidateResids)))
+    sp1.plot(xs, ys, "r-", lw=2, label="N(0,1)")
+    sp1.set_title("Candidates: basis fit", fontsize=titleFs-2)
+    sp1.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
+
+    sp2.hist(spatialResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" % (num.mean(spatialResids), num.var(spatialResids)))
+    sp2.plot(xs, ys, "r-", lw=2, label="N(0,1)")
+    sp2.set_title("Candidates: spatial fit", fontsize=titleFs-2)
+    sp2.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
+
+    sp3.hist(nonfitResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" % (num.mean(nonfitResids), num.var(nonfitResids)))
+    sp3.plot(xs, ys, "r-", lw=2, label="N(0,1)")
+    sp3.set_title("Control sample: spatial fit", fontsize=titleFs-2)
+    sp3.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
+
+    sp4.hist(allResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" % (num.mean(allResids), num.var(allResids)))
+    sp4.plot(xs, ys, "r-", lw=2, label="N(0,1)")
+    sp4.set_title("Full image (subsampled)", fontsize=titleFs-2)
+    sp4.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
+
+    pylab.setp(sp1.get_xticklabels()+sp1.get_yticklabels(), fontsize=titleFs-4)
+    pylab.setp(sp2.get_xticklabels()+sp2.get_yticklabels(), fontsize=titleFs-4)
+    pylab.setp(sp3.get_xticklabels()+sp3.get_yticklabels(), fontsize=titleFs-4)
+    pylab.setp(sp4.get_xticklabels()+sp4.get_yticklabels(), fontsize=titleFs-4)
+
+    sp1.set_xlim(-5, 5)
+    sp1.set_ylim(0, 0.5)
+    fig.show()
+
+    global keptPlots
+    if keepPlots and not keptPlots:
+        # Keep plots open when done
+        def show():
+            print "%s: Please close plots when done." % __name__
+            try:
+                pylab.show()
+            except:
+                pass
+            print "Plots closed, exiting..."
+        import atexit
+        atexit.register(show)
+        keptPlots = True
