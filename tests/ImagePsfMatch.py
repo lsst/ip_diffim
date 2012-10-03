@@ -103,22 +103,6 @@ class PsfMatchTestCases(unittest.TestCase):
         resultsDF  = psfMatchDF.subtractExposures(tExp, sExp, doWarping = True)
         resultsDFr = psfMatchDFr.subtractExposures(tExp, sExp, doWarping = True)
 
-        # Some tests
-        if False:
-            diffimTools.displayBasisMosaic(resultsAL.psfMatchingKernel,  frame = 0)
-            diffimTools.displayBasisMosaic(resultsDF.psfMatchingKernel,  frame = 1)
-            diffimTools.displayBasisMosaic(resultsDFr.psfMatchingKernel, frame = 2)
-        if False:
-            diffimTools.displayKernelMosaic(resultsAL.kernelCellSet,  frame = 0)
-            diffimTools.displayKernelMosaic(resultsDF.kernelCellSet,  frame = 1)
-            diffimTools.displayKernelMosaic(resultsDFr.kernelCellSet, frame = 2)
-        if False:
-            diffimTools.displaySpatialKernelQuality(resultsDF.kernelCellSet, 
-                                                    resultsDF.psfMatchingKernel, 
-                                                    resultsDF.backgroundModel, 
-                                                    frame = 0)
-
-
         self.assertEqual(len(resultsAL), 4+1) # include metadata
         self.assertEqual(type(resultsAL.subtractedImage), afwImage.ExposureF)
         self.assertEqual(type(resultsAL.psfMatchingKernel), afwMath.LinearCombinationKernel)
