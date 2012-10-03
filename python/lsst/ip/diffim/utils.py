@@ -94,6 +94,41 @@ def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
                                 xc - size, yc - size - 4, frame=frame, ctype=color, size=size)
 
 
+def showDiaSources(sources, exposure, isFlagged, isDipole, frame=None):
+    """Display Dia Sources
+    """
+    #
+    # Show us the ccandidates
+    #
+    # Too many mask planes in diffims
+    for plane in ("BAD", "CR", "EDGE", "INTERPOlATED", "INTRP", "SAT", "SATURATED"):
+        ds9.setMaskPlaneVisibility(plane, False)
+
+    mos = displayUtils.Mosaic()
+    for i in range(len(sources)):
+        source = sources[i]
+        badFlag = isFlagged[i]
+        dipoleFlag = isDipole[i]
+        bbox = source.getFootprint().getBBox()
+        stamp = type(exposure)(exposure, bbox, True)
+        im = displayUtils.Mosaic(gutter=1, background=0, mode="x")
+        im.append(stamp.getMaskedImage())
+        lab = "%.1f,%.1f:" % (source.getX(), source.getY())
+        if badFlag:
+            ctype = ds9.RED
+            lab += "BAD"
+        if dipoleFlag:
+            ctype = ds9.YELLOW
+            lab += "DIPOLE"
+        if not badFlag and not dipoleFlag:
+            ctype = ds9.GREEN
+            lab += "OK"
+        mos.append(im.makeMosaic(), lab, ctype)
+        print source.getId()
+    title = "Dia Sources"
+    mosaicImage = mos.makeMosaic(frame=frame, title=title)
+    return mosaicImage
+
 def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadCandidates=True,
                          resids=False, kernels=False):
     """Display the Kernel candidates.

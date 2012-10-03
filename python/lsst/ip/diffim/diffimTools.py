@@ -330,4 +330,34 @@ def sourceToFootprintList(candidateInList, exposureToConvolve, exposureToNotConv
     log.info("Using %d kernel candidate stars" % (len(candidateOutList))) 
     return candidateOutList
     
-    
+#######
+# DiaSource filters (here for now)
+#######
+
+class SourceFlagChecker(object):
+    """A functor to check whether a difference image source has any flags set that should cause it to be labeled bad."""
+    def __init__(self, sources, badFlags=['flags.pixel.edge', 'flags.pixel.interpolated.center', 'flags.pixel.saturated.center']):
+        self.keys = [sources.getSchema().find(name).key for name in badFlags]
+        self.keys.append(sources.table.getCentroidFlagKey())
+
+    def __call__(self, source):
+        for k in self.keys:
+            if source.get(k):
+                return False
+        return True
+
+class DipoleChecker(object):
+    """A functor to check for dipoles in difference image source tables."""
+    def __init__(self, sources, radiusPixels = 7.0):
+        self.sources   = sources
+        self.negkey    = self.sources.getSchema().find("flags.negative").key
+        self.matches   = afwTable.matchXy(self.sources, radiusPixels)
+        self.dipoleIds = []
+        for match in self.matches:
+            if match.first.get(self.negkey) != match.second.get(self.negkey):
+                self.dipoleIds.append(match.first.getId())
+                self.dipoleIds.append(match.second.getId())
+        
+    def __call__(self, source):
+        return source.getId() in self.dipoleIds
+        
