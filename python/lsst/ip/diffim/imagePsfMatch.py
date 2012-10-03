@@ -20,7 +20,6 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import numpy as num
-import diffimLib 
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.afw.image as afwImage
@@ -32,7 +31,10 @@ import lsst.meas.algorithms as measAlg
 import diffimTools
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatch, PsfMatchConfigDF, PsfMatchConfigAL
+from . import utils as diUtils 
+from . import diffimLib
 import lsst.afw.display.ds9 as ds9
+
 sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
 class ImagePsfMatchConfig(pexConfig.Config):
@@ -167,10 +169,11 @@ class ImagePsfMatchTask(PsfMatch):
                         continue
                     if center[1] < bbox.getMinY() or center[1] > bbox.getMaxY():
                         continue
-                    xmin   = center[0] - self.config.kernel.active.detectionConfig.fpGrowPix
-                    xmax   = center[0] + self.config.kernel.active.detectionConfig.fpGrowPix
-                    ymin   = center[1] - self.config.kernel.active.detectionConfig.fpGrowPix
-                    ymax   = center[1] + self.config.kernel.active.detectionConfig.fpGrowPix
+                    # Only stars, grow only a little
+                    xmin   = center[0] - self.config.kernel.active.detectionConfig.fpGrowPix // 2
+                    xmax   = center[0] + self.config.kernel.active.detectionConfig.fpGrowPix // 2
+                    ymin   = center[1] - self.config.kernel.active.detectionConfig.fpGrowPix // 2
+                    ymax   = center[1] + self.config.kernel.active.detectionConfig.fpGrowPix // 2
 
                     # Keep object centered
                     if (xmin - bbox.getMinX()) < 0:
@@ -270,7 +273,30 @@ class ImagePsfMatchTask(PsfMatch):
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
         conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))        
         self.metadata.set("spatialConditionNum", conditionNum)
-    
+
+        import lsstDebug
+        display = lsstDebug.Info(__name__).display
+        displayTemplate = lsstDebug.Info(__name__).displayTemplate
+        displaySciIm = lsstDebug.Info(__name__).displaySciIm
+        displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells
+        maskTransparency = lsstDebug.Info(__name__).maskTransparency   
+        if not maskTransparency:
+            maskTransparency = 0
+        ds9.setMaskTransparency(maskTransparency)
+
+        if display and displayTemplate:
+            ds9.mtv(maskedImageToConvolve, frame=lsstDebug.frame, title="Image to convolve")
+            lsstDebug.frame += 1
+
+        if display and displaySpatialCells:
+            diUtils.showKernelSpatialCells(maskedImageToNotConvolve, kernelCellSet, 
+                                           symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
+                                           size=4, frame=lsstDebug.frame)
+            lsstDebug.frame += 1
+        elif display and  displaySciIm:
+            ds9.mtv(maskedImageToNotConvolve, frame=lsstDebug.frame, title="Image to not convolve")
+            lsstDebug.frame += 1
+
         psfMatchedMaskedImage = afwImage.MaskedImageF(maskedImageToConvolve.getBBox(afwImage.PARENT))
         doNormalize = False
         afwMath.convolve(psfMatchedMaskedImage, maskedImageToConvolve, psfMatchingKernel, doNormalize)
@@ -385,6 +411,18 @@ class ImagePsfMatchTask(PsfMatch):
         subtractedMaskedImage -= results.matchedImage
         subtractedMaskedImage -= results.backgroundModel
         results.subtractedMaskedImage = subtractedMaskedImage
+
+        import lsstDebug
+        display = lsstDebug.Info(__name__).display
+        displayDiffIm = lsstDebug.Info(__name__).displayDiffIm
+        maskTransparency = lsstDebug.Info(__name__).maskTransparency   
+        if not maskTransparency:
+            maskTransparency = 0
+        ds9.setMaskTransparency(maskTransparency)
+        if display and displayDiffIm:
+            ds9.mtv(subtractedMaskedImage, frame=lsstDebug.frame)
+            lsstDebug.frame += 1
+
         return results
 
     def _adaptCellSize(self, candidateList):
@@ -402,7 +440,6 @@ class ImagePsfMatchTask(PsfMatch):
         
         @return kernelCellSet: a SpatialCellSet for use with self._solve
         """
-        
         # Candidate source footprints to use for Psf matching
         if candidateList == None:
             self.log.log(pexLog.Log.INFO, "temporarily subtracting backgrounds for detection")

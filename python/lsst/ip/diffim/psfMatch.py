@@ -21,13 +21,15 @@
 #
 import time
 import numpy as num
-import diffimLib
 import lsst.afw.image as afwImage
 import lsst.pex.logging as pexLog
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
+import lsst.afw.display.ds9 as ds9
 import lsst.pipe.base as pipeBase
+from . import utils as diUtils
+from . import diffimLib
 
 class DetectionConfig(pexConfig.Config):
     detThreshold = pexConfig.Field(
@@ -676,6 +678,20 @@ class PsfMatch(pipeBase.Task):
         @raise Exception if unable to determine PSF matching kernel and returnOnExcept False
         """
 
+        import lsstDebug
+        display = lsstDebug.Info(__name__).display
+        showBadCandidates = lsstDebug.Info(__name__).showBadCandidates 
+        displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells
+        displayCandidates = lsstDebug.Info(__name__).displayCandidates
+        displayKernelBasis = lsstDebug.Info(__name__).displayKernelBasis
+        displayKernelMosaic = lsstDebug.Info(__name__).displayKernelMosaic
+        plotKernelSpatialModel = lsstDebug.Info(__name__).plotKernelSpatialModel
+        showBadCandidates = lsstDebug.Info(__name__).showBadCandidates 
+        maskTransparency = lsstDebug.Info(__name__).maskTransparency   
+        if not maskTransparency:
+            maskTransparency = 0
+        ds9.setMaskTransparency(maskTransparency)
+
         maxSpatialIterations   = self.kconfig.maxSpatialIterations
         nStarPerCell           = self.kconfig.nStarPerCell
         usePcaForSpatialKernel = self.kconfig.usePcaForSpatialKernel
@@ -794,7 +810,7 @@ class PsfMatch(pipeBase.Task):
                 spatialkv.solveLinearEquation()
                 pexLog.Trace(self.log.getName()+"._solve", 3, 
                              "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
-                spatialKernel, spatialBacakground = spatialkv.getSolutionPair()
+                spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
             spatialSolution = spatialkv.getKernelSolution()
 
@@ -806,8 +822,31 @@ class PsfMatch(pipeBase.Task):
             pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
             pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0])
             raise e
-            
-      
+
+        if display and displayCandidates:
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates)
+            lsstDebug.frame += 1
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates,
+                                         kernels=True)
+            lsstDebug.frame += 1
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates,
+                                         resids=True)
+            lsstDebug.frame += 1
+        
+        if display and displayKernelBasis:
+            diUtils.showKernelBasis(spatialKernel, frame=lsstDebug.frame)
+            lsstDebug.frame += 1
+
+        if display and displayKernelMosaic:
+            diUtils.showKernelMosaic(kernelCellSet.getBBox(), spatialKernel, frame=lsstDebug.frame)
+            lsstDebug.frame += 1 
+
+        if display and plotKernelSpatialModel:
+            diUtils.plotKernelSpatialModel(spatialKernel, kernelCellSet, showBadCandidates=showBadCandidates)
+
         t1 = time.time()
         pexLog.Trace(self.log.getName()+"._solve", 1, 
                      "Total time to compute the spatial kernel : %.2f s" % (t1 - t0))
