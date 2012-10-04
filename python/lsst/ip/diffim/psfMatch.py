@@ -638,6 +638,8 @@ class PsfMatch(pipeBase.Task):
         pcaBasisList = importStarVisitor.getEigenKernels()
 
         eSum = num.sum(eigenValues)
+        if eSum == 0.0:
+            raise RuntimeError("Eigenvalues sum to zero")
         for j in range(len(eigenValues)):
             pexLog.Trace(self.log.getName()+"._solve", 6, 
                          "Eigenvalue %d : %f (%f)" % (j, eigenValues[j], eigenValues[j]/eSum))

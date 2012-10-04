@@ -30,6 +30,10 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfigDF.useRegularization = False
         self.subconfigDFr.useRegularization = True
 
+        self.subconfigAL.constantVarianceWeighting = False
+        self.subconfigDF.constantVarianceWeighting = False
+        self.subconfigDFr.constantVarianceWeighting = False
+
         # variance is a hack
         self.subconfigAL.singleKernelClipping   = False   
         self.subconfigAL.spatialKernelClipping  = False  
@@ -103,8 +107,7 @@ class PsfMatchTestCases(unittest.TestCase):
         resultsDF  = psfMatchDF.subtractExposures(tExp, sExp, doWarping = True)
         resultsDFr = psfMatchDFr.subtractExposures(tExp, sExp, doWarping = True)
 
-        self.assertEqual(len(resultsAL), 4+1) # include metadata
-        self.assertEqual(type(resultsAL.subtractedImage), afwImage.ExposureF)
+        self.assertEqual(type(resultsAL.subtractedExposure), afwImage.ExposureF)
         self.assertEqual(type(resultsAL.psfMatchingKernel), afwMath.LinearCombinationKernel)
         self.assertEqual(type(resultsAL.backgroundModel), afwMath.Function2D)
         self.assertEqual(type(resultsAL.kernelCellSet), afwMath.SpatialCellSet)
@@ -120,8 +123,8 @@ class PsfMatchTestCases(unittest.TestCase):
 
         psfMatchAL = ipDiffim.ImagePsfMatchTask(config=self.configAL)
         resultsAL  = psfMatchAL.matchExposures(tExp, sExp,
-                                    psfFwhmPixTc = 2.0, psfFwhmPixTnc = 3.0, doWarping = True)
-        self.assertEqual(type(resultsAL.matchedImage), afwImage.ExposureF)
+                                               psfFwhmPixTc = 2.0, psfFwhmPixTnc = 3.0, doWarping = True)
+        self.assertEqual(type(resultsAL.matchedExposure), afwImage.ExposureF)
         self.assertEqual(type(resultsAL.psfMatchingKernel), afwMath.LinearCombinationKernel)
         self.assertEqual(type(resultsAL.backgroundModel), afwMath.Function2D)
         self.assertEqual(type(resultsAL.kernelCellSet), afwMath.SpatialCellSet)
@@ -131,7 +134,7 @@ class PsfMatchTestCases(unittest.TestCase):
         
         self.subconfigDF.usePcaForSpatialKernel = True
         self.subconfigDF.numPrincipalComponents = nTerms
-        
+
         psfMatchDF  = ipDiffim.ImagePsfMatchTask(config=self.configDF)
         resultsDF   = psfMatchDF.subtractMaskedImages(tMi, sMi)
         
@@ -167,7 +170,12 @@ class PsfMatchTestCases(unittest.TestCase):
         # candidates in the KernelCellSet are initialized in
         # makeFakeKernelSet
         tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = 0.0, addNoise = False)
-        
+
+        svar = sMi.getVariance()
+        svar.set(1.0)
+        tvar = tMi.getVariance()
+        tvar.set(1.0)
+
         basisList = ipDiffim.makeKernelBasisList(confake.kernel.active)
         psfMatchAL = ipDiffim.ImagePsfMatchTask(config=confake)
         spatialSolution, psfMatchingKernel, backgroundModel = psfMatchAL._solve(kcs, basisList)

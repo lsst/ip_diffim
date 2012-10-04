@@ -377,6 +377,7 @@ class DiffimTestCases(unittest.TestCase):
         smi.set(cpix, cpix, (1, 0x0, 0.0))
 
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        self.policy.set("constantVarianceWeighting", False)
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi, smi, self.policy)
         try:
             kc.build(kList)

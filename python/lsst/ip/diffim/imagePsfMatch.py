@@ -404,7 +404,7 @@ class ImagePsfMatchTask(PsfMatch):
             mi1 = maskedImageToConvolve.Factory(maskedImageToConvolve, True)
             mi2 = maskedImageToNotConvolve.Factory(maskedImageToNotConvolve, True)
             tmp = diffimTools.backgroundSubtract(self.kconfig.afwBackgroundConfig, [mi1, mi2])
-            
+
             detConfig = self.kconfig.detectionConfig
             kcDetect = diffimLib.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
             kcDetect.apply(mi1, mi2)

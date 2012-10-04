@@ -173,14 +173,12 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     # And turn into MaskedImages
     sim   = afwImage.ImageF(sim, bbox, afwImage.LOCAL)
     svar  = afwImage.ImageF(sim, True)
-    svar.set(1.0)
     smask = afwImage.MaskU(sim.getDimensions())
     smask.set(0x0)
     sMi   = afwImage.MaskedImageF(sim, smask, svar)
     
     tim   = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
     tvar  = afwImage.ImageF(tim, True)
-    tvar.set(1.0)
     tmask = afwImage.MaskU(tim.getDimensions())
     tmask.set(0x0)
     tMi   = afwImage.MaskedImageF(tim, tmask, tvar)
