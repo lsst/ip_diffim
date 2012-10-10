@@ -209,14 +209,27 @@ class ImagePsfMatchTask(PsfMatch):
             raise RuntimeError, "Input images different size"
             
         self.log.log(pexLog.Log.INFO, "compute PSF-matching kernel")
+        if psfFwhmPixTc and psfFwhmPixTnc:
+            pexLog.Trace(self.log.getName(), 2, "Matching Psf FWHM %.2f -> %.2f pix" % (psfFwhmPixTc, psfFwhmPixTnc))
+
+
+
+
+        if self.kconfig.useBicForKernelBasis:
+            tmpKernelCellSet = self._buildCellSet(maskedImageToConvolve,
+                                                  maskedImageToNotConvolve,
+                                                  candidateList = candidateList)
+            nbe = diffimTools.NbasisEvaluator(self.kconfig, psfFwhmPixTc, psfFwhmPixTnc)
+            bicDegrees = nbe(tmpKernelCellSet, self.log)
+            basisList = makeKernelBasisList(self.kconfig, psfFwhmPixTc, psfFwhmPixTnc, bicDegrees[0])
+            del tmpKernelCellSet
+        else:
+            basisList = makeKernelBasisList(self.kconfig, psfFwhmPixTc, psfFwhmPixTnc)
+
+
         kernelCellSet = self._buildCellSet(maskedImageToConvolve,
                                            maskedImageToNotConvolve,
                                            candidateList = candidateList)
-        import pdb; pdb.set_trace()
-
-        if psfFwhmPixTc and psfFwhmPixTnc:
-            pexLog.Trace(self.log.getName(), 2, "Matching Psf FWHM %.2f -> %.2f pix" % (psfFwhmPixTc, psfFwhmPixTnc))
-        basisList = makeKernelBasisList(self.kconfig, psfFwhmPixTc, psfFwhmPixTnc)
 
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
         conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))        
