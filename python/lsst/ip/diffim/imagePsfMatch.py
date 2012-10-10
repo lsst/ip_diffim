@@ -212,6 +212,7 @@ class ImagePsfMatchTask(PsfMatch):
         kernelCellSet = self._buildCellSet(maskedImageToConvolve,
                                            maskedImageToNotConvolve,
                                            candidateList = candidateList)
+        import pdb; pdb.set_trace()
 
         if psfFwhmPixTc and psfFwhmPixTnc:
             pexLog.Trace(self.log.getName(), 2, "Matching Psf FWHM %.2f -> %.2f pix" % (psfFwhmPixTc, psfFwhmPixTnc))

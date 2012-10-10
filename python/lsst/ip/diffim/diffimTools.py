@@ -34,7 +34,7 @@ import lsst.pex.config as pexConfig
 from .makeKernelBasisList import makeKernelBasisList 
 
 # third party
-import numpy
+import numpy as num
 import time
 import os
 
@@ -64,7 +64,7 @@ def makePoissonNoiseImage(im):
     @param[in] im image; the output image has the same dimensions and shape
         and its expectation value is the value of im at each pixel
     """
-    import numpy.random as rand
+    import num.random as rand
     imArr = im.getArray()
     noiseIm = im.Factory(im.getBBox(afwImage.PARENT))
     noiseArr = noiseIm.getArray()
@@ -163,7 +163,7 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     sim  += bgValue
 
     # Watch out for negative values
-    tim  += 2 * numpy.abs(numpy.min(tim.getArray()))
+    tim  += 2 * num.abs(num.min(tim.getArray()))
     
     # Add noise?
     if addNoise:
@@ -359,3 +359,46 @@ class DipoleChecker(object):
     def __call__(self, source):
         return source.getId() in self.dipoleIds
         
+class BicEvaluator(object):
+    """A functor to evaluate the Bayesian Information Criterion for the basis sets going into the kernel fitting"""
+    def __init__(self, psfMatchConfig, psfFwhmPixTc, psfFwhmPixTnc):
+        self.psfMatchConfig = psfMatchConfig
+        self.psfFwhmPixTc = psfFwhmPixTc
+        self.psfFwhmPixTnc = psfFwhmPixTnc
+        if not self.psfMatchConfig.kernel.active.kernelBasisSet == "alard-lupton":
+            raise RuntimeError, "BIC only implemnted for AL (alard lupton) basis"
+        
+    def __call__(self, kernelCellSet):
+        d1, d2, d3 = self.psfMatchConfig.kernel.active.alardDegGauss
+        bicArray = {}
+        for i in range(1, d1+1):
+            for j in range(1, d2+1):
+                for k in range(1, d3+1):
+                    dList = [i, j, k]
+                    bicArray[(i,j,k)] = {}
+                    bicConfig = type(self.psfMatchConfig.kernel.active)(self.psfMatchConfig.kernel.active, alardDegGauss=dList)
+                    kList = makeKernelBasisList(bicConfig)
+                    k = len(kList)
+                    singlekv = diffimLib.BuildSingleKernelVisitorF(kList, pexConfig.makePolicy(bicConfig))
+                    singlekv.setSkipBuilt(False)
+                    kernelCellSet.visitCandidates(singlekv, bicConfig.nStarPerCell)        
+
+                    for cell in kernelCellSet.getCellList():
+                        for cand in cell.begin(False): # False = include bad candidates
+                            cand = diffimLib.cast_KernelCandidateF(cand)
+                            diffIm = cand.getDifferenceImage(diffimLib.KernelCandidateF.RECENT)
+                            bbox = cand.getKernel(diffimLib.KernelCandidateF.RECENT).shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
+                            diffIm = type(diffIm)(diffIm, bbox, True)
+                            chi2 = diffIm.getImage().getArray()**2 / diffIm.getVariance().getArray()
+                            n = chi2.shape[0] * chi2.shape[1]
+                            bic = num.sum(chi2) + k * num.log(n)
+                            bicArray[i][j][k][cand.getId()] = bic
+
+        keys = [
+        for i in range(1, d1+1):
+            bicArray[i] = {}
+            for j in range(1, d2+1):
+                bicArray[i][j] = {}
+                for k in range(1, d3+1):
+                    bicArray[i][j][k] = {}
+                            
