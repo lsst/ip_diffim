@@ -33,6 +33,9 @@ class DiffimTestCases(unittest.TestCase):
         # "stdev" vs "pixel_stdev"
         self.subconfig.detectionConfig.detThresholdType = "stdev"
 
+	# Impacts some of the test values
+	self.subconfig.constantVarianceWeighting = False
+
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
 
