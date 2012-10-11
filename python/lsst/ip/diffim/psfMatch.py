@@ -682,7 +682,6 @@ class PsfMatch(pipeBase.Task):
 
         import lsstDebug
         display = lsstDebug.Info(__name__).display
-        showBadCandidates = lsstDebug.Info(__name__).showBadCandidates 
         displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells
         displayCandidates = lsstDebug.Info(__name__).displayCandidates
         displayKernelBasis = lsstDebug.Info(__name__).displayKernelBasis
