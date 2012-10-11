@@ -34,7 +34,7 @@ class DiffimTestCases(unittest.TestCase):
         self.subconfig.detectionConfig.detThresholdType = "stdev"
 
 	# Impacts some of the test values
-	self.subconfig.constantVarianceWeighting = False
+	self.subconfig.constantVarianceWeighting = True
 
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
@@ -128,7 +128,7 @@ class DiffimTestCases(unittest.TestCase):
             self.assertAlmostEqual(backgroundModel1(10, 10), backgroundModel2(10, 10), 4)
 
         else:
-            # Kernel weights (end up different when fitting for background)
+            # Check on the spatial coefficients; note Cheby internally maps from -1 to 1
             nPar1 = len(spatialKernel1.getKernelParameters())    
             nPar2 = len(spatialKernel2.getKernelParameters())    
             kp1   = afwMath.vectorD(nPar1)
@@ -136,8 +136,18 @@ class DiffimTestCases(unittest.TestCase):
             spatialKernel1.computeKernelParametersFromSpatialModel(kp1, 0.0, 0.0)
             spatialKernel2.computeKernelParametersFromSpatialModel(kp2, 0.0, 0.0)
             for i in range(len(kp1)):
-                self.assertAlmostEqual(kp1[i], kp2[i], 2)
+                self.assertAlmostEqual(kp1[i], kp2[i], 1)
 
+            # More improtant is the kernel needs to be then same when realized at a coordinate
+            kim1 = afwImage.ImageD(spatialKernel1.getDimensions())
+            kim2 = afwImage.ImageD(spatialKernel2.getDimensions())
+            ksum1 = spatialKernel1.computeImage(kim1, False, 0.0, 0.0)
+            ksum2 = spatialKernel2.computeImage(kim2, False, 0.0, 0.0)
+            self.assertAlmostEqual(ksum1, ksum2, 5)
+            for y in range(kim1.getHeight()):
+                for x in range(kim1.getHeight()):
+                    self.assertAlmostEqual(kim1.get(x, y), kim2.get(x, y), 2)
+                    
             # Nterms (zeroth order)
             self.assertEqual(backgroundModel1.getNParameters(), 1)
             self.assertEqual(backgroundModel2.getNParameters(), 1)
@@ -238,7 +248,7 @@ class DiffimTestCases(unittest.TestCase):
         bgp2 = backgroundModel2.getParameters()
 
         # first term = kernel sum, 0, 0
-        self.assertAlmostEqual(skp1[0][0], skp2[0][0])
+        self.assertAlmostEqual(skp1[0][0], skp2[0][0], 6)
 
         # On other terms, the spatial terms are the same, the zpt terms are different
         for nk in range(1, len(skp1)):
