@@ -325,7 +325,13 @@ class ImagePsfMatchTask(PsfMatch):
             maskTransparency = 0
         ds9.setMaskTransparency(maskTransparency)
         if display and displayDiffIm:
-            ds9.mtv(subtractedExposure, frame=lsstDebug.frame)
+            ds9.mtv(exposureToConvolve, frame=lsstDebug.frame, title="Template")
+            lsstDebug.frame += 1
+            ds9.mtv(results.matchedExposure, frame=lsstDebug.frame, title="Matched template")
+            lsstDebug.frame += 1
+            ds9.mtv(exposureToNotConvolve, frame=lsstDebug.frame, title="Target")
+            lsstDebug.frame += 1
+            ds9.mtv(subtractedExposure, frame=lsstDebug.frame, title="Subtracted")
             lsstDebug.frame += 1
 
         results.subtractedExposure = subtractedExposure
