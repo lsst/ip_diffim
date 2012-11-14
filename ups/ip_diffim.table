@@ -5,7 +5,6 @@ setupRequired(pex_config)
 setupRequired(pipe_base)
 
 setupOptional(afwdata)
-setupOptional(pyfits)
 setupOptional(matplotlib)
 
 envPrepend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
