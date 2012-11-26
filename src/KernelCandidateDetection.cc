@@ -189,7 +189,6 @@ namespace diffim {
             return growCandidate(fpCore, fpGrowPix, miToConvolvePtr, miToNotConvolvePtr);
         } 
 
-        afwGeom::Box2I fpBox = fp->getBBox();
         pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                           "Original footprint in parent : %d,%d -> %d,%d -> %d,%d",
                           fpBBox.getMinX(), fpBBox.getMinY(), 
