@@ -507,7 +507,7 @@ namespace diffim {
     {};
 
     template <typename InputT>
-    void MaskedKernelSolution<InputT>::build(
+    void MaskedKernelSolution<InputT>::buildWithMask(
         lsst::afw::image::Image<InputT> const &imageToConvolve,
         lsst::afw::image::Image<InputT> const &imageToNotConvolve,
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
@@ -653,7 +653,7 @@ namespace diffim {
             *eiter = eigenCptr;
         }
         double time = t.elapsed();
-        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.build", 
+        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.buildWithMask", 
                           "Total compute time to do basis convolutions : %.2f s", time);
         t.restart();
         
