@@ -87,7 +87,7 @@ class ImagePsfMatchTask(PsfMatch):
     @pipeBase.timeMethod
     def matchExposures(self, exposureToConvolve, exposureToNotConvolve,
                        psfFwhmPixTc = None, psfFwhmPixTnc = None,
-                       candidateList = None, doWarping = True, swapImageToConvolve = False):
+                       candidateList = None, doWarping = True, convolveTemplate = True):
         """Warp and PSF-match an exposure to the reference
 
         Do the following, in order:
@@ -106,9 +106,9 @@ class ImagePsfMatchTask(PsfMatch):
         @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
             - if True then warp exposureToConvolve to match exposureToNotConvolve
             - if False then raise an Exception
-        @param swapImageToConvolve: switch which image is used as the refernce, in case of e.g. deconvolution
-            - if True, exposureToConvolve is warped if doWarping, exposureToNotConvolve is convolved
-            - if False, exposureToConvolve is warped if doWarping, exposureToConvolve is convolved
+        @param convolveTemplate: convolve the template image or the science image
+            - if True, exposureToConvolve is warped if doWarping, exposureToConvolve is convolved
+            - if False, exposureToConvolve is warped if doWarping, exposureToNotConvolve is convolved
         
         @return a pipeBase.Struct containing these fields:
         - matchedImage: the PSF-matched exposure =
@@ -155,15 +155,15 @@ class ImagePsfMatchTask(PsfMatch):
             if type(candidateList[0]) == afwTable.SourceRecord:
                 candidateList = diffimTools.sourceToFootprintList(candidateList, exposureToConvolve, exposureToNotConvolve, 
                                                                   self.kconfig.detectionConfig, self.log)
-        if swapImageToConvolve:
-            results = self.matchMaskedImages(
-                exposureToNotConvolve.getMaskedImage(), exposureToConvolve.getMaskedImage(),
-                psfFwhmPixTc = psfFwhmPixTnc, psfFwhmPixTnc = psfFwhmPixTc,
-                candidateList = candidateList)
-        else:
+        if convolveTemplate:
             results = self.matchMaskedImages(
                 exposureToConvolve.getMaskedImage(), exposureToNotConvolve.getMaskedImage(),
                 psfFwhmPixTc = psfFwhmPixTc, psfFwhmPixTnc = psfFwhmPixTnc,
+                candidateList = candidateList)
+        else:
+            results = self.matchMaskedImages(
+                exposureToNotConvolve.getMaskedImage(), exposureToConvolve.getMaskedImage(),
+                psfFwhmPixTc = psfFwhmPixTnc, psfFwhmPixTnc = psfFwhmPixTc,
                 candidateList = candidateList)
         
         psfMatchedExposure = afwImage.makeExposure(results.matchedImage, exposureToNotConvolve.getWcs())
@@ -258,7 +258,7 @@ class ImagePsfMatchTask(PsfMatch):
     @pipeBase.timeMethod
     def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
                           psfFwhmPixTc = None, psfFwhmPixTnc = None,
-                          candidateList = None, doWarping = True, swapImageToConvolve = False):
+                          candidateList = None, doWarping = True, convolveTemplate = True):
         """Subtract two Exposures
         
         Do the following, in order:
@@ -277,9 +277,9 @@ class ImagePsfMatchTask(PsfMatch):
         @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
             - if True then warp exposureToConvolve to match exposureToNotConvolve
             - if False then raise an Exception
-        @param swapImageToConvolve: switch which image is used as the refernce, in case of e.g. deconvolution
-            - if True, exposureToConvolve is warped if doWarping, exposureToNotConvolve is convolved
-            - if False, exposureToConvolve is warped if doWarping, exposureToConvolve is convolved
+        @param convolveTemplate: convolve the template image or the science image
+            - if True, exposureToConvolve is warped if doWarping, exposureToConvolve is convolved
+            - if False, exposureToConvolve is warped if doWarping, exposureToNotConvolve is convolved
         
         @return a pipeBase.Struct containing these fields:
         - subtractedExposure: subtracted Exposure = exposureToNotConvolve - (matchedImage + backgroundModel)
@@ -296,11 +296,15 @@ class ImagePsfMatchTask(PsfMatch):
             psfFwhmPixTnc = psfFwhmPixTnc,
             candidateList = candidateList,
             doWarping = doWarping,
-            swapImageToConvolve = swapImageToConvolve
+            convolveTemplate = convolveTemplate
         )
         
         subtractedExposure = afwImage.ExposureF(exposureToNotConvolve, True)
-        if swapImageToConvolve:
+        if convolveTemplate:
+            subtractedMaskedImage  = subtractedExposure.getMaskedImage()
+            subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
+            subtractedMaskedImage -= results.backgroundModel
+        else:
             subtractedExposure.setMaskedImage(results.warpedExposure.getMaskedImage())
             subtractedMaskedImage  = subtractedExposure.getMaskedImage()
             subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
@@ -311,11 +315,6 @@ class ImagePsfMatchTask(PsfMatch):
 
             # Place back on native photometric scale
             subtractedMaskedImage /= results.psfMatchingKernel.computeImage(afwImage.ImageD(results.psfMatchingKernel.getDimensions()), False)
-
-        else:
-            subtractedMaskedImage  = subtractedExposure.getMaskedImage()
-            subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
-            subtractedMaskedImage -= results.backgroundModel
 
         import lsstDebug
         display = lsstDebug.Info(__name__).display
