@@ -310,7 +310,7 @@ class ImagePsfMatchTask(PsfMatch):
             subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
             subtractedMaskedImage -= results.backgroundModel
 
-            # Preserve polaity of differences
+            # Preserve polarity of differences
             subtractedMaskedImage *= -1
 
             # Place back on native photometric scale
@@ -462,12 +462,12 @@ class ImagePsfMatchTask(PsfMatch):
         templateLimit  = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getEnd()))
         scienceLimit   = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getEnd()))
         
-        self.log.log(pexLog.Log.INFO, "Template Wcs : %f,%f -> %f,%f" %
-                     (templateOrigin[0], templateOrigin[1],
-                      templateLimit[0], templateLimit[1]))
-        self.log.log(pexLog.Log.INFO, "Science Wcs : %f,%f -> %f,%f" %
-                     (scienceOrigin[0], scienceOrigin[1],
-                      scienceLimit[0], scienceLimit[1]))
+        self.log.info("Template Wcs : %f,%f -> %f,%f" %
+                      (templateOrigin[0], templateOrigin[1],
+                       templateLimit[0], templateLimit[1]))
+        self.log.info("Science Wcs : %f,%f -> %f,%f" %
+                      (scienceOrigin[0], scienceOrigin[1],
+                       scienceLimit[0], scienceLimit[1]))
 
         templateBBox = afwGeom.Box2D(templateOrigin.getPosition(), templateLimit.getPosition())
         scienceBBox  = afwGeom.Box2D(scienceOrigin.getPosition(), scienceLimit.getPosition())

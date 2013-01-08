@@ -273,6 +273,22 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
 #######
 
 def sourceToFootprintList(candidateInList, exposureToConvolve, exposureToNotConvolve, config, log):
+    """ Takes an input list of Sources that were selected to constrain
+    the Psf-matching Kernel and turns them into a List of Footprints,
+    which are used to seed a set of KernelCandidates.  The function
+    checks both the template and science image for masked pixels,
+    rejecting the Source if certain Mask bits (defined in config) are
+    set within the Footprint.
+
+    @param candidateInList: Input list of Sources
+    @param exposureToConvolve: Template image, to be checked for Mask bits in Source Footprint
+    @param exposureToNotConvolve: Science image, to be checked for Mask bits in Source Footprint
+    @param config: Config that defines the Mask planes that indicate an invalid Source and Bbox grow radius
+    @param log: Log for output
+    
+    @return a List of Footprints whose pixels will be used to constrain the Psf-matching Kernel
+    """
+
     candidateOutList = []
     fsb = diffimLib.FindSetBitsU()
     badBitMask = 0
