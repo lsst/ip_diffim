@@ -447,7 +447,7 @@ class ImagePsfMatchTask(PsfMatch):
         return maskedImageToConvolve.getDimensions() == maskedImageToNotConvolve.getDimensions()
     
     def _validateWcs(self, exposureToConvolve, exposureToNotConvolve):
-        """Return True if two Exposures have the same WCS
+        """Return True if the WCS of the two Exposures have the same origin and extent
         """
         templateWcs    = exposureToConvolve.getWcs() 
         scienceWcs     = exposureToNotConvolve.getWcs()
@@ -462,10 +462,10 @@ class ImagePsfMatchTask(PsfMatch):
         templateLimit  = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getEnd()))
         scienceLimit   = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getEnd()))
         
-        print ("Template limits : %f,%f -> %f,%f" %
+        self.log.log(pexLog.Log.INFO, "Template Wcs : %f,%f -> %f,%f" %
                      (templateOrigin[0], templateOrigin[1],
                       templateLimit[0], templateLimit[1]))
-        print ("Science limits : %f,%f -> %f,%f" %
+        self.log.log(pexLog.Log.INFO, "Science Wcs : %f,%f -> %f,%f" %
                      (scienceOrigin[0], scienceOrigin[1],
                       scienceLimit[0], scienceLimit[1]))
 
@@ -473,7 +473,6 @@ class ImagePsfMatchTask(PsfMatch):
         scienceBBox  = afwGeom.Box2D(scienceOrigin.getPosition(), scienceLimit.getPosition())
         if not (templateBBox.overlaps(scienceBBox)):
             raise RuntimeError, "Input images do not overlap at all"
-            
 
         if ( (templateOrigin.getPosition() != scienceOrigin.getPosition()) or \
              (templateLimit.getPosition()  != scienceLimit.getPosition())  or \
