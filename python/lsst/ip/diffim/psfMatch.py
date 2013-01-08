@@ -50,8 +50,8 @@ class DetectionConfig(pexConfig.Config):
     )
     detOnTemplate = pexConfig.Field(
         dtype = bool,
-        doc = """If true run detection on the template (imageToConvolve); 
-                 if false run detection on the science image (imageToNotConvolve)""",
+        doc = """If true run detection on the template (image to convolve); 
+                 if false run detection on the science image""",
         default = True
     )
     badMaskPlanes = pexConfig.ListField(

@@ -110,7 +110,7 @@ Notes:
 
     psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
     results  = psfmatch.run(templateMaskedImage, scienceMaskedImage, "subtractMaskedImages",
-                            psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
+                            templateFwhmPix = fwhmT, scienceFwhmPix = fwhmS)
 
     differenceMaskedImage = results.subtractedImage
     differenceMaskedImage.writeFits(outputPath)

@@ -258,8 +258,8 @@ namespace diffim {
 
     template <typename InputT>
     void StaticKernelSolution<InputT>::build(
-        lsst::afw::image::Image<InputT> const &imageToConvolve,
-        lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+        lsst::afw::image::Image<InputT> const &templateImage,
+        lsst::afw::image::Image<InputT> const &scienceImage,
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate
         ) {
 
@@ -314,7 +314,7 @@ namespace diffim {
            these coordinates, therefore they need to be in LOCAL coordinates.
            This was written before ndarray unification.
         */
-        afwGeom::Box2I goodBBox = (*kiter)->shrinkBBox(imageToConvolve.getBBox(afwImage::LOCAL));
+        afwGeom::Box2I goodBBox = (*kiter)->shrinkBBox(templateImage.getBBox(afwImage::LOCAL));
         unsigned int const startCol = goodBBox.getMinX();
         unsigned int const startRow = goodBBox.getMinY();
         // endCol/Row is one past the index of the last good col/row
@@ -325,25 +325,25 @@ namespace diffim {
         t.restart();
         
         /* Eigen representation of input images; only the pixels that are unconvolved in cimage below */
-        Eigen::MatrixXd eigenToConvolve = imageToEigenMatrix(imageToConvolve).block(startRow, 
-                                                                                    startCol, 
-                                                                                    endRow-startRow, 
-                                                                                    endCol-startCol);
-        Eigen::MatrixXd eigenToNotConvolve = imageToEigenMatrix(imageToNotConvolve).block(startRow, 
-                                                                                          startCol, 
-                                                                                          endRow-startRow, 
-                                                                                          endCol-startCol);
+        Eigen::MatrixXd eigenTemplate = imageToEigenMatrix(templateImage).block(startRow, 
+                                                                                startCol, 
+                                                                                endRow-startRow, 
+                                                                                endCol-startCol);
+        Eigen::MatrixXd eigenScience = imageToEigenMatrix(scienceImage).block(startRow, 
+                                                                              startCol, 
+                                                                              endRow-startRow, 
+                                                                              endCol-startCol);
         Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(varianceEstimate).block(
 	    startRow, startCol, endRow-startRow, endCol-startCol
 	).array().inverse().matrix();
 
         /* Resize into 1-D for later usage */
-        eigenToConvolve.resize(eigenToConvolve.rows()*eigenToConvolve.cols(), 1);
-        eigenToNotConvolve.resize(eigenToNotConvolve.rows()*eigenToNotConvolve.cols(), 1);
+        eigenTemplate.resize(eigenTemplate.rows()*eigenTemplate.cols(), 1);
+        eigenScience.resize(eigenScience.rows()*eigenScience.cols(), 1);
         eigeniVariance.resize(eigeniVariance.rows()*eigeniVariance.cols(), 1);
         
         /* Holds image convolved with basis function */
-        afwImage::Image<PixelT> cimage(imageToConvolve.getDimensions());
+        afwImage::Image<PixelT> cimage(templateImage.getDimensions());
         
         /* Holds eigen representation of image convolved with all basis functions */
         std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
@@ -353,7 +353,7 @@ namespace diffim {
             convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
-            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+            afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
 
             boost::shared_ptr<Eigen::MatrixXd> cMat (
                 new Eigen::MatrixXd(imageToEigenMatrix(cimage).block(startRow, 
@@ -375,7 +375,7 @@ namespace diffim {
            Load matrix with all values from convolvedEigenList : all images
            (eigeniVariance, convolvedEigenList) must be the same size
         */
-        Eigen::MatrixXd cMat(eigenToConvolve.col(0).size(), nParameters);
+        Eigen::MatrixXd cMat(eigenTemplate.col(0).size(), nParameters);
         typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
             convolvedEigenList.begin();
         typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
@@ -389,7 +389,7 @@ namespace diffim {
 
         _cMat.reset(new Eigen::MatrixXd(cMat));
         _ivVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
-        _iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.col(0)));
+        _iVec.reset(new Eigen::VectorXd(eigenScience.col(0)));
 
         /* Make these outside of solve() so I can check condition number */
         _mMat.reset(new Eigen::MatrixXd((*_cMat).transpose() * ((*_ivVec).asDiagonal() * (*_cMat))));
@@ -508,8 +508,8 @@ namespace diffim {
 
     template <typename InputT>
     void MaskedKernelSolution<InputT>::buildWithMask(
-        lsst::afw::image::Image<InputT> const &imageToConvolve,
-        lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+        lsst::afw::image::Image<InputT> const &templateImage,
+        lsst::afw::image::Image<InputT> const &scienceImage,
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
         lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const &pixelMask
         ) {
@@ -525,7 +525,7 @@ namespace diffim {
         }
 
         /* Full footprint of all input images */
-        afwDet::Footprint::Ptr fullFp(new afwDet::Footprint(imageToConvolve.getBBox(afwImage::PARENT)));
+        afwDet::Footprint::Ptr fullFp(new afwDet::Footprint(templateImage.getBBox(afwImage::PARENT)));
 
         afwMath::KernelList basisList = 
             boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
@@ -569,20 +569,20 @@ namespace diffim {
         ndarray::Array<int, 1, 1> maskArray = 
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
         afwDet::flattenArray(*fullFp, finalMask.getArray(), 
-                             maskArray, imageToConvolve.getXY0()); /* Need to fake the XY0 */
+                             maskArray, templateImage.getXY0()); /* Need to fake the XY0 */
         ndarray::EigenView<int, 1, 1> maskEigen(maskArray);
 
-        ndarray::Array<InputT, 1, 1> arrayToConvolve = 
+        ndarray::Array<InputT, 1, 1> arrayTemplate = 
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
-        afwDet::flattenArray(*fullFp, imageToConvolve.getArray(), 
-                             arrayToConvolve, imageToConvolve.getXY0());
-        ndarray::EigenView<InputT, 1, 1> eigenToConvolve0(arrayToConvolve);
+        afwDet::flattenArray(*fullFp, templateImage.getArray(), 
+                             arrayTemplate, templateImage.getXY0());
+        ndarray::EigenView<InputT, 1, 1> eigenTemplate0(arrayTemplate);
 
-        ndarray::Array<InputT, 1, 1> arrayToNotConvolve = 
+        ndarray::Array<InputT, 1, 1> arrayScience = 
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
-        afwDet::flattenArray(*fullFp, imageToNotConvolve.getArray(), 
-                             arrayToNotConvolve, imageToNotConvolve.getXY0());
-        ndarray::EigenView<InputT, 1, 1> eigenToNotConvolve0(arrayToNotConvolve);
+        afwDet::flattenArray(*fullFp, scienceImage.getArray(), 
+                             arrayScience, scienceImage.getXY0());
+        ndarray::EigenView<InputT, 1, 1> eigenScience0(arrayScience);
 
         ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance = 
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
@@ -596,14 +596,14 @@ namespace diffim {
                 nGood += 1;
         }
 
-        Eigen::VectorXd eigenToConvolve(nGood);
-        Eigen::VectorXd eigenToNotConvolve(nGood);
+        Eigen::VectorXd eigenTemplate(nGood);
+        Eigen::VectorXd eigenScience(nGood);
         Eigen::VectorXd eigenVariance(nGood);
         int nUsed = 0;
         for (int i = 0; i < maskEigen.size(); i++) {
             if (maskEigen(i) == 0.0) {
-                eigenToConvolve(nUsed) = eigenToConvolve0(i);
-                eigenToNotConvolve(nUsed) = eigenToNotConvolve0(i);
+                eigenTemplate(nUsed) = eigenTemplate0(i);
+                eigenScience(nUsed) = eigenScience0(i);
                 eigenVariance(nUsed) = eigenVariance0(i);
                 nUsed += 1;
             }
@@ -618,7 +618,7 @@ namespace diffim {
         unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
 
         /* Holds image convolved with basis function */
-        afwImage::Image<InputT> cimage(imageToConvolve.getDimensions());
+        afwImage::Image<InputT> cimage(templateImage.getDimensions());
         
         /* Holds eigen representation of image convolved with all basis functions */
         std::vector<boost::shared_ptr<Eigen::VectorXd> >
@@ -630,7 +630,7 @@ namespace diffim {
 
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
-            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+            afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
 
             ndarray::Array<InputT, 1, 1> arrayC = 
                 ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
@@ -658,14 +658,14 @@ namespace diffim {
         t.restart();
         
         /* Load matrix with all convolved images */
-        Eigen::MatrixXd cMat(eigenToConvolve.size(), nParameters);
+        Eigen::MatrixXd cMat(eigenTemplate.size(), nParameters);
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = 
             convolvedEigenList.begin();
         typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = 
             convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-            cMat.block(0, kidxj, eigenToConvolve.size(), 1) = 
-                Eigen::MatrixXd(**eiterj).block(0, 0, eigenToConvolve.size(), 1);
+            cMat.block(0, kidxj, eigenTemplate.size(), 1) = 
+                Eigen::MatrixXd(**eiterj).block(0, 0, eigenTemplate.size(), 1);
         }
         /* Treat the last "image" as all 1's to do the background calculation. */
         if (this->_fitForBackground)
@@ -673,9 +673,9 @@ namespace diffim {
         
         this->_cMat.reset(new Eigen::MatrixXd(cMat));
         //this->_ivVec.reset(new Eigen::VectorXd((eigenVariance.template cast<double>()).cwise().inverse()));
-        //this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.template cast<double>()));
+        //this->_iVec.reset(new Eigen::VectorXd(eigenScience.template cast<double>()));
         this->_ivVec.reset(new Eigen::VectorXd(eigenVariance.array().inverse().matrix()));
-        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve));
+        this->_iVec.reset(new Eigen::VectorXd(eigenScience));
 
         /* Make these outside of solve() so I can check condition number */
         this->_mMat.reset(
@@ -689,8 +689,8 @@ namespace diffim {
 
     template <typename InputT>
     void MaskedKernelSolution<InputT>::buildOrig(
-        lsst::afw::image::Image<InputT> const &imageToConvolve,
-        lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+        lsst::afw::image::Image<InputT> const &templateImage,
+        lsst::afw::image::Image<InputT> const &scienceImage,
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
         lsst::afw::image::Mask<lsst::afw::image::MaskPixel> pixelMask
         ) {
@@ -727,7 +727,7 @@ namespace diffim {
            This was written before ndarray unification.
         */
         /* Ignore known EDGE pixels for speed */
-        afwGeom::Box2I shrunkLocalBBox = (*kiter)->shrinkBBox(imageToConvolve.getBBox(afwImage::LOCAL));
+        afwGeom::Box2I shrunkLocalBBox = (*kiter)->shrinkBBox(templateImage.getBBox(afwImage::LOCAL));
         pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
                           "Limits of good pixels after convolution: %d,%d -> %d,%d (local)", 
                           shrunkLocalBBox.getMinX(), shrunkLocalBBox.getMinY(), 
@@ -751,45 +751,45 @@ namespace diffim {
                                                                endRow-startRow, 
                                                                endCol-startCol);
 
-        Eigen::MatrixXd eigenToConvolve = imageToEigenMatrix(imageToConvolve).block(startRow, 
-                                                                                    startCol, 
-                                                                                    endRow-startRow, 
-                                                                                    endCol-startCol);
-        Eigen::MatrixXd eigenToNotConvolve = imageToEigenMatrix(imageToNotConvolve).block(startRow, 
-                                                                                          startCol, 
-                                                                                          endRow-startRow, 
-                                                                                          endCol-startCol);
+        Eigen::MatrixXd eigenTemplate = imageToEigenMatrix(templateImage).block(startRow, 
+                                                                                startCol, 
+                                                                                endRow-startRow, 
+                                                                                endCol-startCol);
+        Eigen::MatrixXd eigenScience = imageToEigenMatrix(scienceImage).block(startRow, 
+                                                                              startCol, 
+                                                                              endRow-startRow, 
+                                                                              endCol-startCol);
         Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(varianceEstimate).block(
 	    startRow, startCol, endRow-startRow, endCol-startCol
 	).array().inverse().matrix();
 
         /* Resize into 1-D for later usage */
         eMask.resize(eMask.rows()*eMask.cols(), 1);
-        eigenToConvolve.resize(eigenToConvolve.rows()*eigenToConvolve.cols(), 1);
-        eigenToNotConvolve.resize(eigenToNotConvolve.rows()*eigenToNotConvolve.cols(), 1);
+        eigenTemplate.resize(eigenTemplate.rows()*eigenTemplate.cols(), 1);
+        eigenScience.resize(eigenScience.rows()*eigenScience.cols(), 1);
         eigeniVariance.resize(eigeniVariance.rows()*eigeniVariance.cols(), 1);
 
         /* Do the masking, slowly for now... */
-        Eigen::MatrixXd maskedEigenToConvolve(eigenToConvolve.rows(), 1);
-        Eigen::MatrixXd maskedEigenToNotConvolve(eigenToNotConvolve.rows(), 1);
+        Eigen::MatrixXd maskedEigenTemplate(eigenTemplate.rows(), 1);
+        Eigen::MatrixXd maskedEigenScience(eigenScience.rows(), 1);
         Eigen::MatrixXd maskedEigeniVariance(eigeniVariance.rows(), 1);
         int nGood = 0;
         for (int i = 0; i < eMask.rows(); i++) {
             if (eMask(i, 0) == 0) {
-                maskedEigenToConvolve(nGood, 0) = eigenToConvolve(i, 0);
-                maskedEigenToNotConvolve(nGood, 0) = eigenToNotConvolve(i, 0);
+                maskedEigenTemplate(nGood, 0) = eigenTemplate(i, 0);
+                maskedEigenScience(nGood, 0) = eigenScience(i, 0);
                 maskedEigeniVariance(nGood, 0) = eigeniVariance(i, 0);
                 nGood += 1;
             }
         }
         /* Can't resize() since all values are lost; use blocks */
-        eigenToConvolve    = maskedEigenToConvolve.block(0, 0, nGood, 1);
-        eigenToNotConvolve = maskedEigenToNotConvolve.block(0, 0, nGood, 1);
-        eigeniVariance     = maskedEigeniVariance.block(0, 0, nGood, 1);
+        eigenTemplate    = maskedEigenTemplate.block(0, 0, nGood, 1);
+        eigenScience     = maskedEigenScience.block(0, 0, nGood, 1);
+        eigeniVariance   = maskedEigeniVariance.block(0, 0, nGood, 1);
 
 
         /* Holds image convolved with basis function */
-        afwImage::Image<InputT> cimage(imageToConvolve.getDimensions());
+        afwImage::Image<InputT> cimage(templateImage.getDimensions());
         
         /* Holds eigen representation of image convolved with all basis functions */
         std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
@@ -799,7 +799,7 @@ namespace diffim {
             convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
-            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+            afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
             
             Eigen::MatrixXd cMat = imageToEigenMatrix(cimage).block(startRow, 
                                                                     startCol, 
@@ -830,7 +830,7 @@ namespace diffim {
            Load matrix with all values from convolvedEigenList : all images
            (eigeniVariance, convolvedEigenList) must be the same size
         */
-        Eigen::MatrixXd cMat(eigenToConvolve.col(0).size(), nParameters);
+        Eigen::MatrixXd cMat(eigenTemplate.col(0).size(), nParameters);
         typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
             convolvedEigenList.begin();
         typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
@@ -844,7 +844,7 @@ namespace diffim {
 
         this->_cMat.reset(new Eigen::MatrixXd(cMat));
         this->_ivVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
-        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.col(0)));
+        this->_iVec.reset(new Eigen::VectorXd(eigenScience.col(0)));
 
         /* Make these outside of solve() so I can check condition number */
         this->_mMat.reset(
@@ -860,8 +860,8 @@ namespace diffim {
        buildSingleMask to use the ndarray stuff */
     template <typename InputT>
     void MaskedKernelSolution<InputT>::buildSingleMaskOrig(
-        lsst::afw::image::Image<InputT> const &imageToConvolve,
-        lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+        lsst::afw::image::Image<InputT> const &templateImage,
+        lsst::afw::image::Image<InputT> const &scienceImage,
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
         lsst::afw::geom::Box2I maskBox
         ) {
@@ -889,7 +889,7 @@ namespace diffim {
            NOTE : If we are using these views in Afw's Image space, we need to
            make sure and compensate for the XY0 of the image:
 
-           afwGeom::Box2I fullBBox = imageToConvolve.getBBox(afwImage::PARENT);
+           afwGeom::Box2I fullBBox = templateImage.getBBox(afwImage::PARENT);
            int maskStartCol = maskBox.getMinX();
            int maskStartRow = maskBox.getMinY();
            int maskEndCol   = maskBox.getMaxX();
@@ -899,17 +899,17 @@ namespace diffim {
           If we are going to be doing the slicing in Eigen matrices derived from
           the images, ignore the XY0.
 
-           afwGeom::Box2I fullBBox = imageToConvolve.getBBox(afwImage::LOCAL);
+           afwGeom::Box2I fullBBox = templateImage.getBBox(afwImage::LOCAL);
 
-           int maskStartCol = maskBox.getMinX() - imageToConvolve.getX0();
-           int maskStartRow = maskBox.getMinY() - imageToConvolve.getY0();
-           int maskEndCol   = maskBox.getMaxX() - imageToConvolve.getX0();
-           int maskEndRow   = maskBox.getMaxY() - imageToConvolve.getY0();
+           int maskStartCol = maskBox.getMinX() - templateImage.getX0();
+           int maskStartRow = maskBox.getMinY() - templateImage.getY0();
+           int maskEndCol   = maskBox.getMaxX() - templateImage.getX0();
+           int maskEndRow   = maskBox.getMaxY() - templateImage.getY0();
 
         */
 
                                                                          
-        afwGeom::Box2I shrunkBBox = (*kiter)->shrinkBBox(imageToConvolve.getBBox(afwImage::PARENT));
+        afwGeom::Box2I shrunkBBox = (*kiter)->shrinkBBox(templateImage.getBBox(afwImage::PARENT));
 
         pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
                           "Limits of good pixels after convolution: %d,%d -> %d,%d", 
@@ -998,11 +998,11 @@ namespace diffim {
         totalSize    += lBox.getWidth() * lBox.getHeight();
         totalSize    += rBox.getWidth() * rBox.getHeight();
 
-        Eigen::MatrixXd eigenToConvolve(totalSize, 1);
-        Eigen::MatrixXd eigenToNotConvolve(totalSize, 1);
+        Eigen::MatrixXd eigenTemplate(totalSize, 1);
+        Eigen::MatrixXd eigenScience(totalSize, 1);
         Eigen::MatrixXd eigeniVariance(totalSize, 1);
-        eigenToConvolve.setZero();
-        eigenToNotConvolve.setZero();
+        eigenTemplate.setZero();
+        eigenScience.setZero();
         eigeniVariance.setZero();
         
         boost::timer t;
@@ -1013,33 +1013,33 @@ namespace diffim {
         for (; biter != boxArray.end(); ++biter) {
             int area = (*biter).getWidth() * (*biter).getHeight();
 
-            afwImage::Image<InputT> siToConvolve(imageToConvolve, *biter, afwImage::PARENT);
-            afwImage::Image<InputT> siToNotConvolve(imageToNotConvolve, *biter, afwImage::PARENT);
+            afwImage::Image<InputT> siTemplate(templateImage, *biter, afwImage::PARENT);
+            afwImage::Image<InputT> siScience(scienceImage, *biter, afwImage::PARENT);
             afwImage::Image<InputT> sVarEstimate(varianceEstimate, *biter, afwImage::PARENT);
 
-            Eigen::MatrixXd eToConvolve = imageToEigenMatrix(siToConvolve);
-            Eigen::MatrixXd eToNotConvolve = imageToEigenMatrix(siToNotConvolve);
+            Eigen::MatrixXd eTemplate = imageToEigenMatrix(siTemplate);
+            Eigen::MatrixXd eScience = imageToEigenMatrix(siScience);
             Eigen::MatrixXd eiVarEstimate = imageToEigenMatrix(sVarEstimate).array().inverse().matrix();
             
-            eToConvolve.resize(area, 1);
-            eToNotConvolve.resize(area, 1);
+            eTemplate.resize(area, 1);
+            eScience.resize(area, 1);
             eiVarEstimate.resize(area, 1);
 
-            eigenToConvolve.block(nTerms, 0, area, 1) = eToConvolve.block(0, 0, area, 1);
-            eigenToNotConvolve.block(nTerms, 0, area, 1) = eToNotConvolve.block(0, 0, area, 1);
+            eigenTemplate.block(nTerms, 0, area, 1) = eTemplate.block(0, 0, area, 1);
+            eigenScience.block(nTerms, 0, area, 1) = eScience.block(0, 0, area, 1);
             eigeniVariance.block(nTerms, 0, area, 1) = eiVarEstimate.block(0, 0, area, 1);
 
             nTerms += area;
         }
 
-        afwImage::Image<InputT> cimage(imageToConvolve.getDimensions());
+        afwImage::Image<InputT> cimage(templateImage.getDimensions());
 
         std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
         typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
             convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
-            afwMath::convolve(cimage, imageToConvolve, **kiter, false); /* cimage stores convolved image */
+            afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
             Eigen::MatrixXd cMat(totalSize, 1);
             cMat.setZero();
 
@@ -1070,7 +1070,7 @@ namespace diffim {
            Load matrix with all values from convolvedEigenList : all images
            (eigeniVariance, convolvedEigenList) must be the same size
         */
-        Eigen::MatrixXd cMat(eigenToConvolve.col(0).size(), nParameters);
+        Eigen::MatrixXd cMat(eigenTemplate.col(0).size(), nParameters);
         typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
             convolvedEigenList.begin();
         typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
@@ -1084,7 +1084,7 @@ namespace diffim {
 
         this->_cMat.reset(new Eigen::MatrixXd(cMat));
         this->_ivVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
-        this->_iVec.reset(new Eigen::VectorXd(eigenToNotConvolve.col(0)));
+        this->_iVec.reset(new Eigen::VectorXd(eigenScience.col(0)));
 
         /* Make these outside of solve() so I can check condition number */
         this->_mMat.reset(

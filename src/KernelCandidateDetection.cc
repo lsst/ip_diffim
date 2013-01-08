@@ -76,8 +76,8 @@ namespace diffim {
      */
     template <typename PixelT>
     void KernelCandidateDetection<PixelT>::apply(
-        MaskedImagePtr const& miToConvolvePtr,
-        MaskedImagePtr const& miToNotConvolvePtr
+        MaskedImagePtr const& templateMaskedImage,
+        MaskedImagePtr const& scienceMaskedImage
         ) {
         
         // Parse the Policy
@@ -100,7 +100,7 @@ namespace diffim {
 
         if (detOnTemplate == true) {
             afwDetect::FootprintSet footprintSet(
-                *(miToConvolvePtr), 
+                *(templateMaskedImage), 
                 threshold,
                 "",
                 fpNpixMin);
@@ -113,7 +113,7 @@ namespace diffim {
         }
         else {
             afwDetect::FootprintSet footprintSet(
-                *(miToNotConvolvePtr), 
+                *(scienceMaskedImage), 
                 threshold,
                 "",
                 fpNpixMin);
@@ -130,7 +130,7 @@ namespace diffim {
             
             pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                               "Processing footprint %d", (*i)->getId());
-            growCandidate((*i), fpGrowPix, miToConvolvePtr, miToNotConvolvePtr);
+            growCandidate((*i), fpGrowPix, templateMaskedImage, scienceMaskedImage);
         }
         
         if (_footprints.size() == 0) {
@@ -148,8 +148,8 @@ namespace diffim {
     bool KernelCandidateDetection<PixelT>::growCandidate(
         lsst::afw::detection::Footprint::Ptr fp, 
         int fpGrowPix,
-        MaskedImagePtr const& miToConvolvePtr,
-        MaskedImagePtr const& miToNotConvolvePtr
+        MaskedImagePtr const& templateMaskedImage,
+        MaskedImagePtr const& scienceMaskedImage
         ) {
 
         /* Grow the Footprint by the requested (optimal) amount; if you happen
@@ -186,7 +186,7 @@ namespace diffim {
             afwDetect::Footprint::Ptr fpCore(
                 new afwDetect::Footprint(afwGeom::Box2I(afwGeom::Point2I(xc, yc), afwGeom::Extent2I(1,1)))
                 );
-            return growCandidate(fpCore, fpGrowPix, miToConvolvePtr, miToNotConvolvePtr);
+            return growCandidate(fpCore, fpGrowPix, templateMaskedImage, scienceMaskedImage);
         } 
 
         pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
@@ -230,7 +230,7 @@ namespace diffim {
         /* Failure Condition 2) 
          * Grown off the image
          */
-        if (!(miToConvolvePtr->getBBox(afwImage::PARENT).contains(fpGrowBBox))) {
+        if (!(templateMaskedImage->getBBox(afwImage::PARENT).contains(fpGrowBBox))) {
             pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                               "Footprint grown off image"); 
 
@@ -238,20 +238,20 @@ namespace diffim {
                 return false;
             }
             else {
-                return growCandidate(fp, fpGrowMin, miToConvolvePtr, miToNotConvolvePtr);
+                return growCandidate(fp, fpGrowMin, templateMaskedImage, scienceMaskedImage);
             }
         }
         
         /* Grab subimages; report any exception */
         bool subimageHasFailed = false;
         try {
-            afwImage::MaskedImage<PixelT> subImageToConvolve(*miToConvolvePtr, fpGrowBBox, 
+            afwImage::MaskedImage<PixelT> templateSubimage(*templateMaskedImage, fpGrowBBox, 
                                                              afwImage::PARENT);
-            afwImage::MaskedImage<PixelT> subImageToNotConvolve(*miToNotConvolvePtr, fpGrowBBox, 
+            afwImage::MaskedImage<PixelT> scienceSubimage(*scienceMaskedImage, fpGrowBBox, 
                                                                 afwImage::PARENT);
             
             // Search for any masked pixels within the footprint
-            fsb.apply(*(subImageToConvolve.getMask()));
+            fsb.apply(*(templateSubimage.getMask()));
             if (fsb.getBits() & _badBitMask) {
                 pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                                   "Footprint has masked pix (vals=%d) in image to convolve", 
@@ -259,7 +259,7 @@ namespace diffim {
                 subimageHasFailed = true;
             }
             
-            fsb.apply(*(subImageToNotConvolve.getMask()));
+            fsb.apply(*(scienceSubimage.getMask()));
             if (fsb.getBits() & _badBitMask) {
                 pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                                   "Footprint has masked pix (vals=%d) in image not to convolve", 
@@ -279,7 +279,7 @@ namespace diffim {
                 return false;
             }
             else {
-                return growCandidate(fp, fpGrowMin, miToConvolvePtr, miToNotConvolvePtr);
+                return growCandidate(fp, fpGrowMin, templateMaskedImage, scienceMaskedImage);
             }
         } else {
             /* We have a good candidate */

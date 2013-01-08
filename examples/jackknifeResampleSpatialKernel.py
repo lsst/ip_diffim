@@ -106,8 +106,8 @@ class DiffimTestCases(unittest.TestCase):
                                                                                self.dStats.getRms()))
         
     def assess(self, cand, kFn1, bgFn1, kFn2, bgFn2, frame0):
-        tmi   = cand.getMiToConvolvePtr()
-        smi   = cand.getMiToNotConvolvePtr()
+        tmi   = cand.getTemplateMaskedImage()
+        smi   = cand.getScienceMaskedImage()
         
         im1   = afwImage.ImageD(kFn1.getDimensions())
         kFn1.computeImage(im1, False,

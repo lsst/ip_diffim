@@ -272,7 +272,7 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
 # Converting types
 #######
 
-def sourceToFootprintList(candidateInList, exposureToConvolve, exposureToNotConvolve, config, log):
+def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, config, log):
     """ Takes an input list of Sources that were selected to constrain
     the Psf-matching Kernel and turns them into a List of Footprints,
     which are used to seed a set of KernelCandidates.  The function
@@ -281,8 +281,8 @@ def sourceToFootprintList(candidateInList, exposureToConvolve, exposureToNotConv
     set within the Footprint.
 
     @param candidateInList: Input list of Sources
-    @param exposureToConvolve: Template image, to be checked for Mask bits in Source Footprint
-    @param exposureToNotConvolve: Science image, to be checked for Mask bits in Source Footprint
+    @param templateExposure: Template image, to be checked for Mask bits in Source Footprint
+    @param scienceExposure: Science image, to be checked for Mask bits in Source Footprint
     @param config: Config that defines the Mask planes that indicate an invalid Source and Bbox grow radius
     @param log: Log for output
     
@@ -295,7 +295,7 @@ def sourceToFootprintList(candidateInList, exposureToConvolve, exposureToNotConv
     for mp in config.badMaskPlanes: 
         badBitMask |= afwImage.MaskU.getPlaneBitMask(mp)
     log.info("Growing %d kernel candidate stars" % (len(candidateInList)))
-    bbox = exposureToNotConvolve.getBBox()
+    bbox = scienceExposure.getBBox()
     for kernelCandidate in candidateInList:
         if not type(kernelCandidate) == afwTable.SourceRecord:
             raise RuntimeError, ("Candiate not of type afwTable.SourceRecord")
@@ -303,7 +303,7 @@ def sourceToFootprintList(candidateInList, exposureToConvolve, exposureToNotConv
         bm2 = 0
         ra  = kernelCandidate.getRa()
         dec = kernelCandidate.getDec()
-        center = afwGeom.Point2I(exposureToNotConvolve.getWcs().skyToPixel(kernelCandidate.getCoord()))
+        center = afwGeom.Point2I(scienceExposure.getWcs().skyToPixel(kernelCandidate.getCoord()))
         if center[0] < bbox.getMinX() or center[0] > bbox.getMaxX():
             continue
         if center[1] < bbox.getMinY() or center[1] > bbox.getMaxY():
@@ -332,9 +332,9 @@ def sourceToFootprintList(candidateInList, exposureToConvolve, exposureToNotConv
             
         kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
         try:
-            fsb.apply(afwImage.MaskedImageF(exposureToConvolve.getMaskedImage(), kbbox, False).getMask())
+            fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, False).getMask())
             bm1 = fsb.getBits()
-            fsb.apply(afwImage.MaskedImageF(exposureToNotConvolve.getMaskedImage(), kbbox, False).getMask())
+            fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, False).getMask())
             bm2 = fsb.getBits()
         except Exception, e:
             pass
