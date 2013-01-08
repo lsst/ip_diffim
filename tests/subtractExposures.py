@@ -80,18 +80,16 @@ class DiffimTestCases(unittest.TestCase):
 
         self.subconfig.spatialModelType = 'chebyshev1'
         psfmatch1 = ipDiffim.ImagePsfMatchTask(config=self.config)
-        results1 = psfmatch1.run(templateSubImage, scienceSubImage, "subtractExposures", 
-                                 doWarping = True)
-        differenceExposure1 = results1.subtractedImage
+        results1 = psfmatch1.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
+        differenceExposure1 = results1.subtractedExposure
         spatialKernel1      = results1.psfMatchingKernel
         backgroundModel1    = results1.backgroundModel
         kernelCellSet1      = results1.kernelCellSet
 
         self.subconfig.spatialModelType = 'polynomial'
         psfmatch2 = ipDiffim.ImagePsfMatchTask(config=self.config)
-        results2 = psfmatch2.run(templateSubImage, scienceSubImage, "subtractExposures",
-                                 doWarping = True)
-        differenceExposure2 = results2.subtractedImage
+        results2 = psfmatch2.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
+        differenceExposure2 = results2.subtractedExposure
         spatialKernel2      = results2.psfMatchingKernel
         backgroundModel2    = results2.backgroundModel
         kernelCellSet2      = results2.kernelCellSet
@@ -174,7 +172,7 @@ class DiffimTestCases(unittest.TestCase):
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
         psfmatch = ipDiffim.ImagePsfMatchTask(config=self.config)
         try:
-            psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures", doWarping = False)
+            psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = False)
         except Exception, e:
             pass
         else:
@@ -197,9 +195,8 @@ class DiffimTestCases(unittest.TestCase):
 
         # Have an XY0
         psfmatch  = ipDiffim.ImagePsfMatchTask(config=self.config)
-        results1  = psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures",
-                                 doWarping = True)
-        differenceExposure1 = results1.subtractedImage
+        results1  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
+        differenceExposure1 = results1.subtractedExposure
         spatialKernel1      = results1.psfMatchingKernel
         backgroundModel1    = results1.backgroundModel
         kernelCellSet1      = results1.kernelCellSet
@@ -207,9 +204,8 @@ class DiffimTestCases(unittest.TestCase):
         # And then take away XY0
         templateSubImage.setXY0(afwGeom.Point2I(0, 0)) 
         scienceSubImage.setXY0(afwGeom.Point2I(0, 0))
-        results2  = psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures",
-                                 doWarping = True)
-        differenceExposure2 = results2.subtractedImage
+        results2  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
+        differenceExposure2 = results2.subtractedExposure
         spatialKernel2      = results2.psfMatchingKernel
         backgroundModel2    = results2.backgroundModel
         kernelCellSet2      = results2.kernelCellSet

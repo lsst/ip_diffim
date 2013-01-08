@@ -21,13 +21,15 @@
 #
 import time
 import numpy as num
-import diffimLib
 import lsst.afw.image as afwImage
 import lsst.pex.logging as pexLog
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
+import lsst.afw.display.ds9 as ds9
 import lsst.pipe.base as pipeBase
+from . import utils as diUtils
+from . import diffimLib
 
 class DetectionConfig(pexConfig.Config):
     detThreshold = pexConfig.Field(
@@ -48,8 +50,8 @@ class DetectionConfig(pexConfig.Config):
     )
     detOnTemplate = pexConfig.Field(
         dtype = bool,
-        doc = """If true run detection on the template (imageToConvolve); 
-                 if false run detection on the science image (imageToNotConvolve)""",
+        doc = """If true run detection on the template (image to convolve); 
+                 if false run detection on the science image""",
         default = True
     )
     badMaskPlanes = pexConfig.ListField(
@@ -374,7 +376,7 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = bool,
         doc = """Use constant variance weighting in single kernel fitting?
                  In some cases this is better for bright star residuals.""",
-        default = False,
+        default = True,
     )
     calculateKernelUncertainty = pexConfig.Field(
         dtype = bool,
@@ -553,6 +555,9 @@ class PsfMatch(pipeBase.Task):
         conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))
         pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
                      "Spatial model condition number : %.3e" % (conditionNum))
+        if conditionNum < 0.0:
+            pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
+                         "WARNING: Condition number is negative (%.3e)" % (conditionNum))
         if conditionNum > self.kconfig.maxSpatialConditionNumber:
             pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
                          "WARNING: Spatial solution exceeds max condition number (%.3e > %.3e)" % (conditionNum, self.kconfig.maxSpatialConditionNumber))
@@ -633,6 +638,8 @@ class PsfMatch(pipeBase.Task):
         pcaBasisList = importStarVisitor.getEigenKernels()
 
         eSum = num.sum(eigenValues)
+        if eSum == 0.0:
+            raise RuntimeError("Eigenvalues sum to zero")
         for j in range(len(eigenValues)):
             pexLog.Trace(self.log.getName()+"._solve", 6, 
                          "Eigenvalue %d : %f (%f)" % (j, eigenValues[j], eigenValues[j]/eSum))
@@ -672,6 +679,19 @@ class PsfMatch(pipeBase.Task):
         
         @raise Exception if unable to determine PSF matching kernel and returnOnExcept False
         """
+
+        import lsstDebug
+        display = lsstDebug.Info(__name__).display
+        displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells
+        displayCandidates = lsstDebug.Info(__name__).displayCandidates
+        displayKernelBasis = lsstDebug.Info(__name__).displayKernelBasis
+        displayKernelMosaic = lsstDebug.Info(__name__).displayKernelMosaic
+        plotKernelSpatialModel = lsstDebug.Info(__name__).plotKernelSpatialModel
+        showBadCandidates = lsstDebug.Info(__name__).showBadCandidates 
+        maskTransparency = lsstDebug.Info(__name__).maskTransparency   
+        if not maskTransparency:
+            maskTransparency = 0
+        ds9.setMaskTransparency(maskTransparency)
 
         maxSpatialIterations   = self.kconfig.maxSpatialIterations
         nStarPerCell           = self.kconfig.nStarPerCell
@@ -791,7 +811,7 @@ class PsfMatch(pipeBase.Task):
                 spatialkv.solveLinearEquation()
                 pexLog.Trace(self.log.getName()+"._solve", 3, 
                              "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
-                spatialKernel, spatialBacakground = spatialkv.getSolutionPair()
+                spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
             spatialSolution = spatialkv.getKernelSolution()
 
@@ -803,8 +823,31 @@ class PsfMatch(pipeBase.Task):
             pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
             pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0])
             raise e
-            
-      
+
+        if display and displayCandidates:
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates)
+            lsstDebug.frame += 1
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates,
+                                         kernels=True)
+            lsstDebug.frame += 1
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates,
+                                         resids=True)
+            lsstDebug.frame += 1
+        
+        if display and displayKernelBasis:
+            diUtils.showKernelBasis(spatialKernel, frame=lsstDebug.frame)
+            lsstDebug.frame += 1
+
+        if display and displayKernelMosaic:
+            diUtils.showKernelMosaic(kernelCellSet.getBBox(), spatialKernel, frame=lsstDebug.frame)
+            lsstDebug.frame += 1 
+
+        if display and plotKernelSpatialModel:
+            diUtils.plotKernelSpatialModel(spatialKernel, kernelCellSet, showBadCandidates=showBadCandidates)
+
         t1 = time.time()
         pexLog.Trace(self.log.getName()+"._solve", 1, 
                      "Total time to compute the spatial kernel : %.2f s" % (t1 - t0))
@@ -812,3 +855,4 @@ class PsfMatch(pipeBase.Task):
         self._diagnostic(kernelCellSet, spatialSolution, spatialKernel, spatialBackground)
         
         return spatialSolution, spatialKernel, spatialBackground
+

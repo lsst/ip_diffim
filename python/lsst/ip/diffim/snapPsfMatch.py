@@ -89,12 +89,16 @@ class SnapPsfMatchConfig(pexConfig.Config):
 class SnapPsfMatchTask(ImagePsfMatchTask):
     ConfigClass = SnapPsfMatchConfig
 
-    # Override ImagePsfMatchTask method; don't validate WCS by default
-    def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
-                          psfFwhmPixTc = None, psfFwhmPixTnc = None,
-                          footprints = None):
-        doWarping = self.config.doWarping
-        return ImagePsfMatchTask.subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
-                                                   psfFwhmPixTc = psfFwhmPixTc, psfFwhmPixTnc = psfFwhmPixTnc,
-                                                   footprints = footprints, doWarping = doWarping)
+    # Override ImagePsfMatchTask.subtractExposures to set doWarping on config.doWarping
+    def subtractExposures(self, templateExposure, scienceExposure,
+                          templateFwhmPix = None, scienceFwhmPix = None,
+                          candidateList = None):
+        return ImagePsfMatchTask.subtractExposures(self,
+            templateExposure = templateExposure,
+            scienceExposure = scienceExposure,
+            templateFwhmPix = templateFwhmPix,
+            scienceFwhmPix = scienceFwhmPix,
+            candidateList = candidateList,
+            doWarping = self.config.doWarping,
+        )
 

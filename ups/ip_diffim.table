@@ -1,11 +1,10 @@
-setupRequired(afw >= 5.2.1.0)
-setupRequired(meas_algorithms >= 5.2.1.0)
+setupRequired(afw >= 6.1.0.0)
+setupRequired(meas_algorithms >= 6.1.0.0)
 setupRequired(numpy)
 setupRequired(pex_config)
 setupRequired(pipe_base)
 
 setupOptional(afwdata)
-setupOptional(pyfits)
 setupOptional(matplotlib)
 
 envPrepend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)

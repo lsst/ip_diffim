@@ -8,7 +8,6 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
@@ -116,15 +115,15 @@ class DiffimTestCases(unittest.TestCase):
 
         # And these should be filled
         try:
-            kc.getMiToConvolvePtr()
-            kc.getMiToNotConvolvePtr()
+            kc.getTemplateMaskedImage()
+            kc.getScienceMaskedImage()
         except Exception, e:
             print e
             self.fail()
 
         # And of the right type
-        self.assertEqual(type(kc.getMiToConvolvePtr()), type(afwImage.MaskedImageF()))
-        self.assertEqual(type(kc.getMiToNotConvolvePtr()), type(afwImage.MaskedImageF()))
+        self.assertEqual(type(kc.getTemplateMaskedImage()), type(afwImage.MaskedImageF()))
+        self.assertEqual(type(kc.getScienceMaskedImage()), type(afwImage.MaskedImageF()))
         
         # None of these should work
         for kType in (ipDiffim.KernelCandidateF.ORIG,
@@ -378,6 +377,7 @@ class DiffimTestCases(unittest.TestCase):
         smi.set(cpix, cpix, (1, 0x0, 0.0))
 
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        self.policy.set("constantVarianceWeighting", False)
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi, smi, self.policy)
         try:
             kc.build(kList)

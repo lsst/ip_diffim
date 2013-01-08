@@ -75,8 +75,8 @@ class DiffimTestCases(unittest.TestCase):
         bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy)
         bskv.processCandidate(kc)
         self.assertEqual(kc.isInitialized(), True)
-        #ds9.mtv(kc.getMiToConvolvePtr(), frame=1)
-        #ds9.mtv(kc.getMiToNotConvolvePtr(), frame=2)
+        #ds9.mtv(kc.getTemplateMaskedImage(), frame=1)
+        #ds9.mtv(kc.getScienceMaskedImage(), frame=2)
         #ds9.mtv(kc.getKernelImage(ipDiffim.KernelCandidateF.RECENT), frame=3)
         #ds9.mtv(kc.getDifferenceImage(ipDiffim.KernelCandidateF.RECENT), frame=4)
         
