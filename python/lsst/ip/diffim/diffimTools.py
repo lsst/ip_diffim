@@ -65,7 +65,7 @@ def makePoissonNoiseImage(im):
     @param[in] im image; the output image has the same dimensions and shape
         and its expectation value is the value of im at each pixel
     """
-    import num.random as rand
+    import numpy.random as rand
     imArr = im.getArray()
     noiseIm = im.Factory(im.getBBox(afwImage.PARENT))
     noiseArr = noiseIm.getArray()
