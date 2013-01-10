@@ -25,8 +25,8 @@ namespace diffim {
      *
      * @note Runs detection on the template; searches through both images for masked pixels
      *
-     * @param imageToConvolve  MaskedImage that will be convolved with kernel; detection is run on this image
-     * @param imageToNotConvolve  MaskedImage to subtract convolved template from
+     * @param templateMaskedImage  MaskedImage that will be convolved with kernel
+     * @param scienceMaskedImage   MaskedImage to subtract convolved template from
      * @param policy  Policy for operations; in particular object detection
      *
      * @ingroup ip_diffim
@@ -41,13 +41,13 @@ namespace diffim {
 
         virtual ~KernelCandidateDetection() {};
 
-        void apply(MaskedImagePtr const& miToConvolvePtr,
-                   MaskedImagePtr const& miToNotConvolvePtr);
+        void apply(MaskedImagePtr const& templateMaskedImage,
+                   MaskedImagePtr const& scienceMaskedImage);
         
         bool growCandidate(lsst::afw::detection::Footprint::Ptr fp,
                            int fpGrowPix,
-                           MaskedImagePtr const& miToConvolvePtr,
-                           MaskedImagePtr const& miToNotConvolvePtr);
+                           MaskedImagePtr const& templateMaskedImage,
+                           MaskedImagePtr const& scienceMaskedImage);
 
         std::vector<lsst::afw::detection::Footprint::Ptr> getFootprints() {return _footprints;};
 

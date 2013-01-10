@@ -50,8 +50,8 @@ class DetectionConfig(pexConfig.Config):
     )
     detOnTemplate = pexConfig.Field(
         dtype = bool,
-        doc = """If true run detection on the template (imageToConvolve); 
-                 if false run detection on the science image (imageToNotConvolve)""",
+        doc = """If true run detection on the template (image to convolve); 
+                 if false run detection on the science image""",
         default = True
     )
     badMaskPlanes = pexConfig.ListField(
@@ -690,7 +690,6 @@ class PsfMatch(pipeBase.Task):
 
         import lsstDebug
         display = lsstDebug.Info(__name__).display
-        showBadCandidates = lsstDebug.Info(__name__).showBadCandidates 
         displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells
         displayCandidates = lsstDebug.Info(__name__).displayCandidates
         displayKernelBasis = lsstDebug.Info(__name__).displayKernelBasis

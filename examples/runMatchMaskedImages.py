@@ -109,7 +109,7 @@ Notes:
 
     psfmatch = ipDiffim.ImagePsfMatch(subconfig)
     results  = psfmatch.matchMaskedImages(templateMaskedImage, scienceMaskedImage,
-                                          psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
+                                          templateFwhmPix = fwhmT, scienceFwhmPix = fwhmS)
 
     matchMaskedImage = results[0]
     matchMaskedImage.writeFits(outputPath)

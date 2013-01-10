@@ -115,15 +115,15 @@ class DiffimTestCases(unittest.TestCase):
 
         # And these should be filled
         try:
-            kc.getMiToConvolvePtr()
-            kc.getMiToNotConvolvePtr()
+            kc.getTemplateMaskedImage()
+            kc.getScienceMaskedImage()
         except Exception, e:
             print e
             self.fail()
 
         # And of the right type
-        self.assertEqual(type(kc.getMiToConvolvePtr()), type(afwImage.MaskedImageF()))
-        self.assertEqual(type(kc.getMiToNotConvolvePtr()), type(afwImage.MaskedImageF()))
+        self.assertEqual(type(kc.getTemplateMaskedImage()), type(afwImage.MaskedImageF()))
+        self.assertEqual(type(kc.getScienceMaskedImage()), type(afwImage.MaskedImageF()))
         
         # None of these should work
         for kType in (ipDiffim.KernelCandidateF.ORIG,

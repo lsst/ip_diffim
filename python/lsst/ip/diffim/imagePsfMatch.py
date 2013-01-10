@@ -67,135 +67,135 @@ class ImagePsfMatchTask(PsfMatch):
         self._warper = afwMath.Warper.fromConfig(self.kconfig.warpingConfig)
 
     @pipeBase.timeMethod
-    def run(self, imageToConvolve, imageToNotConvolve, mode, **kwargs):
+    def run(self, templateImage, scienceImage, mode, **kwargs):
         self.log.warn("run is deprecated; call the appropriate method directly")
 
         if mode == "matchExposures":
-            return self.matchExposures(imageToConvolve, imageToNotConvolve, **kwargs)
+            return self.matchExposures(templateImage, scienceImage, **kwargs)
 
         elif mode == "matchMaskedImages":
-            return self.matchMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
+            return self.matchMaskedImages(templateImage, scienceImage, **kwargs)
 
         elif mode == "subtractExposures":
-            return self.subtractExposures(imageToConvolve, imageToNotConvolve, **kwargs)
+            return self.subtractExposures(templateImage, scienceImage, **kwargs)
 
         elif mode == "subtractMaskedImages":
-            return self.subtractMaskedImages(imageToConvolve, imageToNotConvolve, **kwargs)
+            return self.subtractMaskedImages(templateImage, scienceImage, **kwargs)
         else:
             raise ValueError("Invalid mode requested")
         
     @pipeBase.timeMethod
-    def matchExposures(self, exposureToConvolve, exposureToNotConvolve,
-                       psfFwhmPixTc = None, psfFwhmPixTnc = None,
-                       candidateList = None, doWarping = True, swapImageToConvolve = False):
+    def matchExposures(self, templateExposure, scienceExposure,
+                       templateFwhmPix = None, scienceFwhmPix = None,
+                       candidateList = None, doWarping = True, convolveTemplate = True):
         """Warp and PSF-match an exposure to the reference
 
         Do the following, in order:
-        - Warp exposureToConvolve to match exposureToNotConvolve,
+        - Warp templateExposure to match scienceExposure,
             if doWarping True and their WCSs do not already match
         - Determine a PSF matching kernel and differential background model
-            that matches exposureToConvolve to exposureToNotConvolve
-        - Convolve exposureToConvolve by PSF matching kernel
+            that matches templateExposure to scienceExposure
+        - Convolve templateExposure by PSF matching kernel
         
-        @param exposureToConvolve: Exposure to warp and PSF-match to the reference masked image
-        @param exposureToNotConvolve: Exposure whose WCS and PSF are to be matched
-        @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
-        @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
+        @param templateExposure: Exposure to warp and PSF-match to the reference masked image
+        @param scienceExposure: Exposure whose WCS and PSF are to be matched to
+        @param templateFwhmPix: FWHM (in pixels) of the Psf in the template image (image to convolve)
+        @param scienceFwhmPix: FWHM (in pixels) of the Psf in the science image
         @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
-        @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
-            - if True then warp exposureToConvolve to match exposureToNotConvolve
+        @param doWarping: what to do if templateExposure's and scienceExposure's WCSs do not match:
+            - if True then warp templateExposure to match scienceExposure
             - if False then raise an Exception
-        @param swapImageToConvolve: switch which image is used as the refernce, in case of e.g. deconvolution
-            - if True, exposureToConvolve is warped if doWarping, exposureToNotConvolve is convolved
-            - if False, exposureToConvolve is warped if doWarping, exposureToConvolve is convolved
+        @param convolveTemplate: convolve the template image or the science image
+            - if True, templateExposure is warped if doWarping, templateExposure is convolved
+            - if False, templateExposure is warped if doWarping, scienceExposure is convolved
         
         @return a pipeBase.Struct containing these fields:
         - matchedImage: the PSF-matched exposure =
-            warped exposureToConvolve convolved by psfMatchingKernel. This has:
-            - the same parent bbox, Wcs and Calib as exposureToNotConvolve
-            - the same filter as exposureToConvolve
+            warped templateExposure convolved by psfMatchingKernel. This has:
+            - the same parent bbox, Wcs and Calib as scienceExposure
+            - the same filter as templateExposure
             - no Psf (because the PSF-matching process does not compute one)
         - psfMatchingKernel: the PSF matching kernel
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
 
-        @raise RuntimeError if doWarping is False and exposureToConvolve's and exposureToNotConvolve's
+        @raise RuntimeError if doWarping is False and templateExposure's and scienceExposure's
             WCSs do not match
         """
-        if not self._validateWcs(exposureToConvolve, exposureToNotConvolve):
+        if not self._validateWcs(templateExposure, scienceExposure):
             if doWarping:
                 pexLog.Trace(self.log.getName(), 1, "Astrometrically registering template to science image")
-                exposureToConvolve = self._warper.warpExposure(exposureToNotConvolve.getWcs(), 
-                    exposureToConvolve, destBBox = exposureToNotConvolve.getBBox(afwImage.PARENT))
+                templateExposure = self._warper.warpExposure(scienceExposure.getWcs(), 
+                    templateExposure, destBBox = scienceExposure.getBBox(afwImage.PARENT))
             else:
                 pexLog.Trace(self.log.getName(), 1, "ERROR: Input images not registered")
                 raise RuntimeError, "Input images not registered"
 
-        if psfFwhmPixTc is None:
-            if not exposureToConvolve.hasPsf():
+        if templateFwhmPix is None:
+            if not templateExposure.hasPsf():
                 pexLog.Trace(self.log.getName(), 1, "WARNING: no estimate of Psf FWHM for template image")
             else:
-                psf = exposureToConvolve.getPsf()
+                psf = templateExposure.getPsf()
                 width, height = psf.getKernel().getDimensions()
                 psfAttr = measAlg.PsfAttributes(psf, width//2, height//2)
-                psfSigPixTc = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
-                psfFwhmPixTc = psfSigPixTc * sigma2fwhm 
-        if psfFwhmPixTnc is None:
-            if not exposureToNotConvolve.hasPsf():
+                templateSigPix = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
+                templateFwhmPix = templateSigPix * sigma2fwhm 
+        if scienceFwhmPix is None:
+            if not scienceExposure.hasPsf():
                 pexLog.Trace(self.log.getName(), 1, "WARNING: no estimate of Psf FWHM for science image")
             else:
-                psf = exposureToNotConvolve.getPsf()
+                psf = scienceExposure.getPsf()
                 width, height = psf.getKernel().getDimensions()
                 psfAttr = measAlg.PsfAttributes(psf, width//2, height//2)
-                psfSigPixTnc = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
-                psfFwhmPixTnc = psfSigPixTnc * sigma2fwhm 
+                scienceSigPix = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
+                scienceFwhmPix = scienceSigPix * sigma2fwhm 
 
         if candidateList != None:
             if type(candidateList[0]) == afwTable.SourceRecord:
-                candidateList = diffimTools.sourceToFootprintList(candidateList, exposureToConvolve, exposureToNotConvolve, 
+                candidateList = diffimTools.sourceToFootprintList(candidateList, templateExposure, scienceExposure, 
                                                                   self.kconfig.detectionConfig, self.log)
-        if swapImageToConvolve:
+        if convolveTemplate:
             results = self.matchMaskedImages(
-                exposureToNotConvolve.getMaskedImage(), exposureToConvolve.getMaskedImage(),
-                psfFwhmPixTc = psfFwhmPixTnc, psfFwhmPixTnc = psfFwhmPixTc,
+                templateExposure.getMaskedImage(), scienceExposure.getMaskedImage(),
+                templateFwhmPix = templateFwhmPix, scienceFwhmPix = scienceFwhmPix,
                 candidateList = candidateList)
         else:
             results = self.matchMaskedImages(
-                exposureToConvolve.getMaskedImage(), exposureToNotConvolve.getMaskedImage(),
-                psfFwhmPixTc = psfFwhmPixTc, psfFwhmPixTnc = psfFwhmPixTnc,
+                scienceExposure.getMaskedImage(), templateExposure.getMaskedImage(),
+                templateFwhmPix = scienceFwhmPix, scienceFwhmPix = templateFwhmPix,
                 candidateList = candidateList)
         
-        psfMatchedExposure = afwImage.makeExposure(results.matchedImage, exposureToNotConvolve.getWcs())
-        psfMatchedExposure.setFilter(exposureToConvolve.getFilter())
-        psfMatchedExposure.setCalib(exposureToNotConvolve.getCalib())
-        results.warpedExposure  = exposureToConvolve
+        psfMatchedExposure = afwImage.makeExposure(results.matchedImage, scienceExposure.getWcs())
+        psfMatchedExposure.setFilter(templateExposure.getFilter())
+        psfMatchedExposure.setCalib(scienceExposure.getCalib())
+        results.warpedExposure  = templateExposure
         results.matchedExposure = psfMatchedExposure
         return results
 
     @pipeBase.timeMethod
-    def matchMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve, 
-                          psfFwhmPixTc = None, psfFwhmPixTnc = None, 
+    def matchMaskedImages(self, templateMaskedImage, scienceMaskedImage, 
+                          templateFwhmPix = None, scienceFwhmPix = None, 
                           candidateList = None):
-        """PSF-match a MaskedImage to a reference MaskedImage
+        """PSF-match a MaskedImage (templateMaskedImage) to a reference MaskedImage (scienceMaskedImage)
 
         Do the following, in order:
         - Determine a PSF matching kernel and differential background model
-            that matches maskedImageToConvolve to maskedImageToNotConvolve
-        - Convolve maskedImageToConvolve by the PSF matching kernel
+            that matches templateMaskedImage to scienceMaskedImage
+        - Convolve templateMaskedImage by the PSF matching kernel
         
-        @param maskedImageToConvolve: masked image to PSF-match to the reference masked image;
+        @param templateMaskedImage: masked image to PSF-match to the reference masked image;
             must be warped to match the reference masked image
-        @param maskedImageToNotConvolve: maskedImage whose PSF is to be matched
-        @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
-        @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
+        @param scienceMaskedImage: maskedImage whose PSF is to be matched to
+        @param templateFwhmPix: FWHM (in pixels) of the Psf in the template image (image to convolve)
+        @param scienceFwhmPix: FWHM (in pixels) of the Psf in the science image
         @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
         
         @return a pipeBase.Struct containing these fields:
         - psfMatchedMaskedImage: the PSF-matched masked image =
-            maskedImageToConvolve convolved with psfMatchingKernel.
-            This has the same xy0, dimensions and wcs as maskedImageToNotConvolve.
+            templateMaskedImage convolved with psfMatchingKernel.
+            This has the same xy0, dimensions and wcs as scienceMaskedImage.
         - psfMatchingKernel: the PSF matching kernel
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
@@ -204,16 +204,17 @@ class ImagePsfMatchTask(PsfMatch):
         """
 
 
-        if not self._validateSize(maskedImageToConvolve, maskedImageToNotConvolve):
+        if not self._validateSize(templateMaskedImage, scienceMaskedImage):
             pexLog.Trace(self.log.getName(), 1, "ERROR: Input images different size")
             raise RuntimeError, "Input images different size"
             
         self.log.log(pexLog.Log.INFO, "compute PSF-matching kernel")
-        if psfFwhmPixTc and psfFwhmPixTnc:
-            pexLog.Trace(self.log.getName(), 2, "Matching Psf FWHM %.2f -> %.2f pix" % (psfFwhmPixTc, psfFwhmPixTnc))
+        kernelCellSet = self._buildCellSet(templateMaskedImage,
+                                           scienceMaskedImage,
+                                           candidateList = candidateList)
 
-
-
+        if templateFwhmPix and scienceFwhmPix:
+            pexLog.Trace(self.log.getName(), 2, "Matching Psf FWHM %.2f -> %.2f pix" % (templateFwhmPix, scienceFwhmPix))
 
         if self.kconfig.useBicForKernelBasis:
             tmpKernelCellSet = self._buildCellSet(maskedImageToConvolve,
@@ -225,11 +226,6 @@ class ImagePsfMatchTask(PsfMatch):
             del tmpKernelCellSet
         else:
             basisList = makeKernelBasisList(self.kconfig, psfFwhmPixTc, psfFwhmPixTnc)
-
-
-        kernelCellSet = self._buildCellSet(maskedImageToConvolve,
-                                           maskedImageToNotConvolve,
-                                           candidateList = candidateList)
 
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
         conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))        
@@ -246,21 +242,21 @@ class ImagePsfMatchTask(PsfMatch):
         ds9.setMaskTransparency(maskTransparency)
 
         if display and displayTemplate:
-            ds9.mtv(maskedImageToConvolve, frame=lsstDebug.frame, title="Image to convolve")
+            ds9.mtv(templateMaskedImage, frame=lsstDebug.frame, title="Image to convolve")
             lsstDebug.frame += 1
 
         if display and displaySpatialCells:
-            diUtils.showKernelSpatialCells(maskedImageToNotConvolve, kernelCellSet, 
+            diUtils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet, 
                                            symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
                                            size=4, frame=lsstDebug.frame)
             lsstDebug.frame += 1
         elif display and  displaySciIm:
-            ds9.mtv(maskedImageToNotConvolve, frame=lsstDebug.frame, title="Image to not convolve")
+            ds9.mtv(scienceMaskedImage, frame=lsstDebug.frame, title="Image to not convolve")
             lsstDebug.frame += 1
 
-        psfMatchedMaskedImage = afwImage.MaskedImageF(maskedImageToConvolve.getBBox(afwImage.PARENT))
+        psfMatchedMaskedImage = afwImage.MaskedImageF(templateMaskedImage.getBBox(afwImage.PARENT))
         doNormalize = False
-        afwMath.convolve(psfMatchedMaskedImage, maskedImageToConvolve, psfMatchingKernel, doNormalize)
+        afwMath.convolve(psfMatchedMaskedImage, templateMaskedImage, psfMatchingKernel, doNormalize)
         self.log.log(pexLog.Log.INFO, "done")
         return pipeBase.Struct(
             matchedImage = psfMatchedMaskedImage,
@@ -270,66 +266,65 @@ class ImagePsfMatchTask(PsfMatch):
         )
 
     @pipeBase.timeMethod
-    def subtractExposures(self, exposureToConvolve, exposureToNotConvolve,
-                          psfFwhmPixTc = None, psfFwhmPixTnc = None,
-                          candidateList = None, doWarping = True, swapImageToConvolve = False):
+    def subtractExposures(self, templateExposure, scienceExposure,
+                          templateFwhmPix = None, scienceFwhmPix = None,
+                          candidateList = None, doWarping = True, convolveTemplate = True):
         """Subtract two Exposures
         
         Do the following, in order:
-        - Warp exposureToConvolve to match exposureToNotConvolve, if their WCSs do not already match
+        - Warp templateExposure to match scienceExposure, if their WCSs do not already match
         - Determine a PSF matching kernel and differential background model
-            that matches exposureToConvolve to exposureToNotConvolve
-        - PSF-match exposureToConvolve to exposureToNotConvolve
+            that matches templateExposure to scienceExposure
+        - PSF-match templateExposure to scienceExposure
         - Compute subtracted exposure (see return values for equation).
 
-        @param exposureToConvolve: exposure to PSF-matched to exposureToNotConvolve
-        @param exposureToNotConvolve: reference Exposure
-        @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
-        @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
+        @param templateExposure: exposure to PSF-match to scienceExposure
+        @param scienceExposure: reference Exposure
+        @param templateFwhmPix: FWHM (in pixels) of the Psf in the template image (image to convolve)
+        @param scienceFwhmPix: FWHM (in pixels) of the Psf in the science image
         @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
-        @param doWarping: what to do if exposureToConvolve's and exposureToNotConvolve's WCSs do not match:
-            - if True then warp exposureToConvolve to match exposureToNotConvolve
+        @param doWarping: what to do if templateExposure's and scienceExposure's WCSs do not match:
+            - if True then warp templateExposure to match scienceExposure
             - if False then raise an Exception
-        @param swapImageToConvolve: switch which image is used as the refernce, in case of e.g. deconvolution
-            - if True, exposureToConvolve is warped if doWarping, exposureToNotConvolve is convolved
-            - if False, exposureToConvolve is warped if doWarping, exposureToConvolve is convolved
+        @param convolveTemplate: convolve the template image or the science image
+            - if True, templateExposure is warped if doWarping, templateExposure is convolved
+            - if False, templateExposure is warped if doWarping, scienceExposure is convolved
         
         @return a pipeBase.Struct containing these fields:
-        - subtractedExposure: subtracted Exposure = exposureToNotConvolve - (matchedImage + backgroundModel)
-        - matchedImage: exposureToConvolve after warping to match exposureToConvolve (if doWarping true),
+        - subtractedExposure: subtracted Exposure = scienceExposure - (matchedImage + backgroundModel)
+        - matchedImage: templateExposure after warping to match templateExposure (if doWarping true),
             and convolving with psfMatchingKernel
         - psfMatchingKernel: PSF matching kernel
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
         """     
         results = self.matchExposures(
-            exposureToConvolve = exposureToConvolve,
-            exposureToNotConvolve = exposureToNotConvolve,
-            psfFwhmPixTc = psfFwhmPixTc,
-            psfFwhmPixTnc = psfFwhmPixTnc,
+            templateExposure = templateExposure,
+            scienceExposure = scienceExposure,
+            templateFwhmPix = templateFwhmPix,
+            scienceFwhmPix = scienceFwhmPix,
             candidateList = candidateList,
             doWarping = doWarping,
-            swapImageToConvolve = swapImageToConvolve
+            convolveTemplate = convolveTemplate
         )
         
-        subtractedExposure = afwImage.ExposureF(exposureToNotConvolve, True)
-        if swapImageToConvolve:
+        subtractedExposure = afwImage.ExposureF(scienceExposure, True)
+        if convolveTemplate:
+            subtractedMaskedImage  = subtractedExposure.getMaskedImage()
+            subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
+            subtractedMaskedImage -= results.backgroundModel
+        else:
             subtractedExposure.setMaskedImage(results.warpedExposure.getMaskedImage())
             subtractedMaskedImage  = subtractedExposure.getMaskedImage()
             subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
             subtractedMaskedImage -= results.backgroundModel
 
-            # Preserve polaity of differences
+            # Preserve polarity of differences
             subtractedMaskedImage *= -1
 
             # Place back on native photometric scale
             subtractedMaskedImage /= results.psfMatchingKernel.computeImage(afwImage.ImageD(results.psfMatchingKernel.getDimensions()), False)
-
-        else:
-            subtractedMaskedImage  = subtractedExposure.getMaskedImage()
-            subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
-            subtractedMaskedImage -= results.backgroundModel
 
         import lsstDebug
         display = lsstDebug.Info(__name__).display
@@ -339,47 +334,53 @@ class ImagePsfMatchTask(PsfMatch):
             maskTransparency = 0
         ds9.setMaskTransparency(maskTransparency)
         if display and displayDiffIm:
-            ds9.mtv(subtractedExposure, frame=lsstDebug.frame)
+            ds9.mtv(templateExposure, frame=lsstDebug.frame, title="Template")
+            lsstDebug.frame += 1
+            ds9.mtv(results.matchedExposure, frame=lsstDebug.frame, title="Matched template")
+            lsstDebug.frame += 1
+            ds9.mtv(scienceExposure, frame=lsstDebug.frame, title="Target")
+            lsstDebug.frame += 1
+            ds9.mtv(subtractedExposure, frame=lsstDebug.frame, title="Subtracted")
             lsstDebug.frame += 1
 
         results.subtractedExposure = subtractedExposure
         return results
 
     @pipeBase.timeMethod
-    def subtractMaskedImages(self, maskedImageToConvolve, maskedImageToNotConvolve,
-                             psfFwhmPixTc = None, psfFwhmPixTnc = None,
+    def subtractMaskedImages(self, templateMaskedImage, scienceMaskedImage,
+                             templateFwhmPix = None, scienceFwhmPix = None,
                              candidateList = None):
         """Subtract two MaskedImages
         
         Do the following, in order:
-        - PSF-match maskedImageToConvolve to maskedImageToNotConvolve
+        - PSF-match templateMaskedImage to scienceMaskedImage
         - Determine the differential background
-        - Return the difference: maskedImageToNotConvolve -
-            ((warped maskedImageToConvolve convolved with psfMatchingKernel) + backgroundModel)
+        - Return the difference: scienceMaskedImage -
+            ((warped templateMaskedImage convolved with psfMatchingKernel) + backgroundModel)
         
-        @param maskedImageToConvolve: MaskedImage to PSF-matched to maskedImageToNotConvolve
-        @param maskedImageToNotConvolve: reference MaskedImage
-        @param psfFwhmPixTc: FWHM (in pixels) of the Psf in the template image (image to convolve)
-        @param psfFwhmPixTnc: FWHM (in pixels) of the Psf in the science image
+        @param templateMaskedImage: MaskedImage to PSF-match to scienceMaskedImage
+        @param scienceMaskedImage: reference MaskedImage
+        @param templateFwhmPix: FWHM (in pixels) of the Psf in the template image (image to convolve)
+        @param scienceFwhmPix: FWHM (in pixels) of the Psf in the science image
         @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
         
         @return a pipeBase.Struct containing these fields:
-        - subtractedMaskedImage = maskedImageToNotConvolve - (matchedImage + backgroundModel)
-        - matchedImage: maskedImageToConvolve convolved with psfMatchingKernel
+        - subtractedMaskedImage = scienceMaskedImage - (matchedImage + backgroundModel)
+        - matchedImage: templateMaskedImage convolved with psfMatchingKernel
         - psfMatchingKernel: PSF matching kernel
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
         """
         results = self.matchMaskedImages(
-            maskedImageToConvolve = maskedImageToNotConvolve,
-            maskedImageToNotConvolve = maskedImageToConvolve,
-            psfFwhmPixTc = psfFwhmPixTnc,
-            psfFwhmPixTnc = psfFwhmPixTc,
+            templateMaskedImage = templateMaskedImage,
+            scienceMaskedImage = scienceMaskedImage,
+            templateFwhmPix = templateFwhmPix,
+            scienceFwhmPix = scienceFwhmPix,
             candidateList = candidateList,
             )
 
-        subtractedMaskedImage  = afwImage.MaskedImageF(maskedImageToNotConvolve, True)
+        subtractedMaskedImage  = afwImage.MaskedImageF(scienceMaskedImage, True)
         subtractedMaskedImage -= results.matchedImage
         subtractedMaskedImage -= results.backgroundModel
         results.subtractedMaskedImage = subtractedMaskedImage
@@ -402,11 +403,11 @@ class ImagePsfMatchTask(PsfMatch):
         nCand = len(candidateList)
         return self.kconfig.sizeCellX, self.kconfig.sizeCellY
 
-    def _buildCellSet(self, maskedImageToConvolve, maskedImageToNotConvolve, candidateList = None):
+    def _buildCellSet(self, templateMaskedImage, scienceMaskedImage, candidateList = None):
         """Build a SpatialCellSet for use with the solve method
 
-        @param maskedImageToConvolve: MaskedImage to PSF-matched to maskedImageToNotConvolve
-        @param maskedImageToNotConvolve: reference MaskedImage
+        @param templateMaskedImage: MaskedImage to PSF-matched to scienceMaskedImage
+        @param scienceMaskedImage: reference MaskedImage
         @param candidateList: a list of footprints/maskedImages for kernel candidates; if None then source detection is run.
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
         
@@ -415,8 +416,8 @@ class ImagePsfMatchTask(PsfMatch):
         # Candidate source footprints to use for Psf matching
         if candidateList == None:
             self.log.log(pexLog.Log.INFO, "temporarily subtracting backgrounds for detection")
-            mi1 = maskedImageToConvolve.Factory(maskedImageToConvolve, True)
-            mi2 = maskedImageToNotConvolve.Factory(maskedImageToNotConvolve, True)
+            mi1 = templateMaskedImage.Factory(templateMaskedImage, True)
+            mi2 = scienceMaskedImage.Factory(scienceMaskedImage, True)
             tmp = diffimTools.backgroundSubtract(self.kconfig.afwBackgroundConfig, [mi1, mi2])
 
             detConfig = self.kconfig.detectionConfig
@@ -427,7 +428,7 @@ class ImagePsfMatchTask(PsfMatch):
         sizeCellX, sizeCellY = self._adaptCellSize(candidateList)
 
         # Object to store the KernelCandidates for spatial modeling
-        kernelCellSet = afwMath.SpatialCellSet(maskedImageToConvolve.getBBox(afwImage.PARENT),
+        kernelCellSet = afwMath.SpatialCellSet(templateMaskedImage.getBBox(afwImage.PARENT),
                                                sizeCellX, sizeCellY)
         
             
@@ -440,8 +441,8 @@ class ImagePsfMatchTask(PsfMatch):
             xC   = 0.5 * ( bbox.getMinX() + bbox.getMaxX() )
             yC   = 0.5 * ( bbox.getMinY() + bbox.getMaxY() )
             
-            tmi  = afwImage.MaskedImageF(maskedImageToConvolve, bbox, afwImage.PARENT)
-            smi  = afwImage.MaskedImageF(maskedImageToNotConvolve, bbox, afwImage.PARENT)
+            tmi  = afwImage.MaskedImageF(templateMaskedImage, bbox, afwImage.PARENT)
+            smi  = afwImage.MaskedImageF(scienceMaskedImage, bbox, afwImage.PARENT)
             cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, policy)
             
             pexLog.Trace(self.log.getName(), 5,
@@ -450,18 +451,18 @@ class ImagePsfMatchTask(PsfMatch):
 
         return kernelCellSet
 
-    def _validateSize(self, maskedImageToConvolve, maskedImageToNotConvolve):
+    def _validateSize(self, templateMaskedImage, scienceMaskedImage):
         """Return True if two image-like objects are the same size
         """
-        return maskedImageToConvolve.getDimensions() == maskedImageToNotConvolve.getDimensions()
+        return templateMaskedImage.getDimensions() == scienceMaskedImage.getDimensions()
     
-    def _validateWcs(self, exposureToConvolve, exposureToNotConvolve):
-        """Return True if two Exposures have the same WCS
+    def _validateWcs(self, templateExposure, scienceExposure):
+        """Return True if the WCS of the two Exposures have the same origin and extent
         """
-        templateWcs    = exposureToConvolve.getWcs() 
-        scienceWcs     = exposureToNotConvolve.getWcs()
-        templateBBox   = exposureToConvolve.getBBox(afwImage.PARENT)
-        scienceBBox    = exposureToNotConvolve.getBBox(afwImage.PARENT)
+        templateWcs    = templateExposure.getWcs() 
+        scienceWcs     = scienceExposure.getWcs()
+        templateBBox   = templateExposure.getBBox(afwImage.PARENT)
+        scienceBBox    = scienceExposure.getBBox(afwImage.PARENT)
 
         # LLC
         templateOrigin = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getBegin()))
@@ -471,21 +472,20 @@ class ImagePsfMatchTask(PsfMatch):
         templateLimit  = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getEnd()))
         scienceLimit   = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getEnd()))
         
-        print ("Template limits : %f,%f -> %f,%f" %
-                     (templateOrigin[0], templateOrigin[1],
-                      templateLimit[0], templateLimit[1]))
-        print ("Science limits : %f,%f -> %f,%f" %
-                     (scienceOrigin[0], scienceOrigin[1],
-                      scienceLimit[0], scienceLimit[1]))
+        self.log.info("Template Wcs : %f,%f -> %f,%f" %
+                      (templateOrigin[0], templateOrigin[1],
+                       templateLimit[0], templateLimit[1]))
+        self.log.info("Science Wcs : %f,%f -> %f,%f" %
+                      (scienceOrigin[0], scienceOrigin[1],
+                       scienceLimit[0], scienceLimit[1]))
 
         templateBBox = afwGeom.Box2D(templateOrigin.getPosition(), templateLimit.getPosition())
         scienceBBox  = afwGeom.Box2D(scienceOrigin.getPosition(), scienceLimit.getPosition())
         if not (templateBBox.overlaps(scienceBBox)):
             raise RuntimeError, "Input images do not overlap at all"
-            
 
         if ( (templateOrigin.getPosition() != scienceOrigin.getPosition()) or \
              (templateLimit.getPosition()  != scienceLimit.getPosition())  or \
-             (exposureToConvolve.getDimensions() != exposureToNotConvolve.getDimensions())):
+             (templateExposure.getDimensions() != scienceExposure.getDimensions())):
             return False
         return True

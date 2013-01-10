@@ -110,7 +110,7 @@ def showDiaSources(sources, exposure, isFlagged, isDipole, frame=None):
         badFlag = isFlagged[i]
         dipoleFlag = isDipole[i]
         bbox = source.getFootprint().getBBox()
-        stamp = type(exposure)(exposure, bbox, True)
+        stamp = exposure.Factory(exposure, bbox, True)
         im = displayUtils.Mosaic(gutter=1, background=0, mode="x")
         im.append(stamp.getMaskedImage())
         lab = "%.1f,%.1f:" % (source.getX(), source.getY())
@@ -159,34 +159,34 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
 
             try:
                 im = cand.getMiToNotConvolvePtr()
-                im = type(im)(im, True)
+                im = im.Factory(im, True)
                 im.setXY0(cand.getMiToNotConvolvePtr().getXY0())
             except:
                 continue
             if (not resids and not kernels):
-                im_resid.append(type(im)(im, True))
+                im_resid.append(im.Factory(im, True))
             try:
                 im = cand.getMiToConvolvePtr()
-                im = type(im)(im, True)
+                im = im.Factory(im, True)
                 im.setXY0(cand.getMiToConvolvePtr().getXY0())
             except:
                 continue
             if (not resids and not kernels):
-                im_resid.append(type(im)(im, True))
+                im_resid.append(im.Factory(im, True))
 
             # Difference image with original basis
             resid = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
             if resids:
                 var = resid.getVariance()
-                var = type(var)(var, True)
+                var = var.Factory(var, True)
                 num.sqrt(var.getArray(), var.getArray()) # inplace sqrt
                 resid = resid.getImage()
                 resid /= var
                 bbox = kernel.shrinkBBox(resid.getBBox())
-                resid = type(resid)(resid, bbox, True)
+                resid = resid.Factory(resid, bbox, True)
             elif kernels:
                 kim = cand.getKernelImage(diffimLib.KernelCandidateF.ORIG).convertF()
-                resid = type(kim)(kim, True)
+                resid = kim.Factory(kim, True)
             im_resid.append(resid)
 
             # residuals using spatial model
@@ -202,10 +202,10 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
                 resid = sresid.getImage()
                 resid /= var
                 bbox = kernel.shrinkBBox(resid.getBBox())
-                resid = type(resid)(resid, bbox, True)
+                resid = resid.Factory(resid, bbox, True)
             elif kernels:
                 kim = ski.convertF()
-                resid = type(kim)(kim, True)
+                resid = kim.Factory(kim, True)
             im_resid.append(resid)
 
             im = im_resid.makeMosaic()
@@ -497,9 +497,9 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
 
             # trim edgs due to convolution
             bbox    = kernel.shrinkBBox(diffim.getBBox())
-            tdiffim  = type(diffim)(diffim, bbox)
-            torig    = type(orig)(orig, bbox)
-            tsdiffim = type(sdiffim)(sdiffim, bbox)
+            tdiffim  = diffim.Factory(diffim, bbox)
+            torig    = orig.Factory(orig, bbox)
+            tsdiffim = sdiffim.Factory(sdiffim, bbox)
 
             if origVariance:
                 candidateResids.append(num.ravel(tdiffim.getImage().getArray() / num.sqrt(torig.getVariance().getArray())))
@@ -525,7 +525,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
 
     testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure, exposure, config, pexLog.getDefaultLog())
     for fp in testFootprints:
-        subexp = type(diffExposure)(diffExposure, fp.getBBox())
+        subexp = diffExposure.Factory(diffExposure, fp.getBBox())
         subim  = subexp.getMaskedImage().getImage()
         if origVariance:
             subvar = afwImage.ExposureF(exposure, fp.getBBox()).getMaskedImage().getVariance()
