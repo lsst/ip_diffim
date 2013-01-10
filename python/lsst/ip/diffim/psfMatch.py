@@ -389,7 +389,7 @@ class PsfMatchConfig(pexConfig.Config):
     useBicForKernelBasis = pexConfig.Field(
         dtype = bool,
         doc = """Use Bayesian Information Criterion to select the number of bases going into the kernel decomposition""",
-        default = True,
+        default = False,
     )
 
 
