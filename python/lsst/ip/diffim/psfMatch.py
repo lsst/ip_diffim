@@ -398,7 +398,7 @@ class PsfMatchConfigAL(PsfMatchConfig):
         PsfMatchConfig.setDefaults(self)
         self.kernelBasisSet = "alard-lupton"
         self.maxConditionNumber = 5.0e7
-        self.useBicForKernelBasis = True
+
 
     #####
     # Alard-Lupton Basis Parameters
@@ -438,7 +438,7 @@ class PsfMatchConfigDF(PsfMatchConfig):
         self.maxConditionNumber = 5.0e6
         self.usePcaForSpatialKernel = True
         self.subtractMeanForPca = True
-        self.useBicForKernelBasis = True
+        self.useBicForKernelBasis = False
 
     #####
     # Delta Function Basis Parameters

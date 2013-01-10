@@ -50,9 +50,9 @@ namespace diffim {
      * 
      * @note This version accepts a MaskedImage for the template
      * 
-     * @param templateMaskedImage  MaskedImage to apply convolutionKernel to
-     * @param scienceMaskedImage  MaskedImage from which convolved templateMaskedImage is subtracted 
-     * @param convolutionKernel  Kernel to apply to templateMaskedImage
+     * @param templateImage  MaskedImage to apply convolutionKernel to
+     * @param scienceMaskedImage  MaskedImage from which convolved templateImage is subtracted 
+     * @param convolutionKernel  Kernel to apply to templateImage
      * @param background  Background scalar or function to subtract after convolution
      * @param invert  Invert the output difference image
      * 
@@ -60,7 +60,7 @@ namespace diffim {
      */
     template <typename PixelT, typename BackgroundT>
     lsst::afw::image::MaskedImage<PixelT> convolveAndSubtract(
-        lsst::afw::image::MaskedImage<PixelT> const& templateMaskedImage,
+        lsst::afw::image::MaskedImage<PixelT> const& templateImage,
         lsst::afw::image::MaskedImage<PixelT> const& scienceMaskedImage,
         lsst::afw::math::Kernel const& convolutionKernel,
         BackgroundT background,
@@ -72,9 +72,9 @@ namespace diffim {
      * 
      * @note This version accepts an Image for the template, and is thus faster during convolution
      * 
-     * @param templateMaskedImage  Image to apply convolutionKernel to
-     * @param scienceMaskedImage  MaskedImage from which convolved templateMaskedImage is subtracted 
-     * @param convolutionKernel  Kernel to apply to templateMaskedImage
+     * @param templateImage  Image to apply convolutionKernel to
+     * @param scienceMaskedImage  MaskedImage from which convolved templateImage is subtracted 
+     * @param convolutionKernel  Kernel to apply to templateImage
      * @param background  Background scalar or function to subtract after convolution
      * @param invert  Invert the output difference image
      * 

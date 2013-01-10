@@ -217,15 +217,15 @@ class ImagePsfMatchTask(PsfMatch):
             pexLog.Trace(self.log.getName(), 2, "Matching Psf FWHM %.2f -> %.2f pix" % (templateFwhmPix, scienceFwhmPix))
 
         if self.kconfig.useBicForKernelBasis:
-            tmpKernelCellSet = self._buildCellSet(maskedImageToConvolve,
-                                                  maskedImageToNotConvolve,
+            tmpKernelCellSet = self._buildCellSet(templateMaskedImage,
+                                                  scienceMaskedImage,
                                                   candidateList = candidateList)
-            nbe = diffimTools.NbasisEvaluator(self.kconfig, psfFwhmPixTc, psfFwhmPixTnc)
+            nbe = diffimTools.NbasisEvaluator(self.kconfig, templateFwhmPix, scienceFwhmPix)
             bicDegrees = nbe(tmpKernelCellSet, self.log)
-            basisList = makeKernelBasisList(self.kconfig, psfFwhmPixTc, psfFwhmPixTnc, bicDegrees[0])
+            basisList = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix, bicDegrees[0])
             del tmpKernelCellSet
         else:
-            basisList = makeKernelBasisList(self.kconfig, psfFwhmPixTc, psfFwhmPixTnc)
+            basisList = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix)
 
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
         conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))        
