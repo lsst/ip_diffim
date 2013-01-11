@@ -158,17 +158,17 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
             im_resid = displayUtils.Mosaic(gutter=1, background=-5, mode="x")
 
             try:
-                im = cand.getMiToNotConvolvePtr()
+                im = cand.getScienceMaskedImage()
                 im = im.Factory(im, True)
-                im.setXY0(cand.getMiToNotConvolvePtr().getXY0())
+                im.setXY0(cand.getScienceMaskedImage().getXY0())
             except:
                 continue
             if (not resids and not kernels):
                 im_resid.append(im.Factory(im, True))
             try:
-                im = cand.getMiToConvolvePtr()
+                im = cand.getTemplateMaskedImage()
                 im = im.Factory(im, True)
-                im.setXY0(cand.getMiToConvolvePtr().getXY0())
+                im.setXY0(cand.getTemplateMaskedImage().getXY0())
             except:
                 continue
             if (not resids and not kernels):
@@ -216,10 +216,10 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
             mos.append(im, lab, ctype)
 
             if False and num.isnan(rchi2):
-                ds9.mtv(cand.getMiToNotConvolvePtr.getImage(), title="candidate", frame=1)
+                ds9.mtv(cand.getScienceMaskedImage.getImage(), title="candidate", frame=1)
                 print "rating",  cand.getCandidateRating()
 
-            im = cand.getMiToNotConvolvePtr()
+            im = cand.getScienceMaskedImage()
             center = (candidateIndex, cand.getXCenter() - im.getX0(), cand.getYCenter() - im.getY0())
             candidateIndex += 1
             if cand.isBad():
@@ -279,7 +279,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True, numSam
                 continue
             candCenter = afwGeom.PointD(cand.getXCenter(), cand.getYCenter())
             try:
-                im = cand.getMiToConvolvePtr()
+                im = cand.getTemplateMaskedImage()
             except Exception, e:
                 continue
 
@@ -487,7 +487,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
 
             cand    = diffimLib.cast_KernelCandidateF(cand)
             diffim  = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
-            orig    = cand.getMiToNotConvolvePtr()
+            orig    = cand.getScienceMaskedImage()
 
             ski     = afwImage.ImageD(kernel.getDimensions())
             kernel.computeImage(ski, False, int(cand.getXCenter()), int(cand.getYCenter()))
