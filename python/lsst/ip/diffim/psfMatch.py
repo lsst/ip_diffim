@@ -386,12 +386,19 @@ class PsfMatchConfig(pexConfig.Config):
         default = False,
     )
 
+    useBicForKernelBasis = pexConfig.Field(
+        dtype = bool,
+        doc = """Use Bayesian Information Criterion to select the number of bases going into the kernel decomposition""",
+        default = False,
+    )
+
 
 class PsfMatchConfigAL(PsfMatchConfig):
     def setDefaults(self): 
         PsfMatchConfig.setDefaults(self)
         self.kernelBasisSet = "alard-lupton"
         self.maxConditionNumber = 5.0e7
+
 
     #####
     # Alard-Lupton Basis Parameters
@@ -431,6 +438,7 @@ class PsfMatchConfigDF(PsfMatchConfig):
         self.maxConditionNumber = 5.0e6
         self.usePcaForSpatialKernel = True
         self.subtractMeanForPca = True
+        self.useBicForKernelBasis = False
 
     #####
     # Delta Function Basis Parameters

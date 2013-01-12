@@ -103,7 +103,7 @@ Eigen::MatrixXi maskToEigenMatrix(
     
 
 /** 
- * @Brief Implement fundamental difference imaging step of convolution and
+ * @brief Implement fundamental difference imaging step of convolution and
  * subtraction : D = I - (K*T + bg) where * denotes convolution
  * 
  * @note If you convolve the science image, D = (K*I + bg) - T, set invert=False

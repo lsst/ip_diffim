@@ -20,6 +20,12 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
+# python
+import time
+import os
+from collections import Counter
+import numpy as num
+
 # all the c++ level classes and routines
 import diffimLib
 
@@ -32,11 +38,6 @@ import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 from .makeKernelBasisList import makeKernelBasisList 
-
-# third party
-import numpy
-import time
-import os
 
 # Helper functions for ipDiffim; mostly viewing of results and writing
 # debugging info to disk.
@@ -163,7 +164,7 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     sim  += bgValue
 
     # Watch out for negative values
-    tim  += 2 * numpy.abs(numpy.min(tim.getArray()))
+    tim  += 2 * num.abs(num.min(tim.getArray()))
     
     # Add noise?
     if addNoise:
@@ -375,3 +376,54 @@ class DipoleChecker(object):
     def __call__(self, source):
         return source.getId() in self.dipoleIds
         
+class NbasisEvaluator(object):
+    """A functor to evaluate the Bayesian Information Criterion for the number of basis sets going into the kernel fitting"""
+    def __init__(self, psfMatchConfig, psfFwhmPixTc, psfFwhmPixTnc):
+        self.psfMatchConfig = psfMatchConfig
+        self.psfFwhmPixTc = psfFwhmPixTc
+        self.psfFwhmPixTnc = psfFwhmPixTnc
+        if not self.psfMatchConfig.kernelBasisSet == "alard-lupton":
+            raise RuntimeError, "BIC only implemnted for AL (alard lupton) basis"
+        
+    def __call__(self, kernelCellSet, log):
+        d1, d2, d3 = self.psfMatchConfig.alardDegGauss
+        bicArray = {}
+        for d1i in range(1, d1+1):
+            for d2i in range(1, d2+1):
+                for d3i in range(1, d3+1):
+                    dList = [d1i, d2i, d3i]
+                    bicConfig = type(self.psfMatchConfig)(self.psfMatchConfig, alardDegGauss=dList)
+                    kList = makeKernelBasisList(bicConfig, self.psfFwhmPixTc, self.psfFwhmPixTnc)
+                    k = len(kList)
+                    singlekv = diffimLib.BuildSingleKernelVisitorF(kList, pexConfig.makePolicy(bicConfig))
+                    singlekv.setSkipBuilt(False)
+                    kernelCellSet.visitCandidates(singlekv, bicConfig.nStarPerCell)        
+
+                    for cell in kernelCellSet.getCellList():
+                        for cand in cell.begin(False): # False = include bad candidates
+                            cand = diffimLib.cast_KernelCandidateF(cand)
+                            if cand.getStatus() != afwMath.SpatialCellCandidate.GOOD:
+                                continue
+                            diffIm = cand.getDifferenceImage(diffimLib.KernelCandidateF.RECENT)
+                            bbox = cand.getKernel(diffimLib.KernelCandidateF.RECENT).shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
+                            diffIm = type(diffIm)(diffIm, bbox, True)
+                            chi2 = diffIm.getImage().getArray()**2 / diffIm.getVariance().getArray()
+                            n = chi2.shape[0] * chi2.shape[1]
+                            bic = num.sum(chi2) + k * num.log(n)
+                            if not bicArray.has_key(cand.getId()):
+                                bicArray[cand.getId()] = {}
+                            bicArray[cand.getId()][(d1i, d2i, d3i)] = bic
+
+        bestConfigs = []
+        candIds = bicArray.keys()
+        for candId in candIds:
+            cconfig, cvals = bicArray[candId].keys(), bicArray[candId].values()
+            idx = num.argsort(cvals)
+            bestConfig = cconfig[idx[0]]
+            bestConfigs.append(bestConfig)
+        
+        counter = Counter(bestConfigs).most_common(3)
+        log.info("B.I.C. prefers basis complexity %s %d times; %s %d times; %s %d times" % (counter[0][0], counter[0][1],
+                                                                                            counter[1][0], counter[1][1],
+                                                                                            counter[2][0], counter[2][1]))
+        return counter[0][0], counter[1][0], counter[2][0]

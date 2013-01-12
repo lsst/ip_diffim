@@ -25,23 +25,24 @@ import lsst.pex.logging as pexLog
 import numpy as num
 sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
-def makeKernelBasisList(config, targetFwhmPix = None, referenceFwhmPix = None):
+def makeKernelBasisList(config, targetFwhmPix = None, referenceFwhmPix = None, alardDegGauss = None):
     if config.kernelBasisSet == "alard-lupton":
-        return generateAlardLuptonBasisList(config, targetFwhmPix=targetFwhmPix, referenceFwhmPix=referenceFwhmPix)
+        return generateAlardLuptonBasisList(config, targetFwhmPix=targetFwhmPix, referenceFwhmPix=referenceFwhmPix, alardDegGauss=alardDegGauss)
     elif config.kernelBasisSet == "delta-function":
         kernelSize = config.kernelSize
         return diffimLib.makeDeltaFunctionBasisList(kernelSize, kernelSize)
     else:
         raise ValueError("Cannot generate %s basis set" % (config.kernelBasisSet))
 
-def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix = None, minSigma = 0.4, minRatio = 1.25):
+def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix = None, minSigma = 0.4, minRatio = 1.25, alardDegGauss = None):
     if config.kernelBasisSet != "alard-lupton":
         raise RuntimeError("Cannot generate %s basis within generateAlardLuptonBasisList" % (config.kernelBasisSet))
 
     kernelSize    = config.kernelSize
     alardNGauss   = config.alardNGauss
-    alardDegGauss = config.alardDegGauss
     alardSigGauss = config.alardSigGauss
+    if alardDegGauss == None:
+        alardDegGauss = config.alardDegGauss
 
     if len(alardDegGauss) != alardNGauss:
         raise ValueError("len(alardDegGauss) != alardNGauss : %d vs %d" % (len(alardDegGauss), alardNGauss))
