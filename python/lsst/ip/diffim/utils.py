@@ -124,7 +124,7 @@ def showDiaSources(sources, exposure, isFlagged, isDipole, frame=None):
             ctype = ds9.GREEN
             lab += "OK"
         mos.append(im.makeMosaic(), lab, ctype)
-        print source.getId()
+        #print source.getId()
     title = "Dia Sources"
     mosaicImage = mos.makeMosaic(frame=frame, title=title)
     return mosaicImage
