@@ -248,7 +248,7 @@ class ImagePsfMatchTask(PsfMatch):
         if display and displaySpatialCells:
             diUtils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet, 
                                            symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
-                                           size=4, frame=lsstDebug.frame)
+                                           size=4, frame=lsstDebug.frame, title="Image to not convolve")
             lsstDebug.frame += 1
         elif display and  displaySciIm:
             ds9.mtv(scienceMaskedImage, frame=lsstDebug.frame, title="Image to not convolve")

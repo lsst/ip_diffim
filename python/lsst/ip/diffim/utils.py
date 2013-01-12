@@ -60,10 +60,10 @@ def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=ds9.GREEN, symb="+", size=2):
 # Kernel display utilities
 #
 def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
-                           ctype=None, ctypeUnused=None, ctypeBad=None, size=3, frame=None):
+                           ctype=None, ctypeUnused=None, ctypeBad=None, size=3, frame=None, title="Spatial Cells"):
     """Show the SpatialCells.  If symb is something that ds9.dot understands (e.g. "o"), the top nMaxPerCell candidates will be indicated with that symbol, using ctype and size"""
 
-    ds9.mtv(maskedIm, frame=frame)
+    ds9.mtv(maskedIm, frame=frame, title=title)
     with ds9.Buffering():
         origin = [-maskedIm.getX0(), -maskedIm.getY0()]
         for cell in kernelCellSet.getCellList():
