@@ -86,7 +86,6 @@ class DetectionConfig(pexConfig.Config):
                  thumb is at least 1.5 times the kernel size.  The grown stamp is
                  ~2*fpGrowPix pixels larger in each dimension.""",
         default = 30,
-        check = lambda x: (x >= 20) and (x <= 40)
     )
     fpGrowMin = pexConfig.Field(
         dtype = int,
