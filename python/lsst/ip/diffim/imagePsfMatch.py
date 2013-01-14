@@ -338,9 +338,9 @@ class ImagePsfMatchTask(PsfMatch):
             lsstDebug.frame += 1
             ds9.mtv(results.matchedExposure, frame=lsstDebug.frame, title="Matched template")
             lsstDebug.frame += 1
-            ds9.mtv(scienceExposure, frame=lsstDebug.frame, title="Target")
+            ds9.mtv(scienceExposure, frame=lsstDebug.frame, title="Science Image")
             lsstDebug.frame += 1
-            ds9.mtv(subtractedExposure, frame=lsstDebug.frame, title="Subtracted")
+            ds9.mtv(subtractedExposure, frame=lsstDebug.frame, title="Difference Image")
             lsstDebug.frame += 1
 
         results.subtractedExposure = subtractedExposure
