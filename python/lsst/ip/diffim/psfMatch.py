@@ -79,12 +79,14 @@ class DetectionConfig(pexConfig.Config):
     )
     fpGrowPix = pexConfig.Field(
         dtype = int,
-        doc = """Grow each raw detection footprint by
-                 this many pixels.  The smaller the faster; however the kernel sum does
-                 not converge if the stamp is too small; and the kernel is not
-                 constrained at all if the stamp is the size of the kernel.  Rule of
-                 thumb is at least 1.5 times the kernel size.  The grown stamp is
-                 ~2*fpGrowPix pixels larger in each dimension.""",
+        doc = """Growing radius (in pixels) for each raw detection
+                 footprint.  The smaller the faster; however the
+                 kernel sum does not converge if the stamp is too
+                 small; and the kernel is not constrained at all if
+                 the stamp is the size of the kernel.  Rule of thumb
+                 is at least 1.5 times the kernel size.  The grown
+                 stamp is 2 * fpGrowPix pixels larger in each
+                 dimension.""",
         default = 30,
     )
     fpGrowMin = pexConfig.Field(
