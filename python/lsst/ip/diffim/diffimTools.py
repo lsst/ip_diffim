@@ -309,11 +309,11 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
             continue
         if center[1] < bbox.getMinY() or center[1] > bbox.getMaxY():
             continue
-        # Only stars, grow only a little
-        xmin   = center[0] - config.fpGrowPix // 2
-        xmax   = center[0] + config.fpGrowPix // 2
-        ymin   = center[1] - config.fpGrowPix // 2
-        ymax   = center[1] + config.fpGrowPix // 2
+        # Grow Sources
+        xmin   = center[0] - config.fpGrowPix
+        xmax   = center[0] + config.fpGrowPix
+        ymin   = center[1] - config.fpGrowPix
+        ymax   = center[1] + config.fpGrowPix
 
         # Keep object centered
         if (xmin - bbox.getMinX()) < 0:
@@ -330,7 +330,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
             ymax += (bbox.getMaxY() - ymax)
         if xmin > xmax or ymin > ymax:
             continue
-            
+        
         kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
         try:
             fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, False).getMask())
