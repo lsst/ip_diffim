@@ -139,7 +139,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
     #
     # Show us the ccandidates
     #
-    mos = displayUtils.Mosaic()
+    mos = displayUtils.Mosaic(gutter=5, background=-2)
     #
     candidateCenters = []
     candidateCentersBad = []
@@ -155,7 +155,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
             if not showBadCandidates and cand.isBad():
                 continue
 
-            im_resid = displayUtils.Mosaic(gutter=1, background=-5, mode="x")
+            im_resid = displayUtils.Mosaic(gutter=1, background=-2, mode="x")
 
             try:
                 im = cand.getScienceMaskedImage()
