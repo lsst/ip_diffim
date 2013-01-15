@@ -228,8 +228,6 @@ class ImagePsfMatchTask(PsfMatch):
             basisList = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix)
 
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
-        conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))        
-        self.metadata.set("spatialConditionNum", conditionNum)
 
         import lsstDebug
         display = lsstDebug.Info(__name__).display

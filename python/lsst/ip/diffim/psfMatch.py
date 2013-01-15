@@ -570,6 +570,9 @@ class PsfMatch(pipeBase.Task):
         if conditionNum > self.kconfig.maxSpatialConditionNumber:
             pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
                          "WARNING: Spatial solution exceeds max condition number (%.3e > %.3e)" % (conditionNum, self.kconfig.maxSpatialConditionNumber))
+
+        self.metadata.set("spatialConditionNum", conditionNum)
+        self.metadata.set("spatialKernelSum", kSum)
  
         # Look at how well the solution is constrained
         nBasisKernels = spatialKernel.getNBasisKernels()
