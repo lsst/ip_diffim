@@ -50,15 +50,31 @@ for kSize in kSizes:
         tmp.log.info("%.2f %.2f : %.3e %.2f" % (kSize, gSize, cNum, kSum))
         
         
-import pdb; pdb.set_trace()
 import pylab
+
+sp1 = pylab.subplot(211)
 data = num.array(kSums).reshape(len(kSizes), len(gSizes)).T
 ymin = kSizes.min()
 ymax = kSizes.max()
 xmin = gSizes.min()
 xmax = gSizes.max()
-im = pylab.imshow(data, origin='lower', cmap=pylab.cm.jet, extent=[ymin, ymax, xmin, xmax], interpolation="nearest")
-pylab.xlabel("Kernel Size")
-pylab.ylabel("Stamp Grow")
-cb = pylab.colorbar(im, orientation="horizontal")
+im1 = sp1.imshow(data, origin='lower', cmap=pylab.cm.jet, extent=[ymin, ymax, xmin, xmax], interpolation="nearest")
+sp1.set_title("Kernel Sum")
+sp1.set_xlabel("Kernel Size")
+sp1.set_ylabel("Stamp Grow")
+cb = pylab.colorbar(im1) #, orientation="horizontal")
+
+sp2 = pylab.subplot(212)
+data = num.array(num.log10(cNums)).reshape(len(kSizes), len(gSizes)).T
+ymin = kSizes.min()
+ymax = kSizes.max()
+xmin = gSizes.min()
+xmax = gSizes.max()
+im2 = sp2.imshow(data, origin='lower', cmap=pylab.cm.jet, extent=[ymin, ymax, xmin, xmax], interpolation="nearest")
+sp2.set_title("log10(Condition Number)")
+sp2.set_xlabel("Kernel Size")
+sp2.set_ylabel("Stamp Grow")
+cb = pylab.colorbar(im2) #, orientation="horizontal")
+
+
 pylab.show()

@@ -386,7 +386,6 @@ class PsfMatchConfig(pexConfig.Config):
                  Warning: regularization can cause problems for this step.""",
         default = False,
     )
-
     useBicForKernelBasis = pexConfig.Field(
         dtype = bool,
         doc = """Use Bayesian Information Criterion to select the number of bases going into the kernel decomposition""",
