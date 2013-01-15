@@ -11,8 +11,6 @@ from lsst.pipe.tasks.imageDifference import ImageDifferenceTask
 
 kSizes = num.arange(13, 33, 2)
 gSizes = num.arange(2, 5, 0.25)
-#kSizes = num.arange(13, 18, 2) # 3
-#gSizes = num.arange(2, 3, 0.25) # 4
 
 kSums  = []
 cNums  = []
@@ -46,9 +44,6 @@ for kSize in kSizes:
         else:
             kSums.append(kSum)
             cNums.append(cNum)
-        
-        tmp.log.info("%.2f %.2f : %.3e %.2f" % (kSize, gSize, cNum, kSum))
-        
         
 import pylab
 
