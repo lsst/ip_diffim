@@ -342,7 +342,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
         else:
             if not((bm1 & badBitMask) or (bm2 & badBitMask)):
                 candidateOutList.append(afwDetect.Footprint(kbbox))
-    log.info("Using %d kernel candidate stars" % (len(candidateOutList))) 
+    log.info("Selected %d / %d sources for KernelCandidacy" % (len(candidateOutList), len(candidateInList)))
     return candidateOutList
     
 #######

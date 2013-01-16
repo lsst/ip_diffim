@@ -208,7 +208,6 @@ class ImagePsfMatchTask(PsfMatch):
             pexLog.Trace(self.log.getName(), 1, "ERROR: Input images different size")
             raise RuntimeError, "Input images different size"
             
-        self.log.log(pexLog.Log.INFO, "compute PSF-matching kernel")
         kernelCellSet = self._buildCellSet(templateMaskedImage,
                                            scienceMaskedImage,
                                            candidateList = candidateList)

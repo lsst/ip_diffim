@@ -556,19 +556,17 @@ class PsfMatch(pipeBase.Task):
         # What is the final kernel sum
         kImage = afwImage.ImageD(spatialKernel.getDimensions())
         kSum = spatialKernel.computeImage(kImage, False)
-        pexLog.Trace(self.log.getName()+"._diagnostic", 0,
-                     "Final spatial kernel sum %.3f" % (kSum))
+        self.log.info("Final spatial kernel sum %.3f" % (kSum))
 
         # Look at how well conditioned the matrix is
         conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))
-        pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
-                     "Spatial model condition number : %.3e" % (conditionNum))
+        self.log.info("Spatial model condition number %.3e" % (conditionNum))
+
         if conditionNum < 0.0:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
-                         "WARNING: Condition number is negative (%.3e)" % (conditionNum))
+            self.log.warn("Condition number is negative (%.3e)" % (conditionNum))
         if conditionNum > self.kconfig.maxSpatialConditionNumber:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
-                         "WARNING: Spatial solution exceeds max condition number (%.3e > %.3e)" % (conditionNum, self.kconfig.maxSpatialConditionNumber))
+            self.log.warn("Spatial solution exceeds max condition number (%.3e > %.3e)" % (
+                    conditionNum, self.kconfig.maxSpatialConditionNumber))
 
         self.metadata.set("spatialConditionNum", conditionNum)
         self.metadata.set("spatialKernelSum", kSum)
@@ -599,41 +597,32 @@ class PsfMatch(pipeBase.Task):
 
         # Counting statistics
         if nBad > 2*nGood:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: many more candidates rejected than accepted; %d total, %d rejected, %d used" % (
+            self.log.warn("Many more candidates rejected than accepted; %d total, %d rejected, %d used" % (
                           nTot, nBad, nGood) )
         else:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "NOTE: %d candidates total, %d rejected, %d used" % (nTot, nBad, nGood))
+            self.log.info("%d candidates total, %d rejected, %d used" % (nTot, nBad, nGood))
             
         # Some judgements on the quality of the spatial models
         if nGood < nKernelTerms:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: spatial kernel model underconstrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
-            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
-                         "Consider lowering the spatial order")
+            self.log.warn("Spatial kernel model underconstrained; %d candidates, %d terms, %d bases" % (
+                    nGood, nKernelTerms, nBasisKernels))
+            self.log.warn("Consider lowering the spatial order")
         elif nGood <= 2*nKernelTerms:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: spatial kernel model poorly constrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
-            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
-                         "Consider lowering the spatial order")
+            self.log.warn("Spatial kernel model poorly constrained; %d candidates, %d terms, %d bases" % (
+                    nGood, nKernelTerms, nBasisKernels))
+            self.log.warn("Consider lowering the spatial order")
         else:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "NOTE: spatial kernel model appears well constrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
+            self.log.info("Spatial kernel model appears well constrained; %d candidates, %d terms, %d bases" % (
+                    nGood, nKernelTerms, nBasisKernels))
 
         if nGood < nBgTerms:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: spatial background model underconstrained; %d candidates, %d terms" % (nGood, nBgTerms))
-            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
-                         "Consider lowering the spatial order")
+            self.log.warn("Spatial background model underconstrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            self.log.warn("Consider lowering the spatial order")
         elif nGood <= 2*nBgTerms:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: spatial background model poorly constrained; %d candidates, %d terms" % (nGood, nBgTerms))
-            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
-                         "Consider lowering the spatial order")
+            self.log.warn("Spatial background model poorly constrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            self.log.warn("Consider lowering the spatial order")
         else:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "NOTE: spatial background model appears well constrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            self.log.info("Spatial background model appears well constrained; %d candidates, %d terms" % (nGood, nBgTerms))
         
     
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
