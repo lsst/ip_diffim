@@ -1,4 +1,5 @@
-import numpy as num
+import numpy as np
+import matplotlib.pyplot as plt
 import sys
 from lsst.pipe.tasks.imageDifference import ImageDifferenceTask
 
@@ -9,8 +10,8 @@ from lsst.pipe.tasks.imageDifference import ImageDifferenceTask
 # Run like a Task, as in:
 # compareKernelSizes.py . --id visit=865833781 raft=2,2 sensor=1,1 --configfile imageDifferenceConfig.py --output=tmplsstdiff 
 
-kSizes = num.arange(13, 33, 2)
-gSizes = num.arange(2, 5, 0.25)
+kSizes = np.arange(13, 33, 2)
+gSizes = np.arange(2, 5, 0.25)
 
 kSums  = []
 cNums  = []
@@ -39,37 +40,34 @@ for kSize in kSizes:
             kSum = task.subtract.metadata.get("spatialKernelSum")
             cNum = task.subtract.metadata.get("spatialConditionNum")
         except:
-            kSums.append(num.inf)
-            cNums.append(num.inf)
+            kSums.append(np.inf)
+            cNums.append(np.inf)
         else:
             kSums.append(kSum)
             cNums.append(cNum)
         
-import pylab
-
-sp1 = pylab.subplot(211)
-data = num.array(kSums).reshape(len(kSizes), len(gSizes)).T
+fig = plt.figure()
+data = np.array(kSums).reshape(len(kSizes), len(gSizes)).T
 ymin = kSizes.min()
 ymax = kSizes.max()
 xmin = gSizes.min()
 xmax = gSizes.max()
-im1 = sp1.imshow(data, origin='lower', cmap=pylab.cm.jet, extent=[ymin, ymax, xmin, xmax], interpolation="nearest")
-sp1.set_title("Kernel Sum")
-sp1.set_xlabel("Kernel Size")
-sp1.set_ylabel("Stamp Grow")
-cb = pylab.colorbar(im1) #, orientation="horizontal")
+im1 = plt.imshow(data, origin='lower', cmap=plt.cm.jet, extent=[ymin, ymax, xmin, xmax], interpolation="nearest", aspect="auto")
+plt.title("Kernel Sum")
+plt.xlabel("Kernel Size")
+plt.ylabel("Stamp Grow")
+plt.colorbar(im1, ax = fig.gca(), orientation="horizontal")
 
-sp2 = pylab.subplot(212)
-data = num.array(num.log10(cNums)).reshape(len(kSizes), len(gSizes)).T
+fig = plt.figure()
+data = np.array(np.log10(cNums)).reshape(len(kSizes), len(gSizes)).T
 ymin = kSizes.min()
 ymax = kSizes.max()
 xmin = gSizes.min()
 xmax = gSizes.max()
-im2 = sp2.imshow(data, origin='lower', cmap=pylab.cm.jet, extent=[ymin, ymax, xmin, xmax], interpolation="nearest")
-sp2.set_title("log10(Condition Number)")
-sp2.set_xlabel("Kernel Size")
-sp2.set_ylabel("Stamp Grow")
-cb = pylab.colorbar(im2) #, orientation="horizontal")
+im2 = plt.imshow(data, origin='lower', cmap=plt.cm.jet, extent=[ymin, ymax, xmin, xmax], interpolation="nearest", aspect="auto")
+plt.title("log10(Condition Number)")
+plt.xlabel("Kernel Size")
+plt.ylabel("Stamp Grow")
+plt.colorbar(im2, ax = fig.gca(), orientation="horizontal")
 
-
-pylab.show()
+plt.show()
