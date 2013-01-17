@@ -208,7 +208,6 @@ class ImagePsfMatchTask(PsfMatch):
             pexLog.Trace(self.log.getName(), 1, "ERROR: Input images different size")
             raise RuntimeError, "Input images different size"
             
-        self.log.log(pexLog.Log.INFO, "compute PSF-matching kernel")
         kernelCellSet = self._buildCellSet(templateMaskedImage,
                                            scienceMaskedImage,
                                            candidateList = candidateList)
@@ -228,8 +227,6 @@ class ImagePsfMatchTask(PsfMatch):
             basisList = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix)
 
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
-        conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))        
-        self.metadata.set("spatialConditionNum", conditionNum)
 
         import lsstDebug
         display = lsstDebug.Info(__name__).display
@@ -248,7 +245,7 @@ class ImagePsfMatchTask(PsfMatch):
         if display and displaySpatialCells:
             diUtils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet, 
                                            symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
-                                           size=4, frame=lsstDebug.frame)
+                                           size=4, frame=lsstDebug.frame, title="Image to not convolve")
             lsstDebug.frame += 1
         elif display and  displaySciIm:
             ds9.mtv(scienceMaskedImage, frame=lsstDebug.frame, title="Image to not convolve")
@@ -338,9 +335,9 @@ class ImagePsfMatchTask(PsfMatch):
             lsstDebug.frame += 1
             ds9.mtv(results.matchedExposure, frame=lsstDebug.frame, title="Matched template")
             lsstDebug.frame += 1
-            ds9.mtv(scienceExposure, frame=lsstDebug.frame, title="Target")
+            ds9.mtv(scienceExposure, frame=lsstDebug.frame, title="Science Image")
             lsstDebug.frame += 1
-            ds9.mtv(subtractedExposure, frame=lsstDebug.frame, title="Subtracted")
+            ds9.mtv(subtractedExposure, frame=lsstDebug.frame, title="Difference Image")
             lsstDebug.frame += 1
 
         results.subtractedExposure = subtractedExposure
