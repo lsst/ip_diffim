@@ -189,7 +189,6 @@ namespace detail {
 
     typedef float PixelT;
     template class KernelPcaVisitor<PixelT>;
-
     template class KernelPca<afwImage::Image<afwMath::Kernel::Pixel> >;
 
 }}}} // end of namespace lsst::ip::diffim::detail
