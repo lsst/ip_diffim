@@ -36,10 +36,10 @@
 #include "lsst/ip/diffim/KernelCandidate.h"
 #include "lsst/ip/diffim/KernelCandidateDetection.h"
 
+#include "lsst/ip/diffim/KernelPca.h"
 #include "lsst/ip/diffim/AssessSpatialKernelVisitor.h"
 #include "lsst/ip/diffim/BuildSingleKernelVisitor.h"
 #include "lsst/ip/diffim/BuildSpatialKernelVisitor.h"
-#include "lsst/ip/diffim/KernelPca.h"
 #include "lsst/ip/diffim/KernelSumVisitor.h"
 
 #endif // LSST_IP_DIFFIM_H

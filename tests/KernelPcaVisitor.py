@@ -103,6 +103,7 @@ class DiffimTestCases(unittest.TestCase):
         pcaBasisList2[0].computeImage(kImage0, False)
         maxVal  = afwMath.makeStatistics(kRefIm, afwMath.MAX).getValue(afwMath.MAX)
         kRefIm /= maxVal
+        import pdb; pdb.set_trace()
         for y in range(kRefIm.getHeight()):
             for x in range(kRefIm.getWidth()):
                 self.assertTrue( abs(kRefIm.get(x, y) - kImage0.get(x, y)) / kRefIm.get(x, y) < 0.2 )

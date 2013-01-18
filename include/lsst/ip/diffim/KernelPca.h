@@ -1,16 +1,16 @@
 // -*- lsst-c++ -*-
 /**
- * @file KernelPcaVisitor.h
+ * @file KernelPca.h
  *
- * @brief Declaration of KernelPcaVisitor 
+ * @brief Declaration of KernelPca and KernelPcaVisitor
  *
  * @author Andrew Becker, University of Washington
  *
  * @ingroup ip_diffim
  */
 
-#ifndef LSST_IP_DIFFIM_KERNELPCAVISITOR_H
-#define LSST_IP_DIFFIM_KERNELPCAVISITOR_H
+#ifndef LSST_IP_DIFFIM_KERNELPCA_H
+#define LSST_IP_DIFFIM_KERNELPCA_H
 
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"

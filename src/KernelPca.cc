@@ -1,8 +1,8 @@
 // -*- lsst-c++ -*-
 /**
- * @file KernelPcaVisitor.h
+ * @file KernelPca.cc
  *
- * @brief Implementation of KernelPcaVisitor 
+ * @brief Implementation of KernelPca and KernelPcaVisitor 
  *
  * @author Andrew Becker, University of Washington
  *
@@ -15,7 +15,7 @@
 #include "lsst/pex/logging/Trace.h"
 
 #include "lsst/ip/diffim/KernelCandidate.h"
-#include "lsst/ip/diffim/KernelPcaVisitor.h"
+#include "lsst/ip/diffim/KernelPca.h"
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
@@ -150,7 +150,7 @@ namespace detail {
            the remaining terms carry less of the power than if you do
            subtract off the mean.  (0.041223/(1-0.876046) < 0.373870).
          */
-        pexLogging::TTrace<6>("lsst.ip.diffim.SetPcaImageVisitor.subtractMean", 
+        pexLogging::TTrace<6>("lsst.ip.diffim.KernelPcaVisitor.subtractMean", 
                               "Subtracting mean feature before Pca");
         
         _mean = _imagePca->getMean();
@@ -188,7 +188,8 @@ namespace detail {
 
 
     typedef float PixelT;
-    template class KernelPca<PixelT>;
     template class KernelPcaVisitor<PixelT>;
+
+    template class KernelPca<afwImage::Image<afwMath::Kernel::Pixel> >;
 
 }}}} // end of namespace lsst::ip::diffim::detail

@@ -24,11 +24,15 @@
 /******************************************************************************/
 
 %{
-#include "lsst/ip/diffim/KernelPcaVisitor.h"
+#include "lsst/ip/diffim/KernelPca.h"
 %}
 
 %define %KernelPcaVisitorPtr(TYPE)
     %shared_ptr(lsst::ip::diffim::detail::KernelPcaVisitor<TYPE>);
+%enddef
+
+%define %KernelPcaPtr(TYPE)
+    %shared_ptr(lsst::ip::diffim::detail::KernelPca<lsst::afw::image::Image<TYPE> >);
 %enddef
 
 %define %KernelPcaVisitor(NAME, TYPE)
@@ -36,10 +40,16 @@
     %template(makeKernelPcaVisitor) lsst::ip::diffim::detail::makeKernelPcaVisitor<TYPE>;
 %enddef
 
+%define %KernelPca(NAMETYPE)
+    %template(KernelPca) lsst::ip::diffim::detail::KernelPca<lsst::afw::image::Image<TYPE> >;
+%enddef
+
+%KernelPcaPtr(lsst::afw::math::Kernel::Pixel)
 %KernelPcaVisitorPtr(float)
 
-%include "lsst/ip/diffim/KernelPcaVisitor.h"
+%include "lsst/ip/diffim/KernelPca.h"
 
+%KernelPca(lsst::afw::math::Kernel::Pixel)
 %KernelPcaVisitor(F, float)
 
 /******************************************************************************/
