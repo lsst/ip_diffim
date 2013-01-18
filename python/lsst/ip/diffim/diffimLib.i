@@ -265,14 +265,14 @@ typename KernelCandidate<PixelT>::Ptr
 makeKernelCandidateForSwig(float const xCenter,
                            float const yCenter, 
                            boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
-                               miToConvolvePtr,
+                               templateMaskedImage,
                            boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
-                               miToNotConvolvePtr,
+                               scienceMaskedImage,
                            lsst::pex::policy::Policy const& policy) {
     
     return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
-                                                                             miToConvolvePtr,
-                                                                             miToNotConvolvePtr,
+                                                                             templateMaskedImage,
+                                                                             scienceMaskedImage,
                                                                              policy));
 }
 }}}}
