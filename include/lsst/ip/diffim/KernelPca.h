@@ -27,6 +27,7 @@ namespace detail {
         typedef typename boost::shared_ptr<KernelPca<ImageT> > Ptr;
         using lsst::afw::image::ImagePca<ImageT>::getEigenImages;
         using lsst::afw::image::ImagePca<ImageT>::getEigenValues;
+        using lsst::afw::image::ImagePca<ImageT>::addImage;
 
         /// Ctor
         explicit KernelPca(bool constantWeight=true) : Super(constantWeight) {}
