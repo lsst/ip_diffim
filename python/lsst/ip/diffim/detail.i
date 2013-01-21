@@ -25,6 +25,7 @@
 
 %{
 #include "lsst/ip/diffim/KernelPca.h"
+#include "boost/shared_ptr.hpp"
 %}
 
 %define %KernelPcaVisitorPtr(TYPE)
@@ -40,8 +41,14 @@
     %template(makeKernelPcaVisitor) lsst::ip::diffim::detail::makeKernelPcaVisitor<TYPE>;
 %enddef
 
-%define %KernelPca(NAMETYPE)
-    %template(KernelPca) lsst::ip::diffim::detail::KernelPca<lsst::afw::image::Image<TYPE> >;
+%define %KernelPca(NAME, TYPE)
+    %template(KernelPca##NAME) lsst::ip::diffim::detail::KernelPca<lsst::afw::image::Image<TYPE> >;
+    %inline %{
+        lsst::ip::diffim::detail::KernelPca<lsst::afw::image::Image<TYPE> >::Ptr
+            cast_KernelPca##NAME(lsst::afw::image::ImagePca<lsst::afw::image::Image<TYPE> >::Ptr imagePca) {
+            return boost::shared_dynamic_cast<lsst::ip::diffim::detail::KernelPca<lsst::afw::image::Image<TYPE> > >(imagePca);
+        }
+    %}
 %enddef
 
 %KernelPcaPtr(lsst::afw::math::Kernel::Pixel)
@@ -49,8 +56,9 @@
 
 %include "lsst/ip/diffim/KernelPca.h"
 
-%KernelPca(lsst::afw::math::Kernel::Pixel)
+%KernelPca(D, lsst::afw::math::Kernel::Pixel)
 %KernelPcaVisitor(F, float)
+
 
 /******************************************************************************/
 

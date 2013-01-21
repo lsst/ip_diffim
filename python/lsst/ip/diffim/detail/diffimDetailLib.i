@@ -40,7 +40,7 @@ Python bindings for lsst::ip::diffim::detail code
 %shared_ptr(lsst::ip::diffim::detail::BuildSingleKernelVisitor);
 %shared_ptr(lsst::ip::diffim::detail::BuildSpatialKernelVisitor);
 %shared_ptr(lsst::ip::diffim::detail::KernelPca);
-%shared_ptr(lsst::ip::diffim::detail::KernelPcaVisitor<float>);
+%shared_ptr(lsst::ip::diffim::detail::KernelPcaVisitor);
 %shared_ptr(lsst::ip::diffim::detail::KernelSumVisitor<float>);
 
 %include "lsst/ip/diffim/AssessSpatialKernelVisitor.h"
