@@ -634,7 +634,6 @@ class PsfMatch(pipeBase.Task):
             importStarVisitor.subtractMean()
         imagePca.analyze()
 
-        import pdb; pdb.set_trace()
         eigenValues  = imagePca.getEigenValues()
         pcaBasisList = importStarVisitor.getEigenKernels()
 
