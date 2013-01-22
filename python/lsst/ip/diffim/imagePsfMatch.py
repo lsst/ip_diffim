@@ -203,14 +203,38 @@ class ImagePsfMatchTask(PsfMatch):
         @raise RuntimeError if input images have different dimensions
         """
 
+        import lsstDebug
+        display = lsstDebug.Info(__name__).display
+        displayTemplate = lsstDebug.Info(__name__).displayTemplate
+        displaySciIm = lsstDebug.Info(__name__).displaySciIm
+        displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells
+        maskTransparency = lsstDebug.Info(__name__).maskTransparency   
+        if not maskTransparency:
+            maskTransparency = 0
+        ds9.setMaskTransparency(maskTransparency)
+
 
         if not self._validateSize(templateMaskedImage, scienceMaskedImage):
             pexLog.Trace(self.log.getName(), 1, "ERROR: Input images different size")
             raise RuntimeError, "Input images different size"
-            
+
+        if display and displayTemplate:
+            ds9.mtv(templateMaskedImage, frame=lsstDebug.frame, title="Image to convolve")
+            lsstDebug.frame += 1
+
+        if display and  displaySciIm:
+            ds9.mtv(scienceMaskedImage, frame=lsstDebug.frame, title="Image to not convolve")
+            lsstDebug.frame += 1
+
         kernelCellSet = self._buildCellSet(templateMaskedImage,
                                            scienceMaskedImage,
                                            candidateList = candidateList)
+
+        if display and displaySpatialCells:
+            diUtils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet, 
+                                           symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
+                                           size=4, frame=lsstDebug.frame, title="Image to not convolve")
+            lsstDebug.frame += 1
 
         if templateFwhmPix and scienceFwhmPix:
             pexLog.Trace(self.log.getName(), 2, "Matching Psf FWHM %.2f -> %.2f pix" % (templateFwhmPix, scienceFwhmPix))
@@ -228,28 +252,8 @@ class ImagePsfMatchTask(PsfMatch):
 
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
 
-        import lsstDebug
-        display = lsstDebug.Info(__name__).display
-        displayTemplate = lsstDebug.Info(__name__).displayTemplate
-        displaySciIm = lsstDebug.Info(__name__).displaySciIm
-        displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells
-        maskTransparency = lsstDebug.Info(__name__).maskTransparency   
-        if not maskTransparency:
-            maskTransparency = 0
-        ds9.setMaskTransparency(maskTransparency)
 
-        if display and displayTemplate:
-            ds9.mtv(templateMaskedImage, frame=lsstDebug.frame, title="Image to convolve")
-            lsstDebug.frame += 1
 
-        if display and displaySpatialCells:
-            diUtils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet, 
-                                           symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
-                                           size=4, frame=lsstDebug.frame, title="Image to not convolve")
-            lsstDebug.frame += 1
-        elif display and  displaySciIm:
-            ds9.mtv(scienceMaskedImage, frame=lsstDebug.frame, title="Image to not convolve")
-            lsstDebug.frame += 1
 
         psfMatchedMaskedImage = afwImage.MaskedImageF(templateMaskedImage.getBBox(afwImage.PARENT))
         doNormalize = False
