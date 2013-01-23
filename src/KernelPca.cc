@@ -29,48 +29,33 @@ namespace detail {
 
     /**
      * @class KernelPcaVisitor
+     *
      * @ingroup ip_diffim
      *
-     * @brief A class to run a PCA on all candidate kernels (represented as Images)
+     * @brief A class to run a PCA on all candidate kernels (represented as
+     * Images).
      *
-     * @code
-        afwImage::ImagePca<ImageT> imagePca;
-        detail::KernelPcaVisitor<PixelT> importStarVisitor(&imagePca);
-        kernelCells.visitCandidates(&importStarVisitor, nStarPerCell);
-        importStarVisitor.subtractMean();
-        imagePca.analyze();
-        std::vector<typename ImageT::Ptr> eigenImages = imagePca.getEigenImages();
-        afwMath::KernelList kernelListRaw;
-        kernelListRaw.push_back(afwMath::Kernel::Ptr(
-                                    new afwMath::FixedKernel(
-                                        afwImage::Image<afwMath::Kernel::Pixel>
-                                        (*(importStarVisitor.returnMean()), true))));
-        int const ncomp = static_cast<int>(eigenImages.size()) - 1; // -1 since we have subtracted mean
-        for (int j = 0; j != ncomp; ++j) {
-            kernelListRaw.push_back(afwMath::Kernel::Ptr(
-                                        new afwMath::FixedKernel(
-                                            afwImage::Image<afwMath::Kernel::Pixel>
-                                            (*eigenImages[j], true))));
-        }
-     * @endcode
+     * @note Templated on the types of MaskedImages it will be visiting
+     * (typically float).
      *
-     * @note Works in concert with a afwMath::SpatialCellSet and afwImage::ImagePca
-     * to create a Karhunen-Loeve basis from all the good KernelCandidates.  This
-     * class adds the extra functionality to subtract off the mean kernel from all
-     * entries in afwImage::ImagePca, which makes the resulting basis more compact.
-     * The user needs to manually add this mean image into the resulting basis list
-     * after imagePca.analyze() is called.
-     *
-     * @note afwImage::ImagePca weights objects of different brightness differently.
-     * However we don't necessarily want images with larger kernel sums to have more
-     * weight.  Each kernel should have constant weight in the Pca.  For simplicity
-     * we scale them to have the same kernel sum, 1.0, and send to ImagePca that the
-     * flux (weight) is 1.0.
+     * @note Works in concert with a afwMath::SpatialCellSet and ip::Diffim
+     * KernelPca to create a Karhunen-Loeve basis from all the good
+     * KernelCandidates.  This class adds the extra functionality to subtract
+     * off the mean kernel from all entries, which makes the resulting basis
+     * more compact.  The user needs to manually add this mean image into the
+     * resulting basis list after imagePca.analyze() is called.
+     * 
+     * @note KernelPca (and base class afwImage::ImagePca) weight objects of
+     * different brightness differently.  However we don't necessarily want
+     * images with larger kernel sums to have more weight.  Each kernel should
+     * have constant weight in the Pca.  For simplicity we scale them to have
+     * the same kernel sum, 1.0, and send to ImagePca that the flux (weight) is
+     * 1.0.
      * 
      */
     template<typename PixelT>
     KernelPcaVisitor<PixelT>::KernelPcaVisitor(
-        KernelPca<ImageT> *imagePca ///< Set of Images to initialise
+        boost::shared_ptr<KernelPca<ImageT> > imagePca ///< Set of Images to initialise
         ) :
         afwMath::CandidateVisitor(),
         _imagePca(imagePca),
@@ -81,7 +66,7 @@ namespace detail {
     lsst::afw::math::KernelList KernelPcaVisitor<PixelT>::getEigenKernels() {
         afwMath::KernelList kernelList;
 
-        std::vector<typename ImageT::Ptr> eigenImages = (*_imagePca).getEigenImages();
+        std::vector<typename ImageT::Ptr> eigenImages = _imagePca->getEigenImages();
         int ncomp = eigenImages.size();
 
         if (_mean) {
@@ -114,7 +99,7 @@ namespace detail {
         
         try {
             /* Normalize to unit sum */
-            ImageT::Ptr kImage = kCandidate->getKernelSolution(
+            PTR(ImageT) kImage = kCandidate->getKernelSolution(
                 KernelCandidate<PixelT>::ORIG)->makeKernelImage();
             *kImage           /= kCandidate->getKernelSolution(
                 KernelCandidate<PixelT>::ORIG)->getKsum();
@@ -161,6 +146,20 @@ namespace detail {
         }
     }
 
+    /**
+     * @class KernelPca
+     *
+     * @ingroup ip_diffim
+     *
+     * @brief Overrides the analyze method of base class afwImage::ImagePca
+     *
+     * @note Templated on the types of Images it is running on (typically
+     * double)
+     *
+     * @note This override normalizes the resulting eigenImages to have peak
+     * value of 1.0.
+     *
+     */
     template <typename ImageT>
     void KernelPca<ImageT>::analyze()
     {
