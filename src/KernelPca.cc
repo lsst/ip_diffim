@@ -35,8 +35,8 @@ namespace detail {
      * @brief A class to run a PCA on all candidate kernels (represented as
      * Images).
      *
-     * @note Templated on the types of MaskedImages it will be visiting
-     * (typically float).
+     * @note Templated on the pixel types of the MaskedImages it will be
+     * visiting (typically float).
      *
      * @note Works in concert with a afwMath::SpatialCellSet and ip::Diffim
      * KernelPca to create a Karhunen-Loeve basis from all the good
@@ -153,8 +153,8 @@ namespace detail {
      *
      * @brief Overrides the analyze method of base class afwImage::ImagePca
      *
-     * @note Templated on the types of Images it is running on (typically
-     * double)
+     * @note Templated on the Image types it is running on (typically
+     * [exclusively?] afwMath::Kernel::Pixel, which is double)
      *
      * @note This override normalizes the resulting eigenImages to have peak
      * value of 1.0.
