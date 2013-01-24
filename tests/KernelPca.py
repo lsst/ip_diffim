@@ -45,8 +45,8 @@ class DiffimTestCases(unittest.TestCase):
         gaussFunction = afwMath.GaussianFunction2D(2, 3)
         gaussKernel   = afwMath.AnalyticKernel(size, size, gaussFunction)
         
-        imagePca1 = afwImage.ImagePcaD()  # mean subtract
-        imagePca2 = afwImage.ImagePcaD()  # don't mean subtract
+        imagePca1 = ipDiffim.KernelPcaD()  # mean subtract
+        imagePca2 = ipDiffim.KernelPcaD()  # don't mean subtract
         kpv1      = ipDiffim.KernelPcaVisitorF(imagePca1)
         kpv2      = ipDiffim.KernelPcaVisitorF(imagePca2)
 
@@ -116,7 +116,7 @@ class DiffimTestCases(unittest.TestCase):
         kc3 = self.makeCandidate(3, 0.0, 0.0)
         kc3.build(self.kList)
 
-        imagePca = afwImage.ImagePcaD()
+        imagePca = ipDiffim.KernelPcaD()
         kpv = ipDiffim.KernelPcaVisitorF(imagePca)
         kpv.processCandidate(kc1)
         kpv.processCandidate(kc2)
@@ -140,7 +140,7 @@ class DiffimTestCases(unittest.TestCase):
         kc3 = self.makeCandidate(3, 0.0, 0.0)
         kc3.build(self.kList)
 
-        imagePca = afwImage.ImagePcaD()
+        imagePca = ipDiffim.KernelPcaD()
         kpv = ipDiffim.KernelPcaVisitorF(imagePca)
         kpv.processCandidate(kc1)
         kpv.processCandidate(kc2)
@@ -169,7 +169,7 @@ class DiffimTestCases(unittest.TestCase):
         kc3 = self.makeCandidate(3, 0.0, 0.0)
         kc3.build(self.kList)
 
-        imagePca = afwImage.ImagePcaD()
+        imagePca = ipDiffim.KernelPcaD()
         kpv = ipDiffim.KernelPcaVisitorF(imagePca)
         kpv.processCandidate(kc1)
         kpv.processCandidate(kc2)
@@ -202,7 +202,7 @@ class DiffimTestCases(unittest.TestCase):
                     self.assertAlmostEqual(imageMean.get(x, y), 0.0)
 
     def testVisit(self, nCell = 3):
-        imagePca = afwImage.ImagePcaD()
+        imagePca = ipDiffim.KernelPcaD()
         kpv = ipDiffim.makeKernelPcaVisitor(imagePca)
 
         sizeCellX = self.policy.get("sizeCellX")

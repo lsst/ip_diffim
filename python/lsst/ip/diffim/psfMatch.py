@@ -627,7 +627,7 @@ class PsfMatch(pipeBase.Task):
     
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
         nComponents       = self.kconfig.numPrincipalComponents
-        imagePca          = afwImage.ImagePcaD()
+        imagePca          = diffimLib.KernelPcaD()
         importStarVisitor = diffimLib.KernelPcaVisitorF(imagePca)
         kernelCellSet.visitCandidates(importStarVisitor, nStarPerCell)
         if self.kconfig.subtractMeanForPca:
