@@ -32,6 +32,7 @@ from modelPsfMatch import *
 from snapPsfMatch import *
 from diaSourceAnalysis import *
 from makeKernelBasisList import *
+from diaCatalogSourceSelector import *
 
 from diffimTools import *
 
