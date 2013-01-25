@@ -144,25 +144,18 @@ class DiaCatalogSourceSelector(object):
                 if not isGoodSource(source):
                     symb, ctype = "+", ds9.RED
                 else:
-
-                    try:
-                        isStar = ref.get("stargal")
-                        isVar = not ref.get("photometric")
-                        gMag = -2.5 * np.log10(ref.get("g"))
-                        rMag = -2.5 * np.log10(ref.get("r"))
-                        isRightType  = (self.config.selectStar and isStar) or (self.config.selectGalaxy and not isStar)
-                        isRightVar   = self.config.selectVariable is isVar
-                        isRightColor = (gMag-rMag) >= self.config.grMin and (gMag-rMag) <= self.config.grMax
-                        if isRightType and isRightVar and isRightColor:
-                            kernelCandidateSourceList.append(source)
-                            symb, ctype = "+", ds9.GREEN
-                        else:
-                            symb, ctype = "o", ds9.BLUE
-                    except Exception as err:
-                        symb, ctype = "o", ds9.RED
-                        print "ACB", err
-                        pass # FIXME: should log this!  E.g. StarSelector base class has a log
-
+                    isStar = ref.get("stargal")
+                    isVar = not ref.get("photometric")
+                    gMag = -2.5 * np.log10(ref.get("g"))
+                    rMag = -2.5 * np.log10(ref.get("r"))
+                    isRightType  = (self.config.selectStar and isStar) or (self.config.selectGalaxy and not isStar)
+                    isRightVar   = self.config.selectVariable is isVar
+                    isRightColor = (gMag-rMag) >= self.config.grMin and (gMag-rMag) <= self.config.grMax
+                    if isRightType and isRightVar and isRightColor:
+                        kernelCandidateSourceList.append(source)
+                        symb, ctype = "+", ds9.GREEN
+                    else:
+                        symb, ctype = "o", ds9.BLUE
 
                 if display and displayExposure:
                     ds9.dot(symb, source.getX() - mi.getX0(), source.getY() - mi.getY0(),
