@@ -112,6 +112,12 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
         sources = self.sourceSelector.selectSources(self.exposure, srcCat, matches)
         self.assertEqual(len(sources), nSrc-3)
 
+        # Set one of the types to be bad
+        if self.sourceSelector.config.selectStar and not self.sourceSelector.config.selectGalaxy:
+            matches[3].first.set("stargal", False)
+            sources = self.sourceSelector.selectSources(self.exposure, srcCat, matches)
+            self.assertEqual(len(sources), nSrc-4)
+
 def suite():
     """Returns a suite containing all the test cases in this module."""
 
