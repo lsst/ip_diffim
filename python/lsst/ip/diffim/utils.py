@@ -148,6 +148,12 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
         for cand in cell.begin(False): # include bad candidates
             cand = diffimLib.cast_KernelCandidateF(cand)
 
+            # Original difference image; if does not exist, skip candidate
+            try:
+                resid = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
+            except:
+                continue
+                
             rchi2 = cand.getChi2()
             if rchi2 > 1e100:
                 rchi2 = num.nan
@@ -175,7 +181,6 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
                 im_resid.append(im.Factory(im, True))
 
             # Difference image with original basis
-            resid = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
             if resids:
                 var = resid.getVariance()
                 var = var.Factory(var, True)
