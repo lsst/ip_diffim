@@ -56,8 +56,8 @@ print "# And nPeaks =", len(s.getFootprint().getPeaks())
 
 # Measure dipole at known location
 schema  = afwTable.SourceTable.makeMinimalSchema()
-control = ipDiffim.NaiveDipoleCentroidControl()
-msb     = measAlg.MeasureSourcesBuilder().addAlgorithm(control)
+msb     = measAlg.MeasureSourcesBuilder().addAlgorithm(ipDiffim.NaiveDipoleCentroidControl())
+msb     = msb.addAlgorithm(ipDiffim.NaiveDipoleFluxControl())
 ms      = msb.build(schema)
 table   = afwTable.SourceTable.make(schema)
 source  = table.makeRecord()
@@ -78,6 +78,59 @@ for key in schema.getNames():
     print key, source.get(key)
 
 
-#control = ipDiffim.NaiveDipoleFluxControl()
-#msb     = msb.addAlgorithm(control)
+from lsst.meas.deblender.baseline import _fit_psf, CachingPsf, PerPeak, PerFootprint
+import lsst.pex.logging as pexLogging
+import numpy as np
+sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
+psf_chisq_cut1 = psf_chisq_cut2 = psf_chisq_cut2b = 1.5
+
+fp  = source.getFootprint()
+peaks = fp.getPeaks()
+peaksF = [pk.getF() for pk in peaks]
+fbb = fp.getBBox()
+cpsf = CachingPsf(psf)
+log = pexLogging.Log(pexLogging.Log.getDefaultLog(), 'makeDipole', pexLogging.Log.INFO)
+fmask = afwImage.MaskU(fbb)
+fmask.setXY0(fbb.getMinX(), fbb.getMinY())
+afwDet.setMaskFromFootprint(fmask, fp, 1)
+
+width, height = psf.getKernel().getDimensions()
+psfAttr = measAlg.PsfAttributes(psf, width//2, height//2)
+psfSigPix = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
+psfFwhmPix = psfSigPix * sigma2fwhm 
+
+subimage = afwImage.ExposureF(exp, fbb, True)
+
+# prepare results structure
+fpres = PerFootprint()
+fpres.peaks = []
+for pki,pk in enumerate(peaks):
+    pkres = PerPeak()
+    pkres.peak = pk
+    pkres.pki = pki
+    fpres.peaks.append(pkres)
+
+
+for pki,(pk,pkres,pkF) in enumerate(zip(peaks, fpres.peaks, peaksF)):
+    log.logdebug('Peak %i' % pki)
+    _fit_psf(fp, fmask, pk, pkF, pkres, fbb, peaks, peaksF, log, cpsf,
+             psfFwhmPix, 
+             subimage.getMaskedImage().getImage(), 
+             subimage.getMaskedImage().getVariance(), 
+             psf_chisq_cut1, psf_chisq_cut2, psf_chisq_cut2b)
+
+for i, peak in enumerate(fpres.peaks):
+    if peak.psfflux > 0:
+        suffix = "pos"
+    else:
+        suffix = "neg"
+    
+    print "centroid.dipole.psf.%s" % (suffix), peak.center
+    print "centroid.dipole.chi2dof.%s" % (suffix), peak.chisq / peak.dof
+    print "flux.dipole.psf.%s" % (suffix), peak.psfflux * np.sum(peak.tmimg.getImage().getArray())
+        
+    #print i, peak.center, peak.chisq, peak.dof, peak.psfflux, peak.psfflux * np.sum(peak.tmimg.getImage().getArray())
+    ds9.mtv(afwImage.ExposureF(exp, peak.tfoot.getBBox()), frame=5+i)
+
+#import pdb; pdb.set_trace()

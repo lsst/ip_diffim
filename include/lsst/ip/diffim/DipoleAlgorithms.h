@@ -217,11 +217,8 @@ private:
 };
 
 /**
- *  @brief C++ control object for PSF dipole fluxes.; 
- *
- *  @note Comment out until implementation, otherwise C++ complains of missing vtable
+ *  @brief C++ control object for PSF dipole fluxes.
  */
-    /*
 class PsfDipoleFluxControl : public DipoleFluxControl {
 public:
     LSST_CONTROL_FIELD(background, double, "Background tweak to apply");
@@ -234,8 +231,6 @@ private:
         afw::table::Schema & schema, PTR(daf::base::PropertyList) const & metadata
     ) const;
 };
-
-    */
 
 
 }}}// namespace lsst::ip::diffim

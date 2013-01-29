@@ -77,8 +77,8 @@ public:
 
     NaiveDipoleFlux(NaiveDipoleFluxControl const & ctrl, afw::table::Schema & schema) :
         DipoleFluxAlgorithm(ctrl, schema, "raw flux counts"),
-        _numPositiveKey(schema.addField<int>(ctrl.name, "number of positive pixels", "dn")),
-        _numNegativeKey(schema.addField<int>(ctrl.name, "number of negative pixels", "dn"))
+        _numPositiveKey(schema.addField<int>(ctrl.name+".npos", "number of positive pixels", "dn")),
+        _numNegativeKey(schema.addField<int>(ctrl.name+".nneg", "number of negative pixels", "dn"))
     {}
 
 private:
@@ -289,6 +289,91 @@ PTR(meas::algorithms::Algorithm) NaiveDipoleFluxControl::_makeAlgorithm(
     PTR(daf::base::PropertyList) const &
 ) const {
     return boost::make_shared<NaiveDipoleFlux>(*this, boost::ref(schema));
+}
+
+
+/**
+ * @brief Implementation of Psf dipole flux
+ */
+class PsfDipoleFlux : public DipoleFluxAlgorithm {
+public:
+
+    PsfDipoleFlux(PsfDipoleFluxControl const & ctrl, afw::table::Schema & schema) :
+        DipoleFluxAlgorithm(ctrl, schema, "raw psf flux counts")
+    {}
+
+private:
+    template <typename PixelT>
+    void _apply(
+        afw::table::SourceRecord & source,
+        afw::image::Exposure<PixelT> const & exposure,
+        afw::geom::Point2D const & center
+    ) const;
+
+    LSST_MEAS_ALGORITHM_PRIVATE_INTERFACE(PsfDipoleFlux);
+
+};
+
+template<typename PixelT>
+void PsfDipoleFlux::_apply(
+    afw::table::SourceRecord & source, 
+    afw::image::Exposure<PixelT> const& exposure,
+    afw::geom::Point2D const & center // Not used; source required to have footprint&peaks
+) const {
+    source.set(getPositiveKeys().flag, true); // say we've failed so that's the result if we throw
+    source.set(getNegativeKeys().flag, true); // say we've failed so that's the result if we throw
+
+    float background = static_cast<PsfDipoleFluxControl const &>(getControl()).background;
+    typedef typename afw::image::Exposure<PixelT>::MaskedImageT MaskedImageT;
+
+    CONST_PTR(afw::detection::Footprint) foot = source.getFootprint();
+    if (!foot) {
+        throw LSST_EXCEPT(pex::exceptions::RuntimeErrorException,
+                          (boost::format("No footprint for source %d") % source.getId()).str());
+    }
+    afw::detection::Footprint::PeakList const& peakList = foot->getPeaks();
+    if (peakList.size() == 0) {
+        throw LSST_EXCEPT(pex::exceptions::RuntimeErrorException,
+                          (boost::format("No peak for source %d") % source.getId()).str());
+    }
+
+    PTR(afw::detection::Peak) peak1 = peakList[0];
+    afw::geom::Point2D center1(peak1->getFx(), peak1->getFy());
+    PTR(afw::detection::Peak) peak2 = peakList[1];
+    afw::geom::Point2D center2(peak2->getFx(), peak2->getFy());
+    
+    /*
+    afwTable::Schema schema = afwTable::SourceTable::makeMinimalSchema();
+    measAlgorithms::PsfFluxControl fluxControlPos(_ctrl.name+".pos");
+    measAlgorithms::MeasureSources msPos =
+        measAlgorithms::MeasureSourcesBuilder()
+        .addAlgorithm(fluxControlPos)
+        .build(schema);
+
+    afwTable::Schema schema = afwTable::SourceTable::makeMinimalSchema();
+    measAlgorithms::PsfFluxControl fluxControlNeg(_ctrl.name+".neg");
+    measAlgorithms::MeasureSources msNeg =
+        measAlgorithms::MeasureSourcesBuilder()
+        .addAlgorithm(fluxControlNeg)
+        .build(schema);
+
+    msPos.applyWithPixel(sourcePos, exposure);
+    msNeg.applyWithPixel(sourceNeg, exposure);
+    */
+
+}
+
+LSST_MEAS_ALGORITHM_PRIVATE_IMPLEMENTATION(PsfDipoleFlux);
+
+PTR(meas::algorithms::AlgorithmControl) PsfDipoleFluxControl::_clone() const {
+    return boost::make_shared<PsfDipoleFluxControl>(*this);
+}
+
+PTR(meas::algorithms::Algorithm) PsfDipoleFluxControl::_makeAlgorithm(
+    afw::table::Schema & schema,
+    PTR(daf::base::PropertyList) const &
+) const {
+    return boost::make_shared<PsfDipoleFlux>(*this, boost::ref(schema));
 }
 
 
