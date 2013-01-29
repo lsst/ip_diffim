@@ -157,7 +157,7 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
     DipoleCentroidControl const & ctrl, afw::table::Schema & schema, char const * doc
     ) :
     Algorithm(ctrl), _positiveKeys(afw::table::addCentroidFields(schema, ctrl.name + ".pos", doc)),
-    _negativeKeys(afw::table::addCentroidFields(schema, ctrl.name + ".pos", doc))
+    _negativeKeys(afw::table::addCentroidFields(schema, ctrl.name + ".neg", doc))
 {}
 
 inline DipoleCentroidControl const & DipoleCentroidAlgorithm::getControl() const {
@@ -174,7 +174,7 @@ inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
     DipoleFluxControl const & ctrl, afw::table::Schema & schema, char const * doc
     ) :
     Algorithm(ctrl), _positiveKeys(afw::table::addFluxFields(schema, ctrl.name + ".pos", doc)),
-    _negativeKeys(afw::table::addFluxFields(schema, ctrl.name + ".pos", doc))
+    _negativeKeys(afw::table::addFluxFields(schema, ctrl.name + ".neg", doc))
 {}
 
 inline DipoleFluxControl const & DipoleFluxAlgorithm::getControl() const {
