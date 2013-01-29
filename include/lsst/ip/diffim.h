@@ -42,4 +42,6 @@
 #include "lsst/ip/diffim/BuildSpatialKernelVisitor.h"
 #include "lsst/ip/diffim/KernelSumVisitor.h"
 
+#include "lsst/ip/diffim/DipoleAlgorithms.h"
+
 #endif // LSST_IP_DIFFIM_H
