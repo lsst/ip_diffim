@@ -24,7 +24,7 @@
 import time
 import os
 from collections import Counter
-import numpy as num
+import numpy as np
 
 # all the c++ level classes and routines
 import diffimLib
@@ -37,6 +37,8 @@ import lsst.afw.detection as afwDetect
 import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
+import lsst.meas.algorithms as measAlg
+import lsst.meas.deblender.baseline as measDeblend
 from .makeKernelBasisList import makeKernelBasisList 
 
 # Helper functions for ipDiffim; mostly viewing of results and writing
@@ -164,7 +166,7 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     sim  += bgValue
 
     # Watch out for negative values
-    tim  += 2 * num.abs(num.min(tim.getArray()))
+    tim  += 2 * np.abs(np.min(tim.getArray()))
     
     # Add noise?
     if addNoise:
@@ -349,6 +351,98 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
 # DiaSource filters (here for now)
 #######
 
+class DipoleDeblender(object):
+    """A functor to deblend a source as a dipole, and return a new
+       source with deblended footprints.  This necessarily overrides
+       some of the functionality from
+       meas_algorithms/python/lsst/meas/algorithms/deblend.py since we
+       need a single source that contains the blended peaks, not
+       multiple children sources.  This directly calls the core
+       deblending code measDeblend.deblend (optionally _fit_psf for
+       debugging).
+    """
+    def __init__(self):
+        # Set up defaults to send to deblender
+        self.psf_chisq_cut1 = self.psf_chisq_cut2 = self.psf_chisq_cut2b = np.inf # always deblend as Psf
+        self.log = pexLog.Log(pexLog.Log.getDefaultLog(), 'lsst.ip.diffim.DipoleDeblender', pexLog.Log.INFO)
+        self.sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
+
+    def __call__(self, source, exposure):
+        fp     = source.getFootprint()
+        peaks  = fp.getPeaks()
+        peaksF = [pk.getF() for pk in peaks]
+        fbb    = fp.getBBox()
+        fmask  = afwImage.MaskU(fbb)
+        fmask.setXY0(fbb.getMinX(), fbb.getMinY())
+        afwDetect.setMaskFromFootprint(fmask, fp, 1)
+
+        psf        = exposure.getPsf()
+        width, height = psf.getKernel().getDimensions()
+        psfAttr    = measAlg.PsfAttributes(psf, width//2, height//2)
+        psfSigPix  = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
+        psfFwhmPix = psfSigPix * self.sigma2fwhm 
+        subimage   = afwImage.ExposureF(exposure, fbb, True)
+        cpsf       = measDeblend.CachingPsf(psf)
+
+        # if fewer than 2 peaks, just return a copy of the source
+        if len(peaks) < 2:
+            return source.getTable().copyRecord(source)
+
+        # make sure you only deblend 2 peaks; take the brighest and faintest
+        speaks = [(p.getPeakValue(), p) for p in peaks]
+        speaks.sort() 
+        dpeaks = [speaks[0][1], speaks[-1][1]]
+
+        # and only set these peaks in the footprint (peaks is mutable)
+        peaks.clear()
+        for peak in dpeaks:
+            peaks.push_back(peak)
+
+        if True:
+            # Call top-level deblend task
+            fpres = measDeblend.deblend(fp, exposure.getMaskedImage(), psf, psfFwhmPix,
+                                        log = self.log,
+                                        psf_chisq_cut1 = self.psf_chisq_cut1,
+                                        psf_chisq_cut2 = self.psf_chisq_cut2,
+                                        psf_chisq_cut2b = self.psf_chisq_cut2b)
+        else:
+            # Call lower-level _fit_psf task
+
+            # Prepare results structure
+            fpres = measDeblend.PerFootprint()
+            fpres.peaks = []
+            for pki,pk in enumerate(dpeaks):
+                pkres = measDeblend.PerPeak()
+                pkres.peak = pk
+                pkres.pki = pki
+                fpres.peaks.append(pkres)
+            
+            for pki,(pk,pkres,pkF) in enumerate(zip(dpeaks, fpres.peaks, peaksF)):
+                self.log.logdebug('Peak %i' % pki)
+                measDeblend._fit_psf(fp, fmask, pk, pkF, pkres, fbb, dpeaks, peaksF, self.log, 
+                                     cpsf, psfFwhmPix, 
+                                     subimage.getMaskedImage().getImage(), 
+                                     subimage.getMaskedImage().getVariance(), 
+                                     self.psf_chisq_cut1, self.psf_chisq_cut2, self.psf_chisq_cut2b)
+
+
+        deblendedSource = source.getTable().copyRecord(source)
+        deblendedSource.setParent(source.getId())
+        peakList        = deblendedSource.getFootprint().getPeaks()
+        peakList.clear()
+
+        for i, peak in enumerate(fpres.peaks):
+            if peak.psfflux > 0:
+                suffix = "pos"
+            else:
+                suffix = "neg"
+            self.log.info("deblended.centroid.dipole.psf.%s %f %f" % (suffix, peak.center[0], peak.center[1]))
+            self.log.info("deblended.chi2dof.dipole.%s %f" % (suffix, peak.chisq / peak.dof))
+            self.log.info("deblended.flux.dipole.psf.%s %f" % (suffix, peak.psfflux * np.sum(peak.tmimg.getImage().getArray())))
+            peakList.push_back(peak.peak)
+        return deblendedSource
+        
+
 class SourceFlagChecker(object):
     """A functor to check whether a difference image source has any flags set that should cause it to be labeled bad."""
     def __init__(self, sources, badFlags=['flags.pixel.edge', 'flags.pixel.interpolated.center', 'flags.pixel.saturated.center']):
@@ -409,7 +503,7 @@ class NbasisEvaluator(object):
                             diffIm = type(diffIm)(diffIm, bbox, True)
                             chi2 = diffIm.getImage().getArray()**2 / diffIm.getVariance().getArray()
                             n = chi2.shape[0] * chi2.shape[1]
-                            bic = num.sum(chi2) + k * num.log(n)
+                            bic = np.sum(chi2) + k * np.log(n)
                             if not bicArray.has_key(cand.getId()):
                                 bicArray[cand.getId()] = {}
                             bicArray[cand.getId()][(d1i, d2i, d3i)] = bic
@@ -418,7 +512,7 @@ class NbasisEvaluator(object):
         candIds = bicArray.keys()
         for candId in candIds:
             cconfig, cvals = bicArray[candId].keys(), bicArray[candId].values()
-            idx = num.argsort(cvals)
+            idx = np.argsort(cvals)
             bestConfig = cconfig[idx[0]]
             bestConfigs.append(bestConfig)
         
