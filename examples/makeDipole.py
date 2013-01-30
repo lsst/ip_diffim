@@ -26,9 +26,9 @@ psfw, psfh = psfim.getDimensions()
 
 # For the dipole
 array = image.getImage().getArray()
-x0, y0 = xc-psfw+psfw//3, yc-psfh+psfh//3
+x0, y0 = xc-psfw+psfw//4, yc-psfh+psfh//4
 array[y0:y0+psfh, x0:x0+psfw] += psfim.getArray() * 100 
-x0, y0 = xc-psfw//3, yc-psfh//3
+x0, y0 = xc-psfw//4, yc-psfh//4
 array[y0:y0+psfh, x0:x0+psfw] -= psfim.getArray() * 100
 ds9.mtv(image, frame=3)
 
@@ -56,8 +56,10 @@ print "# And nPeaks =", len(s.getFootprint().getPeaks())
 
 # Measure dipole at known location
 schema  = afwTable.SourceTable.makeMinimalSchema()
-msb     = measAlg.MeasureSourcesBuilder().addAlgorithm(ipDiffim.NaiveDipoleCentroidControl())
-msb     = msb.addAlgorithm(ipDiffim.NaiveDipoleFluxControl())
+msb     = measAlg.MeasureSourcesBuilder()\
+            .addAlgorithm(ipDiffim.NaiveDipoleCentroidControl())\
+            .addAlgorithm(ipDiffim.NaiveDipoleFluxControl())\
+            .addAlgorithm(ipDiffim.PsfDipoleFluxControl())
 ms      = msb.build(schema)
 table   = afwTable.SourceTable.make(schema)
 source  = table.makeRecord()
@@ -83,14 +85,14 @@ import lsst.pex.logging as pexLogging
 import numpy as np
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
-psf_chisq_cut1 = psf_chisq_cut2 = psf_chisq_cut2b = 1.5
+psf_chisq_cut1 = psf_chisq_cut2 = psf_chisq_cut2b = np.inf # always deblend as Psf
 
 fp  = source.getFootprint()
 peaks = fp.getPeaks()
 peaksF = [pk.getF() for pk in peaks]
 fbb = fp.getBBox()
 cpsf = CachingPsf(psf)
-log = pexLogging.Log(pexLogging.Log.getDefaultLog(), 'makeDipole', pexLogging.Log.INFO)
+log = pexLogging.Log(pexLogging.Log.getDefaultLog(), 'makeDipole', pexLogging.Log.DEBUG)
 fmask = afwImage.MaskU(fbb)
 fmask.setXY0(fbb.getMinX(), fbb.getMinY())
 afwDet.setMaskFromFootprint(fmask, fp, 1)
@@ -126,11 +128,19 @@ for i, peak in enumerate(fpres.peaks):
     else:
         suffix = "neg"
     
-    print "centroid.dipole.psf.%s" % (suffix), peak.center
-    print "centroid.dipole.chi2dof.%s" % (suffix), peak.chisq / peak.dof
-    print "flux.dipole.psf.%s" % (suffix), peak.psfflux * np.sum(peak.tmimg.getImage().getArray())
+    print "DEBLENDED centroid.dipole.psf.%s" % (suffix), peak.center
+    print "DEBLENDED centroid.dipole.chi2dof.%s" % (suffix), peak.chisq / peak.dof
+    print "DEBLENDED flux.dipole.psf.%s" % (suffix), peak.psfflux * np.sum(peak.tmimg.getImage().getArray())
         
     #print i, peak.center, peak.chisq, peak.dof, peak.psfflux, peak.psfflux * np.sum(peak.tmimg.getImage().getArray())
     ds9.mtv(afwImage.ExposureF(exp, peak.tfoot.getBBox()), frame=5+i)
 
-#import pdb; pdb.set_trace()
+
+#### Work on C++ dipole measurement here
+import pdb; pdb.set_trace()
+
+
+
+
+
+

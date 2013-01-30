@@ -25,20 +25,25 @@
 /**
  * @file
  */
+#include <iostream>     // std::cout
+#include <algorithm>    // std::sort
+#include <functional>   // std::binary_function
 
+#include "boost/shared_ptr.hpp"
 #include "lsst/pex/exceptions.h"
 #include "lsst/pex/logging/Trace.h"
 #include "lsst/afw/image.h"
-#include "lsst/afw/detection/Psf.h"
-#include "lsst/afw/detection/FootprintFunctor.h"
-#include "lsst/meas/algorithms/CentroidControl.h"
-
+#include "lsst/afw/detection.h"
+#include "lsst/afw/table.h"
+#include "lsst/meas/algorithms.h"
 #include "lsst/ip/diffim/DipoleAlgorithms.h"
 
 namespace pexExceptions = lsst::pex::exceptions;
 namespace pexLogging = lsst::pex::logging;
 namespace afwDet = lsst::afw::detection;
 namespace afwImage = lsst::afw::image;
+namespace afwTable = lsst::afw::table;
+namespace measAlgorithms = lsst::meas::algorithms;
 
 namespace lsst {
 namespace ip {
@@ -314,6 +319,16 @@ private:
 
 };
 
+namespace {
+    struct CmpPeakFlux : public std::binary_function<afw::detection::Peak::Ptr,
+                                                     afw::detection::Peak::Ptr,
+                                                     bool> { 
+        bool operator()(afw::detection::Peak::Ptr p1, afw::detection::Peak::Ptr p2) {
+            return p1->getPeakValue() < p2->getPeakValue();
+        }
+    };
+} // end anonymous
+ 
 template<typename PixelT>
 void PsfDipoleFlux::_apply(
     afw::table::SourceRecord & source, 
@@ -323,7 +338,7 @@ void PsfDipoleFlux::_apply(
     source.set(getPositiveKeys().flag, true); // say we've failed so that's the result if we throw
     source.set(getNegativeKeys().flag, true); // say we've failed so that's the result if we throw
 
-    float background = static_cast<PsfDipoleFluxControl const &>(getControl()).background;
+    //float background = static_cast<PsfDipoleFluxControl const &>(getControl()).background;
     typedef typename afw::image::Exposure<PixelT>::MaskedImageT MaskedImageT;
 
     CONST_PTR(afw::detection::Footprint) foot = source.getFootprint();
@@ -331,35 +346,45 @@ void PsfDipoleFlux::_apply(
         throw LSST_EXCEPT(pex::exceptions::RuntimeErrorException,
                           (boost::format("No footprint for source %d") % source.getId()).str());
     }
-    afw::detection::Footprint::PeakList const& peakList = foot->getPeaks();
+    afw::detection::Footprint::PeakList peakList = afw::detection::Footprint::PeakList(foot->getPeaks());
+
     if (peakList.size() == 0) {
         throw LSST_EXCEPT(pex::exceptions::RuntimeErrorException,
                           (boost::format("No peak for source %d") % source.getId()).str());
     }
-
-    PTR(afw::detection::Peak) peak1 = peakList[0];
-    afw::geom::Point2D center1(peak1->getFx(), peak1->getFy());
-    PTR(afw::detection::Peak) peak2 = peakList[1];
-    afw::geom::Point2D center2(peak2->getFx(), peak2->getFy());
+    else if (peakList.size() == 1) {
+        std::cout << "TESTING: Only 1 peak! " << std::endl;
+        // No deblending to do 
+        return;
+    }
+    // For N>=2, just measure the brightest and faintest peaks
     
-    /*
-    afwTable::Schema schema = afwTable::SourceTable::makeMinimalSchema();
-    measAlgorithms::PsfFluxControl fluxControlPos(_ctrl.name+".pos");
-    measAlgorithms::MeasureSources msPos =
-        measAlgorithms::MeasureSourcesBuilder()
-        .addAlgorithm(fluxControlPos)
-        .build(schema);
+    // Order by peak flux, most negative one is first
+    std::sort(peakList.begin(), peakList.end(), CmpPeakFlux());
+    PTR(afw::detection::Peak) negativePeak = peakList.front();
+    PTR(afw::detection::Peak) positivePeak = peakList.back();
 
-    afwTable::Schema schema = afwTable::SourceTable::makeMinimalSchema();
-    measAlgorithms::PsfFluxControl fluxControlNeg(_ctrl.name+".neg");
-    measAlgorithms::MeasureSources msNeg =
-        measAlgorithms::MeasureSourcesBuilder()
-        .addAlgorithm(fluxControlNeg)
-        .build(schema);
+    afw::geom::Point2D negCenter(negativePeak->getFx(), negativePeak->getFy());
+    afw::geom::Point2D posCenter(positivePeak->getFx(), positivePeak->getFy());
 
-    msPos.applyWithPixel(sourcePos, exposure);
-    msNeg.applyWithPixel(sourceNeg, exposure);
-    */
+    /* Minimal source to receive the Psf flux */
+    afwTable::Schema schema = afwTable::SourceTable::makeMinimalSchema();
+    measAlgorithms::PsfFluxControl fluxControl;
+    measAlgorithms::MeasureSources ms =
+        measAlgorithms::MeasureSourcesBuilder()
+        .addAlgorithm(fluxControl)
+        .build(schema);
+    PTR(afwTable::SourceTable) table = afwTable::SourceTable::make(schema);
+
+    PTR(afwTable::SourceRecord) negativeSource = table->makeRecord();
+    ms.apply(*negativeSource, exposure, negCenter, false);
+
+    PTR(afwTable::SourceRecord) positiveSource = table->makeRecord();
+    ms.apply(*positiveSource, exposure, posCenter, false);
+
+    afwTable::Flux::MeasKey fluxKey = table->getSchema()[fluxControl.name];
+    std::cout << "TESTING: Negative flux " << negativeSource->get(fluxKey) << std::endl;
+    std::cout << "TESTING: Positive flux " << positiveSource->get(fluxKey) << std::endl;
 
 }
 
