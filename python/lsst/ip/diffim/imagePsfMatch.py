@@ -47,6 +47,10 @@ class ImagePsfMatchConfig(pexConfig.Config):
         ),
         default = "AL",
     )
+    
+    def setDefaults(self):
+        self.kernel["DF"].fitForBackground = True
+        self.kernel["AL"].fitForBackground = True
 
 class ImagePsfMatchTask(PsfMatch):
     """PSF-match images to reference images
