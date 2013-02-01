@@ -310,7 +310,8 @@ class PsfDipoleFlux : public DipoleFluxAlgorithm {
 public:
 
     PsfDipoleFlux(PsfDipoleFluxControl const & ctrl, afw::table::Schema & schema) :
-        DipoleFluxAlgorithm(ctrl, schema, "raw psf flux counts")
+        DipoleFluxAlgorithm(ctrl, schema, "jointly fitted psf flux counts"),
+        _chi2dofKey(schema.addField<float>(ctrl.name+".chi2dof", "chi2 per degree of freedom of fit"))
     {}
 
 private:
@@ -322,6 +323,8 @@ private:
     ) const;
 
     LSST_MEAS_ALGORITHM_PRIVATE_INTERFACE(PsfDipoleFlux);
+
+    afw::table::Key<float> _chi2dofKey;
 
 };
 
@@ -411,6 +414,7 @@ void PsfDipoleFlux::_apply(
     afwImage::Image<double> negModel(footprint->getBBox());
     afwImage::Image<double> posModel(footprint->getBBox());
     afwImage::Image<PixelT> data(*(exposure.getMaskedImage().getImage()), footprint->getBBox(), afwImage::PARENT);
+    afwImage::Image<afwImage::VariancePixel> var(*(exposure.getMaskedImage().getVariance()), footprint->getBBox(), afwImage::PARENT);
     
     afwGeom::Box2I negPsfBBox = negPsf->getBBox(afwImage::PARENT);
     afwGeom::Box2I posPsfBBox = posPsf->getBBox(afwImage::PARENT);
@@ -460,6 +464,17 @@ void PsfDipoleFlux::_apply(
     source.set(getPositiveKeys().meas, fluxPos * posSum);
     source.set(getPositiveKeys().err, std::sqrt(fluxPosVar) * posSum);
     source.set(getPositiveKeys().flag, false);
+
+    negModel  *= fluxNeg;
+    posModel  *= fluxPos;
+    afwImage::Image<double> residuals(negModel, true);
+    residuals += posModel;
+    residuals -= data;
+    residuals /= var;
+    afwMath::Statistics stats = afwMath::makeStatistics(residuals, afwMath::SUM, afwMath::NPOINT);
+    float chi2 = stats.getValue(afwMath::SUM);
+    float dof  = stats.getValue(afwMath::NPOINT) - 2;
+    source.set(_chi2dofKey, chi2/dof);
 
     /*
     std::cout << "TESTINGB: Negative flux " << fluxNeg << " " << negSum << " " << fluxNeg*negSum << std::endl;
