@@ -32,9 +32,9 @@ print "ORIGINAL PSF SUM:", psfSum * scaling
 
 # For the dipole
 array = image.getImage().getArray()
-xp, yp = xc-psfw+psfw//3, yc-psfh+psfh//3
+xp, yp = xc-psfw+psfw//2, yc-psfh+psfh//2
 array[yp:yp+psfh, xp:xp+psfw] += psfim.getArray() * scaling
-xn, yn = xc-psfw//3, yc-psfh//3
+xn, yn = xc-psfw//2, yc-psfh//2
 array[yn:yn+psfh, xn:xn+psfw] -= psfim.getArray() * scaling
 ds9.mtv(image, frame=3)
 
@@ -92,8 +92,8 @@ else:
     # Force the known center
     negCenter = afwGeom.Point2D(xn+psfw//2, yn+psfw//2)
     posCenter = afwGeom.Point2D(xp+psfw//2, yp+psfw//2)
-print peaks[0].getFx(), dpeaks[0].getFy(), dpeaks[1].getFx(), dpeaks[1].getFy()
-print xn+psfw//2, yn+psfw//2, xp+psfw//2, yp+psfw//2
+print "PEAKS", peaks[0].getFx(), dpeaks[0].getFy(), dpeaks[1].getFx(), dpeaks[1].getFy()
+print "REALLY AT", xn+psfw//2, yn+psfw//2, xp+psfw//2, yp+psfw//2
 
 psf = exp.getPsf()
 negPsf = psf.computeImage(negCenter, True).convertF()
@@ -171,10 +171,59 @@ montSubim   += posSubim
 ds9.mtv(montage, frame=8, title="Fitted model")
 montage   -= data
 ds9.mtv(montage, frame=9, title="Residuals")
+montage   *= montage
+montage   /= afwImage.ImageF(exp.getMaskedImage().getVariance(), fp.getBBox())
+chi2       = np.sum(montage.getArray())
+npts       = montage.getArray().shape[0] * montage.getArray().shape[1]
+print "MY CHI", chi2 / (npts - 2)
 
-resids = montage.getArray() / afwImage.ImageF(exp.getMaskedImage().getVariance(), fp.getBBox()).getArray()
-print np.mean(resids), np.std(resids)
+print "AFW", source.get("flux.dipole.psf.neg"), source.get("flux.dipole.psf.pos"), source.get("flux.dipole.psf.chi2dof")
+print "AFW", source.get("flux.dipole.psf.neg.centroid"), source.get("flux.dipole.psf.pos.centroid")
 
+
+####
+
+negPsf = psf.computeImage(source.get("flux.dipole.psf.neg.centroid"), True).convertF()
+posPsf = psf.computeImage(source.get("flux.dipole.psf.pos.centroid"), True).convertF()
+negPsf /= float(np.sum(negPsf.getArray()))
+posPsf /= float(np.sum(posPsf.getArray()))
+
+fpos = source.get("flux.dipole.psf.pos")
+fneg = source.get("flux.dipole.psf.neg")
+negBBox = negPsf.getBBox(afwImage.PARENT)
+posBBox = posPsf.getBBox(afwImage.PARENT)
+
+# Portion of the negative Psf that overlaps the montage
+negXmin = negBBox.getMinX() if (negBBox.getMinX() > montBBox.getMinX()) else montBBox.getMinX()
+negYmin = negBBox.getMinY() if (negBBox.getMinY() > montBBox.getMinY()) else montBBox.getMinY()
+negXmax = negBBox.getMaxX() if (negBBox.getMaxX() < montBBox.getMaxX()) else montBBox.getMaxX()
+negYmax = negBBox.getMaxY() if (negBBox.getMaxY() < montBBox.getMaxY()) else montBBox.getMaxY()
+negOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(negXmin, negYmin), afwGeom.Point2I(negXmax, negYmax))
+
+# Portion of the positivePsf that overlaps the montage
+posXmin = posBBox.getMinX() if (posBBox.getMinX() > montBBox.getMinX()) else montBBox.getMinX()
+posYmin = posBBox.getMinY() if (posBBox.getMinY() > montBBox.getMinY()) else montBBox.getMinY()
+posXmax = posBBox.getMaxX() if (posBBox.getMaxX() < montBBox.getMaxX()) else montBBox.getMaxX()
+posYmax = posBBox.getMaxY() if (posBBox.getMaxY() < montBBox.getMaxY()) else montBBox.getMaxY()
+posOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(posXmin, posYmin), afwGeom.Point2I(posXmax, posYmax))
+
+montage      = afwImage.ImageF(fp.getBBox())
+negSubim     = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT, True)
+negSubim    *= float(fneg)
+posSubim     = type(posPsf)(posPsf, posOverlapBBox, afwImage.PARENT, True)
+posSubim    *= float(fpos)
+montSubim    = type(montage)(montage, negOverlapBBox, afwImage.PARENT)
+montSubim   += negSubim
+montSubim    = type(montage)(montage, posOverlapBBox, afwImage.PARENT)
+montSubim   += posSubim
+
+montage   -= data
+ds9.mtv(montage, frame=10, title="New Residuals")
+montage   *= montage
+montage   /= afwImage.ImageF(exp.getMaskedImage().getVariance(), fp.getBBox())
+chi2       = np.sum(montage.getArray())
+npts       = montage.getArray().shape[0] * montage.getArray().shape[1]
+print "MY CHI", chi2 / (npts - 2)
 
 
 #negBBox.shift(psfShift)
