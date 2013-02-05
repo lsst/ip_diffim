@@ -23,7 +23,7 @@
 from .version import *
 
 # c wrapper
-from diffimLib import *
+from .diffimLib import *
 
 # python code
 from psfMatch import *
@@ -33,6 +33,11 @@ from snapPsfMatch import *
 from diaSourceAnalysis import *
 from makeKernelBasisList import *
 from diaCatalogSourceSelector import *
-
 from diffimTools import *
 
+# automatically register ip_diffim Algorithms
+import lsst.meas.algorithms
+lsst.meas.algorithms.AlgorithmRegistry.register("centroid.dipole.naive", NaiveDipoleCentroidControl)
+lsst.meas.algorithms.AlgorithmRegistry.register("flux.dipole.naive", NaiveDipoleFluxControl)
+lsst.meas.algorithms.AlgorithmRegistry.register("flux.dipole.psf", PsfDipoleFluxControl)
+del lsst # cleanup namespace

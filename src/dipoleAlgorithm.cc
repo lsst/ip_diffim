@@ -461,7 +461,6 @@ void PsfDipoleFlux::_apply(
                           (boost::format("No peak for source %d") % source.getId()).str());
     }
     else if (peakList.size() == 1) {
-        std::cout << "TESTING: Only 1 peak! " << std::endl;
         // No deblending to do 
         return;
     }
