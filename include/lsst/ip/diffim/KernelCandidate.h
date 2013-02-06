@@ -18,6 +18,7 @@
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
 #include "lsst/ip/diffim/KernelSolution.h"
+#include "lsst/afw/table/Source.h"
 
 namespace lsst { 
 namespace ip { 
@@ -47,6 +48,7 @@ namespace diffim {
         typedef boost::shared_ptr<KernelCandidate> Ptr;
         typedef boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
         typedef boost::shared_ptr<lsst::afw::image::Image<lsst::afw::image::VariancePixel> > VariancePtr;
+        typedef boost::shared_ptr<lsst::afw::table::SourceRecord> SourcePtr;
 
         enum CandidateSwitch {
             ORIG    = 0,
@@ -68,6 +70,20 @@ namespace diffim {
                         MaskedImagePtr const& templateMaskedImage,
                         MaskedImagePtr const& scienceMaskedImage,
                         lsst::pex::policy::Policy const& policy);        
+
+        /**
+	 * @brief Constructor
+         *
+         * @param source Pointer to a source to use in constructing the
+         * candidate
+         * @param templateMaskedImage  Pointer to template image
+         * @param scienceMaskedImage  Pointer to science image
+         * @param policy  Policy file
+         */
+        KernelCandidate(SourcePtr const& source,
+                        MaskedImagePtr const& templateMaskedImage,
+                        MaskedImagePtr const& scienceMaskedImage,
+                        lsst::pex::policy::Policy const& policy);        
         /// Destructor
         virtual ~KernelCandidate() {};
 
@@ -76,8 +92,11 @@ namespace diffim {
          * 
          * @note Required method for use by SpatialCell; e.g. total flux
          */
-        double getCandidateRating() const {return _coreFlux;}
-
+        double getCandidateRating() const { return _coreFlux; }
+        /**
+         * @brief Return the original source
+         */
+        SourcePtr getSource() const { return _source; }
         /**
          * @brief Return pointers to the image pixels used in kernel determination
          */
@@ -175,6 +194,7 @@ namespace diffim {
         MaskedImagePtr _scienceMaskedImage;                 ///< Subimage around which you build kernel
         VariancePtr _varianceEstimate;                      ///< Estimate of the local variance
         lsst::pex::policy::Policy _policy;                  ///< Policy
+        SourcePtr _source;
         double _coreFlux;                                   ///< Mean S/N in the science image
         bool _isInitialized;                                ///< Has the kernel been built
         bool _useRegularization;                            ///< Use regularization?              
@@ -211,6 +231,30 @@ namespace diffim {
                         lsst::pex::policy::Policy const& policy){
         
         return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
+                                                                                 templateMaskedImage,
+                                                                                 scienceMaskedImage,
+                                                                                 policy));
+    }
+
+    /**
+     * @brief Return a KernelCandidate pointer of the right sort
+     *
+     * @param source  afw::table::SourceRecord used to construct the
+     * KernelCandidate
+     * @param templateMaskedImage  Template subimage 
+     * @param scienceMaskedImage  Science image subimage
+     * @param policy   Policy file for creation of rating
+     *
+     * @ingroup ip_diffim
+     */
+    template <typename PixelT>
+    boost::shared_ptr<KernelCandidate<PixelT> >
+    makeKernelCandidate(boost::shared_ptr<lsst::afw::table::SourceRecord> const & source, 
+                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& templateMaskedImage,
+                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& scienceMaskedImage,
+                        lsst::pex::policy::Policy const& policy){
+        
+        return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(source,
                                                                                  templateMaskedImage,
                                                                                  scienceMaskedImage,
                                                                                  policy));
