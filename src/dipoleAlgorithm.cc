@@ -29,6 +29,7 @@
 #include <algorithm>    // std::sort
 #include <functional>   // std::binary_function
 #include <limits>       // std::numeric_limits
+#include <cmath>        // std::sqrt
 
 #include "boost/shared_ptr.hpp"
 #include "lsst/pex/exceptions.h"
@@ -382,6 +383,9 @@ std::pair<double,afw::math::LeastSquares> PsfDipoleFlux::_linearFit(
     afwImage::Image<PixelT> data(*(exposure.getMaskedImage().getImage()), footprint->getBBox(), afwImage::PARENT);
     afwImage::Image<afwImage::VariancePixel> var(*(exposure.getMaskedImage().getVariance()), footprint->getBBox(), afwImage::PARENT);
     data -= background;
+    // Use the median of the variance to get a better estimate of the fit uncertainties
+    // Divide M,b by inverse square root
+    double matrixNorm = 1. / std::sqrt(afwMath::makeStatistics(var, afwMath::MEDIAN).getValue(afwMath::MEDIAN));
     
     afwGeom::Box2I negPsfBBox = negPsf->getBBox(afwImage::PARENT);
     afwGeom::Box2I posPsfBBox = posPsf->getBBox(afwImage::PARENT);
@@ -418,6 +422,9 @@ std::pair<double,afw::math::LeastSquares> PsfDipoleFlux::_linearFit(
     afwDet::flattenArray(*footprint, negModel.getArray(), Mt[0].shallow(), negModel.getXY0());
     afwDet::flattenArray(*footprint, posModel.getArray(), Mt[1].shallow(), posModel.getXY0());
     afwDet::flattenArray(*footprint, data.getArray(), b, data.getXY0());
+    // Normalize by inverse sqrt of the median variance
+    Mt.deep() *= matrixNorm;
+    b.deep()  *= matrixNorm;
     afw::math::LeastSquares lstsq = afwMath::LeastSquares::fromDesignMatrix(Mt.transpose().shallow(), b);
 
     double fluxNeg = lstsq.getSolution()[0];

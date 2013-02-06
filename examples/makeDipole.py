@@ -147,6 +147,9 @@ negPsfSum = np.sum(negPsf.getArray())
 
 M = np.array((np.ravel(negMont.getArray()), np.ravel(posMont.getArray()))).T.astype(np.float64)
 B = np.array((np.ravel(data.getArray()))).astype(np.float64)
+matrixNorm = 1. / np.sqrt(np.median(var.getArray()))
+M *= matrixNorm
+B *= matrixNorm
 
 # SCIPY
 fneg, fpos = np.linalg.lstsq(M, B)[0]
@@ -154,9 +157,8 @@ print "SCIPY", fneg, fpos, fneg*negPsfSum, fpos*posPsfSum
 
 lsq = afwMath.LeastSquares.fromDesignMatrix(M, B, afwMath.LeastSquares.DIRECT_SVD)
 fneg, fpos = lsq.getSolution()
-print "AFW", fneg, fpos, fneg*negPsfSum, fpos*posPsfSum
-
-#import pdb; pdb.set_trace()
+cov        = lsq.getCovariance()
+print "AFW", fneg, fpos, fneg*negPsfSum, fpos*posPsfSum, "ERR:", np.sqrt(cov[0][0]), np.sqrt(cov[1][1])
 
 montage      = afwImage.ImageF(fp.getBBox())
 negSubim     = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT, True)
