@@ -457,19 +457,69 @@ class SourceFlagChecker(object):
 
 class DipoleChecker(object):
     """A functor to check for dipoles in difference image source tables."""
-    def __init__(self, sources, radiusPixels = 7.0):
-        self.sources   = sources
-        self.negkey    = self.sources.getSchema().find("flags.negative").key
-        self.matches   = afwTable.matchXy(self.sources, radiusPixels)
-        self.dipoleIds = []
-        for match in self.matches:
-            if match.first.get(self.negkey) != match.second.get(self.negkey):
-                self.dipoleIds.append(match.first.getId())
-                self.dipoleIds.append(match.second.getId())
-        
+    def __init__(self):
+        pass
+
     def __call__(self, source):
-        return source.getId() in self.dipoleIds
+        return self.getSn(source), self.getCentroid(source), self.getOrientation(source)
+
+    def getSn(self, source):
+        posflux = source.get("flux.dipole.psf.pos")
+        posfluxErr = source.get("flux.dipole.psf.pos.err")
+        negflux = source.get("flux.dipole.psf.neg")
+        negfluxErr = source.get("flux.dipole.psf.neg.err")
+
+        # Not a dipole!
+        if (posflux < 0) is (negflux < 0):
+            return 0
+
+        return np.sqrt((posflux/posfluxErr)**2 + (negflux/negfluxErr)**2)
+
+    def getCentroid(self, source):
+        negCen = source.get("flux.dipole.psf.neg.centroid")
+        posCen = source.get("flux.dipole.psf.pos.centroid")
+        if (False in np.isfinite(negCen)) or (False in np.isfinite(posCen)):
+            return None
         
+        center = afwGeom.Point2D(0.5*(negCen[0]+posCen[0]),
+                                 0.5*(negCen[1]+posCen[1]))
+        return center
+
+    def getOrientation(self, source):
+        negCen = source.get("flux.dipole.psf.neg.centroid")
+        posCen = source.get("flux.dipole.psf.pos.centroid")
+        if (False in np.isfinite(negCen)) or (False in np.isfinite(posCen)):
+            return None
+
+        dx, dy = posCen[0]-negCen[0], posCen[1]-negCen[1]
+        angle  = afwGeom.Angle(np.arctan2(dx, dy), afwGeom.radians)
+        return angle
+
+    def displayDipoles(self, exposure, sources, frame=1):
+        import lsst.afw.display.ds9 as ds9                
+        ds9.mtv(exposure, frame=frame)
+        with ds9.Buffering():
+            for source in sources:
+                cen = source.get("flux.dipole.psf.centroid")
+                ctype= "green"
+                if (False in np.isfinite(cen)):
+                    cen = source.getCentroid()
+                    ctype = "red"
+                    print "NOT DIPOLE: %.1f,%.1f" % (cen.getX(), cen.getY())
+                else:
+                    print "DIPOLE: %.1f,%.1f %.1f,%.1f" % (cen.getX(), cen.getY(), source.get("flux.dipole.psf.neg"), source.get("flux.dipole.psf.pos"))
+
+                ds9.dot("o", cen.getX(), cen.getY(), size=2, ctype=ctype, frame=frame)
+
+                negCen = source.get("flux.dipole.psf.neg.centroid")
+                posCen = source.get("flux.dipole.psf.pos.centroid")
+                if (False in np.isfinite(negCen)) or (False in np.isfinite(posCen)):
+                    continue
+
+                ds9.line([(negCen.getX(), negCen.getY()),(posCen.getX(), posCen.getY())], ctype="yellow", frame=frame)
+            
+        
+
 class NbasisEvaluator(object):
     """A functor to evaluate the Bayesian Information Criterion for the number of basis sets going into the kernel fitting"""
     def __init__(self, psfMatchConfig, psfFwhmPixTc, psfFwhmPixTnc):
