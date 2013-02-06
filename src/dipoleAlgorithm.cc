@@ -314,6 +314,8 @@ public:
     PsfDipoleFlux(PsfDipoleFluxControl const & ctrl, afw::table::Schema & schema) :
         DipoleFluxAlgorithm(ctrl, schema, "jointly fitted psf flux counts"),
         _chi2dofKey(schema.addField<float>(ctrl.name+".chi2dof", "chi2 per degree of freedom of fit")),
+        _avgCentroid(
+            addCentroidFields(schema, ctrl.name+".centroid", "average of the postive and negative lobe positions")),
         _negCentroid(
             addCentroidFields(schema, ctrl.name+".neg.centroid", "psf fitted center of negative lobe")),
         _posCentroid(
@@ -339,6 +341,7 @@ private:
     LSST_MEAS_ALGORITHM_PRIVATE_INTERFACE(PsfDipoleFlux);
 
     afw::table::Key<float> _chi2dofKey;
+    afw::table::KeyTuple<afw::table::Centroid> _avgCentroid;
     afw::table::KeyTuple<afw::table::Centroid> _negCentroid;
     afw::table::KeyTuple<afw::table::Centroid> _posCentroid;
 
@@ -525,128 +528,9 @@ void PsfDipoleFlux::_apply(
     source.set(_chi2dofKey, minChi2);
     source.set(_negCentroid.meas, *minNegCentroid);
     source.set(_posCentroid.meas, *minPosCentroid);
+    source.set(_avgCentroid.meas, afw::geom::Point2D(0.5*(minNegCentroid->getX() + minPosCentroid->getX()),
+                                                     0.5*(minNegCentroid->getY() + minPosCentroid->getY())));
 
-
-
-
-//    afw::geom::Point2D negCenter(negativePeak->getFx(), negativePeak->getFy());
-//    afw::geom::Point2D posCenter(positivePeak->getFx(), positivePeak->getFy());
-//
-//    /* 1) Naive implementation: fit each peak separately using the above
-//     * centroid
-//     *
-//
-//    afwTable::Schema schema = afwTable::SourceTable::makeMinimalSchema();
-//    measAlgorithms::PsfFluxControl fluxControl;
-//    measAlgorithms::MeasureSources ms =
-//        measAlgorithms::MeasureSourcesBuilder()
-//        .addAlgorithm(fluxControl)
-//        .build(schema);
-//    PTR(afwTable::SourceTable) table = afwTable::SourceTable::make(schema);
-//
-//    PTR(afwTable::SourceRecord) negativeSource = table->makeRecord();
-//    ms.apply(*negativeSource, exposure, negCenter, false);
-//
-//    PTR(afwTable::SourceRecord) positiveSource = table->makeRecord();
-//    ms.apply(*positiveSource, exposure, posCenter, false);
-//
-//    afwTable::Flux::MeasKey fluxKey = table->getSchema()[fluxControl.name];
-//    std::cout << "TESTINGA: Negative flux " << negativeSource->get(fluxKey) << std::endl;
-//    std::cout << "TESTINGA: Positive flux " << positiveSource->get(fluxKey) << std::endl;
-//
-//    */
-//
-//    /* 2) Slightly better implementation: fit for the superposition of Psfs at
-//     * the two centroids.  Still does not take into account possible centroid
-//     * offsets.
-//     *
-//     */
-//    CONST_PTR(afwDet::Psf) psf = exposure.getPsf();
-//    PTR(afwImage::Image<afwMath::Kernel::Pixel>) negPsf = psf->computeImage(negCenter, true);
-//    PTR(afwImage::Image<afwMath::Kernel::Pixel>) posPsf = psf->computeImage(posCenter, true);
-//    double negSum = negPsf->getArray().asEigen().sum();
-//    double posSum = posPsf->getArray().asEigen().sum();
-//    
-//    afwImage::Image<double> negModel(footprint->getBBox());
-//    afwImage::Image<double> posModel(footprint->getBBox());
-//    afwImage::Image<PixelT> data(*(exposure.getMaskedImage().getImage()), footprint->getBBox(), afwImage::PARENT);
-//    afwImage::Image<afwImage::VariancePixel> var(*(exposure.getMaskedImage().getVariance()), footprint->getBBox(), afwImage::PARENT);
-//    
-//    afwGeom::Box2I negPsfBBox = negPsf->getBBox(afwImage::PARENT);
-//    afwGeom::Box2I posPsfBBox = posPsf->getBBox(afwImage::PARENT);
-//    afwGeom::Box2I negModelBBox = negModel.getBBox(afwImage::PARENT);
-//    afwGeom::Box2I posModelBBox = posModel.getBBox(afwImage::PARENT);
-//    
-//    // Portion of the negative Psf that overlaps the model
-//    int negXmin = std::max(negPsfBBox.getMinX(), negModelBBox.getMinX());
-//    int negYmin = std::max(negPsfBBox.getMinY(), negModelBBox.getMinY());
-//    int negXmax = std::min(negPsfBBox.getMaxX(), negModelBBox.getMaxX());
-//    int negYmax = std::min(negPsfBBox.getMaxY(), negModelBBox.getMaxY());
-//    afwGeom::Box2I negBBox = afwGeom::Box2I(afwGeom::Point2I(negXmin, negYmin), 
-//                                            afwGeom::Point2I(negXmax, negYmax));
-//    afwImage::Image<afwMath::Kernel::Pixel> negSubim(*negPsf, negBBox, afwImage::PARENT);
-//    afwImage::Image<double> negModelSubim(negModel, negBBox, afwImage::PARENT);
-//    negModelSubim += negSubim;
-//    
-//    
-//    // Portion of the positive Psf that overlaps the model
-//    int posXmin = std::max(posPsfBBox.getMinX(), posModelBBox.getMinX());
-//    int posYmin = std::max(posPsfBBox.getMinY(), posModelBBox.getMinY());
-//    int posXmax = std::min(posPsfBBox.getMaxX(), posModelBBox.getMaxX());
-//    int posYmax = std::min(posPsfBBox.getMaxY(), posModelBBox.getMaxY());
-//    afwGeom::Box2I posBBox = afwGeom::Box2I(afwGeom::Point2I(posXmin, posYmin), 
-//                                            afwGeom::Point2I(posXmax, posYmax));
-//    afwImage::Image<afwMath::Kernel::Pixel> posSubim(*posPsf, posBBox, afwImage::PARENT);
-//    afwImage::Image<double> posModelSubim(posModel, posBBox, afwImage::PARENT);
-//    posModelSubim += posSubim;
-//    
-//    // Set up a linear least squares fit with no centroid shift
-//    ndarray::Array<double, 2, 2> Mt = ndarray::allocate(2, footprint->getArea());
-//    ndarray::Array<double, 1, 1> b = ndarray::allocate(footprint->getArea());
-//    
-//    afwDet::flattenArray(*footprint, negModel.getArray(), Mt[0].shallow(), negModel.getXY0());
-//    afwDet::flattenArray(*footprint, posModel.getArray(), Mt[1].shallow(), posModel.getXY0());
-//    afwDet::flattenArray(*footprint, data.getArray(), b, data.getXY0());
-//    afw::math::LeastSquares lstsq = afwMath::LeastSquares::fromDesignMatrix(Mt.transpose().shallow(), b);
-//    double fluxNeg = lstsq.getSolution()[0];
-//    double fluxPos = lstsq.getSolution()[1];
-//    double fluxNegVar = lstsq.getCovariance()[0][0];
-//    double fluxPosVar = lstsq.getCovariance()[1][1];
-//
-//    source.set(getNegativeKeys().meas, fluxNeg * negSum);
-//    source.set(getNegativeKeys().err, std::sqrt(fluxNegVar) * negSum);
-//    source.set(getNegativeKeys().flag, false);
-//
-//    source.set(getPositiveKeys().meas, fluxPos * posSum);
-//    source.set(getPositiveKeys().err, std::sqrt(fluxPosVar) * posSum);
-//    source.set(getPositiveKeys().flag, false);
-//
-//    negModel  *= fluxNeg;  // scale negative model to image
-//    posModel  *= fluxPos;  // scale positive model to image
-//    afwImage::Image<double> residuals(negModel, true); // full model contains negative lobe...
-//    residuals += posModel; // plus positive lobe...
-//    residuals -= data;     // minus the data...
-//    residuals *= residuals;// squared...
-//    residuals /= var;      // divided by the variance : [(model-data)/sigma]**2
-//    afwMath::Statistics stats = afwMath::makeStatistics(residuals, afwMath::SUM | afwMath::NPOINT);
-//    float chi2 = stats.getValue(afwMath::SUM);
-//    float dof  = stats.getValue(afwMath::NPOINT) - 2;
-//    source.set(_chi2dofKey, chi2/dof);
-//
-//    /*
-//    std::cout << "TESTINGB: Negative flux " << fluxNeg << " " << negSum << " " << fluxNeg*negSum << std::endl;
-//    std::cout << "TESTINGB: Positive flux " << fluxPos << " " << posSum << " " << fluxPos*posSum << std::endl;
-//    
-//    negModel.writeFits("/tmp/neg.fits");
-//    posModel.writeFits("/tmp/pos.fits");
-//    data.writeFits("/tmp/data.fits");
-//    negModel *= fluxNeg;
-//    posModel *= fluxPos;
-//    negModel += posModel;
-//    negModel.writeFits("/tmp/model.fits");
-//    negModel -= data;
-//    negModel.writeFits("/tmp/resids.fits");
-//    */
 }
 
 LSST_MEAS_ALGORITHM_PRIVATE_IMPLEMENTATION(PsfDipoleFlux);
