@@ -20,8 +20,14 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import numpy as np
+import lsst.afw.geom as afwGeom
+import lsst.afw.image as afwImage
+import lsst.afw.detection as afwDetect
 import lsst.pipe.base as pipeBase
+import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
+import lsst.meas.algorithms as measAlg
+import lsst.meas.deblender.baseline as measDeblend
 from lsst.meas.algorithms import SourceMeasurementTask, SourceMeasurementConfig
 
 class DipoleClassificationConfig(pexConfig.Config):
