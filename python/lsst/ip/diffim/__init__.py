@@ -33,6 +33,7 @@ from snapPsfMatch import *
 from diaSourceAnalysis import *
 from makeKernelBasisList import *
 from diaCatalogSourceSelector import *
+from dipoleMeasurement import *
 from diffimTools import *
 
 # automatically register ip_diffim Algorithms
