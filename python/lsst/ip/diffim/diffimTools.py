@@ -348,21 +348,9 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
     return candidateOutList
     
 #######
-# DiaSource filters (here for now)
+# 
 #######
 
-
-class SourceFlagChecker(object):
-    """A functor to check whether a difference image source has any flags set that should cause it to be labeled bad."""
-    def __init__(self, sources, badFlags=['flags.pixel.edge', 'flags.pixel.interpolated.center', 'flags.pixel.saturated.center']):
-        self.keys = [sources.getSchema().find(name).key for name in badFlags]
-        self.keys.append(sources.table.getCentroidFlagKey())
-
-    def __call__(self, source):
-        for k in self.keys:
-            if source.get(k):
-                return False
-        return True
 
 class NbasisEvaluator(object):
     """A functor to evaluate the Bayesian Information Criterion for the number of basis sets going into the kernel fitting"""

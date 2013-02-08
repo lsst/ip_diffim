@@ -68,7 +68,7 @@ class DipoleMeasurementTask(SourceMeasurementTask):
         except:
             self.log.warn("Key %s not found in table" % (self._ClassificationFlag))            
             return
-        print key
+
         for source in sources:
             passesSn = self.dipoleAnalysis.getSn(source) > ctrl.minSn
 
@@ -88,6 +88,18 @@ class DipoleMeasurementTask(SourceMeasurementTask):
 #########
 # Other Support classs
 #########
+
+class SourceFlagChecker(object):
+    """A functor to check whether a difference image source has any flags set that should cause it to be labeled bad."""
+    def __init__(self, sources, badFlags=['flags.pixel.edge', 'flags.pixel.interpolated.center', 'flags.pixel.saturated.center']):
+        self.keys = [sources.getSchema().find(name).key for name in badFlags]
+        self.keys.append(sources.table.getCentroidFlagKey())
+
+    def __call__(self, source):
+        for k in self.keys:
+            if source.get(k):
+                return False
+        return True
 
 class DipoleAnalysis(object):
     """A functor to check for dipoles in difference image source tables."""
@@ -135,13 +147,16 @@ class DipoleAnalysis(object):
         with ds9.Buffering():
             for source in sources:
                 cen = source.get("flux.dipole.psf.centroid")
-                ctype= "green"
                 if (False in np.isfinite(cen)):
                     cen = source.getCentroid()
+
+                isdipole = source.get("classification.dipole")
+                if isdipole:
+                    ctype= "green"
+                    print "DIPOLE: %.1f,%.1f %.1f,%.1f" % (cen.getX(), cen.getY(), source.get("flux.dipole.psf.neg"), source.get("flux.dipole.psf.pos"))
+                else:
                     ctype = "red"
                     print "NOT DIPOLE: %.1f,%.1f" % (cen.getX(), cen.getY())
-                else:
-                    print "DIPOLE: %.1f,%.1f %.1f,%.1f" % (cen.getX(), cen.getY(), source.get("flux.dipole.psf.neg"), source.get("flux.dipole.psf.pos"))
 
                 ds9.dot("o", cen.getX(), cen.getY(), size=2, ctype=ctype, frame=frame)
 
