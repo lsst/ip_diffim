@@ -595,6 +595,9 @@ class PsfMatch(pipeBase.Task):
                 if cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
                     nBad += 1
 
+        self.log.info("Doing stats of kernel candidates used in the spatial fit.")
+        diUtils.calcKernelStats(kernelCellSet, 'ORIG')
+
         # Counting statistics
         if nBad > 2*nGood:
             self.log.warn("Many more candidates rejected than accepted; %d total, %d rejected, %d used" % (
@@ -823,7 +826,8 @@ class PsfMatch(pipeBase.Task):
             pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
             pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0])
             raise e
-
+        
+        
         if display and displayCandidates:
             diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
                                          showBadCandidates=showBadCandidates)

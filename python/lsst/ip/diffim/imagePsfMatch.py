@@ -415,6 +415,8 @@ class ImagePsfMatchTask(PsfMatch):
         @return kernelCellSet: a SpatialCellSet for use with self._solve
         """
         # Candidate source footprints to use for Psf matching
+        # !! This breaks things if footprints are sent !!
+        '''
         if candidateList == None:
             self.log.log(pexLog.Log.INFO, "temporarily subtracting backgrounds for detection")
             mi1 = templateMaskedImage.Factory(templateMaskedImage, True)
@@ -425,6 +427,7 @@ class ImagePsfMatchTask(PsfMatch):
             kcDetect = diffimLib.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
             kcDetect.apply(mi1, mi2)
             candidateList = kcDetect.getFootprints()
+        '''
 
         sizeCellX, sizeCellY = self._adaptCellSize(candidateList)
 
@@ -436,15 +439,15 @@ class ImagePsfMatchTask(PsfMatch):
         policy = pexConfig.makePolicy(self.kconfig)
         # Place candidates within the spatial grid
         for cand in candidateList:
-            bbox = cand.getBBox()
+            bbox = cand['footprint'].getBBox()  #-- Fix for footprints?
             
             # Grab the centers in the parent's coordinate system
-            xC   = 0.5 * ( bbox.getMinX() + bbox.getMaxX() )
-            yC   = 0.5 * ( bbox.getMinY() + bbox.getMaxY() )
+            #xC   = 0.5 * ( bbox.getMinX() + bbox.getMaxX() )  -- Fix for footprints?
+            #yC   = 0.5 * ( bbox.getMinY() + bbox.getMaxY() )  -- Fix for footprints
             
             tmi  = afwImage.MaskedImageF(templateMaskedImage, bbox, afwImage.PARENT)
             smi  = afwImage.MaskedImageF(scienceMaskedImage, bbox, afwImage.PARENT)
-            cand = diffimLib.makeKernelCandidate(xC, yC, tmi, smi, policy)
+            cand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
             
             pexLog.Trace(self.log.getName(), 5,
                          "Candidate %d at %f, %f" % (cand.getId(), cand.getXCenter(), cand.getYCenter()))

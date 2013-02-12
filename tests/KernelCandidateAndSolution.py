@@ -159,6 +159,28 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.fail()
 
+            
+    def testSourceStats(self):
+        # Original and uninitialized
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+        source = self.ss.addNew()
+        source.setId(1)
+	source.set(self.table.getCentroidKey().getX(), 276)
+	source.set(self.table.getCentroidKey().getY(), 717)
+	source.set(self.table.getPsfFluxKey(), 1.)
+        
+        kc = ipDiffim.KernelCandidateF(source,
+                                       self.templateExposure2.getMaskedImage(),
+                                       self.scienceImage2.getMaskedImage(),
+                                       self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+
+        kc.build(kList)
+        self.assertEqual(kc.isInitialized(), True)
+
+
     def testSourceConstructor(self):
         # Original and uninitialized
         if not self.defDataDir:
@@ -223,6 +245,12 @@ class DiffimTestCases(unittest.TestCase):
             pass
         else:
             self.fail()
+
+        #build the list to test the 
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+
+        kc.build(kList)
+        self.assertEqual(kc.isInitialized(), True)
 
     def testDeltaFunctionScaled(self, scaling = 2.7, bg = 11.3):
         if not self.defDataDir:

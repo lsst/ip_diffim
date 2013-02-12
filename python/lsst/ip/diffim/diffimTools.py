@@ -273,7 +273,7 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
 # Converting types
 #######
 
-def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, config, log):
+def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, config, log, isNotParent=False):
     """ Takes an input list of Sources that were selected to constrain
     the Psf-matching Kernel and turns them into a List of Footprints,
     which are used to seed a set of KernelCandidates.  The function
@@ -333,17 +333,30 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
         
         kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
         try:
-            fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, False).getMask())
+            fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, isNotParent).getMask())
             bm1 = fsb.getBits()
-            fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, False).getMask())
+            fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, isNotParent).getMask())
             bm2 = fsb.getBits()
         except Exception, e:
             pass
         else:
             if not((bm1 & badBitMask) or (bm2 & badBitMask)):
-                candidateOutList.append(afwDetect.Footprint(kbbox))
+                candidateOutList.append({'source':kernelCandidate, 'footprint':afwDetect.Footprint(kbbox)})
     log.info("Selected %d / %d sources for KernelCandidacy" % (len(candidateOutList), len(candidateInList)))
     return candidateOutList
+
+def sourceTableToCandList(sourceTable, templateExposure, scienceExposure, config, kconfig, log):
+    footprintList = sourceToFootprintList(list(sourceTable), templateExposure, scienceExposure, kconfig, log, isNotParent=True)
+    candList = []
+
+    policy = pexConfig.makePolicy(config)
+    for cand in footprintList:
+        bbox = cand['footprint'].getBBox()  #-- Fix for footprints?
+        tmi  = afwImage.MaskedImageF(templateExposure.getMaskedImage(), bbox, afwImage.PARENT)
+        smi  = afwImage.MaskedImageF(scienceExposure.getMaskedImage(), bbox, afwImage.PARENT)
+        candList.append(diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy))
+    return candList
+
     
 #######
 # DiaSource filters (here for now)
