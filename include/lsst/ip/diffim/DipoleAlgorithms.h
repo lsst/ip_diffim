@@ -196,10 +196,7 @@ inline DipoleFluxControl const & DipoleFluxAlgorithm::getControl() const {
  */
 class NaiveDipoleCentroidControl : public DipoleCentroidControl {
 public:
-    LSST_CONTROL_FIELD(background, double, "Background tweak to apply");
-
-    NaiveDipoleCentroidControl() : DipoleCentroidControl("centroid.dipole.naive"), 
-                                   background(0.0) {}
+    NaiveDipoleCentroidControl() : DipoleCentroidControl("centroid.dipole.naive") {}
 
 private:
     virtual PTR(meas::algorithms::AlgorithmControl) _clone() const;
@@ -213,9 +210,7 @@ private:
  */
 class NaiveDipoleFluxControl : public DipoleFluxControl {
 public:
-    LSST_CONTROL_FIELD(background, double, "Background tweak to apply");
-
-    NaiveDipoleFluxControl() : DipoleFluxControl("flux.dipole.naive"), background(0.0) {}
+    NaiveDipoleFluxControl() : DipoleFluxControl("flux.dipole.naive") {}
 
 private:
     virtual PTR(meas::algorithms::AlgorithmControl) _clone() const;
@@ -229,9 +224,7 @@ private:
  */
 class PsfDipoleFluxControl : public DipoleFluxControl {
 public:
-    LSST_CONTROL_FIELD(background, double, "Background tweak to apply");
-
-    PsfDipoleFluxControl() : DipoleFluxControl("flux.dipole.psf"), background(0.0) {}
+    PsfDipoleFluxControl() : DipoleFluxControl("flux.dipole.psf") {}
 
 private:
     virtual PTR(meas::algorithms::AlgorithmControl) _clone() const;

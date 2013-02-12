@@ -59,8 +59,8 @@ namespace diffim {
 
 
 /**
- * @brief A class that knows how to calculate centroids as a simple unweighted first moment
- * of the 3x3 region around the peaks
+ * A class that knows how to calculate centroids as a simple unweighted first
+ * moment of the 3x3 region around the peaks
  */
 class NaiveDipoleCentroid : public DipoleCentroidAlgorithm {
 public:
@@ -82,8 +82,8 @@ private:
 };
 
 /**
- * @brief A class that knows how to calculate centroids as a simple unweighted first moment
- * of the 3x3 region around the peaks
+ * A class that knows how to calculate centroids as a simple unweighted first
+ * moment of the 3x3 region around the peaks
  */
 class NaiveDipoleFlux : public DipoleFluxAlgorithm {
 public:
@@ -117,8 +117,7 @@ void naiveCentroid(
     afw::table::SourceRecord & source,
     afw::image::Exposure<PixelT> const& exposure,
     afw::geom::Point2I const & center,
-    afw::table::KeyTuple<afw::table::Centroid> keys,
-    float background
+    afw::table::KeyTuple<afw::table::Centroid> keys
     )
 {
     source.set(keys.meas, afw::geom::Point2D(center));
@@ -139,8 +138,8 @@ void naiveCentroid(
     double const sum =
         (im(-1,  1) + im( 0,  1) + im( 1,  1) +
          im(-1,  0) + im( 0,  0) + im( 1,  0) +
-         im(-1, -1) + im( 0, -1) + im( 1, -1))
-        - 9 * background;
+         im(-1, -1) + im( 0, -1) + im( 1, -1));
+
 
     if (sum == 0.0) {
         throw LSST_EXCEPT(pexExceptions::RuntimeErrorException,
@@ -170,7 +169,7 @@ void naiveCentroid(
 
 
 /**
- * @brief Given an image and a pixel position, return a Centroid using a naive 3x3 weighted moment
+ * Given an image and a pixel position, return a Centroid using a naive 3x3 weighted moment
  */
 template<typename PixelT>
 void NaiveDipoleCentroid::_apply(
@@ -182,16 +181,14 @@ void NaiveDipoleCentroid::_apply(
     source.set(getNegativeKeys().flag, true); // say we've failed so that's the result if we throw
 
     afw::detection::Footprint::PeakList const& peaks = source.getFootprint()->getPeaks();
-    float background = static_cast<NaiveDipoleCentroidControl const &>(getControl()).background;
-
 
     naiveCentroid(source, exposure, peaks[0]->getI(), (peaks[0]->getPeakValue() >= 0 ? 
                                                        getPositiveKeys() : 
-                                                       getNegativeKeys()), background);
+                                                       getNegativeKeys()));
     if (peaks.size() > 1) {
         naiveCentroid(source, exposure, peaks[1]->getI(), (peaks[1]->getPeakValue() >= 0 ? 
                                                            getPositiveKeys() :
-                                                           getNegativeKeys()), background);
+                                                           getNegativeKeys()));
     }
 }
 
@@ -211,27 +208,27 @@ PTR(meas::algorithms::Algorithm) NaiveDipoleCentroidControl::_makeAlgorithm(
 
 
 namespace {
+
 template <typename MaskedImageT>
 class NaiveDipoleFootprinter : public afw::detection::FootprintFunctor<MaskedImageT> {
 public:
-    explicit NaiveDipoleFootprinter(MaskedImageT const& mimage, ///< The image the source lives in
-                                    float background            ///< Background tweak value
-        ) : afw::detection::FootprintFunctor<MaskedImageT>(mimage), _background(background),
+    explicit NaiveDipoleFootprinter(MaskedImageT const& mimage ///< The image the source lives in
+        ) : afw::detection::FootprintFunctor<MaskedImageT>(mimage), 
             _sumPositive(0.0), _sumNegative(0.0), _numPositive(0), _numNegative(0) {}
 
-    /// @brief Reset everything for a new Footprint
+    /// Reset everything for a new Footprint
     void reset() {
         _sumPositive = _sumNegative = 0.0;
         _numPositive = _numNegative = 0;
     }
     void reset(afwDet::Footprint const&) {}
 
-    /// @brief method called for each pixel by apply()
+    /// method called for each pixel by apply()
     void operator()(typename MaskedImageT::xy_locator loc, ///< locator pointing at the pixel
                     int,                                   ///< column-position of pixel
                     int                                    ///< row-position of pixel
                    ) {
-        typename MaskedImageT::Image::Pixel ival = loc.image(0, 0) - _background;
+        typename MaskedImageT::Image::Pixel ival = loc.image(0, 0);
         typename MaskedImageT::Image::Pixel vval = loc.variance(0, 0);
         if (ival >= 0.0) {
             _sumPositive += ival;
@@ -252,7 +249,6 @@ public:
     int getNumNegative() const { return _numNegative; }
 
 private:
-    float _background;
     double _sumPositive;
     double _sumNegative;
     double _varPositive;
@@ -266,7 +262,7 @@ private:
 
 
 /**
- * @brief Given an image and a pixel position, return a Centroid using a naive 3x3 weighted moment
+ * Given an image and a pixel position, return a Centroid using a naive 3x3 weighted moment
  */
 template<typename PixelT>
 void NaiveDipoleFlux::_apply(
@@ -277,10 +273,9 @@ void NaiveDipoleFlux::_apply(
     source.set(getPositiveKeys().flag, true); // say we've failed so that's the result if we throw
     source.set(getNegativeKeys().flag, true); // say we've failed so that's the result if we throw
 
-    float background = static_cast<NaiveDipoleFluxControl const &>(getControl()).background;
     typedef typename afw::image::Exposure<PixelT>::MaskedImageT MaskedImageT;
 
-    NaiveDipoleFootprinter<MaskedImageT> functor(exposure.getMaskedImage(), background);
+    NaiveDipoleFootprinter<MaskedImageT> functor(exposure.getMaskedImage());
     functor.apply(*source.getFootprint());
 
     source.set(getPositiveKeys().meas, functor.getSumPositive());
@@ -309,7 +304,7 @@ PTR(meas::algorithms::Algorithm) NaiveDipoleFluxControl::_makeAlgorithm(
 
 
 /**
- * @brief Implementation of Psf dipole flux
+ * Implementation of Psf dipole flux
  */
 class PsfDipoleFlux : public DipoleFluxAlgorithm {
 public:
@@ -354,16 +349,6 @@ private:
 
 };
 
-namespace {
-    struct CmpPeakFlux : public std::binary_function<afw::detection::Peak::Ptr,
-                                                     afw::detection::Peak::Ptr,
-                                                     bool> { 
-        bool operator()(afw::detection::Peak::Ptr p1, afw::detection::Peak::Ptr p2) {
-            return p1->getPeakValue() < p2->getPeakValue();
-        }
-    };
-} // end anonymous
-
 template<typename PixelT>
 std::pair<double,afw::math::LeastSquares> PsfDipoleFlux::_linearFit(
     afw::table::SourceRecord & source, 
@@ -375,7 +360,6 @@ std::pair<double,afw::math::LeastSquares> PsfDipoleFlux::_linearFit(
     afw::geom::Point2D posCenter(posCenterX, posCenterY);
 
     CONST_PTR(afw::detection::Footprint) footprint = source.getFootprint();
-    float background = static_cast<PsfDipoleFluxControl const &>(getControl()).background;
 
     /* Fit for the superposition of Psfs at the two centroids.  
      *
@@ -394,7 +378,6 @@ std::pair<double,afw::math::LeastSquares> PsfDipoleFlux::_linearFit(
                                  footprint->getBBox(), afwImage::PARENT);
     afwImage::Image<afwImage::VariancePixel> var(*(exposure.getMaskedImage().getVariance()), 
                                                  footprint->getBBox(), afwImage::PARENT);
-    data -= background;
     // Use the median of the variance to get a better estimate of the fit uncertainties
     // Divide M,b by inverse square root
     double matrixNorm = 1. / 
@@ -487,9 +470,7 @@ void PsfDipoleFlux::_apply(
         return;
     }
     // For N>=2, just measure the brightest and faintest peaks
-    
     // Order by peak flux, most negative one is first
-    std::sort(peakList.begin(), peakList.end(), CmpPeakFlux());
     PTR(afw::detection::Peak) negativePeak = peakList.front();
     PTR(afw::detection::Peak) positivePeak = peakList.back();
 
