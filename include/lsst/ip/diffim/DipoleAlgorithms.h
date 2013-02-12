@@ -67,7 +67,8 @@ protected:
         KeyTuple const & negativeKeys);
 
     /// @brief Initialize using afw::table::addCentroid field to fill out repetitive descriptions.
-    DipoleCentroidAlgorithm(DipoleCentroidControl const & ctrl, afw::table::Schema & schema, char const * doc);
+    DipoleCentroidAlgorithm(DipoleCentroidControl const & ctrl, 
+                            afw::table::Schema & schema, char const * doc);
 
 private:
     KeyTuple _positiveKeys;
@@ -84,9 +85,11 @@ public:
     PTR(DipoleCentroidAlgorithm) makeAlgorithm(
         afw::table::Schema & schema,
         PTR(daf::base::PropertyList) const & metadata = PTR(daf::base::PropertyList)(),
-        meas::algorithms::AlgorithmControlMap const & others = meas::algorithms::AlgorithmControlMap()
+        meas::algorithms::AlgorithmControlMap const & others = 
+        meas::algorithms::AlgorithmControlMap()
     ) const {
-        return boost::static_pointer_cast<DipoleCentroidAlgorithm>(_makeAlgorithm(schema, metadata, others));
+        return boost::static_pointer_cast<DipoleCentroidAlgorithm>(
+            _makeAlgorithm(schema, metadata, others));
     }
 
 protected:
@@ -122,7 +125,8 @@ protected:
                         KeyTuple const & negativeKeys);
 
     /// @brief Initialize using afw::table::addFlux field to fill out repetitive descriptions.
-    DipoleFluxAlgorithm(DipoleFluxControl const & ctrl, afw::table::Schema & schema, char const * doc);
+    DipoleFluxAlgorithm(DipoleFluxControl const & ctrl, 
+                        afw::table::Schema & schema, char const * doc);
 
 private:
     KeyTuple _positiveKeys;
@@ -132,14 +136,17 @@ private:
 class DipoleFluxControl : public meas::algorithms::AlgorithmControl {
 public:
 
-    PTR(DipoleFluxControl) clone() const { return boost::static_pointer_cast<DipoleFluxControl>(_clone()); }
+    PTR(DipoleFluxControl) clone() const { 
+        return boost::static_pointer_cast<DipoleFluxControl>(_clone()); }
 
     PTR(DipoleFluxAlgorithm) makeAlgorithm(
         afw::table::Schema & schema,
         PTR(daf::base::PropertyList) const & metadata = PTR(daf::base::PropertyList)(),
-        meas::algorithms::AlgorithmControlMap const & others = meas::algorithms::AlgorithmControlMap()
+        meas::algorithms::AlgorithmControlMap const & others = 
+        meas::algorithms::AlgorithmControlMap()
     ) const {
-        return boost::static_pointer_cast<DipoleFluxAlgorithm>(_makeAlgorithm(schema, metadata, others));
+        return boost::static_pointer_cast<DipoleFluxAlgorithm>(
+            _makeAlgorithm(schema, metadata, others));
     }
 
 protected:
@@ -191,7 +198,8 @@ class NaiveDipoleCentroidControl : public DipoleCentroidControl {
 public:
     LSST_CONTROL_FIELD(background, double, "Background tweak to apply");
 
-    NaiveDipoleCentroidControl() : DipoleCentroidControl("centroid.dipole.naive"), background(0.0) {}
+    NaiveDipoleCentroidControl() : DipoleCentroidControl("centroid.dipole.naive"), 
+                                   background(0.0) {}
 
 private:
     virtual PTR(meas::algorithms::AlgorithmControl) _clone() const;

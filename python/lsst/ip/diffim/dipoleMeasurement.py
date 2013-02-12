@@ -32,7 +32,7 @@ from lsst.meas.algorithms import SourceMeasurementTask, SourceMeasurementConfig
 
 class DipoleClassificationConfig(pexConfig.Config):
     minSn = pexConfig.Field(
-        doc="Minimum quadrature sum of positive lobe and negative lobe S/N to be considered a dipole",
+        doc="Minimum quadrature sum of positive+negative lobe S/N to be considered a dipole",
         dtype=float, default=np.sqrt(2) * 5.0, 
         )
     maxFluxRatio = pexConfig.Field(
@@ -54,8 +54,8 @@ class DipoleMeasurementTask(SourceMeasurementTask):
     def __init__(self, schema, algMetadata=None, **kwds):
         """Create the task, adding necessary fields to the given schema.
 
-        @param[in,out] schema        Schema object for measurement fields; will be modified in-place.
-        @param[in,out] algMetadata   Passed to MeasureSources object to be filled with initialization
+        @param[in,out] schema        Schema object for measurement fields; modified in-place.
+        @param[in,out] algMetadata   Passed to MeasureSources object to be filled with 
                                      metadata by algorithms (e.g. radii for aperture photometry).
         @param         **kwds        Passed to Task.__init__.
         """
@@ -96,8 +96,12 @@ class DipoleMeasurementTask(SourceMeasurementTask):
 #########
 
 class SourceFlagChecker(object):
-    """A functor to check whether a difference image source has any flags set that should cause it to be labeled bad."""
-    def __init__(self, sources, badFlags=['flags.pixel.edge', 'flags.pixel.interpolated.center', 'flags.pixel.saturated.center']):
+    """A functor to check whether a difference image source has any
+    flags set that should cause it to be labeled bad."""
+
+    def __init__(self, sources, badFlags=['flags.pixel.edge', 
+                                          'flags.pixel.interpolated.center', 
+                                          'flags.pixel.saturated.center']):
         self.keys = [sources.getSchema().find(name).key for name in badFlags]
         self.keys.append(sources.table.getCentroidFlagKey())
 
@@ -159,7 +163,10 @@ class DipoleAnalysis(object):
                 isdipole = source.get("classification.dipole")
                 if isdipole:
                     ctype= "green"
-                    print "DIPOLE: %.1f,%.1f %.1f,%.1f" % (cen.getX(), cen.getY(), source.get("flux.dipole.psf.neg"), source.get("flux.dipole.psf.pos"))
+                    print "DIPOLE: %.1f,%.1f %.1f,%.1f" % (
+                        cen.getX(), cen.getY(), 
+                        source.get("flux.dipole.psf.neg"), 
+                        source.get("flux.dipole.psf.pos"))
                 else:
                     ctype = "red"
                     print "NOT DIPOLE: %.1f,%.1f" % (cen.getX(), cen.getY())
@@ -171,7 +178,8 @@ class DipoleAnalysis(object):
                 if (False in np.isfinite(negCen)) or (False in np.isfinite(posCen)):
                     continue
 
-                ds9.line([(negCen.getX(), negCen.getY()),(posCen.getX(), posCen.getY())], ctype="yellow", frame=frame)
+                ds9.line([(negCen.getX(), negCen.getY()),(posCen.getX(), posCen.getY())], 
+                         ctype="yellow", frame=frame)
             
         
 
@@ -191,8 +199,11 @@ class DipoleDeblender(object):
     """
     def __init__(self):
         # Set up defaults to send to deblender
-        self.psf_chisq_cut1 = self.psf_chisq_cut2 = self.psf_chisq_cut2b = np.inf # always deblend as Psf
-        self.log = pexLog.Log(pexLog.Log.getDefaultLog(), 'lsst.ip.diffim.DipoleDeblender', pexLog.Log.INFO)
+
+        # Always deblend as Psf
+        self.psf_chisq_cut1 = self.psf_chisq_cut2 = self.psf_chisq_cut2b = np.inf 
+        self.log = pexLog.Log(pexLog.Log.getDefaultLog(), 
+                              'lsst.ip.diffim.DipoleDeblender', pexLog.Log.INFO)
         self.sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
     def __call__(self, source, exposure):
@@ -264,9 +275,12 @@ class DipoleDeblender(object):
                 suffix = "pos"
             else:
                 suffix = "neg"
-            self.log.info("deblended.centroid.dipole.psf.%s %f %f" % (suffix, peak.center[0], peak.center[1]))
-            self.log.info("deblended.chi2dof.dipole.%s %f" % (suffix, peak.chisq / peak.dof))
-            self.log.info("deblended.flux.dipole.psf.%s %f" % (suffix, peak.psfflux * np.sum(peak.tmimg.getImage().getArray())))
+            self.log.info("deblended.centroid.dipole.psf.%s %f %f" % (
+                    suffix, peak.center[0], peak.center[1]))
+            self.log.info("deblended.chi2dof.dipole.%s %f" % (
+                    suffix, peak.chisq / peak.dof))
+            self.log.info("deblended.flux.dipole.psf.%s %f" % (
+                    suffix, peak.psfflux * np.sum(peak.tmimg.getImage().getArray())))
             peakList.push_back(peak.peak)
         return deblendedSource
         

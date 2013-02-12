@@ -130,7 +130,8 @@ void naiveCentroid(
 
     if (x < 1 || x >= image.getWidth() - 1 || y < 1 || y >= image.getHeight() - 1) {
          throw LSST_EXCEPT(lsst::pex::exceptions::LengthErrorException,
-                           (boost::format("Object at (%d, %d) is too close to the edge") % x % y).str());
+                           (boost::format("Object at (%d, %d) is too close to the edge") 
+                            % x % y).str());
     }
 
     typename ImageT::xy_locator im = image.xy_at(x, y);
@@ -184,10 +185,12 @@ void NaiveDipoleCentroid::_apply(
     float background = static_cast<NaiveDipoleCentroidControl const &>(getControl()).background;
 
 
-    naiveCentroid(source, exposure, peaks[0]->getI(), (peaks[0]->getPeakValue() >= 0  ? getPositiveKeys() :
+    naiveCentroid(source, exposure, peaks[0]->getI(), (peaks[0]->getPeakValue() >= 0 ? 
+                                                       getPositiveKeys() : 
                                                        getNegativeKeys()), background);
     if (peaks.size() > 1) {
-        naiveCentroid(source, exposure, peaks[1]->getI(), (peaks[1]->getPeakValue() >= 0  ? getPositiveKeys() :
+        naiveCentroid(source, exposure, peaks[1]->getI(), (peaks[1]->getPeakValue() >= 0 ? 
+                                                           getPositiveKeys() :
                                                            getNegativeKeys()), background);
     }
 }
@@ -313,13 +316,17 @@ public:
 
     PsfDipoleFlux(PsfDipoleFluxControl const & ctrl, afw::table::Schema & schema) :
         DipoleFluxAlgorithm(ctrl, schema, "jointly fitted psf flux counts"),
-        _chi2dofKey(schema.addField<float>(ctrl.name+".chi2dof", "chi2 per degree of freedom of fit")),
+        _chi2dofKey(schema.addField<float>(ctrl.name+".chi2dof", 
+                                           "chi2 per degree of freedom of fit")),
         _avgCentroid(
-            addCentroidFields(schema, ctrl.name+".centroid", "average of the postive and negative lobe positions")),
+            addCentroidFields(schema, ctrl.name+".centroid", 
+                              "average of the postive and negative lobe positions")),
         _negCentroid(
-            addCentroidFields(schema, ctrl.name+".neg.centroid", "psf fitted center of negative lobe")),
+            addCentroidFields(schema, ctrl.name+".neg.centroid", 
+                              "psf fitted center of negative lobe")),
         _posCentroid(
-            addCentroidFields(schema, ctrl.name+".pos.centroid", "psf fitted center of positive lobe"))
+            addCentroidFields(schema, ctrl.name+".pos.centroid", 
+                              "psf fitted center of positive lobe"))
     {}
 
 private:
@@ -383,12 +390,15 @@ std::pair<double,afw::math::LeastSquares> PsfDipoleFlux::_linearFit(
     
     afwImage::Image<double> negModel(footprint->getBBox());
     afwImage::Image<double> posModel(footprint->getBBox());
-    afwImage::Image<PixelT> data(*(exposure.getMaskedImage().getImage()), footprint->getBBox(), afwImage::PARENT);
-    afwImage::Image<afwImage::VariancePixel> var(*(exposure.getMaskedImage().getVariance()), footprint->getBBox(), afwImage::PARENT);
+    afwImage::Image<PixelT> data(*(exposure.getMaskedImage().getImage()), 
+                                 footprint->getBBox(), afwImage::PARENT);
+    afwImage::Image<afwImage::VariancePixel> var(*(exposure.getMaskedImage().getVariance()), 
+                                                 footprint->getBBox(), afwImage::PARENT);
     data -= background;
     // Use the median of the variance to get a better estimate of the fit uncertainties
     // Divide M,b by inverse square root
-    double matrixNorm = 1. / std::sqrt(afwMath::makeStatistics(var, afwMath::MEDIAN).getValue(afwMath::MEDIAN));
+    double matrixNorm = 1. / 
+        std::sqrt(afwMath::makeStatistics(var, afwMath::MEDIAN).getValue(afwMath::MEDIAN));
     
     afwGeom::Box2I negPsfBBox = negPsf->getBBox(afwImage::PARENT);
     afwGeom::Box2I posPsfBBox = posPsf->getBBox(afwImage::PARENT);
@@ -428,7 +438,8 @@ std::pair<double,afw::math::LeastSquares> PsfDipoleFlux::_linearFit(
     // Normalize by inverse sqrt of the median variance
     Mt.deep() *= matrixNorm;
     b.deep()  *= matrixNorm;
-    afw::math::LeastSquares lstsq = afwMath::LeastSquares::fromDesignMatrix(Mt.transpose().shallow(), b);
+    afw::math::LeastSquares lstsq = 
+        afwMath::LeastSquares::fromDesignMatrix(Mt.transpose().shallow(), b);
 
     double fluxNeg = lstsq.getSolution()[0];
     double fluxPos = lstsq.getSolution()[1];
@@ -464,7 +475,8 @@ void PsfDipoleFlux::_apply(
         throw LSST_EXCEPT(pex::exceptions::RuntimeErrorException,
                           (boost::format("No footprint for source %d") % source.getId()).str());
     }
-    afw::detection::Footprint::PeakList peakList = afw::detection::Footprint::PeakList(footprint->getPeaks());
+    afw::detection::Footprint::PeakList peakList = 
+        afw::detection::Footprint::PeakList(footprint->getPeaks());
 
     if (peakList.size() == 0) {
         throw LSST_EXCEPT(pex::exceptions::RuntimeErrorException,
@@ -484,7 +496,8 @@ void PsfDipoleFlux::_apply(
     CONST_PTR(afwDet::Psf) psf = exposure.getPsf();
     afwGeom::Extent2I psfsize = psf->getKernel()->getDimensions();
     measAlgorithms::PsfAttributes psfAttrib(psf, psfsize[0]/2.0, psfsize[1]/2.0);
-    double fwhm    = psfAttrib.computeGaussianWidth(measAlgorithms::PsfAttributes::ADAPTIVE_MOMENT) * 2.3548; 
+    double fwhm = 
+        psfAttrib.computeGaussianWidth(measAlgorithms::PsfAttributes::ADAPTIVE_MOMENT) * 2.3548; 
     float minChi2  = std::numeric_limits< double >::max();
     PTR(afw::math::LeastSquares) minLstsq;
     PTR(afw::geom::Point2D) minPosCentroid;
@@ -494,11 +507,16 @@ void PsfDipoleFlux::_apply(
     float offset   = 0.5 * fwhm; // Maximum distance to search on either side of initial centroid
     float stepsize = 2 * offset / nStepsPer;
         
-    for (float dnx = negativePeak->getFx() - offset; dnx <= negativePeak->getFx() + offset; dnx += stepsize) {
-        for (float dny = negativePeak->getFy() - offset; dny <= negativePeak->getFy() + offset; dny += stepsize) {
-            for (float dpx = positivePeak->getFx() - offset; dpx <= positivePeak->getFx() + offset; dpx += stepsize) {
-                for (float dpy = positivePeak->getFy() - offset; dpy <= positivePeak->getFy() + offset; dpy += stepsize) {
-                    std::pair<double,afw::math::LeastSquares> fit = _linearFit(source, exposure, dnx, dny, dpx, dpy);
+    for (float dnx = negativePeak->getFx() - offset; 
+         dnx <= negativePeak->getFx() + offset; dnx += stepsize) {
+        for (float dny = negativePeak->getFy() - offset; 
+             dny <= negativePeak->getFy() + offset; dny += stepsize) {
+            for (float dpx = positivePeak->getFx() - offset; 
+                 dpx <= positivePeak->getFx() + offset; dpx += stepsize) {
+                for (float dpy = positivePeak->getFy() - offset; 
+                     dpy <= positivePeak->getFy() + offset; dpy += stepsize) {
+                    std::pair<double,afw::math::LeastSquares> fit = 
+                        _linearFit(source, exposure, dnx, dny, dpx, dpy);
                     if (fit.first < minChi2) {
                         minChi2 = fit.first;
                         minLstsq = PTR(afw::math::LeastSquares)(
@@ -528,8 +546,9 @@ void PsfDipoleFlux::_apply(
     source.set(_chi2dofKey, minChi2);
     source.set(_negCentroid.meas, *minNegCentroid);
     source.set(_posCentroid.meas, *minPosCentroid);
-    source.set(_avgCentroid.meas, afw::geom::Point2D(0.5*(minNegCentroid->getX() + minPosCentroid->getX()),
-                                                     0.5*(minNegCentroid->getY() + minPosCentroid->getY())));
+    source.set(_avgCentroid.meas, 
+               afw::geom::Point2D(0.5*(minNegCentroid->getX() + minPosCentroid->getX()),
+                                  0.5*(minNegCentroid->getY() + minPosCentroid->getY())));
 
 }
 

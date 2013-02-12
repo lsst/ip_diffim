@@ -148,7 +148,8 @@ class DipoleAlgorithmTest(unittest.TestCase):
         
         source.setFootprint(s.getFootprint())
         ms.apply(source, exposure, afwGeom.Point2D(self.xc, self.yc))
-        for key in (".pos", ".pos.err", ".pos.flags", ".neg", ".neg.err", ".neg.flags", ".npos", ".nneg"):
+        for key in (".pos", ".pos.err", ".pos.flags", ".neg", ".neg.err", 
+                    ".neg.flags", ".npos", ".nneg"):
             try:
                 source.get(alg.name+key)
             except:
@@ -178,7 +179,8 @@ class DipoleAlgorithmTest(unittest.TestCase):
         source = self.measureDipole(s, exposure)
 
     def XXX_testPsfDipoleIter(self, scaling=100., fracOffset=0.5):
-        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc, scaling=scaling, fracOffset=fracOffset)
+        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc, 
+                                                scaling=scaling, fracOffset=fracOffset)
         source = self.measureDipole(s, exposure)
 
         # Recreate the simultaneous joint Psf fit in python
@@ -230,18 +232,44 @@ class DipoleAlgorithmTest(unittest.TestCase):
                             modelBBox  = model.getBBox(afwImage.PARENT)
                     
                             # Portion of the negative Psf that overlaps the montage
-                            negXmin = negPsfBBox.getMinX() if (negPsfBBox.getMinX() > modelBBox.getMinX()) else modelBBox.getMinX()
-                            negYmin = negPsfBBox.getMinY() if (negPsfBBox.getMinY() > modelBBox.getMinY()) else modelBBox.getMinY()
-                            negXmax = negPsfBBox.getMaxX() if (negPsfBBox.getMaxX() < modelBBox.getMaxX()) else modelBBox.getMaxX()
-                            negYmax = negPsfBBox.getMaxY() if (negPsfBBox.getMaxY() < modelBBox.getMaxY()) else modelBBox.getMaxY()
-                            negOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(negXmin, negYmin), afwGeom.Point2I(negXmax, negYmax))
+                            negXmin = negPsfBBox.getMinX() if \
+                                (negPsfBBox.getMinX() > modelBBox.getMinX()) else \
+                                modelBBox.getMinX()
+
+                            negYmin = negPsfBBox.getMinY() if \
+                                (negPsfBBox.getMinY() > modelBBox.getMinY()) else \
+                                modelBBox.getMinY()
+
+                            negXmax = negPsfBBox.getMaxX() if \
+                                (negPsfBBox.getMaxX() < modelBBox.getMaxX()) else \
+                                modelBBox.getMaxX()
+
+                            negYmax = negPsfBBox.getMaxY() if \
+                                (negPsfBBox.getMaxY() < modelBBox.getMaxY()) else \
+                                modelBBox.getMaxY()
+
+                            negOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(negXmin, negYmin), 
+                                                           afwGeom.Point2I(negXmax, negYmax))
                     
                             # Portion of the positivePsf that overlaps the montage
-                            posXmin = posPsfBBox.getMinX() if (posPsfBBox.getMinX() > modelBBox.getMinX()) else modelBBox.getMinX()
-                            posYmin = posPsfBBox.getMinY() if (posPsfBBox.getMinY() > modelBBox.getMinY()) else modelBBox.getMinY()
-                            posXmax = posPsfBBox.getMaxX() if (posPsfBBox.getMaxX() < modelBBox.getMaxX()) else modelBBox.getMaxX()
-                            posYmax = posPsfBBox.getMaxY() if (posPsfBBox.getMaxY() < modelBBox.getMaxY()) else modelBBox.getMaxY()
-                            posOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(posXmin, posYmin), afwGeom.Point2I(posXmax, posYmax))
+                            posXmin = posPsfBBox.getMinX() if \
+                                (posPsfBBox.getMinX() > modelBBox.getMinX()) else \
+                                modelBBox.getMinX()
+
+                            posYmin = posPsfBBox.getMinY() if \
+                                (posPsfBBox.getMinY() > modelBBox.getMinY()) else \
+                                modelBBox.getMinY()
+
+                            posXmax = posPsfBBox.getMaxX() if \
+                                (posPsfBBox.getMaxX() < modelBBox.getMaxX()) else \
+                                modelBBox.getMaxX()
+
+                            posYmax = posPsfBBox.getMaxY() if \
+                                (posPsfBBox.getMaxY() < modelBBox.getMaxY()) else \
+                                modelBBox.getMaxY()
+
+                            posOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(posXmin, posYmin), 
+                                                           afwGeom.Point2I(posXmax, posYmax))
                     
                             negPsfSubim    = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT)
                             modelSubim     = type(model)(model, negOverlapBBox, afwImage.PARENT)
@@ -262,7 +290,8 @@ class DipoleAlgorithmTest(unittest.TestCase):
                             posPsfSum = np.sum(posPsf.getArray())
                             negPsfSum = np.sum(negPsf.getArray())
                     
-                            M = np.array((np.ravel(negModel.getArray()), np.ravel(posModel.getArray()))).T.astype(np.float64)
+                            M = np.array((np.ravel(negModel.getArray()), 
+                                          np.ravel(posModel.getArray()))).T.astype(np.float64)
                             B = np.array((np.ravel(data.getArray()))).astype(np.float64)
                             M *= matrixNorm
                             B *= matrixNorm
@@ -303,8 +332,10 @@ class DipoleAlgorithmTest(unittest.TestCase):
 
                             results.append( (chi2dof, ((fpos+fneg)/dftot)) )
 
-            sp1.hist(chi2dofs, bins=10**(np.arange(-1, 2.0, 0.1)), alpha=0.1/shift, label="shift=%.1f (%.2f,%.2f)" % (shift, np.mean(chi2dofs), 
-                                                                                                                np.std(chi2dofs)))
+            sp1.hist(chi2dofs, bins=10**(np.arange(-1, 2.0, 0.1)), alpha=0.1/shift, 
+                     label="shift=%.1f (%.2f,%.2f)" % (shift, np.mean(chi2dofs), 
+                                                       np.std(chi2dofs)))
+
             sp2.hist(sigmas, alpha=0.1/shift, label="shift=%.1f (%.2f,%.2f)" % (shift, np.mean(sigmas), 
                                                                                 np.std(sigmas)))
             print 1.0 * len(np.where(np.abs(sigmas)>5)[0]) / len(sigmas)
@@ -338,17 +369,33 @@ class DipoleAlgorithmTest(unittest.TestCase):
         modelBBox  = model.getBBox(afwImage.PARENT)
 
         # Portion of the negative Psf that overlaps the montage
-        negXmin = negPsfBBox.getMinX() if (negPsfBBox.getMinX() > modelBBox.getMinX()) else modelBBox.getMinX()
-        negYmin = negPsfBBox.getMinY() if (negPsfBBox.getMinY() > modelBBox.getMinY()) else modelBBox.getMinY()
-        negXmax = negPsfBBox.getMaxX() if (negPsfBBox.getMaxX() < modelBBox.getMaxX()) else modelBBox.getMaxX()
-        negYmax = negPsfBBox.getMaxY() if (negPsfBBox.getMaxY() < modelBBox.getMaxY()) else modelBBox.getMaxY()
+        negXmin = negPsfBBox.getMinX() if (negPsfBBox.getMinX() > modelBBox.getMinX()) else \
+            modelBBox.getMinX()
+
+        negYmin = negPsfBBox.getMinY() if (negPsfBBox.getMinY() > modelBBox.getMinY()) else \
+            modelBBox.getMinY()
+
+        negXmax = negPsfBBox.getMaxX() if (negPsfBBox.getMaxX() < modelBBox.getMaxX()) else \
+            modelBBox.getMaxX()
+
+        negYmax = negPsfBBox.getMaxY() if (negPsfBBox.getMaxY() < modelBBox.getMaxY()) else \
+            modelBBox.getMaxY()
+
         negOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(negXmin, negYmin), afwGeom.Point2I(negXmax, negYmax))
 
         # Portion of the positivePsf that overlaps the montage
-        posXmin = posPsfBBox.getMinX() if (posPsfBBox.getMinX() > modelBBox.getMinX()) else modelBBox.getMinX()
-        posYmin = posPsfBBox.getMinY() if (posPsfBBox.getMinY() > modelBBox.getMinY()) else modelBBox.getMinY()
-        posXmax = posPsfBBox.getMaxX() if (posPsfBBox.getMaxX() < modelBBox.getMaxX()) else modelBBox.getMaxX()
-        posYmax = posPsfBBox.getMaxY() if (posPsfBBox.getMaxY() < modelBBox.getMaxY()) else modelBBox.getMaxY()
+        posXmin = posPsfBBox.getMinX() if (posPsfBBox.getMinX() > modelBBox.getMinX()) else \
+            modelBBox.getMinX()
+
+        posYmin = posPsfBBox.getMinY() if (posPsfBBox.getMinY() > modelBBox.getMinY()) else \
+            modelBBox.getMinY()
+
+        posXmax = posPsfBBox.getMaxX() if (posPsfBBox.getMaxX() < modelBBox.getMaxX()) else \
+            modelBBox.getMaxX()
+
+        posYmax = posPsfBBox.getMaxY() if (posPsfBBox.getMaxY() < modelBBox.getMaxY()) else \
+            modelBBox.getMaxY()
+
         posOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(posXmin, posYmin), afwGeom.Point2I(posXmax, posYmax))
 
         negPsfSubim    = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT)
@@ -419,7 +466,8 @@ class DipoleAlgorithmTest(unittest.TestCase):
         
     def testRecentroid(self, scaling=100.):
         # When the dipoles are closer, you really need to recentroid to get a good fit
-        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc, scaling=scaling, fracOffset=1.0)
+        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc, 
+                                                scaling=scaling, fracOffset=1.0)
         source = self.measureDipole(s, exposure)
 
         # Recreate the simultaneous joint Psf fit in python (but at bad centroid!)
@@ -430,12 +478,14 @@ class DipoleAlgorithmTest(unittest.TestCase):
         dpeaks = [speaks[0][1], speaks[-1][1]]
         negCenter = afwGeom.Point2D(dpeaks[0].getFx(), dpeaks[0].getFy())
         posCenter = afwGeom.Point2D(dpeaks[1].getFx(), dpeaks[1].getFy())
-        fneg0, negPsfSum0, fpos0, posPsfSum0, residIm0 = self._makeModel(exposure, psf, fp, negCenter, posCenter)
+        fneg0, negPsfSum0, fpos0, posPsfSum0, residIm0 = \
+            self._makeModel(exposure, psf, fp, negCenter, posCenter)
 
         # Now do it at the best centroid found by PsfDipoleFlux 
         negCenter = source.get("flux.dipole.psf.neg.centroid")
         posCenter = source.get("flux.dipole.psf.pos.centroid")
-        fneg1, negPsfSum1, fpos1, posPsfSum1, residIm1 = self._makeModel(exposure, psf, fp, negCenter, posCenter)
+        fneg1, negPsfSum1, fpos1, posPsfSum1, residIm1 = \
+            self._makeModel(exposure, psf, fp, negCenter, posCenter)
         
         # First off, make sure that the original centroid is wrong
         self.assertNotAlmostEqual(1e-2*scaling, -1e-2*fneg0, 2)
@@ -450,8 +500,10 @@ class DipoleAlgorithmTest(unittest.TestCase):
         self.assertAlmostEqual(1e-4*fpos1*posPsfSum1, 1e-4*source.get("flux.dipole.psf.pos"), 2)
 
         # Second fit is better
-        chi2dof0 = np.sum(residIm0.getArray()) / (residIm0.getArray().shape[0] * residIm0.getArray().shape[1] - 2)
-        chi2dof1 = np.sum(residIm1.getArray()) / (residIm1.getArray().shape[0] * residIm1.getArray().shape[1] - 2)
+        chi2dof0 = np.sum(residIm0.getArray()) / (residIm0.getArray().shape[0] * 
+                                                  residIm0.getArray().shape[1] - 2)
+        chi2dof1 = np.sum(residIm1.getArray()) / (residIm1.getArray().shape[0] * 
+                                                  residIm1.getArray().shape[1] - 2)
         self.assertTrue(chi2dof0 > chi2dof1)
 
         # And same as PsfDipoleFlux
