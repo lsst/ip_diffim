@@ -470,9 +470,9 @@ void PsfDipoleFlux::_apply(
         return;
     }
     // For N>=2, just measure the brightest and faintest peaks
-    // Order by peak flux, most negative one is first
-    PTR(afw::detection::Peak) negativePeak = peakList.front();
-    PTR(afw::detection::Peak) positivePeak = peakList.back();
+    // Order by peak flux, most positive one (brightest) is first
+    PTR(afw::detection::Peak) positivePeak = peakList.front();
+    PTR(afw::detection::Peak) negativePeak = peakList.back();
 
     CONST_PTR(afwDet::Psf) psf = exposure.getPsf();
     afwGeom::Extent2I psfsize = psf->getKernel()->getDimensions();
