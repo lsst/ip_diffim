@@ -60,8 +60,11 @@ def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=ds9.GREEN, symb="+", size=2):
 # Kernel display utilities
 #
 def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
-                           ctype=None, ctypeUnused=None, ctypeBad=None, size=3, frame=None, title="Spatial Cells"):
-    """Show the SpatialCells.  If symb is something that ds9.dot understands (e.g. "o"), the top nMaxPerCell candidates will be indicated with that symbol, using ctype and size"""
+                           ctype=None, ctypeUnused=None, ctypeBad=None, size=3, 
+                           frame=None, title="Spatial Cells"):
+    """Show the SpatialCells.  If symb is something that ds9.dot
+    understands (e.g. "o"), the top nMaxPerCell candidates will be
+    indicated with that symbol, using ctype and size"""
 
     ds9.mtv(maskedIm, frame=frame, title=title)
     with ds9.Buffering():
@@ -257,7 +260,8 @@ def showKernelBasis(kernel, frame=None):
 
 ###############
 
-def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True, numSample=128, keepPlots=True, maxCoeff = 10):
+def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True, 
+                           numSample=128, keepPlots=True, maxCoeff = 10):
     """Plot the Kernel spatial model."""
 
     try:
@@ -360,7 +364,8 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True, numSam
         vmax = fRange.max() # + 0.05 * num.fabs(fRange.max())
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
         im = ax.imshow(fRange, aspect='auto', norm=norm,
-                       extent=[0, kernelCellSet.getBBox().getWidth()-1, 0, kernelCellSet.getBBox().getHeight()-1])
+                       extent=[0, kernelCellSet.getBBox().getWidth()-1, 
+                               0, kernelCellSet.getBBox().getHeight()-1])
         ax.set_title('Spatial polynomial')
         plt.colorbar(im, orientation='horizontal', ticks=[vmin, vmax])
 
@@ -412,7 +417,8 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True, numSam
         keptPlots = True
 
 
-def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None, showCenter=True, showEllipticity=True):
+def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None, 
+                     showCenter=True, showEllipticity=True):
     """Show a mosaic of Kernel images. 
     """
     mos = displayUtils.Mosaic()
@@ -478,7 +484,8 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None, showCe
 
     return mos
 
-def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCellSet, kernel, background, testSources, config, 
+def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCellSet, 
+                       kernel, background, testSources, config, 
                        origVariance = False, nptsFull = 1e6, keepPlots = True, titleFs=14):
     candidateResids = []
     spatialResids   = []
@@ -507,11 +514,15 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
             tsdiffim = sdiffim.Factory(sdiffim, bbox)
 
             if origVariance:
-                candidateResids.append(num.ravel(tdiffim.getImage().getArray() / num.sqrt(torig.getVariance().getArray())))
-                spatialResids.append(num.ravel(tsdiffim.getImage().getArray() / num.sqrt(torig.getVariance().getArray())))
+                candidateResids.append(num.ravel(tdiffim.getImage().getArray() \
+                                                     / num.sqrt(torig.getVariance().getArray())))
+                spatialResids.append(num.ravel(tsdiffim.getImage().getArray() \
+                                                   / num.sqrt(torig.getVariance().getArray())))
             else:
-                candidateResids.append(num.ravel(tdiffim.getImage().getArray() / num.sqrt(tdiffim.getVariance().getArray())))
-                spatialResids.append(num.ravel(tsdiffim.getImage().getArray() / num.sqrt(tsdiffim.getVariance().getArray())))
+                candidateResids.append(num.ravel(tdiffim.getImage().getArray() \
+                                                     / num.sqrt(tdiffim.getVariance().getArray())))
+                spatialResids.append(num.ravel(tsdiffim.getImage().getArray() \
+                                                   / num.sqrt(tsdiffim.getVariance().getArray())))
 
     fullIm   = diffExposure.getMaskedImage().getImage().getArray()
     fullMask = diffExposure.getMaskedImage().getMask().getArray()
@@ -528,7 +539,8 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     sidx = idx[0][::stride], idx[1][::stride]
     allResids = fullIm[sidx] / num.sqrt(fullVar[sidx])
 
-    testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure, exposure, config, pexLog.getDefaultLog())
+    testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure, 
+                                                       exposure, config, pexLog.getDefaultLog())
     for fp in testFootprints:
         subexp = diffExposure.Factory(diffExposure, fp.getBBox())
         subim  = subexp.getMaskedImage().getImage()
@@ -567,22 +579,26 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     xs  = num.arange(-5, 5.05, 0.1)
     ys  = 1. / num.sqrt(2 * num.pi) * num.exp( -0.5 * xs**2 )
 
-    sp1.hist(candidateResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" % (num.mean(candidateResids), num.var(candidateResids)))
+    sp1.hist(candidateResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
+                 % (num.mean(candidateResids), num.var(candidateResids)))
     sp1.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp1.set_title("Candidates: basis fit", fontsize=titleFs-2)
     sp1.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
 
-    sp2.hist(spatialResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" % (num.mean(spatialResids), num.var(spatialResids)))
+    sp2.hist(spatialResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
+                 % (num.mean(spatialResids), num.var(spatialResids)))
     sp2.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp2.set_title("Candidates: spatial fit", fontsize=titleFs-2)
     sp2.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
 
-    sp3.hist(nonfitResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" % (num.mean(nonfitResids), num.var(nonfitResids)))
+    sp3.hist(nonfitResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
+                 % (num.mean(nonfitResids), num.var(nonfitResids)))
     sp3.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp3.set_title("Control sample: spatial fit", fontsize=titleFs-2)
     sp3.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
 
-    sp4.hist(allResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" % (num.mean(allResids), num.var(allResids)))
+    sp4.hist(allResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
+                 % (num.mean(allResids), num.var(allResids)))
     sp4.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp4.set_title("Full image (subsampled)", fontsize=titleFs-2)
     sp4.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
