@@ -38,7 +38,6 @@ import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.meas.algorithms as measAlg
-import lsst.meas.deblender.baseline as measDeblend
 from .makeKernelBasisList import makeKernelBasisList 
 
 # Helper functions for ipDiffim; mostly viewing of results and writing

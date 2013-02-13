@@ -27,7 +27,7 @@ import lsst.pipe.base as pipeBase
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.meas.algorithms as measAlg
-import lsst.meas.deblender.baseline as measDeblend
+import lsst.meas.deblender.baseline as deblendBaseline
 from lsst.meas.algorithms import SourceMeasurementTask, SourceMeasurementConfig
 
 class DipoleClassificationConfig(pexConfig.Config):
@@ -191,7 +191,7 @@ class DipoleDeblender(object):
        meas_algorithms/python/lsst/meas/algorithms/deblend.py since we
        need a single source that contains the blended peaks, not
        multiple children sources.  This directly calls the core
-       deblending code measDeblend.deblend (optionally _fit_psf for
+       deblending code deblendBaseline.deblend (optionally _fit_psf for
        debugging).
 
        Not actively being used, but there is a unit test for it in 
@@ -221,7 +221,7 @@ class DipoleDeblender(object):
         psfSigPix  = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
         psfFwhmPix = psfSigPix * self.sigma2fwhm 
         subimage   = afwImage.ExposureF(exposure, fbb, True)
-        cpsf       = measDeblend.CachingPsf(psf)
+        cpsf       = deblendBaseline.CachingPsf(psf)
 
         # if fewer than 2 peaks, just return a copy of the source
         if len(peaks) < 2:
@@ -239,30 +239,30 @@ class DipoleDeblender(object):
 
         if True:
             # Call top-level deblend task
-            fpres = measDeblend.deblend(fp, exposure.getMaskedImage(), psf, psfFwhmPix,
-                                        log = self.log,
-                                        psf_chisq_cut1 = self.psf_chisq_cut1,
-                                        psf_chisq_cut2 = self.psf_chisq_cut2,
-                                        psf_chisq_cut2b = self.psf_chisq_cut2b)
+            fpres = deblendBaseline.deblend(fp, exposure.getMaskedImage(), psf, psfFwhmPix,
+                                            log = self.log,
+                                            psf_chisq_cut1 = self.psf_chisq_cut1,
+                                            psf_chisq_cut2 = self.psf_chisq_cut2,
+                                            psf_chisq_cut2b = self.psf_chisq_cut2b)
         else:
             # Call lower-level _fit_psf task
 
             # Prepare results structure
-            fpres = measDeblend.PerFootprint()
+            fpres = deblendBaseline.PerFootprint()
             fpres.peaks = []
             for pki,pk in enumerate(dpeaks):
-                pkres = measDeblend.PerPeak()
+                pkres = deblendBaseline.PerPeak()
                 pkres.peak = pk
                 pkres.pki = pki
                 fpres.peaks.append(pkres)
             
             for pki,(pk,pkres,pkF) in enumerate(zip(dpeaks, fpres.peaks, peaksF)):
                 self.log.logdebug('Peak %i' % pki)
-                measDeblend._fit_psf(fp, fmask, pk, pkF, pkres, fbb, dpeaks, peaksF, self.log, 
-                                     cpsf, psfFwhmPix, 
-                                     subimage.getMaskedImage().getImage(), 
-                                     subimage.getMaskedImage().getVariance(), 
-                                     self.psf_chisq_cut1, self.psf_chisq_cut2, self.psf_chisq_cut2b)
+                deblendBaseline._fit_psf(fp, fmask, pk, pkF, pkres, fbb, dpeaks, peaksF, self.log, 
+                                         cpsf, psfFwhmPix, 
+                                         subimage.getMaskedImage().getImage(), 
+                                         subimage.getMaskedImage().getVariance(), 
+                                         self.psf_chisq_cut1, self.psf_chisq_cut2, self.psf_chisq_cut2b)
 
 
         deblendedSource = source.getTable().copyRecord(source)
