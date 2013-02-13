@@ -46,6 +46,12 @@ class DipoleMeasurementConfig(SourceMeasurementConfig):
         doc="Dipole classification config"
         )
 
+    def setDefaults(self):
+        self.algorithms.names.add("centroid.dipole.naive")
+        self.algorithms.names.add("flux.dipole.naive")
+        self.algorithms.names.add("flux.dipole.psf")
+        self.doReplaceWithNoise = False
+
 class DipoleMeasurementTask(SourceMeasurementTask):
     ConfigClass = DipoleMeasurementConfig
     _DefaultName = "dipoleMeasurement"
