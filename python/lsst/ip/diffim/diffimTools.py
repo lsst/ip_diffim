@@ -273,7 +273,7 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
 # Converting types
 #######
 
-def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, config, log, isNotParent=False):
+def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, config, log):
     """ Takes an input list of Sources that were selected to constrain
     the Psf-matching Kernel and turns them into a List of Footprints,
     which are used to seed a set of KernelCandidates.  The function
@@ -333,9 +333,9 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
         
         kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
         try:
-            fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, isNotParent).getMask())
+            fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, False).getMask())
             bm1 = fsb.getBits()
-            fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, isNotParent).getMask())
+            fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, False).getMask())
             bm2 = fsb.getBits()
         except Exception, e:
             pass
@@ -346,7 +346,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
     return candidateOutList
 
 def sourceTableToCandList(sourceTable, templateExposure, scienceExposure, config, kconfig, log):
-    footprintList = sourceToFootprintList(list(sourceTable), templateExposure, scienceExposure, kconfig, log, isNotParent=True)
+    footprintList = sourceToFootprintList(list(sourceTable), templateExposure, scienceExposure, kconfig, log)
     candList = []
 
     policy = pexConfig.makePolicy(config)

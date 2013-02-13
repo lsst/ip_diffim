@@ -20,6 +20,7 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import numpy as num
+import lsst.daf.base as dafBase
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.afw.image as afwImage
@@ -28,7 +29,7 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDetect
 import lsst.pipe.base as pipeBase
-import lsst.meas.algorithms as measAlg
+from lsst.meas.algorithms import SourceDetectionTask, PsfAttributes
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatch, PsfMatchConfigDF, PsfMatchConfigAL
 from . import utils as diUtils 
@@ -138,7 +139,7 @@ class ImagePsfMatchTask(PsfMatch):
             else:
                 psf = templateExposure.getPsf()
                 width, height = psf.getKernel().getDimensions()
-                psfAttr = measAlg.PsfAttributes(psf, width//2, height//2)
+                psfAttr = PsfAttributes(psf, width//2, height//2)
                 templateSigPix = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
                 templateFwhmPix = templateSigPix * sigma2fwhm 
         if scienceFwhmPix is None:
@@ -147,7 +148,7 @@ class ImagePsfMatchTask(PsfMatch):
             else:
                 psf = scienceExposure.getPsf()
                 width, height = psf.getKernel().getDimensions()
-                psfAttr = measAlg.PsfAttributes(psf, width//2, height//2)
+                psfAttr = PsfAttributes(psf, width//2, height//2)
                 scienceSigPix = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
                 scienceFwhmPix = scienceSigPix * sigma2fwhm 
 
@@ -415,19 +416,19 @@ class ImagePsfMatchTask(PsfMatch):
         @return kernelCellSet: a SpatialCellSet for use with self._solve
         """
         # Candidate source footprints to use for Psf matching
-        # !! This breaks things if footprints are sent !!
-        '''
         if candidateList == None:
-            self.log.log(pexLog.Log.INFO, "temporarily subtracting backgrounds for detection")
-            mi1 = templateMaskedImage.Factory(templateMaskedImage, True)
-            mi2 = scienceMaskedImage.Factory(scienceMaskedImage, True)
-            tmp = diffimTools.backgroundSubtract(self.kconfig.afwBackgroundConfig, [mi1, mi2])
+            detectSchema = afwTable.SourceTable.makeMinimalSchema()
+            detectMetadata = dafBase.PropertyList()
+            detect = SourceDetectionTask(schema=detectSchema)
+            table = afwTable.SourceTable.make(detectSchema)
+            table.setMetadata(detectMetadata)
+            detRet = detect.makeSourceCatalog(table=table, 
+                    exposure=afwImage.ExposureF(scienceMaskedImage))
+            candidateList = diffimTools.sourceToFootprintList(detRet.sources, 
+                    afwImage.ExposureF(templateMaskedImage), 
+                    afwImage.ExposureF(scienceExposure),
+                    self.kconfig.detectionConfig)
 
-            detConfig = self.kconfig.detectionConfig
-            kcDetect = diffimLib.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
-            kcDetect.apply(mi1, mi2)
-            candidateList = kcDetect.getFootprints()
-        '''
 
         sizeCellX, sizeCellY = self._adaptCellSize(candidateList)
 
