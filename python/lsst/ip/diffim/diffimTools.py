@@ -24,7 +24,7 @@
 import time
 import os
 from collections import Counter
-import numpy as num
+import numpy as np
 
 # all the c++ level classes and routines
 import diffimLib
@@ -37,6 +37,7 @@ import lsst.afw.detection as afwDetect
 import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
+import lsst.meas.algorithms as measAlg
 from .makeKernelBasisList import makeKernelBasisList 
 
 # Helper functions for ipDiffim; mostly viewing of results and writing
@@ -164,7 +165,7 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     sim  += bgValue
 
     # Watch out for negative values
-    tim  += 2 * num.abs(num.min(tim.getArray()))
+    tim  += 2 * np.abs(np.min(tim.getArray()))
     
     # Add noise?
     if addNoise:
@@ -346,36 +347,10 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
     return candidateOutList
     
 #######
-# DiaSource filters (here for now)
+# 
 #######
 
-class SourceFlagChecker(object):
-    """A functor to check whether a difference image source has any flags set that should cause it to be labeled bad."""
-    def __init__(self, sources, badFlags=['flags.pixel.edge', 'flags.pixel.interpolated.center', 'flags.pixel.saturated.center']):
-        self.keys = [sources.getSchema().find(name).key for name in badFlags]
-        self.keys.append(sources.table.getCentroidFlagKey())
 
-    def __call__(self, source):
-        for k in self.keys:
-            if source.get(k):
-                return False
-        return True
-
-class DipoleChecker(object):
-    """A functor to check for dipoles in difference image source tables."""
-    def __init__(self, sources, radiusPixels = 7.0):
-        self.sources   = sources
-        self.negkey    = self.sources.getSchema().find("flags.negative").key
-        self.matches   = afwTable.matchXy(self.sources, radiusPixels)
-        self.dipoleIds = []
-        for match in self.matches:
-            if match.first.get(self.negkey) != match.second.get(self.negkey):
-                self.dipoleIds.append(match.first.getId())
-                self.dipoleIds.append(match.second.getId())
-        
-    def __call__(self, source):
-        return source.getId() in self.dipoleIds
-        
 class NbasisEvaluator(object):
     """A functor to evaluate the Bayesian Information Criterion for the number of basis sets going into the kernel fitting"""
     def __init__(self, psfMatchConfig, psfFwhmPixTc, psfFwhmPixTnc):
@@ -409,7 +384,7 @@ class NbasisEvaluator(object):
                             diffIm = type(diffIm)(diffIm, bbox, True)
                             chi2 = diffIm.getImage().getArray()**2 / diffIm.getVariance().getArray()
                             n = chi2.shape[0] * chi2.shape[1]
-                            bic = num.sum(chi2) + k * num.log(n)
+                            bic = np.sum(chi2) + k * np.log(n)
                             if not bicArray.has_key(cand.getId()):
                                 bicArray[cand.getId()] = {}
                             bicArray[cand.getId()][(d1i, d2i, d3i)] = bic
@@ -418,7 +393,7 @@ class NbasisEvaluator(object):
         candIds = bicArray.keys()
         for candId in candIds:
             cconfig, cvals = bicArray[candId].keys(), bicArray[candId].values()
-            idx = num.argsort(cvals)
+            idx = np.argsort(cvals)
             bestConfig = cconfig[idx[0]]
             bestConfigs.append(bestConfig)
         

@@ -55,8 +55,8 @@ class DiaCatalogSourceSelectorConfig(pexConfig.Config):
         dtype = bool,
         default = False
     )
-    selectVariable = pexConfig.Field(
-        doc = "Select objects that are known to be variable",
+    includeVariable = pexConfig.Field(
+        doc = "Include objects that are known to be variable",
         dtype = bool,
         default = False
     )
@@ -149,7 +149,7 @@ class DiaCatalogSourceSelector(object):
                     gMag = -2.5 * np.log10(ref.get("g"))
                     rMag = -2.5 * np.log10(ref.get("r"))
                     isRightType  = (self.config.selectStar and isStar) or (self.config.selectGalaxy and not isStar)
-                    isRightVar   = self.config.selectVariable is isVar
+                    isRightVar   = (self.config.includeVariable) or (self.config.includeVariable is isVar)
                     isRightColor = (gMag-rMag) >= self.config.grMin and (gMag-rMag) <= self.config.grMax
                     if isRightType and isRightVar and isRightColor:
                         kernelCandidateSourceList.append(source)
