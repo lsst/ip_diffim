@@ -686,154 +686,193 @@ def calcWidth(arr, centx, centy):
     ystd = num.sqrt(narr.sum()/sarr.sum())
     return xstd, ystd
 
-def calcKernelStats(kernelCellSet, kType):
-    for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(False): # include bad candidates
-            cand = diffimLib.cast_KernelCandidateF(cand)
-            if cand.isBad():
-                continue
-            try:
-	        populateSourceMetrics(cand, kType)
-            except Exception, e:
-                #Make this an acual log message and maybe add it to the task metadata
-                print "Couldn't calculate metrics for kernel %i"%(cand.getId())
-
-def calcKernelCtrlStats(candList, kType, kernel, background):
-    for cand in candList: # include bad candidates
-        try:
-            populateSourceMetrics(cand, kType, kernel, background)
-        except Exception, e:
-            #Make this an acual log message and maybe add it to the task metadata
-            print "Couldn't calculate metrics for kernel %i"%(cand.getId())
-
-def populateSourceMetrics(kernelCandidate, kTypeStr, kernel=None, background=None):
+class KernelCandidateQa(object):
     
-    source = kernelCandidate.getSource()
-    schema = source.schema
+    def __init__(self, nKernelSpatial):
+        self.fields = []
+        for kType in ("LOCAL", "SPATIAL"):
+            self.fields.append(afwTable.Field["F"]("KCDiffimMean_%s"%(kType), 
+                                                   "Mean of KernelCandidate diffim", "sigma"))
 
-    #Get masked array for the diffim
-    if kTypeStr == 'CTRL':
-        kim  = afwImage.ImageD(kernel.getDimensions())
-        kernel.computeImage(kim, False, int(kernelCandidate.getXCenter()), int(kernelCandidate.getYCenter()))
-        sk   = afwMath.FixedKernel(kim)
-        sbg = background(int(kernelCandidate.getXCenter()), int(kernelCandidate.getYCenter()))
-        mi = kernelCandidate.getDifferenceImage(sk, sbg)
-    else:
-        kType = getattr(diffimLib.KernelCandidateF, kTypeStr)
-        mi = kernelCandidate.getDifferenceImage(kType)
-        kernel = kernelCandidate.getKernel(kType)
-        kstatus = kernelCandidate.getStatus()
-        kernelValues=kernelCandidate.getKernel(kType).getKernelParameters()
-        backgroundValue = kernelCandidate.getBackground(kType)
-        kernelValues = num.asarray(kernelValues)
+            self.fields.append(afwTable.Field["F"]("KCDiffimMedian_%s"%(kType), 
+                                                   "Median of KernelCandidate diffim", "sigma"))
 
-    mask = mi.getMask()
-    imArr = mi.getImage().getArray()
-    maskArr = mi.getMask().getArray()
-    #Only leave BAD, SAT, and EDGE mask set.  We want detected pixels.
-    maskArr &= (mask.getPlaneBitMask("BAD")|mask.getPlaneBitMask("SAT")|mask.getPlaneBitMask("EDGE"))
-    varArr = mi.getVariance().getArray()
-    miArr = ma.array(imArr, mask=maskArr)
+            self.fields.append(afwTable.Field["F"]("KCDiffimIQR_%s"%(kType), 
+                                                   "Inner quartile range of KernelCandidate diffim", 
+                                                   "sigma"))
 
-    #Normalize by varliance
-    miArr /= num.sqrt(varArr)
-    mean = miArr.mean()
+            self.fields.append(afwTable.Field["F"]("KCDiffimStDev_%s"%(kType), 
+                                                   "Standard deviation of KernelCandidate diffim",
+                                                   "sigma"))
 
-    #This is the maximum-likelihood extimate of the variance stdev**2
-    stdev = miArr.std()
-    median = ma.extras.median(miArr)
+            self.fields.append(afwTable.Field["F"]("KCDiffimKSD_%s"%(kType), 
+                                                   "D from K-S test of diffim pixels relative to Normal"))
 
-    #Compute IQR of just un-masked data
-    data = ma.getdata(miArr[~miArr.mask])
-    iqr = num.percentile(data, 75.) - num.percentile(data, 25.)
+            self.fields.append(afwTable.Field["F"]("KCDiffimKSProb_%s"%(kType), 
+                                                   "Prob from K-S test of diffim pixels relative to Normal",
+                                                   "likelihood"))
 
-    #K-S test on the diffim to a Normal distribution
-    D, prob = kstest(miArr, normalCdf)
+            self.fields.append(afwTable.Field["F"]("KCKernelCentX_%s"%(kType), 
+                                                   "Centroid in X for this Kernel",
+                                                   "pixels"))
 
-    #Anderson Darling test is harder to do.
+            self.fields.append(afwTable.Field["F"]("KCKernelCentY_%s"%(kType), 
+                                                   "Centroid in Y for this Kernel",
+                                                   "pixels"))
+                               
+            self.fields.append(afwTable.Field["F"]("KCKernelStdX_%s"%(kType), 
+                                                   "Standard deviation in X for this Kernel",
+                                                   "pixels"))
 
-    #We need to do something about persisting the kernel solution
-    if kTypeStr == 'ORIG':
-        kim = kernelCandidate.getKernelImage(kType)
-        karr = kim.getArray()
-        centx, centy = calcCentroid(karr)
-        stdx, stdy = calcWidth(karr, centx, centy)
-        solution = kernelCandidate.getKernelSolution(kType)
-        metrics = {"KCDiffimMean%s"%(kTypeStr):mean,
-               "KCDiffimMedian%s"%(kTypeStr):median,
-               "KCDiffimIQR%s"%(kTypeStr):iqr,
-               "KCDiffimStDev%s"%(kTypeStr):stdev,
-               "KCDiffimKSD%s"%(kTypeStr):D,
-               "KCDiffimKSProb%s"%(kTypeStr):prob,
-               "KCKernelCentX%s"%(kTypeStr):centx,
-               "KCKernelCentY%s"%(kTypeStr):centy,
-               "KCKernelStdX%s"%(kTypeStr):stdx,
-               "KCKernelStdY%s"%(kTypeStr):stdy,
-               "KernelCandidateId%s"%(kTypeStr):kernelCandidate.getId(),
-               "KCKernelStatus%s"%(kTypeStr):kstatus,
-               "KernelCoeffValues%s"%(kTypeStr):kernelValues,
-               "BackgroundValue%s"%(kTypeStr):backgroundValue}
-    else:
-        karr = kim.getArray()
-        centx, centy = calcCentroid(karr)
-        stdx, stdy = calcWidth(karr, centx, centy)
-        #Apparently there is no solution if the _build method is not called.  I guess this makes sense,
-        #but I don't know how to get the coeffs at this location.
-        #solution = kernelCandidate.getKernelSolution(getattr(diffimLib.KernelCandidateF, 'ORIG'))
-        solution = None
-        metrics = {"KCDiffimMean%s"%(kTypeStr):mean,
-               "KCDiffimMedian%s"%(kTypeStr):median,
-               "KCDiffimIQR%s"%(kTypeStr):iqr,
-               "KCDiffimStDev%s"%(kTypeStr):stdev,
-               "KCDiffimKSD%s"%(kTypeStr):D,
-               "KCDiffimKSProb%s"%(kTypeStr):prob,
-               "KCKernelCentX%s"%(kTypeStr):centx,
-               "KCKernelCentY%s"%(kTypeStr):centy,
-               "KCKernelStdX%s"%(kTypeStr):stdx,
-               "KCKernelStdY%s"%(kTypeStr):stdy,
-               "KernelCandidateId%s"%(kTypeStr):kernelCandidate.getId()}
-    for k in metrics.keys():
-        key = schema[k].asKey()
-        setter = getattr(source, "set"+key.getTypeString())
-        setter(key, metrics[k])
+            self.fields.append(afwTable.Field["F"]("KCKernelStdY_%s"%(kType), 
+                                                   "Standard deviation in Y for this Kernel",
+                                                   "pixels"))
 
-def addMetricsColumns(sourceCatalog, nKernelSpatial):
-    schema = sourceCatalog.getSchema()
-    inKeys = []
-    fluxKey = sourceCatalog.getPsfFluxKey()
-    centroidKey = sourceCatalog.getCentroidKey()
-    shapeKey = sourceCatalog.getShapeKey()
-    for n in schema.getNames():
-        inKeys.append(schema[n].asKey())
-    #Add columns for metrics.  Unfortunately these need to be kept in sync
-    #with ip_diffim.utils.populateSourceMetrics.
-    for kType in ('ORIG', 'CTRL'):
-        meank = schema.addField("KCDiffimMean%s"%(kType), type="F", doc="Mean of KernelCandidate diffim")
-        mediank = schema.addField("KCDiffimMedian%s"%(kType), type="F", doc="Median of KernelCandidate diffim")
-        iqrk = schema.addField("KCDiffimIQR%s"%(kType), type="F", doc="Inner quartile range of KernelCandidate diffim")
-        stdevk = schema.addField("KCDiffimStDev%s"%(kType), type="F", doc="Standard deviation of KernelCandidate diffim")
-        dk = schema.addField("KCDiffimKSD%s"%(kType), type="F", doc="D from K-S test on pixels of KernelCandidate diffim relative to Normal")
-        probk = schema.addField("KCDiffimKSProb%s"%(kType), type="F", doc="Prob from K-S test on pixels of KernalCandidate diffim relative to Normal")
-        centxk = schema.addField("KCKernelCentX%s"%(kType), type="F", doc="Centroid in X for this Kernel")
-        centyk = schema.addField("KCKernelCentY%s"%(kType), type="F", doc="Centroid in Y for this Kernel")
-        stdxk = schema.addField("KCKernelStdX%s"%(kType), type="F", doc="Standard deviation in X for this Kernel")
-        stdyk = schema.addField("KCKernelStdY%s"%(kType), type="F", doc="Standard deviation in Y for this Kernel")
-        kcidk = schema.addField("KernelCandidateId%s"%(kType), type="I", doc="Id for this KernelCandidate")
-        if kType == 'ORIG':
-            statk = schema.addField("KCKernelStatus%s"%(kType), type="I", doc="Status of the KernelCandidate")
-            ksk = schema.addField("KernelCoeffValues%s"%(kType), type="ArrayD", size=nKernelSpatial, doc="Original basis coefficients")
-            bckdsk = schema.addField("BackgroundValue%s"%(kType), type="F", doc="Evaluation of background model at this point.")
-    retCatalog = afwTable.SourceCatalog(schema)
-    for source in sourceCatalog:
-        rec = retCatalog.addNew()
-        for k in inKeys:
-            if k.getTypeString() == 'Coord':
-                rec.setCoord(source.getCoord())
-            else:
-                setter = getattr(rec, "set"+k.getTypeString())
-                getter = getattr(source, "get"+k.getTypeString())
-                setter(k, getter(k))
-    retCatalog.definePsfFlux(fluxKey)
-    retCatalog.defineCentroid(centroidKey)
-    retCatalog.defineShape(shapeKey)
-    return retCatalog
+            self.fields.append(afwTable.Field["I"]("KernelCandidateId_%s"%(kType), 
+                                                   "Id for this KernelCandidate"))
+
+            if kType == 'ORIG':
+                self.fields.append(afwTable.Field["I"]("KCKernelStatus_%s"%(kType), 
+                                                       "Status of the KernelCandidate"))
+
+                self.fields.append(afwTable.Field["ArrayD"]("KernelCoeffValues_%s"%(kType), 
+                                                            "Original basis coefficients",
+                                                            nKernelSpatial))
+
+                self.fields.append(afwTable.Field["F"]("BackgroundValue_%s"%(kType), 
+                                                       "Evaluation of background model at this point"))
+        
+    def addToSchema(self, inSourceCatalog):
+        schema = inSourceCatalog.getSchema()
+        inKeys = []
+        fluxKey = inSourceCatalog.getPsfFluxKey()
+        centroidKey = inSourceCatalog.getCentroidKey()
+        shapeKey = inSourceCatalog.getShapeKey()
+        for n in schema.getNames():
+            inKeys.append(schema[n].asKey())
+
+        for field in self.fields:
+            schema.addField(field)
+
+        outSourceCatalog = afwTable.SourceCatalog(schema)
+        for source in inSourceCatalog:
+            rec = outSourceCatalog.addNew()
+            for k in inKeys:
+                if k.getTypeString() == 'Coord':
+                    rec.setCoord(source.getCoord())
+                else:
+                    setter = getattr(rec, "set"+k.getTypeString())
+                    getter = getattr(source, "get"+k.getTypeString())
+                    setter(k, getter(k))
+        outSourceCatalog.definePsfFlux(fluxKey)
+        outSourceCatalog.defineCentroid(centroidKey)
+        outSourceCatalog.defineShape(shapeKey)
+        return outSourceCatalog
+
+    def _calculateStats(self, di):
+        mask = di.getMask()
+        maskArr = di.getMask().getArray()
+
+        # Create a mask using BAD,SAT,EDGE pixels.  Keep detections
+        maskArr &= (mask.getPlaneBitMask("BAD")|mask.getPlaneBitMask("SAT")|mask.getPlaneBitMask("EDGE"))
+
+        # Mask out values based on maskArr
+        diArr = ma.array(di.getImage().getArray(), mask=maskArr)
+        varArr = ma.array(di.getVariance().getArray(), mask=maskArr)
+
+        # Normalize by sqrt variance, units are in sigma
+        diArr /= num.sqrt(varArr)
+        mean = diArr.mean()
+
+        # This is the maximum-likelihood extimate of the variance stdev**2
+        stdev = diArr.std()
+        median = ma.extras.median(diArr)
+
+        # Compute IQR of just un-masked data
+        data = ma.getdata(diArr[~diArr.mask])
+        iqr = num.percentile(data, 75.) - num.percentile(data, 25.)
+
+        # K-S test on the diffim to a Normal distribution
+        D, prob = kstest(diArr, normalCdf)
+
+        # Anderson Darling test is harder to do.
+        # TBD
+
+        return mean, stdev, median, iqr, D, prob
+
+    def apply(self, candidateList, spatialKernel, spatialBackground):
+        for kernelCandidate in candidateList:
+            source = kernelCandidate.getSource()
+            schema = source.schema
+    
+            # Calculate ORIG stats (original basis fit)
+            if kernelCandidate.getStatus() != afwMath.SpatialCellCandidate.UNKNOWN:
+                kType = getattr(diffimLib.KernelCandidateF, "ORIG")
+                di = kernelCandidate.getDifferenceImage(kType)
+                kernel = kernelCandidate.getKernel(kType)
+                kstatus = kernelCandidate.getStatus()
+                backgroundValue = kernelCandidate.getBackground(kType)
+                kernelValues = kernelCandidate.getKernel(kType).getKernelParameters()
+                kernelValues = num.asarray(kernelValues)
+    
+                kim = kernelCandidate.getKernelImage(kType)
+                centx, centy = calcCentroid(kim.getArray())
+                stdx, stdy = calcWidth(kim.getArray(), centx, centy)
+                solution = kernelCandidate.getKernelSolution(kType)
+                # NOTE
+                # What is the difference between kernelValues and solution?
+    
+                mean, stdev, median, iqr, D, prob = self._calculateStats(di)
+    
+                metrics = {"KCDiffimMean_LOCAL":mean,
+                           "KCDiffimMedian_LOCAL":median,
+                           "KCDiffimIQR_LOCAL":iqr,
+                           "KCDiffimStDev_LOCAL":stdev,
+                           "KCDiffimKSD_LOCAL":D,
+                           "KCDiffimKSProb_LOCAL":prob,
+                           "KCKernelCentX_LOCAL":centx,
+                           "KCKernelCentY_LOCAL":centy,
+                           "KCKernelStdX_LOCAL":stdx,
+                           "KCKernelStdY_LOCAL":stdy,
+                           "KernelCandidateId_LOCAL":kernelCandidate.getId()}
+                for k in metrics.keys():
+                    key = schema[k].asKey()
+                    setter = getattr(source, "set"+key.getTypeString())
+                    setter(key, metrics[k])
+                
+    
+            # Calculate spatial model evaluated at each position, for
+            # all candidates
+            kim  = afwImage.ImageD(spatialKernel.getDimensions())
+            spatialKernel.computeImage(kim, False, kernelCandidate.getXCenter(),
+                                       kernelCandidate.getYCenter())
+            centx, centy = calcCentroid(kim.getArray())
+            stdx, stdy = calcWidth(kim.getArray(), centx, centy)
+    
+            sk = afwMath.FixedKernel(kim)
+            sbg = spatialBackground(kernelCandidate.getXCenter(), kernelCandidate.getYCenter())
+            di = kernelCandidate.getDifferenceImage(sk, sbg)
+            mean, stdev, median, iqr, D, prob = self._calculateStats(di)
+    
+            metrics = {"KCDiffimMean_SPATIAL":mean,
+                       "KCDiffimMedian_SPATIAL":median,
+                       "KCDiffimIQR_SPATIAL":iqr,
+                       "KCDiffimStDev_SPATIAL":stdev,
+                       "KCDiffimKSD_SPATIAL":D,
+                       "KCDiffimKSProb_SPATIAL":prob,
+                       "KCKernelCentX_SPATIAL":centx,
+                       "KCKernelCentY_SPATIAL":centy,
+                       "KCKernelStdX_SPATIAL":stdx,
+                       "KCKernelStdY_SPATIAL":stdy,
+                       "KernelCandidateId_SPATIAL":kernelCandidate.getId()}
+            for k in metrics.keys():
+                key = schema[k].asKey()
+                setter = getattr(source, "set"+key.getTypeString())
+                setter(key, metrics[k])
+
+
+    def test(self):
+        schema = afwTable.SourceTable.makeMinimalSchema()
+        table = afwTable.SourceTable.make(schema)
+        ss = afwTable.SourceCatalog(table)
+

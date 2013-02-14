@@ -596,7 +596,6 @@ class PsfMatch(pipeBase.Task):
                     nBad += 1
 
         self.log.info("Doing stats of kernel candidates used in the spatial fit.")
-        diUtils.calcKernelStats(kernelCellSet, 'ORIG')
 
         # Counting statistics
         if nBad > 2*nGood:
