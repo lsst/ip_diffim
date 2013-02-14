@@ -26,7 +26,7 @@ import re
 import sys
 import math
 
-import numpy as num
+import numpy as np
 import numpy.ma as ma
 
 import lsst.pex.exceptions as pexExcept
@@ -94,7 +94,7 @@ def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
                     if showChi2:
                         rchi2 = cand.getChi2()
                         if rchi2 > 1e100:
-                            rchi2 = num.nan
+                            rchi2 = np.nan
                         ds9.dot("%d %.1f" % (cand.getId(), rchi2),
                                 xc - size, yc - size - 4, frame=frame, ctype=color, size=size)
 
@@ -161,7 +161,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
                 
             rchi2 = cand.getChi2()
             if rchi2 > 1e100:
-                rchi2 = num.nan
+                rchi2 = np.nan
 
             if not showBadCandidates and cand.isBad():
                 continue
@@ -189,7 +189,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
             if resids:
                 var = resid.getVariance()
                 var = var.Factory(var, True)
-                num.sqrt(var.getArray(), var.getArray()) # inplace sqrt
+                np.sqrt(var.getArray(), var.getArray()) # inplace sqrt
                 resid = resid.getImage()
                 resid /= var
                 bbox = kernel.shrinkBBox(resid.getBBox())
@@ -225,7 +225,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
 
             mos.append(im, lab, ctype)
 
-            if False and num.isnan(rchi2):
+            if False and np.isnan(rchi2):
                 ds9.mtv(cand.getScienceMaskedImage.getImage(), title="candidate", frame=1)
                 print "rating",  cand.getCandidateRating()
 
@@ -299,7 +299,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
             targetAmps = badAmps if cand.isBad() else candAmps
 
             # compare original and spatial kernel coefficients
-            kp0 = num.array(cand.getKernel(diffimLib.KernelCandidateF.ORIG).getKernelParameters())
+            kp0 = np.array(cand.getKernel(diffimLib.KernelCandidateF.ORIG).getKernelParameters())
             amp = cand.getCandidateRating()
 
             targetFits = badFits if cand.isBad() else candFits
@@ -313,19 +313,19 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
     numCandidates = len(candFits)
     numBasisFuncs = kernel.getNBasisKernels()
 
-    xGood = num.array([pos.getX() for pos in candPos]) - x0
-    yGood = num.array([pos.getY() for pos in candPos]) - y0
-    zGood = num.array(candFits)
-    ampGood = num.array(candAmps)
+    xGood = np.array([pos.getX() for pos in candPos]) - x0
+    yGood = np.array([pos.getY() for pos in candPos]) - y0
+    zGood = np.array(candFits)
+    ampGood = np.array(candAmps)
 
-    xBad = num.array([pos.getX() for pos in badPos]) - x0
-    yBad = num.array([pos.getY() for pos in badPos]) - y0
-    zBad = num.array(badFits)
-    ampBad = num.array(badAmps)
+    xBad = np.array([pos.getX() for pos in badPos]) - x0
+    yBad = np.array([pos.getY() for pos in badPos]) - y0
+    zBad = np.array(badFits)
+    ampBad = np.array(badAmps)
     numBad = len(badPos)
 
-    xRange = num.linspace(0, kernelCellSet.getBBox().getWidth(), num=numSample)
-    yRange = num.linspace(0, kernelCellSet.getBBox().getHeight(), num=numSample)
+    xRange = np.linspace(0, kernelCellSet.getBBox().getWidth(), num=numSample)
+    yRange = np.linspace(0, kernelCellSet.getBBox().getHeight(), num=numSample)
 
     if maxCoeff:
         maxCoeff = min(maxCoeff, kernel.getNKernelParameters())
@@ -334,18 +334,18 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
 
     for k in range(maxCoeff):
         func = kernel.getSpatialFunction(k)
-        dfGood = zGood[:,k] - num.array([func(pos.getX(), pos.getY()) for pos in candPos])
+        dfGood = zGood[:,k] - np.array([func(pos.getX(), pos.getY()) for pos in candPos])
         yMin = dfGood.min()
         yMax = dfGood.max()
         if numBad > 0:
-            dfBad = zBad[:,k] - num.array([func(pos.getX(), pos.getY()) for pos in badPos])
+            dfBad = zBad[:,k] - np.array([func(pos.getX(), pos.getY()) for pos in badPos])
             # Can really screw up the range...
             yMin = min([yMin, dfBad.min()])
             yMax = max([yMax, dfBad.max()])
         yMin -= 0.05 * (yMax - yMin)
         yMax += 0.05 * (yMax - yMin)
 
-        fRange = num.ndarray((len(xRange), len(yRange)))
+        fRange = np.ndarray((len(xRange), len(yRange)))
         for j, yVal in enumerate(yRange):
             for i, xVal in enumerate(xRange):
                 fRange[j][i] = func(xVal, yVal)
@@ -362,8 +362,8 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
 
         # LL
         ax = fig.add_axes((0.1, 0.05, 0.35, 0.35))
-        vmin = fRange.min() # - 0.05 * num.fabs(fRange.min())
-        vmax = fRange.max() # + 0.05 * num.fabs(fRange.max())
+        vmin = fRange.min() # - 0.05 * np.fabs(fRange.min())
+        vmax = fRange.max() # + 0.05 * np.fabs(fRange.max())
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
         im = ax.imshow(fRange, aspect='auto', norm=norm,
                        extent=[0, kernelCellSet.getBBox().getWidth()-1, 
@@ -373,9 +373,9 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
 
         # UL
         ax = fig.add_axes((0.1, 0.55, 0.35, 0.35))
-        ax.plot(-2.5*num.log10(candAmps), zGood[:,k], 'b+')
+        ax.plot(-2.5*np.log10(candAmps), zGood[:,k], 'b+')
         if numBad > 0:
-            ax.plot(-2.5*num.log10(badAmps), zBad[:,k], 'r+')
+            ax.plot(-2.5*np.log10(badAmps), zBad[:,k], 'r+')
         ax.set_title("Basis Coefficients")
         ax.set_xlabel("Instr mag")
         ax.set_ylabel("Coeff")
@@ -516,15 +516,15 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
             tsdiffim = sdiffim.Factory(sdiffim, bbox)
 
             if origVariance:
-                candidateResids.append(num.ravel(tdiffim.getImage().getArray() \
-                                                     / num.sqrt(torig.getVariance().getArray())))
-                spatialResids.append(num.ravel(tsdiffim.getImage().getArray() \
-                                                   / num.sqrt(torig.getVariance().getArray())))
+                candidateResids.append(np.ravel(tdiffim.getImage().getArray() \
+                                                     / np.sqrt(torig.getVariance().getArray())))
+                spatialResids.append(np.ravel(tsdiffim.getImage().getArray() \
+                                                   / np.sqrt(torig.getVariance().getArray())))
             else:
-                candidateResids.append(num.ravel(tdiffim.getImage().getArray() \
-                                                     / num.sqrt(tdiffim.getVariance().getArray())))
-                spatialResids.append(num.ravel(tsdiffim.getImage().getArray() \
-                                                   / num.sqrt(tsdiffim.getVariance().getArray())))
+                candidateResids.append(np.ravel(tdiffim.getImage().getArray() \
+                                                     / np.sqrt(tdiffim.getVariance().getArray())))
+                spatialResids.append(np.ravel(tsdiffim.getImage().getArray() \
+                                                   / np.sqrt(tsdiffim.getVariance().getArray())))
 
     fullIm   = diffExposure.getMaskedImage().getImage().getArray()
     fullMask = diffExposure.getMaskedImage().getMask().getArray()
@@ -536,10 +536,10 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     bitmaskBad  = 0
     bitmaskBad |= afwImage.MaskU.getPlaneBitMask('EDGE')
     bitmaskBad |= afwImage.MaskU.getPlaneBitMask('SAT')
-    idx = num.where((fullMask & bitmaskBad) == 0)
+    idx = np.where((fullMask & bitmaskBad) == 0)
     stride = int(len(idx[0]) // nptsFull)
     sidx = idx[0][::stride], idx[1][::stride]
-    allResids = fullIm[sidx] / num.sqrt(fullVar[sidx])
+    allResids = fullIm[sidx] / np.sqrt(fullVar[sidx])
 
     testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure, 
                                                        exposure, config, pexLog.getDefaultLog())
@@ -550,11 +550,11 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
             subvar = afwImage.ExposureF(exposure, fp.getBBox()).getMaskedImage().getVariance()
         else:
             subvar = subexp.getMaskedImage().getVariance()
-        nonfitResids.append(num.ravel(subim.getArray() / num.sqrt(subvar.getArray())))
+        nonfitResids.append(np.ravel(subim.getArray() / np.sqrt(subvar.getArray())))
 
-    candidateResids = num.ravel(num.array(candidateResids))
-    spatialResids   = num.ravel(num.array(spatialResids))
-    nonfitResids    = num.ravel(num.array(nonfitResids))
+    candidateResids = np.ravel(np.array(candidateResids))
+    spatialResids   = np.ravel(np.array(spatialResids))
+    nonfitResids    = np.ravel(np.array(nonfitResids))
 
     try:
         import pylab
@@ -578,29 +578,29 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     sp2 = pylab.subplot(222, sharex=sp1, sharey=sp1)
     sp3 = pylab.subplot(223, sharex=sp1, sharey=sp1)
     sp4 = pylab.subplot(224, sharex=sp1, sharey=sp1)
-    xs  = num.arange(-5, 5.05, 0.1)
-    ys  = 1. / num.sqrt(2 * num.pi) * num.exp( -0.5 * xs**2 )
+    xs  = np.arange(-5, 5.05, 0.1)
+    ys  = 1. / np.sqrt(2 * np.pi) * np.exp( -0.5 * xs**2 )
 
     sp1.hist(candidateResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
-                 % (num.mean(candidateResids), num.var(candidateResids)))
+                 % (np.mean(candidateResids), np.var(candidateResids)))
     sp1.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp1.set_title("Candidates: basis fit", fontsize=titleFs-2)
     sp1.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
 
     sp2.hist(spatialResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
-                 % (num.mean(spatialResids), num.var(spatialResids)))
+                 % (np.mean(spatialResids), np.var(spatialResids)))
     sp2.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp2.set_title("Candidates: spatial fit", fontsize=titleFs-2)
     sp2.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
 
     sp3.hist(nonfitResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
-                 % (num.mean(nonfitResids), num.var(nonfitResids)))
+                 % (np.mean(nonfitResids), np.var(nonfitResids)))
     sp3.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp3.set_title("Control sample: spatial fit", fontsize=titleFs-2)
     sp3.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
 
     sp4.hist(allResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
-                 % (num.mean(allResids), num.var(allResids)))
+                 % (np.mean(allResids), np.var(allResids)))
     sp4.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp4.set_title("Full image (subsampled)", fontsize=titleFs-2)
     sp4.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
@@ -632,7 +632,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
 def ksprob(d, ne, iter=100):
     eps1 = 0.0001
     eps2 = 1.e-8
-    en = num.sqrt(ne)
+    en = np.sqrt(ne)
     lam = (en + 0.12 + 0.11/en)*d
     a2 = -2*lam**2
     probks = 0.
@@ -640,24 +640,24 @@ def ksprob(d, ne, iter=100):
     sign = 1.
     for j in range(iter):
 	j += 1
-        term = sign*2*num.exp(a2*j**2)
+        term = sign*2*np.exp(a2*j**2)
         probks = probks + term
-        if num.abs(term) <= eps1*termbf or num.abs(term) <= eps2*probks:
+        if np.abs(term) <= eps1*termbf or np.abs(term) <= eps2*probks:
             return probks
         sign = -sign
-        termbf = num.abs(term)
+        termbf = np.abs(term)
     #Did not converge.
     return 1.
 
 def kstest(arr, probFunc):
     data = arr[~arr.mask]
-    idxs = num.argsort(data)
+    idxs = np.argsort(data)
     N = len(idxs)
     vals = []
     for idx in idxs:
         vals.append(probFunc(data[idx]))
-    vals = num.asarray(vals)
-    D = num.abs(num.arange(1.0, N+1.)/N - vals).max()
+    vals = np.asarray(vals)
+    D = np.abs(np.arange(1.0, N+1.)/N - vals).max()
     return D, ksprob(D, N)
 
 def normalCdf(x, mu=0., sigma=1.):
@@ -666,8 +666,8 @@ def normalCdf(x, mu=0., sigma=1.):
 def calcCentroid(arr):
     y, x = arr.shape
     sarr = arr*arr
-    xarr = num.asarray([[el for el in range(x)] for el2 in range(y)])
-    yarr = num.asarray([[el2 for el in range(x)] for el2 in range(y)])
+    xarr = np.asarray([[el for el in range(x)] for el2 in range(y)])
+    yarr = np.asarray([[el2 for el in range(x)] for el2 in range(y)])
     narr = xarr*sarr
     centx = narr.sum()/sarr.sum()
     narr = yarr*sarr
@@ -678,12 +678,12 @@ def calcWidth(arr, centx, centy):
     y, x = arr.shape
     #Square the flux so we don't have to deal with negatives
     sarr = arr*arr
-    xarr = num.asarray([[el for el in range(x)] for el2 in range(y)])
-    yarr = num.asarray([[el2 for el in range(x)] for el2 in range(y)])
-    narr = sarr*num.power((xarr - centx), 2.)
-    xstd = num.sqrt(narr.sum()/sarr.sum())
-    narr = sarr*num.power((yarr - centy), 2.)
-    ystd = num.sqrt(narr.sum()/sarr.sum())
+    xarr = np.asarray([[el for el in range(x)] for el2 in range(y)])
+    yarr = np.asarray([[el2 for el in range(x)] for el2 in range(y)])
+    narr = sarr*np.power((xarr - centx), 2.)
+    xstd = np.sqrt(narr.sum()/sarr.sum())
+    narr = sarr*np.power((yarr - centy), 2.)
+    ystd = np.sqrt(narr.sum()/sarr.sum())
     return xstd, ystd
 
 class KernelCandidateQa(object):
@@ -781,7 +781,7 @@ class KernelCandidateQa(object):
         varArr = ma.array(di.getVariance().getArray(), mask=maskArr)
 
         # Normalize by sqrt variance, units are in sigma
-        diArr /= num.sqrt(varArr)
+        diArr /= np.sqrt(varArr)
         mean = diArr.mean()
 
         # This is the maximum-likelihood extimate of the variance stdev**2
@@ -790,7 +790,7 @@ class KernelCandidateQa(object):
 
         # Compute IQR of just un-masked data
         data = ma.getdata(diArr[~diArr.mask])
-        iqr = num.percentile(data, 75.) - num.percentile(data, 25.)
+        iqr = np.percentile(data, 75.) - np.percentile(data, 25.)
 
         # K-S test on the diffim to a Normal distribution
         D, prob = kstest(diArr, normalCdf)
@@ -813,7 +813,7 @@ class KernelCandidateQa(object):
                 kstatus = kernelCandidate.getStatus()
                 backgroundValue = kernelCandidate.getBackground(kType)
                 kernelValues = kernelCandidate.getKernel(kType).getKernelParameters()
-                kernelValues = num.asarray(kernelValues)
+                kernelValues = np.asarray(kernelValues)
     
                 kim = kernelCandidate.getKernelImage(kType)
                 centx, centy = calcCentroid(kim.getArray())
@@ -870,6 +870,15 @@ class KernelCandidateQa(object):
                 setter = getattr(source, "set"+key.getTypeString())
                 setter(key, metrics[k])
 
+    def aggregate(self, sourceCatalog, metadata):
+        for kType in ("LOCAL", "SPATIAL"):
+            for sName in ("KCDiffimMean", "KCDiffimMedian", "KCDiffimIQR", "KCDiffimStDev", "KCDiffimKSProb"):
+                kName = "%s_%s" % (sName, kType)
+                vals = np.array([s.get(kName) for s in sourceCatalog])
+                idx = np.isfinite(vals)
+                metadata.add("%s_MEAN" % (sName), np.mean(vals[idx]))
+                metadata.add("%s_MEDIAN" % (sName), np.median(vals[idx]))
+                metadata.add("%s_STDEV" % (sName), np.std(vals[idx]))
 
     def test(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
