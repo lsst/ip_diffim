@@ -880,8 +880,4 @@ class KernelCandidateQa(object):
                 metadata.add("%s_MEDIAN" % (kName), np.median(vals[idx]))
                 metadata.add("%s_STDEV" % (kName), np.std(vals[idx]))
 
-    def test(self):
-        schema = afwTable.SourceTable.makeMinimalSchema()
-        table = afwTable.SourceTable.make(schema)
-        ss = afwTable.SourceCatalog(table)
 
