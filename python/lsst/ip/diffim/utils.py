@@ -876,9 +876,9 @@ class KernelCandidateQa(object):
                 kName = "%s_%s" % (sName, kType)
                 vals = np.array([s.get(kName) for s in sourceCatalog])
                 idx = np.isfinite(vals)
-                metadata.add("%s_MEAN" % (sName), np.mean(vals[idx]))
-                metadata.add("%s_MEDIAN" % (sName), np.median(vals[idx]))
-                metadata.add("%s_STDEV" % (sName), np.std(vals[idx]))
+                metadata.add("%s_MEAN" % (kName), np.mean(vals[idx]))
+                metadata.add("%s_MEDIAN" % (kName), np.median(vals[idx]))
+                metadata.add("%s_STDEV" % (kName), np.std(vals[idx]))
 
     def test(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
