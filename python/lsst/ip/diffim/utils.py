@@ -853,7 +853,7 @@ class KernelCandidateQa(object):
             sbg = spatialBackground(kernelCandidate.getXCenter(), kernelCandidate.getYCenter())
             di = kernelCandidate.getDifferenceImage(sk, sbg)
             mean, stdev, median, iqr, D, prob = self._calculateStats(di)
-    
+
             metrics = {"KCDiffimMean_SPATIAL":mean,
                        "KCDiffimMedian_SPATIAL":median,
                        "KCDiffimIQR_SPATIAL":iqr,
