@@ -296,7 +296,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
     for mp in config.badMaskPlanes: 
         badBitMask |= afwImage.MaskU.getPlaneBitMask(mp)
     log.info("Growing %d kernel candidate stars" % (len(candidateInList)))
-    bbox = scienceExposure.getBBox()
+    bbox = scienceExposure.getBBox(afwImage.PARENT)
     for kernelCandidate in candidateInList:
         if not type(kernelCandidate) == afwTable.SourceRecord:
             raise RuntimeError, ("Candiate not of type afwTable.SourceRecord")
