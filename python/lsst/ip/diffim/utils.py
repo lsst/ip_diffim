@@ -802,7 +802,6 @@ class KernelCandidateQa(object):
         iqr = np.percentile(data, 75.) - np.percentile(data, 25.)
 
         # K-S test on the diffim to a Normal distribution
-        import pdb; pdb.set_trace()
         try:
             import scipy.stats
             D, prob = scipy.stats.kstest(diArr, 'norm')
