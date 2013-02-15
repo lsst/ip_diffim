@@ -801,13 +801,13 @@ class KernelCandidateQa(object):
         data = ma.getdata(diArr[~diArr.mask])
         iqr = np.percentile(data, 75.) - np.percentile(data, 25.)
 
-        # K-S test on the diffim to a Normal distribution
         try:
+            # K-S test on the diffim to a Normal distribution
             import scipy.stats
-        D, prob = scipy.stats.kstest(diArr, 'norm')
+            D, prob = scipy.stats.kstest(diArr, 'norm')
 
-        # Anderson Darling test is harder to do.
-        A2, crit, sig = scipy.stats.anderson(diArr, 'norm')
+            # Anderson Darling test is harder to do.
+            A2, crit, sig = scipy.stats.anderson(diArr, 'norm')
         except:
             mean = 0.
             stdev = 0.
