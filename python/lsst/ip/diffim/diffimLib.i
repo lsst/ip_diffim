@@ -68,6 +68,7 @@ namespace boost {
 #include "lsst/afw/image.h"
 #include "lsst/afw/table/Source.h"
 #include "lsst/afw/cameraGeom.h"
+#include "lsst/meas/algorithms.h"
 
 #include "lsst/ip/diffim.h"
 %}
@@ -97,11 +98,12 @@ namespace boost {
 %shared_ptr(Eigen::VectorXd);
 
 %include "lsst/daf/base/persistenceMacros.i"
-
+%include "lsst/pex/config.h"            // LSST_CONTROL_FIELD.
 %import  "lsst/afw/image/imageLib.i"
 %import  "lsst/afw/math/mathLib.i"
 %import  "lsst/afw/math/objectVectors.i"
 %import  "lsst/afw/detection/detectionLib.i"
+%import  "lsst/meas/algorithms/algorithmsLib.i"
 
 %lsst_exceptions();
 
@@ -307,5 +309,26 @@ lsst::afw::image::Image<PIXTYPE>
 
 %include "lsst/ip/diffim/BasisLists.h"
 
+/******************************************************************************/
+
+%{
+#include "lsst/ip/diffim/DipoleAlgorithms.h"
+%}
+
+%shared_ptr(lsst::ip::diffim::DipoleCentroidControl)
+%shared_ptr(lsst::ip::diffim::DipoleFluxControl)
+%shared_ptr(lsst::ip::diffim::DipoleCentroidAlgorithm)
+%shared_ptr(lsst::ip::diffim::DipoleCentroidControl)
+%shared_ptr(lsst::ip::diffim::DipoleFluxAlgorithm)
+%shared_ptr(lsst::ip::diffim::DipoleFluxControl)
+%shared_ptr(lsst::ip::diffim::NaiveDipoleCentroidControl)
+%shared_ptr(lsst::ip::diffim::NaiveDipoleFluxControl)
+%shared_ptr(lsst::ip::diffim::PsfDipoleFluxControl)
+
+%include "lsst/ip/diffim/DipoleAlgorithms.h"
+
+/******************************************************************************/
+
 %include "lsst/ip/diffim/detail.i"
 
+/******************************************************************************/

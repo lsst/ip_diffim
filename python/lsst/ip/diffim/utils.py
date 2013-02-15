@@ -803,6 +803,7 @@ class KernelCandidateQa(object):
 
         # K-S test on the diffim to a Normal distribution
         try:
+            # K-S test on the diffim to a Normal distribution
             import scipy.stats
             D, prob = scipy.stats.kstest(diArr, 'norm')
 

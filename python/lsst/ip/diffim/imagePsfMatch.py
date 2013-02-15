@@ -429,35 +429,40 @@ class ImagePsfMatchTask(PsfMatch):
             lsstDebug.frame += 1
 
         return results
-    def getSelectSources(self, exposure, sigma=None, doSmooth = True, idFactory=None):
+    def getSelectSources(self, exposure, sigma=None, doSmooth = True, idFactory=None, binsize=None):
         if idFactory:
             table = afwTable.SourceTable.make(self.selectSchema, idFactory)
         else:
             table = afwTable.SourceTable.make(self.selectSchema)
+        mi = exposure.getMaskedImage()
+	#If binsize is not set, fall back to simple median estimation
+        if not binsize:
+            imArr = mi.getImage().getArray()
+            maskArr = mi.getMask().getArray()
+            miArr = num.ma.masked_array(imArr, mask=maskArr)
+            bkgd = num.ma.extras.median(miArr)
+        else:
+            bkgd = getBackground(exposure.getMaskedImage(),
+                                           BackgroundConfig(binSize=binsize)).getImageF()
+        #Take off background for detection
+        mi -= bkgd
         table.setMetadata(self.selectAlgMetadata) 
         detRet = self.selectDetection.makeSourceCatalog(
             table = table,
             exposure = exposure,
             sigma = sigma,
             doSmooth = doSmooth
-         )
+        )
         selectSources = detRet.sources
         self.selectMeasurement.measure(exposure, selectSources)
+        #Put back on the background in case it is needed down stream
+        mi += bkgd
+	del bkgd
         return selectSources
 
     def makeCandidateList(self, templateExposure, scienceExposure, candidateList=None):
         if candidateList == None:
-            mi = scienceExposure.getMaskedImage()
-            imArr = mi.getImage().getArray()
-            maskArr = mi.getMask().getArray()
-            miArr = num.ma.masked_array(imArr, mask=maskArr)
-            bkgd = num.ma.extras.median(miArr)
-            #Take off background for detection
-            mi -= bkgd
             candidateList = self.getSelectSources(scienceExposure)
-            #Put back on the background in case it is needed down stream
-            mi += bkgd
-
 
         if not type(candidateList[0]) == afwTable.SourceRecord:
             raise RuntimeError, "Can only make a candidate list from a set of SourceRecords.  Got %s instead."%(type(candidateList[0]))
