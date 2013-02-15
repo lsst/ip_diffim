@@ -688,8 +688,9 @@ def calcWidth(arr, centx, centy):
 
 class KernelCandidateQa(object):
     
-    def __init__(self, nKernelSpatial):
+    def __init__(self, nKernelSpatial, log):
         self.fields = []
+        self.log = log
         for kType in ("LOCAL", "SPATIAL"):
             self.fields.append(afwTable.Field["F"]("KCDiffimMean_%s"%(kType), 
                                                    "Mean of KernelCandidate diffim", "sigma"))
@@ -712,6 +713,15 @@ class KernelCandidateQa(object):
                                                    "Prob from K-S test of diffim pixels relative to Normal",
                                                    "likelihood"))
 
+	    self.fields.append(afwTable.Field["F"]("KCDiffimKSA2_%s"%(kType), 
+                                                   "Anderson-Darling test statistic of diffim pixels relative to Normal"))
+
+	    self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADCrit_%s"%(kType), 
+                                                   "Critical values for the significance levels in KCDiffimADSig.  If A2 is greater than this number, hypothesis that the two distributions are the same can be rejected.", 5))
+
+	    self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADSig_%s"%(kType), 
+                                                   "Anderson-Darling significance levels for the Normal distribution", 5))
+
             self.fields.append(afwTable.Field["F"]("KCKernelCentX_%s"%(kType), 
                                                    "Centroid in X for this Kernel",
                                                    "pixels"))
@@ -731,7 +741,7 @@ class KernelCandidateQa(object):
             self.fields.append(afwTable.Field["I"]("KernelCandidateId_%s"%(kType), 
                                                    "Id for this KernelCandidate"))
 
-            if kType == 'ORIG':
+            if kType == 'LOCAL':
                 self.fields.append(afwTable.Field["I"]("KCKernelStatus_%s"%(kType), 
                                                        "Status of the KernelCandidate"))
 
@@ -741,7 +751,6 @@ class KernelCandidateQa(object):
 
                 self.fields.append(afwTable.Field["F"]("BackgroundValue_%s"%(kType), 
                                                        "Evaluation of background model at this point"))
-        
     def addToSchema(self, inSourceCatalog):
         schema = inSourceCatalog.getSchema()
         inKeys = []
@@ -793,12 +802,24 @@ class KernelCandidateQa(object):
         iqr = np.percentile(data, 75.) - np.percentile(data, 25.)
 
         # K-S test on the diffim to a Normal distribution
-        D, prob = kstest(diArr, normalCdf)
+        try:
+            import scipy.stats
+        D, prob = scipy.stats.kstest(diArr, 'norm')
 
         # Anderson Darling test is harder to do.
-        # TBD
-
-        return mean, stdev, median, iqr, D, prob
+        A2, crit, sig = scipy.stats.anderson(diArr, 'norm')
+        except:
+            mean = 0.
+            stdev = 0.
+            median = 0.
+            iqr = 0.
+            D = 0.
+            prob = 0.
+            A2 = 0.
+            crit = num.zeros(5)
+            sig = num.zeros(5)
+  
+        return mean, stdev, median, iqr, D, prob, A2, crit, sig
 
     def apply(self, candidateList, spatialKernel, spatialBackground):
         for kernelCandidate in candidateList:
@@ -822,7 +843,7 @@ class KernelCandidateQa(object):
                 # NOTE
                 # What is the difference between kernelValues and solution?
     
-                mean, stdev, median, iqr, D, prob = self._calculateStats(di)
+                mean, stdev, median, iqr, D, prob, A2, crit, sig = self._calculateStats(di)
     
                 metrics = {"KCDiffimMean_LOCAL":mean,
                            "KCDiffimMedian_LOCAL":median,
@@ -830,13 +851,18 @@ class KernelCandidateQa(object):
                            "KCDiffimStDev_LOCAL":stdev,
                            "KCDiffimKSD_LOCAL":D,
                            "KCDiffimKSProb_LOCAL":prob,
+                           "KCDiffimADStat_LOCAL":A2,
+                           "KCDiffimADCrit_LOCAL":crit,
+                           "KCDiffimADSig_LOCAL":sig,
                            "KCKernelCentX_LOCAL":centx,
                            "KCKernelCentY_LOCAL":centy,
                            "KCKernelStdX_LOCAL":stdx,
                            "KCKernelStdY_LOCAL":stdy,
-                           "KernelCandidateId_LOCAL":kernelCandidate.getId()}
+                           "KernelCandidateId_LOCAL":kernelCandidate.getId(),
+                           "KernelCoeffValues_LOCAL":kernelValues}
                 for k in metrics.keys():
                     key = schema[k].asKey()
+		    print key, metrics[k], k
                     setter = getattr(source, "set"+key.getTypeString())
                     setter(key, metrics[k])
                 
@@ -852,7 +878,7 @@ class KernelCandidateQa(object):
             sk = afwMath.FixedKernel(kim)
             sbg = spatialBackground(kernelCandidate.getXCenter(), kernelCandidate.getYCenter())
             di = kernelCandidate.getDifferenceImage(sk, sbg)
-            mean, stdev, median, iqr, D, prob = self._calculateStats(di)
+            mean, stdev, median, iqr, D, prob, A2, crit, sig = self._calculateStats(di)
     
             metrics = {"KCDiffimMean_SPATIAL":mean,
                        "KCDiffimMedian_SPATIAL":median,
@@ -860,6 +886,9 @@ class KernelCandidateQa(object):
                        "KCDiffimStDev_SPATIAL":stdev,
                        "KCDiffimKSD_SPATIAL":D,
                        "KCDiffimKSProb_SPATIAL":prob,
+                       "KCDiffimADStat_LOCAL":A2,
+                       "KCDiffimADCrit_LOCAL":crit,
+                       "KCDiffimADSig_LOCAL":sig,
                        "KCKernelCentX_SPATIAL":centx,
                        "KCKernelCentY_SPATIAL":centy,
                        "KCKernelStdX_SPATIAL":stdx,
@@ -867,6 +896,7 @@ class KernelCandidateQa(object):
                        "KernelCandidateId_SPATIAL":kernelCandidate.getId()}
             for k in metrics.keys():
                 key = schema[k].asKey()
+	        print key, metrics[k], k
                 setter = getattr(source, "set"+key.getTypeString())
                 setter(key, metrics[k])
 
