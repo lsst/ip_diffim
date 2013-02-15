@@ -21,7 +21,7 @@
 #
 import lsst.pex.config as pexConfig
 from psfMatch import PsfMatchConfigDF, PsfMatchConfigAL
-from imagePsfMatch import ImagePsfMatchTask
+from imagePsfMatch import ImagePsfMatchTask, ImagePsfMatchConfig
 
 class SnapPsfMatchConfigDF(PsfMatchConfigDF):
     """Version of Psf Matching optimized for snap subtraction"""
@@ -70,7 +70,7 @@ class SnapPsfMatchConfigAL(PsfMatchConfigAL):
         self.alardDegGauss = (4, 2)
         self.alardSigGauss = (1.0, 2.5)
 
-class SnapPsfMatchConfig(pexConfig.Config):
+class SnapPsfMatchConfig(ImagePsfMatchConfig):
     kernel = pexConfig.ConfigChoiceField(
         doc = "kernel type",
         typemap = dict(

@@ -4,10 +4,13 @@ import lsst.utils.tests as tests
 import lsst.afw.image as afwImage
 import lsst.afw.image.utils as imageUtils
 import lsst.afw.math as afwMath
+import lsst.afw.detection as afwDet
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.daf.base as dafBase
 import lsst.pex.policy as pexPolicy
+
+import lsst.afw.geom as afwGeom
 
 import lsst.pex.logging as pexLog
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
@@ -47,6 +50,11 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfigAL.fitForBackground = True
         self.subconfigDF.fitForBackground = True
         self.subconfigDFr.fitForBackground = True
+
+        # Make ideal PSF
+        self.ksize  = 21
+        self.sigma = 2.0
+        self.psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma)
 
     def makeWcs(self, offset = 0):
         # taken from $AFW_DIR/tests/testMakeWcs.py
@@ -94,6 +102,7 @@ class PsfMatchTestCases(unittest.TestCase):
         sWcs = self.makeWcs(offset = 1)
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
+        sExp.setPsf(self.psf)
 
         psfMatchAL  = ipDiffim.ImagePsfMatchTask(config=self.configAL)
         psfMatchDF  = ipDiffim.ImagePsfMatchTask(config=self.configDF)
@@ -120,6 +129,7 @@ class PsfMatchTestCases(unittest.TestCase):
         sWcs = self.makeWcs(offset = 1)
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
+        sExp.setPsf(self.psf)
 
         psfMatchAL = ipDiffim.ImagePsfMatchTask(config=self.configAL)
         resultsAL  = psfMatchAL.matchExposures(tExp, sExp,
@@ -131,12 +141,19 @@ class PsfMatchTestCases(unittest.TestCase):
 
     def testPca(self, nTerms = 3):
         tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
-        
+
+        tWcs = self.makeWcs(offset = 0)
+        sWcs = self.makeWcs(offset = 0)
+        tExp = afwImage.ExposureF(tMi, tWcs)
+        sExp = afwImage.ExposureF(sMi, sWcs)
+        sExp.setPsf(self.psf)
+
         self.subconfigDF.usePcaForSpatialKernel = True
         self.subconfigDF.numPrincipalComponents = nTerms
 
         psfMatchDF  = ipDiffim.ImagePsfMatchTask(config=self.configDF)
-        resultsDF   = psfMatchDF.subtractMaskedImages(tMi, sMi)
+        candList = psfMatchDF.makeCandidateList(tExp, sExp)
+        resultsDF   = psfMatchDF.subtractMaskedImages(tMi, sMi, candList)
         
         spatialKernel = resultsDF.psfMatchingKernel
         spatialKernelSolution = spatialKernel.getSpatialParameters()
@@ -196,6 +213,7 @@ class PsfMatchTestCases(unittest.TestCase):
         del self.configAL 
         del self.configDF 
         del self.configDFr
+        del self.psf
 
 def suite():
     """Returns a suite containing all the test cases in this module."""

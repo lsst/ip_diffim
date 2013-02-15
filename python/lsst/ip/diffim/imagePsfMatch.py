@@ -29,7 +29,7 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDetect
 import lsst.pipe.base as pipeBase
-from lsst.meas.algorithms import SourceDetectionTask, PsfAttributes
+from lsst.meas.algorithms import SourceDetectionConfig, SourceDetectionTask, PsfAttributes, SourceMeasurementTask, SourceMeasurementConfig
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatch, PsfMatchConfigDF, PsfMatchConfigAL
 from . import utils as diUtils 
@@ -48,6 +48,26 @@ class ImagePsfMatchConfig(pexConfig.Config):
         ),
         default = "AL",
     )
+    selectDetection = pexConfig.ConfigurableField(
+        target = SourceDetectionTask,
+        doc = "Initial detections used to feed stars to kernel fitting",
+    )
+    selectMeasurement = pexConfig.ConfigurableField(
+        target = SourceMeasurementTask,
+        doc = "Initial measurements used to feed stars to kernel fitting",
+    )
+
+    def setDefaults(self):
+        # High sigma detections only
+        self.selectDetection.reEstimateBackground = False
+        self.selectDetection.thresholdValue = 10.0
+
+        # Minimal set of measurments for star selection
+        self.selectMeasurement.algorithms.names.clear()
+        self.selectMeasurement.algorithms.names = ('flux.psf', 'flags.pixel', 'shape.sdss',  'flux.gaussian', 'skycoord')
+        self.selectMeasurement.slots.modelFlux = None
+        self.selectMeasurement.slots.apFlux = None 
+        self.selectMeasurement.doApplyApCorr = False
 
 class ImagePsfMatchTask(PsfMatch):
     """PSF-match images to reference images
@@ -66,22 +86,26 @@ class ImagePsfMatchTask(PsfMatch):
         PsfMatch.__init__(self, *args, **kwargs)
         self.kconfig = self.config.kernel.active
         self._warper = afwMath.Warper.fromConfig(self.kconfig.warpingConfig)
+        self.selectSchema = afwTable.SourceTable.makeMinimalSchema()
+        self.selectAlgMetadata = dafBase.PropertyList()
+        self.makeSubtask("selectDetection", schema=self.selectSchema)
+        self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)
 
     @pipeBase.timeMethod
-    def run(self, templateImage, scienceImage, mode, **kwargs):
+    def run(self, templateImage, scienceImage, mode, candidateList=None, **kwargs):
         self.log.warn("run is deprecated; call the appropriate method directly")
 
         if mode == "matchExposures":
             return self.matchExposures(templateImage, scienceImage, **kwargs)
 
         elif mode == "matchMaskedImages":
-            return self.matchMaskedImages(templateImage, scienceImage, **kwargs)
+            return self.matchMaskedImages(templateImage, scienceImage, candidateList, **kwargs)
 
         elif mode == "subtractExposures":
             return self.subtractExposures(templateImage, scienceImage, **kwargs)
 
         elif mode == "subtractMaskedImages":
-            return self.subtractMaskedImages(templateImage, scienceImage, **kwargs)
+            return self.subtractMaskedImages(templateImage, scienceImage, candidateList, **kwargs)
         else:
             raise ValueError("Invalid mode requested")
         
@@ -152,20 +176,23 @@ class ImagePsfMatchTask(PsfMatch):
                 scienceSigPix = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
                 scienceFwhmPix = scienceSigPix * sigma2fwhm 
 
+        '''
         if candidateList != None:
             if type(candidateList[0]) == afwTable.SourceRecord:
                 candidateList = diffimTools.sourceToFootprintList(candidateList, templateExposure, scienceExposure, 
                                                                   self.kconfig.detectionConfig, self.log)
+        '''
+
+        candidateList = self.makeCandidateList(templateExposure, scienceExposure, candidateList)
+
         if convolveTemplate:
             results = self.matchMaskedImages(
-                templateExposure.getMaskedImage(), scienceExposure.getMaskedImage(),
-                templateFwhmPix = templateFwhmPix, scienceFwhmPix = scienceFwhmPix,
-                candidateList = candidateList)
+                templateExposure.getMaskedImage(), scienceExposure.getMaskedImage(), candidateList,
+                templateFwhmPix = templateFwhmPix, scienceFwhmPix = scienceFwhmPix)
         else:
             results = self.matchMaskedImages(
-                scienceExposure.getMaskedImage(), templateExposure.getMaskedImage(),
-                templateFwhmPix = scienceFwhmPix, scienceFwhmPix = templateFwhmPix,
-                candidateList = candidateList)
+                scienceExposure.getMaskedImage(), templateExposure.getMaskedImage(), candidateList,
+                templateFwhmPix = scienceFwhmPix, scienceFwhmPix = templateFwhmPix)
         
         psfMatchedExposure = afwImage.makeExposure(results.matchedImage, scienceExposure.getWcs())
         psfMatchedExposure.setFilter(templateExposure.getFilter())
@@ -175,9 +202,8 @@ class ImagePsfMatchTask(PsfMatch):
         return results
 
     @pipeBase.timeMethod
-    def matchMaskedImages(self, templateMaskedImage, scienceMaskedImage, 
-                          templateFwhmPix = None, scienceFwhmPix = None, 
-                          candidateList = None):
+    def matchMaskedImages(self, templateMaskedImage, scienceMaskedImage, candidateList, 
+            templateFwhmPix = None, scienceFwhmPix = None):
         """PSF-match a MaskedImage (templateMaskedImage) to a reference MaskedImage (scienceMaskedImage)
 
         Do the following, in order:
@@ -214,6 +240,8 @@ class ImagePsfMatchTask(PsfMatch):
             maskTransparency = 0
         ds9.setMaskTransparency(maskTransparency)
 
+        if not candidateList:
+            raise RuntimeError, "Candidate list must be populated by makeCandidateList"
 
         if not self._validateSize(templateMaskedImage, scienceMaskedImage):
             pexLog.Trace(self.log.getName(), 1, "ERROR: Input images different size")
@@ -229,7 +257,7 @@ class ImagePsfMatchTask(PsfMatch):
 
         kernelCellSet = self._buildCellSet(templateMaskedImage,
                                            scienceMaskedImage,
-                                           candidateList = candidateList)
+                                           candidateList)
 
         if display and displaySpatialCells:
             diUtils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet, 
@@ -243,7 +271,7 @@ class ImagePsfMatchTask(PsfMatch):
         if self.kconfig.useBicForKernelBasis:
             tmpKernelCellSet = self._buildCellSet(templateMaskedImage,
                                                   scienceMaskedImage,
-                                                  candidateList = candidateList)
+                                                  candidateList)
             nbe = diffimTools.NbasisEvaluator(self.kconfig, templateFwhmPix, scienceFwhmPix)
             bicDegrees = nbe(tmpKernelCellSet, self.log)
             basisList = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix, bicDegrees[0])
@@ -349,9 +377,8 @@ class ImagePsfMatchTask(PsfMatch):
         return results
 
     @pipeBase.timeMethod
-    def subtractMaskedImages(self, templateMaskedImage, scienceMaskedImage,
-                             templateFwhmPix = None, scienceFwhmPix = None,
-                             candidateList = None):
+    def subtractMaskedImages(self, templateMaskedImage, scienceMaskedImage, candidateList,
+            templateFwhmPix = None, scienceFwhmPix = None):
         """Subtract two MaskedImages
         
         Do the following, in order:
@@ -374,12 +401,15 @@ class ImagePsfMatchTask(PsfMatch):
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
         """
+        if not candidateList:
+            raise RuntimeError, "Candidate list must be populated by makeCandidateList"
+
         results = self.matchMaskedImages(
             templateMaskedImage = templateMaskedImage,
             scienceMaskedImage = scienceMaskedImage,
+            candidateList = candidateList,
             templateFwhmPix = templateFwhmPix,
             scienceFwhmPix = scienceFwhmPix,
-            candidateList = candidateList,
             )
 
         subtractedMaskedImage  = afwImage.MaskedImageF(scienceMaskedImage, True)
@@ -399,13 +429,47 @@ class ImagePsfMatchTask(PsfMatch):
             lsstDebug.frame += 1
 
         return results
+    def getSelectSources(self, exposure, sigma=None, doSmooth = True, idFactory=None):
+        if idFactory:
+            table = afwTable.SourceTable.make(self.selectSchema, idFactory)
+        else:
+            table = afwTable.SourceTable.make(self.selectSchema)
+        table.setMetadata(self.selectAlgMetadata) 
+        detRet = self.selectDetection.makeSourceCatalog(
+            table = table,
+            exposure = exposure,
+            sigma = sigma,
+            doSmooth = doSmooth
+         )
+        selectSources = detRet.sources
+        self.selectMeasurement.measure(exposure, selectSources)
+        return selectSources
+
+    def makeCandidateList(self, templateExposure, scienceExposure, candidateList=None):
+        if candidateList == None:
+            mi = scienceExposure.getMaskedImage()
+            imArr = mi.getImage().getArray()
+            maskArr = mi.getMask().getArray()
+            miArr = num.ma.masked_array(imArr, mask=maskArr)
+            bkgd = num.ma.extras.median(miArr)
+            #Take off background for detection
+            mi -= bkgd
+            candidateList = self.getSelectSources(scienceExposure)
+            #Put back on the background in case it is needed down stream
+            mi += bkgd
+
+
+        if not type(candidateList[0]) == afwTable.SourceRecord:
+            raise RuntimeError, "Can only make a candidate list from a set of SourceRecords.  Got %s instead."%(type(candidateList[0]))
+        candidateList = diffimTools.sourceToFootprintList(list(candidateList), templateExposure, scienceExposure, self.kconfig.detectionConfig, self.log)
+        return candidateList
 
     def _adaptCellSize(self, candidateList):
         """ NOT IMPLEMENTED YET"""
         nCand = len(candidateList)
         return self.kconfig.sizeCellX, self.kconfig.sizeCellY
 
-    def _buildCellSet(self, templateMaskedImage, scienceMaskedImage, candidateList = None):
+    def _buildCellSet(self, templateMaskedImage, scienceMaskedImage, candidateList):
         """Build a SpatialCellSet for use with the solve method
 
         @param templateMaskedImage: MaskedImage to PSF-matched to scienceMaskedImage
@@ -415,20 +479,8 @@ class ImagePsfMatchTask(PsfMatch):
         
         @return kernelCellSet: a SpatialCellSet for use with self._solve
         """
-        # Candidate source footprints to use for Psf matching
-        if candidateList == None:
-            detectSchema = afwTable.SourceTable.makeMinimalSchema()
-            detectMetadata = dafBase.PropertyList()
-            detect = SourceDetectionTask(schema=detectSchema)
-            table = afwTable.SourceTable.make(detectSchema)
-            table.setMetadata(detectMetadata)
-            detRet = detect.makeSourceCatalog(table=table, 
-                    exposure=afwImage.ExposureF(scienceMaskedImage))
-            candidateList = diffimTools.sourceToFootprintList(detRet.sources, 
-                    afwImage.ExposureF(templateMaskedImage), 
-                    afwImage.ExposureF(scienceExposure),
-                    self.kconfig.detectionConfig)
-
+        if not candidateList:
+            raise RuntimeError, "Candidate list must be populated by makeCandidateList"
 
         sizeCellX, sizeCellY = self._adaptCellSize(candidateList)
 
@@ -440,11 +492,7 @@ class ImagePsfMatchTask(PsfMatch):
         policy = pexConfig.makePolicy(self.kconfig)
         # Place candidates within the spatial grid
         for cand in candidateList:
-            bbox = cand['footprint'].getBBox()  #-- Fix for footprints?
-            
-            # Grab the centers in the parent's coordinate system
-            #xC   = 0.5 * ( bbox.getMinX() + bbox.getMaxX() )  -- Fix for footprints?
-            #yC   = 0.5 * ( bbox.getMinY() + bbox.getMaxY() )  -- Fix for footprints
+            bbox = cand['footprint'].getBBox()  
             
             tmi  = afwImage.MaskedImageF(templateMaskedImage, bbox, afwImage.PARENT)
             smi  = afwImage.MaskedImageF(scienceMaskedImage, bbox, afwImage.PARENT)

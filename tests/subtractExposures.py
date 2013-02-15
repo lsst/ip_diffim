@@ -9,10 +9,12 @@ import eups
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.afw.detection as afwDet
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
 import lsst.pex.config as pexConfig
 import lsst.ip.diffim.diffimTools as diffimTools
+
 
 verbosity = 5
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
@@ -58,11 +60,18 @@ class DiffimTestCases(unittest.TestCase):
             self.subconfig.spatialKernelOrder = 1
             self.subconfig.spatialBgOrder = 0
 
+            # Take a stab at a PSF.  This is needed to get the KernelCandidateList if you don't provide one.
+            ksize  = 21
+            sigma = 2.0
+            self.psf = afwDet.createPsf("DoubleGaussian", ksize, ksize, sigma)
+            self.scienceImage.setPsf(self.psf)
+
     def tearDown(self):
         del self.config
         if self.defDataDir:
             del self.scienceImage
             del self.templateImage
+            del self.psf
 
     def testModelType(self):
         self.runModelType(fitForBackground = True)
@@ -75,8 +84,8 @@ class DiffimTestCases(unittest.TestCase):
 
         self.subconfig.fitForBackground = fitForBackground
             
-        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.PARENT)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
 
         self.subconfig.spatialModelType = 'chebyshev1'
         psfmatch1 = ipDiffim.ImagePsfMatchTask(config=self.config)
@@ -168,8 +177,8 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
-        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.LOCAL)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.PARENT)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
         psfmatch = ipDiffim.ImagePsfMatchTask(config=self.config)
         try:
             psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = False)
@@ -225,10 +234,11 @@ class DiffimTestCases(unittest.TestCase):
                 
                 cand1 = ipDiffim.cast_KernelCandidateF(cand1)
                 cand2 = ipDiffim.cast_KernelCandidateF(kernelCellSet2.getCandidateById(cand1.getId()+count))
+                
 
                 # positions are the same
                 self.assertEqual(cand1.getXCenter(), cand2.getXCenter())
-                self.assertEqual(cand1.getYCenter(), cand2.getYCenter() + self.offset)
+                self.assertAlmostEqual(cand1.getYCenter(), cand2.getYCenter() + self.offset, 3)
 
                 # kernels are the same
                 im1   = cand1.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
