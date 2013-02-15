@@ -639,7 +639,7 @@ def ksprob(d, ne, iter=100):
     termbf = 0.
     sign = 1.
     for j in range(iter):
-	j += 1
+        j += 1
         term = sign*2*np.exp(a2*j**2)
         probks = probks + term
         if np.abs(term) <= eps1*termbf or np.abs(term) <= eps2*probks:
@@ -713,13 +713,13 @@ class KernelCandidateQa(object):
                                                    "Prob from K-S test of diffim pixels relative to Normal",
                                                    "likelihood"))
 
-	    self.fields.append(afwTable.Field["F"]("KCDiffimKSA2_%s"%(kType), 
+            self.fields.append(afwTable.Field["F"]("KCDiffimKSA2_%s"%(kType), 
                                                    "Anderson-Darling test statistic of diffim pixels relative to Normal"))
 
-	    self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADCrit_%s"%(kType), 
+            self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADCrit_%s"%(kType), 
                                                    "Critical values for the significance levels in KCDiffimADSig.  If A2 is greater than this number, hypothesis that the two distributions are the same can be rejected.", 5))
 
-	    self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADSig_%s"%(kType), 
+            self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADSig_%s"%(kType), 
                                                    "Anderson-Darling significance levels for the Normal distribution", 5))
 
             self.fields.append(afwTable.Field["F"]("KCKernelCentX_%s"%(kType), 
@@ -801,6 +801,7 @@ class KernelCandidateQa(object):
         data = ma.getdata(diArr[~diArr.mask])
         iqr = np.percentile(data, 75.) - np.percentile(data, 25.)
 
+        # K-S test on the diffim to a Normal distribution
         try:
             # K-S test on the diffim to a Normal distribution
             import scipy.stats
@@ -809,10 +810,6 @@ class KernelCandidateQa(object):
             # Anderson Darling test is harder to do.
             A2, crit, sig = scipy.stats.anderson(diArr, 'norm')
         except:
-            mean = 0.
-            stdev = 0.
-            median = 0.
-            iqr = 0.
             D = 0.
             prob = 0.
             A2 = 0.
@@ -862,7 +859,7 @@ class KernelCandidateQa(object):
                            "KernelCoeffValues_LOCAL":kernelValues}
                 for k in metrics.keys():
                     key = schema[k].asKey()
-		    print key, metrics[k], k
+                    print key, metrics[k], k
                     setter = getattr(source, "set"+key.getTypeString())
                     setter(key, metrics[k])
                 
@@ -879,7 +876,7 @@ class KernelCandidateQa(object):
             sbg = spatialBackground(kernelCandidate.getXCenter(), kernelCandidate.getYCenter())
             di = kernelCandidate.getDifferenceImage(sk, sbg)
             mean, stdev, median, iqr, D, prob, A2, crit, sig = self._calculateStats(di)
-    
+
             metrics = {"KCDiffimMean_SPATIAL":mean,
                        "KCDiffimMedian_SPATIAL":median,
                        "KCDiffimIQR_SPATIAL":iqr,
@@ -896,7 +893,7 @@ class KernelCandidateQa(object):
                        "KernelCandidateId_SPATIAL":kernelCandidate.getId()}
             for k in metrics.keys():
                 key = schema[k].asKey()
-	        print key, metrics[k], k
+                print key, metrics[k], k
                 setter = getattr(source, "set"+key.getTypeString())
                 setter(key, metrics[k])
 
