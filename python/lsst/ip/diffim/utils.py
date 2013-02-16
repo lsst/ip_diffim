@@ -801,6 +801,7 @@ class KernelCandidateQa(object):
         data = ma.getdata(diArr[~diArr.mask])
         iqr = np.percentile(data, 75.) - np.percentile(data, 25.)
 
+        # If scipy is not set up, return zero for the stats
         try:
             # K-S test on the diffim to a Normal distribution
             import scipy.stats
