@@ -713,7 +713,7 @@ class KernelCandidateQa(object):
                                                    "Prob from K-S test of diffim pixels relative to Normal",
                                                    "likelihood"))
 
-            self.fields.append(afwTable.Field["F"]("KCDiffimKSA2_%s"%(kType), 
+            self.fields.append(afwTable.Field["F"]("KCDiffimADA2_%s"%(kType), 
                                                    "Anderson-Darling test statistic of diffim pixels relative to Normal"))
 
             self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADCrit_%s"%(kType), 
@@ -801,14 +801,16 @@ class KernelCandidateQa(object):
         data = ma.getdata(diArr[~diArr.mask])
         iqr = np.percentile(data, 75.) - np.percentile(data, 25.)
 
-        # K-S test on the diffim to a Normal distribution
         try:
             # K-S test on the diffim to a Normal distribution
             import scipy.stats
-            D, prob = scipy.stats.kstest(diArr, 'norm')
+            D, prob = scipy.stats.kstest(data, 'norm')
 
             # Anderson Darling test is harder to do.
-            A2, crit, sig = scipy.stats.anderson(diArr, 'norm')
+            A2, crit, sig = scipy.stats.anderson(data, 'norm')
+            if np.isinf(A2) or np.isnan(A2):
+                self.log.info("Anderson Statistic out of range")
+                A2 = 9999.
         except:
             D = 0.
             prob = 0.
@@ -848,7 +850,7 @@ class KernelCandidateQa(object):
                            "KCDiffimStDev_LOCAL":stdev,
                            "KCDiffimKSD_LOCAL":D,
                            "KCDiffimKSProb_LOCAL":prob,
-                           "KCDiffimADStat_LOCAL":A2,
+                           "KCDiffimADA2_LOCAL":A2,
                            "KCDiffimADCrit_LOCAL":crit,
                            "KCDiffimADSig_LOCAL":sig,
                            "KCKernelCentX_LOCAL":centx,
@@ -859,7 +861,6 @@ class KernelCandidateQa(object):
                            "KernelCoeffValues_LOCAL":kernelValues}
                 for k in metrics.keys():
                     key = schema[k].asKey()
-                    print key, metrics[k], k
                     setter = getattr(source, "set"+key.getTypeString())
                     setter(key, metrics[k])
                 
@@ -883,9 +884,9 @@ class KernelCandidateQa(object):
                        "KCDiffimStDev_SPATIAL":stdev,
                        "KCDiffimKSD_SPATIAL":D,
                        "KCDiffimKSProb_SPATIAL":prob,
-                       "KCDiffimADStat_LOCAL":A2,
-                       "KCDiffimADCrit_LOCAL":crit,
-                       "KCDiffimADSig_LOCAL":sig,
+                       "KCDiffimADA2_SPATIAL":A2,
+                       "KCDiffimADCrit_SPATIAL":crit,
+                       "KCDiffimADSig_SPATIAL":sig,
                        "KCKernelCentX_SPATIAL":centx,
                        "KCKernelCentY_SPATIAL":centy,
                        "KCKernelStdX_SPATIAL":stdx,
@@ -893,7 +894,6 @@ class KernelCandidateQa(object):
                        "KernelCandidateId_SPATIAL":kernelCandidate.getId()}
             for k in metrics.keys():
                 key = schema[k].asKey()
-                print key, metrics[k], k
                 setter = getattr(source, "set"+key.getTypeString())
                 setter(key, metrics[k])
 
