@@ -108,7 +108,7 @@ class ModelPsfMatchTask(PsfMatch):
         fwhm1 = s1 * sigma2fwhm
         fwhm2 = s2 * sigma2fwhm
 
-        basisList = makeKernelBasisList(self.kconfig, fwhm1, fwhm2)
+        basisList = makeKernelBasisList(self.kconfig, fwhm1, fwhm2, metadata = self.metadata)
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
         
         if psfMatchingKernel.isSpatiallyVarying():

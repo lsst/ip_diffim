@@ -22,25 +22,33 @@
 import diffimLib 
 import lsst.pex.config as pexConfig
 import lsst.pex.logging as pexLog
-import numpy as num
-sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
+import numpy as np
+sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
-def makeKernelBasisList(config, targetFwhmPix = None, referenceFwhmPix = None, alardDegGauss = None):
+def makeKernelBasisList(config, targetFwhmPix = None, referenceFwhmPix = None, 
+                        alardDegGauss = None, metadata = None):
     if config.kernelBasisSet == "alard-lupton":
-        return generateAlardLuptonBasisList(config, targetFwhmPix=targetFwhmPix, referenceFwhmPix=referenceFwhmPix, alardDegGauss=alardDegGauss)
+        return generateAlardLuptonBasisList(config, targetFwhmPix=targetFwhmPix, 
+                                            referenceFwhmPix=referenceFwhmPix, 
+                                            alardDegGauss=alardDegGauss,
+                                            metadata=metadata)
     elif config.kernelBasisSet == "delta-function":
         kernelSize = config.kernelSize
         return diffimLib.makeDeltaFunctionBasisList(kernelSize, kernelSize)
     else:
         raise ValueError("Cannot generate %s basis set" % (config.kernelBasisSet))
 
-def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix = None, minSigma = 0.4, minRatio = 1.25, alardDegGauss = None):
+def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix = None, 
+                                 alardDegGauss = None, metadata = None):
     if config.kernelBasisSet != "alard-lupton":
-        raise RuntimeError("Cannot generate %s basis within generateAlardLuptonBasisList" % (config.kernelBasisSet))
+        raise RuntimeError("Cannot generate %s basis within generateAlardLuptonBasisList" % (
+                config.kernelBasisSet))
 
-    kernelSize    = config.kernelSize
-    alardNGauss   = config.alardNGauss
-    alardSigGauss = config.alardSigGauss
+    kernelSize     = config.kernelSize
+    alardNGauss    = config.alardNGauss
+    alardSigGauss  = config.alardSigGauss
+    alardGaussBeta = config.alardGaussBeta
+    alardMinSig    = config.alardMinSig
     if alardDegGauss == None:
         alardDegGauss = config.alardDegGauss
 
@@ -51,17 +59,18 @@ def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix 
     if (kernelSize % 2) != 1:
         raise ValueError("Only odd-sized Alard-Lupton bases allowed")
         
-    if (targetFwhmPix == None) or (referenceFwhmPix == None):
+    if (targetFwhmPix == None) or (referenceFwhmPix == None) or (not config.scaleByFwhm):
+        if metadata is not None:
+            metadata.add("ALBasisNGauss", alardNGauss)
+            metadata.add("ALBasisDefGauss", alardDegGauss)
+            metadata.add("ALBasisSigGauss", alardSigGauss)
+
         return diffimLib.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
 
     targetSigma    = targetFwhmPix / sigma2fwhm
     referenceSigma = referenceFwhmPix / sigma2fwhm
     pexLog.Trace("lsst.ip.diffim.generateAlardLuptonBasisList", 2,
                  "Generating matching bases for sigma %.2f pix -> %.2f pix" % (targetSigma, referenceSigma))
-        
-    if not config.scaleByFwhm:
-        return diffimLib.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
-    
 
     # Modify the size of Alard Lupton kernels based upon the images FWHM
     #
@@ -73,86 +82,54 @@ def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix 
     if targetSigma == referenceSigma:
         # Leave defaults as-is
         pass
-    elif float(referenceSigma) / float(targetSigma) > 2.0:
-        # Extreme convolution; central Gaussian is at the template
-        # scale, outer Gaussian is at the scale to match the two
-        # cores, central Gaussian is geometric mean.
-        kernelCoreSigma   = targetSigma
-        kernelOuterSigma  = num.sqrt(referenceSigma**2 - targetSigma**2)
-
-        # Minimum ratio
-        ratio             = num.sqrt(kernelOuterSigma / kernelCoreSigma)
-        if ratio < minRatio:
-            kernelOuterSigma = minRatio**2 * kernelCoreSigma
-        kernelMiddleSigma = num.sqrt(kernelCoreSigma * kernelOuterSigma)
-
-        alardNGauss   = 3
-        alardSigGauss = (kernelCoreSigma, kernelMiddleSigma, kernelOuterSigma)
-        alardDegGauss = alardDegGauss[:3]
-
-    elif (referenceSigma > targetSigma) and False:
-        # Did not work as well as intended...
-
-        # Normal convolution; put the bulk of the power in the Gaussian
-        # that matches the core Fwhms.  Outer gaussian corresponds to
-        # the science image's Fwhm.  Middle is geometric mean to create
-        # geometric progression of Gaussian sizes
-        kernelCoreSigma   = max(minSigma, num.sqrt(referenceSigma**2 - targetSigma**2))
-        kernelOuterSigma  = referenceSigma
-
-        # Minimum ratio
-        ratio             = num.sqrt(kernelOuterSigma / kernelCoreSigma)
-        if ratio < minRatio:
-            kernelOuterSigma = minRatio**2 * kernelCoreSigma
-        kernelMiddleSigma = num.sqrt(kernelCoreSigma * kernelOuterSigma)
-
-        alardNGauss   = 3
-        alardSigGauss = (kernelCoreSigma, kernelMiddleSigma, kernelOuterSigma)
-        alardDegGauss = alardDegGauss[:3]
-
     elif referenceSigma > targetSigma:
         # Normal convolution
-        kernelCoreSigma  = max(minSigma, 0.33 * targetSigma)
-        kernelOuterSigma = num.sqrt(referenceSigma**2 - targetSigma**2)
 
-        # Minimum ratio
-        ratio            = num.sqrt(kernelOuterSigma / kernelCoreSigma)
-        if ratio < minRatio:
-            kernelOuterSigma = minRatio**2 * kernelCoreSigma
-        kernelMiddleSigma = num.sqrt(kernelCoreSigma * kernelOuterSigma)
+        # First (inner) Gaussian has the sigma that comes from the
+        # convolution of two Gaussians : Sig_S**2 = Sig_T**2 + Sig_K**2
+        kernelMinSigma = np.sqrt(referenceSigma**2 - targetSigma**2)
+        if kernelMinSigma < alardMinSig:
+            kernelMinSigma = alardMinSig
+        alardSigGauss = []
+        alardSigGauss.append(kernelMinSigma)
 
-        alardNGauss   = 3
-        alardSigGauss = (kernelCoreSigma, kernelMiddleSigma, kernelOuterSigma)
-        alardDegGauss = alardDegGauss[:3]
-
+        # Any other Gaussians above alardNGauss=1 come from a scaling
+        # relationship: Sig_i+1 / Sig_i = alardGaussBeta
+        for i in range(1,alardNGauss):
+            alardSigGauss.append(alardSigGauss[-1]*alardGaussBeta)
     else:
-        # Deconvolution; put the smallest Gaussian at the smallest
-        # allowed scale, and define the progression of Gaussians using
-        # a method used to derive a deconvolution sum-of-Gaussians
-        # from its convolution counterpart.
+        # Deconvolution; Define the progression of Gaussians using a
+        # method to derive a deconvolution sum-of-Gaussians from its
+        # convolution counterpart.
         #
         # http://iopscience.iop.org/0266-5611/26/8/085002  Equation 40
-        kernelDeconvSigma = minSigma
-        kernelCoreSigma   = minSigma
-        kernelOuterSigma  = targetSigma
-
-        # Minimum ratio
-        ratio             = num.sqrt(kernelOuterSigma / kernelCoreSigma)
-        if ratio < minRatio:
-            kernelOuterSigma = minRatio**2 * kernelCoreSigma
-        kernelMiddleSigma = num.sqrt(kernelCoreSigma * kernelOuterSigma)
-
-        alardNGauss   = config.alardNGaussDeconv
-        alardDegGauss = config.alardDegGaussDeconv
+        kernelMinSigma = np.sqrt(targetSigma**2 - referenceSigma**2)
+        if kernelMinSigma < alardMinSig:
+            kernelMinSigma = alardMinSig
         alardSigGauss = []
-        alardSigGauss.append(kernelDeconvSigma)
+        alardSigGauss.append(kernelMinSigma)
+        for i in range(1,3):
+            alardSigGauss.append(alardSigGauss[-1]*alardGaussBeta)
+
+        sig0 = alardSigGauss[0]
+        sig1 = alardSigGauss[1]
+        sig2 = alardSigGauss[2]
+        alardSigGauss = []
         for n in range(3):
             for j in range(n):
-                sigma2jn  = (n - j) * kernelMiddleSigma**2
-                sigma2jn += j * kernelOuterSigma**2
-                sigma2jn -= (n + 1) * kernelCoreSigma**2
-                sigmajn   = num.sqrt(sigma2jn)
+                sigma2jn  = (n - j) * sig1**2
+                sigma2jn += j * sig2**2
+                sigma2jn -= (n + 1) * sig0**2
+                sigmajn   = np.sqrt(sigma2jn)
                 alardSigGauss.append(sigmajn)
-
+        alardNGauss = len(alardSigGauss)
+        alardDegGauss = [config.alardDegGaussDeconv for x in alardSigGauss]
+                
+    import pdb; pdb.set_trace()
+    if metadata is not None:
+        metadata.add("ALBasisNGauss", alardNGauss)
+        metadata.add("ALBasisDefGauss", alardDegGauss)
+        metadata.add("ALBasisSigGauss", alardSigGauss)
+        
     return diffimLib.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
 

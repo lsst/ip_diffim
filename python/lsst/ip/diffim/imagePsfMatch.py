@@ -153,16 +153,15 @@ class ImagePsfMatchTask(PsfMatch):
         """
         if not self._validateWcs(templateExposure, scienceExposure):
             if doWarping:
-                pexLog.Trace(self.log.getName(), 1, "Astrometrically registering template to science image")
+                self.log.info("Astrometrically registering template to science image")
                 templateExposure = self._warper.warpExposure(scienceExposure.getWcs(), 
                     templateExposure, destBBox = scienceExposure.getBBox(afwImage.PARENT))
             else:
                 pexLog.Trace(self.log.getName(), 1, "ERROR: Input images not registered")
                 raise RuntimeError, "Input images not registered"
-
         if templateFwhmPix is None:
             if not templateExposure.hasPsf():
-                pexLog.Trace(self.log.getName(), 1, "WARNING: no estimate of Psf FWHM for template image")
+                self.log.info("WARNING: no estimate of Psf FWHM for template image")
             else:
                 psf = templateExposure.getPsf()
                 width, height = psf.getKernel().getDimensions()
@@ -171,7 +170,7 @@ class ImagePsfMatchTask(PsfMatch):
                 templateFwhmPix = templateSigPix * sigma2fwhm 
         if scienceFwhmPix is None:
             if not scienceExposure.hasPsf():
-                pexLog.Trace(self.log.getName(), 1, "WARNING: no estimate of Psf FWHM for science image")
+                self.log.info("WARNING: no estimate of Psf FWHM for science image")
             else:
                 psf = scienceExposure.getPsf()
                 width, height = psf.getKernel().getDimensions()
@@ -270,8 +269,7 @@ class ImagePsfMatchTask(PsfMatch):
             lsstDebug.frame += 1
 
         if templateFwhmPix and scienceFwhmPix:
-            pexLog.Trace(self.log.getName(), 2, "Matching Psf FWHM %.2f -> %.2f pix" % (
-                    templateFwhmPix, scienceFwhmPix))
+            self.log.info("Matching Psf FWHM %.2f -> %.2f pix" % (templateFwhmPix, scienceFwhmPix))
 
         if self.kconfig.useBicForKernelBasis:
             tmpKernelCellSet = self._buildCellSet(templateMaskedImage,
@@ -279,10 +277,12 @@ class ImagePsfMatchTask(PsfMatch):
                                                   candidateList)
             nbe = diffimTools.NbasisEvaluator(self.kconfig, templateFwhmPix, scienceFwhmPix)
             bicDegrees = nbe(tmpKernelCellSet, self.log)
-            basisList = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix, bicDegrees[0])
+            basisList = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix, 
+                                            alardDegGauss = bicDegrees[0], metadata = self.metadata)
             del tmpKernelCellSet
         else:
-            basisList = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix)
+            basisList = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix, 
+                                            metadata = self.metadata)
 
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
 
@@ -292,7 +292,6 @@ class ImagePsfMatchTask(PsfMatch):
         psfMatchedMaskedImage = afwImage.MaskedImageF(templateMaskedImage.getBBox(afwImage.PARENT))
         doNormalize = False
         afwMath.convolve(psfMatchedMaskedImage, templateMaskedImage, psfMatchingKernel, doNormalize)
-        self.log.log(pexLog.Log.INFO, "done")
         return pipeBase.Struct(
             matchedImage = psfMatchedMaskedImage,
             psfMatchingKernel = psfMatchingKernel,
@@ -516,8 +515,7 @@ class ImagePsfMatchTask(PsfMatch):
             smi  = afwImage.MaskedImageF(scienceMaskedImage, bbox, afwImage.PARENT)
             cand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
             
-            pexLog.Trace(self.log.getName(), 5,
-                         "Candidate %d at %f, %f" % (cand.getId(), cand.getXCenter(), cand.getYCenter()))
+            self.log.logdebug("Candidate %d at %f, %f" % (cand.getId(), cand.getXCenter(), cand.getYCenter()))
             kernelCellSet.insertCandidate(cand)
 
         return kernelCellSet
