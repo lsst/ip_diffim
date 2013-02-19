@@ -125,7 +125,6 @@ def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix 
         alardNGauss = len(alardSigGauss)
         alardDegGauss = [config.alardDegGaussDeconv for x in alardSigGauss]
                 
-    import pdb; pdb.set_trace()
     if metadata is not None:
         metadata.add("ALBasisNGauss", alardNGauss)
         metadata.add("ALBasisDefGauss", alardDegGauss)
