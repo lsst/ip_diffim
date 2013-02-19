@@ -437,6 +437,7 @@ class ImagePsfMatchTask(PsfMatch):
             lsstDebug.frame += 1
 
         return results
+
     def getSelectSources(self, exposure, sigma=None, doSmooth = True, idFactory=None, binsize=None):
         if idFactory:
             table = afwTable.SourceTable.make(self.selectSchema, idFactory)

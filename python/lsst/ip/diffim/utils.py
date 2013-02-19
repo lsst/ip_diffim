@@ -21,7 +21,7 @@
 #
 
 """Support utilities for Measuring sources"""
-
+import pdb
 import re
 import sys
 import math
@@ -691,6 +691,13 @@ class KernelCandidateQa(object):
     def __init__(self, nKernelSpatial, log):
         self.fields = []
         self.log = log
+        self.fields.append(afwTable.Field["PointD"]("RegisterRefPosition", 
+                                              "Position of reference object for registration (radians)."))
+        #TODO check units of the following angles
+        self.fields.append(afwTable.Field["Angle"]("RegisterResidualRA", 
+                                              "Offset in RA from reference after registraction"))
+        self.fields.append(afwTable.Field["Angle"]("RegisterResidualDec", 
+                                              "Offset in Dec from reference after registraction"))
         for kType in ("LOCAL", "SPATIAL"):
             self.fields.append(afwTable.Field["F"]("KCDiffimMean_%s"%(kType), 
                                                    "Mean of KernelCandidate diffim", "sigma"))
@@ -721,6 +728,9 @@ class KernelCandidateQa(object):
 
             self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADSig_%s"%(kType), 
                                                    "Anderson-Darling significance levels for the Normal distribution", 5))
+
+            self.fields.append(afwTable.Field["F"]("KCDiffimChiSq_%s"%(kType), 
+                                                   "Reduced chi^2 of the residual.", "likelihood"))
 
             self.fields.append(afwTable.Field["F"]("KCKernelCentX_%s"%(kType), 
                                                    "Centroid in X for this Kernel",
@@ -778,7 +788,7 @@ class KernelCandidateQa(object):
         outSourceCatalog.defineShape(shapeKey)
         return outSourceCatalog
 
-    def _calculateStats(self, di):
+    def _calculateStats(self, di, dof=0.):
         mask = di.getMask()
         maskArr = di.getMask().getArray()
 
@@ -801,16 +811,21 @@ class KernelCandidateQa(object):
         data = ma.getdata(diArr[~diArr.mask])
         iqr = np.percentile(data, 75.) - np.percentile(data, 25.)
 
+        #Calculte chisquare of the residual
+        chisq=np.sum(np.power(data, 2.))  
+
+
         # If scipy is not set up, return zero for the stats
         try:
+            #In try block because of risk of divide by zero
+            rchisq=chisq/(len(data)-1-dof)
             # K-S test on the diffim to a Normal distribution
             import scipy.stats
             D, prob = scipy.stats.kstest(data, 'norm')
 
-            # Anderson Darling test is harder to do.
             A2, crit, sig = scipy.stats.anderson(data, 'norm')
+            # Anderson Darling statistic cand be inf for really non-Gaussian distributions.
             if np.isinf(A2) or np.isnan(A2):
-                self.log.info("Anderson Statistic out of range")
                 A2 = 9999.
         except:
             D = 0.
@@ -818,10 +833,11 @@ class KernelCandidateQa(object):
             A2 = 0.
             crit = num.zeros(5)
             sig = num.zeros(5)
+            rchisq = 0
   
-        return mean, stdev, median, iqr, D, prob, A2, crit, sig
+        return mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq
 
-    def apply(self, candidateList, spatialKernel, spatialBackground):
+    def apply(self, candidateList, spatialKernel, spatialBackground, dof=0):
         for kernelCandidate in candidateList:
             source = kernelCandidate.getSource()
             schema = source.schema
@@ -843,7 +859,7 @@ class KernelCandidateQa(object):
                 # NOTE
                 # What is the difference between kernelValues and solution?
     
-                mean, stdev, median, iqr, D, prob, A2, crit, sig = self._calculateStats(di)
+                mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq = self._calculateStats(di, dof=dof)
     
                 metrics = {"KCDiffimMean_LOCAL":mean,
                            "KCDiffimMedian_LOCAL":median,
@@ -854,6 +870,7 @@ class KernelCandidateQa(object):
                            "KCDiffimADA2_LOCAL":A2,
                            "KCDiffimADCrit_LOCAL":crit,
                            "KCDiffimADSig_LOCAL":sig,
+                           "KCDiffimChiSq_LOCAL":rchisq,
                            "KCKernelCentX_LOCAL":centx,
                            "KCKernelCentY_LOCAL":centy,
                            "KCKernelStdX_LOCAL":stdx,
@@ -877,7 +894,7 @@ class KernelCandidateQa(object):
             sk = afwMath.FixedKernel(kim)
             sbg = spatialBackground(kernelCandidate.getXCenter(), kernelCandidate.getYCenter())
             di = kernelCandidate.getDifferenceImage(sk, sbg)
-            mean, stdev, median, iqr, D, prob, A2, crit, sig = self._calculateStats(di)
+            mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq = self._calculateStats(di, dof=dof)
 
             metrics = {"KCDiffimMean_SPATIAL":mean,
                        "KCDiffimMedian_SPATIAL":median,
@@ -888,6 +905,7 @@ class KernelCandidateQa(object):
                        "KCDiffimADA2_SPATIAL":A2,
                        "KCDiffimADCrit_SPATIAL":crit,
                        "KCDiffimADSig_SPATIAL":sig,
+                       "KCDiffimChiSq_SPATIAL":rchisq,
                        "KCKernelCentX_SPATIAL":centx,
                        "KCKernelCentY_SPATIAL":centy,
                        "KCKernelStdX_SPATIAL":stdx,
@@ -898,7 +916,22 @@ class KernelCandidateQa(object):
                 setter = getattr(source, "set"+key.getTypeString())
                 setter(key, metrics[k])
 
-    def aggregate(self, sourceCatalog, metadata):
+    def aggregate(self, sourceCatalog, metadata, wcsresids, diaSources=None):
+	for source in sourceCatalog:
+	    if source.getId() in wcsresids.keys():
+                coord, resids = wcsresids[source.getId()]
+		key = source.schema["RegisterResidualRA"].asKey()
+                setter = getattr(source, "set"+key.getTypeString())
+		setter(key, resids[0])
+		key = source.schema["RegisterResidualDec"].asKey()
+                setter = getattr(source, "set"+key.getTypeString())
+		setter(key, resids[1])
+		key = source.schema["RegisterRefPosition"].asKey()
+                setter = getattr(source, "set"+key.getTypeString())
+		setter(key, afwGeom.Point2D(coord.getRa().asRadians(),\
+                        coord.getDec().asRadians()))
+        if diaSources:
+            metadata.add("Total_false_pos", len(diaSources))
         for kType in ("LOCAL", "SPATIAL"):
             for sName in ("KCDiffimMean", "KCDiffimMedian", "KCDiffimIQR", "KCDiffimStDev", "KCDiffimKSProb"):
                 kName = "%s_%s" % (sName, kType)
@@ -907,5 +940,6 @@ class KernelCandidateQa(object):
                 metadata.add("%s_MEAN" % (kName), np.mean(vals[idx]))
                 metadata.add("%s_MEDIAN" % (kName), np.median(vals[idx]))
                 metadata.add("%s_STDEV" % (kName), np.std(vals[idx]))
+
 
 
