@@ -183,8 +183,7 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = int,
         doc = """Number of rows/columns in the convolution kernel; should be odd-valued.
                  Modified by kernelSizeFwhmScaling if scaleByFwhm = true""",
-        default = 19,
-        check = lambda x: (x >= 7) and (x <= 33)
+        default = 21,
     )
     scaleByFwhm = pexConfig.Field(
         dtype = bool,
@@ -193,9 +192,18 @@ class PsfMatchConfig(pexConfig.Config):
     )
     kernelSizeFwhmScaling = pexConfig.Field(
         dtype = float,
-        doc = """How much to scale the kernel size based on the Psf Fwhm;,
-                 should be smaller than fpGrowFwhmScaling.  Sets kernelSize.""",
-        default = 4.0,
+        doc = """How much to scale the kernel size based on the largest AL Sigma""",
+        default = 2.0,
+    )
+    kernelSizeMin = pexConfig.Field(
+        dtype = int,
+        doc = """Minimum Kernel Size""",
+        default = 19,
+    )
+    kernelSizeMax = pexConfig.Field(
+        dtype = int,
+        doc = """Maximum Kernel Size""",
+        default = 31,
     )
 
     #####
@@ -435,7 +443,7 @@ class PsfMatchConfigAL(PsfMatchConfig):
     alardDegGaussDeconv = pexConfig.Field(
         dtype = int,
         doc = """Degree of spatial modification of ALL gaussians in AL basis during deconvolution""",
-        default = 3,
+        default = 2,
     )
 
 

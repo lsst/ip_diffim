@@ -45,6 +45,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix 
                 config.kernelBasisSet))
 
     kernelSize     = config.kernelSize
+    fwhmScaling    = config.kernelSizeFwhmScaling
     alardNGauss    = config.alardNGauss
     alardSigGauss  = config.alardSigGauss
     alardGaussBeta = config.alardGaussBeta
@@ -62,8 +63,9 @@ def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix 
     if (targetFwhmPix == None) or (referenceFwhmPix == None) or (not config.scaleByFwhm):
         if metadata is not None:
             metadata.add("ALBasisNGauss", alardNGauss)
-            metadata.add("ALBasisDefGauss", alardDegGauss)
+            metadata.add("ALBasisDegGauss", alardDegGauss)
             metadata.add("ALBasisSigGauss", alardSigGauss)
+            metadata.add("ALKernelSize", kernelSize)
 
         return diffimLib.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
 
@@ -85,22 +87,38 @@ def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix 
     elif referenceSigma > targetSigma:
         # Normal convolution
 
-        # First (inner) Gaussian has the sigma that comes from the
-        # convolution of two Gaussians : Sig_S**2 = Sig_T**2 + Sig_K**2
-        kernelMinSigma = np.sqrt(referenceSigma**2 - targetSigma**2)
-        if kernelMinSigma < alardMinSig:
-            kernelMinSigma = alardMinSig
+        # First Gaussian has the sigma that comes from the convolution
+        # of two Gaussians : Sig_S**2 = Sig_T**2 + Sig_K**2
+        #
+        # If its larger than alardMinSig * alardGaussBeta, make it the
+        # second kernel.  Else make it the smallest kernel.  Unless
+        # only 1 kernel is asked for.
+        kernelSigma = np.sqrt(referenceSigma**2 - targetSigma**2)
+        if kernelSigma < alardMinSig:
+            kernelSigma = alardMinSig
+
         alardSigGauss = []
-        alardSigGauss.append(kernelMinSigma)
+        if alardNGauss == 1:
+            alardSigGauss.append(kernelSigma)
+            loc = 1
+        else:
+            if (kernelSigma/alardGaussBeta) > alardMinSig:
+                alardSigGauss.append(kernelSigma/alardGaussBeta)
+                alardSigGauss.append(kernelSigma)
+                loc = 2
+            else:
+                alardSigGauss.append(kernelSigma)
+                loc = 1
 
         # Any other Gaussians above alardNGauss=1 come from a scaling
         # relationship: Sig_i+1 / Sig_i = alardGaussBeta
-        for i in range(1,alardNGauss):
+        for i in range(loc,alardNGauss):
             alardSigGauss.append(alardSigGauss[-1]*alardGaussBeta)
     else:
         # Deconvolution; Define the progression of Gaussians using a
         # method to derive a deconvolution sum-of-Gaussians from its
-        # convolution counterpart.
+        # convolution counterpart.  Only use 3 since the algorithm
+        # assumes 3 components.
         #
         # http://iopscience.iop.org/0266-5611/26/8/085002  Equation 40
         kernelMinSigma = np.sqrt(targetSigma**2 - referenceSigma**2)
@@ -122,13 +140,19 @@ def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix 
                 sigma2jn -= (n + 1) * sig0**2
                 sigmajn   = np.sqrt(sigma2jn)
                 alardSigGauss.append(sigmajn)
+        alardSigGauss.sort()
         alardNGauss = len(alardSigGauss)
         alardDegGauss = [config.alardDegGaussDeconv for x in alardSigGauss]
-                
+
+    kernelSize  = int(fwhmScaling * alardSigGauss[-1])
+    kernelSize += 0 if kernelSize%2 else 1 # Make sure its odd
+    kernelSize  = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
+
     if metadata is not None:
         metadata.add("ALBasisNGauss", alardNGauss)
-        metadata.add("ALBasisDefGauss", alardDegGauss)
+        metadata.add("ALBasisDegGauss", alardDegGauss)
         metadata.add("ALBasisSigGauss", alardSigGauss)
-        
+        metadata.add("ALKernelSize", kernelSize)
+
     return diffimLib.makeAlardLuptonBasisList(kernelSize//2, alardNGauss, alardSigGauss, alardDegGauss)
 
