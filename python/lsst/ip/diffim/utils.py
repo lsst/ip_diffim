@@ -933,7 +933,8 @@ class KernelCandidateQa(object):
         if diaSources:
             metadata.add("Total_false_pos", len(diaSources))
         for kType in ("LOCAL", "SPATIAL"):
-            for sName in ("KCDiffimMean", "KCDiffimMedian", "KCDiffimIQR", "KCDiffimStDev", "KCDiffimKSProb"):
+            for sName in ("KCDiffimMean", "KCDiffimMedian", "KCDiffimIQR", "KCDiffimStDev", 
+                          "KCDiffimKSProb", "KCDiffimADSig", "KCDiffimChiSq"):
                 kName = "%s_%s" % (sName, kType)
                 vals = np.array([s.get(kName) for s in sourceCatalog])
                 idx = np.isfinite(vals)
