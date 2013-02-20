@@ -484,6 +484,9 @@ class ImagePsfMatchTask(PsfMatch):
         candidateList = diffimTools.sourceToFootprintList(list(candidateList), templateExposure, 
                                                           scienceExposure, self.kconfig.detectionConfig, 
                                                           self.log)
+        if len(candidateList) == 0:
+            raise RuntimeError, "Cannot find any objects suitable for KernelCandidacy" 
+
         return candidateList
 
     def _adaptCellSize(self, candidateList):
