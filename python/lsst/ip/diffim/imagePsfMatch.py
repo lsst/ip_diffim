@@ -445,14 +445,20 @@ class ImagePsfMatchTask(PsfMatch):
             table = afwTable.SourceTable.make(self.selectSchema)
         mi = exposure.getMaskedImage()
 	#If binsize is not set, fall back to simple median estimation
+        imArr = mi.getImage().getArray()
+        maskArr = mi.getMask().getArray()
+        miArr = num.ma.masked_array(imArr, mask=maskArr)
         if not binsize:
-            imArr = mi.getImage().getArray()
-            maskArr = mi.getMask().getArray()
-            miArr = num.ma.masked_array(imArr, mask=maskArr)
             bkgd = num.ma.extras.median(miArr)
         else:
-            bkgd = getBackground(exposure.getMaskedImage(),
+            try:
+                bkgd = getBackground(exposure.getMaskedImage(),
                                            BackgroundConfig(binSize=binsize)).getImageF()
+            except:
+                self.log.info("Failed to get background model.  Falling back to median background estimation")
+                bkgd = num.ma.extras.median(miArr)
+
+
         #Take off background for detection
         mi -= bkgd
         table.setMetadata(self.selectAlgMetadata) 
