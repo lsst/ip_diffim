@@ -119,8 +119,8 @@ Eigen::MatrixXi maskToEigenMatrix(
  */
 template <typename PixelT, typename BackgroundT>
 afwImage::MaskedImage<PixelT> convolveAndSubtract(
-    lsst::afw::image::MaskedImage<PixelT> const &imageToConvolve,    ///< Image T to convolve with Kernel
-    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract T from
+    lsst::afw::image::MaskedImage<PixelT> const &templateImage,      ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<PixelT> const &scienceMaskedImage, ///< Image I to subtract T from
     lsst::afw::math::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used
     BackgroundT background,                                  ///< Differential background 
     bool invert                                              ///< Invert the output difference image
@@ -129,17 +129,17 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     boost::timer t;
     t.restart();
 
-    afwImage::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
+    afwImage::MaskedImage<PixelT> convolvedMaskedImage(templateImage.getDimensions());
     afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
     convolutionControl.setDoNormalize(false);
-    afwMath::convolve(convolvedMaskedImage, imageToConvolve, 
+    afwMath::convolve(convolvedMaskedImage, templateImage, 
                       convolutionKernel, convolutionControl);
     
     /* Add in background */
     *(convolvedMaskedImage.getImage()) += background;
     
     /* Do actual subtraction */
-    convolvedMaskedImage -= imageToNotConvolve;
+    convolvedMaskedImage -= scienceMaskedImage;
 
     /* Invert */
     if (invert) {
@@ -170,8 +170,8 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
  */
 template <typename PixelT, typename BackgroundT>
 afwImage::MaskedImage<PixelT> convolveAndSubtract(
-    lsst::afw::image::Image<PixelT> const &imageToConvolve,          ///< Image T to convolve with Kernel
-    lsst::afw::image::MaskedImage<PixelT> const &imageToNotConvolve, ///< Image I to subtract T from
+    lsst::afw::image::Image<PixelT> const &templateImage,            ///< Image T to convolve with Kernel
+    lsst::afw::image::MaskedImage<PixelT> const &scienceMaskedImage, ///< Image I to subtract T from
     lsst::afw::math::Kernel const &convolutionKernel,                ///< PSF-matching Kernel used
     BackgroundT background,                                  ///< Differential background 
     bool invert                                              ///< Invert the output difference image
@@ -180,24 +180,24 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     boost::timer t;
     t.restart();
 
-    afwImage::MaskedImage<PixelT> convolvedMaskedImage(imageToConvolve.getDimensions());
+    afwImage::MaskedImage<PixelT> convolvedMaskedImage(templateImage.getDimensions());
     afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
     convolutionControl.setDoNormalize(false);
-    afwMath::convolve(*convolvedMaskedImage.getImage(), imageToConvolve, 
+    afwMath::convolve(*convolvedMaskedImage.getImage(), templateImage, 
                       convolutionKernel, convolutionControl);
     
     /* Add in background */
     *(convolvedMaskedImage.getImage()) += background;
     
     /* Do actual subtraction */
-    *convolvedMaskedImage.getImage() -= *imageToNotConvolve.getImage();
+    *convolvedMaskedImage.getImage() -= *scienceMaskedImage.getImage();
 
     /* Invert */
     if (invert) {
         *convolvedMaskedImage.getImage() *= -1.0;
     }
-    *convolvedMaskedImage.getMask() <<= *imageToNotConvolve.getMask();
-    *convolvedMaskedImage.getVariance() <<= *imageToNotConvolve.getVariance();
+    *convolvedMaskedImage.getMask() <<= *scienceMaskedImage.getMask();
+    *convolvedMaskedImage.getVariance() <<= *scienceMaskedImage.getVariance();
     
     double time = t.elapsed();
     pexLog::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
@@ -226,16 +226,16 @@ template class ImageStatistics<double>;
 #define p_INSTANTIATE_convolveAndSubtract(TEMPLATE_IMAGE_T, TYPE)     \
     template \
     lsst::afw::image::MaskedImage<TYPE> convolveAndSubtract(            \
-        lsst::afw::image::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
-        lsst::afw::image::MaskedImage<TYPE> const& imageToNotConvolve,  \
+        lsst::afw::image::TEMPLATE_IMAGE_T<TYPE> const& templateImage, \
+        lsst::afw::image::MaskedImage<TYPE> const& scienceMaskedImage,  \
         lsst::afw::math::Kernel const& convolutionKernel,               \
         double background,                                              \
         bool invert);                                                   \
     \
     template \
     afwImage::MaskedImage<TYPE> convolveAndSubtract( \
-        lsst::afw::image::TEMPLATE_IMAGE_T<TYPE> const& imageToConvolve, \
-        lsst::afw::image::MaskedImage<TYPE> const& imageToNotConvolve, \
+        lsst::afw::image::TEMPLATE_IMAGE_T<TYPE> const& templateImage, \
+        lsst::afw::image::MaskedImage<TYPE> const& scienceMaskedImage, \
         lsst::afw::math::Kernel const& convolutionKernel, \
         lsst::afw::math::Function2<double> const& backgroundFunction, \
         bool invert); \

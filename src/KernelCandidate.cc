@@ -35,13 +35,13 @@ namespace diffim {
     KernelCandidate<PixelT>::KernelCandidate(
         float const xCenter,
         float const yCenter, 
-        MaskedImagePtr const& miToConvolvePtr,
-        MaskedImagePtr const& miToNotConvolvePtr,
+        MaskedImagePtr const& templateMaskedImage,
+        MaskedImagePtr const& scienceMaskedImage,
         lsst::pex::policy::Policy const& policy
         ) :
         lsst::afw::math::SpatialCellImageCandidate<lsst::afw::math::Kernel::Pixel>(xCenter, yCenter),
-        _miToConvolvePtr(miToConvolvePtr),
-        _miToNotConvolvePtr(miToNotConvolvePtr),
+        _templateMaskedImage(templateMaskedImage),
+        _scienceMaskedImage(scienceMaskedImage),
         _varianceEstimate(),
         _policy(policy),
         _coreFlux(),
@@ -53,10 +53,10 @@ namespace diffim {
     {
         
         /* Rank by mean core S/N in science image */
-        ImageStatistics<PixelT> imstats;
+        ImageStatistics<PixelT> imstats(_policy);
         int candidateCoreRadius = _policy.getInt("candidateCoreRadius");
         try {
-            imstats.apply(*_miToNotConvolvePtr, candidateCoreRadius);
+            imstats.apply(*_scienceMaskedImage, candidateCoreRadius);
         } catch (pexExcept::Exception& e) {
             pexLogging::TTrace<3>("lsst.ip.diffim.KernelCandidate", 
                                   "Unable to calculate core imstats for ranking Candidate %d", this->getId()); 
@@ -87,9 +87,9 @@ namespace diffim {
 
         /* Examine the policy for control over the variance estimate */
         afwImage::Image<afwImage::VariancePixel> var = 
-            afwImage::Image<afwImage::VariancePixel>(*(_miToNotConvolvePtr->getVariance()), true);
+            afwImage::Image<afwImage::VariancePixel>(*(_scienceMaskedImage->getVariance()), true);
         /* Variance estimate comes from sum of image variances */
-        var += (*(_miToConvolvePtr->getVariance()));
+        var += (*(_templateMaskedImage->getVariance()));
 
         if (_policy.getBool("constantVarianceWeighting")) {
             /* Constant variance weighting */
@@ -100,7 +100,7 @@ namespace diffim {
             else
                 varValue = varStats.getValue(afwMath::MEDIAN);
             pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                              "Candidate %d using constant variance of %.2f", varValue);
+                              "Candidate %d using constant variance of %.2f", this->getId(), varValue);
             var = varValue;
 
         }
@@ -157,8 +157,8 @@ namespace diffim {
                 _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution<PixelT> >(
                     new RegularizedKernelSolution<PixelT>(basisList, _fitForBackground, hMat, _policy)
                     );
-                _kernelSolutionPca->build(*(_miToConvolvePtr->getImage()),
-                                          *(_miToNotConvolvePtr->getImage()),
+                _kernelSolutionPca->build(*(_templateMaskedImage->getImage()),
+                                          *(_scienceMaskedImage->getImage()),
                                           *_varianceEstimate);
                 if (checkConditionNumber) {
                     if (_kernelSolutionPca->getConditionNumber(ctype) > maxConditionNumber) {
@@ -175,8 +175,8 @@ namespace diffim {
                 _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution<PixelT> >(
                     new RegularizedKernelSolution<PixelT>(basisList, _fitForBackground, hMat, _policy)
                     );
-                _kernelSolutionOrig->build(*(_miToConvolvePtr->getImage()),
-                                           *(_miToNotConvolvePtr->getImage()),
+                _kernelSolutionOrig->build(*(_templateMaskedImage->getImage()),
+                                           *(_scienceMaskedImage->getImage()),
                                            *_varianceEstimate);
                 if (checkConditionNumber) {
                     if (_kernelSolutionOrig->getConditionNumber(ctype) > maxConditionNumber) {
@@ -198,8 +198,8 @@ namespace diffim {
                 _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution<PixelT> >(
                     new StaticKernelSolution<PixelT>(basisList, _fitForBackground)
                     );
-                _kernelSolutionPca->build(*(_miToConvolvePtr->getImage()),
-                                          *(_miToNotConvolvePtr->getImage()),
+                _kernelSolutionPca->build(*(_templateMaskedImage->getImage()),
+                                          *(_scienceMaskedImage->getImage()),
                                           *_varianceEstimate);
                 if (checkConditionNumber) {
                     if (_kernelSolutionPca->getConditionNumber(ctype) > maxConditionNumber) {
@@ -216,8 +216,8 @@ namespace diffim {
                 _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution<PixelT> >(
                     new StaticKernelSolution<PixelT>(basisList, _fitForBackground)
                     );
-                _kernelSolutionOrig->build(*(_miToConvolvePtr->getImage()),
-                                           *(_miToNotConvolvePtr->getImage()),
+                _kernelSolutionOrig->build(*(_templateMaskedImage->getImage()),
+                                           *(_scienceMaskedImage->getImage()),
                                            *_varianceEstimate);
                 if (checkConditionNumber) {
                     if (_kernelSolutionOrig->getConditionNumber(ctype) > maxConditionNumber) {
@@ -413,8 +413,8 @@ namespace diffim {
         double background
         ) {
         /* Make diffim and set chi2 from result */
-        afwImage::MaskedImage<PixelT> diffIm = convolveAndSubtract(*_miToConvolvePtr,
-                                                                   *_miToNotConvolvePtr,
+        afwImage::MaskedImage<PixelT> diffIm = convolveAndSubtract(*_templateMaskedImage,
+                                                                   *_scienceMaskedImage,
                                                                    *kernel,
                                                                    background);
         return diffIm;

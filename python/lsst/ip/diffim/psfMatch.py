@@ -21,13 +21,15 @@
 #
 import time
 import numpy as num
-import diffimLib
 import lsst.afw.image as afwImage
 import lsst.pex.logging as pexLog
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
+import lsst.afw.display.ds9 as ds9
 import lsst.pipe.base as pipeBase
+from . import utils as diUtils
+from . import diffimLib
 
 class DetectionConfig(pexConfig.Config):
     detThreshold = pexConfig.Field(
@@ -48,16 +50,15 @@ class DetectionConfig(pexConfig.Config):
     )
     detOnTemplate = pexConfig.Field(
         dtype = bool,
-        doc = """If true run detection on the template (imageToConvolve); 
-                 if false run detection on the science image (imageToNotConvolve)""",
+        doc = """If true run detection on the template (image to convolve); 
+                 if false run detection on the science image""",
         default = True
     )
-    detBadMaskPlanes = pexConfig.ListField(
+    badMaskPlanes = pexConfig.ListField(
         dtype = str,
         doc = """Mask planes that lead to an invalid detection.
-                 Options: EDGE SAT BAD CR INTRP
-                 E.g. : EDGE SAT BAD allows CR-masked and interpolated pixels""",
-        default = ("EDGE", "SAT", "BAD")
+                 Options: EDGE SAT BAD CR INTRP""",
+        default = ("EDGE", "SAT")
     )
     fpNpixMin = pexConfig.Field(
         dtype = int,
@@ -78,14 +79,15 @@ class DetectionConfig(pexConfig.Config):
     )
     fpGrowPix = pexConfig.Field(
         dtype = int,
-        doc = """Grow each raw detection footprint by
-                 this many pixels.  The smaller the faster; however the kernel sum does
-                 not converge if the stamp is too small; and the kernel is not
-                 constrained at all if the stamp is the size of the kernel.  Rule of
-                 thumb is at least 1.5 times the kernel size.  The grown stamp is
-                 ~2*fpGrowPix pixels larger in each dimension.""",
+        doc = """Growing radius (in pixels) for each raw detection
+                 footprint.  The smaller the faster; however the
+                 kernel sum does not converge if the stamp is too
+                 small; and the kernel is not constrained at all if
+                 the stamp is the size of the kernel.  Rule of thumb
+                 is at least 1.5 times the kernel size.  The grown
+                 stamp is 2 * fpGrowPix pixels larger in each
+                 dimension.""",
         default = 30,
-        check = lambda x: (x >= 20) and (x <= 40)
     )
     fpGrowMin = pexConfig.Field(
         dtype = int,
@@ -296,6 +298,12 @@ class PsfMatchConfig(pexConfig.Config):
 
     ####
     # Clipping of KernelCandidates based on diffim residuals; used with singleKernelClipping and spatialKernelClipping
+    badMaskPlanes = pexConfig.ListField(
+        dtype = str,
+        doc = """Mask planes to ignore when calculating diffim statistics
+                 Options: EDGE SAT BAD CR INTRP""",
+        default = ("EDGE", "SAT")
+    )
     candidateResidualMeanMax = pexConfig.Field(
         dtype = float,
         doc = """Rejects KernelCandidates yielding bad difference image quality.
@@ -369,13 +377,18 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = bool,
         doc = """Use constant variance weighting in single kernel fitting?
                  In some cases this is better for bright star residuals.""",
-        default = False,
+        default = True,
     )
     calculateKernelUncertainty = pexConfig.Field(
         dtype = bool,
         doc = """Calculate kernel and background uncertainties for each kernel candidate?
                  This comes from the inverse of the covariance matrix.
                  Warning: regularization can cause problems for this step.""",
+        default = False,
+    )
+    useBicForKernelBasis = pexConfig.Field(
+        dtype = bool,
+        doc = """Use Bayesian Information Criterion to select the number of bases going into the kernel decomposition""",
         default = False,
     )
 
@@ -385,6 +398,7 @@ class PsfMatchConfigAL(PsfMatchConfig):
         PsfMatchConfig.setDefaults(self)
         self.kernelBasisSet = "alard-lupton"
         self.maxConditionNumber = 5.0e7
+
 
     #####
     # Alard-Lupton Basis Parameters
@@ -424,6 +438,7 @@ class PsfMatchConfigDF(PsfMatchConfig):
         self.maxConditionNumber = 5.0e6
         self.usePcaForSpatialKernel = True
         self.subtractMeanForPca = True
+        self.useBicForKernelBasis = False
 
     #####
     # Delta Function Basis Parameters
@@ -541,16 +556,20 @@ class PsfMatch(pipeBase.Task):
         # What is the final kernel sum
         kImage = afwImage.ImageD(spatialKernel.getDimensions())
         kSum = spatialKernel.computeImage(kImage, False)
-        pexLog.Trace(self.log.getName()+"._diagnostic", 0,
-                     "Final spatial kernel sum %.3f" % (kSum))
+        self.log.info("Final spatial kernel sum %.3f" % (kSum))
 
         # Look at how well conditioned the matrix is
         conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))
-        pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
-                     "Spatial model condition number : %.3e" % (conditionNum))
+        self.log.info("Spatial model condition number %.3e" % (conditionNum))
+
+        if conditionNum < 0.0:
+            self.log.warn("Condition number is negative (%.3e)" % (conditionNum))
         if conditionNum > self.kconfig.maxSpatialConditionNumber:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1, 
-                         "WARNING: Spatial solution exceeds max condition number (%.3e > %.3e)" % (conditionNum, self.kconfig.maxSpatialConditionNumber))
+            self.log.warn("Spatial solution exceeds max condition number (%.3e > %.3e)" % (
+                    conditionNum, self.kconfig.maxSpatialConditionNumber))
+
+        self.metadata.set("spatialConditionNum", conditionNum)
+        self.metadata.set("spatialKernelSum", kSum)
  
         # Look at how well the solution is constrained
         nBasisKernels = spatialKernel.getNBasisKernels()
@@ -578,46 +597,37 @@ class PsfMatch(pipeBase.Task):
 
         # Counting statistics
         if nBad > 2*nGood:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: many more candidates rejected than accepted; %d total, %d rejected, %d used" % (
+            self.log.warn("Many more candidates rejected than accepted; %d total, %d rejected, %d used" % (
                           nTot, nBad, nGood) )
         else:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "NOTE: %d candidates total, %d rejected, %d used" % (nTot, nBad, nGood))
+            self.log.info("%d candidates total, %d rejected, %d used" % (nTot, nBad, nGood))
             
         # Some judgements on the quality of the spatial models
         if nGood < nKernelTerms:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: spatial kernel model underconstrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
-            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
-                         "Consider lowering the spatial order")
+            self.log.warn("Spatial kernel model underconstrained; %d candidates, %d terms, %d bases" % (
+                    nGood, nKernelTerms, nBasisKernels))
+            self.log.warn("Consider lowering the spatial order")
         elif nGood <= 2*nKernelTerms:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: spatial kernel model poorly constrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
-            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
-                         "Consider lowering the spatial order")
+            self.log.warn("Spatial kernel model poorly constrained; %d candidates, %d terms, %d bases" % (
+                    nGood, nKernelTerms, nBasisKernels))
+            self.log.warn("Consider lowering the spatial order")
         else:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "NOTE: spatial kernel model appears well constrained; %d candidates, %d terms, %d bases" % (nGood, nKernelTerms, nBasisKernels))
+            self.log.info("Spatial kernel model appears well constrained; %d candidates, %d terms, %d bases" % (
+                    nGood, nKernelTerms, nBasisKernels))
 
         if nGood < nBgTerms:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: spatial background model underconstrained; %d candidates, %d terms" % (nGood, nBgTerms))
-            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
-                         "Consider lowering the spatial order")
+            self.log.warn("Spatial background model underconstrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            self.log.warn("Consider lowering the spatial order")
         elif nGood <= 2*nBgTerms:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "WARNING: spatial background model poorly constrained; %d candidates, %d terms" % (nGood, nBgTerms))
-            pexLog.Trace(self.log.getName()+"._diagnostic", 2,
-                         "Consider lowering the spatial order")
+            self.log.warn("Spatial background model poorly constrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            self.log.warn("Consider lowering the spatial order")
         else:
-            pexLog.Trace(self.log.getName()+"._diagnostic", 1,
-                         "NOTE: spatial background model appears well constrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            self.log.info("Spatial background model appears well constrained; %d candidates, %d terms" % (nGood, nBgTerms))
         
     
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
         nComponents       = self.kconfig.numPrincipalComponents
-        imagePca          = afwImage.ImagePcaD()
+        imagePca          = diffimLib.KernelPcaD()
         importStarVisitor = diffimLib.KernelPcaVisitorF(imagePca)
         kernelCellSet.visitCandidates(importStarVisitor, nStarPerCell)
         if self.kconfig.subtractMeanForPca:
@@ -628,6 +638,8 @@ class PsfMatch(pipeBase.Task):
         pcaBasisList = importStarVisitor.getEigenKernels()
 
         eSum = num.sum(eigenValues)
+        if eSum == 0.0:
+            raise RuntimeError("Eigenvalues sum to zero")
         for j in range(len(eigenValues)):
             pexLog.Trace(self.log.getName()+"._solve", 6, 
                          "Eigenvalue %d : %f (%f)" % (j, eigenValues[j], eigenValues[j]/eSum))
@@ -667,6 +679,19 @@ class PsfMatch(pipeBase.Task):
         
         @raise Exception if unable to determine PSF matching kernel and returnOnExcept False
         """
+
+        import lsstDebug
+        display = lsstDebug.Info(__name__).display
+        displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells
+        displayCandidates = lsstDebug.Info(__name__).displayCandidates
+        displayKernelBasis = lsstDebug.Info(__name__).displayKernelBasis
+        displayKernelMosaic = lsstDebug.Info(__name__).displayKernelMosaic
+        plotKernelSpatialModel = lsstDebug.Info(__name__).plotKernelSpatialModel
+        showBadCandidates = lsstDebug.Info(__name__).showBadCandidates 
+        maskTransparency = lsstDebug.Info(__name__).maskTransparency   
+        if not maskTransparency:
+            maskTransparency = 0
+        ds9.setMaskTransparency(maskTransparency)
 
         maxSpatialIterations   = self.kconfig.maxSpatialIterations
         nStarPerCell           = self.kconfig.nStarPerCell
@@ -786,7 +811,7 @@ class PsfMatch(pipeBase.Task):
                 spatialkv.solveLinearEquation()
                 pexLog.Trace(self.log.getName()+"._solve", 3, 
                              "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
-                spatialKernel, spatialBacakground = spatialkv.getSolutionPair()
+                spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
             spatialSolution = spatialkv.getKernelSolution()
 
@@ -798,8 +823,31 @@ class PsfMatch(pipeBase.Task):
             pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
             pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0])
             raise e
-            
-      
+
+        if display and displayCandidates:
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates)
+            lsstDebug.frame += 1
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates,
+                                         kernels=True)
+            lsstDebug.frame += 1
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates,
+                                         resids=True)
+            lsstDebug.frame += 1
+        
+        if display and displayKernelBasis:
+            diUtils.showKernelBasis(spatialKernel, frame=lsstDebug.frame)
+            lsstDebug.frame += 1
+
+        if display and displayKernelMosaic:
+            diUtils.showKernelMosaic(kernelCellSet.getBBox(), spatialKernel, frame=lsstDebug.frame)
+            lsstDebug.frame += 1 
+
+        if display and plotKernelSpatialModel:
+            diUtils.plotKernelSpatialModel(spatialKernel, kernelCellSet, showBadCandidates=showBadCandidates)
+
         t1 = time.time()
         pexLog.Trace(self.log.getName()+"._solve", 1, 
                      "Total time to compute the spatial kernel : %.2f s" % (t1 - t0))
@@ -807,3 +855,4 @@ class PsfMatch(pipeBase.Task):
         self._diagnostic(kernelCellSet, spatialSolution, spatialKernel, spatialBackground)
         
         return spatialSolution, spatialKernel, spatialBackground
+

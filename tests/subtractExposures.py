@@ -33,13 +33,16 @@ class DiffimTestCases(unittest.TestCase):
         # "stdev" vs "pixel_stdev"
         self.subconfig.detectionConfig.detThresholdType = "stdev"
 
+	# Impacts some of the test values
+	self.subconfig.constantVarianceWeighting = True
+
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
 
             defTemplatePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                           "v5-e0-c011-a00.sci")
+                                           "v5-e0-c011-a00.sci.fits")
             defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v26-e0",
-                                          "v26-e0-c011-a00.sci")
+                                          "v26-e0-c011-a00.sci.fits")
             
             self.scienceImage   = afwImage.ExposureF(defSciencePath)
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
@@ -77,18 +80,16 @@ class DiffimTestCases(unittest.TestCase):
 
         self.subconfig.spatialModelType = 'chebyshev1'
         psfmatch1 = ipDiffim.ImagePsfMatchTask(config=self.config)
-        results1 = psfmatch1.run(templateSubImage, scienceSubImage, "subtractExposures", 
-                                 doWarping = True)
-        differenceExposure1 = results1.subtractedImage
+        results1 = psfmatch1.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
+        differenceExposure1 = results1.subtractedExposure
         spatialKernel1      = results1.psfMatchingKernel
         backgroundModel1    = results1.backgroundModel
         kernelCellSet1      = results1.kernelCellSet
 
         self.subconfig.spatialModelType = 'polynomial'
         psfmatch2 = ipDiffim.ImagePsfMatchTask(config=self.config)
-        results2 = psfmatch2.run(templateSubImage, scienceSubImage, "subtractExposures",
-                                 doWarping = True)
-        differenceExposure2 = results2.subtractedImage
+        results2 = psfmatch2.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
+        differenceExposure2 = results2.subtractedExposure
         spatialKernel2      = results2.psfMatchingKernel
         backgroundModel2    = results2.backgroundModel
         kernelCellSet2      = results2.kernelCellSet
@@ -125,7 +126,7 @@ class DiffimTestCases(unittest.TestCase):
             self.assertAlmostEqual(backgroundModel1(10, 10), backgroundModel2(10, 10), 4)
 
         else:
-            # Kernel weights (end up different when fitting for background)
+            # Check on the spatial coefficients; note Cheby internally maps from -1 to 1
             nPar1 = len(spatialKernel1.getKernelParameters())    
             nPar2 = len(spatialKernel2.getKernelParameters())    
             kp1   = afwMath.vectorD(nPar1)
@@ -133,8 +134,18 @@ class DiffimTestCases(unittest.TestCase):
             spatialKernel1.computeKernelParametersFromSpatialModel(kp1, 0.0, 0.0)
             spatialKernel2.computeKernelParametersFromSpatialModel(kp2, 0.0, 0.0)
             for i in range(len(kp1)):
-                self.assertAlmostEqual(kp1[i], kp2[i], 2)
+                self.assertAlmostEqual(kp1[i], kp2[i], 1)
 
+            # More improtant is the kernel needs to be then same when realized at a coordinate
+            kim1 = afwImage.ImageD(spatialKernel1.getDimensions())
+            kim2 = afwImage.ImageD(spatialKernel2.getDimensions())
+            ksum1 = spatialKernel1.computeImage(kim1, False, 0.0, 0.0)
+            ksum2 = spatialKernel2.computeImage(kim2, False, 0.0, 0.0)
+            self.assertAlmostEqual(ksum1, ksum2, 5)
+            for y in range(kim1.getHeight()):
+                for x in range(kim1.getHeight()):
+                    self.assertAlmostEqual(kim1.get(x, y), kim2.get(x, y), 2)
+                    
             # Nterms (zeroth order)
             self.assertEqual(backgroundModel1.getNParameters(), 1)
             self.assertEqual(backgroundModel2.getNParameters(), 1)
@@ -161,7 +172,7 @@ class DiffimTestCases(unittest.TestCase):
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.LOCAL)
         psfmatch = ipDiffim.ImagePsfMatchTask(config=self.config)
         try:
-            psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures", doWarping = False)
+            psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = False)
         except Exception, e:
             pass
         else:
@@ -184,9 +195,8 @@ class DiffimTestCases(unittest.TestCase):
 
         # Have an XY0
         psfmatch  = ipDiffim.ImagePsfMatchTask(config=self.config)
-        results1  = psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures",
-                                 doWarping = True)
-        differenceExposure1 = results1.subtractedImage
+        results1  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
+        differenceExposure1 = results1.subtractedExposure
         spatialKernel1      = results1.psfMatchingKernel
         backgroundModel1    = results1.backgroundModel
         kernelCellSet1      = results1.kernelCellSet
@@ -194,9 +204,8 @@ class DiffimTestCases(unittest.TestCase):
         # And then take away XY0
         templateSubImage.setXY0(afwGeom.Point2I(0, 0)) 
         scienceSubImage.setXY0(afwGeom.Point2I(0, 0))
-        results2  = psfmatch.run(templateSubImage, scienceSubImage, "subtractExposures",
-                                 doWarping = True)
-        differenceExposure2 = results2.subtractedImage
+        results2  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
+        differenceExposure2 = results2.subtractedExposure
         spatialKernel2      = results2.psfMatchingKernel
         backgroundModel2    = results2.backgroundModel
         kernelCellSet2      = results2.kernelCellSet
@@ -235,7 +244,7 @@ class DiffimTestCases(unittest.TestCase):
         bgp2 = backgroundModel2.getParameters()
 
         # first term = kernel sum, 0, 0
-        self.assertAlmostEqual(skp1[0][0], skp2[0][0])
+        self.assertAlmostEqual(skp1[0][0], skp2[0][0], 6)
 
         # On other terms, the spatial terms are the same, the zpt terms are different
         for nk in range(1, len(skp1)):

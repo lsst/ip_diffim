@@ -59,14 +59,14 @@ namespace diffim {
          *
          * @param xCenter Col position of object
          * @param yCenter Row position of object
-         * @param miToConvolvePtr  Pointer to template image
-         * @param miToNotConvolvePtr  Pointer to science image
+         * @param templateMaskedImage  Pointer to template image
+         * @param scienceMaskedImage  Pointer to science image
          * @param policy  Policy file
          */
         KernelCandidate(float const xCenter,
                         float const yCenter, 
-                        MaskedImagePtr const& miToConvolvePtr,
-                        MaskedImagePtr const& miToNotConvolvePtr,
+                        MaskedImagePtr const& templateMaskedImage,
+                        MaskedImagePtr const& scienceMaskedImage,
                         lsst::pex::policy::Policy const& policy);        
         /// Destructor
         virtual ~KernelCandidate() {};
@@ -81,8 +81,8 @@ namespace diffim {
         /**
          * @brief Return pointers to the image pixels used in kernel determination
          */
-        MaskedImagePtr getMiToConvolvePtr() {return _miToConvolvePtr;}
-        MaskedImagePtr getMiToNotConvolvePtr() {return _miToNotConvolvePtr;}
+        MaskedImagePtr getTemplateMaskedImage() {return _templateMaskedImage;}
+        MaskedImagePtr getScienceMaskedImage() {return _scienceMaskedImage;}
 
         /**
          * @brief Return results of kernel solution
@@ -171,8 +171,8 @@ namespace diffim {
        
 
     private:
-        MaskedImagePtr _miToConvolvePtr;                    ///< Subimage around which you build kernel
-        MaskedImagePtr _miToNotConvolvePtr;                 ///< Subimage around which you build kernel
+        MaskedImagePtr _templateMaskedImage;                ///< Subimage around which you build kernel
+        MaskedImagePtr _scienceMaskedImage;                 ///< Subimage around which you build kernel
         VariancePtr _varianceEstimate;                      ///< Estimate of the local variance
         lsst::pex::policy::Policy _policy;                  ///< Policy
         double _coreFlux;                                   ///< Mean S/N in the science image
@@ -196,8 +196,8 @@ namespace diffim {
      *
      * @param xCenter  X-center of candidate
      * @param yCenter  Y-center of candidate
-     * @param miToConvolvePtr  Template subimage 
-     * @param miToNotConvolvePtr  Science image subimage
+     * @param templateMaskedImage  Template subimage 
+     * @param scienceMaskedImage  Science image subimage
      * @param policy   Policy file for creation of rating
      *
      * @ingroup ip_diffim
@@ -206,13 +206,13 @@ namespace diffim {
     boost::shared_ptr<KernelCandidate<PixelT> >
     makeKernelCandidate(float const xCenter,
                         float const yCenter, 
-                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToConvolvePtr,
-                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& miToNotConvolvePtr,
+                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& templateMaskedImage,
+                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& scienceMaskedImage,
                         lsst::pex::policy::Policy const& policy){
         
         return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
-                                                                                 miToConvolvePtr,
-                                                                                 miToNotConvolvePtr,
+                                                                                 templateMaskedImage,
+                                                                                 scienceMaskedImage,
                                                                                  policy));
     }
 

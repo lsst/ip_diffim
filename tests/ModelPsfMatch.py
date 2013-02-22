@@ -5,7 +5,6 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.detection as afwDet
 import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.meas.algorithms as measAlg
 
 import lsst.pex.logging as pexLog

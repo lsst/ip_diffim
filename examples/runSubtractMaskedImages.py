@@ -108,9 +108,9 @@ Notes:
         if subconfig.fitForBackground == False:
             print 'NOTE: no background subtraction at all is requested'
 
-    psfmatch = imDiffim.ImagePsfMatchTask(subconfig)
+    psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
     results  = psfmatch.run(templateMaskedImage, scienceMaskedImage, "subtractMaskedImages",
-                            psfFwhmPixTc = fwhmT, psfFwhmPixTnc = fwhmS)
+                            templateFwhmPix = fwhmT, scienceFwhmPix = fwhmS)
 
     differenceMaskedImage = results.subtractedImage
     differenceMaskedImage.writeFits(outputPath)

@@ -89,7 +89,7 @@ footprints = kcDetect.getFootprints()
 # delta function
 psfmatch1 = ipDiffim.ImagePsfMatchTask(config=configDF)
 results1  = psfmatch1.run(templateMaskedImage, scienceMaskedImage, 
-                          "subtractMaskedImages", footprints = footprints)
+                          "subtractMaskedImages", candidateList = footprints)
 diffim1        = results1.subtractedImage
 spatialKernel1 = results1.psfMatchingKernel
 spatialBg1     = results1.backgroundModel
@@ -98,7 +98,7 @@ kernelCellSet1 = results1.kernelCellSet
 # alard lupton
 psfmatch2 = ipDiffim.ImagePsfMatchTask(config=configAL)
 results2  = psfmatch2.run(templateMaskedImage, scienceMaskedImage, 
-                          "subtractMaskedImages", footprints = footprints)
+                          "subtractMaskedImages", candidateList = footprints)
 diffim2        = results2.subtractedImage
 spatialKernel2 = results2.psfMatchingKernel
 spatialBg2     = results2.backgroundModel
@@ -107,7 +107,7 @@ kernelCellSet2 = results2.kernelCellSet
 # regularized delta function
 psfmatch3 = ipDiffim.ImagePsfMatchTask(config=configDFr)
 results3  = psfmatch3.run(templateMaskedImage, scienceMaskedImage, 
-                          "subtractMaskedImages", footprints = footprints)
+                          "subtractMaskedImages", candidateList = footprints)
 diffim3        = results3.subtractedImage
 spatialKernel3 = results3.psfMatchingKernel
 spatialBg3     = results3.backgroundModel

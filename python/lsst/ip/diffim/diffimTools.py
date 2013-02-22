@@ -20,22 +20,24 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
+# python
+import time
+import os
+from collections import Counter
+import numpy as num
+
 # all the c++ level classes and routines
 import diffimLib
 
 # all the other LSST packages
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
+import lsst.afw.table as afwTable
+import lsst.afw.detection as afwDetect
 import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
-import imagePsfMatch
 from .makeKernelBasisList import makeKernelBasisList 
-
-# third party
-import numpy
-import time
-import os
 
 # Helper functions for ipDiffim; mostly viewing of results and writing
 # debugging info to disk.
@@ -90,6 +92,7 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
                       deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
                       addNoise = True, bgValue = 100., display = False):
 
+    from . import imagePsfMatch
     configFake               = imagePsfMatch.ImagePsfMatchConfig()
     configFake.kernel.name   = "AL"
     subconfigFake            = configFake.kernel.active
@@ -161,7 +164,7 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     sim  += bgValue
 
     # Watch out for negative values
-    tim  += 2 * numpy.abs(numpy.min(tim.getArray()))
+    tim  += 2 * num.abs(num.min(tim.getArray()))
     
     # Add noise?
     if addNoise:
@@ -171,14 +174,12 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     # And turn into MaskedImages
     sim   = afwImage.ImageF(sim, bbox, afwImage.LOCAL)
     svar  = afwImage.ImageF(sim, True)
-    svar.set(1.0)
     smask = afwImage.MaskU(sim.getDimensions())
     smask.set(0x0)
     sMi   = afwImage.MaskedImageF(sim, smask, svar)
     
     tim   = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
     tvar  = afwImage.ImageF(tim, True)
-    tvar.set(1.0)
     tmask = afwImage.MaskU(tim.getDimensions())
     tmask.set(0x0)
     tMi   = afwImage.MaskedImageF(tim, tmask, tvar)
@@ -241,195 +242,8 @@ def backgroundSubtract(config, maskedImages):
     return backgrounds
 
 #######
-# Visualization of kernels
+# More coarse debugging
 #######
-
-def displayKernelList(kernelList, frame0 = 0):
-    import lsst.afw.display.ds9 as ds9
-    frame = frame0
-    for kernel in kernelList:
-        ki = afwImage.ImageD(kernel.getDimensions())
-        kernel.computeImage(ki, False)
-        ds9.mtv(ki, frame = frame)
-        frame += 1
-
-def displaySpatialKernelQuality(kernelCellSet, spatialKernel, spatialBg, frame):
-    import lsst.afw.display.ds9 as ds9
-
-    imstat = diffimLib.ImageStatisticsF()
-    
-    for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(True): # False = include bad candidates
-            cand  = diffimLib.cast_KernelCandidateF(cand)
-            if not (cand.getStatus() == afwMath.SpatialCellCandidate.GOOD):
-                continue
-
-            # raw inputs
-            tmi = cand.getMiToConvolvePtr()
-            smi = cand.getMiToNotConvolvePtr()
-            ki  = cand.getImage()
-            dmi = cand.getDifferenceImage(diffimLib.KernelCandidateF.RECENT)
-
-            # spatial model
-            ski   = afwImage.ImageD(ki.getDimensions())
-            spatialKernel.computeImage(ski, False,
-                                       int(cand.getXCenter()),
-                                       int(cand.getYCenter()))
-            sk    = afwMath.FixedKernel(ski)
-            sbg   = spatialBg(int(cand.getXCenter()),
-                              int(cand.getYCenter()))
-            sdmi  = cand.getDifferenceImage(sk, sbg)
-
-            ds9.mtv(tmi,  frame=frame+0) # template image
-            ds9.mtv(smi,  frame=frame+1) # science image
-            ds9.mtv(ki,   frame=frame+2) # best-fit kernel
-            ds9.mtv(dmi,  frame=frame+3) # best-fit kernel diffim 
-            ds9.mtv(ski,  frame=frame+4) # spatial kernel
-            ds9.mtv(sdmi, frame=frame+5) # spatial kernel diffim
-
-            ki -= ski
-            ds9.mtv(ki,   frame=frame+6) # differnce in kernels
-
-            imstat.apply(dmi)
-            pexLog.Trace("lsst.ip.diffim.displaySpatialKernelQuality", 1,
-                         "Candidate %d diffim residuals = %.2f +/- %.2f sigma" % (cand.getId(),
-                                                                                  imstat.getMean(),
-                                                                                  imstat.getRms()))
-            imstat.apply(sdmi)
-            pexLog.Trace("lsst.ip.diffim.displaySpatialKernelQuality", 1,
-                         "Candidate %d sdiffim residuals = %.2f +/- %.2f sigma" % (cand.getId(),
-                                                                                   imstat.getMean(),
-                                                                                   imstat.getRms()))
-            raw_input("Next: ")
-
-                    
-            
-def displayKernelMosaic(kernelCellSet, frame):
-    import lsst.afw.display.ds9 as ds9
-    import lsst.afw.display.utils as displayUtils
-
-    mos = displayUtils.Mosaic()
-    
-    for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(False): # False = include bad candidates
-            cand = diffimLib.cast_KernelCandidateF(cand)
-            if not (cand.getStatus() == afwMath.SpatialCellCandidate.GOOD):
-                continue
-            im = cand.getKernelImage(diffimLib.KernelCandidateF.ORIG)
-            mos.append(im)
-            
-    mosaic = mos.makeMosaic()
-    ds9.mtv(mosaic, frame=frame)
-
-def displaySpatialKernelMosaic(spatialKernel, width, height, frame, doNorm=False):
-    import lsst.afw.display.ds9 as ds9
-    import lsst.afw.display.utils as displayUtils
-
-    mos = displayUtils.Mosaic()
-    
-    for y in (0, height//2, height):
-        for x in (0, width//2, width):
-            im   = afwImage.ImageD(spatialKernel.getDimensions())
-            ksum = spatialKernel.computeImage(im, doNorm, x, y)
-
-            mos.append(im, "x=%d y=%d kSum=%.2f" % (x, y, ksum))
-    
-    mosaic = mos.makeMosaic()
-    ds9.mtv(mosaic, frame=frame)
-    mos.drawLabels(frame=frame)
-    
-
-def displayBasisMosaic(spatialKernel, frame):
-    import lsst.afw.display.ds9 as ds9
-    import lsst.afw.display.utils as displayUtils
-
-    mos = displayUtils.Mosaic()
-
-    basisList = spatialKernel.getKernelList()
-    for idx in range(len(basisList)):
-        kernel = basisList[idx]
-        im   = afwImage.ImageD(spatialKernel.getDimensions())
-        kernel.computeImage(im, False)
-        mos.append(im, "K%d" % (idx))
-    mosaic = mos.makeMosaic()
-    ds9.mtv(mosaic, frame=frame)
-    mos.drawLabels(frame=frame)
-
-def displayCandidateMosaic(kernelCellSet, frame):
-    import lsst.afw.display.ds9 as ds9
-    import lsst.afw.display.utils as displayUtils
-
-    mos = displayUtils.Mosaic()
-
-    for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(False): # False = include bad candidates
-            cand  = diffimLib.cast_KernelCandidateF(cand)
-            rchi2 = cand.getChi2()
-                
-            try:
-                im = cand.getImage()
-                if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
-                    statStr = "Good"
-                elif cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
-                    statStr = "Bad"
-                else:
-                    statStr = "Unkn"
-                mos.append(im, "#%d: %.1f (%s)" % (cand.getId(), rchi2, statStr))
-            except Exception, e:
-                pass
-    mosaic = mos.makeMosaic()
-    ds9.mtv(mosaic, frame=frame)
-    mos.drawLabels(frame=frame)
-
-def displayCandidateResults(kernelCellSet, frame, goodOnly = True):
-    import lsst.afw.display.ds9 as ds9
-    import lsst.afw.display.utils as displayUtils
-    mos = displayUtils.Mosaic()
-
-    for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(goodOnly): # False = include bad candidates
-            cand  = diffimLib.cast_KernelCandidateF(cand)
-            
-            tmi   = cand.getMiToConvolvePtr()
-            smi   = cand.getMiToNotConvolvePtr()
-            try:
-                ki    = cand.getKernelImage(diffimLib.KernelCandidateF.ORIG)
-                dmi   = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
-            except:
-                pass
-            else:
-                mos.append(tmi.getImage())
-                mos.append(smi.getImage())
-                mos.append(ki.convertFloat())
-                mos.append(dmi.getImage())
-                
-    mosaic = mos.makeMosaic(mode=4)
-    ds9.mtv(mosaic, frame=frame, title = "Kernel Candidates")
-
-def displayFootprints(image, footprintList, frame):
-    import lsst.afw.display.ds9 as ds9
-    import lsst.afw.detection as afwDetection
-
-    bitmask = image.getMask().getPlaneBitMask("DETECTED")
-    afwDetection.setMaskFromFootprintList(image.getMask(), footprintList, bitmask)
-
-    ds9.mtv(image, frame=frame)
-
-    # ANOTHER WAY TO DO IT
-    #
-    #ds9.mtv(image, frame=frame)
-    #for fp in footprintList:
-    #    bboxes = afwDetection.footprintToBBoxList(fp)
-    #    for bbox in bboxes:
-    #        bbox.shift(-afwGeom.Extent2I(image.getXY0()))
-    #        
-    #        x0, y0, x1, y1 = bbox.getMinX(), bbox.getMinY(), bbox.getMaxX(), bbox.getMaxY()
-    #        
-    #        x0 -= 0.5; y0 -= 0.5
-    #        x1 += 0.5; y1 += 0.5
-    #        
-    #        ds9.line([(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)], ctype=ds9.RED)
-    
 
 def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir):
     if not os.path.isdir(outdir):
@@ -455,30 +269,161 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
                 sdmi  = cand.getDifferenceImage(sk, sbg)
                 sdmi.writeFits(os.path.join(outdir, 'sdiffim_c%d_x%d_y%d.fits' % (idCand, xCand, yCand)))
                                 
-def displayKernelCellSet(image, kernelCellSet, frame):
-    import lsst.afw.display.ds9 as ds9
-    import lsst.afw.display.utils as utils
+#######
+# Converting types
+#######
+
+def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, config, log):
+    """ Takes an input list of Sources that were selected to constrain
+    the Psf-matching Kernel and turns them into a List of Footprints,
+    which are used to seed a set of KernelCandidates.  The function
+    checks both the template and science image for masked pixels,
+    rejecting the Source if certain Mask bits (defined in config) are
+    set within the Footprint.
+
+    @param candidateInList: Input list of Sources
+    @param templateExposure: Template image, to be checked for Mask bits in Source Footprint
+    @param scienceExposure: Science image, to be checked for Mask bits in Source Footprint
+    @param config: Config that defines the Mask planes that indicate an invalid Source and Bbox grow radius
+    @param log: Log for output
     
-    ds9.ds9Cmd("mask transparency 50")
-    ds9.mtv(image, frame = frame)
+    @return a List of Footprints whose pixels will be used to constrain the Psf-matching Kernel
+    """
 
-    for cell in kernelCellSet.getCellList():
-        bbox = cell.getBBox()
-        utils.drawBBox(bbox, frame = frame, ctype = 'blue')
+    candidateOutList = []
+    fsb = diffimLib.FindSetBitsU()
+    badBitMask = 0
+    for mp in config.badMaskPlanes: 
+        badBitMask |= afwImage.MaskU.getPlaneBitMask(mp)
+    log.info("Growing %d kernel candidate stars" % (len(candidateInList)))
+    bbox = scienceExposure.getBBox()
+    for kernelCandidate in candidateInList:
+        if not type(kernelCandidate) == afwTable.SourceRecord:
+            raise RuntimeError, ("Candiate not of type afwTable.SourceRecord")
+        bm1 = 0
+        bm2 = 0
+        ra  = kernelCandidate.getRa()
+        dec = kernelCandidate.getDec()
+        center = afwGeom.Point2I(scienceExposure.getWcs().skyToPixel(kernelCandidate.getCoord()))
+        if center[0] < bbox.getMinX() or center[0] > bbox.getMaxX():
+            continue
+        if center[1] < bbox.getMinY() or center[1] > bbox.getMaxY():
+            continue
+        # Grow Sources
+        xmin   = center[0] - config.fpGrowPix
+        xmax   = center[0] + config.fpGrowPix
+        ymin   = center[1] - config.fpGrowPix
+        ymax   = center[1] + config.fpGrowPix
+
+        # Keep object centered
+        if (xmin - bbox.getMinX()) < 0:
+            xmax += (xmin - bbox.getMinX())
+            xmin -= (xmin - bbox.getMinX())
+        if (ymin - bbox.getMinY()) < 0:
+            ymax += (ymin - bbox.getMinY())
+            ymin -= (ymin - bbox.getMinY())
+        if (bbox.getMaxX() - xmax) < 0:
+            xmin -= (bbox.getMaxX() - xmax)
+            xmax += (bbox.getMaxX() - xmax)
+        if (bbox.getMaxY() - ymax) < 0:
+            ymin -= (bbox.getMaxY() - ymax)
+            ymax += (bbox.getMaxY() - ymax)
+        if xmin > xmax or ymin > ymax:
+            continue
         
-        for cand in cell.begin(False): # False = include bad candidates
-            cand  = diffimLib.cast_KernelCandidateF(cand)
-   
-            if (cand.getStatus() == afwMath.SpatialCellCandidate.GOOD):
-                color = 'green'
-            elif (cand.getStatus() == afwMath.SpatialCellCandidate.BAD):
-                color = 'red'
-            else:
-                color = 'yellow'
-            
-            xCenter = cand.getXCenter()
-            yCenter = cand.getYCenter()
+        kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
+        try:
+            fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, False).getMask())
+            bm1 = fsb.getBits()
+            fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, False).getMask())
+            bm2 = fsb.getBits()
+        except Exception, e:
+            pass
+        else:
+            if not((bm1 & badBitMask) or (bm2 & badBitMask)):
+                candidateOutList.append(afwDetect.Footprint(kbbox))
+    log.info("Selected %d / %d sources for KernelCandidacy" % (len(candidateOutList), len(candidateInList)))
+    return candidateOutList
+    
+#######
+# DiaSource filters (here for now)
+#######
 
-            cmd   = 'regions command { circle %g %g %g # color=%s text=\"%d\"};' % (
-                xCenter, yCenter, 10, color, cand.getId())
-            ds9.ds9Cmd(cmd)
+class SourceFlagChecker(object):
+    """A functor to check whether a difference image source has any flags set that should cause it to be labeled bad."""
+    def __init__(self, sources, badFlags=['flags.pixel.edge', 'flags.pixel.interpolated.center', 'flags.pixel.saturated.center']):
+        self.keys = [sources.getSchema().find(name).key for name in badFlags]
+        self.keys.append(sources.table.getCentroidFlagKey())
+
+    def __call__(self, source):
+        for k in self.keys:
+            if source.get(k):
+                return False
+        return True
+
+class DipoleChecker(object):
+    """A functor to check for dipoles in difference image source tables."""
+    def __init__(self, sources, radiusPixels = 7.0):
+        self.sources   = sources
+        self.negkey    = self.sources.getSchema().find("flags.negative").key
+        self.matches   = afwTable.matchXy(self.sources, radiusPixels)
+        self.dipoleIds = []
+        for match in self.matches:
+            if match.first.get(self.negkey) != match.second.get(self.negkey):
+                self.dipoleIds.append(match.first.getId())
+                self.dipoleIds.append(match.second.getId())
+        
+    def __call__(self, source):
+        return source.getId() in self.dipoleIds
+        
+class NbasisEvaluator(object):
+    """A functor to evaluate the Bayesian Information Criterion for the number of basis sets going into the kernel fitting"""
+    def __init__(self, psfMatchConfig, psfFwhmPixTc, psfFwhmPixTnc):
+        self.psfMatchConfig = psfMatchConfig
+        self.psfFwhmPixTc = psfFwhmPixTc
+        self.psfFwhmPixTnc = psfFwhmPixTnc
+        if not self.psfMatchConfig.kernelBasisSet == "alard-lupton":
+            raise RuntimeError, "BIC only implemnted for AL (alard lupton) basis"
+        
+    def __call__(self, kernelCellSet, log):
+        d1, d2, d3 = self.psfMatchConfig.alardDegGauss
+        bicArray = {}
+        for d1i in range(1, d1+1):
+            for d2i in range(1, d2+1):
+                for d3i in range(1, d3+1):
+                    dList = [d1i, d2i, d3i]
+                    bicConfig = type(self.psfMatchConfig)(self.psfMatchConfig, alardDegGauss=dList)
+                    kList = makeKernelBasisList(bicConfig, self.psfFwhmPixTc, self.psfFwhmPixTnc)
+                    k = len(kList)
+                    singlekv = diffimLib.BuildSingleKernelVisitorF(kList, pexConfig.makePolicy(bicConfig))
+                    singlekv.setSkipBuilt(False)
+                    kernelCellSet.visitCandidates(singlekv, bicConfig.nStarPerCell)        
+
+                    for cell in kernelCellSet.getCellList():
+                        for cand in cell.begin(False): # False = include bad candidates
+                            cand = diffimLib.cast_KernelCandidateF(cand)
+                            if cand.getStatus() != afwMath.SpatialCellCandidate.GOOD:
+                                continue
+                            diffIm = cand.getDifferenceImage(diffimLib.KernelCandidateF.RECENT)
+                            bbox = cand.getKernel(diffimLib.KernelCandidateF.RECENT).shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
+                            diffIm = type(diffIm)(diffIm, bbox, True)
+                            chi2 = diffIm.getImage().getArray()**2 / diffIm.getVariance().getArray()
+                            n = chi2.shape[0] * chi2.shape[1]
+                            bic = num.sum(chi2) + k * num.log(n)
+                            if not bicArray.has_key(cand.getId()):
+                                bicArray[cand.getId()] = {}
+                            bicArray[cand.getId()][(d1i, d2i, d3i)] = bic
+
+        bestConfigs = []
+        candIds = bicArray.keys()
+        for candId in candIds:
+            cconfig, cvals = bicArray[candId].keys(), bicArray[candId].values()
+            idx = num.argsort(cvals)
+            bestConfig = cconfig[idx[0]]
+            bestConfigs.append(bestConfig)
+        
+        counter = Counter(bestConfigs).most_common(3)
+        log.info("B.I.C. prefers basis complexity %s %d times; %s %d times; %s %d times" % (counter[0][0], counter[0][1],
+                                                                                            counter[1][0], counter[1][1],
+                                                                                            counter[2][0], counter[2][1]))
+        return counter[0][0], counter[1][0], counter[2][0]

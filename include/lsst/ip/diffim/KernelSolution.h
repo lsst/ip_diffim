@@ -91,8 +91,8 @@ namespace diffim {
         void solve();
 
         /* Used by RegularizedKernelSolution */
-        virtual void build(lsst::afw::image::Image<InputT> const &imageToConvolve,
-                           lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+        virtual void build(lsst::afw::image::Image<InputT> const &templateImage,
+                           lsst::afw::image::Image<InputT> const &scienceImage,
                            lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate);
         virtual lsst::afw::math::Kernel::Ptr getKernel();
         virtual lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr makeKernelImage();
@@ -122,20 +122,20 @@ namespace diffim {
         MaskedKernelSolution(lsst::afw::math::KernelList const& basisList,
                              bool fitForBackground);
         virtual ~MaskedKernelSolution() {};
-        virtual void buildOrig(lsst::afw::image::Image<InputT> const &imageToConvolve,
-                               lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+        virtual void buildOrig(lsst::afw::image::Image<InputT> const &templateImage,
+                               lsst::afw::image::Image<InputT> const &scienceImage,
                                lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
                                const &varianceEstimate,
                                lsst::afw::image::Mask<lsst::afw::image::MaskPixel> pixelMask);
 
-        virtual void build(lsst::afw::image::Image<InputT> const &imageToConvolve,
-                           lsst::afw::image::Image<InputT> const &imageToNotConvolve,
-                           lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
-                           const &varianceEstimate,
-                           lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const &pixelMask);
+        virtual void buildWithMask(lsst::afw::image::Image<InputT> const &templateImage,
+                                   lsst::afw::image::Image<InputT> const &scienceImage,
+                                   lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
+                                   const &varianceEstimate,
+                                   lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const &pixelMask);
 
-        virtual void buildSingleMaskOrig(lsst::afw::image::Image<InputT> const &imageToConvolve,
-                                         lsst::afw::image::Image<InputT> const &imageToNotConvolve,
+        virtual void buildSingleMaskOrig(lsst::afw::image::Image<InputT> const &templateImage,
+                                         lsst::afw::image::Image<InputT> const &scienceImage,
                                          lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
                                          const &varianceEstimate,
                                          lsst::afw::geom::Box2I maskBox);

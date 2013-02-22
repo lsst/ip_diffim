@@ -33,7 +33,6 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as logging
 
 verbosity = 4
@@ -60,7 +59,7 @@ class DiffimTestCases(unittest.TestCase):
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
             defImagePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                        "v5-e0-c011-a00.sci")
+                                        "v5-e0-c011-a00.sci.fits")
             self.templateImage  = afwImage.MaskedImageF(defImagePath)
             self.scienceImage   = self.templateImage.Factory( self.templateImage.getDimensions() )
             

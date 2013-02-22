@@ -119,7 +119,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(soln3_1, kc3.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getId())
         
         # do pca basis; visit manually since visitCandidates is still broken
-        imagePca = afwImage.ImagePcaD()
+        imagePca = ipDiffim.KernelPcaD()
         kpv = ipDiffim.KernelPcaVisitorF(imagePca)
         kpv.processCandidate(kc1)
         kpv.processCandidate(kc2)
@@ -193,7 +193,7 @@ class DiffimTestCases(unittest.TestCase):
         bskv1.processCandidate(kc2)
         bskv1.processCandidate(kc3)            
         
-        imagePca = afwImage.ImagePcaD()
+        imagePca = ipDiffim.KernelPcaD()
         kpv = ipDiffim.KernelPcaVisitorF(imagePca)
         kpv.processCandidate(kc1)
         kpv.processCandidate(kc2)
