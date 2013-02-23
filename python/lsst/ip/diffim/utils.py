@@ -898,8 +898,11 @@ class KernelCandidateQa(object):
                     setter = getattr(source, "set"+key.getTypeString())
                     setter(key, metrics[k])
             else:
-                kType = getattr(diffimLib.KernelCandidateF, "ORIG")
-                lkim = kernelCandidate.getKernelImage(kType)
+                try:
+                    kType = getattr(diffimLib.KernelCandidateF, "ORIG")
+                    lkim = kernelCandidate.getKernelImage(kType)
+                except:
+                    lkim = None
     
             # Calculate spatial model evaluated at each position, for
             # all candidates
@@ -916,10 +919,13 @@ class KernelCandidateQa(object):
                 self._calculateStats(di, dof=dof)
 
             # Kernel mse
-            skim     -= lkim
-            bias      = np.mean(skim.getArray())
-            variance  = np.mean(np.power(skim.getArray(), 2.))
-            mseKernel = bias**2 + variance
+            if lkim is not None:
+                skim     -= lkim
+                bias      = np.mean(skim.getArray())
+                variance  = np.mean(np.power(skim.getArray(), 2.))
+                mseKernel = bias**2 + variance
+            else:
+                mseKernel = -99.999
 
             metrics = {"KCDiffimMean_SPATIAL":mean,
                        "KCDiffimMedian_SPATIAL":median,
