@@ -721,16 +721,19 @@ class KernelCandidateQa(object):
                                                    "likelihood"))
 
             self.fields.append(afwTable.Field["F"]("KCDiffimADA2_%s"%(kType), 
-                                                   "Anderson-Darling test statistic of diffim pixels relative to Normal"))
+                    "Anderson-Darling test statistic of diffim pixels relative to Normal"))
 
             self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADCrit_%s"%(kType), 
-                                                   "Critical values for the significance levels in KCDiffimADSig.  If A2 is greater than this number, hypothesis that the two distributions are the same can be rejected.", 5))
+                    "Critical values for the significance levels in KCDiffimADSig.  If A2 is greater than this number, hypothesis that the two distributions are the same can be rejected.", 5))
 
             self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADSig_%s"%(kType), 
-                                                   "Anderson-Darling significance levels for the Normal distribution", 5))
+                    "Anderson-Darling significance levels for the Normal distribution", 5))
 
             self.fields.append(afwTable.Field["F"]("KCDiffimChiSq_%s"%(kType), 
                                                    "Reduced chi^2 of the residual.", "likelihood"))
+
+            self.fields.append(afwTable.Field["F"]("KCDiffimMseResids_%s"%(kType), 
+                                                   "Mean squared error in diffim : Variance + Bias**2"))
 
             self.fields.append(afwTable.Field["F"]("KCKernelCentX_%s"%(kType), 
                                                    "Centroid in X for this Kernel",
@@ -761,6 +764,11 @@ class KernelCandidateQa(object):
 
                 self.fields.append(afwTable.Field["F"]("BackgroundValue_%s"%(kType), 
                                                        "Evaluation of background model at this point"))
+            else:
+                self.fields.append(afwTable.Field["F"]("KCDiffimMseKernel_%s"%(kType), 
+                                                       "Mean squared error of spatial kernel estimate"))
+
+
     def addToSchema(self, inSourceCatalog):
         schema = inSourceCatalog.getSchema()
         inKeys = []
@@ -814,6 +822,12 @@ class KernelCandidateQa(object):
         #Calculte chisquare of the residual
         chisq=np.sum(np.power(data, 2.))  
 
+        # Mean squared error: variance + bias**2
+        # Bias = |data - model| = mean of diffim
+        # Variance = |(data - model)**2| = mean of diffim**2
+        bias = mean
+        variance = np.power(data, 2.).mean()
+        mseResids = bias**2 + variance
 
         # If scipy is not set up, return zero for the stats
         try:
@@ -835,7 +849,7 @@ class KernelCandidateQa(object):
             sig = num.zeros(5)
             rchisq = 0
   
-        return mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq
+        return mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq, mseResids
 
     def apply(self, candidateList, spatialKernel, spatialBackground, dof=0):
         for kernelCandidate in candidateList:
@@ -852,14 +866,15 @@ class KernelCandidateQa(object):
                 kernelValues = kernelCandidate.getKernel(kType).getKernelParameters()
                 kernelValues = np.asarray(kernelValues)
     
-                kim = kernelCandidate.getKernelImage(kType)
-                centx, centy = calcCentroid(kim.getArray())
-                stdx, stdy = calcWidth(kim.getArray(), centx, centy)
+                lkim = kernelCandidate.getKernelImage(kType)
+                centx, centy = calcCentroid(lkim.getArray())
+                stdx, stdy = calcWidth(lkim.getArray(), centx, centy)
                 solution = kernelCandidate.getKernelSolution(kType)
                 # NOTE
                 # What is the difference between kernelValues and solution?
     
-                mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq = self._calculateStats(di, dof=dof)
+                mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq, mseResids = \
+                    self._calculateStats(di, dof=dof)
     
                 metrics = {"KCDiffimMean_LOCAL":mean,
                            "KCDiffimMedian_LOCAL":median,
@@ -871,6 +886,7 @@ class KernelCandidateQa(object):
                            "KCDiffimADCrit_LOCAL":crit,
                            "KCDiffimADSig_LOCAL":sig,
                            "KCDiffimChiSq_LOCAL":rchisq,
+                           "KCDiffimMseResids_LOCAL":mseResids,
                            "KCKernelCentX_LOCAL":centx,
                            "KCKernelCentY_LOCAL":centy,
                            "KCKernelStdX_LOCAL":stdx,
@@ -881,20 +897,29 @@ class KernelCandidateQa(object):
                     key = schema[k].asKey()
                     setter = getattr(source, "set"+key.getTypeString())
                     setter(key, metrics[k])
-                
+            else:
+                kType = getattr(diffimLib.KernelCandidateF, "ORIG")
+                lkim = kernelCandidate.getKernelImage(kType)
     
             # Calculate spatial model evaluated at each position, for
             # all candidates
-            kim  = afwImage.ImageD(spatialKernel.getDimensions())
-            spatialKernel.computeImage(kim, False, kernelCandidate.getXCenter(),
+            skim  = afwImage.ImageD(spatialKernel.getDimensions())
+            spatialKernel.computeImage(skim, False, kernelCandidate.getXCenter(),
                                        kernelCandidate.getYCenter())
-            centx, centy = calcCentroid(kim.getArray())
-            stdx, stdy = calcWidth(kim.getArray(), centx, centy)
+            centx, centy = calcCentroid(skim.getArray())
+            stdx, stdy = calcWidth(skim.getArray(), centx, centy)
     
-            sk = afwMath.FixedKernel(kim)
+            sk = afwMath.FixedKernel(skim)
             sbg = spatialBackground(kernelCandidate.getXCenter(), kernelCandidate.getYCenter())
             di = kernelCandidate.getDifferenceImage(sk, sbg)
-            mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq = self._calculateStats(di, dof=dof)
+            mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq, mseResids = \
+                self._calculateStats(di, dof=dof)
+
+            # Kernel mse
+            skim     -= lkim
+            bias      = np.mean(skim.getArray())
+            variance  = np.mean(np.power(skim.getArray(), 2.))
+            mseKernel = bias**2 + variance
 
             metrics = {"KCDiffimMean_SPATIAL":mean,
                        "KCDiffimMedian_SPATIAL":median,
@@ -906,6 +931,8 @@ class KernelCandidateQa(object):
                        "KCDiffimADCrit_SPATIAL":crit,
                        "KCDiffimADSig_SPATIAL":sig,
                        "KCDiffimChiSq_SPATIAL":rchisq,
+                       "KCDiffimMseResids_SPATIAL":mseResids,
+                       "KCDiffimMseKernel_SPATIAL":mseKernel,
                        "KCKernelCentX_SPATIAL":centx,
                        "KCKernelCentY_SPATIAL":centy,
                        "KCKernelStdX_SPATIAL":stdx,
@@ -934,13 +961,15 @@ class KernelCandidateQa(object):
             metadata.add("Total_false_pos", len(diaSources))
         for kType in ("LOCAL", "SPATIAL"):
             for sName in ("KCDiffimMean", "KCDiffimMedian", "KCDiffimIQR", "KCDiffimStDev", 
-                          "KCDiffimKSProb", "KCDiffimADSig", "KCDiffimChiSq"):
+                          "KCDiffimKSProb", "KCDiffimADSig", "KCDiffimChiSq", 
+                          "KCDiffimMseResids", "KCDiffimMseKernel"):
+                if sName == "KCDiffimMseKernel" and kType == "LOCAL":
+                    continue
                 kName = "%s_%s" % (sName, kType)
                 vals = np.array([s.get(kName) for s in sourceCatalog])
                 idx = np.isfinite(vals)
                 metadata.add("%s_MEAN" % (kName), np.mean(vals[idx]))
                 metadata.add("%s_MEDIAN" % (kName), np.median(vals[idx]))
                 metadata.add("%s_STDEV" % (kName), np.std(vals[idx]))
-
 
 
