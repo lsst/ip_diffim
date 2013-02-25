@@ -544,10 +544,10 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure, 
                                                        exposure, config, pexLog.getDefaultLog())
     for fp in testFootprints:
-        subexp = diffExposure.Factory(diffExposure, fp.getBBox())
+        subexp = diffExposure.Factory(diffExposure, fp["footprint"].getBBox())
         subim  = subexp.getMaskedImage().getImage()
         if origVariance:
-            subvar = afwImage.ExposureF(exposure, fp.getBBox()).getMaskedImage().getVariance()
+            subvar = afwImage.ExposureF(exposure, fp["footprint"].getBBox()).getMaskedImage().getVariance()
         else:
             subvar = subexp.getMaskedImage().getVariance()
         nonfitResids.append(np.ravel(subim.getArray() / np.sqrt(subvar.getArray())))
