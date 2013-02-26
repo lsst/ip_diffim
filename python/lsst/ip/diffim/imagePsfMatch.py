@@ -29,8 +29,8 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDetect
 import lsst.pipe.base as pipeBase
-from lsst.meas.algorithms import SourceDetectionConfig, SourceDetectionTask, \
-    PsfAttributes, SourceMeasurementTask, SourceMeasurementConfig, getBackground, BackgroundConfig
+from lsst.meas.algorithms import SourceDetectionTask, \
+    PsfAttributes, SourceMeasurementTask, getBackground, BackgroundConfig
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatch, PsfMatchConfigDF, PsfMatchConfigAL
 from . import utils as diUtils 

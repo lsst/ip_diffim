@@ -694,10 +694,11 @@ class KernelCandidateQa(object):
         self.fields.append(afwTable.Field["PointD"]("RegisterRefPosition", 
                                               "Position of reference object for registration (radians)."))
         #TODO check units of the following angles
-        self.fields.append(afwTable.Field["Angle"]("RegisterResidualRA", 
-                                              "Offset in RA from reference after registraction"))
-        self.fields.append(afwTable.Field["Angle"]("RegisterResidualDec", 
-                                              "Offset in Dec from reference after registraction"))
+        self.fields.append(afwTable.Field["Angle"]("RegisterResidualBearing", 
+                                              "Angle of residual wrt declination parallel in radians"))
+
+        self.fields.append(afwTable.Field["Angle"]("RegisterResidualDistance", 
+                                              "Offset of residual in radians"))
         for kType in ("LOCAL", "SPATIAL"):
             self.fields.append(afwTable.Field["F"]("KCDiffimMean_%s"%(kType), 
                                                    "Mean of KernelCandidate diffim", "sigma"))
@@ -919,11 +920,13 @@ class KernelCandidateQa(object):
     def aggregate(self, sourceCatalog, metadata, wcsresids, diaSources=None):
 	for source in sourceCatalog:
 	    if source.getId() in wcsresids.keys():
+                #Note that the residuals are not delta RA, delta Dec
+                #From the source code "bearing (angle wrt a declination parallel) and distance
                 coord, resids = wcsresids[source.getId()]
-		key = source.schema["RegisterResidualRA"].asKey()
+		key = source.schema["RegisterResidualBearing"].asKey()
                 setter = getattr(source, "set"+key.getTypeString())
 		setter(key, resids[0])
-		key = source.schema["RegisterResidualDec"].asKey()
+		key = source.schema["RegisterResidualDistance"].asKey()
                 setter = getattr(source, "set"+key.getTypeString())
 		setter(key, resids[1])
 		key = source.schema["RegisterRefPosition"].asKey()
@@ -931,7 +934,22 @@ class KernelCandidateQa(object):
 		setter(key, afwGeom.Point2D(coord.getRa().asRadians(),\
                         coord.getDec().asRadians()))
         if diaSources:
-            metadata.add("Total_false_pos", len(diaSources))
+            metadata.add("NFalsePositivesTotal", len(diaSources))
+            nrefmatch = 0
+            nsrcmatch = 0
+            nunmatched = 0
+            for source in diaSources:
+                refId = source.get("refMatchId")
+                srcId = source.get("srcMatchId")
+                if refId > 0:
+                    nrefmatch += 1
+                if srcId > 0:
+                    nsrcmatch += 1
+                if refId == 0 and srcId == 0:
+                    nunmatched += 1
+            metadata.add("NFalsePositivesRefAssociated", nrefmatch)
+            metadata.add("NFalsePositivesSrcAssociated", nsrcmatch)
+            metadata.add("NFalsePositivesUnassociated", nunmatched)
         for kType in ("LOCAL", "SPATIAL"):
             for sName in ("KCDiffimMean", "KCDiffimMedian", "KCDiffimIQR", "KCDiffimStDev", 
                           "KCDiffimKSProb", "KCDiffimADSig", "KCDiffimChiSq"):
@@ -942,5 +960,60 @@ class KernelCandidateQa(object):
                 metadata.add("%s_MEDIAN" % (kName), np.median(vals[idx]))
                 metadata.add("%s_STDEV" % (kName), np.std(vals[idx]))
 
+def printSkyDiffs(sources, wcs):
+    for s in sources: 
+        dra = 3600*(s.getCoord().getPosition().getX() - wcs.pixelToSky(s.getCentroid().getX(), s.getCentroid().getY()).getPosition().getX())/0.2
+        ddec = 3600*(s.getCoord().getPosition().getY() - wcs.pixelToSky(s.getCentroid().getX(), s.getCentroid().getY()).getPosition().getY())/0.2
+        if np.isfinite(dra) and np.isfinite(ddec):
+            print dra, ddec
 
+def makeRegions(sources, outfilename, wcs=None):
+    fh = open(outfilename, "w")
+    fh.write("global color=red font=\"helvetica 10 normal\" select=1 highlite=1 edit=1 move=1 delete=1 include=1 fixed=0 source\nfk5\n")
+    for s in sources:
+        if wcs:
+            (ra, dec) = wcs.pixelToSky(s.getCentroid().getX(), s.getCentroid().getY()).getPosition()
+        else:
+            (ra, dec) = s.getCoord().getPosition()
+        if np.isfinite(ra) and np.isfinite(dec):
+            fh.write("circle(%f,%f,2\")\n"%(ra,dec))
+    fh.flush()
+    fh.close()
 
+def showSourceSetSky(sSet, wcs, xy0, frame=0, ctype=ds9.GREEN, symb="+", size=2):
+    """Draw the (RA, Dec) positions of a set of Sources. Image has the XY0."""
+    with ds9.Buffering():
+        for s in sSet:
+            (xc, yc) = wcs.skyToPixel(s.getCoord().getRa(), s.getCoord().getDec())
+            xc -= xy0[0]
+            yc -= xy0[1]
+            ds9.dot(symb, xc, yc, frame=frame, ctype=ctype, size=size)
+
+def plotWhisker(results, newWcs):
+    refCoordKey = results.matches[0].first.getTable().getCoordKey()
+    inCentroidKey = results.matches[0].second.getTable().getCentroidKey()
+    sids      = [m.first.getId() for m in results.matches]
+    positions = [m.first.get(refCoordKey) for m in results.matches]
+    residuals = [m.first.get(refCoordKey).getOffsetFrom(
+                       newWcs.pixelToSky(m.second.get(inCentroidKey))) for
+                       m in results.matches]
+    import matplotlib.pyplot as plt      
+    fig = plt.figure()
+    sp = fig.add_subplot(1, 1, 0)
+    xpos = [x[0].asDegrees() for x in positions]
+    ypos = [x[1].asDegrees() for x in positions]
+    xidxs = np.isfinite(xpos)
+    yidxs = np.isfinite(ypos)
+    X = np.asarray(xpos)[xidxs]
+    Y = np.asarray(ypos)[yidxs]
+    distance = [x[0].asArcseconds() for x in residuals]
+    distance = np.asarray(distance)[xidxs]
+    #NOTE: This assumes that the bearing is measured positive from +RA through North.
+    #From the documentation this is not clear.
+    bearing = [x[1].asRadians() for x in residuals]
+    bearing = np.asarray(bearing)[xidxs]
+    U = (distance*np.cos(bearing))
+    V = (distance*np.sin(bearing))
+    sp.quiver(X, Y, U, V)
+    sp.set_title("WCS Residual")
+    plt.show()
