@@ -198,7 +198,7 @@ class PsfMatchConfig(pexConfig.Config):
     kernelSizeMin = pexConfig.Field(
         dtype = int,
         doc = """Minimum Kernel Size""",
-        default = 19,
+        default = 21,
     )
     kernelSizeMax = pexConfig.Field(
         dtype = int,

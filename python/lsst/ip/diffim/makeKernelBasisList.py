@@ -114,6 +114,11 @@ def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix 
         # relationship: Sig_i+1 / Sig_i = alardGaussBeta
         for i in range(loc,alardNGauss):
             alardSigGauss.append(alardSigGauss[-1]*alardGaussBeta)
+
+        kernelSize  = int(fwhmScaling * alardSigGauss[-1])
+        kernelSize += 0 if kernelSize%2 else 1 # Make sure its odd
+        kernelSize  = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
+
     else:
         # Deconvolution; Define the progression of Gaussians using a
         # method to derive a deconvolution sum-of-Gaussians from its
@@ -121,14 +126,28 @@ def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix 
         # assumes 3 components.
         #
         # http://iopscience.iop.org/0266-5611/26/8/085002  Equation 40
-        kernelMinSigma = np.sqrt(targetSigma**2 - referenceSigma**2)
-        if kernelMinSigma < alardMinSig:
-            kernelMinSigma = alardMinSig
+        alardNGauss = 3
+        kernelSigma = np.sqrt(targetSigma**2 - referenceSigma**2)
+        if kernelSigma < alardMinSig:
+            kernelSigma = alardMinSig
+
         alardSigGauss = []
-        alardSigGauss.append(kernelMinSigma)
-        for i in range(1,3):
+        if (kernelSigma/alardGaussBeta) > alardMinSig:
+            alardSigGauss.append(kernelSigma/alardGaussBeta)
+            alardSigGauss.append(kernelSigma)
+            loc = 2
+        else:
+            alardSigGauss.append(kernelSigma)
+            loc = 1
+
+        for i in range(loc,alardNGauss):
             alardSigGauss.append(alardSigGauss[-1]*alardGaussBeta)
 
+        kernelSize  = int(fwhmScaling * alardSigGauss[-1])
+        kernelSize += 0 if kernelSize%2 else 1 # Make sure its odd
+        kernelSize  = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
+
+        # Now build a deconvolution set from these sigmas
         sig0 = alardSigGauss[0]
         sig1 = alardSigGauss[1]
         sig2 = alardSigGauss[2]
@@ -143,10 +162,6 @@ def generateAlardLuptonBasisList(config, targetFwhmPix = None, referenceFwhmPix 
         alardSigGauss.sort()
         alardNGauss = len(alardSigGauss)
         alardDegGauss = [config.alardDegGaussDeconv for x in alardSigGauss]
-
-    kernelSize  = int(fwhmScaling * alardSigGauss[-1])
-    kernelSize += 0 if kernelSize%2 else 1 # Make sure its odd
-    kernelSize  = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
 
     if metadata is not None:
         metadata.add("ALBasisNGauss", alardNGauss)

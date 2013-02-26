@@ -346,16 +346,27 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
     log.info("Selected %d / %d sources for KernelCandidacy" % (len(candidateOutList), len(candidateInList)))
     return candidateOutList
 
-def sourceTableToCandList(sourceTable, templateExposure, scienceExposure, config, kconfig, log):
-    footprintList = sourceToFootprintList(list(sourceTable), templateExposure, scienceExposure, kconfig, log)
+def sourceTableToCandList(sourceTable, templateExposure, scienceExposure, kconfig, dconfig, log, 
+                          dobuild=False, basisList=None):
+    footprintList = sourceToFootprintList(list(sourceTable), templateExposure, scienceExposure, dconfig, log)
     candList = []
 
-    policy = pexConfig.makePolicy(config)
+    if dobuild and not basisList:
+        dobuild = False
+    else:
+        policy = pexConfig.makePolicy(kconfig)
+        singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy)
+
+    policy = pexConfig.makePolicy(kconfig)
     for cand in footprintList:
         bbox = cand['footprint'].getBBox()  #-- Fix for footprints?
         tmi  = afwImage.MaskedImageF(templateExposure.getMaskedImage(), bbox, afwImage.PARENT)
         smi  = afwImage.MaskedImageF(scienceExposure.getMaskedImage(), bbox, afwImage.PARENT)
-        candList.append(diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy))
+        kcand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
+        if dobuild:
+            singlekv.processCandidate(kcand)
+            kcand.setStatus(afwMath.SpatialCellCandidate.UNKNOWN)
+        candList.append(kcand)
     return candList
 
     
