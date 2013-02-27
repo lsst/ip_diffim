@@ -951,20 +951,20 @@ class KernelCandidateQa(object):
                 setter(key, metrics[k])
 
     def aggregate(self, sourceCatalog, metadata, wcsresids, diaSources=None):
-	for source in sourceCatalog:
-	    if source.getId() in wcsresids.keys():
+        for source in sourceCatalog:
+            if source.getId() in wcsresids.keys():
                 #Note that the residuals are not delta RA, delta Dec
                 #From the source code "bearing (angle wrt a declination parallel) and distance
                 coord, resids = wcsresids[source.getId()]
-		key = source.schema["RegisterResidualBearing"].asKey()
+                key = source.schema["RegisterResidualBearing"].asKey()
                 setter = getattr(source, "set"+key.getTypeString())
-		setter(key, resids[0])
-		key = source.schema["RegisterResidualDistance"].asKey()
+                setter(key, resids[0])
+                key = source.schema["RegisterResidualDistance"].asKey()
                 setter = getattr(source, "set"+key.getTypeString())
-		setter(key, resids[1])
-		key = source.schema["RegisterRefPosition"].asKey()
+                setter(key, resids[1])
+                key = source.schema["RegisterRefPosition"].asKey()
                 setter = getattr(source, "set"+key.getTypeString())
-		setter(key, afwGeom.Point2D(coord.getRa().asRadians(),\
+                setter(key, afwGeom.Point2D(coord.getRa().asRadians(),\
                         coord.getDec().asRadians()))
         if diaSources:
             metadata.add("NFalsePositivesTotal", len(diaSources))
@@ -1038,18 +1038,46 @@ def plotWhisker(results, newWcs):
     sp = fig.add_subplot(1, 1, 0)
     xpos = [x[0].asDegrees() for x in positions]
     ypos = [x[1].asDegrees() for x in positions]
+    xpos.append(0.02*(max(xpos) - min(xpos)) + min(xpos))
+    ypos.append(0.98*(max(ypos) - min(ypos)) + min(ypos))
     xidxs = np.isfinite(xpos)
     yidxs = np.isfinite(ypos)
     X = np.asarray(xpos)[xidxs]
     Y = np.asarray(ypos)[yidxs]
-    distance = [x[0].asArcseconds() for x in residuals]
+    distance = [x[1].asArcseconds() for x in residuals]
+    distance.append(0.2)
     distance = np.asarray(distance)[xidxs]
+    print np.median(distance)/0.2, np.std(distance)/0.2
     #NOTE: This assumes that the bearing is measured positive from +RA through North.
     #From the documentation this is not clear.
-    bearing = [x[1].asRadians() for x in residuals]
+    bearing = [x[0].asRadians() for x in residuals]
+    bearing.append(0)
     bearing = np.asarray(bearing)[xidxs]
     U = (distance*np.cos(bearing))
+    print np.median(U)/0.2, np.std(U)/0.2
     V = (distance*np.sin(bearing))
+    print np.median(V)/0.2, np.std(V)/0.2
     sp.quiver(X, Y, U, V)
     sp.set_title("WCS Residual")
     plt.show()
+
+def matchXY(first, second, matchRadius):
+    srcMatchDict = {}
+    #Only returns closest match
+    for s in second:
+        dist = matchRadius
+        fid = None
+        sid = None
+        for f in first:
+            fx = f.getX()
+            fy = f.getY()
+            sx = s.getX()
+            sy = s.getY()
+            if len(np.isfinite([fx, fy, sx, sy]) == 4):
+                if math.hypot(f.getX() - s.getX(), f.getY() - s.getY()) < dist:
+                    dist = math.hypot(f.getX() - s.getX(), f.getY() - s.getY())
+                    fid = f.getId()
+                    sid = s.getId()
+        if fid and sid:
+            srcMatchDict[sid] = fid
+    return srcMatchDict
