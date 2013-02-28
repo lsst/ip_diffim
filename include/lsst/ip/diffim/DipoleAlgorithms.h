@@ -224,7 +224,9 @@ private:
  */
 class PsfDipoleFluxControl : public DipoleFluxControl {
 public:
-    PsfDipoleFluxControl() : DipoleFluxControl("flux.dipole.psf") {}
+    LSST_CONTROL_FIELD(maxPixels, int, "Maximum number of pixels to apply the measurement to");
+
+    PsfDipoleFluxControl() : DipoleFluxControl("flux.dipole.psf"), maxPixels(500) {}
 
 private:
     virtual PTR(meas::algorithms::AlgorithmControl) _clone() const;
