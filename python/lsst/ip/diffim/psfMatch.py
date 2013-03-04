@@ -186,7 +186,7 @@ class PsfMatchConfig(pexConfig.Config):
     kernelSizeFwhmScaling = pexConfig.Field(
         dtype = float,
         doc = """How much to scale the kernel size based on the largest AL Sigma""",
-        default = 3.0,
+        default = 6.0,
     )
     kernelSizeMin = pexConfig.Field(
         dtype = int,
@@ -196,7 +196,7 @@ class PsfMatchConfig(pexConfig.Config):
     kernelSizeMax = pexConfig.Field(
         dtype = int,
         doc = """Maximum Kernel Size""",
-        default = 31,
+        default = 35,
     )
 
     #####

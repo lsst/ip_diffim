@@ -144,7 +144,10 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
     #
     # Show us the ccandidates
     #
-    mos = displayUtils.Mosaic(gutter=5, background=-2)
+    if kernels:
+        mos = displayUtils.Mosaic(gutter=5, background=0)
+    else:
+        mos = displayUtils.Mosaic(gutter=5, background=-1)
     #
     candidateCenters = []
     candidateCentersBad = []
