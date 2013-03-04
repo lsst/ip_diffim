@@ -71,11 +71,16 @@ class DetectionConfig(pexConfig.Config):
                  too big and the subsequent convolutions become unwieldy""",
         default = 500
     )
-    fpGrowFwhmScaling = pexConfig.Field(
+    fpGrowKernelScaling = pexConfig.Field(
         dtype = float,
-        doc = """Grow the footprint based on the Psf Fwhm;
-                 should be larger than kernelRadiusFwhmScaling""",
-        default = 10.
+        doc = """If config.scaleByFwhm, grow the footprint based on
+                 the final kernelSize.  Each footprint will be
+                 2*fpGrowKernelScaling*kernelSize x 
+                 2*fpGrowKernelScaling*kernelSize.  With the value 
+                 of 1.0, the remaining pixels in each KernelCandiate 
+                 after convolution by the basis functions will be 
+                 eqaul to the kernel size iteslf.""",
+        default = 1.0
     )
     fpGrowPix = pexConfig.Field(
         dtype = int,
@@ -83,29 +88,17 @@ class DetectionConfig(pexConfig.Config):
                  footprint.  The smaller the faster; however the
                  kernel sum does not converge if the stamp is too
                  small; and the kernel is not constrained at all if
-                 the stamp is the size of the kernel.  Rule of thumb
-                 is at least 1.5 times the kernel size.  The grown
-                 stamp is 2 * fpGrowPix pixels larger in each
-                 dimension.""",
+                 the stamp is the size of the kernel.  The grown stamp
+                 is 2 * fpGrowPix pixels larger in each dimension.  
+                 This is overridden by fpGrowKernelScaling if scaleByFwhm""",
         default = 30,
     )
-    fpGrowMin = pexConfig.Field(
-        dtype = int,
-        doc = """Minimum number of pixels to grow""",
-        default = 20,
-    )
-    fpGrowMax = pexConfig.Field(
-        dtype = int,
-        doc = """Maximum number of pixels to grow.""",
-        default = 40,
+    scaleByFwhm = pexConfig.Field(
+        dtype = bool,
+        doc = "Scale fpGrowPix by input Fwhm",
+        default = True,
     )
 
-    def validate(self):
-        pexConfig.Config.validate(self)
-        if (self.fpGrowPix < self.fpGrowMin) or (self.fpGrowPix > self.fpGrowMax):
-            return False
-        return True
-        
     
 class AfwBackgroundConfig(pexConfig.Config):
     algorithmName = pexConfig.ChoiceField(
@@ -187,13 +180,13 @@ class PsfMatchConfig(pexConfig.Config):
     )
     scaleByFwhm = pexConfig.Field(
         dtype = bool,
-        doc = "Scale kernelSize, fpGrowPix, alardGaussians by input Fwhm",
+        doc = "Scale kernelSize, alardGaussians by input Fwhm",
         default = True,
     )
     kernelSizeFwhmScaling = pexConfig.Field(
         dtype = float,
         doc = """How much to scale the kernel size based on the largest AL Sigma""",
-        default = 2.0,
+        default = 3.0,
     )
     kernelSizeMin = pexConfig.Field(
         dtype = int,

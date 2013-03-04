@@ -274,7 +274,7 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
 # Converting types
 #######
 
-def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, config, log):
+def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, kernelSize, config, log):
     """ Takes an input list of Sources that were selected to constrain
     the Psf-matching Kernel and turns them into a List of Footprints,
     which are used to seed a set of KernelCandidates.  The function
@@ -296,8 +296,15 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
     badBitMask = 0
     for mp in config.badMaskPlanes: 
         badBitMask |= afwImage.MaskU.getPlaneBitMask(mp)
-    log.info("Growing %d kernel candidate stars" % (len(candidateInList)))
     bbox = scienceExposure.getBBox(afwImage.PARENT)
+
+    # Size to grow Sources
+    if config.scaleByFwhm:
+        fpGrowPix = int(config.fpGrowKernelScaling * kernelSize + 0.5)
+    else:
+        fpGrowPix = config.fpGrowPix
+    log.info("Growing %d kernel candidate stars by %d pixels" % (len(candidateInList), fpGrowPix))
+
     for kernelCandidate in candidateInList:
         if not type(kernelCandidate) == afwTable.SourceRecord:
             raise RuntimeError, ("Candiate not of type afwTable.SourceRecord")
@@ -310,11 +317,11 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
             continue
         if center[1] < bbox.getMinY() or center[1] > bbox.getMaxY():
             continue
-        # Grow Sources
-        xmin   = center[0] - config.fpGrowPix
-        xmax   = center[0] + config.fpGrowPix
-        ymin   = center[1] - config.fpGrowPix
-        ymax   = center[1] + config.fpGrowPix
+
+        xmin   = center[0] - fpGrowPix
+        xmax   = center[0] + fpGrowPix
+        ymin   = center[1] - fpGrowPix
+        ymax   = center[1] + fpGrowPix
 
         # Keep object centered
         if (xmin - bbox.getMinX()) < 0:
@@ -347,8 +354,10 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, co
     return candidateOutList
 
 def sourceTableToCandList(sourceTable, templateExposure, scienceExposure, kconfig, dconfig, log, 
-                          dobuild=False, basisList=None):
-    footprintList = sourceToFootprintList(list(sourceTable), templateExposure, scienceExposure, dconfig, log)
+                          basisList, dobuild=False):
+    kernelSize = basisList[0].getWidth()
+    footprintList = sourceToFootprintList(list(sourceTable), templateExposure, scienceExposure, 
+                                          kernelSize, dconfig, log)
     candList = []
 
     if dobuild and not basisList:

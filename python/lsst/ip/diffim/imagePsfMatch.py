@@ -178,14 +178,8 @@ class ImagePsfMatchTask(PsfMatch):
                 scienceSigPix = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
                 scienceFwhmPix = scienceSigPix * sigma2fwhm 
 
-        '''
-        if candidateList != None:
-            if type(candidateList[0]) == afwTable.SourceRecord:
-                candidateList = diffimTools.sourceToFootprintList(candidateList, templateExposure, 
-                                  scienceExposure, self.kconfig.detectionConfig, self.log)
-        '''
-
-        candidateList = self.makeCandidateList(templateExposure, scienceExposure, candidateList)
+        kernelSize = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix)[0].getWidth()
+        candidateList = self.makeCandidateList(templateExposure, scienceExposure, kernelSize, candidateList)
 
         if convolveTemplate:
             results = self.matchMaskedImages(
@@ -205,7 +199,7 @@ class ImagePsfMatchTask(PsfMatch):
 
     @pipeBase.timeMethod
     def matchMaskedImages(self, templateMaskedImage, scienceMaskedImage, candidateList, 
-            templateFwhmPix = None, scienceFwhmPix = None):
+                          templateFwhmPix = None, scienceFwhmPix = None):
         """PSF-match a MaskedImage (templateMaskedImage) to a reference MaskedImage (scienceMaskedImage)
 
         Do the following, in order:
@@ -474,15 +468,17 @@ class ImagePsfMatchTask(PsfMatch):
 	del bkgd
         return selectSources
 
-    def makeCandidateList(self, templateExposure, scienceExposure, candidateList=None):
+    def makeCandidateList(self, templateExposure, scienceExposure, kernelSize, candidateList=None):
         if candidateList == None:
             candidateList = self.getSelectSources(scienceExposure)
 
         if not type(candidateList[0]) == afwTable.SourceRecord:
             raise RuntimeError, "Can only make candidate list from set of SourceRecords.  Got %s instead." \
                 % (type(candidateList[0]))
-        candidateList = diffimTools.sourceToFootprintList(list(candidateList), templateExposure, 
-                                                          scienceExposure, self.kconfig.detectionConfig, 
+        candidateList = diffimTools.sourceToFootprintList(list(candidateList), 
+                                                          templateExposure, scienceExposure, 
+                                                          kernelSize,
+                                                          self.kconfig.detectionConfig, 
                                                           self.log)
         if len(candidateList) == 0:
             raise RuntimeError, "Cannot find any objects suitable for KernelCandidacy" 
