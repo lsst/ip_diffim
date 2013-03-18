@@ -436,7 +436,7 @@ class PsfMatchConfigAL(PsfMatchConfig):
     alardDegGaussDeconv = pexConfig.Field(
         dtype = int,
         doc = """Degree of spatial modification of ALL gaussians in AL basis during deconvolution""",
-        default = 2,
+        default = 3,
     )
 
 
