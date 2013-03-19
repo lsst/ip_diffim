@@ -152,6 +152,14 @@ class ModelPsfMatchTask(PsfMatch):
         
         @raise RuntimeError if reference PSF model and science PSF model have different dimensions
         """
+        # The Psf base class does not support getKernel() in general, as there are some Psf
+        # classes for which this is not meaningful.
+        # Many Psfs we use in practice are KernelPsfs, and this algorithm will work fine for them,
+        # but someday it should probably be modified to support arbitrary Psfs.
+        referencePsfModel = measAlg.KernelPsf.swigConvert(referencePsfModel)
+        sciencePsfModel = measAlg.KernelPsf.swigConvert(sciencePsfModel)
+        if referencePsfModel is None or sciencePsfModel is None:
+            raise RuntimeError("ERROR: Psf matching is only implemented for KernelPsfs")
         if (referencePsfModel.getKernel().getDimensions() != sciencePsfModel.getKernel().getDimensions()):
             pexLog.Trace(self.log.getName(), 1,
                          "ERROR: Dimensions of reference Psf and science Psf different; exiting")
@@ -215,9 +223,7 @@ class ModelPsfMatchTask(PsfMatch):
                 pexLog.Trace(self.log.getName(), 5, "Creating Psf candidate at %.1f %.1f" % (posX, posY))
     
                 # reference kernel image, at location of science subimage
-                kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY), True).convertF()
-                imsum = afwMath.makeStatistics(kernelImageR, afwMath.SUM).getValue(afwMath.SUM)
-                kernelImageR /= imsum         # image sums to 1.0 
+                kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY)).convertF()
                 kernelMaskR   = afwImage.MaskU(dimenR)
                 kernelMaskR.set(0)
                 kernelVarR    = afwImage.ImageF(dimenR)
@@ -225,9 +231,7 @@ class ModelPsfMatchTask(PsfMatch):
                 referenceMI   = afwImage.MaskedImageF(kernelImageR, kernelMaskR, kernelVarR)
      
                 # kernel image we are going to convolve
-                kernelImageS = sciencePsfModel.computeImage(afwGeom.Point2D(posX, posY), True).convertF()
-                imsum = afwMath.makeStatistics(kernelImageS, afwMath.SUM).getValue(afwMath.SUM)
-                kernelImageS /= imsum         # image sums to 1.0 
+                kernelImageS = sciencePsfModel.computeImage(afwGeom.Point2D(posX, posY)).convertF()
                 kernelMaskS   = afwImage.MaskU(dimenS)
                 kernelMaskS.set(0)
                 kernelVarS    = afwImage.ImageF(dimenS)
