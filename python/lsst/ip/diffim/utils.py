@@ -849,8 +849,8 @@ class KernelCandidateQa(object):
             D = 0.
             prob = 0.
             A2 = 0.
-            crit = num.zeros(5)
-            sig = num.zeros(5)
+            crit = np.zeros(5)
+            sig = np.zeros(5)
             rchisq = 0
   
         return mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq, mseResids
