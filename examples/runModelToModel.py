@@ -11,7 +11,7 @@ import lsst.afw.geom                     as afwGeom
 import lsst.afw.image                    as afwImage
 import lsst.pex.policy                   as pexPolicy
 import lsst.pex.logging                  as pexLog
-
+import lsst.meas.algorithms              as measAlg
 import lsst.afw.display.ds9              as ds9
 
 def pcapsf_read_boost(fn):
@@ -42,8 +42,8 @@ if __name__ == '__main__':
         calexp.setPsf(psf)
 
     # match to this
-    gaussPsf = afwDet.createPsf("DoubleGaussian", psf.getKernel().getWidth(),
-                                psf.getKernel().getHeight(), sigGauss)
+    gaussPsf = measAlg.DoubleGaussianPsf(psf.getKernel().getWidth(),
+                                         psf.getKernel().getHeight(), sigGauss)
 
     config = ipDiffim.ModelPsfMatchTask.ConfigClass()
     subconfig = config.kernel
