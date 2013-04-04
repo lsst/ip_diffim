@@ -152,7 +152,7 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfigDF.numPrincipalComponents = nTerms
 
         psfMatchDF  = ipDiffim.ImagePsfMatchTask(config=self.configDF)
-        candList = psfMatchDF.makeCandidateList(tExp, sExp)
+        candList = psfMatchDF.makeCandidateList(tExp, sExp, self.ksize)
         resultsDF   = psfMatchDF.subtractMaskedImages(tMi, sMi, candList)
         
         spatialKernel = resultsDF.psfMatchingKernel

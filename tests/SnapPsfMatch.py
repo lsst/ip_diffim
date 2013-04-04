@@ -83,11 +83,16 @@ class PsfMatchTestCases(unittest.TestCase):
         psfMatchAL   = ipDiffim.SnapPsfMatchTask(config=self.configAL)
         psfMatchDF   = ipDiffim.SnapPsfMatchTask(config=self.configDF)
         psfMatchDFr  = ipDiffim.SnapPsfMatchTask(config=self.configDFr)
-        candlist = psfMatchAL.makeCandidateList(tExp, sExp)
-        print len(candlist)
-        resultsAL    = psfMatchAL.subtractMaskedImages(tMi, sMi, psfMatchAL.makeCandidateList(tExp, sExp))
-        resultsDF    = psfMatchDF.subtractMaskedImages(tMi, sMi, psfMatchDF.makeCandidateList(tExp, sExp))
-        resultsDFr   = psfMatchDFr.subtractMaskedImages(tMi, sMi, psfMatchDFr.makeCandidateList(tExp, sExp))
+        candlist = psfMatchAL.makeCandidateList(tExp, sExp, self.ksize)
+        resultsAL    = psfMatchAL.subtractMaskedImages(tMi, sMi, psfMatchAL.makeCandidateList(tExp, 
+                                                                                              sExp, 
+                                                                                              self.ksize))
+        resultsDF    = psfMatchDF.subtractMaskedImages(tMi, sMi, psfMatchDF.makeCandidateList(tExp, 
+                                                                                              sExp, 
+                                                                                              self.ksize))
+        resultsDFr   = psfMatchDFr.subtractMaskedImages(tMi, sMi, psfMatchDFr.makeCandidateList(tExp, 
+                                                                                                sExp, 
+                                                                                                self.ksize))
 
     def tearDown(self):
         del self.configAL 

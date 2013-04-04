@@ -56,11 +56,8 @@ class DiffimTestCases(unittest.TestCase):
 
     def testDetectionConfig(self):
         config = ipDiffim.DetectionConfig()
-
-        # Try invalid entry
         config.fpGrowPix = 1
-        config.fpGrowMin = 2
-        self.assertEqual(config.validate(), False)
+        config.validate()
 
     def testAfwBackgroundConfig(self):
         config = ipDiffim.AfwBackgroundConfig()
