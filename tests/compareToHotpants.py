@@ -7,6 +7,7 @@ import eups
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.afw.detection as afwDet
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
@@ -20,6 +21,10 @@ class DiffimTestCases(unittest.TestCase):
         self.config.kernel.name = "AL"
         self.subconfig = self.config.kernel.active
 
+        # Test was put together before the min size went to 21
+        self.subconfig.kernelSize = 19 
+
+        self.subconfig.scaleByFwhm = False
         self.subconfig.fitForBackground = True
         self.subconfig.spatialModelType = "polynomial"
         self.policy = pexConfig.makePolicy(self.subconfig)
@@ -47,10 +52,21 @@ class DiffimTestCases(unittest.TestCase):
         # 96 160
         # 160 160
         # 32 160
-        detConfig.detThresholdType = "stdev"
-        kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
-        kcDetect.apply(self.smi, self.tmi)
-        self.footprints = kcDetect.getFootprints()
+
+        # As of Winter2013, KernelCandidateDetectionF does not return
+        # these exact centroids anymore, so I need to hardcode them
+        # in.
+        self.footprints = []
+        for xc,yc in [(32, 32), (96, 32), (160, 32),
+                      (96, 95), (31, 96), (160, 96),
+                      (96, 160), (160, 160), (32, 160)]:
+            self.footprints.append(afwDet.Footprint(afwGeom.Box2I(
+                        afwGeom.Point2I(xc,yc), afwGeom.Extent2I(1,1))))
+
+        #detConfig.detThresholdType = "stdev"
+        #kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
+        #kcDetect.apply(self.smi, self.tmi)
+        #self.footprints = kcDetect.getFootprints()
 
         # Make a basis list that hotpants has been run with
         nGauss = 1
@@ -60,7 +76,7 @@ class DiffimTestCases(unittest.TestCase):
         self.subconfig.alardSigGauss = sGauss
         self.subconfig.alardDegGauss = dGauss
         basisList0 = ipDiffim.makeKernelBasisList(self.subconfig)
-        
+
         # HP does things in a different order, and with different normalization, so reorder list
         order   = [0, 2, 5, 9, 1, 4, 8, 3, 7, 6]
         scaling = [1.000000e+00,
