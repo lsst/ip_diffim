@@ -555,7 +555,6 @@ class DipoleAlgorithmTest(unittest.TestCase):
         ms      = msb.build(schema)
         table   = afwTable.SourceTable.make(schema)
         source  = table.makeRecord()
-        
         source.setFootprint(s.getFootprint())
         ms.apply(source, exp, afwGeom.Point2D(self.xc, self.yc))
         return source 

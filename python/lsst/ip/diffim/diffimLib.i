@@ -66,6 +66,7 @@ namespace boost {
 #include "lsst/afw/math.h"
 #include "lsst/afw/geom.h" 
 #include "lsst/afw/image.h"
+#include "lsst/afw/table/Source.h"
 #include "lsst/afw/cameraGeom.h"
 #include "lsst/meas/algorithms.h"
 
@@ -234,9 +235,9 @@ def version(HeadURL = r"$HeadURL$"):
 %KernelCandidateDetection(F, float);
 /******************************************************************************/
 
-%{
-#include "lsst/ip/diffim/KernelCandidate.h"
-%}
+//%{
+//#include "lsst/ip/diffim/KernelCandidate.h"
+//%}
 
 %define %IMAGE(PIXTYPE)
 lsst::afw::image::Image<PIXTYPE>
@@ -246,32 +247,45 @@ lsst::afw::image::Image<PIXTYPE>
 %shared_ptr(lsst::ip::diffim::KernelCandidate<TYPE>);
 
 /* Same problem as with meas algorithms makePsfCandidate */
-%inline %{
-namespace lsst { namespace ip { namespace diffim { namespace lsstSwig {
-template <typename PixelT>
-typename KernelCandidate<PixelT>::Ptr
-makeKernelCandidateForSwig(float const xCenter,
-                           float const yCenter, 
-                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
-                               templateMaskedImage,
-                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
-                               scienceMaskedImage,
-                           lsst::pex::policy::Policy const& policy) {
-    
-    return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
-                                                                             templateMaskedImage,
-                                                                             scienceMaskedImage,
-                                                                             policy));
-}
-}}}}
-%}
+//%inline %{
+//namespace lsst { namespace ip { namespace diffim { namespace lsstSwig {
+//template <typename PixelT>
+//typename KernelCandidate<PixelT>::Ptr
+//makeKernelCandidateForSwig(float const xCenter,
+//                           float const yCenter, 
+//                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
+//                               templateMaskedImage,
+//                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
+//                               scienceMaskedImage,
+//                           lsst::pex::policy::Policy const& policy) {
+//    
+//    return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
+//                                                                             templateMaskedImage,
+//                                                                             scienceMaskedImage,
+//                                                                             policy));
+//template <typename PixelT>
+//typename KernelCandidate<PixelT>::Ptr
+//makeKernelCandidateForSwig(boost::shared_ptr<lsst::afw::table::SourceRecord> const& source, 
+//                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
+//                               templateMaskedImage,
+//                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
+//                               scienceMaskedImage,
+//                           lsst::pex::policy::Policy const& policy) {
+//    
+//    return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(source,
+//                                                                             templateMaskedImage,
+//                                                                             scienceMaskedImage,
+//                                                                             policy));
+//}
+//}}}}
+//%}
 
-%ignore makeKernelCandidate;
+//%ignore makeKernelCandidate;
 %enddef
 
 %define %KernelCandidate(NAME, TYPE)
 %template(KernelCandidate##NAME) lsst::ip::diffim::KernelCandidate<TYPE>;
-%template(makeKernelCandidate) lsst::ip::diffim::lsstSwig::makeKernelCandidateForSwig<TYPE>;
+%template(makeKernelCandidate) lsst::ip::diffim::makeKernelCandidate<TYPE>;
 %inline %{
     lsst::ip::diffim::KernelCandidate<TYPE>::Ptr
         cast_KernelCandidate##NAME(lsst::afw::math::SpatialCellCandidate::Ptr candidate) {
@@ -280,6 +294,7 @@ makeKernelCandidateForSwig(float const xCenter,
 %}
 %enddef
 
+%include "lsst/ip/diffim/KernelCandidate.h"
 %KernelCandidatePtr(F, float);
 
 %include "lsst/ip/diffim/KernelCandidate.h"

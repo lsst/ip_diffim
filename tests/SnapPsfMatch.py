@@ -4,6 +4,7 @@ import lsst.utils.tests as tests
 import lsst.afw.image as afwImage
 import lsst.afw.image.utils as imageUtils
 import lsst.afw.math as afwMath
+import lsst.afw.detection as afwDet
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.daf.base as dafBase
@@ -44,20 +45,60 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfigDF.fitForBackground = True
         self.subconfigDFr.fitForBackground = True
 
+        # Make ideal PSF
+        self.ksize  = 21
+        self.sigma = 2.0
+        self.psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma)
+
+    def makeWcs(self, offset = 0):
+        # taken from $AFW_DIR/tests/testMakeWcs.py
+        metadata = dafBase.PropertySet()
+        metadata.set("SIMPLE",                    "T") 
+        metadata.set("BITPIX",                  -32) 
+        metadata.set("NAXIS",                    2) 
+        metadata.set("NAXIS1",                 1024) 
+        metadata.set("NAXIS2",                 1153) 
+        metadata.set("RADECSYS", 'FK5')
+        metadata.set("EQUINOX",                2000.)
+        metadata.setDouble("CRVAL1",     215.604025685476)
+        metadata.setDouble("CRVAL2",     53.1595451514076)
+        metadata.setDouble("CRPIX1",     1109.99981456774 + offset)
+        metadata.setDouble("CRPIX2",     560.018167811613 + offset)
+        metadata.set("CTYPE1", 'RA---SIN')
+        metadata.set("CTYPE2", 'DEC--SIN')
+        metadata.setDouble("CD1_1", 5.10808596133527E-05)
+        metadata.setDouble("CD1_2", 1.85579539217196E-07)
+        metadata.setDouble("CD2_2", -5.10281493481982E-05)
+        metadata.setDouble("CD2_1", -8.27440751733828E-07)
+        return afwImage.makeWcs(metadata)
+
     def testSnap(self):
         tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
 
+        tWcs = self.makeWcs(offset = 0)
+        sWcs = self.makeWcs(offset = 0)
+        tExp = afwImage.ExposureF(tMi, tWcs)
+        sExp = afwImage.ExposureF(sMi, sWcs)
+	sExp.setPsf(self.psf)
         psfMatchAL   = ipDiffim.SnapPsfMatchTask(config=self.configAL)
         psfMatchDF   = ipDiffim.SnapPsfMatchTask(config=self.configDF)
         psfMatchDFr  = ipDiffim.SnapPsfMatchTask(config=self.configDFr)
-        resultsAL    = psfMatchAL.subtractMaskedImages(tMi, sMi)
-        resultsDF    = psfMatchDF.subtractMaskedImages(tMi, sMi)
-        resultsDFr   = psfMatchDFr.subtractMaskedImages(tMi, sMi)
+        candlist = psfMatchAL.makeCandidateList(tExp, sExp, self.ksize)
+        resultsAL    = psfMatchAL.subtractMaskedImages(tMi, sMi, psfMatchAL.makeCandidateList(tExp, 
+                                                                                              sExp, 
+                                                                                              self.ksize))
+        resultsDF    = psfMatchDF.subtractMaskedImages(tMi, sMi, psfMatchDF.makeCandidateList(tExp, 
+                                                                                              sExp, 
+                                                                                              self.ksize))
+        resultsDFr   = psfMatchDFr.subtractMaskedImages(tMi, sMi, psfMatchDFr.makeCandidateList(tExp, 
+                                                                                                sExp, 
+                                                                                                self.ksize))
 
     def tearDown(self):
         del self.configAL 
         del self.configDF 
         del self.configDFr
+	del self.psf
 
 def suite():
     """Returns a suite containing all the test cases in this module."""

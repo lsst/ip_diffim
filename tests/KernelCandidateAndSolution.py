@@ -11,6 +11,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
+import lsst.afw.table as afwTable
 import numpy as num
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
@@ -18,6 +19,16 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 class DiffimTestCases(unittest.TestCase):
     
     def setUp(self):
+        schema = afwTable.SourceTable.makeMinimalSchema()
+	centroidKey = schema.addField("centroid", type="PointD")
+        fluxKey = schema.addField("flux", type=float)
+        fluxErrKey = schema.addField("flux.err", type=float)
+        fluxFlagKey = schema.addField("flux.flags", type="Flag")
+        self.table = afwTable.SourceTable.make(schema)
+        self.table.definePsfFlux("flux")
+	self.table.defineCentroid("centroid")
+        self.ss = afwTable.SourceCatalog(self.table)
+
         self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config.kernel.name = "DF"
         self.subconfig = self.config.kernel.active
@@ -147,6 +158,99 @@ class DiffimTestCases(unittest.TestCase):
             pass
         else:
             self.fail()
+
+            
+    def testSourceStats(self):
+        # Original and uninitialized
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+        source = self.ss.addNew()
+        source.setId(1)
+	source.set(self.table.getCentroidKey().getX(), 276)
+	source.set(self.table.getCentroidKey().getY(), 717)
+	source.set(self.table.getPsfFluxKey(), 1.)
+        
+        kc = ipDiffim.KernelCandidateF(source,
+                                       self.templateExposure2.getMaskedImage(),
+                                       self.scienceImage2.getMaskedImage(),
+                                       self.policy)
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+
+        kc.build(kList)
+        self.assertEqual(kc.isInitialized(), True)
+
+
+    def testSourceConstructor(self):
+        # Original and uninitialized
+        if not self.defDataDir:
+            print >> sys.stderr, "Warning: afwdata is not set up"
+            return
+        source = self.ss.addNew()
+        source.setId(1)
+	source.set(self.table.getCentroidKey().getX(), 276)
+	source.set(self.table.getCentroidKey().getY(), 717)
+	source.set(self.table.getPsfFluxKey(), 1.)
+        
+        kc = ipDiffim.KernelCandidateF(source,
+                                       self.templateExposure2.getMaskedImage(),
+                                       self.scienceImage2.getMaskedImage(),
+                                       self.policy)
+
+        # Kernel not initialized
+        self.assertEqual(kc.isInitialized(), False)
+
+	#Check that the source is set
+	self.assertEqual(kc.getSource(), source)
+	self.assertEqual(kc.getCandidateRating(), source.getPsfFlux()) 
+
+        # But this should be set on construction
+        try:
+            kc.getCandidateRating()
+        except Exception, e:
+            print e
+            self.fail()
+
+        # And these should be filled
+        try:
+            kc.getTemplateMaskedImage()
+            kc.getScienceMaskedImage()
+        except Exception, e:
+            print e
+            self.fail()
+
+        # And of the right type
+        self.assertEqual(type(kc.getTemplateMaskedImage()), type(afwImage.MaskedImageF()))
+        self.assertEqual(type(kc.getScienceMaskedImage()), type(afwImage.MaskedImageF()))
+        
+        # None of these should work
+        for kType in (ipDiffim.KernelCandidateF.ORIG,
+                      ipDiffim.KernelCandidateF.PCA,
+                      ipDiffim.KernelCandidateF.RECENT):
+            for kMethod in (kc.getKernelSolution,
+                            kc.getKernel,
+                            kc.getBackground,
+                            kc.getKsum,
+                            kc.getKernelImage,
+                            kc.getDifferenceImage):
+                try:
+                    kMethod(kType)
+                except Exception, e:
+                    pass
+                else:
+                    self.fail()
+        try:
+            kc.getImage()
+        except:
+            pass
+        else:
+            self.fail()
+
+        #build the list to test the 
+        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+
+        kc.build(kList)
+        self.assertEqual(kc.isInitialized(), True)
 
     def testDeltaFunctionScaled(self, scaling = 2.7, bg = 11.3):
         if not self.defDataDir:
@@ -428,6 +532,8 @@ class DiffimTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.policy
+	del self.table
+	del self.ss
         if self.defDataDir:
             del self.scienceImage2
             del self.templateExposure2

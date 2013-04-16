@@ -44,6 +44,7 @@ namespace diffim {
         _scienceMaskedImage(scienceMaskedImage),
         _varianceEstimate(),
         _policy(policy),
+        _source(),
         _coreFlux(),
         _isInitialized(false),
         _useRegularization(false),
@@ -69,8 +70,32 @@ namespace diffim {
                           "Candidate %d at %.2f %.2f with ranking %.2f", 
                           this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);
     }
-    
 
+    template <typename PixelT>
+    KernelCandidate<PixelT>::KernelCandidate(
+        SourcePtr const& source, 
+        MaskedImagePtr const& templateMaskedImage,
+        MaskedImagePtr const& scienceMaskedImage,
+        lsst::pex::policy::Policy const& policy
+        ) :
+        lsst::afw::math::SpatialCellImageCandidate<lsst::afw::math::Kernel::Pixel>(source->getX(), source->getY()),
+        _templateMaskedImage(templateMaskedImage),
+        _scienceMaskedImage(scienceMaskedImage),
+        _varianceEstimate(),
+        _policy(policy),
+        _source(source),
+        _coreFlux(source->getPsfFlux()),
+        _isInitialized(false),
+        _useRegularization(false),
+        _fitForBackground(_policy.getBool("fitForBackground")),
+        _kernelSolutionOrig(),
+        _kernelSolutionPca()
+    {
+        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
+                          "Candidate %d at %.2f %.2f with ranking %.2f", 
+                          this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);
+    }
+    
     template <typename PixelT>
     void KernelCandidate<PixelT>::build(
         lsst::afw::math::KernelList const& basisList

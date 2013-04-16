@@ -458,6 +458,13 @@ void PsfDipoleFlux::_apply(
         throw LSST_EXCEPT(pex::exceptions::RuntimeErrorException,
                           (boost::format("No footprint for source %d") % source.getId()).str());
     }
+
+    PsfDipoleFluxControl const & ctrl = static_cast<PsfDipoleFluxControl const &>(getControl());
+    if (footprint->getArea() > ctrl.maxPixels) {
+        // Too big
+        return;
+    }
+
     afw::detection::Footprint::PeakList peakList = 
         afw::detection::Footprint::PeakList(footprint->getPeaks());
 

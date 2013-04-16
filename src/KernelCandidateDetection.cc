@@ -151,15 +151,6 @@ namespace diffim {
         MaskedImagePtr const& templateMaskedImage,
         MaskedImagePtr const& scienceMaskedImage
         ) {
-
-        /* Grow the Footprint by the requested (optimal) amount; if you happen
-         * to find a masked pixel within the grown Footprint, try again growing
-         * by the minimal acceptable amount.  We don't want to be too sensitive
-         * to masked pixels in the wings of the stamp.  If it fails this minimal
-         * grow just don't use it, its too close to a masked pixel 
-         */
-
-        int fpGrowMin = _policy.getInt("fpGrowMin");
         int fpNpixMax = _policy.getInt("fpNpixMax");
 
         /* Functor to search through the images for masked pixels within *
@@ -233,13 +224,7 @@ namespace diffim {
         if (!(templateMaskedImage->getBBox(afwImage::PARENT).contains(fpGrowBBox))) {
             pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                               "Footprint grown off image"); 
-
-            if (fpGrowPix == fpGrowMin) {
-                return false;
-            }
-            else {
-                return growCandidate(fp, fpGrowMin, templateMaskedImage, scienceMaskedImage);
-            }
+            return false;
         }
         
         /* Grab subimages; report any exception */
@@ -275,12 +260,7 @@ namespace diffim {
             subimageHasFailed = true;
         }
         if (subimageHasFailed) {
-            if (fpGrowPix == fpGrowMin) {
-                return false;
-            }
-            else {
-                return growCandidate(fp, fpGrowMin, templateMaskedImage, scienceMaskedImage);
-            }
+            return false;
         } else {
             /* We have a good candidate */
             _footprints.push_back(fpGrow);

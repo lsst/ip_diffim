@@ -71,11 +71,16 @@ class DetectionConfig(pexConfig.Config):
                  too big and the subsequent convolutions become unwieldy""",
         default = 500
     )
-    fpGrowFwhmScaling = pexConfig.Field(
+    fpGrowKernelScaling = pexConfig.Field(
         dtype = float,
-        doc = """Grow the footprint based on the Psf Fwhm;
-                 should be larger than kernelRadiusFwhmScaling""",
-        default = 10.
+        doc = """If config.scaleByFwhm, grow the footprint based on
+                 the final kernelSize.  Each footprint will be
+                 2*fpGrowKernelScaling*kernelSize x 
+                 2*fpGrowKernelScaling*kernelSize.  With the value 
+                 of 1.0, the remaining pixels in each KernelCandiate 
+                 after convolution by the basis functions will be 
+                 eqaul to the kernel size iteslf.""",
+        default = 1.0
     )
     fpGrowPix = pexConfig.Field(
         dtype = int,
@@ -83,29 +88,17 @@ class DetectionConfig(pexConfig.Config):
                  footprint.  The smaller the faster; however the
                  kernel sum does not converge if the stamp is too
                  small; and the kernel is not constrained at all if
-                 the stamp is the size of the kernel.  Rule of thumb
-                 is at least 1.5 times the kernel size.  The grown
-                 stamp is 2 * fpGrowPix pixels larger in each
-                 dimension.""",
+                 the stamp is the size of the kernel.  The grown stamp
+                 is 2 * fpGrowPix pixels larger in each dimension.  
+                 This is overridden by fpGrowKernelScaling if scaleByFwhm""",
         default = 30,
     )
-    fpGrowMin = pexConfig.Field(
-        dtype = int,
-        doc = """Minimum number of pixels to grow""",
-        default = 20,
-    )
-    fpGrowMax = pexConfig.Field(
-        dtype = int,
-        doc = """Maximum number of pixels to grow.""",
-        default = 40,
+    scaleByFwhm = pexConfig.Field(
+        dtype = bool,
+        doc = "Scale fpGrowPix by input Fwhm",
+        default = True,
     )
 
-    def validate(self):
-        pexConfig.Config.validate(self)
-        if (self.fpGrowPix < self.fpGrowMin) or (self.fpGrowPix > self.fpGrowMax):
-            return False
-        return True
-        
     
 class AfwBackgroundConfig(pexConfig.Config):
     algorithmName = pexConfig.ChoiceField(
@@ -139,9 +132,12 @@ class AfwBackgroundConfig(pexConfig.Config):
     )
 
 class PsfMatchConfig(pexConfig.Config):
-    warpingConfig = pexConfig.ConfigField("Config for warping exposures to a common alignment", afwMath.warper.WarperConfig)
-    detectionConfig = pexConfig.ConfigField("Controlling the detection of sources for kernel building", DetectionConfig)
-    afwBackgroundConfig = pexConfig.ConfigField("Controlling the Afw background fitting", AfwBackgroundConfig)
+    warpingConfig = pexConfig.ConfigField("Config for warping exposures to a common alignment", 
+                                          afwMath.warper.WarperConfig)
+    detectionConfig = pexConfig.ConfigField("Controlling the detection of sources for kernel building", 
+                                            DetectionConfig)
+    afwBackgroundConfig = pexConfig.ConfigField("Controlling the Afw background fitting", 
+                                                AfwBackgroundConfig)
 
     ####
     # Background fitting
@@ -180,19 +176,27 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = int,
         doc = """Number of rows/columns in the convolution kernel; should be odd-valued.
                  Modified by kernelSizeFwhmScaling if scaleByFwhm = true""",
-        default = 19,
-        check = lambda x: (x >= 7) and (x <= 33)
+        default = 21,
     )
     scaleByFwhm = pexConfig.Field(
         dtype = bool,
-        doc = "Scale kernelSize, fpGrowPix, alardGaussians by input Fwhm",
+        doc = "Scale kernelSize, alardGaussians by input Fwhm",
         default = True,
     )
     kernelSizeFwhmScaling = pexConfig.Field(
         dtype = float,
-        doc = """How much to scale the kernel size based on the Psf Fwhm;,
-                 should be smaller than fpGrowFwhmScaling.  Sets kernelSize.""",
-        default = 4.0,
+        doc = """How much to scale the kernel size based on the largest AL Sigma""",
+        default = 6.0,
+    )
+    kernelSizeMin = pexConfig.Field(
+        dtype = int,
+        doc = """Minimum Kernel Size""",
+        default = 21,
+    )
+    kernelSizeMax = pexConfig.Field(
+        dtype = int,
+        doc = """Maximum Kernel Size""",
+        default = 35,
     )
 
     #####
@@ -265,7 +269,7 @@ class PsfMatchConfig(pexConfig.Config):
     )
     fracEigenVal = pexConfig.Field(
         dtype = float,
-        doc = "At what fraction of the eigenvalues do you cut off the expansion. Warning: not yet implemented",
+        doc = "At what fraction of the eigenvalues do you cut off the expansion. NOT YET IMPLEMENTED",
         default = 0.99,
     )
 
@@ -297,7 +301,8 @@ class PsfMatchConfig(pexConfig.Config):
     )
 
     ####
-    # Clipping of KernelCandidates based on diffim residuals; used with singleKernelClipping and spatialKernelClipping
+    # Clipping of KernelCandidates based on diffim residuals; 
+    # used with singleKernelClipping and spatialKernelClipping
     badMaskPlanes = pexConfig.ListField(
         dtype = str,
         doc = """Mask planes to ignore when calculating diffim statistics
@@ -388,7 +393,7 @@ class PsfMatchConfig(pexConfig.Config):
     )
     useBicForKernelBasis = pexConfig.Field(
         dtype = bool,
-        doc = """Use Bayesian Information Criterion to select the number of bases going into the kernel decomposition""",
+        doc = """Use Bayesian Information Criterion to select the number of bases going into the kernel""",
         default = False,
     )
 
@@ -404,29 +409,34 @@ class PsfMatchConfigAL(PsfMatchConfig):
     # Alard-Lupton Basis Parameters
     alardNGauss = pexConfig.Field(
         dtype = int,
-        doc = "Number of gaussians in alard-lupton basis",
+        doc = "Number of Gaussians in alard-lupton basis",
         default = 3,
     )
     alardDegGauss = pexConfig.ListField(
         dtype = int,
-        doc = "Degree of spatial modification of gaussians in alard-lupton basis",
-        default = (4, 3, 2),
+        doc = "Degree of spatial modification of Gaussians in alard-lupton basis",
+        default = (4, 2, 2),
     )
     alardSigGauss = pexConfig.ListField(
         dtype = float,
-        doc = """Sigma in pixels of gaussians in alard-lupton basis (note: FWHM = 2.35 sigma).""",
+        doc = """Sigma in pixels of Gaussians in alard-lupton basis (note: FWHM = 2.35 sigma).""",
         default = (0.7, 1.5, 3.0),
     )
-
-    alardNGaussDeconv = pexConfig.Field(
-        dtype = int,
-        doc = "Number of gaussians in deconvolving alard-lupton basis",
-        default = 4,
+    alardGaussBeta = pexConfig.Field(
+        dtype = float,
+        doc = """Default scale factor between Gaussian sigmas """,
+        default = 2.0,
     )
-    alardDegGaussDeconv = pexConfig.ListField(
+    alardMinSig = pexConfig.Field(
+        dtype = float,
+        doc = """Minimum Sigma (pixels) for Gaussians""",
+        default = 0.7,
+    )
+
+    alardDegGaussDeconv = pexConfig.Field(
         dtype = int,
-        doc = """Degree of spatial modification of gaussians in alard-lupton basis during deconvolution""",
-        default = (5, 5, 3, 3,),
+        doc = """Degree of spatial modification of ALL gaussians in AL basis during deconvolution""",
+        default = 3,
     )
 
 
@@ -559,7 +569,8 @@ class PsfMatch(pipeBase.Task):
         self.log.info("Final spatial kernel sum %.3f" % (kSum))
 
         # Look at how well conditioned the matrix is
-        conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (self.kconfig.conditionNumberType)))
+        conditionNum = spatialSolution.getConditionNumber(eval("diffimLib.KernelSolution.%s" % (
+                    self.kconfig.conditionNumberType)))
         self.log.info("Spatial model condition number %.3e" % (conditionNum))
 
         if conditionNum < 0.0:
@@ -595,6 +606,8 @@ class PsfMatch(pipeBase.Task):
                 if cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
                     nBad += 1
 
+        self.log.info("Doing stats of kernel candidates used in the spatial fit.")
+
         # Counting statistics
         if nBad > 2*nGood:
             self.log.warn("Many more candidates rejected than accepted; %d total, %d rejected, %d used" % (
@@ -612,17 +625,20 @@ class PsfMatch(pipeBase.Task):
                     nGood, nKernelTerms, nBasisKernels))
             self.log.warn("Consider lowering the spatial order")
         else:
-            self.log.info("Spatial kernel model appears well constrained; %d candidates, %d terms, %d bases" % (
+            self.log.info("Spatial kernel model well constrained; %d candidates, %d terms, %d bases" % (
                     nGood, nKernelTerms, nBasisKernels))
 
         if nGood < nBgTerms:
-            self.log.warn("Spatial background model underconstrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            self.log.warn("Spatial background model underconstrained; %d candidates, %d terms" % (
+                    nGood, nBgTerms))
             self.log.warn("Consider lowering the spatial order")
         elif nGood <= 2*nBgTerms:
-            self.log.warn("Spatial background model poorly constrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            self.log.warn("Spatial background model poorly constrained; %d candidates, %d terms" % (
+                    nGood, nBgTerms))
             self.log.warn("Consider lowering the spatial order")
         else:
-            self.log.info("Spatial background model appears well constrained; %d candidates, %d terms" % (nGood, nBgTerms))
+            self.log.info("Spatial background model appears well constrained; %d candidates, %d terms" % (
+                    nGood, nBgTerms))
         
     
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
@@ -723,7 +739,8 @@ class PsfMatch(pipeBase.Task):
                     kernelCellSet.visitCandidates(singlekv, nStarPerCell)
                     nRejectedSkf = singlekv.getNRejected()
                     pexLog.Trace(self.log.getName()+"._solve", 2, 
-                                 "Iteration %d, rejected %d candidates due to initial kernel fit" % (thisIteration, nRejectedSkf))
+                                 "Iteration %d, rejected %d candidates due to initial kernel fit" % (
+                            thisIteration, nRejectedSkf))
 
                 # Reject outliers in kernel sum 
                 ksv.resetKernelSum()
@@ -735,7 +752,8 @@ class PsfMatch(pipeBase.Task):
 
                 nRejectedKsum = ksv.getNRejected()
                 pexLog.Trace(self.log.getName()+"._solve", 2, 
-                             "Iteration %d, rejected %d candidates due to kernel sum" % (thisIteration, nRejectedKsum))
+                             "Iteration %d, rejected %d candidates due to kernel sum" % (
+                        thisIteration, nRejectedKsum))
 
 
                 # Do we jump back to the top without incrementing thisIteration?
@@ -753,7 +771,8 @@ class PsfMatch(pipeBase.Task):
 
                     nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
                     pexLog.Trace(self.log.getName()+"._solve", 2, 
-                                 "Iteration %d, rejected %d candidates due to Pca kernel fit" % (thisIteration, nRejectedPca))
+                                 "Iteration %d, rejected %d candidates due to Pca kernel fit" % (
+                            thisIteration, nRejectedPca))
                     
                     # We don't want to continue on (yet) with the
                     # spatial modeling, because we have bad objects
@@ -785,7 +804,8 @@ class PsfMatch(pipeBase.Task):
                 nRejectedSpatial = assesskv.getNRejected()
                 nGoodSpatial     = assesskv.getNGood()
                 pexLog.Trace(self.log.getName()+"._solve", 2, 
-                             "Iteration %d, rejected %d candidates due to spatial kernel fit" % (thisIteration, nRejectedSpatial))
+                             "Iteration %d, rejected %d candidates due to spatial kernel fit" % (
+                        thisIteration, nRejectedSpatial))
                 pexLog.Trace(self.log.getName()+"._solve", 2, 
                              "%d candidates used in fit" % (nGoodSpatial))
                 
@@ -823,16 +843,20 @@ class PsfMatch(pipeBase.Task):
             pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
             pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0])
             raise e
-
+        
+        
         if display and displayCandidates:
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
+                                         frame=lsstDebug.frame,
                                          showBadCandidates=showBadCandidates)
             lsstDebug.frame += 1
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
+                                         frame=lsstDebug.frame,
                                          showBadCandidates=showBadCandidates,
                                          kernels=True)
             lsstDebug.frame += 1
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, frame=lsstDebug.frame,
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
+                                         frame=lsstDebug.frame,
                                          showBadCandidates=showBadCandidates,
                                          resids=True)
             lsstDebug.frame += 1
