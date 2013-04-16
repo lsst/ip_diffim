@@ -264,7 +264,7 @@ class DiffimTestCases(unittest.TestCase):
                 self.assertNotEqual(skp1[nk][0], skp2[nk][0])
             elif poly == 'chebyshev1':
                 # Cheby remaps coords, so model should be the same!
-                self.assertAlmostEqual(skp1[nk][0], skp2[nk][0])
+                self.assertAlmostEqual(skp1[nk][0], skp2[nk][0], 4)
             else:
                 self.fail()
 
