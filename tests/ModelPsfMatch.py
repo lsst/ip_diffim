@@ -22,11 +22,11 @@ class PsfMatchTestCases(unittest.TestCase):
         self.sigma1 = 2.0
         self.sigma2 = 3.7
         self.exp    = afwImage.ExposureF(afwGeom.Extent2I(self.imsize, self.imsize))
-        self.exp.setPsf(afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma1))
+        self.exp.setPsf(measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma1))
 
     def testTooBig(self):
         self.subconfig.kernelSize = self.ksize
-        psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma2)
+        psf = measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma2)
         psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
         try:
             results = psfMatch.run(self.exp, psf)
@@ -43,7 +43,7 @@ class PsfMatchTestCases(unittest.TestCase):
     def runMatch(self, kOrder = 0, kSumIn = 3.7):
         self.subconfig.spatialKernelOrder = kOrder 
 
-        psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma2)
+        psf = measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma2)
         psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
         results = psfMatch.run(self.exp, psf, kernelSum = kSumIn)
 

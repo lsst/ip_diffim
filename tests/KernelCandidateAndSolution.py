@@ -42,9 +42,9 @@ class DiffimTestCases(unittest.TestCase):
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
             defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v26-e0",
-                                          "v26-e0-c011-a10.sci")
+                                          "v26-e0-c011-a10.sci.fits")
             defTemplatePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                           "v5-e0-c011-a10.sci")
+                                           "v5-e0-c011-a10.sci.fits")
 
             scienceExposure  = afwImage.ExposureF(defSciencePath)
             templateExposure = afwImage.ExposureF(defTemplatePath)
