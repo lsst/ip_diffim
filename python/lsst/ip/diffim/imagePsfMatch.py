@@ -30,7 +30,7 @@ import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDetect
 import lsst.pipe.base as pipeBase
 from lsst.meas.algorithms import SourceDetectionTask, \
-    PsfAttributes, SourceMeasurementTask, getBackground, BackgroundConfig
+    SourceMeasurementTask, getBackground, BackgroundConfig
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatch, PsfMatchConfigDF, PsfMatchConfigAL
 from . import utils as diUtils 
@@ -69,7 +69,6 @@ class ImagePsfMatchConfig(pexConfig.Config):
                                                    'flux.gaussian', 'skycoord')
         self.selectMeasurement.slots.modelFlux = None
         self.selectMeasurement.slots.apFlux = None 
-        self.selectMeasurement.doApplyApCorr = False
 
 class ImagePsfMatchTask(PsfMatch):
     """PSF-match images to reference images
@@ -164,18 +163,14 @@ class ImagePsfMatchTask(PsfMatch):
                 self.log.info("WARNING: no estimate of Psf FWHM for template image")
             else:
                 psf = templateExposure.getPsf()
-                width, height = psf.getKernel().getDimensions()
-                psfAttr = PsfAttributes(psf, width//2, height//2)
-                templateSigPix = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
+                templateSigPix = psf.computeShape().getDeterminantRadius()
                 templateFwhmPix = templateSigPix * sigma2fwhm 
         if scienceFwhmPix is None:
             if not scienceExposure.hasPsf():
                 self.log.info("WARNING: no estimate of Psf FWHM for science image")
             else:
                 psf = scienceExposure.getPsf()
-                width, height = psf.getKernel().getDimensions()
-                psfAttr = PsfAttributes(psf, width//2, height//2)
-                scienceSigPix = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
+                scienceSigPix = psf.computeShape().getDeterminantRadius()
                 scienceFwhmPix = scienceSigPix * sigma2fwhm 
 
         kernelSize = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix)[0].getWidth()

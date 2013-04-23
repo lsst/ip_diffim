@@ -10,6 +10,7 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.detection as afwDet
+import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
 import lsst.pex.config as pexConfig
@@ -63,7 +64,7 @@ class DiffimTestCases(unittest.TestCase):
             # Take a stab at a PSF.  This is needed to get the KernelCandidateList if you don't provide one.
             ksize  = 21
             sigma = 2.0
-            self.psf = afwDet.createPsf("DoubleGaussian", ksize, ksize, sigma)
+            self.psf = measAlg.DoubleGaussianPsf(ksize, ksize, sigma)
             self.scienceImage.setPsf(self.psf)
 
     def tearDown(self):

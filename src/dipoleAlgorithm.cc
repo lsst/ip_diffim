@@ -365,12 +365,8 @@ std::pair<double,afw::math::LeastSquares> PsfDipoleFlux::_linearFit(
      *
      */
     CONST_PTR(afwDet::Psf) psf = exposure.getPsf();
-    PTR(afwImage::Image<afwMath::Kernel::Pixel>) negPsf = psf->computeImage(negCenter, true);
-    PTR(afwImage::Image<afwMath::Kernel::Pixel>) posPsf = psf->computeImage(posCenter, true);
-    double negSum = negPsf->getArray().asEigen().sum();
-    double posSum = posPsf->getArray().asEigen().sum();
-    *negPsf /= negSum; // Normalize so that the fit returns the total flux
-    *posPsf /= posSum;
+    PTR(afwImage::Image<afwMath::Kernel::Pixel>) negPsf = psf->computeImage(negCenter);
+    PTR(afwImage::Image<afwMath::Kernel::Pixel>) posPsf = psf->computeImage(posCenter);
     
     afwImage::Image<double> negModel(footprint->getBBox());
     afwImage::Image<double> posModel(footprint->getBBox());
@@ -482,10 +478,7 @@ void PsfDipoleFlux::_apply(
     PTR(afw::detection::Peak) negativePeak = peakList.back();
 
     CONST_PTR(afwDet::Psf) psf = exposure.getPsf();
-    afwGeom::Extent2I psfsize = psf->getKernel()->getDimensions();
-    measAlgorithms::PsfAttributes psfAttrib(psf, psfsize[0]/2.0, psfsize[1]/2.0);
-    double fwhm = 
-        psfAttrib.computeGaussianWidth(measAlgorithms::PsfAttributes::ADAPTIVE_MOMENT) * 2.3548; 
+    double fwhm = psf->computeShape().getDeterminantRadius() * 2.3548;
     float minChi2  = std::numeric_limits< double >::max();
     PTR(afw::math::LeastSquares) minLstsq;
     PTR(afw::geom::Point2D) minPosCentroid;

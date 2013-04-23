@@ -9,6 +9,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.daf.base as dafBase
 import lsst.pex.policy as pexPolicy
+import lsst.meas.algorithms as measAlg
 
 import lsst.afw.geom as afwGeom
 
@@ -54,7 +55,7 @@ class PsfMatchTestCases(unittest.TestCase):
         # Make ideal PSF
         self.ksize  = 21
         self.sigma = 2.0
-        self.psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma)
+        self.psf = measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma)
 
     def makeWcs(self, offset = 0):
         # taken from $AFW_DIR/tests/testMakeWcs.py

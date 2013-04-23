@@ -53,7 +53,7 @@ public:
      */
     typedef afw::table::KeyTuple<afw::table::Centroid> KeyTuple;
 
-    /// @copydoc Algorithm::getControl
+    /// @copydoc meas::algorithms::Algorithm::getControl
     DipoleCentroidControl const & getControl() const;
 
     /// @brief Return the standard centroid keys registered by this algorithm.
@@ -85,8 +85,7 @@ public:
     PTR(DipoleCentroidAlgorithm) makeAlgorithm(
         afw::table::Schema & schema,
         PTR(daf::base::PropertyList) const & metadata = PTR(daf::base::PropertyList)(),
-        meas::algorithms::AlgorithmControlMap const & others = 
-        meas::algorithms::AlgorithmControlMap()
+        meas::algorithms::AlgorithmMap const & others = meas::algorithms::AlgorithmMap()
     ) const {
         return boost::static_pointer_cast<DipoleCentroidAlgorithm>(
             _makeAlgorithm(schema, metadata, others));
@@ -111,7 +110,7 @@ public:
      */
     typedef afw::table::KeyTuple<afw::table::Flux> KeyTuple;
 
-    /// @copydoc Algorithm::getControl
+    /// @copydoc meas::algorithms::Algorithm::getControl
     DipoleFluxControl const & getControl() const;
 
     /// @brief Return the standard flux keys registered by this algorithm.
@@ -142,8 +141,7 @@ public:
     PTR(DipoleFluxAlgorithm) makeAlgorithm(
         afw::table::Schema & schema,
         PTR(daf::base::PropertyList) const & metadata = PTR(daf::base::PropertyList)(),
-        meas::algorithms::AlgorithmControlMap const & others = 
-        meas::algorithms::AlgorithmControlMap()
+        meas::algorithms::AlgorithmMap const & others = meas::algorithms::AlgorithmMap()
     ) const {
         return boost::static_pointer_cast<DipoleFluxAlgorithm>(
             _makeAlgorithm(schema, metadata, others));
