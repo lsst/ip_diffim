@@ -5,6 +5,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.image.utils as imageUtils
 import lsst.afw.math as afwMath
 import lsst.afw.detection as afwDet
+import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.daf.base as dafBase
@@ -48,7 +49,7 @@ class PsfMatchTestCases(unittest.TestCase):
         # Make ideal PSF
         self.ksize  = 21
         self.sigma = 2.0
-        self.psf = afwDet.createPsf("DoubleGaussian", self.ksize, self.ksize, self.sigma)
+        self.psf = measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma)
 
     def makeWcs(self, offset = 0):
         # taken from $AFW_DIR/tests/testMakeWcs.py

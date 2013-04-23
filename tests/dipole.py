@@ -59,10 +59,8 @@ def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.5):
 
     # Create Psf for dipole creation and measurement
     psfSize = 17
-    psf = afwDet.createPsf("DoubleGaussian", psfSize, psfSize, 2.0, 3.5, 0.1)
-    psfAttr = measAlg.PsfAttributes(psf, psfSize//2, psfSize//2)
-    psfSigPix = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
-    psfFwhmPix = psfSigPix * sigma2fwhm 
+    psf = measAlg.DoubleGaussianPsf(psfSize, psfSize, 2.0, 3.5, 0.1)
+    psfFwhmPix = sigma2fwhm * psf.computeShape().getDeterminantRadius()
     psfim = psf.computeImage(afwGeom.Point2D(0., 0.)).convertF()
     psfim *= scaling
     psfw, psfh = psfim.getDimensions()
