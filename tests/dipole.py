@@ -194,9 +194,7 @@ class DipoleAlgorithmTest(unittest.TestCase):
         sp3     = pylab.figure().add_subplot(111)
 
         psf = exposure.getPsf()
-        psfw, psfh = psf.getKernel().getDimensions()
-        psfAttr = measAlg.PsfAttributes(psf, psfw//2, psfh//2)
-        psfSigPix = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
+        psfSigPix = psf.computeShape().getDeterminantRadius()
         psfFwhmPix = psfSigPix * sigma2fwhm 
         offset = fracOffset * psfFwhmPix // 2
         xp, yp = self.xc + offset, self.yc + offset
@@ -217,8 +215,12 @@ class DipoleAlgorithmTest(unittest.TestCase):
                             negCenter = afwGeom.Point2D(xn + dnegCenterX, yn + dnegCenterY)
                             posCenter = afwGeom.Point2D(xp + dposCenterX, yp + dposCenterY)
     
-                            negPsf = psf.computeImage(negCenter, True).convertF()
-                            posPsf = psf.computeImage(posCenter, True).convertF()
+                            negPsf = psf.computeImage(negCenter).convertF()
+                            posPsf = psf.computeImage(posCenter).convertF()
+                            negPeak = psf.computePeak(negCenter)
+                            posPeak = psf.computePeak(posCenter)
+                            negPsf /= negPeak
+                            posPsf /= posPeak
                     
                             model    = afwImage.ImageF(fp.getBBox())
                             negModel = afwImage.ImageF(fp.getBBox())
@@ -354,8 +356,12 @@ class DipoleAlgorithmTest(unittest.TestCase):
 
     def _makeModel(self, exposure, psf, fp, negCenter, posCenter):
 
-        negPsf = psf.computeImage(negCenter, True).convertF()
-        posPsf = psf.computeImage(posCenter, True).convertF()
+        negPsf = psf.computeImage(negCenter).convertF()
+        posPsf = psf.computeImage(posCenter).convertF()
+        negPeak = psf.computePeak(negCenter)
+        posPeak = psf.computePeak(posCenter)
+        negPsf /= negPeak
+        posPsf /= posPeak
 
         model    = afwImage.ImageF(fp.getBBox())
         negModel = afwImage.ImageF(fp.getBBox())

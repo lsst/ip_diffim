@@ -222,9 +222,7 @@ class DipoleDeblender(object):
         afwDetect.setMaskFromFootprint(fmask, fp, 1)
 
         psf        = exposure.getPsf()
-        width, height = psf.getKernel().getDimensions()
-        psfAttr    = measAlg.PsfAttributes(psf, width//2, height//2)
-        psfSigPix  = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT)
+        psfSigPix  = psf.computeShape().getDeterminantRadius()
         psfFwhmPix = psfSigPix * self.sigma2fwhm 
         subimage   = afwImage.ExposureF(exposure, fbb, True)
         cpsf       = deblendBaseline.CachingPsf(psf)
