@@ -43,7 +43,7 @@ sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.5):
+def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.2):
     # Make random noise image: set image plane to normal distribution
     image = afwImage.MaskedImageF(w,h)
     image.set(0)
@@ -61,8 +61,8 @@ def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.5):
     psfSize = 17
     psf = measAlg.DoubleGaussianPsf(psfSize, psfSize, 2.0, 3.5, 0.1)
     psfFwhmPix = sigma2fwhm * psf.computeShape().getDeterminantRadius()
-    psfim = psf.computeImage(afwGeom.Point2D(0., 0.)).convertF()
-    psfim *= scaling
+    psfim = psf.computeImage().convertF()
+    psfim *= scaling / psf.computePeak()
     psfw, psfh = psfim.getDimensions()
     psfSum = np.sum(psfim.getArray())
     
@@ -94,7 +94,7 @@ def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.5):
     # Merge them together
     assert(len(results.sources) == 2)
     fpSet = results.fpSets.positive
-    fpSet.merge(results.fpSets.negative, 2, 2, False)
+    fpSet.merge(results.fpSets.negative, 0, 0, False)
     sources = afwTable.SourceCatalog(table)
     fpSet.makeSources(sources)
     assert(len(sources) == 1)
@@ -232,44 +232,14 @@ class DipoleAlgorithmTest(unittest.TestCase):
                             modelBBox  = model.getBBox(afwImage.PARENT)
                     
                             # Portion of the negative Psf that overlaps the montage
-                            negXmin = negPsfBBox.getMinX() if \
-                                (negPsfBBox.getMinX() > modelBBox.getMinX()) else \
-                                modelBBox.getMinX()
-
-                            negYmin = negPsfBBox.getMinY() if \
-                                (negPsfBBox.getMinY() > modelBBox.getMinY()) else \
-                                modelBBox.getMinY()
-
-                            negXmax = negPsfBBox.getMaxX() if \
-                                (negPsfBBox.getMaxX() < modelBBox.getMaxX()) else \
-                                modelBBox.getMaxX()
-
-                            negYmax = negPsfBBox.getMaxY() if \
-                                (negPsfBBox.getMaxY() < modelBBox.getMaxY()) else \
-                                modelBBox.getMaxY()
-
-                            negOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(negXmin, negYmin), 
-                                                           afwGeom.Point2I(negXmax, negYmax))
+                            negOverlapBBox = afwGeom.Box2I(negPsfBBox)
+                            negOverlapBBox.clip(modelBBox)
+                            self.assertFalse(negOverlapBBox.isEmpty())
                     
                             # Portion of the positivePsf that overlaps the montage
-                            posXmin = posPsfBBox.getMinX() if \
-                                (posPsfBBox.getMinX() > modelBBox.getMinX()) else \
-                                modelBBox.getMinX()
-
-                            posYmin = posPsfBBox.getMinY() if \
-                                (posPsfBBox.getMinY() > modelBBox.getMinY()) else \
-                                modelBBox.getMinY()
-
-                            posXmax = posPsfBBox.getMaxX() if \
-                                (posPsfBBox.getMaxX() < modelBBox.getMaxX()) else \
-                                modelBBox.getMaxX()
-
-                            posYmax = posPsfBBox.getMaxY() if \
-                                (posPsfBBox.getMaxY() < modelBBox.getMaxY()) else \
-                                modelBBox.getMaxY()
-
-                            posOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(posXmin, posYmin), 
-                                                           afwGeom.Point2I(posXmax, posYmax))
+                            posOverlapBBox = afwGeom.Box2I(posPsfBBox)
+                            posOverlapBBox.clip(modelBBox)
+                            self.assertFalse(posOverlapBBox.isEmpty())
                     
                             negPsfSubim    = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT)
                             modelSubim     = type(model)(model, negOverlapBBox, afwImage.PARENT)
@@ -373,34 +343,14 @@ class DipoleAlgorithmTest(unittest.TestCase):
         modelBBox  = model.getBBox(afwImage.PARENT)
 
         # Portion of the negative Psf that overlaps the montage
-        negXmin = negPsfBBox.getMinX() if (negPsfBBox.getMinX() > modelBBox.getMinX()) else \
-            modelBBox.getMinX()
-
-        negYmin = negPsfBBox.getMinY() if (negPsfBBox.getMinY() > modelBBox.getMinY()) else \
-            modelBBox.getMinY()
-
-        negXmax = negPsfBBox.getMaxX() if (negPsfBBox.getMaxX() < modelBBox.getMaxX()) else \
-            modelBBox.getMaxX()
-
-        negYmax = negPsfBBox.getMaxY() if (negPsfBBox.getMaxY() < modelBBox.getMaxY()) else \
-            modelBBox.getMaxY()
-
-        negOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(negXmin, negYmin), afwGeom.Point2I(negXmax, negYmax))
+        negOverlapBBox = afwGeom.Box2I(negPsfBBox)
+        negOverlapBBox.clip(modelBBox)
+        self.assertFalse(negOverlapBBox.isEmpty())
 
         # Portion of the positivePsf that overlaps the montage
-        posXmin = posPsfBBox.getMinX() if (posPsfBBox.getMinX() > modelBBox.getMinX()) else \
-            modelBBox.getMinX()
-
-        posYmin = posPsfBBox.getMinY() if (posPsfBBox.getMinY() > modelBBox.getMinY()) else \
-            modelBBox.getMinY()
-
-        posXmax = posPsfBBox.getMaxX() if (posPsfBBox.getMaxX() < modelBBox.getMaxX()) else \
-            modelBBox.getMaxX()
-
-        posYmax = posPsfBBox.getMaxY() if (posPsfBBox.getMaxY() < modelBBox.getMaxY()) else \
-            modelBBox.getMaxY()
-
-        posOverlapBBox = afwGeom.Box2I(afwGeom.Point2I(posXmin, posYmin), afwGeom.Point2I(posXmax, posYmax))
+        posOverlapBBox = afwGeom.Box2I(posPsfBBox)
+        posOverlapBBox.clip(modelBBox)
+        self.assertFalse(posOverlapBBox.isEmpty())
 
         negPsfSubim    = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT)
         modelSubim     = type(model)(model, negOverlapBBox, afwImage.PARENT)

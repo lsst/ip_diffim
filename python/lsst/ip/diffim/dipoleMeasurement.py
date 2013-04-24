@@ -97,6 +97,10 @@ class DipoleMeasurementTask(SourceMeasurementTask):
 
             source.set(key, val)
 
+    def run(self, exposure, sources, **kwds):
+        SourceMeasurementTask.run(self, exposure, sources, **kwds)
+        self.classify(sources)
+
 #########
 # Other Support classs
 #########
