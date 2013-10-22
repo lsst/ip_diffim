@@ -30,7 +30,7 @@ class SnapPsfMatchConfigDF(PsfMatchConfigDF):
 
         # No spatial variation in model
         self.spatialKernelOrder = 0
-        
+
         # Don't fit for differential background
         self.fitForBackground = False
 
@@ -47,7 +47,7 @@ class SnapPsfMatchConfigDF(PsfMatchConfigDF):
         self.usePcaForSpatialKernel = True
         self.subtractMeanForPca = True
         self.numPrincipalComponents = 5
-        
+
 class SnapPsfMatchConfigAL(PsfMatchConfigAL):
     """Version of Psf Matching optimized for snap subtraction"""
     def setDefaults(self):
@@ -55,7 +55,7 @@ class SnapPsfMatchConfigAL(PsfMatchConfigAL):
 
         # No spatial variation in model
         self.spatialKernelOrder = 0
-        
+
         # Don't fit for differential background
         self.fitForBackground = False
 
@@ -79,9 +79,9 @@ class SnapPsfMatchConfig(ImagePsfMatchConfig):
         ),
         default = "AL",
     )
-            
+
     doWarping = pexConfig.Field(
-        dtype = bool, 
+        dtype = bool,
         doc   = "Warp the snaps?",
         default = False
     )

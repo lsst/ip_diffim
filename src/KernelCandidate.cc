@@ -9,7 +9,7 @@
  * @ingroup ip_diffim
  */
 
-#include "boost/timer.hpp" 
+#include "boost/timer.hpp"
 
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
@@ -23,18 +23,18 @@
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
-namespace pexLog         = lsst::pex::logging; 
-namespace pexExcept      = lsst::pex::exceptions; 
-namespace pexLogging     = lsst::pex::logging; 
+namespace pexLog         = lsst::pex::logging;
+namespace pexExcept      = lsst::pex::exceptions;
+namespace pexLogging     = lsst::pex::logging;
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 
     template <typename PixelT>
     KernelCandidate<PixelT>::KernelCandidate(
         float const xCenter,
-        float const yCenter, 
+        float const yCenter,
         MaskedImagePtr const& templateMaskedImage,
         MaskedImagePtr const& scienceMaskedImage,
         lsst::pex::policy::Policy const& policy
@@ -52,14 +52,14 @@ namespace diffim {
         _kernelSolutionOrig(),
         _kernelSolutionPca()
     {
-        
+
         /* Rank by mean core S/N in science image */
         ImageStatistics<PixelT> imstats(_policy);
         int candidateCoreRadius = _policy.getInt("candidateCoreRadius");
         try {
             imstats.apply(*_scienceMaskedImage, candidateCoreRadius);
         } catch (pexExcept::Exception& e) {
-            pexLogging::TTrace<3>("lsst.ip.diffim.KernelCandidate", 
+            pexLogging::TTrace<3>("lsst.ip.diffim.KernelCandidate",
                                   "Unable to calculate core imstats for ranking Candidate %d", this->getId()); 
             this->setStatus(afwMath::SpatialCellCandidate::BAD);
             return;
@@ -73,7 +73,7 @@ namespace diffim {
 
     template <typename PixelT>
     KernelCandidate<PixelT>::KernelCandidate(
-        SourcePtr const& source, 
+        SourcePtr const& source,
         MaskedImagePtr const& templateMaskedImage,
         MaskedImagePtr const& scienceMaskedImage,
         lsst::pex::policy::Policy const& policy
@@ -95,15 +95,14 @@ namespace diffim {
                           "Candidate %d at %.2f %.2f with ranking %.2f", 
                           this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);
     }
-    
+
     template <typename PixelT>
     void KernelCandidate<PixelT>::build(
         lsst::afw::math::KernelList const& basisList
         ) {
         build(basisList, boost::shared_ptr<Eigen::MatrixXd>());
     }
-    
-    
+
     template <typename PixelT>
     void KernelCandidate<PixelT>::build(
         lsst::afw::math::KernelList const& basisList,
@@ -111,7 +110,7 @@ namespace diffim {
         ) {
 
         /* Examine the policy for control over the variance estimate */
-        afwImage::Image<afwImage::VariancePixel> var = 
+        afwImage::Image<afwImage::VariancePixel> var =
             afwImage::Image<afwImage::VariancePixel>(*(_scienceMaskedImage->getVariance()), true);
         /* Variance estimate comes from sum of image variances */
         var += (*(_templateMaskedImage->getVariance()));
@@ -137,7 +136,6 @@ namespace diffim {
         } catch (pexExcept::Exception &e) {
             throw e;
         }
-        
 
         if (_policy.getBool("iterateSingleKernel") && (!(_policy.getBool("constantVarianceWeighting")))) {
             afwImage::MaskedImage<PixelT> diffim = getDifferenceImage(KernelCandidate::RECENT);
@@ -156,7 +154,7 @@ namespace diffim {
 
     template <typename PixelT>
     void KernelCandidate<PixelT>::_buildKernelSolution(lsst::afw::math::KernelList const& basisList,
-                                                       boost::shared_ptr<Eigen::MatrixXd> hMat) 
+                                                       boost::shared_ptr<Eigen::MatrixXd> hMat)
     {
         bool checkConditionNumber = _policy.getBool("checkConditionNumber");
         double maxConditionNumber = _policy.getDouble("maxConditionNumber");
@@ -169,9 +167,9 @@ namespace diffim {
             ctype = KernelSolution::EIGENVALUE;
         }
         else {
-            throw LSST_EXCEPT(pexExcept::Exception, "conditionNumberType not recognized");            
+            throw LSST_EXCEPT(pexExcept::Exception, "conditionNumberType not recognized");
         }
-        
+
         /* Do we have a regularization matrix?  If so use it */
         if (hMat) {
             _useRegularization = true;

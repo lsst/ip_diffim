@@ -24,9 +24,9 @@ logging.Trace_setVerbosity('ImagePsfMatchTask', verbosity)
 display = False
 
 class DiffimTestCases(unittest.TestCase):
-    
+
     # D = I - (K.x.T + bg)
-        
+
     def setUp(self):
         self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config.kernel.name = "AL"
@@ -36,8 +36,8 @@ class DiffimTestCases(unittest.TestCase):
         # "stdev" vs "pixel_stdev"
         self.subconfig.detectionConfig.detThresholdType = "stdev"
 
-	# Impacts some of the test values
-	self.subconfig.constantVarianceWeighting = True
+        # Impacts some of the test values
+        self.subconfig.constantVarianceWeighting = True
 
         self.defDataDir = eups.productDir('afwdata')
         if self.defDataDir:
@@ -46,7 +46,7 @@ class DiffimTestCases(unittest.TestCase):
                                            "v5-e0-c011-a00.sci.fits")
             defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a00.sci.fits")
-            
+
             self.scienceImage   = afwImage.ExposureF(defSciencePath)
             self.templateImage  = afwImage.ExposureF(defTemplatePath)
 
@@ -77,14 +77,14 @@ class DiffimTestCases(unittest.TestCase):
     def testModelType(self):
         self.runModelType(fitForBackground = True)
         self.runModelType(fitForBackground = False)
-        
+
     def runModelType(self, fitForBackground):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
         self.subconfig.fitForBackground = fitForBackground
-            
+
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.PARENT)
         scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
 
@@ -119,19 +119,19 @@ class DiffimTestCases(unittest.TestCase):
         for i in range(1, len(kp1par0)):
             self.assertAlmostEqual(kp1par0[i], 0.0, 5)
             self.assertAlmostEqual(kp1par0[i], kp2par0[i], 5)
-            
+
         if fitForBackground:
             # Nterms (zeroth order model)
             self.assertEqual(backgroundModel1.getNParameters(), 1)
             self.assertEqual(backgroundModel2.getNParameters(), 1)
 
             # Same value in function
-            self.assertAlmostEqual(backgroundModel1.getParameters()[0], 
+            self.assertAlmostEqual(backgroundModel1.getParameters()[0],
                                    backgroundModel2.getParameters()[0], 4)
 
             # Functions evaluates to each other
             self.assertAlmostEqual(backgroundModel1(0, 0), backgroundModel2(0, 0), 4)
-            
+
             # Spatially...
             self.assertAlmostEqual(backgroundModel1(10, 10), backgroundModel2(10, 10), 4)
 
@@ -145,7 +145,7 @@ class DiffimTestCases(unittest.TestCase):
             for y in range(kim1.getHeight()):
                 for x in range(kim1.getHeight()):
                     self.assertAlmostEqual(kim1.get(x, y), kim2.get(x, y), 1)
-                    
+
             # Nterms (zeroth order)
             self.assertEqual(backgroundModel1.getNParameters(), 1)
             self.assertEqual(backgroundModel2.getNParameters(), 1)
@@ -157,11 +157,11 @@ class DiffimTestCases(unittest.TestCase):
             # Function evaluates to zero
             self.assertAlmostEqual(backgroundModel1(0, 0), 0.0)
             self.assertAlmostEqual(backgroundModel2(0, 0), 0.0)
-            
+
             # Spatially...
             self.assertAlmostEqual(backgroundModel1(10, 10), 0.0)
             self.assertAlmostEqual(backgroundModel2(10, 10), 0.0)
-        
+
     def testWarping(self):
         # Should fail since images are not aligned
         if not self.defDataDir:
@@ -222,10 +222,10 @@ class DiffimTestCases(unittest.TestCase):
                     continue
                 if cand1.getStatus() == afwMath.SpatialCellCandidate.BAD:
                     continue
-                
+
                 cand1 = ipDiffim.cast_KernelCandidateF(cand1)
                 cand2 = ipDiffim.cast_KernelCandidateF(kernelCellSet2.getCandidateById(cand1.getId()+count))
-                
+
 
                 # positions are the same
                 self.assertEqual(cand1.getXCenter(), cand2.getXCenter())
@@ -267,7 +267,7 @@ class DiffimTestCases(unittest.TestCase):
             self.assertAlmostEqual(bgp1[np], bgp2[np], 4)
 
 #####
-        
+
 def suite():
     """Returns a suite containing all the test cases in this module."""
     tests.init()
@@ -283,8 +283,3 @@ def run(doExit=False):
 
 if __name__ == "__main__":
     run(True)
-    
-        
-
-
-     

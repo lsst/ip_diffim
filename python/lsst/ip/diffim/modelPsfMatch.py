@@ -65,30 +65,30 @@ class ModelPsfMatchTask(PsfMatch):
 
     def __init__(self, *args, **kwargs):
         """Create a PsfMatchToModel
-        
+
         @param config: see lsst.ip.diffim.PsfMatchConfig
         @param logName: name by which messages are logged
         """
         PsfMatch.__init__(self, *args, **kwargs)
-        self.kconfig = self.config.kernel.active
+        self.kConfig = self.config.kernel.active
 
     @pipeBase.timeMethod
     def run(self, exposure, referencePsfModel, kernelSum=1.0):
         """PSF-match an exposure to a PSF model.
-        
+
         @param exposure: Exposure to PSF-match to the reference masked image;
             must contain a PSF model and must be warped to match the reference masked image
         @param referencePsfModel: PSF model to match to (an afwDetection.Psf)
-        @param kernelSum: A multipicative factor reflecting the difference in 
+        @param kernelSum: A multipicative factor reflecting the difference in
             zeropoints between the images; kernelSum = zpt(science) / zpt(ref)
-        
+
         @return
         - psfMatchedExposure: the PSF-matched exposure.
             This has the same parent bbox, Wcs, Calib and Filter as exposure but no psf.
             In theory the psf should equal referencePsfModel but the match is likely not exact.
         - psfMatchingKernel: the PSF matching kernel
         - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
-        
+
         @raise RuntimeError if exposure does not contain a PSF model"
         """
         if not exposure.hasPsf():
@@ -108,9 +108,9 @@ class ModelPsfMatchTask(PsfMatch):
         fwhm1 = s1 * sigma2fwhm
         fwhm2 = s2 * sigma2fwhm
 
-        basisList = makeKernelBasisList(self.kconfig, fwhm1, fwhm2, metadata = self.metadata)
+        basisList = makeKernelBasisList(self.kConfig, fwhm1, fwhm2, metadata = self.metadata)
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
-        
+
         if psfMatchingKernel.isSpatiallyVarying():
             sParameters = num.array(psfMatchingKernel.getSpatialParameters())
             sParameters[0][0] = kernelSum
@@ -119,7 +119,7 @@ class ModelPsfMatchTask(PsfMatch):
             kParameters = num.array(psfMatchingKernel.getKernelParameters())
             kParameters[0] = kernelSum
             psfMatchingKernel.setKernelParameters(kParameters)
-            
+
         self.log.log(pexLog.Log.INFO, "PSF-match science exposure to reference")
         psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(afwImage.PARENT), exposure.getWcs())
         psfMatchedExposure.setFilter(exposure.getFilter())
@@ -130,13 +130,13 @@ class ModelPsfMatchTask(PsfMatch):
         # when PSF-matching one model to another.
         doNormalize = True
         afwMath.convolve(psfMatchedMaskedImage, maskedImage, psfMatchingKernel, doNormalize)
-        
+
         self.log.log(pexLog.Log.INFO, "done")
-        return pipeBase.Struct(psfMatchedExposure=psfMatchedExposure, 
-                               psfMatchingKernel=psfMatchingKernel, 
+        return pipeBase.Struct(psfMatchedExposure=psfMatchedExposure,
+                               psfMatchingKernel=psfMatchingKernel,
                                kernelCellSet=kernelCellSet,
                                metadata=self.metadata)
-    
+
     def _diagnostic(self,kernelCellSet, spatialSolution, spatialKernel, spatialBg):
         """The debugging diagnostics are not really useful here, since we have no variance"""
         return
@@ -147,9 +147,9 @@ class ModelPsfMatchTask(PsfMatch):
         @param referencePsfModel: PSF model to match to (an afwDetection.Psf)
         @param scienceBBox: parent bounding box on science image
         @param sciencePsfModel: PSF model for science image
-        
+
         @return kernelCellSet: a SpatialCellSet for use with self._solve
-        
+
         @raise RuntimeError if reference PSF model and science PSF model have different dimensions
         """
         # The Psf base class does not support getKernel() in general, as there are some Psf
@@ -164,14 +164,14 @@ class ModelPsfMatchTask(PsfMatch):
             pexLog.Trace(self.log.getName(), 1,
                          "ERROR: Dimensions of reference Psf and science Psf different; exiting")
             raise RuntimeError, "ERROR: Dimensions of reference Psf and science Psf different; exiting"
-    
+
         psfWidth, psfHeight = referencePsfModel.getKernel().getDimensions()
-        maxKernelSize = min(psfWidth, psfHeight) - 1 
+        maxKernelSize = min(psfWidth, psfHeight) - 1
         if maxKernelSize % 2 == 0:
             maxKernelSize -= 1
-        if self.kconfig.kernelSize > maxKernelSize:
+        if self.kConfig.kernelSize > maxKernelSize:
             raise ValueError, "Kernel size (%d) too big to match Psfs of size %d; reduce to at least %d" % (
-                self.kconfig.kernelSize, psfWidth, maxKernelSize)
+                self.kConfig.kernelSize, psfWidth, maxKernelSize)
 
         # Infer spatial order of Psf model!
         #
@@ -191,37 +191,36 @@ class ModelPsfMatchTask(PsfMatch):
                 pexLog.Trace(self.log.getName(), 3, "Problem inferring spatial order of image's Psf")
             else:
                 pexLog.Trace(self.log.getName(), 2, "Spatial order of Psf = %d; matching kernel order = %d" % (
-                        order, self.kconfig.spatialKernelOrder))
-            
-        
+                        order, self.kConfig.spatialKernelOrder))
+
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0,   scienceY0   = scienceBBox.getMin()
-    
-        sizeCellX = self.kconfig.sizeCellX
-        sizeCellY = self.kconfig.sizeCellY
-    
+
+        sizeCellX = self.kConfig.sizeCellX
+        sizeCellY = self.kConfig.sizeCellY
+
         kernelCellSet = afwMath.SpatialCellSet(
             afwGeom.Box2I(afwGeom.Point2I(scienceX0, scienceY0),
                           afwGeom.Extent2I(regionSizeX, regionSizeY)),
             sizeCellX, sizeCellY
             )
-    
+
         nCellX    = regionSizeX // sizeCellX
         nCellY    = regionSizeY // sizeCellY
         dimenR    = referencePsfModel.getKernel().getDimensions()
         dimenS    = sciencePsfModel.getKernel().getDimensions()
-        
-        policy = pexConfig.makePolicy(self.kconfig)
+
+        policy = pexConfig.makePolicy(self.kConfig)
         for row in range(nCellY):
             # place at center of cell
             posY = sizeCellY * row + sizeCellY // 2 + scienceY0
-            
+
             for col in range(nCellX):
                 # place at center of cell
                 posX = sizeCellX * col + sizeCellX // 2 + scienceX0
-    
+
                 pexLog.Trace(self.log.getName(), 5, "Creating Psf candidate at %.1f %.1f" % (posX, posY))
-    
+
                 # reference kernel image, at location of science subimage
                 kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY)).convertF()
                 kernelMaskR   = afwImage.MaskU(dimenR)
@@ -229,7 +228,7 @@ class ModelPsfMatchTask(PsfMatch):
                 kernelVarR    = afwImage.ImageF(dimenR)
                 kernelVarR.set(1.0)
                 referenceMI   = afwImage.MaskedImageF(kernelImageR, kernelMaskR, kernelVarR)
-     
+
                 # kernel image we are going to convolve
                 kernelImageS = sciencePsfModel.computeImage(afwGeom.Point2D(posX, posY)).convertF()
                 kernelMaskS   = afwImage.MaskU(dimenS)
@@ -240,7 +239,7 @@ class ModelPsfMatchTask(PsfMatch):
 
                 #referenceMI.writeFits('ref_%d_%d.fits' % (row, col))
                 #scienceMI.writeFits('sci_%d_%d.fits' % (row, col))
- 
+
                 # The image to convolve is the science image, to the reference Psf.
                 kc = diffimLib.makeKernelCandidate(posX, posY, scienceMI, referenceMI, policy)
                 kernelCellSet.insertCandidate(kc)
