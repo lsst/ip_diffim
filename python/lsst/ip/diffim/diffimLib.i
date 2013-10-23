@@ -1,9 +1,9 @@
 // -*- lsst-c++ -*-
 
-/* 
+/*
  * LSST Data Management System
  * Copyright 2008, 2009, 2010 LSST Corporation.
- * 
+ *
  * This product includes software developed by the
  * LSST Project (http://www.lsst.org/).
  *
@@ -11,17 +11,17 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the LSST License Statement and 
  * the GNU General Public License along with this program.  If not, 
  * see <http://www.lsstcorp.org/LegalNotices/>.
  */
- 
+
 %define diffimLib_DOCSTRING
 "
 Python bindings for lsst::ip::diffim code
@@ -37,7 +37,7 @@ Python bindings for lsst::ip::diffim code
 %ignore lsst::ip::diffim::ImageStatistics::operator();
 
 // Reference for this file is at http://dev.lsstcorp.org/trac/wiki/SwigFAQ 
-// Nice practical example is at 
+// Nice practical example is at
 //     http://dev.lsstcorp.org/trac/browser/DMS/afw/trunk/python/lsst/afw/image/imageLib.i 
 
 // Suppress swig complaints
@@ -48,7 +48,6 @@ Python bindings for lsst::ip::diffim code
 // Nothing known about 'boost::bad_any_cast'
 namespace boost {
     class bad_any_cast; 
-    //typedef unsigned short boost::uint16_t;
 }
 
 /* handle C++ arguments that should be outputs in python */
@@ -136,7 +135,7 @@ def version(HeadURL = r"$HeadURL$"):
 /******************************************************************************/
 
 %template(pair_Kernel_double)   std::pair<lsst::afw::math::Kernel::Ptr, double>;
-%template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, 
+%template(pair_Kernel_Function) std::pair<lsst::afw::math::LinearCombinationKernel::Ptr,
                                           lsst::afw::math::Kernel::SpatialFunctionPtr>;
 
 /******************************************************************************/
@@ -235,10 +234,6 @@ def version(HeadURL = r"$HeadURL$"):
 %KernelCandidateDetection(F, float);
 /******************************************************************************/
 
-//%{
-//#include "lsst/ip/diffim/KernelCandidate.h"
-//%}
-
 %define %IMAGE(PIXTYPE)
 lsst::afw::image::Image<PIXTYPE>
 %enddef
@@ -246,41 +241,6 @@ lsst::afw::image::Image<PIXTYPE>
 %define %KernelCandidatePtr(NAME, TYPE)
 %shared_ptr(lsst::ip::diffim::KernelCandidate<TYPE>);
 
-/* Same problem as with meas algorithms makePsfCandidate */
-//%inline %{
-//namespace lsst { namespace ip { namespace diffim { namespace lsstSwig {
-//template <typename PixelT>
-//typename KernelCandidate<PixelT>::Ptr
-//makeKernelCandidateForSwig(float const xCenter,
-//                           float const yCenter, 
-//                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
-//                               templateMaskedImage,
-//                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
-//                               scienceMaskedImage,
-//                           lsst::pex::policy::Policy const& policy) {
-//    
-//    return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
-//                                                                             templateMaskedImage,
-//                                                                             scienceMaskedImage,
-//                                                                             policy));
-//template <typename PixelT>
-//typename KernelCandidate<PixelT>::Ptr
-//makeKernelCandidateForSwig(boost::shared_ptr<lsst::afw::table::SourceRecord> const& source, 
-//                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
-//                               templateMaskedImage,
-//                           boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& 
-//                               scienceMaskedImage,
-//                           lsst::pex::policy::Policy const& policy) {
-//    
-//    return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(source,
-//                                                                             templateMaskedImage,
-//                                                                             scienceMaskedImage,
-//                                                                             policy));
-//}
-//}}}}
-//%}
-
-//%ignore makeKernelCandidate;
 %enddef
 
 %define %KernelCandidate(NAME, TYPE)

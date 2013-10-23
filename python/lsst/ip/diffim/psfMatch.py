@@ -1,7 +1,7 @@
-# 
+#
 # LSST Data Management System
 # Copyright 2008, 2009, 2010 LSST Corporation.
-# 
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -9,14 +9,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import time
@@ -28,6 +28,7 @@ import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
 import lsst.afw.display.ds9 as ds9
 import lsst.pipe.base as pipeBase
+from lsst.meas.algorithms.detection import BackgroundConfig
 from . import utils as diUtils
 from . import diffimLib
 
@@ -36,6 +37,7 @@ class DetectionConfig(pexConfig.Config):
         dtype = float,
         doc = "Value of footprint detection threshold",
         default = 10.0
+        check = lambda x : x >= 3.0
     )
     detThresholdType = pexConfig.ChoiceField(
         dtype = str,
@@ -64,12 +66,14 @@ class DetectionConfig(pexConfig.Config):
         dtype = int,
         doc = "Minimum number of pixels in an acceptable Footprint",
         default = 5
+        check = lambda x : x >= 5
     )
     fpNpixMax = pexConfig.Field(
         dtype = int,
         doc = """Maximum number of pixels in an acceptable Footprint;
                  too big and the subsequent convolutions become unwieldy""",
         default = 500
+        check = lambda x : x <= 500
     )
     fpGrowKernelScaling = pexConfig.Field(
         dtype = float,
@@ -81,6 +85,7 @@ class DetectionConfig(pexConfig.Config):
                  after convolution by the basis functions will be
                  eqaul to the kernel size iteslf.""",
         default = 1.0
+        check = lambda x : x >= 1.0
     )
     fpGrowPix = pexConfig.Field(
         dtype = int,
@@ -92,44 +97,14 @@ class DetectionConfig(pexConfig.Config):
                  is 2 * fpGrowPix pixels larger in each dimension.
                  This is overridden by fpGrowKernelScaling if scaleByFwhm""",
         default = 30,
+        check = lambda x : x >= 10
     )
     scaleByFwhm = pexConfig.Field(
         dtype = bool,
-        doc = "Scale fpGrowPix by input Fwhm",
+        doc = "Scale fpGrowPix by input Fwhm?",
         default = True,
     )
 
-
-class AfwBackgroundConfig(pexConfig.Config):
-    algorithmName = pexConfig.ChoiceField(
-        dtype = str,
-        doc = "How to interpolate the background values",
-        default = "NATURAL_SPLINE",
-        allowed = {
-            "CONSTANT": "CONSTANT",
-            "LINEAR": "LINEAR",
-            "NATURAL_SPLINE": "NATURAL_SPLINE",
-            "CUBIC_SPLINE": "CUBIC_SPLINE",
-            "CUBIC_SPLINE_PERIODIC": "CUBIC_SPLINE_PERIODIC",
-            "AKIMA_SPLINE": "AKIMA_SPLINE",
-            "AKIMA_SPLINE_PERIODIC": "AKIMA_SPLINE_PERIODIC"
-        }
-    )
-    binsize = pexConfig.Field(
-        dtype = int,
-        doc = "How large of regions should be used for each background point",
-        default = 2048
-    )
-    undersample = pexConfig.ChoiceField(
-        dtype = str,
-        doc = "What to do if there are not enough regions for the interpolation",
-        default = "REDUCE_INTERP_ORDER",
-        allowed = {
-            "THROW_EXCEPTION" : "THROW_EXCEPTION",
-            "REDUCE_INTERP_ORDER" : "REDUCE_INTERP_ORDER",
-            "INCREASE_NXNYSAMPLE" : "INCREASE_NXNYSAMPLE"
-        }
-    )
 
 class PsfMatchConfig(pexConfig.Config):
     warpingConfig = pexConfig.ConfigField("Config for warping exposures to a common alignment",
@@ -137,7 +112,7 @@ class PsfMatchConfig(pexConfig.Config):
     detectionConfig = pexConfig.ConfigField("Controlling the detection of sources for kernel building",
                                             DetectionConfig)
     afwBackgroundConfig = pexConfig.ConfigField("Controlling the Afw background fitting",
-                                                AfwBackgroundConfig)
+                                                BackgroundConfig)
 
     ####
     # Background fitting
@@ -187,6 +162,7 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = float,
         doc = """How much to scale the kernel size based on the largest AL Sigma""",
         default = 6.0,
+        check = lambda x : x >= 1.0
     )
     kernelSizeMin = pexConfig.Field(
         dtype = int,
@@ -226,21 +202,25 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = int,
         doc = "Size (rows) in pixels of each SpatialCell for spatial modeling",
         default = 128,
+        check = lambda x : x >= 32
     )
     sizeCellY = pexConfig.Field(
         dtype = int,
         doc = "Size (columns) in pixels of each SpatialCell for spatial modeling",
         default = 128,
+        check = lambda x : x >= 32
     )
     nStarPerCell = pexConfig.Field(
         dtype = int,
         doc = "Number of KernelCandidates in each SpatialCell to use in the spatial fitting",
         default = 3,
+        check = lambda x : x >= 1
     )
     maxSpatialIterations = pexConfig.Field(
         dtype = int,
         doc = "Maximum number of iterations for rejecting bad KernelCandidates in spatial fitting",
         default = 3,
+        check = lambda x : x >= 1 && x <= 5
     )
 
     ####
@@ -266,6 +246,7 @@ class PsfMatchConfig(pexConfig.Config):
         doc = """Number of principal components to use for Pca basis, including the
                  mean kernel if requested.""",
         default = 5,
+        check = lambda x : x >= 3
     )
 
     ####
@@ -310,6 +291,7 @@ class PsfMatchConfig(pexConfig.Config):
                  Used by BuildSingleKernelVisitor, AssessSpatialKernelVisitor.
                  Represents average over pixels of (image/sqrt(variance)).""",
         default = 0.25,
+        check = lambda x : x >= 0.0
     )
     candidateResidualStdMax = pexConfig.Field(
         dtype = float,
@@ -317,6 +299,7 @@ class PsfMatchConfig(pexConfig.Config):
                  Used by BuildSingleKernelVisitor, AssessSpatialKernelVisitor.
                  Represents stddev over pixels of (image/sqrt(variance)).""",
         default = 1.50,
+        check = lambda x : x >= 0.0
     )
     useCoreStats = pexConfig.Field(
         dtype = bool,
@@ -331,6 +314,7 @@ class PsfMatchConfig(pexConfig.Config):
                  This is used both for 'core' diffim quality as well as ranking of
                  KernelCandidates by their total flux in this core""",
         default = 3,
+        check = lambda x : x >= 1
     )
 
     ####
@@ -340,6 +324,7 @@ class PsfMatchConfig(pexConfig.Config):
         doc = """Maximum allowed sigma for outliers from kernel sum distribution.
                  Used to reject variable objects from the kernel model""",
         default = 3.0,
+        check = lambda x : x >= 0.0
     )
 
 
@@ -349,6 +334,7 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = float,
         doc = "Maximum condition number for a well conditioned matrix",
         default = 5.0e7,
+        check = lambda x : x >= 0.0
     )
     conditionNumberType = pexConfig.ChoiceField(
         dtype = str,
@@ -363,6 +349,7 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = float,
         doc = "Maximum condition number for a well conditioned spatial matrix",
         default = 1.0e10,
+        check = lambda x : x >= 0.0
     )
 
     ####
@@ -394,7 +381,7 @@ class PsfMatchConfig(pexConfig.Config):
 
 
 class PsfMatchConfigAL(PsfMatchConfig):
-    def setDefaults(self): 
+    def setDefaults(self):
         PsfMatchConfig.setDefaults(self)
         self.kernelBasisSet = "alard-lupton"
         self.maxConditionNumber = 5.0e7
@@ -406,33 +393,38 @@ class PsfMatchConfigAL(PsfMatchConfig):
         dtype = int,
         doc = "Number of Gaussians in alard-lupton basis",
         default = 3,
+        check = lambda x : x >= 1
     )
     alardDegGauss = pexConfig.ListField(
         dtype = int,
-        doc = "Degree of spatial modification of Gaussians in alard-lupton basis",
+        doc = "Polynomial order of spatial modification of Gaussians.  Must in number equal alardNGauss",
         default = (4, 2, 2),
     )
     alardSigGauss = pexConfig.ListField(
         dtype = float,
-        doc = """Sigma in pixels of Gaussians in alard-lupton basis (note: FWHM = 2.35 sigma).""",
+        doc = """Sigma in pixels of Gaussians (FWHM = 2.35 sigma).  Must in number equal alardNGauss""",
         default = (0.7, 1.5, 3.0),
     )
     alardGaussBeta = pexConfig.Field(
         dtype = float,
         doc = """Default scale factor between Gaussian sigmas """,
         default = 2.0,
+        check = lambda x: x >= 0.0,
     )
     alardMinSig = pexConfig.Field(
         dtype = float,
         doc = """Minimum Sigma (pixels) for Gaussians""",
         default = 0.7,
+        check = lambda x : x >= 0.25
     )
 
     alardDegGaussDeconv = pexConfig.Field(
         dtype = int,
         doc = """Degree of spatial modification of ALL gaussians in AL basis during deconvolution""",
         default = 3,
+        check = lambda x : x >= 1
     )
+
 
 
 class PsfMatchConfigDF(PsfMatchConfig):
@@ -460,14 +452,14 @@ class PsfMatchConfigDF(PsfMatchConfig):
         default = "centralDifference",
         allowed = {
             "centralDifference": "Penalize second derivative using 2-D stencil of central finite difference",
-            "forwardDifference": "Penalize first, second, third or combination of derivatives using forward finite differeces"
+            "forwardDifference": "Penalize first, second, third derivatives using forward finite differeces"
         }
     )
     centralRegularizationStencil = pexConfig.ChoiceField(
         dtype = int,
         doc = "Type of stencil to approximate central derivative (for centralDifference only)",
         default = 9,
-        allowed = { 
+        allowed = {
             5 : "5-point stencil including only adjacent-in-x,y elements",
             9 : "9-point stencil including diagonal elements"
         }
@@ -482,6 +474,7 @@ class PsfMatchConfigDF(PsfMatchConfig):
         dtype = float,
         doc = "Value of the penalty for kernel border pixels",
         default = 3.0,
+        check = lambda x : x >= 0.0
     )
 
     #####
@@ -557,6 +550,14 @@ class PsfMatch(pipeBase.Task):
             self.hMat = diffimLib.makeRegularizationMatrix(pexConfig.makePolicy(self.kConfig))
 
     def _diagnostic(self, kernelCellSet, spatialSolution, spatialKernel, spatialBg):
+        """Provide logging diagnostics on quality of spatial kernel fit
+
+        @param kernelCellSet: Cellset that contains the KernelCandidates used in the fitting
+        @param spatialSolution: KernelSolution of best-fit
+        @param spatialKernel: Best-fit spatial Kernel model
+        @param spatialBg: Best-fit spatial background model
+
+        """
         # What is the final kernel sum
         kImage = afwImage.ImageD(spatialKernel.getDimensions())
         kSum = spatialKernel.computeImage(kImage, False)
@@ -634,6 +635,47 @@ class PsfMatch(pipeBase.Task):
             self.log.info("Spatial background model appears well constrained; %d candidates, %d terms" % (
                     nGood, nBgTerms))
 
+    def _displayDebug(self, kernelCellSet, spatialKernel, spatialBackground):
+        import lsstDebug
+        displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells
+        displayCandidates = lsstDebug.Info(__name__).displayCandidates
+        displayKernelBasis = lsstDebug.Info(__name__).displayKernelBasis
+        displayKernelMosaic = lsstDebug.Info(__name__).displayKernelMosaic
+        plotKernelSpatialModel = lsstDebug.Info(__name__).plotKernelSpatialModel
+        showBadCandidates = lsstDebug.Info(__name__).showBadCandidates
+        maskTransparency = lsstDebug.Info(__name__).maskTransparency
+        if not maskTransparency:
+            maskTransparency = 0
+        ds9.setMaskTransparency(maskTransparency)
+
+        if displayCandidates:
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
+                                         frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates)
+            lsstDebug.frame += 1
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
+                                         frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates,
+                                         kernels=True)
+            lsstDebug.frame += 1
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
+                                         frame=lsstDebug.frame,
+                                         showBadCandidates=showBadCandidates,
+                                         resids=True)
+            lsstDebug.frame += 1
+
+        if displayKernelBasis:
+            diUtils.showKernelBasis(spatialKernel, frame=lsstDebug.frame)
+            lsstDebug.frame += 1
+
+        if displayKernelMosaic:
+            diUtils.showKernelMosaic(kernelCellSet.getBBox(), spatialKernel, frame=lsstDebug.frame)
+            lsstDebug.frame += 1
+
+        if plotKernelSpatialModel:
+            diUtils.plotKernelSpatialModel(spatialKernel, kernelCellSet, showBadCandidates=showBadCandidates)
+
+
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
         nComponents       = self.kConfig.numPrincipalComponents
         imagePca          = diffimLib.KernelPcaD()
@@ -650,7 +692,7 @@ class PsfMatch(pipeBase.Task):
         if eSum == 0.0:
             raise RuntimeError("Eigenvalues sum to zero")
         for j in range(len(eigenValues)):
-            pexLog.Trace(self.log.getName()+"._solve", 6, 
+            pexLog.Trace(self.log.getName()+"._solve", 6,
                          "Eigenvalue %d : %f (%f)" % (j, eigenValues[j], eigenValues[j]/eSum))
 
         nToUse = min(nComponents, len(eigenValues))
@@ -675,7 +717,7 @@ class PsfMatch(pipeBase.Task):
         return nRejectedPca, spatialBasisList
 
     @pipeBase.timeMethod
-    def _solve(self, kernelCellSet, basisList, returnOnExcept = False):
+    def _solve(self, kernelCellSet, basisList, returnOnExcept=False):
         """Determine the PSF matching kernel
 
         @param kernelCellSet: a SpatialCellSet to use in determining the PSF matching kernel
@@ -691,16 +733,6 @@ class PsfMatch(pipeBase.Task):
 
         import lsstDebug
         display = lsstDebug.Info(__name__).display
-        displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells
-        displayCandidates = lsstDebug.Info(__name__).displayCandidates
-        displayKernelBasis = lsstDebug.Info(__name__).displayKernelBasis
-        displayKernelMosaic = lsstDebug.Info(__name__).displayKernelMosaic
-        plotKernelSpatialModel = lsstDebug.Info(__name__).plotKernelSpatialModel
-        showBadCandidates = lsstDebug.Info(__name__).showBadCandidates
-        maskTransparency = lsstDebug.Info(__name__).maskTransparency
-        if not maskTransparency:
-            maskTransparency = 0
-        ds9.setMaskTransparency(maskTransparency)
 
         maxSpatialIterations   = self.kConfig.maxSpatialIterations
         nStarPerCell           = self.kConfig.nStarPerCell
@@ -763,7 +795,7 @@ class PsfMatch(pipeBase.Task):
                     pexLog.Trace(self.log.getName()+"._solve", 1, "Building Pca basis")
 
                     nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
-                    pexLog.Trace(self.log.getName()+"._solve", 2, 
+                    pexLog.Trace(self.log.getName()+"._solve", 2,
                                  "Iteration %d, rejected %d candidates due to Pca kernel fit" % (
                             thisIteration, nRejectedPca))
 
@@ -837,36 +869,12 @@ class PsfMatch(pipeBase.Task):
             pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0])
             raise e
 
-        if display and displayCandidates:
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
-                                         frame=lsstDebug.frame,
-                                         showBadCandidates=showBadCandidates)
-            lsstDebug.frame += 1
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
-                                         frame=lsstDebug.frame,
-                                         showBadCandidates=showBadCandidates,
-                                         kernels=True)
-            lsstDebug.frame += 1
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
-                                         frame=lsstDebug.frame,
-                                         showBadCandidates=showBadCandidates,
-                                         resids=True)
-            lsstDebug.frame += 1
-
-        if display and displayKernelBasis:
-            diUtils.showKernelBasis(spatialKernel, frame=lsstDebug.frame)
-            lsstDebug.frame += 1
-
-        if display and displayKernelMosaic:
-            diUtils.showKernelMosaic(kernelCellSet.getBBox(), spatialKernel, frame=lsstDebug.frame)
-            lsstDebug.frame += 1
-
-        if display and plotKernelSpatialModel:
-            diUtils.plotKernelSpatialModel(spatialKernel, kernelCellSet, showBadCandidates=showBadCandidates)
-
         t1 = time.time()
         pexLog.Trace(self.log.getName()+"._solve", 1,
                      "Total time to compute the spatial kernel : %.2f s" % (t1 - t0))
+
+        if display:
+            self._displayDebug(kernelCellSet, spatialKernel, spatialBackground)
 
         self._diagnostic(kernelCellSet, spatialSolution, spatialKernel, spatialBackground)
 

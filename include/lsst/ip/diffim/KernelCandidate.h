@@ -20,35 +20,35 @@
 #include "lsst/ip/diffim/KernelSolution.h"
 #include "lsst/afw/table/Source.h"
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
-    
 
-    /** 
+
+    /**
      * @brief Class stored in SpatialCells for spatial Kernel fitting
-     * 
+     *
      * @note KernelCandidate is a single Kernel derived around a source.  We'll assign
      * them to sets of SpatialCells; these sets will then be used to fit a
      * spatial model to the Kernel.
      *
      * @ingroup ip_diffim
-     */    
+     */
     template <typename _PixelT>
     class KernelCandidate :
-        public lsst::afw::math::SpatialCellImageCandidate<lsst::afw::math::Kernel::Pixel> {
-    public: 
-        typedef lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> ImageT;
-        typedef _PixelT PixelT;         // _after_ lsst::afw::math::Kernel::Pixel
+        public afw::math::SpatialCellImageCandidate<afw::math::Kernel::Pixel> {
+    public:
+        typedef afw::image::Image<afw::math::Kernel::Pixel> ImageT;
+        typedef _PixelT PixelT;         // _after_ afw::math::Kernel::Pixel
 
     private:
-        using lsst::afw::math::SpatialCellImageCandidate<lsst::afw::math::Kernel::Pixel>::_image;
+        using afw::math::SpatialCellImageCandidate<afw::math::Kernel::Pixel>::_image;
 
     public:
         typedef boost::shared_ptr<KernelCandidate> Ptr;
-        typedef boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
-        typedef boost::shared_ptr<lsst::afw::image::Image<lsst::afw::image::VariancePixel> > VariancePtr;
-        typedef boost::shared_ptr<lsst::afw::table::SourceRecord> SourcePtr;
+        typedef boost::shared_ptr<afw::image::MaskedImage<PixelT> > MaskedImagePtr;
+        typedef boost::shared_ptr<afw::image::Image<afw::image::VariancePixel> > VariancePtr;
+        typedef boost::shared_ptr<afw::table::SourceRecord> SourcePtr;
 
         enum CandidateSwitch {
             ORIG    = 0,
@@ -66,10 +66,10 @@ namespace diffim {
          * @param policy  Policy file
          */
         KernelCandidate(float const xCenter,
-                        float const yCenter, 
+                        float const yCenter,
                         MaskedImagePtr const& templateMaskedImage,
                         MaskedImagePtr const& scienceMaskedImage,
-                        lsst::pex::policy::Policy const& policy);        
+                        pex::policy::Policy const& policy);
 
         /**
 	 * @brief Constructor
@@ -83,13 +83,13 @@ namespace diffim {
         KernelCandidate(SourcePtr const& source,
                         MaskedImagePtr const& templateMaskedImage,
                         MaskedImagePtr const& scienceMaskedImage,
-                        lsst::pex::policy::Policy const& policy);        
+                        pex::policy::Policy const& policy);
         /// Destructor
         virtual ~KernelCandidate() {};
 
         /**
          * @brief Return Candidate rating
-         * 
+         *
          * @note Required method for use by SpatialCell; e.g. total flux
          */
         double getCandidateRating() const { return _coreFlux; }
@@ -105,35 +105,34 @@ namespace diffim {
 
         /**
          * @brief Return results of kernel solution
-         * 
+         *
          */
-        lsst::afw::math::Kernel::Ptr getKernel(CandidateSwitch cand) const;
+        afw::math::Kernel::Ptr getKernel(CandidateSwitch cand) const;
         double getBackground(CandidateSwitch cand) const;
         double getKsum(CandidateSwitch cand) const;
         PTR(ImageT) getKernelImage(CandidateSwitch cand) const;
         CONST_PTR(ImageT) getImage() const; // For SpatialCellImageCandidate
-        boost::shared_ptr<StaticKernelSolution<PixelT> > getKernelSolution(CandidateSwitch cand) const; 
-        
-        /** 
+        boost::shared_ptr<StaticKernelSolution<PixelT> > getKernelSolution(CandidateSwitch cand) const;
+
+        /**
          * @brief Calculate associated difference image using internal solutions
          */
-        lsst::afw::image::MaskedImage<PixelT> getDifferenceImage(CandidateSwitch cand);
+        afw::image::MaskedImage<PixelT> getDifferenceImage(CandidateSwitch cand);
 
-        /** 
+        /**
          * @brief Calculate associated difference image using input kernel and background.
-         * 
+         *
          * @note Useful for spatial modeling
          */
-        lsst::afw::image::MaskedImage<PixelT> getDifferenceImage(
-            lsst::afw::math::Kernel::Ptr kernel,
+        afw::image::MaskedImage<PixelT> getDifferenceImage(
+            afw::math::Kernel::Ptr kernel,
             double background
             );
-        
-        
+
         bool isInitialized() const {return _isInitialized;}
 
 
-        /** 
+        /**
          * @brief Core functionality of KernelCandidate, to build and fill a KernelSolution
          *
          * @note This is an expensive step involving matrix math, and one that
@@ -153,7 +152,7 @@ namespace diffim {
          *  _kernelSolutionCurrent.
          */
 
-        /** 
+        /**
          * @brief Build KernelSolution matrices for M x = B with regularization matrix H 
          *
          * @note Modified equation is (Mt.M + lambda H) x = Mt.B with lambda a
@@ -180,24 +179,22 @@ namespace diffim {
          */
 
         void build(
-            lsst::afw::math::KernelList const& basisList
+            afw::math::KernelList const& basisList
             );
         void build(
-            lsst::afw::math::KernelList const& basisList,
+            afw::math::KernelList const& basisList,
             boost::shared_ptr<Eigen::MatrixXd> hMat
             );
-
-       
 
     private:
         MaskedImagePtr _templateMaskedImage;                ///< Subimage around which you build kernel
         MaskedImagePtr _scienceMaskedImage;                 ///< Subimage around which you build kernel
         VariancePtr _varianceEstimate;                      ///< Estimate of the local variance
-        lsst::pex::policy::Policy _policy;                  ///< Policy
+        pex::policy::Policy _policy;                  ///< Policy
         SourcePtr _source;
         double _coreFlux;                                   ///< Mean S/N in the science image
         bool _isInitialized;                                ///< Has the kernel been built
-        bool _useRegularization;                            ///< Use regularization?              
+        bool _useRegularization;                            ///< Use regularization?
         bool _fitForBackground;
 
         /* best single raw kernel */
@@ -206,7 +203,7 @@ namespace diffim {
         /* with Pca basis */
         boost::shared_ptr<StaticKernelSolution<PixelT> > _kernelSolutionPca;  ///< Most recent  solution
 
-        void _buildKernelSolution(lsst::afw::math::KernelList const& basisList,
+        void _buildKernelSolution(afw::math::KernelList const& basisList,
                                   boost::shared_ptr<Eigen::MatrixXd> hMat);
     };
 
@@ -225,11 +222,11 @@ namespace diffim {
     template <typename PixelT>
     boost::shared_ptr<KernelCandidate<PixelT> >
     makeKernelCandidate(float const xCenter,
-                        float const yCenter, 
-                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& templateMaskedImage,
-                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& scienceMaskedImage,
-                        lsst::pex::policy::Policy const& policy){
-        
+                        float const yCenter,
+                        boost::shared_ptr<afw::image::MaskedImage<PixelT> > const& templateMaskedImage,
+                        boost::shared_ptr<afw::image::MaskedImage<PixelT> > const& scienceMaskedImage,
+                        pex::policy::Policy const& policy){
+
         return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
                                                                                  templateMaskedImage,
                                                                                  scienceMaskedImage,
@@ -249,11 +246,11 @@ namespace diffim {
      */
     template <typename PixelT>
     boost::shared_ptr<KernelCandidate<PixelT> >
-    makeKernelCandidate(boost::shared_ptr<lsst::afw::table::SourceRecord> const & source, 
-                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& templateMaskedImage,
-                        boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > const& scienceMaskedImage,
-                        lsst::pex::policy::Policy const& policy){
-        
+    makeKernelCandidate(boost::shared_ptr<afw::table::SourceRecord> const & source,
+                        boost::shared_ptr<afw::image::MaskedImage<PixelT> > const& templateMaskedImage,
+                        boost::shared_ptr<afw::image::MaskedImage<PixelT> > const& scienceMaskedImage,
+                        pex::policy::Policy const& policy){
+
         return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(source,
                                                                                  templateMaskedImage,
                                                                                  scienceMaskedImage,
