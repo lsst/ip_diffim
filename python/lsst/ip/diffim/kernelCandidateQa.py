@@ -48,63 +48,12 @@ class KernelCandidateQa(object):
 
         self.fields.append(afwTable.Field["Angle"]("RegisterResidualDistance",
                                               "Offset of residual in radians"))
+        metricMap = self.makeMetricMap()
+
         for kType in ("LOCAL", "SPATIAL"):
-            self.fields.append(afwTable.Field["F"]("KCDiffimMean_%s"%(kType),
-                                                   "Mean of KernelCandidate diffim", "sigma"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimMedian_%s"%(kType),
-                                                   "Median of KernelCandidate diffim", "sigma"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimIQR_%s"%(kType),
-                                                   "Inner quartile range of KernelCandidate diffim",
-                                                   "sigma"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimStDev_%s"%(kType),
-                                                   "Standard deviation of KernelCandidate diffim",
-                                                   "sigma"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimKSD_%s"%(kType),
-                                                   "D from K-S test of diffim pixels relative to Normal"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimKSProb_%s"%(kType),
-                                                   "Prob from K-S test of diffim pixels relative to Normal",
-                                                   "likelihood"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimADA2_%s"%(kType),
-                    "Anderson-Darling test statistic of diffim pixels relative to Normal"))
-
-            self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADCrit_%s"%(kType),
-                    "Critical values for the significance levels in KCDiffimADSig.  If A2 is greater than this number, hypothesis that the two distributions are the same can be rejected.", 5))
-
-            self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADSig_%s"%(kType),
-                    "Anderson-Darling significance levels for the Normal distribution", 5))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimChiSq_%s"%(kType),
-                                                   "Reduced chi^2 of the residual.", "likelihood"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimMseResids_%s"%(kType),
-                                                   "Mean squared error in diffim : Variance + Bias**2"))
-
-            self.fields.append(afwTable.Field["F"]("KCKernelCentX_%s"%(kType),
-                                                   "Centroid in X for this Kernel",
-                                                   "pixels"))
-
-            self.fields.append(afwTable.Field["F"]("KCKernelCentY_%s"%(kType),
-                                                   "Centroid in Y for this Kernel",
-                                                   "pixels"))
-
-            self.fields.append(afwTable.Field["F"]("KCKernelStdX_%s"%(kType),
-                                                   "Standard deviation in X for this Kernel",
-                                                   "pixels"))
-
-            self.fields.append(afwTable.Field["F"]("KCKernelStdY_%s"%(kType),
-                                                   "Standard deviation in Y for this Kernel",
-                                                   "pixels"))
-
-            self.fields.append(afwTable.Field["I"]("KernelCandidateId_%s"%(kType),
-                                                   "Id for this KernelCandidate"))
-
-
+            for k in metricMap:
+                commentAndUnit = metricMap[k]['comment']
+                self.fields.append(afwTable.Field[metricMap[k]['type']](k%(kType), *commentAndUnit))
 
         self.fields.append(afwTable.Field["I"]("KCKernelStatus_LOCAL",
                                                "Status of the KernelCandidate"))
@@ -118,6 +67,36 @@ class KernelCandidateQa(object):
 
         self.fields.append(afwTable.Field["F"]("KCDiffimMseKernel_SPATIAL",
                                                "Mean squared error of spatial kernel estimate"))
+
+    def makeMetricMap(self):
+        nameList = ['KCDiffimMean_\%s', 'KCDiffimMedian_\%s', 'KCDiffimIQR_\%s', 'KCDiffimStDev_\%s',
+                    'KCDiffimKSD_\%s', 'KCDiffimKSProb_\%s', 'KCDiffimADA2_\%s', 'KCDiffimADCrit_\%s',
+                    'KCDiffimADSig_\%s', 'KCDiffimChiSq_\%s', 'KCDiffimMseResids_\%s', 'KCKernelCentX_\%s',
+                    'KCKernelCentY_\%s', 'KCKernelStdX_\%s', 'KCKernelStdY_\%s', 'KernelCandidateId_\%s']
+        typeList = ['F', 'F', 'F', 'F', 'F', 'F', 'F', 'ArrayD', 'ArrayD', 'F', 'F', 'F', 
+                    'F', 'F', 'F', 'I']
+        commentList = [("Mean of KernelCandidate diffim", "sigma"), 
+                       ("Median of KernelCandidate diffim", "sigma"),
+                       ("Inner quartile range of KernelCandidate diffim", "sigma"), 
+                       ("Standard deviation of KernelCandidate diffim","sigma"),
+                       ("D from K-S test of diffim pixels relative to Normal", ), 
+                       ("Prob from K-S test of diffim pixels relative to Normal", "likelihood"),
+                       ("Anderson-Darling test statistic of diffim pixels relative to Normal", ), 
+                       ("Critical values for the significance levels in KCDiffimADSig.  If A2 is greater "+\
+                       "than this number, hypothesis that the two distributions are the same can be rejected.", 5),
+                       ("Anderson-Darling significance levels for the Normal distribution", 5),
+                       ("Reduced chi^2 of the residual.", "likelihood"),
+                       ("Mean squared error in diffim : Variance + Bias**2",),
+                       ("Centroid in X for this Kernel", "pixels"),
+                       ("Centroid in Y for this Kernel", "pixels"),
+                       ("Standard deviation in X for this Kernel", "pixels"),
+                       ("Standard deviation in Y for this Kernel", "pixels"),
+                       ("Id for this KernelCandidate",)]
+        metricMap = {}
+        for name, type, comment in zip(nameList, typeList, commentList):
+            metricMap[name] = {'type':type, 'comment':comment}
+
+        return metricMap
 
 
     def addToSchema(self, inSourceCatalog):
