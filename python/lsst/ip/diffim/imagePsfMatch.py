@@ -92,6 +92,11 @@ class ImagePsfMatchTask(PsfMatch):
         self.makeSubtask("selectDetection", schema=self.selectSchema)
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)
 
+    def getFwhmPix(self, psf):
+        """Return the FWHM in pixels of a Psf"""
+        sigPix = psf.computeShape().getDeterminantRadius()
+        return sigPix * sigma2fwhm
+
     @pipeBase.timeMethod
     def matchExposures(self, templateExposure, scienceExposure,
                        templateFwhmPix=None, scienceFwhmPix=None,
@@ -144,16 +149,13 @@ class ImagePsfMatchTask(PsfMatch):
             if not templateExposure.hasPsf():
                 self.log.warn("No estimate of Psf FWHM for template image")
             else:
-                psf = templateExposure.getPsf()
-                templateSigPix = psf.computeShape().getDeterminantRadius()
-                templateFwhmPix = templateSigPix * sigma2fwhm
+                templateFwhmPix = self.getFwhmPix(templateExposure.getPsf())
+
         if scienceFwhmPix is None:
             if not scienceExposure.hasPsf():
                 self.log.warn("No estimate of Psf FWHM for science image")
             else:
-                psf = scienceExposure.getPsf()
-                scienceSigPix = psf.computeShape().getDeterminantRadius()
-                scienceFwhmPix = scienceSigPix * sigma2fwhm
+                scienceFwhmPix = self.getFwhmPix(scienceExposure.getPsf())
 
         kernelSize = makeKernelBasisList(self.kconfig, templateFwhmPix, scienceFwhmPix)[0].getWidth()
         candidateList = self.makeCandidateList(templateExposure, scienceExposure, kernelSize, candidateList)
@@ -445,18 +447,20 @@ class ImagePsfMatchTask(PsfMatch):
 
         #Take off background for detection
         mi -= bkgd
-        table.setMetadata(self.selectAlgMetadata) 
-        detRet = self.selectDetection.makeSourceCatalog(
-            table=table,
-            exposure=exposure,
-            sigma=sigma,
-            doSmooth=doSmooth
-        )
-        selectSources = detRet.sources
-        self.selectMeasurement.measure(exposure, selectSources)
-        #Put back on the background in case it is needed down stream
-        mi += bkgd
-        del bkgd
+        try:
+            table.setMetadata(self.selectAlgMetadata) 
+            detRet = self.selectDetection.makeSourceCatalog(
+                table=table,
+                exposure=exposure,
+                sigma=sigma,
+                doSmooth=doSmooth
+                )
+            selectSources = detRet.sources
+            self.selectMeasurement.measure(exposure, selectSources)
+        finally:
+            # Put back on the background in case it is needed down stream
+            mi += bkgd
+            del bkgd
         return selectSources
 
     def makeCandidateList(self, templateExposure, scienceExposure, kernelSize, candidateList=None):
