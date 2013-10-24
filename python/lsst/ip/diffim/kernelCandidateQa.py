@@ -73,17 +73,17 @@ class KernelCandidateQa(object):
                     'KCDiffimKSD_\%s', 'KCDiffimKSProb_\%s', 'KCDiffimADA2_\%s', 'KCDiffimADCrit_\%s',
                     'KCDiffimADSig_\%s', 'KCDiffimChiSq_\%s', 'KCDiffimMseResids_\%s', 'KCKernelCentX_\%s',
                     'KCKernelCentY_\%s', 'KCKernelStdX_\%s', 'KCKernelStdY_\%s', 'KernelCandidateId_\%s']
-        typeList = ['F', 'F', 'F', 'F', 'F', 'F', 'F', 'ArrayD', 'ArrayD', 'F', 'F', 'F', 
+        typeList = ['F', 'F', 'F', 'F', 'F', 'F', 'F', 'ArrayD', 'ArrayD', 'F', 'F', 'F',
                     'F', 'F', 'F', 'I']
-        commentList = [("Mean of KernelCandidate diffim", "sigma"), 
+        commentList = [("Mean of KernelCandidate diffim", "sigma"),
                        ("Median of KernelCandidate diffim", "sigma"),
-                       ("Inner quartile range of KernelCandidate diffim", "sigma"), 
+                       ("Inner quartile range of KernelCandidate diffim", "sigma"),
                        ("Standard deviation of KernelCandidate diffim","sigma"),
-                       ("D from K-S test of diffim pixels relative to Normal", ), 
+                       ("D from K-S test of diffim pixels relative to Normal", ),
                        ("Prob from K-S test of diffim pixels relative to Normal", "likelihood"),
-                       ("Anderson-Darling test statistic of diffim pixels relative to Normal", ), 
+                       ("Anderson-Darling test statistic of diffim pixels relative to Normal", ),
                        ("Critical values for the significance levels in KCDiffimADSig.  If A2 is greater "+\
-                       "than this number, hypothesis that the two distributions are the same can be rejected.", 5),
+                       "than this number, hypothesis that the distributions are similar can be rejected.", 5),
                        ("Anderson-Darling significance levels for the Normal distribution", 5),
                        ("Reduced chi^2 of the residual.", "likelihood"),
                        ("Mean squared error in diffim : Variance + Bias**2",),
@@ -322,8 +322,8 @@ class KernelCandidateQa(object):
             metadata.add("NFalsePositivesSrcAssociated", nSrcMatch)
             metadata.add("NFalsePositivesUnassociated", nunmatched)
         for kType in ("LOCAL", "SPATIAL"):
-            for sName in ("KCDiffimMean", "KCDiffimMedian", "KCDiffimIQR", "KCDiffimStDev", 
-                          "KCDiffimKSProb", "KCDiffimADSig", "KCDiffimChiSq", 
+            for sName in ("KCDiffimMean", "KCDiffimMedian", "KCDiffimIQR", "KCDiffimStDev",
+                          "KCDiffimKSProb", "KCDiffimADSig", "KCDiffimChiSq",
                           "KCDiffimMseResids", "KCDiffimMseKernel"):
                 if sName == "KCDiffimMseKernel" and kType == "LOCAL":
                     continue
