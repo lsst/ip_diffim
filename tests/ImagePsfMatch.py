@@ -39,12 +39,12 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfigDFr.constantVarianceWeighting = False
 
         # variance is a hack
-        self.subconfigAL.singleKernelClipping   = False   
-        self.subconfigAL.spatialKernelClipping  = False  
-        self.subconfigDF.singleKernelClipping   = False   
-        self.subconfigDF.spatialKernelClipping  = False  
-        self.subconfigDFr.singleKernelClipping  = False   
-        self.subconfigDFr.spatialKernelClipping = False  
+        self.subconfigAL.singleKernelClipping   = False
+        self.subconfigAL.spatialKernelClipping  = False
+        self.subconfigDF.singleKernelClipping   = False
+        self.subconfigDF.spatialKernelClipping  = False
+        self.subconfigDFr.singleKernelClipping  = False
+        self.subconfigDFr.spatialKernelClipping = False
 
         # Send fake kernel a differential background
         self.bgValue = 100.
@@ -60,17 +60,17 @@ class PsfMatchTestCases(unittest.TestCase):
     def makeWcs(self, offset = 0):
         # taken from $AFW_DIR/tests/testMakeWcs.py
         metadata = dafBase.PropertySet()
-        metadata.set("SIMPLE",                    "T") 
-        metadata.set("BITPIX",                  -32) 
-        metadata.set("NAXIS",                    2) 
-        metadata.set("NAXIS1",                 1024) 
-        metadata.set("NAXIS2",                 1153) 
+        metadata.set("SIMPLE", "T")
+        metadata.set("BITPIX", -32)
+        metadata.set("NAXIS", 2)
+        metadata.set("NAXIS1", 1024)
+        metadata.set("NAXIS2", 1153)
         metadata.set("RADECSYS", 'FK5')
-        metadata.set("EQUINOX",                2000.)
-        metadata.setDouble("CRVAL1",     215.604025685476)
-        metadata.setDouble("CRVAL2",     53.1595451514076)
-        metadata.setDouble("CRPIX1",     1109.99981456774 + offset)
-        metadata.setDouble("CRPIX2",     560.018167811613 + offset)
+        metadata.set("EQUINOX", 2000.)
+        metadata.setDouble("CRVAL1", 215.604025685476)
+        metadata.setDouble("CRVAL2", 53.1595451514076)
+        metadata.setDouble("CRPIX1", 1109.99981456774 + offset)
+        metadata.setDouble("CRPIX2", 560.018167811613 + offset)
         metadata.set("CTYPE1", 'RA---SIN')
         metadata.set("CTYPE2", 'DEC--SIN')
         metadata.setDouble("CD1_1", 5.10808596133527E-05)
@@ -78,7 +78,7 @@ class PsfMatchTestCases(unittest.TestCase):
         metadata.setDouble("CD2_2", -5.10281493481982E-05)
         metadata.setDouble("CD2_1", -8.27440751733828E-07)
         return afwImage.makeWcs(metadata)
-        
+
     def testWarping(self):
         tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
 
@@ -155,7 +155,7 @@ class PsfMatchTestCases(unittest.TestCase):
         psfMatchDF  = ipDiffim.ImagePsfMatchTask(config=self.configDF)
         candList = psfMatchDF.makeCandidateList(tExp, sExp, self.ksize)
         resultsDF   = psfMatchDF.subtractMaskedImages(tMi, sMi, candList)
-        
+
         spatialKernel = resultsDF.psfMatchingKernel
         spatialKernelSolution = spatialKernel.getSpatialParameters()
         self.assertEqual(len(spatialKernelSolution), nTerms)
@@ -197,12 +197,12 @@ class PsfMatchTestCases(unittest.TestCase):
         basisList = ipDiffim.makeKernelBasisList(confake.kernel.active)
         psfMatchAL = ipDiffim.ImagePsfMatchTask(config=confake)
         spatialSolution, psfMatchingKernel, backgroundModel = psfMatchAL._solve(kcs, basisList)
-        
+
         fitCoeffs = psfMatchingKernel.getSpatialParameters()
 
         for b in range(len(fakeCoeffs)):
             for s in range(len(fakeCoeffs[b])):
-                
+
                 if fakeCoeffs[b][s] == 0.0:
                     self.assertAlmostEqual(fitCoeffs[b][s], 0.0)
                 else:
@@ -211,8 +211,8 @@ class PsfMatchTestCases(unittest.TestCase):
                        self.assertAlmostEqual(fitCoeffs[b][s]/fakeCoeffs[b][s], 1.0, 1)
 
     def tearDown(self):
-        del self.configAL 
-        del self.configDF 
+        del self.configAL
+        del self.configDF
         del self.configDFr
         del self.psf
 
