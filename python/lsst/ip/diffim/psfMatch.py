@@ -36,7 +36,7 @@ class DetectionConfig(pexConfig.Config):
     detThreshold = pexConfig.Field(
         dtype = float,
         doc = "Value of footprint detection threshold",
-        default = 10.0
+        default = 10.0,
         check = lambda x : x >= 3.0
     )
     detThresholdType = pexConfig.ChoiceField(
@@ -65,14 +65,14 @@ class DetectionConfig(pexConfig.Config):
     fpNpixMin = pexConfig.Field(
         dtype = int,
         doc = "Minimum number of pixels in an acceptable Footprint",
-        default = 5
+        default = 5,
         check = lambda x : x >= 5
     )
     fpNpixMax = pexConfig.Field(
         dtype = int,
         doc = """Maximum number of pixels in an acceptable Footprint;
                  too big and the subsequent convolutions become unwieldy""",
-        default = 500
+        default = 500,
         check = lambda x : x <= 500
     )
     fpGrowKernelScaling = pexConfig.Field(
@@ -84,7 +84,7 @@ class DetectionConfig(pexConfig.Config):
                  of 1.0, the remaining pixels in each KernelCandiate
                  after convolution by the basis functions will be
                  eqaul to the kernel size iteslf.""",
-        default = 1.0
+        default = 1.0,
         check = lambda x : x >= 1.0
     )
     fpGrowPix = pexConfig.Field(
@@ -220,7 +220,7 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = int,
         doc = "Maximum number of iterations for rejecting bad KernelCandidates in spatial fitting",
         default = 3,
-        check = lambda x : x >= 1 && x <= 5
+        check = lambda x : x >= 1 and x <= 5
     )
 
     ####
