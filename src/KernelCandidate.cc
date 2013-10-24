@@ -186,7 +186,7 @@ namespace diffim {
                 if (checkConditionNumber) {
                     if (_kernelSolutionPca->getConditionNumber(ctype) > maxConditionNumber) {
                         pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                                          "Candidate %d solution has bad condition number", 
+                                          "Candidate %d solution has bad condition number",
                                           this->getId());
                         this->setStatus(afwMath::SpatialCellCandidate::BAD);
                         return;
@@ -204,7 +204,7 @@ namespace diffim {
                 if (checkConditionNumber) {
                     if (_kernelSolutionOrig->getConditionNumber(ctype) > maxConditionNumber) {
                         pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                                          "Candidate %d solution has bad condition number", 
+                                          "Candidate %d solution has bad condition number",
                                           this->getId());
                         this->setStatus(afwMath::SpatialCellCandidate::BAD);
                         return;
@@ -215,7 +215,7 @@ namespace diffim {
         }
         else {
             _useRegularization = false;
-            pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
+            pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build",
                               "Not using kernel regularization");
             if (_isInitialized) {
                 _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution<PixelT> >(
@@ -227,7 +227,7 @@ namespace diffim {
                 if (checkConditionNumber) {
                     if (_kernelSolutionPca->getConditionNumber(ctype) > maxConditionNumber) {
                         pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                                          "Candidate %d solution has bad condition number", 
+                                          "Candidate %d solution has bad condition number",
                                           this->getId());
                         this->setStatus(afwMath::SpatialCellCandidate::BAD);
                         return;
@@ -245,7 +245,7 @@ namespace diffim {
                 if (checkConditionNumber) {
                     if (_kernelSolutionOrig->getConditionNumber(ctype) > maxConditionNumber) {
                         pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                                          "Candidate %d solution has bad condition number", 
+                                          "Candidate %d solution has bad condition number",
                                           this->getId());
                         this->setStatus(afwMath::SpatialCellCandidate::BAD);
                         return;
@@ -255,23 +255,23 @@ namespace diffim {
             }
         }
     }
-            
+
     template <typename PixelT>
     lsst::afw::math::Kernel::Ptr KernelCandidate<PixelT>::getKernel(CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
-            if (_kernelSolutionOrig) 
+            if (_kernelSolutionOrig)
                 return _kernelSolutionOrig->getKernel();
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return _kernelSolutionPca->getKernel();
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
         }
         else if (cand == KernelCandidate::RECENT) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return _kernelSolutionPca->getKernel();
             else if (_kernelSolutionOrig)
                 return _kernelSolutionOrig->getKernel();
@@ -286,19 +286,19 @@ namespace diffim {
     template <typename PixelT>
     double KernelCandidate<PixelT>::getBackground(CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
-            if (_kernelSolutionOrig) 
+            if (_kernelSolutionOrig)
                 return _kernelSolutionOrig->getBackground();
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return _kernelSolutionPca->getBackground();
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
         }
         else if (cand == KernelCandidate::RECENT) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return _kernelSolutionPca->getBackground();
             else if (_kernelSolutionOrig)
                 return _kernelSolutionOrig->getBackground();
@@ -313,19 +313,19 @@ namespace diffim {
     template <typename PixelT>
     double KernelCandidate<PixelT>::getKsum(CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
-            if (_kernelSolutionOrig) 
+            if (_kernelSolutionOrig)
                 return _kernelSolutionOrig->getKsum();
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return _kernelSolutionPca->getKsum();
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
         }
         else if (cand == KernelCandidate::RECENT) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return _kernelSolutionPca->getKsum();
             else if (_kernelSolutionOrig)
                 return _kernelSolutionOrig->getKsum();
@@ -341,19 +341,19 @@ namespace diffim {
     KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::getKernelImage(
         CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
-            if (_kernelSolutionOrig) 
+            if (_kernelSolutionOrig)
                 return _kernelSolutionOrig->makeKernelImage();
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return _kernelSolutionPca->makeKernelImage();
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
         }
         else if (cand == KernelCandidate::RECENT) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return _kernelSolutionPca->makeKernelImage();
             else if (_kernelSolutionOrig)
                 return _kernelSolutionOrig->makeKernelImage();
@@ -374,19 +374,19 @@ namespace diffim {
     boost::shared_ptr<StaticKernelSolution<PixelT> > KernelCandidate<PixelT>::getKernelSolution(
         CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
-            if (_kernelSolutionOrig) 
+            if (_kernelSolutionOrig)
                 return _kernelSolutionOrig;
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return _kernelSolutionPca;
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
         }
         else if (cand == KernelCandidate::RECENT) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return _kernelSolutionPca;
             else if (_kernelSolutionOrig)
                 return _kernelSolutionOrig;
@@ -402,21 +402,21 @@ namespace diffim {
     lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::getDifferenceImage(
         CandidateSwitch cand) {
         if (cand == KernelCandidate::ORIG) {
-            if (_kernelSolutionOrig) 
+            if (_kernelSolutionOrig)
                 return getDifferenceImage(_kernelSolutionOrig->getKernel(),
                                           _kernelSolutionOrig->getBackground());
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
         }
         else if (cand == KernelCandidate::PCA) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return getDifferenceImage(_kernelSolutionPca->getKernel(),
                                           _kernelSolutionPca->getBackground());
-            else 
+            else
                 throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
         }
         else if (cand == KernelCandidate::RECENT) {
-            if (_kernelSolutionPca) 
+            if (_kernelSolutionPca)
                 return getDifferenceImage(_kernelSolutionPca->getKernel(),
                                           _kernelSolutionPca->getBackground());
             else if (_kernelSolutionOrig)
@@ -443,7 +443,6 @@ namespace diffim {
         return diffIm;
     }
 
-    
 /***********************************************************************************************************/
 //
 // Explicit instantiations
