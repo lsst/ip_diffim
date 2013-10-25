@@ -222,9 +222,9 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
 def backgroundSubtract(config, maskedImages):
     backgrounds = []
     t0 = time.time()
-    algorithm   = config.algorithmName
-    binsize     = config.binsize
-    undersample = config.undersample
+    algorithm   = config.algorithm
+    binsize     = config.binSize
+    undersample = config.undersampleStyle
     bctrl       = afwMath.BackgroundControl(algorithm)
     bctrl.setUndersampleStyle(undersample)
     for maskedImage in maskedImages:
