@@ -22,11 +22,13 @@
 
 """Quality Assessment class for Kernel Candidates"""
 import numpy as np
+import numpy.ma as ma
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
 from . import diffimLib
+from .utils import calcCentroid, calcWidth
 
 class KernelCandidateQa(object):
 
@@ -69,10 +71,10 @@ class KernelCandidateQa(object):
                                                "Mean squared error of spatial kernel estimate"))
 
     def makeMetricMap(self):
-        nameList = ['KCDiffimMean_\%s', 'KCDiffimMedian_\%s', 'KCDiffimIQR_\%s', 'KCDiffimStDev_\%s',
-                    'KCDiffimKSD_\%s', 'KCDiffimKSProb_\%s', 'KCDiffimADA2_\%s', 'KCDiffimADCrit_\%s',
-                    'KCDiffimADSig_\%s', 'KCDiffimChiSq_\%s', 'KCDiffimMseResids_\%s', 'KCKernelCentX_\%s',
-                    'KCKernelCentY_\%s', 'KCKernelStdX_\%s', 'KCKernelStdY_\%s', 'KernelCandidateId_\%s']
+        nameList = ['KCDiffimMean_%s', 'KCDiffimMedian_%s', 'KCDiffimIQR_%s', 'KCDiffimStDev_%s',
+                    'KCDiffimKSD_%s', 'KCDiffimKSProb_%s', 'KCDiffimADA2_%s', 'KCDiffimADCrit_%s',
+                    'KCDiffimADSig_%s', 'KCDiffimChiSq_%s', 'KCDiffimMseResids_%s', 'KCKernelCentX_%s',
+                    'KCKernelCentY_%s', 'KCKernelStdX_%s', 'KCKernelStdY_%s', 'KernelCandidateId_%s']
         typeList = ['F', 'F', 'F', 'F', 'F', 'F', 'F', 'ArrayD', 'ArrayD', 'F', 'F', 'F',
                     'F', 'F', 'F', 'I']
         commentList = [("Mean of KernelCandidate diffim", "sigma"),
@@ -93,8 +95,8 @@ class KernelCandidateQa(object):
                        ("Standard deviation in Y for this Kernel", "pixels"),
                        ("Id for this KernelCandidate",)]
         metricMap = {}
-        for name, type, comment in zip(nameList, typeList, commentList):
-            metricMap[name] = {'type':type, 'comment':comment}
+        for name, mtype, comment in zip(nameList, typeList, commentList):
+            metricMap[name] = {'type':mtype, 'comment':comment}
 
         return metricMap
 

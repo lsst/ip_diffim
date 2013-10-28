@@ -24,6 +24,7 @@ import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.math as afwMath
 import lsst.meas.algorithms as measAlg
+import lsst.pex.logging as pexLog
 
 class DiaCatalogSourceSelectorConfig(pexConfig.Config):
     # Selection cuts on the input source catalog
@@ -100,6 +101,8 @@ class DiaCatalogSourceSelector(object):
         if not config:
             config = DiaCatalogSourceSelector.ConfigClass()
         self.config = config
+        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
+                              'lsst.ip.diffim.DiaCatalogSourceSelector', pexLog.Log.INFO)
 
     def selectSources(self, exposure, sources, matches=None):
         """Return a list of Sources for Kernel candidates 
@@ -139,6 +142,7 @@ class DiaCatalogSourceSelector(object):
         #
         kernelCandidateSourceList = []
 
+        doColorCut = True
         with ds9.Buffering():
             for ref, source, d in matches:
                 if not isGoodSource(source):
@@ -146,11 +150,21 @@ class DiaCatalogSourceSelector(object):
                 else:
                     isStar = ref.get("stargal")
                     isVar = not ref.get("photometric")
-                    gMag = -2.5 * np.log10(ref.get("g"))
-                    rMag = -2.5 * np.log10(ref.get("r"))
+                    gMag = None
+                    rMag = None
+                    if doColorCut:
+                        try:
+                            gMag = -2.5 * np.log10(ref.get("g"))
+                            rMag = -2.5 * np.log10(ref.get("r"))
+                        except KeyError:
+                            self.log.warn("Cannot cut on color info; fields 'g' and 'r' do not exist")
+                            doColorCut = False
+                            isRightColor = True
+                        else:
+                            isRightColor = (gMag-rMag) >= self.config.grMin and (gMag-rMag) <= self.config.grMax
+                        
                     isRightType  = (self.config.selectStar and isStar) or (self.config.selectGalaxy and not isStar)
                     isRightVar   = (self.config.includeVariable) or (self.config.includeVariable is isVar)
-                    isRightColor = (gMag-rMag) >= self.config.grMin and (gMag-rMag) <= self.config.grMax
                     if isRightType and isRightVar and isRightColor:
                         kernelCandidateSourceList.append(source)
                         symb, ctype = "+", ds9.GREEN

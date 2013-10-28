@@ -22,7 +22,6 @@
 
 """Support utilities for Measuring sources"""
 import numpy as np
-import numpy.ma as ma
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.logging as pexLog
 import lsst.daf.base as dafBase
