@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <limits>
 
+#include "boost/shared_ptr.hpp"
 #include "boost/timer.hpp" 
 
 #include "Eigen/Core"
