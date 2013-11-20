@@ -289,7 +289,7 @@ lsst::afw::image::Image<PIXTYPE>
 %inline %{
     lsst::ip::diffim::KernelCandidate<TYPE>::Ptr
         cast_KernelCandidate##NAME(lsst::afw::math::SpatialCellCandidate::Ptr candidate) {
-        return boost::shared_dynamic_cast<lsst::ip::diffim::KernelCandidate<TYPE> >(candidate);
+        return boost::dynamic_pointer_cast<lsst::ip::diffim::KernelCandidate<TYPE> >(candidate);
     }
 %}
 %enddef

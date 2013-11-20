@@ -274,7 +274,7 @@ namespace diffim {
         }
 
         lsst::afw::math::KernelList basisList = 
-            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
+            boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
         
         unsigned int const nKernelParameters     = basisList.size();
         unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
@@ -437,7 +437,7 @@ namespace diffim {
         unsigned int const nParameters           = _aVec->size();
         unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
         unsigned int const nKernelParameters     = 
-            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
+            boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
         if (nParameters != (nKernelParameters + nBackgroundParameters)) 
             throw LSST_EXCEPT(pexExcept::Exception, "Mismatched sizes in kernel solution");
 
@@ -528,7 +528,7 @@ namespace diffim {
         afwDet::Footprint::Ptr fullFp(new afwDet::Footprint(templateImage.getBBox(afwImage::PARENT)));
 
         afwMath::KernelList basisList = 
-            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
+            boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
         std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
 
         /* Only BAD pixels marked in this mask */
@@ -706,7 +706,7 @@ namespace diffim {
         }
 
         lsst::afw::math::KernelList basisList = 
-            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
+            boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
         std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
 
         /* Only BAD pixels marked in this mask */
@@ -877,7 +877,7 @@ namespace diffim {
         }
 
         lsst::afw::math::KernelList basisList = 
-            boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
+            boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
 
         unsigned int const nKernelParameters     = basisList.size();
         unsigned int const nBackgroundParameters = this->_fitForBackground ? 1 : 0;
@@ -1553,7 +1553,7 @@ namespace diffim {
                 kCoeffs[i] = (*_aVec)(i);
             }
             lsst::afw::math::KernelList basisList = 
-                boost::shared_dynamic_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
+                boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
             _kernel.reset(
                 new afwMath::LinearCombinationKernel(basisList, kCoeffs)
                 );

@@ -46,7 +46,7 @@
     %inline %{
         lsst::ip::diffim::detail::KernelPca<lsst::afw::image::Image<TYPE> >::Ptr
             cast_KernelPca##NAME(lsst::afw::image::ImagePca<lsst::afw::image::Image<TYPE> >::Ptr imagePca) {
-            return boost::shared_dynamic_cast<lsst::ip::diffim::detail::KernelPca<lsst::afw::image::Image<TYPE> > >(imagePca);
+            return boost::dynamic_pointer_cast<lsst::ip::diffim::detail::KernelPca<lsst::afw::image::Image<TYPE> > >(imagePca);
         }
     %}
 %enddef
