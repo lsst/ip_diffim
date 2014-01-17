@@ -201,7 +201,7 @@ class DipoleDeblender(object):
        meas_algorithms/python/lsst/meas/algorithms/deblend.py since we
        need a single source that contains the blended peaks, not
        multiple children sources.  This directly calls the core
-       deblending code deblendBaseline.deblend (optionally _fit_psf for
+       deblending code deblendBaseline.deblend (optionally _fitPsf for
        debugging).
 
        Not actively being used, but there is a unit test for it in 
@@ -211,7 +211,7 @@ class DipoleDeblender(object):
         # Set up defaults to send to deblender
 
         # Always deblend as Psf
-        self.psf_chisq_cut1 = self.psf_chisq_cut2 = self.psf_chisq_cut2b = np.inf 
+        self.psfChisqCut1 = self.psfChisqCut2 = self.psfChisqCut2b = np.inf 
         self.log = pexLog.Log(pexLog.Log.getDefaultLog(), 
                               'lsst.ip.diffim.DipoleDeblender', pexLog.Log.INFO)
         self.sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
@@ -249,9 +249,9 @@ class DipoleDeblender(object):
             # Call top-level deblend task
             fpres = deblendBaseline.deblend(fp, exposure.getMaskedImage(), psf, psfFwhmPix,
                                             log = self.log,
-                                            psf_chisq_cut1 = self.psf_chisq_cut1,
-                                            psf_chisq_cut2 = self.psf_chisq_cut2,
-                                            psf_chisq_cut2b = self.psf_chisq_cut2b)
+                                            psfChisqCut1 = self.psfChisqCut1,
+                                            psfChisqCut2 = self.psfChisqCut2,
+                                            psfChisqCut2b = self.psfChisqCut2b)
         else:
             # Call lower-level _fit_psf task
 
@@ -266,11 +266,11 @@ class DipoleDeblender(object):
             
             for pki,(pk,pkres,pkF) in enumerate(zip(dpeaks, fpres.peaks, peaksF)):
                 self.log.logdebug('Peak %i' % pki)
-                deblendBaseline._fit_psf(fp, fmask, pk, pkF, pkres, fbb, dpeaks, peaksF, self.log, 
+                deblendBaseline._fitPsf(fp, fmask, pk, pkF, pkres, fbb, dpeaks, peaksF, self.log, 
                                          cpsf, psfFwhmPix, 
                                          subimage.getMaskedImage().getImage(), 
                                          subimage.getMaskedImage().getVariance(), 
-                                         self.psf_chisq_cut1, self.psf_chisq_cut2, self.psf_chisq_cut2b)
+                                         self.psfChisqCut1, self.psfChisqCut2, self.psfChisqCut2b)
 
 
         deblendedSource = source.getTable().copyRecord(source)
@@ -279,16 +279,17 @@ class DipoleDeblender(object):
         peakList.clear()
 
         for i, peak in enumerate(fpres.peaks):
-            if peak.psfflux > 0:
+            if peak.psfFitFlux > 0:
                 suffix = "pos"
             else:
                 suffix = "neg"
+            c = peak.psfFitCenter
             self.log.info("deblended.centroid.dipole.psf.%s %f %f" % (
-                    suffix, peak.center[0], peak.center[1]))
+                suffix, c[0], c[1]))
             self.log.info("deblended.chi2dof.dipole.%s %f" % (
-                    suffix, peak.chisq / peak.dof))
+                suffix, peak.psfFitChisq / peak.psfFitDof))
             self.log.info("deblended.flux.dipole.psf.%s %f" % (
-                    suffix, peak.psfflux * np.sum(peak.tmimg.getImage().getArray())))
+                suffix, peak.psfFitFlux * np.sum(peak.templateMaskedImage.getImage().getArray())))
             peakList.push_back(peak.peak)
         return deblendedSource
         
