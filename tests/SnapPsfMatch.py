@@ -33,12 +33,12 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfigDFr.useRegularization = True
 
         # variance is a hack
-        self.subconfigAL.singleKernelClipping   = False   
-        self.subconfigAL.spatialKernelClipping  = False  
-        self.subconfigDF.singleKernelClipping   = False   
-        self.subconfigDF.spatialKernelClipping  = False  
-        self.subconfigDFr.singleKernelClipping  = False   
-        self.subconfigDFr.spatialKernelClipping = False  
+        self.subconfigAL.singleKernelClipping   = False
+        self.subconfigAL.spatialKernelClipping  = False
+        self.subconfigDF.singleKernelClipping   = False
+        self.subconfigDF.spatialKernelClipping  = False
+        self.subconfigDFr.singleKernelClipping  = False
+        self.subconfigDFr.spatialKernelClipping = False
 
         # Send fake kernel a differential background
         self.bgValue = 100.
@@ -54,17 +54,17 @@ class PsfMatchTestCases(unittest.TestCase):
     def makeWcs(self, offset = 0):
         # taken from $AFW_DIR/tests/testMakeWcs.py
         metadata = dafBase.PropertySet()
-        metadata.set("SIMPLE",                    "T") 
-        metadata.set("BITPIX",                  -32) 
-        metadata.set("NAXIS",                    2) 
-        metadata.set("NAXIS1",                 1024) 
-        metadata.set("NAXIS2",                 1153) 
+        metadata.set("SIMPLE", "T")
+        metadata.set("BITPIX", -32)
+        metadata.set("NAXIS", 2)
+        metadata.set("NAXIS1", 1024)
+        metadata.set("NAXIS2", 1153)
         metadata.set("RADECSYS", 'FK5')
-        metadata.set("EQUINOX",                2000.)
-        metadata.setDouble("CRVAL1",     215.604025685476)
-        metadata.setDouble("CRVAL2",     53.1595451514076)
-        metadata.setDouble("CRPIX1",     1109.99981456774 + offset)
-        metadata.setDouble("CRPIX2",     560.018167811613 + offset)
+        metadata.set("EQUINOX", 2000.)
+        metadata.setDouble("CRVAL1", 215.604025685476)
+        metadata.setDouble("CRVAL2", 53.1595451514076)
+        metadata.setDouble("CRPIX1", 1109.99981456774 + offset)
+        metadata.setDouble("CRPIX2", 560.018167811613 + offset)
         metadata.set("CTYPE1", 'RA---SIN')
         metadata.set("CTYPE2", 'DEC--SIN')
         metadata.setDouble("CD1_1", 5.10808596133527E-05)
@@ -80,26 +80,25 @@ class PsfMatchTestCases(unittest.TestCase):
         sWcs = self.makeWcs(offset = 0)
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
-	sExp.setPsf(self.psf)
+        sExp.setPsf(self.psf)
         psfMatchAL   = ipDiffim.SnapPsfMatchTask(config=self.configAL)
         psfMatchDF   = ipDiffim.SnapPsfMatchTask(config=self.configDF)
         psfMatchDFr  = ipDiffim.SnapPsfMatchTask(config=self.configDFr)
-        candlist = psfMatchAL.makeCandidateList(tExp, sExp, self.ksize)
-        resultsAL    = psfMatchAL.subtractMaskedImages(tMi, sMi, psfMatchAL.makeCandidateList(tExp, 
-                                                                                              sExp, 
+        resultsAL    = psfMatchAL.subtractMaskedImages(tMi, sMi, psfMatchAL.makeCandidateList(tExp,
+                                                                                              sExp,
                                                                                               self.ksize))
-        resultsDF    = psfMatchDF.subtractMaskedImages(tMi, sMi, psfMatchDF.makeCandidateList(tExp, 
-                                                                                              sExp, 
+        resultsDF    = psfMatchDF.subtractMaskedImages(tMi, sMi, psfMatchDF.makeCandidateList(tExp,
+                                                                                              sExp,
                                                                                               self.ksize))
-        resultsDFr   = psfMatchDFr.subtractMaskedImages(tMi, sMi, psfMatchDFr.makeCandidateList(tExp, 
-                                                                                                sExp, 
+        resultsDFr   = psfMatchDFr.subtractMaskedImages(tMi, sMi, psfMatchDFr.makeCandidateList(tExp,
+                                                                                                sExp,
                                                                                                 self.ksize))
 
     def tearDown(self):
-        del self.configAL 
-        del self.configDF 
+        del self.configAL
+        del self.configDF
         del self.configDFr
-	del self.psf
+        del self.psf
 
 def suite():
     """Returns a suite containing all the test cases in this module."""

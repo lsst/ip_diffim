@@ -472,8 +472,10 @@ void PsfDipoleFlux::_apply(
         // No deblending to do 
         return;
     }
-    // For N>=2, just measure the brightest and faintest peaks
-    // Order by peak flux, most positive one (brightest) is first
+
+    // For N>=2, just measure the brightest-positive and brightest-negative
+    // peaks.  peakList is automatically ordered by peak flux, with the most
+    // positive one (brightest) being first
     PTR(afw::detection::Peak) positivePeak = peakList.front();
     PTR(afw::detection::Peak) negativePeak = peakList.back();
 

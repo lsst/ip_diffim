@@ -35,6 +35,7 @@ from makeKernelBasisList import *
 from diaCatalogSourceSelector import *
 from dipoleMeasurement import *
 from diffimTools import *
+from kernelCandidateQa import *
 
 # automatically register ip_diffim Algorithms
 import lsst.meas.algorithms

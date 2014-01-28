@@ -17,16 +17,16 @@ import numpy as num
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
 class DiffimTestCases(unittest.TestCase):
-    
+
     def setUp(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
-	centroidKey = schema.addField("centroid", type="PointD")
+        centroidKey = schema.addField("centroid", type="PointD")
         fluxKey = schema.addField("flux", type=float)
         fluxErrKey = schema.addField("flux.err", type=float)
         fluxFlagKey = schema.addField("flux.flags", type="Flag")
         self.table = afwTable.SourceTable.make(schema)
         self.table.definePsfFlux("flux")
-	self.table.defineCentroid("centroid")
+        self.table.defineCentroid("centroid")
         self.ss = afwTable.SourceCatalog(self.table)
 
         self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
@@ -82,14 +82,14 @@ class DiffimTestCases(unittest.TestCase):
         # kSum != 1.0 I need to go to only 4 digits.
         #
         # -5.4640810225678728e-06 != 0.0 within 7 places
-        # 
+        #
         bgSolution = solution.getBackground()
         self.assertAlmostEqual(bgSolution, bg, 4)
 
         # again when kSum = 1.0 this agrees.  otherwise
         #
         # 2.7000000605594079 != 2.7000000000000002 within 7 places
-        # 
+        #
         kSumSolution = solution.getKsum()
         self.assertAlmostEqual(kSumSolution, kSum, 5)
 
@@ -108,7 +108,7 @@ class DiffimTestCases(unittest.TestCase):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
-        
+
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.templateExposure2.getMaskedImage(),
                                        self.scienceImage2.getMaskedImage(),
@@ -135,7 +135,7 @@ class DiffimTestCases(unittest.TestCase):
         # And of the right type
         self.assertEqual(type(kc.getTemplateMaskedImage()), type(afwImage.MaskedImageF()))
         self.assertEqual(type(kc.getScienceMaskedImage()), type(afwImage.MaskedImageF()))
-        
+
         # None of these should work
         for kType in (ipDiffim.KernelCandidateF.ORIG,
                       ipDiffim.KernelCandidateF.PCA,
@@ -159,7 +159,6 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.fail()
 
-            
     def testSourceStats(self):
         # Original and uninitialized
         if not self.defDataDir:
@@ -167,10 +166,10 @@ class DiffimTestCases(unittest.TestCase):
             return
         source = self.ss.addNew()
         source.setId(1)
-	source.set(self.table.getCentroidKey().getX(), 276)
-	source.set(self.table.getCentroidKey().getY(), 717)
-	source.set(self.table.getPsfFluxKey(), 1.)
-        
+        source.set(self.table.getCentroidKey().getX(), 276)
+        source.set(self.table.getCentroidKey().getY(), 717)
+        source.set(self.table.getPsfFluxKey(), 1.)
+
         kc = ipDiffim.KernelCandidateF(source,
                                        self.templateExposure2.getMaskedImage(),
                                        self.scienceImage2.getMaskedImage(),
@@ -188,10 +187,10 @@ class DiffimTestCases(unittest.TestCase):
             return
         source = self.ss.addNew()
         source.setId(1)
-	source.set(self.table.getCentroidKey().getX(), 276)
-	source.set(self.table.getCentroidKey().getY(), 717)
-	source.set(self.table.getPsfFluxKey(), 1.)
-        
+        source.set(self.table.getCentroidKey().getX(), 276)
+        source.set(self.table.getCentroidKey().getY(), 717)
+        source.set(self.table.getPsfFluxKey(), 1.)
+
         kc = ipDiffim.KernelCandidateF(source,
                                        self.templateExposure2.getMaskedImage(),
                                        self.scienceImage2.getMaskedImage(),
@@ -200,9 +199,9 @@ class DiffimTestCases(unittest.TestCase):
         # Kernel not initialized
         self.assertEqual(kc.isInitialized(), False)
 
-	#Check that the source is set
-	self.assertEqual(kc.getSource(), source)
-	self.assertEqual(kc.getCandidateRating(), source.getPsfFlux()) 
+        #Check that the source is set
+        self.assertEqual(kc.getSource(), source)
+        self.assertEqual(kc.getCandidateRating(), source.getPsfFlux()) 
 
         # But this should be set on construction
         try:
@@ -222,7 +221,7 @@ class DiffimTestCases(unittest.TestCase):
         # And of the right type
         self.assertEqual(type(kc.getTemplateMaskedImage()), type(afwImage.MaskedImageF()))
         self.assertEqual(type(kc.getScienceMaskedImage()), type(afwImage.MaskedImageF()))
-        
+
         # None of these should work
         for kType in (ipDiffim.KernelCandidateF.ORIG,
                       ipDiffim.KernelCandidateF.PCA,
@@ -246,7 +245,6 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.fail()
 
-        #build the list to test the 
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
 
         kc.build(kList)
@@ -281,8 +279,6 @@ class DiffimTestCases(unittest.TestCase):
         kc.build(kList)
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
                                          bg = bg)
-
-        
 
     def testDeltaFunction(self):
         if not self.defDataDir:
@@ -324,7 +320,7 @@ class DiffimTestCases(unittest.TestCase):
             self.fail()
         else:
             pass
-                
+
         # None of these should work
         for kType in (ipDiffim.KernelCandidateF.PCA,):
             for kMethod in (kc.getKernelSolution,
@@ -341,7 +337,7 @@ class DiffimTestCases(unittest.TestCase):
                 else:
                     print kMethod
                     self.fail()
-        
+
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT))
 
     def testGaussianWithNoise(self):
@@ -391,7 +387,6 @@ class DiffimTestCases(unittest.TestCase):
                     # sigh, too bad this sort of thing fails..
                     # 0.99941584433815966 != 1.0 within 3 places
                     self.assertAlmostEqual(kImageOut.get(i, j)/kImageIn.get(i, j), 1.0, 2)
-        
 
         # now repeat with noise added; decrease precision of comparison
         bkg = self.addNoise(smi2)
@@ -409,12 +404,12 @@ class DiffimTestCases(unittest.TestCase):
         self.assertAlmostEqual(soln.getKsum(), kSumIn, 3)
         if not (self.policy.get("fitForBackground")):
             self.assertEqual(soln.getBackground(), 0.0)
-            
+
         for j in range(kImageOut.getHeight()):
             for i in range(kImageOut.getWidth()):
                 if kImageIn.get(i, j) > 1e-2:
                     self.assertAlmostEqual(kImageOut.get(i, j), kImageIn.get(i, j), 2)
-        
+
 
     def testGaussian(self, imsize = 50):
         # Convolve a delta function with a known gaussian; try to
@@ -452,7 +447,7 @@ class DiffimTestCases(unittest.TestCase):
             for i in range(tmi2.getWidth()):
                 self.assertEqual(tmi2.getMask().get(i, j), 0)
                 self.assertEqual(smi2.getMask().get(i, j), 0)
- 
+
 
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi2, smi2, self.policy)
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
@@ -489,7 +484,7 @@ class DiffimTestCases(unittest.TestCase):
             pass
         else:
             self.fail()
-        
+
     def testConstantWeighting(self):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
@@ -498,7 +493,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set("fitForBackground", False)
         self.testGaussian()
         self.testGaussianWithNoise()
-        
+
     def testNoBackgroundFit(self):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
@@ -511,7 +506,7 @@ class DiffimTestCases(unittest.TestCase):
         mi = afwImage.MaskedImageF(afwGeom.Extent2I(10, 10))
         kc = ipDiffim.makeKernelCandidate(0., 0., mi, mi, self.policy)
         kc.setStatus(afwMath.SpatialCellCandidate.GOOD)
-        
+
         sizeCellX = self.policy.get("sizeCellX")
         sizeCellY = self.policy.get("sizeCellY")
         kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(1, 1)),
@@ -524,22 +519,22 @@ class DiffimTestCases(unittest.TestCase):
                 self.assertEqual(cand.getStatus(), afwMath.SpatialCellCandidate.GOOD)
                 nSeen += 1
         self.assertEqual(nSeen, 1)
-        
+
     def dontTestDisp(self):
         ds9.mtv(self.scienceImage2, frame=1)
         ds9.mtv(self.templateExposure2, frame=2)
-        
+
 
     def tearDown(self):
         del self.policy
-	del self.table
-	del self.ss
+        del self.table
+        del self.ss
         if self.defDataDir:
             del self.scienceImage2
             del self.templateExposure2
-        
+
 #####
-        
+
 def suite():
     """Returns a suite containing all the test cases in this module."""
     tests.init()

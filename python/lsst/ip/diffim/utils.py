@@ -21,14 +21,7 @@
 #
 
 """Support utilities for Measuring sources"""
-import pdb
-import re
-import sys
-import math
-
 import numpy as np
-import numpy.ma as ma
-
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.logging as pexLog
 import lsst.daf.base as dafBase
@@ -44,7 +37,7 @@ from . import diffimLib
 from . import diffimTools
 
 keptPlots = False                       # Have we arranged to keep spatial plots open?
-    
+
 def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=ds9.GREEN, symb="+", size=2):
     """Draw the (XAstrom, YAstrom) positions of a set of Sources.  Image has the given XY0"""
 
@@ -62,7 +55,7 @@ def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=ds9.GREEN, symb="+", size=2):
 # Kernel display utilities
 #
 def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
-                           ctype=None, ctypeUnused=None, ctypeBad=None, size=3, 
+                           ctype=None, ctypeUnused=None, ctypeBad=None, size=3,
                            frame=None, title="Spatial Cells"):
     """Show the SpatialCells.  If symb is something that ds9.dot
     understands (e.g. "o"), the top nMaxPerCell candidates will be
@@ -161,7 +154,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
                 resid = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
             except:
                 continue
-                
+
             rchi2 = cand.getChi2()
             if rchi2 > 1e100:
                 rchi2 = np.nan
@@ -369,7 +362,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
         vmax = fRange.max() # + 0.05 * np.fabs(fRange.max())
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
         im = ax.imshow(fRange, aspect='auto', norm=norm,
-                       extent=[0, kernelCellSet.getBBox().getWidth()-1, 
+                       extent=[0, kernelCellSet.getBBox().getWidth()-1,
                                0, kernelCellSet.getBBox().getHeight()-1])
         ax.set_title('Spatial polynomial')
         plt.colorbar(im, orientation='horizontal', ticks=[vmin, vmax])
@@ -424,7 +417,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
 
 def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None, 
                      showCenter=True, showEllipticity=True):
-    """Show a mosaic of Kernel images. 
+    """Show a mosaic of Kernel images.
     """
     mos = displayUtils.Mosaic()
 
@@ -458,7 +451,7 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
             ksum = kernel.computeImage(im, False, x, y)
             lab = "Kernel(%d,%d)=%.2f" % (x, y, ksum) if False else ""
             mos.append(im, lab)
-    
+
             exp = afwImage.makeExposure(afwImage.makeMaskedImage(im))
             w, h = im.getWidth(), im.getHeight()
             cen = afwGeom.PointD(w//2, h//2)
@@ -471,7 +464,7 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
 
             shaper.apply(src, exp, cen)
             shapes.append((src.getIxx(), src.getIxy(), src.getIyy()))
-            
+
     mos.makeMosaic(frame=frame, title=title if title else "Model Kernel", mode=nx)
 
     if centers and frame is not None:
@@ -489,9 +482,10 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
 
     return mos
 
-def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCellSet, 
-                       kernel, background, testSources, config, 
+def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCellSet,
+                       kernel, background, testSources, config,
                        origVariance = False, nptsFull = 1e6, keepPlots = True, titleFs=14):
+    """Plot diffim residuals for LOCAL and SPATIAL models"""
     candidateResids = []
     spatialResids   = []
     nonfitResids    = []
@@ -519,15 +513,15 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
             tsdiffim = sdiffim.Factory(sdiffim, bbox)
 
             if origVariance:
-                candidateResids.append(np.ravel(tdiffim.getImage().getArray() \
-                                                     / np.sqrt(torig.getVariance().getArray())))
-                spatialResids.append(np.ravel(tsdiffim.getImage().getArray() \
-                                                   / np.sqrt(torig.getVariance().getArray())))
+                candidateResids.append(np.ravel(tdiffim.getImage().getArray() /
+                                                np.sqrt(torig.getVariance().getArray())))
+                spatialResids.append(np.ravel(tsdiffim.getImage().getArray() /
+                                              np.sqrt(torig.getVariance().getArray())))
             else:
-                candidateResids.append(np.ravel(tdiffim.getImage().getArray() \
-                                                     / np.sqrt(tdiffim.getVariance().getArray())))
-                spatialResids.append(np.ravel(tsdiffim.getImage().getArray() \
-                                                   / np.sqrt(tsdiffim.getVariance().getArray())))
+                candidateResids.append(np.ravel(tdiffim.getImage().getArray() /
+                                                np.sqrt(tdiffim.getVariance().getArray())))
+                spatialResids.append(np.ravel(tsdiffim.getImage().getArray() /
+                                              np.sqrt(tsdiffim.getVariance().getArray())))
 
     fullIm   = diffExposure.getMaskedImage().getImage().getArray()
     fullMask = diffExposure.getMaskedImage().getMask().getArray()
@@ -565,7 +559,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     except ImportError, e:
         print "Unable to import pylab: %s" % e
         return
-    
+
     fig = pylab.figure()
     fig.clf()
     try:
@@ -584,26 +578,26 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     xs  = np.arange(-5, 5.05, 0.1)
     ys  = 1. / np.sqrt(2 * np.pi) * np.exp( -0.5 * xs**2 )
 
-    sp1.hist(candidateResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
-                 % (np.mean(candidateResids), np.var(candidateResids)))
+    sp1.hist(candidateResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
+             % (np.mean(candidateResids), np.var(candidateResids)))
     sp1.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp1.set_title("Candidates: basis fit", fontsize=titleFs-2)
     sp1.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
 
-    sp2.hist(spatialResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
-                 % (np.mean(spatialResids), np.var(spatialResids)))
+    sp2.hist(spatialResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
+             % (np.mean(spatialResids), np.var(spatialResids)))
     sp2.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp2.set_title("Candidates: spatial fit", fontsize=titleFs-2)
     sp2.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
 
-    sp3.hist(nonfitResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
-                 % (np.mean(nonfitResids), np.var(nonfitResids)))
+    sp3.hist(nonfitResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
+             % (np.mean(nonfitResids), np.var(nonfitResids)))
     sp3.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp3.set_title("Control sample: spatial fit", fontsize=titleFs-2)
     sp3.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
 
-    sp4.hist(allResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)" \
-                 % (np.mean(allResids), np.var(allResids)))
+    sp4.hist(allResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
+             % (np.mean(allResids), np.var(allResids)))
     sp4.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp4.set_title("Full image (subsampled)", fontsize=titleFs-2)
     sp4.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
@@ -631,382 +625,47 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
         atexit.register(show)
         keptPlots = True
 
-### Reference TODO
-def ksprob(d, ne, iter=100):
-    eps1 = 0.0001
-    eps2 = 1.e-8
-    en = np.sqrt(ne)
-    lam = (en + 0.12 + 0.11/en)*d
-    a2 = -2*lam**2
-    probks = 0.
-    termbf = 0.
-    sign = 1.
-    for j in range(iter):
-        j += 1
-        term = sign*2*np.exp(a2*j**2)
-        probks = probks + term
-        if np.abs(term) <= eps1*termbf or np.abs(term) <= eps2*probks:
-            return probks
-        sign = -sign
-        termbf = np.abs(term)
-    #Did not converge.
-    return 1.
-
-def kstest(arr, probFunc):
-    data = arr[~arr.mask]
-    idxs = np.argsort(data)
-    N = len(idxs)
-    vals = []
-    for idx in idxs:
-        vals.append(probFunc(data[idx]))
-    vals = np.asarray(vals)
-    D = np.abs(np.arange(1.0, N+1.)/N - vals).max()
-    return D, ksprob(D, N)
-
-def normalCdf(x, mu=0., sigma=1.):
-    return (1+math.erf((x-mu)/math.sqrt(2.*sigma**2.)))/2.
-
 def calcCentroid(arr):
+    """Calculate first moment of a (kernel) image"""
     y, x = arr.shape
     sarr = arr*arr
     xarr = np.asarray([[el for el in range(x)] for el2 in range(y)])
     yarr = np.asarray([[el2 for el in range(x)] for el2 in range(y)])
     narr = xarr*sarr
-    centx = narr.sum()/sarr.sum()
+    sarrSum = sarr.sum()
+    centx = narr.sum()/sarrSum
     narr = yarr*sarr
-    centy = narr.sum()/sarr.sum()
+    centy = narr.sum()/sarrSum
     return centx, centy
 
 def calcWidth(arr, centx, centy):
+    """Calculate second moment of a (kernel) image"""
     y, x = arr.shape
     #Square the flux so we don't have to deal with negatives
     sarr = arr*arr
     xarr = np.asarray([[el for el in range(x)] for el2 in range(y)])
     yarr = np.asarray([[el2 for el in range(x)] for el2 in range(y)])
     narr = sarr*np.power((xarr - centx), 2.)
-    xstd = np.sqrt(narr.sum()/sarr.sum())
+    sarrSum = sarr.sum()
+    xstd = np.sqrt(narr.sum()/sarrSum)
     narr = sarr*np.power((yarr - centy), 2.)
-    ystd = np.sqrt(narr.sum()/sarr.sum())
+    ystd = np.sqrt(narr.sum()/sarrSum)
     return xstd, ystd
 
-class KernelCandidateQa(object):
-    
-    def __init__(self, nKernelSpatial, log):
-        self.fields = []
-        self.log = log
-        self.fields.append(afwTable.Field["PointD"]("RegisterRefPosition", 
-                                              "Position of reference object for registration (radians)."))
-        #TODO check units of the following angles
-        self.fields.append(afwTable.Field["Angle"]("RegisterResidualBearing", 
-                                              "Angle of residual wrt declination parallel in radians"))
-
-        self.fields.append(afwTable.Field["Angle"]("RegisterResidualDistance", 
-                                              "Offset of residual in radians"))
-        for kType in ("LOCAL", "SPATIAL"):
-            self.fields.append(afwTable.Field["F"]("KCDiffimMean_%s"%(kType), 
-                                                   "Mean of KernelCandidate diffim", "sigma"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimMedian_%s"%(kType), 
-                                                   "Median of KernelCandidate diffim", "sigma"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimIQR_%s"%(kType), 
-                                                   "Inner quartile range of KernelCandidate diffim", 
-                                                   "sigma"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimStDev_%s"%(kType), 
-                                                   "Standard deviation of KernelCandidate diffim",
-                                                   "sigma"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimKSD_%s"%(kType), 
-                                                   "D from K-S test of diffim pixels relative to Normal"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimKSProb_%s"%(kType), 
-                                                   "Prob from K-S test of diffim pixels relative to Normal",
-                                                   "likelihood"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimADA2_%s"%(kType), 
-                    "Anderson-Darling test statistic of diffim pixels relative to Normal"))
-
-            self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADCrit_%s"%(kType), 
-                    "Critical values for the significance levels in KCDiffimADSig.  If A2 is greater than this number, hypothesis that the two distributions are the same can be rejected.", 5))
-
-            self.fields.append(afwTable.Field["ArrayD"]("KCDiffimADSig_%s"%(kType), 
-                    "Anderson-Darling significance levels for the Normal distribution", 5))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimChiSq_%s"%(kType), 
-                                                   "Reduced chi^2 of the residual.", "likelihood"))
-
-            self.fields.append(afwTable.Field["F"]("KCDiffimMseResids_%s"%(kType), 
-                                                   "Mean squared error in diffim : Variance + Bias**2"))
-
-            self.fields.append(afwTable.Field["F"]("KCKernelCentX_%s"%(kType), 
-                                                   "Centroid in X for this Kernel",
-                                                   "pixels"))
-
-            self.fields.append(afwTable.Field["F"]("KCKernelCentY_%s"%(kType), 
-                                                   "Centroid in Y for this Kernel",
-                                                   "pixels"))
-                               
-            self.fields.append(afwTable.Field["F"]("KCKernelStdX_%s"%(kType), 
-                                                   "Standard deviation in X for this Kernel",
-                                                   "pixels"))
-
-            self.fields.append(afwTable.Field["F"]("KCKernelStdY_%s"%(kType), 
-                                                   "Standard deviation in Y for this Kernel",
-                                                   "pixels"))
-
-            self.fields.append(afwTable.Field["I"]("KernelCandidateId_%s"%(kType), 
-                                                   "Id for this KernelCandidate"))
-
-            if kType == 'LOCAL':
-                self.fields.append(afwTable.Field["I"]("KCKernelStatus_%s"%(kType), 
-                                                       "Status of the KernelCandidate"))
-
-                self.fields.append(afwTable.Field["ArrayD"]("KernelCoeffValues_%s"%(kType), 
-                                                            "Original basis coefficients",
-                                                            nKernelSpatial))
-
-                self.fields.append(afwTable.Field["F"]("BackgroundValue_%s"%(kType), 
-                                                       "Evaluation of background model at this point"))
-            else:
-                self.fields.append(afwTable.Field["F"]("KCDiffimMseKernel_%s"%(kType), 
-                                                       "Mean squared error of spatial kernel estimate"))
-
-
-    def addToSchema(self, inSourceCatalog):
-        schema = inSourceCatalog.getSchema()
-        inKeys = []
-        fluxKey = inSourceCatalog.getPsfFluxKey()
-        centroidKey = inSourceCatalog.getCentroidKey()
-        shapeKey = inSourceCatalog.getShapeKey()
-        for n in schema.getNames():
-            inKeys.append(schema[n].asKey())
-
-        for field in self.fields:
-            schema.addField(field)
-
-        outSourceCatalog = afwTable.SourceCatalog(schema)
-        for source in inSourceCatalog:
-            rec = outSourceCatalog.addNew()
-            for k in inKeys:
-                if k.getTypeString() == 'Coord':
-                    rec.setCoord(source.getCoord())
-                else:
-                    setter = getattr(rec, "set"+k.getTypeString())
-                    getter = getattr(source, "get"+k.getTypeString())
-                    setter(k, getter(k))
-        outSourceCatalog.definePsfFlux(fluxKey)
-        outSourceCatalog.defineCentroid(centroidKey)
-        outSourceCatalog.defineShape(shapeKey)
-        return outSourceCatalog
-
-    def _calculateStats(self, di, dof=0.):
-        mask = di.getMask()
-        maskArr = di.getMask().getArray()
-
-        # Create a mask using BAD,SAT,EDGE pixels.  Keep detections
-        maskArr &= (mask.getPlaneBitMask("BAD")|mask.getPlaneBitMask("SAT")|mask.getPlaneBitMask("EDGE"))
-
-        # Mask out values based on maskArr
-        diArr = ma.array(di.getImage().getArray(), mask=maskArr)
-        varArr = ma.array(di.getVariance().getArray(), mask=maskArr)
-
-        # Normalize by sqrt variance, units are in sigma
-        diArr /= np.sqrt(varArr)
-        mean = diArr.mean()
-
-        # This is the maximum-likelihood extimate of the variance stdev**2
-        stdev = diArr.std()
-        median = ma.extras.median(diArr)
-
-        # Compute IQR of just un-masked data
-        data = ma.getdata(diArr[~diArr.mask])
-        iqr = np.percentile(data, 75.) - np.percentile(data, 25.)
-
-        #Calculte chisquare of the residual
-        chisq=np.sum(np.power(data, 2.))  
-
-        # Mean squared error: variance + bias**2
-        # Bias = |data - model| = mean of diffim
-        # Variance = |(data - model)**2| = mean of diffim**2
-        bias = mean
-        variance = np.power(data, 2.).mean()
-        mseResids = bias**2 + variance
-
-        # If scipy is not set up, return zero for the stats
-        try:
-            #In try block because of risk of divide by zero
-            rchisq=chisq/(len(data)-1-dof)
-            # K-S test on the diffim to a Normal distribution
-            import scipy.stats
-            D, prob = scipy.stats.kstest(data, 'norm')
-
-            A2, crit, sig = scipy.stats.anderson(data, 'norm')
-            # Anderson Darling statistic cand be inf for really non-Gaussian distributions.
-            if np.isinf(A2) or np.isnan(A2):
-                A2 = 9999.
-        except:
-            D = 0.
-            prob = 0.
-            A2 = 0.
-            crit = np.zeros(5)
-            sig = np.zeros(5)
-            rchisq = 0
-  
-        return mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq, mseResids
-
-    def apply(self, candidateList, spatialKernel, spatialBackground, dof=0):
-        for kernelCandidate in candidateList:
-            source = kernelCandidate.getSource()
-            schema = source.schema
-    
-            # Calculate ORIG stats (original basis fit)
-            if kernelCandidate.getStatus() != afwMath.SpatialCellCandidate.UNKNOWN:
-                kType = getattr(diffimLib.KernelCandidateF, "ORIG")
-                di = kernelCandidate.getDifferenceImage(kType)
-                kernel = kernelCandidate.getKernel(kType)
-                kstatus = kernelCandidate.getStatus()
-                backgroundValue = kernelCandidate.getBackground(kType)
-                kernelValues = kernelCandidate.getKernel(kType).getKernelParameters()
-                kernelValues = np.asarray(kernelValues)
-    
-                lkim = kernelCandidate.getKernelImage(kType)
-                centx, centy = calcCentroid(lkim.getArray())
-                stdx, stdy = calcWidth(lkim.getArray(), centx, centy)
-                solution = kernelCandidate.getKernelSolution(kType)
-                # NOTE
-                # What is the difference between kernelValues and solution?
-    
-                mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq, mseResids = \
-                    self._calculateStats(di, dof=dof)
-    
-                metrics = {"KCDiffimMean_LOCAL":mean,
-                           "KCDiffimMedian_LOCAL":median,
-                           "KCDiffimIQR_LOCAL":iqr,
-                           "KCDiffimStDev_LOCAL":stdev,
-                           "KCDiffimKSD_LOCAL":D,
-                           "KCDiffimKSProb_LOCAL":prob,
-                           "KCDiffimADA2_LOCAL":A2,
-                           "KCDiffimADCrit_LOCAL":crit,
-                           "KCDiffimADSig_LOCAL":sig,
-                           "KCDiffimChiSq_LOCAL":rchisq,
-                           "KCDiffimMseResids_LOCAL":mseResids,
-                           "KCKernelCentX_LOCAL":centx,
-                           "KCKernelCentY_LOCAL":centy,
-                           "KCKernelStdX_LOCAL":stdx,
-                           "KCKernelStdY_LOCAL":stdy,
-                           "KernelCandidateId_LOCAL":kernelCandidate.getId(),
-                           "KernelCoeffValues_LOCAL":kernelValues}
-                for k in metrics.keys():
-                    key = schema[k].asKey()
-                    setter = getattr(source, "set"+key.getTypeString())
-                    setter(key, metrics[k])
-            else:
-                try:
-                    kType = getattr(diffimLib.KernelCandidateF, "ORIG")
-                    lkim = kernelCandidate.getKernelImage(kType)
-                except:
-                    lkim = None
-    
-            # Calculate spatial model evaluated at each position, for
-            # all candidates
-            skim  = afwImage.ImageD(spatialKernel.getDimensions())
-            spatialKernel.computeImage(skim, False, kernelCandidate.getXCenter(),
-                                       kernelCandidate.getYCenter())
-            centx, centy = calcCentroid(skim.getArray())
-            stdx, stdy = calcWidth(skim.getArray(), centx, centy)
-    
-            sk = afwMath.FixedKernel(skim)
-            sbg = spatialBackground(kernelCandidate.getXCenter(), kernelCandidate.getYCenter())
-            di = kernelCandidate.getDifferenceImage(sk, sbg)
-            mean, stdev, median, iqr, D, prob, A2, crit, sig, rchisq, mseResids = \
-                self._calculateStats(di, dof=dof)
-
-            # Kernel mse
-            if lkim is not None:
-                skim     -= lkim
-                bias      = np.mean(skim.getArray())
-                variance  = np.mean(np.power(skim.getArray(), 2.))
-                mseKernel = bias**2 + variance
-            else:
-                mseKernel = -99.999
-
-            metrics = {"KCDiffimMean_SPATIAL":mean,
-                       "KCDiffimMedian_SPATIAL":median,
-                       "KCDiffimIQR_SPATIAL":iqr,
-                       "KCDiffimStDev_SPATIAL":stdev,
-                       "KCDiffimKSD_SPATIAL":D,
-                       "KCDiffimKSProb_SPATIAL":prob,
-                       "KCDiffimADA2_SPATIAL":A2,
-                       "KCDiffimADCrit_SPATIAL":crit,
-                       "KCDiffimADSig_SPATIAL":sig,
-                       "KCDiffimChiSq_SPATIAL":rchisq,
-                       "KCDiffimMseResids_SPATIAL":mseResids,
-                       "KCDiffimMseKernel_SPATIAL":mseKernel,
-                       "KCKernelCentX_SPATIAL":centx,
-                       "KCKernelCentY_SPATIAL":centy,
-                       "KCKernelStdX_SPATIAL":stdx,
-                       "KCKernelStdY_SPATIAL":stdy,
-                       "KernelCandidateId_SPATIAL":kernelCandidate.getId()}
-            for k in metrics.keys():
-                key = schema[k].asKey()
-                setter = getattr(source, "set"+key.getTypeString())
-                setter(key, metrics[k])
-
-    def aggregate(self, sourceCatalog, metadata, wcsresids, diaSources=None):
-        for source in sourceCatalog:
-            if source.getId() in wcsresids.keys():
-                #Note that the residuals are not delta RA, delta Dec
-                #From the source code "bearing (angle wrt a declination parallel) and distance
-                coord, resids = wcsresids[source.getId()]
-                key = source.schema["RegisterResidualBearing"].asKey()
-                setter = getattr(source, "set"+key.getTypeString())
-                setter(key, resids[0])
-                key = source.schema["RegisterResidualDistance"].asKey()
-                setter = getattr(source, "set"+key.getTypeString())
-                setter(key, resids[1])
-                key = source.schema["RegisterRefPosition"].asKey()
-                setter = getattr(source, "set"+key.getTypeString())
-                setter(key, afwGeom.Point2D(coord.getRa().asRadians(),\
-                        coord.getDec().asRadians()))
-        if diaSources:
-            metadata.add("NFalsePositivesTotal", len(diaSources))
-            nrefmatch = 0
-            nsrcmatch = 0
-            nunmatched = 0
-            for source in diaSources:
-                refId = source.get("refMatchId")
-                srcId = source.get("srcMatchId")
-                if refId > 0:
-                    nrefmatch += 1
-                if srcId > 0:
-                    nsrcmatch += 1
-                if refId == 0 and srcId == 0:
-                    nunmatched += 1
-            metadata.add("NFalsePositivesRefAssociated", nrefmatch)
-            metadata.add("NFalsePositivesSrcAssociated", nsrcmatch)
-            metadata.add("NFalsePositivesUnassociated", nunmatched)
-        for kType in ("LOCAL", "SPATIAL"):
-            for sName in ("KCDiffimMean", "KCDiffimMedian", "KCDiffimIQR", "KCDiffimStDev", 
-                          "KCDiffimKSProb", "KCDiffimADSig", "KCDiffimChiSq", 
-                          "KCDiffimMseResids", "KCDiffimMseKernel"):
-                if sName == "KCDiffimMseKernel" and kType == "LOCAL":
-                    continue
-                kName = "%s_%s" % (sName, kType)
-                vals = np.array([s.get(kName) for s in sourceCatalog])
-                idx = np.isfinite(vals)
-                metadata.add("%s_MEAN" % (kName), np.mean(vals[idx]))
-                metadata.add("%s_MEDIAN" % (kName), np.median(vals[idx]))
-                metadata.add("%s_STDEV" % (kName), np.std(vals[idx]))
-
 def printSkyDiffs(sources, wcs):
-    for s in sources: 
-        dra = 3600*(s.getCoord().getPosition().getX() - wcs.pixelToSky(s.getCentroid().getX(), s.getCentroid().getY()).getPosition().getX())/0.2
-        ddec = 3600*(s.getCoord().getPosition().getY() - wcs.pixelToSky(s.getCentroid().getX(), s.getCentroid().getY()).getPosition().getY())/0.2
+    """Print differences in sky coordinates between source Position and its Centroid mapped through Wcs"""
+    for s in sources:
+        sCentroid = s.getCentroid()
+        sPosition = s.getCoord().getPosition()
+        dra = 3600*(sPosition.getX() - wcs.pixelToSky(sCentroid.getX(),
+                                                      sCentroid.getY()).getPosition().getX())/0.2
+        ddec = 3600*(sPosition.getY() - wcs.pixelToSky(sCentroid.getX(),
+                                                       sCentroid.getY()).getPosition().getY())/0.2
         if np.isfinite(dra) and np.isfinite(ddec):
             print dra, ddec
 
 def makeRegions(sources, outfilename, wcs=None):
+    """Create regions file for ds9 from input source list"""
     fh = open(outfilename, "w")
     fh.write("global color=red font=\"helvetica 10 normal\" select=1 highlite=1 edit=1 move=1 delete=1 include=1 fixed=0 source\nfk5\n")
     for s in sources:
@@ -1029,6 +688,7 @@ def showSourceSetSky(sSet, wcs, xy0, frame=0, ctype=ds9.GREEN, symb="+", size=2)
             ds9.dot(symb, xc, yc, frame=frame, ctype=ctype, size=size)
 
 def plotWhisker(results, newWcs):
+    """Plot whisker diagram of astromeric offsets between results.matches"""
     refCoordKey = results.matches[0].first.getTable().getCoordKey()
     inCentroidKey = results.matches[0].second.getTable().getCentroidKey()
     sids      = [m.first.getId() for m in results.matches]
@@ -1036,7 +696,7 @@ def plotWhisker(results, newWcs):
     residuals = [m.first.get(refCoordKey).getOffsetFrom(
                        newWcs.pixelToSky(m.second.get(inCentroidKey))) for
                        m in results.matches]
-    import matplotlib.pyplot as plt      
+    import matplotlib.pyplot as plt
     fig = plt.figure()
     sp = fig.add_subplot(1, 1, 0)
     xpos = [x[0].asDegrees() for x in positions]
@@ -1050,37 +710,14 @@ def plotWhisker(results, newWcs):
     distance = [x[1].asArcseconds() for x in residuals]
     distance.append(0.2)
     distance = np.asarray(distance)[xidxs]
-    print np.median(distance)/0.2, np.std(distance)/0.2
     #NOTE: This assumes that the bearing is measured positive from +RA through North.
     #From the documentation this is not clear.
     bearing = [x[0].asRadians() for x in residuals]
     bearing.append(0)
     bearing = np.asarray(bearing)[xidxs]
     U = (distance*np.cos(bearing))
-    print np.median(U)/0.2, np.std(U)/0.2
     V = (distance*np.sin(bearing))
-    print np.median(V)/0.2, np.std(V)/0.2
     sp.quiver(X, Y, U, V)
     sp.set_title("WCS Residual")
     plt.show()
 
-def matchXY(first, second, matchRadius):
-    srcMatchDict = {}
-    #Only returns closest match
-    for s in second:
-        dist = matchRadius
-        fid = None
-        sid = None
-        for f in first:
-            fx = f.getX()
-            fy = f.getY()
-            sx = s.getX()
-            sy = s.getY()
-            if len(np.isfinite([fx, fy, sx, sy]) == 4):
-                if math.hypot(f.getX() - s.getX(), f.getY() - s.getY()) < dist:
-                    dist = math.hypot(f.getX() - s.getX(), f.getY() - s.getY())
-                    fid = f.getId()
-                    sid = s.getId()
-        if fid and sid:
-            srcMatchDict[sid] = fid
-    return srcMatchDict

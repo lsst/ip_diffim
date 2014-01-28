@@ -1,7 +1,7 @@
-# 
+#
 # LSST Data Management System
 # Copyright 2008, 2009, 2010 LSST Corporation.
-# 
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -9,14 +9,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
@@ -57,12 +57,12 @@ def makeFlatNoiseImage(mi, seedStat = afwMath.MAX):
 
 def makePoissonNoiseImage(im):
     """Return a Poisson noise image based on im
-    
+
     Uses numpy.random; you may wish to call numpy.random.seed first.
-    
+
     @warning This uses an undocumented numpy API (the documented API
     uses a single float expectation value instead of an array).
-    
+
     @param[in] im image; the output image has the same dimensions and shape
         and its expectation value is the value of im at each pixel
     """
@@ -81,11 +81,11 @@ def makePoissonNoiseImage(im):
 # varying kernel.
 #######
 def fakeCoeffs():
-    kCoeffs = ((  1.0,     0.0,       0.0), 
-               (  0.005,  -0.000001,  0.000001), 
-               (  0.005,   0.000004,  0.000004), 
-               ( -0.001,  -0.000030,  0.000030), 
-               ( -0.001,   0.000015,  0.000015), 
+    kCoeffs = ((  1.0,     0.0,       0.0),
+               (  0.005,  -0.000001,  0.000001),
+               (  0.005,   0.000004,  0.000004),
+               ( -0.001,  -0.000030,  0.000030),
+               ( -0.001,   0.000015,  0.000015),
                ( -0.005,  -0.000050,  0.000050))
     return kCoeffs
 
@@ -144,7 +144,7 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     # Trim off border pixels
     bbox = gaussKernel.shrinkBBox(tim.getBBox(afwImage.LOCAL))
     tim  = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
-    
+
     # Now make a science image which is this convolved with some
     # spatial function.  Use input basis list.
     sOrder   = 1
@@ -166,19 +166,19 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
 
     # Watch out for negative values
     tim  += 2 * np.abs(np.min(tim.getArray()))
-    
+
     # Add noise?
     if addNoise:
         sim   = makePoissonNoiseImage(sim)
         tim   = makePoissonNoiseImage(tim) 
-    
+
     # And turn into MaskedImages
     sim   = afwImage.ImageF(sim, bbox, afwImage.LOCAL)
     svar  = afwImage.ImageF(sim, True)
     smask = afwImage.MaskU(sim.getDimensions())
     smask.set(0x0)
     sMi   = afwImage.MaskedImageF(sim, smask, svar)
-    
+
     tim   = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
     tvar  = afwImage.ImageF(tim, True)
     tmask = afwImage.MaskU(tim.getDimensions())
@@ -213,7 +213,7 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
             kernelCellSet.insertCandidate(kc)
 
     return tMi, sMi, sKernel, kernelCellSet, configFake
-    
+
 
 #######
 # Background subtraction for ip_diffim
@@ -222,9 +222,9 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
 def backgroundSubtract(config, maskedImages):
     backgrounds = []
     t0 = time.time()
-    algorithm   = config.algorithmName
-    binsize     = config.binsize
-    undersample = config.undersample
+    algorithm   = config.algorithm
+    binsize     = config.binSize
+    undersample = config.undersampleStyle
     bctrl       = afwMath.BackgroundControl(algorithm)
     bctrl.setUndersampleStyle(undersample)
     for maskedImage in maskedImages:
@@ -249,7 +249,7 @@ def backgroundSubtract(config, maskedImages):
 def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir):
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
-        
+
     for cell in kernelCellSet.getCellList():
         for cand in cell.begin(False): # False = include bad candidates
             cand = diffimLib.cast_KernelCandidateF(cand)
@@ -269,7 +269,7 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
                 sbg   = backgroundModel(xCand, yCand)
                 sdmi  = cand.getDifferenceImage(sk, sbg)
                 sdmi.writeFits(os.path.join(outdir, 'sdiffim_c%d_x%d_y%d.fits' % (idCand, xCand, yCand)))
-                                
+
 #######
 # Converting types
 #######
@@ -287,8 +287,8 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
     @param scienceExposure: Science image, to be checked for Mask bits in Source Footprint
     @param config: Config that defines the Mask planes that indicate an invalid Source and Bbox grow radius
     @param log: Log for output
-    
-    @return a List of Footprints whose pixels will be used to constrain the Psf-matching Kernel
+
+    @return a list of dicts having a "source" and "footprint" field, to be used for Psf-matching
     """
 
     candidateOutList = []
@@ -338,7 +338,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
             ymax += (bbox.getMaxY() - ymax)
         if xmin > xmax or ymin > ymax:
             continue
-        
+
         kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
         try:
             fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, False).getMask())
@@ -353,34 +353,36 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
     log.info("Selected %d / %d sources for KernelCandidacy" % (len(candidateOutList), len(candidateInList)))
     return candidateOutList
 
-def sourceTableToCandList(sourceTable, templateExposure, scienceExposure, kconfig, dconfig, log, 
-                          basisList, dobuild=False):
+def sourceTableToCandidateList(sourceTable, templateExposure, scienceExposure, kConfig, dConfig, log,
+                               basisList, doBuild=False):
+    """Takes an input list of Sources, and turns them into
+    KernelCandidates for fitting of the Psf-matching kernel."""
     kernelSize = basisList[0].getWidth()
-    footprintList = sourceToFootprintList(list(sourceTable), templateExposure, scienceExposure, 
-                                          kernelSize, dconfig, log)
+    footprintList = sourceToFootprintList(list(sourceTable), templateExposure, scienceExposure,
+                                          kernelSize, dConfig, log)
     candList = []
 
-    if dobuild and not basisList:
-        dobuild = False
+    if doBuild and not basisList:
+        doBuild = False
     else:
-        policy = pexConfig.makePolicy(kconfig)
-        singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy)
+        policy = pexConfig.makePolicy(kConfig)
+        visitor = diffimLib.BuildSingleKernelVisitorF(basisList, policy)
 
-    policy = pexConfig.makePolicy(kconfig)
+    policy = pexConfig.makePolicy(kConfig)
     for cand in footprintList:
-        bbox = cand['footprint'].getBBox()  #-- Fix for footprints?
+        bbox = cand['footprint'].getBBox() 
         tmi  = afwImage.MaskedImageF(templateExposure.getMaskedImage(), bbox, afwImage.PARENT)
         smi  = afwImage.MaskedImageF(scienceExposure.getMaskedImage(), bbox, afwImage.PARENT)
-        kcand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
-        if dobuild:
-            singlekv.processCandidate(kcand)
-            kcand.setStatus(afwMath.SpatialCellCandidate.UNKNOWN)
-        candList.append(kcand)
+        kCand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
+        if doBuild:
+            visitor.processCandidate(kCand)
+            kCand.setStatus(afwMath.SpatialCellCandidate.UNKNOWN)
+        candList.append(kCand)
     return candList
 
-    
+
 #######
-# 
+#
 #######
 
 
@@ -392,7 +394,7 @@ class NbasisEvaluator(object):
         self.psfFwhmPixTnc = psfFwhmPixTnc
         if not self.psfMatchConfig.kernelBasisSet == "alard-lupton":
             raise RuntimeError, "BIC only implemnted for AL (alard lupton) basis"
-        
+
     def __call__(self, kernelCellSet, log):
         d1, d2, d3 = self.psfMatchConfig.alardDegGauss
         bicArray = {}
@@ -403,9 +405,9 @@ class NbasisEvaluator(object):
                     bicConfig = type(self.psfMatchConfig)(self.psfMatchConfig, alardDegGauss=dList)
                     kList = makeKernelBasisList(bicConfig, self.psfFwhmPixTc, self.psfFwhmPixTnc)
                     k = len(kList)
-                    singlekv = diffimLib.BuildSingleKernelVisitorF(kList, pexConfig.makePolicy(bicConfig))
-                    singlekv.setSkipBuilt(False)
-                    kernelCellSet.visitCandidates(singlekv, bicConfig.nStarPerCell)        
+                    visitor = diffimLib.BuildSingleKernelVisitorF(kList, pexConfig.makePolicy(bicConfig))
+                    visitor.setSkipBuilt(False)
+                    kernelCellSet.visitCandidates(visitor, bicConfig.nStarPerCell)
 
                     for cell in kernelCellSet.getCellList():
                         for cand in cell.begin(False): # False = include bad candidates
@@ -429,7 +431,7 @@ class NbasisEvaluator(object):
             idx = np.argsort(cvals)
             bestConfig = cconfig[idx[0]]
             bestConfigs.append(bestConfig)
-        
+
         counter = Counter(bestConfigs).most_common(3)
         log.info("B.I.C. prefers basis complexity %s %d times; %s %d times; %s %d times" % (counter[0][0], counter[0][1],
                                                                                             counter[1][0], counter[1][1],
