@@ -426,8 +426,8 @@ class PsfMatchConfigAL(PsfMatchConfig):
     )
     alardMinSigDeconv = pexConfig.Field(
         dtype = float,
-        doc = """Minimum Sigma (pixels) for Gaussians during deconvolution; make smaller than alardMinSig""",
-        default = 0.5,
+        doc = """Minimum Sigma (pixels) for Gaussians during deconvolution; make smaller than alardMinSig as this is only indirectly used""",
+        default = 0.4,
         check = lambda x : x >= 0.25
     )
     alardNGaussDeconv = pexConfig.Field(
