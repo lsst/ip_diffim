@@ -129,7 +129,11 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         # assumes 3 components.
         #
         # http://iopscience.iop.org/0266-5611/26/8/085002  Equation 40
-        basisNGauss = 3
+
+        # Use specializations for deconvolution
+        basisNGauss = config.alardNGaussDeconv
+        basisMinSigma = config.alardMinSigDeconv
+
         kernelSigma = np.sqrt(targetSigma**2 - referenceSigma**2)
         if kernelSigma < basisMinSigma:
             kernelSigma = basisMinSigma
@@ -155,13 +159,14 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         sig1 = basisSigmaGauss[1]
         sig2 = basisSigmaGauss[2]
         basisSigmaGauss = []
-        for n in range(3):
+        for n in range(1, 3):
             for j in range(n):
                 sigma2jn  = (n - j) * sig1**2
                 sigma2jn += j * sig2**2
                 sigma2jn -= (n + 1) * sig0**2
                 sigmajn   = np.sqrt(sigma2jn)
                 basisSigmaGauss.append(sigmajn)
+
         basisSigmaGauss.sort()
         basisNGauss = len(basisSigmaGauss)
         basisDegGauss = [config.alardDegGaussDeconv for x in basisSigmaGauss]

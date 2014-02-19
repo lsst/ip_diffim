@@ -424,6 +424,18 @@ class PsfMatchConfigAL(PsfMatchConfig):
         default = 3,
         check = lambda x : x >= 1
     )
+    alardMinSigDeconv = pexConfig.Field(
+        dtype = float,
+        doc = """Minimum Sigma (pixels) for Gaussians during deconvolution; make smaller than alardMinSig as this is only indirectly used""",
+        default = 0.4,
+        check = lambda x : x >= 0.25
+    )
+    alardNGaussDeconv = pexConfig.Field(
+        dtype = int,
+        doc = "Number of Gaussians in AL basis during deconvolution",
+        default = 3,
+        check = lambda x : x >= 1
+    )
 
 
 
