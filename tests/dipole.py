@@ -176,154 +176,6 @@ class DipoleAlgorithmTest(unittest.TestCase):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         source = self.measureDipole(s, exposure)
 
-    def XXX_testPsfDipoleIter(self, scaling=100., fracOffset=0.5):
-        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc, 
-                                                scaling=scaling, fracOffset=fracOffset)
-        source = self.measureDipole(s, exposure)
-
-        # Recreate the simultaneous joint Psf fit in python
-        fp     = source.getFootprint()
-        peaks  = fp.getPeaks()
-        speaks = [(p.getPeakValue(), p) for p in peaks]
-        speaks.sort() 
-        dpeaks = [speaks[0][1], speaks[-1][1]]
-
-        import pylab
-        sp1     = pylab.figure().add_subplot(111)
-        sp2     = pylab.figure().add_subplot(111)
-        sp3     = pylab.figure().add_subplot(111)
-
-        psf = exposure.getPsf()
-        psfSigPix = psf.computeShape().getDeterminantRadius()
-        psfFwhmPix = psfSigPix * sigma2fwhm 
-        offset = fracOffset * psfFwhmPix // 2
-        xp, yp = self.xc + offset, self.yc + offset
-        xn, yn = self.xc - offset, self.yc - offset
-
-        xframe = 1
-        for shift in [0.1, 0.5, 1.0,]:
-            #shift  = 0.1
-            chi2dofs  = []
-            sigmas    = []
-            totfluxes = []
-            results   = []
-            for dnegCenterX in np.arange(-shift, 2*shift-0.01, shift):
-                for dnegCenterY in np.arange(-shift, 2*shift-0.01, shift):
-                    for dposCenterX in np.arange(-shift, 2*shift-0.01, shift):
-                        for dposCenterY in np.arange(-shift, 2*shift-0.01, shift):
-    
-                            negCenter = afwGeom.Point2D(xn + dnegCenterX, yn + dnegCenterY)
-                            posCenter = afwGeom.Point2D(xp + dposCenterX, yp + dposCenterY)
-    
-                            negPsf = psf.computeImage(negCenter).convertF()
-                            posPsf = psf.computeImage(posCenter).convertF()
-                            negPeak = psf.computePeak(negCenter)
-                            posPeak = psf.computePeak(posCenter)
-                            negPsf /= negPeak
-                            posPsf /= posPeak
-                    
-                            model    = afwImage.ImageF(fp.getBBox())
-                            negModel = afwImage.ImageF(fp.getBBox())
-                            posModel = afwImage.ImageF(fp.getBBox())
-                    
-                            # The center of the Psf should be at negCenter, posCenter
-                            negPsfBBox = negPsf.getBBox(afwImage.PARENT)
-                            posPsfBBox = posPsf.getBBox(afwImage.PARENT)
-                            modelBBox  = model.getBBox(afwImage.PARENT)
-                    
-                            # Portion of the negative Psf that overlaps the montage
-                            negOverlapBBox = afwGeom.Box2I(negPsfBBox)
-                            negOverlapBBox.clip(modelBBox)
-                            self.assertFalse(negOverlapBBox.isEmpty())
-                    
-                            # Portion of the positivePsf that overlaps the montage
-                            posOverlapBBox = afwGeom.Box2I(posPsfBBox)
-                            posOverlapBBox.clip(modelBBox)
-                            self.assertFalse(posOverlapBBox.isEmpty())
-                    
-                            negPsfSubim    = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT)
-                            modelSubim     = type(model)(model, negOverlapBBox, afwImage.PARENT)
-                            negModelSubim  = type(negModel)(negModel, negOverlapBBox, afwImage.PARENT)
-                            modelSubim    += negPsfSubim  # just for debugging
-                            negModelSubim += negPsfSubim  # for fitting
-                    
-                            posPsfSubim    = type(posPsf)(posPsf, posOverlapBBox, afwImage.PARENT)
-                            modelSubim     = type(model)(model, posOverlapBBox, afwImage.PARENT)
-                            posModelSubim  = type(posModel)(posModel, posOverlapBBox, afwImage.PARENT)
-                            modelSubim    += posPsfSubim
-                            posModelSubim += posPsfSubim
-                    
-                            data = afwImage.ImageF(exposure.getMaskedImage().getImage(), fp.getBBox())
-                            var = afwImage.ImageF(exposure.getMaskedImage().getVariance(), fp.getBBox())
-                            matrixNorm = 1. / np.sqrt(np.median(var.getArray()))
-
-                            posPsfSum = np.sum(posPsf.getArray())
-                            negPsfSum = np.sum(negPsf.getArray())
-                    
-                            M = np.array((np.ravel(negModel.getArray()), 
-                                          np.ravel(posModel.getArray()))).T.astype(np.float64)
-                            B = np.array((np.ravel(data.getArray()))).astype(np.float64)
-                            M *= matrixNorm
-                            B *= matrixNorm
-                    
-                            # Numpy solution
-                            fneg0, fpos0 = np.linalg.lstsq(M, B)[0]
-                    
-                            # Afw solution
-                            lsq = afwMath.LeastSquares.fromDesignMatrix(M, B, afwMath.LeastSquares.DIRECT_SVD)
-                            fneg, fpos = lsq.getSolution()
-                            dfneg = np.sqrt(lsq.getCovariance()[0][0])
-                            dfpos = np.sqrt(lsq.getCovariance()[1][1])
-                            dftot = np.sqrt(dfneg**2 + dfpos**2)
-   
-                            # Recreate model
-                            fitted    = afwImage.ImageF(fp.getBBox())
-                            negFit    = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT, True)
-                            negFit   *= float(fneg)
-                            posFit    = type(posPsf)(posPsf, posOverlapBBox, afwImage.PARENT, True)
-                            posFit   *= float(fpos)
-                            
-                            fitSubim  = type(fitted)(fitted, negOverlapBBox, afwImage.PARENT)
-                            fitSubim += negFit
-                            fitSubim  = type(fitted)(fitted, posOverlapBBox, afwImage.PARENT)
-                            fitSubim += posFit
-                            
-                            fitted   -= data
-                            fitted   *= fitted
-                            fitted   /= var
-                            chi2      = np.sum(fitted.getArray())
-                            npts      = fitted.getArray().shape[0] * fitted.getArray().shape[1]
-                            chi2dof   = chi2/(npts - 2)
-                            #print "%.3f" % (chi2dof)
-    
-                            chi2dofs.append(chi2dof)
-                            sigmas.append((fpos+fneg)/dftot)
-                            totfluxes.append(fpos+fneg)
-
-                            results.append( (chi2dof, ((fpos+fneg)/dftot)) )
-
-            sp1.hist(chi2dofs, bins=10**(np.arange(-1, 2.0, 0.1)), alpha=0.1/shift, 
-                     label="shift=%.1f (%.2f,%.2f)" % (shift, np.mean(chi2dofs), 
-                                                       np.std(chi2dofs)))
-
-            sp2.hist(sigmas, alpha=0.1/shift, label="shift=%.1f (%.2f,%.2f)" % (shift, np.mean(sigmas), 
-                                                                                np.std(sigmas)))
-            print 1.0 * len(np.where(np.abs(sigmas)>5)[0]) / len(sigmas)
-            sp3.hist(totfluxes, alpha=0.1/shift, label="shift=%.1f (%.2f,%.2f)" % (shift, np.mean(totfluxes), 
-                                                                                   np.std(totfluxes)))
-            sp2.axvline(x=scaling)
-
-            results.sort()
-            print results[0], results[1], results[2]
-
-        sp1.set_title("chi2/dof (dipole sep = %.1f FWHM)" % (fracOffset))
-        sp2.set_title("(positive+negative)/unc (dipole sep = %.1f FWHM)" % (fracOffset))
-        sp3.set_title("positive+negative flux (dipole sep = %.1f FWHM)" % (fracOffset))
-        sp1.legend()
-        sp2.legend()
-        sp3.legend()
-        pylab.show()
-
     def _makeModel(self, exposure, psf, fp, negCenter, posCenter):
 
         negPsf = psf.computeImage(negCenter).convertF()
@@ -418,52 +270,6 @@ class DipoleAlgorithmTest(unittest.TestCase):
 
         return fneg, negPsfSum, fpos, posPsfSum, fitted
         
-    def testRecentroid(self, scaling=100.):
-        # When the dipoles are closer, you really need to recentroid to get a good fit
-        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc, 
-                                                scaling=scaling, fracOffset=1.0)
-        source = self.measureDipole(s, exposure)
-
-        # Recreate the simultaneous joint Psf fit in python (but at bad centroid!)
-        fp     = source.getFootprint()
-        peaks  = fp.getPeaks()
-        speaks = [(p.getPeakValue(), p) for p in peaks]
-        speaks.sort() 
-        dpeaks = [speaks[0][1], speaks[-1][1]]
-        negCenter = afwGeom.Point2D(dpeaks[0].getFx(), dpeaks[0].getFy())
-        posCenter = afwGeom.Point2D(dpeaks[1].getFx(), dpeaks[1].getFy())
-        fneg0, negPsfSum0, fpos0, posPsfSum0, residIm0 = \
-            self._makeModel(exposure, psf, fp, negCenter, posCenter)
-
-        # Now do it at the best centroid found by PsfDipoleFlux 
-        negCenter = source.get("flux.dipole.psf.neg.centroid")
-        posCenter = source.get("flux.dipole.psf.pos.centroid")
-        fneg1, negPsfSum1, fpos1, posPsfSum1, residIm1 = \
-            self._makeModel(exposure, psf, fp, negCenter, posCenter)
-        
-        # First off, make sure that the original centroid is wrong
-        self.assertNotAlmostEqual(1e-2*scaling, -1e-2*fneg0, 2)
-        self.assertNotAlmostEqual(1e-2*scaling,  1e-2*fpos0, 2)
-
-        # And then that PsfDipoleFlux does a much better job by recentroiding
-        self.assertAlmostEqual(1e-2*scaling, -1e-2*fneg1, 2)
-        self.assertAlmostEqual(1e-2*scaling,  1e-2*fpos1, 2)
-        
-        # And that my python implementation gets the same solution as PsfDipoleFlux
-        self.assertAlmostEqual(1e-4*fneg1*negPsfSum1, 1e-4*source.get("flux.dipole.psf.neg"), 2)
-        self.assertAlmostEqual(1e-4*fpos1*posPsfSum1, 1e-4*source.get("flux.dipole.psf.pos"), 2)
-
-        # Second fit is better
-        chi2dof0 = np.sum(residIm0.getArray()) / (residIm0.getArray().shape[0] * 
-                                                  residIm0.getArray().shape[1] - 2)
-        chi2dof1 = np.sum(residIm1.getArray()) / (residIm1.getArray().shape[0] * 
-                                                  residIm1.getArray().shape[1] - 2)
-        self.assertTrue(chi2dof0 > chi2dof1)
-
-        # And same as PsfDipoleFlux
-        self.assertAlmostEqual(chi2dof1, source.get("flux.dipole.psf.chi2dof"), 2)
-
-
     def testPsfDipoleFit(self, scaling=100.):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc, scaling=scaling)
         source = self.measureDipole(s, exposure)
@@ -496,9 +302,24 @@ class DipoleAlgorithmTest(unittest.TestCase):
         # fneg*negPsfSum to flux.dipole.psf.neg.
         self.assertAlmostEqual(1e-4*fneg*negPsfSum, 1e-4*source.get("flux.dipole.psf.neg"), 2)
         self.assertAlmostEqual(1e-4*fpos*posPsfSum, 1e-4*source.get("flux.dipole.psf.pos"), 2)
+        self.assertTrue(source.get("flux.dipole.psf.pos.err") > 0.0)
+        self.assertTrue(source.get("flux.dipole.psf.neg.err") > 0.0)
+        self.assertEqual(source.get("flux.dipole.psf.neg.flags"), False)
+        self.assertEqual(source.get("flux.dipole.psf.pos.flags"), False)
 
-        # Not a Nan in chi2/dof
-        self.assertTrue(np.isfinite(source.get("flux.dipole.psf.chi2dof")))
+        self.assertAlmostEqual(source.get("flux.dipole.psf.centroid")[0], 50.0, 1)
+        self.assertAlmostEqual(source.get("flux.dipole.psf.centroid")[1], 50.0, 1)
+        self.assertAlmostEqual(source.get("flux.dipole.psf.neg.centroid")[0], negCenter[0], 1)
+        self.assertAlmostEqual(source.get("flux.dipole.psf.neg.centroid")[1], negCenter[1], 1)
+        self.assertAlmostEqual(source.get("flux.dipole.psf.pos.centroid")[0], posCenter[0], 1)
+        self.assertAlmostEqual(source.get("flux.dipole.psf.pos.centroid")[1], posCenter[1], 1)
+        self.assertEqual(source.get("flux.dipole.psf.centroid.flags"), False)
+        self.assertEqual(source.get("flux.dipole.psf.neg.centroid.flags"), False)
+        self.assertEqual(source.get("flux.dipole.psf.pos.centroid.flags"), False)
+
+        self.assertAlmostEqual(source.get("flux.dipole.psf.chi2dof"), 1.0, 2)
+
+        
 
     def measureDipole(self, s, exp):
         schema  = afwTable.SourceTable.makeMinimalSchema()
