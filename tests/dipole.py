@@ -319,6 +319,23 @@ class DipoleAlgorithmTest(unittest.TestCase):
 
         self.assertAlmostEqual(source.get("flux.dipole.psf.chi2dof"), 1.0, 2)
 
+        self.assertEqual(source.get("flux.dipole.psf.flags.maxpix"), False)
+
+    def testMaxPixelFlag(self):
+        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
+        schema  = afwTable.SourceTable.makeMinimalSchema()
+        psfControl = ipDiffim.PsfDipoleFluxControl()
+        psfControl.maxPixels = 10
+        msb     = measAlg.MeasureSourcesBuilder()\
+                   .addAlgorithm(ipDiffim.NaiveDipoleCentroidControl())\
+                   .addAlgorithm(ipDiffim.NaiveDipoleFluxControl())\
+                   .addAlgorithm(psfControl)
+        ms      = msb.build(schema)
+        table   = afwTable.SourceTable.make(schema)
+        source  = table.makeRecord()
+        source.setFootprint(s.getFootprint())
+        ms.apply(source, exposure, afwGeom.Point2D(self.xc, self.yc))
+        self.assertEqual(source.get("flux.dipole.psf.flags.maxpix"), True)
         
 
     def measureDipole(self, s, exp):
