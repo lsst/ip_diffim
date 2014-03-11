@@ -65,6 +65,12 @@ namespace lsst {
 namespace ip {
 namespace diffim {
 
+    int const NEGCENTXPAR(0); // Parameter for the x-component of the negative lobe centroid
+    int const NEGCENTYPAR(1); // Parameter for the y-component of the negative lobe centroid 
+    int const NEGFLUXPAR(2);  // Parameter for the flux of the negative lobe
+    int const POSCENTXPAR(3); // Parameter for the x-component of the positive lobe centroid
+    int const POSCENTYPAR(4); // Parameter for the y-component of the positive lobe centroid
+    int const POSFLUXPAR(5);  // Parameter for the flux of the positive lobe
 
 /**
  * A class that knows how to calculate centroids as a simple unweighted first
@@ -330,7 +336,9 @@ public:
                               "psf fitted center of negative lobe")),
         _posCentroid(
             addCentroidFields(schema, ctrl.name+".pos.centroid", 
-                              "psf fitted center of positive lobe"))
+                              "psf fitted center of positive lobe")),
+        _flagMaxPixelsKey(schema.addField<afw::table::Flag>(ctrl.name+".flags.maxpix",
+                                                            "set if too large a footprint was sent to the algorithm"))
     {}
     template <typename PixelT>
     std::pair<double,int> chi2(afw::table::SourceRecord & source,
@@ -355,6 +363,7 @@ private:
     afw::table::KeyTuple<afw::table::Centroid> _negCentroid;
     afw::table::KeyTuple<afw::table::Centroid> _posCentroid;
 
+    afw::table::Key< afw::table::Flag > _flagMaxPixelsKey;
 };
 
 /**
@@ -381,13 +390,13 @@ public:
     void setMaxPix(int maxPix) { _maxPix = maxPix; }
 
     // Evaluate our cost function (in this case chi^2)
-    double operator()(const std::vector<double>& params) const {
-        double negCenterX = params[0];
-        double negCenterY = params[1];
-        double negFlux    = params[2];
-        double posCenterX = params[3];
-        double posCenterY = params[4];
-        double posFlux    = params[5];
+    virtual double operator()(std::vector<double> const & params) const {
+        double negCenterX = params[NEGCENTXPAR];
+        double negCenterY = params[NEGCENTYPAR];
+        double negFlux    = params[NEGFLUXPAR];
+        double posCenterX = params[POSCENTXPAR];
+        double posCenterY = params[POSCENTYPAR];
+        double posFlux    = params[POSFLUXPAR];
         
         /* Restrict negative dipole to be negative; positive to be positive */
         if ((negFlux > 0.0) || (posFlux < 0.0)) {
@@ -491,6 +500,7 @@ void PsfDipoleFlux::_apply(
 
     source.set(getPositiveKeys().flag, true); // say we've failed so that's the result if we throw
     source.set(getNegativeKeys().flag, true); // say we've failed so that's the result if we throw
+    source.set(_flagMaxPixelsKey, true);
 
     typedef typename afw::image::Exposure<PixelT>::MaskedImageT MaskedImageT;
 
@@ -505,6 +515,7 @@ void PsfDipoleFlux::_apply(
         // Too big
         return;
     }
+    source.set(_flagMaxPixelsKey, false);
 
     afw::detection::Footprint::PeakList peakList = 
         afw::detection::Footprint::PeakList(footprint->getPeaks());
@@ -524,25 +535,20 @@ void PsfDipoleFlux::_apply(
     PTR(afw::detection::Peak) positivePeak = peakList.front();
     PTR(afw::detection::Peak) negativePeak = peakList.back();
 
-    // Default step sizes
-    float const stepCoord = 0.1;
-    float const stepFlux = 1.0;
-
     // Set up fit parameters and param names
     ROOT::Minuit2::MnUserParameters fitPar;
 
-    fitPar.Add(boost::format("P0").str(), negativePeak->getFx(), stepCoord);
-    fitPar.Add(boost::format("P1").str(), negativePeak->getFy(), stepCoord);
-    fitPar.Add(boost::format("P2").str(), negativePeak->getPeakValue(), stepFlux);
-    fitPar.Add(boost::format("P3").str(), positivePeak->getFx(), stepCoord);
-    fitPar.Add(boost::format("P4").str(), positivePeak->getFy(), stepCoord);
-    fitPar.Add(boost::format("P5").str(), positivePeak->getPeakValue(), stepFlux);
+    fitPar.Add((boost::format("P%d")%NEGCENTXPAR).str(), negativePeak->getFx(), ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%NEGCENTYPAR).str(), negativePeak->getFy(), ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%NEGFLUXPAR).str(), negativePeak->getPeakValue(), ctrl.stepSizeFlux);
+    fitPar.Add((boost::format("P%d")%POSCENTXPAR).str(), positivePeak->getFx(), ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%POSCENTYPAR).str(), positivePeak->getFy(), ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%POSFLUXPAR).str(), positivePeak->getPeakValue(), ctrl.stepSizeFlux);
 
     // Create the minuit object that knows how to minimise our functor
     //
     MinimizeDipoleChi2<PixelT> minimizerFunc(*this, source, exposure);
-    double const errorDef = 1.0;       // use +- 1sigma errors
-    minimizerFunc.setErrorDef(errorDef);
+    minimizerFunc.setErrorDef(ctrl.errorDef);
 
     //
     // tell minuit about it
@@ -552,8 +558,7 @@ void PsfDipoleFlux::_apply(
     //
     // And let it loose
     //
-    int maxFnCalls = 0;                 // i.e. unlimited
-    ROOT::Minuit2::FunctionMinimum min = migrad(maxFnCalls);
+    ROOT::Minuit2::FunctionMinimum min = migrad(ctrl.maxFnCalls);
 
     float minChi2 = min.Fval();
     bool const isValid = min.IsValid() && std::isfinite(minChi2);
@@ -566,19 +571,22 @@ void PsfDipoleFlux::_apply(
            private member variable anywhere.  Consted into a corner.
         */
         std::pair<double,int> fit = chi2(source, exposure, 
-                                         min.UserState().Value(0), min.UserState().Value(1), min.UserState().Value(2), 
-                                         min.UserState().Value(3), min.UserState().Value(4), min.UserState().Value(5));
+                                         min.UserState().Value(NEGCENTXPAR), min.UserState().Value(NEGCENTYPAR), 
+                                         min.UserState().Value(NEGFLUXPAR), min.UserState().Value(POSCENTXPAR), 
+                                         min.UserState().Value(POSCENTYPAR), min.UserState().Value(POSFLUXPAR));
         double evalChi2 = fit.first;
         int nPix = fit.second;
         
-        PTR(afw::geom::Point2D) minNegCentroid(new afw::geom::Point2D(min.UserState().Value(0), min.UserState().Value(1)));
-        source.set(getNegativeKeys().meas, min.UserState().Value(2));
-        source.set(getNegativeKeys().err, min.UserState().Error(2));
+        PTR(afw::geom::Point2D) minNegCentroid(new afw::geom::Point2D(min.UserState().Value(NEGCENTXPAR), 
+                                                                      min.UserState().Value(NEGCENTYPAR)));
+        source.set(getNegativeKeys().meas, min.UserState().Value(NEGFLUXPAR));
+        source.set(getNegativeKeys().err, min.UserState().Error(NEGFLUXPAR));
         source.set(getNegativeKeys().flag, false);
         
-        PTR(afw::geom::Point2D) minPosCentroid(new afw::geom::Point2D(min.UserState().Value(3), min.UserState().Value(4))); 
-        source.set(getPositiveKeys().meas, min.UserState().Value(5));
-        source.set(getPositiveKeys().err, min.UserState().Error(5));
+        PTR(afw::geom::Point2D) minPosCentroid(new afw::geom::Point2D(min.UserState().Value(POSCENTXPAR), 
+                                                                      min.UserState().Value(POSCENTYPAR))); 
+        source.set(getPositiveKeys().meas, min.UserState().Value(POSFLUXPAR));
+        source.set(getPositiveKeys().err, min.UserState().Error(POSFLUXPAR));
         source.set(getPositiveKeys().flag, false);
 
         source.set(_chi2dofKey, evalChi2 / (nPix - minimizerFunc.getNpar()));
