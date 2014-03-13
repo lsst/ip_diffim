@@ -78,11 +78,11 @@ private:
 class DipoleCentroidControl : public meas::algorithms::AlgorithmControl {
 public:
 
-    PTR(DipoleCentroidControl) clone() const {
+    virtual PTR(DipoleCentroidControl) clone() const {
         return boost::static_pointer_cast<DipoleCentroidControl>(_clone());
     }
 
-    PTR(DipoleCentroidAlgorithm) makeAlgorithm(
+    virtual PTR(DipoleCentroidAlgorithm) makeAlgorithm(
         afw::table::Schema & schema,
         PTR(daf::base::PropertyList) const & metadata = PTR(daf::base::PropertyList)(),
         meas::algorithms::AlgorithmMap const & others = meas::algorithms::AlgorithmMap()
@@ -135,10 +135,10 @@ private:
 class DipoleFluxControl : public meas::algorithms::AlgorithmControl {
 public:
 
-    PTR(DipoleFluxControl) clone() const { 
+    virtual PTR(DipoleFluxControl) clone() const { 
         return boost::static_pointer_cast<DipoleFluxControl>(_clone()); }
 
-    PTR(DipoleFluxAlgorithm) makeAlgorithm(
+    virtual PTR(DipoleFluxAlgorithm) makeAlgorithm(
         afw::table::Schema & schema,
         PTR(daf::base::PropertyList) const & metadata = PTR(daf::base::PropertyList)(),
         meas::algorithms::AlgorithmMap const & others = meas::algorithms::AlgorithmMap()
@@ -223,8 +223,12 @@ private:
 class PsfDipoleFluxControl : public DipoleFluxControl {
 public:
     LSST_CONTROL_FIELD(maxPixels, int, "Maximum number of pixels to apply the measurement to");
-
-    PsfDipoleFluxControl() : DipoleFluxControl("flux.dipole.psf"), maxPixels(500) {}
+    LSST_CONTROL_FIELD(stepSizeCoord, float, "Default initial step size for coordinates in non-linear fitter");
+    LSST_CONTROL_FIELD(stepSizeFlux, float, "Default initial step size for flux in non-linear fitter");
+    LSST_CONTROL_FIELD(errorDef, double, "How many sigma the error bars of the non-linear fitter represent");
+    LSST_CONTROL_FIELD(maxFnCalls, int, "Maximum function calls for non-linear fitter; 0 = unlimited");
+    PsfDipoleFluxControl() : DipoleFluxControl("flux.dipole.psf"), maxPixels(500), 
+                             stepSizeCoord(0.1), stepSizeFlux(1.0), errorDef(1.0), maxFnCalls(100000) {}
 
 private:
     virtual PTR(meas::algorithms::AlgorithmControl) _clone() const;
