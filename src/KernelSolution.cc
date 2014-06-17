@@ -121,7 +121,7 @@ namespace diffim {
             }
         default:
             {
-            throw LSST_EXCEPT(pexExcept::InvalidParameterException,
+            throw LSST_EXCEPT(pexExcept::InvalidParameterError,
                               "Undefined ConditionNumberType : only EIGENVALUE, SVD allowed.");
             break;
             }

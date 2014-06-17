@@ -124,7 +124,7 @@ namespace detail {
         ) {
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
-            throw LSST_EXCEPT(pexExcept::LogicErrorException,
+            throw LSST_EXCEPT(pexExcept::LogicError,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
         if (!(kCandidate->isInitialized())) {
