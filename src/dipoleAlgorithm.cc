@@ -142,7 +142,7 @@ void naiveCentroid(
     int y = center.getY() - image.getY0();
 
     if (x < 1 || x >= image.getWidth() - 1 || y < 1 || y >= image.getHeight() - 1) {
-         throw LSST_EXCEPT(lsst::pex::exceptions::LengthErrorException,
+         throw LSST_EXCEPT(lsst::pex::exceptions::LengthError,
                            (boost::format("Object at (%d, %d) is too close to the edge") 
                             % x % y).str());
     }
@@ -156,7 +156,7 @@ void naiveCentroid(
 
 
     if (sum == 0.0) {
-        throw LSST_EXCEPT(pexExceptions::RuntimeErrorException,
+        throw LSST_EXCEPT(pexExceptions::RuntimeError,
                           (boost::format("Object at (%d, %d) has no counts") %
                            x % y).str());
     }
@@ -506,7 +506,7 @@ void PsfDipoleFlux::_apply(
 
     CONST_PTR(afw::detection::Footprint) footprint = source.getFootprint();
     if (!footprint) {
-        throw LSST_EXCEPT(pex::exceptions::RuntimeErrorException,
+        throw LSST_EXCEPT(pex::exceptions::RuntimeError,
                           (boost::format("No footprint for source %d") % source.getId()).str());
     }
 
@@ -521,7 +521,7 @@ void PsfDipoleFlux::_apply(
         afw::detection::Footprint::PeakList(footprint->getPeaks());
 
     if (peakList.size() == 0) {
-        throw LSST_EXCEPT(pex::exceptions::RuntimeErrorException,
+        throw LSST_EXCEPT(pex::exceptions::RuntimeError,
                           (boost::format("No peak for source %d") % source.getId()).str());
     }
     else if (peakList.size() == 1) {

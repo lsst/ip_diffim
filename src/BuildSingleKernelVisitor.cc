@@ -137,7 +137,7 @@ namespace detail {
             pexLogging::TTrace<3>("lsst.ip.diffim.BuildSingleKernelVisitor.processCandidate", 
                                   "Failed to cast SpatialCellCandidate to KernelCandidate %d", 
                                   kCandidate->getId());
-            throw LSST_EXCEPT(pexExcept::LogicErrorException,
+            throw LSST_EXCEPT(pexExcept::LogicError,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
         
