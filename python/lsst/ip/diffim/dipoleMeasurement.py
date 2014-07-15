@@ -108,7 +108,6 @@ class DipoleMeasurementTask(SourceMeasurementTask):
 class SourceFlagChecker(object):
     """A functor to check whether a difference image source has any
     flags set that should cause it to be labeled bad."""
-
     def __init__(self, sources, badFlags=['flags.pixel.edge', 
                                           'flags.pixel.interpolated.center', 
                                           'flags.pixel.saturated.center']):

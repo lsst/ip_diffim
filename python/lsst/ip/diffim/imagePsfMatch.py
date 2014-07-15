@@ -430,6 +430,7 @@ class ImagePsfMatchTask(PsfMatch):
             table = afwTable.SourceTable.make(self.selectSchema, idFactory)
         else:
             table = afwTable.SourceTable.make(self.selectSchema)
+        table.setVersion(0)
         mi = exposure.getMaskedImage()
 
         imArr = mi.getImage().getArray()

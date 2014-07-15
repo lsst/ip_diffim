@@ -25,6 +25,7 @@ class DiffimTestCases(unittest.TestCase):
         fluxErrKey = schema.addField("flux.err", type=float)
         fluxFlagKey = schema.addField("flux.flags", type="Flag")
         self.table = afwTable.SourceTable.make(schema)
+        self.table.setVersion(0)
         self.table.definePsfFlux("flux")
         self.table.defineCentroid("centroid")
         self.ss = afwTable.SourceCatalog(self.table)
