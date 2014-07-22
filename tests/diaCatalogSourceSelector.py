@@ -57,7 +57,7 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
         for flag in self.sourceSelector.config.badPixelFlags:
             schema.addField(flag, type="Flag")
         table = afwTable.SourceTable.make(schema)
-        table.setVersion(0) 
+        table.setVersion(0)
         table.definePsfFlux("flux")
         catalog = afwTable.SourceCatalog(table)
         return catalog
