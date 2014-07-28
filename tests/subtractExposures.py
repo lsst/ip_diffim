@@ -115,10 +115,10 @@ class DiffimTestCases(unittest.TestCase):
         # First order term has zero spatial variation and sum = kernel sum
         kp1par0 = spatialKernel1.getSpatialFunctionList()[0].getParameters()
         kp2par0 = spatialKernel2.getSpatialFunctionList()[0].getParameters()
-        self.assertAlmostEqual(kp1par0[0], kp2par0[0], 5)
+        self.assertAlmostEqual(kp1par0[0], kp2par0[0], delta=1e-5)
         for i in range(1, len(kp1par0)):
-            self.assertAlmostEqual(kp1par0[i], 0.0, 5)
-            self.assertAlmostEqual(kp1par0[i], kp2par0[i], 5)
+            self.assertAlmostEqual(kp1par0[i], 0.0, delta=1e-5)
+            self.assertAlmostEqual(kp1par0[i], kp2par0[i], delta=1e-5)
 
         if fitForBackground:
             # Nterms (zeroth order model)
@@ -127,13 +127,13 @@ class DiffimTestCases(unittest.TestCase):
 
             # Same value of function coefficients (different to 0.001 level)
             self.assertAlmostEqual(backgroundModel1.getParameters()[0],
-                                   backgroundModel2.getParameters()[0], 3)
+                                   backgroundModel2.getParameters()[0], delta=1e-3)
 
             # Functions evaluate to same value at origin (0.001 difference)
-            self.assertAlmostEqual(backgroundModel1(0, 0), backgroundModel2(0, 0), 3)
+            self.assertAlmostEqual(backgroundModel1(0, 0), backgroundModel2(0, 0), delta=1e-3)
 
             # At at different location within image
-            self.assertAlmostEqual(backgroundModel1(10, 10), backgroundModel2(10, 10), 3)
+            self.assertAlmostEqual(backgroundModel1(10, 10), backgroundModel2(10, 10), delta=1e-3)
 
         else:
             # More improtant is the kernel needs to be then same when realized at a coordinate
@@ -141,10 +141,10 @@ class DiffimTestCases(unittest.TestCase):
             kim2 = afwImage.ImageD(spatialKernel2.getDimensions())
             ksum1 = spatialKernel1.computeImage(kim1, False, 0.0, 0.0)
             ksum2 = spatialKernel2.computeImage(kim2, False, 0.0, 0.0)
-            self.assertAlmostEqual(ksum1, ksum2, 5)
+            self.assertAlmostEqual(ksum1, ksum2, delta=1e-5)
             for y in range(kim1.getHeight()):
                 for x in range(kim1.getHeight()):
-                    self.assertAlmostEqual(kim1.get(x, y), kim2.get(x, y), 1)
+                    self.assertAlmostEqual(kim1.get(x, y), kim2.get(x, y), delta=1e-1)
 
             # Nterms (zeroth order)
             self.assertEqual(backgroundModel1.getNParameters(), 1)
@@ -227,8 +227,8 @@ class DiffimTestCases(unittest.TestCase):
                 cand2 = ipDiffim.cast_KernelCandidateF(kernelCellSet2.getCandidateById(cand1.getId()+count))
 
                 # positions are nearly the same (different at the 0.01 pixel level)
-                self.assertAlmostEqual(cand1.getXCenter(), cand2.getXCenter(), 1)
-                self.assertAlmostEqual(cand1.getYCenter(), cand2.getYCenter() + self.offset, 1)
+                self.assertAlmostEqual(cand1.getXCenter(), cand2.getXCenter(), delta=1e-1)
+                self.assertAlmostEqual(cand1.getYCenter(), cand2.getYCenter() + self.offset, delta=1e-1)
 
                 # kernels are the same
                 im1   = cand1.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
@@ -244,7 +244,7 @@ class DiffimTestCases(unittest.TestCase):
         bgp2 = backgroundModel2.getParameters()
 
         # first term = kernel sum, 0, 0
-        self.assertAlmostEqual(skp1[0][0], skp2[0][0], 6)
+        self.assertAlmostEqual(skp1[0][0], skp2[0][0], delta=1e-6)
 
         # On other terms, the spatial terms are the same, the zpt terms are different
         for nk in range(1, len(skp1)):
@@ -254,16 +254,16 @@ class DiffimTestCases(unittest.TestCase):
                 self.assertNotEqual(skp1[nk][0], skp2[nk][0])
             elif poly == 'chebyshev1':
                 # Cheby remaps coords, so model should be the same!
-                self.assertAlmostEqual(skp1[nk][0], skp2[nk][0], 4)
+                self.assertAlmostEqual(skp1[nk][0], skp2[nk][0], delta=1e-4)
             else:
                 self.fail()
 
             # Spatial terms
             for np in range(1, len(skp1[nk])):
-                self.assertAlmostEqual(skp1[nk][np], skp2[nk][np], 4)
+                self.assertAlmostEqual(skp1[nk][np], skp2[nk][np], delta=1e-4)
 
         for np in range(len(bgp1)):
-            self.assertAlmostEqual(bgp1[np], bgp2[np], 4)
+            self.assertAlmostEqual(bgp1[np], bgp2[np], delta=1e-4)
 
 #####
 
