@@ -151,16 +151,16 @@ class DiffimTestCases(unittest.TestCase):
             self.assertEqual(backgroundModel2.getNParameters(), 1)
 
             # Zero value in function
-            self.assertTrue(abs(backgroundModel1.getParameters()[0]) < 10**-7)
-            self.assertTrue(abs(backgroundModel2.getParameters()[0]) < 10**-7)
+            self.assertAlmostEqual(backgroundModel1.getParameters()[0], 0.0, delta=1e-7)
+            self.assertAlmostEqual(backgroundModel2.getParameters()[0], 0.0, delta=1e-7)
 
             # Function evaluates to zero
-            self.assertTrue(abs(backgroundModel1(0, 0)) < 10**-7)
-            self.assertTrue(abs(backgroundModel2(0, 0)) < 10**-7)
+            self.assertAlmostEqual(backgroundModel1(0, 0), 0.0, delta=1e-7)
+            self.assertAlmostEqual(backgroundModel2(0, 0), 0.0, delta=1e-7)
 
             # Spatially...
-            self.assertTrue(abs(backgroundModel1(10, 10)) < 10**-7)
-            self.assertTrue(abs(backgroundModel2(10, 10)) < 10**-7)
+            self.assertAlmostEqual(backgroundModel1(10, 10), 0.0, delta=1e-7)
+            self.assertAlmostEqual(backgroundModel2(10, 10), 0.0, delta=1e-7)
 
     def testWarping(self):
         # Should fail since images are not aligned
@@ -235,7 +235,7 @@ class DiffimTestCases(unittest.TestCase):
                 im2   = cand2.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
                 for y in range(im1.getHeight()):
                     for x in range(im1.getWidth()):
-                        self.assertTrue(abs(im1.get(x, y)-im2.get(x, y)) < 10**-7)
+                        self.assertAlmostEqual(im1.get(x, y), im2.get(x, y), delta=1e-7)
 
         # Spatial fits are the same
         skp1 = spatialKernel1.getSpatialParameters()
