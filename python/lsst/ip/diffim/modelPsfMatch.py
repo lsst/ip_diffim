@@ -58,7 +58,7 @@ class ModelPsfMatchConfig(pexConfig.Config):
         self.kernel.active.kernelSize = 11
 
 
-class ModelPsfMatchTask(PsfMatch):
+class ModelPsfMatchTask(PsfMatchTask):
     """PSF-match PSF models to reference PSF models
     """
     ConfigClass = ModelPsfMatchConfig

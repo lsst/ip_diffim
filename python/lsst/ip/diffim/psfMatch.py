@@ -542,7 +542,7 @@ class PsfMatchConfigDF(PsfMatchConfig):
     )
 
 
-class PsfMatch(pipeBase.Task):
+class PsfMatchTask(pipeBase.Task):
     """Base class for PSF matching task.  Has no run method; hence should not be called!
     """
     ConfigClass = PsfMatchConfig
@@ -892,3 +892,4 @@ class PsfMatch(pipeBase.Task):
 
         return spatialSolution, spatialKernel, spatialBackground
 
+PsfMatch=PsfMatchTask

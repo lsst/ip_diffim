@@ -70,7 +70,7 @@ class ImagePsfMatchConfig(pexConfig.Config):
         self.selectMeasurement.slots.modelFlux = None
         self.selectMeasurement.slots.apFlux = None
 
-class ImagePsfMatchTask(PsfMatch):
+class ImagePsfMatchTask(PsfMatchTask):
     """PSF-match images to reference images
 
     Fits the following model:
@@ -84,7 +84,7 @@ class ImagePsfMatchTask(PsfMatch):
         @param config: see lsst.ip.diffim.PsfMatchConfig
         @param logName: name by which messages are logged
         """
-        PsfMatch.__init__(self, *args, **kwargs)
+        PsfMatchTask.__init__(self, *args, **kwargs)
         self.kConfig = self.config.kernel.active
         self._warper = afwMath.Warper.fromConfig(self.kConfig.warpingConfig)
         self.selectSchema = afwTable.SourceTable.makeMinimalSchema()
