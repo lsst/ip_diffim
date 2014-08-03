@@ -647,7 +647,9 @@ for this Task include:
 
 \section ip_diffim_psfmatch_Example   As a base class, there is no example code for PsfMatchTask
 
-However, see \link lsst.ip.diffim.ImagePsfMatchTask ImagePsfMatchTask\endlink, \ref ImagePsfMatchTask, \ref SnapPsfMatchTask, and \ref ModelPsfMatchTask.
+However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchTask\endlink, 
+\link lsst.ip.diffim.snapPsfMatch.SnapPsfMatchTask SnapPsfMatchTask\endlink, and
+\link lsst.ip.diffim.modelPsfMatch.ModelPsfMatchTask ModelPsfMatchTask\endlink.
 
     """
     ConfigClass = PsfMatchConfig
