@@ -875,7 +875,8 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
 
 
     def _buildCellSet(self, *args):
-        """!Solve for the Psf-matching and background matching functions; override in derived classes"""
+        """!Fill a SpatialCellSet with KernelCandidates for the Psf-matching process;
+        override in derived classes"""
         return
 
     @pipeBase.timeMethod
