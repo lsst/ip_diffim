@@ -112,8 +112,8 @@ class DetectionConfig(pexConfig.Config):
 
 
 class PsfMatchConfig(pexConfig.Config):
-    """!Describes the base configuration of the Psf-matching kernel, and of the warping, detection, and background
-    modeling subTasks."""
+    """!Describes the base configuration of the Psf-matching kernel, and of the warping, detection, 
+    and background modeling subTasks."""
 
     warpingConfig = pexConfig.ConfigField("Config for warping exposures to a common alignment",
                                           afwMath.warper.WarperConfig)
@@ -358,7 +358,7 @@ class PsfMatchConfig(pexConfig.Config):
 
 
 class PsfMatchConfigAL(PsfMatchConfig):
-    """!Describes the parameters specific to the so-called "Alard-Lupton" (sum-of-Gaussian) Psf-matching basis"""
+    """!Describes the parameters specific to the "Alard-Lupton" (sum-of-Gaussian) Psf-matching basis"""
 
     def setDefaults(self):
         PsfMatchConfig.setDefaults(self)
@@ -401,7 +401,8 @@ class PsfMatchConfigAL(PsfMatchConfig):
     )
     alardMinSigDeconv = pexConfig.Field(
         dtype = float,
-        doc = """Minimum Sigma (pixels) for Gaussians during deconvolution; make smaller than alardMinSig as this is only indirectly used""",
+        doc = """Minimum Sigma (pixels) for Gaussians during deconvolution; 
+        make smaller than alardMinSig as this is only indirectly used""",
         default = 0.4,
         check = lambda x : x >= 0.25
     )
@@ -415,7 +416,7 @@ class PsfMatchConfigAL(PsfMatchConfig):
 
 
 class PsfMatchConfigDF(PsfMatchConfig):
-    """!Describes the parameters specific to the delta-function (one basis function per-pixel) Psf-matching basis"""
+    """!Describes the parameters specific to the delta-function (one basis per-pixel) Psf-matching basis"""
 
     def setDefaults(self):
         PsfMatchConfig.setDefaults(self)
@@ -541,8 +542,8 @@ class PsfMatchTask(pipeBase.Task):
 
 \copybrief PsfMatchTask
 
-PsfMatchTask is a base class that implements the core functionality for matching the Psfs of two images using a 
-spatially varying Psf-matching lsst.afw.math.LinearCombinationKernel.
+PsfMatchTask is a base class that implements the core functionality for matching the 
+Psfs of two images using a spatially varying Psf-matching lsst.afw.math.LinearCombinationKernel.
 The Task requires the user to provide an instance of an lsst.afw.math.SpatialCellSet, 
 filled with lsst.ip.diffim.KernelCandidate instances, and an lsst.afw.math.KernelList 
 of basis shapes that will be used for the decomposition.  If requested, the Task
@@ -590,13 +591,17 @@ See \ref PsfMatchConfig, \ref PsfMatchConfigAL, \ref PsfMatchConfigDF, and \ref 
     via \link lsst.ip.diffim.PsfMatchTask._diagnostic PsfMatchTask._diagnostic \endlink </DD> </DT>
 
 <DT> ALBasisNGauss <DD> If using sum-of-Gaussian basis, the number of gaussians used;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList generateAlardLuptonBasisList\endlink </DD> </DT>
+    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList 
+    generateAlardLuptonBasisList\endlink </DD> </DT>
 <DT> ALBasisDegGauss <DD> If using sum-of-Gaussian basis, the degree of spatial variation of the Gaussians;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList generateAlardLuptonBasisList\endlink </DD> </DT>
+    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList 
+    generateAlardLuptonBasisList\endlink </DD> </DT>
 <DT> ALBasisSigGauss <DD> If using sum-of-Gaussian basis, the widths (sigma) of the Gaussians;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList generateAlardLuptonBasisList\endlink </DD> </DT>
+    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList 
+    generateAlardLuptonBasisList\endlink </DD> </DT>
 <DT> ALKernelSize <DD> If using sum-of-Gaussian basis, the kernel size;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList generateAlardLuptonBasisList\endlink </DD> </DT>
+    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList 
+    generateAlardLuptonBasisList\endlink </DD> </DT>
 
 <DT> NFalsePositivesTotal <DD> Total number of diaSources;
     via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
@@ -606,11 +611,14 @@ See \ref PsfMatchConfig, \ref PsfMatchConfigAL, \ref PsfMatchConfigDF, and \ref 
     via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
 <DT> NFalsePositivesUnassociated <DD> Number of diaSources that are orphans;
     via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
-<DT> metric_MEAN <DD> Mean value of substamp diffim quality metrics across all KernelCandidates, for both the per-candidate (LOCAL) and SPATIAL residuals;
+<DT> metric_MEAN <DD> Mean value of substamp diffim quality metrics across all KernelCandidates, 
+    for both the per-candidate (LOCAL) and SPATIAL residuals;
     via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
-<DT> metric_MEDIAN <DD> Median value of substamp diffim quality metrics across all KernelCandidates, for both the per-candidate (LOCAL) and SPATIAL residuals;
+<DT> metric_MEDIAN <DD> Median value of substamp diffim quality metrics across all KernelCandidates, 
+    for both the per-candidate (LOCAL) and SPATIAL residuals;
     via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
-<DT> metric_STDEV <DD> Standard deviation of substamp diffim quality metrics across all KernelCandidates, for both the per-candidate (LOCAL) and SPATIAL residuals;
+<DT> metric_STDEV <DD> Standard deviation of substamp diffim quality metrics across all KernelCandidates, 
+    for both the per-candidate (LOCAL) and SPATIAL residuals;
     via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
 </DL>
 
@@ -768,7 +776,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
     def _displayDebug(self, kernelCellSet, spatialKernel, spatialBackground):
         """! Provide visualization of the inputs and ouputs to the Psf-matching code
 
-        @param kernelCellSet: the SpatialCellSet used in determining the PSF matching kernel and background match
+        @param kernelCellSet: the SpatialCellSet used in determining the matching kernel and background 
         @param spatialKernel: spatially varying Psf-matching kernel
         @param spatialBackground: spatially varying background-matching function
 
@@ -814,10 +822,10 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
 
 
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
-        """! If a principal component analysis is requested, typically when using a delta function basis, perform
-        the PCA here and return a new basis list containing the new principal components.
+        """! If a principal component analysis is requested, typically when using a delta function basis, 
+        perform the PCA here and return a new basis list containing the new principal components.
 
-        @param kernelCellSet: a SpatialCellSet containing KernelCandidates, from which the principal components are derived
+        @param kernelCellSet: a SpatialCellSet containing KernelCandidates, from which components are derived
         @param nStarPerCell: the number of stars per cell to visit when doing the PCA
         @param policy: input policy controlling the single kernel visitor
 
@@ -865,12 +873,19 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
 
         return nRejectedPca, spatialBasisList
 
+
+    def _buildCellSet(self, *args):
+        """!Solve for the Psf-matching and background matching functions; override in derived classes"""
+        return
+
     @pipeBase.timeMethod
     def _solve(self, kernelCellSet, basisList, returnOnExcept=False):
         """!Determine the PSF matching kernel
 
-        @param kernelCellSet: a SpatialCellSet to use in determining the PSF matching kernel (typically as provided by _buildCellSet)
-        @param basisList: list of Kernels to be used in the decomposition of the spatially varying Psf-matching kernel (typically as provided by makeKernelBasisList)
+        @param kernelCellSet: a SpatialCellSet to use in determining the matching kernel 
+          (typically as provided by _buildCellSet)
+        @param basisList: list of Kernels to be used in the decomposition of the spatially varying kernel 
+          (typically as provided by makeKernelBasisList)
         @param returnOnExcept: if True then return (None, None) if an error occurs, else raise the exception
 
         @return
