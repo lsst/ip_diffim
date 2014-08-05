@@ -880,7 +880,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
 
     @pipeBase.timeMethod
     def _solve(self, kernelCellSet, basisList, returnOnExcept=False):
-        """!Determine the PSF matching kernel
+        """!Solve for the PSF matching kernel
 
         @param kernelCellSet: a SpatialCellSet to use in determining the matching kernel 
           (typically as provided by _buildCellSet)
