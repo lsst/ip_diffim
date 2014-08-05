@@ -212,6 +212,8 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
             kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policyFake)
             kernelCellSet.insertCandidate(kc)
 
+    tMi.setXY0(0,0)
+    sMi.setXY0(0,0)
     return tMi, sMi, sKernel, kernelCellSet, configFake
 
 
