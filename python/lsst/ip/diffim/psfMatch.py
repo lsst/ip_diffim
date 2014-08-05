@@ -659,6 +659,8 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
 \link lsst.ip.diffim.snapPsfMatch.SnapPsfMatchTask SnapPsfMatchTask\endlink, and
 \link lsst.ip.diffim.modelPsfMatch.ModelPsfMatchTask ModelPsfMatchTask\endlink.
 
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
     """
     ConfigClass = PsfMatchConfig
     _DefaultName = "psfMatch"
