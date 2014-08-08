@@ -651,6 +651,12 @@ for this Task include:
 
 \endcode
 
+Note that if you want addional logging info, you may add to your scripts:
+\code{.py}
+import lsst.pex.logging as pexLog
+pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
+\endcode
+
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 \section ip_diffim_psfmatch_Example   As a base class, there is no example code for PsfMatchTask
