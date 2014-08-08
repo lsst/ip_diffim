@@ -185,7 +185,15 @@ for this Task include:
     import lsstDebug
     def DebugInfo(name):
         di = lsstDebug.getInfo(name)   
-        if name == "lsst.ip.diffim.imagePsfMatch":
+        if name == "lsst.ip.diffim.psfMatch":
+            di.display = True                 # global
+            di.maskTransparency = 80          # ds9 mask transparency
+            di.displayCandidates = True       # show all the candidates and residuals
+            di.displayKernelBasis = False     # show kernel basis functions
+            di.displayKernelMosaic = True     # show kernel realized across the image
+            di.plotKernelSpatialModel = False # show coefficients of spatial model
+            di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
+        elif name == "lsst.ip.diffim.imagePsfMatch":
             di.display = True                 # global
             di.maskTransparency = 30          # ds9 mask transparency
             di.displayTemplate = True         # show full (remapped) template
@@ -201,6 +209,12 @@ for this Task include:
         return di
     lsstDebug.Info = DebugInfo
     lsstDebug.frame = 1      
+\endcode
+
+Note that if you want addional logging info, you may add to your scripts:
+\code{.py}
+import lsst.pex.logging as pexLog
+pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 \endcode
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
