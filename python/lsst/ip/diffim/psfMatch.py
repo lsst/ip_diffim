@@ -33,10 +33,11 @@ from . import utils as diUtils
 from . import diffimLib
 
 class DetectionConfig(pexConfig.Config):
-    """!Defines the configuration for running detection on images, and turning 
-    detected lsst.afw.detection.FootPrints into an acceptable (unmasked, high signal-to-noise, 
-    not too large or not too small) list of lsst.ip.diffim.KernelSources which will
-    be used to build the Psf-matching kernel"""
+    """!Configuration for detecting sources on images for building a PSF-matching kernel
+
+    Configuration for turning detected lsst.afw.detection.FootPrints into an acceptable 
+    (unmasked, high signal-to-noise, not too large or not too small) list of 
+    lsst.ip.diffim.KernelSources that are used to build the Psf-matching kernel"""
 
     detThreshold = pexConfig.Field(
         dtype = float,
@@ -112,7 +113,9 @@ class DetectionConfig(pexConfig.Config):
 
 
 class PsfMatchConfig(pexConfig.Config):
-    """!Describes the base configuration of the Psf-matching kernel, and of the warping, detection, 
+    """!Base configuration for Psf-matching
+
+    The base configuration of the Psf-matching kernel, and of the warping, detection, 
     and background modeling subTasks."""
 
     warpingConfig = pexConfig.ConfigField("Config for warping exposures to a common alignment",
@@ -358,7 +361,7 @@ class PsfMatchConfig(pexConfig.Config):
 
 
 class PsfMatchConfigAL(PsfMatchConfig):
-    """!Describes the parameters specific to the "Alard-Lupton" (sum-of-Gaussian) Psf-matching basis"""
+    """!The parameters specific to the "Alard-Lupton" (sum-of-Gaussian) Psf-matching basis"""
 
     def setDefaults(self):
         PsfMatchConfig.setDefaults(self)
@@ -416,7 +419,7 @@ class PsfMatchConfigAL(PsfMatchConfig):
 
 
 class PsfMatchConfigDF(PsfMatchConfig):
-    """!Describes the parameters specific to the delta-function (one basis per-pixel) Psf-matching basis"""
+    """!The parameters specific to the delta-function (one basis per-pixel) Psf-matching basis"""
 
     def setDefaults(self):
         PsfMatchConfig.setDefaults(self)
@@ -659,8 +662,9 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_psfmatch_Example   As a base class, there is no example code for PsfMatchTask
+\section ip_diffim_psfmatch_Example   Example code
 
+As a base class, there is no example code for PsfMatchTask.
 However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchTask\endlink, 
 \link lsst.ip.diffim.snapPsfMatch.SnapPsfMatchTask SnapPsfMatchTask\endlink, and
 \link lsst.ip.diffim.modelPsfMatch.ModelPsfMatchTask ModelPsfMatchTask\endlink.
@@ -672,7 +676,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
     _DefaultName = "psfMatch"
 
     def __init__(self, *args, **kwargs):
-        """! Create the psf-matching Task
+        """!Create the psf-matching Task
 
         \param *args arguments to be passed to lsst.pipe.base.task.Task.__init__
         \param **kwargs keyword arguments to be passed to lsst.pipe.base.task.Task.__init__
@@ -782,7 +786,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
                     nGood, nBgTerms))
 
     def _displayDebug(self, kernelCellSet, spatialKernel, spatialBackground):
-        """! Provide visualization of the inputs and ouputs to the Psf-matching code
+        """!Provide visualization of the inputs and ouputs to the Psf-matching code
 
         @param kernelCellSet: the SpatialCellSet used in determining the matching kernel and background 
         @param spatialKernel: spatially varying Psf-matching kernel
@@ -830,7 +834,9 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
 
 
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
-        """! If a principal component analysis is requested, typically when using a delta function basis, 
+        """!Create Principal Component basis
+
+        If a principal component analysis is requested, typically when using a delta function basis, 
         perform the PCA here and return a new basis list containing the new principal components.
 
         @param kernelCellSet: a SpatialCellSet containing KernelCandidates, from which components are derived

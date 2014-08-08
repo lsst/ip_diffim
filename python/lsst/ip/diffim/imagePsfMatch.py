@@ -41,8 +41,7 @@ import lsst.afw.display.ds9 as ds9
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 class ImagePsfMatchConfig(pexConfig.Config):
-    """!Select either the sum-of-Gaussian or delta-function basis for Psf-matching, and target 
-    the source detection and measurement subTasks"""
+    """!Configuration for image-to-image Psf matching"""
     kernel = pexConfig.ConfigChoiceField(
         doc="kernel type",
         typemap=dict(
@@ -473,7 +472,7 @@ And finally provide some optional debugging displays:
     def subtractExposures(self, templateExposure, scienceExposure,
                           templateFwhmPix=None, scienceFwhmPix=None,
                           candidateList=None, doWarping=True, convolveTemplate=True):
-        """!Subtract two Exposures
+        """!Register, Psf-match and subtract two Exposures
 
         Do the following, in order:
         - Warp templateExposure to match scienceExposure, if their WCSs do not already match
@@ -555,7 +554,7 @@ And finally provide some optional debugging displays:
     @pipeBase.timeMethod
     def subtractMaskedImages(self, templateMaskedImage, scienceMaskedImage, candidateList,
             templateFwhmPix=None, scienceFwhmPix=None):
-        """!Subtract two MaskedImages
+        """!Psf-match and subtract two MaskedImages
 
         Do the following, in order:
         - PSF-match templateMaskedImage to scienceMaskedImage
@@ -658,7 +657,9 @@ And finally provide some optional debugging displays:
         return selectSources
 
     def makeCandidateList(self, templateExposure, scienceExposure, kernelSize, candidateList=None):
-        """!Accept or generate a list of candidate sources for
+        """!Make a list of acceptable KernelCandidates
+
+        Accept or generate a list of candidate sources for
         Psf-matching, and examine the Mask planes in both of the
         images for indications of bad pixels
 

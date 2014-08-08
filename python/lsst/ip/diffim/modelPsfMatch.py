@@ -36,8 +36,8 @@ import lsst.afw.display.ds9 as ds9
 sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
 class ModelPsfMatchConfig(pexConfig.Config):
-    # We can determine the widths of the Psfs, thus can optmize the
-    # Alard-Lupton gaussian widths. 
+    """!Configuration for model-to-model Psf matching"""
+
     kernel = pexConfig.ConfigChoiceField(
         doc = "kernel type",
         typemap = dict(
@@ -302,7 +302,9 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                                metadata=self.metadata)
 
     def _diagnostic(self, kernelCellSet, spatialSolution, spatialKernel, spatialBg):
-        """!The debugging diagnostics are not really useful here, since the images we are matching have
+        """!Print diagnostic information on spatial kernel and background fit
+
+        The debugging diagnostics are not really useful here, since the images we are matching have
         no variance.  Thus override the _diagnostic method to generate no logging information"""
         return
 
