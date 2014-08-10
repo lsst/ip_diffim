@@ -641,7 +641,7 @@ for this Task include:
     def DebugInfo(name):
         di = lsstDebug.getInfo(name)          
         if name == "lsst.ip.diffim.psfMatch":
-            di.display = True                 # global
+            di.display = True                 # enable debug output
             di.maskTransparency = 80          # ds9 mask transparency
             di.displayCandidates = True       # show all the candidates and residuals
             di.displayKernelBasis = False     # show kernel basis functions
