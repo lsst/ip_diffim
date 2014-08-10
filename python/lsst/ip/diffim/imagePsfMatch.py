@@ -185,7 +185,7 @@ for this Task include:
     def DebugInfo(name):
         di = lsstDebug.getInfo(name)   
         if name == "lsst.ip.diffim.psfMatch":
-            di.display = True                 # global
+            di.display = True                 # enable debug output
             di.maskTransparency = 80          # ds9 mask transparency
             di.displayCandidates = True       # show all the candidates and residuals
             di.displayKernelBasis = False     # show kernel basis functions
@@ -193,7 +193,7 @@ for this Task include:
             di.plotKernelSpatialModel = False # show coefficients of spatial model
             di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
         elif name == "lsst.ip.diffim.imagePsfMatch":
-            di.display = True                 # global
+            di.display = True                 # enable debug output
             di.maskTransparency = 30          # ds9 mask transparency
             di.displayTemplate = True         # show full (remapped) template
             di.displaySciIm = True            # show science image to match to
@@ -201,7 +201,7 @@ for this Task include:
             di.displayDiffIm = True           # show difference image
             di.showBadCandidates = True       # show the bad candidates (red) along with good (green) 
         elif name == "lsst.ip.diffim.diaCatalogSourceSelector":
-            di.display = False                # global
+            di.display = False                # enable debug output
             di.maskTransparency = 30          # ds9 mask transparency
             di.displayExposure = True         # show exposure with candidates indicated
             di.pauseAtEnd = False             # pause when done
@@ -336,8 +336,10 @@ And finally provide some optional debugging displays:
         if not self._validateWcs(templateExposure, scienceExposure):
             if doWarping:
                 self.log.info("Astrometrically registering template to science image")
+                templatePsf = templateExposure.getPsf()
                 templateExposure = self._warper.warpExposure(scienceExposure.getWcs(),
                     templateExposure, destBBox=scienceExposure.getBBox(afwImage.PARENT))
+                templateExposure.setPsf(templatePsf)
             else:
                 pexLog.Trace(self.log.getName(), 1, "ERROR: Input images not registered")
                 raise RuntimeError("Input images not registered")
