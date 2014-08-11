@@ -82,8 +82,6 @@ class DipoleMeasurementTask(SourceMeasurementTask):
 
 \section ip_diffim_dipolemeas_Purpose   Description
 
-\copybrief DipoleMeasurementTask
-
 This class provies a specialized set of Source measurements that allow the user to test the hypothesis that
 the Source is a dipole.  This includes a set of measurements derived from intermediate base classes 
 DipoleCentroidAlgorithm and DipoleFluxAlgorithm.  Their respective algorithm control classes are defined in

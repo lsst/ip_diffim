@@ -98,8 +98,6 @@ class ImagePsfMatchTask(PsfMatchTask):
 
 \section ip_diffim_imagepsfmatch_Purpose   Description
 
-\copybrief ImagePsfMatchTask
-
 Build a Psf-matching kernel using two input images, either as MaskedImages (in which case they need
     to be astrometrically aligned) or Exposures (in which case astrometric alignment will happen by
     default but may be turned off).  This requires a list of input Sources which may be provided

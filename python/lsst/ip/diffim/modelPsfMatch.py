@@ -87,8 +87,6 @@ class ModelPsfMatchTask(PsfMatchTask):
 
 \section ip_diffim_modelpsfmatch_Purpose   Description
 
-\copybrief ModelPsfMatchTask
-
 This Task differs from ImagePsfMatchTask in that it matches two Psf _models_, by realizing
 them in an Exposure-sized SpatialCellSet and then inserting each Psf-image pair into KernelCandidates.  
 Because none of the pairs of sources that are to be matched should be invalid, all sigma clipping is 

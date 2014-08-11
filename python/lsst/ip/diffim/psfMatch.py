@@ -543,8 +543,6 @@ class PsfMatchTask(pipeBase.Task):
 
 \section ip_diffim_psfmatch_Purpose   Description
 
-\copybrief PsfMatchTask
-
 PsfMatchTask is a base class that implements the core functionality for matching the 
 Psfs of two images using a spatially varying Psf-matching lsst.afw.math.LinearCombinationKernel.
 The Task requires the user to provide an instance of an lsst.afw.math.SpatialCellSet, 
