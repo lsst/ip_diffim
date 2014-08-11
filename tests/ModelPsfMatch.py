@@ -16,9 +16,11 @@ class PsfMatchTestCases(unittest.TestCase):
         self.config    = ipDiffim.ModelPsfMatchTask.ConfigClass()
         self.subconfig = self.config.kernel.active
         self.subconfig.scaleByFwhm = False
+        self.subconfig.kernelSize = 9
+        self.subconfig.kernelSizeMin = 9
 
         self.imsize = 2 * self.subconfig.sizeCellX
-        self.ksize  = self.subconfig.kernelSizeMin
+        self.ksize  = 11
         self.sigma1 = 2.0
         self.sigma2 = 3.7
         self.exp    = afwImage.ExposureF(afwGeom.Extent2I(self.imsize, self.imsize))
