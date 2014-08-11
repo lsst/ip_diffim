@@ -29,8 +29,11 @@ import lsst.pex.config as pexConfig
 import lsst.meas.algorithms as measAlg
 import lsst.meas.deblender.baseline as deblendBaseline
 from lsst.meas.algorithms import SourceMeasurementTask, SourceMeasurementConfig
+import lsst.afw.display.ds9 as ds9                
+
 
 class DipoleClassificationConfig(pexConfig.Config):
+    """!Classification of detected diaSources as dipole or not"""
     minSn = pexConfig.Field(
         doc="Minimum quadrature sum of positive+negative lobe S/N to be considered a dipole",
         dtype=float, default=np.sqrt(2) * 5.0, 
@@ -41,6 +44,7 @@ class DipoleClassificationConfig(pexConfig.Config):
         )
 
 class DipoleMeasurementConfig(SourceMeasurementConfig):
+    """!Measurement of detected diaSources as dipoles"""
     classification = pexConfig.ConfigField(
         dtype=DipoleClassificationConfig,
         doc="Dipole classification config"
@@ -52,13 +56,219 @@ class DipoleMeasurementConfig(SourceMeasurementConfig):
         self.algorithms.names.add("flux.dipole.psf")
         self.doReplaceWithNoise = False
 
+## \addtogroup LSST_task_documentation
+## \{
+## \page DipoleMeasurementTask
+## \ref DipoleMeasurementTask_ "DipoleMeasurementTask"
+## \copybrief DipoleMeasurementTask
+## \}
 class DipoleMeasurementTask(SourceMeasurementTask):
+    """!
+\anchor DipoleMeasurementTask_
+
+\brief Measurement of Sources, specifically ones from difference images, for characterization as dipoles
+
+\section ip_diffim_dipolemeas_Contents Contents
+
+ - \ref ip_diffim_dipolemeas_Purpose
+ - \ref ip_diffim_dipolemeas_Initialize
+ - \ref ip_diffim_dipolemeas_IO
+ - \ref ip_diffim_dipolemeas_Config
+ - \ref ip_diffim_dipolemeas_Metadata
+ - \ref ip_diffim_dipolemeas_Debug
+ - \ref ip_diffim_dipolemeas_Example
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_dipolemeas_Purpose   Description
+
+\copybrief DipoleMeasurementTask
+
+This class provies a specialized set of Source measurements that allow the user to test the hypothesis that
+the Source is a dipole.  This includes a set of measurements derived from intermediate base classes 
+DipoleCentroidAlgorithm and DipoleFluxAlgorithm.  Their respective algorithm control classes are defined in
+DipoleCentroidControl and DipoleFluxControl.  Each centroid and flux measurement will have .neg (negative)
+and .pos (positive lobe) fields.
+
+The first set of measurements uses a "naive" alrogithm for centroid and flux measurements, implemented in
+NaiveDipoleCentroidControl and NaiveDipoleFluxControl.  The algorithm uses a naive 3x3 weighted moment around
+the nominal centroids of each peak in the Source Footprint.  These algorithms fill the table fields 
+centroid.dipole.naive.* and flux.dipole.naive.*.
+
+The second set of measurements undertakes a joint-Psf model on the negative and positive lobe simultaneously.
+This fit simultaneously solves for the negative and positive lobe centroids and fluxes using non-linear
+least squares minimization.  The fields are stored in table elements flux.dipole.psf.*.
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_dipolemeas_Initialize    Task initialization
+
+\copydoc \_\_init\_\_
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_dipolemeas_IO        Invoking the Task
+
+\copydoc run
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_dipolemeas_Config       Configuration parameters
+
+See \ref DipoleMeasurementConfig and \ref DipoleClassificationConfig
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_dipolemeas_Metadata   Quantities set in Metadata
+
+No specific values are set in the Task metadata.  However, the Source schema are modified to store the
+results of the dipole-specific measurements.  These additional fields include:
+
+ . classification.dipole : probability of being a dipole
+ 
+ . centroid.dipole.naive.pos : unweighted 3x3 first moment centroid
+ 
+ . centroid.dipole.naive.pos.err : covariance matrix for centroid.dipole.naive.pos
+ 
+ . centroid.dipole.naive.pos.flags : set if the centroid.dipole.naive.pos measurement did not fully succeed
+ 
+ . centroid.dipole.naive.neg : unweighted 3x3 first moment centroid
+ 
+ . centroid.dipole.naive.neg.err : covariance matrix for centroid.dipole.naive.neg
+ 
+ . centroid.dipole.naive.neg.flags : set if the centroid.dipole.naive.neg measurement did not fully succeed
+ 
+ . flux.dipole.naive.pos : raw flux counts
+ 
+ . flux.dipole.naive.pos.err : uncertainty for flux.dipole.naive.pos
+ 
+ . flux.dipole.naive.pos.flags : set if the flux.dipole.naive.pos measurement failed
+ 
+ . flux.dipole.naive.neg : raw flux counts
+ 
+ . flux.dipole.naive.neg.err : uncertainty for flux.dipole.naive.neg
+ 
+ . flux.dipole.naive.neg.flags : set if the flux.dipole.naive.neg measurement failed
+ 
+ . flux.dipole.naive.npos : number of positive pixels
+ 
+ . flux.dipole.naive.nneg : number of negative pixels
+ 
+ . flux.dipole.psf.pos : jointly fitted psf flux counts
+ 
+ . flux.dipole.psf.pos.err : uncertainty for flux.dipole.psf.pos
+ 
+ . flux.dipole.psf.pos.flags : set if the flux.dipole.psf.pos measurement failed
+ 
+ . flux.dipole.psf.neg : jointly fitted psf flux counts
+ 
+ . flux.dipole.psf.neg.err : uncertainty for flux.dipole.psf.neg
+ 
+ . flux.dipole.psf.neg.flags : set if the flux.dipole.psf.neg measurement failed
+ 
+ . flux.dipole.psf.chi2dof : chi2 per degree of freedom of fit
+ 
+ . flux.dipole.psf.centroid : average of the postive and negative lobe positions
+ 
+ . flux.dipole.psf.centroid.err : covariance matrix for flux.dipole.psf.centroid
+ 
+ . flux.dipole.psf.centroid.flags : set if the flux.dipole.psf.centroid measurement did not fully succeed
+ 
+ . flux.dipole.psf.neg.centroid : psf fitted center of negative lobe
+ 
+ . flux.dipole.psf.neg.centroid.err : covariance matrix for flux.dipole.psf.neg.centroid
+ 
+ . flux.dipole.psf.neg.centroid.flags : set if the flux.dipole.psf.neg.centroid measurement did not fully succeed
+ 
+ . flux.dipole.psf.pos.centroid : psf fitted center of positive lobe
+ 
+ . flux.dipole.psf.pos.centroid.err : covariance matrix for flux.dipole.psf.pos.centroid
+ 
+ . flux.dipole.psf.pos.centroid.flags : set if the flux.dipole.psf.pos.centroid measurement did not fully succeed
+ 
+ . flux.dipole.psf.flags.maxpix : set if too large a footprint was sent to the algorithm
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_dipolemeas_Debug     Debug variables
+
+The \link lsst.pipe.base.cmdLineTask.CmdLineTask command line task\endlink interface supports a
+flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py 
+for this Task include:
+
+\code{.py}
+    import sys
+    import lsstDebug
+    def DebugInfo(name):
+        di = lsstDebug.getInfo(name)   
+        if name == "lsst.ip.diffim.dipoleMeasurement":
+            di.display = True                 # enable debug output
+            di.maskTransparency = 90          # ds9 mask transparency
+            di.displayDiaSources = True       # show exposure with dipole results
+        return di
+    lsstDebug.Info = DebugInfo
+    lsstDebug.frame = 1      
+\endcode
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_dipolemeas_Example   A complete example of using DipoleMeasurementTask
+
+This code is dipoleMeasTask.py in the examples directory, and can be run as \em e.g.
+\code
+examples/dipoleMeasTask.py
+examples/dipoleMeasTask.py --debug 
+examples/dipoleMeasTask.py --debug --image /path/to/image.fits
+\endcode
+
+\dontinclude dipoleMeasTask.py
+Start the processing by parsing the command line, where the user has the option of enabling debugging output
+and/or sending their own image for demonstration (in case they have not downloaded the afwdata package).
+\skip main
+\until run
+
+\dontinclude dipoleMeasTask.py
+The processing occurs in the run function.  We first extract an exposure from disk or afwdata, displaying
+it if requested:
+\skip args
+\until mtv
+
+Create a default source schema that we will append fields to as we add more algorithms:
+\skip makeMinimalSchema
+\until makeMinimalSchema
+
+Create the detection and measurement Tasks, with some minor tweaking of their configs:
+\skip Create
+\until measureTask
+
+Having fully initialied the schema, we create a Source table from it:
+\skip output
+\until SourceTable
+
+Run detection:
+\skip Process
+\until detectionTask
+
+Because we are looking for dipoles, we need to merge the positive and negative detections:
+\skip Merge
+\until numNeg
+
+Finally, perform measurement (both standard and dipole-specialized) on the merged sources:
+\skip measureTask
+\until measureTask
+
+Optionally display debugging information:
+\skip Display
+\until displayDipoles
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+    """
     ConfigClass = DipoleMeasurementConfig
     _DefaultName = "dipoleMeasurement"
     _ClassificationFlag = "classification.dipole"
 
     def __init__(self, schema, algMetadata=None, **kwds):
-        """Create the task, adding necessary fields to the given schema.
+        """!Create the Task, and add Task-specific fields to the provided measurement table schema.
 
         @param[in,out] schema        Schema object for measurement fields; modified in-place.
         @param[in,out] algMetadata   Passed to MeasureSources object to be filled with 
@@ -70,6 +280,11 @@ class DipoleMeasurementTask(SourceMeasurementTask):
 
     @pipeBase.timeMethod
     def classify(self, sources):
+        """!Create the records needed for dipole classification, and run classifier
+
+        @param[in,out] sources       The diaSources to run classification on; modified in in-place
+        """
+
         self.log.log(self.log.INFO, "Classifying %d sources" % len(sources))
         if not sources:
             return
@@ -98,6 +313,12 @@ class DipoleMeasurementTask(SourceMeasurementTask):
             source.set(key, val)
 
     def run(self, exposure, sources, **kwds):
+        """!Run dipole measurement and classification
+        @param exposure      Exposure on which the diaSources were detected
+        @param sources       diaSources that will be measured using dipole measurement
+        @param **kwds        Sent to SourceMeasurementTask
+        """
+
         SourceMeasurementTask.run(self, exposure, sources, **kwds)
         self.classify(sources)
 
@@ -106,29 +327,49 @@ class DipoleMeasurementTask(SourceMeasurementTask):
 #########
 
 class SourceFlagChecker(object):
-    """A functor to check whether a difference image source has any
-    flags set that should cause it to be labeled bad."""
-    def __init__(self, sources, badFlags=['flags.pixel.edge', 
-                                          'flags.pixel.interpolated.center', 
-                                          'flags.pixel.saturated.center']):
-        self.keys = [sources.getSchema().find(name).key for name in badFlags]
+    """!Functor class to check whether a diaSource has flags set that should cause it to be labeled bad."""
+    def __init__(self, sources, badFlags=None):
+        """!Constructor
+
+        @param sources     Sources that will be measured
+        @param badFlags    A list of flags that will be used to determine if there was a measurement problem
+
+        The list of badFlags will be used to make a list of keys to check for measurement flags on.  By
+        default the centroid keys are added to this list"""
+
+        self.badFlags = ['flags.pixel.edge', 'flags.pixel.interpolated.center', 'flags.pixel.saturated.center']
+        if badFlags is not None:
+            for flag in badFlags:
+                self.badFlags.append(flag)
+        self.keys = [sources.getSchema().find(name).key for name in self.badFlags]
         self.keys.append(sources.table.getCentroidFlagKey())
 
     def __call__(self, source):
+        """!Call the source flag checker on a single Source
+
+        @param source      Source that will be examined"""
         for k in self.keys:
             if source.get(k):
                 return False
         return True
 
 class DipoleAnalysis(object):
-    """A functor to check for dipoles in difference image source tables."""
+    """!Functor class that provides (S/N, position, orientation) of measured dipoles"""
     def __init__(self):
+        """!Constructor"""
         pass
 
     def __call__(self, source):
+        """!Parse information returned from dipole measurement
+
+        @param source  The source that will be examined"""
         return self.getSn(source), self.getCentroid(source), self.getOrientation(source)
 
     def getSn(self, source):
+        """!Get the total signal-to-noise of the dipole; total S/N is from positive and negative lobe
+
+        @param source  The source that will be examined"""
+
         posflux = source.get("flux.dipole.psf.pos")
         posfluxErr = source.get("flux.dipole.psf.pos.err")
         negflux = source.get("flux.dipole.psf.neg")
@@ -141,6 +382,10 @@ class DipoleAnalysis(object):
         return np.sqrt((posflux/posfluxErr)**2 + (negflux/negfluxErr)**2)
 
     def getCentroid(self, source):
+        """!Get the centroid of the dipole; average of positive and negative lobe
+
+        @param source  The source that will be examined"""
+
         negCen = source.get("flux.dipole.psf.neg.centroid")
         posCen = source.get("flux.dipole.psf.pos.centroid")
         if (False in np.isfinite(negCen)) or (False in np.isfinite(posCen)):
@@ -151,6 +396,10 @@ class DipoleAnalysis(object):
         return center
 
     def getOrientation(self, source):
+        """!Calculate the orientation of dipole; vector from negative to positive lobe
+
+        @param source  The source that will be examined"""
+
         negCen = source.get("flux.dipole.psf.neg.centroid")
         posCen = source.get("flux.dipole.psf.pos.centroid")
         if (False in np.isfinite(negCen)) or (False in np.isfinite(posCen)):
@@ -160,43 +409,57 @@ class DipoleAnalysis(object):
         angle  = afwGeom.Angle(np.arctan2(dx, dy), afwGeom.radians)
         return angle
 
-    def displayDipoles(self, exposure, sources, frame=1):
-        import lsst.afw.display.ds9 as ds9                
-        ds9.mtv(exposure, frame=frame)
-        with ds9.Buffering():
-            for source in sources:
-                cen = source.get("flux.dipole.psf.centroid")
-                if (False in np.isfinite(cen)):
-                    cen = source.getCentroid()
+    def displayDipoles(self, exposure, sources):
+        """!Display debugging information on the detected dipoles
 
-                isdipole = source.get("classification.dipole")
-                if isdipole:
-                    ctype= "green"
-                    print "DIPOLE: %.1f,%.1f %.1f,%.1f" % (
-                        cen.getX(), cen.getY(), 
-                        source.get("flux.dipole.psf.neg"), 
-                        source.get("flux.dipole.psf.pos"))
-                else:
-                    ctype = "red"
-                    print "NOT DIPOLE: %.1f,%.1f" % (cen.getX(), cen.getY())
+        @param exposure  Image the dipoles were measured on
+        @param sources   The set of diaSources that were measured"""
 
-                ds9.dot("o", cen.getX(), cen.getY(), size=2, ctype=ctype, frame=frame)
+        try:
+            import debug
+        except:
+            return
+        import lsstDebug
+        display = lsstDebug.Info(__name__).display
+        displayDiaSources = lsstDebug.Info(__name__).displayDiaSources
+        maskTransparency = lsstDebug.Info(__name__).maskTransparency
+        if not maskTransparency:
+            maskTransparency = 90
+        ds9.setMaskTransparency(maskTransparency)
+        ds9.mtv(exposure, frame=lsstDebug.frame)
 
-                negCen = source.get("flux.dipole.psf.neg.centroid")
-                posCen = source.get("flux.dipole.psf.pos.centroid")
-                if (False in np.isfinite(negCen)) or (False in np.isfinite(posCen)):
-                    continue
+        if display and displayDiaSources:
+            with ds9.Buffering():
+                for source in sources:
+                    cenX, cenY = source.get("flux.dipole.psf.centroid")
+                    if np.isinf(cenX) or np.isinf(cenY):
+                        cenX, cenY = source.getCentroid()
 
-                ds9.line([(negCen.getX(), negCen.getY()),(posCen.getX(), posCen.getY())], 
-                         ctype="yellow", frame=frame)
-            
-        
+                    isdipole = source.get("classification.dipole")
+                    if isdipole and np.isfinite(isdipole):
+                        # Dipole
+                        ctype= "green"
+                    else:
+                        # Not dipole
+                        ctype = "red"
+
+                    ds9.dot("o", cenX, cenY, size=2, ctype=ctype, frame=lsstDebug.frame)
+
+                    negCenX, negCenY = source.get("flux.dipole.psf.neg.centroid")
+                    posCenX, posCenY = source.get("flux.dipole.psf.pos.centroid")
+                    if (np.isinf(negCenX) or np.isinf(negCenY) or np.isinf(posCenX) or np.isinf(posCenY)):
+                        continue
+
+                    ds9.line([(negCenX, negCenY), (posCenX, posCenY)], ctype="yellow", frame=lsstDebug.frame)
+
+            lsstDebug.frame += 1
+
 
 
 class DipoleDeblender(object):
-    """A functor to deblend a source as a dipole, and return a new
-       source with deblended footprints.  This necessarily overrides
-       some of the functionality from
+    """!Functor to deblend a source as a dipole, and return a new source with deblended footprints.  
+
+       This necessarily overrides some of the functionality from
        meas_algorithms/python/lsst/meas/algorithms/deblend.py since we
        need a single source that contains the blended peaks, not
        multiple children sources.  This directly calls the core
