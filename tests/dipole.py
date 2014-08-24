@@ -85,9 +85,9 @@ def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.2):
     config.thresholdPolarity = "both"
     config.reEstimateBackground = False
     schema = afwTable.SourceTable.makeMinimalSchema()
+    schema.setVersion(0)
     task = measAlg.SourceDetectionTask(schema, config=config)
     table = afwTable.SourceTable.make(schema)
-    table.setVersion(0)
     results = task.makeSourceCatalog(table, exp)
     if display:
         ds9.mtv(image, frame=4, title="Detection plane")
@@ -380,11 +380,11 @@ class DipoleMeasurementTaskTest(unittest.TestCase):
 
     def testMeasure(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
+        schema.setVersion(0)
         dipoleFlag = ipDiffim.DipoleMeasurementTask._ClassificationFlag
         schema.addField(dipoleFlag, "F", "probability of being a dipole")
         task = ipDiffim.DipoleMeasurementTask(schema, config=self.config)
         table = afwTable.SourceTable.make(schema)
-        table.setVersion(0)
         sources = afwTable.SourceCatalog(table)
         source = sources.addNew()
     

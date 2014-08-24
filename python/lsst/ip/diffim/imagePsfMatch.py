@@ -282,6 +282,7 @@ And finally provide some optional debugging displays:
         self.kConfig = self.config.kernel.active
         self._warper = afwMath.Warper.fromConfig(self.kConfig.warpingConfig)
         self.selectSchema = afwTable.SourceTable.makeMinimalSchema()
+        self.selectSchema.setVersion(0)
         self.selectAlgMetadata = dafBase.PropertyList()
         self.makeSubtask("selectDetection", schema=self.selectSchema)
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)
@@ -625,7 +626,6 @@ And finally provide some optional debugging displays:
             table = afwTable.SourceTable.make(self.selectSchema, idFactory)
         else:
             table = afwTable.SourceTable.make(self.selectSchema)
-        table.setVersion(0)
         mi = exposure.getMaskedImage()
 
         imArr = mi.getImage().getArray()
