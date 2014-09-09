@@ -27,12 +27,10 @@ import lsst.utils.tests as tests
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
-import lsst.afw.detection as afwDet
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
 import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimTools as diffimTools
 #display = True
 try:
     display
@@ -217,8 +215,8 @@ class DipoleAlgorithmTest(unittest.TestCase):
         modelSubim    += posPsfSubim
         posModelSubim += posPsfSubim
 
-        data = afwImage.ImageF(exposure.getMaskedImage().getImage(), fp.getBBox())
-        var = afwImage.ImageF(exposure.getMaskedImage().getVariance(), fp.getBBox())
+        data = afwImage.ImageF(exposure.getMaskedImage().getImage(), fp.getBBox(), afwImage.PARENT)
+        var = afwImage.ImageF(exposure.getMaskedImage().getVariance(), fp.getBBox(), afwImage.PARENT)
         matrixNorm = 1. / np.sqrt(np.median(var.getArray()))
 
         if display:

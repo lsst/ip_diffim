@@ -22,9 +22,7 @@
 
 """Support utilities for Measuring sources"""
 import numpy as np
-import lsst.pex.exceptions as pexExcept
 import lsst.pex.logging as pexLog
-import lsst.daf.base as dafBase
 import lsst.afw.detection as afwDet
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -67,7 +65,6 @@ def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
         for cell in kernelCellSet.getCellList():
             displayUtils.drawBBox(cell.getBBox(), origin=origin, frame=frame)
 
-            i = 0
             goodies = ctypeBad is None
             for cand in cell.begin(goodies):
                 cand = diffimLib.cast_KernelCandidateF(cand)
@@ -263,7 +260,6 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
     """Plot the Kernel spatial model."""
 
     try:
-        import numpy as num
         import matplotlib.pyplot as plt
         import matplotlib.colors
     except ImportError, e:
@@ -306,18 +302,13 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
             targetPos.append(candCenter)
             targetAmps.append(amp)
 
-    numCandidates = len(candFits)
-    numBasisFuncs = kernel.getNBasisKernels()
-
     xGood = np.array([pos.getX() for pos in candPos]) - x0
     yGood = np.array([pos.getY() for pos in candPos]) - y0
     zGood = np.array(candFits)
-    ampGood = np.array(candAmps)
 
     xBad = np.array([pos.getX() for pos in badPos]) - x0
     yBad = np.array([pos.getY() for pos in badPos]) - y0
     zBad = np.array(badFits)
-    ampBad = np.array(badAmps)
     numBad = len(badPos)
 
     xRange = np.linspace(0, kernelCellSet.getBBox().getWidth(), num=numSample)
@@ -456,7 +447,7 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
             w, h = im.getWidth(), im.getHeight()
             cen = afwGeom.PointD(w//2, h//2)
             src = table.makeRecord()
-            foot = afwDet.Footprint(exp.getBBox())
+            foot = afwDet.Footprint(exp.getBBox(afwImage.LOCAL))
             src.setFootprint(foot)
 
             centroider.apply(src, exp, cen)
@@ -691,7 +682,6 @@ def plotWhisker(results, newWcs):
     """Plot whisker diagram of astromeric offsets between results.matches"""
     refCoordKey = results.matches[0].first.getTable().getCoordKey()
     inCentroidKey = results.matches[0].second.getTable().getCentroidKey()
-    sids      = [m.first.getId() for m in results.matches]
     positions = [m.first.get(refCoordKey) for m in results.matches]
     residuals = [m.first.get(refCoordKey).getOffsetFrom(
                        newWcs.pixelToSky(m.second.get(inCentroidKey))) for
