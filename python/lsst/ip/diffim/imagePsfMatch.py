@@ -27,10 +27,8 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
-import lsst.afw.detection as afwDetect
 import lsst.pipe.base as pipeBase
-from lsst.meas.algorithms import (SourceDetectionTask, SourceMeasurementTask,
-                                  getBackground, BackgroundConfig)
+from lsst.meas.algorithms import SourceDetectionTask, SourceMeasurementTask, getBackground
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigDF, PsfMatchConfigAL
 from . import utils as diUtils 
@@ -337,7 +335,7 @@ And finally provide some optional debugging displays:
                 self.log.info("Astrometrically registering template to science image")
                 templatePsf = templateExposure.getPsf()
                 templateExposure = self._warper.warpExposure(scienceExposure.getWcs(),
-                    templateExposure, destBBox=scienceExposure.getBBox(afwImage.PARENT))
+                    templateExposure, destBBox=scienceExposure.getBBox())
                 templateExposure.setPsf(templatePsf)
             else:
                 pexLog.Trace(self.log.getName(), 1, "ERROR: Input images not registered")
@@ -459,7 +457,7 @@ And finally provide some optional debugging displays:
 
 
 
-        psfMatchedMaskedImage = afwImage.MaskedImageF(templateMaskedImage.getBBox(afwImage.PARENT))
+        psfMatchedMaskedImage = afwImage.MaskedImageF(templateMaskedImage.getBBox())
         doNormalize = False
         afwMath.convolve(psfMatchedMaskedImage, templateMaskedImage, psfMatchingKernel, doNormalize)
         return pipeBase.Struct(
@@ -711,7 +709,7 @@ And finally provide some optional debugging displays:
         sizeCellX, sizeCellY = self._adaptCellSize(candidateList)
 
         # Object to store the KernelCandidates for spatial modeling
-        kernelCellSet = afwMath.SpatialCellSet(templateMaskedImage.getBBox(afwImage.PARENT),
+        kernelCellSet = afwMath.SpatialCellSet(templateMaskedImage.getBBox(),
                                                sizeCellX, sizeCellY)
 
         policy = pexConfig.makePolicy(self.kConfig)
@@ -719,8 +717,8 @@ And finally provide some optional debugging displays:
         for cand in candidateList:
             bbox = cand['footprint'].getBBox()
 
-            tmi  = afwImage.MaskedImageF(templateMaskedImage, bbox, afwImage.PARENT)
-            smi  = afwImage.MaskedImageF(scienceMaskedImage, bbox, afwImage.PARENT)
+            tmi  = afwImage.MaskedImageF(templateMaskedImage, bbox)
+            smi  = afwImage.MaskedImageF(scienceMaskedImage, bbox)
             cand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
 
             self.log.logdebug("Candidate %d at %f, %f" % (cand.getId(), cand.getXCenter(), cand.getYCenter()))
@@ -738,8 +736,8 @@ And finally provide some optional debugging displays:
         """
         templateWcs    = templateExposure.getWcs() 
         scienceWcs     = scienceExposure.getWcs()
-        templateBBox   = templateExposure.getBBox(afwImage.PARENT)
-        scienceBBox    = scienceExposure.getBBox(afwImage.PARENT)
+        templateBBox   = templateExposure.getBBox()
+        scienceBBox    = scienceExposure.getBBox()
 
         # LLC
         templateOrigin = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getBegin()))

@@ -27,7 +27,6 @@ import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.meas.algorithms as measAlg
 import lsst.pipe.base as pipeBase
-import diffimTools
 from makeKernelBasisList import makeKernelBasisList
 from psfMatch import PsfMatchTask, PsfMatchConfigAL
 from . import utils as diUtils 
@@ -283,7 +282,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
             psfMatchingKernel.setKernelParameters(kParameters)
 
         self.log.log(pexLog.Log.INFO, "Psf-match science exposure to reference")
-        psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(afwImage.PARENT), exposure.getWcs())
+        psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(), exposure.getWcs())
         psfMatchedExposure.setFilter(exposure.getFilter())
         psfMatchedExposure.setCalib(exposure.getCalib())
         psfMatchedMaskedImage = psfMatchedExposure.getMaskedImage()
@@ -316,7 +315,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
 
         Raise a RuntimeError if the reference Psf model and science Psf model have different dimensions
         """
-        scienceBBox = exposure.getBBox(afwImage.PARENT)
+        scienceBBox = exposure.getBBox()
         sciencePsfModel = exposure.getPsf()
         # The Psf base class does not support getKernel() in general, as there are some Psf
         # classes for which this is not meaningful.

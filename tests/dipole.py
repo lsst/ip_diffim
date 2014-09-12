@@ -189,9 +189,9 @@ class DipoleAlgorithmTest(unittest.TestCase):
         posModel = afwImage.ImageF(fp.getBBox())
 
         # The center of the Psf should be at negCenter, posCenter
-        negPsfBBox = negPsf.getBBox(afwImage.PARENT)
-        posPsfBBox = posPsf.getBBox(afwImage.PARENT)
-        modelBBox  = model.getBBox(afwImage.PARENT)
+        negPsfBBox = negPsf.getBBox()
+        posPsfBBox = posPsf.getBBox()
+        modelBBox  = model.getBBox()
 
         # Portion of the negative Psf that overlaps the montage
         negOverlapBBox = afwGeom.Box2I(negPsfBBox)
@@ -203,20 +203,20 @@ class DipoleAlgorithmTest(unittest.TestCase):
         posOverlapBBox.clip(modelBBox)
         self.assertFalse(posOverlapBBox.isEmpty())
 
-        negPsfSubim    = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT)
-        modelSubim     = type(model)(model, negOverlapBBox, afwImage.PARENT)
-        negModelSubim  = type(negModel)(negModel, negOverlapBBox, afwImage.PARENT)
+        negPsfSubim    = type(negPsf)(negPsf, negOverlapBBox)
+        modelSubim     = type(model)(model, negOverlapBBox)
+        negModelSubim  = type(negModel)(negModel, negOverlapBBox)
         modelSubim    += negPsfSubim  # just for debugging
         negModelSubim += negPsfSubim  # for fitting
 
-        posPsfSubim    = type(posPsf)(posPsf, posOverlapBBox, afwImage.PARENT)
-        modelSubim     = type(model)(model, posOverlapBBox, afwImage.PARENT)
-        posModelSubim  = type(posModel)(posModel, posOverlapBBox, afwImage.PARENT)
+        posPsfSubim    = type(posPsf)(posPsf, posOverlapBBox)
+        modelSubim     = type(model)(model, posOverlapBBox)
+        posModelSubim  = type(posModel)(posModel, posOverlapBBox)
         modelSubim    += posPsfSubim
         posModelSubim += posPsfSubim
 
-        data = afwImage.ImageF(exposure.getMaskedImage().getImage(), fp.getBBox(), afwImage.PARENT)
-        var = afwImage.ImageF(exposure.getMaskedImage().getVariance(), fp.getBBox(), afwImage.PARENT)
+        data = afwImage.ImageF(exposure.getMaskedImage().getImage(), fp.getBBox())
+        var = afwImage.ImageF(exposure.getMaskedImage().getVariance(), fp.getBBox())
         matrixNorm = 1. / np.sqrt(np.median(var.getArray()))
 
         if display:
@@ -249,9 +249,9 @@ class DipoleAlgorithmTest(unittest.TestCase):
         posFit  = type(posPsf)(posPsf, posOverlapBBox, afwImage.PARENT, True)
         posFit *= float(fpos)
 
-        fitSubim  = type(fitted)(fitted, negOverlapBBox, afwImage.PARENT)
+        fitSubim  = type(fitted)(fitted, negOverlapBBox)
         fitSubim += negFit
-        fitSubim  = type(fitted)(fitted, posOverlapBBox, afwImage.PARENT)
+        fitSubim  = type(fitted)(fitted, posOverlapBBox)
         fitSubim += posFit
         if display:
             ds9.mtv(fitted, frame=7, title="Fitted model")

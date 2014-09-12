@@ -221,7 +221,7 @@ namespace diffim {
         /* Failure Condition 2) 
          * Grown off the image
          */
-        if (!(templateMaskedImage->getBBox(afwImage::PARENT).contains(fpGrowBBox))) {
+        if (!(templateMaskedImage->getBBox().contains(fpGrowBBox))) {
             pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                               "Footprint grown off image"); 
             return false;
@@ -230,10 +230,8 @@ namespace diffim {
         /* Grab subimages; report any exception */
         bool subimageHasFailed = false;
         try {
-            afwImage::MaskedImage<PixelT> templateSubimage(*templateMaskedImage, fpGrowBBox, 
-                                                             afwImage::PARENT);
-            afwImage::MaskedImage<PixelT> scienceSubimage(*scienceMaskedImage, fpGrowBBox, 
-                                                                afwImage::PARENT);
+            afwImage::MaskedImage<PixelT> templateSubimage(*templateMaskedImage, fpGrowBBox);
+            afwImage::MaskedImage<PixelT> scienceSubimage(*scienceMaskedImage, fpGrowBBox);
             
             // Search for any masked pixels within the footprint
             fsb.apply(*(templateSubimage.getMask()));

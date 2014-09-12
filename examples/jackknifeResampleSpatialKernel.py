@@ -23,13 +23,11 @@
 #
 
 import os
-import pdb
 import sys
 import unittest
 import lsst.utils.tests as tests
  
 import eups
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -79,7 +77,7 @@ class DiffimTestCases(unittest.TestCase):
 
         warper = afwMath.Warper.fromConfig(self.subconfigAL.warpingConfig)
         self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
-                                                    destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
+                                                    destBBox = self.scienceExposure.getBBox())
 
         self.scienceMaskedImage = self.scienceExposure.getMaskedImage()
         self.templateMaskedImage = self.templateExposure.getMaskedImage()
@@ -159,7 +157,6 @@ class DiffimTestCases(unittest.TestCase):
 
     def jackknifeResample(self, psfmatch, results):
         
-        diffim  = results.subtractedImage
         kernel  = results.psfMatchingKernel
         bg      = results.backgroundModel
         cellSet = results.kernelCellSet

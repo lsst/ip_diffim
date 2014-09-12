@@ -2,6 +2,7 @@ import sys
 import optparse
 import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
+import lsst.ip.diffim as ipDiffim
 import lsst.daf.base as dafBase
 from lsst.pex.logging import Log
 
@@ -34,7 +35,7 @@ def main():
     warper = afwMath.Warper.fromConfig(subconfig.warpingConfig)
     warpedExposure = warper.warpExposure(refWcsExposure.getWcs(), 
                                          toWarpExposure,
-                                         destBBox = refWcsExposure.getBBox(afwImage.PARENT))
+                                         destBBox = refWcsExposure.getBBox())
     warpedExposure.writeFits(warpedPath)
     
 def run():

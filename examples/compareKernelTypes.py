@@ -23,8 +23,6 @@
 #
 
 import os
-import pdb
-import sys
 import unittest
 import lsst.utils.tests as tests
 
@@ -34,7 +32,6 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.pex.config as pexConfig
 import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
@@ -105,7 +102,7 @@ class DiffimTestCases(unittest.TestCase):
             self.templateExposure  = afwImage.ExposureF(defTemplatePath)
             warper = afwMath.Warper.fromConfig(self.subconfigAL.warpingConfig)
             self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
-                                                        destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
+                                                        destBBox = self.scienceExposure.getBBox())
 
 
         # image statistics
@@ -175,7 +172,7 @@ class DiffimTestCases(unittest.TestCase):
             else:
                 smi  = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
                 tmi  = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
-        except Exception, e:
+        except Exception:
             return None
 
         #
