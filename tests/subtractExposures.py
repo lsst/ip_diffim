@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import os
-import pdb
 import sys
 import unittest
 import lsst.utils.tests as tests
@@ -9,11 +8,9 @@ import eups
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.afw.detection as afwDet
 import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as logging
-import lsst.pex.config as pexConfig
 import lsst.ip.diffim.diffimTools as diffimTools
 
 
@@ -85,8 +82,8 @@ class DiffimTestCases(unittest.TestCase):
 
         self.subconfig.fitForBackground = fitForBackground
 
-        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.PARENT)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
 
         self.subconfig.spatialModelType = 'chebyshev1'
         psfmatch1 = ipDiffim.ImagePsfMatchTask(config=self.config)
@@ -168,12 +165,12 @@ class DiffimTestCases(unittest.TestCase):
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
-        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.PARENT)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
         psfmatch = ipDiffim.ImagePsfMatchTask(config=self.config)
         try:
             psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = False)
-        except Exception, e:
+        except Exception:
             pass
         else:
             self.fail()
@@ -190,8 +187,8 @@ class DiffimTestCases(unittest.TestCase):
         self.subconfig.spatialModelType = poly
         self.subconfig.fitForBackground = fitForBackground
 
-        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox, afwImage.PARENT)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox, afwImage.PARENT)
+        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
+        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
 
         # Have an XY0
         psfmatch  = ipDiffim.ImagePsfMatchTask(config=self.config)

@@ -37,7 +37,6 @@ import lsst.afw.detection as afwDetect
 import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
-import lsst.meas.algorithms as measAlg
 from .makeKernelBasisList import makeKernelBasisList 
 
 # Helper functions for ipDiffim; mostly viewing of results and writing
@@ -68,7 +67,7 @@ def makePoissonNoiseImage(im):
     """
     import numpy.random as rand
     imArr = im.getArray()
-    noiseIm = im.Factory(im.getBBox(afwImage.PARENT))
+    noiseIm = im.Factory(im.getBBox())
     noiseArr = noiseIm.getArray()
 
     intNoiseArr = rand.poisson(imArr)
@@ -147,7 +146,6 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
 
     # Now make a science image which is this convolved with some
     # spatial function.  Use input basis list.
-    sOrder   = 1
     polyFunc = afwMath.PolynomialFunction2D(1)
     kCoeffs  = fakeCoeffs()
     nToUse   = min(len(kCoeffs), len(basisList))
@@ -298,7 +296,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
     badBitMask = 0
     for mp in config.badMaskPlanes: 
         badBitMask |= afwImage.MaskU.getPlaneBitMask(mp)
-    bbox = scienceExposure.getBBox(afwImage.PARENT)
+    bbox = scienceExposure.getBBox()
 
     # Size to grow Sources
     if config.scaleByFwhm:
@@ -312,8 +310,6 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
             raise RuntimeError, ("Candiate not of type afwTable.SourceRecord")
         bm1 = 0
         bm2 = 0
-        ra  = kernelCandidate.getRa()
-        dec = kernelCandidate.getDec()
         center = afwGeom.Point2I(scienceExposure.getWcs().skyToPixel(kernelCandidate.getCoord()))
         if center[0] < bbox.getMinX() or center[0] > bbox.getMaxX():
             continue
@@ -347,7 +343,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
             bm1 = fsb.getBits()
             fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, False).getMask())
             bm2 = fsb.getBits()
-        except Exception, e:
+        except Exception:
             pass
         else:
             if not((bm1 & badBitMask) or (bm2 & badBitMask)):
@@ -373,8 +369,8 @@ def sourceTableToCandidateList(sourceTable, templateExposure, scienceExposure, k
     policy = pexConfig.makePolicy(kConfig)
     for cand in footprintList:
         bbox = cand['footprint'].getBBox() 
-        tmi  = afwImage.MaskedImageF(templateExposure.getMaskedImage(), bbox, afwImage.PARENT)
-        smi  = afwImage.MaskedImageF(scienceExposure.getMaskedImage(), bbox, afwImage.PARENT)
+        tmi  = afwImage.MaskedImageF(templateExposure.getMaskedImage(), bbox)
+        smi  = afwImage.MaskedImageF(scienceExposure.getMaskedImage(), bbox)
         kCand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
         if doBuild:
             visitor.processCandidate(kCand)

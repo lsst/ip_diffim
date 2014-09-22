@@ -12,7 +12,6 @@ import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.table as afwTable
-import numpy as num
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
@@ -55,7 +54,7 @@ class DiffimTestCases(unittest.TestCase):
             # do the warping first so we don't have any masked pixels in the postage stamps
             warper = afwMath.Warper.fromConfig(self.subconfig.warpingConfig)
             templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
-                destBBox = scienceExposure.getBBox(afwImage.PARENT))
+                destBBox = scienceExposure.getBBox())
 
             # Change xy0
             # Nice star at position 276, 717
@@ -481,7 +480,7 @@ class DiffimTestCases(unittest.TestCase):
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi, smi, self.policy)
         try:
             kc.build(kList)
-        except Exception, e:
+        except Exception:
             pass
         else:
             self.fail()

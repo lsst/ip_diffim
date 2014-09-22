@@ -29,7 +29,6 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLogging
-import lsst.pex.config as pexConfig
 
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.display.utils as displayUtils
@@ -68,7 +67,7 @@ subconfig = config.kernel.active
 if warp:
     warper = afwMath.Warper.fromConfig(subconfig.warpingConfig)
     templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
-                                           destBBox = scienceExposure.getBBox(afwImage.PARENT))
+                                           destBBox = scienceExposure.getBBox())
 if subBackground:
     # Do in AFW
     diffimTools.backgroundSubtract(subconfig.afwBackgroundConfig,

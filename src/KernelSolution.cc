@@ -526,7 +526,7 @@ namespace diffim {
         }
 
         /* Full footprint of all input images */
-        afwDet::Footprint::Ptr fullFp(new afwDet::Footprint(templateImage.getBBox(afwImage::PARENT)));
+        afwDet::Footprint::Ptr fullFp(new afwDet::Footprint(templateImage.getBBox()));
 
         afwMath::KernelList basisList = 
             boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
@@ -890,7 +890,7 @@ namespace diffim {
            NOTE : If we are using these views in Afw's Image space, we need to
            make sure and compensate for the XY0 of the image:
 
-           afwGeom::Box2I fullBBox = templateImage.getBBox(afwImage::PARENT);
+           afwGeom::Box2I fullBBox = templateImage.getBBox();
            int maskStartCol = maskBox.getMinX();
            int maskStartRow = maskBox.getMinY();
            int maskEndCol   = maskBox.getMaxX();
@@ -910,7 +910,7 @@ namespace diffim {
         */
 
                                                                          
-        afwGeom::Box2I shrunkBBox = (*kiter)->shrinkBBox(templateImage.getBBox(afwImage::PARENT));
+        afwGeom::Box2I shrunkBBox = (*kiter)->shrinkBBox(templateImage.getBBox());
 
         pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
                           "Limits of good pixels after convolution: %d,%d -> %d,%d", 
@@ -1014,9 +1014,9 @@ namespace diffim {
         for (; biter != boxArray.end(); ++biter) {
             int area = (*biter).getWidth() * (*biter).getHeight();
 
-            afwImage::Image<InputT> siTemplate(templateImage, *biter, afwImage::PARENT);
-            afwImage::Image<InputT> siScience(scienceImage, *biter, afwImage::PARENT);
-            afwImage::Image<InputT> sVarEstimate(varianceEstimate, *biter, afwImage::PARENT);
+            afwImage::Image<InputT> siTemplate(templateImage, *biter);
+            afwImage::Image<InputT> siScience(scienceImage, *biter);
+            afwImage::Image<InputT> sVarEstimate(varianceEstimate, *biter);
 
             Eigen::MatrixXd eTemplate = imageToEigenMatrix(siTemplate);
             Eigen::MatrixXd eScience = imageToEigenMatrix(siScience);
@@ -1049,7 +1049,7 @@ namespace diffim {
             for (; biter != boxArray.end(); ++biter) {
                 int area = (*biter).getWidth() * (*biter).getHeight();
 
-                afwImage::Image<InputT> csubimage(cimage, *biter, afwImage::PARENT);
+                afwImage::Image<InputT> csubimage(cimage, *biter);
                 Eigen::MatrixXd esubimage = imageToEigenMatrix(csubimage);
                 esubimage.resize(area, 1);
                 cMat.block(nTerms, 0, area, 1) = esubimage.block(0, 0, area, 1);

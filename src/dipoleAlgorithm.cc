@@ -447,14 +447,14 @@ std::pair<double,int> PsfDipoleFlux::chi2(
     afwImage::Image<double> negModel(footprint->getBBox());
     afwImage::Image<double> posModel(footprint->getBBox());
     afwImage::Image<PixelT> data(*(exposure.getMaskedImage().getImage()), 
-                                 footprint->getBBox(), afwImage::PARENT);
+                                 footprint->getBBox());
     afwImage::Image<afwImage::VariancePixel> var(*(exposure.getMaskedImage().getVariance()), 
-                                                 footprint->getBBox(), afwImage::PARENT);
+                                                 footprint->getBBox());
     
-    afwGeom::Box2I negPsfBBox = negPsf->getBBox(afwImage::PARENT);
-    afwGeom::Box2I posPsfBBox = posPsf->getBBox(afwImage::PARENT);
-    afwGeom::Box2I negModelBBox = negModel.getBBox(afwImage::PARENT);
-    afwGeom::Box2I posModelBBox = posModel.getBBox(afwImage::PARENT);
+    afwGeom::Box2I negPsfBBox = negPsf->getBBox();
+    afwGeom::Box2I posPsfBBox = posPsf->getBBox();
+    afwGeom::Box2I negModelBBox = negModel.getBBox();
+    afwGeom::Box2I posModelBBox = posModel.getBBox();
     
     // Portion of the negative Psf that overlaps the model
     int negXmin = std::max(negPsfBBox.getMinX(), negModelBBox.getMinX());
@@ -463,8 +463,8 @@ std::pair<double,int> PsfDipoleFlux::chi2(
     int negYmax = std::min(negPsfBBox.getMaxY(), negModelBBox.getMaxY());
     afwGeom::Box2I negBBox = afwGeom::Box2I(afwGeom::Point2I(negXmin, negYmin), 
                                             afwGeom::Point2I(negXmax, negYmax));
-    afwImage::Image<afwMath::Kernel::Pixel> negSubim(*negPsf, negBBox, afwImage::PARENT);
-    afwImage::Image<double> negModelSubim(negModel, negBBox, afwImage::PARENT);
+    afwImage::Image<afwMath::Kernel::Pixel> negSubim(*negPsf, negBBox);
+    afwImage::Image<double> negModelSubim(negModel, negBBox);
     negModelSubim += negSubim;
     
     // Portion of the positive Psf that overlaps the model
@@ -474,8 +474,8 @@ std::pair<double,int> PsfDipoleFlux::chi2(
     int posYmax = std::min(posPsfBBox.getMaxY(), posModelBBox.getMaxY());
     afwGeom::Box2I posBBox = afwGeom::Box2I(afwGeom::Point2I(posXmin, posYmin), 
                                             afwGeom::Point2I(posXmax, posYmax));
-    afwImage::Image<afwMath::Kernel::Pixel> posSubim(*posPsf, posBBox, afwImage::PARENT);
-    afwImage::Image<double> posModelSubim(posModel, posBBox, afwImage::PARENT);
+    afwImage::Image<afwMath::Kernel::Pixel> posSubim(*posPsf, posBBox);
+    afwImage::Image<double> posModelSubim(posModel, posBBox);
     posModelSubim += posSubim;
     
     negModel  *= negFlux;  // scale negative model to image

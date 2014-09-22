@@ -27,12 +27,10 @@ import lsst.utils.tests as tests
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
-import lsst.afw.detection as afwDet
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
 import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimTools as diffimTools
 #display = True
 try:
     display
@@ -191,9 +189,9 @@ class DipoleAlgorithmTest(unittest.TestCase):
         posModel = afwImage.ImageF(fp.getBBox())
 
         # The center of the Psf should be at negCenter, posCenter
-        negPsfBBox = negPsf.getBBox(afwImage.PARENT)
-        posPsfBBox = posPsf.getBBox(afwImage.PARENT)
-        modelBBox  = model.getBBox(afwImage.PARENT)
+        negPsfBBox = negPsf.getBBox()
+        posPsfBBox = posPsf.getBBox()
+        modelBBox  = model.getBBox()
 
         # Portion of the negative Psf that overlaps the montage
         negOverlapBBox = afwGeom.Box2I(negPsfBBox)
@@ -205,15 +203,15 @@ class DipoleAlgorithmTest(unittest.TestCase):
         posOverlapBBox.clip(modelBBox)
         self.assertFalse(posOverlapBBox.isEmpty())
 
-        negPsfSubim    = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT)
-        modelSubim     = type(model)(model, negOverlapBBox, afwImage.PARENT)
-        negModelSubim  = type(negModel)(negModel, negOverlapBBox, afwImage.PARENT)
+        negPsfSubim    = type(negPsf)(negPsf, negOverlapBBox)
+        modelSubim     = type(model)(model, negOverlapBBox)
+        negModelSubim  = type(negModel)(negModel, negOverlapBBox)
         modelSubim    += negPsfSubim  # just for debugging
         negModelSubim += negPsfSubim  # for fitting
 
-        posPsfSubim    = type(posPsf)(posPsf, posOverlapBBox, afwImage.PARENT)
-        modelSubim     = type(model)(model, posOverlapBBox, afwImage.PARENT)
-        posModelSubim  = type(posModel)(posModel, posOverlapBBox, afwImage.PARENT)
+        posPsfSubim    = type(posPsf)(posPsf, posOverlapBBox)
+        modelSubim     = type(model)(model, posOverlapBBox)
+        posModelSubim  = type(posModel)(posModel, posOverlapBBox)
         modelSubim    += posPsfSubim
         posModelSubim += posPsfSubim
 
@@ -251,9 +249,9 @@ class DipoleAlgorithmTest(unittest.TestCase):
         posFit  = type(posPsf)(posPsf, posOverlapBBox, afwImage.PARENT, True)
         posFit *= float(fpos)
 
-        fitSubim  = type(fitted)(fitted, negOverlapBBox, afwImage.PARENT)
+        fitSubim  = type(fitted)(fitted, negOverlapBBox)
         fitSubim += negFit
-        fitSubim  = type(fitted)(fitted, posOverlapBBox, afwImage.PARENT)
+        fitSubim  = type(fitted)(fitted, posOverlapBBox)
         fitSubim += posFit
         if display:
             ds9.mtv(fitted, frame=7, title="Fitted model")

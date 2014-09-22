@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 import os
-import pdb
 import sys
 import unittest
+
 import lsst.utils.tests as tests
-import numpy as num
 import eups
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -104,7 +103,7 @@ class DiffimTestCases(unittest.TestCase):
             self.templateExposure  = afwImage.ExposureF(defTemplatePath)
             warper = afwMath.Warper.fromConfig(self.subconfig1.warpingConfig)
             self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
-                                                        destBBox = self.scienceExposure.getBBox(afwImage.PARENT))
+                                                        destBBox = self.scienceExposure.getBBox())
 
         diffimTools.backgroundSubtract(self.subconfig1.afwBackgroundConfig,
                                        [self.scienceExposure.getMaskedImage(),
@@ -180,7 +179,7 @@ class DiffimTestCases(unittest.TestCase):
             else:
                 smi  = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
                 tmi  = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
-        except Exception, e:
+        except Exception:
             return None
 
         # delta function kernel
