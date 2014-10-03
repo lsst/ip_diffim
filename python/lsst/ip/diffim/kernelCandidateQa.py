@@ -105,15 +105,14 @@ class KernelCandidateQa(object):
         """Add the to-be-generated QA keys to the Source schema"""
         schema = inSourceCatalog.getSchema()
         inKeys = []
-        fluxKey = inSourceCatalog.getPsfFluxKey()
-        centroidKey = inSourceCatalog.getCentroidKey()
-        shapeKey = inSourceCatalog.getShapeKey()
+        psfDef = inSourceCatalog.getPsfFluxDefinition()
+        centroidDef = inSourceCatalog.getCentroidDefinition()
+        shapeDef = inSourceCatalog.getShapeDefinition()
         for n in schema.getNames():
             inKeys.append(schema[n].asKey())
 
         for field in self.fields:
             schema.addField(field)
-
         outSourceCatalog = afwTable.SourceCatalog(schema)
         for source in inSourceCatalog:
             rec = outSourceCatalog.addNew()
@@ -124,9 +123,9 @@ class KernelCandidateQa(object):
                     setter = getattr(rec, "set"+k.getTypeString())
                     getter = getattr(source, "get"+k.getTypeString())
                     setter(k, getter(k))
-        outSourceCatalog.definePsfFlux(fluxKey)
-        outSourceCatalog.defineCentroid(centroidKey)
-        outSourceCatalog.defineShape(shapeKey)
+        outSourceCatalog.definePsfFlux(psfDef)
+        outSourceCatalog.defineCentroid(centroidDef)
+        outSourceCatalog.defineShape(shapeDef)
         return outSourceCatalog
 
     def _calculateStats(self, di, dof=0.):
