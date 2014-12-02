@@ -507,7 +507,7 @@ class DipoleDeblender(object):
         # and only set these peaks in the footprint (peaks is mutable)
         peaks.clear()
         for peak in dpeaks:
-            peaks.push_back(peak)
+            peaks.append(peak)
 
         if True:
             # Call top-level deblend task
@@ -554,6 +554,6 @@ class DipoleDeblender(object):
                 suffix, peak.psfFitChisq / peak.psfFitDof))
             self.log.info("deblended.flux.dipole.psf.%s %f" % (
                 suffix, peak.psfFitFlux * np.sum(peak.templateMaskedImage.getImage().getArray())))
-            peakList.push_back(peak.peak)
+            peakList.append(peak.peak)
         return deblendedSource
         
