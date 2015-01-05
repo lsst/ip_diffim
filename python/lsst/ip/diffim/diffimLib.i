@@ -65,9 +65,9 @@ namespace boost {
 #include "lsst/afw/math.h"
 #include "lsst/afw/geom.h" 
 #include "lsst/afw/image.h"
-#include "lsst/afw/table/Source.h"
+#include "lsst/afw/table.h"
 #include "lsst/afw/cameraGeom.h"
-#include "lsst/meas/algorithms.h"
+#include "lsst/meas/base.h"
 
 #include "lsst/ip/diffim.h"
 %}
@@ -76,7 +76,6 @@ namespace boost {
 
 /* Eigen / numpy.  Info comes from $AFW_DIR/include/lsst/afw/numpyTypemaps.h */
 %{
-#define PY_ARRAY_UNIQUE_SYMBOL LSST_IP_DIFFIM_NUMPY_ARRAY_API
 #include "numpy/arrayobject.h"
 #include "ndarray/swig.h"
 #include "ndarray/swig/eigen.h"
@@ -98,12 +97,17 @@ namespace boost {
 
 %include "lsst/daf/base/persistenceMacros.i"
 %include "lsst/pex/config.h"            // LSST_CONTROL_FIELD.
+%include "lsst/meas/base/constants.h"
+%include "lsst/meas/base/exceptions.i"
+%include "lsst/meas/base/utilities.i"
+%include "lsst/meas/base/Algorithm.h"
+
 %import  "lsst/afw/image/imageLib.i"
 %import  "lsst/afw/math/mathLib.i"
 %import  "lsst/afw/math/objectVectors.i"
 %import  "lsst/afw/detection/detectionLib.i"
-%import  "lsst/meas/algorithms/algorithmsLib.i"
-
+%include "lsst/afw/image/Exposure.h"
+%include "lsst/afw/table/Source.h"
 %lsst_exceptions();
 
 
@@ -269,23 +273,8 @@ lsst::afw::image::Image<PIXTYPE>
 
 %include "lsst/ip/diffim/BasisLists.h"
 
-/******************************************************************************/
 
-%{
-#include "lsst/ip/diffim/DipoleAlgorithms.h"
-%}
-
-%shared_ptr(lsst::ip::diffim::DipoleCentroidControl)
-%shared_ptr(lsst::ip::diffim::DipoleFluxControl)
-%shared_ptr(lsst::ip::diffim::DipoleCentroidAlgorithm)
-%shared_ptr(lsst::ip::diffim::DipoleCentroidControl)
-%shared_ptr(lsst::ip::diffim::DipoleFluxAlgorithm)
-%shared_ptr(lsst::ip::diffim::DipoleFluxControl)
-%shared_ptr(lsst::ip::diffim::NaiveDipoleCentroidControl)
-%shared_ptr(lsst::ip::diffim::NaiveDipoleFluxControl)
-%shared_ptr(lsst::ip::diffim::PsfDipoleFluxControl)
-
-%include "lsst/ip/diffim/DipoleAlgorithms.h"
+%include  "lsst/ip/diffim/dipole.i"
 
 /******************************************************************************/
 

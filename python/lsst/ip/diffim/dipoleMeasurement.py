@@ -26,10 +26,11 @@ import lsst.afw.detection as afwDetect
 import lsst.pipe.base as pipeBase
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
-import lsst.meas.algorithms as measAlg
 import lsst.meas.deblender.baseline as deblendBaseline
-from lsst.meas.algorithms import SourceMeasurementTask, SourceMeasurementConfig
+from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig
 import lsst.afw.display.ds9 as ds9                
+
+__all__ = ("DipoleMeasurementConfig", "DipoleMeasurementTask", "DipoleAnalysis", "DipoleDeblender")
 
 
 class DipoleClassificationConfig(pexConfig.Config):
@@ -43,7 +44,7 @@ class DipoleClassificationConfig(pexConfig.Config):
         dtype = float, default = 0.65
         )
 
-class DipoleMeasurementConfig(SourceMeasurementConfig):
+class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
     """!Measurement of detected diaSources as dipoles"""
     classification = pexConfig.ConfigField(
         dtype=DipoleClassificationConfig,
@@ -51,9 +52,11 @@ class DipoleMeasurementConfig(SourceMeasurementConfig):
         )
 
     def setDefaults(self):
-        self.algorithms.names.add("centroid.dipole.naive")
-        self.algorithms.names.add("flux.dipole.naive")
-        self.algorithms.names.add("flux.dipole.psf")
+        return
+        self.plugins = ["ipdiffim_NaiveDipoleCentroid",
+            "ipdiffim_NaiveDipoleFlux",
+            "ipdiffim_PsfDipoleFlux"
+        ]
         self.doReplaceWithNoise = False
 
 ## \addtogroup LSST_task_documentation
@@ -62,7 +65,7 @@ class DipoleMeasurementConfig(SourceMeasurementConfig):
 ## \ref DipoleMeasurementTask_ "DipoleMeasurementTask"
 ## \copybrief DipoleMeasurementTask
 ## \}
-class DipoleMeasurementTask(SourceMeasurementTask):
+class DipoleMeasurementTask(SingleFrameMeasurementTask):
     """!
 \anchor DipoleMeasurementTask_
 
@@ -263,7 +266,7 @@ Optionally display debugging information:
     """
     ConfigClass = DipoleMeasurementConfig
     _DefaultName = "dipoleMeasurement"
-    _ClassificationFlag = "classification.dipole"
+    _ClassificationFlag = "classification_dipole"
 
     def __init__(self, schema, algMetadata=None, **kwds):
         """!Create the Task, and add Task-specific fields to the provided measurement table schema.
@@ -273,7 +276,7 @@ Optionally display debugging information:
                                      metadata by algorithms (e.g. radii for aperture photometry).
         @param         **kwds        Passed to Task.__init__.
         """
-        SourceMeasurementTask.__init__(self, schema, algMetadata, **kwds)
+        SingleFrameMeasurementTask.__init__(self, schema, algMetadata, **kwds)
         self.dipoleAnalysis = DipoleAnalysis()
 
     @pipeBase.timeMethod
@@ -297,12 +300,11 @@ Optionally display debugging information:
         for source in sources:
             passesSn = self.dipoleAnalysis.getSn(source) > ctrl.minSn
 
-            negFlux   = np.abs(source.get("flux.dipole.psf.neg"))
-            posFlux   = np.abs(source.get("flux.dipole.psf.pos"))
+            negFlux   = np.abs(source.get("ip_diffim_PsfDipoleFlux_neg_flux"))
+            posFlux   = np.abs(source.get("ip_diffim_PsfDipoleFlux_pos_flux"))
             totalFlux = negFlux + posFlux
             passesFluxNeg = (negFlux / (negFlux + posFlux)) < ctrl.maxFluxRatio
             passesFluxPos = (posFlux / (negFlux + posFlux)) < ctrl.maxFluxRatio
-
             if (passesSn and passesFluxPos and passesFluxNeg):
                 val = 1.0
             else:
@@ -310,14 +312,14 @@ Optionally display debugging information:
 
             source.set(key, val)
 
-    def run(self, exposure, sources, **kwds):
+    def run(self, sources, exposure, **kwds):
         """!Run dipole measurement and classification
         @param exposure      Exposure on which the diaSources were detected
         @param sources       diaSources that will be measured using dipole measurement
-        @param **kwds        Sent to SourceMeasurementTask
+        @param **kwds        Sent to SingleFrameMeasurementTask
         """
 
-        SourceMeasurementTask.run(self, exposure, sources, **kwds)
+        SingleFrameMeasurementTask.run(self, exposure, sources, **kwds)
         self.classify(sources)
 
 #########
@@ -335,7 +337,7 @@ class SourceFlagChecker(object):
         The list of badFlags will be used to make a list of keys to check for measurement flags on.  By
         default the centroid keys are added to this list"""
 
-        self.badFlags = ['flags.pixel.edge', 'flags.pixel.interpolated.center', 'flags.pixel.saturated.center']
+        self.badFlags = ['base_PixelFlags_flag_edge', 'base_PixelFlags_flag_interpolatedCenter', 'base_PixelFlags_flag_saturatedCenter']
         if badFlags is not None:
             for flag in badFlags:
                 self.badFlags.append(flag)
@@ -368,10 +370,10 @@ class DipoleAnalysis(object):
 
         @param source  The source that will be examined"""
 
-        posflux = source.get("flux.dipole.psf.pos")
-        posfluxErr = source.get("flux.dipole.psf.pos.err")
-        negflux = source.get("flux.dipole.psf.neg")
-        negfluxErr = source.get("flux.dipole.psf.neg.err")
+        posflux = source.get("ip_diffim_PsfDipoleFlux_pos_flux")
+        posfluxErr = source.get("ip_diffim_PsfDipoleFlux_pos_fluxSigma")
+        negflux = source.get("ip_diffim_PsfDipoleFlux_neg_flux")
+        negfluxErr = source.get("ip_diffim_PsfDipoleFlux_neg_fluxSigma")
 
         # Not a dipole!
         if (posflux < 0) is (negflux < 0):
@@ -384,13 +386,15 @@ class DipoleAnalysis(object):
 
         @param source  The source that will be examined"""
 
-        negCen = source.get("flux.dipole.psf.neg.centroid")
-        posCen = source.get("flux.dipole.psf.pos.centroid")
-        if (False in np.isfinite(negCen)) or (False in np.isfinite(posCen)):
+        negCenX = source.get("ip_diffim_PsfDipoleFlux_neg_centroid_x")
+        negCenY = source.get("ip_diffim_PsfDipoleFlux_neg_centroid_y")
+        posCenX = source.get("ip_diffim_PsfDipoleFlux_pos_centroid_x")
+        posCenY = source.get("ip_diffim_PsfDipoleFlux_pos_centroid_y")
+        if (np.isinf(negCenX) or np.isinf(negCenY) or np.isinf(posCenX) or np.isinf(posCenY)):
             return None
         
-        center = afwGeom.Point2D(0.5*(negCen[0]+posCen[0]),
-                                 0.5*(negCen[1]+posCen[1]))
+        center = afwGeom.Point2D(0.5*(negCenX+posCenX),
+                                 0.5*(negCenY+posCenY))
         return center
 
     def getOrientation(self, source):
@@ -398,12 +402,14 @@ class DipoleAnalysis(object):
 
         @param source  The source that will be examined"""
 
-        negCen = source.get("flux.dipole.psf.neg.centroid")
-        posCen = source.get("flux.dipole.psf.pos.centroid")
-        if (False in np.isfinite(negCen)) or (False in np.isfinite(posCen)):
+        negCenX = source.get("ip_diffim_PsfDipoleFlux_neg_centroid_x")
+        negCenY = source.get("ip_diffim_PsfDipoleFlux_neg_centroid_y")
+        posCenX = source.get("ip_diffim_PsfDipoleFlux_pos_centroid_x")
+        posCenY = source.get("ip_diffim_PsfDipoleFlux_pos_centroid_y")
+        if (np.isinf(negCenX) or np.isinf(negCenY) or np.isinf(posCenX) or np.isinf(posCenY)):
             return None
 
-        dx, dy = posCen[0]-negCen[0], posCen[1]-negCen[1]
+        dx, dy = posCenX-negCenX, posCenY-negCenY
         angle  = afwGeom.Angle(np.arctan2(dx, dy), afwGeom.radians)
         return angle
 
@@ -429,7 +435,7 @@ class DipoleAnalysis(object):
         if display and displayDiaSources:
             with ds9.Buffering():
                 for source in sources:
-                    cenX, cenY = source.get("flux.dipole.psf.centroid")
+                    cenX, cenY = source.get("ipdiffim_DipolePsfFlux_centroid")
                     if np.isinf(cenX) or np.isinf(cenY):
                         cenX, cenY = source.getCentroid()
 
@@ -443,8 +449,10 @@ class DipoleAnalysis(object):
 
                     ds9.dot("o", cenX, cenY, size=2, ctype=ctype, frame=lsstDebug.frame)
 
-                    negCenX, negCenY = source.get("flux.dipole.psf.neg.centroid")
-                    posCenX, posCenY = source.get("flux.dipole.psf.pos.centroid")
+                    negCenX = source.get("ip_diffim_PsfDipoleFlux_neg_centroid_x")
+                    negCenY = source.get("ip_diffim_PsfDipoleFlux_neg_centroid_y")
+                    posCenX = source.get("ip_diffim_PsfDipoleFlux_pos_centroid_x")
+                    posCenY = source.get("ip_diffim_PsfDipoleFlux_pos_centroid_y")
                     if (np.isinf(negCenX) or np.isinf(negCenY) or np.isinf(posCenX) or np.isinf(posCenY)):
                         continue
 
