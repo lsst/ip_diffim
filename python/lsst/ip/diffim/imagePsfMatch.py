@@ -1,4 +1,3 @@
-#
 # LSST Data Management System
 # Copyright 2008, 2009, 2010 LSST Corporation.
 #
@@ -28,7 +27,8 @@ import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.pipe.base as pipeBase
-from lsst.meas.algorithms import SourceDetectionTask, SourceMeasurementTask, getBackground
+from lsst.meas.algorithms import SourceDetectionTask, getBackground
+from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigDF, PsfMatchConfigAL
 from . import utils as diUtils 
@@ -53,7 +53,7 @@ class ImagePsfMatchConfig(pexConfig.Config):
         doc="Initial detections used to feed stars to kernel fitting",
     )
     selectMeasurement = pexConfig.ConfigurableField(
-        target=SourceMeasurementTask,
+        target=SingleFrameMeasurementTask,
         doc="Initial measurements used to feed stars to kernel fitting",
     )
 
@@ -64,8 +64,8 @@ class ImagePsfMatchConfig(pexConfig.Config):
 
         # Minimal set of measurments for star selection
         self.selectMeasurement.algorithms.names.clear()
-        self.selectMeasurement.algorithms.names = ('flux.psf', 'flags.pixel', 'shape.sdss',
-                                                   'flux.gaussian', 'skycoord')
+        self.selectMeasurement.algorithms.names = ('base_SdssCentroid', 'base_PsfFlux', 'base_PixelFlags',
+                                                   'base_SdssShape', 'base_GaussianFlux', 'base_SkyCoord')
         self.selectMeasurement.slots.modelFlux = None
         self.selectMeasurement.slots.apFlux = None
 
@@ -280,7 +280,7 @@ And finally provide some optional debugging displays:
         self.kConfig = self.config.kernel.active
         self._warper = afwMath.Warper.fromConfig(self.kConfig.warpingConfig)
         self.selectSchema = afwTable.SourceTable.makeMinimalSchema()
-        self.selectSchema.setVersion(0)
+        #self.selectSchema.setVersion(0)
         self.selectAlgMetadata = dafBase.PropertyList()
         self.makeSubtask("selectDetection", schema=self.selectSchema)
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)

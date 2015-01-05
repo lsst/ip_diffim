@@ -36,10 +36,11 @@ from diaCatalogSourceSelector import *
 from dipoleMeasurement import *
 from diffimTools import *
 from kernelCandidateQa import *
+from lsst.meas.base import wrapSimpleAlgorithm
 
 # automatically register ip_diffim Algorithms
-import lsst.meas.algorithms
-lsst.meas.algorithms.AlgorithmRegistry.register("centroid.dipole.naive", NaiveDipoleCentroidControl)
-lsst.meas.algorithms.AlgorithmRegistry.register("flux.dipole.naive", NaiveDipoleFluxControl)
-lsst.meas.algorithms.AlgorithmRegistry.register("flux.dipole.psf", PsfDipoleFluxControl)
+wrapSimpleAlgorithm(NaiveDipoleCentroid, Control=NaiveDipoleCentroidControl, executionOrder=0.0)
+wrapSimpleAlgorithm(NaiveDipoleFlux, Control=NaiveDipoleFluxControl, executionOrder=2.0)
+wrapSimpleAlgorithm(PsfDipoleFlux, Control=PsfDipoleFluxControl, executionOrder=2.0)
+
 del lsst # cleanup namespace

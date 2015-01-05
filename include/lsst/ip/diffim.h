@@ -43,5 +43,6 @@
 #include "lsst/ip/diffim/KernelSumVisitor.h"
 
 #include "lsst/ip/diffim/DipoleAlgorithms.h"
+#include "lsst/ip/diffim/SillyCentroid.h"
 
 #endif // LSST_IP_DIFFIM_H
