@@ -337,11 +337,17 @@ class DipoleAlgorithmTest(unittest.TestCase):
         schema.addField("centroid_x", type=float)
         schema.addField("centroid_y", type=float)
         schema.addField("centroid_flag", type='Flag')
-        msConfig.plugins.names = ["base_SdssCentroid",
+        msConfig.plugins.names = ["base_GaussianCentroid",
             "ip_diffim_NaiveDipoleCentroid",
             "ip_diffim_NaiveDipoleFlux",
             "ip_diffim_PsfDipoleFlux",
         ]
+        msConfig.slots.psfFlux = None
+        msConfig.slots.modelFlux = None
+        msConfig.slots.apFlux = None
+        msConfig.slots.instFlux = None
+        msConfig.slots.shape = None
+        msConfig.slots.centroid = "base_GaussianCentroid"
         msConfig.plugins['ip_diffim_PsfDipoleFlux'].maxPixels = 10
         task = ipDiffim.DipoleMeasurementTask(schema, config=msConfig)
         measCat = afwTable.SourceCatalog(schema)
@@ -361,11 +367,17 @@ class DipoleAlgorithmTest(unittest.TestCase):
         schema.addField("centroid_x", type=float)
         schema.addField("centroid_y", type=float)
         schema.addField("centroid_flag", type='Flag')
-        msConfig.plugins.names = ["base_SdssCentroid",
+        msConfig.plugins.names = ["base_GaussianCentroid",
             "ip_diffim_NaiveDipoleCentroid",
             "ip_diffim_NaiveDipoleFlux",
             "ip_diffim_PsfDipoleFlux",
         ]
+        msConfig.slots.psfFlux = None
+        msConfig.slots.modelFlux = None
+        msConfig.slots.apFlux = None
+        msConfig.slots.instFlux = None
+        msConfig.slots.shape = None
+        msConfig.slots.centroid = "base_GaussianCentroid"
         task = ipDiffim.DipoleMeasurementTask(schema, config=msConfig)
         measCat = afwTable.SourceCatalog(schema)
         measCat.defineCentroid("centroid")
@@ -395,10 +407,17 @@ class DipoleMeasurementTaskTest(unittest.TestCase):
     tested above"""
     def setUp(self):
         self.config = ipDiffim.DipoleMeasurementConfig()
-        self.config.algorithms.names.discard("base_SkyCoord")
-        self.config.algorithms.names.add("ip_diffim_NaiveDipoleCentroid")
-        self.config.algorithms.names.add("ip_diffim_NaiveDipoleFlux")
-        self.config.algorithms.names.add("ip_diffim_PsfDipoleFlux")
+        self.config.plugins.names = ["base_GaussianCentroid",
+            "ip_diffim_NaiveDipoleCentroid",
+            "ip_diffim_NaiveDipoleFlux",
+            "ip_diffim_PsfDipoleFlux",
+        ]
+        self.config.slots.psfFlux = None
+        self.config.slots.modelFlux = None
+        self.config.slots.apFlux = None
+        self.config.slots.instFlux = None
+        self.config.slots.shape = None
+        self.config.slots.centroid = "base_GaussianCentroid"
 
     def tearDown(self):
         del self.config

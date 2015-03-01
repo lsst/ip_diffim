@@ -76,10 +76,10 @@ public:
 /**
  *  @brief Intermediate base class for algorithms that compute a centroid.
  */
-class DipoleCentroidAlgorithm : public lsst::meas::base::SimpleAlgorithm {
+class DipoleCentroidAlgorithm : public meas::base::SimpleAlgorithm {
 public:
     enum {
-        FAILURE=lsst::meas::base::FlagHandler::FAILURE,
+        FAILURE=meas::base::FlagHandler::FAILURE,
         POS_FAILURE,
         NEG_FAILURE,
         N_FLAGS
@@ -102,7 +102,7 @@ public:
 
     virtual void fail(
         afw::table::SourceRecord & measRecord,
-        lsst::meas::base::MeasurementError * error=NULL
+        meas::base::MeasurementError * error=NULL
     ) const = 0;
 
 protected:
@@ -111,9 +111,9 @@ protected:
        std::string const & doc, ResultKey const & positiveKeys, ResultKey const & negativeKeys);
 
     Control _ctrl;
-    lsst::meas::base::FluxResultKey _fluxResultKey;
-    lsst::meas::base::FlagHandler _flagHandler;
-    lsst::meas::base::SafeCentroidExtractor _centroidExtractor;
+    meas::base::FluxResultKey _fluxResultKey;
+    meas::base::FlagHandler _flagHandler;
+    meas::base::SafeCentroidExtractor _centroidExtractor;
     ResultKey _positiveKeys;
     ResultKey _negativeKeys;
 };
@@ -121,10 +121,10 @@ protected:
 /**
  *  @brief Intermediate base class for algorithms that compute a flux.
  */
-class DipoleFluxAlgorithm : public lsst::meas::base::SimpleAlgorithm {
+class DipoleFluxAlgorithm : public meas::base::SimpleAlgorithm {
 public:
     enum {
-        FAILURE=lsst::meas::base::FlagHandler::FAILURE,
+        FAILURE=meas::base::FlagHandler::FAILURE,
         POS_FAILURE,
         NEG_FAILURE,
         N_FLAGS
@@ -138,7 +138,7 @@ public:
         std::string const & doc);
 
     // A typedef for the FunctorKey which returns the result of this algorithm
-    typedef lsst::meas::base::FluxResultKey ResultKey;
+    typedef meas::base::FluxResultKey ResultKey;
     /// @brief Return the standard flux keys registered by this algorithm.
     ResultKey const & getPositiveKeys() const { return _positiveKeys; }
     ResultKey const & getNegativeKeys() const { return _negativeKeys; }
@@ -150,7 +150,7 @@ public:
 
     virtual void fail(
         afw::table::SourceRecord & measRecord,
-        lsst::meas::base::MeasurementError * error=NULL
+        meas::base::MeasurementError * error=NULL
     ) const = 0;
 
 protected:
@@ -161,9 +161,9 @@ protected:
                         ResultKey const & positiveKeys, ResultKey const & negativeKeys);
 
     Control _ctrl;
-    lsst::meas::base::FluxResultKey _fluxResultKey;
-    lsst::meas::base::FlagHandler _flagHandler;
-    lsst::meas::base::SafeCentroidExtractor _centroidExtractor;
+    meas::base::FluxResultKey _fluxResultKey;
+    meas::base::FlagHandler _flagHandler;
+    meas::base::SafeCentroidExtractor _centroidExtractor;
 
     ResultKey _positiveKeys;
     ResultKey _negativeKeys;
@@ -175,7 +175,7 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
     _ctrl(ctrl),
     _centroidExtractor(schema, name, true)
 {
-    static boost::array<lsst::meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
+    static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
         {"flag", "general failure flag, set if anything went wrong"},
         {"pos_flag", "failure flag for positive, set if anything went wrong"},
         {"neg_flag", "failure flag for negative, set if anything went wrong"}
@@ -196,7 +196,7 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
 {
     meas::base::CentroidResultKey::addFields(schema, name+"_pos", doc + ": positive lobe", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_neg", doc + ": negative lobe", meas::base::SIGMA_ONLY);
-    static boost::array<lsst::meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
+    static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
         {"flag", "general failure flag, set if anything went wrong"},
         {"pos_flag", "failure flag for positive, set if anything went wrong"},
         {"neg_flag", "failure flag for negative, set if anything went wrong"}
@@ -207,13 +207,13 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
 }
 
 inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
-    DipoleFluxControl const & ctrl, std::string const & name, afw::table::Schema & schema,
+    Control const & ctrl, std::string const & name, afw::table::Schema & schema,
         std::string const & doc, ResultKey const & positiveKeys, ResultKey const & negativeKeys
     ) :
     _ctrl(ctrl),
     _centroidExtractor(schema, name, false)
 {
-    static boost::array<lsst::meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
+    static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
         {"flag", "general failure flag, set if anything went wrong"},
         {"pos_flag", "failure flag for positive, set if anything went wrong"},
         {"neg_flag", "failure flag for negative, set if anything went wrong"}
@@ -226,13 +226,13 @@ inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
 }
 
 inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
-    DipoleFluxControl const & ctrl, std::string const & name, afw::table::Schema & schema,
+    Control const & ctrl, std::string const & name, afw::table::Schema & schema,
         std::string const & doc
     ) :
     _ctrl(ctrl),
     _centroidExtractor(schema, name, false)
 {
-    static boost::array<lsst::meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
+    static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
         {"flag", "general failure flag, set if anything went wrong"},
         {"pos_flag", "failure flag for positive, set if anything went wrong"},
         {"neg_flag", "failure flag for negative, set if anything went wrong"}
@@ -269,7 +269,7 @@ private:
 
     void fail(
         afw::table::SourceRecord & measRecord,
-        lsst::meas::base::MeasurementError * error=NULL
+        meas::base::MeasurementError * error=NULL
     ) const;
 
     Control _ctrl;
@@ -283,7 +283,7 @@ private:
 class NaiveDipoleCentroid : public DipoleCentroidAlgorithm {
 public:
     enum {
-        FAILURE=lsst::meas::base::FlagHandler::FAILURE,
+        FAILURE=meas::base::FlagHandler::FAILURE,
         POS_FLAGS,
         NEG_FLAGS,
         N_FLAGS
@@ -319,13 +319,13 @@ private:
 
     void fail(
         afw::table::SourceRecord & measRecord,
-        lsst::meas::base::MeasurementError * error=NULL
+        meas::base::MeasurementError * error=NULL
     ) const;
 
     Control _ctrl;
-    lsst::meas::base::FluxResultKey _fluxResultKey;
-    lsst::meas::base::FlagHandler _flagHandler;
-    lsst::meas::base::SafeCentroidExtractor _centroidExtractor;
+    meas::base::FluxResultKey _fluxResultKey;
+    meas::base::FlagHandler _flagHandler;
+    meas::base::SafeCentroidExtractor _centroidExtractor;
 };
 
 
@@ -350,9 +350,9 @@ public:
         meas::base::CentroidResultKey::addFields(schema, name+"_pos_centroid", "psf fitted center of positive lobe", meas::base::SIGMA_ONLY);
         meas::base::CentroidResultKey::addFields(schema, name+"_neg_centroid", "psf fitted center of negative lobe", meas::base::SIGMA_ONLY);
         meas::base::CentroidResultKey::addFields(schema, name+"_centroid", "average of negative and positive lobe positions", meas::base::SIGMA_ONLY);
-        _posCentroid = lsst::meas::base::CentroidResultKey(schema[name+"_pos_centroid"]);
-        _negCentroid = lsst::meas::base::CentroidResultKey(schema[name+"_neg_centroid"]);
-        _avgCentroid = lsst::meas::base::CentroidResultKey(schema[name+"_centroid"]);
+        _posCentroid = meas::base::CentroidResultKey(schema[name+"_pos_centroid"]);
+        _negCentroid = meas::base::CentroidResultKey(schema[name+"_neg_centroid"]);
+        _avgCentroid = meas::base::CentroidResultKey(schema[name+"_centroid"]);
     }
     std::pair<double,int> chi2(afw::table::SourceRecord & source,
                 afw::image::Exposure<float> const & exposure,
@@ -369,14 +369,14 @@ private:
 
     void fail(
         afw::table::SourceRecord & measRecord,
-        lsst::meas::base::MeasurementError * error=NULL
+        meas::base::MeasurementError * error=NULL
     ) const;
 
     Control _ctrl;
     afw::table::Key<float> _chi2dofKey;
-    lsst::meas::base::CentroidResultKey  _avgCentroid;
-    lsst::meas::base::CentroidResultKey  _negCentroid;
-    lsst::meas::base::CentroidResultKey  _posCentroid;
+    meas::base::CentroidResultKey  _avgCentroid;
+    meas::base::CentroidResultKey  _negCentroid;
+    meas::base::CentroidResultKey  _posCentroid;
 
     afw::table::Key< afw::table::Flag > _flagMaxPixelsKey;
 };

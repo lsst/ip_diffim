@@ -1,7 +1,7 @@
 // -*- lsst-c++ -*-
 /*
  * LSST Data Management System
- * Copyright 2008-2013 LSST Corporation.
+ * Copyright 2008-2015 AURA/LSST
  *
  * This product includes software developed by the
  * LSST Project (http://www.lsst.org/).
@@ -62,15 +62,7 @@ Basic routines to talk to test::foo:bar classes
 %include "std_vector.i"
 %import "lsst/afw/geom/geomLib.i"
 %import "lsst/afw/table/tableLib.i"
-%import "lsst/afw/image/imageLib.i"
-%import "lsst/afw/detection/detectionLib.i"
 %import "lsst/pex/config.h"
-%import "lsst/afw/image/Exposure.h"
-
-%include "lsst/meas/base/constants.h"
-%include "lsst/meas/base/exceptions.i"
-%include "lsst/meas/base/utilities.i"
-%include "lsst/meas/base/Algorithm.h"
 
 %{
 #include "lsst/ip/diffim/DipoleAlgorithms.h"

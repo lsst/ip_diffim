@@ -89,7 +89,7 @@ void naiveCentroid(
     int y = center.getY() - image.getY0();
 
     if (x < 1 || x >= image.getWidth() - 1 || y < 1 || y >= image.getHeight() - 1) {
-         throw LSST_EXCEPT(lsst::pex::exceptions::LengthError,
+         throw LSST_EXCEPT(pex::exceptions::LengthError,
                            (boost::format("Object at (%d, %d) is too close to the edge") 
                             % x % y).str());
     }
@@ -116,8 +116,8 @@ void naiveCentroid(
         (im(-1,  1) + im( 0,  1) + im( 1,  1)) -
         (im(-1, -1) + im( 0, -1) + im( 1, -1));
 
-    float xx = lsst::afw::image::indexToPosition(x + image.getX0()) + sum_x / sum;
-    float yy = lsst::afw::image::indexToPosition(y + image.getY0()) + sum_y / sum;
+    float xx = afw::image::indexToPosition(x + image.getX0()) + sum_x / sum;
+    float yy = afw::image::indexToPosition(y + image.getY0()) + sum_y / sum;
     source.set(keys.getX(), xx);
     source.set(keys.getY(), yy);
 }
@@ -139,10 +139,9 @@ NaiveDipoleCentroid::NaiveDipoleCentroid(
  * Given an image and a pixel position, return a Centroid using a naive 3x3 weighted moment
  */
 void NaiveDipoleCentroid::measure(
-    lsst::afw::table::SourceRecord & source,
-    lsst::afw::image::Exposure<float> const & exposure
+    afw::table::SourceRecord & source,
+    afw::image::Exposure<float> const & exposure
 ) const {
-    afw::geom::Point2D center = _centroidExtractor(source, _flagHandler);
     afw::detection::Footprint::PeakList const& peaks = source.getFootprint()->getPeaks();
 
     naiveCentroid(source, exposure, peaks[0]->getI(), (peaks[0]->getPeakValue() >= 0 ? 
@@ -155,17 +154,17 @@ void NaiveDipoleCentroid::measure(
     }
 }
 
-void NaiveDipoleCentroid::fail(lsst::afw::table::SourceRecord & measRecord, lsst::meas::base::MeasurementError * error) const {
+void NaiveDipoleCentroid::fail(afw::table::SourceRecord & measRecord, meas::base::MeasurementError * error) const {
     _flagHandler.handleFailure(measRecord, error);
 }
 
 
 namespace {
 
-class NaiveDipoleFootprinter : public lsst::afw::detection::FootprintFunctor< lsst::afw::image::MaskedImage<float> > {
+class NaiveDipoleFootprinter : public afw::detection::FootprintFunctor< afw::image::MaskedImage<float> > {
 public:
-    explicit NaiveDipoleFootprinter(lsst::afw::image::MaskedImage<float> const& mimage ///< The image the source lives in
-        ) : lsst::afw::detection::FootprintFunctor< lsst::afw::image::MaskedImage<float> >(mimage), 
+    explicit NaiveDipoleFootprinter(afw::image::MaskedImage<float> const& mimage ///< The image the source lives in
+        ) : afw::detection::FootprintFunctor< afw::image::MaskedImage<float> >(mimage), 
             _sumPositive(0.0), _sumNegative(0.0), _numPositive(0), _numNegative(0) {}
 
     /// Reset everything for a new Footprint
@@ -176,12 +175,12 @@ public:
     void reset(afwDet::Footprint const&) {}
 
     /// method called for each pixel by apply()
-    void operator()( lsst::afw::image::MaskedImage<float>::xy_locator loc, ///< locator pointing at the pixel
+    void operator()( afw::image::MaskedImage<float>::xy_locator loc, ///< locator pointing at the pixel
                     int,                                   ///< column-position of pixel
                     int                                    ///< row-position of pixel
                    ) {
-        lsst::afw::image::MaskedImage<float>::Image::Pixel ival = loc.image(0, 0);
-        lsst::afw::image::MaskedImage<float>::Image::Pixel vval = loc.variance(0, 0);
+        afw::image::MaskedImage<float>::Image::Pixel ival = loc.image(0, 0);
+        afw::image::MaskedImage<float>::Image::Pixel vval = loc.variance(0, 0);
         if (ival >= 0.0) {
             _sumPositive += ival;
             _varPositive += vval;
@@ -216,11 +215,9 @@ private:
  * Given an image and a pixel position, return a Centroid using a naive 3x3 weighted moment
  */
 void NaiveDipoleFlux::measure(
-    lsst::afw::table::SourceRecord & source, 
-    lsst::afw::image::Exposure<float> const & exposure
+    afw::table::SourceRecord & source, 
+    afw::image::Exposure<float> const & exposure
 ) const {
-    afw::geom::Point2D center = _centroidExtractor(source, _flagHandler);
-
     typedef afw::image::Exposure<float>::MaskedImageT MaskedImageT;
 
     NaiveDipoleFootprinter functor(exposure.getMaskedImage());
@@ -235,7 +232,7 @@ void NaiveDipoleFlux::measure(
     source.set(_numNegativeKey, functor.getNumNegative());
 }
 
-void NaiveDipoleFlux::fail(lsst::afw::table::SourceRecord & measRecord, lsst::meas::base::MeasurementError * error) const {
+void NaiveDipoleFlux::fail(afw::table::SourceRecord & measRecord, meas::base::MeasurementError * error) const {
     _flagHandler.handleFailure(measRecord, error);
 }
 
@@ -246,8 +243,8 @@ void NaiveDipoleFlux::fail(lsst::afw::table::SourceRecord & measRecord, lsst::me
 class MinimizeDipoleChi2 : public ROOT::Minuit2::FCNBase {
 public:
     explicit MinimizeDipoleChi2(PsfDipoleFlux const& psfDipoleFlux,
-                                lsst::afw::table::SourceRecord & source,
-                                lsst::afw::image::Exposure<float> const& exposure
+                                afw::table::SourceRecord & source,
+                                afw::image::Exposure<float> const& exposure
                                 ) : _errorDef(1.0),
                                     _nPar(6),
                                     _maxPix(1e4),
@@ -293,21 +290,21 @@ private:
     double _bigChi2;                // large value to tell fitter when it has gone into bad region of parameter space
     
     PsfDipoleFlux const& _psfDipoleFlux;
-    lsst::afw::table::SourceRecord & _source;
-    lsst::afw::image::Exposure<float> const& _exposure;
+    afw::table::SourceRecord & _source;
+    afw::image::Exposure<float> const& _exposure;
 };
 
 std::pair<double,int> PsfDipoleFlux::chi2(
-    lsst::afw::table::SourceRecord & source, 
-    lsst::afw::image::Exposure<float> const& exposure,
+    afw::table::SourceRecord & source, 
+    afw::image::Exposure<float> const& exposure,
     double negCenterX, double negCenterY, double negFlux,
     double posCenterX, double posCenterY, double posFlux
 ) const { 
     
-    lsst::afw::geom::Point2D negCenter(negCenterX, negCenterY);
-    lsst::afw::geom::Point2D posCenter(posCenterX, posCenterY);
+    afw::geom::Point2D negCenter(negCenterX, negCenterY);
+    afw::geom::Point2D posCenter(posCenterX, posCenterY);
 
-    CONST_PTR(lsst::afw::detection::Footprint) footprint = source.getFootprint();
+    CONST_PTR(afw::detection::Footprint) footprint = source.getFootprint();
 
     /* Fit for the superposition of Psfs at the two centroids.  
      *
@@ -364,16 +361,14 @@ std::pair<double,int> PsfDipoleFlux::chi2(
 }    
  
 void PsfDipoleFlux::measure(
-    lsst::afw::table::SourceRecord & source, 
-    lsst::afw::image::Exposure<float> const & exposure
+    afw::table::SourceRecord & source, 
+    afw::image::Exposure<float> const & exposure
 ) const {
-    lsst::afw::geom::Point2D center = _centroidExtractor(source, _flagHandler);
-
     source.set(_flagMaxPixelsKey, true);
 
-    typedef lsst::afw::image::Exposure<float>::MaskedImageT MaskedImageT;
+    typedef afw::image::Exposure<float>::MaskedImageT MaskedImageT;
 
-    CONST_PTR(lsst::afw::detection::Footprint) footprint = source.getFootprint();
+    CONST_PTR(afw::detection::Footprint) footprint = source.getFootprint();
     if (!footprint) {
         throw LSST_EXCEPT(pex::exceptions::RuntimeError,
                           (boost::format("No footprint for source %d") % source.getId()).str());
@@ -385,8 +380,8 @@ void PsfDipoleFlux::measure(
     }
     source.set(_flagMaxPixelsKey, false);
 
-    lsst::afw::detection::Footprint::PeakList peakList = 
-        lsst::afw::detection::Footprint::PeakList(footprint->getPeaks());
+    afw::detection::Footprint::PeakList peakList = 
+        afw::detection::Footprint::PeakList(footprint->getPeaks());
 
     if (peakList.size() == 0) {
         throw LSST_EXCEPT(pex::exceptions::RuntimeError,
@@ -400,8 +395,8 @@ void PsfDipoleFlux::measure(
     // For N>=2, just measure the brightest-positive and brightest-negative
     // peaks.  peakList is automatically ordered by peak flux, with the most
     // positive one (brightest) being first
-    PTR(lsst::afw::detection::Peak) positivePeak = peakList.front();
-    PTR(lsst::afw::detection::Peak) negativePeak = peakList.back();
+    PTR(afw::detection::Peak) positivePeak = peakList.front();
+    PTR(afw::detection::Peak) negativePeak = peakList.back();
 
     // Set up fit parameters and param names
     ROOT::Minuit2::MnUserParameters fitPar;
@@ -445,12 +440,12 @@ void PsfDipoleFlux::measure(
         double evalChi2 = fit.first;
         int nPix = fit.second;
         
-        PTR(lsst::afw::geom::Point2D) minNegCentroid(new lsst::afw::geom::Point2D(min.UserState().Value(NEGCENTXPAR), 
+        PTR(afw::geom::Point2D) minNegCentroid(new afw::geom::Point2D(min.UserState().Value(NEGCENTXPAR), 
                                                                       min.UserState().Value(NEGCENTYPAR)));
         source.set(getNegativeKeys().getFlux(), min.UserState().Value(NEGFLUXPAR));
         source.set(getNegativeKeys().getFluxSigma(), min.UserState().Error(NEGFLUXPAR));
         
-        PTR(lsst::afw::geom::Point2D) minPosCentroid(new lsst::afw::geom::Point2D(min.UserState().Value(POSCENTXPAR), 
+        PTR(afw::geom::Point2D) minPosCentroid(new afw::geom::Point2D(min.UserState().Value(POSCENTXPAR), 
                                                                       min.UserState().Value(POSCENTYPAR))); 
         source.set(getPositiveKeys().getFlux(), min.UserState().Value(POSFLUXPAR));
         source.set(getPositiveKeys().getFluxSigma(), min.UserState().Error(POSFLUXPAR));
@@ -466,7 +461,7 @@ void PsfDipoleFlux::measure(
     }
 }
 
-void PsfDipoleFlux::fail(lsst::afw::table::SourceRecord & measRecord, lsst::meas::base::MeasurementError * error) const {
+void PsfDipoleFlux::fail(afw::table::SourceRecord & measRecord, meas::base::MeasurementError * error) const {
     _flagHandler.handleFailure(measRecord, error);
 }
 }}}  // namespace lsst::ip::diffim

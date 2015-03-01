@@ -314,12 +314,12 @@ Optionally display debugging information:
 
     def run(self, sources, exposure, **kwds):
         """!Run dipole measurement and classification
-        @param exposure      Exposure on which the diaSources were detected
         @param sources       diaSources that will be measured using dipole measurement
+        @param exposure      Exposure on which the diaSources were detected
         @param **kwds        Sent to SingleFrameMeasurementTask
         """
 
-        SingleFrameMeasurementTask.run(self, exposure, sources, **kwds)
+        SingleFrameMeasurementTask.run(self, sources, exposure, **kwds)
         self.classify(sources)
 
 #########
