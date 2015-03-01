@@ -1,8 +1,6 @@
-// -*- LSST-C++ -*-
-
 /*
  * LSST Data Management System
- * Copyright 2008-2013 LSST Corporation.
+ * Copyright 2008-2015 AURA/LSST
  *
  * This product includes software developed by the
  * LSST Project (http://www.lsst.org/).
@@ -48,7 +46,6 @@
 #include "lsst/afw/table.h"
 #include "lsst/afw/math.h"
 #include "lsst/afw/geom.h"
-#include "lsst/meas/algorithms.h"
 #include "lsst/ip/diffim/DipoleAlgorithms.h"
 #include "ndarray/eigen.h"
 
@@ -59,7 +56,7 @@ namespace afwImage = lsst::afw::image;
 namespace afwTable = lsst::afw::table;
 namespace afwMath = lsst::afw::math;
 namespace afwGeom = lsst::afw::geom;
-namespace measAlgorithms = lsst::meas::algorithms;
+namespace measBase = lsst::meas::base;
 
 namespace lsst {
 namespace ip {
@@ -72,82 +69,32 @@ namespace diffim {
     int const POSCENTYPAR(4); // Parameter for the y-component of the positive lobe centroid
     int const POSFLUXPAR(5);  // Parameter for the flux of the positive lobe
 
-/**
- * A class that knows how to calculate centroids as a simple unweighted first
- * moment of the 3x3 region around the peaks
- */
-class NaiveDipoleCentroid : public DipoleCentroidAlgorithm {
-public:
-
-    NaiveDipoleCentroid(NaiveDipoleCentroidControl const & ctrl, afw::table::Schema & schema) :
-        DipoleCentroidAlgorithm(ctrl, schema, "unweighted 3x3 first moment centroid")
-    {}
-
-private:
-
-    template <typename PixelT>
-    void _apply(
-        afw::table::SourceRecord & source,
-        afw::image::Exposure<PixelT> const & exposure,
-        afw::geom::Point2D const & center
-    ) const;
-
-    LSST_MEAS_ALGORITHM_PRIVATE_INTERFACE(NaiveDipoleCentroid);
-};
-
-/**
- * A class that knows how to calculate centroids as a simple unweighted first
- * moment of the 3x3 region around the peaks
- */
-class NaiveDipoleFlux : public DipoleFluxAlgorithm {
-public:
-
-    NaiveDipoleFlux(NaiveDipoleFluxControl const & ctrl, afw::table::Schema & schema) :
-        DipoleFluxAlgorithm(ctrl, schema, "raw flux counts"),
-        _numPositiveKey(schema.addField<int>(ctrl.name+".npos", "number of positive pixels", "dn")),
-        _numNegativeKey(schema.addField<int>(ctrl.name+".nneg", "number of negative pixels", "dn"))
-    {}
-
-private:
-    template <typename PixelT>
-    void _apply(
-        afw::table::SourceRecord & source,
-        afw::image::Exposure<PixelT> const & exposure,
-        afw::geom::Point2D const & center
-    ) const;
-
-    LSST_MEAS_ALGORITHM_PRIVATE_INTERFACE(NaiveDipoleFlux);
-
-    afw::table::Key<int> _numPositiveKey;
-    afw::table::Key<int> _numNegativeKey;
-};
-
-
 
 namespace {
 
-template<typename PixelT>
 void naiveCentroid(
     afw::table::SourceRecord & source,
-    afw::image::Exposure<PixelT> const& exposure,
+    afw::image::Exposure<float> const& exposure,
     afw::geom::Point2I const & center,
-    afw::table::KeyTuple<afw::table::Centroid> keys
+    meas::base::CentroidResultKey const & keys
     )
 {
-    source.set(keys.meas, afw::geom::Point2D(center));
-    typedef afw::image::Image<PixelT> ImageT;
+    typedef afw::image::Image<float> ImageT;
     ImageT const& image = *exposure.getMaskedImage().getImage();
+    // set to the input centroid, just in case all else fails
+    source.set(keys.getX(), center.getX());
+    source.set(keys.getY(), center.getY());
 
     int x = center.getX() - image.getX0();
     int y = center.getY() - image.getY0();
 
     if (x < 1 || x >= image.getWidth() - 1 || y < 1 || y >= image.getHeight() - 1) {
-         throw LSST_EXCEPT(lsst::pex::exceptions::LengthError,
+         throw LSST_EXCEPT(pex::exceptions::LengthError,
                            (boost::format("Object at (%d, %d) is too close to the edge") 
                             % x % y).str());
     }
 
-    typename ImageT::xy_locator im = image.xy_at(x, y);
+    ImageT::xy_locator im = image.xy_at(x, y);
 
     double const sum =
         (im(-1,  1) + im( 0,  1) + im( 1,  1) +
@@ -169,31 +116,32 @@ void naiveCentroid(
         (im(-1,  1) + im( 0,  1) + im( 1,  1)) -
         (im(-1, -1) + im( 0, -1) + im( 1, -1));
 
-    source.set(keys.flag, false);
-    source.set(
-        keys.meas, 
-        afw::geom::Point2D(
-            lsst::afw::image::indexToPosition(x + image.getX0()) + sum_x / sum,
-            lsst::afw::image::indexToPosition(y + image.getY0()) + sum_y / sum
-        )
-    );
+    float xx = afw::image::indexToPosition(x + image.getX0()) + sum_x / sum;
+    float yy = afw::image::indexToPosition(y + image.getY0()) + sum_y / sum;
+    source.set(keys.getX(), xx);
+    source.set(keys.getY(), yy);
 }
 
 } // anonymous namespace
 
 
+NaiveDipoleCentroid::NaiveDipoleCentroid(
+    Control const & ctrl,
+    std::string const & name,
+    afw::table::Schema & schema
+) : DipoleCentroidAlgorithm(ctrl, name, schema, "unweighted first moment centroid"),
+    _ctrl(ctrl),
+    _centroidExtractor(schema, name)
+{
+}
+
 /**
  * Given an image and a pixel position, return a Centroid using a naive 3x3 weighted moment
  */
-template<typename PixelT>
-void NaiveDipoleCentroid::_apply(
-    afw::table::SourceRecord & source, 
-    afw::image::Exposure<PixelT> const& exposure,
-    afw::geom::Point2D const & center
+void NaiveDipoleCentroid::measure(
+    afw::table::SourceRecord & source,
+    afw::image::Exposure<float> const & exposure
 ) const {
-    source.set(getPositiveKeys().flag, true); // say we've failed so that's the result if we throw
-    source.set(getNegativeKeys().flag, true); // say we've failed so that's the result if we throw
-
     afw::detection::Footprint::PeakList const& peaks = source.getFootprint()->getPeaks();
 
     naiveCentroid(source, exposure, peaks[0]->getI(), (peaks[0]->getPeakValue() >= 0 ? 
@@ -206,28 +154,17 @@ void NaiveDipoleCentroid::_apply(
     }
 }
 
-LSST_MEAS_ALGORITHM_PRIVATE_IMPLEMENTATION(NaiveDipoleCentroid);
-
-PTR(meas::algorithms::AlgorithmControl) NaiveDipoleCentroidControl::_clone() const {
-    return boost::make_shared<NaiveDipoleCentroidControl>(*this);
+void NaiveDipoleCentroid::fail(afw::table::SourceRecord & measRecord, meas::base::MeasurementError * error) const {
+    _flagHandler.handleFailure(measRecord, error);
 }
-
-PTR(meas::algorithms::Algorithm) NaiveDipoleCentroidControl::_makeAlgorithm(
-    afw::table::Schema & schema,
-    PTR(daf::base::PropertyList) const &
-) const {
-    return boost::make_shared<NaiveDipoleCentroid>(*this, boost::ref(schema));
-}
-
 
 
 namespace {
 
-template <typename MaskedImageT>
-class NaiveDipoleFootprinter : public afw::detection::FootprintFunctor<MaskedImageT> {
+class NaiveDipoleFootprinter : public afw::detection::FootprintFunctor< afw::image::MaskedImage<float> > {
 public:
-    explicit NaiveDipoleFootprinter(MaskedImageT const& mimage ///< The image the source lives in
-        ) : afw::detection::FootprintFunctor<MaskedImageT>(mimage), 
+    explicit NaiveDipoleFootprinter(afw::image::MaskedImage<float> const& mimage ///< The image the source lives in
+        ) : afw::detection::FootprintFunctor< afw::image::MaskedImage<float> >(mimage), 
             _sumPositive(0.0), _sumNegative(0.0), _numPositive(0), _numNegative(0) {}
 
     /// Reset everything for a new Footprint
@@ -238,12 +175,12 @@ public:
     void reset(afwDet::Footprint const&) {}
 
     /// method called for each pixel by apply()
-    void operator()(typename MaskedImageT::xy_locator loc, ///< locator pointing at the pixel
+    void operator()( afw::image::MaskedImage<float>::xy_locator loc, ///< locator pointing at the pixel
                     int,                                   ///< column-position of pixel
                     int                                    ///< row-position of pixel
                    ) {
-        typename MaskedImageT::Image::Pixel ival = loc.image(0, 0);
-        typename MaskedImageT::Image::Pixel vval = loc.variance(0, 0);
+        afw::image::MaskedImage<float>::Image::Pixel ival = loc.image(0, 0);
+        afw::image::MaskedImage<float>::Image::Pixel vval = loc.variance(0, 0);
         if (ival >= 0.0) {
             _sumPositive += ival;
             _varPositive += vval;
@@ -274,107 +211,40 @@ private:
 } // anonymous namespace
 
 
-
 /**
  * Given an image and a pixel position, return a Centroid using a naive 3x3 weighted moment
  */
-template<typename PixelT>
-void NaiveDipoleFlux::_apply(
+void NaiveDipoleFlux::measure(
     afw::table::SourceRecord & source, 
-    afw::image::Exposure<PixelT> const& exposure,
-    afw::geom::Point2D const & center
+    afw::image::Exposure<float> const & exposure
 ) const {
-    source.set(getPositiveKeys().flag, true); // say we've failed so that's the result if we throw
-    source.set(getNegativeKeys().flag, true); // say we've failed so that's the result if we throw
+    typedef afw::image::Exposure<float>::MaskedImageT MaskedImageT;
 
-    typedef typename afw::image::Exposure<PixelT>::MaskedImageT MaskedImageT;
-
-    NaiveDipoleFootprinter<MaskedImageT> functor(exposure.getMaskedImage());
+    NaiveDipoleFootprinter functor(exposure.getMaskedImage());
     functor.apply(*source.getFootprint());
 
-    source.set(getPositiveKeys().meas, functor.getSumPositive());
-    source.set(getPositiveKeys().err, ::sqrt(functor.getVarPositive()));
+    source.set(getPositiveKeys().getFlux(), functor.getSumPositive());
+    source.set(getPositiveKeys().getFluxSigma(), ::sqrt(functor.getVarPositive()));
     source.set(_numPositiveKey, functor.getNumPositive());
-    source.set(getPositiveKeys().flag, false);
 
-    source.set(getNegativeKeys().meas, functor.getSumNegative());
-    source.set(getNegativeKeys().err, ::sqrt(functor.getVarNegative()));
+    source.set(getNegativeKeys().getFlux(), functor.getSumNegative());
+    source.set(getNegativeKeys().getFluxSigma(), ::sqrt(functor.getVarNegative()));
     source.set(_numNegativeKey, functor.getNumNegative());
-    source.set(getNegativeKeys().flag, false);
 }
 
-LSST_MEAS_ALGORITHM_PRIVATE_IMPLEMENTATION(NaiveDipoleFlux);
-
-PTR(meas::algorithms::AlgorithmControl) NaiveDipoleFluxControl::_clone() const {
-    return boost::make_shared<NaiveDipoleFluxControl>(*this);
+void NaiveDipoleFlux::fail(afw::table::SourceRecord & measRecord, meas::base::MeasurementError * error) const {
+    _flagHandler.handleFailure(measRecord, error);
 }
 
-PTR(meas::algorithms::Algorithm) NaiveDipoleFluxControl::_makeAlgorithm(
-    afw::table::Schema & schema,
-    PTR(daf::base::PropertyList) const &
-) const {
-    return boost::make_shared<NaiveDipoleFlux>(*this, boost::ref(schema));
-}
-
-
-
-/**
- * Implementation of Psf dipole flux
- */
-class PsfDipoleFlux : public DipoleFluxAlgorithm {
-public:
-
-    PsfDipoleFlux(PsfDipoleFluxControl const & ctrl, afw::table::Schema & schema) :
-        DipoleFluxAlgorithm(ctrl, schema, "jointly fitted psf flux counts"),
-        _chi2dofKey(schema.addField<float>(ctrl.name+".chi2dof", 
-                                           "chi2 per degree of freedom of fit")),
-        _avgCentroid(
-            addCentroidFields(schema, ctrl.name+".centroid", 
-                              "average of the postive and negative lobe positions")),
-        _negCentroid(
-            addCentroidFields(schema, ctrl.name+".neg.centroid", 
-                              "psf fitted center of negative lobe")),
-        _posCentroid(
-            addCentroidFields(schema, ctrl.name+".pos.centroid", 
-                              "psf fitted center of positive lobe")),
-        _flagMaxPixelsKey(schema.addField<afw::table::Flag>(ctrl.name+".flags.maxpix",
-                                                            "set if too large a footprint was sent to the algorithm"))
-    {}
-    template <typename PixelT>
-    std::pair<double,int> chi2(afw::table::SourceRecord & source,
-                afw::image::Exposure<PixelT> const & exposure,
-                double negCenterX, double negCenterY, double negFlux,
-                double posCenterX, double poCenterY, double posFlux
-                ) const;
-
-
-private:
-    template <typename PixelT>
-    void _apply(
-        afw::table::SourceRecord & source,
-        afw::image::Exposure<PixelT> const & exposure,
-        afw::geom::Point2D const & center
-    ) const;
-
-    LSST_MEAS_ALGORITHM_PRIVATE_INTERFACE(PsfDipoleFlux);
-
-    afw::table::Key<float> _chi2dofKey;
-    afw::table::KeyTuple<afw::table::Centroid> _avgCentroid;
-    afw::table::KeyTuple<afw::table::Centroid> _negCentroid;
-    afw::table::KeyTuple<afw::table::Centroid> _posCentroid;
-
-    afw::table::Key< afw::table::Flag > _flagMaxPixelsKey;
-};
 
 /**
  * Class to minimize PsfDipoleFlux; this is the object that Minuit minimizes
  */
-template<typename PixelT>
 class MinimizeDipoleChi2 : public ROOT::Minuit2::FCNBase {
 public:
     explicit MinimizeDipoleChi2(PsfDipoleFlux const& psfDipoleFlux,
                                 afw::table::SourceRecord & source,
-                                afw::image::Exposure<PixelT> const& exposure
+                                afw::image::Exposure<float> const& exposure
                                 ) : _errorDef(1.0),
                                     _nPar(6),
                                     _maxPix(1e4),
@@ -421,13 +291,12 @@ private:
     
     PsfDipoleFlux const& _psfDipoleFlux;
     afw::table::SourceRecord & _source;
-    afw::image::Exposure<PixelT> const& _exposure;
+    afw::image::Exposure<float> const& _exposure;
 };
 
-template<typename PixelT>
 std::pair<double,int> PsfDipoleFlux::chi2(
     afw::table::SourceRecord & source, 
-    afw::image::Exposure<PixelT> const& exposure,
+    afw::image::Exposure<float> const& exposure,
     double negCenterX, double negCenterY, double negFlux,
     double posCenterX, double posCenterY, double posFlux
 ) const { 
@@ -446,7 +315,7 @@ std::pair<double,int> PsfDipoleFlux::chi2(
     
     afwImage::Image<double> negModel(footprint->getBBox());
     afwImage::Image<double> posModel(footprint->getBBox());
-    afwImage::Image<PixelT> data(*(exposure.getMaskedImage().getImage()), 
+    afwImage::Image<float> data(*(exposure.getMaskedImage().getImage()), 
                                  footprint->getBBox());
     afwImage::Image<afwImage::VariancePixel> var(*(exposure.getMaskedImage().getVariance()), 
                                                  footprint->getBBox());
@@ -491,18 +360,13 @@ std::pair<double,int> PsfDipoleFlux::chi2(
     return std::pair<double,int>(chi2, nPix);
 }    
  
-template<typename PixelT>
-void PsfDipoleFlux::_apply(
+void PsfDipoleFlux::measure(
     afw::table::SourceRecord & source, 
-    afw::image::Exposure<PixelT> const& exposure,
-    afw::geom::Point2D const & center // Not used; source required to have footprint&peaks
+    afw::image::Exposure<float> const & exposure
 ) const {
-
-    source.set(getPositiveKeys().flag, true); // say we've failed so that's the result if we throw
-    source.set(getNegativeKeys().flag, true); // say we've failed so that's the result if we throw
     source.set(_flagMaxPixelsKey, true);
 
-    typedef typename afw::image::Exposure<PixelT>::MaskedImageT MaskedImageT;
+    typedef afw::image::Exposure<float>::MaskedImageT MaskedImageT;
 
     CONST_PTR(afw::detection::Footprint) footprint = source.getFootprint();
     if (!footprint) {
@@ -510,8 +374,7 @@ void PsfDipoleFlux::_apply(
                           (boost::format("No footprint for source %d") % source.getId()).str());
     }
 
-    PsfDipoleFluxControl const & ctrl = static_cast<PsfDipoleFluxControl const &>(getControl());
-    if (footprint->getArea() > ctrl.maxPixels) {
+    if (footprint->getArea() > _ctrl.maxPixels) {
         // Too big
         return;
     }
@@ -538,17 +401,17 @@ void PsfDipoleFlux::_apply(
     // Set up fit parameters and param names
     ROOT::Minuit2::MnUserParameters fitPar;
 
-    fitPar.Add((boost::format("P%d")%NEGCENTXPAR).str(), negativePeak->getFx(), ctrl.stepSizeCoord);
-    fitPar.Add((boost::format("P%d")%NEGCENTYPAR).str(), negativePeak->getFy(), ctrl.stepSizeCoord);
-    fitPar.Add((boost::format("P%d")%NEGFLUXPAR).str(), negativePeak->getPeakValue(), ctrl.stepSizeFlux);
-    fitPar.Add((boost::format("P%d")%POSCENTXPAR).str(), positivePeak->getFx(), ctrl.stepSizeCoord);
-    fitPar.Add((boost::format("P%d")%POSCENTYPAR).str(), positivePeak->getFy(), ctrl.stepSizeCoord);
-    fitPar.Add((boost::format("P%d")%POSFLUXPAR).str(), positivePeak->getPeakValue(), ctrl.stepSizeFlux);
+    fitPar.Add((boost::format("P%d")%NEGCENTXPAR).str(), negativePeak->getFx(), _ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%NEGCENTYPAR).str(), negativePeak->getFy(), _ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%NEGFLUXPAR).str(), negativePeak->getPeakValue(), _ctrl.stepSizeFlux);
+    fitPar.Add((boost::format("P%d")%POSCENTXPAR).str(), positivePeak->getFx(), _ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%POSCENTYPAR).str(), positivePeak->getFy(), _ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%POSFLUXPAR).str(), positivePeak->getPeakValue(), _ctrl.stepSizeFlux);
 
     // Create the minuit object that knows how to minimise our functor
     //
-    MinimizeDipoleChi2<PixelT> minimizerFunc(*this, source, exposure);
-    minimizerFunc.setErrorDef(ctrl.errorDef);
+    MinimizeDipoleChi2 minimizerFunc(*this, source, exposure);
+    minimizerFunc.setErrorDef(_ctrl.errorDef);
 
     //
     // tell minuit about it
@@ -558,7 +421,7 @@ void PsfDipoleFlux::_apply(
     //
     // And let it loose
     //
-    ROOT::Minuit2::FunctionMinimum min = migrad(ctrl.maxFnCalls);
+    ROOT::Minuit2::FunctionMinimum min = migrad(_ctrl.maxFnCalls);
 
     float minChi2 = min.Fval();
     bool const isValid = min.IsValid() && std::isfinite(minChi2);
@@ -579,40 +442,26 @@ void PsfDipoleFlux::_apply(
         
         PTR(afw::geom::Point2D) minNegCentroid(new afw::geom::Point2D(min.UserState().Value(NEGCENTXPAR), 
                                                                       min.UserState().Value(NEGCENTYPAR)));
-        source.set(getNegativeKeys().meas, min.UserState().Value(NEGFLUXPAR));
-        source.set(getNegativeKeys().err, min.UserState().Error(NEGFLUXPAR));
-        source.set(getNegativeKeys().flag, false);
+        source.set(getNegativeKeys().getFlux(), min.UserState().Value(NEGFLUXPAR));
+        source.set(getNegativeKeys().getFluxSigma(), min.UserState().Error(NEGFLUXPAR));
         
         PTR(afw::geom::Point2D) minPosCentroid(new afw::geom::Point2D(min.UserState().Value(POSCENTXPAR), 
                                                                       min.UserState().Value(POSCENTYPAR))); 
-        source.set(getPositiveKeys().meas, min.UserState().Value(POSFLUXPAR));
-        source.set(getPositiveKeys().err, min.UserState().Error(POSFLUXPAR));
-        source.set(getPositiveKeys().flag, false);
+        source.set(getPositiveKeys().getFlux(), min.UserState().Value(POSFLUXPAR));
+        source.set(getPositiveKeys().getFluxSigma(), min.UserState().Error(POSFLUXPAR));
 
         source.set(_chi2dofKey, evalChi2 / (nPix - minimizerFunc.getNpar()));
-        source.set(_negCentroid.meas, *minNegCentroid);
-        source.set(_posCentroid.meas, *minPosCentroid);
-        source.set(_avgCentroid.meas, 
-                   afw::geom::Point2D(0.5*(minNegCentroid->getX() + minPosCentroid->getX()),
-                                      0.5*(minNegCentroid->getY() + minPosCentroid->getY())));
+        source.set(_negCentroid.getX(), minNegCentroid->getX());
+        source.set(_negCentroid.getY(), minNegCentroid->getY());
+        source.set(_posCentroid.getX(), minPosCentroid->getX());
+        source.set(_posCentroid.getY(), minPosCentroid->getY());
+        source.set(_avgCentroid.getX(), 0.5*(minNegCentroid->getX() + minPosCentroid->getX()));
+        source.set(_avgCentroid.getY(), 0.5*(minNegCentroid->getY() + minPosCentroid->getY()));
 
     }
-
 }
 
-LSST_MEAS_ALGORITHM_PRIVATE_IMPLEMENTATION(PsfDipoleFlux);
-
-PTR(meas::algorithms::AlgorithmControl) PsfDipoleFluxControl::_clone() const {
-    return boost::make_shared<PsfDipoleFluxControl>(*this);
+void PsfDipoleFlux::fail(afw::table::SourceRecord & measRecord, meas::base::MeasurementError * error) const {
+    _flagHandler.handleFailure(measRecord, error);
 }
-
-PTR(meas::algorithms::Algorithm) PsfDipoleFluxControl::_makeAlgorithm(
-    afw::table::Schema & schema,
-    PTR(daf::base::PropertyList) const &
-) const {
-    return boost::make_shared<PsfDipoleFlux>(*this, boost::ref(schema));
-}
-
-
-
 }}}  // namespace lsst::ip::diffim

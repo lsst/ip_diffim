@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-
-# 
+#
 # LSST Data Management System
-# Copyright 2008, 2009, 2010 LSST Corporation.
-# 
+# Copyright 2008-2015 AURA/LSST
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -11,27 +10,29 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import unittest
 import numpy as np
 import lsst.utils.tests as tests
 import lsst.afw.display.ds9 as ds9
+import lsst.pex.exceptions as pexExceptions
 import lsst.afw.image as afwImage
-import lsst.afw.table as afwTable
 import lsst.afw.geom as afwGeom
+import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
 import lsst.meas.algorithms as measAlg
+import lsst.meas.base
 import lsst.ip.diffim as ipDiffim
-#display = True
+
 try:
     display
 except:
@@ -40,6 +41,20 @@ np.random.seed(666)
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+def makePluginAndCat(alg, name, control, metadata=False, centroid=None):
+    schema = afwTable.SourceTable.makeMinimalSchema()
+    if centroid:
+        schema.addField(centroid + "_x", type=float)
+        schema.addField(centroid + "_y", type=float)
+        schema.addField(centroid + "_flag", type='Flag')
+    if metadata:
+        plugin = alg(control, name, schema, dafBase.PropertySet())
+    else:
+        plugin = alg(control, name, schema)
+    cat = afwTable.SourceCatalog(schema)
+    if centroid:
+        cat.defineCentroid(centroid)
+    return plugin, cat
 
 def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.2):
     # Make random noise image: set image plane to normal distribution
@@ -63,7 +78,7 @@ def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.2):
     psfim *= scaling / psf.computePeak()
     psfw, psfh = psfim.getDimensions()
     psfSum = np.sum(psfim.getArray())
-    
+
     # Create the dipole, offset by fracOffset of the Psf FWHM (pixels)
     offset = fracOffset * psfFwhmPix // 2
     array  = image.getImage().getArray()
@@ -75,7 +90,7 @@ def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.2):
 
     if display:
         ds9.mtv(image, frame=3, title="With dipole")
-    
+
     # Create an exposure, detect positive and negative peaks separately
     exp = afwImage.makeExposure(image)
     exp.setPsf(psf)
@@ -89,7 +104,7 @@ def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.2):
     results = task.makeSourceCatalog(table, exp)
     if display:
         ds9.mtv(image, frame=4, title="Detection plane")
-    
+
     # Merge them together
     assert(len(results.sources) == 2)
     fpSet = results.fpSets.positive
@@ -99,9 +114,9 @@ def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.2):
     assert(len(sources) == 1)
     s = sources[0]
     assert(len(s.getFootprint().getPeaks()) == 2)
-    
+
     return psf, psfSum, exp, s
-    
+
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 class DipoleAlgorithmTest(unittest.TestCase):
@@ -114,60 +129,55 @@ class DipoleAlgorithmTest(unittest.TestCase):
         pass
 
     def testNaiveDipoleCentroid(self):
-        alg = ipDiffim.NaiveDipoleCentroidControl()
-
+        control = ipDiffim.DipoleCentroidControl()
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
-        schema  = afwTable.SourceTable.makeMinimalSchema()
-        msb     = measAlg.MeasureSourcesBuilder()\
-                   .addAlgorithm(alg)
-        ms      = msb.build(schema)
-        table   = afwTable.SourceTable.make(schema)
-        source  = table.makeRecord()
-        
+        plugin, cat = makePluginAndCat(ipDiffim.NaiveDipoleCentroid, "test", control, centroid="centroid")
+        source = cat.addNew()
+        source.set("centroid_x", 50)
+        source.set("centroid_y", 50)
         source.setFootprint(s.getFootprint())
-        ms.apply(source, exposure, afwGeom.Point2D(self.xc, self.yc))
-        for key in (".pos", ".pos.err", ".pos.flags", ".neg", ".neg.err", ".neg.flags"):
+        plugin.measure(source, exposure)
+        for key in ("_pos_x", "_pos_y", "_pos_xSigma", "_pos_ySigma", "_pos_flag",
+            "_neg_x", "_neg_y", "_neg_xSigma", "_neg_ySigma", "_neg_flag"):
             try:
-                source.get(alg.name+key)
+                source.get("test"+key)
             except:
                 self.fail()
 
     def testNaiveDipoleFluxControl(self):
-        alg = ipDiffim.NaiveDipoleFluxControl()
-
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         schema  = afwTable.SourceTable.makeMinimalSchema()
-        msb     = measAlg.MeasureSourcesBuilder()\
-                   .addAlgorithm(alg)
-        ms      = msb.build(schema)
-        table   = afwTable.SourceTable.make(schema)
-        source  = table.makeRecord()
-        
+        control = ipDiffim.DipoleFluxControl()
+        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
+        plugin, cat = makePluginAndCat(ipDiffim.NaiveDipoleFlux, "test", control, centroid="centroid")
+        source = cat.addNew()
+        source.set("centroid_x", 50)
+        source.set("centroid_y", 50)
         source.setFootprint(s.getFootprint())
-        ms.apply(source, exposure, afwGeom.Point2D(self.xc, self.yc))
-        for key in (".pos", ".pos.err", ".pos.flags", ".neg", ".neg.err", 
-                    ".neg.flags", ".npos", ".nneg"):
+        plugin.measure(source, exposure)
+        for key in ("_pos_flux", "_pos_fluxSigma", "_pos_flag", "_npos",
+            "_neg_flux", "_neg_fluxSigma", "_neg_flag", "_nneg"):
             try:
-                source.get(alg.name+key)
+                source.get("test"+key)
             except:
                 self.fail()
 
     def testPsfDipoleFluxControl(self):
-        alg = ipDiffim.PsfDipoleFluxControl()
-
+        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         schema  = afwTable.SourceTable.makeMinimalSchema()
-        msb     = measAlg.MeasureSourcesBuilder()\
-                   .addAlgorithm(alg)
-        ms      = msb.build(schema)
-        table   = afwTable.SourceTable.make(schema)
-        source  = table.makeRecord()
-        
+        control = ipDiffim.PsfDipoleFluxControl()
+        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
+        plugin, cat = makePluginAndCat(ipDiffim.PsfDipoleFlux, "test", control, centroid="centroid")
+        source = cat.addNew()
+        source.set("centroid_x", 50)
+        source.set("centroid_y", 50)
         source.setFootprint(s.getFootprint())
-        ms.apply(source, exposure, afwGeom.Point2D(self.xc, self.yc))
-        for key in (".pos", ".pos.err", ".pos.flags", ".neg", ".neg.err", ".neg.flags"):
+        plugin.measure(source, exposure)
+        for key in ("_pos_flux", "_pos_fluxSigma", "_pos_flag",
+            "_neg_flux", "_neg_fluxSigma", "_neg_flag"):
             try:
-                source.get(alg.name+key)
+                source.get("test"+key)
             except:
                 self.fail()
 
@@ -241,7 +251,7 @@ class DipoleAlgorithmTest(unittest.TestCase):
         # Should be exaxtly the same as each other
         self.assertAlmostEqual(1e-2*fneg0,  1e-2*fneg)
         self.assertAlmostEqual(1e-2*fpos0,  1e-2*fpos)
-        
+
         # Recreate model
         fitted  = afwImage.ImageF(fp.getBBox())
         negFit  = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT, True)
@@ -268,16 +278,15 @@ class DipoleAlgorithmTest(unittest.TestCase):
             ds9.mtv(fitted, frame=9, title="Chi2")
 
         return fneg, negPsfSum, fpos, posPsfSum, fitted
-        
+
     def testPsfDipoleFit(self, scaling=100.):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc, scaling=scaling)
         source = self.measureDipole(s, exposure)
-
         # Recreate the simultaneous joint Psf fit in python
         fp     = source.getFootprint()
         peaks  = fp.getPeaks()
         speaks = [(p.getPeakValue(), p) for p in peaks]
-        speaks.sort() 
+        speaks.sort()
         dpeaks = [speaks[0][1], speaks[-1][1]]
 
         negCenter = afwGeom.Point2D(dpeaks[0].getFx(), dpeaks[0].getFy())
@@ -299,56 +308,86 @@ class DipoleAlgorithmTest(unittest.TestCase):
         # the total flux, while here we are just fitting for the
         # scaling of the Psf.  Therefore the comparison is
         # fneg*negPsfSum to flux.dipole.psf.neg.
-        self.assertAlmostEqual(1e-4*fneg*negPsfSum, 1e-4*source.get("flux.dipole.psf.neg"), 2)
-        self.assertAlmostEqual(1e-4*fpos*posPsfSum, 1e-4*source.get("flux.dipole.psf.pos"), 2)
-        self.assertTrue(source.get("flux.dipole.psf.pos.err") > 0.0)
-        self.assertTrue(source.get("flux.dipole.psf.neg.err") > 0.0)
-        self.assertEqual(source.get("flux.dipole.psf.neg.flags"), False)
-        self.assertEqual(source.get("flux.dipole.psf.pos.flags"), False)
+        self.assertAlmostEqual(1e-4*fneg*negPsfSum, 1e-4*source.get("ip_diffim_PsfDipoleFlux_neg_flux"), 2)
+        self.assertAlmostEqual(1e-4*fpos*posPsfSum, 1e-4*source.get("ip_diffim_PsfDipoleFlux_pos_flux"), 2)
 
-        self.assertAlmostEqual(source.get("flux.dipole.psf.centroid")[0], 50.0, 1)
-        self.assertAlmostEqual(source.get("flux.dipole.psf.centroid")[1], 50.0, 1)
-        self.assertAlmostEqual(source.get("flux.dipole.psf.neg.centroid")[0], negCenter[0], 1)
-        self.assertAlmostEqual(source.get("flux.dipole.psf.neg.centroid")[1], negCenter[1], 1)
-        self.assertAlmostEqual(source.get("flux.dipole.psf.pos.centroid")[0], posCenter[0], 1)
-        self.assertAlmostEqual(source.get("flux.dipole.psf.pos.centroid")[1], posCenter[1], 1)
-        self.assertEqual(source.get("flux.dipole.psf.centroid.flags"), False)
-        self.assertEqual(source.get("flux.dipole.psf.neg.centroid.flags"), False)
-        self.assertEqual(source.get("flux.dipole.psf.pos.centroid.flags"), False)
+        self.assertTrue(source.get("ip_diffim_PsfDipoleFlux_pos_fluxSigma") > 0.0)
+        self.assertTrue(source.get("ip_diffim_PsfDipoleFlux_neg_fluxSigma") > 0.0)
+        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_neg_flag"), False)
+        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_pos_flag"), False)
 
-        self.assertTrue(source.get("flux.dipole.psf.chi2dof") > 0.0)
+        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_centroid_x"), 50.0, 1)
+        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_centroid_y"), 50.0, 1)
+        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_neg_centroid_x"), negCenter[0], 1)
+        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_neg_centroid_y"), negCenter[1], 1)
+        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_pos_centroid_x"), posCenter[0], 1)
+        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_pos_centroid_y"), posCenter[1], 1)
+        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_neg_flag"), False)
+        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_pos_flag"), False)
 
-        self.assertEqual(source.get("flux.dipole.psf.flags.maxpix"), False)
+        self.assertTrue(source.get("ip_diffim_PsfDipoleFlux_chi2dof") > 0.0)
+
+        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_flags_maxpix"), False)
 
     def testMaxPixelFlag(self):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
-        schema  = afwTable.SourceTable.makeMinimalSchema()
-        psfControl = ipDiffim.PsfDipoleFluxControl()
-        psfControl.maxPixels = 10
-        msb     = measAlg.MeasureSourcesBuilder()\
-                   .addAlgorithm(ipDiffim.NaiveDipoleCentroidControl())\
-                   .addAlgorithm(ipDiffim.NaiveDipoleFluxControl())\
-                   .addAlgorithm(psfControl)
-        ms      = msb.build(schema)
-        table   = afwTable.SourceTable.make(schema)
-        source  = table.makeRecord()
+        msConfig = ipDiffim.DipoleMeasurementConfig()
+        #   This tests is run with the default sfm algorithms as well as Dipole
+        schema = afwTable.SourceTable.makeMinimalSchema()
+        schema.addField("centroid_x", type=float)
+        schema.addField("centroid_y", type=float)
+        schema.addField("centroid_flag", type='Flag')
+        msConfig.plugins.names = ["base_GaussianCentroid",
+            "ip_diffim_NaiveDipoleCentroid",
+            "ip_diffim_NaiveDipoleFlux",
+            "ip_diffim_PsfDipoleFlux",
+        ]
+        msConfig.slots.psfFlux = None
+        msConfig.slots.modelFlux = None
+        msConfig.slots.apFlux = None
+        msConfig.slots.instFlux = None
+        msConfig.slots.shape = None
+        msConfig.slots.centroid = "base_GaussianCentroid"
+        msConfig.plugins['ip_diffim_PsfDipoleFlux'].maxPixels = 10
+        task = ipDiffim.DipoleMeasurementTask(schema, config=msConfig)
+        measCat = afwTable.SourceCatalog(schema)
+        measCat.defineCentroid("centroid")
+        source = measCat.addNew()
+        source.set("centroid_x", self.xc)
+        source.set("centroid_y", self.yc)
         source.setFootprint(s.getFootprint())
-        ms.apply(source, exposure, afwGeom.Point2D(self.xc, self.yc))
-        self.assertEqual(source.get("flux.dipole.psf.flags.maxpix"), True)
-        
+        # Then run the default SFM task.  Results not checked
+        task.run(measCat, exposure)
+        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_flags_maxpix"), True)
+
 
     def measureDipole(self, s, exp):
-        schema  = afwTable.SourceTable.makeMinimalSchema()
-        msb     = measAlg.MeasureSourcesBuilder()\
-                   .addAlgorithm(ipDiffim.NaiveDipoleCentroidControl())\
-                   .addAlgorithm(ipDiffim.NaiveDipoleFluxControl())\
-                   .addAlgorithm(ipDiffim.PsfDipoleFluxControl())
-        ms      = msb.build(schema)
-        table   = afwTable.SourceTable.make(schema)
-        source  = table.makeRecord()
+        msConfig = ipDiffim.DipoleMeasurementConfig()
+        schema = afwTable.SourceTable.makeMinimalSchema()
+        schema.addField("centroid_x", type=float)
+        schema.addField("centroid_y", type=float)
+        schema.addField("centroid_flag", type='Flag')
+        msConfig.plugins.names = ["base_GaussianCentroid",
+            "ip_diffim_NaiveDipoleCentroid",
+            "ip_diffim_NaiveDipoleFlux",
+            "ip_diffim_PsfDipoleFlux",
+        ]
+        msConfig.slots.psfFlux = None
+        msConfig.slots.modelFlux = None
+        msConfig.slots.apFlux = None
+        msConfig.slots.instFlux = None
+        msConfig.slots.shape = None
+        msConfig.slots.centroid = "base_GaussianCentroid"
+        task = ipDiffim.DipoleMeasurementTask(schema, config=msConfig)
+        measCat = afwTable.SourceCatalog(schema)
+        measCat.defineCentroid("centroid")
+        source = measCat.addNew()
+        source.set("centroid_x", self.xc)
+        source.set("centroid_y", self.yc)
         source.setFootprint(s.getFootprint())
-        ms.apply(source, exp, afwGeom.Point2D(self.xc, self.yc))
-        return source 
+        # Then run the default SFM task.  Results not checked
+        task.run(measCat, exp)
+        return measCat[0]
 
     def testDipoleAnalysis(self):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
@@ -361,7 +400,6 @@ class DipoleAlgorithmTest(unittest.TestCase):
         source = self.measureDipole(s, exposure)
         dpDeblender = ipDiffim.DipoleDeblender()
         deblendSource = dpDeblender(source, exposure)
-        
 
 class DipoleMeasurementTaskTest(unittest.TestCase):
     """A test case for the DipoleMeasurementTask.  Essentially just
@@ -369,30 +407,35 @@ class DipoleMeasurementTaskTest(unittest.TestCase):
     tested above"""
     def setUp(self):
         self.config = ipDiffim.DipoleMeasurementConfig()
-        self.config.algorithms.names.add("centroid.dipole.naive")
-        self.config.algorithms.names.add("flux.dipole.naive")
-        self.config.algorithms.names.add("flux.dipole.psf")
+        self.config.plugins.names = ["base_GaussianCentroid",
+            "ip_diffim_NaiveDipoleCentroid",
+            "ip_diffim_NaiveDipoleFlux",
+            "ip_diffim_PsfDipoleFlux",
+        ]
+        self.config.slots.psfFlux = None
+        self.config.slots.modelFlux = None
+        self.config.slots.apFlux = None
+        self.config.slots.instFlux = None
+        self.config.slots.shape = None
+        self.config.slots.centroid = "base_GaussianCentroid"
 
     def tearDown(self):
         del self.config
 
     def testMeasure(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
-        schema.setVersion(0)
         dipoleFlag = ipDiffim.DipoleMeasurementTask._ClassificationFlag
         schema.addField(dipoleFlag, "F", "probability of being a dipole")
         task = ipDiffim.DipoleMeasurementTask(schema, config=self.config)
         table = afwTable.SourceTable.make(schema)
         sources = afwTable.SourceCatalog(table)
         source = sources.addNew()
-    
         # make fake image
         psf, psfSum, exposure, s = createDipole(100, 100, 50, 50)
 
         # set it in source with the appropriate schema
         source.setFootprint(s.getFootprint())
-
-        task.run(exposure, sources)
+        task.run(sources, exposure)
         self.assertEqual(source.get(dipoleFlag), 1.0)
 
 def suite():
