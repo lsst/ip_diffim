@@ -95,15 +95,6 @@ public:
     /// @brief Return the standard centroid keys registered by this algorithm.
     ResultKey const & getPositiveKeys() const { return _positiveKeys; }
     ResultKey const & getNegativeKeys() const { return _negativeKeys; }
-    virtual void measure(
-        afw::table::SourceRecord & measRecord,
-        afw::image::Exposure<float> const & exposure
-    ) const = 0;
-
-    virtual void fail(
-        afw::table::SourceRecord & measRecord,
-        meas::base::MeasurementError * error=NULL
-    ) const = 0;
 
 protected:
     /// @brief Initialize with a manually-constructed key tuple.
@@ -142,16 +133,6 @@ public:
     /// @brief Return the standard flux keys registered by this algorithm.
     ResultKey const & getPositiveKeys() const { return _positiveKeys; }
     ResultKey const & getNegativeKeys() const { return _negativeKeys; }
-
-    virtual void measure(
-        afw::table::SourceRecord & measRecord,
-        afw::image::Exposure<float> const & exposure
-    ) const = 0;
-
-    virtual void fail(
-        afw::table::SourceRecord & measRecord,
-        meas::base::MeasurementError * error=NULL
-    ) const = 0;
 
 protected:
 
@@ -260,8 +241,6 @@ public:
     {
     }
 
-private:
-// These are private to avoid shadowing the base class methods
     void measure(
         afw::table::SourceRecord & measRecord,
         afw::image::Exposure<float> const & exposure
@@ -271,6 +250,8 @@ private:
         afw::table::SourceRecord & measRecord,
         meas::base::MeasurementError * error=NULL
     ) const;
+
+private:
 
     Control _ctrl;
     afw::table::Key<int> _numPositiveKey;
@@ -301,17 +282,6 @@ public:
     ResultKey const & getPositiveKeys() const { return _positiveKeys; }
     ResultKey const & getNegativeKeys() const { return _negativeKeys; }
 
-    // These are private so they doesn't shadow the other overloads in base classes;
-    // we can still call it via the public method on the base class.  We could have
-    // used a using declaration instead, but Swig had trouble with that here.
-
-protected:
-    /// @brief Initialize with a manually-constructed key tuple.
-    NaiveDipoleCentroid(Control const & ctrl, std::string const & name, afw::table::Schema & schema,
-        ResultKey const & positiveKeys, ResultKey const & negativeKeys);
-
-private:
-// These are private to avoid shadowing the base class methods
     void measure(
         afw::table::SourceRecord & measRecord,
         afw::image::Exposure<float> const & exposure
@@ -321,6 +291,13 @@ private:
         afw::table::SourceRecord & measRecord,
         meas::base::MeasurementError * error=NULL
     ) const;
+
+protected:
+    /// @brief Initialize with a manually-constructed key tuple.
+    NaiveDipoleCentroid(Control const & ctrl, std::string const & name, afw::table::Schema & schema,
+        ResultKey const & positiveKeys, ResultKey const & negativeKeys);
+
+private:
 
     Control _ctrl;
     meas::base::FluxResultKey _fluxResultKey;
@@ -360,8 +337,6 @@ public:
                 double posCenterX, double poCenterY, double posFlux
                 ) const;
 
-private:
-// These are private to avoid shadowing the base class methods
     void measure(
         afw::table::SourceRecord & measRecord,
         afw::image::Exposure<float> const & exposure
@@ -371,6 +346,8 @@ private:
         afw::table::SourceRecord & measRecord,
         meas::base::MeasurementError * error=NULL
     ) const;
+
+private:
 
     Control _ctrl;
     afw::table::Key<float> _chi2dofKey;
