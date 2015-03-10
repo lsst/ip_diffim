@@ -199,16 +199,12 @@ class KernelCandidateQa(object):
             if kernelCandidate.getStatus() != afwMath.SpatialCellCandidate.UNKNOWN:
                 kType = getattr(diffimLib.KernelCandidateF, "ORIG")
                 di = kernelCandidate.getDifferenceImage(kType)
-                kernel = kernelCandidate.getKernel(kType)
-                kstatus = kernelCandidate.getStatus()
-                backgroundValue = kernelCandidate.getBackground(kType)
                 kernelValues = kernelCandidate.getKernel(kType).getKernelParameters()
                 kernelValues = np.asarray(kernelValues)
 
                 lkim = kernelCandidate.getKernelImage(kType)
                 centx, centy = calcCentroid(lkim.getArray())
                 stdx, stdy = calcWidth(lkim.getArray(), centx, centy)
-                solution = kernelCandidate.getKernelSolution(kType)
                 # NOTE
                 # What is the difference between kernelValues and solution?
 
@@ -239,7 +235,7 @@ class KernelCandidateQa(object):
                 try:
                     kType = getattr(diffimLib.KernelCandidateF, "ORIG")
                     lkim = kernelCandidate.getKernelImage(kType)
-                except:
+                except Exception:
                     lkim = None
 
             # Calculate spatial model evaluated at each position, for

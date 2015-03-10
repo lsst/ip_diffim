@@ -1,9 +1,6 @@
 #!/usr/bin/env python
-import os, sys
 import unittest
 import lsst.utils.tests as tests
-import numpy as num
-import eups
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -35,7 +32,7 @@ class DiffimTestCases(unittest.TestCase):
         self.tmi.setXY0(0,0)
 
         # Run detection
-        detConfig = self.subconfig.detectionConfig
+        #detConfig = self.subconfig.detectionConfig
         # Note here regarding detConfig:
         #
         # If I set detThresholdType = "pixel_stdev", I get slightly

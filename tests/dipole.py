@@ -21,22 +21,20 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import unittest
+
 import numpy as np
+
 import lsst.utils.tests as tests
+import lsst.daf.base as dafBase
 import lsst.afw.display.ds9 as ds9
-import lsst.pex.exceptions as pexExceptions
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
 import lsst.meas.algorithms as measAlg
-import lsst.meas.base
 import lsst.ip.diffim as ipDiffim
 
-try:
-    display
-except:
-    display = False
+display = False
 np.random.seed(666)
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
@@ -141,12 +139,11 @@ class DipoleAlgorithmTest(unittest.TestCase):
             "_neg_x", "_neg_y", "_neg_xSigma", "_neg_ySigma", "_neg_flag"):
             try:
                 source.get("test"+key)
-            except:
+            except Exception:
                 self.fail()
 
     def testNaiveDipoleFluxControl(self):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
-        schema  = afwTable.SourceTable.makeMinimalSchema()
         control = ipDiffim.DipoleFluxControl()
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         plugin, cat = makePluginAndCat(ipDiffim.NaiveDipoleFlux, "test", control, centroid="centroid")
@@ -159,13 +156,12 @@ class DipoleAlgorithmTest(unittest.TestCase):
             "_neg_flux", "_neg_fluxSigma", "_neg_flag", "_nneg"):
             try:
                 source.get("test"+key)
-            except:
+            except Exception:
                 self.fail()
 
     def testPsfDipoleFluxControl(self):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
-        schema  = afwTable.SourceTable.makeMinimalSchema()
         control = ipDiffim.PsfDipoleFluxControl()
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         plugin, cat = makePluginAndCat(ipDiffim.PsfDipoleFlux, "test", control, centroid="centroid")
@@ -178,12 +174,12 @@ class DipoleAlgorithmTest(unittest.TestCase):
             "_neg_flux", "_neg_fluxSigma", "_neg_flag"):
             try:
                 source.get("test"+key)
-            except:
+            except Exception:
                 self.fail()
 
     def testAll(self):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
-        source = self.measureDipole(s, exposure)
+        self.measureDipole(s, exposure)
 
     def _makeModel(self, exposure, psf, fp, negCenter, posCenter):
 
@@ -393,13 +389,13 @@ class DipoleAlgorithmTest(unittest.TestCase):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         source = self.measureDipole(s, exposure)
         dpAnalysis = ipDiffim.DipoleAnalysis()
-        results = dpAnalysis(source)
+        dpAnalysis(source)
 
     def testDipoleDeblender(self):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         source = self.measureDipole(s, exposure)
         dpDeblender = ipDiffim.DipoleDeblender()
-        deblendSource = dpDeblender(source, exposure)
+        dpDeblender(source, exposure)
 
 class DipoleMeasurementTaskTest(unittest.TestCase):
     """A test case for the DipoleMeasurementTask.  Essentially just

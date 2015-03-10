@@ -4,7 +4,6 @@ import diffimLib
 # all the other LSST packages
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.pex.logging as pexLog
 
 # Basically deprecated until SDQA is replaced
 
@@ -21,7 +20,7 @@ def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
             kSum = spatialKernel.computeImage(kImage, False, x, y)
             kSums.push_back(kSum)
             
-    afwStat    = afwMath.makeStatistics(kSums, afwMath.MEAN | afwMath.STDEV)
+    #afwStat    = afwMath.makeStatistics(kSums, afwMath.MEAN | afwMath.STDEV)
     #kSumRating = sdqa.SdqaRating("lsst.ip.diffim.kernel_sum",
     #                             afwStat.getValue(afwMath.MEAN),
     #                             afwStat.getValue(afwMath.STDEV),
@@ -48,8 +47,8 @@ def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
                 diffIm = cand.getDifferenceImage(kernel, background)
                 imstats.apply(diffIm)
                 
-                candMean   = imstats.getMean()
-                candRms    = imstats.getRms()
+                #candMean   = imstats.getMean()
+                #candRms    = imstats.getRms()
                 #candRating = sdqa.SdqaRating("lsst.ip.diffim.residuals_%d_%d" % (xCand, yCand),
                 #                             candMean, candRms, scope)
                 #sdqaVector.append(candRating)
@@ -64,7 +63,7 @@ def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
     nKernelTerms = spatialKernel.getNSpatialParameters()
     if nKernelTerms == 0: # order 0
         nKernelTerms = 1
-    nBgTerms     = len(spatialBg.getParameters())
+    #nBgTerms     = len(spatialBg.getParameters())
     #nKernRating  = sdqa.SdqaRating("lsst.ip.diffim.nTermsSpatialKernel", nKernelTerms, 0, scope)
     #nBgRating    = sdqa.SdqaRating("lsst.ip.diffim.nTermsSpatialBg", nBgTerms, 0, scope)
     #sdqaVector.append(nKernRating)

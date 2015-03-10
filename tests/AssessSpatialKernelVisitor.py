@@ -1,11 +1,9 @@
 #!/usr/bin/env python
-import os, sys
 import unittest
 import numpy as num
 
 import lsst.utils.tests as tests
 
-import eups
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -13,7 +11,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 
-import lsst.afw.display.ds9 as ds9
+#import lsst.afw.display.ds9 as ds9
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 

@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-import os, sys
 import unittest
-import lsst.utils.tests as tests
 
-import eups
+import lsst.utils.tests as tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
@@ -11,7 +9,6 @@ import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
-import lsst.afw.display.ds9 as ds9
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
@@ -52,7 +49,6 @@ class DiffimTestCases(unittest.TestCase):
 
         kRefIm    = None
 
-        frame = 0
         for i in range(100):
             kImage1 = afwImage.ImageD(gaussKernel.getDimensions())
             gaussKernel.computeImage(kImage1, False)

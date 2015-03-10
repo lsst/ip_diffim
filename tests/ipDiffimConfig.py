@@ -23,8 +23,7 @@
 #
 
 import unittest
-import eups
-import os
+
 import lsst.utils.tests as tests
 import lsst.ip.diffim as ipDiffim
 
@@ -43,6 +42,10 @@ class DiffimTestCases(unittest.TestCase):
         config = ipDiffim.ImagePsfMatchConfig()
         config.validate()
 
+    def testSnapPsfMatchConfig(self):
+        config = ipDiffim.SnapPsfMatchConfig()
+        config.validate()
+
     def testSnapPsfMatchConfigDF(self):
         config = ipDiffim.SnapPsfMatchConfigDF()
         config.validate()
@@ -52,7 +55,7 @@ class DiffimTestCases(unittest.TestCase):
         config.validate()
 
     def testModelPsfMatchConfig(self):
-        config = ipDiffim.ModelPsfMatchConfig()
+        ipDiffim.ModelPsfMatchConfig()
 
     def testDetectionConfig(self):
         config = ipDiffim.DetectionConfig()
@@ -74,18 +77,6 @@ class DiffimTestCases(unittest.TestCase):
         config.validate()
 
     #
-
-    def testSnapPsfMatchConfig(self):
-        config = ipDiffim.SnapPsfMatchConfig()
-        config.validate()
-
-    def testSnapPsfMatchConfigAL(self):
-        config = ipDiffim.SnapPsfMatchConfigAL()
-        config.validate()
-
-    def testSnapPsfMatchConfigDF(self):
-        config = ipDiffim.SnapPsfMatchConfigDF()
-        config.validate()
 
 #####
         

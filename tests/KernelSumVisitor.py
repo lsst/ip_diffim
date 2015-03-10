@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-import os, sys
 import unittest
-import lsst.utils.tests as tests
 
-import eups
+import lsst.utils.tests as tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
@@ -45,7 +43,7 @@ class DiffimTestCases(unittest.TestCase):
         kc = self.makeCandidate(1, 0.0, 0.0) 
         try:
             ksv.processCandidate(kc)
-        except Exception, e:
+        except Exception:
             pass
         else:
             self.fail()

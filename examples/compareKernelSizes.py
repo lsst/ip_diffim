@@ -39,7 +39,7 @@ for kSize in kSizes:
         try:
             kSum = task.subtract.metadata.get("spatialKernelSum")
             cNum = task.subtract.metadata.get("spatialConditionNum")
-        except:
+        except Exception:
             kSums.append(np.inf)
             cNums.append(np.inf)
         else:

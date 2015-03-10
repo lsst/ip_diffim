@@ -126,7 +126,7 @@ def run(args):
     	# See if the LSST debug has incremented the frame number; if not start with frame 3
     	try:
     		frame = debug.lsstDebug.frame+1
-    	except:
+    	except Exception:
     		frame = 3
     	ds9.mtv(result.psfMatchedExposure, frame=frame, title="Example script: Matched Science Image")
 

@@ -1,17 +1,12 @@
 #!/usr/bin/env python
-import os, sys
 import unittest
 import lsst.utils.tests as tests
 
-import eups
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
-import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
-
-import numpy
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
@@ -100,15 +95,15 @@ class DiffimTestCases(unittest.TestCase):
         basisList = ipDiffim.makeKernelBasisList(self.subconfig)
         
         self.policy.set("spatialModelType", "polynomial") 
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
+        ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
 
         self.policy.set("spatialModelType", "chebyshev1") 
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
+        ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
 
         try:
             self.policy.set("spatialModelType", "foo") 
-            bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
-        except:
+            ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
+        except Exception:
             pass
         else:
             self.fail()

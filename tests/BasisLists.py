@@ -1,11 +1,9 @@
 #!/usr/bin/env python
-import os
 import numpy as num
 
 import unittest
 import lsst.utils.tests as tests
 
-import eups
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -185,7 +183,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policyDF.set("regularizationType", "centralDifference")
         try:
             self.policyDF.set("centralRegularizationStencil", 1)
-            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # stencil of 1 not allowed
             pass
         else:
@@ -193,7 +191,7 @@ class DiffimTestCases(unittest.TestCase):
             
         self.policyDF.set("centralRegularizationStencil", 5)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # stencil of 5 allowed
             print e
             self.fail()
@@ -202,7 +200,7 @@ class DiffimTestCases(unittest.TestCase):
 
         self.policyDF.set("centralRegularizationStencil", 9)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # stencil of 9 allowed
             print e
             self.fail()
@@ -211,7 +209,7 @@ class DiffimTestCases(unittest.TestCase):
 
         self.policyDF.set("regularizationBorderPenalty", -1.0)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # border penalty > 0
             pass
         else:
@@ -219,7 +217,7 @@ class DiffimTestCases(unittest.TestCase):
 
         self.policyDF.set("regularizationBorderPenalty", 0.0)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # border penalty > 0
             print e
             self.fail()
@@ -230,7 +228,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policyDF.set("regularizationType", "forwardDifference")
         self.policyDF.set("forwardRegularizationOrders", 0)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # order 1..3 allowed
             pass
         else:
@@ -238,7 +236,7 @@ class DiffimTestCases(unittest.TestCase):
 
         self.policyDF.set("forwardRegularizationOrders", 1)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # order 1..3 allowed
             print e
             self.fail()
@@ -247,7 +245,7 @@ class DiffimTestCases(unittest.TestCase):
 
         self.policyDF.set("forwardRegularizationOrders", 4)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception, e: # order 1..3 allowed
             pass
         else:
@@ -256,8 +254,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policyDF.set("forwardRegularizationOrders", 1)
         self.policyDF.add("forwardRegularizationOrders", 2)
         try:
-            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
-        except Exception, e: # order 1..3 allowed
+            ipDiffim.makeRegularizationMatrix(self.policyDF)
+        except Exception as e: # order 1..3 allowed
             print e
             self.fail()
         else:
@@ -266,8 +264,8 @@ class DiffimTestCases(unittest.TestCase):
     def testBadRegularization(self):
         try:
             self.policyDF.set("regularizationType", "foo")
-            h = ipDiffim.makeRegularizationMatrix(self.policyDF)
-        except Exception, e: # invalid option
+            ipDiffim.makeRegularizationMatrix(self.policyDF)
+        except Exception: # invalid option
             pass
         else:
             self.fail()

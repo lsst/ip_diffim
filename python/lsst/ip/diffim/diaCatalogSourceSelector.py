@@ -22,7 +22,6 @@
 import numpy as np
 import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
-import lsst.afw.math as afwMath
 import lsst.meas.algorithms as measAlg
 import lsst.pex.logging as pexLog
 
@@ -129,7 +128,6 @@ class DiaCatalogSourceSelector(object):
         mi = exposure.getMaskedImage()
         
         if display:
-            frames = {}
             if displayExposure:
                 ds9.mtv(mi, title="Kernel candidates", frame=lsstDebug.frame)
         #

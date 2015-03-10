@@ -23,7 +23,6 @@
 #
 
 import os
-import pdb
 import sys
 import unittest
 import lsst.utils.tests as tests
