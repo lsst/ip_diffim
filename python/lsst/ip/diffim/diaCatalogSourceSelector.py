@@ -142,18 +142,21 @@ class DiaCatalogSourceSelector(object):
 
         doColorCut = True
         with ds9.Buffering():
+            refSchema = matches[0][0].schema
+            rRefFluxField = measAlg.getRefFluxField(refSchema, "r")
+            gRefFluxField = measAlg.getRefFluxField(refSchema, "g")
             for ref, source, d in matches:
                 if not isGoodSource(source):
                     symb, ctype = "+", ds9.RED
                 else:
-                    isStar = ref.get("stargal")
+                    isStar = not ref.get("resolved")
                     isVar = not ref.get("photometric")
                     gMag = None
                     rMag = None
                     if doColorCut:
                         try:
-                            gMag = -2.5 * np.log10(ref.get("g"))
-                            rMag = -2.5 * np.log10(ref.get("r"))
+                            gMag = -2.5 * np.log10(ref.get(gRefFluxField))
+                            rMag = -2.5 * np.log10(ref.get(rRefFluxField))
                         except KeyError:
                             self.log.warn("Cannot cut on color info; fields 'g' and 'r' do not exist")
                             doColorCut = False
