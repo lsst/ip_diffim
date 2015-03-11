@@ -293,7 +293,7 @@ Optionally display debugging information:
         ctrl = self.config.classification
         try:
             key = sources[0].getSchema().find(self._ClassificationFlag).getKey()
-        except:
+        except Exception:
             self.log.warn("Key %s not found in table" % (self._ClassificationFlag))            
             return
 
@@ -303,8 +303,8 @@ Optionally display debugging information:
             negFlux   = np.abs(source.get("ip_diffim_PsfDipoleFlux_neg_flux"))
             posFlux   = np.abs(source.get("ip_diffim_PsfDipoleFlux_pos_flux"))
             totalFlux = negFlux + posFlux
-            passesFluxNeg = (negFlux / (negFlux + posFlux)) < ctrl.maxFluxRatio
-            passesFluxPos = (posFlux / (negFlux + posFlux)) < ctrl.maxFluxRatio
+            passesFluxNeg = (negFlux / totalFlux) < ctrl.maxFluxRatio
+            passesFluxPos = (posFlux / totalFlux) < ctrl.maxFluxRatio
             if (passesSn and passesFluxPos and passesFluxNeg):
                 val = 1.0
             else:
@@ -419,10 +419,6 @@ class DipoleAnalysis(object):
         @param exposure  Image the dipoles were measured on
         @param sources   The set of diaSources that were measured"""
 
-        try:
-            import debug
-        except:
-            return
         import lsstDebug
         display = lsstDebug.Info(__name__).display
         displayDiaSources = lsstDebug.Info(__name__).displayDiaSources

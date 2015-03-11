@@ -2,16 +2,11 @@
 import unittest
 import lsst.utils.tests as tests
 import lsst.afw.image as afwImage
-import lsst.afw.image.utils as imageUtils
 import lsst.afw.math as afwMath
-import lsst.afw.detection as afwDet
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.daf.base as dafBase
-import lsst.pex.policy as pexPolicy
 import lsst.meas.algorithms as measAlg
-
-import lsst.afw.geom as afwGeom
 
 import lsst.pex.logging as pexLog
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
@@ -88,9 +83,11 @@ class PsfMatchTestCases(unittest.TestCase):
         sExp = afwImage.ExposureF(sMi, sWcs)
 
         # Should fail due to registration problem
+        psfMatchAL  = ipDiffim.ImagePsfMatchTask(config=self.configAL)
         try:
-            resultsAL  = psfMatchAL.subtractExposures(tExp, sExp, doWarping = True)
-        except:
+            psfMatchAL.subtractExposures(tExp, sExp, doWarping = True)
+        except Exception as e:
+            print "testWarning failed with %r" % (e,)
             pass
         else:
             self.fail()
@@ -114,8 +111,8 @@ class PsfMatchTestCases(unittest.TestCase):
         self.assertEqual(psfMatchDFr.useRegularization, True)
 
         resultsAL  = psfMatchAL.subtractExposures(tExp, sExp, doWarping = True)
-        resultsDF  = psfMatchDF.subtractExposures(tExp, sExp, doWarping = True)
-        resultsDFr = psfMatchDFr.subtractExposures(tExp, sExp, doWarping = True)
+        psfMatchDF.subtractExposures(tExp, sExp, doWarping = True)
+        psfMatchDFr.subtractExposures(tExp, sExp, doWarping = True)
 
         self.assertEqual(type(resultsAL.subtractedExposure), afwImage.ExposureF)
         self.assertEqual(type(resultsAL.psfMatchingKernel), afwMath.LinearCombinationKernel)

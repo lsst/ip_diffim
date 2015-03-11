@@ -792,7 +792,6 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
 
         """
         import lsstDebug
-        displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells
         displayCandidates = lsstDebug.Info(__name__).displayCandidates
         displayKernelBasis = lsstDebug.Info(__name__).displayKernelBasis
         displayKernelMosaic = lsstDebug.Info(__name__).displayKernelMosaic
@@ -914,7 +913,6 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         maxSpatialIterations   = self.kConfig.maxSpatialIterations
         nStarPerCell           = self.kConfig.nStarPerCell
         usePcaForSpatialKernel = self.kConfig.usePcaForSpatialKernel
-        subtractMeanForPca     = self.kConfig.subtractMeanForPca
 
         # Visitor for the single kernel fit
         policy = pexConfig.makePolicy(self.kConfig)

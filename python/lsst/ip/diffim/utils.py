@@ -149,7 +149,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
             # Original difference image; if does not exist, skip candidate
             try:
                 resid = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
-            except:
+            except Exception:
                 continue
 
             rchi2 = cand.getChi2()
@@ -165,7 +165,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
                 im = cand.getScienceMaskedImage()
                 im = im.Factory(im, True)
                 im.setXY0(cand.getScienceMaskedImage().getXY0())
-            except:
+            except Exception:
                 continue
             if (not resids and not kernels):
                 im_resid.append(im.Factory(im, True))
@@ -173,7 +173,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
                 im = cand.getTemplateMaskedImage()
                 im = im.Factory(im, True)
                 im.setXY0(cand.getTemplateMaskedImage().getXY0())
-            except:
+            except Exception:
                 continue
             if (not resids and not kernels):
                 im_resid.append(im.Factory(im, True))
@@ -342,7 +342,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
         fig.clf()
         try:
             fig.canvas._tkcanvas._root().lift() # == Tk's raise, but raise is a python reserved word
-        except:                                 # protect against API changes
+        except Exception:                                 # protect against API changes
             pass
 
         fig.suptitle('Kernel component %d' % k)
@@ -398,7 +398,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
             print "%s: Please close plots when done." % __name__
             try:
                 plt.show()
-            except:
+            except Exception:
                 pass
             print "Plots closed, exiting..."
         import atexit
@@ -555,7 +555,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     fig.clf()
     try:
         fig.canvas._tkcanvas._root().lift() # == Tk's raise, but raise is a python reserved word
-    except:                                 # protect against API changes
+    except Exception:                                 # protect against API changes
         pass
     if origVariance:
         fig.suptitle("Diffim residuals: Normalized by sqrt(input variance)", fontsize=titleFs)
@@ -609,7 +609,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
             print "%s: Please close plots when done." % __name__
             try:
                 pylab.show()
-            except:
+            except Exception:
                 pass
             print "Plots closed, exiting..."
         import atexit

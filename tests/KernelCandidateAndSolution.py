@@ -20,10 +20,10 @@ class DiffimTestCases(unittest.TestCase):
     def setUp(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
         schema.setVersion(0)
-        centroidKey = schema.addField("centroid", type="PointD")
-        fluxKey = schema.addField("flux", type=float)
-        fluxErrKey = schema.addField("flux.err", type=float)
-        fluxFlagKey = schema.addField("flux.flags", type="Flag")
+        schema.addField("centroid", type="PointD")
+        schema.addField("flux", type=float)
+        schema.addField("flux.err", type=float)
+        schema.addField("flux.flags", type="Flag")
         self.table = afwTable.SourceTable.make(schema)
         self.table.definePsfFlux("flux")
         self.table.defineCentroid("centroid")
@@ -154,7 +154,7 @@ class DiffimTestCases(unittest.TestCase):
                     self.fail()
         try:
             kc.getImage()
-        except:
+        except Exception:
             pass
         else:
             self.fail()
@@ -240,7 +240,7 @@ class DiffimTestCases(unittest.TestCase):
                     self.fail()
         try:
             kc.getImage()
-        except:
+        except Exception:
             pass
         else:
             self.fail()
@@ -315,7 +315,7 @@ class DiffimTestCases(unittest.TestCase):
                     pass
         try:
             kc.getImage()
-        except:
+        except Exception:
             print kMethod, e
             self.fail()
         else:
@@ -389,7 +389,7 @@ class DiffimTestCases(unittest.TestCase):
                     self.assertAlmostEqual(kImageOut.get(i, j)/kImageIn.get(i, j), 1.0, 2)
 
         # now repeat with noise added; decrease precision of comparison
-        bkg = self.addNoise(smi2)
+        self.addNoise(smi2)
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)

@@ -2,14 +2,10 @@
 import unittest
 import lsst.utils.tests as tests
 import lsst.afw.image as afwImage
-import lsst.afw.image.utils as imageUtils
-import lsst.afw.math as afwMath
-import lsst.afw.detection as afwDet
 import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.daf.base as dafBase
-import lsst.pex.policy as pexPolicy
 
 import lsst.pex.logging as pexLog
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
@@ -84,15 +80,9 @@ class PsfMatchTestCases(unittest.TestCase):
         psfMatchAL   = ipDiffim.SnapPsfMatchTask(config=self.configAL)
         psfMatchDF   = ipDiffim.SnapPsfMatchTask(config=self.configDF)
         psfMatchDFr  = ipDiffim.SnapPsfMatchTask(config=self.configDFr)
-        resultsAL    = psfMatchAL.subtractMaskedImages(tMi, sMi, psfMatchAL.makeCandidateList(tExp,
-                                                                                              sExp,
-                                                                                              self.ksize))
-        resultsDF    = psfMatchDF.subtractMaskedImages(tMi, sMi, psfMatchDF.makeCandidateList(tExp,
-                                                                                              sExp,
-                                                                                              self.ksize))
-        resultsDFr   = psfMatchDFr.subtractMaskedImages(tMi, sMi, psfMatchDFr.makeCandidateList(tExp,
-                                                                                                sExp,
-                                                                                                self.ksize))
+        psfMatchAL.subtractMaskedImages(tMi, sMi, psfMatchAL.makeCandidateList(tExp, sExp, self.ksize))
+        psfMatchDF.subtractMaskedImages(tMi, sMi, psfMatchDF.makeCandidateList(tExp, sExp, self.ksize))
+        psfMatchDFr.subtractMaskedImages(tMi, sMi, psfMatchDFr.makeCandidateList(tExp, sExp, self.ksize))
 
     def tearDown(self):
         del self.configAL

@@ -22,13 +22,10 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
-import os
 
 import unittest
 import lsst.utils.tests as tests
 
-import eups
-import lsst.afw.detection as afwDetection
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim

@@ -28,7 +28,7 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.pipe.base as pipeBase
 from lsst.meas.algorithms import SourceDetectionTask, getBackground
-from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig
+from lsst.meas.base import SingleFrameMeasurementTask
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigDF, PsfMatchConfigAL
 from . import utils as diUtils 
@@ -630,7 +630,7 @@ And finally provide some optional debugging displays:
         miArr = np.ma.masked_array(imArr, mask=maskArr)
         try:
             bkgd = getBackground(mi, self.kConfig.afwBackgroundConfig).getImageF()
-        except:
+        except Exception:
             self.log.warn("Failed to get background model.  Falling back to median background estimation")
             bkgd = np.ma.extras.median(miArr)
 
@@ -688,7 +688,6 @@ And finally provide some optional debugging displays:
 
     def _adaptCellSize(self, candidateList):
         """! NOT IMPLEMENTED YET"""
-        nCand = len(candidateList)
         return self.kConfig.sizeCellX, self.kConfig.sizeCellY
 
     def _buildCellSet(self, templateMaskedImage, scienceMaskedImage, candidateList):

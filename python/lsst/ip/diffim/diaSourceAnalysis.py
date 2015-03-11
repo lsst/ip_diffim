@@ -23,7 +23,6 @@
 #
 from __future__ import division
 
-import os
 from optparse import OptionParser
 import lsst.afw.image                    as afwImage
 import lsst.afw.geom                     as afwGeom

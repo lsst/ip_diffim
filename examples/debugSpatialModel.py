@@ -119,7 +119,7 @@ if display:
 
             try:
                 im = cand.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
-            except:
+            except Exception:
                 continue
             
             if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:

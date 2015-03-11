@@ -3,7 +3,6 @@ import unittest
 import lsst.utils.tests as tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
-import lsst.afw.detection as afwDet
 import lsst.ip.diffim as ipDiffim
 import lsst.meas.algorithms as measAlg
 
@@ -31,8 +30,8 @@ class PsfMatchTestCases(unittest.TestCase):
         psf = measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma2)
         psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
         try:
-            results = psfMatch.run(self.exp, psf)
-        except:
+            psfMatch.run(self.exp, psf)
+        except Exception:
             pass
         else:
             self.fail()
@@ -49,9 +48,7 @@ class PsfMatchTestCases(unittest.TestCase):
         psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
         results = psfMatch.run(self.exp, psf, kernelSum = kSumIn)
 
-        matchedExp     = results.psfMatchedExposure
         matchingKernel = results.psfMatchingKernel
-        kernelCellSet  = results.kernelCellSet
 
         kImage = afwImage.ImageD(matchingKernel.getDimensions())
         kSumOut = matchingKernel.computeImage(kImage, False)

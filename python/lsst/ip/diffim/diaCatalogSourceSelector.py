@@ -22,7 +22,6 @@
 import numpy as np
 import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
-import lsst.afw.math as afwMath
 import lsst.meas.algorithms as measAlg
 import lsst.pex.logging as pexLog
 
@@ -129,7 +128,6 @@ class DiaCatalogSourceSelector(object):
         mi = exposure.getMaskedImage()
         
         if display:
-            frames = {}
             if displayExposure:
                 ds9.mtv(mi, title="Kernel candidates", frame=lsstDebug.frame)
         #
@@ -144,18 +142,21 @@ class DiaCatalogSourceSelector(object):
 
         doColorCut = True
         with ds9.Buffering():
+            refSchema = matches[0][0].schema
+            rRefFluxField = measAlg.getRefFluxField(refSchema, "r")
+            gRefFluxField = measAlg.getRefFluxField(refSchema, "g")
             for ref, source, d in matches:
                 if not isGoodSource(source):
                     symb, ctype = "+", ds9.RED
                 else:
-                    isStar = ref.get("stargal")
+                    isStar = not ref.get("resolved")
                     isVar = not ref.get("photometric")
                     gMag = None
                     rMag = None
                     if doColorCut:
                         try:
-                            gMag = -2.5 * np.log10(ref.get("g"))
-                            rMag = -2.5 * np.log10(ref.get("r"))
+                            gMag = -2.5 * np.log10(ref.get(gRefFluxField))
+                            rMag = -2.5 * np.log10(ref.get(rRefFluxField))
                         except KeyError:
                             self.log.warn("Cannot cut on color info; fields 'g' and 'r' do not exist")
                             doColorCut = False

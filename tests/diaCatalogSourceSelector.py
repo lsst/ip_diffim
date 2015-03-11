@@ -28,7 +28,9 @@ import lsst.afw.table as afwTable
 import lsst.afw.coord as afwCoord
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
+from lsst.meas.algorithms import LoadReferenceObjectsTask, getRefFluxField
 import lsst.ip.diffim as ipDiffim
+
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 class DiaCatalogSourceSelectorTest(unittest.TestCase):
@@ -42,12 +44,9 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
         del self.exposure
 
     def makeRefCatalog(self):
-        schema = afwTable.SourceTable.makeMinimalSchema()
-        schema.addField("g", type="D")
-        schema.addField("r", type="D")
-        schema.addField("stargal", type="Flag")
-        schema.addField("photometric", type="Flag")
-        catalog = afwTable.SourceCatalog(schema)
+        schema = LoadReferenceObjectsTask.makeMinimalSchema(filterNameList=["g", "r"],
+            addFluxSigma=False, addIsPhotometric=True, addIsResolved=True)
+        catalog = afwTable.SimpleCatalog(schema)
         return catalog
 
     def makeSrcCatalog(self):
@@ -70,9 +69,9 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
             
             coord  = afwCoord.Coord(afwGeom.Point2D(*np.random.randn(2)), afwGeom.degrees)
             
-            refSrc.set("g", 10**(-0.4*18))
-            refSrc.set("r", 10**(-0.4*18))
-            refSrc.set("stargal", True)
+            refSrc.set("g_flux", 10**(-0.4*18))
+            refSrc.set("r_flux", 10**(-0.4*18))
+            refSrc.set("resolved", False)
             refSrc.set("photometric", True)
             refSrc.set("coord", coord)
 
@@ -108,14 +107,16 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
 
         # Set one of the colors to be bad
         grMin = self.sourceSelector.config.grMin
-        gFlux = 10**(-0.4 * (grMin - 0.1)) * matches[2].first.get("r")
-        matches[2].first.set("g", gFlux)
+        rFluxField = getRefFluxField(refCat.schema, "r")
+        gFluxField = getRefFluxField(refCat.schema, "g")
+        gFlux = 10**(-0.4 * (grMin - 0.1)) * matches[2].first.get(rFluxField)
+        matches[2].first.set(gFluxField, gFlux)
         sources = self.sourceSelector.selectSources(self.exposure, srcCat, matches)
         self.assertEqual(len(sources), nSrc-3)
 
         # Set one of the types to be bad
         if self.sourceSelector.config.selectStar and not self.sourceSelector.config.selectGalaxy:
-            matches[3].first.set("stargal", False)
+            matches[3].first.set("resolved", True)
             sources = self.sourceSelector.selectSources(self.exposure, srcCat, matches)
             self.assertEqual(len(sources), nSrc-4)
 
