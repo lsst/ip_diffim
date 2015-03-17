@@ -351,6 +351,7 @@ And finally provide some optional debugging displays:
             else:
                 scienceFwhmPix = self.getFwhmPix(scienceExposure.getPsf())
 
+
         kernelSize = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix)[0].getWidth()
         candidateList = self.makeCandidateList(templateExposure, scienceExposure, kernelSize, candidateList)
 
@@ -646,7 +647,7 @@ And finally provide some optional debugging displays:
                 doSmooth=doSmooth
                 )
             selectSources = detRet.sources
-            self.selectMeasurement.measure(exposure, selectSources)
+            self.selectMeasurement.run(measCat=selectSources, exposure=exposure)
         finally:
             # Put back on the background in case it is needed down stream
             mi += bkgd
@@ -671,6 +672,9 @@ And finally provide some optional debugging displays:
         """
         if candidateList is None:
             candidateList = self.getSelectSources(scienceExposure)
+
+        if len(candidateList) < 1:
+            raise RuntimeError("No candidates in candidateList")
 
         listTypes = set(type(x) for x in candidateList)
         if (not len(listTypes) == 1) or (type(listTypes.pop()) != type(afwTable.SourceRecord)):
