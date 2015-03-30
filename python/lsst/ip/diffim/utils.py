@@ -447,7 +447,7 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
             w, h = im.getWidth(), im.getHeight()
             cen = afwGeom.PointD(w//2, h//2)
             src = table.makeRecord()
-            foot = afwDet.Footprint(exp.getBBox(afwImage.LOCAL))
+            foot = afwDet.Footprint(exp.getBBox())
             src.setFootprint(foot)
 
             centroider.apply(src, exp, cen)
