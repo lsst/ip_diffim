@@ -75,17 +75,13 @@ namespace boost {
 /******************************************************************************/
 
 /* Eigen / numpy.  Info comes from $AFW_DIR/include/lsst/afw/numpyTypemaps.h */
+
+%include "lsst/p_lsstSwig.i"
+%initializeNumPy(ip_diffim)
 %{
-#include "numpy/arrayobject.h"
 #include "ndarray/swig.h"
 #include "ndarray/swig/eigen.h"
 %}
-
-%init %{
-    import_array();
-%}
-
-%include "lsst/p_lsstSwig.i"
 %include "ndarray.i"
 
 %template(PtrEigenMatrixXd) boost::shared_ptr<Eigen::MatrixXd>;
