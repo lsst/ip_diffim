@@ -21,15 +21,6 @@
  * see <http://www.lsstcorp.org/LegalNotices/>.
  */
 
-%define testlib_DOCSTRING
-"
-Basic routines to talk to test::foo:bar classes
-"
-%enddef
-
-%feature("autodoc", "1");
-%module(package="lsst.meas.base", docstring=testlib_DOCSTRING) testlib
-
 %{
 #include "lsst/pex/logging.h"
 #include "lsst/afw/geom.h"
@@ -39,25 +30,9 @@ Basic routines to talk to test::foo:bar classes
 #include "lsst/afw/image.h"
 #include "lsst/afw/detection.h"
 #include "lsst/meas/base.h"
-#define PY_ARRAY_UNIQUE_SYMBOL LSST_MEAS_BASE_NUMPY_ARRAY_API
-#include "numpy/arrayobject.h"
-#include "ndarray/swig.h"
-#include "ndarray/swig/eigen.h"
 %}
-
-%init %{
-    import_array();
-%}
-
-%include "lsst/p_lsstSwig.i"
-%include "lsst/base.h"
-%include "std_complex.i"
-
-%include "ndarray.i"
 
 %declareNumPyConverters(lsst::meas::base::CentroidCov);
-
-%lsst_exceptions();
 
 %include "std_vector.i"
 %import "lsst/afw/geom/geomLib.i"
@@ -91,4 +66,3 @@ Basic routines to talk to test::foo:bar classes
 %shared_ptr(lsst::ip::diffim::NaiveDipoleFlux)
 
 %include "lsst/ip/diffim/DipoleAlgorithms.h"
-
