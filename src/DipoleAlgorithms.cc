@@ -142,13 +142,13 @@ void NaiveDipoleCentroid::measure(
     afw::table::SourceRecord & source,
     afw::image::Exposure<float> const & exposure
 ) const {
-    afw::detection::Footprint::PeakList const& peaks = source.getFootprint()->getPeaks();
+    afw::detection::PeakCatalog const& peaks = source.getFootprint()->getPeaks();
 
-    naiveCentroid(source, exposure, peaks[0]->getI(), (peaks[0]->getPeakValue() >= 0 ? 
+    naiveCentroid(source, exposure, peaks[0].getI(), (peaks[0].getPeakValue() >= 0 ? 
                                                        getPositiveKeys() : 
                                                        getNegativeKeys()));
     if (peaks.size() > 1) {
-        naiveCentroid(source, exposure, peaks[1]->getI(), (peaks[1]->getPeakValue() >= 0 ? 
+        naiveCentroid(source, exposure, peaks[1].getI(), (peaks[1].getPeakValue() >= 0 ? 
                                                            getPositiveKeys() :
                                                            getNegativeKeys()));
     }
@@ -380,33 +380,32 @@ void PsfDipoleFlux::measure(
     }
     source.set(_flagMaxPixelsKey, false);
 
-    afw::detection::Footprint::PeakList peakList = 
-        afw::detection::Footprint::PeakList(footprint->getPeaks());
+    afw::detection::PeakCatalog peakCatalog = afw::detection::PeakCatalog(footprint->getPeaks());
 
-    if (peakList.size() == 0) {
+    if (peakCatalog.size() == 0) {
         throw LSST_EXCEPT(pex::exceptions::RuntimeError,
                           (boost::format("No peak for source %d") % source.getId()).str());
     }
-    else if (peakList.size() == 1) {
+    else if (peakCatalog.size() == 1) {
         // No deblending to do 
         return;
     }
 
     // For N>=2, just measure the brightest-positive and brightest-negative
-    // peaks.  peakList is automatically ordered by peak flux, with the most
+    // peaks.  peakCatalog is automatically ordered by peak flux, with the most
     // positive one (brightest) being first
-    PTR(afw::detection::Peak) positivePeak = peakList.front();
-    PTR(afw::detection::Peak) negativePeak = peakList.back();
+    afw::detection::PeakRecord const& positivePeak = peakCatalog.front();
+    afw::detection::PeakRecord const& negativePeak = peakCatalog.back();
 
     // Set up fit parameters and param names
     ROOT::Minuit2::MnUserParameters fitPar;
 
-    fitPar.Add((boost::format("P%d")%NEGCENTXPAR).str(), negativePeak->getFx(), _ctrl.stepSizeCoord);
-    fitPar.Add((boost::format("P%d")%NEGCENTYPAR).str(), negativePeak->getFy(), _ctrl.stepSizeCoord);
-    fitPar.Add((boost::format("P%d")%NEGFLUXPAR).str(), negativePeak->getPeakValue(), _ctrl.stepSizeFlux);
-    fitPar.Add((boost::format("P%d")%POSCENTXPAR).str(), positivePeak->getFx(), _ctrl.stepSizeCoord);
-    fitPar.Add((boost::format("P%d")%POSCENTYPAR).str(), positivePeak->getFy(), _ctrl.stepSizeCoord);
-    fitPar.Add((boost::format("P%d")%POSFLUXPAR).str(), positivePeak->getPeakValue(), _ctrl.stepSizeFlux);
+    fitPar.Add((boost::format("P%d")%NEGCENTXPAR).str(), negativePeak.getFx(), _ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%NEGCENTYPAR).str(), negativePeak.getFy(), _ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%NEGFLUXPAR).str(), negativePeak.getPeakValue(), _ctrl.stepSizeFlux);
+    fitPar.Add((boost::format("P%d")%POSCENTXPAR).str(), positivePeak.getFx(), _ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%POSCENTYPAR).str(), positivePeak.getFy(), _ctrl.stepSizeCoord);
+    fitPar.Add((boost::format("P%d")%POSFLUXPAR).str(), positivePeak.getPeakValue(), _ctrl.stepSizeFlux);
 
     // Create the minuit object that knows how to minimise our functor
     //
