@@ -26,6 +26,10 @@ class PsfMatchTestCases(unittest.TestCase):
         self.configDFr.kernel.name = "DF"
         self.subconfigDFr = self.configDFr.kernel.active
 
+        self.subconfigAL.afwBackgroundConfig.useApprox = False
+        self.subconfigDF.afwBackgroundConfig.useApprox = False
+        self.subconfigDFr.afwBackgroundConfig.useApprox = False
+
         self.subconfigDF.useRegularization = False
         self.subconfigDFr.useRegularization = True
 
