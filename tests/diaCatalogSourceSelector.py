@@ -51,13 +51,12 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
 
     def makeSrcCatalog(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
-        schema.setVersion(0)
-        schema.addField("flux", type=float)
-        schema.addField("flux.err", type=float)
+        schema.addField("test_flux", type=float)
+        schema.addField("test_fluxSigma", type=float)
         for flag in self.sourceSelector.config.badPixelFlags:
             schema.addField(flag, type="Flag")
         table = afwTable.SourceTable.make(schema)
-        table.definePsfFlux("flux")
+        table.definePsfFlux("test")
         catalog = afwTable.SourceCatalog(table)
         return catalog
 

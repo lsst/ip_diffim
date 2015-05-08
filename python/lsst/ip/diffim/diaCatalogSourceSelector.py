@@ -42,7 +42,8 @@ class DiaCatalogSourceSelectorConfig(pexConfig.Config):
     badPixelFlags = pexConfig.ListField(
         doc = "Kernel candidate objects may not have any of these bits set",
         dtype = str,
-        default = ["flags.pixel.edge", "flags.pixel.interpolated.center", "flags.pixel.saturated.center", "flags.badcentroid"],
+        default = ["base_PixelFlags_edge", "base_PixelFlags_interpolatedCenter",
+                   "base_PixelFlags_saturatedCenter", "slot_Centroid_flag"],
         )
     # Selection cuts on the reference catalog
     selectStar = pexConfig.Field(
