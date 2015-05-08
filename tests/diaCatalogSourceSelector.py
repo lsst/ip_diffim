@@ -72,7 +72,7 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
             refSrc.set("r_flux", 10**(-0.4*18))
             refSrc.set("resolved", False)
             refSrc.set("photometric", True)
-            refSrc.set("coord", coord)
+            refSrc.setCoord(coord)
 
             srcSrc.setCoord(coord)
             srcSrc.set(srcSrc.getTable().getPsfFluxKey(), 10.)
