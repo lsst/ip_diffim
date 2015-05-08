@@ -19,14 +19,13 @@ class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
-        schema.setVersion(0)
-        schema.addField("centroid", type="PointD")
-        schema.addField("flux", type=float)
-        schema.addField("flux.err", type=float)
-        schema.addField("flux.flags", type="Flag")
+        afwTable.Point2DKey.addFields(schema, "Centroid", "input centroid", "pixels")
+        schema.addField("PsfFlux_flux", type=float)
+        schema.addField("PsfFlux_fluxSigma", type=float)
+        schema.addField("PsfFlux_flag", type="Flag")
         self.table = afwTable.SourceTable.make(schema)
-        self.table.definePsfFlux("flux")
-        self.table.defineCentroid("centroid")
+        self.table.definePsfFlux("PsfFlux")
+        self.table.defineCentroid("Centroid")
         self.ss = afwTable.SourceCatalog(self.table)
 
         self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
