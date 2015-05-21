@@ -24,7 +24,7 @@
 
 import os
 import sys
-import eups
+import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image.imageLib as afwImage
 import lsst.ip.diffim as ipDiffim
@@ -37,8 +37,8 @@ display = True
 verbosity = 5
 pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 
-defDataDir   = eups.productDir("afwdata") 
-imageProcDir = eups.productDir("ip_diffim")
+defDataDir   = lsst.utils.getPackageDir('afwdata')
+imageProcDir = lsst.utils.getPackageDir('ip_diffim')
 
 if len(sys.argv) == 1:
     defTemplatePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2_tmpl")

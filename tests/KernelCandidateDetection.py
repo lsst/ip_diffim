@@ -3,7 +3,7 @@ import os, sys
 import unittest
 import lsst.utils.tests as tests
 
-import eups
+import lsst.utils
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -27,7 +27,11 @@ class DiffimTestCases(unittest.TestCase):
         self.gaussKernel   = afwMath.AnalyticKernel(self.gSize, self.gSize, self.gaussFunction)
 
         # known input images
-        self.defDataDir = eups.productDir('afwdata')
+        try:
+            self.defDataDir = lsst.utils.getPackageDir('afwdata')
+        except Exception:
+            self.defDataDir = None
+
         if self.defDataDir:
             defImagePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
                                         "v5-e0-c011-a00.sci.fits")

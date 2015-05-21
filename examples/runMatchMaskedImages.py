@@ -1,4 +1,4 @@
-import eups
+import lsst.utils
 import sys
 import os
 import optparse
@@ -13,10 +13,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 
 def main():
-    imageProcDir = eups.productDir('ip_diffim')
-    if imageProcDir == None:
-        print 'Error: could not set up ip_diffim'
-        sys.exit(1)
+    imageProcDir = lsst.utils.getPackageDir('ip_diffim')
 
     defSciencePath  = None
     defTemplatePath = None

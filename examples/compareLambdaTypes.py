@@ -4,7 +4,7 @@ import sys
 import unittest
 
 import lsst.utils.tests as tests
-import eups
+import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -85,7 +85,7 @@ class DiffimTestCases(unittest.TestCase):
         self.bskv4  = ipDiffim.BuildSingleKernelVisitorF(self.kList4, pexConfig.makePolicy(self.subconfig4), self.hMat4)
 
         # known input images
-        defDataDir = eups.productDir('afwdata')
+        defDataDir = lsst.utils.getPackageDir('afwdata')
         if CFHT:
             defSciencePath  = os.path.join(defDataDir, 'CFHT', 'D4', CFHTTORUN)
             defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', CFHTTORUN+'_tmpl')

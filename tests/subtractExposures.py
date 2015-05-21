@@ -4,7 +4,7 @@ import sys
 import unittest
 import lsst.utils.tests as tests
 
-import eups
+import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -36,7 +36,11 @@ class DiffimTestCases(unittest.TestCase):
         # Impacts some of the test values
         self.subconfig.constantVarianceWeighting = True
 
-        self.defDataDir = eups.productDir('afwdata')
+        try:
+            self.defDataDir = lsst.utils.getPackageDir('afwdata')
+        except Exception:
+            self.defDataDir = None
+
         if self.defDataDir:
 
             defTemplatePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",

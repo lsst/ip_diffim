@@ -26,7 +26,7 @@ import os
 import sys
 import numpy as np
 
-import eups
+import lsst.utils
 import lsst.daf.base               as dafBase
 import lsst.afw.table              as afwTable
 import lsst.afw.image              as afwImage
@@ -40,12 +40,8 @@ def loadData(imFile=None):
 
     if imFile is None:
         # Load sample input from disk
-        mypath = eups.productDir("afwdata")
-        if not mypath:
-            print >> sys.stderr, "Please setup afwdata and try again"
-            sys.exit(1)
-
-        imFile = os.path.join(mypath, "CFHT", "D4", "cal-53535-i-797722_small_1.fits")
+        afwdataDir = lsst.utils.getPackageDir('afwdata')
+        imFile = os.path.join(afwdataDir, "CFHT", "D4", "cal-53535-i-797722_small_1.fits")
     else:
         if not os.path.isfile(imFile):
             print >> sys.stderr, "Input file %s does not exist" % (imFile)

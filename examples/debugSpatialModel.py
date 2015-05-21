@@ -22,7 +22,7 @@
 
 import os
 import sys
-import eups
+import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -41,8 +41,8 @@ warp = True
 verbosity = 5
 pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 
-defDataDir   = eups.productDir("afwdata") 
-imageProcDir = eups.productDir("ip_diffim")
+defDataDir = lsst.utils.getPackageDir('afwdata')
+imageProcDir = lsst.utils.getPackageDir('ip_diffim')
 
 if len(sys.argv) == 1:
     defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
