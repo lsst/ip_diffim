@@ -106,32 +106,6 @@ namespace boost {
 %include "lsst/afw/table/Source.h"
 %lsst_exceptions();
 
-
-%pythoncode %{
-import lsst.utils
-
-def version(HeadURL = r"$HeadURL$"):
-    """Return a version given a HeadURL string. If a different version is setup, return that too"""
-
-    version_svn = lsst.utils.guessSvnVersion(HeadURL)
-
-    try:
-        import eups
-    except ImportError:
-        return version_svn
-    else:
-        try:
-            version_eups = eups.setup("ip_diffim")
-        except AttributeError:
-            return version_svn
-
-    if version_eups == version_svn:
-        return version_svn
-    else:
-        return "%s (setup: %s)" % (version_svn, version_eups)
-
-%}
-
 /******************************************************************************/
 
 %template(pair_Kernel_double)   std::pair<lsst::afw::math::Kernel::Ptr, double>;
