@@ -4,6 +4,7 @@ setupRequired(meas_deblender)
 setupRequired(numpy)
 setupRequired(pex_config)
 setupRequired(pipe_base)
+setupRequired(utils)
 
 setupOptional(afwdata)
 setupOptional(matplotlib)

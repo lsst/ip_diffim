@@ -26,7 +26,7 @@ import os
 import unittest
 import lsst.utils.tests as tests
 
-import eups
+import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -92,7 +92,7 @@ class DiffimTestCases(unittest.TestCase):
             self.scienceExposure   = afwImage.ExposureF(defSciencePath)
             self.templateExposure  = afwImage.ExposureF(defTemplatePath)
         else:
-            defDataDir = eups.productDir('afwdata')
+            defDataDir = lsst.utils.getPackageDir('afwdata')
             defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a00.sci")
             defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",

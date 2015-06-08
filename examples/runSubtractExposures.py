@@ -1,4 +1,4 @@
-import eups
+import lsst.utils
 import sys
 import os
 import optparse
@@ -15,14 +15,8 @@ import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 
 def main():
-    defDataDir   = eups.productDir('afwdata')
-    if defDataDir == None:
-        print 'Error: afwdata not set up'
-        sys.exit(1)
-    imageProcDir = eups.productDir('ip_diffim')
-    if imageProcDir == None:
-        print 'Error: could not set up ip_diffim'
-        sys.exit(1)
+    defDataDir = lsst.utils.getPackageDir('afwdata')
+    imageProcDir = lsst.utils.getPackageDir('ip_diffim')
 
     defSciencePath  = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0", "v26-e0-c011-a10.sci")
     defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0", "v5-e0-c011-a10.sci")

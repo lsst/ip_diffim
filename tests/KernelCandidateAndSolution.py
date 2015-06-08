@@ -3,7 +3,7 @@ import os, sys
 import unittest
 import lsst.utils.tests as tests
 
-import eups
+import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -39,7 +39,11 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set("useRegularization", False)
 
         # known input images
-        self.defDataDir = eups.productDir('afwdata')
+        try:
+            self.defDataDir = lsst.utils.getPackageDir('afwdata')
+        except Exception:
+            self.defDataDir = None
+
         if self.defDataDir:
             defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a10.sci.fits")
