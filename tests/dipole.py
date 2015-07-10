@@ -338,6 +338,7 @@ class DipoleAlgorithmTest(unittest.TestCase):
             "ip_diffim_PsfDipoleFlux",
         ]
         msConfig.slots.psfFlux = None
+        msConfig.slots.calibFlux = None
         msConfig.slots.modelFlux = None
         msConfig.slots.apFlux = None
         msConfig.slots.instFlux = None
@@ -368,6 +369,7 @@ class DipoleAlgorithmTest(unittest.TestCase):
             "ip_diffim_PsfDipoleFlux",
         ]
         msConfig.slots.psfFlux = None
+        msConfig.slots.calibFlux = None
         msConfig.slots.modelFlux = None
         msConfig.slots.apFlux = None
         msConfig.slots.instFlux = None
@@ -408,6 +410,7 @@ class DipoleMeasurementTaskTest(unittest.TestCase):
             "ip_diffim_PsfDipoleFlux",
         ]
         self.config.slots.psfFlux = None
+        self.config.slots.calibFlux = None
         self.config.slots.modelFlux = None
         self.config.slots.apFlux = None
         self.config.slots.instFlux = None
