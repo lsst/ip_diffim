@@ -69,6 +69,7 @@ class ImagePsfMatchConfig(pexConfig.Config):
                                                    'base_SdssShape', 'base_GaussianFlux', 'base_SkyCoord')
         self.selectMeasurement.slots.modelFlux = None
         self.selectMeasurement.slots.apFlux = None
+        self.selectMeasurement.slots.calibFlux = None
 
 ## \addtogroup LSST_task_documentation
 ## \{
