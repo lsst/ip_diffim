@@ -30,7 +30,8 @@ import lsst.meas.deblender.baseline as deblendBaseline
 from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig
 import lsst.afw.display.ds9 as ds9                
 
-__all__ = ("DipoleMeasurementConfig", "DipoleMeasurementTask", "DipoleAnalysis", "DipoleDeblender")
+__all__ = ("DipoleMeasurementConfig", "DipoleMeasurementTask", "DipoleAnalysis", "DipoleDeblender",
+           "SourceFlagChecker")
 
 
 class DipoleClassificationConfig(pexConfig.Config):
