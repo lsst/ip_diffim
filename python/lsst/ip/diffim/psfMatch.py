@@ -1037,7 +1037,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
 
         except pexExcept.Exception as e:
             pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
-            pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0].what())
+            pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0])
             raise e
         except Exception, e:
             pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
