@@ -306,9 +306,11 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
     log.info("Growing %d kernel candidate stars by %d pixels" % (len(candidateInList), fpGrowPix))
 
     for kernelCandidate in candidateInList:
-        kernelCandidate = kernelCandidate.getSource()
         if not type(kernelCandidate) == afwTable.SourceRecord:
-            raise RuntimeError, ("Candiate not of type afwTable.SourceRecord")
+            try:
+                kernelCandidate = kernelCandidate.getSource()
+            except:
+                raise RuntimeError, ("Candiate not of type afwTable.SourceRecord")
         bm1 = 0
         bm2 = 0
         center = afwGeom.Point2I(scienceExposure.getWcs().skyToPixel(kernelCandidate.getCoord()))
