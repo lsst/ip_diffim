@@ -412,7 +412,8 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         maskTransparency = lsstDebug.Info(__name__).maskTransparency
         if not maskTransparency:
             maskTransparency = 0
-        ds9.setMaskTransparency(maskTransparency)
+        if display:
+            ds9.setMaskTransparency(maskTransparency)
         if display and displaySpatialCells:
             diUtils.showKernelSpatialCells(exposure.getMaskedImage(), kernelCellSet,
                 symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
