@@ -411,7 +411,8 @@ And finally provide some optional debugging displays:
         maskTransparency = lsstDebug.Info(__name__).maskTransparency
         if not maskTransparency:
             maskTransparency = 0
-        ds9.setMaskTransparency(maskTransparency)
+        if display:
+            ds9.setMaskTransparency(maskTransparency)
 
         if not candidateList:
             raise RuntimeError("Candidate list must be populated by makeCandidateList")
@@ -538,7 +539,8 @@ And finally provide some optional debugging displays:
         maskTransparency = lsstDebug.Info(__name__).maskTransparency
         if not maskTransparency:
             maskTransparency = 0
-        ds9.setMaskTransparency(maskTransparency)
+        if display:
+            ds9.setMaskTransparency(maskTransparency)
         if display and displayDiffIm:
             ds9.mtv(templateExposure, frame=lsstDebug.frame, title="Template")
             lsstDebug.frame += 1
@@ -600,7 +602,8 @@ And finally provide some optional debugging displays:
         maskTransparency = lsstDebug.Info(__name__).maskTransparency
         if not maskTransparency:
             maskTransparency = 0
-        ds9.setMaskTransparency(maskTransparency)
+        if display:
+            ds9.setMaskTransparency(maskTransparency)
         if display and displayDiffIm:
             ds9.mtv(subtractedMaskedImage, frame=lsstDebug.frame)
             lsstDebug.frame += 1
