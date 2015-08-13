@@ -559,7 +559,7 @@ class DipoleDeblender(object):
             self.log.info("deblended.chi2dof.dipole.%s %f" % (
                 suffix, peak.psfFitChisq / peak.psfFitDof))
             self.log.info("deblended.flux.dipole.psf.%s %f" % (
-                suffix, peak.psfFitFlux * np.sum(peak.templateMaskedImage.getImage().getArray())))
+                suffix, peak.psfFitFlux * np.sum(peak.templateImage.getArray())))
             peakList.append(peak.peak)
         return deblendedSource
         
