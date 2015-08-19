@@ -66,7 +66,7 @@ class DetectionConfig(pexConfig.Config):
         dtype = str,
         doc = """Mask planes that lead to an invalid detection.
                  Options: NO_DATA EDGE SAT BAD CR INTRP""",
-        default = ("NO_DATA", "SAT")
+        default = ("NO_DATA", "EDGE", "SAT")
     )
     fpNpixMin = pexConfig.Field(
         dtype = int,
@@ -273,7 +273,7 @@ class PsfMatchConfig(pexConfig.Config):
         dtype = str,
         doc = """Mask planes to ignore when calculating diffim statistics
                  Options: NO_DATA EDGE SAT BAD CR INTRP""",
-        default = ("NO_DATA", "SAT")
+        default = ("NO_DATA", "EDGE", "SAT")
     )
     candidateResidualMeanMax = pexConfig.Field(
         dtype = float,

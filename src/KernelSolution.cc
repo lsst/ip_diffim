@@ -536,6 +536,7 @@ namespace diffim {
         afwImage::MaskPixel bitMask = 
             (afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD") | 
              afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("SAT") |
+             afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("NO_DATA") |
              afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("EDGE"));
 
         /* Create a Footprint that contains all the masked pixels set above */
