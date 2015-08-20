@@ -133,8 +133,8 @@ class KernelCandidateQa(object):
         mask = di.getMask()
         maskArr = di.getMask().getArray()
 
-        # Create a mask using BAD,SAT,EDGE pixels.  Keep detections
-        maskArr &= (mask.getPlaneBitMask("BAD")|mask.getPlaneBitMask("SAT")|mask.getPlaneBitMask("EDGE"))
+        # Create a mask using BAD, SAT, NO_DATA, EDGE bits.  Keep detections
+        maskArr &= mask.getPlaneBitMask(["BAD", "SAT", "NO_DATA", "EDGE"])
 
         # Mask out values based on maskArr
         diArr = ma.array(di.getImage().getArray(), mask=maskArr)

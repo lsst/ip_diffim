@@ -64,7 +64,7 @@ class DiaSourceAnalystConfig(pexConfig.Config):
         doc = """Mask planes that lead to an invalid detection.
                  Options: NO_DATA EDGE SAT BAD CR INTRP
                  E.g. : NO_DATA SAT BAD allows CR-masked and interpolated pixels""",
-        default = ("NO_DATA", "SAT", "BAD")
+        default = ("NO_DATA", "EDGE", "SAT", "BAD")
     )
     fBadPixels = pexConfig.Field(
         dtype = float,
