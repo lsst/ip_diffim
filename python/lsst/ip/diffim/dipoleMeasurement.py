@@ -1,6 +1,6 @@
 # 
 # LSST Data Management System
-# Copyright 2008, 2009, 2010, 2011 LSST Corporation.
+# Copyright 2008-2015 AURA/LSST.
 # 
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -17,7 +17,7 @@
 # 
 # You should have received a copy of the LSST License Statement and 
 # the GNU General Public License along with this program.  If not, 
-# see <http://www.lsstcorp.org/LegalNotices/>.
+# see <https://www.lsstcorp.org/LegalNotices/>.
 #
 import numpy as np
 import lsst.afw.geom as afwGeom
@@ -28,7 +28,7 @@ import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.meas.deblender.baseline as deblendBaseline
 from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig
-import lsst.afw.display.ds9 as ds9                
+import lsst.afw.display.ds9 as ds9
 
 __all__ = ("DipoleMeasurementConfig", "DipoleMeasurementTask", "DipoleAnalysis", "DipoleDeblender")
 
@@ -37,7 +37,7 @@ class DipoleClassificationConfig(pexConfig.Config):
     """!Classification of detected diaSources as dipole or not"""
     minSn = pexConfig.Field(
         doc="Minimum quadrature sum of positive+negative lobe S/N to be considered a dipole",
-        dtype=float, default=np.sqrt(2) * 5.0, 
+        dtype=float, default=np.sqrt(2) * 5.0,
         )
     maxFluxRatio = pexConfig.Field(
         doc = "Maximum flux ratio in either lobe to be considered a dipole",
@@ -92,14 +92,14 @@ class DipoleMeasurementTask(SingleFrameMeasurementTask):
 \section ip_diffim_dipolemeas_Purpose   Description
 
 This class provies a specialized set of Source measurements that allow the user to test the hypothesis that
-the Source is a dipole.  This includes a set of measurements derived from intermediate base classes 
+the Source is a dipole.  This includes a set of measurements derived from intermediate base classes
 DipoleCentroidAlgorithm and DipoleFluxAlgorithm.  Their respective algorithm control classes are defined in
 DipoleCentroidControl and DipoleFluxControl.  Each centroid and flux measurement will have .neg (negative)
 and .pos (positive lobe) fields.
 
 The first set of measurements uses a "naive" alrogithm for centroid and flux measurements, implemented in
 NaiveDipoleCentroidControl and NaiveDipoleFluxControl.  The algorithm uses a naive 3x3 weighted moment around
-the nominal centroids of each peak in the Source Footprint.  These algorithms fill the table fields 
+the nominal centroids of each peak in the Source Footprint.  These algorithms fill the table fields
 centroid.dipole.naive.* and flux.dipole.naive.*.
 
 The second set of measurements undertakes a joint-Psf model on the negative and positive lobe simultaneously.
@@ -132,67 +132,67 @@ No specific values are set in the Task metadata.  However, the Source schema are
 results of the dipole-specific measurements.  These additional fields include:
 
  . classification.dipole : probability of being a dipole
- 
+
  . centroid.dipole.naive.pos : unweighted 3x3 first moment centroid
- 
+
  . centroid.dipole.naive.pos.err : covariance matrix for centroid.dipole.naive.pos
- 
+
  . centroid.dipole.naive.pos.flags : set if the centroid.dipole.naive.pos measurement did not fully succeed
- 
+
  . centroid.dipole.naive.neg : unweighted 3x3 first moment centroid
- 
+
  . centroid.dipole.naive.neg.err : covariance matrix for centroid.dipole.naive.neg
- 
+
  . centroid.dipole.naive.neg.flags : set if the centroid.dipole.naive.neg measurement did not fully succeed
- 
+
  . flux.dipole.naive.pos : raw flux counts
- 
+
  . flux.dipole.naive.pos.err : uncertainty for flux.dipole.naive.pos
- 
+
  . flux.dipole.naive.pos.flags : set if the flux.dipole.naive.pos measurement failed
- 
+
  . flux.dipole.naive.neg : raw flux counts
- 
+
  . flux.dipole.naive.neg.err : uncertainty for flux.dipole.naive.neg
- 
+
  . flux.dipole.naive.neg.flags : set if the flux.dipole.naive.neg measurement failed
- 
+
  . flux.dipole.naive.npos : number of positive pixels
- 
+
  . flux.dipole.naive.nneg : number of negative pixels
- 
+
  . flux.dipole.psf.pos : jointly fitted psf flux counts
- 
+
  . flux.dipole.psf.pos.err : uncertainty for flux.dipole.psf.pos
- 
+
  . flux.dipole.psf.pos.flags : set if the flux.dipole.psf.pos measurement failed
- 
+
  . flux.dipole.psf.neg : jointly fitted psf flux counts
- 
+
  . flux.dipole.psf.neg.err : uncertainty for flux.dipole.psf.neg
- 
+
  . flux.dipole.psf.neg.flags : set if the flux.dipole.psf.neg measurement failed
- 
+
  . flux.dipole.psf.chi2dof : chi2 per degree of freedom of fit
- 
+
  . flux.dipole.psf.centroid : average of the postive and negative lobe positions
- 
+
  . flux.dipole.psf.centroid.err : covariance matrix for flux.dipole.psf.centroid
- 
+
  . flux.dipole.psf.centroid.flags : set if the flux.dipole.psf.centroid measurement did not fully succeed
- 
+
  . flux.dipole.psf.neg.centroid : psf fitted center of negative lobe
- 
+
  . flux.dipole.psf.neg.centroid.err : covariance matrix for flux.dipole.psf.neg.centroid
- 
+
  . flux.dipole.psf.neg.centroid.flags : set if the flux.dipole.psf.neg.centroid measurement did not fully succeed
- 
+
  . flux.dipole.psf.pos.centroid : psf fitted center of positive lobe
- 
+
  . flux.dipole.psf.pos.centroid.err : covariance matrix for flux.dipole.psf.pos.centroid
- 
+
  . flux.dipole.psf.pos.centroid.flags : set if the flux.dipole.psf.pos.centroid measurement did not fully succeed
- 
+
  . flux.dipole.psf.flags.maxpix : set if too large a footprint was sent to the algorithm
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -200,21 +200,21 @@ results of the dipole-specific measurements.  These additional fields include:
 \section ip_diffim_dipolemeas_Debug     Debug variables
 
 The \link lsst.pipe.base.cmdLineTask.CmdLineTask command line task\endlink interface supports a
-flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py 
+flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py
 for this Task include:
 
 \code{.py}
     import sys
     import lsstDebug
     def DebugInfo(name):
-        di = lsstDebug.getInfo(name)   
+        di = lsstDebug.getInfo(name)
         if name == "lsst.ip.diffim.dipoleMeasurement":
             di.display = True                 # enable debug output
             di.maskTransparency = 90          # ds9 mask transparency
             di.displayDiaSources = True       # show exposure with dipole results
         return di
     lsstDebug.Info = DebugInfo
-    lsstDebug.frame = 1      
+    lsstDebug.frame = 1
 \endcode
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -224,7 +224,7 @@ for this Task include:
 This code is dipoleMeasTask.py in the examples directory, and can be run as \em e.g.
 \code
 examples/dipoleMeasTask.py
-examples/dipoleMeasTask.py --debug 
+examples/dipoleMeasTask.py --debug
 examples/dipoleMeasTask.py --debug --image /path/to/image.fits
 \endcode
 
@@ -278,7 +278,7 @@ Optionally display debugging information:
         """!Create the Task, and add Task-specific fields to the provided measurement table schema.
 
         @param[in,out] schema        Schema object for measurement fields; modified in-place.
-        @param[in,out] algMetadata   Passed to MeasureSources object to be filled with 
+        @param[in,out] algMetadata   Passed to MeasureSources object to be filled with
                                      metadata by algorithms (e.g. radii for aperture photometry).
         @param         **kwds        Passed to Task.__init__.
         """
@@ -300,7 +300,7 @@ Optionally display debugging information:
         try:
             key = sources[0].getSchema().find(self._ClassificationFlag).getKey()
         except Exception:
-            self.log.warn("Key %s not found in table" % (self._ClassificationFlag))            
+            self.log.warn("Key %s not found in table" % (self._ClassificationFlag))
             return
 
         for source in sources:
@@ -398,7 +398,7 @@ class DipoleAnalysis(object):
         posCenY = source.get("ip_diffim_PsfDipoleFlux_pos_centroid_y")
         if (np.isinf(negCenX) or np.isinf(negCenY) or np.isinf(posCenX) or np.isinf(posCenY)):
             return None
-        
+
         center = afwGeom.Point2D(0.5*(negCenX+posCenX),
                                  0.5*(negCenY+posCenY))
         return center
@@ -465,7 +465,7 @@ class DipoleAnalysis(object):
 
 
 class DipoleDeblender(object):
-    """!Functor to deblend a source as a dipole, and return a new source with deblended footprints.  
+    """!Functor to deblend a source as a dipole, and return a new source with deblended footprints.
 
        This necessarily overrides some of the functionality from
        meas_algorithms/python/lsst/meas/algorithms/deblend.py since we
@@ -474,15 +474,15 @@ class DipoleDeblender(object):
        deblending code deblendBaseline.deblend (optionally _fitPsf for
        debugging).
 
-       Not actively being used, but there is a unit test for it in 
+       Not actively being used, but there is a unit test for it in
        dipoleAlgorithm.py.
     """
     def __init__(self):
         # Set up defaults to send to deblender
 
         # Always deblend as Psf
-        self.psfChisqCut1 = self.psfChisqCut2 = self.psfChisqCut2b = np.inf 
-        self.log = pexLog.Log(pexLog.Log.getDefaultLog(), 
+        self.psfChisqCut1 = self.psfChisqCut2 = self.psfChisqCut2b = np.inf
+        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
                               'lsst.ip.diffim.DipoleDeblender', pexLog.Log.INFO)
         self.sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
@@ -497,7 +497,7 @@ class DipoleDeblender(object):
 
         psf        = exposure.getPsf()
         psfSigPix  = psf.computeShape().getDeterminantRadius()
-        psfFwhmPix = psfSigPix * self.sigma2fwhm 
+        psfFwhmPix = psfSigPix * self.sigma2fwhm
         subimage   = afwImage.ExposureF(exposure, fbb, True)
         cpsf       = deblendBaseline.CachingPsf(psf)
 
@@ -507,7 +507,7 @@ class DipoleDeblender(object):
 
         # make sure you only deblend 2 peaks; take the brighest and faintest
         speaks = [(p.getPeakValue(), p) for p in peaks]
-        speaks.sort() 
+        speaks.sort()
         dpeaks = [speaks[0][1], speaks[-1][1]]
 
         # and only set these peaks in the footprint (peaks is mutable)
@@ -533,13 +533,13 @@ class DipoleDeblender(object):
                 pkres.peak = pk
                 pkres.pki = pki
                 fpres.peaks.append(pkres)
-            
+
             for pki,(pk,pkres,pkF) in enumerate(zip(dpeaks, fpres.peaks, peaksF)):
                 self.log.logdebug('Peak %i' % pki)
-                deblendBaseline._fitPsf(fp, fmask, pk, pkF, pkres, fbb, dpeaks, peaksF, self.log, 
-                                         cpsf, psfFwhmPix, 
-                                         subimage.getMaskedImage().getImage(), 
-                                         subimage.getMaskedImage().getVariance(), 
+                deblendBaseline._fitPsf(fp, fmask, pk, pkF, pkres, fbb, dpeaks, peaksF, self.log,
+                                         cpsf, psfFwhmPix,
+                                         subimage.getMaskedImage().getImage(),
+                                         subimage.getMaskedImage().getVariance(),
                                          self.psfChisqCut1, self.psfChisqCut2, self.psfChisqCut2b)
 
 
@@ -559,7 +559,6 @@ class DipoleDeblender(object):
             self.log.info("deblended.chi2dof.dipole.%s %f" % (
                 suffix, peak.psfFitChisq / peak.psfFitDof))
             self.log.info("deblended.flux.dipole.psf.%s %f" % (
-                suffix, peak.psfFitFlux * np.sum(peak.templateMaskedImage.getImage().getArray())))
+                suffix, peak.psfFitFlux * np.sum(peak.templateImage.getArray())))
             peakList.append(peak.peak)
         return deblendedSource
-        
