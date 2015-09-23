@@ -104,7 +104,6 @@ protected:
     Control _ctrl;
     meas::base::FluxResultKey _fluxResultKey;
     meas::base::FlagHandler _flagHandler;
-    meas::base::SafeCentroidExtractor _centroidExtractor;
     ResultKey _positiveKeys;
     ResultKey _negativeKeys;
 };
@@ -144,7 +143,6 @@ protected:
     Control _ctrl;
     meas::base::FluxResultKey _fluxResultKey;
     meas::base::FlagHandler _flagHandler;
-    meas::base::SafeCentroidExtractor _centroidExtractor;
 
     ResultKey _positiveKeys;
     ResultKey _negativeKeys;
@@ -153,8 +151,7 @@ protected:
 inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
     Control const & ctrl, std::string const & name, afw::table::Schema & schema, std::string const & doc
     ) :
-    _ctrl(ctrl),
-    _centroidExtractor(schema, name, true)
+    _ctrl(ctrl)
 {
     static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
         {"flag", "general failure flag, set if anything went wrong"},
@@ -172,8 +169,7 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
         Control const & ctrl, std::string const & name, afw::table::Schema & schema, std::string const & doc,
         ResultKey const & positiveKeys, ResultKey const & negativeKeys
     ) :
-    _ctrl(ctrl),
-    _centroidExtractor(schema, name, true)
+    _ctrl(ctrl)
 {
     meas::base::CentroidResultKey::addFields(schema, name+"_pos", doc + ": positive lobe", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_neg", doc + ": negative lobe", meas::base::SIGMA_ONLY);
@@ -191,8 +187,7 @@ inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
     Control const & ctrl, std::string const & name, afw::table::Schema & schema,
         std::string const & doc, ResultKey const & positiveKeys, ResultKey const & negativeKeys
     ) :
-    _ctrl(ctrl),
-    _centroidExtractor(schema, name, false)
+    _ctrl(ctrl)
 {
     static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
         {"flag", "general failure flag, set if anything went wrong"},
@@ -210,8 +205,7 @@ inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
     Control const & ctrl, std::string const & name, afw::table::Schema & schema,
         std::string const & doc
     ) :
-    _ctrl(ctrl),
-    _centroidExtractor(schema, name, false)
+    _ctrl(ctrl)
 {
     static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
         {"flag", "general failure flag, set if anything went wrong"},
@@ -302,7 +296,6 @@ private:
     Control _ctrl;
     meas::base::FluxResultKey _fluxResultKey;
     meas::base::FlagHandler _flagHandler;
-    meas::base::SafeCentroidExtractor _centroidExtractor;
 };
 
 
