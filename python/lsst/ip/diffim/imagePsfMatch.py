@@ -669,7 +669,9 @@ And finally provide some optional debugging displays:
         @param templateExposure: Exposure that will be convolved
         @param scienceExposure: Exposure that will be matched-to
         @param kernelSize: Dimensions of the Psf-matching Kernel, used to grow detection footprints
-        @param candidateList: List of Sources to examine
+        @param candidateList: List of Sources to examine. Elements must be of type afw.table.Source
+                              or a type that wraps a Source and has a getSource() method, such as
+                              meas.algorithms.PsfCandidateF.
 
         @return a list of dicts having a "source" and "footprint"
         field for the Sources deemed to be appropriate for Psf
@@ -682,9 +684,18 @@ And finally provide some optional debugging displays:
             raise RuntimeError("No candidates in candidateList")
 
         listTypes = set(type(x) for x in candidateList)
-        if (not len(listTypes) == 1) or (type(listTypes.pop()) != type(afwTable.SourceRecord)):
-            raise RuntimeError("Can only make candidate list from set of SourceRecords.  Got %s instead." \
-                                   % (type(candidateList[0])))
+        if len(listTypes) > 1:
+            raise RuntimeError("Candidate list contains mixed types: %s" % [l for l in listTypes])
+
+        if not isinstance(candidateList[0], afwTable.SourceRecord):
+            try:
+                candidateList[0].getSource()
+            except Exception as e:
+                raise RuntimeError("Candidate List is of type: %s. " % (type(candidateList[0])) +
+                                   "Can only make candidate list from list of afwTable.SourceRecords, " +
+                                   "measAlg.PsfCandidateF or other type with a getSource() method: %s" % (e))
+            candidateList = [c.getSource() for c in candidateList]
+
         candidateList = diffimTools.sourceToFootprintList(candidateList,
                                                           templateExposure, scienceExposure,
                                                           kernelSize,
