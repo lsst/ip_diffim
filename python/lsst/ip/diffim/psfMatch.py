@@ -23,7 +23,6 @@ import time
 import numpy as num
 import lsst.afw.image as afwImage
 import lsst.pex.logging as pexLog
-import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
 import lsst.afw.display.ds9 as ds9
@@ -1035,13 +1034,9 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
 
             spatialSolution = spatialkv.getKernelSolution()
 
-        except pexExcept.Exception as e:
+        except Exception as e:
             pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
-            pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0])
-            raise e
-        except Exception, e:
-            pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
-            pexLog.Trace(self.log.getName()+"._solve", 2, e.args[0])
+            pexLog.Trace(self.log.getName()+"._solve", 2, str(e))
             raise e
 
         t1 = time.time()
