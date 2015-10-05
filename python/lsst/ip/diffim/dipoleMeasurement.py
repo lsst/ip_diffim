@@ -30,7 +30,8 @@ import lsst.meas.deblender.baseline as deblendBaseline
 from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig
 import lsst.afw.display.ds9 as ds9
 
-__all__ = ("DipoleMeasurementConfig", "DipoleMeasurementTask", "DipoleAnalysis", "DipoleDeblender")
+__all__ = ("DipoleMeasurementConfig", "DipoleMeasurementTask", "DipoleAnalysis", "DipoleDeblender",
+           "SourceFlagChecker")
 
 
 class DipoleClassificationConfig(pexConfig.Config):
@@ -62,7 +63,7 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
         self.slots.apFlux = None
         self.slots.instFlux = None
         self.slots.shape = None
-        self.slots.centroid = "ip_diffim_NaiveDipoleCentroid_pos"
+        self.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
         self.doReplaceWithNoise = False
 
 ## \addtogroup LSST_task_documentation
@@ -282,6 +283,16 @@ Optionally display debugging information:
                                      metadata by algorithms (e.g. radii for aperture photometry).
         @param         **kwds        Passed to Task.__init__.
         """
+        # NaiveDipoleCentroid_x/y and classification fields are not added by the algorithms
+        # In the interim, better to add here than to require in client code
+        # DM-3515 will provide for a more permanent solution
+        if self._ClassificationFlag not in schema.getNames():
+            schema.addField(self._ClassificationFlag, "F", "probability of being a dipole")
+        if "ip_diffim_NaiveDipoleCentroid_x" not in schema.getNames():
+            schema.addField("ip_diffim_NaiveDipoleCentroid_x", "D", "Naive Dipole Centroid", units="pixels")
+        if "ip_diffim_NaiveDipoleCentroid_y" not in schema.getNames():
+            schema.addField("ip_diffim_NaiveDipoleCentroid_y", "D", "Naive Dipole Centroid", units="pixels")
+
         SingleFrameMeasurementTask.__init__(self, schema, algMetadata, **kwds)
         self.dipoleAnalysis = DipoleAnalysis()
 
