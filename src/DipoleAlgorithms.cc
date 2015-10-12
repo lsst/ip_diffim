@@ -125,10 +125,8 @@ NaiveDipoleCentroid::NaiveDipoleCentroid(
     std::string const & name,
     afw::table::Schema & schema
 ) : DipoleCentroidAlgorithm(ctrl, name, schema, "unweighted first moment centroid"),
-    _ctrl(ctrl),
-    _centroidExtractor(schema, name)
-{
-}
+    _ctrl(ctrl)
+{ }
 
 /**
  * Given an image and a pixel position, return a Centroid using a naive 3x3 weighted moment
