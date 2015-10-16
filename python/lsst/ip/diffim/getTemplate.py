@@ -114,7 +114,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             self.log.info("Reading patch %s" % patchArgDict)
             coaddPatch = sensorRef.get(**patchArgDict)
             coaddView = afwImage.MaskedImageF(coaddExposure.getMaskedImage(), coaddPatch.getBBox())
-            coaddView <<= coaddPatch.getMaskedImage()
+            coaddView[:] = coaddPatch.getMaskedImage()
             if coaddFilter is None:
                 coaddFilter = coaddPatch.getFilter()
 
