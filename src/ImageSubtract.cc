@@ -196,8 +196,8 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     if (invert) {
         *convolvedMaskedImage.getImage() *= -1.0;
     }
-    *convolvedMaskedImage.getMask() <<= *scienceMaskedImage.getMask();
-    *convolvedMaskedImage.getVariance() <<= *scienceMaskedImage.getVariance();
+    convolvedMaskedImage.getMask()->assign(*scienceMaskedImage.getMask());
+    convolvedMaskedImage.getVariance()->assign(*scienceMaskedImage.getVariance());
     
     double time = t.elapsed();
     pexLog::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
