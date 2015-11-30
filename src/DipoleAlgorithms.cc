@@ -359,7 +359,6 @@ void PsfDipoleFlux::measure(
     afw::table::SourceRecord & source,
     afw::image::Exposure<float> const & exposure
 ) const {
-    source.set(_flagMaxPixelsKey, true);
 
     typedef afw::image::Exposure<float>::MaskedImageT MaskedImageT;
 
@@ -368,12 +367,6 @@ void PsfDipoleFlux::measure(
         throw LSST_EXCEPT(pex::exceptions::RuntimeError,
                           (boost::format("No footprint for source %d") % source.getId()).str());
     }
-
-    if (footprint->getArea() > _ctrl.maxPixels) {
-        // Too big
-        return;
-    }
-    source.set(_flagMaxPixelsKey, false);
 
     afw::detection::PeakCatalog peakCatalog = afw::detection::PeakCatalog(footprint->getPeaks());
 

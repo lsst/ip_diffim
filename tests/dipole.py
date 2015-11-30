@@ -321,29 +321,6 @@ class DipoleAlgorithmTest(unittest.TestCase):
 
         self.assertTrue(source.get("ip_diffim_PsfDipoleFlux_chi2dof") > 0.0)
 
-        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_flags_maxpix"), False)
-
-    def testMaxPixelFlag(self):
-        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
-        msConfig = ipDiffim.DipoleMeasurementConfig()
-        #   This tests is run with the default sfm algorithms as well as Dipole
-        schema = afwTable.SourceTable.makeMinimalSchema()
-        schema.addField("centroid_x", type=float)
-        schema.addField("centroid_y", type=float)
-        schema.addField("centroid_flag", type='Flag')
-        msConfig.plugins['ip_diffim_PsfDipoleFlux'].maxPixels = 10
-        task = ipDiffim.DipoleMeasurementTask(schema, config=msConfig)
-        measCat = afwTable.SourceCatalog(schema)
-        measCat.defineCentroid("centroid")
-        source = measCat.addNew()
-        source.set("centroid_x", self.xc)
-        source.set("centroid_y", self.yc)
-        source.setFootprint(s.getFootprint())
-        # Then run the default SFM task.  Results not checked
-        task.run(measCat, exposure)
-        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_flags_maxpix"), True)
-
-
     def measureDipole(self, s, exp):
         msConfig = ipDiffim.DipoleMeasurementConfig()
         schema = afwTable.SourceTable.makeMinimalSchema()

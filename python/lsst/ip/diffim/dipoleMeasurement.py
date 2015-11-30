@@ -194,7 +194,6 @@ results of the dipole-specific measurements.  These additional fields include:
 
  . flux.dipole.psf.pos.centroid.flags : set if the flux.dipole.psf.pos.centroid measurement did not fully succeed
 
- . flux.dipole.psf.flags.maxpix : set if too large a footprint was sent to the algorithm
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
