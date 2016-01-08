@@ -137,14 +137,25 @@ void NaiveDipoleCentroid::measure(
 ) const {
     afw::detection::PeakCatalog const& peaks = source.getFootprint()->getPeaks();
 
-    naiveCentroid(source, exposure, peaks[0].getI(), (peaks[0].getPeakValue() >= 0 ?
-                                                       getPositiveKeys() :
-                                                       getNegativeKeys()));
-    if (peaks.size() > 1) {
+    ResultKey peak_keys;
+
+    if (peaks.size() == 0) {
+        peak_keys = (peaks[0].getPeakValue() >= 0 ? getPositiveKeys() : getNegativeKeys());
+        naiveCentroid(source, exposure, peaks[0].getI(), peak_keys);
+
+        source.set(getCenterKeys().getX(), source.get(peak_keys.getX()));
+        source.set(getCenterKeys().getY(), source.get(peak_keys.getY()));
+    } else {
         naiveCentroid(source, exposure, peaks[1].getI(), (peaks[1].getPeakValue() >= 0 ?
                                                            getPositiveKeys() :
                                                            getNegativeKeys()));
+
+        source.set(getCenterKeys().getX(),
+                   0.5*(source.get(getPositiveKeys().getX()) + source.get(getNegativeKeys().getX())));
+        source.set(getCenterKeys().getY(),
+                   0.5*(source.get(getPositiveKeys().getY()) + source.get(getNegativeKeys().getY())));
     }
+
 }
 
 void NaiveDipoleCentroid::fail(afw::table::SourceRecord & measRecord,
