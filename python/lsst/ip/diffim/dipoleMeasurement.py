@@ -33,7 +33,6 @@ import lsst.afw.display.ds9 as ds9
 __all__ = ("DipoleMeasurementConfig", "DipoleMeasurementTask", "DipoleAnalysis", "DipoleDeblender",
            "SourceFlagChecker")
 
-
 class DipoleClassificationConfig(pexConfig.Config):
     """!Classification of detected diaSources as dipole or not"""
     minSn = pexConfig.Field(
@@ -54,15 +53,10 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
 
     def setDefaults(self):
         SingleFrameMeasurementConfig.setDefaults(self)
-        self.plugins = ["ip_diffim_NaiveDipoleCentroid",
-                        "ip_diffim_NaiveDipoleFlux",
-                        "ip_diffim_PsfDipoleFlux"]
-        self.slots.psfFlux = None
-        self.slots.calibFlux = None
-        self.slots.modelFlux = None
-        self.slots.apFlux = None
-        self.slots.instFlux = None
-        self.slots.shape = None
+        self.plugins.names.add("ip_diffim_NaiveDipoleCentroid")
+        self.plugins.names.add("ip_diffim_NaiveDipoleFlux")
+        self.plugins.names.add("ip_diffim_PsfDipoleFlux")
+
         self.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
         self.doReplaceWithNoise = False
 
@@ -288,13 +282,6 @@ Optionally display debugging information:
         # DM-3515 will provide for a more permanent solution
         if self._ClassificationFlag not in schema.getNames():
             schema.addField(self._ClassificationFlag, "F", "probability of being a dipole")
-
-        # CTS
-        #
-        #if "ip_diffim_NaiveDipoleCentroid_x" not in schema.getNames():
-        #    schema.addField("ip_diffim_NaiveDipoleCentroid_x", "D", "Naive Dipole Centroid", units="pixels")
-        #if "ip_diffim_NaiveDipoleCentroid_y" not in schema.getNames():
-        #    schema.addField("ip_diffim_NaiveDipoleCentroid_y", "D", "Naive Dipole Centroid", units="pixels")
 
         SingleFrameMeasurementTask.__init__(self, schema, algMetadata, **kwds)
         self.dipoleAnalysis = DipoleAnalysis()

@@ -287,6 +287,8 @@ public:
         afw::image::Exposure<float> const & exposure
     ) const;
 
+    void mergeCentroids(afw::table::SourceRecord & source) const;
+
     void fail(
         afw::table::SourceRecord & measRecord,
         meas::base::MeasurementError * error=NULL
