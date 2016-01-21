@@ -64,12 +64,11 @@ public:
  */
 class PsfDipoleFluxControl : public DipoleFluxControl {
 public:
-    LSST_CONTROL_FIELD(maxPixels, int, "Maximum number of pixels to apply the measurement to");
     LSST_CONTROL_FIELD(stepSizeCoord, float, "Default initial step size for coordinates in non-linear fitter");
     LSST_CONTROL_FIELD(stepSizeFlux, float, "Default initial step size for flux in non-linear fitter");
     LSST_CONTROL_FIELD(errorDef, double, "How many sigma the error bars of the non-linear fitter represent");
     LSST_CONTROL_FIELD(maxFnCalls, int, "Maximum function calls for non-linear fitter; 0 = unlimited");
-    PsfDipoleFluxControl() : DipoleFluxControl(), maxPixels(500),
+    PsfDipoleFluxControl() : DipoleFluxControl(),
                              stepSizeCoord(0.1), stepSizeFlux(1.0), errorDef(1.0), maxFnCalls(100000) {}
 };
 
@@ -313,9 +312,7 @@ public:
         DipoleFluxAlgorithm(ctrl, name, schema, "jointly fitted psf flux counts"),
         _ctrl(ctrl),
         _chi2dofKey(schema.addField<float>(name+"_chi2dof",
-                                           "chi2 per degree of freedom of fit")),
-        _flagMaxPixelsKey(schema.addField<afw::table::Flag>(name+"_flags_maxpix",
-                                                            "set if too large a footprint was sent to the algorithm"))
+                                           "chi2 per degree of freedom of fit"))
     {
         meas::base::CentroidResultKey::addFields(schema, name+"_pos_centroid", "psf fitted center of positive lobe", meas::base::SIGMA_ONLY);
         meas::base::CentroidResultKey::addFields(schema, name+"_neg_centroid", "psf fitted center of negative lobe", meas::base::SIGMA_ONLY);
@@ -348,7 +345,6 @@ private:
     meas::base::CentroidResultKey  _negCentroid;
     meas::base::CentroidResultKey  _posCentroid;
 
-    afw::table::Key< afw::table::Flag > _flagMaxPixelsKey;
 };
 
 }}}// namespace lsst::ip::diffim
