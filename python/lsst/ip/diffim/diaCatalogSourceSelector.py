@@ -104,17 +104,15 @@ class DiaCatalogSourceSelector(object):
         self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
                               'lsst.ip.diffim.DiaCatalogSourceSelector', pexLog.Log.INFO)
 
-    def selectSources(self, exposure, sources, matches=None):
+    def selectSources(self, exposure, sourceCat, matches=None):
         """Return a list of Sources for Kernel candidates 
         
-        @param[in] exposure: the exposure containing the sources
-        @param[in] sources: a source list containing sources that may be candidates
-        @param[in] matches: a match vector as produced by meas_astrom; not optional
-                            (passing None just allows us to handle the exception better here
-                            than in calling code)
+        @param[in] exposure  the exposure containing the sources
+        @param[in] sourceCat  catalog of sources that may be stars (an lsst.afw.table.SourceCatalog)
+        @param[in] matches  a match vector as produced by meas_astrom; required
+                            (defaults to None to match the StarSelector API and improve error handling)
         
         @return kernelCandidateSourceList: a list of sources to be used as kernel candidates
- 
         """
         import lsstDebug
         display = lsstDebug.Info(__name__).display
@@ -122,9 +120,7 @@ class DiaCatalogSourceSelector(object):
         pauseAtEnd = lsstDebug.Info(__name__).pauseAtEnd
 
         if matches is None:
-            raise RuntimeError(
-                "Cannot use catalog source selector without running astrometry."
-                )
+            raise RuntimeError("DiaCatalogSourceSelector requires matches")
 
         mi = exposure.getMaskedImage()
         
@@ -134,7 +130,7 @@ class DiaCatalogSourceSelector(object):
         #
         # Look for flags in each Source
         #
-        isGoodSource = CheckSource(sources, self.config.fluxLim, self.config.fluxMax, self.config.badPixelFlags)
+        isGoodSource = CheckSource(sourceCat, self.config.fluxLim, self.config.fluxMax, self.config.badPixelFlags)
 
         #
         # Go through and find all the acceptable candidates in the catalogue
