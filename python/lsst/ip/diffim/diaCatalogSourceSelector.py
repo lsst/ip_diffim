@@ -92,6 +92,7 @@ class CheckSource(object):
 
 class DiaCatalogSourceSelector(object):
     ConfigClass = DiaCatalogSourceSelectorConfig
+    usesMatches = True # selectStars uses (requires) its matches argument
 
     def __init__(self, config=None):
         """Construct a source selector that uses a reference catalog
