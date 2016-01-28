@@ -56,6 +56,11 @@ class ImagePsfMatchConfig(pexConfig.Config):
         target=SingleFrameMeasurementTask,
         doc="Initial measurements used to feed stars to kernel fitting",
     )
+    replaceExposureWithNoise = pexConfig.Field(dtype=bool, default=False,
+        doc="Replaces both science and template exposures with noise from the variance plane.")
+
+    extraExposureNoiseScaling = pexConfig.Field(dtype=float, default=1.0,
+        doc="Scale the noise used in replaceExposureWithNoise by a constant factor.")
 
     def setDefaults(self):
         # High sigma detections only
@@ -514,6 +519,27 @@ And finally provide some optional debugging displays:
             doWarping=doWarping,
             convolveTemplate=convolveTemplate
         )
+
+        if self.config.replaceExposureWithNoise:
+            # Specifically do not want a constant seed.
+            rnd = afwMath.Random(afwMath.Random.MT19937, int(np.random.rand()*10000))
+            sci_mi = scienceExposure.getMaskedImage()
+
+            afwMath.randomGaussianImage(sci_mi.getImage(), rnd)
+            sci_arr = sci_mi.getImage().getArray()
+            sci_arr *= np.sqrt(sci_mi.getVariance().getArray())
+            sci_arr *= self.config.extraExposureNoiseScaling
+
+
+            template_mi = results.matchedExposure.getMaskedImage()
+            afwMath.randomGaussianImage(template_mi.getImage(), rnd)
+            template_arr = template_mi.getImage().getArray()
+            template_arr *= np.sqrt(template_mi.getVariance().getArray())
+            template_arr *= self.config.extraExposureNoiseScaling
+
+            # No background on noise image
+            results.backgroundModel.setParameters( (0,) * results.backgroundModel.getNParameters())
+
 
         subtractedExposure = afwImage.ExposureF(scienceExposure, True)
         if convolveTemplate:
