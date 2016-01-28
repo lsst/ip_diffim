@@ -145,6 +145,33 @@ void NaiveDipoleCentroid::measure(
                                                            getPositiveKeys() :
                                                            getNegativeKeys()));
     }
+
+    mergeCentroids(source);
+
+}
+
+void NaiveDipoleCentroid::mergeCentroids(afw::table::SourceRecord & source) const {
+
+    float pos_x, pos_y;
+    float neg_x, neg_y;
+
+    pos_x = source.get(getPositiveKeys().getX());
+    pos_y = source.get(getPositiveKeys().getY());
+
+    neg_x = source.get(getNegativeKeys().getX());
+    neg_y = source.get(getNegativeKeys().getY());
+
+    if(std::isfinite(pos_x) && std::isfinite(pos_y) &&
+       std::isfinite(neg_x) && std::isfinite(neg_y)) {
+        source.set(getCenterKeys().getX(), 0.5*(pos_x + neg_x));
+        source.set(getCenterKeys().getY(), 0.5*(pos_y + neg_y));
+    } else if (std::isfinite(pos_x) && std::isfinite(pos_y)) {
+        source.set(getCenterKeys().getX(), pos_x);
+        source.set(getCenterKeys().getY(), pos_y);
+    } else {
+        source.set(getCenterKeys().getX(), neg_x);
+        source.set(getCenterKeys().getY(), neg_y);
+    }
 }
 
 void NaiveDipoleCentroid::fail(afw::table::SourceRecord & measRecord,

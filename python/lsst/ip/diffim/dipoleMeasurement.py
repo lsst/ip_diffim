@@ -287,10 +287,6 @@ Optionally display debugging information:
         # DM-3515 will provide for a more permanent solution
         if self._ClassificationFlag not in schema.getNames():
             schema.addField(self._ClassificationFlag, "F", "probability of being a dipole")
-        if "ip_diffim_NaiveDipoleCentroid_x" not in schema.getNames():
-            schema.addField("ip_diffim_NaiveDipoleCentroid_x", "D", "Naive Dipole Centroid", units="pixels")
-        if "ip_diffim_NaiveDipoleCentroid_y" not in schema.getNames():
-            schema.addField("ip_diffim_NaiveDipoleCentroid_y", "D", "Naive Dipole Centroid", units="pixels")
 
         SingleFrameMeasurementTask.__init__(self, schema, algMetadata, **kwds)
         self.dipoleAnalysis = DipoleAnalysis()

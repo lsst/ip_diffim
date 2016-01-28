@@ -103,6 +103,7 @@ protected:
     Control _ctrl;
     meas::base::FluxResultKey _fluxResultKey;
     meas::base::FlagHandler _flagHandler;
+    ResultKey _centerKeys;
     ResultKey _positiveKeys;
     ResultKey _negativeKeys;
 };
@@ -158,8 +159,10 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
         {"neg_flag", "failure flag for negative, set if anything went wrong"}
     }};
     _flagHandler = meas::base::FlagHandler::addFields(schema, name, flagDefs.begin(), flagDefs.end());
+    meas::base::CentroidResultKey::addFields(schema, name, doc+": overall centroid", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_pos", doc+": positive lobe", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_neg", doc+": negative lobe", meas::base::SIGMA_ONLY);
+    _centerKeys = ResultKey(schema[name]);
     _positiveKeys = ResultKey(schema[name+"_pos"]);
     _negativeKeys = ResultKey(schema[name+"_neg"]);
 }
@@ -170,6 +173,7 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
     ) :
     _ctrl(ctrl)
 {
+    meas::base::CentroidResultKey::addFields(schema, name, doc+": overall centroid", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_pos", doc + ": positive lobe", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_neg", doc + ": negative lobe", meas::base::SIGMA_ONLY);
     static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
@@ -178,6 +182,7 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
         {"neg_flag", "failure flag for negative, set if anything went wrong"}
     }};
     _flagHandler = meas::base::FlagHandler::addFields(schema, name, flagDefs.begin(), flagDefs.end());
+    _centerKeys = ResultKey(schema[name]);
     _positiveKeys = ResultKey(schema[name+"_pos"]);
     _negativeKeys = ResultKey(schema[name+"_neg"]);
 }
@@ -272,6 +277,7 @@ public:
     typedef meas::base::CentroidResultKey ResultKey;
 
     /// @brief Return the standard centroid keys registered by this algorithm.
+    ResultKey const & getCenterKeys() const { return _centerKeys; }
     ResultKey const & getPositiveKeys() const { return _positiveKeys; }
     ResultKey const & getNegativeKeys() const { return _negativeKeys; }
 
@@ -279,6 +285,8 @@ public:
         afw::table::SourceRecord & measRecord,
         afw::image::Exposure<float> const & exposure
     ) const;
+
+    void mergeCentroids(afw::table::SourceRecord & source) const;
 
     void fail(
         afw::table::SourceRecord & measRecord,
