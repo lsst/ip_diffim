@@ -54,13 +54,15 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
 
     def setDefaults(self):
         SingleFrameMeasurementConfig.setDefaults(self)
-        self.plugins = ["ip_diffim_NaiveDipoleCentroid",
+        self.plugins = ["base_CircularApertureFlux",
+                        "base_PixelFlags",
+                        "base_SkyCoord",
+                        "base_PsfFlux",
+                        "ip_diffim_NaiveDipoleCentroid",
                         "ip_diffim_NaiveDipoleFlux",
                         "ip_diffim_PsfDipoleFlux"]
-        self.slots.psfFlux = None
         self.slots.calibFlux = None
         self.slots.modelFlux = None
-        self.slots.apFlux = None
         self.slots.instFlux = None
         self.slots.shape = None
         self.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
