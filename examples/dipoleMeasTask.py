@@ -32,8 +32,9 @@ import lsst.afw.table              as afwTable
 import lsst.afw.image              as afwImage
 import lsst.afw.display.ds9        as ds9
 import lsst.meas.algorithms        as measAlg
+from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig
 from lsst.meas.algorithms.detection import SourceDetectionTask
-from lsst.ip.diffim import DipoleMeasurementTask, DipoleAnalysis
+from lsst.ip.diffim import DipoleAnalysis
 
 def loadData(imFile=None):
     """Prepare the data we need to run the example"""
@@ -52,7 +53,7 @@ def loadData(imFile=None):
     exposure.setPsf(psf)
 
     im = exposure.getMaskedImage().getImage()
-    im -= np.median(im.getArray())
+    im -= np.nanmedian(im.getArray())
 
     # Create the dipole
     offset = 3
@@ -76,10 +77,22 @@ def run(args):
     detectionTask = SourceDetectionTask(config=config, schema=schema)
     
     # And the measurement Task
-    config = DipoleMeasurementTask.ConfigClass()
+    config = SingleFrameMeasurementConfig()
+    config.plugins.names = ["base_PsfFlux",
+                            "ip_diffim_PsfDipoleFlux",
+                            "ip_diffim_NaiveDipoleFlux",
+                            "ip_diffim_NaiveDipoleCentroid",
+                            "ip_diffim_ClassificationDipole"]
+
+    config.slots.apFlux = None
+    config.slots.calibFlux = None
+    config.slots.modelFlux = None
+    config.slots.instFlux = None
+    config.slots.shape = None
+    config.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
+    config.doReplaceWithNoise = False
     algMetadata = dafBase.PropertyList()
-    schema.addField(DipoleMeasurementTask._ClassificationFlag, "F", "probability of being a dipole")
-    measureTask = DipoleMeasurementTask(schema, algMetadata, config=config)
+    measureTask = SingleFrameMeasurementTask(schema, algMetadata, config=config)
 
     # Create the output table
     tab = afwTable.SourceTable.make(schema)
@@ -109,7 +122,8 @@ def run(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(
-        description="Demonstrate the use of SourceDetectionTask and DipoleMeasurement}Task")
+        description="Demonstrate the use of SourceDetectionTask and " +
+                    "SingleFrameMeasurementTask on image differences")
 
     parser.add_argument('--debug', '-d', action="store_true", help="Load debug.py?", default=False)
     parser.add_argument("--image", "-i", help="User defined image", default=None)

@@ -33,12 +33,31 @@ import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
 import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
+from lsst.meas.base import SingleFrameMeasurementConfig, SingleFrameMeasurementTask
 
 display = False
 np.random.seed(666)
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+def makeDipoleMeasurementConfig():
+    config = SingleFrameMeasurementConfig()
+    config.plugins.names = ["base_PsfFlux",
+                            "ip_diffim_PsfDipoleFlux",
+                            "ip_diffim_NaiveDipoleFlux",
+                            "ip_diffim_NaiveDipoleCentroid",
+                            "ip_diffim_ClassificationDipole"]
+
+    config.slots.apFlux = None
+    config.slots.calibFlux = None
+    config.slots.modelFlux = None
+    config.slots.instFlux = None
+    config.slots.shape = None
+    config.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
+    config.doReplaceWithNoise = False
+    return config
+
 def makePluginAndCat(alg, name, control, metadata=False, centroid=None):
     schema = afwTable.SourceTable.makeMinimalSchema()
     if centroid:
@@ -322,12 +341,12 @@ class DipoleAlgorithmTest(unittest.TestCase):
         self.assertTrue(source.get("ip_diffim_PsfDipoleFlux_chi2dof") > 0.0)
 
     def measureDipole(self, s, exp):
-        msConfig = ipDiffim.DipoleMeasurementConfig()
+        msConfig = makeDipoleMeasurementConfig()
         schema = afwTable.SourceTable.makeMinimalSchema()
         schema.addField("centroid_x", type=float)
         schema.addField("centroid_y", type=float)
         schema.addField("centroid_flag", type='Flag')
-        task = ipDiffim.DipoleMeasurementTask(schema, config=msConfig)
+        task = SingleFrameMeasurementTask(schema, config=msConfig)
         measCat = afwTable.SourceCatalog(schema)
         measCat.defineCentroid("centroid")
         source = measCat.addNew()
@@ -350,21 +369,18 @@ class DipoleAlgorithmTest(unittest.TestCase):
         dpDeblender = ipDiffim.DipoleDeblender()
         dpDeblender(source, exposure)
 
-class DipoleMeasurementTaskTest(unittest.TestCase):
-    """A test case for the DipoleMeasurementTask.  Essentially just
-    test the classification flag since the invididual algorithms are
-    tested above"""
+class DipoleClassificationTest(unittest.TestCase):
+    """A test case for the classification flag,
+    since the invididual algorithms are tested above"""
     def setUp(self):
-        self.config = ipDiffim.DipoleMeasurementConfig()
+        self.config = makeDipoleMeasurementConfig()
 
     def tearDown(self):
         del self.config
 
     def testMeasure(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
-        dipoleFlag = ipDiffim.DipoleMeasurementTask._ClassificationFlag
-        schema.addField(dipoleFlag, "F", "probability of being a dipole")
-        task = ipDiffim.DipoleMeasurementTask(schema, config=self.config)
+        task = SingleFrameMeasurementTask(schema, config=self.config)
         table = afwTable.SourceTable.make(schema)
         sources = afwTable.SourceCatalog(table)
         source = sources.addNew()
@@ -374,7 +390,7 @@ class DipoleMeasurementTaskTest(unittest.TestCase):
         # set it in source with the appropriate schema
         source.setFootprint(s.getFootprint())
         task.run(sources, exposure)
-        self.assertEqual(source.get(dipoleFlag), 1.0)
+        self.assertEqual(source.get("ip_diffim_ClassificationDipole_value"), 1.0)
 
 def suite():
     """Returns a suite containing all the test cases in this module."""
@@ -383,7 +399,7 @@ def suite():
 
     suites = []
     suites += unittest.makeSuite(DipoleAlgorithmTest)
-    suites += unittest.makeSuite(DipoleMeasurementTaskTest)
+    suites += unittest.makeSuite(DipoleClassificationTest)
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
