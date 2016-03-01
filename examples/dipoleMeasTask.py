@@ -32,9 +32,9 @@ import lsst.afw.table              as afwTable
 import lsst.afw.image              as afwImage
 import lsst.afw.display.ds9        as ds9
 import lsst.meas.algorithms        as measAlg
-from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig
+from lsst.meas.base import SingleFrameMeasurementTask
 from lsst.meas.algorithms.detection import SourceDetectionTask
-from lsst.ip.diffim import DipoleAnalysis
+from lsst.ip.diffim import DipoleAnalysis, makeDipoleMeasurementConfig
 
 def loadData(imFile=None):
     """Prepare the data we need to run the example"""
@@ -77,20 +77,8 @@ def run(args):
     detectionTask = SourceDetectionTask(config=config, schema=schema)
     
     # And the measurement Task
-    config = SingleFrameMeasurementConfig()
-    config.plugins.names = ["base_PsfFlux",
-                            "ip_diffim_PsfDipoleFlux",
-                            "ip_diffim_NaiveDipoleFlux",
-                            "ip_diffim_NaiveDipoleCentroid",
-                            "ip_diffim_ClassificationDipole"]
-
-    config.slots.apFlux = None
-    config.slots.calibFlux = None
-    config.slots.modelFlux = None
-    config.slots.instFlux = None
-    config.slots.shape = None
-    config.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
-    config.doReplaceWithNoise = False
+    config = makeDipoleMeasurementConfig()
+    config.algorithms.names.remove('base_SkyCoord')
     algMetadata = dafBase.PropertyList()
     measureTask = SingleFrameMeasurementTask(schema, algMetadata, config=config)
 

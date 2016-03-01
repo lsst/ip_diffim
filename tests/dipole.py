@@ -33,7 +33,7 @@ import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
 import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
-from lsst.meas.base import SingleFrameMeasurementConfig, SingleFrameMeasurementTask
+from lsst.meas.base import SingleFrameMeasurementTask
 
 display = False
 np.random.seed(666)
@@ -41,22 +41,6 @@ sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-def makeDipoleMeasurementConfig():
-    config = SingleFrameMeasurementConfig()
-    config.plugins.names = ["base_PsfFlux",
-                            "ip_diffim_PsfDipoleFlux",
-                            "ip_diffim_NaiveDipoleFlux",
-                            "ip_diffim_NaiveDipoleCentroid",
-                            "ip_diffim_ClassificationDipole"]
-
-    config.slots.apFlux = None
-    config.slots.calibFlux = None
-    config.slots.modelFlux = None
-    config.slots.instFlux = None
-    config.slots.shape = None
-    config.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
-    config.doReplaceWithNoise = False
-    return config
 
 def makePluginAndCat(alg, name, control, metadata=False, centroid=None):
     schema = afwTable.SourceTable.makeMinimalSchema()
@@ -341,7 +325,7 @@ class DipoleAlgorithmTest(unittest.TestCase):
         self.assertTrue(source.get("ip_diffim_PsfDipoleFlux_chi2dof") > 0.0)
 
     def measureDipole(self, s, exp):
-        msConfig = makeDipoleMeasurementConfig()
+        msConfig = ipDiffim.makeDipoleMeasurementConfig()
         schema = afwTable.SourceTable.makeMinimalSchema()
         schema.addField("centroid_x", type=float)
         schema.addField("centroid_y", type=float)
@@ -373,7 +357,7 @@ class DipoleClassificationTest(unittest.TestCase):
     """A test case for the classification flag,
     since the invididual algorithms are tested above"""
     def setUp(self):
-        self.config = makeDipoleMeasurementConfig()
+        self.config = ipDiffim.makeDipoleMeasurementConfig()
 
     def tearDown(self):
         del self.config

@@ -39,11 +39,34 @@ import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.meas.deblender.baseline as deblendBaseline
 from lsst.meas.base.pluginRegistry import register
-from lsst.meas.base import SingleFramePluginConfig, SingleFramePlugin
+from lsst.meas.base import SingleFramePluginConfig, SingleFramePlugin, SingleFrameMeasurementConfig
 import lsst.afw.display.ds9 as ds9
 
-__all__ = ("DipoleAnalysis", "DipoleDeblender",
+__all__ = ("DipoleAnalysis", "DipoleDeblender", "makeDipoleMeasurementConfig",
            "SourceFlagChecker", "ClassificationDipoleConfig", "ClassificationDipolePlugin")
+
+
+def makeDipoleMeasurementConfig(config=None):
+    """Return default config for dipole measurement
+    """
+    if config is None:
+        config = SingleFrameMeasurementConfig()
+
+    config.plugins.names = ["base_PsfFlux",
+                            "ip_diffim_PsfDipoleFlux",
+                            "ip_diffim_NaiveDipoleFlux",
+                            "ip_diffim_NaiveDipoleCentroid",
+                            "ip_diffim_ClassificationDipole",
+                            "base_CircularApertureFlux",
+                            "base_SkyCoord"]
+
+    config.slots.calibFlux = None
+    config.slots.modelFlux = None
+    config.slots.instFlux = None
+    config.slots.shape = None
+    config.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
+    config.doReplaceWithNoise = False
+    return config
 
 
 class ClassificationDipoleConfig(SingleFramePluginConfig):
