@@ -10,8 +10,10 @@ config.log
 *.pyc
 *.py~
 *_wrap.cc
+_build.*
 *Lib.py
 doc/html
+doc/xml
 doc/*.tag
 doc/*.inc
 doc/doxygen.conf
