@@ -39,6 +39,8 @@ from kernelCandidateQa import *
 from getTemplate import *
 from lsst.meas.base import wrapSimpleAlgorithm
 
+from dipoleFitTask import *
+
 # automatically register ip_diffim Algorithms
 wrapSimpleAlgorithm(NaiveDipoleCentroid, Control=DipoleCentroidControl, executionOrder=0.0)
 wrapSimpleAlgorithm(NaiveDipoleFlux, Control=DipoleFluxControl, executionOrder=2.0)
