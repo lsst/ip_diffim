@@ -23,6 +23,7 @@
 from collections import namedtuple
 import numpy as np
 
+from scipy.stats import chi2
 import lmfit
 
 #import lsst.daf.base as dafBase
@@ -41,6 +42,7 @@ import lsst.pex.logging as pexLog
 
 __all__ = ("DipoleFitConfig", "DipoleFitTask", "DipoleFitPlugin")
 
+## Create a namedtuple to hold all of the relevant output from the lmfit results
 resultsOutput = namedtuple('resultsOutput',
                            ['psfFitPosCentroidX', 'psfFitPosCentroidY',
                             'psfFitNegCentroidX', 'psfFitNegCentroidY', 'psfFitPosFlux',
@@ -129,6 +131,7 @@ def fitDipole(diffim, source, posImage=None, negImage=None, tol=1e-7, rel_weight
     ## source is a putative dipole source, with a footprint, from a catalog.
     ## separateNegParams --> separate flux (and TBD: gradient) params for negative img.
     ## Otherwise same as posImage
+    ## Returns a lmfit.MinimzerResult object
 
     fp = source.getFootprint()
     box = fp.getBBox()
@@ -271,27 +274,6 @@ def fitDipole_new(exposure, source, posImage=None, negImage=None, tol=1e-7, rel_
 ## pass a separate pos- and neg- exposure/image to the `DipoleFitPlugin`s `run()` method.
 
 class DipoleFitConfig(measBase.SingleFramePluginConfig):
-    # ## Taken from original DipoleMeasurementConfig
-    # def setDefaults(self):
-    #     measBase.SingleFramePluginConfig.setDefaults(self)
-    #     self.plugins = ["base_CircularApertureFlux",
-    #                     "base_PixelFlags",
-    #                     "base_SkyCoord",
-    #                     "base_PsfFlux",
-    #                     #"ip_diffim_NaiveDipoleCentroid",
-    #                     #"ip_diffim_NaiveDipoleFlux",
-    #                     #"ip_diffim_PsfDipoleFlux"]
-    #                     DipoleFitTask._DefaultName]
-    #     self.slots.calibFlux = None
-    #     self.slots.modelFlux = None
-    #     self.slots.instFlux = None
-    #     self.slots.shape = None
-    #     self.slots.centroid = DipoleFitTask._DefaultName #"ip_diffim_NaiveDipoleCentroid"
-    #     self.doReplaceWithNoise = False
-
-        # Disable aperture correction, which requires having an ApCorrMap attached to
-        # the Exposure (it'll warn if it's not present and we don't explicitly disable it).
-    #    self.slots.doApplyApCorr = "no"
 
     centroidRange = Field(
         dtype=float, default=5.,
@@ -322,8 +304,10 @@ class DipoleFitConfig(measBase.SingleFramePluginConfig):
         dtype = float, default = 0.65,
         doc = "Maximum flux ratio in either lobe to be considered a dipole")
 
+    ## Choose a maxChi2DoF corresponding to a significance level of at most 0.05
+    ## (note this is actually a significance not a chi2 number)
     maxChi2DoF = Field(
-        dtype = float, default = 0.65,
+        dtype = float, default = 0.05,
         doc = "Maximum Chi2/DoF of fit to be considered a dipole")
 
     verbose = Field(
@@ -366,7 +350,7 @@ class DipoleFitTransform(measBase.FluxTransform):
         measBase.FluxTransform.__init__(self, name, mapper)
         mapper.addMapping(mapper.getInputSchema().find(name + "_flag_edge").key)
 
-#@measBase.register("ip_diffim_DipoleFit")
+@measBase.register("ip_diffim_DipoleFit")
 class DipoleFitPlugin(measBase.SingleFramePlugin):
 
     ConfigClass = DipoleFitConfig
@@ -447,6 +431,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             doc="flag set when rectangle used by dipole doesn't fit in the image")
 
     def measure(self, measRecord, exposure, posImage=None, negImage=None):
+        ## Do the non-linear least squares estimation
         try:
             result = fitDipole_new(exposure, measRecord,
                                    posImage=posImage, negImage=negImage,
@@ -463,6 +448,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
 
+        ## Add the relevant values to the measRecord
         measRecord[self.posFluxKey] = result.psfFitPosFlux
         measRecord[self.posFluxSigmaKey] = result.psfFitSignaltoNoise   ## to be changed to actual sigma
         measRecord[self.posCentroidKeyX] = result.psfFitPosCentroidX
@@ -487,8 +473,13 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         ## Second, does are the pos/neg fluxes no more than 0.65 of the total flux?
         passesFluxPos = abs(result.psfFitPosFlux) / (measRecord[self.fluxKey]*2.) < self.config.maxFluxRatio
         passesFluxNeg = abs(result.psfFitNegFlux) / (measRecord[self.fluxKey]*2.) < self.config.maxFluxRatio
+
         ## Third, is it a good fit (chi2dof < 1)?
-        passesChi2 = result.psfFitRedChi2 < self.config.maxChi2DoF
+        ## Use scipy's chi2 cumulative distrib to estimate significance
+        ndof = result.psfFitChi2 / result.psfFitRedChi2
+        significance = chi2.cdf(result.psfFitChi2, ndof)
+        passesChi2 = significance < self.config.maxChi2DoF
+        #print ndof, result.psfFitChi2, result.psfFitRedChi2, significance, self.config.maxChi2DoF
 
         if (passesSn and passesFluxPos and passesFluxNeg and passesChi2):
             measRecord.set(self.classificationFlagKey, True)
@@ -592,7 +583,7 @@ def makeDipoleImage_lsst(w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23
     dma[:,:] = posDetectedBits * pos_det + negDetectedBits * neg_det
     return dipole, (posImage, posCatalog), (negImage, negCatalog)
 
-def detectDipoleSources(dipole, posImage, posCatalog, negImage, negCatalog):
+def detectDipoleSources(dipole, posImage, posCatalog, negImage, negCatalog, doMerge=True):
     from lsst.meas.deblender import SourceDeblendTask
 
     # Start with a minimal schema - only the fields all SourceCatalogs need
@@ -627,9 +618,13 @@ def detectDipoleSources(dipole, posImage, posCatalog, negImage, negCatalog):
     deblendTask.run(dipole, catalog, psf=dipole.getPsf())
 
     ## Now do the merge.
-    fpSet = detectResult.fpSets.positive
-    fpSet.merge(detectResult.fpSets.negative, 2, 2, False)
-    sources = afwTable.SourceCatalog(table)
-    fpSet.makeSources(sources)
+    if doMerge:
+        fpSet = detectResult.fpSets.positive
+        fpSet.merge(detectResult.fpSets.negative, 2, 2, False)
+        sources = afwTable.SourceCatalog(table)
+        fpSet.makeSources(sources)
 
-    return sources
+        return sources
+
+    else:
+        return detectTask, deblendTask, schema
