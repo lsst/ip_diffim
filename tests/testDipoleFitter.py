@@ -1,25 +1,34 @@
+#
+# LSST Data Management System
+# Copyright 2008-2015 AURA/LSST.
+#
+# This product includes software developed by the
+# LSST Project (http://www.lsst.org/).
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
+# see <https://www.lsstcorp.org/LegalNotices/>.
+
 import unittest
 
-import numpy as np
+from numpy import (random as np_random,
+                   array as np_array)
 
 ## LSST imports:
-import lsst.utils.tests as tests
-#import lsst.afw.image as afwImage
-#import lsst.afw.geom as afwGeom
-import lsst.afw.table as afwTable
-#import lsst.afw.math as afwMath
-import lsst.meas.algorithms as measAlg
-#import lsst.ip.diffim as ipDiffim
+import lsst.utils.tests as lsst_tests
+from lsst.afw.table import (SourceTable, SourceCatalog)
 from lsst.ip.diffim import dipoleFitTask as dft
-## need to separately set up meas_modelfit:
-import lsst.meas.modelfit as modelfit
-import lsst.meas.base as measBase
-
-# import lsst.meas.base
-# import lsst.pex.config
-#import lsst.meas.deblender
-from lsst.meas.deblender import SourceDeblendTask
-import lsst.utils.tests
+from lsst.meas.base import SingleFrameMeasurementConfig
 
 class DipoleFitTestGlobalParams():
     """
@@ -51,22 +60,22 @@ class DipoleFitTestGlobalParams():
         """
         Initialize the parameters.
         """
-        np.random.seed(666)
+        np_random.seed(666)
         self.display = True
         self.verbose = False
         self.w, self.h = 100, 100 # size of image
 
-        self.xc = np.array([65.3, 24.2]) ## xcenters of two dipoles in image
-        self.yc = np.array([38.6, 78.5]) ## ycenters of two dipoles
-        self.flux = np.array([2500., 2345.])  ## fluxes of pos/neg lobes
-        self.gradientParams = np.array([10., 3., 5.])
+        self.xc = np_array([65.3, 24.2]) ## xcenters of two dipoles in image
+        self.yc = np_array([38.6, 78.5]) ## ycenters of two dipoles
+        self.flux = np_array([2500., 2345.])  ## fluxes of pos/neg lobes
+        self.gradientParams = np_array([10., 3., 5.])
 
-        self.offsets = np.array([-2., 2.]) ## pixel coord offsets between lobes of dipoles
+        self.offsets = np_array([-2., 2.]) ## pixel coord offsets between lobes of dipoles
 
 ## First, test the algorithm itself (fitDipole_new()):
 ## Create a simulated diffim (with dipoles) and a linear background gradient in the pre-sub images
 ##   then compare the input fluxes/centroids with the fitted results.
-class DipoleFitAlgorithmTest(lsst.utils.tests.TestCase):
+class DipoleFitAlgorithmTest(lsst_tests.TestCase):
     """
     A test case for dipole fit algorithm.
 
@@ -143,7 +152,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
             self.negCatalog, doMerge=False)
 
         #measureConfig = dft.DipoleFitConfig()
-        measureConfig = measBase.SingleFrameMeasurementConfig()
+        measureConfig = SingleFrameMeasurementConfig()
 
         # Modify the set of active plugins ('.names' behaves like a Python set)
         measureConfig.plugins.names.remove("base_PsfFlux")
@@ -173,14 +182,14 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
 
         measureTask = dft.DipoleFitTask(config=measureConfig, schema=schema)
 
-        table = afwTable.SourceTable.make(schema)
+        table = SourceTable.make(schema)
         detectResult = detectTask.run(table, self.dipole)
         catalog = detectResult.sources
         deblendTask.run(self.dipole, catalog, psf=self.dipole.getPsf())
 
         fpSet = detectResult.fpSets.positive
         fpSet.merge(detectResult.fpSets.negative, 2, 2, False)
-        sources = afwTable.SourceCatalog(table)
+        sources = SourceCatalog(table)
         fpSet.makeSources(sources)
 
         measureTask.run(sources, self.dipole, self.posImage, self.negImage)
@@ -189,7 +198,8 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         for i, r1 in enumerate(sources):
             result = r1.extract("ip_diffim_DipoleFit*")
             self.assertClose((result['ip_diffim_DipoleFit_pos_flux'] +
-                              abs(result['ip_diffim_DipoleFit_neg_flux']))/2., self.params.flux[i], rtol=0.02)
+                              abs(result['ip_diffim_DipoleFit_neg_flux']))/2.,
+                             self.params.flux[i], rtol=0.02)
             self.assertClose(result['ip_diffim_DipoleFit_pos_centroid_x'],
                              self.params.xc[i] + offsets[i], rtol=0.01)
             self.assertClose(result['ip_diffim_DipoleFit_pos_centroid_y'],
@@ -228,17 +238,17 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
 def suite():
     """Returns a suite containing all the test cases in this module."""
 
-    tests.init()
+    lsst_tests.init()
 
     suites = []
     suites += unittest.makeSuite(DipoleFitAlgorithmTest)
     suites += unittest.makeSuite(DipoleFitTaskTest)
-    suites += unittest.makeSuite(tests.MemoryTestCase)
+    suites += unittest.makeSuite(lsst_tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
 def run(shouldExit = False):
     """Run the tests"""
-    tests.run(suite(), shouldExit)
+    lsst_tests.run(suite(), shouldExit)
 
 if __name__ == "__main__":
     run(True)
