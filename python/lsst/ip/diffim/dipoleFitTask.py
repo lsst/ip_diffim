@@ -40,235 +40,244 @@ import lsst.pex.exceptions as pexExcept
 from lsst.pex.config import Field
 import lsst.pex.logging as pexLog
 
-__all__ = ("DipoleFitConfig", "DipoleFitTask", "DipoleFitPlugin")
+__all__ = ("DipoleFitConfig", "DipoleFitTask", "DipoleFitPlugin",
+           "DipoleUtils", "DipoleFitAlgorithm")
 
-## Create a namedtuple to hold all of the relevant output from the lmfit results
-resultsOutput = namedtuple('resultsOutput',
-                           ['psfFitPosCentroidX', 'psfFitPosCentroidY',
-                            'psfFitNegCentroidX', 'psfFitNegCentroidY', 'psfFitPosFlux',
-                            'psfFitNegFlux', 'psfFitPosFluxSigma', 'psfFitNegFluxSigma',
-                            'psfFitCentroidX', 'psfFitCentroidY', 'psfFitOrientation',
-                            'psfFitSignaltoNoise', 'psfFitChi2', 'psfFitRedChi2'])
+class DipoleFitAlgorithm():
+    ## Create a namedtuple to hold all of the relevant output from the lmfit results
+    resultsOutput = namedtuple('resultsOutput',
+                               ['psfFitPosCentroidX', 'psfFitPosCentroidY',
+                                'psfFitNegCentroidX', 'psfFitNegCentroidY', 'psfFitPosFlux',
+                                'psfFitNegFlux', 'psfFitPosFluxSigma', 'psfFitNegFluxSigma',
+                                'psfFitCentroidX', 'psfFitCentroidY', 'psfFitOrientation',
+                                'psfFitSignaltoNoise', 'psfFitChi2', 'psfFitRedChi2'])
 
-def dipoleFunc(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
-               b=None, x1=None, y1=None, **kwargs):
-    """
-    dipoleFunc(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg)
-    Dipole model generator using difference image's psf.
-    Psf is is passed as kwargs['psf']
-    Other kwargs include 'rel_weight' - set the relative weighting of pre-sub images
-    versus the diffim, and
-                         'footprint' - the footprint of the dipole source
-    """
+    @staticmethod
+    def dipoleFunc(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
+                   b=None, x1=None, y1=None, **kwargs):
+        """
+        dipoleFunc(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg)
+        Dipole model generator using difference image's psf.
+        Psf is is passed as kwargs['psf']
+        Other kwargs include 'rel_weight' - set the relative weighting of pre-sub images
+        versus the diffim, and
+                             'footprint' - the footprint of the dipole source
+        """
 
-    psf = kwargs.get('psf')
-    rel_weight = kwargs.get('rel_weight')
-    fp = kwargs.get('footprint')
-    bbox = fp.getBBox()
+        psf = kwargs.get('psf')
+        rel_weight = kwargs.get('rel_weight')
+        fp = kwargs.get('footprint')
+        bbox = fp.getBBox()
 
-    if fluxNeg is None:
-        fluxNeg = flux
+        if fluxNeg is None:
+            fluxNeg = flux
 
-    gradient = None #gradientImage = None  ## TBD: is using an afwImage faster?
-    if b is not None and abs(b)+abs(x1)+abs(y1) > 0.:
-        y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
-        gradient = b + x1 * x + y1 * y
-        # gradientImage = afwImage.ImageF(bbox)
-        # gradientImage.getArray()[:,:] = gradient
+        gradient = None #gradientImage = None  ## TBD: is using an afwImage faster?
+        if b is not None and abs(b)+abs(x1)+abs(y1) > 0.:
+            y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
+            gradient = b + x1 * x + y1 * y
+            # gradientImage = afwImage.ImageF(bbox)
+            # gradientImage.getArray()[:,:] = gradient
 
-    p_pos = psf.computeImage(afwGeom.Point2D(xcenPos, ycenPos)).convertF()
-    p_pos_sum = np.sum(p_pos.getArray())
-    p_pos *= (flux/p_pos_sum)
-    p_neg = psf.computeImage(afwGeom.Point2D(xcenNeg, ycenNeg)).convertF()
-    p_neg_sum = np.sum(p_neg.getArray())
-    p_neg *= (fluxNeg/p_neg_sum)
+        p_pos = psf.computeImage(afwGeom.Point2D(xcenPos, ycenPos)).convertF()
+        p_pos_sum = np.sum(p_pos.getArray())
+        p_pos *= (flux/p_pos_sum)
+        p_neg = psf.computeImage(afwGeom.Point2D(xcenNeg, ycenNeg)).convertF()
+        p_neg_sum = np.sum(p_neg.getArray())
+        p_neg *= (fluxNeg/p_neg_sum)
 
-    pos_box = p_pos.getBBox()
-    neg_box = p_neg.getBBox()
+        pos_box = p_pos.getBBox()
+        neg_box = p_neg.getBBox()
 
-    ## Clip the PSF image bounding boxes to fall within the footprint bounding box
-    pos_box.clip(bbox)
-    neg_box.clip(bbox)
+        ## Clip the PSF image bounding boxes to fall within the footprint bounding box
+        pos_box.clip(bbox)
+        neg_box.clip(bbox)
 
-    ## Then actually crop the psf images.
-    ## Usually not necessary, but if the dipole is near the edge of the image...
-    ## Would be nice if we could compare original pos_box with clipped pos_box and
-    ##     see if it actually was clipped.
-    p_pos = afwImage.ImageF(p_pos, pos_box, afwImage.PARENT)
-    p_neg = afwImage.ImageF(p_neg, neg_box, afwImage.PARENT)
+        ## Then actually crop the psf images.
+        ## Usually not necessary, but if the dipole is near the edge of the image...
+        ## Would be nice if we could compare original pos_box with clipped pos_box and
+        ##     see if it actually was clipped.
+        p_pos = afwImage.ImageF(p_pos, pos_box, afwImage.PARENT)
+        p_neg = afwImage.ImageF(p_neg, neg_box, afwImage.PARENT)
 
-    posIm = afwImage.ImageF(bbox)
-    tmpSubim = afwImage.ImageF(posIm, pos_box, afwImage.PARENT)
-    tmpSubim += p_pos
+        posIm = afwImage.ImageF(bbox)
+        tmpSubim = afwImage.ImageF(posIm, pos_box, afwImage.PARENT)
+        tmpSubim += p_pos
 
-    negIm = afwImage.ImageF(bbox)
-    tmpSubim = afwImage.ImageF(negIm, neg_box, afwImage.PARENT)
-    tmpSubim += p_neg
+        negIm = afwImage.ImageF(bbox)
+        tmpSubim = afwImage.ImageF(negIm, neg_box, afwImage.PARENT)
+        tmpSubim += p_neg
 
-    if gradient is not None:
-        # posIm += gradientImage
-        # negIm += gradientImage
-        posIm.getArray()[:,:] += gradient
-        negIm.getArray()[:,:] += gradient
+        if gradient is not None:
+            # posIm += gradientImage
+            # negIm += gradientImage
+            posIm.getArray()[:,:] += gradient
+            negIm.getArray()[:,:] += gradient
 
-    diffIm = afwImage.ImageF(bbox)
-    diffIm += posIm
-    diffIm -= negIm
+        diffIm = afwImage.ImageF(bbox)
+        diffIm += posIm
+        diffIm -= negIm
 
-    zout = diffIm.getArray()
-    if rel_weight > 0.:
-        zout = np.append([zout], [posIm.getArray(), negIm.getArray()], axis=0)
+        zout = diffIm.getArray()
+        if rel_weight > 0.:
+            zout = np.append([zout], [posIm.getArray(), negIm.getArray()], axis=0)
 
-    return zout
+        return zout
 
-def fitDipole(diffim, source, posImage=None, negImage=None, tol=1e-7, rel_weight=0.1,
-              fitBgGradient=True, centroidRangeInSigma=5., separateNegParams=True,
-              verbose=False, display=False):
-    """
-    fitDipole()
-    """
-    ## diffim is the image difference (exposure)
-    ## source is a putative dipole source, with a footprint, from a catalog.
-    ## separateNegParams --> separate flux (and TBD: gradient) params for negative img.
-    ## Otherwise same as posImage
-    ## Returns a lmfit.MinimzerResult object
+    @staticmethod
+    def fitDipole(diffim, source, posImage=None, negImage=None, tol=1e-7, rel_weight=0.1,
+                  fitBgGradient=True, centroidRangeInSigma=5., separateNegParams=True,
+                  verbose=False, display=False):
+        """
+        fitDipole()
+        """
+        ## diffim is the image difference (exposure)
+        ## source is a putative dipole source, with a footprint, from a catalog.
+        ## separateNegParams --> separate flux (and TBD: gradient) params for negative img.
+        ## Otherwise same as posImage
+        ## Returns a lmfit.MinimzerResult object
 
-    fp = source.getFootprint()
-    box = fp.getBBox()
-    subim = diffim.getMaskedImage().Factory(
-        diffim.getMaskedImage(), box, afwImage.PARENT)
+        fp = source.getFootprint()
+        box = fp.getBBox()
+        subim = diffim.getMaskedImage().Factory(
+            diffim.getMaskedImage(), box, afwImage.PARENT)
 
-    z = subim.getArrays()[0] ## allow passing of just the diffim
-    weights = subim.getArrays()[2]  ## get the weights (=1/variance)
-    if posImage is not None:
-        posSubim = posImage.getMaskedImage().Factory(
-            posImage.getMaskedImage(), box, afwImage.PARENT)
-        negSubim = negImage.getMaskedImage().Factory(
-            negImage.getMaskedImage(), box, afwImage.PARENT)
-        z = np.append([z], [posSubim.getArrays()[0],
-                        negSubim.getArrays()[0]], axis=0)
-        weights = np.append([weights], [posSubim.getArrays()[2] * rel_weight,
-                        negSubim.getArrays()[2] * rel_weight], axis=0)
-
-    weights = 1. / weights  ## TBD: is there an inplace operator for this?
-
-    psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
-
-    ## Create the lmfit model (uses scipy 'leastsq' option by default - Levenberg-Marquardt)
-    gmod = lmfit.Model(dipoleFunc, verbose=verbose)
-
-    pks = fp.getPeaks()
-    cenPos, cenNeg = pks[0].getF(), pks[1].getF()
-
-    ## For close/faint dipoles the starting locs (min/max) might be way off, let's help them a bit.
-    ## First assume dipole is not separated by more than 5*psfSigma.
-    centroidRange = psfSigma * centroidRangeInSigma
-
-    ## parameter hints/constraints: https://lmfit.github.io/lmfit-py/model.html#model-param-hints-section
-    ## might make sense to not use bounds -- see http://lmfit.github.io/lmfit-py/bounds.html
-    gmod.set_param_hint('xcenPos', value=cenPos[0], min=cenPos[0]-centroidRange, max=cenPos[0]+centroidRange)
-    gmod.set_param_hint('ycenPos', value=cenPos[1], min=cenPos[1]-centroidRange, max=cenPos[1]+centroidRange)
-    gmod.set_param_hint('xcenNeg', value=cenNeg[0], min=cenNeg[0]-centroidRange, max=cenNeg[0]+centroidRange)
-    gmod.set_param_hint('ycenNeg', value=cenNeg[1], min=cenNeg[1]-centroidRange, max=cenNeg[1]+centroidRange)
-
-    ## Estimate starting flux. This strongly affects runtime performance so we want to make it close.
-    ## Subtract a (constant) background (median) to get estimate - this may not be necessary.
-    ## Just using the area within the footprint bounding box.
-    if posImage is not None:
-        #startingFlux = (z[1,:] - np.median(z[1,:])).sum()   ## use the pos. image
-        startingFlux = (np.abs(z[0,:]) - np.median(z[0,:])).sum() / 2.  ## use the dipole
-    else:
-        startingFlux = (np.abs(z) - np.median(z)).sum() / 2.  ## use the dipole for an estimate.
-
-    ## TBD: set max. flux limit?
-    gmod.set_param_hint('flux', value=startingFlux, min=0.1) #, max=startingFlux * 2.)
-
-    if separateNegParams:
-        ## TBD: set max negative lobe flux limit?
-        gmod.set_param_hint('fluxNeg', value=startingFlux, min=0.1) #, max=startingFlux * 2.)
-    else:
-        gmod.set_param_hint('fluxNeg', value=startingFlux, min=0.1, expr='flux')
-
-    ## Fixed parameters (dont fit for them if there are no pre-sub images or no gradient fit requested):
-    varyBgParams = (rel_weight > 0. and fitBgGradient)
-    gmod.set_param_hint('b', value=0., vary=varyBgParams)
-    gmod.set_param_hint('x1', value=0., vary=varyBgParams)
-    gmod.set_param_hint('y1', value=0., vary=varyBgParams)
-
-    ## Compute footprint bounding box as a numpy extent
-    extent = (box.getBeginX(), box.getEndX(), box.getBeginY(), box.getEndY())
-    in_x = np.array(extent)   # input x coordinate grid
-
-    ## Note that while we can, we don't need to set initial values for params here, since we
-    ## set their param_hint's above.
-    ## add "method" param to not use 'leastsq' (==levenberg-marquardt), e.g. "method='nelder'"
-    result = gmod.fit(z, weights=weights, x=in_x,
-                      verbose=verbose,
-                      fit_kws={'ftol':tol, 'xtol':tol, 'gtol':tol}, ## see scipy docs
-                      psf=diffim.getPsf(),
-                      rel_weight=rel_weight,
-                      footprint=fp
-                     )
-
-    ## Probably never wanted - also this takes a long time (longer than the fit!)
-    ## This is how to get confidence intervals out;
-    ##    see here: https://lmfit.github.io/lmfit-py/confidence.html and
-    ##    here: http://cars9.uchicago.edu/software/python/lmfit/model.html
-    if verbose and separateNegParams:
-        print result.fit_report(show_correl=False)
-        print result.ci_report()
-
-    ## Display images, model fits and residuals (currently uses matplotlib display functions
-    if display:
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(8, 2.5))
-        plt.subplot(1, 3, 1)
+        z = subim.getArrays()[0] ## allow passing of just the diffim
+        weights = subim.getArrays()[2]  ## get the weights (=1/variance)
         if posImage is not None:
-            display2dArray(z[0,:], 'Data', True, extent=extent)
-        else:
-            display2dArray(z, 'Data', True, extent=extent)
-        plt.subplot(1, 3, 2)
+            posSubim = posImage.getMaskedImage().Factory(
+                posImage.getMaskedImage(), box, afwImage.PARENT)
+            negSubim = negImage.getMaskedImage().Factory(
+                negImage.getMaskedImage(), box, afwImage.PARENT)
+            z = np.append([z], [posSubim.getArrays()[0],
+                            negSubim.getArrays()[0]], axis=0)
+            weights = np.append([weights], [posSubim.getArrays()[2] * rel_weight,
+                            negSubim.getArrays()[2] * rel_weight], axis=0)
+
+        weights = 1. / weights  ## TBD: is there an inplace operator for this?
+
+        psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
+
+        ## Create the lmfit model (uses scipy 'leastsq' option by default - Levenberg-Marquardt)
+        gmod = lmfit.Model(DipoleFitAlgorithm.dipoleFunc, verbose=verbose)
+
+        pks = fp.getPeaks()
+        cenPos, cenNeg = pks[0].getF(), pks[1].getF()
+
+        ## For close/faint dipoles the starting locs (min/max) might be way off, let's help them a bit.
+        ## First assume dipole is not separated by more than 5*psfSigma.
+        centroidRange = psfSigma * centroidRangeInSigma
+
+        ## parameter hints/constraints: https://lmfit.github.io/lmfit-py/model.html#model-param-hints-section
+        ## might make sense to not use bounds -- see http://lmfit.github.io/lmfit-py/bounds.html
+        gmod.set_param_hint('xcenPos', value=cenPos[0], min=cenPos[0]-centroidRange, max=cenPos[0]+centroidRange)
+        gmod.set_param_hint('ycenPos', value=cenPos[1], min=cenPos[1]-centroidRange, max=cenPos[1]+centroidRange)
+        gmod.set_param_hint('xcenNeg', value=cenNeg[0], min=cenNeg[0]-centroidRange, max=cenNeg[0]+centroidRange)
+        gmod.set_param_hint('ycenNeg', value=cenNeg[1], min=cenNeg[1]-centroidRange, max=cenNeg[1]+centroidRange)
+
+        ## Estimate starting flux. This strongly affects runtime performance so we want to make it close.
+        ## Subtract a (constant) background (median) to get estimate - this may not be necessary.
+        ## Just using the area within the footprint bounding box.
         if posImage is not None:
-            display2dArray(result.best_fit[0,:], 'Model', True, extent=extent)
+            #startingFlux = (z[1,:] - np.median(z[1,:])).sum()   ## use the pos. image
+            startingFlux = (np.abs(z[0,:]) - np.median(z[0,:])).sum() / 2.  ## use the dipole
         else:
-            display2dArray(result.best_fit, 'Model', True, extent=extent)
-        plt.subplot(1, 3, 3)
-        if posImage is not None:
-            display2dArray(z[0,:] - result.best_fit[0,:], 'Residual', True, extent=extent)
+            startingFlux = (np.abs(z) - np.median(z)).sum() / 2.  ## use the dipole for an estimate.
+
+        ## TBD: set max. flux limit?
+        gmod.set_param_hint('flux', value=startingFlux, min=0.1) #, max=startingFlux * 2.)
+
+        if separateNegParams:
+            ## TBD: set max negative lobe flux limit?
+            gmod.set_param_hint('fluxNeg', value=startingFlux, min=0.1) #, max=startingFlux * 2.)
         else:
-            display2dArray(z - result.best_fit, 'Residual', True, extent=extent)
+            gmod.set_param_hint('fluxNeg', value=startingFlux, min=0.1, expr='flux')
 
-    return result
+        ## Fixed parameters (dont fit for them if there are no pre-sub images or no gradient fit requested):
+        varyBgParams = (rel_weight > 0. and fitBgGradient)
+        gmod.set_param_hint('b', value=0., vary=varyBgParams)
+        gmod.set_param_hint('x1', value=0., vary=varyBgParams)
+        gmod.set_param_hint('y1', value=0., vary=varyBgParams)
 
-def fitDipole_new(exposure, source, posImage=None, negImage=None, tol=1e-7, rel_weight=0.1,
-                  return_fitObj=False, fitBgGradient=True, centroidRangeInSigma=5.,
-                  separateNegParams=True, verbose=False, display=False):
+        ## Compute footprint bounding box as a numpy extent
+        extent = (box.getBeginX(), box.getEndX(), box.getBeginY(), box.getEndY())
+        in_x = np.array(extent)   # input x coordinate grid
 
-    result = fitDipole(exposure, source=source, posImage=posImage, negImage=negImage,
-                       rel_weight=rel_weight, tol=tol, fitBgGradient=fitBgGradient,
-                       centroidRangeInSigma=centroidRangeInSigma,
-                       separateNegParams=separateNegParams, verbose=verbose, display=display)
+        ## Note that while we can, we don't need to set initial values for params here, since we
+        ## set their param_hint's above.
+        ## add "method" param to not use 'leastsq' (==levenberg-marquardt), e.g. "method='nelder'"
+        result = gmod.fit(z, weights=weights, x=in_x,
+                          verbose=verbose,
+                          fit_kws={'ftol':tol, 'xtol':tol, 'gtol':tol}, ## see scipy docs
+                          psf=diffim.getPsf(),
+                          rel_weight=rel_weight,
+                          footprint=fp
+                         )
 
-    results = result.best_values
+        ## Probably never wanted - also this takes a long time (longer than the fit!)
+        ## This is how to get confidence intervals out;
+        ##    see here: https://lmfit.github.io/lmfit-py/confidence.html and
+        ##    here: http://cars9.uchicago.edu/software/python/lmfit/model.html
+        if verbose and separateNegParams:
+            print result.fit_report(show_correl=False)
+            print result.ci_report()
 
-    centroid = ((results['xcenPos']+results['xcenNeg'])/2., (results['ycenPos']+results['ycenNeg'])/2.)
-    dx, dy = results['xcenPos'] - results['xcenNeg'], results['ycenPos'] - results['ycenNeg']
-    angle = np.arctan2(dy, dx) / np.pi * 180.   ## convert to degrees (should keep as rad?)
+        ## Display images, model fits and residuals (currently uses matplotlib display functions
+        if display:
+            try:
+                plt.figure(figsize=(8, 2.5))
+                plt.subplot(1, 3, 1)
+                if posImage is not None:
+                    DipoleUtils.display2dArray(z[0,:], 'Data', True, extent=extent)
+                else:
+                    DipoleUtils.display2dArray(z, 'Data', True, extent=extent)
+                plt.subplot(1, 3, 2)
+                if posImage is not None:
+                    DipoleUtils.display2dArray(result.best_fit[0,:], 'Model', True, extent=extent)
+                else:
+                    DipoleUtils.display2dArray(result.best_fit, 'Model', True, extent=extent)
+                plt.subplot(1, 3, 3)
+                if posImage is not None:
+                    DipoleUtils.display2dArray(z[0,:] - result.best_fit[0,:], 'Residual', True, extent=extent)
+                else:
+                    DipoleUtils.display2dArray(z - result.best_fit, 'Residual', True, extent=extent)
+            except:
+                pass
 
-    ## TBD - signalToNoise should be flux / variance_within_footprint, not flux / fluxErr.
-    fluxVal, fluxErr = result.params['flux'].value, result.params['flux'].stderr
-    fluxValNeg, fluxErrNeg = result.params['fluxNeg'].value, result.params['fluxNeg'].stderr
-    signalToNoise = np.sqrt((fluxVal/fluxErr)**2 + (fluxValNeg/fluxErrNeg)**2) ## Derived from DipoleAnalysis
+        return result
 
-    chi2, redchi2 = result.chisqr, result.redchi
+    @staticmethod
+    def fitDipole_new(exposure, source, posImage=None, negImage=None, tol=1e-7, rel_weight=0.1,
+                      return_fitObj=False, fitBgGradient=True, centroidRangeInSigma=5.,
+                      separateNegParams=True, verbose=False, display=False):
 
-    out = resultsOutput(results['xcenPos'], results['ycenPos'], results['xcenNeg'], results['ycenNeg'],
-                        fluxVal, -fluxValNeg, fluxErr, fluxErrNeg, centroid[0], centroid[1], angle,
-                        signalToNoise, chi2, redchi2)
+        result = DipoleFitAlgorithm.fitDipole(
+            exposure, source=source, posImage=posImage, negImage=negImage,
+            rel_weight=rel_weight, tol=tol, fitBgGradient=fitBgGradient,
+            centroidRangeInSigma=centroidRangeInSigma,
+            separateNegParams=separateNegParams, verbose=verbose, display=display)
 
-    if not return_fitObj:  ## for debugging
-        return out
-    return out, result
+        results = result.best_values
+
+        centroid = ((results['xcenPos']+results['xcenNeg'])/2., (results['ycenPos']+results['ycenNeg'])/2.)
+        dx, dy = results['xcenPos'] - results['xcenNeg'], results['ycenPos'] - results['ycenNeg']
+        angle = np.arctan2(dy, dx) / np.pi * 180.   ## convert to degrees (should keep as rad?)
+
+        ## TBD - signalToNoise should be flux / variance_within_footprint, not flux / fluxErr.
+        fluxVal, fluxErr = result.params['flux'].value, result.params['flux'].stderr
+        fluxValNeg, fluxErrNeg = result.params['fluxNeg'].value, result.params['fluxNeg'].stderr
+        signalToNoise = np.sqrt((fluxVal/fluxErr)**2 + (fluxValNeg/fluxErrNeg)**2) ## Derived from DipoleAnalysis
+
+        chi2, redchi2 = result.chisqr, result.redchi
+
+        out = DipoleFitAlgorithm.resultsOutput(
+            results['xcenPos'], results['ycenPos'], results['xcenNeg'], results['ycenNeg'],
+            fluxVal, -fluxValNeg, fluxErr, fluxErrNeg, centroid[0], centroid[1], angle,
+            signalToNoise, chi2, redchi2)
+
+        if not return_fitObj:  ## for debugging
+            return out
+        return out, result
 
 ## Create a new measurement task (`DipoleFitTask`) that can handle all other SFM tasks but can
 ## pass a separate pos- and neg- exposure/image to the `DipoleFitPlugin`s `run()` method.
@@ -433,14 +442,15 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
     def measure(self, measRecord, exposure, posImage=None, negImage=None):
         ## Do the non-linear least squares estimation
         try:
-            result = fitDipole_new(exposure, measRecord,
-                                   posImage=posImage, negImage=negImage,
-                                   rel_weight=self.config.relWeight,
-                                   tol=self.config.tolerance,
-                                   centroidRangeInSigma=self.config.centroidRange,
-                                   fitBgGradient=self.config.fitBgGradient,
-                                   separateNegParams=self.config.fitSeparateNegParams,
-                                   verbose=self.config.verbose, display=False)
+            result = DipoleFitAlgorithm.fitDipole_new(
+                exposure, measRecord,
+                posImage=posImage, negImage=negImage,
+                rel_weight=self.config.relWeight,
+                tol=self.config.tolerance,
+                centroidRangeInSigma=self.config.centroidRange,
+                fitBgGradient=self.config.fitBgGradient,
+                separateNegParams=self.config.fitSeparateNegParams,
+                verbose=self.config.verbose, display=False)
         except pexExcept.LengthError as err:
             raise measBase.MeasurementError(err, self.FAILURE_EDGE)
 
@@ -497,134 +507,143 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
 ################# UTILITIES FUNCTIONS -- TBD WHERE THEY ULTIMATELY END UP #######
 
-def display2dArray(arr, title='Data', showBars=True, extent=None):
+class DipoleUtils():
     import matplotlib.pyplot as plt
-    img = plt.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
-    plt.title(title)
-    if showBars:
-        plt.colorbar(img, cmap='gray')
 
-def displayImage(image, showBars=True, width=8, height=2.5):
-    import matplotlib.pyplot as plt
-    plt.figure(figsize=(width, height))
-    bbox = image.getBBox()
-    extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-    plt.subplot(1, 3, 1)
-    ma = image.getArray()
-    display2dArray(ma, title='Data', showBars=showBars, extent=extent)
+    @staticmethod
+    def display2dArray(arr, title='Data', showBars=True, extent=None):
+        img = plt.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
+        plt.title(title)
+        if showBars:
+            plt.colorbar(img, cmap='gray')
 
-def displayMaskedImage(maskedImage, showMasks=True, showVariance=False, showBars=True, width=8, height=2.5):
-    import matplotlib.pyplot as plt
-    plt.figure(figsize=(width, height))
-    bbox = maskedImage.getBBox()
-    extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-    plt.subplot(1, 3, 1)
-    ma = maskedImage.getArrays()
-    display2dArray(ma[0], title='Data', showBars=showBars, extent=extent)
-    if showMasks:
-        plt.subplot(1, 3, 2)
-        display2dArray(ma[1], title='Masks', showBars=showBars, extent=extent)
-    if showVariance:
-        plt.subplot(1, 3, 3)
-        display2dArray(ma[2], title='Variance', showBars=showBars, extent=extent)
-
-def displayExposure(exposure, showMasks=True, showVariance=False, showPsf=False, showBars=True,
-                    width=8, height=2.5):
-    displayMaskedImage(exposure.getMaskedImage(), showMasks, showVariance=not showPsf, showBars=showBars,
-                       width=width, height=height)
-    if showPsf:
-        plt.subplot(1, 3, 3)
-        psfIm = exposure.getPsf().computeImage()
-        bbox = psfIm.getBBox()
+    @staticmethod
+    def displayImage(image, showBars=True, width=8, height=2.5):
+        plt.figure(figsize=(width, height))
+        bbox = image.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-        display2dArray(psfIm.getArray(), title='PSF', showBars=showBars, extent=extent)
+        plt.subplot(1, 3, 1)
+        ma = image.getArray()
+        display2dArray(ma, title='Data', showBars=showBars, extent=extent)
 
-def makeStarImage_lsst(w=101, h=101, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=1.0,
-                       gradientParams=None, schema=None):
-    from lsst.meas.base.tests import TestDataset
-    bbox = afwGeom.Box2I(afwGeom.Point2I(0,0), afwGeom.Point2I(w-1, h-1))
-    dataset = TestDataset(bbox, psfSigma=psfSigma, threshold=1.)
-    for i in xrange(len(xc)):
-        dataset.addSource(flux=flux[i], centroid=afwGeom.Point2D(xc[i], yc[i]))
-    if schema is None:
-        schema = TestDataset.makeMinimalSchema()
-    exposure, catalog = dataset.realize(noise=noise, schema=schema)
-    if gradientParams is not None:
-        imgArr = exposure.getMaskedImage().getArrays()[0]
-        y, x = np.mgrid[:w, :h]
-        gp = gradientParams
-        gradient = gp[0] + gp[1] * x + gp[2] * y
-        imgArr += gradient
+    @staticmethod
+    def displayMaskedImage(maskedImage, showMasks=True, showVariance=False, showBars=True, width=8, height=2.5):
+        plt.figure(figsize=(width, height))
+        bbox = maskedImage.getBBox()
+        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+        plt.subplot(1, 3, 1)
+        ma = maskedImage.getArrays()
+        display2dArray(ma[0], title='Data', showBars=showBars, extent=extent)
+        if showMasks:
+            plt.subplot(1, 3, 2)
+            display2dArray(ma[1], title='Masks', showBars=showBars, extent=extent)
+        if showVariance:
+            plt.subplot(1, 3, 3)
+            display2dArray(ma[2], title='Variance', showBars=showBars, extent=extent)
 
-    return exposure, catalog
+    @staticmethod
+    def displayExposure(exposure, showMasks=True, showVariance=False, showPsf=False, showBars=True,
+                        width=8, height=2.5):
+        displayMaskedImage(exposure.getMaskedImage(), showMasks, showVariance=not showPsf, showBars=showBars,
+                           width=width, height=height)
+        if showPsf:
+            plt.subplot(1, 3, 3)
+            psfIm = exposure.getPsf().computeImage()
+            bbox = psfIm.getBBox()
+            extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+            display2dArray(psfIm.getArray(), title='PSF', showBars=showBars, extent=extent)
 
-def makeDipoleImage_lsst(w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
-                         psfSigma=2., flux=[30000.], fluxNeg=[None], noise=10., gradientParams=None):
+    @staticmethod
+    def makeStarImage(w=101, h=101, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=1.0,
+                           gradientParams=None, schema=None):
+        from lsst.meas.base.tests import TestDataset
+        bbox = afwGeom.Box2I(afwGeom.Point2I(0,0), afwGeom.Point2I(w-1, h-1))
+        dataset = TestDataset(bbox, psfSigma=psfSigma, threshold=1.)
+        for i in xrange(len(xc)):
+            dataset.addSource(flux=flux[i], centroid=afwGeom.Point2D(xc[i], yc[i]))
+        if schema is None:
+            schema = TestDataset.makeMinimalSchema()
+        exposure, catalog = dataset.realize(noise=noise, schema=schema)
+        if gradientParams is not None:
+            y, x = np.mgrid[:w, :h]
+            gp = gradientParams
+            gradient = gp[0] + gp[1] * x + gp[2] * y
+            imgArr = exposure.getMaskedImage().getArrays()[0]
+            imgArr += gradient
 
-    posImage, posCatalog = makeStarImage_lsst(w, h, xcenPos, ycenPos, flux=flux, psfSigma=psfSigma,
-                                              gradientParams=gradientParams, noise=noise)
-    if fluxNeg is None:
-        fluxNeg = flux
-    negImage, negCatalog = makeStarImage_lsst(w, h, xcenNeg, ycenNeg, flux=fluxNeg, psfSigma=psfSigma,
-                                              gradientParams=gradientParams, noise=noise)
+        return exposure, catalog
 
-    dipole = posImage.clone()
-    di = dipole.getMaskedImage()
-    di -= negImage.getMaskedImage()
+    @staticmethod
+    def makeDipoleImage(w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
+                        psfSigma=2., flux=[30000.], fluxNeg=[None], noise=10., gradientParams=None):
 
-    ## Carry through pos/neg detection masks to new planes in diffim image
-    dm = di.getMask()
-    posDetectedBits = posImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
-    negDetectedBits = negImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
-    pos_det = dm.addMaskPlane("DETECTED_POS") ## new mask plane -- this is different from "DETECTED"
-    neg_det = dm.addMaskPlane("DETECTED_NEG") ## new mask plane -- this is different from "DETECTED_NEGATIVE"
-    dma = dm.getArray()
-    ## set the two custom mask planes to these new masks
-    dma[:,:] = posDetectedBits * pos_det + negDetectedBits * neg_det
-    return dipole, (posImage, posCatalog), (negImage, negCatalog)
+        posImage, posCatalog = DipoleUtils.makeStarImage(
+            w, h, xcenPos, ycenPos, flux=flux, psfSigma=psfSigma,
+            gradientParams=gradientParams, noise=noise)
+        if fluxNeg is None:
+            fluxNeg = flux
+        negImage, negCatalog = DipoleUtils.makeStarImage(
+            w, h, xcenNeg, ycenNeg, flux=fluxNeg, psfSigma=psfSigma,
+            gradientParams=gradientParams, noise=noise)
 
-def detectDipoleSources(dipole, posImage, posCatalog, negImage, negCatalog, doMerge=True):
-    from lsst.meas.deblender import SourceDeblendTask
+        dipole = posImage.clone()
+        di = dipole.getMaskedImage()
+        di -= negImage.getMaskedImage()
 
-    # Start with a minimal schema - only the fields all SourceCatalogs need
-    schema = afwTable.SourceTable.makeMinimalSchema()
+        ## Carry through pos/neg detection masks to new planes in diffim image
+        dm = di.getMask()
+        posDetectedBits = posImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
+        negDetectedBits = negImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
+        pos_det = dm.addMaskPlane("DETECTED_POS") ## new mask plane -- this is different from "DETECTED"
+        neg_det = dm.addMaskPlane("DETECTED_NEG") ## new mask plane -- this is different from "DETECTED_NEGATIVE"
+        dma = dm.getArray()
+        ## set the two custom mask planes to these new masks
+        dma[:,:] = posDetectedBits * pos_det + negDetectedBits * neg_det
+        return dipole, (posImage, posCatalog), (negImage, negCatalog)
 
-    # Create and run a task for deblending (optional, but almost always a good idea).
-    # Again, the task defines a few flag fields it will later fill.
-    deblendTask = SourceDeblendTask(schema=schema)
+    @staticmethod
+    def detectDipoleSources(dipole, posImage, posCatalog, negImage, negCatalog, doMerge=True):
+        from lsst.meas.deblender import SourceDeblendTask
 
-    deblendTask.run(posImage, posCatalog, psf=posImage.getPsf())
-    deblendTask.run(negImage, negCatalog, psf=negImage.getPsf())
+        # Start with a minimal schema - only the fields all SourceCatalogs need
+        schema = afwTable.SourceTable.makeMinimalSchema()
 
-    # Customize the detection task a bit (optional)
-    detectConfig = measAlg.SourceDetectionConfig()
-    detectConfig.returnOriginalFootprints = False # should be the default
-    detectConfig.thresholdValue = 10 # only 10-sigma detections
+        # Create and run a task for deblending (optional, but almost always a good idea).
+        # Again, the task defines a few flag fields it will later fill.
+        deblendTask = SourceDeblendTask(schema=schema)
 
-    ## code from imageDifference.py:
-    detectConfig.thresholdPolarity = "both"
-    detectConfig.thresholdValue = 5.5
-    detectConfig.reEstimateBackground = False
-    detectConfig.thresholdType = "pixel_stdev"
+        deblendTask.run(posImage, posCatalog, psf=posImage.getPsf())
+        deblendTask.run(negImage, negCatalog, psf=negImage.getPsf())
 
-    # Create the detection task. We pass the schema so the task can declare a few flag fields
-    detectTask = measAlg.SourceDetectionTask(config=detectConfig, schema=schema)
+        # Customize the detection task a bit (optional)
+        detectConfig = measAlg.SourceDetectionConfig()
+        detectConfig.returnOriginalFootprints = False # should be the default
+        detectConfig.thresholdValue = 10 # only 10-sigma detections
 
-    table = afwTable.SourceTable.make(schema)
-    detectResult = detectTask.run(table, dipole)
-    catalog = detectResult.sources
-    #results = detectTask.makeSourceCatalog(table, exposure, sigma=psfSigma)
+        ## code from imageDifference.py:
+        detectConfig.thresholdPolarity = "both"
+        detectConfig.thresholdValue = 5.5
+        detectConfig.reEstimateBackground = False
+        detectConfig.thresholdType = "pixel_stdev"
 
-    deblendTask.run(dipole, catalog, psf=dipole.getPsf())
+        # Create the detection task. We pass the schema so the task can declare a few flag fields
+        detectTask = measAlg.SourceDetectionTask(config=detectConfig, schema=schema)
 
-    ## Now do the merge.
-    if doMerge:
-        fpSet = detectResult.fpSets.positive
-        fpSet.merge(detectResult.fpSets.negative, 2, 2, False)
-        sources = afwTable.SourceCatalog(table)
-        fpSet.makeSources(sources)
+        table = afwTable.SourceTable.make(schema)
+        detectResult = detectTask.run(table, dipole)
+        catalog = detectResult.sources
+        #results = detectTask.makeSourceCatalog(table, exposure, sigma=psfSigma)
 
-        return sources
+        deblendTask.run(dipole, catalog, psf=dipole.getPsf())
 
-    else:
-        return detectTask, deblendTask, schema
+        ## Now do the merge.
+        if doMerge:
+            fpSet = detectResult.fpSets.positive
+            fpSet.merge(detectResult.fpSets.negative, 2, 2, False)
+            sources = afwTable.SourceCatalog(table)
+            fpSet.makeSources(sources)
+
+            return sources
+
+        else:
+            return detectTask, deblendTask, schema
