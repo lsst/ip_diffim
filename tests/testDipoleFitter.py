@@ -121,6 +121,7 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
                 self.dipole, s, self.posImage, self.negImage,
                 rel_weight=1., separateNegParams=False,
                 verbose=self.params.verbose, display=self.params.display)
+            print result
             self.assertClose((result.psfFitPosFlux + abs(result.psfFitNegFlux))/2.,
                              self.params.flux[i], rtol=0.02)
             self.assertClose(result.psfFitPosCentroidX, self.params.xc[i] + offsets[i], rtol=0.01)

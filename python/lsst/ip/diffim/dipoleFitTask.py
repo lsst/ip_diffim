@@ -288,7 +288,7 @@ class DipoleFitAlgorithm():
 
     @staticmethod
     def dipoleFunc(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
-                   b=None, x1=None, y1=None, **kwargs):
+                   b=None, x1=None, y1=None, xy=None, x2=None, y2=None, **kwargs):
         """
         dipoleFunc(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg)
         Dipole model generator functor using difference image's psf.
@@ -310,6 +310,8 @@ class DipoleFitAlgorithm():
         if b is not None and abs(b)+abs(x1)+abs(y1) > 0.:
             y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
             gradient = b + x1 * x + y1 * y
+            if xy is not None and abs(xy)+abs(x2)+abs(y2) > 0.:
+                gradient += xy * x*y + x2 * x*x + y2 * y*y
             # gradientImage = ImageF(bbox)
             # gradientImage.getArray()[:,:] = gradient
 
@@ -360,7 +362,8 @@ class DipoleFitAlgorithm():
 
     @staticmethod
     def fitDipole(diffim, source, posImage=None, negImage=None, tol=1e-7, rel_weight=0.1,
-                  fitBgGradient=True, centroidRangeInSigma=5., separateNegParams=True,
+                  fitBgGradient=True, include2ndOrderGradient=False,
+                  centroidRangeInSigma=5., separateNegParams=True,
                   verbose=False, display=False):
         """
         fitDipole()
@@ -404,10 +407,15 @@ class DipoleFitAlgorithm():
 
         ## parameter hints/constraints: https://lmfit.github.io/lmfit-py/model.html#model-param-hints-section
         ## might make sense to not use bounds -- see http://lmfit.github.io/lmfit-py/bounds.html
-        gmod.set_param_hint('xcenPos', value=cenPos[0], min=cenPos[0]-centroidRange, max=cenPos[0]+centroidRange)
-        gmod.set_param_hint('ycenPos', value=cenPos[1], min=cenPos[1]-centroidRange, max=cenPos[1]+centroidRange)
-        gmod.set_param_hint('xcenNeg', value=cenNeg[0], min=cenNeg[0]-centroidRange, max=cenNeg[0]+centroidRange)
-        gmod.set_param_hint('ycenNeg', value=cenNeg[1], min=cenNeg[1]-centroidRange, max=cenNeg[1]+centroidRange)
+        ## also see this discussion -- https://github.com/scipy/scipy/issues/3129
+        gmod.set_param_hint('xcenPos', value=cenPos[0],
+                            min=cenPos[0]-centroidRange, max=cenPos[0]+centroidRange)
+        gmod.set_param_hint('ycenPos', value=cenPos[1],
+                            min=cenPos[1]-centroidRange, max=cenPos[1]+centroidRange)
+        gmod.set_param_hint('xcenNeg', value=cenNeg[0],
+                            min=cenNeg[0]-centroidRange, max=cenNeg[0]+centroidRange)
+        gmod.set_param_hint('ycenNeg', value=cenNeg[1],
+                            min=cenNeg[1]-centroidRange, max=cenNeg[1]+centroidRange)
 
         ## Estimate starting flux. This strongly affects runtime performance so we want to make it close.
         ## Subtract a (constant) background (median) to get estimate - this may not be necessary.
@@ -432,21 +440,24 @@ class DipoleFitAlgorithm():
         gmod.set_param_hint('b', value=0., vary=varyBgParams)
         gmod.set_param_hint('x1', value=0., vary=varyBgParams)
         gmod.set_param_hint('y1', value=0., vary=varyBgParams)
+        if include2ndOrderGradient:
+            gmod.set_param_hint('xy', value=0., vary=varyBgParams)
+            gmod.set_param_hint('x2', value=0., vary=varyBgParams)
+            gmod.set_param_hint('y2', value=0., vary=varyBgParams)
 
         ## Compute footprint bounding box as a numpy extent
         extent = (box.getBeginX(), box.getEndX(), box.getBeginY(), box.getEndY())
         in_x = np.array(extent)   # input x coordinate grid
 
-        ## Note that while we can, we don't need to set initial values for params here, since we
-        ## set their param_hint's above.
+        ## Note that although we can, we're not required to set initial values for params here,
+        ## since we set their param_hint's above.
         ## add "method" param to not use 'leastsq' (==levenberg-marquardt), e.g. "method='nelder'"
         result = gmod.fit(z, weights=weights, x=in_x,
                           verbose=verbose,
                           fit_kws={'ftol':tol, 'xtol':tol, 'gtol':tol}, ## see scipy docs
                           psf=diffim.getPsf(),
                           rel_weight=rel_weight,
-                          footprint=fp
-                         )
+                          footprint=fp)
 
         ## Probably never wanted - also this takes a long time (longer than the fit!)
         ## This is how to get confidence intervals out;
@@ -577,6 +588,8 @@ class DipoleUtils():
             y, x = np.mgrid[:w, :h]
             gp = gradientParams
             gradient = gp[0] + gp[1] * x + gp[2] * y
+            if len(gradientParams) > 3: ## it includes a set of 2nd-order polynomial params
+                gradient += gp[3] * x*y + gp[4] * x*x + gp[5] * y*y
             imgArr = exposure.getMaskedImage().getArrays()[0]
             imgArr += gradient
 
