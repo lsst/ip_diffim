@@ -120,8 +120,8 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
             result = dft.DipoleFitAlgorithm.fitDipole_new(
                 self.dipole, s, self.posImage, self.negImage,
                 rel_weight=1., separateNegParams=False,
-                verbose=self.params.verbose, display=self.params.display)
-            print result
+                verbose=self.params.verbose, display=False) #self.params.display)
+
             self.assertClose((result.psfFitPosFlux + abs(result.psfFitNegFlux))/2.,
                              self.params.flux[i], rtol=0.02)
             self.assertClose(result.psfFitPosCentroidX, self.params.xc[i] + offsets[i], rtol=0.01)
@@ -231,6 +231,10 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
                              result2['ip_diffim_PsfDipoleFlux_neg_centroid_y'],
                              rtol=0.01)
 
+            if self.params.display:
+                dft.DipoleUtils.displayCutouts(r1, self.dipole, self.posImage, self.negImage)
+        if self.params.display:
+            dft.DipoleUtils.plt.show()
 
         #for r1 in sources:
         #    print r1.extract("ip_diffim_PsfDipoleFlux*")

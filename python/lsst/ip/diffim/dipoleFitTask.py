@@ -470,23 +470,25 @@ class DipoleFitAlgorithm():
         ## Display images, model fits and residuals (currently uses matplotlib display functions
         if display:
             try:
-                plt.figure(figsize=(8, 2.5))
-                plt.subplot(1, 3, 1)
+                DipoleUtils.plt.figure(figsize=(8, 2.5))
+                DipoleUtils.plt.subplot(1, 3, 1)
                 if posImage is not None:
                     DipoleUtils.display2dArray(z[0,:], 'Data', True, extent=extent)
                 else:
                     DipoleUtils.display2dArray(z, 'Data', True, extent=extent)
-                plt.subplot(1, 3, 2)
+                DipoleUtils.plt.subplot(1, 3, 2)
                 if posImage is not None:
                     DipoleUtils.display2dArray(result.best_fit[0,:], 'Model', True, extent=extent)
                 else:
                     DipoleUtils.display2dArray(result.best_fit, 'Model', True, extent=extent)
-                plt.subplot(1, 3, 3)
+                DipoleUtils.plt.subplot(1, 3, 3)
                 if posImage is not None:
                     DipoleUtils.display2dArray(z[0,:] - result.best_fit[0,:], 'Residual', True, extent=extent)
                 else:
                     DipoleUtils.display2dArray(z - result.best_fit, 'Residual', True, extent=extent)
-            except:
+                DipoleUtils.plt.show()
+            except Exception as err:
+                print 'Uh oh!', err
                 pass
 
         return result
@@ -528,50 +530,73 @@ class DipoleFitAlgorithm():
 ################# UTILITIES FUNCTIONS -- TBD WHERE THEY ULTIMATELY END UP #######
 
 class DipoleUtils():
-    import matplotlib.pyplot as plt
+    try:
+        import matplotlib.pyplot as plt
+    except Exception as err:
+        print 'Uh oh!', err
+        pass  ## matplotlib not installed -- cannot do any plotting
 
     @staticmethod
     def display2dArray(arr, title='Data', showBars=True, extent=None):
-        img = plt.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
-        plt.title(title)
+        img = DipoleUtils.plt.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
+        DipoleUtils.plt.title(title)
         if showBars:
-            plt.colorbar(img, cmap='gray')
+            DipoleUtils.plt.colorbar(img, cmap='gray')
 
     @staticmethod
     def displayImage(image, showBars=True, width=8, height=2.5):
-        plt.figure(figsize=(width, height))
+        DipoleUtils.plt.figure(figsize=(width, height))
         bbox = image.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-        plt.subplot(1, 3, 1)
+        DipoleUtils.plt.subplot(1, 3, 1)
         ma = image.getArray()
-        display2dArray(ma, title='Data', showBars=showBars, extent=extent)
+        DipoleUtils.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
 
     @staticmethod
     def displayMaskedImage(maskedImage, showMasks=True, showVariance=False, showBars=True, width=8, height=2.5):
-        plt.figure(figsize=(width, height))
+        DipoleUtils.plt.figure(figsize=(width, height))
         bbox = maskedImage.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-        plt.subplot(1, 3, 1)
+        DipoleUtils.plt.subplot(1, 3, 1)
         ma = maskedImage.getArrays()
-        display2dArray(ma[0], title='Data', showBars=showBars, extent=extent)
+        DipoleUtils.display2dArray(ma[0], title='Data', showBars=showBars, extent=extent)
         if showMasks:
-            plt.subplot(1, 3, 2)
-            display2dArray(ma[1], title='Masks', showBars=showBars, extent=extent)
+            DipoleUtils.plt.subplot(1, 3, 2)
+            DipoleUtils.display2dArray(ma[1], title='Masks', showBars=showBars, extent=extent)
         if showVariance:
-            plt.subplot(1, 3, 3)
-            display2dArray(ma[2], title='Variance', showBars=showBars, extent=extent)
+            DipoleUtils.plt.subplot(1, 3, 3)
+            DipoleUtils.display2dArray(ma[2], title='Variance', showBars=showBars, extent=extent)
 
     @staticmethod
     def displayExposure(exposure, showMasks=True, showVariance=False, showPsf=False, showBars=True,
                         width=8, height=2.5):
-        displayMaskedImage(exposure.getMaskedImage(), showMasks, showVariance=not showPsf, showBars=showBars,
-                           width=width, height=height)
+        DipoleUtils.displayMaskedImage(exposure.getMaskedImage(), showMasks, showVariance=not showPsf,
+                                       showBars=showBars, width=width, height=height)
         if showPsf:
-            plt.subplot(1, 3, 3)
+            DipoleUtils.plt.subplot(1, 3, 3)
             psfIm = exposure.getPsf().computeImage()
             bbox = psfIm.getBBox()
             extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-            display2dArray(psfIm.getArray(), title='PSF', showBars=showBars, extent=extent)
+            DipoleUtils.display2dArray(psfIm.getArray(), title='PSF', showBars=showBars, extent=extent)
+
+    @staticmethod
+    def displayCutouts(source, exposure, posImage=None, negImage=None):
+        fp = source.getFootprint()
+        bbox = fp.getBBox()
+        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+
+        DipoleUtils.plt.figure(figsize=(8, 2.5))
+        subexp = ImageF(exposure.getMaskedImage().getImage(), bbox, PARENT)
+        DipoleUtils.plt.subplot(1, 3, 1)
+        DipoleUtils.display2dArray(subexp.getArray(), title='Diffim', extent=extent)
+        if posImage is not None:
+            subexp = ImageF(posImage.getMaskedImage().getImage(), bbox, PARENT)
+            DipoleUtils.plt.subplot(1, 3, 2)
+            DipoleUtils.display2dArray(subexp.getArray(), title='Pos', extent=extent)
+        if negImage is not None:
+            subexp = ImageF(negImage.getMaskedImage().getImage(), bbox, PARENT)
+            DipoleUtils.plt.subplot(1, 3, 3)
+            DipoleUtils.display2dArray(subexp.getArray(), title='Neg', extent=extent)
 
     @staticmethod
     def makeStarImage(w=101, h=101, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=1.0,
@@ -640,12 +665,11 @@ class DipoleUtils():
         # Customize the detection task a bit (optional)
         detectConfig = SourceDetectionConfig()
         detectConfig.returnOriginalFootprints = False # should be the default
-        detectConfig.thresholdValue = 10 # only 10-sigma detections
 
         ## code from imageDifference.py:
         detectConfig.thresholdPolarity = "both"
         detectConfig.thresholdValue = 5.5
-        detectConfig.reEstimateBackground = False
+        detectConfig.reEstimateBackground = True
         detectConfig.thresholdType = "pixel_stdev"
 
         # Create the detection task. We pass the schema so the task can declare a few flag fields
