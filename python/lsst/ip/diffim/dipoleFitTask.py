@@ -296,6 +296,7 @@ class DipoleFitAlgorithm():
         Other kwargs include 'rel_weight' - set the relative weighting of pre-sub images
         versus the diffim, and
                              'footprint' - the footprint of the dipole source
+        Output - generate an output model containing a diffim and a coadd
         """
 
         psf = kwargs.get('psf')
@@ -318,6 +319,7 @@ class DipoleFitAlgorithm():
         p_pos = psf.computeImage(Point2D(xcenPos, ycenPos)).convertF()
         p_pos_sum = np.sum(p_pos.getArray())
         p_pos *= (flux/p_pos_sum)
+
         p_neg = psf.computeImage(Point2D(xcenNeg, ycenNeg)).convertF()
         p_neg_sum = np.sum(p_neg.getArray())
         p_neg *= (fluxNeg/p_neg_sum)
@@ -350,13 +352,18 @@ class DipoleFitAlgorithm():
             posIm.getArray()[:,:] += gradient
             negIm.getArray()[:,:] += gradient
 
+        ## Generate the diffIm model
         diffIm = ImageF(bbox)
         diffIm += posIm
         diffIm -= negIm
 
+        ## Generate the coadd model
+        coadd = posIm
+        coadd += negIm
+
         zout = diffIm.getArray()
         if rel_weight > 0.:
-            zout = np.append([zout], [posIm.getArray(), negIm.getArray()], axis=0)
+            zout = np.append([zout], [posIm.getArray()], axis=0)
 
         return zout
 
@@ -386,16 +393,18 @@ class DipoleFitAlgorithm():
                 posImage.getMaskedImage(), box, PARENT)
             negSubim = negImage.getMaskedImage().Factory(
                 negImage.getMaskedImage(), box, PARENT)
-            z = np.append([z], [posSubim.getArrays()[0],
-                            negSubim.getArrays()[0]], axis=0)
-            weights = np.append([weights], [posSubim.getArrays()[2] * rel_weight,
-                            negSubim.getArrays()[2] * rel_weight], axis=0)
+            z = np.append([z], [posSubim.getArrays()[0] +
+                                negSubim.getArrays()[0]], axis=0)
+            weights = np.append([weights], [posSubim.getArrays()[2] * 2. * rel_weight], axis=0) #,
+                                            #negSubim.getArrays()[2] * rel_weight], axis=0)
 
-        weights = 1. / weights  ## TBD: is there an inplace operator for this?
+        weights[:] = 1. / weights  ## TBD: is there an inplace operator for this?
 
         psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
+        psfImg = diffim.getPsf().computeImage()
+        pkToFlux = np.sum(psfImg.getArray()) / diffim.getPsf().computePeak()
 
-        ## Create the lmfit model (uses scipy 'leastsq' option by default - Levenberg-Marquardt)
+        ## Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
         gmod = DipoleFitAlgorithm.lmfit.Model(DipoleFitAlgorithm.dipoleFunc, verbose=verbose)
 
         pks = fp.getPeaks()
@@ -418,22 +427,16 @@ class DipoleFitAlgorithm():
                             min=cenNeg[1]-centroidRange, max=cenNeg[1]+centroidRange)
 
         ## Estimate starting flux. This strongly affects runtime performance so we want to make it close.
-        ## Subtract a (constant) background (median) to get estimate - this may not be necessary.
-        ## Just using the area within the footprint bounding box.
-        if posImage is not None:
-            #startingFlux = (z[1,:] - np.median(z[1,:])).sum()   ## use the pos. image
-            startingFlux = (np.abs(z[0,:]) - np.median(z[0,:])).sum() / 2.  ## use the dipole
-        else:
-            startingFlux = (np.abs(z) - np.median(z)).sum() / 2.  ## use the dipole for an estimate.
+        posFlux, negFlux = pks[0].getPeakValue() * pkToFlux, pks[1].getPeakValue() * pkToFlux
 
         ## TBD: set max. flux limit?
-        gmod.set_param_hint('flux', value=startingFlux, min=0.1) #, max=startingFlux * 2.)
+        gmod.set_param_hint('flux', value=posFlux, min=0.1) #, max=startingFlux * 2.)
 
         if separateNegParams:
             ## TBD: set max negative lobe flux limit?
-            gmod.set_param_hint('fluxNeg', value=startingFlux, min=0.1) #, max=startingFlux * 2.)
+            gmod.set_param_hint('fluxNeg', value=-negFlux, min=0.1) #, max=startingFlux * 2.)
         else:
-            gmod.set_param_hint('fluxNeg', value=startingFlux, min=0.1, expr='flux')
+            gmod.set_param_hint('fluxNeg', value=posFlux, min=0.1, expr='flux')
 
         ## Fixed parameters (dont fit for them if there are no pre-sub images or no gradient fit requested):
         varyBgParams = (rel_weight > 0. and fitBgGradient)

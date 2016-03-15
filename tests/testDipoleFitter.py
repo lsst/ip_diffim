@@ -61,7 +61,7 @@ class DipoleFitTestGlobalParams():
         Initialize the parameters.
         """
         np_random.seed(666)
-        self.display = True
+        self.display = False
         self.verbose = False
         self.w, self.h = 100, 100 # size of image
 
