@@ -48,7 +48,7 @@ class DipoleFitConfig(meas_base.SingleFramePluginConfig):
         doc="assume dipole is not separated by more than centroidRange*psfSigma")
 
     relWeight = Field(
-        dtype=float, default=1.,
+        dtype=float, default=0.5,
         doc="relative weighting of pre-subtraction images")
 
     tolerance = Field(
@@ -60,7 +60,7 @@ class DipoleFitConfig(meas_base.SingleFramePluginConfig):
         doc="fit separate parameters for linear gradient in pre-sub. images")
 
     fitSeparateNegParams = Field(
-        dtype=bool, default=True,
+        dtype=bool, default=False,
         doc="fit parameters for negative values (flux/gradient) separately from pos.")
 
     """!Config params for classification of detected diaSources as dipole or not"""
@@ -288,7 +288,9 @@ class DipoleFitAlgorithm():
 
     @staticmethod
     def dipoleFunc(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
-                   b=None, x1=None, y1=None, xy=None, x2=None, y2=None, **kwargs):
+                   b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
+                   bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
+                   **kwargs):
         """
         dipoleFunc(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg)
         Dipole model generator functor using difference image's psf.
@@ -296,7 +298,7 @@ class DipoleFitAlgorithm():
         Other kwargs include 'rel_weight' - set the relative weighting of pre-sub images
         versus the diffim, and
                              'footprint' - the footprint of the dipole source
-        Output - generate an output model containing a diffim and a coadd
+        Output - generate an output model containing a diffim and the two pre-sub. images
         """
 
         psf = kwargs.get('psf')
@@ -307,6 +309,15 @@ class DipoleFitAlgorithm():
         if fluxNeg is None:
             fluxNeg = flux
 
+        if bNeg is None:
+            bNeg = b
+            x1Neg = x1
+            y1Neg = y1
+            xyNeg = xy
+            x2Neg = x2
+            y2Neg = y2
+
+
         gradient = None #gradientImage = None  ## TBD: is using an afwImage faster?
         if b is not None and abs(b)+abs(x1)+abs(y1) > 0.:
             y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
@@ -315,6 +326,13 @@ class DipoleFitAlgorithm():
                 gradient += xy * x*y + x2 * x*x + y2 * y*y
             # gradientImage = ImageF(bbox)
             # gradientImage.getArray()[:,:] = gradient
+
+        gradientNeg = gradient
+        if bNeg is not None and abs(bNeg)+abs(x1Neg)+abs(y1Neg) > 0.:
+            y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
+            gradientNeg = bNeg + x1Neg * x + y1Neg * y
+            if xyNeg is not None and abs(xyNeg)+abs(x2Neg)+abs(y2Neg) > 0.:
+                gradientNeg += xyNeg * x*y + x2Neg * x*x + y2Neg * y*y
 
         p_pos = psf.computeImage(Point2D(xcenPos, ycenPos)).convertF()
         p_pos_sum = np.sum(p_pos.getArray())
@@ -350,7 +368,7 @@ class DipoleFitAlgorithm():
             # posIm += gradientImage
             # negIm += gradientImage
             posIm.getArray()[:,:] += gradient
-            negIm.getArray()[:,:] += gradient
+            negIm.getArray()[:,:] += gradientNeg
 
         ## Generate the diffIm model
         diffIm = ImageF(bbox)
@@ -358,17 +376,17 @@ class DipoleFitAlgorithm():
         diffIm -= negIm
 
         ## Generate the coadd model
-        coadd = posIm
-        coadd += negIm
+        #coadd = posIm
+        #coadd += negIm
 
         zout = diffIm.getArray()
         if rel_weight > 0.:
-            zout = np.append([zout], [posIm.getArray()], axis=0)
+            zout = np.append([zout], [posIm.getArray(), negIm.getArray()], axis=0)
 
         return zout
 
     @staticmethod
-    def fitDipole(diffim, source, posImage=None, negImage=None, tol=1e-7, rel_weight=0.1,
+    def fitDipole(diffim, source, posImage=None, negImage=None, tol=1e-7, rel_weight=0.5,
                   fitBgGradient=True, include2ndOrderGradient=False,
                   centroidRangeInSigma=5., separateNegParams=True,
                   verbose=False, display=False):
@@ -388,21 +406,19 @@ class DipoleFitAlgorithm():
 
         z = subim.getArrays()[0] ## allow passing of just the diffim
         weights = subim.getArrays()[2]  ## get the weights (=1/variance)
-        if posImage is not None:
+        if posImage is not None and rel_weight > 0.:
             posSubim = posImage.getMaskedImage().Factory(
                 posImage.getMaskedImage(), box, PARENT)
             negSubim = negImage.getMaskedImage().Factory(
                 negImage.getMaskedImage(), box, PARENT)
-            z = np.append([z], [posSubim.getArrays()[0] +
+            z = np.append([z], [posSubim.getArrays()[0],
                                 negSubim.getArrays()[0]], axis=0)
-            weights = np.append([weights], [posSubim.getArrays()[2] * 2. * rel_weight], axis=0) #,
-                                            #negSubim.getArrays()[2] * rel_weight], axis=0)
+            weights = np.append([weights], [posSubim.getArrays()[2] * rel_weight,
+                                            negSubim.getArrays()[2] * rel_weight], axis=0)
 
         weights[:] = 1. / weights  ## TBD: is there an inplace operator for this?
 
         psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
-        psfImg = diffim.getPsf().computeImage()
-        pkToFlux = np.sum(psfImg.getArray()) / diffim.getPsf().computePeak()
 
         ## Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
         gmod = DipoleFitAlgorithm.lmfit.Model(DipoleFitAlgorithm.dipoleFunc, verbose=verbose)
@@ -427,7 +443,39 @@ class DipoleFitAlgorithm():
                             min=cenNeg[1]-centroidRange, max=cenNeg[1]+centroidRange)
 
         ## Estimate starting flux. This strongly affects runtime performance so we want to make it close.
-        posFlux, negFlux = pks[0].getPeakValue() * pkToFlux, pks[1].getPeakValue() * pkToFlux
+        psfImg = diffim.getPsf().computeImage()
+        pkToFlux = np.nansum(psfImg.getArray()) / diffim.getPsf().computePeak()
+
+        posFlux = pks[0].getPeakValue()
+        negFlux = pks[1].getPeakValue()
+
+        ## This will only be accurate if there is not a bright gradient/background in the pre-sub images
+        if posImage is not None:
+            posSubim = ImageF(posImage.getMaskedImage().getImage(), box, PARENT)
+            negSubim = ImageF(negImage.getMaskedImage().getImage(), box, PARENT)
+            w, h = posSubim.getWidth(), posSubim.getHeight()
+
+            ## If the brightest pixel is close to the edge pixel value, then it is picking up the bg gradient
+            posArr = posSubim.getArray()
+            posPk = np.nanmax(posArr)
+            if (np.max(np.abs(posPk - np.array([posArr[0,0], posArr[h-1,0], posArr[h-1,w-1], posArr[0,w-1]]))) >
+                    np.abs(posPk - pks[0].getPeakValue())):
+                #print 'HERE1'
+                #print posPk, pks[0].getPeakValue(), np.array([posArr[0,0], posArr[h-1,0], posArr[h-1,w-1], posArr[0,w-1]])
+                posFlux = posPk
+
+            negArr = negSubim.getArray()
+            negPk = np.nanmax(negArr)
+            if (np.max(np.abs(negPk - np.array([negArr[0,0], negArr[h-1,0], negArr[h-1,w-1], negArr[0,w-1]]))) >
+                    np.abs(negPk - -pks[1].getPeakValue())):
+                #print 'HERE2'
+                #print negPk, pks[1].getPeakValue(), np.array([negArr[0,0], negArr[h-1,0], negArr[h-1,w-1], negArr[0,w-1]])
+                negFlux = -negPk
+
+        #print 'X:', posFlux, negFlux, pkToFlux
+        posFlux *= pkToFlux
+        negFlux *= pkToFlux
+        #print 'Y:', posFlux, negFlux, pkToFlux
 
         ## TBD: set max. flux limit?
         gmod.set_param_hint('flux', value=posFlux, min=0.1) #, max=startingFlux * 2.)
@@ -443,10 +491,18 @@ class DipoleFitAlgorithm():
         gmod.set_param_hint('b', value=0., vary=varyBgParams)
         gmod.set_param_hint('x1', value=0., vary=varyBgParams)
         gmod.set_param_hint('y1', value=0., vary=varyBgParams)
+        if separateNegParams:
+            gmod.set_param_hint('bNeg', value=0., vary=varyBgParams)
+            gmod.set_param_hint('x1Neg', value=0., vary=varyBgParams)
+            gmod.set_param_hint('y1Neg', value=0., vary=varyBgParams)
         if include2ndOrderGradient:
             gmod.set_param_hint('xy', value=0., vary=varyBgParams)
             gmod.set_param_hint('x2', value=0., vary=varyBgParams)
             gmod.set_param_hint('y2', value=0., vary=varyBgParams)
+            if separateNegParams:
+                gmod.set_param_hint('xyNeg', value=0., vary=varyBgParams)
+                gmod.set_param_hint('x2Neg', value=0., vary=varyBgParams)
+                gmod.set_param_hint('y2Neg', value=0., vary=varyBgParams)
 
         ## Compute footprint bounding box as a numpy extent
         extent = (box.getBeginX(), box.getEndX(), box.getBeginY(), box.getEndY())
@@ -463,29 +519,30 @@ class DipoleFitAlgorithm():
                           footprint=fp)
 
         ## Probably never wanted - also this takes a long time (longer than the fit!)
-        ## This is how to get confidence intervals out;
-        ##    see here: https://lmfit.github.io/lmfit-py/confidence.html and
-        ##    here: http://cars9.uchicago.edu/software/python/lmfit/model.html
-        if verbose and separateNegParams:
+        ## This is how to get confidence intervals out:
+        ##    https://lmfit.github.io/lmfit-py/confidence.html and
+        ##    http://cars9.uchicago.edu/software/python/lmfit/model.html
+        if verbose:  ## fails if neg params are constrained for some reason.
             print result.fit_report(show_correl=False)
-            print result.ci_report()
+            if separateNegParams:
+                print result.ci_report()
 
-        ## Display images, model fits and residuals (currently uses matplotlib display functions
+        ## Display images, model fits and residuals (currently uses matplotlib display functions)
         if display:
             try:
                 DipoleUtils.plt.figure(figsize=(8, 2.5))
                 DipoleUtils.plt.subplot(1, 3, 1)
-                if posImage is not None:
+                if posImage is not None and rel_weight > 0.:
                     DipoleUtils.display2dArray(z[0,:], 'Data', True, extent=extent)
                 else:
                     DipoleUtils.display2dArray(z, 'Data', True, extent=extent)
                 DipoleUtils.plt.subplot(1, 3, 2)
-                if posImage is not None:
+                if posImage is not None and rel_weight > 0.:
                     DipoleUtils.display2dArray(result.best_fit[0,:], 'Model', True, extent=extent)
                 else:
                     DipoleUtils.display2dArray(result.best_fit, 'Model', True, extent=extent)
                 DipoleUtils.plt.subplot(1, 3, 3)
-                if posImage is not None:
+                if posImage is not None and rel_weight > 0.:
                     DipoleUtils.display2dArray(z[0,:] - result.best_fit[0,:], 'Residual', True, extent=extent)
                 else:
                     DipoleUtils.display2dArray(z - result.best_fit, 'Residual', True, extent=extent)

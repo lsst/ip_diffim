@@ -82,3 +82,10 @@ dft.DipoleFitAlgorithm.fitDipole_new(
     diffim, s, posImage, negImage, rel_weight=1., separateNegParams=False,
     verbose=False, display=True)
 
+## ===============================
+
+import lsst.afw.geom as afwGeom
+import lsst.afw.image as afwImage
+
+bbox = afwGeom.Box2I(afwGeom.Point2I(230, 1080), afwGeom.Extent2I(100, 100))
+subim = afwImage.ImageF(diffim.getMaskedImage().getImage(), bbox, afwImage.PARENT)
