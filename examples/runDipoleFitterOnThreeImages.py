@@ -56,7 +56,12 @@ posCatalog = runDetection(posImage)
 negImage.setPsf(posImage.getPsf())
 negCatalog = runDetection(negImage)
 
-catalog = dft.DipoleUtils.detectDipoleSources(
+import imp, os
+print os.getenv('IP_DIFFIM_DIR')+'/tests/testDipoleFitter.py'
+dtUtils = imp.load_source('dtUtils', os.getenv('IP_DIFFIM_DIR')+'/tests/testDipoleFitter.py')
+from lsst.ip.diffim import dipoleFitTask as dft
+
+catalog = dtUtils.DipoleTestUtils.detectDipoleSources(
     diffim, posImage, posCatalog, negImage, negCatalog)
 
 for i,s in enumerate(catalog):
@@ -67,7 +72,7 @@ for i,s in enumerate(catalog):
         print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
 
     result = dft.DipoleFitAlgorithm.fitDipole_new(
-        diffim, s, posImage, negImage, rel_weight=1., separateNegParams=False,
+        diffim, s, posImage, negImage, rel_weight=0.5, separateNegParams=False,
         verbose=False, display=False)
 
 

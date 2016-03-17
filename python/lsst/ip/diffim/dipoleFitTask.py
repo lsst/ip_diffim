@@ -308,7 +308,7 @@ class DipoleFitAlgorithm():
         psf_img_sum = np.nansum(psf_img.getArray())
         psf_img *= (flux/psf_img_sum)
 
-        ## Clip the PSF image bounding boxe to fall within the footprint bounding box
+        ## Clip the PSF image bounding box to fall within the footprint bounding box
         bbox = fp.getBBox()
         psf_box = psf_img.getBBox()
         psf_box.clip(bbox)
@@ -405,8 +405,8 @@ class DipoleFitAlgorithm():
         gmod = DipoleFitAlgorithm.lmfit.Model(DipoleFitAlgorithm.genDipoleModel, verbose=verbose)
 
         ## Add the constraints for centroids, fluxes.
-        w, h = diffim.getWidth(), diffim.getHeight()
-        cenNeg = cenPos = np.array([w/2., h/2.])  ## starting constraint - near center of footprint
+        ## starting constraint - near centroid of footprint
+        cenNeg = cenPos = np.array([fp.getCentroid().getX(), fp.getCentroid().getY()])  
 
         pks = fp.getPeaks()
         if len(pks) >= 1:
