@@ -22,13 +22,18 @@
 import unittest
 
 from numpy import (random as np_random,
-                   array as np_array)
+                   array as np_array,
+                   mgrid as np_mgrid)
 
 ## LSST imports:
 import lsst.utils.tests as lsst_tests
 from lsst.afw.table import (SourceTable, SourceCatalog)
 from lsst.ip.diffim import dipoleFitTask as dft
 from lsst.meas.base import SingleFrameMeasurementConfig
+from lsst.meas.algorithms import (SourceDetectionConfig, SourceDetectionTask)
+from lsst.afw.geom import (Box2I, Point2I, Point2D)
+
+__all__ = ("DipoleTestUtils")
 
 class DipoleFitTestGlobalParams():
     """
@@ -87,7 +92,7 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
 
         offsets = self.params.offsets
         self.dipole, (self.posImage, self.posCatalog), (self.negImage, self.negCatalog) = \
-            dft.DipoleUtils.makeDipoleImage(
+            DipoleTestUtils.makeDipoleImage(
                 xcenPos=self.params.xc + offsets,
                 ycenPos=self.params.yc + offsets,
                 xcenNeg=self.params.xc - offsets,
@@ -95,7 +100,7 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
                 flux=self.params.flux, fluxNeg=self.params.flux,
                 gradientParams=self.params.gradientParams)
 
-        self.catalog = dft.DipoleUtils.detectDipoleSources(
+        self.catalog = DipoleTestUtils.detectDipoleSources(
             self.dipole, self.posImage, self.posCatalog,
             self.negImage, self.negCatalog)
 
@@ -147,7 +152,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         """
 
         ## Create the various tasks and schema -- avoid code reuse.
-        detectTask, deblendTask, schema = dft.DipoleUtils.detectDipoleSources(
+        detectTask, deblendTask, schema = DipoleTestUtils.detectDipoleSources(
             self.dipole, self.posImage,
             self.posCatalog, self.negImage,
             self.negCatalog, doMerge=False)
@@ -232,13 +237,121 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
                              rtol=0.01)
 
             if self.params.display:
-                dft.DipoleUtils.displayCutouts(r1, self.dipole, self.posImage, self.negImage)
+                dft.DipolePlotUtils.displayCutouts(r1, self.dipole, self.posImage, self.negImage)
         if self.params.display:
-            dft.DipoleUtils.plt.show()
+            dft.DipolePlotUtils.plt.show()
 
         #for r1 in sources:
         #    print r1.extract("ip_diffim_PsfDipoleFlux*")
         #    print r1.extract("base_CircularApertureFlux_25_*")
+
+
+class DipoleTestUtils():
+
+    @staticmethod
+    def makeStarImage(w=101, h=101, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=1.0,
+                      gradientParams=None, schema=None):
+
+        from lsst.meas.base.tests import TestDataset
+        bbox = Box2I(Point2I(0,0), Point2I(w-1, h-1))
+        dataset = TestDataset(bbox, psfSigma=psfSigma, threshold=1.)
+
+        for i in xrange(len(xc)):
+            dataset.addSource(flux=flux[i], centroid=Point2D(xc[i], yc[i]))
+
+        if schema is None:
+            schema = TestDataset.makeMinimalSchema()
+        exposure, catalog = dataset.realize(noise=noise, schema=schema)
+
+        if gradientParams is not None:
+            y, x = np_mgrid[:w, :h]
+            gp = gradientParams
+            gradient = gp[0] + gp[1] * x + gp[2] * y
+            if len(gradientParams) > 3: ## it includes a set of 2nd-order polynomial params
+                gradient += gp[3] * x*y + gp[4] * x*x + gp[5] * y*y
+            imgArr = exposure.getMaskedImage().getArrays()[0]
+            imgArr += gradient
+
+        return exposure, catalog
+
+    @staticmethod
+    def makeDipoleImage(w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
+                        psfSigma=2., flux=[30000.], fluxNeg=None, noise=10., gradientParams=None):
+
+        posImage, posCatalog = DipoleTestUtils.makeStarImage(
+            w, h, xcenPos, ycenPos, flux=flux, psfSigma=psfSigma,
+            gradientParams=gradientParams, noise=noise)
+
+        if fluxNeg is None:
+            fluxNeg = flux
+        negImage, negCatalog = DipoleTestUtils.makeStarImage(
+            w, h, xcenNeg, ycenNeg, flux=fluxNeg, psfSigma=psfSigma,
+            gradientParams=gradientParams, noise=noise)
+
+        dipole = posImage.clone()
+        di = dipole.getMaskedImage()
+        di -= negImage.getMaskedImage()
+
+        ## Carry through pos/neg detection masks to new planes in diffim image
+        dm = di.getMask()
+        posDetectedBits = posImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
+        negDetectedBits = negImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
+        pos_det = dm.addMaskPlane("DETECTED_POS") ## new mask plane -- this is different from "DETECTED"
+        neg_det = dm.addMaskPlane("DETECTED_NEG") ## new mask plane -- this is different from "DETECTED_NEGATIVE"
+        dma = dm.getArray()
+        ## set the two custom mask planes to these new masks
+        dma[:,:] = posDetectedBits * pos_det + negDetectedBits * neg_det
+        return dipole, (posImage, posCatalog), (negImage, negCatalog)
+
+    @staticmethod
+    def detectDipoleSources(dipole, posImage, posCatalog, negImage, negCatalog, doMerge=True,
+                            detectSigma=5.0, grow=2):
+        from lsst.meas.deblender import SourceDeblendTask
+
+        # Start with a minimal schema - only the fields all SourceCatalogs need
+        schema = SourceTable.makeMinimalSchema()
+
+        # Create and run a task for deblending (optional, but almost always a good idea).
+        # Again, the task defines a few flag fields it will later fill.
+        deblendTask = SourceDeblendTask(schema=schema)
+
+        deblendTask.run(posImage, posCatalog, psf=posImage.getPsf())
+        deblendTask.run(negImage, negCatalog, psf=negImage.getPsf())
+
+        # Customize the detection task a bit (optional)
+        detectConfig = SourceDetectionConfig()
+        detectConfig.returnOriginalFootprints = False # should be the default
+
+        psfSigma = dipole.getPsf().computeShape().getDeterminantRadius()
+
+        ## code from imageDifference.py:
+        detectConfig.thresholdPolarity = "both"
+        detectConfig.thresholdValue = detectSigma
+        detectConfig.nSigmaToGrow = psfSigma
+        detectConfig.reEstimateBackground = True
+        detectConfig.thresholdType = "pixel_stdev"
+
+        # Create the detection task. We pass the schema so the task can declare a few flag fields
+        detectTask = SourceDetectionTask(config=detectConfig, schema=schema)
+
+        table = SourceTable.make(schema)
+        detectResult = detectTask.run(table, dipole)
+        catalog = detectResult.sources
+        #results = detectTask.makeSourceCatalog(table, exposure, sigma=psfSigma)
+
+        deblendTask.run(dipole, catalog, psf=dipole.getPsf())
+
+        ## Now do the merge.
+        if doMerge:
+            fpSet = detectResult.fpSets.positive
+            fpSet.merge(detectResult.fpSets.negative, grow, grow, False)
+            sources = SourceCatalog(table)
+            fpSet.makeSources(sources)
+
+            return sources
+
+        else:
+            return detectTask, deblendTask, schema
 
 def suite():
     """Returns a suite containing all the test cases in this module."""
