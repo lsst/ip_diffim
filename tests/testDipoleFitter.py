@@ -134,7 +134,7 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
             self.assertClose(result.psfFitNegCentroidX, self.params.xc[i] - offsets[i], rtol=0.01)
             self.assertClose(result.psfFitNegCentroidY, self.params.yc[i] - offsets[i], rtol=0.01)
 
-## Second, test the task in the same way as the algorithm:
+## Test the task in the same way as the algorithm:
 ## Also test that it correctly classifies the dipoles.
 class DipoleFitTaskTest(DipoleFitAlgorithmTest):
     """ A test case for dipole fit task"""
@@ -161,9 +161,8 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         measureConfig = SingleFrameMeasurementConfig()
 
         # Modify the set of active plugins ('.names' behaves like a Python set)
-        measureConfig.plugins.names.remove("base_PsfFlux")
-        measureConfig.plugins.names.remove("base_GaussianCentroid")
-        # If I remove any of the following plugins, I get an 'base_GaussianFlux_flux' not found error
+        #measureConfig.plugins.names.remove("base_PsfFlux")
+        #measureConfig.plugins.names.remove("base_GaussianCentroid")
         #measureConfig.plugins.names.remove("base_SdssCentroid")
         #measureConfig.plugins.names.remove("base_GaussianFlux")
         #measureConfig.plugins.names.remove("base_SdssShape")
@@ -177,15 +176,12 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
                                         "ip_diffim_NaiveDipoleCentroid",
                                         "ip_diffim_NaiveDipoleFlux",
                                         "ip_diffim_PsfDipoleFlux"]
-                                        #"ip_diffim_DipoleFit"]
-
-        # Modify the internal configuration of one of the plugins
-        #measureConfig.plugins["base_ClassificationExtendedness"].fluxRatio = 0.985
 
         # Disable aperture correction, which requires having an ApCorrMap attached to
         # the Exposure (it'll warn if it's not present and we don't explicitly disable it).
         measureConfig.doApplyApCorr = "no"
 
+        # Here is where we make the dipole fitting task. It can run the other measurements as well.
         measureTask = dft.DipoleFitTask(config=measureConfig, schema=schema)
 
         table = SourceTable.make(schema)
@@ -214,6 +210,8 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
                              self.params.xc[i] - offsets[i], rtol=0.01)
             self.assertClose(result['ip_diffim_DipoleFit_neg_centroid_y'],
                              self.params.yc[i] - offsets[i], rtol=0.01)
+            ## Note this is dependent on the noise (variance) being realistic in the image.
+            ## otherwise it throws off the chi2 estimate, which is used for classification:
             self.assertTrue(result['ip_diffim_DipoleFit_flag_classification'])
 
             ## compare to the original ip_diffim_PsfDipoleFlux measurements
@@ -249,7 +247,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
 class DipoleTestUtils():
 
     @staticmethod
-    def makeStarImage(w=101, h=101, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=1.0,
+    def makeStarImage(w=101, h=101, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=10.0,
                       gradientParams=None, schema=None):
 
         from lsst.meas.base.tests import TestDataset

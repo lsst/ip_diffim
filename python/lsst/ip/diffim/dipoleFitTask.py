@@ -29,7 +29,7 @@ import lsst.meas.base as meas_base
 ## Only import what's necessary
 from lsst.afw.geom import (Point2D)
 from lsst.afw.image import (ImageF, MaskedImageF, PARENT)
-from lsst.afw.table import (SourceTable, SourceCatalog, Point2DKey)
+from lsst.afw.table import (Point2DKey)
 from lsst.pex.exceptions import LengthError
 from lsst.pex.logging import Log
 from lsst.pex.config import Field
@@ -372,9 +372,8 @@ class DipoleFitAlgorithm():
 
     @staticmethod
     def fitDipole(diffim, source, posImage=None, negImage=None, tol=1e-7, rel_weight=0.5,
-                  fitBgGradient=True, bgGradientOrder=1,
-                  centroidRangeInSigma=5., separateNegParams=True,
-                  verbose=False, display=False):
+                  fitBgGradient=True, bgGradientOrder=1, centroidRangeInSigma=5.,
+                  separateNegParams=True, verbose=False, display=False):
         """
         fitDipole()
         """
@@ -437,47 +436,46 @@ class DipoleFitAlgorithm():
         pkToFlux = np.nansum(psfImg.getArray()) / diffim.getPsf().computePeak()
 
         bg = np.median(z[0,:])
-        startingFlux = np.nanmax(z[0,:]) - bg   ## use just the dipole for an estimate. Remove the background
-        posFlux, negFlux = startingFlux, -startingFlux
+        startingPk = np.nanmax(z[0,:]) - bg   ## use just the dipole for an estimate. Remove the background
+        posFlux, negFlux = startingPk * pkToFlux, -startingPk * pkToFlux
 
         if len(pks) >= 1:
             posFlux = pks[0].getPeakValue() * pkToFlux
         if len(pks) >= 2:
             negFlux = pks[1].getPeakValue() * pkToFlux
 
-        ## This will only be accurate if there is not a bright gradient/background in the pre-sub images
-        if posImage is not None:
-            posSubim = ImageF(posImage.getMaskedImage().getImage(), box, PARENT)
-            negSubim = ImageF(negImage.getMaskedImage().getImage(), box, PARENT)
-            w, h = posSubim.getWidth(), posSubim.getHeight()
+        # ## This will only be accurate if there is not a bright gradient/background in the pre-sub images
+        # if posImage is not None:
+        #     posSubim = ImageF(posImage.getMaskedImage().getImage(), box, PARENT)
+        #     negSubim = ImageF(negImage.getMaskedImage().getImage(), box, PARENT)
+        #     w, h = posSubim.getWidth(), posSubim.getHeight()
 
-            ## If the brightest pixel value is close to a corner's pixel value, then it is picking up the bg gradient
-            ## In that case, use the footprint peak value instead
-            if len(pks) >= 1:
-                posArr = posSubim.getArray()
-                posPk = np.nanmax(posArr)
-                if (np.max(np.abs(posPk - np.array([posArr[0,0], posArr[h-1,0],
-                                                    posArr[h-1,w-1], posArr[0,w-1]]))) >
-                    np.abs(posPk - pks[0].getPeakValue())):
-                    posFlux = posPk * pkToFlux
+        #     ## If the brightest pixel value is close to a corner's pixel value, then it is picking up the bg gradient
+        #     ## In that case, use the footprint peak value instead
+        #     if len(pks) >= 1:
+        #         posArr = posSubim.getArray()
+        #         posPk = np.nanmax(posArr)
+        #         if (np.max(np.abs(posPk - np.array([posArr[0,0], posArr[h-1,0],
+        #                                             posArr[h-1,w-1], posArr[0,w-1]]))) >
+        #             np.abs(posPk - pks[0].getPeakValue())):
+        #             posFlux = posPk * pkToFlux
 
-            if len(pks) >= 2:
-                negArr = negSubim.getArray()
-                negPk = np.nanmax(negArr)
-                if (np.max(np.abs(negPk - np.array([negArr[0,0], negArr[h-1,0],
-                                                    negArr[h-1,w-1], negArr[0,w-1]]))) >
-                    np.abs(negPk - -pks[1].getPeakValue())):
-                    negFlux = -negPk * pkToFlux
+        #     if len(pks) >= 2:
+        #         negArr = negSubim.getArray()
+        #         negPk = np.nanmax(negArr)
+        #         if (np.max(np.abs(negPk - np.array([negArr[0,0], negArr[h-1,0],
+        #                                             negArr[h-1,w-1], negArr[0,w-1]]))) >
+        #             np.abs(negPk - -pks[1].getPeakValue())):
+        #             negFlux = -negPk * pkToFlux
 
         ## TBD: set max. flux limit?
-        gmod.set_param_hint('flux', value=posFlux, min=0.1) #, max=startingFlux * 2.)
-
+        gmod.set_param_hint('flux', value=posFlux, min=0.1) #, max=posFlux * 2.)
 
         if separateNegParams:
             if negFlux < 0:
                 negFlux = abs(negFlux)
             ## TBD: set max negative lobe flux limit?
-            gmod.set_param_hint('fluxNeg', value=negFlux, min=0.1) #, max=startingFlux * 2.)
+            gmod.set_param_hint('fluxNeg', value=negFlux, min=0.1) #, max=negFlux * 2.)
 
         ## Fixed parameters (dont fit for them if there are no pre-sub images or no gradient fit requested):
         if (rel_weight > 0. and fitBgGradient):
@@ -553,38 +551,53 @@ class DipoleFitAlgorithm():
 
     @staticmethod
     def fitDipole_new(exposure, source, posImage=None, negImage=None, tol=1e-7, rel_weight=0.1,
-                      return_fitObj=False, fitBgGradient=True, centroidRangeInSigma=5.,
-                      separateNegParams=True, bgGradientOrder=1, verbose=False, display=False):
+                      fitBgGradient=True, centroidRangeInSigma=5., separateNegParams=True,
+                      bgGradientOrder=1, verbose=False, display=False, return_fitObj=False):
 
-        result = DipoleFitAlgorithm.fitDipole(
+        fitResult = DipoleFitAlgorithm.fitDipole(
             exposure, source=source, posImage=posImage, negImage=negImage,
-            rel_weight=rel_weight, tol=tol, fitBgGradient=fitBgGradient,
+            tol=tol, rel_weight=rel_weight, fitBgGradient=fitBgGradient,
             centroidRangeInSigma=centroidRangeInSigma, separateNegParams=separateNegParams,
             bgGradientOrder=bgGradientOrder, verbose=verbose, display=display)
 
-        results = result.best_values
+        ## In (rare) extreme cases of very faint dipoles on top of a very steep background
+        ## gradient (and we're including the pre-sub. images in the fit), the fit can go haywire.
+        ## In this case, hope that the diffim is better and let's re-run the fit just using just
+        ## the diffim instead.
+        ## This will be rare and running it without background gradient fitting on is about 2x faster
+        ## so doesn't add too much time to the fitting.
+        if rel_weight > 0. and (fitResult.redchi > 100. or
+                                fitResult.params['flux'].stderr == 0. or
+                                fitResult.params['flux'].stderr >= 1e6 or
+                                (separateNegParams and fitResult.params['fluxNeg'].stderr == 0)):
+            fitResult = DipoleFitAlgorithm.fitDipole(
+                exposure, source=source, posImage=posImage, negImage=negImage,
+                tol=tol, rel_weight=0., fitBgGradient=False,
+                centroidRangeInSigma=centroidRangeInSigma, separateNegParams=separateNegParams,
+                bgGradientOrder=0, verbose=verbose, display=display)
+            #print '   2:', fitResult.params['flux'].stderr
 
-        centroid = ((results['xcenPos']+results['xcenNeg'])/2., (results['ycenPos']+results['ycenNeg'])/2.)
-        dx, dy = results['xcenPos'] - results['xcenNeg'], results['ycenPos'] - results['ycenNeg']
+        fitParams = fitResult.best_values
+
+        centroid = ((fitParams['xcenPos']+fitParams['xcenNeg'])/2., (fitParams['ycenPos']+fitParams['ycenNeg'])/2.)
+        dx, dy = fitParams['xcenPos'] - fitParams['xcenNeg'], fitParams['ycenPos'] - fitParams['ycenNeg']
         angle = np.arctan2(dy, dx) / np.pi * 180.   ## convert to degrees (should keep as rad?)
 
         ## TBD - signalToNoise should be flux / variance_within_footprint, not flux / fluxErr.
-        fluxVal, fluxErr = result.params['flux'].value, result.params['flux'].stderr
+        fluxVal, fluxErr = fitParams['flux'], fitResult.params['flux'].stderr
         try:
-            fluxValNeg, fluxErrNeg = result.params['fluxNeg'].value, result.params['fluxNeg'].stderr
+            fluxValNeg, fluxErrNeg = fitParams['fluxNeg'], fitResult.params['fluxNeg'].stderr
         except:
-            fluxValNeg, fluxErrNeg = result.params['flux'].value, result.params['flux'].stderr
+            fluxValNeg, fluxErrNeg = fitParams['flux'], fitResult.params['flux'].stderr
         signalToNoise = np.sqrt((fluxVal/fluxErr)**2 + (fluxValNeg/fluxErrNeg)**2) ## Derived from DipoleAnalysis
 
-        chi2, redchi2 = result.chisqr, result.redchi
-
         out = DipoleFitAlgorithm.resultsOutput(
-            results['xcenPos'], results['ycenPos'], results['xcenNeg'], results['ycenNeg'],
+            fitParams['xcenPos'], fitParams['ycenPos'], fitParams['xcenNeg'], fitParams['ycenNeg'],
             fluxVal, -fluxValNeg, fluxErr, fluxErrNeg, centroid[0], centroid[1], angle,
-            signalToNoise, chi2, redchi2)
+            signalToNoise, fitResult.chisqr, fitResult.redchi)
 
         if return_fitObj:  ## for debugging
-            return out, result
+            return out, fitResult
         return out
 
 
