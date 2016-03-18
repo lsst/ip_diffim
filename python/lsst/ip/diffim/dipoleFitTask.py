@@ -262,13 +262,15 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
 
         ## Third, is it a good fit (chi2dof < 1)?
         ## Use scipy's chi2 cumulative distrib to estimate significance
+        ## This doesn't really work since I don't trust the values in the variance plane (which
+        ##   affects the least-sq weights, which affects the resulting chi2).
         from scipy.stats import chi2
 
         ndof = result.psfFitChi2 / measRecord[self.chi2dofKey]
         significance = chi2.cdf(result.psfFitChi2, ndof)
         passesChi2 = significance < self.config.maxChi2DoF
 
-        allPass = (passesSn and passesFluxPos and passesFluxNeg and passesChi2)
+        allPass = (passesSn and passesFluxPos and passesFluxNeg) # and passesChi2)
         if allPass:  ## Note cannot pass `allPass` into the `measRecord.set()` call below...?
             measRecord.set(self.classificationFlagKey, True)
         else:
