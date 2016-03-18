@@ -82,8 +82,8 @@ class DiaCatalogSourceSelectorConfig(measAlg.StarSelectorConfig):
 class CheckSource(object):
     """A functor to check whether a source has any flags set that should cause it to be labeled bad."""
 
-    def __init__(self, table, fluxLim, fluxMax, badPixelFlags):
-        self.keys = [table.getSchema().find(name).key for name in badPixelFlags]
+    def __init__(self, table, fluxLim, fluxMax, badFlags):
+        self.keys = [table.getSchema().find(name).key for name in badFlags]
         self.fluxLim = fluxLim
         self.fluxMax = fluxMax
 
