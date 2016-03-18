@@ -123,7 +123,9 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
 
     ConfigClass = DipoleFitConfig
 
-    FAILURE_EDGE = 1
+    FAILURE_EDGE = 1   ## too close to the edge
+    FAILURE_FIT = 2    ## failure in the fitting
+    FAILURE_NOT_DIPOLE = 4  ## input source is not a putative dipole to begin with
 
     @classmethod
     def getExecutionOrder(cls):
@@ -206,6 +208,10 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
             doc="flag set when rectangle used by dipole doesn't fit in the image")
 
     def measure(self, measRecord, exposure, posImage=None, negImage=None):
+        pks = measRecord.getFootprint().getPeaks()
+        if len(pks) <= 1: ## not a dipole for our analysis
+            self.fail(measRecord, meas_base.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
+
         ## Do the non-linear least squares estimation
         try:
             result = DipoleFitAlgorithm.fitDipole_new(
@@ -220,9 +226,12 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
         except LengthError as err:
             raise meas_base.MeasurementError(err, self.FAILURE_EDGE)
 
-        ## add chi2, coord/flux uncertainties (TBD), dipole classification
-
         self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
+
+        if result.psfFitPosFlux <= 1.:   ## usually around 0.1 -- the minimun flux allowed -- i.e. bad fit.
+            self.fail(measRecord, meas_base.MeasurementError('dipole fit failure', self.FAILURE_FIT))
+
+        ## add chi2, coord/flux uncertainties (TBD), dipole classification
 
         ## Add the relevant values to the measRecord
         measRecord[self.posFluxKey] = result.psfFitPosFlux
@@ -279,10 +288,8 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
     ## TBD: need to catch more exceptions
     def fail(self, measRecord, error=None):
         measRecord.set(self.flagKey, True)
-        if error is not None:
-            assert error.getFlagBit() == self.FAILURE_EDGE
+        if error is not None and error.getFlagBit() == self.FAILURE_EDGE:
             measRecord.set(self.edgeFlagKey, True)
-
 
 class DipoleFitAlgorithm():
     import lmfit  ## In the future, we might need to change fitters. Astropy, or just scipy, or iminuit?
@@ -368,7 +375,7 @@ class DipoleFitAlgorithm():
 
         gradient = DipoleFitAlgorithm.genBgGradientModel(bbox, b, x1, y1, xy, x2, y2)
         gradientNeg = gradient
-        if bNeg is not None and abs(bNeg)+abs(x1Neg)+abs(y1Neg) > 0.:
+        if bNeg is not None: # and abs(bNeg)+abs(x1Neg)+abs(y1Neg) > 0.:
             gradientNeg = DipoleFitAlgorithm.genBgGradientModel(bbox, bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg)
 
         if gradient is not None:
@@ -581,8 +588,16 @@ class DipoleFitAlgorithm():
         #         bgGradientOrder=0, verbose=verbose, display=display)
 
         fitParams = fitResult.best_values
+        if fitParams['flux'] <= 1.:   ## usually around 0.1 -- the minimun flux allowed -- i.e. bad fit.
+            out = DipoleFitAlgorithm.resultsOutput(
+                np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
+                np.nan, np.nan, np.nan)
+            if return_fitObj:  ## for debugging
+                return out, fitResult
+            return out
 
-        centroid = ((fitParams['xcenPos']+fitParams['xcenNeg'])/2., (fitParams['ycenPos']+fitParams['ycenNeg'])/2.)
+        centroid = ((fitParams['xcenPos']+fitParams['xcenNeg'])/2.,
+                    (fitParams['ycenPos']+fitParams['ycenNeg'])/2.)
         dx, dy = fitParams['xcenPos'] - fitParams['xcenNeg'], fitParams['ycenPos'] - fitParams['ycenNeg']
         angle = np.arctan2(dy, dx) / np.pi * 180.   ## convert to degrees (should keep as rad?)
 
@@ -592,7 +607,10 @@ class DipoleFitAlgorithm():
             fluxValNeg, fluxErrNeg = fitParams['fluxNeg'], fitResult.params['fluxNeg'].stderr
         except:
             fluxValNeg, fluxErrNeg = fitParams['flux'], fitResult.params['flux'].stderr
-        signalToNoise = np.sqrt((fluxVal/fluxErr)**2 + (fluxValNeg/fluxErrNeg)**2) ## Derived from DipoleAnalysis
+        try:
+            signalToNoise = np.sqrt((fluxVal/fluxErr)**2 + (fluxValNeg/fluxErrNeg)**2) ## Derived from DipoleAnalysis
+        except:
+            signalToNoise = np.nan
 
         out = DipoleFitAlgorithm.resultsOutput(
             fitParams['xcenPos'], fitParams['ycenPos'], fitParams['xcenNeg'], fitParams['ycenNeg'],
@@ -615,33 +633,36 @@ class DipolePlotUtils():
 
     @staticmethod
     def display2dArray(arr, title='Data', showBars=True, extent=None):
-        img = DipolePlotUtils.plt.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
+        fig = DipolePlotUtils.plt.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
         DipolePlotUtils.plt.title(title)
         if showBars:
-            DipolePlotUtils.plt.colorbar(img, cmap='gray')
+            DipolePlotUtils.plt.colorbar(fig, cmap='gray')
+        return fig
 
     @staticmethod
     def displayImage(image, showBars=True, width=8, height=2.5):
-        DipolePlotUtils.plt.figure(figsize=(width, height))
+        fig = DipolePlotUtils.plt.figure(figsize=(width, height))
         bbox = image.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
         DipolePlotUtils.plt.subplot(1, 3, 1)
         ma = image.getArray()
         DipolePlotUtils.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
+        return fig
 
     @staticmethod
     def displayImages(images, showBars=True, width=8, height=2.5):
-        DipolePlotUtils.plt.figure(figsize=(width, height))
+        fig = DipolePlotUtils.plt.figure(figsize=(width, height))
         for i,image in enumerate(images):
             bbox = image.getBBox()
             extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
             DipolePlotUtils.plt.subplot(1, len(images), i+1)
             ma = image.getArray()
             DipolePlotUtils.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
+        return fig
 
     @staticmethod
     def displayMaskedImage(maskedImage, showMasks=True, showVariance=False, showBars=True, width=8, height=2.5):
-        DipolePlotUtils.plt.figure(figsize=(width, height))
+        fig = DipolePlotUtils.plt.figure(figsize=(width, height))
         bbox = maskedImage.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
         DipolePlotUtils.plt.subplot(1, 3, 1)
@@ -653,18 +674,21 @@ class DipolePlotUtils():
         if showVariance:
             DipolePlotUtils.plt.subplot(1, 3, 3)
             DipolePlotUtils.display2dArray(ma[2], title='Variance', showBars=showBars, extent=extent)
+        return fig
 
     @staticmethod
     def displayExposure(exposure, showMasks=True, showVariance=False, showPsf=False, showBars=True,
                         width=8, height=2.5):
-        DipolePlotUtils.displayMaskedImage(exposure.getMaskedImage(), showMasks, showVariance=not showPsf,
-                                       showBars=showBars, width=width, height=height)
+        fig = DipolePlotUtils.displayMaskedImage(exposure.getMaskedImage(), showMasks,
+                                                 showVariance=not showPsf,
+                                                 showBars=showBars, width=width, height=height)
         if showPsf:
             DipolePlotUtils.plt.subplot(1, 3, 3)
             psfIm = exposure.getPsf().computeImage()
             bbox = psfIm.getBBox()
             extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
             DipolePlotUtils.display2dArray(psfIm.getArray(), title='PSF', showBars=showBars, extent=extent)
+        return fig
 
     @staticmethod
     def displayCutouts(source, exposure, posImage=None, negImage=None, asHeavyFootprint=False):
@@ -672,12 +696,12 @@ class DipolePlotUtils():
         bbox = fp.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
 
-        DipolePlotUtils.plt.figure(figsize=(8, 2.5))
+        fig = DipolePlotUtils.plt.figure(figsize=(8, 2.5))
         if not asHeavyFootprint:
             subexp = ImageF(exposure.getMaskedImage().getImage(), bbox, PARENT)
         else:
             hfp = afw_det.HeavyFootprintF(fp, exposure.getMaskedImage())
-            subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp, display=False)
+            subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
         DipolePlotUtils.plt.subplot(1, 3, 1)
         DipolePlotUtils.display2dArray(subexp.getArray(), title='Diffim', extent=extent)
         if posImage is not None:
@@ -685,7 +709,7 @@ class DipolePlotUtils():
                 subexp = ImageF(posImage.getMaskedImage().getImage(), bbox, PARENT)
             else:
                 hfp = afw_det.HeavyFootprintF(fp, posImage.getMaskedImage())
-                subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp, display=False)
+                subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
             DipolePlotUtils.plt.subplot(1, 3, 2)
             DipolePlotUtils.display2dArray(subexp.getArray(), title='Pos', extent=extent)
         if negImage is not None:
@@ -693,9 +717,10 @@ class DipolePlotUtils():
                 subexp = ImageF(negImage.getMaskedImage().getImage(), bbox, PARENT)
             else:
                 hfp = afw_det.HeavyFootprintF(fp, negImage.getMaskedImage())
-                subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp, display=False)
+                subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
             DipolePlotUtils.plt.subplot(1, 3, 3)
             DipolePlotUtils.display2dArray(subexp.getArray(), title='Neg', extent=extent)
+        return fig
 
     @staticmethod
     def makeHeavyCatalog(catalog, exposure, verbose=False):
@@ -711,22 +736,17 @@ class DipolePlotUtils():
         return catalog
 
     @staticmethod
-    def getHeavyFootprintSubimage(fp, display=False, badfill=np.nan):
+    def getHeavyFootprintSubimage(fp, badfill=np.nan):
         hfp = afw_det.HeavyFootprintF_cast(fp)
         bbox = hfp.getBBox()
 
         subim2 = ImageF(bbox, badfill)  ## set the mask to NA (can use 0. if desired)
         #subim2.getArray()[:,:] = np.nan
         afw_det.expandArray(hfp, hfp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
-        if display:
-            DipolePlotUtils.plt.subplot(1, 3, 3)
-            DipolePlotUtils.displayImage(subim2)
-            plt.show()
         return subim2
 
     @staticmethod
     def searchCatalog(catalog, x, y):
-        #bbox = Box2I(Point2I(x-window/2, y-window/2), Point2I(x+window/2, y+window/2))
         for i,s in enumerate(catalog):
             bbox = s.getFootprint().getBBox()
             if bbox.contains(Point2I(x, y)):
@@ -742,7 +762,7 @@ class DipolePlotUtils():
         bbox = footprint.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
         if z.shape[0] == 3:
-            DipolePlotUtils.plt.figure(figsize=(8, 8))
+            fig = DipolePlotUtils.plt.figure(figsize=(8, 8))
             for i in range(3):
                 DipolePlotUtils.plt.subplot(3, 3, i*3+1)
                 DipolePlotUtils.display2dArray(z[i,:], 'Data', True, extent=extent)
@@ -750,13 +770,14 @@ class DipolePlotUtils():
                 DipolePlotUtils.display2dArray(fit[i,:], 'Model', True, extent=extent)
                 DipolePlotUtils.plt.subplot(3, 3, i*3+3)
                 DipolePlotUtils.display2dArray(z[i,:] - fit[i,:], 'Residual', True, extent=extent)
+            return fig
         else:
-            DipolePlotUtils.plt.figure(figsize=(8, 2.5))
+            fig = DipolePlotUtils.plt.figure(figsize=(8, 2.5))
             DipolePlotUtils.plt.subplot(1, 3, 1)
             DipolePlotUtils.display2dArray(z, 'Data', True, extent=extent)
             DipolePlotUtils.plt.subplot(1, 3, 2)
             DipolePlotUtils.display2dArray(fit, 'Model', True, extent=extent)
             DipolePlotUtils.plt.subplot(1, 3, 3)
             DipolePlotUtils.display2dArray(z - fit, 'Residual', True, extent=extent)
-        DipolePlotUtils.plt.show()
+            return fig
 
