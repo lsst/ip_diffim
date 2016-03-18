@@ -27,12 +27,13 @@ import numpy as np
 import lsst.meas.base as meas_base
 
 ## Only import what's necessary
-from lsst.afw.geom import (Point2D)
+from lsst.afw.geom import (Box2I, Point2I, Point2D)
 from lsst.afw.image import (ImageF, MaskedImageF, PARENT)
 from lsst.afw.table import (Point2DKey)
 from lsst.pex.exceptions import LengthError
 from lsst.pex.logging import Log
 from lsst.pex.config import Field
+import lsst.afw.detection as afw_det
 
 __all__ = ("DipoleFitConfig", "DipoleFitTask", "DipoleFitPlugin",
            "DipoleFitAlgorithm", "DipolePlotUtils")
@@ -180,6 +181,10 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
             schema.join(name, "orientation"), type=float, units="deg",
             doc="Dipole orientation")
 
+        self.separationKey = schema.addField(
+            schema.join(name, "separation"), type=float, units="pixels",
+            doc="Pixel separation between positive and negative lobes of dipole")
+
         self.chi2dofKey = schema.addField(
             schema.join(name, "chi2dof"), type=float,
             doc="Chi2 per degree of freedom of dipole fit")
@@ -233,6 +238,8 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
         ## Dia source flux: average of pos+neg
         measRecord[self.fluxKey] = (abs(result.psfFitPosFlux) + abs(result.psfFitNegFlux))/2.
         measRecord[self.orientationKey] = result.psfFitOrientation
+        measRecord[self.separationKey] = np.sqrt((result.psfFitPosCentroidX - result.psfFitNegCentroidX)**2. +
+                                                 (result.psfFitPosCentroidY - result.psfFitNegCentroidY)**2.)
         measRecord[self.centroidKeyX] = (result.psfFitPosCentroidX + result.psfFitNegCentroidX)/2.
         measRecord[self.centroidKeyY] = (result.psfFitPosCentroidY + result.psfFitNegCentroidY)/2.
 
@@ -328,7 +335,7 @@ class DipoleFitAlgorithm():
     def genDipoleModel(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
                        b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
                        bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
-                       **kwargs):
+                       debug=False, **kwargs):
         """
         genDipoleModel(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg)
         Dipole model generator functor using difference image's psf.
@@ -346,6 +353,13 @@ class DipoleFitAlgorithm():
 
         if fluxNeg is None:
             fluxNeg = flux
+
+        if debug:
+            print '%.2f %.2f %.2f %.2f %.2f %.2f' % (flux, fluxNeg, xcenPos, ycenPos, xcenNeg, ycenNeg)
+            if x1 is not None:
+                print '     %.2f %.2f %.2f' % (b, x1, y1)
+            if xy is not None:
+                print '     %.2f %.2f %.2f' % (xy, x2, y2)
 
         posIm = DipoleFitAlgorithm.genStarModel(psf, xcenPos, ycenPos, flux, fp)
         negIm = DipoleFitAlgorithm.genStarModel(psf, xcenNeg, ycenNeg, fluxNeg, fp)
@@ -502,14 +516,18 @@ class DipoleFitAlgorithm():
         extent = (box.getBeginX(), box.getEndX(), box.getBeginY(), box.getEndY())
         in_x = np.array(extent)   # input x coordinate grid
 
-        ##weights = np.array([np.ones_like(z[0,:]), np.ones_like(z[0,:])*rel_weight, np.ones_like(z[0,:])*rel_weight])
+        if posImage is not None and rel_weight > 0.:
+            weights = np.array([np.ones_like(z[0,:]), np.ones_like(z[0,:])*rel_weight,
+                                np.ones_like(z[0,:])*rel_weight])
+        else:
+            weights = 1.
 
         ## Note that although we can, we're not required to set initial values for params here,
         ## since we set their param_hint's above.
         ## add "method" param to not use 'leastsq' (==levenberg-marquardt), e.g. "method='nelder'"
         result = gmod.fit(z, weights=weights, x=in_x,
                           verbose=verbose,
-                          fit_kws={'ftol':tol, 'xtol':tol, 'gtol':tol}, ## see scipy docs
+                          fit_kws={'ftol':tol, 'xtol':tol, 'gtol':tol, 'maxfev':250}, ## see scipy docs
                           psf=diffim.getPsf(),   ## hereon: additional kwargs get passed to genDipoleModel()
                           rel_weight=rel_weight,
                           footprint=fp)
@@ -526,23 +544,7 @@ class DipoleFitAlgorithm():
         ## Display images, model fits and residuals (currently uses matplotlib display functions)
         if display:
             try:
-                DipolePlotUtils.plt.figure(figsize=(8, 2.5))
-                DipolePlotUtils.plt.subplot(1, 3, 1)
-                if posImage is not None and rel_weight > 0.:
-                    DipolePlotUtils.display2dArray(z[0,:], 'Data', True, extent=extent)
-                else:
-                    DipolePlotUtils.display2dArray(z, 'Data', True, extent=extent)
-                DipolePlotUtils.plt.subplot(1, 3, 2)
-                if posImage is not None and rel_weight > 0.:
-                    DipolePlotUtils.display2dArray(result.best_fit[0,:], 'Model', True, extent=extent)
-                else:
-                    DipolePlotUtils.display2dArray(result.best_fit, 'Model', True, extent=extent)
-                DipolePlotUtils.plt.subplot(1, 3, 3)
-                if posImage is not None and rel_weight > 0.:
-                    DipolePlotUtils.display2dArray(z[0,:] - result.best_fit[0,:], 'Residual', True, extent=extent)
-                else:
-                    DipolePlotUtils.display2dArray(z - result.best_fit, 'Residual', True, extent=extent)
-                DipolePlotUtils.plt.show()
+                DipolePlotUtils.displayFitResults(result, fp)
             except Exception as err:
                 print 'Uh oh!', err
                 pass
@@ -566,16 +568,15 @@ class DipoleFitAlgorithm():
         ## the diffim instead.
         ## This will be rare and running it without background gradient fitting on is about 2x faster
         ## so doesn't add too much time to the fitting.
-        if rel_weight > 0. and (fitResult.redchi > 100. or
-                                fitResult.params['flux'].stderr == 0. or
-                                fitResult.params['flux'].stderr >= 1e6 or
-                                (separateNegParams and fitResult.params['fluxNeg'].stderr == 0)):
-            fitResult = DipoleFitAlgorithm.fitDipole(
-                exposure, source=source, posImage=posImage, negImage=negImage,
-                tol=tol, rel_weight=0., fitBgGradient=False,
-                centroidRangeInSigma=centroidRangeInSigma, separateNegParams=separateNegParams,
-                bgGradientOrder=0, verbose=verbose, display=display)
-            #print '   2:', fitResult.params['flux'].stderr
+        # if rel_weight > 0. and (fitResult.redchi > 10000. or
+        #                         fitResult.params['flux'].stderr == 0. or
+        #                         fitResult.params['flux'].stderr >= 1e6 or
+        #                         (separateNegParams and fitResult.params['fluxNeg'].stderr == 0)):
+        #     fitResult = DipoleFitAlgorithm.fitDipole(
+        #         exposure, source=source, posImage=posImage, negImage=negImage,
+        #         tol=tol, rel_weight=0., fitBgGradient=False,
+        #         centroidRangeInSigma=centroidRangeInSigma, separateNegParams=separateNegParams,
+        #         bgGradientOrder=0, verbose=verbose, display=display)
 
         fitParams = fitResult.best_values
 
@@ -627,6 +628,16 @@ class DipolePlotUtils():
         DipolePlotUtils.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
 
     @staticmethod
+    def displayImages(images, showBars=True, width=8, height=2.5):
+        DipolePlotUtils.plt.figure(figsize=(width, height))
+        for i,image in enumerate(images):
+            bbox = image.getBBox()
+            extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+            DipolePlotUtils.plt.subplot(1, len(images), i+1)
+            ma = image.getArray()
+            DipolePlotUtils.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
+
+    @staticmethod
     def displayMaskedImage(maskedImage, showMasks=True, showVariance=False, showBars=True, width=8, height=2.5):
         DipolePlotUtils.plt.figure(figsize=(width, height))
         bbox = maskedImage.getBBox()
@@ -654,20 +665,96 @@ class DipolePlotUtils():
             DipolePlotUtils.display2dArray(psfIm.getArray(), title='PSF', showBars=showBars, extent=extent)
 
     @staticmethod
-    def displayCutouts(source, exposure, posImage=None, negImage=None):
+    def displayCutouts(source, exposure, posImage=None, negImage=None, asHeavyFootprint=False):
         fp = source.getFootprint()
         bbox = fp.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
 
         DipolePlotUtils.plt.figure(figsize=(8, 2.5))
-        subexp = ImageF(exposure.getMaskedImage().getImage(), bbox, PARENT)
+        if not asHeavyFootprint:
+            subexp = ImageF(exposure.getMaskedImage().getImage(), bbox, PARENT)
+        else:
+            hfp = afw_det.HeavyFootprintF(fp, exposure.getMaskedImage())
+            subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp, display=False)
         DipolePlotUtils.plt.subplot(1, 3, 1)
         DipolePlotUtils.display2dArray(subexp.getArray(), title='Diffim', extent=extent)
         if posImage is not None:
-            subexp = ImageF(posImage.getMaskedImage().getImage(), bbox, PARENT)
+            if not asHeavyFootprint:
+                subexp = ImageF(posImage.getMaskedImage().getImage(), bbox, PARENT)
+            else:
+                hfp = afw_det.HeavyFootprintF(fp, posImage.getMaskedImage())
+                subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp, display=False)
             DipolePlotUtils.plt.subplot(1, 3, 2)
             DipolePlotUtils.display2dArray(subexp.getArray(), title='Pos', extent=extent)
         if negImage is not None:
-            subexp = ImageF(negImage.getMaskedImage().getImage(), bbox, PARENT)
+            if not asHeavyFootprint:
+                subexp = ImageF(negImage.getMaskedImage().getImage(), bbox, PARENT)
+            else:
+                hfp = afw_det.HeavyFootprintF(fp, negImage.getMaskedImage())
+                subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp, display=False)
             DipolePlotUtils.plt.subplot(1, 3, 3)
             DipolePlotUtils.display2dArray(subexp.getArray(), title='Neg', extent=extent)
+
+    @staticmethod
+    def makeHeavyCatalog(catalog, exposure, verbose=False):
+        """Usage: catalog = makeHeavyCatalog(catalog, exposure, True)"""
+        for source in catalog:
+            fp = source.getFootprint()
+            if not fp.isHeavy():
+                if verbose:
+                    print 'not heavy => heavy'
+                hfp = afw_det.HeavyFootprintF(fp, exposure.getMaskedImage())
+                source.setFootprint(hfp)
+
+        return catalog
+
+    @staticmethod
+    def getHeavyFootprintSubimage(fp, display=False, badfill=np.nan):
+        hfp = afw_det.HeavyFootprintF_cast(fp)
+        bbox = hfp.getBBox()
+
+        subim2 = ImageF(bbox, badfill)  ## set the mask to NA (can use 0. if desired)
+        #subim2.getArray()[:,:] = np.nan
+        afw_det.expandArray(hfp, hfp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
+        if display:
+            DipolePlotUtils.plt.subplot(1, 3, 3)
+            DipolePlotUtils.displayImage(subim2)
+            plt.show()
+        return subim2
+
+    @staticmethod
+    def searchCatalog(catalog, x, y):
+        #bbox = Box2I(Point2I(x-window/2, y-window/2), Point2I(x+window/2, y+window/2))
+        for i,s in enumerate(catalog):
+            bbox = s.getFootprint().getBBox()
+            if bbox.contains(Point2I(x, y)):
+                print i
+                return s
+        return None
+
+    @staticmethod
+    def displayFitResults(result, footprint):
+        ## Display images, model fits and residuals (currently uses matplotlib display functions)
+        z = result.data
+        fit = result.best_fit
+        bbox = footprint.getBBox()
+        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+        if z.shape[0] == 3:
+            DipolePlotUtils.plt.figure(figsize=(8, 8))
+            for i in range(3):
+                DipolePlotUtils.plt.subplot(3, 3, i*3+1)
+                DipolePlotUtils.display2dArray(z[i,:], 'Data', True, extent=extent)
+                DipolePlotUtils.plt.subplot(3, 3, i*3+2)
+                DipolePlotUtils.display2dArray(fit[i,:], 'Model', True, extent=extent)
+                DipolePlotUtils.plt.subplot(3, 3, i*3+3)
+                DipolePlotUtils.display2dArray(z[i,:] - fit[i,:], 'Residual', True, extent=extent)
+        else:
+            DipolePlotUtils.plt.figure(figsize=(8, 2.5))
+            DipolePlotUtils.plt.subplot(1, 3, 1)
+            DipolePlotUtils.display2dArray(z, 'Data', True, extent=extent)
+            DipolePlotUtils.plt.subplot(1, 3, 2)
+            DipolePlotUtils.display2dArray(fit, 'Model', True, extent=extent)
+            DipolePlotUtils.plt.subplot(1, 3, 3)
+            DipolePlotUtils.display2dArray(z - fit, 'Residual', True, extent=extent)
+        DipolePlotUtils.plt.show()
+

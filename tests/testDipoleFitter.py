@@ -302,7 +302,7 @@ class DipoleTestUtils():
         return dipole, (posImage, posCatalog), (negImage, negCatalog)
 
     @staticmethod
-    def detectDipoleSources(dipole, posImage, posCatalog, negImage, negCatalog, doMerge=True,
+    def detectDipoleSources(diffim, posImage, posCatalog, negImage, negCatalog, doMerge=True,
                             detectSigma=5.0, grow=2):
         from lsst.meas.deblender import SourceDeblendTask
 
@@ -320,24 +320,24 @@ class DipoleTestUtils():
         detectConfig = SourceDetectionConfig()
         detectConfig.returnOriginalFootprints = False # should be the default
 
-        psfSigma = dipole.getPsf().computeShape().getDeterminantRadius()
+        psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
 
         ## code from imageDifference.py:
         detectConfig.thresholdPolarity = "both"
         detectConfig.thresholdValue = detectSigma
-        detectConfig.nSigmaToGrow = psfSigma
-        detectConfig.reEstimateBackground = True
+        #detectConfig.nSigmaToGrow = psfSigma
+        detectConfig.reEstimateBackground = False
         detectConfig.thresholdType = "pixel_stdev"
 
         # Create the detection task. We pass the schema so the task can declare a few flag fields
         detectTask = SourceDetectionTask(config=detectConfig, schema=schema)
 
         table = SourceTable.make(schema)
-        detectResult = detectTask.run(table, dipole)
+        detectResult = detectTask.run(table, diffim)
         catalog = detectResult.sources
         #results = detectTask.makeSourceCatalog(table, exposure, sigma=psfSigma)
 
-        deblendTask.run(dipole, catalog, psf=dipole.getPsf())
+        deblendTask.run(diffim, catalog, psf=diffim.getPsf())
 
         ## Now do the merge.
         if doMerge:

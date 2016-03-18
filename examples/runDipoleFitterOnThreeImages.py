@@ -75,22 +75,29 @@ for i,s in enumerate(catalog):
         diffim, s, posImage, negImage, rel_weight=0.5, separateNegParams=False,
         verbose=False, display=False)
 
+from matplotlib import pyplot as plt
 
-s = catalog[115]
+s = catalog[176]
 fp = s.getFootprint()
 print fp.getBBox(), fp.getNpix()
 for pk in fp.getPeaks():
     print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
 
-#dft.DipoleUtils.displayCutouts(catalog[0], diffim, posImage, negImage)
 dft.DipoleFitAlgorithm.fitDipole_new(
-    diffim, s, posImage, negImage, rel_weight=1., separateNegParams=False,
-    verbose=False, display=True)
+    diffim, s, posImage, negImage, rel_weight=0.5, separateNegParams=False,
+    verbose=True, display=True)
 
-## ===============================
+dft.DipoleFitAlgorithm.fitDipole_new(
+    diffim, s, rel_weight=0., separateNegParams=False,
+    verbose=True, display=True)
 
-import lsst.afw.geom as afwGeom
-import lsst.afw.image as afwImage
+#catalog = dft.DipolePlotUtils.makeHeavyCatalog(catalog, diffim)
 
-bbox = afwGeom.Box2I(afwGeom.Point2I(230, 1080), afwGeom.Extent2I(100, 100))
-subim = afwImage.ImageF(diffim.getMaskedImage().getImage(), bbox, afwImage.PARENT)
+dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage)
+plt.show()
+dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage, asHeavyFootprint=True)
+plt.show()
+
+s = dft.DipolePlotUtils.searchCatalog(catalog, 1354, 825)
+dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage, asHeavyFootprint=True)
+plt.show()
