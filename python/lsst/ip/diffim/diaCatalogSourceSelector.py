@@ -97,7 +97,68 @@ class CheckSource(object):
             return False
         return True
 
+## \addtogroup LSST_task_documentation
+## \{
+## \page DiaCatalogSourceSelectorTask
+## \ref DiaCatalogSourceSelectorTask_ "DiaCatalogSourceSelectorTask"
+## \copybrief DiaCatalogSourceSelectorTask
+## \}
+
 class DiaCatalogSourceSelectorTask(measAlg.StarSelectorTask):
+    """!Select sources for Kernel candidates
+
+    @anchor DiaCatalogSourceSelectorTask_
+    
+    @section ip_diffim_diaCatalogSourceSelector_Contents  Contents
+
+     - @ref ip_diffim_diaCatalogSourceSelector_Purpose
+     - @ref ip_diffim_diaCatalogSourceSelector_Initialize
+     - @ref ip_diffim_diaCatalogSourceSelector_IO
+     - @ref ip_diffim_diaCatalogSourceSelector_Config
+     - @ref ip_diffim_diaCatalogSourceSelector_Debug
+
+    @section ip_diffim_diaCatalogSourceSelector_Purpose  Description
+
+    A naive star selector based on second moments. Use with caution.
+
+    @section ip_diffim_diaCatalogSourceSelector_Initialize  Task initialisation
+
+    @copydoc \_\_init\_\_
+
+    @section ip_diffim_diaCatalogSourceSelector_IO  Invoking the Task
+
+    Like all star selectors, the main method is `run`.
+
+    @section ip_diffim_diaCatalogSourceSelector_Config  Configuration parameters
+
+    See @ref DiaCatalogSourceSelectorConfig
+
+    @section ip_diffim_diaCatalogSourceSelector_Debug  Debug variables
+
+    DiaCatalogSourceSelectorTask has a debug dictionary with the following keys:
+    <dl>
+    <dt>display
+    <dd>bool; if True display debug information
+    <dt>displayExposure
+    <dd>bool; if True display exposure
+    <dt>pauseAtEnd
+    <dd>bool; if True wait after displaying everything and wait for user input
+    </dl>
+
+    For example, put something like:
+    @code{.py}
+        import lsstDebug
+        def DebugInfo(name):
+            di = lsstDebug.getInfo(name)  # N.b. lsstDebug.Info(name) would call us recursively
+            if name.endswith("catalogStarSelector"):
+                di.display = True
+
+            return di
+
+        lsstDebug.Info = DebugInfo
+    @endcode
+    into your `debug.py` file and run your task with the `--debug` flag.
+    """
     ConfigClass = DiaCatalogSourceSelectorConfig
     usesMatches = True # selectStars uses (requires) its matches argument
 
