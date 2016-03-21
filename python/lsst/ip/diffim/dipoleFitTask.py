@@ -41,6 +41,7 @@ __all__ = ("DipoleFitConfig", "DipoleFitTask", "DipoleFitPlugin",
 ## Create a new measurement task (`DipoleFitTask`) that can handle all other SFM tasks but can
 ## pass a separate pos- and neg- exposure/image to the `DipoleFitPlugin`s `run()` method.
 
+
 class DipoleFitConfig(meas_base.SingleFramePluginConfig):
 
     centroidRange = Field(
@@ -81,6 +82,7 @@ class DipoleFitConfig(meas_base.SingleFramePluginConfig):
     verbose = Field(
         dtype=bool, default=False,
         doc="be verbose; this is slow")
+
 
 class DipoleFitTask(meas_base.SingleFrameMeasurementTask):
 
@@ -176,8 +178,8 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
             setattr(self, ''.join(('centroidKey', x_y.upper())), key)
 
         self.fluxKey = schema.addField(
-                schema.join(name, "flux"), type=float, units="dn",
-                doc="Dipole overall flux")
+            schema.join(name, "flux"), type=float, units="dn",
+            doc="Dipole overall flux")
 
         self.orientationKey = schema.addField(
             schema.join(name, "orientation"), type=float, units="deg",
@@ -291,8 +293,13 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
         if error is not None and error.getFlagBit() == self.FAILURE_EDGE:
             measRecord.set(self.edgeFlagKey, True)
 
+
 class DipoleFitAlgorithm():
     import lmfit  ## In the future, we might need to change fitters. Astropy, or just scipy, or iminuit?
+
+    ## This is just a private version number to sync with the ipython notebooks that I have been
+    ## using for algorithm development.
+    __private_version__ = '0.0.1b'
 
     ## Create a namedtuple to hold all of the relevant output from the lmfit results
     resultsOutput = namedtuple('resultsOutput',
@@ -429,7 +436,8 @@ class DipoleFitAlgorithm():
 
         ## Add the constraints for centroids, fluxes.
         ## starting constraint - near centroid of footprint
-        cenNeg = cenPos = np.array([fp.getCentroid().getX(), fp.getCentroid().getY()])  
+        fpCentroid = np.array([fp.getCentroid().getX(), fp.getCentroid().getY()])
+        cenNeg = cenPos = fpCentroid
 
         pks = fp.getPeaks()
         if len(pks) >= 1:
@@ -439,7 +447,13 @@ class DipoleFitAlgorithm():
 
         ## For close/faint dipoles the starting locs (min/max) might be way off, let's help them a bit.
         ## First assume dipole is not separated by more than 5*psfSigma.
-        centroidRange = psfSigma * centroidRangeInSigma / 2.
+        centroidRange = psfSigma * centroidRangeInSigma
+
+        ## Note - this may be a cheat to assume the dipole is centered in center of the footprint.
+        if np.sum(np.sqrt((np.array(cenPos) - fpCentroid)**2.)) > centroidRange:
+            cenPos = fpCentroid
+        if np.sum(np.sqrt((np.array(cenNeg) - fpCentroid)**2.)) > centroidRange:
+            cenPos = fpCentroid
 
         ## parameter hints/constraints: https://lmfit.github.io/lmfit-py/model.html#model-param-hints-section
         ## might make sense to not use bounds -- see http://lmfit.github.io/lmfit-py/bounds.html
@@ -454,18 +468,24 @@ class DipoleFitAlgorithm():
                             min=cenNeg[1]-centroidRange, max=cenNeg[1]+centroidRange)
 
         ## Estimate starting flux. This strongly affects runtime performance so we want to make it close.
+        ## I tried many possibilities, the best one seems to be just using sum(abs(diffIm))/2.
+        ## I am leaving the other ties here (commented out) for posterity and possible future improvements...
+
         ## Value to convert peak value to total flux based on flux within psf
-        psfImg = diffim.getPsf().computeImage()
-        pkToFlux = np.nansum(psfImg.getArray()) / diffim.getPsf().computePeak()
+        # psfImg = diffim.getPsf().computeImage()
+        # pkToFlux = np.nansum(psfImg.getArray()) / diffim.getPsf().computePeak()
 
-        bg = np.median(z[0,:])
-        startingPk = np.nanmax(z[0,:]) - bg   ## use just the dipole for an estimate. Remove the background
-        posFlux, negFlux = startingPk * pkToFlux, -startingPk * pkToFlux
+        bg = np.nanmedian(z[0,:]) ## Compute the dipole background (probably very close to zero)
+        # startingPk = np.nanmax(z[0,:]) - bg   ## use the dipole peak for an estimate.
+        # posFlux, negFlux = startingPk * pkToFlux, -startingPk * pkToFlux
 
-        if len(pks) >= 1:
-            posFlux = pks[0].getPeakValue() * pkToFlux
-        if len(pks) >= 2:
-            negFlux = pks[1].getPeakValue() * pkToFlux
+        # if len(pks) >= 1:
+        #     posFlux = pks[0].getPeakValue() * pkToFlux
+        # if len(pks) >= 2:
+        #     negFlux = pks[1].getPeakValue() * pkToFlux
+
+        startingFlux = np.nansum(np.abs(z[0,:] - bg)) / 2.   ## use the flux under the dipole for an estimate.
+        posFlux = negFlux = startingFlux
 
         # ## This will only be accurate if there is not a bright gradient/background in the pre-sub images
         # if posImage is not None:
@@ -495,10 +515,8 @@ class DipoleFitAlgorithm():
         gmod.set_param_hint('flux', value=posFlux, min=0.1) #, max=posFlux * 2.)
 
         if separateNegParams:
-            if negFlux < 0:
-                negFlux = abs(negFlux)
             ## TBD: set max negative lobe flux limit?
-            gmod.set_param_hint('fluxNeg', value=negFlux, min=0.1) #, max=negFlux * 2.)
+            gmod.set_param_hint('fluxNeg', value=np.abs(negFlux), min=0.1) #, max=negFlux * 2.)
 
         ## Fixed parameters (dont fit for them if there are no pre-sub images or no gradient fit requested):
         if (rel_weight > 0. and fitBgGradient):
@@ -577,15 +595,16 @@ class DipoleFitAlgorithm():
         ## the diffim instead.
         ## This will be rare and running it without background gradient fitting on is about 2x faster
         ## so doesn't add too much time to the fitting.
-        # if rel_weight > 0. and (fitResult.redchi > 10000. or
-        #                         fitResult.params['flux'].stderr == 0. or
-        #                         fitResult.params['flux'].stderr >= 1e6 or
-        #                         (separateNegParams and fitResult.params['fluxNeg'].stderr == 0)):
-        #     fitResult = DipoleFitAlgorithm.fitDipole(
-        #         exposure, source=source, posImage=posImage, negImage=negImage,
-        #         tol=tol, rel_weight=0., fitBgGradient=False,
-        #         centroidRangeInSigma=centroidRangeInSigma, separateNegParams=separateNegParams,
-        #         bgGradientOrder=0, verbose=verbose, display=display)
+        ## Currently not run:
+        if False and rel_weight > 0. and (fitResult.redchi > 10000. or
+                                          fitResult.params['flux'].stderr == 0. or
+                                          fitResult.params['flux'].stderr >= 1e6 or
+                                          (separateNegParams and fitResult.params['fluxNeg'].stderr == 0)):
+            fitResult = DipoleFitAlgorithm.fitDipole(
+                exposure, source=source, posImage=posImage, negImage=negImage,
+                tol=tol, rel_weight=0., fitBgGradient=False,
+                centroidRangeInSigma=centroidRangeInSigma, separateNegParams=separateNegParams,
+                bgGradientOrder=0, verbose=verbose, display=display)
 
         fitParams = fitResult.best_values
         if fitParams['flux'] <= 1.:   ## usually around 0.1 -- the minimun flux allowed -- i.e. bad fit.
