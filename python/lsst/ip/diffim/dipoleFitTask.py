@@ -43,6 +43,9 @@ __all__ = ("DipoleFitConfig", "DipoleFitTask", "DipoleFitPlugin",
 
 
 class DipoleFitConfig(meas_base.SingleFramePluginConfig):
+    """
+    Class to initialize and store dipole fitting configuration parameters
+    """
 
     centroidRange = Field(
         dtype=float, default=5.,
@@ -85,6 +88,12 @@ class DipoleFitConfig(meas_base.SingleFramePluginConfig):
 
 
 class DipoleFitTask(meas_base.SingleFrameMeasurementTask):
+    """
+    Subclass of SingleFrameMeasurementTask which can accept three input images in its
+    run() method. Because it subclasses SingleFrameMeasurementTask, and calls
+    SingleFrameMeasurementTask.run() in its run() method, it still can be used identically
+    to a standard SingleFrameMeasurementTask.
+    """
 
     ConfigClass = DipoleFitConfig
     _DefaultName = "ip_diffim_DipoleFit"
@@ -114,14 +123,22 @@ class DipoleFitTask(meas_base.SingleFrameMeasurementTask):
         for source in sources:
             self.dipoleFitter.measure(source, exposure, posImage, negImage)
 
+
 class DipoleFitTransform(meas_base.FluxTransform):
 
     def __init__(self, config, name, mapper):
         meas_base.FluxTransform.__init__(self, name, mapper)
         mapper.addMapping(mapper.getInputSchema().find(name + "_flag_edge").key)
 
+
 @meas_base.register("ip_diffim_DipoleFit")
 class DipoleFitPlugin(meas_base.SingleFramePlugin):
+    """
+    Subclass of SingleFramePlugin which can accept three input images in its
+    measure() method and fits dipoles to all merged (two-peak) footprints in a
+    diffim/pos-im/neg-im simultaneously. The meat of the fitting routines are
+    in the class DipoleFitAlgorithm.
+    """
 
     ConfigClass = DipoleFitConfig
 
@@ -295,6 +312,9 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
 
 
 class DipoleFitAlgorithm():
+    """
+    Class containing static methods for fitting dipoles in diffims, used by DipoleFitPlugin.
+    """
     import lmfit  ## In the future, we might need to change fitters. Astropy, or just scipy, or iminuit?
 
     ## This is just a private version number to sync with the ipython notebooks that I have been
@@ -315,11 +335,16 @@ class DipoleFitAlgorithm():
         if b is not None: ## Don't fit for other gradient parameters if the intercept is not allowed.
             y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
             gradient = np.full_like(x, b, dtype='float64')
-            if x1 is not None: gradient += x1 * x
-            if y1 is not None: gradient += y1 * y
-            if xy is not None: gradient += xy * (x * y)
-            if x2 is not None: gradient += x2 * (x * x)
-            if y2 is not None: gradient += y2 * (y * y)
+            if x1 is not None:
+                gradient += x1 * x
+            if y1 is not None:
+                gradient += y1 * y
+            if xy is not None:
+                gradient += xy * (x * y)
+            if x2 is not None:
+                gradient += x2 * (x * x)
+            if y2 is not None:
+                gradient += y2 * (y * y)
             # gradientImage = ImageF(bbox)
             # gradientImage.getArray()[:,:] = gradient
         return gradient
@@ -417,7 +442,7 @@ class DipoleFitAlgorithm():
         box = fp.getBBox()
         subim = MaskedImageF(diffim.getMaskedImage(), box, PARENT)
 
-        z = subim.getArrays()[0] ## allow passing of just the diffim
+        z = diArr = subim.getArrays()[0] ## allow passing of just the diffim
         weights = subim.getArrays()[2]  ## get the weights (=1/variance)
         if posImage is not None and rel_weight > 0.:
             posSubim = MaskedImageF(posImage.getMaskedImage(), box, PARENT)
@@ -475,8 +500,8 @@ class DipoleFitAlgorithm():
         # psfImg = diffim.getPsf().computeImage()
         # pkToFlux = np.nansum(psfImg.getArray()) / diffim.getPsf().computePeak()
 
-        bg = np.nanmedian(z[0,:]) ## Compute the dipole background (probably very close to zero)
-        # startingPk = np.nanmax(z[0,:]) - bg   ## use the dipole peak for an estimate.
+        bg = np.nanmedian(diArr) ## Compute the dipole background (probably very close to zero)
+        # startingPk = np.nanmax(diArr) - bg   ## use the dipole peak for an estimate.
         # posFlux, negFlux = startingPk * pkToFlux, -startingPk * pkToFlux
 
         # if len(pks) >= 1:
@@ -484,7 +509,7 @@ class DipoleFitAlgorithm():
         # if len(pks) >= 2:
         #     negFlux = pks[1].getPeakValue() * pkToFlux
 
-        startingFlux = np.nansum(np.abs(z[0,:] - bg)) / 2.   ## use the flux under the dipole for an estimate.
+        startingFlux = np.nansum(np.abs(diArr - bg)) / 2.   ## use the flux under the dipole for an estimate.
         posFlux = negFlux = startingFlux
 
         # ## This will only be accurate if there is not a bright gradient/background in the pre-sub images
@@ -544,8 +569,8 @@ class DipoleFitAlgorithm():
         in_x = np.array(extent)   # input x coordinate grid
 
         if posImage is not None and rel_weight > 0.:
-            weights = np.array([np.ones_like(z[0,:]), np.ones_like(z[0,:])*rel_weight,
-                                np.ones_like(z[0,:])*rel_weight])
+            weights = np.array([np.ones_like(diArr), np.ones_like(diArr)*rel_weight,
+                                np.ones_like(diArr)*rel_weight])
         else:
             weights = 1.
 
@@ -627,7 +652,8 @@ class DipoleFitAlgorithm():
         except:
             fluxValNeg, fluxErrNeg = fitParams['flux'], fitResult.params['flux'].stderr
         try:
-            signalToNoise = np.sqrt((fluxVal/fluxErr)**2 + (fluxValNeg/fluxErrNeg)**2) ## Derived from DipoleAnalysis
+            ## Derived from DipoleAnalysis:
+            signalToNoise = np.sqrt((fluxVal/fluxErr)**2 + (fluxValNeg/fluxErrNeg)**2)
         except:
             signalToNoise = np.nan
 
@@ -644,6 +670,10 @@ class DipoleFitAlgorithm():
 ################# UTILITIES FUNCTIONS -- TBD WHERE THEY ULTIMATELY END UP #######
 
 class DipolePlotUtils():
+    """
+    Class containing static utility methods for detecting, and displaying dipoles/footprints in
+    difference images, mostly used for debugging.
+    """
     try:
         import matplotlib.pyplot as plt
     except Exception as err:
@@ -652,7 +682,8 @@ class DipolePlotUtils():
 
     @staticmethod
     def display2dArray(arr, title='Data', showBars=True, extent=None):
-        fig = DipolePlotUtils.plt.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
+        fig = DipolePlotUtils.plt.imshow(arr, origin='lower', interpolation='none', cmap='gray',
+                                         extent=extent)
         DipolePlotUtils.plt.title(title)
         if showBars:
             DipolePlotUtils.plt.colorbar(fig, cmap='gray')
@@ -680,7 +711,8 @@ class DipolePlotUtils():
         return fig
 
     @staticmethod
-    def displayMaskedImage(maskedImage, showMasks=True, showVariance=False, showBars=True, width=8, height=2.5):
+    def displayMaskedImage(maskedImage, showMasks=True, showVariance=False, showBars=True, width=8,
+                           height=2.5):
         fig = DipolePlotUtils.plt.figure(figsize=(width, height))
         bbox = maskedImage.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
