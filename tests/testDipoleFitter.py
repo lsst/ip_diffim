@@ -100,8 +100,7 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
                 flux=self.params.flux, fluxNeg=self.params.flux,
                 gradientParams=self.params.gradientParams)
 
-        self.catalog = DipoleTestUtils.detectDipoleSources(
-            self.dipole, self.posImage, self.negImage)
+        self.catalog = DipoleTestUtils.detectDipoleSources(self.dipole)
 
     def tearDown(self):
         del self.dipole, self.posImage, self.negImage
@@ -113,11 +112,12 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
         Test the dipole fitting algorithm. Test that the resulting fluxes/centroids
         are very close to the input values for both dipoles in the image.
         """
-        for s in self.catalog:
-            fp = s.getFootprint()
-            print fp.getBBox(), fp.getNpix()
-            for pk in fp.getPeaks():
-                print 'FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
+        if self.params.verbose:
+            for s in self.catalog:
+                fp = s.getFootprint()
+                print fp.getBBox(), fp.getNpix()
+                for pk in fp.getPeaks():
+                    print 'FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
 
         offsets = self.params.offsets
         for i,s in enumerate(self.catalog):
@@ -235,10 +235,6 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         if self.params.display:
             dft.DipolePlotUtils.plt.show()
 
-        #for r1 in sources:
-        #    print r1.extract("ip_diffim_PsfDipoleFlux*")
-        #    print r1.extract("base_CircularApertureFlux_25_*")
-
 
 class DipoleTestUtils():
 
@@ -318,7 +314,7 @@ class DipoleTestUtils():
         detectConfig.thresholdPolarity = "both"
         detectConfig.thresholdValue = detectSigma
         #detectConfig.nSigmaToGrow = psfSigma
-        detectConfig.reEstimateBackground = False ##True
+        detectConfig.reEstimateBackground = True  ## if False, will fail often for faint sources on gradients?
         detectConfig.thresholdType = "pixel_stdev"
 
         # Create the detection task. We pass the schema so the task can declare a few flag fields
@@ -339,6 +335,7 @@ class DipoleTestUtils():
         else:
             return detectTask, schema
 
+
 def suite():
     """Returns a suite containing all the test cases in this module."""
 
@@ -350,9 +347,11 @@ def suite():
     suites += unittest.makeSuite(lsst_tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
+
 def run(shouldExit = False):
     """Run the tests"""
     lsst_tests.run(suite(), shouldExit)
+
 
 if __name__ == "__main__":
     run(True)

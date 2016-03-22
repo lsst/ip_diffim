@@ -599,7 +599,7 @@ class DipoleFitAlgorithm():
         ## This is how to get confidence intervals out:
         ##    https://lmfit.github.io/lmfit-py/confidence.html and
         ##    http://cars9.uchicago.edu/software/python/lmfit/model.html
-        if verbose:  ## fails if neg params are constrained for some reason.
+        if verbose:  ## the ci_report() seems to fail if neg params are constrained -- TBD why.
             print result.fit_report(show_correl=False)
             if separateNegParams:
                 print result.ci_report()
@@ -656,16 +656,30 @@ class DipoleFitAlgorithm():
         dx, dy = fitParams['xcenPos'] - fitParams['xcenNeg'], fitParams['ycenPos'] - fitParams['ycenNeg']
         angle = np.arctan2(dy, dx) / np.pi * 180.   ## convert to degrees (should keep as rad?)
 
-        ## TBD - signalToNoise should be flux / variance_within_footprint, not flux / fluxErr.
-        fluxVal, fluxErr = fitParams['flux'], fitResult.params['flux'].stderr
+        ## Exctract flux value, compute signalToNoise from flux/variance_within_footprint
+        ## Also extract the stderr of flux estimate.
+        def computeSumVariance(exposure, footprint):
+            box = footprint.getBBox()
+            subim = MaskedImageF(exposure.getMaskedImage(), box, PARENT)
+            return np.sqrt(np.nansum(subim.getArrays()[1][:,:]))
+
+        fluxVal = fluxVar = fitParams['flux']
+        fluxErr = fluxErrNeg = fitResult.params['flux'].stderr
+        if posImage is not None:
+            fluxVar = computeSumVariance(posImage, source.getFootprint())
+        else:
+            fluxVar = computeSumVariance(exposure, source.getFootprint())
+
+        fluxValNeg, fluxVarNeg = fluxVal, fluxVar
+        if separateNegParams:
+            fluxValNeg = fitParams['fluxNeg']
+            fluxErrNeg = fitResult.params['fluxNeg'].stderr
+        if negImage is not None:
+            fluxVarNeg = computeSumVariance(negImage, source.getFootprint())
+
         try:
-            fluxValNeg, fluxErrNeg = fitParams['fluxNeg'], fitResult.params['fluxNeg'].stderr
-        except:
-            fluxValNeg, fluxErrNeg = fitParams['flux'], fitResult.params['flux'].stderr
-        try:
-            ## Derived from DipoleAnalysis:
-            signalToNoise = np.sqrt((fluxVal/fluxErr)**2 + (fluxValNeg/fluxErrNeg)**2)
-        except:
+            signalToNoise = np.sqrt((fluxVal/fluxVar)**2 + (fluxValNeg/fluxVarNeg)**2)
+        except:  ## catch divide by zero - should never happen.
             signalToNoise = np.nan
 
         out = DipoleFitAlgorithm.resultsOutput(
