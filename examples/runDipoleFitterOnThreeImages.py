@@ -19,8 +19,9 @@
 # the GNU General Public License along with this program.  If not,
 # see <https://www.lsstcorp.org/LegalNotices/>.
 
-from numpy import (random as np_random,
+from numpy import (sqrt, random as np_random,
                    array as np_array)
+from matplotlib import pyplot as plt
 
 ## LSST imports:
 import lsst.afw.image as afw_image
@@ -33,6 +34,13 @@ from lsst.meas.algorithms import (SourceDetectionConfig, SourceDetectionTask)
 posImage = afw_image.ExposureF('calexp-0289820_11.fits')
 negImage = afw_image.ExposureF('matchexp-11.fits')
 diffim = afw_image.ExposureF('diffexp-11.fits')
+
+negImage.setPsf(posImage.getPsf())
+
+import imp, os
+print os.getenv('IP_DIFFIM_DIR')+'/tests/testDipoleFitter.py'
+dtUtils = imp.load_source('dtUtils', os.getenv('IP_DIFFIM_DIR')+'/tests/testDipoleFitter.py')
+from lsst.ip.diffim import dipoleFitTask as dft
 
 def runDetection(exposure):
     # Customize the detection task a bit (optional)
@@ -52,60 +60,55 @@ def runDetection(exposure):
     return posCatalog
 
 posCatalog = runDetection(posImage)
-
-negImage.setPsf(posImage.getPsf())
 negCatalog = runDetection(negImage)
 
-import imp, os
-print os.getenv('IP_DIFFIM_DIR')+'/tests/testDipoleFitter.py'
-dtUtils = imp.load_source('dtUtils', os.getenv('IP_DIFFIM_DIR')+'/tests/testDipoleFitter.py')
-from lsst.ip.diffim import dipoleFitTask as dft
+if False:
 
-catalog = dtUtils.DipoleTestUtils.detectDipoleSources(
-    diffim, posImage, posCatalog, negImage, negCatalog)
+    catalog = dtUtils.DipoleTestUtils.detectDipoleSources(diffim)
 
-## Here is an example of how to run the algorithm on each source.
-## Below we will just use the DipoleFitTask
+    ## Here is an example of how to run the algorithm on each source.
+    ## Below we will just use the DipoleFitTask
 
-for i,s in enumerate(catalog):
+    for i,s in enumerate(catalog):
+        fp = s.getFootprint()
+        if (len(fp.getPeaks()) <= 1): continue
+        print i, fp.getBBox(), fp.getNpix(), len(fp.getPeaks())
+        for pk in fp.getPeaks():
+            print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
+
+        try:
+            result = dft.DipoleFitAlgorithm.fitDipole_new(
+                diffim, s, posImage, negImage, rel_weight=0.5, separateNegParams=False,
+                verbose=False, display=False)
+        except Exception as err:
+            print err
+
+    s = catalog[176]
     fp = s.getFootprint()
-    if (len(fp.getPeaks()) <= 1): continue
-    print i, fp.getBBox(), fp.getNpix(), len(fp.getPeaks())
+    print fp.getBBox(), fp.getNpix()
     for pk in fp.getPeaks():
         print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
 
-    result = dft.DipoleFitAlgorithm.fitDipole_new(
+    dft.DipoleFitAlgorithm.fitDipole_new(
         diffim, s, posImage, negImage, rel_weight=0.5, separateNegParams=False,
-        verbose=False, display=False)
+        verbose=True, display=True)
 
-from matplotlib import pyplot as plt
+    dft.DipoleFitAlgorithm.fitDipole_new(
+        diffim, s, rel_weight=0., separateNegParams=False,
+        verbose=True, display=True)
 
-s = catalog[176]
-fp = s.getFootprint()
-print fp.getBBox(), fp.getNpix()
-for pk in fp.getPeaks():
-    print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
+    #catalog = dft.DipolePlotUtils.makeHeavyCatalog(catalog, diffim)
 
-dft.DipoleFitAlgorithm.fitDipole_new(
-    diffim, s, posImage, negImage, rel_weight=0.5, separateNegParams=False,
-    verbose=True, display=True)
+    dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage)
+    plt.show()
+    dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage, asHeavyFootprint=True)
+    plt.show()
 
-dft.DipoleFitAlgorithm.fitDipole_new(
-    diffim, s, rel_weight=0., separateNegParams=False,
-    verbose=True, display=True)
+    s = dft.DipolePlotUtils.searchCatalog(catalog, 1354, 825)
+    dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage, asHeavyFootprint=True)
+    plt.show()
 
-#catalog = dft.DipolePlotUtils.makeHeavyCatalog(catalog, diffim)
-
-dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage)
-plt.show()
-dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage, asHeavyFootprint=True)
-plt.show()
-
-s = dft.DipolePlotUtils.searchCatalog(catalog, 1354, 825)
-dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage, asHeavyFootprint=True)
-plt.show()
-
-
+##### END SKIP
 
 
 #### Now run the DipoleFitTask plugin on the image.
@@ -114,8 +117,8 @@ from lsst.afw.table import (SourceTable, SourceCatalog)
 from lsst.meas.algorithms import (SourceDetectionConfig, SourceDetectionTask)
 
 ## Create the various tasks and schema -- avoid code reuse.
-detectTask, deblendTask, schema = dtUtils.DipoleTestUtils.detectDipoleSources(
-    diffim, posImage, posCatalog, negImage, negCatalog, doMerge=False)
+detectTask, schema = dtUtils.DipoleTestUtils.detectDipoleSources(
+    diffim, detectSigma=5.5, doMerge=False)
 
 measureConfig = SingleFrameMeasurementConfig()
 
@@ -143,26 +146,31 @@ measureConfig.doApplyApCorr = "no"
 # Here is where we make the dipole fitting task. It can run the other measurements as well.
 measureTask = dft.DipoleFitTask(config=measureConfig, schema=schema)
 
+# Erase existing detection mask planes
+mask  = diffim.getMaskedImage().getMask()
+mask &= ~(mask.getPlaneBitMask("DETECTED") | mask.getPlaneBitMask("DETECTED_NEGATIVE"))
+
 table = SourceTable.make(schema)
 detectResult = detectTask.run(table, diffim)
 catalog = detectResult.sources
-deblendTask.run(diffim, catalog, psf=diffim.getPsf())
 
 fpSet = detectResult.fpSets.positive
-fpSet.merge(detectResult.fpSets.negative, 2, 2, False)
+grow = 5
+fpSet.merge(detectResult.fpSets.negative, grow, grow, False)
 sources = SourceCatalog(table)
 fpSet.makeSources(sources)
 
 for i,s in enumerate(sources):
     fp = s.getFootprint()
-    if (len(fp.getPeaks()) <= 1): continue
-    print i, fp.getBBox(), fp.getNpix(), len(fp.getPeaks())
+#    if (len(fp.getPeaks()) <= 1): continue
+    print i, s.getId(), fp.getBBox(), fp.getNpix(), len(fp.getPeaks())
     for pk in fp.getPeaks():
         print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
 
 measureTask.run(sources, diffim, posImage, negImage)
 
-s = sources[0]
+#s = sources[0]
+s = dft.DipolePlotUtils.searchCatalog(sources, 617, 209)
 print s.extract("ip_diffim_DipoleFit*")
 
 if False:
@@ -171,9 +179,20 @@ if False:
     page = 1
     for i,s in enumerate(sources):
         isDipole = s.extract("ip_diffim_DipoleFit*")['ip_diffim_DipoleFit_flag_classification']
-        if isDipole:
-            print i, page, isDipole
+        if isDipole or s.getId() == 331:
+            print i, s.getId(), page, isDipole
             page += 1
-            fig = dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage, asHeavyFootprint=True)
+            fig = dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage,
+                                                     asHeavyFootprint=True, title='%d %d'%(i, s.getId()))
             pdf.savefig(fig)
     pdf.close()
+
+if False:
+    ##s = dft.DipolePlotUtils.searchCatalog(sources, 1592,900)
+    s = dft.DipolePlotUtils.searchCatalog(sources, 1432, 1077)
+    result = dft.DipoleFitAlgorithm.fitDipole_new(
+        diffim, s, posImage, negImage, rel_weight=0.5, separateNegParams=False,
+        verbose=True, display=True)
+    print result.psfFitOrientation, \
+        np.sqrt((result.psfFitPosCentroidX - result.psfFitNegCentroidX)**2. + \
+                (result.psfFitPosCentroidY - result.psfFitNegCentroidY)**2.)

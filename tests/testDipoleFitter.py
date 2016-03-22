@@ -101,8 +101,7 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
                 gradientParams=self.params.gradientParams)
 
         self.catalog = DipoleTestUtils.detectDipoleSources(
-            self.dipole, self.posImage, self.posCatalog,
-            self.negImage, self.negCatalog)
+            self.dipole, self.posImage, self.negImage)
 
     def tearDown(self):
         del self.dipole, self.posImage, self.negImage
@@ -152,10 +151,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         """
 
         ## Create the various tasks and schema -- avoid code reuse.
-        detectTask, deblendTask, schema = DipoleTestUtils.detectDipoleSources(
-            self.dipole, self.posImage,
-            self.posCatalog, self.negImage,
-            self.negCatalog, doMerge=False)
+        detectTask, schema = DipoleTestUtils.detectDipoleSources(self.dipole, doMerge=False)
 
         #measureConfig = dft.DipoleFitConfig()
         measureConfig = SingleFrameMeasurementConfig()
@@ -187,7 +183,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         table = SourceTable.make(schema)
         detectResult = detectTask.run(table, self.dipole)
         catalog = detectResult.sources
-        deblendTask.run(self.dipole, catalog, psf=self.dipole.getPsf())
+        #deblendTask.run(self.dipole, catalog, psf=self.dipole.getPsf())
 
         fpSet = detectResult.fpSets.positive
         fpSet.merge(detectResult.fpSets.negative, 2, 2, False)
@@ -302,19 +298,15 @@ class DipoleTestUtils():
         return dipole, (posImage, posCatalog), (negImage, negCatalog)
 
     @staticmethod
-    def detectDipoleSources(diffim, posImage, posCatalog, negImage, negCatalog, doMerge=True,
-                            detectSigma=5.0, grow=2):
-        from lsst.meas.deblender import SourceDeblendTask
+    def detectDipoleSources(diffim, doMerge=True, detectSigma=5.5, grow=3):
+        """
+        Utility function for detecting dipoles. Detects pos/neg sources in the diffim,
+        then merges them. A bigger "grow" parameter leads to a larger footprint which
+        helps with dipole measurement for faint dipoles.
+        """
 
         # Start with a minimal schema - only the fields all SourceCatalogs need
         schema = SourceTable.makeMinimalSchema()
-
-        # Create and run a task for deblending (optional, but almost always a good idea).
-        # Again, the task defines a few flag fields it will later fill.
-        deblendTask = SourceDeblendTask(schema=schema)
-
-        deblendTask.run(posImage, posCatalog, psf=posImage.getPsf())
-        deblendTask.run(negImage, negCatalog, psf=negImage.getPsf())
 
         # Customize the detection task a bit (optional)
         detectConfig = SourceDetectionConfig()
@@ -326,30 +318,26 @@ class DipoleTestUtils():
         detectConfig.thresholdPolarity = "both"
         detectConfig.thresholdValue = detectSigma
         #detectConfig.nSigmaToGrow = psfSigma
-        detectConfig.reEstimateBackground = False
+        detectConfig.reEstimateBackground = False ##True
         detectConfig.thresholdType = "pixel_stdev"
 
         # Create the detection task. We pass the schema so the task can declare a few flag fields
-        detectTask = SourceDetectionTask(config=detectConfig, schema=schema)
+        detectTask = SourceDetectionTask(schema, config=detectConfig)
 
         table = SourceTable.make(schema)
-        detectResult = detectTask.run(table, diffim)
-        catalog = detectResult.sources
-        #results = detectTask.makeSourceCatalog(table, exposure, sigma=psfSigma)
-
-        deblendTask.run(diffim, catalog, psf=diffim.getPsf())
+        catalog = detectTask.makeSourceCatalog(table, diffim, sigma=psfSigma)
 
         ## Now do the merge.
         if doMerge:
-            fpSet = detectResult.fpSets.positive
-            fpSet.merge(detectResult.fpSets.negative, grow, grow, False)
+            fpSet = catalog.fpSets.positive
+            fpSet.merge(catalog.fpSets.negative, grow, grow, False)
             sources = SourceCatalog(table)
             fpSet.makeSources(sources)
 
             return sources
 
         else:
-            return detectTask, deblendTask, schema
+            return detectTask, schema
 
 def suite():
     """Returns a suite containing all the test cases in this module."""

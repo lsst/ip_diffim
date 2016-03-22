@@ -243,7 +243,8 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
                 separateNegParams=self.config.fitSeparateNegParams,
                 verbose=self.config.verbose, display=False)
         except LengthError as err:
-            raise meas_base.MeasurementError(err, self.FAILURE_EDGE)
+            print err
+            raise meas_base.MeasurementError('edge failure', self.FAILURE_EDGE)
 
         self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
 
@@ -281,12 +282,14 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
         ## First, does the total signal-to-noise surpass the minSn?
         passesSn = measRecord[self.signalToNoiseKey] > self.config.minSn
 
-        ## Second, does are the pos/neg fluxes no more than 0.65 of the total flux?
+        ## Second, are the pos/neg fluxes less than 1.0 and no more than 0.65 of the total flux?
         ## By default this will never happen since posFlux = negFlux.
         passesFluxPos = (abs(measRecord[self.posFluxKey]) /
                          (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
+        passesFluxPos &= (abs(measRecord[self.posFluxKey]) >= 1.0)
         passesFluxNeg = (abs(measRecord[self.negFluxKey]) /
                          (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
+        passesFluxNeg &= (abs(measRecord[self.negFluxKey]) >= 1.0)
 
         ## Third, is it a good fit (chi2dof < 1)?
         ## Use scipy's chi2 cumulative distrib to estimate significance
@@ -314,6 +317,14 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
 class DipoleFitAlgorithm():
     """
     Class containing static methods for fitting dipoles in diffims, used by DipoleFitPlugin.
+    This code is documented in DMTN-007. Below is a (somewhat incomplete) list of improvements
+    that would be worth investigating, given the time:
+
+    1. Initial fast test whether a background gradient needs to be fit
+    2. Initial fast estimate of background gradient(s) params -- perhaps using numpy.lstsq
+    3. better estimate for staring flux when there's a strong gradient
+    4. evaluate necessity for separate parameters for pos- and neg- images
+    5. only fit background OUTSIDE footprint and dipole params INSIDE footprint?
     """
     import lmfit  ## In the future, we might need to change fitters. Astropy, or just scipy, or iminuit?
 
@@ -442,7 +453,7 @@ class DipoleFitAlgorithm():
         box = fp.getBBox()
         subim = MaskedImageF(diffim.getMaskedImage(), box, PARENT)
 
-        z = diArr = subim.getArrays()[0] ## allow passing of just the diffim
+        z = diArr = subim.getArrays()[0]
         weights = subim.getArrays()[2]  ## get the weights (=1/variance)
         if posImage is not None and rel_weight > 0.:
             posSubim = MaskedImageF(posImage.getMaskedImage(), box, PARENT)
@@ -621,10 +632,10 @@ class DipoleFitAlgorithm():
         ## This will be rare and running it without background gradient fitting on is about 2x faster
         ## so doesn't add too much time to the fitting.
         ## Currently not run:
-        if False and rel_weight > 0. and (fitResult.redchi > 10000. or
-                                          fitResult.params['flux'].stderr == 0. or
-                                          fitResult.params['flux'].stderr >= 1e6 or
-                                          (separateNegParams and fitResult.params['fluxNeg'].stderr == 0)):
+        if rel_weight > 0. and (fitResult.redchi > 10000. or
+                                fitResult.params['flux'].stderr == 0. or
+                                fitResult.params['flux'].stderr >= 1e6 or
+                                (separateNegParams and fitResult.params['fluxNeg'].stderr == 0)):
             fitResult = DipoleFitAlgorithm.fitDipole(
                 exposure, source=source, posImage=posImage, negImage=negImage,
                 tol=tol, rel_weight=0., fitBgGradient=False,
@@ -671,7 +682,7 @@ class DipoleFitAlgorithm():
 
 class DipolePlotUtils():
     """
-    Class containing static utility methods for detecting, and displaying dipoles/footprints in
+    Utility class containing static methods for displaying dipoles/footprints in
     difference images, mostly used for debugging.
     """
     try:
@@ -742,7 +753,7 @@ class DipolePlotUtils():
         return fig
 
     @staticmethod
-    def displayCutouts(source, exposure, posImage=None, negImage=None, asHeavyFootprint=False):
+    def displayCutouts(source, exposure, posImage=None, negImage=None, asHeavyFootprint=False, title=''):
         fp = source.getFootprint()
         bbox = fp.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
@@ -754,7 +765,7 @@ class DipolePlotUtils():
             hfp = afw_det.HeavyFootprintF(fp, exposure.getMaskedImage())
             subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
         DipolePlotUtils.plt.subplot(1, 3, 1)
-        DipolePlotUtils.display2dArray(subexp.getArray(), title='Diffim', extent=extent)
+        DipolePlotUtils.display2dArray(subexp.getArray(), title=title+' Diffim', extent=extent)
         if posImage is not None:
             if not asHeavyFootprint:
                 subexp = ImageF(posImage.getMaskedImage().getImage(), bbox, PARENT)
@@ -762,7 +773,7 @@ class DipolePlotUtils():
                 hfp = afw_det.HeavyFootprintF(fp, posImage.getMaskedImage())
                 subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
             DipolePlotUtils.plt.subplot(1, 3, 2)
-            DipolePlotUtils.display2dArray(subexp.getArray(), title='Pos', extent=extent)
+            DipolePlotUtils.display2dArray(subexp.getArray(), title=title+' Pos', extent=extent)
         if negImage is not None:
             if not asHeavyFootprint:
                 subexp = ImageF(negImage.getMaskedImage().getImage(), bbox, PARENT)
@@ -770,7 +781,7 @@ class DipolePlotUtils():
                 hfp = afw_det.HeavyFootprintF(fp, negImage.getMaskedImage())
                 subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
             DipolePlotUtils.plt.subplot(1, 3, 3)
-            DipolePlotUtils.display2dArray(subexp.getArray(), title='Neg', extent=extent)
+            DipolePlotUtils.display2dArray(subexp.getArray(), title=title+' Neg', extent=extent)
         return fig
 
     @staticmethod
