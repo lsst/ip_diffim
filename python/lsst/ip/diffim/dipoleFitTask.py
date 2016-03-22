@@ -393,8 +393,8 @@ class DipoleFitAlgorithm(object):
         """Generate model (2-d array) of a 'star' (single PSF) centered at given coordinates
 
         Parameters
-        ---------- 
-       psf : afw.detection.Psf
+        ----------
+        psf : afw.detection.Psf
            Psf model used to generate the 'star'
         xcen : float
            Desired x-centroid of the 'star'
@@ -433,8 +433,8 @@ class DipoleFitAlgorithm(object):
                        bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
                        debug=False, **kwargs):
         """
-        Functor to generate dipole model with given parameters.
-        This is the functor whose sum-of-squared difference with data is minimized by `lmfit`.
+        Generate dipole model with given parameters.
+        This is the functor whose sum-of-squared difference from data is minimized by `lmfit`.
 
         Parameters
         ----------
