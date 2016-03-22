@@ -35,7 +35,8 @@ from lsst.afw.geom import (Box2I, Point2I, Point2D)
 
 __all__ = ("DipoleTestUtils")
 
-class DipoleFitTestGlobalParams():
+
+class DipoleFitTestGlobalParams(object):
     """
     Class to initialize and store global parameters used by all tests below.
 
@@ -133,6 +134,7 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
             self.assertClose(result.psfFitNegCentroidX, self.params.xc[i] - offsets[i], rtol=0.01)
             self.assertClose(result.psfFitNegCentroidY, self.params.yc[i] - offsets[i], rtol=0.01)
 
+
 ## Test the task in the same way as the algorithm:
 ## Also test that it correctly classifies the dipoles.
 class DipoleFitTaskTest(DipoleFitAlgorithmTest):
@@ -178,11 +180,13 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         measureConfig.doApplyApCorr = "no"
 
         # Here is where we make the dipole fitting task. It can run the other measurements as well.
-        measureTask = dft.DipoleFitTask(config=measureConfig, schema=schema)
+        # This is an example of how to pass it a custom config.
+        dpFitConfig = dft.DipoleFitConfig()
+        measureTask = dft.DipoleFitTask(config=measureConfig, schema=schema, dpFitConfig=dpFitConfig)
 
         table = SourceTable.make(schema)
         detectResult = detectTask.run(table, self.dipole)
-        catalog = detectResult.sources
+        #catalog = detectResult.sources
         #deblendTask.run(self.dipole, catalog, psf=self.dipole.getPsf())
 
         fpSet = detectResult.fpSets.positive
@@ -236,7 +240,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
             dft.DipolePlotUtils.plt.show()
 
 
-class DipoleTestUtils():
+class DipoleTestUtils(object):
 
     @staticmethod
     def makeStarImage(w=101, h=101, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=10.0,
