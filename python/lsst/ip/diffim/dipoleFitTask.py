@@ -140,6 +140,13 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
     measure() method and fits dipoles to all merged (two-peak) footprints in a
     diffim/pos-im/neg-im simultaneously. The meat of the fitting routines are
     in the class DipoleFitAlgorithm.
+
+    The motivation behind this plugin and the necessity for including more than
+    one exposure are documented in DMTN-007 (http://dmtn-007.readthedocs.org).
+
+    This class is named ip_diffim_DipoleFit so that it may be used alongside
+    the existing ip_diffim_DipoleMeasurement classes until such a time as those
+    are deemed to be replaceable by this.
     """
 
     ConfigClass = DipoleFitConfig
@@ -169,7 +176,7 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
         self.centroidKey = Point2DKey(schema["slot_Centroid"])
 
         # Add some fields for our outputs, and save their Keys.
-        # Use setAttr() to programmatically set the pos/neg named attributes to values, e.g.
+        # Use setattr() to programmatically set the pos/neg named attributes to values, e.g.
         # self.posCentroidKeyX = 'ip_diffim_DipoleFit_pos_centroid_x'
 
         for pos_neg in ['pos', 'neg']:
@@ -233,10 +240,11 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
         if len(pks) <= 1: ## not a dipole for our analysis
             self.fail(measRecord, meas_base.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
 
-        ## Do the non-linear least squares estimation. The main functionality of this was placed outside
-        ## of this plugin (into DipoleFitAlgorithm.fitDipole_new()) so that
-        ## DipoleFitAlgorithm.fitDipole_new() can be called separately for testing
-        ## (see tests/testDipoleFitter.py)
+        ## Perform the non-linear least squares minimization.
+        ## The main functionality of this routine was placed outside
+        ## of this plugin (into `DipoleFitAlgorithm.fitDipole_new()`) so that
+        ## `DipoleFitAlgorithm.fitDipole_new()` can be called separately for testing
+        ## (see `tests/testDipoleFitter.py`)
         try:
             result = DipoleFitAlgorithm.fitDipole_new(
                 exposure, measRecord,
@@ -247,9 +255,10 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
                 fitBgGradient=self.config.fitBgGradient,
                 separateNegParams=self.config.fitSeparateNegParams,
                 verbose=self.config.verbose, display=False)
-        except LengthError as err:
-            print err
+        except LengthError:
             raise meas_base.MeasurementError('edge failure', self.FAILURE_EDGE)
+        except:
+            self.fail(measRecord, meas_base.MeasurementError('dipole fit failure', self.FAILURE_FIT))
 
         self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
 
@@ -312,11 +321,17 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
         else:
             measRecord.set(self.classificationFlagKey, False)
 
-    ## TBD: need to catch more exceptions
+    ## TBD: need to catch more exceptions, set correct flags.
     def fail(self, measRecord, error=None):
+        #print 'HERE:', error
         measRecord.set(self.flagKey, True)
-        if error is not None and error.getFlagBit() == self.FAILURE_EDGE:
-            measRecord.set(self.edgeFlagKey, True)
+        if error is not None:
+            if error.getFlagBit() == self.FAILURE_EDGE:
+                measRecord.set(self.edgeFlagKey, True)
+            if error.getFlagBit() == self.FAILURE_FIT:
+                measRecord.set(self.flagKey, True)
+            if error.getFlagBit() == self.FAILURE_NOT_DIPOLE:
+                measRecord.set(self.flagKey, True)
 
 
 class DipoleFitAlgorithm(object):
