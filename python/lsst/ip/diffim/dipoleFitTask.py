@@ -262,7 +262,7 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
 
         self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
 
-        if result.psfFitPosFlux <= 1.:   ## usually around 0.1 -- the minimun flux allowed -- i.e. bad fit.
+        if result.psfFitPosFlux <= 1.:   ## usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
             self.fail(measRecord, meas_base.MeasurementError('dipole fit failure', self.FAILURE_FIT))
 
         ## add chi2, coord/flux uncertainties (TBD), dipole classification
@@ -350,7 +350,7 @@ class DipoleFitAlgorithm(object):
 
     ## This is just a private version number to sync with the ipython notebooks that I have been
     ## using for algorithm development.
-    __private_version__ = '0.0.1b'
+    __private_version__ = '0.0.2b'
 
     ## Create a namedtuple to hold all of the relevant output from the lmfit results
     resultsOutput = namedtuple('resultsOutput',
@@ -361,13 +361,13 @@ class DipoleFitAlgorithm(object):
                                 'psfFitSignaltoNoise', 'psfFitChi2', 'psfFitRedChi2'])
 
     @staticmethod
-    def genBgGradientModel(bbox, b=None, x1=0., y1=0., xy=None, x2=0., y2=0.):
+    def genBgGradientModel(in_x, b=None, x1=0., y1=0., xy=None, x2=0., y2=0.):  ## bbox
         """Generate gradient model (2-d array) with up to 2nd-order polynomial
 
         Parameters
         ----------
-        bbox : afw.geom.BoundingBox
-           Bounding box containing region to be filled
+        in_x : 3-d np.array
+           Provides the input x,y grid upon which to compute the gradient
         b : float, optional
            Intercept (0th-order parameter) for gradient. If None, do nothing (for speed).
         x1 : float, optional
@@ -387,7 +387,7 @@ class DipoleFitAlgorithm(object):
         """
         gradient = None #gradientImage = None  ## TBD: is using an afwImage faster?
         if b is not None: ## Don't fit for other gradient parameters if the intercept is not allowed.
-            y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
+            y, x = in_x[0,:], in_x[1,:]
             gradient = np.full_like(x, b, dtype='float64')
             if x1 is not None:
                 gradient += x1 * x
@@ -454,8 +454,8 @@ class DipoleFitAlgorithm(object):
         Parameters
         ----------
         x : numpy.array
-           Input independent variable. Unused here as these are computed from the
-           input bounding box (provided in **kwargs).
+           Input independent variable. Used here as the grid on which to compute the background
+           gradient model.
         flux : float
            Desired flux of the positive lobe of the dipole
         xcenPos : float
@@ -510,10 +510,15 @@ class DipoleFitAlgorithm(object):
         posIm = DipoleFitAlgorithm.genStarModel(bbox, psf, xcenPos, ycenPos, flux)
         negIm = DipoleFitAlgorithm.genStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
 
-        gradient = DipoleFitAlgorithm.genBgGradientModel(bbox, b, x1, y1, xy, x2, y2)
+        in_x = x
+        if in_x is None: ## use the footprint to generate the input grid
+            y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
+            in_x = np.array([x, y]) * 1.
+
+        gradient = DipoleFitAlgorithm.genBgGradientModel(in_x, b, x1, y1, xy, x2, y2)
         gradientNeg = gradient
         if bNeg is not None: # and abs(bNeg)+abs(x1Neg)+abs(y1Neg) > 0.:
-            gradientNeg = DipoleFitAlgorithm.genBgGradientModel(bbox, bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg)
+            gradientNeg = DipoleFitAlgorithm.genBgGradientModel(in_x, bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg)
 
         if gradient is not None:
             posIm.getArray()[:,:] += gradient
@@ -574,14 +579,14 @@ class DipoleFitAlgorithm(object):
         """
 
         fp = source.getFootprint()
-        box = fp.getBBox()
-        subim = MaskedImageF(diffim.getMaskedImage(), box, PARENT)
+        bbox = fp.getBBox()
+        subim = MaskedImageF(diffim.getMaskedImage(), bbox, PARENT)
 
         z = diArr = subim.getArrays()[0]
         weights = subim.getArrays()[2]  ## get the weights (=1/variance)
         if posImage is not None and rel_weight > 0.:
-            posSubim = MaskedImageF(posImage.getMaskedImage(), box, PARENT)
-            negSubim = MaskedImageF(negImage.getMaskedImage(), box, PARENT)
+            posSubim = MaskedImageF(posImage.getMaskedImage(), bbox, PARENT)
+            negSubim = MaskedImageF(negImage.getMaskedImage(), bbox, PARENT)
             z = np.append([z], [posSubim.getArrays()[0],
                                 negSubim.getArrays()[0]], axis=0)
             weights = np.append([weights], [posSubim.getArrays()[2] * rel_weight,
@@ -644,32 +649,9 @@ class DipoleFitAlgorithm(object):
         # if len(pks) >= 2:
         #     negFlux = pks[1].getPeakValue() * pkToFlux
 
-        startingFlux = np.nansum(np.abs(diArr - bg)) / 2.   ## use the flux under the dipole for an estimate.
+        ## use the (flux under the dipole)/2 for an estimate.
+        startingFlux = np.sum(np.abs(diArr) - np.median(np.abs(diArr))) / 2.
         posFlux = negFlux = startingFlux
-
-        # ## This will only be accurate if there is not a bright gradient/background in the pre-sub images
-        # if posImage is not None:
-        #     posSubim = ImageF(posImage.getMaskedImage().getImage(), box, PARENT)
-        #     negSubim = ImageF(negImage.getMaskedImage().getImage(), box, PARENT)
-        #     w, h = posSubim.getWidth(), posSubim.getHeight()
-
-        #     ## If the brightest pixel value is close to a corner's pixel value, then it is picking up the bg gradient
-        #     ## In that case, use the footprint peak value instead
-        #     if len(pks) >= 1:
-        #         posArr = posSubim.getArray()
-        #         posPk = np.nanmax(posArr)
-        #         if (np.max(np.abs(posPk - np.array([posArr[0,0], posArr[h-1,0],
-        #                                             posArr[h-1,w-1], posArr[0,w-1]]))) >
-        #             np.abs(posPk - pks[0].getPeakValue())):
-        #             posFlux = posPk * pkToFlux
-
-        #     if len(pks) >= 2:
-        #         negArr = negSubim.getArray()
-        #         negPk = np.nanmax(negArr)
-        #         if (np.max(np.abs(negPk - np.array([negArr[0,0], negArr[h-1,0],
-        #                                             negArr[h-1,w-1], negArr[0,w-1]]))) >
-        #             np.abs(negPk - -pks[1].getPeakValue())):
-        #             negFlux = -negPk * pkToFlux
 
         ## TBD: set max. flux limit?
         gmod.set_param_hint('flux', value=posFlux, min=0.1) #, max=posFlux * 2.)
@@ -700,8 +682,10 @@ class DipoleFitAlgorithm(object):
                     gmod.set_param_hint('y2Neg', value=0.)
 
         ## Compute footprint bounding box as a numpy extent
-        extent = (box.getBeginX(), box.getEndX(), box.getBeginY(), box.getEndY())
-        in_x = np.array(extent)   # input x coordinate grid
+        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+        #in_x = np.array(extent)   # input x coordinate grid
+        y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
+        in_x = np.array([x, y]) * 1.
 
         if posImage is not None and rel_weight > 0.:
             weights = np.array([np.ones_like(diArr), np.ones_like(diArr)*rel_weight,
