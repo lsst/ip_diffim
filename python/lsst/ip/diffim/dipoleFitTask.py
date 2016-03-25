@@ -1,6 +1,7 @@
+from __future__ import absolute_import, division, print_function
 #
 # LSST Data Management System
-# Copyright 2008-2015 AURA/LSST.
+# Copyright 2008-2016 AURA/LSST.
 #
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -25,9 +26,8 @@ import numpy as np
 
 ## LSST imports
 import lsst.meas.base as meas_base
-
 ## Only import what's necessary
-from lsst.afw.geom import (Box2I, Point2I, Point2D)
+from lsst.afw.geom import (Point2I, Point2D)
 from lsst.afw.image import (ImageF, MaskedImageF, PARENT)
 from lsst.afw.table import (Point2DKey)
 from lsst.pex.exceptions import LengthError
@@ -116,8 +116,6 @@ class DipoleFitTask(meas_base.SingleFrameMeasurementTask):
         """
 
         meas_base.SingleFrameMeasurementTask.run(self, sources, exposure, **kwds)
-        #self.dipoleFitter.posImage = posImage
-        #self.dipoleFitter.negImage = negImage
 
         if not sources:
             return
@@ -157,8 +155,9 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
 
     @classmethod
     def getExecutionOrder(cls):
-        return cls.FLUX_ORDER    ## algorithms that require both getShape() and getCentroid(),
-                                 ## in addition to a Footprint and its Peaks
+        ## algorithms that require both getShape() and getCentroid(),
+        ## in addition to a Footprint and its Peaks
+        return cls.FLUX_ORDER
 
     @classmethod
     def getTransformClass(cls):
@@ -304,18 +303,20 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
         passesFluxNeg = (abs(measRecord[self.negFluxKey]) /
                          (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
         passesFluxNeg &= (abs(measRecord[self.negFluxKey]) >= 1.0)
+        allPass = (passesSn and passesFluxPos and passesFluxNeg) # and passesChi2)
 
         ## Third, is it a good fit (chi2dof < 1)?
         ## Use scipy's chi2 cumulative distrib to estimate significance
         ## This doesn't really work since I don't trust the values in the variance plane (which
         ##   affects the least-sq weights, which affects the resulting chi2).
-        from scipy.stats import chi2
+        ## But I'm going to keep this here for future use.
+        if False:
+            from scipy.stats import chi2
+            ndof = result.psfFitChi2 / measRecord[self.chi2dofKey]
+            significance = chi2.cdf(result.psfFitChi2, ndof)
+            passesChi2 = significance < self.config.maxChi2DoF
+            allPass = allPass and passesChi2
 
-        ndof = result.psfFitChi2 / measRecord[self.chi2dofKey]
-        significance = chi2.cdf(result.psfFitChi2, ndof)
-        passesChi2 = significance < self.config.maxChi2DoF
-
-        allPass = (passesSn and passesFluxPos and passesFluxNeg) # and passesChi2)
         if allPass:  ## Note cannot pass `allPass` into the `measRecord.set()` call below...?
             measRecord.set(self.classificationFlagKey, True)
         else:
@@ -323,7 +324,6 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
 
     ## TBD: need to catch more exceptions, set correct flags.
     def fail(self, measRecord, error=None):
-        #print 'HERE:', error
         measRecord.set(self.flagKey, True)
         if error is not None:
             if error.getFlagBit() == self.FAILURE_EDGE:
@@ -345,8 +345,9 @@ class DipoleFitAlgorithm(object):
     3. better estimate for staring flux when there's a strong gradient
     4. evaluate necessity for separate parameters for pos- and neg- images
     5. only fit background OUTSIDE footprint and dipole params INSIDE footprint?
+    6. requires a new package `lmfit` -- TBD: a more conventional fitter (astropy/scipy/iminuit?)
     """
-    import lmfit  ## In the future, we might need to change fitters. Astropy, or just scipy, or iminuit?
+    import lmfit
 
     ## This is just a private version number to sync with the ipython notebooks that I have been
     ## using for algorithm development.
@@ -361,12 +362,12 @@ class DipoleFitAlgorithm(object):
                                 'psfFitSignaltoNoise', 'psfFitChi2', 'psfFitRedChi2'])
 
     @staticmethod
-    def genBgGradientModel(in_x, b=None, x1=0., y1=0., xy=None, x2=0., y2=0.):  ## bbox
+    def genBgGradientModel(in_x, b=None, x1=0., y1=0., xy=None, x2=0., y2=0.):
         """Generate gradient model (2-d array) with up to 2nd-order polynomial
 
         Parameters
         ----------
-        in_x : 3-d np.array
+        in_x : 3-d numpy.array
            Provides the input x,y grid upon which to compute the gradient
         b : float, optional
            Intercept (0th-order parameter) for gradient. If None, do nothing (for speed).
@@ -385,7 +386,7 @@ class DipoleFitAlgorithm(object):
         -------
         None, or 2-d numpy.array of width/height matching input bbox, containing computed gradient values.
         """
-        gradient = None #gradientImage = None  ## TBD: is using an afwImage faster?
+        gradient = None
         if b is not None: ## Don't fit for other gradient parameters if the intercept is not allowed.
             y, x = in_x[0,:], in_x[1,:]
             gradient = np.full_like(x, b, dtype='float64')
@@ -399,8 +400,6 @@ class DipoleFitAlgorithm(object):
                 gradient += x2 * (x * x)
             if y2 is not None:
                 gradient += y2 * (y * y)
-            # gradientImage = ImageF(bbox)
-            # gradientImage.getArray()[:,:] = gradient
         return gradient
 
     @staticmethod
@@ -501,11 +500,11 @@ class DipoleFitAlgorithm(object):
             fluxNeg = flux
 
         if debug:
-            print '%.2f %.2f %.2f %.2f %.2f %.2f' % (flux, fluxNeg, xcenPos, ycenPos, xcenNeg, ycenNeg)
+            print('%.2f %.2f %.2f %.2f %.2f %.2f' % (flux, fluxNeg, xcenPos, ycenPos, xcenNeg, ycenNeg))
             if x1 is not None:
-                print '     %.2f %.2f %.2f' % (b, x1, y1)
+                print('     %.2f %.2f %.2f' % (b, x1, y1))
             if xy is not None:
-                print '     %.2f %.2f %.2f' % (xy, x2, y2)
+                print('     %.2f %.2f %.2f' % (xy, x2, y2))
 
         posIm = DipoleFitAlgorithm.genStarModel(bbox, psf, xcenPos, ycenPos, flux)
         negIm = DipoleFitAlgorithm.genStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
@@ -517,7 +516,7 @@ class DipoleFitAlgorithm(object):
 
         gradient = DipoleFitAlgorithm.genBgGradientModel(in_x, b, x1, y1, xy, x2, y2)
         gradientNeg = gradient
-        if bNeg is not None: # and abs(bNeg)+abs(x1Neg)+abs(y1Neg) > 0.:
+        if bNeg is not None:
             gradientNeg = DipoleFitAlgorithm.genBgGradientModel(in_x, bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg)
 
         if gradient is not None:
@@ -634,7 +633,7 @@ class DipoleFitAlgorithm(object):
 
         ## Estimate starting flux. This strongly affects runtime performance so we want to make it close.
         ## I tried many possibilities, the best one seems to be just using sum(abs(diffIm))/2.
-        ## I am leaving the other ties here (commented out) for posterity and possible future improvements...
+        ## I am leaving the other tries here (commented out) for posterity and possible future improvements...
 
         ## Value to convert peak value to total flux based on flux within psf
         # psfImg = diffim.getPsf().computeImage()
@@ -649,16 +648,17 @@ class DipoleFitAlgorithm(object):
         # if len(pks) >= 2:
         #     negFlux = pks[1].getPeakValue() * pkToFlux
 
-        ## use the (flux under the dipole)/2 for an estimate.
-        startingFlux = np.nansum(np.abs(diArr) - np.nanmedian(np.abs(diArr))) / 2.
+        ## use the (flux under the dipole)*10 for an estimate.
+        ## much testing showed that having startingFlux be too high was better than too low.
+        startingFlux = np.nansum(np.abs(diArr) - np.nanmedian(np.abs(diArr))) * 10.
         posFlux = negFlux = startingFlux
 
         ## TBD: set max. flux limit?
-        gmod.set_param_hint('flux', value=posFlux, min=0.1) #, max=posFlux * 2.)
+        gmod.set_param_hint('flux', value=posFlux, min=0.1)
 
         if separateNegParams:
             ## TBD: set max negative lobe flux limit?
-            gmod.set_param_hint('fluxNeg', value=np.abs(negFlux), min=0.1) #, max=negFlux * 2.)
+            gmod.set_param_hint('fluxNeg', value=np.abs(negFlux), min=0.1)
 
         ## Fixed parameters (dont fit for them if there are no pre-sub images or no gradient fit requested):
         if (rel_weight > 0. and fitBgGradient):
@@ -681,17 +681,13 @@ class DipoleFitAlgorithm(object):
                     gmod.set_param_hint('x2Neg', value=0.)
                     gmod.set_param_hint('y2Neg', value=0.)
 
-        ## Compute footprint bounding box as a numpy extent
-        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-        #in_x = np.array(extent)   # input x coordinate grid
         y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
-        in_x = np.array([x, y]) * 1.
+        in_x = np.array([x, y]).astype(np.float)
 
+        weights = 1.
         if posImage is not None and rel_weight > 0.:
             weights = np.array([np.ones_like(diArr), np.ones_like(diArr)*rel_weight,
                                 np.ones_like(diArr)*rel_weight])
-        else:
-            weights = 1.
 
         ## Note that although we can, we're not required to set initial values for params here,
         ## since we set their param_hint's above.
@@ -708,16 +704,16 @@ class DipoleFitAlgorithm(object):
         ##    https://lmfit.github.io/lmfit-py/confidence.html and
         ##    http://cars9.uchicago.edu/software/python/lmfit/model.html
         if verbose:  ## the ci_report() seems to fail if neg params are constrained -- TBD why.
-            print result.fit_report(show_correl=False)
+            print(result.fit_report(show_correl=False))
             if separateNegParams:
-                print result.ci_report()
+                print(result.ci_report())
 
         ## Display images, model fits and residuals (currently uses matplotlib display functions)
         if display:
             try:
                 DipolePlotUtils.displayFitResults(result, fp)
             except Exception as err:
-                print 'Uh oh!', err
+                print('Uh oh! need matplotlib to use these funcs', err)
                 pass
 
         return result
@@ -759,10 +755,10 @@ class DipoleFitAlgorithm(object):
         ## This will be rare and running it without background gradient fitting on is about 2x faster
         ## so doesn't add too much time to the fitting.
         ## Currently not run:
-        if rel_weight > 0. and (fitResult.redchi > 10000. or
-                                fitResult.params['flux'].stderr == 0. or
-                                fitResult.params['flux'].stderr >= 1e6 or
-                                (separateNegParams and fitResult.params['fluxNeg'].stderr == 0)):
+        if False and (rel_weight > 0.) and (fitResult.redchi > 10000. or
+                                            fitResult.params['flux'].stderr == 0. or
+                                            fitResult.params['flux'].stderr >= 1e6 or
+                                            (separateNegParams and fitResult.params['fluxNeg'].stderr == 0)):
             fitResult = DipoleFitAlgorithm.fitDipole(
                 exposure, source=source, posImage=posImage, negImage=negImage,
                 tol=tol, rel_weight=0., fitBgGradient=False,
@@ -829,7 +825,7 @@ class DipolePlotUtils():
     try:
         import matplotlib.pyplot as plt
     except Exception as err:
-        print 'Uh oh! need matplotlib to use these funcs', err
+        print('Uh oh! need matplotlib to use these funcs', err)
         pass  ## matplotlib not installed -- cannot do any plotting
 
     @staticmethod
@@ -1028,11 +1024,11 @@ class DipolePlotUtils():
     @staticmethod
     def makeHeavyCatalog(catalog, exposure, verbose=False):
         """Usage: catalog = makeHeavyCatalog(catalog, exposure)"""
-        for source in catalog:
+        for i,source in enumerate(catalog):
             fp = source.getFootprint()
             if not fp.isHeavy():
                 if verbose:
-                    print 'not heavy => heavy'
+                    print(i, 'not heavy => heavy')
                 hfp = afw_det.HeavyFootprintF(fp, exposure.getMaskedImage())
                 source.setFootprint(hfp)
 
@@ -1055,7 +1051,7 @@ class DipolePlotUtils():
         for i,s in enumerate(catalog):
             bbox = s.getFootprint().getBBox()
             if bbox.contains(Point2I(x, y)):
-                print i
+                print(i)
                 return s
         return None
 

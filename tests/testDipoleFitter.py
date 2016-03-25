@@ -1,6 +1,7 @@
+from __future__ import absolute_import, division, print_function
 #
 # LSST Data Management System
-# Copyright 2008-2015 AURA/LSST.
+# Copyright 2008-2016 AURA/LSST.
 #
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -28,7 +29,7 @@ from numpy import (random as np_random,
 ## LSST imports:
 import lsst.utils.tests as lsst_tests
 from lsst.afw.table import (SourceTable, SourceCatalog)
-from lsst.ip.diffim import dipoleFitTask as dft
+from lsst.ip.diffim.dipoleFitTask import (DipoleFitAlgorithm, DipoleFitConfig, DipoleFitTask, DipolePlotUtils)
 from lsst.meas.base import SingleFrameMeasurementConfig
 from lsst.meas.algorithms import (SourceDetectionConfig, SourceDetectionTask)
 from lsst.afw.geom import (Box2I, Point2I, Point2D)
@@ -117,13 +118,13 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
         if self.params.verbose:
             for s in self.catalog:
                 fp = s.getFootprint()
-                print fp.getBBox(), fp.getNpix()
+                print(fp.getBBox(), fp.getNpix())
                 for pk in fp.getPeaks():
-                    print 'FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
+                    print('FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue())
 
         offsets = self.params.offsets
         for i,s in enumerate(self.catalog):
-            result = dft.DipoleFitAlgorithm.fitDipole_new(
+            result = DipoleFitAlgorithm.fitDipole_new(
                 self.dipole, s, self.posImage, self.negImage,
                 rel_weight=1., separateNegParams=False,
                 verbose=self.params.verbose, display=False) #self.params.display)
@@ -151,15 +152,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         ## Create the various tasks and schema -- avoid code reuse.
         detectTask, schema = DipoleTestUtils.detectDipoleSources(self.dipole, doMerge=False)
 
-        #measureConfig = dft.DipoleFitConfig()
         measureConfig = SingleFrameMeasurementConfig()
-
-        # Modify the set of active plugins ('.names' behaves like a Python set)
-        #measureConfig.plugins.names.remove("base_PsfFlux")
-        #measureConfig.plugins.names.remove("base_GaussianCentroid")
-        #measureConfig.plugins.names.remove("base_SdssCentroid")
-        #measureConfig.plugins.names.remove("base_GaussianFlux")
-        #measureConfig.plugins.names.remove("base_SdssShape")
 
         measureConfig.slots.modelFlux = "ip_diffim_DipoleFit"
 
@@ -177,8 +170,8 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
 
         # Here is where we make the dipole fitting task. It can run the other measurements as well.
         # This is an example of how to pass it a custom config.
-        dpFitConfig = dft.DipoleFitConfig()
-        measureTask = dft.DipoleFitTask(config=measureConfig, schema=schema, dpFitConfig=dpFitConfig)
+        dpFitConfig = DipoleFitConfig()
+        measureTask = DipoleFitTask(config=measureConfig, schema=schema, dpFitConfig=dpFitConfig)
 
         table = SourceTable.make(schema)
         detectResult = detectTask.run(table, self.dipole)
@@ -243,11 +236,12 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
                              rtol=0.01)
 
             if self.params.display:
-                dft.DipolePlotUtils.displayCutouts(r1, self.dipole, self.posImage, self.negImage)
+                DipolePlotUtils.displayCutouts(r1, self.dipole, self.posImage, self.negImage)
         if self.params.display:
-            dft.DipolePlotUtils.plt.show()
+            DipolePlotUtils.plt.show()
 
         return result
+
 
 ## Test the task in the same way as the algorithm:
 ## Here test that dipoles too close to the edge are raised correctly
@@ -287,13 +281,10 @@ class DipoleFitTaskEdgeTest(DipoleFitTaskTest):
 
         for i, r1 in enumerate(sources):
             result = r1.extract("ip_diffim_DipoleFit*")
-            #print i, result["ip_diffim_DipoleFit_pos_flux"], result["ip_diffim_DipoleFit_flag"], \
-            #    result["ip_diffim_DipoleFit_flag_edge"]
             self.assertTrue(result.get("ip_diffim_DipoleFit_flag"))
-            #self.assertTrue(result.get("ip_diffim_DipoleFit_flag_edge"))
 
 
-#### UTILITY CLASS WITH FUNCS FOR DIPOLE TESTING #####
+#### UTILITY CLASS WITH STATIC METHODS FOR DIPOLE TESTING #####
 
 
 class DipoleTestUtils(object):
@@ -346,8 +337,8 @@ class DipoleTestUtils(object):
         dm = di.getMask()
         posDetectedBits = posImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
         negDetectedBits = negImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
-        pos_det = dm.addMaskPlane("DETECTED_POS") ## new mask plane -- this is different from "DETECTED"
-        neg_det = dm.addMaskPlane("DETECTED_NEG") ## new mask plane -- this is different from "DETECTED_NEGATIVE"
+        pos_det = dm.addMaskPlane("DETECTED_POS") ## new mask plane -- different from "DETECTED"
+        neg_det = dm.addMaskPlane("DETECTED_NEG") ## new mask plane -- different from "DETECTED_NEGATIVE"
         dma = dm.getArray()
         ## set the two custom mask planes to these new masks
         dma[:,:] = posDetectedBits * pos_det + negDetectedBits * neg_det
