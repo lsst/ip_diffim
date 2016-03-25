@@ -640,7 +640,7 @@ class DipoleFitAlgorithm(object):
         # psfImg = diffim.getPsf().computeImage()
         # pkToFlux = np.nansum(psfImg.getArray()) / diffim.getPsf().computePeak()
 
-        bg = np.nanmedian(diArr) ## Compute the dipole background (probably very close to zero)
+        #bg = np.nanmedian(diArr) ## Compute the dipole background (probably very close to zero)
         # startingPk = np.nanmax(diArr) - bg   ## use the dipole peak for an estimate.
         # posFlux, negFlux = startingPk * pkToFlux, -startingPk * pkToFlux
 
@@ -650,7 +650,7 @@ class DipoleFitAlgorithm(object):
         #     negFlux = pks[1].getPeakValue() * pkToFlux
 
         ## use the (flux under the dipole)/2 for an estimate.
-        startingFlux = np.sum(np.abs(diArr) - np.median(np.abs(diArr))) / 2.
+        startingFlux = np.nansum(np.abs(diArr) - np.nanmedian(np.abs(diArr))) / 2.
         posFlux = negFlux = startingFlux
 
         ## TBD: set max. flux limit?
