@@ -80,7 +80,7 @@ class DipoleFitTestGlobalParams(object):
         self.offsets = np_array([-2., 2.]) ## pixel coord offsets between lobes of dipoles
 
 
-## First, test the algorithm itself (fitDipole_new()):
+## First, test the algorithm itself (DipoleFitAlgorithm._fitDipole()):
 ## Create a simulated diffim (with dipoles) and a linear background gradient in the pre-sub images
 ##   then compare the input fluxes/centroids with the fitted results.
 class DipoleFitAlgorithmTest(lsst_tests.TestCase):
@@ -124,10 +124,11 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
 
         offsets = self.params.offsets
         for i,s in enumerate(self.catalog):
-            result = DipoleFitAlgorithm.fitDipole_new(
-                self.dipole, s, self.posImage, self.negImage,
-                rel_weight=1., separateNegParams=False,
-                verbose=self.params.verbose, display=False) #self.params.display)
+            alg = DipoleFitAlgorithm(self.dipole, s, self.posImage, self.negImage)
+            result = alg.fitDipole(rel_weight=1., separateNegParams=False,
+                                   verbose=self.params.verbose)
+            if self.params.verbose:
+                alg.printFitResults()
 
             self.assertClose((result.psfFitPosFlux + abs(result.psfFitNegFlux))/2.,
                              self.params.flux[i], rtol=0.02)
@@ -135,6 +136,9 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
             self.assertClose(result.psfFitPosCentroidY, self.params.yc[i] + offsets[i], rtol=0.01)
             self.assertClose(result.psfFitNegCentroidX, self.params.xc[i] - offsets[i], rtol=0.01)
             self.assertClose(result.psfFitNegCentroidY, self.params.yc[i] - offsets[i], rtol=0.01)
+
+            if self.params.display:
+                alg.displayFitResults()
 
 
 ## Test the task in the same way as the algorithm:
