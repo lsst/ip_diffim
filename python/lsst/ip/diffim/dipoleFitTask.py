@@ -27,6 +27,7 @@ import numpy as np
 # LSST imports
 from lsst.afw.geom import Point2D
 from lsst.afw.image import (ImageF, MaskedImageF, PARENT)
+import lsst.afw.detection as afw_det
 
 __all__ = ("DipoleFitAlgorithm")
 
@@ -409,6 +410,10 @@ class DipoleFitAlgorithm(object):
             if separateNegParams:
                 print(result.ci_report())
 
+        # Display images, model fits and residuals (currently uses matplotlib display functions)
+        if display:
+            self.displayFitResults(result, fp)
+
         return result
 
     def fitDipole(self, source, tol=1e-7, rel_weight=0.1,
@@ -505,3 +510,277 @@ class DipoleFitAlgorithm(object):
         if return_fitObj:  # for debugging
             return out, fitResult
         return out
+
+    def displayFitResults(self, result, footprint):
+        """Usage: fig = displayFitResults(result, fp)"""
+        try:
+            # Display data, model fits and residuals (currently uses matplotlib display functions)
+            import matplotlib.pyplot as plt
+
+            z = result.data
+            fit = result.best_fit
+            bbox = footprint.getBBox()
+            extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+            if z.shape[0] == 3:
+                fig = DipolePlotUtils.plt.figure(figsize=(8, 8))
+                for i in range(3):
+                    plt.subplot(3, 3, i*3+1)
+                    DipolePlotUtils.display2dArray(z[i, :], 'Data', True, extent=extent)
+                    plt.subplot(3, 3, i*3+2)
+                    DipolePlotUtils.display2dArray(fit[i, :], 'Model', True, extent=extent)
+                    plt.subplot(3, 3, i*3+3)
+                    DipolePlotUtils.display2dArray(z[i, :] - fit[i, :], 'Residual', True, extent=extent)
+                return fig
+            else:
+                fig = DipolePlotUtils.plt.figure(figsize=(8, 2.5))
+                plt.subplot(1, 3, 1)
+                DipolePlotUtils.display2dArray(z, 'Data', True, extent=extent)
+                plt.subplot(1, 3, 2)
+                DipolePlotUtils.display2dArray(fit, 'Model', True, extent=extent)
+                plt.subplot(1, 3, 3)
+                DipolePlotUtils.display2dArray(z - fit, 'Residual', True, extent=extent)
+                return fig
+        except Exception as err:
+            print('Uh oh! need matplotlib to use these funcs', err)
+            pass
+
+
+######### UTILITIES FUNCTIONS -- TBD WHERE THEY ULTIMATELY END UP ####
+
+class DipolePlotUtils():
+    """
+    Utility class containing static methods for displaying dipoles/footprints in
+    difference images, mostly used for debugging.
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except Exception as err:
+        print('Uh oh! need matplotlib to use these funcs', err)
+        pass  # matplotlib not installed -- cannot do any plotting
+
+    @staticmethod
+    def display2dArray(arr, title='Data', showBars=True, extent=None):
+        """
+        Use matplotlib.pyplot.imshow() to display a 2-D array.
+
+        Parameters
+        ----------
+        arr : numpy.array
+           The 2-D array to display
+        title : str
+           Optional title to display
+        showBars : bool, optional
+           Show grey-scale bar alongside
+        extent : tuple, optional
+           If not None, a 4-tuple giving the bounding box coordinates of the array
+
+        Returns
+        -------
+        matplotlib.pyplot.figure dispaying the image
+        """
+        fig = DipolePlotUtils.plt.imshow(arr, origin='lower', interpolation='none', cmap='gray',
+                                         extent=extent)
+        DipolePlotUtils.plt.title(title)
+        if showBars:
+            DipolePlotUtils.plt.colorbar(fig, cmap='gray')
+        return fig
+
+    @staticmethod
+    def displayImage(image, showBars=True, width=8, height=2.5):
+        """
+        Use matplotlib.pyplot.imshow() to display an afw.image.Image within its bounding box.
+
+        Parameters (see display2dArray() for those not listed here)
+        ----------
+        image : afw.image.Image
+           The image to display
+        width : int, optional
+           The width of the display (inches)
+        height : int, optional
+           The height of the display (inches)
+
+        Returns
+        -------
+        matplotlib.pyplot.figure dispaying the image
+        """
+        fig = DipolePlotUtils.plt.figure(figsize=(width, height))
+        bbox = image.getBBox()
+        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+        DipolePlotUtils.plt.subplot(1, 3, 1)
+        ma = image.getArray()
+        DipolePlotUtils.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
+        return fig
+
+    @staticmethod
+    def displayImages(images, showBars=True, width=8, height=2.5):
+        """
+        Use matplotlib.pyplot.imshow() to display up to three afw.image.Images alongside each other,
+        each within its bounding box.
+
+        Parameters (see displayImage() for those not listed here)
+        ----------
+        images : tuple
+           Tuple of up to three images to display
+
+        Returns
+        -------
+        matplotlib.pyplot.figure dispaying the image
+        """
+        fig = DipolePlotUtils.plt.figure(figsize=(width, height))
+        for i, image in enumerate(images):
+            bbox = image.getBBox()
+            extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+            DipolePlotUtils.plt.subplot(1, len(images), i+1)
+            ma = image.getArray()
+            DipolePlotUtils.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
+        return fig
+
+    @staticmethod
+    def displayMaskedImage(maskedImage, showMasks=True, showVariance=False, showBars=True, width=8,
+                           height=2.5):
+        """
+        Use matplotlib.pyplot.imshow() to display a afw.image.MaskedImageF, alongside its
+        masks and variance plane
+
+        Parameters (see displayImage() for those not listed here)
+        ----------
+        maskedImage : afw.image.MaskedImageF
+           MaskedImageF to display
+        showMasks : bool, optional
+           Display the MaskedImage's masks
+        showVariance : bool, optional
+           Display the MaskedImage's variance plane
+
+        Returns
+        -------
+        matplotlib.pyplot.figure dispaying the image
+        """
+        fig = DipolePlotUtils.plt.figure(figsize=(width, height))
+        bbox = maskedImage.getBBox()
+        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+        DipolePlotUtils.plt.subplot(1, 3, 1)
+        ma = maskedImage.getArrays()
+        DipolePlotUtils.display2dArray(ma[0], title='Data', showBars=showBars, extent=extent)
+        if showMasks:
+            DipolePlotUtils.plt.subplot(1, 3, 2)
+            DipolePlotUtils.display2dArray(ma[1], title='Masks', showBars=showBars, extent=extent)
+        if showVariance:
+            DipolePlotUtils.plt.subplot(1, 3, 3)
+            DipolePlotUtils.display2dArray(ma[2], title='Variance', showBars=showBars, extent=extent)
+        return fig
+
+    @staticmethod
+    def displayExposure(exposure, showMasks=True, showVariance=False, showPsf=False, showBars=True,
+                        width=8, height=2.5):
+        """
+        Use matplotlib.pyplot.imshow() to display a afw.image.Exposure, including its
+        masks and variance plane and optionally its Psf.
+
+        Parameters (see displayMaskedImage() for those not listed here)
+        ----------
+        exposure : afw.image.Exposure
+           Exposure to display
+        showPsf : bool, optional
+           Display the exposure's Psf
+
+        Returns
+        -------
+        matplotlib.pyplot.figure dispaying the image
+        """
+        fig = DipolePlotUtils.displayMaskedImage(exposure.getMaskedImage(), showMasks,
+                                                 showVariance=not showPsf,
+                                                 showBars=showBars, width=width, height=height)
+        if showPsf:
+            DipolePlotUtils.plt.subplot(1, 3, 3)
+            psfIm = exposure.getPsf().computeImage()
+            bbox = psfIm.getBBox()
+            extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+            DipolePlotUtils.display2dArray(psfIm.getArray(), title='PSF', showBars=showBars, extent=extent)
+        return fig
+
+    @staticmethod
+    def displayCutouts(source, exposure, posImage=None, negImage=None, asHeavyFootprint=False, title=''):
+        """
+        Use matplotlib.pyplot.imshow() to display cutouts within up to three afw.image.Exposure's,
+        given by an input SourceRecord.
+
+        Parameters
+        ----------
+        source : afw.table.SourceRecord
+           Source defining the footprint to extract and display
+        exposure : afw.image.Exposure
+           Exposure from which to extract the cutout to display
+        posImage : afw.image.Exposure, optional
+           Second exposure from which to extract the cutout to display
+        negImage : afw.image.Exposure, optional
+           Third exposure from which to extract the cutout to display
+        asHeavyFootprint : bool, optional
+           Display the cutouts as afw.detection.HeavyFootprint, with regions outside the footprint removed
+
+        Returns
+        -------
+        matplotlib.pyplot.figure dispaying the image
+        """
+        fp = source.getFootprint()
+        bbox = fp.getBBox()
+        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+
+        fig = DipolePlotUtils.plt.figure(figsize=(8, 2.5))
+        if not asHeavyFootprint:
+            subexp = ImageF(exposure.getMaskedImage().getImage(), bbox, PARENT)
+        else:
+            hfp = afw_det.HeavyFootprintF(fp, exposure.getMaskedImage())
+            subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
+        DipolePlotUtils.plt.subplot(1, 3, 1)
+        DipolePlotUtils.display2dArray(subexp.getArray(), title=title+' Diffim', extent=extent)
+        if posImage is not None:
+            if not asHeavyFootprint:
+                subexp = ImageF(posImage.getMaskedImage().getImage(), bbox, PARENT)
+            else:
+                hfp = afw_det.HeavyFootprintF(fp, posImage.getMaskedImage())
+                subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
+            DipolePlotUtils.plt.subplot(1, 3, 2)
+            DipolePlotUtils.display2dArray(subexp.getArray(), title=title+' Pos', extent=extent)
+        if negImage is not None:
+            if not asHeavyFootprint:
+                subexp = ImageF(negImage.getMaskedImage().getImage(), bbox, PARENT)
+            else:
+                hfp = afw_det.HeavyFootprintF(fp, negImage.getMaskedImage())
+                subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
+            DipolePlotUtils.plt.subplot(1, 3, 3)
+            DipolePlotUtils.display2dArray(subexp.getArray(), title=title+' Neg', extent=extent)
+        return fig
+
+    @staticmethod
+    def makeHeavyCatalog(catalog, exposure, verbose=False):
+        """Usage: catalog = makeHeavyCatalog(catalog, exposure)"""
+        for i, source in enumerate(catalog):
+            fp = source.getFootprint()
+            if not fp.isHeavy():
+                if verbose:
+                    print(i, 'not heavy => heavy')
+                hfp = afw_det.HeavyFootprintF(fp, exposure.getMaskedImage())
+                source.setFootprint(hfp)
+
+        return catalog
+
+    @staticmethod
+    def getHeavyFootprintSubimage(fp, badfill=np.nan):
+        """Usage: subim = getHeavyFootprintSubimage(fp)"""
+        hfp = afw_det.HeavyFootprintF_cast(fp)
+        bbox = hfp.getBBox()
+
+        subim2 = ImageF(bbox, badfill)  # set the mask to NA (can use 0. if desired)
+        afw_det.expandArray(hfp, hfp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
+        return subim2
+
+    @staticmethod
+    def searchCatalog(catalog, x, y):
+        """Usage: source = searchCatalog(catalog, x, y)"""
+        for i, s in enumerate(catalog):
+            bbox = s.getFootprint().getBBox()
+            if bbox.contains(Point2D(x, y)):
+                print(i)
+                return s
+        return None
+
