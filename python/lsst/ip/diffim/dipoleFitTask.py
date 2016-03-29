@@ -28,8 +28,63 @@ import numpy as np
 from lsst.afw.geom import Point2D
 from lsst.afw.image import (ImageF, MaskedImageF, PARENT)
 import lsst.afw.detection as afw_det
+import lsst.meas.base as meas_base
+from lsst.afw.table import Point2DKey
+from lsst.pex.exceptions import LengthError
+from lsst.pex.logging import Log
+from lsst.pex.config import Field
 
-__all__ = ("DipoleFitAlgorithm")
+__all__ = ("DipoleFitConfig", "DipoleFitTask", "DipoleFitPlugin",
+           "DipoleFitAlgorithm", "DipolePlotUtils")
+
+
+# Create a new measurement task (`DipoleFitTask`) that can handle all other SFM tasks but can
+# pass a separate pos- and neg- exposure/image to the `DipoleFitPlugin`s `run()` method.
+
+
+class DipoleFitConfig(meas_base.SingleFramePluginConfig):
+    """
+    Class to initialize and store dipole fitting configuration parameters
+    """
+
+    centroidRange = Field(
+        dtype=float, default=5.,
+        doc="assume dipole is not separated by more than centroidRange*psfSigma")
+
+    relWeight = Field(
+        dtype=float, default=0.5,
+        doc="relative weighting of pre-subtraction images")
+
+    tolerance = Field(
+        dtype=float, default=1e-7,
+        doc="fit tolerance")
+
+    fitBgGradient = Field(
+        dtype=bool, default=True,
+        doc="fit parameters for linear gradient in pre-sub. images")
+
+    fitSeparateNegParams = Field(
+        dtype=bool, default=False,
+        doc="fit parameters for negative values (flux/gradient) separately from pos.")
+
+    """!Config params for classification of detected diaSources as dipole or not"""
+    minSn = Field(
+        dtype=float, default=np.sqrt(2) * 5.0,
+        doc="Minimum quadrature sum of positive+negative lobe S/N to be considered a dipole")
+
+    maxFluxRatio = Field(
+        dtype = float, default = 0.65,
+        doc = "Maximum flux ratio in either lobe to be considered a dipole")
+
+    # Choose a maxChi2DoF corresponding to a significance level of at most 0.05
+    # (note this is actually a significance not a chi2 number)
+    maxChi2DoF = Field(
+        dtype = float, default = 0.05,
+        doc = "Maximum Chi2/DoF of fit to be considered a dipole")
+
+    verbose = Field(
+        dtype=bool, default=False,
+        doc="be verbose; this is slow")
 
 
 class DipoleFitAlgorithm(object):
