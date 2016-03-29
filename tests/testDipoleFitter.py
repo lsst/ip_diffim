@@ -27,6 +27,8 @@ from numpy import (random as np_random,
                    mgrid as np_mgrid)
 
 from lsst.afw.geom import (Box2I, Point2I, Point2D)
+from lsst.meas.algorithms import (SourceDetectionConfig, SourceDetectionTask)
+from lsst.afw.table import (SourceTable, SourceCatalog)
 
 ## UTILITY CLASS WITH STATIC METHODS FOR DIPOLE TESTING ###
 
@@ -87,3 +89,45 @@ class DipoleTestUtils(object):
         # set the two custom mask planes to these new masks
         dma[:, :] = posDetectedBits * pos_det + negDetectedBits * neg_det
         return dipole, (posImage, posCatalog), (negImage, negCatalog)
+
+    @staticmethod
+    def detectDipoleSources(diffim, doMerge=True, detectSigma=5.5, grow=3):
+        """
+        Utility function for detecting dipoles. Detects pos/neg sources in the diffim,
+        then merges them. A bigger "grow" parameter leads to a larger footprint which
+        helps with dipole measurement for faint dipoles.
+        """
+
+        # Start with a minimal schema - only the fields all SourceCatalogs need
+        schema = SourceTable.makeMinimalSchema()
+
+        # Customize the detection task a bit (optional)
+        detectConfig = SourceDetectionConfig()
+        detectConfig.returnOriginalFootprints = False  # should be the default
+
+        psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
+
+        # code from imageDifference.py:
+        detectConfig.thresholdPolarity = "both"
+        detectConfig.thresholdValue = detectSigma
+        # detectConfig.nSigmaToGrow = psfSigma
+        detectConfig.reEstimateBackground = True  # if False, will fail often for faint sources on gradients?
+        detectConfig.thresholdType = "pixel_stdev"
+
+        # Create the detection task. We pass the schema so the task can declare a few flag fields
+        detectTask = SourceDetectionTask(schema, config=detectConfig)
+
+        table = SourceTable.make(schema)
+        catalog = detectTask.makeSourceCatalog(table, diffim, sigma=psfSigma)
+
+        # Now do the merge.
+        if doMerge:
+            fpSet = catalog.fpSets.positive
+            fpSet.merge(catalog.fpSets.negative, grow, grow, False)
+            sources = SourceCatalog(table)
+            fpSet.makeSources(sources)
+
+            return sources
+
+        else:
+            return detectTask, schema
