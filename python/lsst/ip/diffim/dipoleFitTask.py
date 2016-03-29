@@ -364,10 +364,16 @@ class DipoleFitAlgorithm(object):
                                 'psfFitSignaltoNoise', 'psfFitChi2', 'psfFitRedChi2'])
 
     def __init__(self, diffim, posImage=None, negImage=None):
-        """!Algorithm to run dipole measurement on a diaSource
-        @param diffim        Exposure on which the diaSources were detected
-        @param posImage      "Positive" exposure from which the template was subtracted
-        @param negImage      "Negative" exposure which was subtracted from the posImage
+        """ Algorithm to run dipole measurement on a diaSource
+
+        Parameters
+        ----------
+        diffim : afw.image.Exposure
+           Exposure on which the diaSources were detected
+        posImage : afw.image.Exposure
+           "Positive" exposure from which the template was subtracted
+        negImage : afw.image.Exposure
+           "Negative" exposure which was subtracted from the posImage
         """
         self.diffim = diffim
         self.posImage = posImage
@@ -375,15 +381,25 @@ class DipoleFitAlgorithm(object):
 
     @staticmethod
     def genBgGradientModel(in_x, b=None, x1=0., y1=0., xy=None, x2=0., y2=0.):
-        """!Generate gradient model (2-d array) with up to 2nd-order polynomial
-        @param in_x   3-d numpy.array. Provides the input x,y grid upon which to compute the gradient
-        @param b      float. Intercept (0th-order parameter) for gradient. If None, do nothing (for speed).
-        @param x1     float, optional. X-slope (1st-order parameter) for gradient.
-        @param y1     float, optional. Y-slope (1st-order parameter) for gradient.
-        @param xy     float, optional. X*Y coefficient (2nd-order parameter) for gradient.
-                                       If None, do not compute 2nd order polynomial.
-        @param x2     float, optional. X**2 coefficient (2nd-order parameter) for gradient.
-        @param y2     float, optional. Y**2 coefficient (2nd-order parameter) for gradient.
+        """Generate gradient model (2-d array) with up to 2nd-order polynomial
+
+        Parameters
+        ----------
+        in_x : 3-d numpy.array
+           Provides the input x,y grid upon which to compute the gradient
+        b : float
+           Intercept (0th-order parameter) for gradient. If None, do nothing (for speed).
+        x1 : float, optional
+           X-slope (1st-order parameter) for gradient.
+        y1 : float, optional
+           Y-slope (1st-order parameter) for gradient.
+        xy : float, optional
+           X*Y coefficient (2nd-order parameter) for gradient.
+           If None, do not compute 2nd order polynomial.
+        x2 : float, optional
+           X**2 coefficient (2nd-order parameter) for gradient.
+        y2 : float, optional
+           Y**2 coefficient (2nd-order parameter) for gradient.
 
         Returns
         -------
@@ -411,6 +427,8 @@ class DipoleFitAlgorithm(object):
 
         Parameters
         ----------
+        bbox : afw.geom.BoundingBox
+           Bounding box marking pixel coordinates for generated model
         psf : afw.detection.Psf
            Psf model used to generate the 'star'
         xcen : float
@@ -537,7 +555,6 @@ class DipoleFitAlgorithm(object):
 
         return zout
 
-    #@staticmethod
     def fitDipoleImpl(self, source, tol=1e-7, rel_weight=0.5,
                       fitBgGradient=True, bgGradientOrder=1, centroidRangeInSigma=5.,
                       separateNegParams=True, verbose=False, display=False):
@@ -696,7 +713,6 @@ class DipoleFitAlgorithm(object):
 
         return result
 
-    #@staticmethod
     def fitDipole(self, source, tol=1e-7, rel_weight=0.1,
                   fitBgGradient=True, centroidRangeInSigma=5., separateNegParams=True,
                   bgGradientOrder=1, verbose=False, display=False, return_fitObj=False):
@@ -792,11 +808,12 @@ class DipoleFitAlgorithm(object):
             return out, fitResult
         return out
 
-    #@staticmethod
     def displayFitResults(self, result, footprint):
         """Usage: fig = displayFitResults(result, fp)"""
         try:
             ## Display data, model fits and residuals (currently uses matplotlib display functions)
+            import matplotlib.pyplot as plt
+
             z = result.data
             fit = result.best_fit
             bbox = footprint.getBBox()
@@ -804,20 +821,20 @@ class DipoleFitAlgorithm(object):
             if z.shape[0] == 3:
                 fig = DipolePlotUtils.plt.figure(figsize=(8, 8))
                 for i in range(3):
-                    DipolePlotUtils.plt.subplot(3, 3, i*3+1)
+                    plt.subplot(3, 3, i*3+1)
                     DipolePlotUtils.display2dArray(z[i,:], 'Data', True, extent=extent)
-                    DipolePlotUtils.plt.subplot(3, 3, i*3+2)
+                    plt.subplot(3, 3, i*3+2)
                     DipolePlotUtils.display2dArray(fit[i,:], 'Model', True, extent=extent)
-                    DipolePlotUtils.plt.subplot(3, 3, i*3+3)
+                    plt.subplot(3, 3, i*3+3)
                     DipolePlotUtils.display2dArray(z[i,:] - fit[i,:], 'Residual', True, extent=extent)
                 return fig
             else:
                 fig = DipolePlotUtils.plt.figure(figsize=(8, 2.5))
-                DipolePlotUtils.plt.subplot(1, 3, 1)
+                plt.subplot(1, 3, 1)
                 DipolePlotUtils.display2dArray(z, 'Data', True, extent=extent)
-                DipolePlotUtils.plt.subplot(1, 3, 2)
+                plt.subplot(1, 3, 2)
                 DipolePlotUtils.display2dArray(fit, 'Model', True, extent=extent)
-                DipolePlotUtils.plt.subplot(1, 3, 3)
+                plt.subplot(1, 3, 3)
                 DipolePlotUtils.display2dArray(z - fit, 'Residual', True, extent=extent)
                 return fig
         except Exception as err:
