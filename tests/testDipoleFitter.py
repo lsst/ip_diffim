@@ -243,6 +243,47 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         return result
 
 
+# Test the task in the same way as the algorithm:
+# Here test that dipoles too close to the edge are raised correctly
+class DipoleFitTaskEdgeTest(DipoleFitTaskTest):
+    """ A test case for dipole fit task"""
+    def setUp(self):
+        # Ensure that both dipoles will fail (too close to edge)
+        self.params = DipoleFitTestGlobalParams()
+        self.params.xc = np_array([5.3, 2.2])  # xcenters of two dipoles in image
+        self.params.yc = np_array([2.6, 98.5])  # ycenters of two dipoles
+
+        offsets = self.params.offsets
+        self.dipole, (self.posImage, self.posCatalog), (self.negImage, self.negCatalog) = \
+            DipoleTestUtils.makeDipoleImage(
+                xcenPos=self.params.xc + offsets,
+                ycenPos=self.params.yc + offsets,
+                xcenNeg=self.params.xc - offsets,
+                ycenNeg=self.params.yc - offsets,
+                flux=self.params.flux, fluxNeg=self.params.flux,
+                gradientParams=self.params.gradientParams)
+
+        self.catalog = DipoleTestUtils.detectDipoleSources(self.dipole)
+
+    def tearDown(self):
+        DipoleFitTaskTest.tearDown(self)
+
+    def testDipoleTask(self):
+        pass
+
+    def testDipoleEdge(self):
+        """
+        Test the dipole fitting singleFramePlugin. Test that the dipoles which are too
+        close to the edge raise the correct exception.
+        """
+
+        sources = DipoleFitTaskTest.runDetection(self)
+
+        for i, r1 in enumerate(sources):
+            result = r1.extract("ip_diffim_DipoleFit*")
+            self.assertTrue(result.get("ip_diffim_DipoleFit_flag"))
+
+
 # UTILITY CLASS WITH STATIC METHODS FOR DIPOLE TESTING ###
 class DipoleTestUtils(object):
 
@@ -352,6 +393,7 @@ def suite():
     suites = []
     suites += unittest.makeSuite(DipoleFitAlgorithmTest)
     suites += unittest.makeSuite(DipoleFitTaskTest)
+    suites += unittest.makeSuite(DipoleFitTaskEdgeTest)
     suites += unittest.makeSuite(lsst_tests.MemoryTestCase)
     return unittest.TestSuite(suites)
 
