@@ -26,7 +26,7 @@ from numpy import (random as np_random,
                    array as np_array,
                    mgrid as np_mgrid)
 
-## LSST imports:
+# LSST imports:
 import lsst.utils.tests as lsst_tests
 from lsst.afw.table import (SourceTable, SourceCatalog)
 from lsst.ip.diffim.dipoleFitTask import (DipoleFitAlgorithm, DipoleFitConfig, DipoleFitTask, DipolePlotUtils)
@@ -34,6 +34,7 @@ from lsst.meas.base import SingleFrameMeasurementConfig
 from lsst.meas.algorithms import (SourceDetectionConfig, SourceDetectionTask)
 from lsst.afw.geom import (Box2I, Point2I, Point2D)
 
+# Export DipoleTestUtils to expose fake image generating funcs
 __all__ = ("DipoleTestUtils")
 
 
@@ -70,19 +71,19 @@ class DipoleFitTestGlobalParams(object):
         np_random.seed(666)
         self.display = False
         self.verbose = False
-        self.w, self.h = 100, 100 # size of image
+        self.w, self.h = 100, 100  # size of image
 
-        self.xc = np_array([65.3, 24.2]) ## xcenters of two dipoles in image
-        self.yc = np_array([38.6, 78.5]) ## ycenters of two dipoles
-        self.flux = np_array([2500., 2345.])  ## fluxes of pos/neg lobes
+        self.xc = np_array([65.3, 24.2])  # xcenters of two dipoles in image
+        self.yc = np_array([38.6, 78.5])  # ycenters of two dipoles
+        self.flux = np_array([2500., 2345.])  # fluxes of pos/neg lobes
         self.gradientParams = np_array([10., 3., 5.])
 
-        self.offsets = np_array([-2., 2.]) ## pixel coord offsets between lobes of dipoles
+        self.offsets = np_array([-2., 2.])  # pixel coord offsets between lobes of dipoles
 
 
-## First, test the algorithm itself (fitDipole()):
-## Create a simulated diffim (with dipoles) and a linear background gradient in the pre-sub images
-##   then compare the input fluxes/centroids with the fitted results.
+# First, test the algorithm itself (fitDipole()):
+# Create a simulated diffim (with dipoles) and a linear background gradient in the pre-sub images
+#   then compare the input fluxes/centroids with the fitted results.
 class DipoleFitAlgorithmTest(lsst_tests.TestCase):
     """
     A test case for dipole fit algorithm.
@@ -123,11 +124,11 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
                     print('FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue())
 
         offsets = self.params.offsets
-        for i,s in enumerate(self.catalog):
+        for i, s in enumerate(self.catalog):
             alg = DipoleFitAlgorithm(self.dipole, self.posImage, self.negImage)
             result = alg.fitDipole(
                 s, rel_weight=1., separateNegParams=False,
-                verbose=self.params.verbose, display=False) #self.params.display)
+                verbose=self.params.verbose, display=self.params.display)
 
             self.assertClose((result.psfFitPosFlux + abs(result.psfFitNegFlux))/2.,
                              self.params.flux[i], rtol=0.02)
@@ -137,8 +138,8 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
             self.assertClose(result.psfFitNegCentroidY, self.params.yc[i] - offsets[i], rtol=0.01)
 
 
-## Test the task in the same way as the algorithm:
-## Also test that it correctly classifies the dipoles.
+# Test the task in the same way as the algorithm:
+# Also test that it correctly classifies the dipoles.
 class DipoleFitTaskTest(DipoleFitAlgorithmTest):
     """ A test case for dipole fit task"""
     def setUp(self):
@@ -149,7 +150,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
 
     def runDetection(self):
 
-        ## Create the various tasks and schema -- avoid code reuse.
+        # Create the various tasks and schema -- avoid code reuse.
         detectTask, schema = DipoleTestUtils.detectDipoleSources(self.dipole, doMerge=False)
 
         measureConfig = SingleFrameMeasurementConfig()
@@ -175,8 +176,8 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
 
         table = SourceTable.make(schema)
         detectResult = detectTask.run(table, self.dipole)
-        #catalog = detectResult.sources
-        #deblendTask.run(self.dipole, catalog, psf=self.dipole.getPsf())
+        # catalog = detectResult.sources
+        # deblendTask.run(self.dipole, catalog, psf=self.dipole.getPsf())
 
         fpSet = detectResult.fpSets.positive
         fpSet.merge(detectResult.fpSets.negative, 2, 2, False)
@@ -211,11 +212,11 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
                              self.params.xc[i] - offsets[i], rtol=0.01)
             self.assertClose(result['ip_diffim_DipoleFit_neg_centroid_y'],
                              self.params.yc[i] - offsets[i], rtol=0.01)
-            ## Note this is dependent on the noise (variance) being realistic in the image.
-            ## otherwise it throws off the chi2 estimate, which is used for classification:
+            # Note this is dependent on the noise (variance) being realistic in the image.
+            # otherwise it throws off the chi2 estimate, which is used for classification:
             self.assertTrue(result['ip_diffim_DipoleFit_flag_classification'])
 
-            ## compare to the original ip_diffim_PsfDipoleFlux measurements
+            # compare to the original ip_diffim_PsfDipoleFlux measurements
             result2 = r1.extract("ip_diffim_PsfDipoleFlux*")
             self.assertClose((result['ip_diffim_DipoleFit_pos_flux'] +
                               abs(result['ip_diffim_DipoleFit_neg_flux']))/2.,
@@ -243,15 +244,15 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         return result
 
 
-## Test the task in the same way as the algorithm:
-## Here test that dipoles too close to the edge are raised correctly
+# Test the task in the same way as the algorithm:
+# Here test that dipoles too close to the edge are raised correctly
 class DipoleFitTaskEdgeTest(DipoleFitTaskTest):
     """ A test case for dipole fit task"""
     def setUp(self):
-        ## Ensure that both dipoles will fail (too close to edge)
+        # Ensure that both dipoles will fail (too close to edge)
         self.params = DipoleFitTestGlobalParams()
-        self.params.xc = np_array([5.3, 2.2]) ## xcenters of two dipoles in image
-        self.params.yc = np_array([2.6, 98.5]) ## ycenters of two dipoles
+        self.params.xc = np_array([5.3, 2.2])  # xcenters of two dipoles in image
+        self.params.yc = np_array([2.6, 98.5])  # ycenters of two dipoles
 
         offsets = self.params.offsets
         self.dipole, (self.posImage, self.posCatalog), (self.negImage, self.negCatalog) = \
@@ -284,7 +285,7 @@ class DipoleFitTaskEdgeTest(DipoleFitTaskTest):
             self.assertTrue(result.get("ip_diffim_DipoleFit_flag"))
 
 
-#### UTILITY CLASS WITH STATIC METHODS FOR DIPOLE TESTING #####
+## UTILITY CLASS WITH STATIC METHODS FOR DIPOLE TESTING ###
 
 
 class DipoleTestUtils(object):
@@ -294,7 +295,7 @@ class DipoleTestUtils(object):
                       gradientParams=None, schema=None):
 
         from lsst.meas.base.tests import TestDataset
-        bbox = Box2I(Point2I(0,0), Point2I(w-1, h-1))
+        bbox = Box2I(Point2I(0, 0), Point2I(w-1, h-1))
         dataset = TestDataset(bbox, psfSigma=psfSigma, threshold=1.)
 
         for i in xrange(len(xc)):
@@ -308,7 +309,7 @@ class DipoleTestUtils(object):
             y, x = np_mgrid[:w, :h]
             gp = gradientParams
             gradient = gp[0] + gp[1] * x + gp[2] * y
-            if len(gradientParams) > 3: ## it includes a set of 2nd-order polynomial params
+            if len(gradientParams) > 3:  # it includes a set of 2nd-order polynomial params
                 gradient += gp[3] * x*y + gp[4] * x*x + gp[5] * y*y
             imgArr = exposure.getMaskedImage().getArrays()[0]
             imgArr += gradient
@@ -333,15 +334,15 @@ class DipoleTestUtils(object):
         di = dipole.getMaskedImage()
         di -= negImage.getMaskedImage()
 
-        ## Carry through pos/neg detection masks to new planes in diffim image
+        # Carry through pos/neg detection masks to new planes in diffim image
         dm = di.getMask()
         posDetectedBits = posImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
         negDetectedBits = negImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
-        pos_det = dm.addMaskPlane("DETECTED_POS") ## new mask plane -- different from "DETECTED"
-        neg_det = dm.addMaskPlane("DETECTED_NEG") ## new mask plane -- different from "DETECTED_NEGATIVE"
+        pos_det = dm.addMaskPlane("DETECTED_POS")  # new mask plane -- different from "DETECTED"
+        neg_det = dm.addMaskPlane("DETECTED_NEG")  # new mask plane -- different from "DETECTED_NEGATIVE"
         dma = dm.getArray()
-        ## set the two custom mask planes to these new masks
-        dma[:,:] = posDetectedBits * pos_det + negDetectedBits * neg_det
+        # set the two custom mask planes to these new masks
+        dma[:, :] = posDetectedBits * pos_det + negDetectedBits * neg_det
         return dipole, (posImage, posCatalog), (negImage, negCatalog)
 
     @staticmethod
@@ -357,15 +358,15 @@ class DipoleTestUtils(object):
 
         # Customize the detection task a bit (optional)
         detectConfig = SourceDetectionConfig()
-        detectConfig.returnOriginalFootprints = False # should be the default
+        detectConfig.returnOriginalFootprints = False  # should be the default
 
         psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
 
-        ## code from imageDifference.py:
+        # code from imageDifference.py:
         detectConfig.thresholdPolarity = "both"
         detectConfig.thresholdValue = detectSigma
-        #detectConfig.nSigmaToGrow = psfSigma
-        detectConfig.reEstimateBackground = True  ## if False, will fail often for faint sources on gradients?
+        # detectConfig.nSigmaToGrow = psfSigma
+        detectConfig.reEstimateBackground = True  # if False, will fail often for faint sources on gradients?
         detectConfig.thresholdType = "pixel_stdev"
 
         # Create the detection task. We pass the schema so the task can declare a few flag fields
@@ -374,7 +375,7 @@ class DipoleTestUtils(object):
         table = SourceTable.make(schema)
         catalog = detectTask.makeSourceCatalog(table, diffim, sigma=psfSigma)
 
-        ## Now do the merge.
+        # Now do the merge.
         if doMerge:
             fpSet = catalog.fpSets.positive
             fpSet.merge(catalog.fpSets.negative, grow, grow, False)
