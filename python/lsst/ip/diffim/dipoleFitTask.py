@@ -63,6 +63,17 @@ class DipoleFitAlgorithm(object):
                                 'psfFitSignaltoNoise', 'psfFitChi2', 'psfFitRedChi2'])
 
     def __init__(self, diffim, posImage=None, negImage=None):
+        """ Algorithm to run dipole measurement on a diaSource
+
+        Parameters
+        ----------
+        diffim : afw.image.Exposure
+           Exposure on which the diaSources were detected
+        posImage : afw.image.Exposure
+           "Positive" exposure from which the template was subtracted
+        negImage : afw.image.Exposure
+           "Negative" exposure which was subtracted from the posImage
+        """
 
         self.diffim = diffim
         self.posImage = posImage
@@ -70,6 +81,30 @@ class DipoleFitAlgorithm(object):
 
     @staticmethod
     def genBgGradientModel(in_x, b=None, x1=0., y1=0., xy=None, x2=0., y2=0.):
+        """Generate gradient model (2-d array) with up to 2nd-order polynomial
+
+        Parameters
+        ----------
+        in_x : 3-d numpy.array
+           Provides the input x,y grid upon which to compute the gradient
+        b : float
+           Intercept (0th-order parameter) for gradient. If None, do nothing (for speed).
+        x1 : float, optional
+           X-slope (1st-order parameter) for gradient.
+        y1 : float, optional
+           Y-slope (1st-order parameter) for gradient.
+        xy : float, optional
+           X*Y coefficient (2nd-order parameter) for gradient.
+           If None, do not compute 2nd order polynomial.
+        x2 : float, optional
+           X**2 coefficient (2nd-order parameter) for gradient.
+        y2 : float, optional
+           Y**2 coefficient (2nd-order parameter) for gradient.
+
+        Returns
+        -------
+        None, or 2-d numpy.array of width/height matching input bbox, containing computed gradient values.
+        """
 
         gradient = None
         if b is not None:  # Don't fit for other gradient parameters if the intercept is not allowed.
@@ -89,6 +124,25 @@ class DipoleFitAlgorithm(object):
 
     @staticmethod
     def genStarModel(bbox, psf, xcen, ycen, flux):
+        """Generate model (2-d array) of a 'star' (single PSF) centered at given coordinates
+
+        Parameters
+        ----------
+        bbox : afw.geom.BoundingBox
+           Bounding box marking pixel coordinates for generated model
+        psf : afw.detection.Psf
+           Psf model used to generate the 'star'
+        xcen : float
+           Desired x-centroid of the 'star'
+        ycen : float
+           Desired y-centroid of the 'star'
+        flux : float
+           Desired flux of the 'star'
+
+        Returns
+        -------
+        2-d numpy.array of width/height matching input bbox, containing PSF with given centroid and flux
+        """
 
         # Generate the psf image, normalize to flux
         psf_img = psf.computeImage(Point2D(xcen, ycen)).convertF()
@@ -115,6 +169,50 @@ class DipoleFitAlgorithm(object):
                        b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
                        bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
                        debug=False, **kwargs):
+        """
+        Generate dipole model with given parameters.
+        This is the functor whose sum-of-squared difference from data is minimized by `lmfit`.
+
+        Parameters
+        ----------
+        x : numpy.array
+           Input independent variable. Used here as the grid on which to compute the background
+           gradient model.
+        flux : float
+           Desired flux of the positive lobe of the dipole
+        xcenPos : float
+           Desired x-centroid of the positive lobe of the dipole
+        ycenPos : float
+           Desired y-centroid of the positive lobe of the dipole
+        xcenNeg : float
+           Desired x-centroid of the negative lobe of the dipole
+        ycenNeg : float
+           Desired y-centroid of the negative lobe of the dipole
+        fluxNeg : float, optional
+           Desired flux of the negative lobe of the dipole, set to 'flux' if None
+        b, x1, y1, xy, x2, y2 : float, optional
+           Gradient parameters for positive lobe, see `genBgGradientModel`.
+        bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg : float, optional
+           Gradient parameters for negative lobe, see `genBgGradientModel`. Set to the corresponding
+           positive values if None.
+        **kwargs :
+           Keyword arguments passed through `lmfit` and used by this functor:
+           {
+              psf : afw.detection.Psf
+                 Psf model used to generate the 'star'
+              rel_weight : float
+                 Used to signify if positive/negative images are to be included (!= 0. if yes)
+              bbox : afw.geom.BoundingBox
+                 Bounding box containing region to be modelled
+           }
+
+        Returns
+        -------
+        numpy.array of width/height matching input bbox, containing dipole model with
+        given centroids and flux(es). If rel_weight = 0., this is a 2-d array with dimensions
+        matching those of bbox; otherwise a stack of three such arrays, representing the dipole
+        (diffim), positive and negative images respectively.
+        """
 
         psf = kwargs.get('psf')
         rel_weight = kwargs.get('rel_weight')  # if > 0, we're including pre-sub. images
@@ -162,6 +260,21 @@ class DipoleFitAlgorithm(object):
     def fitDipoleImpl(self, source, tol=1e-7, rel_weight=0.5,
                       fitBgGradient=True, bgGradientOrder=1, centroidRangeInSigma=5.,
                       separateNegParams=True, verbose=False, display=False):
+        """
+        Fit a dipole model to an input difference image (actually,
+        subimage bounded by the input source's footprint) and
+        optionally constrain the fit using the pre-subtraction images
+        posImage and negImage.
+
+        Parameters
+        ----------
+        See `fitDipole()`
+
+        Returns
+        -------
+        `lmfit.MinimizerResult` object containing the fit parameters and other information.
+
+        """
 
         fp = source.getFootprint()
         bbox = fp.getBBox()
@@ -301,6 +414,43 @@ class DipoleFitAlgorithm(object):
     def fitDipole(self, source, tol=1e-7, rel_weight=0.1,
                   fitBgGradient=True, centroidRangeInSigma=5., separateNegParams=True,
                   bgGradientOrder=1, verbose=False, display=False, return_fitObj=False):
+        """
+        Wrapper around `fitDipoleImpl()` which performs the fit of a dipole
+        model to an input difference image (actually, subimage bounded
+        by the input source's footprint) and optionally constrain the
+        fit using the pre-subtraction images posImage and
+        negImage. Wraps the output into a `resultsOutput` object after
+        computing additional statistics such as orientation and SNR.
+
+        Parameters
+        ----------
+        source : afw.table.SourceRecord
+           Record containing the (merged) dipole source footprint detected on the diffim
+        tol : float, optional
+           Tolerance parameter for scipy.leastsq() optimization
+        rel_weight : float, optional
+           Weighting of posImage/negImage relative to the diffim in the fit
+        fitBgGradient : bool, optional
+           Fit linear background gradient in posImage/negImage?
+        bgGradientOrder : int, optional
+           Desired polynomial order of background gradient (allowed are [0,1,2])
+        centroidRangeInSigma : float, optional
+           Allowed window of centroid parameters relative to peak in input source footprint
+        separateNegParams : bool, optional
+           Fit separate parameters to the flux and background gradient in the negative images?
+        verbose : bool, optional
+           Be verbose
+        display : bool, optional
+           Display input data, best fit model(s) and residuals in a matplotlib window.
+        return_fitObj : bool, optional
+           In addition to the `resultsOutput` object, also returns the
+           `lmfit.MinimizerResult` object for debugging.
+
+        Returns
+        -------
+        `resultsOutput` object containing the fit parameters and other information.
+        `lmfit.MinimizerResult` object if `return_fitObj` is True.
+        """
 
         fitResult = self.fitDipoleImpl(
             source, tol=tol, rel_weight=rel_weight, fitBgGradient=fitBgGradient,
