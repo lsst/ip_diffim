@@ -80,7 +80,7 @@ class DipoleFitTestGlobalParams(object):
         self.offsets = np_array([-2., 2.]) ## pixel coord offsets between lobes of dipoles
 
 
-## First, test the algorithm itself (fitDipole_new()):
+## First, test the algorithm itself (fitDipole()):
 ## Create a simulated diffim (with dipoles) and a linear background gradient in the pre-sub images
 ##   then compare the input fluxes/centroids with the fitted results.
 class DipoleFitAlgorithmTest(lsst_tests.TestCase):
@@ -124,9 +124,9 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
 
         offsets = self.params.offsets
         for i,s in enumerate(self.catalog):
-            result = DipoleFitAlgorithm.fitDipole_new(
-                self.dipole, s, self.posImage, self.negImage,
-                rel_weight=1., separateNegParams=False,
+            alg = DipoleFitAlgorithm(self.dipole, self.posImage, self.negImage)
+            result = alg.fitDipole(
+                s, rel_weight=1., separateNegParams=False,
                 verbose=self.params.verbose, display=False) #self.params.display)
 
             self.assertClose((result.psfFitPosFlux + abs(result.psfFitNegFlux))/2.,
