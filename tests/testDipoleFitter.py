@@ -30,7 +30,8 @@ import lsst.utils.tests as lsst_tests
 from lsst.afw.geom import (Box2I, Point2I, Point2D)
 from lsst.meas.algorithms import (SourceDetectionConfig, SourceDetectionTask)
 from lsst.afw.table import (SourceTable, SourceCatalog)
-from lsst.ip.diffim.dipoleFitTask import DipoleFitAlgorithm
+from lsst.ip.diffim.dipoleFitTask import (DipoleFitAlgorithm, DipoleFitConfig, DipoleFitTask, DipolePlotUtils)
+from lsst.meas.base import SingleFrameMeasurementConfig
 
 # Export DipoleTestUtils to expose fake image generating funcs
 __all__ = ("DipoleTestUtils")
@@ -134,6 +135,112 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
             self.assertClose(result.psfFitPosCentroidY, self.params.yc[i] + offsets[i], rtol=0.01)
             self.assertClose(result.psfFitNegCentroidX, self.params.xc[i] - offsets[i], rtol=0.01)
             self.assertClose(result.psfFitNegCentroidY, self.params.yc[i] - offsets[i], rtol=0.01)
+
+
+# Test the task in the same way as the algorithm:
+# Also test that it correctly classifies the dipoles.
+class DipoleFitTaskTest(DipoleFitAlgorithmTest):
+    """ A test case for dipole fit task"""
+    def setUp(self):
+        DipoleFitAlgorithmTest.setUp(self)
+
+    def tearDown(self):
+        DipoleFitAlgorithmTest.tearDown(self)
+
+    def runDetection(self):
+
+        # Create the various tasks and schema -- avoid code reuse.
+        detectTask, schema = DipoleTestUtils.detectDipoleSources(self.dipole, doMerge=False)
+
+        measureConfig = SingleFrameMeasurementConfig()
+
+        measureConfig.slots.modelFlux = "ip_diffim_DipoleFit"
+
+        measureConfig.plugins.names |= ["base_CircularApertureFlux",
+                                        "base_PixelFlags",
+                                        "base_SkyCoord",
+                                        "base_PsfFlux",
+                                        "ip_diffim_NaiveDipoleCentroid",
+                                        "ip_diffim_NaiveDipoleFlux",
+                                        "ip_diffim_PsfDipoleFlux"]
+
+        # Disable aperture correction, which requires having an ApCorrMap attached to
+        # the Exposure (it'll warn if it's not present and we don't explicitly disable it).
+        measureConfig.doApplyApCorr = "no"
+
+        # Here is where we make the dipole fitting task. It can run the other measurements as well.
+        # This is an example of how to pass it a custom config.
+        dpFitConfig = DipoleFitConfig()
+        measureTask = DipoleFitTask(config=measureConfig, schema=schema, dpFitConfig=dpFitConfig)
+
+        table = SourceTable.make(schema)
+        detectResult = detectTask.run(table, self.dipole)
+        # catalog = detectResult.sources
+        # deblendTask.run(self.dipole, catalog, psf=self.dipole.getPsf())
+
+        fpSet = detectResult.fpSets.positive
+        fpSet.merge(detectResult.fpSets.negative, 2, 2, False)
+        sources = SourceCatalog(table)
+        fpSet.makeSources(sources)
+
+        measureTask.run(sources, self.dipole, self.posImage, self.negImage)
+        return sources
+
+    def testDipoleFitter(self):
+        pass
+
+    def testDipoleTask(self):
+        """
+        Test the dipole fitting singleFramePlugin. Test that the resulting fluxes/centroids
+        are entered into the correct slots of the catalog, and have values that are
+        very close to the input values for both dipoles in the image.
+        """
+        sources = self.runDetection()
+
+        offsets = self.params.offsets
+        for i, r1 in enumerate(sources):
+            result = r1.extract("ip_diffim_DipoleFit*")
+            self.assertClose((result['ip_diffim_DipoleFit_pos_flux'] +
+                              abs(result['ip_diffim_DipoleFit_neg_flux']))/2.,
+                             self.params.flux[i], rtol=0.02)
+            self.assertClose(result['ip_diffim_DipoleFit_pos_centroid_x'],
+                             self.params.xc[i] + offsets[i], rtol=0.01)
+            self.assertClose(result['ip_diffim_DipoleFit_pos_centroid_y'],
+                             self.params.yc[i] + offsets[i], rtol=0.01)
+            self.assertClose(result['ip_diffim_DipoleFit_neg_centroid_x'],
+                             self.params.xc[i] - offsets[i], rtol=0.01)
+            self.assertClose(result['ip_diffim_DipoleFit_neg_centroid_y'],
+                             self.params.yc[i] - offsets[i], rtol=0.01)
+            # Note this is dependent on the noise (variance) being realistic in the image.
+            # otherwise it throws off the chi2 estimate, which is used for classification:
+            self.assertTrue(result['ip_diffim_DipoleFit_flag_classification'])
+
+            # compare to the original ip_diffim_PsfDipoleFlux measurements
+            result2 = r1.extract("ip_diffim_PsfDipoleFlux*")
+            self.assertClose((result['ip_diffim_DipoleFit_pos_flux'] +
+                              abs(result['ip_diffim_DipoleFit_neg_flux']))/2.,
+                             (result2['ip_diffim_PsfDipoleFlux_pos_flux'] +
+                              abs(result2['ip_diffim_PsfDipoleFlux_neg_flux']))/2.,
+                             rtol=0.02)
+            self.assertClose(result['ip_diffim_DipoleFit_pos_centroid_x'],
+                             result2['ip_diffim_PsfDipoleFlux_pos_centroid_x'],
+                             rtol=0.01)
+            self.assertClose(result['ip_diffim_DipoleFit_pos_centroid_y'],
+                             result2['ip_diffim_PsfDipoleFlux_pos_centroid_y'],
+                             rtol=0.01)
+            self.assertClose(result['ip_diffim_DipoleFit_neg_centroid_x'],
+                             result2['ip_diffim_PsfDipoleFlux_neg_centroid_x'],
+                             rtol=0.01)
+            self.assertClose(result['ip_diffim_DipoleFit_neg_centroid_y'],
+                             result2['ip_diffim_PsfDipoleFlux_neg_centroid_y'],
+                             rtol=0.01)
+
+            if self.params.display:
+                DipolePlotUtils.displayCutouts(r1, self.dipole, self.posImage, self.negImage)
+        if self.params.display:
+            DipolePlotUtils.plt.show()
+
+        return result
 
 
 # UTILITY CLASS WITH STATIC METHODS FOR DIPOLE TESTING ###
@@ -244,8 +351,10 @@ def suite():
 
     suites = []
     suites += unittest.makeSuite(DipoleFitAlgorithmTest)
+    suites += unittest.makeSuite(DipoleFitTaskTest)
     suites += unittest.makeSuite(lsst_tests.MemoryTestCase)
     return unittest.TestSuite(suites)
+
 
 def run(shouldExit = False):
     """Run the tests"""
