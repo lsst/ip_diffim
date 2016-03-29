@@ -26,13 +26,117 @@ from numpy import (random as np_random,
                    array as np_array,
                    mgrid as np_mgrid)
 
+import lsst.utils.tests as lsst_tests
 from lsst.afw.geom import (Box2I, Point2I, Point2D)
 from lsst.meas.algorithms import (SourceDetectionConfig, SourceDetectionTask)
 from lsst.afw.table import (SourceTable, SourceCatalog)
+from lsst.ip.diffim.dipoleFitTask import DipoleFitAlgorithm
 
-## UTILITY CLASS WITH STATIC METHODS FOR DIPOLE TESTING ###
+# Export DipoleTestUtils to expose fake image generating funcs
+__all__ = ("DipoleTestUtils")
 
 
+class DipoleFitTestGlobalParams(object):
+    """
+    Class to initialize and store global parameters used by all tests below.
+
+    Attributes
+    ----------
+    display : boolean
+        Display (plot) the output dipole thumbnails (matplotlib)
+    verbose : boolean
+        be verbose during fitting
+    w : integer
+        width (pixels) of test generated exposures
+    h : integer
+        height (pixels) of test generated exposures
+    xc : array of floats
+        x coordinate (pixels) of center(s) of input dipole(s)
+    yc : array of floats
+        y coordinate (pixels) of center(s) of input dipole(s)
+    flux : array of floats
+        flux(es) of input dipole(s)
+    gradientParams : array of floats
+        three parameters for linear background gradient
+    offsets : array of floats
+        pixel coordinates between lobes of dipoles
+    """
+
+    def __init__(self):
+        """
+        Initialize the parameters.
+        """
+        np_random.seed(666)
+        self.display = False
+        self.verbose = False
+        self.w, self.h = 100, 100  # size of image
+
+        self.xc = np_array([65.3, 24.2])  # xcenters of two dipoles in image
+        self.yc = np_array([38.6, 78.5])  # ycenters of two dipoles
+        self.flux = np_array([2500., 2345.])  # fluxes of pos/neg lobes
+        self.gradientParams = np_array([10., 3., 5.])
+
+        self.offsets = np_array([-2., 2.])  # pixel coord offsets between lobes of dipoles
+
+
+# First, test the algorithm itself (fitDipole()):
+# Create a simulated diffim (with dipoles) and a linear background gradient in the pre-sub images
+#   then compare the input fluxes/centroids with the fitted results.
+class DipoleFitAlgorithmTest(lsst_tests.TestCase):
+    """
+    A test case for dipole fit algorithm.
+
+    Test the dipole fitting algorithm on two dipoles within an image with
+    simulated noise.
+    """
+    def setUp(self):
+        self.params = DipoleFitTestGlobalParams()
+
+        offsets = self.params.offsets
+        self.dipole, (self.posImage, self.posCatalog), (self.negImage, self.negCatalog) = \
+            DipoleTestUtils.makeDipoleImage(
+                xcenPos=self.params.xc + offsets,
+                ycenPos=self.params.yc + offsets,
+                xcenNeg=self.params.xc - offsets,
+                ycenNeg=self.params.yc - offsets,
+                flux=self.params.flux, fluxNeg=self.params.flux,
+                gradientParams=self.params.gradientParams)
+
+        self.catalog = DipoleTestUtils.detectDipoleSources(self.dipole)
+
+    def tearDown(self):
+        del self.dipole, self.posImage, self.negImage
+        del self.catalog, self.posCatalog, self.negCatalog
+        del self.params
+
+    def testDipoleFitter(self):
+        """
+        Test the dipole fitting algorithm. Test that the resulting fluxes/centroids
+        are very close to the input values for both dipoles in the image.
+        """
+        if self.params.verbose:
+            for s in self.catalog:
+                fp = s.getFootprint()
+                print(fp.getBBox(), fp.getNpix())
+                for pk in fp.getPeaks():
+                    print('FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue())
+
+        offsets = self.params.offsets
+        for i, s in enumerate(self.catalog):
+            alg = DipoleFitAlgorithm(self.dipole, self.posImage, self.negImage)
+            result = alg.fitDipole(
+                s, rel_weight=1., separateNegParams=False,
+                verbose=self.params.verbose, display=self.params.display)
+
+            self.assertClose((result.psfFitPosFlux + abs(result.psfFitNegFlux))/2.,
+                             self.params.flux[i], rtol=0.02)
+            self.assertClose(result.psfFitPosCentroidX, self.params.xc[i] + offsets[i], rtol=0.01)
+            self.assertClose(result.psfFitPosCentroidY, self.params.yc[i] + offsets[i], rtol=0.01)
+            self.assertClose(result.psfFitNegCentroidX, self.params.xc[i] - offsets[i], rtol=0.01)
+            self.assertClose(result.psfFitNegCentroidY, self.params.yc[i] - offsets[i], rtol=0.01)
+
+
+# UTILITY CLASS WITH STATIC METHODS FOR DIPOLE TESTING ###
 class DipoleTestUtils(object):
 
     @staticmethod
@@ -131,3 +235,22 @@ class DipoleTestUtils(object):
 
         else:
             return detectTask, schema
+
+
+def suite():
+    """Returns a suite containing all the test cases in this module."""
+
+    lsst_tests.init()
+
+    suites = []
+    suites += unittest.makeSuite(DipoleFitAlgorithmTest)
+    suites += unittest.makeSuite(lsst_tests.MemoryTestCase)
+    return unittest.TestSuite(suites)
+
+def run(shouldExit = False):
+    """Run the tests"""
+    lsst_tests.run(suite(), shouldExit)
+
+if __name__ == "__main__":
+    run(True)
+
