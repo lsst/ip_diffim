@@ -87,6 +87,45 @@ class DipoleFitConfig(meas_base.SingleFramePluginConfig):
         doc="be verbose; this is slow")
 
 
+class DipoleFitTask(meas_base.SingleFrameMeasurementTask):
+    """
+    Subclass of SingleFrameMeasurementTask which can accept three input images in its
+    run() method. Because it subclasses SingleFrameMeasurementTask, and calls
+    SingleFrameMeasurementTask.run() from its run() method, it still can be used identically
+    to a standard SingleFrameMeasurementTask.
+    """
+
+    ConfigClass = DipoleFitConfig
+    _DefaultName = "ip_diffim_DipoleFit"
+
+    def __init__(self, schema, algMetadata=None, dpFitConfig=None, **kwds):
+
+        meas_base.SingleFrameMeasurementTask.__init__(self, schema, algMetadata, **kwds)
+
+        self.dpFitConfig = dpFitConfig
+        if self.dpFitConfig is None:
+            self.dpFitConfig = DipoleFitConfig()
+        self.dipoleFitter = DipoleFitPlugin(self.dpFitConfig, name=self._DefaultName,
+                                            schema=schema, metadata=algMetadata)
+
+    def run(self, sources, exposure, posImage=None, negImage=None, **kwds):
+        """!Run dipole measurement and classification
+        @param sources       diaSources that will be measured using dipole measurement
+        @param exposure      Exposure on which the diaSources were detected
+        @param posImage      "Positive" exposure from which the template was subtracted
+        @param negImage      "Negative" exposure which was subtracted from the posImage
+        @param **kwds        Sent to SingleFrameMeasurementTask
+        """
+
+        meas_base.SingleFrameMeasurementTask.run(self, sources, exposure, **kwds)
+
+        if not sources:
+            return
+
+        for source in sources:
+            self.dipoleFitter.measure(source, exposure, posImage, negImage)
+
+
 class DipoleFitTransform(meas_base.FluxTransform):
 
     def __init__(self, config, name, mapper):
