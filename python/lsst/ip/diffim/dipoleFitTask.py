@@ -87,6 +87,13 @@ class DipoleFitConfig(meas_base.SingleFramePluginConfig):
         doc="be verbose; this is slow")
 
 
+class DipoleFitTransform(meas_base.FluxTransform):
+
+    def __init__(self, config, name, mapper):
+        meas_base.FluxTransform.__init__(self, name, mapper)
+        mapper.addMapping(mapper.getInputSchema().find(name + "_flag_edge").key)
+
+
 @meas_base.register("ip_diffim_DipoleFit")
 class DipoleFitPlugin(meas_base.SingleFramePlugin):
     """
@@ -114,6 +121,10 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
         # algorithms that require both getShape() and getCentroid(),
         # in addition to a Footprint and its Peaks
         return cls.FLUX_ORDER
+
+    @classmethod
+    def getTransformClass(cls):
+        return DipoleFitTransform
 
     def __init__(self, config, name, schema, metadata):
         meas_base.SingleFramePlugin.__init__(self, config, name, schema, metadata)
