@@ -112,6 +112,8 @@ class DipoleFitTask(meas_base.SingleFrameMeasurementTask):
         """!Run dipole measurement and classification
         @param sources       diaSources that will be measured using dipole measurement
         @param exposure      Exposure on which the diaSources were detected
+        @param posImage      "Positive" exposure from which the template was subtracted
+        @param negImage      "Negative" exposure which was subtracted from the posImage
         @param **kwds        Sent to SingleFrameMeasurementTask
         """
 
@@ -346,6 +348,7 @@ class DipoleFitAlgorithm(object):
     4. evaluate necessity for separate parameters for pos- and neg- images
     5. only fit background OUTSIDE footprint and dipole params INSIDE footprint?
     6. requires a new package `lmfit` -- TBD: a more conventional fitter (astropy/scipy/iminuit?)
+    7. account for PSFs that vary across the exposures
     """
     import lmfit
 
@@ -582,16 +585,15 @@ class DipoleFitAlgorithm(object):
         subim = MaskedImageF(diffim.getMaskedImage(), bbox, PARENT)
 
         z = diArr = subim.getArrays()[0]
-        weights = subim.getArrays()[2]  ## get the weights (=1/variance)
+        weights = 1. / subim.getArrays()[2]  ## get the weights (=1/variance)
         if posImage is not None and rel_weight > 0.:
             posSubim = MaskedImageF(posImage.getMaskedImage(), bbox, PARENT)
             negSubim = MaskedImageF(negImage.getMaskedImage(), bbox, PARENT)
             z = np.append([z], [posSubim.getArrays()[0],
                                 negSubim.getArrays()[0]], axis=0)
-            weights = np.append([weights], [posSubim.getArrays()[2] * rel_weight,
-                                            negSubim.getArrays()[2] * rel_weight], axis=0)
-
-        weights[:] = 1. / weights  ## TBD: is there an inplace operator for this?
+            ## Weight the pos/neg images by rel_weight relative to the diffim
+            weights = np.append([weights], [1. / posSubim.getArrays()[2] * rel_weight,
+                                            1. / negSubim.getArrays()[2] * rel_weight], axis=0)
 
         psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
 
@@ -684,6 +686,9 @@ class DipoleFitAlgorithm(object):
         y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
         in_x = np.array([x, y]).astype(np.float)
 
+        ## I'm not sure about the variance planes in the diffim (or convolved pre-sub. images
+        ## for that matter) so for now, let's just do an un-weighted least-squares fit
+        ## (override weights computed above).
         weights = 1.
         if posImage is not None and rel_weight > 0.:
             weights = np.array([np.ones_like(diArr), np.ones_like(diArr)*rel_weight,
@@ -711,7 +716,7 @@ class DipoleFitAlgorithm(object):
         ## Display images, model fits and residuals (currently uses matplotlib display functions)
         if display:
             try:
-                DipolePlotUtils.displayFitResults(result, fp)
+                DipoleFitAlgorithm.displayFitResults(result, fp)
             except Exception as err:
                 print('Uh oh! need matplotlib to use these funcs', err)
                 pass
@@ -748,23 +753,6 @@ class DipoleFitAlgorithm(object):
             centroidRangeInSigma=centroidRangeInSigma, separateNegParams=separateNegParams,
             bgGradientOrder=bgGradientOrder, verbose=verbose, display=display)
 
-        ## In (rare) extreme cases of very faint dipoles on top of a very steep background
-        ## gradient (and we're including the pre-sub. images in the fit), the fit can go haywire.
-        ## In this case, hope that the diffim is better and let's re-run the fit just using just
-        ## the diffim instead.
-        ## This will be rare and running it without background gradient fitting on is about 2x faster
-        ## so doesn't add too much time to the fitting.
-        ## Currently not run:
-        if False and (rel_weight > 0.) and (fitResult.redchi > 10000. or
-                                            fitResult.params['flux'].stderr == 0. or
-                                            fitResult.params['flux'].stderr >= 1e6 or
-                                            (separateNegParams and fitResult.params['fluxNeg'].stderr == 0)):
-            fitResult = DipoleFitAlgorithm.fitDipole(
-                exposure, source=source, posImage=posImage, negImage=negImage,
-                tol=tol, rel_weight=0., fitBgGradient=False,
-                centroidRangeInSigma=centroidRangeInSigma, separateNegParams=separateNegParams,
-                bgGradientOrder=0, verbose=verbose, display=display)
-
         fitParams = fitResult.best_values
         if fitParams['flux'] <= 1.:   ## usually around 0.1 -- the minimun flux allowed -- i.e. bad fit.
             out = DipoleFitAlgorithm.resultsOutput(
@@ -774,8 +762,8 @@ class DipoleFitAlgorithm(object):
                 return out, fitResult
             return out
 
-        centroid = ((fitParams['xcenPos']+fitParams['xcenNeg'])/2.,
-                    (fitParams['ycenPos']+fitParams['ycenNeg'])/2.)
+        centroid = ((fitParams['xcenPos'] + fitParams['xcenNeg']) / 2.,
+                    (fitParams['ycenPos'] + fitParams['ycenNeg']) / 2.)
         dx, dy = fitParams['xcenPos'] - fitParams['xcenNeg'], fitParams['ycenPos'] - fitParams['ycenNeg']
         angle = np.arctan2(dy, dx) / np.pi * 180.   ## convert to degrees (should keep as rad?)
 
@@ -813,6 +801,34 @@ class DipoleFitAlgorithm(object):
         if return_fitObj:  ## for debugging
             return out, fitResult
         return out
+
+    @staticmethod
+    def displayFitResults(result, footprint):
+        """Usage: fig = displayFitResults(result, fp)"""
+        ## Display data, model fits and residuals (currently uses matplotlib display functions)
+        z = result.data
+        fit = result.best_fit
+        bbox = footprint.getBBox()
+        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
+        if z.shape[0] == 3:
+            fig = DipolePlotUtils.plt.figure(figsize=(8, 8))
+            for i in range(3):
+                DipolePlotUtils.plt.subplot(3, 3, i*3+1)
+                DipolePlotUtils.display2dArray(z[i,:], 'Data', True, extent=extent)
+                DipolePlotUtils.plt.subplot(3, 3, i*3+2)
+                DipolePlotUtils.display2dArray(fit[i,:], 'Model', True, extent=extent)
+                DipolePlotUtils.plt.subplot(3, 3, i*3+3)
+                DipolePlotUtils.display2dArray(z[i,:] - fit[i,:], 'Residual', True, extent=extent)
+            return fig
+        else:
+            fig = DipolePlotUtils.plt.figure(figsize=(8, 2.5))
+            DipolePlotUtils.plt.subplot(1, 3, 1)
+            DipolePlotUtils.display2dArray(z, 'Data', True, extent=extent)
+            DipolePlotUtils.plt.subplot(1, 3, 2)
+            DipolePlotUtils.display2dArray(fit, 'Model', True, extent=extent)
+            DipolePlotUtils.plt.subplot(1, 3, 3)
+            DipolePlotUtils.display2dArray(z - fit, 'Residual', True, extent=extent)
+            return fig
 
 
 ################# UTILITIES FUNCTIONS -- TBD WHERE THEY ULTIMATELY END UP #######
@@ -1054,32 +1070,4 @@ class DipolePlotUtils():
                 print(i)
                 return s
         return None
-
-    @staticmethod
-    def displayFitResults(result, footprint):
-        """Usage: fig = displayFitResults(result, fp)"""
-        ## Display data, model fits and residuals (currently uses matplotlib display functions)
-        z = result.data
-        fit = result.best_fit
-        bbox = footprint.getBBox()
-        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-        if z.shape[0] == 3:
-            fig = DipolePlotUtils.plt.figure(figsize=(8, 8))
-            for i in range(3):
-                DipolePlotUtils.plt.subplot(3, 3, i*3+1)
-                DipolePlotUtils.display2dArray(z[i,:], 'Data', True, extent=extent)
-                DipolePlotUtils.plt.subplot(3, 3, i*3+2)
-                DipolePlotUtils.display2dArray(fit[i,:], 'Model', True, extent=extent)
-                DipolePlotUtils.plt.subplot(3, 3, i*3+3)
-                DipolePlotUtils.display2dArray(z[i,:] - fit[i,:], 'Residual', True, extent=extent)
-            return fig
-        else:
-            fig = DipolePlotUtils.plt.figure(figsize=(8, 2.5))
-            DipolePlotUtils.plt.subplot(1, 3, 1)
-            DipolePlotUtils.display2dArray(z, 'Data', True, extent=extent)
-            DipolePlotUtils.plt.subplot(1, 3, 2)
-            DipolePlotUtils.display2dArray(fit, 'Model', True, extent=extent)
-            DipolePlotUtils.plt.subplot(1, 3, 3)
-            DipolePlotUtils.display2dArray(z - fit, 'Residual', True, extent=extent)
-            return fig
 
