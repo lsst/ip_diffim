@@ -37,6 +37,7 @@ from dipoleMeasurement import *
 from diffimTools import *
 from kernelCandidateQa import *
 from getTemplate import *
+from .diaCatalogSourceSelector import *
 from lsst.meas.base import wrapSimpleAlgorithm
 
 # automatically register ip_diffim Algorithms
