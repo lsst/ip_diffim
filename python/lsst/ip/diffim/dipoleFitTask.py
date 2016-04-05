@@ -59,9 +59,9 @@ class DipoleFitConfig(meas_base.SingleFramePluginConfig):
         dtype=float, default=1e-7,
         doc="fit tolerance")
 
-    fitBgGradient = Field(
-        dtype=bool, default=True,
-        doc="fit parameters for linear gradient in pre-sub. images")
+    bgGradientOrder = Field(
+        dtype=int, default=1,
+        doc="polynomial order for linear gradient in pre-sub. images (-1 for no fit)")
 
     fitSeparateNegParams = Field(
         dtype=bool, default=False,
@@ -246,22 +246,27 @@ class DipoleFitPlugin(meas_base.SingleFramePlugin):
         # of this plugin (into `DipoleFitAlgorithm.fitDipole()`) so that
         # `DipoleFitAlgorithm.fitDipole()` can be called separately for testing
         # (see `tests/testDipoleFitter.py`)
+        result = None
         try:
             alg = DipoleFitAlgorithm(exposure, posImage=posImage, negImage=negImage)
             result = alg.fitDipole(
                 measRecord, rel_weight=self.config.relWeight,
                 tol=self.config.tolerance,
                 centroidRangeInSigma=self.config.centroidRange,
-                fitBgGradient=self.config.fitBgGradient,
+                fitBgGradient=(self.config.bgGradientOrder >= 0),
+                bgGradientOrder=self.config.bgGradientOrder,
                 separateNegParams=self.config.fitSeparateNegParams,
                 verbose=self.config.verbose, display=False)
+
         except LengthError:
-            raise meas_base.MeasurementError('edge failure', self.FAILURE_EDGE)
+            self.fail(measRecord, meas_base.MeasurementError('edge failure', self.FAILURE_EDGE))
         except Exception:
             self.fail(measRecord, meas_base.MeasurementError('dipole fit failure', self.FAILURE_FIT))
 
-        self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
+        if result is None:
+            return result
 
+        self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
         if result.psfFitPosFlux <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
             self.fail(measRecord, meas_base.MeasurementError('dipole fit failure', self.FAILURE_FIT))
 
@@ -341,22 +346,25 @@ class DipoleFitAlgorithm(object):
     This code is documented in DMTN-007.
     """
     # Below is a (somewhat incomplete) list of improvements
-    # that would be worth investigating, given the time:
+    # that could be added as new tickets:
 
-    # 1. Initial fast test whether a background gradient needs to be fit
-    # 2. Initial fast estimate of background gradient(s) params -- perhaps using numpy.lstsq
-    # 3. better estimate for staring flux when there's a strong gradient
-    # 4. evaluate necessity for separate parameters for pos- and neg- images
-    # 5. only fit background OUTSIDE footprint and dipole params INSIDE footprint?
-    # 6. requires a new package `lmfit` -- investiate others? (astropy/scipy/iminuit?)
-    # 7. account for PSFs that vary across the exposures
+    # 1. evaluate necessity for separate parameters for pos- and neg- images
+    # 2. only fit background OUTSIDE footprint (DONE) and dipole params INSIDE footprint (NOT DONE)?
+    # 3. correct normalization of least-squares weights based on variance planes
+    # 4. account for PSFs that vary across the exposures
+    # 5. correctly account for NA/masks  (i.e., ignore!)
+    # 6. better exception handling in the plugin
+    # 7. (DONE) Initial fast estimate of background gradient(s) params -- perhaps using numpy.lstsq
+    # 8. (NOT NEEDED - see (1)) Initial fast test whether a background gradient needs to be fit
+    # 9. (DONE) better initial estimate for flux when there's a strong gradient
+    # 10. (DONE) requires a new package `lmfit` -- investiate others? (astropy/scipy/iminuit?)
 
     # Only import lmfit if someone wants to use the new DipoleFitAlgorithm.
     import lmfit
 
     # This is just a private version number to sync with the ipython notebooks that I have been
     # using for algorithm development.
-    __private_version__ = '0.0.3'
+    _private_version_ = '0.0.4'
 
     # Create a namedtuple to hold all of the relevant output from the lmfit results
     resultsOutput = namedtuple('resultsOutput',
@@ -383,27 +391,19 @@ class DipoleFitAlgorithm(object):
         self.posImage = posImage
         self.negImage = negImage
 
-    @staticmethod
-    def genBgGradientModel(in_x, b=None, x1=0., y1=0., xy=None, x2=0., y2=0.):
+        self.psfSigma = None
+        if diffim is not None:
+            self.psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
+
+    def genBgGradientModel(self, in_x, pars=()):
         """Generate gradient model (2-d array) with up to 2nd-order polynomial
 
         Parameters
         ----------
         in_x : 3-d numpy.array
            Provides the input x,y grid upon which to compute the gradient
-        b : float
-           Intercept (0th-order parameter) for gradient. If None, do nothing (for speed).
-        x1 : float, optional
-           X-slope (1st-order parameter) for gradient.
-        y1 : float, optional
-           Y-slope (1st-order parameter) for gradient.
-        xy : float, optional
-           X*Y coefficient (2nd-order parameter) for gradient.
-           If None, do not compute 2nd order polynomial.
-        x2 : float, optional
-           X**2 coefficient (2nd-order parameter) for gradient.
-        y2 : float, optional
-           Y**2 coefficient (2nd-order parameter) for gradient.
+        pars : tuple
+           Up to 6 floats for up to 6 2nd-order 2-d polynomial gradient parameters
 
         Returns
         -------
@@ -411,23 +411,58 @@ class DipoleFitAlgorithm(object):
         """
 
         gradient = None
-        if b is not None:  # Don't fit for other gradient parameters if the intercept is not allowed.
+        # Don't fit for other gradient parameters if the intercept is not included.
+        if len(pars) > 0 and pars[0] is not None:
             y, x = in_x[0, :], in_x[1, :]
-            gradient = np.full_like(x, b, dtype='float64')
-            if x1 is not None:
-                gradient += x1 * x
-            if y1 is not None:
-                gradient += y1 * y
-            if xy is not None:
-                gradient += xy * (x * y)
-            if x2 is not None:
-                gradient += x2 * (x * x)
-            if y2 is not None:
-                gradient += y2 * (y * y)
+            gradient = np.full_like(x, pars[0], dtype='float64')
+            if len(pars) > 1 and pars[1] is not None:
+                gradient += pars[1] * x
+            if len(pars) > 2 and pars[2] is not None:
+                gradient += pars[2] * y
+            if len(pars) > 3 and pars[3] is not None:
+                gradient += pars[3] * (x * y)
+            if len(pars) > 4 and pars[4] is not None:
+                gradient += pars[4] * (x**2.)
+            if len(pars) > 5 and pars[5] is not None:
+                gradient += pars[5] * (y**2.)
         return gradient
 
-    @staticmethod
-    def genStarModel(bbox, psf, xcen, ycen, flux):
+    def fitBackgroundGradient(self, source, posImage, order=1):
+        """ Fit a linear (polynomial) model of given order (max 2) to the background of a footprint.
+        Only fit the pixels OUTSIDE of the footprint, but within its bounding box.
+        """
+        fp = source.getFootprint()
+        bbox = fp.getBBox()
+        bbox.grow(3)
+        posImg = ImageF(posImage.getMaskedImage().getImage(), bbox, PARENT)
+        posHfp = afw_det.HeavyFootprintF(fp, posImage.getMaskedImage())
+        posFpImg = DipolePlotUtils.getHeavyFootprintSubimage(posHfp, grow=3)
+
+        isBg = np.isnan(posFpImg.getArray()).ravel()
+
+        data = posImg.getArray().ravel()
+        data = data[isBg]
+        B = data
+
+        x, y = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
+        x = x.astype(np.float64).ravel()
+        x -= np.mean(x)
+        x = x[isBg]
+        y = y.astype(np.float64).ravel()
+        y -= np.mean(y)
+        y = y[isBg]
+        b = np.ones_like(x, dtype=np.float64)
+
+        M = np.vstack([b]).T  # order = 0
+        if order == 1:
+            M = np.vstack([b, x, y]).T
+        elif order == 2:
+            M = np.vstack([b, x, y, x**2., y**2., x*y]).T
+
+        pars = np.linalg.lstsq(M, B)[0]
+        return pars
+
+    def genStarModel(self, bbox, psf, xcen, ycen, flux):
         """Generate model (2-d array) of a 'star' (single PSF) centered at given coordinates
 
         Parameters
@@ -468,11 +503,10 @@ class DipoleFitAlgorithm(object):
 
         return p_Im
 
-    @staticmethod
-    def genDipoleModel(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
-                       b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
-                       bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
-                       debug=False, **kwargs):
+    def genDipoleModelImpl(self, x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
+                           b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
+                           bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
+                           debug=False, **kwargs):
         """
         Generate dipole model with given parameters.
         This is the functor whose sum-of-squared difference from data is minimized by `lmfit`.
@@ -533,42 +567,65 @@ class DipoleFitAlgorithm(object):
             if xy is not None:
                 print('     %.2f %.2f %.2f' % (xy, x2, y2))
 
-        posIm = DipoleFitAlgorithm.genStarModel(bbox, psf, xcenPos, ycenPos, flux)
-        negIm = DipoleFitAlgorithm.genStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
+        posIm = self.genStarModel(bbox, psf, xcenPos, ycenPos, flux)
+        negIm = self.genStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
 
         in_x = x
         if in_x is None:  # use the footprint to generate the input grid
             y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
-            in_x = np.array([x, y]) * 1.
+            in_x = np.array([x, y]).astype(np.float64)
+            in_x[0, :] -= in_x[0, :].mean()
+            in_x[1, :] -= in_x[1, :].mean()
 
-        gradient = DipoleFitAlgorithm.genBgGradientModel(in_x, b, x1, y1, xy, x2, y2)
-        gradientNeg = gradient
-        if bNeg is not None:
-            gradientNeg = DipoleFitAlgorithm.genBgGradientModel(in_x, bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg)
+        if b is not None:
+            gradient = self.genBgGradientModel(in_x, (b, x1, y1, xy, x2, y2))
+            gradientNeg = gradient
+            if bNeg is not None:
+                gradientNeg = self.genBgGradientModel(in_x, (bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg))
 
-        if gradient is not None:
-            posIm.getArray()[:, :] += gradient
-            negIm.getArray()[:, :] += gradientNeg
+            if gradient is not None:
+                posIm.getArray()[:, :] += gradient
+                negIm.getArray()[:, :] += gradientNeg
 
         # Generate the diffIm model
-        diffIm = ImageF(bbox)
-        diffIm += posIm
+        diffIm = posIm
+        if rel_weight > 0.:  # Need to store the posIm, so create a separate array.
+            diffIm = ImageF(bbox)
+            diffIm += posIm
         diffIm -= negIm
 
         zout = diffIm.getArray()
+
         if rel_weight > 0.:
             zout = np.append([zout], [posIm.getArray(), negIm.getArray()], axis=0)
 
         return zout
 
+    @staticmethod
+    def genDipoleModel(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
+                       b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
+                       bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
+                       debug=False, **kwargs):
+        """
+        Generate dipole model with given parameters.
+        This is the functor whose sum-of-squared difference from data is minimized by `lmfit`.
+        Thus it must be static. However, it just defers to `self.genDipoleModelImpl()`, where
+        `self` comes out of kwargs['myself'].
+        """
+        myself = kwargs.pop('myself')
+        return myself.genDipoleModelImpl(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=fluxNeg,
+                                         b=b, x1=x1, y1=y1, xy=xy, x2=x2, y2=y2,
+                                         bNeg=bNeg, x1Neg=x1Neg, y1Neg=y1Neg, xyNeg=xyNeg,
+                                         x2Neg=x2Neg, y2Neg=y2Neg, debug=debug, **kwargs)
+
     def fitDipoleImpl(self, source, tol=1e-7, rel_weight=0.5,
                       fitBgGradient=True, bgGradientOrder=1, centroidRangeInSigma=5.,
                       separateNegParams=True, verbose=False, display=False):
         """
-        Fit a dipole model to an input difference image (actually,
+        Fit a dipole model to an input difference image self.diffim (actually,
         subimage bounded by the input source's footprint) and
         optionally constrain the fit using the pre-subtraction images
-        posImage and negImage.
+        self.posImage and self.negImage.
 
         Parameters
         ----------
@@ -577,7 +634,7 @@ class DipoleFitAlgorithm(object):
         Returns
         -------
         `lmfit.MinimizerResult` object containing the fit parameters and other information.
-
+        `bgParsPos`, `bgParsNeg` tuples containing best fit parameters to background gradient.
         """
 
         fp = source.getFootprint()
@@ -585,6 +642,7 @@ class DipoleFitAlgorithm(object):
         subim = MaskedImageF(self.diffim.getMaskedImage(), bbox, PARENT)
 
         z = diArr = subim.getArrays()[0]
+
         weights = 1. / subim.getArrays()[2]  # get the weights (=1/variance)
         if self.posImage is not None and rel_weight > 0.:
             posSubim = MaskedImageF(self.posImage.getMaskedImage(), bbox, PARENT)
@@ -594,8 +652,6 @@ class DipoleFitAlgorithm(object):
             # Weight the pos/neg images by rel_weight relative to the diffim
             weights = np.append([weights], [1. / posSubim.getArrays()[2] * rel_weight,
                                             1. / negSubim.getArrays()[2] * rel_weight], axis=0)
-
-        psfSigma = self.diffim.getPsf().computeShape().getDeterminantRadius()
 
         # Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
         gmod = DipoleFitAlgorithm.lmfit.Model(DipoleFitAlgorithm.genDipoleModel, verbose=verbose)
@@ -613,7 +669,7 @@ class DipoleFitAlgorithm(object):
 
         # For close/faint dipoles the starting locs (min/max) might be way off, let's help them a bit.
         # First assume dipole is not separated by more than 5*psfSigma.
-        centroidRange = psfSigma * centroidRangeInSigma
+        centroidRange = self.psfSigma * centroidRangeInSigma
 
         # Note - this may be a cheat to assume the dipole is centered in center of the footprint.
         if np.sum(np.sqrt((np.array(cenPos) - fpCentroid)**2.)) > centroidRange:
@@ -662,37 +718,75 @@ class DipoleFitAlgorithm(object):
             # TBD: set max negative lobe flux limit?
             gmod.set_param_hint('fluxNeg', value=np.abs(negFlux), min=0.1)
 
-        # Fixed parameters (dont fit for them if there are no pre-sub images or no gradient fit requested):
-        if (rel_weight > 0. and fitBgGradient):
-            if bgGradientOrder >= 0:
-                gmod.set_param_hint('b', value=0.)
-                if separateNegParams:
-                    gmod.set_param_hint('bNeg', value=0.)
-            if bgGradientOrder >= 1:
-                gmod.set_param_hint('x1', value=0.)
-                gmod.set_param_hint('y1', value=0.)
-                if separateNegParams:
-                    gmod.set_param_hint('x1Neg', value=0.)
-                    gmod.set_param_hint('y1Neg', value=0.)
-            if bgGradientOrder >= 2:
-                gmod.set_param_hint('xy', value=0.)
-                gmod.set_param_hint('x2', value=0.)
-                gmod.set_param_hint('y2', value=0.)
-                if separateNegParams:
-                    gmod.set_param_hint('xyNeg', value=0.)
-                    gmod.set_param_hint('x2Neg', value=0.)
-                    gmod.set_param_hint('y2Neg', value=0.)
+        # Fixed parameters (dont fit for them if there are no pre-sub images or no gradient fit requested).
+        # Right now, we use the linear model to fit the background and initialize the parameters.
+        # It might be better to just subtract the linear model from the data and then don't fit the background
+        # again.
+        bgParsPos = bgParsNeg = (0., 0., 0.)
+        if (rel_weight > 0. and fitBgGradient and bgGradientOrder >= 0):
+            # Fit the gradient to the background
+            bgParsPos = bgParsNeg = self.fitBackgroundGradient(source, self.posImage, order=bgGradientOrder)
+            # Generate the gradient to subtract from the pre-subtraction image data
+            x, y = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
+            in_x = np.array([y, x]).astype(np.float64)
+            in_x[0, :] -= np.mean(in_x[0, :])
+            in_x[1, :] -= np.mean(in_x[1, :])
+            pbg = self.genBgGradientModel(in_x, tuple(bgParsPos))
+            # Subtract it and re-estimate the starting flux
+            z[1, :] -= pbg
+            posFlux = np.nansum(z[1, :] - np.nanmedian(z[1, :]))
+            gmod.set_param_hint('flux', value=posFlux*5., min=0.1)
+            if separateNegParams:
+                bgParsNeg = self.fitBackgroundGradient(source, self.negImage, order=bgGradientOrder)
+                pbg = self.genBgGradientModel(in_x, tuple(bgParsNeg))
+            z[2, :] -= pbg
+            if separateNegParams:
+                negFlux = np.nansum(z[2, :] - np.nanmedian(z[2, :]))
+                gmod.set_param_hint('fluxNeg', value=negFlux*5., min=0.1)
+            bgParsPos = bgParsNeg = (0., 0., 0.)
+
+            # This option currently isnt used but possible to re-fit the gradient jointly with the dipole
+            if False:
+                if bgGradientOrder >= 0:
+                    gmod.set_param_hint('b', value=bgParsPos[0])
+                    if separateNegParams:
+                        gmod.set_param_hint('bNeg', value=bgParsNeg[0])
+                if bgGradientOrder >= 1:
+                    gmod.set_param_hint('x1', value=bgParsPos[1])
+                    gmod.set_param_hint('y1', value=bgParsPos[2])
+                    if separateNegParams:
+                        gmod.set_param_hint('x1Neg', value=bgParsNeg[1])
+                        gmod.set_param_hint('y1Neg', value=bgParsNeg[2])
+                if bgGradientOrder >= 2:
+                    gmod.set_param_hint('xy', value=bgParsPos[3])
+                    gmod.set_param_hint('x2', value=bgParsPos[4])
+                    gmod.set_param_hint('y2', value=bgParsPos[5])
+                    if separateNegParams:
+                        gmod.set_param_hint('xyNeg', value=bgParsNeg[3])
+                        gmod.set_param_hint('x2Neg', value=bgParsNeg[4])
+                        gmod.set_param_hint('y2Neg', value=bgParsNeg[5])
 
         y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
         in_x = np.array([x, y]).astype(np.float)
+        in_x[0, :] -= in_x[0, :].mean()  # center it!
+        in_x[1, :] -= in_x[1, :].mean()
+
+        # Instead of explicitly using a mask to ignore flagged pixels, just set the ignored pixels'
+        #  weights to 0 in the fit. Right now, this is not used. TBD: need to inspect mask planes to set
+        #  this mask.
+        mask = np.ones_like(z, dtype=bool)  # TBD: set mask values to False if the pixels are to be ignored
 
         # I'm not sure about the variance planes in the diffim (or convolved pre-sub. images
         # for that matter) so for now, let's just do an un-weighted least-squares fit
-        # (override weights computed above).
-        weights = 1.
+        # (this overrides the variance-based weights computed above).
+        weights = mask.astype(np.float64)
         if self.posImage is not None and rel_weight > 0.:
-            weights = np.array([np.ones_like(diArr), np.ones_like(diArr)*rel_weight,
-                                np.ones_like(diArr)*rel_weight])
+            weights = np.array([np.ones_like(diArr),
+                                np.ones_like(diArr) * rel_weight,
+                                np.ones_like(diArr) * rel_weight])
+        # Set the weights to zero if mask is False
+        if np.any(~mask):
+            weights[~mask] = 0.
 
         # Note that although we can, we're not required to set initial values for params here,
         # since we set their param_hint's above.
@@ -702,7 +796,8 @@ class DipoleFitAlgorithm(object):
                           fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol, 'maxfev': 250},  # see scipy docs
                           psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to genDipoleModel()
                           rel_weight=rel_weight,
-                          footprint=fp)
+                          footprint=fp,
+                          myself=self)
 
         # Probably never wanted - also this takes a long time (longer than the fit!)
         # This is how to get confidence intervals out:
@@ -717,17 +812,17 @@ class DipoleFitAlgorithm(object):
         if display:
             self.displayFitResults(result, fp)
 
-        return result
+        return result, bgParsPos, bgParsNeg
 
     def fitDipole(self, source, tol=1e-7, rel_weight=0.1,
                   fitBgGradient=True, centroidRangeInSigma=5., separateNegParams=True,
                   bgGradientOrder=1, verbose=False, display=False, return_fitObj=False):
         """
         Wrapper around `fitDipoleImpl()` which performs the fit of a dipole
-        model to an input difference image (actually, subimage bounded
+        model to an input difference image `self.diffim` (actually, subimage bounded
         by the input source's footprint) and optionally constrain the
-        fit using the pre-subtraction images posImage and
-        negImage. Wraps the output into a `resultsOutput` object after
+        fit using the pre-subtraction images `self.posImage` and
+        `self.negImage`. Wraps the output into a `resultsOutput` object after
         computing additional statistics such as orientation and SNR.
 
         Parameters
@@ -760,7 +855,9 @@ class DipoleFitAlgorithm(object):
         `lmfit.MinimizerResult` object if `return_fitObj` is True.
         """
 
-        fitResult = self.fitDipoleImpl(
+        # Currently the output bgPars are ignored, but they could be used in the future to identify
+        # problems.
+        fitResult, bgParsPos, bgParsNeg = self.fitDipoleImpl(
             source, tol=tol, rel_weight=rel_weight, fitBgGradient=fitBgGradient,
             centroidRangeInSigma=centroidRangeInSigma, separateNegParams=separateNegParams,
             bgGradientOrder=bgGradientOrder, verbose=verbose, display=display)
@@ -771,7 +868,7 @@ class DipoleFitAlgorithm(object):
                 np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
                 np.nan, np.nan, np.nan)
             if return_fitObj:  # for debugging
-                return out, fitResult
+                return out, fitResult, bgParsPos, bgParsNeg
             return out
 
         centroid = ((fitParams['xcenPos'] + fitParams['xcenNeg']) / 2.,
@@ -815,9 +912,11 @@ class DipoleFitAlgorithm(object):
         return out
 
     def displayFitResults(self, result, footprint):
-        """Usage: fig = displayFitResults(result, fp)"""
+        """Usage: fig = displayFitResults(result, fp)
+
+        Display data, model fits and residuals (currently uses matplotlib display functions)
+        """
         try:
-            # Display data, model fits and residuals (currently uses matplotlib display functions)
             import matplotlib.pyplot as plt
 
             z = result.data
@@ -848,7 +947,7 @@ class DipoleFitAlgorithm(object):
             pass
 
 
-######### UTILITIES FUNCTIONS -- TBD WHERE THEY ULTIMATELY END UP ####
+# ######## UTILITIES FUNCTIONS -- TBD WHERE THEY ULTIMATELY END UP ####
 
 class DipolePlotUtils():
     """
@@ -1068,10 +1167,12 @@ class DipolePlotUtils():
         return catalog
 
     @staticmethod
-    def getHeavyFootprintSubimage(fp, badfill=np.nan):
+    def getHeavyFootprintSubimage(fp, badfill=np.nan, grow=0):
         """Usage: subim = getHeavyFootprintSubimage(fp)"""
         hfp = afw_det.HeavyFootprintF_cast(fp)
         bbox = hfp.getBBox()
+        if grow > 0:
+            bbox.grow(grow)
 
         subim2 = ImageF(bbox, badfill)  # set the mask to NA (can use 0. if desired)
         afw_det.expandArray(hfp, hfp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
