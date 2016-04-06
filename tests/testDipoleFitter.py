@@ -22,9 +22,7 @@ from __future__ import absolute_import, division, print_function
 
 import unittest
 
-from numpy import (random as np_random,
-                   array as np_array,
-                   mgrid as np_mgrid)
+import numpy as np
 
 import lsst.utils.tests as lsst_tests
 from lsst.afw.geom import (Box2I, Point2I, Point2D)
@@ -33,8 +31,8 @@ from lsst.afw.table import (SourceTable, SourceCatalog)
 from lsst.ip.diffim.dipoleFitTask import (DipoleFitAlgorithm, DipoleFitConfig, DipoleFitTask, DipolePlotUtils)
 from lsst.meas.base import SingleFrameMeasurementConfig
 
-# Export DipoleTestUtils to expose fake image generating funcs
-__all__ = ("DipoleTestUtils")
+# Export DipoleTestImage to expose fake image generating funcs
+__all__ = ("DipoleTestImage")
 
 
 class DipoleFitTestGlobalParams(object):
@@ -67,17 +65,17 @@ class DipoleFitTestGlobalParams(object):
         """
         Initialize the parameters.
         """
-        np_random.seed(666)
+        np.random.seed(666)
         self.display = False
         self.verbose = False
         self.w, self.h = 100, 100  # size of image
 
-        self.xc = np_array([65.3, 24.2])  # xcenters of two dipoles in image
-        self.yc = np_array([38.6, 78.5])  # ycenters of two dipoles
-        self.flux = np_array([2500., 2345.])  # fluxes of pos/neg lobes
-        self.gradientParams = np_array([10., 3., 5.])
+        self.xc = np.array([65.3, 24.2])  # xcenters of two dipoles in image
+        self.yc = np.array([38.6, 78.5])  # ycenters of two dipoles
+        self.flux = np.array([2500., 2345.])  # fluxes of pos/neg lobes
+        self.gradientParams = np.array([10., 3., 5.])
 
-        self.offsets = np_array([-2., 2.])  # pixel coord offsets between lobes of dipoles
+        self.offsets = np.array([-2., 2.])  # pixel coord offsets between lobes of dipoles
 
 
 # First, test the algorithm itself (fitDipole()):
@@ -94,20 +92,18 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
         self.params = DipoleFitTestGlobalParams()
 
         offsets = self.params.offsets
-        self.dipole, (self.posImage, self.posCatalog), (self.negImage, self.negCatalog) = \
-            DipoleTestUtils.makeDipoleImage(
-                xcenPos=self.params.xc + offsets,
-                ycenPos=self.params.yc + offsets,
-                xcenNeg=self.params.xc - offsets,
-                ycenNeg=self.params.yc - offsets,
-                flux=self.params.flux, fluxNeg=self.params.flux,
-                gradientParams=self.params.gradientParams)
+        self.testImage = DipoleTestImage(
+            xcenPos=self.params.xc + offsets,
+            ycenPos=self.params.yc + offsets,
+            xcenNeg=self.params.xc - offsets,
+            ycenNeg=self.params.yc - offsets,
+            flux=self.params.flux, fluxNeg=self.params.flux,
+            gradientParams=self.params.gradientParams)
 
-        self.catalog = DipoleTestUtils.detectDipoleSources(self.dipole)
+        self.catalog = self.testImage.detectDipoleSources()
 
     def tearDown(self):
-        del self.dipole, self.posImage, self.negImage
-        del self.catalog, self.posCatalog, self.negCatalog
+        del self.testImage, self.catalog
         del self.params
 
     def testDipoleFitter(self):
@@ -124,7 +120,7 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
 
         offsets = self.params.offsets
         for i, s in enumerate(self.catalog):
-            alg = DipoleFitAlgorithm(self.dipole, self.posImage, self.negImage)
+            alg = DipoleFitAlgorithm(self.testImage.diffim, self.testImage.posImage, self.testImage.negImage)
             result = alg.fitDipole(
                 s, rel_weight=1., separateNegParams=False,
                 verbose=self.params.verbose, display=self.params.display)
@@ -150,7 +146,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
     def runDetection(self):
 
         # Create the various tasks and schema -- avoid code reuse.
-        detectTask, schema = DipoleTestUtils.detectDipoleSources(self.dipole, doMerge=False)
+        detectTask, schema = self.testImage.detectDipoleSources(doMerge=False)
 
         measureConfig = SingleFrameMeasurementConfig()
 
@@ -174,7 +170,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         measureTask = DipoleFitTask(config=measureConfig, schema=schema, dpFitConfig=dpFitConfig)
 
         table = SourceTable.make(schema)
-        detectResult = detectTask.run(table, self.dipole)
+        detectResult = detectTask.run(table, self.testImage.diffim)
         # catalog = detectResult.sources
         # deblendTask.run(self.dipole, catalog, psf=self.dipole.getPsf())
 
@@ -183,7 +179,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         sources = SourceCatalog(table)
         fpSet.makeSources(sources)
 
-        measureTask.run(sources, self.dipole, self.posImage, self.negImage)
+        measureTask.run(sources, self.testImage.diffim, self.testImage.posImage, self.testImage.negImage)
         return sources
 
     def testDipoleFitter(self):
@@ -236,7 +232,8 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
                              rtol=0.01)
 
             if self.params.display:
-                DipolePlotUtils.displayCutouts(r1, self.dipole, self.posImage, self.negImage)
+                DipolePlotUtils.displayCutouts(r1, self.testImage.diffim,
+                                               self.testImage.posImage, self.testImage.negImage)
         if self.params.display:
             DipolePlotUtils.plt.show()
 
@@ -250,20 +247,19 @@ class DipoleFitTaskEdgeTest(DipoleFitTaskTest):
     def setUp(self):
         # Ensure that both dipoles will fail (too close to edge)
         self.params = DipoleFitTestGlobalParams()
-        self.params.xc = np_array([5.3, 2.2])  # xcenters of two dipoles in image
-        self.params.yc = np_array([2.6, 98.5])  # ycenters of two dipoles
+        self.params.xc = np.array([5.3, 2.2])  # xcenters of two dipoles in image
+        self.params.yc = np.array([2.6, 98.5])  # ycenters of two dipoles
 
         offsets = self.params.offsets
-        self.dipole, (self.posImage, self.posCatalog), (self.negImage, self.negCatalog) = \
-            DipoleTestUtils.makeDipoleImage(
-                xcenPos=self.params.xc + offsets,
-                ycenPos=self.params.yc + offsets,
-                xcenNeg=self.params.xc - offsets,
-                ycenNeg=self.params.yc - offsets,
-                flux=self.params.flux, fluxNeg=self.params.flux,
-                gradientParams=self.params.gradientParams)
+        self.testImage = DipoleTestImage(
+            xcenPos=self.params.xc + offsets,
+            ycenPos=self.params.yc + offsets,
+            xcenNeg=self.params.xc - offsets,
+            ycenNeg=self.params.yc - offsets,
+            flux=self.params.flux, fluxNeg=self.params.flux,
+            gradientParams=self.params.gradientParams)
 
-        self.catalog = DipoleTestUtils.detectDipoleSources(self.dipole)
+        self.catalog = self.testImage.detectDipoleSources()
 
     def tearDown(self):
         DipoleFitTaskTest.tearDown(self)
@@ -285,14 +281,31 @@ class DipoleFitTaskEdgeTest(DipoleFitTaskTest):
 
 
 # UTILITY CLASS WITH STATIC METHODS FOR DIPOLE TESTING ###
-class DipoleTestUtils(object):
+class DipoleTestImage(object):
 
-    @staticmethod
-    def makeStarImage(w=101, h=101, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=10.0,
+    def __init__(self, w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
+                 psfSigma=2., flux=[30000.], fluxNeg=None, noise=10., gradientParams=None):
+        self.w = w
+        self.h = h
+        self.xcenPos = xcenPos
+        self.ycenPos = ycenPos
+        self.xcenNeg = xcenNeg
+        self.ycenNeg = ycenNeg
+        self.psfSigma = psfSigma
+        self.flux = flux
+        self.fluxNeg = fluxNeg
+        if fluxNeg is None:
+            self.fluxNeg = self.flux
+        self.noise = noise
+        self.gradientParams = gradientParams
+        self.diffim, (self.posImage, self.posCatalog), \
+            (self.negImage, self.negCatalog) = self._makeDipoleImage()
+
+    def _makeStarImage(self, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=10.0,
                       gradientParams=None, schema=None):
 
         from lsst.meas.base.tests import TestDataset
-        bbox = Box2I(Point2I(0, 0), Point2I(w-1, h-1))
+        bbox = Box2I(Point2I(0, 0), Point2I(self.w-1, self.h-1))
         dataset = TestDataset(bbox, psfSigma=psfSigma, threshold=1.)
 
         for i in xrange(len(xc)):
@@ -303,29 +316,29 @@ class DipoleTestUtils(object):
         exposure, catalog = dataset.realize(noise=noise, schema=schema)
 
         if gradientParams is not None:
-            y, x = np_mgrid[:w, :h]
+            y, x = np.mgrid[:self.w, :self.h]
+            y = y.astype(np.float64)
+            y -= np.mean(y)  # center it!
+            x = x.astype(np.float64)
+            x -= np.mean(x)
             gp = gradientParams
             gradient = gp[0] + gp[1] * x + gp[2] * y
             if len(gradientParams) > 3:  # it includes a set of 2nd-order polynomial params
-                gradient += gp[3] * x*y + gp[4] * x*x + gp[5] * y*y
+                gradient += gp[3] * x*y + gp[4] * x**2. + gp[5] * y**2.
             imgArr = exposure.getMaskedImage().getArrays()[0]
             imgArr += gradient
 
         return exposure, catalog
 
-    @staticmethod
-    def makeDipoleImage(w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
-                        psfSigma=2., flux=[30000.], fluxNeg=None, noise=10., gradientParams=None):
+    def _makeDipoleImage(self):
 
-        posImage, posCatalog = DipoleTestUtils.makeStarImage(
-            w, h, xcenPos, ycenPos, flux=flux, psfSigma=psfSigma,
-            gradientParams=gradientParams, noise=noise)
+        posImage, posCatalog = self._makeStarImage(
+            xc=self.xcenPos, yc=self.ycenPos, flux=self.flux, psfSigma=self.psfSigma,
+            gradientParams=self.gradientParams, noise=self.noise)
 
-        if fluxNeg is None:
-            fluxNeg = flux
-        negImage, negCatalog = DipoleTestUtils.makeStarImage(
-            w, h, xcenNeg, ycenNeg, flux=fluxNeg, psfSigma=psfSigma,
-            gradientParams=gradientParams, noise=noise)
+        negImage, negCatalog = self._makeStarImage(
+            xc=self.xcenNeg, yc=self.ycenNeg, flux=self.fluxNeg, psfSigma=self.psfSigma,
+            gradientParams=self.gradientParams, noise=self.noise)
 
         dipole = posImage.clone()
         di = dipole.getMaskedImage()
@@ -342,8 +355,15 @@ class DipoleTestUtils(object):
         dma[:, :] = posDetectedBits * pos_det + negDetectedBits * neg_det
         return dipole, (posImage, posCatalog), (negImage, negCatalog)
 
-    @staticmethod
-    def detectDipoleSources(diffim, doMerge=True, detectSigma=5.5, grow=3):
+    def displayImages(self):
+        DipolePlotUtils.displayExposure(self.diffim)
+        DipolePlotUtils.displayExposure(self.posImage)
+        DipolePlotUtils.displayExposure(self.negImage)
+
+    def displayCutouts(self, source, asHeavyFootprint=True):
+        DipolePlotUtils.displayCutouts(source, self.negImage, self.posImage, self.negImage, asHeavyFootprint)
+
+    def detectDipoleSources(self, doMerge=True, detectSigma=5.5, grow=3):
         """
         Utility function for detecting dipoles. Detects pos/neg sources in the diffim,
         then merges them. A bigger "grow" parameter leads to a larger footprint which
@@ -357,7 +377,7 @@ class DipoleTestUtils(object):
         detectConfig = SourceDetectionConfig()
         detectConfig.returnOriginalFootprints = False  # should be the default
 
-        psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
+        psfSigma = self.diffim.getPsf().computeShape().getDeterminantRadius()
 
         # code from imageDifference.py:
         detectConfig.thresholdPolarity = "both"
@@ -370,7 +390,7 @@ class DipoleTestUtils(object):
         detectTask = SourceDetectionTask(schema, config=detectConfig)
 
         table = SourceTable.make(schema)
-        catalog = detectTask.makeSourceCatalog(table, diffim, sigma=psfSigma)
+        catalog = detectTask.makeSourceCatalog(table, self.diffim, sigma=psfSigma)
 
         # Now do the merge.
         if doMerge:

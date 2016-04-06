@@ -364,7 +364,7 @@ class DipoleFitAlgorithm(object):
 
     # This is just a private version number to sync with the ipython notebooks that I have been
     # using for algorithm development.
-    _private_version_ = '0.0.4'
+    _private_version_ = '0.0.5'
 
     # Create a namedtuple to hold all of the relevant output from the lmfit results
     resultsOutput = namedtuple('resultsOutput',
@@ -570,14 +570,14 @@ class DipoleFitAlgorithm(object):
         posIm = self.genStarModel(bbox, psf, xcenPos, ycenPos, flux)
         negIm = self.genStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
 
-        in_x = x
-        if in_x is None:  # use the footprint to generate the input grid
-            y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
-            in_x = np.array([x, y]).astype(np.float64)
-            in_x[0, :] -= in_x[0, :].mean()
-            in_x[1, :] -= in_x[1, :].mean()
+        if b is not None:  # If b is None, don't generate a background gradient.
+            in_x = x
+            if in_x is None:  # use the footprint to generate the input grid
+                y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
+                in_x = np.array([x, y]).astype(np.float64)
+                in_x[0, :] -= in_x[0, :].mean()
+                in_x[1, :] -= in_x[1, :].mean()
 
-        if b is not None:
             gradient = self.genBgGradientModel(in_x, (b, x1, y1, xy, x2, y2))
             gradientNeg = gradient
             if bNeg is not None:
