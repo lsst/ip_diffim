@@ -484,7 +484,12 @@ class DipoleFitAlgorithm(object):
         """
 
         # Generate the psf image, normalize to flux
-        psf_img = psf.computeImage(Point2D(xcen, ycen)).convertF()
+        # Issues between python and C++ documentation: 1. the psf_img is actually NOT always normalized toes
+        # exactly one; 2. I cannot use INTERNAL as an option for speeding this up; 3. I cannot specify
+        # the output dtype of psf.computeImage(), so need to convert to float. All three of these issues
+        # slow down this method.
+        psf_img = psf.computeImage(Point2D(xcen, ycen))
+        psf_img = psf_img.convertF()
         psf_img_sum = np.nansum(psf_img.getArray())
         psf_img *= (flux/psf_img_sum)
 
