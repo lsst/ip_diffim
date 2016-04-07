@@ -35,6 +35,140 @@ from lsst.meas.base import SingleFrameMeasurementConfig
 __all__ = ("DipoleTestImage")
 
 
+
+# UTILITY CLASS WITH STATIC METHODS FOR DIPOLE TESTING ###
+class DipoleTestImage(object):
+
+    def __init__(self, w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
+                 psfSigma=2., flux=[30000.], fluxNeg=None, noise=10., gradientParams=None):
+        self.w = w
+        self.h = h
+        self.xcenPos = xcenPos
+        self.ycenPos = ycenPos
+        self.xcenNeg = xcenNeg
+        self.ycenNeg = ycenNeg
+        self.psfSigma = psfSigma
+        self.flux = flux
+        self.fluxNeg = fluxNeg
+        if fluxNeg is None:
+            self.fluxNeg = self.flux
+        self.noise = noise
+        self.gradientParams = gradientParams
+        self.diffim, (self.posImage, self.posCatalog), \
+            (self.negImage, self.negCatalog) = self._makeDipoleImage()
+
+    def _makeStarImage(self, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=10.0,
+                       gradientParams=None, schema=None):
+
+        from lsst.meas.base.tests import TestDataset
+        bbox = Box2I(Point2I(0, 0), Point2I(self.w-1, self.h-1))
+        dataset = TestDataset(bbox, psfSigma=psfSigma, threshold=1.)
+
+        for i in xrange(len(xc)):
+            dataset.addSource(flux=flux[i], centroid=Point2D(xc[i], yc[i]))
+
+        if schema is None:
+            schema = TestDataset.makeMinimalSchema()
+        exposure, catalog = dataset.realize(noise=noise, schema=schema)
+
+        if gradientParams is not None:
+            y, x = np.mgrid[:self.w, :self.h]
+            y = y.astype(np.float64)
+            y -= np.mean(y)  # center it!
+            x = x.astype(np.float64)
+            x -= np.mean(x)
+            gp = gradientParams
+            gradient = gp[0] + gp[1] * x + gp[2] * y
+            if len(gradientParams) > 3:  # it includes a set of 2nd-order polynomial params
+                gradient += gp[3] * x*y + gp[4] * x**2. + gp[5] * y**2.
+            imgArr = exposure.getMaskedImage().getArrays()[0]
+            imgArr += gradient
+
+        return exposure, catalog
+
+    def _makeDipoleImage(self):
+
+        posImage, posCatalog = self._makeStarImage(
+            xc=self.xcenPos, yc=self.ycenPos, flux=self.flux, psfSigma=self.psfSigma,
+            gradientParams=self.gradientParams, noise=self.noise)
+
+        negImage, negCatalog = self._makeStarImage(
+            xc=self.xcenNeg, yc=self.ycenNeg, flux=self.fluxNeg, psfSigma=self.psfSigma,
+            gradientParams=self.gradientParams, noise=self.noise)
+
+        dipole = posImage.clone()
+        di = dipole.getMaskedImage()
+        di -= negImage.getMaskedImage()
+
+        # Carry through pos/neg detection masks to new planes in diffim image
+        dm = di.getMask()
+        posDetectedBits = posImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
+        negDetectedBits = negImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
+        pos_det = dm.addMaskPlane("DETECTED_POS")  # new mask plane -- different from "DETECTED"
+        neg_det = dm.addMaskPlane("DETECTED_NEG")  # new mask plane -- different from "DETECTED_NEGATIVE"
+        dma = dm.getArray()
+        # set the two custom mask planes to these new masks
+        dma[:, :] = posDetectedBits * pos_det + negDetectedBits * neg_det
+        return dipole, (posImage, posCatalog), (negImage, negCatalog)
+
+    def fitDipoleSource(self, source, **kwds):
+        alg = DipoleFitAlgorithm(self.diffim, self.posImage, self.negImage)
+        fitResult = alg.fitDipole(source, **kwds)
+        return fitResult
+
+    def displayImages(self):
+        DipolePlotUtils.displayExposure(self.diffim)
+        DipolePlotUtils.displayExposure(self.posImage)
+        DipolePlotUtils.displayExposure(self.negImage)
+
+    def displayCutouts(self, source, asHeavyFootprint=True):
+        DipolePlotUtils.displayCutouts(source, self.diffim, self.posImage, self.negImage, asHeavyFootprint)
+
+    def detectDipoleSources(self, doMerge=True, diffim=None, detectSigma=5.5, grow=3):
+        """
+        Utility function for detecting dipoles. Detects pos/neg sources in the diffim,
+        then merges them. A bigger "grow" parameter leads to a larger footprint which
+        helps with dipole measurement for faint dipoles.
+        """
+
+        if diffim is None:
+            diffim = self.diffim
+
+        # Start with a minimal schema - only the fields all SourceCatalogs need
+        schema = SourceTable.makeMinimalSchema()
+
+        # Customize the detection task a bit (optional)
+        detectConfig = SourceDetectionConfig()
+        detectConfig.returnOriginalFootprints = False  # should be the default
+
+        psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
+
+        # code from imageDifference.py:
+        detectConfig.thresholdPolarity = "both"
+        detectConfig.thresholdValue = detectSigma
+        # detectConfig.nSigmaToGrow = psfSigma
+        detectConfig.reEstimateBackground = True  # if False, will fail often for faint sources on gradients?
+        detectConfig.thresholdType = "pixel_stdev"
+
+        # Create the detection task. We pass the schema so the task can declare a few flag fields
+        detectTask = SourceDetectionTask(schema, config=detectConfig)
+
+        table = SourceTable.make(schema)
+        catalog = detectTask.makeSourceCatalog(table, diffim, sigma=psfSigma)
+
+        # Now do the merge.
+        if doMerge:
+            fpSet = catalog.fpSets.positive
+            fpSet.merge(catalog.fpSets.negative, grow, grow, False)
+            sources = SourceCatalog(table)
+            fpSet.makeSources(sources)
+
+            return sources
+
+        else:
+            return detectTask, schema
+
+
 class DipoleFitTestGlobalParams(object):
     """
     Class to initialize and store global parameters used by all tests below.
@@ -278,131 +412,6 @@ class DipoleFitTaskEdgeTest(DipoleFitTaskTest):
         for i, r1 in enumerate(sources):
             result = r1.extract("ip_diffim_DipoleFit*")
             self.assertTrue(result.get("ip_diffim_DipoleFit_flag"))
-
-
-# UTILITY CLASS WITH STATIC METHODS FOR DIPOLE TESTING ###
-class DipoleTestImage(object):
-
-    def __init__(self, w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
-                 psfSigma=2., flux=[30000.], fluxNeg=None, noise=10., gradientParams=None):
-        self.w = w
-        self.h = h
-        self.xcenPos = xcenPos
-        self.ycenPos = ycenPos
-        self.xcenNeg = xcenNeg
-        self.ycenNeg = ycenNeg
-        self.psfSigma = psfSigma
-        self.flux = flux
-        self.fluxNeg = fluxNeg
-        if fluxNeg is None:
-            self.fluxNeg = self.flux
-        self.noise = noise
-        self.gradientParams = gradientParams
-        self.diffim, (self.posImage, self.posCatalog), \
-            (self.negImage, self.negCatalog) = self._makeDipoleImage()
-
-    def _makeStarImage(self, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=10.0,
-                      gradientParams=None, schema=None):
-
-        from lsst.meas.base.tests import TestDataset
-        bbox = Box2I(Point2I(0, 0), Point2I(self.w-1, self.h-1))
-        dataset = TestDataset(bbox, psfSigma=psfSigma, threshold=1.)
-
-        for i in xrange(len(xc)):
-            dataset.addSource(flux=flux[i], centroid=Point2D(xc[i], yc[i]))
-
-        if schema is None:
-            schema = TestDataset.makeMinimalSchema()
-        exposure, catalog = dataset.realize(noise=noise, schema=schema)
-
-        if gradientParams is not None:
-            y, x = np.mgrid[:self.w, :self.h]
-            y = y.astype(np.float64)
-            y -= np.mean(y)  # center it!
-            x = x.astype(np.float64)
-            x -= np.mean(x)
-            gp = gradientParams
-            gradient = gp[0] + gp[1] * x + gp[2] * y
-            if len(gradientParams) > 3:  # it includes a set of 2nd-order polynomial params
-                gradient += gp[3] * x*y + gp[4] * x**2. + gp[5] * y**2.
-            imgArr = exposure.getMaskedImage().getArrays()[0]
-            imgArr += gradient
-
-        return exposure, catalog
-
-    def _makeDipoleImage(self):
-
-        posImage, posCatalog = self._makeStarImage(
-            xc=self.xcenPos, yc=self.ycenPos, flux=self.flux, psfSigma=self.psfSigma,
-            gradientParams=self.gradientParams, noise=self.noise)
-
-        negImage, negCatalog = self._makeStarImage(
-            xc=self.xcenNeg, yc=self.ycenNeg, flux=self.fluxNeg, psfSigma=self.psfSigma,
-            gradientParams=self.gradientParams, noise=self.noise)
-
-        dipole = posImage.clone()
-        di = dipole.getMaskedImage()
-        di -= negImage.getMaskedImage()
-
-        # Carry through pos/neg detection masks to new planes in diffim image
-        dm = di.getMask()
-        posDetectedBits = posImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
-        negDetectedBits = negImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
-        pos_det = dm.addMaskPlane("DETECTED_POS")  # new mask plane -- different from "DETECTED"
-        neg_det = dm.addMaskPlane("DETECTED_NEG")  # new mask plane -- different from "DETECTED_NEGATIVE"
-        dma = dm.getArray()
-        # set the two custom mask planes to these new masks
-        dma[:, :] = posDetectedBits * pos_det + negDetectedBits * neg_det
-        return dipole, (posImage, posCatalog), (negImage, negCatalog)
-
-    def displayImages(self):
-        DipolePlotUtils.displayExposure(self.diffim)
-        DipolePlotUtils.displayExposure(self.posImage)
-        DipolePlotUtils.displayExposure(self.negImage)
-
-    def displayCutouts(self, source, asHeavyFootprint=True):
-        DipolePlotUtils.displayCutouts(source, self.negImage, self.posImage, self.negImage, asHeavyFootprint)
-
-    def detectDipoleSources(self, doMerge=True, detectSigma=5.5, grow=3):
-        """
-        Utility function for detecting dipoles. Detects pos/neg sources in the diffim,
-        then merges them. A bigger "grow" parameter leads to a larger footprint which
-        helps with dipole measurement for faint dipoles.
-        """
-
-        # Start with a minimal schema - only the fields all SourceCatalogs need
-        schema = SourceTable.makeMinimalSchema()
-
-        # Customize the detection task a bit (optional)
-        detectConfig = SourceDetectionConfig()
-        detectConfig.returnOriginalFootprints = False  # should be the default
-
-        psfSigma = self.diffim.getPsf().computeShape().getDeterminantRadius()
-
-        # code from imageDifference.py:
-        detectConfig.thresholdPolarity = "both"
-        detectConfig.thresholdValue = detectSigma
-        # detectConfig.nSigmaToGrow = psfSigma
-        detectConfig.reEstimateBackground = True  # if False, will fail often for faint sources on gradients?
-        detectConfig.thresholdType = "pixel_stdev"
-
-        # Create the detection task. We pass the schema so the task can declare a few flag fields
-        detectTask = SourceDetectionTask(schema, config=detectConfig)
-
-        table = SourceTable.make(schema)
-        catalog = detectTask.makeSourceCatalog(table, self.diffim, sigma=psfSigma)
-
-        # Now do the merge.
-        if doMerge:
-            fpSet = catalog.fpSets.positive
-            fpSet.merge(catalog.fpSets.negative, grow, grow, False)
-            sources = SourceCatalog(table)
-            fpSet.makeSources(sources)
-
-            return sources
-
-        else:
-            return detectTask, schema
 
 
 def suite():
