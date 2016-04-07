@@ -26,7 +26,8 @@ import numpy as np
 
 # LSST imports
 from lsst.afw.geom import Point2D
-from lsst.afw.image import (ImageF, MaskedImageF, PARENT)
+import lsst.afw.image as afw_image
+import lsst.afw.math as afw_math
 import lsst.afw.detection as afw_det
 import lsst.meas.base as meas_base
 from lsst.afw.table import Point2DKey
@@ -395,6 +396,15 @@ class DipoleFitAlgorithm(object):
         if diffim is not None:
             self.psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
 
+        #self.sctrl = afw_math.StatisticsControl()
+        self.sctrl = afw_math.StatisticsControl()
+        self.sctrl.setNumSigmaClip(3)
+        self.sctrl.setNumIter(4)
+        self.sctrl.setAndMask(afw_image.MaskU.getPlaneBitMask(["INTRP", "EDGE"]))
+        self.sctrl.setNoGoodPixelsMask(afw_image.MaskU.getPlaneBitMask("BAD"))
+        self.sctrl.setNanSafe(True)
+
+
     def genBgGradientModel(self, in_x, pars=()):
         """Generate gradient model (2-d array) with up to 2nd-order polynomial
 
@@ -411,6 +421,7 @@ class DipoleFitAlgorithm(object):
         """
 
         gradient = None
+
         # Don't fit for other gradient parameters if the intercept is not included.
         if len(pars) > 0 and pars[0] is not None:
             y, x = in_x[0, :], in_x[1, :]
@@ -430,11 +441,13 @@ class DipoleFitAlgorithm(object):
     def fitBackgroundGradient(self, source, posImage, order=1):
         """ Fit a linear (polynomial) model of given order (max 2) to the background of a footprint.
         Only fit the pixels OUTSIDE of the footprint, but within its bounding box.
+        TBD: look into whether afw_math background stuff -- see
+        http://lsst-web.ncsa.illinois.edu/doxygen/x_masterDoxyDoc/_background_example.html
         """
         fp = source.getFootprint()
         bbox = fp.getBBox()
         bbox.grow(3)
-        posImg = ImageF(posImage.getMaskedImage().getImage(), bbox, PARENT)
+        posImg = afw_image.ImageF(posImage.getMaskedImage().getImage(), bbox, afw_image.PARENT)
         posHfp = afw_det.HeavyFootprintF(fp, posImage.getMaskedImage())
         posFpImg = DipolePlotUtils.getHeavyFootprintSubimage(posHfp, grow=3)
 
@@ -462,6 +475,22 @@ class DipoleFitAlgorithm(object):
         pars = np.linalg.lstsq(M, B)[0]
         return pars
 
+    def fitBackgroundGradientAfw(self, source, posImage, order=2):
+        """!Fit the background of a source's footprint using afw_math and a Chebyshev polynomial.
+        TBD: only fit the region OUTSIDE the footprint (as in `fitBackgroundGradient()`)
+        """
+        fp = source.getFootprint()
+        bbox = fp.getBBox()
+        # bbox.grow(3)
+        posImg = afw_image.ImageF(posImage.getMaskedImage().getImage(), bbox, afw_image.PARENT)
+
+        bctrl = afw_math.BackgroundControl(6, 6, self.sctrl)  # number of bins - how to set?
+        bkgd = afw_math.makeBackground(posImg, bctrl)  # .getMaskedImage()
+        actrl = afw_math.ApproximateControl(afw_math.ApproximateControl.CHEBYSHEV, order, order)
+        approx = bkgd.getApproximate(actrl)
+        bim = approx.getImage(order - 1)
+        return bim.getArray()
+
     def genStarModel(self, bbox, psf, xcen, ycen, flux):
         """Generate model (2-d array) of a 'star' (single PSF) centered at given coordinates
 
@@ -484,26 +513,29 @@ class DipoleFitAlgorithm(object):
         """
 
         # Generate the psf image, normalize to flux
-        # Issues between python and C++ documentation: 1. the psf_img is actually NOT always normalized toes
+        # Issues between python and C++ documentation: 1. the psf_img is actually NOT always normalized to
         # exactly one; 2. I cannot use INTERNAL as an option for speeding this up; 3. I cannot specify
         # the output dtype of psf.computeImage(), so need to convert to float. All three of these issues
-        # slow down this method.
+        # slow down this method, but not by a huge amount (10-20% or so).
         psf_img = psf.computeImage(Point2D(xcen, ycen))
         psf_img = psf_img.convertF()
-        psf_img_sum = np.nansum(psf_img.getArray())
+        # psf_img_sum = np.sum(psf_img.getArray())  # np.nansum() is 3x slower
+        # Looks like using afw_math is a bit faster, so let's use that.
+        stats = afw_math.makeStatistics(psf_img, afw_math.SUM, self.sctrl)
+        psf_img_sum = stats.getValue(afw_math.SUM)
         psf_img *= (flux/psf_img_sum)
 
         # Clip the PSF image bounding box to fall within the footprint bounding box
         psf_box = psf_img.getBBox()
         psf_box.clip(bbox)
-        psf_img = ImageF(psf_img, psf_box, PARENT)
+        psf_img = afw_image.ImageF(psf_img, psf_box, afw_image.PARENT)
 
         # Then actually crop the psf image.
         # Usually not necessary, but if the dipole is near the edge of the image...
         # Would be nice if we could compare original pos_box with clipped pos_box and
         #     see if it actually was clipped.
-        p_Im = ImageF(bbox)
-        tmpSubim = ImageF(p_Im, psf_box, PARENT)
+        p_Im = afw_image.ImageF(bbox)
+        tmpSubim = afw_image.ImageF(p_Im, psf_box, afw_image.PARENT)
         tmpSubim += psf_img
 
         return p_Im
@@ -595,7 +627,7 @@ class DipoleFitAlgorithm(object):
         # Generate the diffIm model
         diffIm = posIm
         if rel_weight > 0.:  # Need to store the posIm, so create a separate array.
-            diffIm = ImageF(bbox)
+            diffIm = afw_image.ImageF(bbox)
             diffIm += posIm
         diffIm -= negIm
 
@@ -623,6 +655,13 @@ class DipoleFitAlgorithm(object):
                                          bNeg=bNeg, x1Neg=x1Neg, y1Neg=y1Neg, xyNeg=xyNeg,
                                          x2Neg=x2Neg, y2Neg=y2Neg, debug=debug, **kwargs)
 
+    def _generateXYGrid(self, bbox):
+        x, y = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
+        in_x = np.array([y, x]).astype(np.float64)
+        in_x[0, :] -= np.mean(in_x[0, :])
+        in_x[1, :] -= np.mean(in_x[1, :])
+        return in_x
+
     def fitDipoleImpl(self, source, tol=1e-7, rel_weight=0.5,
                       fitBgGradient=True, bgGradientOrder=1, centroidRangeInSigma=5.,
                       separateNegParams=True, verbose=False, display=False):
@@ -644,14 +683,14 @@ class DipoleFitAlgorithm(object):
 
         fp = source.getFootprint()
         bbox = fp.getBBox()
-        subim = MaskedImageF(self.diffim.getMaskedImage(), bbox, PARENT)
+        subim = afw_image.MaskedImageF(self.diffim.getMaskedImage(), bbox, afw_image.PARENT)
 
         z = diArr = subim.getArrays()[0]
 
         weights = 1. / subim.getArrays()[2]  # get the weights (=1/variance)
         if self.posImage is not None and rel_weight > 0.:
-            posSubim = MaskedImageF(self.posImage.getMaskedImage(), bbox, PARENT)
-            negSubim = MaskedImageF(self.negImage.getMaskedImage(), bbox, PARENT)
+            posSubim = afw_image.MaskedImageF(self.posImage.getMaskedImage(), bbox, afw_image.PARENT)
+            negSubim = afw_image.MaskedImageF(self.negImage.getMaskedImage(), bbox, afw_image.PARENT)
             z = np.append([z], [posSubim.getArrays()[0],
                                 negSubim.getArrays()[0]], axis=0)
             # Weight the pos/neg images by rel_weight relative to the diffim
@@ -729,25 +768,30 @@ class DipoleFitAlgorithm(object):
         # again.
         bgParsPos = bgParsNeg = (0., 0., 0.)
         if (rel_weight > 0. and fitBgGradient and bgGradientOrder >= 0):
+            pbg = 0.
             # Fit the gradient to the background
-            bgParsPos = bgParsNeg = self.fitBackgroundGradient(source, self.posImage, order=bgGradientOrder)
-            # Generate the gradient to subtract from the pre-subtraction image data
-            x, y = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
-            in_x = np.array([y, x]).astype(np.float64)
-            in_x[0, :] -= np.mean(in_x[0, :])
-            in_x[1, :] -= np.mean(in_x[1, :])
-            pbg = self.genBgGradientModel(in_x, tuple(bgParsPos))
-            # Subtract it and re-estimate the starting flux
+            if False:  # use my custom routine
+                bgParsPos = bgParsNeg = self.fitBackgroundGradient(source, self.posImage, order=bgGradientOrder)
+                # Generate the gradient to subtract from the pre-subtraction image data
+                in_x = self._generateXYGrid(bbox)
+                pbg = self.genBgGradientModel(in_x, tuple(bgParsPos))
+            else:  # use afw_math to estimate background
+                pbg = self.fitBackgroundGradientAfw(source, self.posImage, order=bgGradientOrder+1)
+            # Subtract the background from posImage and re-estimate the starting flux
             z[1, :] -= pbg
             posFlux = np.nansum(z[1, :] - np.nanmedian(z[1, :]))
-            gmod.set_param_hint('flux', value=posFlux*5., min=0.1)
+            gmod.set_param_hint('flux', value=posFlux*1.5, min=0.1)
             if separateNegParams:
-                bgParsNeg = self.fitBackgroundGradient(source, self.negImage, order=bgGradientOrder)
-                pbg = self.genBgGradientModel(in_x, tuple(bgParsNeg))
+                if False:
+                    bgParsNeg = self.fitBackgroundGradient(source, self.negImage, order=bgGradientOrder)
+                    pbg = self.genBgGradientModel(in_x, tuple(bgParsNeg))
+                else:
+                    pbg = self.fitBackgroundGradientAfw(source, self.negImage, order=bgGradientOrder+1)
             z[2, :] -= pbg
             if separateNegParams:
                 negFlux = np.nansum(z[2, :] - np.nanmedian(z[2, :]))
-                gmod.set_param_hint('fluxNeg', value=negFlux*5., min=0.1)
+                gmod.set_param_hint('fluxNeg', value=negFlux*1.5, min=0.1)
+
             bgParsPos = bgParsNeg = (0., 0., 0.)
 
             # This option currently isnt used but possible to re-fit the gradient jointly with the dipole
@@ -885,7 +929,7 @@ class DipoleFitAlgorithm(object):
         # Also extract the stderr of flux estimate.
         def computeSumVariance(exposure, footprint):
             box = footprint.getBBox()
-            subim = MaskedImageF(exposure.getMaskedImage(), box, PARENT)
+            subim = afw_image.MaskedImageF(exposure.getMaskedImage(), box, afw_image.PARENT)
             return np.sqrt(np.nansum(subim.getArrays()[1][:, :]))
 
         fluxVal = fluxVar = fitParams['flux']
@@ -1046,13 +1090,13 @@ class DipolePlotUtils():
     def displayMaskedImage(maskedImage, showMasks=True, showVariance=False, showBars=True, width=8,
                            height=2.5):
         """
-        Use matplotlib.pyplot.imshow() to display a afw.image.MaskedImageF, alongside its
+        Use matplotlib.pyplot.imshow() to display a afw.image.afw_image.MaskedImageF, alongside its
         masks and variance plane
 
         Parameters (see displayImage() for those not listed here)
         ----------
-        maskedImage : afw.image.MaskedImageF
-           MaskedImageF to display
+        maskedImage : afw.image.afw_image.MaskedImageF
+           afw_image.MaskedImageF to display
         showMasks : bool, optional
            Display the MaskedImage's masks
         showVariance : bool, optional
@@ -1134,7 +1178,7 @@ class DipolePlotUtils():
 
         fig = DipolePlotUtils.plt.figure(figsize=(8, 2.5))
         if not asHeavyFootprint:
-            subexp = ImageF(exposure.getMaskedImage().getImage(), bbox, PARENT)
+            subexp = afw_image.ImageF(exposure.getMaskedImage().getImage(), bbox, afw_image.PARENT)
         else:
             hfp = afw_det.HeavyFootprintF(fp, exposure.getMaskedImage())
             subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
@@ -1142,7 +1186,7 @@ class DipolePlotUtils():
         DipolePlotUtils.display2dArray(subexp.getArray(), title=title+' Diffim', extent=extent)
         if posImage is not None:
             if not asHeavyFootprint:
-                subexp = ImageF(posImage.getMaskedImage().getImage(), bbox, PARENT)
+                subexp = afw_image.ImageF(posImage.getMaskedImage().getImage(), bbox, afw_image.PARENT)
             else:
                 hfp = afw_det.HeavyFootprintF(fp, posImage.getMaskedImage())
                 subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
@@ -1150,7 +1194,7 @@ class DipolePlotUtils():
             DipolePlotUtils.display2dArray(subexp.getArray(), title=title+' Pos', extent=extent)
         if negImage is not None:
             if not asHeavyFootprint:
-                subexp = ImageF(negImage.getMaskedImage().getImage(), bbox, PARENT)
+                subexp = afw_image.ImageF(negImage.getMaskedImage().getImage(), bbox, afw_image.PARENT)
             else:
                 hfp = afw_det.HeavyFootprintF(fp, negImage.getMaskedImage())
                 subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
@@ -1179,7 +1223,7 @@ class DipolePlotUtils():
         if grow > 0:
             bbox.grow(grow)
 
-        subim2 = ImageF(bbox, badfill)  # set the mask to NA (can use 0. if desired)
+        subim2 = afw_image.ImageF(bbox, badfill)  # set the mask to NA (can use 0. if desired)
         afw_det.expandArray(hfp, hfp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
         return subim2
 
