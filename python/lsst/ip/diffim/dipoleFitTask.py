@@ -25,7 +25,7 @@ from collections import namedtuple
 import numpy as np
 
 # LSST imports
-from lsst.afw.geom import Point2D
+from lsst.afw.geom import (Point2D, Point2I)
 import lsst.afw.image as afw_image
 import lsst.afw.math as afw_math
 import lsst.afw.detection as afw_det
@@ -663,8 +663,8 @@ class DipoleFitAlgorithm(object):
         return in_x
 
     def fitDipoleImpl(self, source, tol=1e-7, rel_weight=0.5,
-                      fitBgGradient=True, bgGradientOrder=1, centroidRangeInSigma=5.,
-                      separateNegParams=True, verbose=False, display=False):
+                      fitBgGradient=True, bgGradientOrder=2, centroidRangeInSigma=5.,
+                      separateNegParams=False, verbose=False, display=False):
         """
         Fit a dipole model to an input difference image self.diffim (actually,
         subimage bounded by the input source's footprint) and
@@ -863,9 +863,9 @@ class DipoleFitAlgorithm(object):
 
         return result, bgParsPos, bgParsNeg
 
-    def fitDipole(self, source, tol=1e-7, rel_weight=0.1,
-                  fitBgGradient=True, centroidRangeInSigma=5., separateNegParams=True,
-                  bgGradientOrder=1, verbose=False, display=False, return_fitObj=False):
+    def fitDipole(self, source, tol=1e-7, rel_weight=0.5,
+                  fitBgGradient=True, centroidRangeInSigma=5., separateNegParams=False,
+                  bgGradientOrder=2, verbose=False, display=False, return_fitObj=False):
         """
         Wrapper around `fitDipoleImpl()` which performs the fit of a dipole
         model to an input difference image `self.diffim` (actually, subimage bounded
@@ -1232,8 +1232,17 @@ class DipolePlotUtils():
         """Usage: source = searchCatalog(catalog, x, y)"""
         for i, s in enumerate(catalog):
             bbox = s.getFootprint().getBBox()
-            if bbox.contains(Point2D(x, y)):
-                print(i)
-                return s
+            try:
+                if bbox.contains(Point2I(x, y)):
+                    print(i)
+                    return s
+            except:
+                pass
+            try:
+                if bbox.contains(Point2D(x, y)):
+                    print(i)
+                    return s
+            except:
+                pass
         return None
 
