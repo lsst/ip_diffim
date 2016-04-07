@@ -36,7 +36,7 @@ import lsst.ip.diffim as ipDiffim
 class DiaCatalogSourceSelectorTest(unittest.TestCase):
 
     def setUp(self):
-        self.sourceSelector = ipDiffim.DiaCatalogSourceSelector()
+        self.sourceSelector = ipDiffim.DiaCatalogSourceSelectorTask()
         self.exposure = afwImage.ExposureF()
 
     def tearDown(self):
@@ -53,7 +53,7 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
         schema = afwTable.SourceTable.makeMinimalSchema()
         schema.addField("test_flux", type=float)
         schema.addField("test_fluxSigma", type=float)
-        for flag in self.sourceSelector.config.badPixelFlags:
+        for flag in self.sourceSelector.config.badFlags:
             schema.addField(flag, type="Flag")
         table = afwTable.SourceTable.make(schema)
         table.definePsfFlux("test")
@@ -77,7 +77,7 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
             srcSrc.setCoord(coord)
             srcSrc.set(srcSrc.getTable().getPsfFluxKey(), 10.)
             srcSrc.set(srcSrc.getTable().getPsfFluxErrKey(), 1.)
-            for flag in self.sourceSelector.config.badPixelFlags:
+            for flag in self.sourceSelector.config.badFlags:
                 srcSrc.set(flag, False)
 
         mat = afwTable.matchRaDec(refCat, srcCat, 1.0 * afwGeom.arcseconds, False)
@@ -91,17 +91,17 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
         srcCat   = self.makeSrcCatalog()
 
         matches = self.makeMatches(refCat, srcCat, nSrc)
-        sources = self.sourceSelector.selectSources(self.exposure, srcCat, matches)
+        sources = self.sourceSelector.selectStars(self.exposure, srcCat, matches).starCat
         self.assertEqual(len(sources), nSrc)
 
         # Set one of the source flags to be bad
-        matches[0].second.set(self.sourceSelector.config.badPixelFlags[0], True)
-        sources = self.sourceSelector.selectSources(self.exposure, srcCat, matches)
+        matches[0].second.set(self.sourceSelector.config.badFlags[0], True)
+        sources = self.sourceSelector.selectStars(self.exposure, srcCat, matches).starCat
         self.assertEqual(len(sources), nSrc-1)
 
         # Set one of the ref flags to be bad
         matches[1].first.set("photometric", False)
-        sources = self.sourceSelector.selectSources(self.exposure, srcCat, matches)
+        sources = self.sourceSelector.selectStars(self.exposure, srcCat, matches).starCat
         self.assertEqual(len(sources), nSrc-2)
 
         # Set one of the colors to be bad
@@ -110,13 +110,13 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
         gFluxField = getRefFluxField(refCat.schema, "g")
         gFlux = 10**(-0.4 * (grMin - 0.1)) * matches[2].first.get(rFluxField)
         matches[2].first.set(gFluxField, gFlux)
-        sources = self.sourceSelector.selectSources(self.exposure, srcCat, matches)
+        sources = self.sourceSelector.selectStars(self.exposure, srcCat, matches).starCat
         self.assertEqual(len(sources), nSrc-3)
 
         # Set one of the types to be bad
         if self.sourceSelector.config.selectStar and not self.sourceSelector.config.selectGalaxy:
             matches[3].first.set("resolved", True)
-            sources = self.sourceSelector.selectSources(self.exposure, srcCat, matches)
+            sources = self.sourceSelector.selectStars(self.exposure, srcCat, matches).starCat
             self.assertEqual(len(sources), nSrc-4)
 
 def suite():
