@@ -474,7 +474,7 @@ class DipoleFitAlgorithm(object):
         return pars
 
     def fitBackgroundGradientAfw(self, source, posImage, order=2):
-        """!Fit the background of a source's footprint using afw_math and a Chebyshev polynomial.
+        """!Fit the background of a source's footprint using afw_math and a bicubic spline.
         TBD: only fit the region OUTSIDE the footprint (as in `fitBackgroundGradient()`)
         """
         fp = source.getFootprint()
@@ -482,11 +482,20 @@ class DipoleFitAlgorithm(object):
         # bbox.grow(3)
         posImg = afw_image.ImageF(posImage.getMaskedImage().getImage(), bbox, afw_image.PARENT)
 
-        bctrl = afw_math.BackgroundControl(10, 10, self.sctrl)  # number of bins - how to choose?
-        bkgd = afw_math.makeBackground(posImg, bctrl)  # .getMaskedImage()
-        actrl = afw_math.ApproximateControl(afw_math.ApproximateControl.CHEBYSHEV, order, order)
-        approx = bkgd.getApproximate(actrl)
-        bim = approx.getImage(order - 1)
+        # bctrl = afw_math.BackgroundControl(10, 10, self.sctrl)  # number of bins - how to choose?
+        # bkgd = afw_math.makeBackground(posImg, bctrl)  # .getMaskedImage()
+        # actrl = afw_math.ApproximateControl(afw_math.ApproximateControl.CHEBYSHEV, order, order)
+        # approx = bkgd.getApproximate(actrl)
+        # bim = approx.getImage(order - 1)
+
+        bctrl = afw_math.BackgroundControl(10, 10)
+        bctrl.setInterpStyle(afw_math.Interpolate.CUBIC_SPLINE)
+        bctrl.setNxSample(6)
+        bctrl.setNySample(6)
+        bctrl.getStatisticsControl().setNumSigmaClip(5.0)
+        bctrl.getStatisticsControl().setNumIter(10)
+        backobj = afw_math.cast_BackgroundMI(afw_math.makeBackground(posImg, bctrl))
+        bim = backobj.getImageF("NATURAL_SPLINE")  # options: ("CONSTANT", "LINEAR", "NATURAL_SPLINE", "AKIMA_SPLINE")
         return bim.getArray()
 
     def genStarModel(self, bbox, psf, xcen, ycen, flux):

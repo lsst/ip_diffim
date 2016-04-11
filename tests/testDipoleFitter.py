@@ -201,7 +201,7 @@ class DipoleFitTestGlobalParams(object):
         """
         np.random.seed(666)
         self.display = False
-        self.verbose = True
+        self.verbose = False
         self.w, self.h = 100, 100  # size of image
 
         self.xc = np.array([65.3, 24.2])  # xcenters of two dipoles in image
@@ -220,7 +220,7 @@ class DipoleFitAlgorithmTest(lsst_tests.TestCase):
     A test case for dipole fit algorithm.
 
     Test the dipole fitting algorithm on two dipoles within an image with
-    simulated noise.
+    a background gradient and simulated noise.
     """
     def setUp(self):
         self.params = DipoleFitTestGlobalParams()
