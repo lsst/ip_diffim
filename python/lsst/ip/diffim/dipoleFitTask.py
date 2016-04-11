@@ -396,14 +396,12 @@ class DipoleFitAlgorithm(object):
         if diffim is not None:
             self.psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
 
-        #self.sctrl = afw_math.StatisticsControl()
         self.sctrl = afw_math.StatisticsControl()
         self.sctrl.setNumSigmaClip(3)
-        self.sctrl.setNumIter(4)
+        self.sctrl.setNumIter(6)
         self.sctrl.setAndMask(afw_image.MaskU.getPlaneBitMask(["INTRP", "EDGE"]))
         self.sctrl.setNoGoodPixelsMask(afw_image.MaskU.getPlaneBitMask("BAD"))
         self.sctrl.setNanSafe(True)
-
 
     def genBgGradientModel(self, in_x, pars=()):
         """Generate gradient model (2-d array) with up to 2nd-order polynomial
@@ -484,7 +482,7 @@ class DipoleFitAlgorithm(object):
         # bbox.grow(3)
         posImg = afw_image.ImageF(posImage.getMaskedImage().getImage(), bbox, afw_image.PARENT)
 
-        bctrl = afw_math.BackgroundControl(6, 6, self.sctrl)  # number of bins - how to set?
+        bctrl = afw_math.BackgroundControl(10, 10, self.sctrl)  # number of bins - how to choose?
         bkgd = afw_math.makeBackground(posImg, bctrl)  # .getMaskedImage()
         actrl = afw_math.ApproximateControl(afw_math.ApproximateControl.CHEBYSHEV, order, order)
         approx = bkgd.getApproximate(actrl)
@@ -770,8 +768,9 @@ class DipoleFitAlgorithm(object):
         if (rel_weight > 0. and fitBgGradient and bgGradientOrder >= 0):
             pbg = 0.
             # Fit the gradient to the background
-            if False:  # use my custom routine
-                bgParsPos = bgParsNeg = self.fitBackgroundGradient(source, self.posImage, order=bgGradientOrder)
+            if True:  # use my custom routine
+                bgParsPos = bgParsNeg = self.fitBackgroundGradient(source, self.posImage,
+                                                                   order=bgGradientOrder)
                 # Generate the gradient to subtract from the pre-subtraction image data
                 in_x = self._generateXYGrid(bbox)
                 pbg = self.genBgGradientModel(in_x, tuple(bgParsPos))
@@ -780,9 +779,9 @@ class DipoleFitAlgorithm(object):
             # Subtract the background from posImage and re-estimate the starting flux
             z[1, :] -= pbg
             posFlux = np.nansum(z[1, :] - np.nanmedian(z[1, :]))
-            gmod.set_param_hint('flux', value=posFlux*1.5, min=0.1)
+            gmod.set_param_hint('flux', value=posFlux * 1.5, min=0.1)
             if separateNegParams:
-                if False:
+                if True:
                     bgParsNeg = self.fitBackgroundGradient(source, self.negImage, order=bgGradientOrder)
                     pbg = self.genBgGradientModel(in_x, tuple(bgParsNeg))
                 else:
@@ -790,7 +789,7 @@ class DipoleFitAlgorithm(object):
             z[2, :] -= pbg
             if separateNegParams:
                 negFlux = np.nansum(z[2, :] - np.nanmedian(z[2, :]))
-                gmod.set_param_hint('fluxNeg', value=negFlux*1.5, min=0.1)
+                gmod.set_param_hint('fluxNeg', value=negFlux * 1.5, min=0.1)
 
             bgParsPos = bgParsNeg = (0., 0., 0.)
 

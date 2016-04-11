@@ -201,7 +201,7 @@ class DipoleFitTestGlobalParams(object):
         """
         np.random.seed(666)
         self.display = False
-        self.verbose = False
+        self.verbose = True
         self.w, self.h = 100, 100  # size of image
 
         self.xc = np.array([65.3, 24.2])  # xcenters of two dipoles in image
