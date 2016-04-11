@@ -1,3 +1,4 @@
+_build*
 *.dylib
 .sconsign.dblite
 config.log
@@ -9,11 +10,14 @@ config.log
 *.pyc
 *.py~
 *_wrap.cc
+_build.*
 *Lib.py
 doc/html
+doc/xml
 doc/*.tag
 doc/*.inc
 doc/doxygen.conf
+doc/xml
 tests/.tests
 version.py
 examples/maskedKernel

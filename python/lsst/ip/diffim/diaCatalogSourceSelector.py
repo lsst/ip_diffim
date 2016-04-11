@@ -20,12 +20,16 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import numpy as np
+
+from lsst.afw.table import SourceCatalog
+from lsst.pipe.base import Struct
 import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
 import lsst.meas.algorithms as measAlg
-import lsst.pex.logging as pexLog
 
-class DiaCatalogSourceSelectorConfig(pexConfig.Config):
+__all__ = ["DiaCatalogSourceSelectorConfig", "DiaCatalogSourceSelectorTask"]
+
+class DiaCatalogSourceSelectorConfig(measAlg.StarSelectorConfig):
     # Selection cuts on the input source catalog
     fluxLim = pexConfig.Field(
         doc = "specify the minimum psfFlux for good Kernel Candidates",
@@ -39,12 +43,6 @@ class DiaCatalogSourceSelectorConfig(pexConfig.Config):
         default = 0.0,
         check = lambda x: x >= 0.0,
     )
-    badPixelFlags = pexConfig.ListField(
-        doc = "Kernel candidate objects may not have any of these bits set",
-        dtype = str,
-        default = ["base_PixelFlags_flag_edge", "base_PixelFlags_flag_interpolatedCenter",
-                   "base_PixelFlags_flag_saturatedCenter", "slot_Centroid_flag"],
-        )
     # Selection cuts on the reference catalog
     selectStar = pexConfig.Field(
         doc = "Select objects that are flagged as stars",
@@ -71,12 +69,21 @@ class DiaCatalogSourceSelectorConfig(pexConfig.Config):
         dtype = float,
         default = 3.0
     )
+    def setDefaults(self):
+        measAlg.StarSelectorConfig.setDefaults(self)
+        self.badFlags = [
+            "base_PixelFlags_flag_edge",
+            "base_PixelFlags_flag_interpolatedCenter",
+            "base_PixelFlags_flag_saturatedCenter",
+            "slot_Centroid_flag",
+        ]
+
 
 class CheckSource(object):
     """A functor to check whether a source has any flags set that should cause it to be labeled bad."""
 
-    def __init__(self, table, fluxLim, fluxMax, badPixelFlags):
-        self.keys = [table.getSchema().find(name).key for name in badPixelFlags]
+    def __init__(self, table, fluxLim, fluxMax, badFlags):
+        self.keys = [table.getSchema().find(name).key for name in badFlags]
         self.fluxLim = fluxLim
         self.fluxMax = fluxMax
 
@@ -90,31 +97,81 @@ class CheckSource(object):
             return False
         return True
 
-class DiaCatalogSourceSelector(object):
+## \addtogroup LSST_task_documentation
+## \{
+## \page DiaCatalogSourceSelectorTask
+## \ref DiaCatalogSourceSelectorTask_ "DiaCatalogSourceSelectorTask"
+## \copybrief DiaCatalogSourceSelectorTask
+## \}
+
+class DiaCatalogSourceSelectorTask(measAlg.StarSelectorTask):
+    """!Select sources for Kernel candidates
+
+    @anchor DiaCatalogSourceSelectorTask_
+    
+    @section ip_diffim_diaCatalogSourceSelector_Contents  Contents
+
+     - @ref ip_diffim_diaCatalogSourceSelector_Purpose
+     - @ref ip_diffim_diaCatalogSourceSelector_Initialize
+     - @ref ip_diffim_diaCatalogSourceSelector_IO
+     - @ref ip_diffim_diaCatalogSourceSelector_Config
+     - @ref ip_diffim_diaCatalogSourceSelector_Debug
+
+    @section ip_diffim_diaCatalogSourceSelector_Purpose  Description
+
+    A naive star selector based on second moments. Use with caution.
+
+    @section ip_diffim_diaCatalogSourceSelector_Initialize  Task initialisation
+
+    @copydoc \_\_init\_\_
+
+    @section ip_diffim_diaCatalogSourceSelector_IO  Invoking the Task
+
+    Like all star selectors, the main method is `run`.
+
+    @section ip_diffim_diaCatalogSourceSelector_Config  Configuration parameters
+
+    See @ref DiaCatalogSourceSelectorConfig
+
+    @section ip_diffim_diaCatalogSourceSelector_Debug  Debug variables
+
+    DiaCatalogSourceSelectorTask has a debug dictionary with the following keys:
+    <dl>
+    <dt>display
+    <dd>bool; if True display debug information
+    <dt>displayExposure
+    <dd>bool; if True display exposure
+    <dt>pauseAtEnd
+    <dd>bool; if True wait after displaying everything and wait for user input
+    </dl>
+
+    For example, put something like:
+    @code{.py}
+        import lsstDebug
+        def DebugInfo(name):
+            di = lsstDebug.getInfo(name)  # N.b. lsstDebug.Info(name) would call us recursively
+            if name.endswith("catalogStarSelector"):
+                di.display = True
+
+            return di
+
+        lsstDebug.Info = DebugInfo
+    @endcode
+    into your `debug.py` file and run your task with the `--debug` flag.
+    """
     ConfigClass = DiaCatalogSourceSelectorConfig
+    usesMatches = True # selectStars uses (requires) its matches argument
 
-    def __init__(self, config=None):
-        """Construct a source selector that uses a reference catalog
+    def selectStars(self, exposure, sourceCat, matches=None):
+        """Select sources for Kernel candidates 
         
-        @param[in] config: An instance of ConfigClass
-        """
-        if not config:
-            config = DiaCatalogSourceSelector.ConfigClass()
-        self.config = config
-        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
-                              'lsst.ip.diffim.DiaCatalogSourceSelector', pexLog.Log.INFO)
-
-    def selectSources(self, exposure, sources, matches=None):
-        """Return a list of Sources for Kernel candidates 
+        @param[in] exposure  the exposure containing the sources
+        @param[in] sourceCat  catalog of sources that may be stars (an lsst.afw.table.SourceCatalog)
+        @param[in] matches  a match vector as produced by meas_astrom; required
+                            (defaults to None to match the StarSelector API and improve error handling)
         
-        @param[in] exposure: the exposure containing the sources
-        @param[in] sources: a source list containing sources that may be candidates
-        @param[in] matches: a match vector as produced by meas_astrom; not optional
-                            (passing None just allows us to handle the exception better here
-                            than in calling code)
-        
-        @return kernelCandidateSourceList: a list of sources to be used as kernel candidates
- 
+        @return an lsst.pipe.base.Struct containing:
+        - starCat  a list of sources to be used as kernel candidates
         """
         import lsstDebug
         display = lsstDebug.Info(__name__).display
@@ -122,9 +179,7 @@ class DiaCatalogSourceSelector(object):
         pauseAtEnd = lsstDebug.Info(__name__).pauseAtEnd
 
         if matches is None:
-            raise RuntimeError(
-                "Cannot use catalog source selector without running astrometry."
-                )
+            raise RuntimeError("DiaCatalogSourceSelector requires matches")
 
         mi = exposure.getMaskedImage()
         
@@ -134,12 +189,12 @@ class DiaCatalogSourceSelector(object):
         #
         # Look for flags in each Source
         #
-        isGoodSource = CheckSource(sources, self.config.fluxLim, self.config.fluxMax, self.config.badPixelFlags)
+        isGoodSource = CheckSource(sourceCat, self.config.fluxLim, self.config.fluxMax, self.config.badFlags)
 
         #
         # Go through and find all the acceptable candidates in the catalogue
         #
-        kernelCandidateSourceList = []
+        starCat = SourceCatalog(sourceCat.schema)
 
         doColorCut = True
         with ds9.Buffering():
@@ -168,7 +223,7 @@ class DiaCatalogSourceSelector(object):
                     isRightType  = (self.config.selectStar and isStar) or (self.config.selectGalaxy and not isStar)
                     isRightVar   = (self.config.includeVariable) or (self.config.includeVariable is isVar)
                     if isRightType and isRightVar and isRightColor:
-                        kernelCandidateSourceList.append(source)
+                        starCat.append(source)
                         symb, ctype = "+", ds9.GREEN
                     else:
                         symb, ctype = "o", ds9.BLUE
@@ -182,7 +237,6 @@ class DiaCatalogSourceSelector(object):
             if pauseAtEnd:
                 raw_input("Continue? y[es] p[db] ")
 
-        return kernelCandidateSourceList
-
-measAlg.starSelectorRegistry.register("diacatalog", DiaCatalogSourceSelector)
-
+        return Struct(
+            starCat = starCat,
+        )
