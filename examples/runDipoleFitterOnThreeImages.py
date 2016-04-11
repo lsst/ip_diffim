@@ -19,15 +19,12 @@
 # the GNU General Public License along with this program.  If not,
 # see <https://www.lsstcorp.org/LegalNotices/>.
 
-from numpy import (sqrt, random as np_random,
-                   array as np_array)
+import numpy as np
 from matplotlib import pyplot as plt
 
-## LSST imports:
+#  LSST imports:
 import lsst.afw.image as afw_image
-import lsst.utils.tests as lsst_tests
 from lsst.afw.table import (SourceTable, SourceCatalog)
-from lsst.ip.diffim import dipoleFitTask as dft
 from lsst.meas.base import SingleFrameMeasurementConfig
 from lsst.meas.algorithms import (SourceDetectionConfig, SourceDetectionTask)
 
@@ -62,63 +59,17 @@ def runDetection(exposure):
 posCatalog = runDetection(posImage)
 negCatalog = runDetection(negImage)
 
-if False:
-
-    catalog = dtUtils.DipoleTestUtils.detectDipoleSources(diffim)
-
-    ## Here is an example of how to run the algorithm on each source.
-    ## Below we will just use the DipoleFitTask
-
-    for i,s in enumerate(catalog):
-        fp = s.getFootprint()
-        if (len(fp.getPeaks()) <= 1): continue
-        print i, fp.getBBox(), fp.getNpix(), len(fp.getPeaks())
-        for pk in fp.getPeaks():
-            print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
-
-        try:
-            result = dft.DipoleFitAlgorithm.fitDipole_new(
-                diffim, s, posImage, negImage, rel_weight=0.5, separateNegParams=False,
-                verbose=False, display=False)
-        except Exception as err:
-            print err
-
-    s = catalog[176]
-    fp = s.getFootprint()
-    print fp.getBBox(), fp.getNpix()
-    for pk in fp.getPeaks():
-        print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
-
-    dft.DipoleFitAlgorithm.fitDipole_new(
-        diffim, s, posImage, negImage, rel_weight=0.5, separateNegParams=False,
-        verbose=True, display=True)
-
-    dft.DipoleFitAlgorithm.fitDipole_new(
-        diffim, s, rel_weight=0., separateNegParams=False,
-        verbose=True, display=True)
-
-    #catalog = dft.DipolePlotUtils.makeHeavyCatalog(catalog, diffim)
-
-    dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage)
-    plt.show()
-    dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage, asHeavyFootprint=True)
-    plt.show()
-
-    s = dft.DipolePlotUtils.searchCatalog(catalog, 1354, 825)
-    dft.DipolePlotUtils.displayCutouts(s, diffim, posImage, negImage, asHeavyFootprint=True)
-    plt.show()
-
-##### END SKIP
-
-
 #### Now run the DipoleFitTask plugin on the image.
 
 from lsst.afw.table import (SourceTable, SourceCatalog)
 from lsst.meas.algorithms import (SourceDetectionConfig, SourceDetectionTask)
 
 ## Create the various tasks and schema -- avoid code reuse.
-detectTask, schema = dtUtils.DipoleTestUtils.detectDipoleSources(
-    diffim, detectSigma=5.5, doMerge=False)
+img = dtUtils.DipoleTestImage()
+img.diffim = diffim
+img.posImage = posImage
+img.negImage = negImage
+detectTask, schema = img.detectDipoleSources(detectSigma=5.5, doMerge=False)
 
 measureConfig = SingleFrameMeasurementConfig()
 
@@ -162,7 +113,6 @@ fpSet.makeSources(sources)
 
 for i,s in enumerate(sources):
     fp = s.getFootprint()
-#    if (len(fp.getPeaks()) <= 1): continue
     print i, s.getId(), fp.getBBox(), fp.getNpix(), len(fp.getPeaks())
     for pk in fp.getPeaks():
         print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
@@ -172,6 +122,22 @@ measureTask.run(sources, diffim, posImage, negImage)
 #s = sources[0]
 s = dft.DipolePlotUtils.searchCatalog(sources, 617, 209)
 print s.extract("ip_diffim_DipoleFit*")
+
+if False:
+    img.displayCutouts(s, False)
+    fitResult = img.fitDipoleSource(s, verbose=True, display=True)
+
+fitResult = img.fitDipoleSource(s, verbose=True, display=False)
+
+
+fitResults = []
+for i,s in enumerate(sources):
+    fp = s.getFootprint()
+    if (len(fp.getPeaks()) <= 1): continue
+    print i, s.getId(), fp.getBBox(), fp.getNpix(), len(fp.getPeaks())
+    for pk in fp.getPeaks():
+        print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
+    fitResults.append(img.fitDipoleSource(s, verbose=False, display=False))
 
 if False:
     from matplotlib.backends.backend_pdf import PdfPages
