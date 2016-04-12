@@ -479,8 +479,8 @@ class DipoleFitAlgorithm(object):
         """
         fp = source.getFootprint()
         bbox = fp.getBBox()
-        # bbox.grow(3)
-        posImg = afw_image.ImageF(posImage.getMaskedImage().getImage(), bbox, afw_image.PARENT)
+        bbox.grow(3)
+        posImg = afw_image.MaskedImageF(posImage.getMaskedImage(), bbox, afw_image.PARENT)
 
         # bctrl = afw_math.BackgroundControl(10, 10, self.sctrl)  # number of bins - how to choose?
         # bkgd = afw_math.makeBackground(posImg, bctrl)  # .getMaskedImage()
@@ -488,14 +488,16 @@ class DipoleFitAlgorithm(object):
         # approx = bkgd.getApproximate(actrl)
         # bim = approx.getImage(order - 1)
 
-        bctrl = afw_math.BackgroundControl(10, 10)
-        bctrl.setInterpStyle(afw_math.Interpolate.CUBIC_SPLINE)
-        bctrl.setNxSample(6)
-        bctrl.setNySample(6)
-        bctrl.getStatisticsControl().setNumSigmaClip(5.0)
-        bctrl.getStatisticsControl().setNumIter(10)
+        bctrl = afw_math.BackgroundControl(order, order)  # number of bins across image
+        bctrl.setInterpStyle(afw_math.Interpolate.NATURAL_SPLINE)
+        sctrl = bctrl.getStatisticsControl()
+        sctrl.setAndMask(afw_image.MaskU.getPlaneBitMask(["BAD","DETECTED","DETECTED_NEGATIVE","DETECTED_NEG","DETECTED_POS","EDGE"]))
+        sctrl.setNumSigmaClip(3.0)
+        sctrl.setNumIter(3)
+
         backobj = afw_math.cast_BackgroundMI(afw_math.makeBackground(posImg, bctrl))
-        bim = backobj.getImageF("NATURAL_SPLINE")  # options: ("CONSTANT", "LINEAR", "NATURAL_SPLINE", "AKIMA_SPLINE")
+        bim = backobj.getImageF("LINEAR")  # options: ("CONSTANT", "LINEAR", "NATURAL_SPLINE", "AKIMA_SPLINE")
+        bim = afw_image.ImageF(bim, source.getFootprint().getBBox(), afw_image.PARENT)
         return bim.getArray()
 
     def genStarModel(self, bbox, psf, xcen, ycen, flux):
@@ -777,27 +779,29 @@ class DipoleFitAlgorithm(object):
         if (rel_weight > 0. and fitBgGradient and bgGradientOrder >= 0):
             pbg = 0.
             # Fit the gradient to the background
-            if True:  # use my custom routine
+            if True:  # use custom numpy-based linear polynomial fitting routine
                 bgParsPos = bgParsNeg = self.fitBackgroundGradient(source, self.posImage,
                                                                    order=bgGradientOrder)
                 # Generate the gradient to subtract from the pre-subtraction image data
                 in_x = self._generateXYGrid(bbox)
                 pbg = self.genBgGradientModel(in_x, tuple(bgParsPos))
             else:  # use afw_math to estimate background
-                pbg = self.fitBackgroundGradientAfw(source, self.posImage, order=bgGradientOrder+1)
+                pbg = self.fitBackgroundGradientAfw(source, self.posImage, order=bgGradientOrder)
             # Subtract the background from posImage and re-estimate the starting flux
             z[1, :] -= pbg
-            posFlux = np.nansum(z[1, :] - np.nanmedian(z[1, :]))
+            z[1, :] -= np.nanmedian(z[1, :])
+            posFlux = np.nansum(z[1, :])
             gmod.set_param_hint('flux', value=posFlux * 1.5, min=0.1)
             if separateNegParams:
                 if True:
                     bgParsNeg = self.fitBackgroundGradient(source, self.negImage, order=bgGradientOrder)
                     pbg = self.genBgGradientModel(in_x, tuple(bgParsNeg))
                 else:
-                    pbg = self.fitBackgroundGradientAfw(source, self.negImage, order=bgGradientOrder+1)
+                    pbg = self.fitBackgroundGradientAfw(source, self.negImage, order=bgGradientOrder)
             z[2, :] -= pbg
+            z[2, :] -= np.nanmedian(z[2, :])
             if separateNegParams:
-                negFlux = np.nansum(z[2, :] - np.nanmedian(z[2, :]))
+                negFlux = np.nansum(z[2, :])
                 gmod.set_param_hint('fluxNeg', value=negFlux * 1.5, min=0.1)
 
             bgParsPos = bgParsNeg = (0., 0., 0.)
