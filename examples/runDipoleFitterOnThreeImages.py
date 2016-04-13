@@ -119,7 +119,19 @@ for i,s in enumerate(sources):
 
 measureTask.run(sources, diffim, posImage, negImage)
 
-#s = sources[0]
+
+fitResults = []
+for i,s in enumerate(sources):
+    fp = s.getFootprint()
+    if (len(fp.getPeaks()) <= 1): continue
+    print i, s.getId(), fp.getBBox(), fp.getNpix(), len(fp.getPeaks())
+    print '   ', s.extract("ip_diffim_DipoleFit_flag_classification")
+    for pk in fp.getPeaks():
+        print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
+    fitres = img.fitDipoleSource(s, verbose=False, display=False)
+    fitResults.append(fitres)
+
+
 s = dft.DipolePlotUtils.searchCatalog(sources, 617, 209)
 print s.extract("ip_diffim_DipoleFit*")
 
@@ -127,17 +139,8 @@ if False:
     img.displayCutouts(s, False)
     fitResult = img.fitDipoleSource(s, verbose=True, display=True)
 
+#%timeit img.fitDipoleSource(s, verbose=False, display=False)
 fitResult = img.fitDipoleSource(s, verbose=True, display=False)
-
-
-fitResults = []
-for i,s in enumerate(sources):
-    fp = s.getFootprint()
-    if (len(fp.getPeaks()) <= 1): continue
-    print i, s.getId(), fp.getBBox(), fp.getNpix(), len(fp.getPeaks())
-    for pk in fp.getPeaks():
-        print '   FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue()
-    fitResults.append(img.fitDipoleSource(s, verbose=False, display=False))
 
 if False:
     from matplotlib.backends.backend_pdf import PdfPages

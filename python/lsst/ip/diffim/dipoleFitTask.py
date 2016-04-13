@@ -352,13 +352,14 @@ class DipoleFitAlgorithm(object):
     # 1. evaluate necessity for separate parameters for pos- and neg- images
     # 2. only fit background OUTSIDE footprint (DONE) and dipole params INSIDE footprint (NOT DONE)?
     # 3. correct normalization of least-squares weights based on variance planes
-    # 4. account for PSFs that vary across the exposures
+    # 4. account for PSFs that vary across the exposures (should be happening by default?)
     # 5. correctly account for NA/masks  (i.e., ignore!)
     # 6. better exception handling in the plugin
-    # 7. (DONE) Initial fast estimate of background gradient(s) params -- perhaps using numpy.lstsq
-    # 8. (NOT NEEDED - see (1)) Initial fast test whether a background gradient needs to be fit
-    # 9. (DONE) better initial estimate for flux when there's a strong gradient
-    # 10. (DONE) requires a new package `lmfit` -- investiate others? (astropy/scipy/iminuit?)
+    # 7. better classification of dipoles (e.g. by comparing chi2 fit vs. monopole?)
+    # 8. (DONE) Initial fast estimate of background gradient(s) params -- perhaps using numpy.lstsq
+    # 9. (NOT NEEDED - see (1)) Initial fast test whether a background gradient needs to be fit
+    # 10. (DONE) better initial estimate for flux when there's a strong gradient
+    # 11. (DONE) requires a new package `lmfit` -- investiate others? (astropy/scipy/iminuit?)
 
     # Only import lmfit if someone wants to use the new DipoleFitAlgorithm.
     import lmfit
