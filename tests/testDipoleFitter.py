@@ -37,35 +37,22 @@ __all__ = ("DipoleTestUtils")
 
 
 class DipoleFitTestGlobalParams(object):
-    """
-    Class to initialize and store global parameters used by all tests below.
+    """Class to initialize and store global parameters used by all tests below.
 
-    Attributes
-    ----------
-    display : boolean
-        Display (plot) the output dipole thumbnails (matplotlib)
-    verbose : boolean
-        be verbose during fitting
-    w : integer
-        width (pixels) of test generated exposures
-    h : integer
-        height (pixels) of test generated exposures
-    xc : array of floats
-        x coordinate (pixels) of center(s) of input dipole(s)
-    yc : array of floats
-        y coordinate (pixels) of center(s) of input dipole(s)
-    flux : array of floats
-        flux(es) of input dipole(s)
-    gradientParams : array of floats
-        three parameters for linear background gradient
-    offsets : array of floats
-        pixel coordinates between lobes of dipoles
+    Attributes:
+    display: Display (plot) the output dipole thumbnails (matplotlib)
+    verbose: be verbose during fitting
+    w: width (pixels) of test generated exposures
+    h: height (pixels) of test generated exposures
+    xc: x coordinate (pixels) of center(s) of input dipole(s)
+    yc: y coordinate (pixels) of center(s) of input dipole(s)
+    flux: flux(es) of input dipole(s)
+    gradientParams: tuple with three parameters for linear background gradient
+    offsets: pixel coordinates between lobes of dipoles
     """
 
     def __init__(self):
-        """
-        Initialize the parameters.
-        """
+        """Initialize the parameters."""
         np.random.seed(666)
         self.display = False
         self.verbose = False
@@ -83,8 +70,7 @@ class DipoleFitTestGlobalParams(object):
 # Create a simulated diffim (with dipoles) and a linear background gradient in the pre-sub images
 #   then compare the input fluxes/centroids with the fitted results.
 class DipoleFitAlgorithmTest(lsst.utils.tests.TestCase):
-    """
-    A test case for dipole fit algorithm.
+    """A test case for dipole fit algorithm.
 
     Test the dipole fitting algorithm on two dipoles within an image with
     simulated noise.
@@ -110,9 +96,10 @@ class DipoleFitAlgorithmTest(lsst.utils.tests.TestCase):
         del self.params
 
     def testDipoleFitter(self):
-        """
-        Test the dipole fitting algorithm. Test that the resulting fluxes/centroids
-        are very close to the input values for both dipoles in the image.
+        """Test the dipole fitting algorithm. Test that the resulting
+        fluxes/centroids are very close to the input values for both
+        dipoles in the image.
+
         """
         if self.params.verbose:
             for s in self.catalog:
@@ -136,10 +123,10 @@ class DipoleFitAlgorithmTest(lsst.utils.tests.TestCase):
             self.assertClose(result.psfFitNegCentroidY, self.params.yc[i] - offsets[i], rtol=0.01)
 
 
-# Test the task in the same way as the algorithm:
-# Also test that it correctly classifies the dipoles.
 class DipoleFitTaskTest(DipoleFitAlgorithmTest):
-    """ A test case for dipole fit task"""
+    """ A test case to test the task in the same way as the algorithm:
+    Also test that it correctly classifies the dipoles.
+    """
     def setUp(self):
         DipoleFitAlgorithmTest.setUp(self)
 
@@ -189,10 +176,11 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         pass
 
     def testDipoleTask(self):
-        """
-        Test the dipole fitting singleFramePlugin. Test that the resulting fluxes/centroids
-        are entered into the correct slots of the catalog, and have values that are
-        very close to the input values for both dipoles in the image.
+        """Test the dipole fitting singleFramePlugin. Test that the resulting
+        fluxes/centroids are entered into the correct slots of the
+        catalog, and have values that are very close to the input
+        values for both dipoles in the image.
+
         """
         sources = self.runDetection()
 
@@ -245,10 +233,10 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         return result
 
 
-# Test the task in the same way as the algorithm:
-# Here test that dipoles too close to the edge are raised correctly
 class DipoleFitTaskEdgeTest(DipoleFitTaskTest):
-    """ A test case for dipole fit task"""
+    """ A test case to test the task in the same way as the algorithm:
+    Here test that dipoles too close to the edge are raised correctly.
+    """
     def setUp(self):
         # Ensure that both dipoles will fail (too close to edge)
         self.params = DipoleFitTestGlobalParams()
@@ -274,9 +262,9 @@ class DipoleFitTaskEdgeTest(DipoleFitTaskTest):
         pass
 
     def testDipoleEdge(self):
-        """
-        Test the dipole fitting singleFramePlugin. Test that the dipoles which are too
-        close to the edge raise the correct exception.
+        """Test the dipole fitting singleFramePlugin. Test that the dipoles
+        which are too close to the edge raise the correct exception.
+
         """
 
         sources = DipoleFitTaskTest.runDetection(self)
@@ -292,6 +280,7 @@ class DipoleTestUtils(object):
     @classmethod
     def makeStarImage(cls, w=101, h=101, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=10.0,
                       gradientParams=None, schema=None):
+        """Generate an exposure and catalog with the given stellar source(s)"""
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(w-1, h-1))
         dataset = TestDataset(bbox, psfSigma=psfSigma, threshold=1.)
@@ -317,6 +306,7 @@ class DipoleTestUtils(object):
     @classmethod
     def makeDipoleImage(cls, w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
                         psfSigma=2., flux=[30000.], fluxNeg=None, noise=10., gradientParams=None):
+        """Generate an exposure and catalog with the given dipole source(s)"""
 
         posImage, posCatalog = cls.makeStarImage(
             w, h, xcenPos, ycenPos, flux=flux, psfSigma=psfSigma,
@@ -345,10 +335,12 @@ class DipoleTestUtils(object):
 
     @classmethod
     def detectDipoleSources(cls, diffim, doMerge=True, detectSigma=5.5, grow=3):
-        """
-        Utility function for detecting dipoles. Detects pos/neg sources in the diffim,
-        then merges them. A bigger "grow" parameter leads to a larger footprint which
+        """Utility function for detecting dipoles.
+
+        Detect pos/neg sources in the diffim, then merge them. A
+        bigger "grow" parameter leads to a larger footprint which
         helps with dipole measurement for faint dipoles.
+
         """
 
         # Start with a minimal schema - only the fields all SourceCatalogs need
