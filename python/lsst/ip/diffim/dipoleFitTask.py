@@ -27,15 +27,15 @@ import numpy as np
 # LSST imports
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
-import lsst.afw.detection as afwDet
 import lsst.meas.base as measBase
 import lsst.afw.table as afwTable
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
+from . import utils as ipUtils
 
 __all__ = ("DipoleFitConfig", "DipoleFitTask", "DipoleFitPlugin",
-           "DipoleFitAlgorithm", "DipolePlotUtils")
+           "DipoleFitAlgorithm")
 
 
 # Create a new measurement task (`DipoleFitTask`) that can handle all other SFM tasks but can
@@ -728,9 +728,11 @@ class DipoleFitAlgorithm(object):
         @param fitBgGradient Fit linear background gradient in posImage/negImage?
         @param bgGradientOrder Desired polynomial order of background gradient (allowed are [0,1,2])
         @param maxSepInSigma Allowed window of centroid parameters relative to peak in input source footprint
-        @param separateNegParams Fit separate parameters to the flux and background gradient in the negative images?
-        If true, this adds a separate parameter for the negative flux, and [1, 3, or 6] additional parameters to
-        fit for the background gradient in the negImage. Otherwise, the flux and gradient parameters are constrained
+        @param separateNegParams Fit separate parameters to the flux and background gradient in
+        the negative images?
+        If true, this adds a separate parameter for the negative flux, and [1, 3, or 6] additional
+        parameters to fit for the background gradient in the negImage. Otherwise, the flux and
+        gradient parameters are constrained
         to be exactly equal in the fit.
         @param verbose Be verbose
         @param display Display input data, best fit model(s) and residuals in a matplotlib window.
@@ -799,7 +801,7 @@ class DipoleFitAlgorithm(object):
     def displayFitResults(self, result, footprint):
         """Display data, model fits and residuals (currently uses matplotlib display functions)."""
 
-        plt = DipolePlotUtils.importMatplotlib()
+        plt = ipUtils.importMatplotlib()
         if not plt:  # Exit silently if no matplotlib installed
             return
 
@@ -811,260 +813,18 @@ class DipoleFitAlgorithm(object):
             fig = plt.figure(figsize=(8, 8))
             for i in range(3):
                 plt.subplot(3, 3, i*3+1)
-                DipolePlotUtils.display2dArray(z[i, :], 'Data', True, extent=extent)
+                ipUtils.display2dArray(z[i, :], 'Data', True, extent=extent)
                 plt.subplot(3, 3, i*3+2)
-                DipolePlotUtils.display2dArray(fit[i, :], 'Model', True, extent=extent)
+                ipUtils.display2dArray(fit[i, :], 'Model', True, extent=extent)
                 plt.subplot(3, 3, i*3+3)
-                DipolePlotUtils.display2dArray(z[i, :] - fit[i, :], 'Residual', True, extent=extent)
+                ipUtils.display2dArray(z[i, :] - fit[i, :], 'Residual', True, extent=extent)
             return fig
         else:
             fig = plt.figure(figsize=(8, 2.5))
             plt.subplot(1, 3, 1)
-            DipolePlotUtils.display2dArray(z, 'Data', True, extent=extent)
+            ipUtils.display2dArray(z, 'Data', True, extent=extent)
             plt.subplot(1, 3, 2)
-            DipolePlotUtils.display2dArray(fit, 'Model', True, extent=extent)
+            ipUtils.display2dArray(fit, 'Model', True, extent=extent)
             plt.subplot(1, 3, 3)
-            DipolePlotUtils.display2dArray(z - fit, 'Residual', True, extent=extent)
+            ipUtils.display2dArray(z - fit, 'Residual', True, extent=extent)
             return fig
-
-
-######### UTILITIES FUNCTIONS -- TBD WHERE THEY ULTIMATELY END UP ####
-
-class DipolePlotUtils():
-    """Utility class containing methods for displaying dipoles/footprints
-    in difference images, mostly used for debugging.
-
-    """
-
-    @classmethod
-    def importMatplotlib(cls):
-        """!Import matplotlib.pyplot when needed, warn if not available.
-        @return the imported module if available, else False.
-
-        """
-        try:
-            import matplotlib.pyplot as plt
-            return plt
-        except ImportError as err:
-            log = pexLog.Log(pexLog.Log.getDefaultLog(),
-                             'lsst.ip.diffim.DipoleFitTask', pexLog.Log.INFO)
-            log.warn('Unable to import matplotlib: %s' % err)
-            return False
-
-    @classmethod
-    def display2dArray(cls, arr, title='Data', showBars=True, extent=None):
-        """Use matplotlib.pyplot.imshow() to display a 2-D array.
-
-        @param arr The 2-D array to display
-        @param title Optional title to display
-        @param showBars Show grey-scale bar alongside
-        @param extent If not None, a 4-tuple giving the bounding box coordinates of the array
-
-        @return matplotlib.pyplot.figure dispaying the image
-        """
-        plt = cls.importMatplotlib()
-        if not plt:
-            return
-
-        fig = plt.imshow(arr, origin='lower', interpolation='none', cmap='gray',
-                         extent=extent)
-        plt.title(title)
-        if showBars:
-            plt.colorbar(fig, cmap='gray')
-        return fig
-
-    @classmethod
-    def displayImage(cls, image, showBars=True, width=8, height=2.5):
-        """Use matplotlib.pyplot.imshow() to display an afw.image.Image within
-        its bounding box.
-
-        @see display2dArray() for params not listed here.
-        @param image The image to display
-        @param width The width of the display (inches)
-        @param height The height of the display (inches)
-
-        @return matplotlib.pyplot.figure dispaying the image
-
-        """
-        plt = cls.importMatplotlib()
-        if not plt:
-            return
-
-        fig = plt.figure(figsize=(width, height))
-        bbox = image.getBBox()
-        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-        plt.subplot(1, 3, 1)
-        ma = image.getArray()
-        cls.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
-        return fig
-
-    @classmethod
-    def displayImages(cls, images, showBars=True, width=8, height=2.5):
-        """Use matplotlib.pyplot.imshow() to display up to three
-        afw.image.Images alongside each other, each within its
-        bounding box.
-
-        @see displayImage() for params not listed here.
-        @param images tuple of up to three images to display
-
-        @return matplotlib.pyplot.figure dispaying the image
-
-        """
-        plt = cls.importMatplotlib()
-        if not plt:
-            return
-
-        fig = plt.figure(figsize=(width, height))
-        for i, image in enumerate(images):
-            bbox = image.getBBox()
-            extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-            plt.subplot(1, len(images), i+1)
-            ma = image.getArray()
-            cls.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
-        return fig
-
-    @classmethod
-    def displayMaskedImage(cls, maskedImage, showMasks=True, showVariance=False, showBars=True, width=8,
-                           height=2.5):
-        """Use matplotlib.pyplot.imshow() to display a afwImage.MaskedImageF,
-        alongside its masks and variance plane
-
-        !see displayImage() for params not listed here
-
-        @param maskedImage MaskedImage to display
-        @param showMasks Display the MaskedImage's masks
-        @param showVariance Display the MaskedImage's variance plane
-
-        @return matplotlib.pyplot.figure dispaying the image
-
-        """
-        plt = cls.importMatplotlib()
-        if not plt:
-            return
-
-        fig = plt.figure(figsize=(width, height))
-        bbox = maskedImage.getBBox()
-        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-        plt.subplot(1, 3, 1)
-        ma = maskedImage.getArrays()
-        cls.display2dArray(ma[0], title='Data', showBars=showBars, extent=extent)
-        if showMasks:
-            plt.subplot(1, 3, 2)
-            cls.display2dArray(ma[1], title='Masks', showBars=showBars, extent=extent)
-        if showVariance:
-            plt.subplot(1, 3, 3)
-            cls.display2dArray(ma[2], title='Variance', showBars=showBars, extent=extent)
-        return fig
-
-    @classmethod
-    def displayExposure(cls, exposure, showMasks=True, showVariance=False, showPsf=False, showBars=True,
-                        width=8, height=2.5):
-        """Use matplotlib.pyplot.imshow() to display a afw.image.Exposure,
-        including its masks and variance plane and optionally its Psf.
-
-        @see displayMaskedImage() for params not listed here
-
-        @param exposure Exposure to display
-        @param showPsf Display the exposure's Psf
-
-        @return matplotlib.pyplot.figure dispaying the image
-
-        """
-        plt = cls.importMatplotlib()
-        if not plt:
-            return
-
-        fig = cls.displayMaskedImage(exposure.getMaskedImage(), showMasks,
-                                     showVariance=not showPsf,
-                                     showBars=showBars, width=width, height=height)
-        if showPsf:
-            plt.subplot(1, 3, 3)
-            psfIm = exposure.getPsf().computeImage()
-            bbox = psfIm.getBBox()
-            extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-            cls.display2dArray(psfIm.getArray(), title='PSF', showBars=showBars, extent=extent)
-        return fig
-
-    @classmethod
-    def displayCutouts(cls, source, exposure, posImage=None, negImage=None, asHeavyFootprint=False, title=''):
-        """Use matplotlib.pyplot.imshow() to display cutouts within up to
-        three afw.image.Exposure's, given by an input SourceRecord.
-
-        @param source afw.table.SourceRecord defining the footprint to extract and display
-        @param exposure afw.image.Exposure from which to extract the cutout to display
-        @param posImage Second exposure from which to extract the cutout to display
-        @param negImage Third exposure from which to extract the cutout to display
-        @param asHeavyFootprint Display the cutouts as
-        afw.detection.HeavyFootprint, with regions outside the
-        footprint removed
-
-        @return matplotlib.pyplot.figure dispaying the image
-
-        """
-        plt = cls.importMatplotlib()
-        if not plt:
-            return
-
-        fp = source.getFootprint()
-        bbox = fp.getBBox()
-        extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-
-        fig = plt.figure(figsize=(8, 2.5))
-        if not asHeavyFootprint:
-            subexp = afwImage.ImageF(exposure.getMaskedImage().getImage(), bbox, afwImage.PARENT)
-        else:
-            hfp = afwDet.HeavyFootprintF(fp, exposure.getMaskedImage())
-            subexp = cls.getHeavyFootprintSubimage(hfp)
-        plt.subplot(1, 3, 1)
-        cls.display2dArray(subexp.getArray(), title=title+' Diffim', extent=extent)
-        if posImage is not None:
-            if not asHeavyFootprint:
-                subexp = afwImage.ImageF(posImage.getMaskedImage().getImage(), bbox, afwImage.PARENT)
-            else:
-                hfp = afwDet.HeavyFootprintF(fp, posImage.getMaskedImage())
-                subexp = cls.getHeavyFootprintSubimage(hfp)
-            plt.subplot(1, 3, 2)
-            cls.display2dArray(subexp.getArray(), title=title+' Pos', extent=extent)
-        if negImage is not None:
-            if not asHeavyFootprint:
-                subexp = afwImage.ImageF(negImage.getMaskedImage().getImage(), bbox, afwImage.PARENT)
-            else:
-                hfp = afwDet.HeavyFootprintF(fp, negImage.getMaskedImage())
-                subexp = cls.getHeavyFootprintSubimage(hfp)
-            plt.subplot(1, 3, 3)
-            cls.display2dArray(subexp.getArray(), title=title+' Neg', extent=extent)
-        return fig
-
-    @classmethod
-    def makeHeavyCatalog(cls, catalog, exposure, verbose=False):
-        """Turn all footprints in a catalog into heavy footprints."""
-        for i, source in enumerate(catalog):
-            fp = source.getFootprint()
-            if not fp.isHeavy():
-                if verbose:
-                    print(i, 'not heavy => heavy')
-                hfp = afwDet.HeavyFootprintF(fp, exposure.getMaskedImage())
-                source.setFootprint(hfp)
-
-        return catalog
-
-    @classmethod
-    def getHeavyFootprintSubimage(fp, badfill=np.nan):
-        """Extract the image from a heavyFootprint as an ImageF."""
-        hfp = afwDet.HeavyFootprintF_cast(fp)
-        bbox = hfp.getBBox()
-
-        subim2 = afwImage.ImageF(bbox, badfill)  # set the mask to NA (can use 0. if desired)
-        afwDet.expandArray(hfp, hfp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
-        return subim2
-
-    @classmethod
-    def searchCatalog(catalog, x, y):
-        """Search a catalog for a source whose footprint contains the given x, y pixel coordinates."""
-        for i, s in enumerate(catalog):
-            bbox = s.getFootprint().getBBox()
-            if bbox.contains(afwGeom.Point2D(x, y)):
-                print(i)
-                return s
-        return None
-
