@@ -45,15 +45,15 @@ class DipoleFitTestGlobalParams(object):
     """Class to initialize and store global parameters used by all tests below.
 
     Attributes:
-    display: Display (plot) the output dipole thumbnails (matplotlib)
-    verbose: be verbose during fitting
-    w: width (pixels) of test generated exposures
-    h: height (pixels) of test generated exposures
-    xc: x coordinate (pixels) of center(s) of input dipole(s)
-    yc: y coordinate (pixels) of center(s) of input dipole(s)
-    flux: flux(es) of input dipole(s)
-    gradientParams: tuple with three parameters for linear background gradient
-    offsets: pixel coordinates between lobes of dipoles
+    @var display: Display (plot) the output dipole thumbnails (matplotlib)
+    @var verbose: be verbose during fitting
+    @var w: width (pixels) of test generated exposures
+    @var h: height (pixels) of test generated exposures
+    @var xc: x coordinate (pixels) of center(s) of input dipole(s)
+    @var yc: y coordinate (pixels) of center(s) of input dipole(s)
+    @var flux: flux(es) of input dipole(s)
+    @var gradientParams: tuple with three parameters for linear background gradient
+    @var offsets: pixel coordinates between lobes of dipoles
     """
 
     def __init__(self):
@@ -136,11 +136,6 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
     """ A test case to test the task in the same way as the algorithm:
     Also test that it correctly classifies the dipoles.
     """
-    # def setUp(self):
-    #     DipoleFitAlgorithmTest.setUp(self)
-
-    # def tearDown(self):
-    #     DipoleFitAlgorithmTest.tearDown(self)
 
     def runDetection(self):
 
@@ -149,15 +144,20 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
 
         measureConfig = measBase.SingleFrameMeasurementConfig()
 
-        measureConfig.slots.modelFlux = "ip_diffim_DipoleFit"
+        measureConfig.slots.calibFlux = None
+        measureConfig.slots.modelFlux = None
+        measureConfig.slots.instFlux = None
+        measureConfig.slots.shape = None
+        measureConfig.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
+        measureConfig.doReplaceWithNoise = False
 
-        measureConfig.plugins.names |= ["base_CircularApertureFlux",
-                                        "base_PixelFlags",
-                                        "base_SkyCoord",
-                                        "base_PsfFlux",
-                                        "ip_diffim_NaiveDipoleCentroid",
-                                        "ip_diffim_NaiveDipoleFlux",
-                                        "ip_diffim_PsfDipoleFlux"]
+        measureConfig.plugins.names = ["base_CircularApertureFlux",
+                                       "base_PixelFlags",
+                                       "base_SkyCoord",
+                                       "base_PsfFlux",
+                                       "ip_diffim_NaiveDipoleCentroid",
+                                       "ip_diffim_NaiveDipoleFlux",
+                                       "ip_diffim_PsfDipoleFlux"]
 
         # Disable aperture correction, which requires having an ApCorrMap attached to
         # the Exposure (it'll warn if it's not present and we don't explicitly disable it).
@@ -276,7 +276,7 @@ class DipoleFitTaskEdgeTest(DipoleFitTaskTest):
 
         """
 
-        sources = DipoleFitTaskTest.runDetection(self)
+        sources = self.runDetection()
 
         for i, r1 in enumerate(sources):
             result = r1.extract("ip_diffim_DipoleFit*")

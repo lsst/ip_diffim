@@ -862,25 +862,9 @@ def displayImage(image, showBars=True, width=8, height=2.5):
     """Use matplotlib.pyplot.imshow() to display an afw.image.Image within
     its bounding box.
 
-    @see display2dArray() for params not listed here.
-    @param image The image to display
-    @param width The width of the display (inches)
-    @param height The height of the display (inches)
-
-    @return matplotlib.pyplot.figure dispaying the image
-
+    @see displayImages()
     """
-    plt = importMatplotlib()
-    if not plt:
-        return
-
-    fig = plt.figure(figsize=(width, height))
-    bbox = image.getBBox()
-    extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-    plt.subplot(1, 3, 1)
-    ma = image.getArray()
-    display2dArray(ma, title='Data', showBars=showBars, extent=extent)
-    return fig
+    return displayImages((image), showBars=True, width=8, height=2.5)
 
 
 def displayImages(images, showBars=True, width=8, height=2.5):
@@ -888,8 +872,11 @@ def displayImages(images, showBars=True, width=8, height=2.5):
     afw.image.Images alongside each other, each within its
     bounding box.
 
-    @see displayImage() for params not listed here.
+    @see display2dArray() for params not listed here.
     @param images tuple of up to three images to display
+    @param image The image to display
+    @param width The width of the display (inches)
+    @param height The height of the display (inches)
 
     @return matplotlib.pyplot.figure dispaying the image
 
@@ -913,7 +900,7 @@ def displayMaskedImage(maskedImage, showMasks=True, showVariance=False, showBars
     """Use matplotlib.pyplot.imshow() to display a afwImage.MaskedImageF,
     alongside its masks and variance plane
 
-    !see displayImage() for params not listed here
+    @see displayImage() for params not listed here
 
     @param maskedImage MaskedImage to display
     @param showMasks Display the MaskedImage's masks
@@ -1050,5 +1037,4 @@ def searchCatalog(catalog, x, y):
         if bbox.contains(afwGeom.Point2D(x, y)):
             print(i)
             return s
-    return None
 

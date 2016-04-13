@@ -53,7 +53,8 @@ class DipoleFitConfig(measBase.SingleFramePluginConfig):
 
     relWeight = pexConfig.Field(
         dtype=float, default=0.5,
-        doc="Relative weighting of pre-subtraction images (higher -> greater influence of pre-sub. images on fit)")
+        doc="""Relative weighting of pre-subtraction images (higher -> greater influence of pre-sub. 
+        images on fit)""")
 
     tolerance = pexConfig.Field(
         dtype=float, default=1e-7,
@@ -74,13 +75,13 @@ class DipoleFitConfig(measBase.SingleFramePluginConfig):
 
     maxFluxRatio = pexConfig.Field(
         dtype=float, default=0.65,
-        doc="maximum flux ratio in either lobe to be considered a dipole")
+        doc="Maximum flux ratio in either lobe to be considered a dipole")
 
     # Choose a maxChi2DoF corresponding to a significance level of at most 0.05
     # (note this is actually a significance not a chi2 number)
     maxChi2DoF = pexConfig.Field(
         dtype=float, default=0.05,
-        doc="Maximum Chi2/DoF of fit to be considered a dipole")
+        doc="Maximum Chi2/DoF significance of fit to be considered a dipole.")
 
     verbose = pexConfig.Field(
         dtype=bool, default=False,
@@ -162,10 +163,6 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         # algorithms that require both getShape() and getCentroid(),
         # in addition to a Footprint and its Peaks
         return cls.FLUX_ORDER
-
-    @classmethod
-    def getTransformClass(cls):
-        return DipoleFitTransform
 
     def __init__(self, config, name, schema, metadata):
         measBase.SingleFramePlugin.__init__(self, config, name, schema, metadata)
@@ -476,9 +473,9 @@ class DipoleFitAlgorithm(object):
                                             x2Neg=x2Neg, y2Neg=y2Neg, debug=debug, **kwargs)
 
     def genDipoleModelImpl(self, x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
-                       b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
-                       bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
-                       debug=False, **kwargs):
+                           b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
+                           bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
+                           debug=False, **kwargs):
 
         """Generate dipole model with given parameters. This is the functor
         whose sum-of-squared difference from data is minimized by
