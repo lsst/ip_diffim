@@ -35,6 +35,16 @@ from lsst.meas.base.tests import TestDataset
 # Export DipoleTestUtils to expose fake image generating funcs
 __all__ = ("DipoleTestUtils")
 
+# This file produces three unit tests of the DipoelFitAlgorithm and its related tasks and plugins.
+# Each test generates a fake image with two synthetic dipoles as input data.
+#
+# DipoleFitAlgorithmTest - tests the DipoleFitAlgorithm directly and ensures that the recovered
+#   fluxes and centroids are close to the input values.
+# DipoleFitTaskTest - DipoleFitAlgorithmTest subclass that tests the DipoleFitTask similarly to
+#   DipoleFitAlgorithmTest on identical synthetic data, after running dipole detection on the image.
+# DipoleFitTaskEdgeTest - subclass of DipoleFitTaskTest that simply ensures correct handling of
+#   dipoles too close to the edge of the image.
+
 
 class DipoleFitTestGlobalParams(object):
     """Class to initialize and store global parameters used by all tests below.
@@ -91,8 +101,12 @@ class DipoleFitAlgorithmTest(lsst.utils.tests.TestCase):
         self.catalog = DipoleTestUtils.detectDipoleSources(self.dipole)
 
     def tearDown(self):
-        del self.dipole, self.posImage, self.negImage
-        del self.catalog, self.posCatalog, self.negCatalog
+        del self.dipole
+        del self.posImage
+        del self.negImage
+        del self.catalog
+        del self.posCatalog
+        del self.negCatalog
         del self.params
 
     def testDipoleFitter(self):
@@ -127,11 +141,11 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
     """ A test case to test the task in the same way as the algorithm:
     Also test that it correctly classifies the dipoles.
     """
-    def setUp(self):
-        DipoleFitAlgorithmTest.setUp(self)
+    # def setUp(self):
+    #     DipoleFitAlgorithmTest.setUp(self)
 
-    def tearDown(self):
-        DipoleFitAlgorithmTest.tearDown(self)
+    # def tearDown(self):
+    #     DipoleFitAlgorithmTest.tearDown(self)
 
     def runDetection(self):
 
