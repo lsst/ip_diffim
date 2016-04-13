@@ -381,8 +381,7 @@ class DipoleFitAlgorithm(object):
         self.posImage = posImage
         self.negImage = negImage
 
-    @staticmethod
-    def genBgGradientModel(in_x, b=None, x1=0., y1=0., xy=None, x2=0., y2=0.):
+    def genBgGradientModel(self, in_x, b=None, x1=0., y1=0., xy=None, x2=0., y2=0.):
         """Generate gradient model (2-d array) with up to 2nd-order polynomial
 
         Parameters
@@ -424,8 +423,7 @@ class DipoleFitAlgorithm(object):
                 gradient += y2 * (y * y)
         return gradient
 
-    @staticmethod
-    def genStarModel(bbox, psf, xcen, ycen, flux):
+    def genStarModel(self, bbox, psf, xcen, ycen, flux):
         """Generate model (2-d array) of a 'star' (single PSF) centered at given coordinates
 
         Parameters
@@ -471,6 +469,23 @@ class DipoleFitAlgorithm(object):
                        b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
                        bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
                        debug=False, **kwargs):
+        """
+        Generate dipole model with given parameters.
+        This is the functor whose sum-of-squared difference from data is minimized by `lmfit`.
+        Thus it must be static. However, it just defers to `self.genDipoleModelImpl()`, where
+        `self` comes out of kwargs['myself'].
+        """
+        algObject = kwargs.pop('algObject')
+        return algObject.genDipoleModelImpl(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=fluxNeg,
+                                            b=b, x1=x1, y1=y1, xy=xy, x2=x2, y2=y2,
+                                            bNeg=bNeg, x1Neg=x1Neg, y1Neg=y1Neg, xyNeg=xyNeg,
+                                            x2Neg=x2Neg, y2Neg=y2Neg, debug=debug, **kwargs)
+
+    def genDipoleModelImpl(self, x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
+                       b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
+                       bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
+                       debug=False, **kwargs):
+
         """
         Generate dipole model with given parameters.
         This is the functor whose sum-of-squared difference from data is minimized by `lmfit`.
@@ -531,18 +546,18 @@ class DipoleFitAlgorithm(object):
             if xy is not None:
                 print('     %.2f %.2f %.2f' % (xy, x2, y2))
 
-        posIm = DipoleFitAlgorithm.genStarModel(bbox, psf, xcenPos, ycenPos, flux)
-        negIm = DipoleFitAlgorithm.genStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
+        posIm = self.genStarModel(bbox, psf, xcenPos, ycenPos, flux)
+        negIm = self.genStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
 
         in_x = x
         if in_x is None:  # use the footprint to generate the input grid
             y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
             in_x = np.array([x, y]) * 1.
 
-        gradient = DipoleFitAlgorithm.genBgGradientModel(in_x, b, x1, y1, xy, x2, y2)
+        gradient = self.genBgGradientModel(in_x, b, x1, y1, xy, x2, y2)
         gradientNeg = gradient
         if bNeg is not None:
-            gradientNeg = DipoleFitAlgorithm.genBgGradientModel(in_x, bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg)
+            gradientNeg = self.genBgGradientModel(in_x, bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg)
 
         if gradient is not None:
             posIm.getArray()[:, :] += gradient
@@ -703,7 +718,8 @@ class DipoleFitAlgorithm(object):
                           fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol, 'maxfev': 250},  # see scipy docs
                           psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to genDipoleModel()
                           rel_weight=rel_weight,
-                          footprint=fp)
+                          footprint=fp,
+                          algObject=self)
 
         # Probably never wanted - also this takes a long time (longer than the fit!)
         # This is how to get confidence intervals out:
@@ -855,13 +871,14 @@ class DipoleFitAlgorithm(object):
 
 class DipolePlotUtils():
     """
-    Utility class containing static methods for displaying dipoles/footprints in
+    Utility class containing methods for displaying dipoles/footprints in
     difference images, mostly used for debugging.
     """
 
     @classmethod
     def importMatplotlib(cls):
-        """!Prefer to import matplotlib only when needed, but allow for not available."""
+        """!Prefer to import matplotlib.pyplot only when needed, allow for not available.
+        Return the imported module if available, else False."""
         try:
             import matplotlib.pyplot as plt
             return plt
@@ -869,8 +886,8 @@ class DipolePlotUtils():
             print('Unable to import matplotlib: %s' % err)
             return False
 
-    @staticmethod
-    def display2dArray(arr, title='Data', showBars=True, extent=None):
+    @classmethod
+    def display2dArray(cls, arr, title='Data', showBars=True, extent=None):
         """
         Use matplotlib.pyplot.imshow() to display a 2-D array.
 
@@ -889,7 +906,7 @@ class DipolePlotUtils():
         -------
         matplotlib.pyplot.figure dispaying the image
         """
-        plt = DipolePlotUtils.importMatplotlib()
+        plt = cls.importMatplotlib()
         if not plt:
             return
 
@@ -900,8 +917,8 @@ class DipolePlotUtils():
             plt.colorbar(fig, cmap='gray')
         return fig
 
-    @staticmethod
-    def displayImage(image, showBars=True, width=8, height=2.5):
+    @classmethod
+    def displayImage(cls, image, showBars=True, width=8, height=2.5):
         """
         Use matplotlib.pyplot.imshow() to display an afw.image.Image within its bounding box.
 
@@ -918,7 +935,7 @@ class DipolePlotUtils():
         -------
         matplotlib.pyplot.figure dispaying the image
         """
-        plt = DipolePlotUtils.importMatplotlib()
+        plt = cls.importMatplotlib()
         if not plt:
             return
 
@@ -927,11 +944,11 @@ class DipolePlotUtils():
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
         plt.subplot(1, 3, 1)
         ma = image.getArray()
-        DipolePlotUtils.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
+        cls.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
         return fig
 
-    @staticmethod
-    def displayImages(images, showBars=True, width=8, height=2.5):
+    @classmethod
+    def displayImages(cls, images, showBars=True, width=8, height=2.5):
         """
         Use matplotlib.pyplot.imshow() to display up to three afw.image.Images alongside each other,
         each within its bounding box.
@@ -945,7 +962,7 @@ class DipolePlotUtils():
         -------
         matplotlib.pyplot.figure dispaying the image
         """
-        plt = DipolePlotUtils.importMatplotlib()
+        plt = cls.importMatplotlib()
         if not plt:
             return
 
@@ -955,11 +972,11 @@ class DipolePlotUtils():
             extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
             plt.subplot(1, len(images), i+1)
             ma = image.getArray()
-            DipolePlotUtils.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
+            cls.display2dArray(ma, title='Data', showBars=showBars, extent=extent)
         return fig
 
-    @staticmethod
-    def displayMaskedImage(maskedImage, showMasks=True, showVariance=False, showBars=True, width=8,
+    @classmethod
+    def displayMaskedImage(cls, maskedImage, showMasks=True, showVariance=False, showBars=True, width=8,
                            height=2.5):
         """
         Use matplotlib.pyplot.imshow() to display a afwImage.MaskedImageF, alongside its
@@ -978,7 +995,7 @@ class DipolePlotUtils():
         -------
         matplotlib.pyplot.figure dispaying the image
         """
-        plt = DipolePlotUtils.importMatplotlib()
+        plt = cls.importMatplotlib()
         if not plt:
             return
 
@@ -987,17 +1004,17 @@ class DipolePlotUtils():
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
         plt.subplot(1, 3, 1)
         ma = maskedImage.getArrays()
-        DipolePlotUtils.display2dArray(ma[0], title='Data', showBars=showBars, extent=extent)
+        cls.display2dArray(ma[0], title='Data', showBars=showBars, extent=extent)
         if showMasks:
             plt.subplot(1, 3, 2)
-            DipolePlotUtils.display2dArray(ma[1], title='Masks', showBars=showBars, extent=extent)
+            cls.display2dArray(ma[1], title='Masks', showBars=showBars, extent=extent)
         if showVariance:
             plt.subplot(1, 3, 3)
-            DipolePlotUtils.display2dArray(ma[2], title='Variance', showBars=showBars, extent=extent)
+            cls.display2dArray(ma[2], title='Variance', showBars=showBars, extent=extent)
         return fig
 
-    @staticmethod
-    def displayExposure(exposure, showMasks=True, showVariance=False, showPsf=False, showBars=True,
+    @classmethod
+    def displayExposure(cls, exposure, showMasks=True, showVariance=False, showPsf=False, showBars=True,
                         width=8, height=2.5):
         """
         Use matplotlib.pyplot.imshow() to display a afw.image.Exposure, including its
@@ -1014,23 +1031,23 @@ class DipolePlotUtils():
         -------
         matplotlib.pyplot.figure dispaying the image
         """
-        plt = DipolePlotUtils.importMatplotlib()
+        plt = cls.importMatplotlib()
         if not plt:
             return
 
-        fig = DipolePlotUtils.displayMaskedImage(exposure.getMaskedImage(), showMasks,
-                                                 showVariance=not showPsf,
-                                                 showBars=showBars, width=width, height=height)
+        fig = cls.displayMaskedImage(exposure.getMaskedImage(), showMasks,
+                                     showVariance=not showPsf,
+                                     showBars=showBars, width=width, height=height)
         if showPsf:
             plt.subplot(1, 3, 3)
             psfIm = exposure.getPsf().computeImage()
             bbox = psfIm.getBBox()
             extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-            DipolePlotUtils.display2dArray(psfIm.getArray(), title='PSF', showBars=showBars, extent=extent)
+            cls.display2dArray(psfIm.getArray(), title='PSF', showBars=showBars, extent=extent)
         return fig
 
-    @staticmethod
-    def displayCutouts(source, exposure, posImage=None, negImage=None, asHeavyFootprint=False, title=''):
+    @classmethod
+    def displayCutouts(cls, source, exposure, posImage=None, negImage=None, asHeavyFootprint=False, title=''):
         """
         Use matplotlib.pyplot.imshow() to display cutouts within up to three afw.image.Exposure's,
         given by an input SourceRecord.
@@ -1052,7 +1069,7 @@ class DipolePlotUtils():
         -------
         matplotlib.pyplot.figure dispaying the image
         """
-        plt = DipolePlotUtils.importMatplotlib()
+        plt = cls.importMatplotlib()
         if not plt:
             return
 
@@ -1065,29 +1082,29 @@ class DipolePlotUtils():
             subexp = afwImage.ImageF(exposure.getMaskedImage().getImage(), bbox, afwImage.PARENT)
         else:
             hfp = afwDet.HeavyFootprintF(fp, exposure.getMaskedImage())
-            subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
+            subexp = cls.getHeavyFootprintSubimage(hfp)
         plt.subplot(1, 3, 1)
-        DipolePlotUtils.display2dArray(subexp.getArray(), title=title+' Diffim', extent=extent)
+        cls.display2dArray(subexp.getArray(), title=title+' Diffim', extent=extent)
         if posImage is not None:
             if not asHeavyFootprint:
                 subexp = afwImage.ImageF(posImage.getMaskedImage().getImage(), bbox, afwImage.PARENT)
             else:
                 hfp = afwDet.HeavyFootprintF(fp, posImage.getMaskedImage())
-                subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
+                subexp = cls.getHeavyFootprintSubimage(hfp)
             plt.subplot(1, 3, 2)
-            DipolePlotUtils.display2dArray(subexp.getArray(), title=title+' Pos', extent=extent)
+            cls.display2dArray(subexp.getArray(), title=title+' Pos', extent=extent)
         if negImage is not None:
             if not asHeavyFootprint:
                 subexp = afwImage.ImageF(negImage.getMaskedImage().getImage(), bbox, afwImage.PARENT)
             else:
                 hfp = afwDet.HeavyFootprintF(fp, negImage.getMaskedImage())
-                subexp = DipolePlotUtils.getHeavyFootprintSubimage(hfp)
+                subexp = cls.getHeavyFootprintSubimage(hfp)
             plt.subplot(1, 3, 3)
-            DipolePlotUtils.display2dArray(subexp.getArray(), title=title+' Neg', extent=extent)
+            cls.display2dArray(subexp.getArray(), title=title+' Neg', extent=extent)
         return fig
 
-    @staticmethod
-    def makeHeavyCatalog(catalog, exposure, verbose=False):
+    @classmethod
+    def makeHeavyCatalog(cls, catalog, exposure, verbose=False):
         """Usage: catalog = makeHeavyCatalog(catalog, exposure)"""
         for i, source in enumerate(catalog):
             fp = source.getFootprint()
@@ -1099,7 +1116,7 @@ class DipolePlotUtils():
 
         return catalog
 
-    @staticmethod
+    @classmethod
     def getHeavyFootprintSubimage(fp, badfill=np.nan):
         """Usage: subim = getHeavyFootprintSubimage(fp)"""
         hfp = afwDet.HeavyFootprintF_cast(fp)
@@ -1109,7 +1126,7 @@ class DipolePlotUtils():
         afwDet.expandArray(hfp, hfp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
         return subim2
 
-    @staticmethod
+    @classmethod
     def searchCatalog(catalog, x, y):
         """Usage: source = searchCatalog(catalog, x, y)"""
         for i, s in enumerate(catalog):

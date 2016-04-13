@@ -343,8 +343,8 @@ class DipoleTestUtils(object):
         dma[:, :] = posDetectedBits * pos_det + negDetectedBits * neg_det
         return dipole, (posImage, posCatalog), (negImage, negCatalog)
 
-    @staticmethod
-    def detectDipoleSources(diffim, doMerge=True, detectSigma=5.5, grow=3):
+    @classmethod
+    def detectDipoleSources(cls, diffim, doMerge=True, detectSigma=5.5, grow=3):
         """
         Utility function for detecting dipoles. Detects pos/neg sources in the diffim,
         then merges them. A bigger "grow" parameter leads to a larger footprint which
