@@ -29,6 +29,7 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.meas.base as measBase
 import lsst.afw.table as afwTable
+import lsst.afw.detection as afwDet
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
@@ -376,43 +377,88 @@ class DipoleFitAlgorithm(object):
         self.diffim = diffim
         self.posImage = posImage
         self.negImage = negImage
+        self.psfSigma = None
+        if diffim is not None:
+            self.psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
         self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
                               'lsst.ip.diffim.DipoleFitAlgorithm', pexLog.Log.INFO)
 
         import lsstDebug
         self.debug = lsstDebug.Info(__name__).debug
 
-    def genBgGradientModel(self, in_x, b=None, x1=0., y1=0., xy=None, x2=0., y2=0.):
+    def genBgGradientModel(self, in_x, pars=()):
         """Generate gradient model (2-d array) with up to 2nd-order polynomial
         @param in_x Provides the input x,y grid upon which to compute the gradient
-        @param b Intercept (0th-order parameter) for gradient. If None, do nothing (for speed).
-        @param x1 X-slope (1st-order parameter) for gradient.
-        @param y1 Y-slope (1st-order parameter) for gradient.
-        @param xy X*Y coefficient (2nd-order parameter) for gradient.
-        If None, do not compute 2nd order polynomial.
-        @param x2 X**2 coefficient (2nd-order parameter) for gradient.
-        @param y2 Y**2 coefficient (2nd-order parameter) for gradient.
+        @param pars Up to 6 floats for up to 6 2nd-order 2-d polynomial gradient parameters.
+        If emtpy, do nothing (for speed).
 
         @return None, or 2-d numpy.array of width/height matching
         input bbox, containing computed gradient values.
-
         """
 
         gradient = None
-        if b is not None:  # Don't fit for other gradient parameters if the intercept is not allowed.
+
+        # Don't fit for other gradient parameters if the intercept is not allowed.
+        if len(pars) > 0 and pars[0] is not None:
             y, x = in_x[0, :], in_x[1, :]
-            gradient = np.full_like(x, b, dtype='float64')
-            if x1 is not None:
-                gradient += x1 * x
-            if y1 is not None:
-                gradient += y1 * y
-            if xy is not None:
-                gradient += xy * (x * y)
-            if x2 is not None:
-                gradient += x2 * (x * x)
-            if y2 is not None:
-                gradient += y2 * (y * y)
+            gradient = np.full_like(x, pars[0], dtype='float64')
+            if len(pars) > 1 and pars[1] is not None:
+                gradient += pars[1] * x
+            if len(pars) > 2 and pars[2] is not None:
+                gradient += pars[2] * y
+            if len(pars) > 3 and pars[3] is not None:
+                gradient += pars[3] * (x * y)
+            if len(pars) > 4 and pars[4] is not None:
+                gradient += pars[4] * (x * x)
+            if len(pars) > 5 and pars[5] is not None:
+                gradient += pars[5] * (y * y)
         return gradient
+
+    def _generateXYGrid(self, bbox):
+        x, y = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
+        in_x = np.array([y, x]).astype(np.float64)
+        in_x[0, :] -= np.mean(in_x[0, :])
+        in_x[1, :] -= np.mean(in_x[1, :])
+        return in_x
+
+    def fitBackgroundGradient(self, source, posImage, order=1):
+        """ Fit a linear (polynomial) model of given order (max 2) to the background of a footprint.
+        Only fit the pixels OUTSIDE of the footprint, but within its bounding box.
+        TBD: look into whether afw_math background stuff -- see
+        http://lsst-web.ncsa.illinois.edu/doxygen/x_masterDoxyDoc/_background_example.html
+        """
+        from . import utils as ipUtils
+
+        fp = source.getFootprint()
+        bbox = fp.getBBox()
+        bbox.grow(3)
+        posImg = afwImage.ImageF(posImage.getMaskedImage().getImage(), bbox, afwImage.PARENT)
+        posHfp = afwDet.HeavyFootprintF(fp, posImage.getMaskedImage())
+        posFpImg = ipUtils.getHeavyFootprintSubimage(posHfp, grow=3)
+
+        isBg = np.isnan(posFpImg.getArray()).ravel()
+
+        data = posImg.getArray().ravel()
+        data = data[isBg]
+        B = data
+
+        x, y = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
+        x = x.astype(np.float64).ravel()
+        x -= np.mean(x)
+        x = x[isBg]
+        y = y.astype(np.float64).ravel()
+        y -= np.mean(y)
+        y = y[isBg]
+        b = np.ones_like(x, dtype=np.float64)
+
+        M = np.vstack([b]).T  # order = 0
+        if order == 1:
+            M = np.vstack([b, x, y]).T
+        elif order == 2:
+            M = np.vstack([b, x, y, x**2., y**2., x*y]).T
+
+        pars = np.linalg.lstsq(M, B)[0]
+        return pars
 
     def genStarModel(self, bbox, psf, xcen, ycen, flux):
         """Generate model (2-d array) of a 'star' (single PSF) centered at given coordinates
@@ -531,11 +577,13 @@ class DipoleFitAlgorithm(object):
         if in_x is None:  # use the footprint to generate the input grid
             y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
             in_x = np.array([x, y]) * 1.
+            in_x[0, :] -= in_x[0, :].mean()  # center it!
+            in_x[1, :] -= in_x[1, :].mean()
 
-        gradient = self.genBgGradientModel(in_x, b, x1, y1, xy, x2, y2)
+        gradient = self.genBgGradientModel(in_x, (b, x1, y1, xy, x2, y2))
         gradientNeg = gradient
         if bNeg is not None:
-            gradientNeg = self.genBgGradientModel(in_x, bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg)
+            gradientNeg = self.genBgGradientModel(in_x, (bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg))
 
         if gradient is not None:
             posIm.getArray()[:, :] += gradient
@@ -584,8 +632,6 @@ class DipoleFitAlgorithm(object):
             weights = np.append([weights], [1. / posSubim.getArrays()[2] * rel_weight,
                                             1. / negSubim.getArrays()[2] * rel_weight], axis=0)
 
-        psfSigma = self.diffim.getPsf().computeShape().getDeterminantRadius()
-
         # Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
         gmod = lmfit.Model(DipoleFitAlgorithm.genDipoleModel, verbose=verbose)
 
@@ -602,7 +648,7 @@ class DipoleFitAlgorithm(object):
 
         # For close/faint dipoles the starting locs (min/max) might be way off, let's help them a bit.
         # First assume dipole is not separated by more than 5*psfSigma.
-        maxSep = psfSigma * maxSepInSigma
+        maxSep = self.psfSigma * maxSepInSigma
 
         # Note - this may be a cheat to assume the dipole is centered in center of the footprint.
         if np.sum(np.sqrt((np.array(cenPos) - fpCentroid)**2.)) > maxSep:
@@ -650,36 +696,73 @@ class DipoleFitAlgorithm(object):
             gmod.set_param_hint('fluxNeg', value=np.abs(negFlux), min=0.1)
 
         # Fixed parameters (dont fit for them if there are no pre-sub images or no gradient fit requested):
-        if (rel_weight > 0. and fitBgGradient):
-            if bgGradientOrder >= 0:
-                gmod.set_param_hint('b', value=0.)
-                if separateNegParams:
-                    gmod.set_param_hint('bNeg', value=0.)
-            if bgGradientOrder >= 1:
-                gmod.set_param_hint('x1', value=0.)
-                gmod.set_param_hint('y1', value=0.)
-                if separateNegParams:
-                    gmod.set_param_hint('x1Neg', value=0.)
-                    gmod.set_param_hint('y1Neg', value=0.)
-            if bgGradientOrder >= 2:
-                gmod.set_param_hint('xy', value=0.)
-                gmod.set_param_hint('x2', value=0.)
-                gmod.set_param_hint('y2', value=0.)
-                if separateNegParams:
-                    gmod.set_param_hint('xyNeg', value=0.)
-                    gmod.set_param_hint('x2Neg', value=0.)
-                    gmod.set_param_hint('y2Neg', value=0.)
+        # Right now, we use the linear model to fit the background and initialize the parameters.
+        # It might be better to just subtract the linear model from the data and then don't fit the background
+        # again.
+        bgParsPos = bgParsNeg = (0., 0., 0.)
+        if (rel_weight > 0. and fitBgGradient and bgGradientOrder >= 0):
+            pbg = 0.
+            # Fit the gradient to the background (linear model)
+            bgParsPos = bgParsNeg = self.fitBackgroundGradient(source, self.posImage,
+                                                               order=bgGradientOrder)
+            # Generate the gradient and subtract it from the pre-subtraction image data
+            in_x = self._generateXYGrid(bbox)
+            pbg = self.genBgGradientModel(in_x, tuple(bgParsPos))
+            z[1, :] -= pbg
+            z[1, :] -= np.nanmedian(z[1, :])
+            posFlux = np.nansum(z[1, :])
+            gmod.set_param_hint('flux', value=posFlux*1.5, min=0.1)
+
+            if separateNegParams:
+                bgParsNeg = self.fitBackgroundGradient(source, self.negImage, order=bgGradientOrder)
+                pbg = self.genBgGradientModel(in_x, tuple(bgParsNeg))
+            z[2, :] -= pbg
+            z[2, :] -= np.nanmedian(z[2, :])
+            if separateNegParams:
+                negFlux = np.nansum(z[2, :])
+                gmod.set_param_hint('fluxNeg', value=negFlux*1.5, min=0.1)
+
+            if False:  # we have subtracted the background from the images so dont fit anymore (faster!)
+                if bgGradientOrder >= 0:
+                    gmod.set_param_hint('b', value=bgParsPos[0])
+                    if separateNegParams:
+                        gmod.set_param_hint('bNeg', value=bgParsNeg[0])
+                if bgGradientOrder >= 1:
+                    gmod.set_param_hint('x1', value=bgParsPos[1])
+                    gmod.set_param_hint('y1', value=bgParsPos[2])
+                    if separateNegParams:
+                        gmod.set_param_hint('x1Neg', value=bgParsNeg[1])
+                        gmod.set_param_hint('y1Neg', value=bgParsNeg[2])
+                if bgGradientOrder >= 2:
+                    gmod.set_param_hint('xy', value=bgParsPos[3])
+                    gmod.set_param_hint('x2', value=bgParsPos[4])
+                    gmod.set_param_hint('y2', value=bgParsPos[5])
+                    if separateNegParams:
+                        gmod.set_param_hint('xyNeg', value=bgParsNeg[3])
+                        gmod.set_param_hint('x2Neg', value=bgParsNeg[4])
+                        gmod.set_param_hint('y2Neg', value=bgParsNeg[5])
 
         y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
         in_x = np.array([x, y]).astype(np.float)
+        in_x[0, :] -= in_x[0, :].mean()  # center it!
+        in_x[1, :] -= in_x[1, :].mean()
+
+        # Instead of explicitly using a mask to ignore flagged pixels, just set the ignored pixels'
+        #  weights to 0 in the fit. Right now, this is not used. TBD: need to inspect mask planes to set
+        #  this mask.
+        mask = np.ones_like(z, dtype=bool)  # TBD: set mask values to False if the pixels are to be ignored
 
         # I'm not sure about the variance planes in the diffim (or convolved pre-sub. images
         # for that matter) so for now, let's just do an un-weighted least-squares fit
         # (override weights computed above).
-        weights = 1.
+        weights = mask.astype(np.float64)
         if self.posImage is not None and rel_weight > 0.:
             weights = np.array([np.ones_like(diArr), np.ones_like(diArr)*rel_weight,
                                 np.ones_like(diArr)*rel_weight])
+
+        # Set the weights to zero if mask is False
+        if np.any(~mask):
+            weights[~mask] = 0.
 
         # Note that although we can, we're not required to set initial values for params here,
         # since we set their param_hint's above.
