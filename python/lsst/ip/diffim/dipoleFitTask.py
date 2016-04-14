@@ -34,7 +34,7 @@ import lsst.pex.exceptions as pexExcept
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 
-__all__ = ("DipoleFitConfig", "DipoleFitTask", "DipoleFitPlugin",
+__all__ = ("DipoleFitPluginConfig", "DipoleFitTask", "DipoleFitPlugin",
            "DipoleFitAlgorithm")
 
 
@@ -42,7 +42,7 @@ __all__ = ("DipoleFitConfig", "DipoleFitTask", "DipoleFitPlugin",
 # pass a separate pos- and neg- exposure/image to the `DipoleFitPlugin`s `run()` method.
 
 
-class DipoleFitConfig(measBase.SingleFramePluginConfig):
+class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
     """
     Class to initialize and store dipole fitting configuration parameters
     """
@@ -53,7 +53,7 @@ class DipoleFitConfig(measBase.SingleFramePluginConfig):
 
     relWeight = pexConfig.Field(
         dtype=float, default=0.5,
-        doc="""Relative weighting of pre-subtraction images (higher -> greater influence of pre-sub. 
+        doc="""Relative weighting of pre-subtraction images (higher -> greater influence of pre-sub.
         images on fit)""")
 
     tolerance = pexConfig.Field(
@@ -94,20 +94,18 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
     SingleFrameMeasurementTask, and calls
     SingleFrameMeasurementTask.run() from its run() method, it still
     can be used identically to a standard SingleFrameMeasurementTask.
-
     """
 
-    ConfigClass = DipoleFitConfig
+    ConfigClass = DipoleFitPluginConfig
     _DefaultName = "ip_diffim_DipoleFit"
 
-    def __init__(self, schema, algMetadata=None, dpFitConfig=None, **kwds):
+    def __init__(self, schema, algMetadata=None, dpFitPluginConfig=None, **kwds):
 
         measBase.SingleFrameMeasurementTask.__init__(self, schema, algMetadata, **kwds)
 
-        self.dpFitConfig = dpFitConfig
-        if self.dpFitConfig is None:
-            self.dpFitConfig = DipoleFitConfig()
-        self.dipoleFitter = DipoleFitPlugin(self.dpFitConfig, name=self._DefaultName,
+        if dpFitPluginConfig is None:
+            dpFitPluginConfig = DipoleFitPluginConfig()
+        self.dipoleFitter = DipoleFitPlugin(dpFitPluginConfig, name=self._DefaultName,
                                             schema=schema, metadata=algMetadata)
 
     def run(self, sources, exposure, posImage=None, negImage=None, **kwds):
@@ -142,10 +140,9 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
     This class is named ip_diffim_DipoleFit so that it may be used alongside
     the existing ip_diffim_DipoleMeasurement classes until such a time as those
     are deemed to be replaceable by this.
-
     """
 
-    ConfigClass = DipoleFitConfig
+    ConfigClass = DipoleFitPluginConfig
 
     FAILURE_EDGE = 1   # too close to the edge
     FAILURE_FIT = 2    # failure in the fitting
@@ -219,28 +216,30 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         self.classificationFlagKey = schema.addField(
             schema.join(name, "flag", "classification"), type="Flag",
-            doc="flag indicating source is classified as being a dipole")
+            doc="Flag indicating diaSource is classified as a dipole")
 
         self.flagKey = schema.addField(
             schema.join(name, "flag"), type="Flag",
-            doc="general failure flag for dipole fit")
+            doc="General failure flag for dipole fit")
 
         self.edgeFlagKey = schema.addField(
             schema.join(name, "flag", "edge"), type="Flag",
-            doc="flag set when rectangle used by dipole doesn't fit in the image")
+            doc="Flag set when dipole is too close to edge of image")
 
     def measure(self, measRecord, exposure, posImage=None, negImage=None):
-        """Perform the non-linear least squares minimization. The main
-        functionality of this routine was placed outside of this
-        plugin (into `DipoleFitAlgorithm.fitDipole()`) so that
+        """Perform the non-linear least squares minimization.
+
+        The main functionality of this routine was placed outside of
+        this plugin (into `DipoleFitAlgorithm.fitDipole()`) so that
         `DipoleFitAlgorithm.fitDipole()` can be called separately for
         testing (see `tests/testDipoleFitter.py`)
-
         """
+
         pks = measRecord.getFootprint().getPeaks()
         if len(pks) <= 1:  # not a dipole for our analysis
             self.fail(measRecord, measBase.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
 
+        result = None
         try:
             alg = DipoleFitAlgorithm(exposure, posImage=posImage, negImage=negImage)
             result = alg.fitDipole(
@@ -251,9 +250,12 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
                 separateNegParams=self.config.fitSeparateNegParams,
                 verbose=self.config.verbose, display=False)
         except pexExcept.LengthError:
-            raise measBase.MeasurementError('edge failure', self.FAILURE_EDGE)
+            self.fail(measRecord, measBase.MeasurementError('edge failure', self.FAILURE_EDGE))
         except Exception:
             self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
+
+        if result is None:
+            return result
 
         self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
 
@@ -341,23 +343,22 @@ class DipoleFitAlgorithm(object):
     Below is a (somewhat incomplete) list of improvements
     that would be worth investigating, given the time:
 
-    1. Initial fast test whether a background gradient needs to be fit
-    2. Initial fast estimate of background gradient(s) params --
-    perhaps using numpy.lstsq
-    3. better estimate for staring flux when there's a strong gradient
-    4. evaluate necessity for separate parameters for pos- and neg-
-    images
-    5. only fit background OUTSIDE footprint and dipole params INSIDE
-    footprint?
-    6. requires a new package `lmfit` -- investiate others?
-    (astropy/scipy/iminuit?)
-    7. account for PSFs that vary across the exposures
-
+    1. evaluate necessity for separate parameters for pos- and neg- images
+    2. only fit background OUTSIDE footprint (DONE) and dipole params INSIDE footprint (NOT DONE)?
+    3. correct normalization of least-squares weights based on variance planes
+    4. account for PSFs that vary across the exposures (should be happening by default?)
+    5. correctly account for NA/masks  (i.e., ignore!)
+    6. better exception handling in the plugin
+    7. better classification of dipoles (e.g. by comparing chi2 fit vs. monopole?)
+    8. (DONE) Initial fast estimate of background gradient(s) params -- perhaps using numpy.lstsq
+    9. (NOT NEEDED - see (1)) Initial fast test whether a background gradient needs to be fit
+    10. (DONE) better initial estimate for flux when there's a strong gradient
+    11. (DONE) requires a new package `lmfit` -- investiate others? (astropy/scipy/iminuit?)
     """
 
     # This is just a private version number to sync with the ipython notebooks that I have been
     # using for algorithm development.
-    _private_version_ = '0.0.3'
+    _private_version_ = '0.0.4'
 
     # Create a namedtuple to hold all of the relevant output from the lmfit results
     resultsOutput = namedtuple('resultsOutput',
@@ -471,7 +472,6 @@ class DipoleFitAlgorithm(object):
 
         @return 2-d numpy.array of width/height matching input bbox,
         containing PSF with given centroid and flux
-
         """
 
         # Generate the psf image, normalize to flux
@@ -507,7 +507,6 @@ class DipoleFitAlgorithm(object):
         out of kwargs['myself'].
 
         @see genDipoleModelImpl
-
         """
         algObject = kwargs.pop('algObject')
         return algObject.genDipoleModelImpl(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=fluxNeg,
@@ -551,7 +550,6 @@ class DipoleFitAlgorithm(object):
         those of bbox; otherwise a stack of three such arrays,
         representing the dipole (diffim), positive and negative images
         respectively.
-
         """
 
         psf = kwargs.get('psf')
@@ -611,7 +609,6 @@ class DipoleFitAlgorithm(object):
         @see `fitDipole()`
         @return `lmfit.MinimizerResult` object containing the fit
         parameters and other information.
-
         """
 
         # Only import lmfit if someone wants to use the new DipoleFitAlgorithm.
@@ -674,7 +671,7 @@ class DipoleFitAlgorithm(object):
             psfImg = self.diffim.getPsf().computeImage()
             pkToFlux = np.nansum(psfImg.getArray()) / self.diffim.getPsf().computePeak()
 
-            bg = np.nanmedian(diArr) # Compute the dipole background (probably very close to zero)
+            bg = np.nanmedian(diArr)  # Compute the dipole background (probably very close to zero)
             startingPk = np.nanmax(diArr) - bg   # use the dipole peak for an estimate.
             posFlux, negFlux = startingPk * pkToFlux, -startingPk * pkToFlux
 
@@ -819,7 +816,6 @@ class DipoleFitAlgorithm(object):
 
         @return resultsOutput object containing the fit parameters and other information.
         @return lmfit.MinimizerResult object if `return_fitObj` is True.
-
         """
 
         fitResult = self.fitDipoleImpl(
