@@ -261,16 +261,30 @@ def showKernelBasis(kernel, frame=None):
 
 ###############
 
+
+def importMatplotlib():
+    """!Import matplotlib.pyplot when needed, warn if not available.
+    @return the imported module if available, else False.
+
+    """
+    try:
+        import matplotlib.pyplot as plt
+        return plt
+    except ImportError as err:
+        log = pexLog.Log(pexLog.getDefaultLog(),
+                         'lsst.ip.diffim.utils', pexLog.INFO)
+        log.warn('Unable to import matplotlib: %s' % err)
+        return False
+
+
 def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True, 
                            numSample=128, keepPlots=True, maxCoeff = 10):
     """Plot the Kernel spatial model."""
 
-    try:
-        import matplotlib.pyplot as plt
-        import matplotlib.colors
-    except ImportError, e:
-        print "Unable to import numpy and matplotlib: %s" % e
+    plt = importMatplotlib()
+    if not plt:
         return
+    import matplotlib.colors
 
     x0 = kernelCellSet.getBBox().getBeginX()
     y0 = kernelCellSet.getBBox().getBeginY()
@@ -550,14 +564,13 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     spatialResids   = np.ravel(np.array(spatialResids))
     nonfitResids    = np.ravel(np.array(nonfitResids))
 
-    try:
-        import pylab
-        from matplotlib.font_manager import FontProperties
-    except ImportError, e:
-        print "Unable to import pylab: %s" % e
+    plt = importMatplotlib()
+    if not plt:
         return
 
-    fig = pylab.figure()
+    from matplotlib.font_manager import FontProperties
+
+    fig = plt.figure()
     fig.clf()
     try:
         fig.canvas._tkcanvas._root().lift() # == Tk's raise, but raise is a python reserved word
@@ -568,10 +581,10 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     else:
         fig.suptitle("Diffim residuals: Normalized by sqrt(diffim variance)", fontsize=titleFs)
 
-    sp1 = pylab.subplot(221)
-    sp2 = pylab.subplot(222, sharex=sp1, sharey=sp1)
-    sp3 = pylab.subplot(223, sharex=sp1, sharey=sp1)
-    sp4 = pylab.subplot(224, sharex=sp1, sharey=sp1)
+    sp1 = plt.subplot(221)
+    sp2 = plt.subplot(222, sharex=sp1, sharey=sp1)
+    sp3 = plt.subplot(223, sharex=sp1, sharey=sp1)
+    sp4 = plt.subplot(224, sharex=sp1, sharey=sp1)
     xs  = np.arange(-5, 5.05, 0.1)
     ys  = 1. / np.sqrt(2 * np.pi) * np.exp( -0.5 * xs**2 )
 
@@ -599,10 +612,10 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     sp4.set_title("Full image (subsampled)", fontsize=titleFs-2)
     sp4.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
 
-    pylab.setp(sp1.get_xticklabels()+sp1.get_yticklabels(), fontsize=titleFs-4)
-    pylab.setp(sp2.get_xticklabels()+sp2.get_yticklabels(), fontsize=titleFs-4)
-    pylab.setp(sp3.get_xticklabels()+sp3.get_yticklabels(), fontsize=titleFs-4)
-    pylab.setp(sp4.get_xticklabels()+sp4.get_yticklabels(), fontsize=titleFs-4)
+    plt.setp(sp1.get_xticklabels()+sp1.get_yticklabels(), fontsize=titleFs-4)
+    plt.setp(sp2.get_xticklabels()+sp2.get_yticklabels(), fontsize=titleFs-4)
+    plt.setp(sp3.get_xticklabels()+sp3.get_yticklabels(), fontsize=titleFs-4)
+    plt.setp(sp4.get_xticklabels()+sp4.get_yticklabels(), fontsize=titleFs-4)
 
     sp1.set_xlim(-5, 5)
     sp1.set_ylim(0, 0.5)
@@ -614,7 +627,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
         def show():
             print "%s: Please close plots when done." % __name__
             try:
-                pylab.show()
+                plt.show()
             except Exception:
                 pass
             print "Plots closed, exiting..."
@@ -692,7 +705,9 @@ def plotWhisker(results, newWcs):
     residuals = [m.first.get(refCoordKey).getOffsetFrom(
                        newWcs.pixelToSky(m.second.get(inCentroidKey))) for
                        m in results.matches]
-    import matplotlib.pyplot as plt
+    plt = importMatplotlib()
+    if not plt:
+        return
     fig = plt.figure()
     sp = fig.add_subplot(1, 1, 0)
     xpos = [x[0].asDegrees() for x in positions]
@@ -856,21 +871,6 @@ class DipoleTestImage(object):
 
 # Utility class containing methods for displaying dipoles/footprints
 # in difference images, mostly used for debugging.
-
-
-def importMatplotlib():
-    """!Import matplotlib.pyplot when needed, warn if not available.
-    @return the imported module if available, else False.
-
-    """
-    try:
-        import matplotlib.pyplot as plt
-        return plt
-    except ImportError as err:
-        log = pexLog.Log(pexLog.getDefaultLog(),
-                         'lsst.ip.diffim.DipoleFitTask', pexLog.INFO)
-        log.warn('Unable to import matplotlib: %s' % err)
-        return False
 
 
 def display2dArray(arr, title='Data', showBars=True, extent=None):
@@ -1057,10 +1057,12 @@ def makeHeavyCatalog(catalog, exposure, verbose=False):
     return catalog
 
 
-def getHeavyFootprintSubimage(fp, badfill=np.nan):
+def getHeavyFootprintSubimage(fp, badfill=np.nan, grow=0):
     """Extract the image from a heavyFootprint as an ImageF."""
     hfp = afwDet.HeavyFootprintF_cast(fp)
     bbox = hfp.getBBox()
+    if grow > 0:
+        bbox.grow(grow)
 
     subim2 = afwImage.ImageF(bbox, badfill)  # set the mask to NA (can use 0. if desired)
     afwDet.expandArray(hfp, hfp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
