@@ -129,13 +129,6 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
             self.dipoleFitter.measure(source, exposure, posImage, negImage)
 
 
-class DipoleFitTransform(measBase.FluxTransform):
-
-    def __init__(self, config, name, mapper):
-        measBase.FluxTransform.__init__(self, name, mapper)
-        mapper.addMapping(mapper.getInputSchema().find(name + "_flag_edge").key)
-
-
 @measBase.register("ip_diffim_DipoleFit")
 class DipoleFitPlugin(measBase.SingleFramePlugin):
     """Subclass of SingleFramePlugin which can accept three input images
