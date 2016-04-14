@@ -32,7 +32,6 @@ import lsst.afw.table as afwTable
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
-from . import utils as ipUtils
 
 __all__ = ("DipoleFitConfig", "DipoleFitTask", "DipoleFitPlugin",
            "DipoleFitAlgorithm")
@@ -357,7 +356,7 @@ class DipoleFitAlgorithm(object):
 
     # This is just a private version number to sync with the ipython notebooks that I have been
     # using for algorithm development.
-    __private_version__ = '0.0.3'
+    _private_version_ = '0.0.3'
 
     # Create a namedtuple to hold all of the relevant output from the lmfit results
     resultsOutput = namedtuple('resultsOutput',
@@ -800,6 +799,7 @@ class DipoleFitAlgorithm(object):
         @param result `lmfit.MinimizerResult` object returned by `lmfit` optimizer
         """
 
+        from . import utils as ipUtils
         plt = ipUtils.importMatplotlib()
         if not plt:  # Exit silently if no matplotlib installed
             return

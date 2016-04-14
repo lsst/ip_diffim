@@ -84,24 +84,19 @@ class DipoleFitAlgorithmTest(lsst.utils.tests.TestCase):
         self.params = DipoleFitTestGlobalParams()
 
         offsets = self.params.offsets
-        self.dipole, (self.posImage, self.posCatalog), (self.negImage, self.negCatalog) = \
-            ipUtils.makeDipoleImage(
-                xcenPos=self.params.xc + offsets,
-                ycenPos=self.params.yc + offsets,
-                xcenNeg=self.params.xc - offsets,
-                ycenNeg=self.params.yc - offsets,
-                flux=self.params.flux, fluxNeg=self.params.flux,
-                gradientParams=self.params.gradientParams)
+        self.testImage = ipUtils.DipoleTestImage(
+            xcenPos=self.params.xc + offsets,
+            ycenPos=self.params.yc + offsets,
+            xcenNeg=self.params.xc - offsets,
+            ycenNeg=self.params.yc - offsets,
+            flux=self.params.flux, fluxNeg=self.params.flux,
+            gradientParams=self.params.gradientParams)
 
-        self.catalog = ipUtils.detectDipoleSources(self.dipole)
+        self.catalog = self.testImage.detectDipoleSources()
 
     def tearDown(self):
-        del self.dipole
-        del self.posImage
-        del self.negImage
+        del self.testImage
         del self.catalog
-        del self.posCatalog
-        del self.negCatalog
         del self.params
 
     def testDipoleFitter(self):
@@ -119,7 +114,7 @@ class DipoleFitAlgorithmTest(lsst.utils.tests.TestCase):
 
         offsets = self.params.offsets
         for i, s in enumerate(self.catalog):
-            alg = DipoleFitAlgorithm(self.dipole, self.posImage, self.negImage)
+            alg = DipoleFitAlgorithm(self.testImage.diffim, self.testImage.posImage, self.testImage.negImage)
             result = alg.fitDipole(
                 s, rel_weight=1., separateNegParams=False,
                 verbose=self.params.verbose, display=self.params.display)
@@ -140,7 +135,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
     def runDetection(self):
 
         # Create the various tasks and schema -- avoid code reuse.
-        detectTask, schema = ipUtils.detectDipoleSources(self.dipole, doMerge=False)
+        detectTask, schema = self.testImage.detectDipoleSources(doMerge=False)
 
         measureConfig = measBase.SingleFrameMeasurementConfig()
 
@@ -169,7 +164,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         measureTask = DipoleFitTask(config=measureConfig, schema=schema, dpFitConfig=dpFitConfig)
 
         table = afwTable.SourceTable.make(schema)
-        detectResult = detectTask.run(table, self.dipole)
+        detectResult = detectTask.run(table, self.testImage.diffim)
         # catalog = detectResult.sources
         # deblendTask.run(self.dipole, catalog, psf=self.dipole.getPsf())
 
@@ -178,7 +173,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
         sources = afwTable.SourceCatalog(table)
         fpSet.makeSources(sources)
 
-        measureTask.run(sources, self.dipole, self.posImage, self.negImage)
+        measureTask.run(sources, self.testImage.diffim, self.testImage.posImage, self.testImage.negImage)
         return sources
 
     def testDipoleFitter(self):
@@ -232,7 +227,7 @@ class DipoleFitTaskTest(DipoleFitAlgorithmTest):
                              rtol=0.01)
 
             if self.params.display:
-                ipUtils.displayCutouts(r1, self.dipole, self.posImage, self.negImage)
+                self.testImage.displayCutouts(r1)
         if self.params.display:
             plt = ipUtils.importMatplotlib()
             if not plt:
@@ -253,16 +248,15 @@ class DipoleFitTaskEdgeTest(DipoleFitTaskTest):
         self.params.yc = np.array([2.6, 98.5])  # ycenters of two dipoles
 
         offsets = self.params.offsets
-        self.dipole, (self.posImage, self.posCatalog), (self.negImage, self.negCatalog) = \
-            ipUtils.makeDipoleImage(
-                xcenPos=self.params.xc + offsets,
-                ycenPos=self.params.yc + offsets,
-                xcenNeg=self.params.xc - offsets,
-                ycenNeg=self.params.yc - offsets,
-                flux=self.params.flux, fluxNeg=self.params.flux,
-                gradientParams=self.params.gradientParams)
+        self.testImage = ipUtils.DipoleTestImage(
+            xcenPos=self.params.xc + offsets,
+            ycenPos=self.params.yc + offsets,
+            xcenNeg=self.params.xc - offsets,
+            ycenNeg=self.params.yc - offsets,
+            flux=self.params.flux, fluxNeg=self.params.flux,
+            gradientParams=self.params.gradientParams)
 
-        self.catalog = ipUtils.detectDipoleSources(self.dipole)
+        self.catalog = self.testImage.detectDipoleSources()
 
     def tearDown(self):
         DipoleFitTaskTest.tearDown(self)

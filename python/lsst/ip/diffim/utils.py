@@ -31,10 +31,14 @@ import lsst.afw.table as afwTable
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.display.utils as displayUtils
 import lsst.meas.algorithms as measAlg
-from lsst.meas.base.tests import TestDataset
 
 from . import diffimLib
 from . import diffimTools
+from . import dipoleFitTask
+
+# Export DipoleTestImage to expose fake image generating funcs
+__all__ = ("DipoleTestImage")
+
 
 keptPlots = False                       # Have we arranged to keep spatial plots open?
 
@@ -713,107 +717,140 @@ def plotWhisker(results, newWcs):
     sp.set_title("WCS Residual")
     plt.show()
 
-# ################## UTILITY METHODS FOR DIPOLE TESTING ###
+# ################## UTILITY CLASS FOR DIPOLE TESTING ###
 
 
-def makeStarImage(w=101, h=101, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=10.0,
-                  gradientParams=None, schema=None):
-    """Generate an exposure and catalog with the given stellar source(s)"""
+class DipoleTestImage(object):
 
-    bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(w-1, h-1))
-    dataset = TestDataset(bbox, psfSigma=psfSigma, threshold=1.)
+    def __init__(self, w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
+                 psfSigma=2., flux=[30000.], fluxNeg=None, noise=10., gradientParams=None):
+        self.w = w
+        self.h = h
+        self.xcenPos = xcenPos
+        self.ycenPos = ycenPos
+        self.xcenNeg = xcenNeg
+        self.ycenNeg = ycenNeg
+        self.psfSigma = psfSigma
+        self.flux = flux
+        self.fluxNeg = fluxNeg
+        if fluxNeg is None:
+            self.fluxNeg = self.flux
+        self.noise = noise
+        self.gradientParams = gradientParams
+        self.diffim, (self.posImage, self.posCatalog), \
+            (self.negImage, self.negCatalog) = self._makeDipoleImage()
 
-    for i in xrange(len(xc)):
-        dataset.addSource(flux=flux[i], centroid=afwGeom.Point2D(xc[i], yc[i]))
+    def _makeStarImage(self, xc=[15.3], yc=[18.6], flux=[2500], psfSigma=2., noise=10.0,
+                       gradientParams=None, schema=None):
+        """Generate an exposure and catalog with the given stellar source(s)"""
 
-    if schema is None:
-        schema = TestDataset.makeMinimalSchema()
-    exposure, catalog = dataset.realize(noise=noise, schema=schema)
+        from lsst.meas.base.tests import TestDataset
+        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(self.w-1, self.h-1))
+        dataset = TestDataset(bbox, psfSigma=psfSigma, threshold=1.)
 
-    if gradientParams is not None:
-        y, x = np.mgrid[:w, :h]
-        gp = gradientParams
-        gradient = gp[0] + gp[1] * x + gp[2] * y
-        if len(gradientParams) > 3:  # it includes a set of 2nd-order polynomial params
-            gradient += gp[3] * x*y + gp[4] * x*x + gp[5] * y*y
-        imgArr = exposure.getMaskedImage().getArrays()[0]
-        imgArr += gradient
+        for i in xrange(len(xc)):
+            dataset.addSource(flux=flux[i], centroid=afwGeom.Point2D(xc[i], yc[i]))
 
-    return exposure, catalog
+        if schema is None:
+            schema = TestDataset.makeMinimalSchema()
+        exposure, catalog = dataset.realize(noise=noise, schema=schema)
 
+        if gradientParams is not None:
+            y, x = np.mgrid[:self.w, :self.h]
+            gp = gradientParams
+            gradient = gp[0] + gp[1] * x + gp[2] * y
+            if len(gradientParams) > 3:  # it includes a set of 2nd-order polynomial params
+                gradient += gp[3] * x*y + gp[4] * x*x + gp[5] * y*y
+            imgArr = exposure.getMaskedImage().getArrays()[0]
+            imgArr += gradient
 
-def makeDipoleImage(w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
-                    psfSigma=2., flux=[30000.], fluxNeg=None, noise=10., gradientParams=None):
-    """Generate an exposure and catalog with the given dipole source(s)"""
+        return exposure, catalog
 
-    posImage, posCatalog = makeStarImage(
-        w, h, xcenPos, ycenPos, flux=flux, psfSigma=psfSigma,
-        gradientParams=gradientParams, noise=noise)
+    def _makeDipoleImage(self):
+        """Generate an exposure and catalog with the given dipole source(s)"""
 
-    if fluxNeg is None:
-        fluxNeg = flux
-    negImage, negCatalog = makeStarImage(
-        w, h, xcenNeg, ycenNeg, flux=fluxNeg, psfSigma=psfSigma,
-        gradientParams=gradientParams, noise=noise)
+        posImage, posCatalog = self._makeStarImage(
+            xc=self.xcenPos, yc=self.ycenPos, flux=self.flux, psfSigma=self.psfSigma,
+            gradientParams=self.gradientParams, noise=self.noise)
 
-    dipole = posImage.clone()
-    di = dipole.getMaskedImage()
-    di -= negImage.getMaskedImage()
+        negImage, negCatalog = self._makeStarImage(
+            xc=self.xcenNeg, yc=self.ycenNeg, flux=self.fluxNeg, psfSigma=self.psfSigma,
+            gradientParams=self.gradientParams, noise=self.noise)
 
-    # Carry through pos/neg detection masks to new planes in diffim
-    dm = di.getMask()
-    posDetectedBits = posImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
-    negDetectedBits = negImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
-    pos_det = dm.addMaskPlane("DETECTED_POS")  # new mask plane -- different from "DETECTED"
-    neg_det = dm.addMaskPlane("DETECTED_NEG")  # new mask plane -- different from "DETECTED_NEGATIVE"
-    dma = dm.getArray()
-    # set the two custom mask planes to these new masks
-    dma[:, :] = posDetectedBits*pos_det + negDetectedBits*neg_det
-    return dipole, (posImage, posCatalog), (negImage, negCatalog)
+        dipole = posImage.clone()
+        di = dipole.getMaskedImage()
+        di -= negImage.getMaskedImage()
 
+        # Carry through pos/neg detection masks to new planes in diffim
+        dm = di.getMask()
+        posDetectedBits = posImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
+        negDetectedBits = negImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
+        pos_det = dm.addMaskPlane("DETECTED_POS")  # new mask plane -- different from "DETECTED"
+        neg_det = dm.addMaskPlane("DETECTED_NEG")  # new mask plane -- different from "DETECTED_NEGATIVE"
+        dma = dm.getArray()
+        # set the two custom mask planes to these new masks
+        dma[:, :] = posDetectedBits*pos_det + negDetectedBits*neg_det
+        return dipole, (posImage, posCatalog), (negImage, negCatalog)
 
-def detectDipoleSources(diffim, doMerge=True, detectSigma=5.5, grow=3):
-    """Utility function for detecting dipoles.
+    def fitDipoleSource(self, source, **kwds):
+        alg = dipoleFitTask.DipoleFitAlgorithm(self.diffim, self.posImage, self.negImage)
+        fitResult = alg.fitDipole(source, **kwds)
+        return fitResult
 
-    Detect pos/neg sources in the diffim, then merge them. A
-    bigger "grow" parameter leads to a larger footprint which
-    helps with dipole measurement for faint dipoles.
+    def displayImages(self):
+        displayExposure(self.diffim)
+        displayExposure(self.posImage)
+        displayExposure(self.negImage)
 
-    """
+    def displayCutouts(self, source, asHeavyFootprint=True):
+        displayCutouts(source, self.diffim, self.posImage, self.negImage, asHeavyFootprint)
 
-    # Start with a minimal schema - only the fields all SourceCatalogs need
-    schema = afwTable.SourceTable.makeMinimalSchema()
+    def detectDipoleSources(self, doMerge=True, diffim=None, detectSigma=5.5, grow=3):
+        """Utility function for detecting dipoles.
 
-    # Customize the detection task a bit (optional)
-    detectConfig = measAlg.SourceDetectionConfig()
-    detectConfig.returnOriginalFootprints = False  # should be the default
+        Detect pos/neg sources in the diffim, then merge them. A
+        bigger "grow" parameter leads to a larger footprint which
+        helps with dipole measurement for faint dipoles.
 
-    psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
+        """
 
-    # code from imageDifference.py:
-    detectConfig.thresholdPolarity = "both"
-    detectConfig.thresholdValue = detectSigma
-    # detectConfig.nSigmaToGrow = psfSigma
-    detectConfig.reEstimateBackground = True  # if False, will fail often for faint sources on gradients?
-    detectConfig.thresholdType = "pixel_stdev"
+        if diffim is None:
+            diffim = self.diffim
 
-    # Create the detection task. We pass the schema so the task can declare a few flag fields
-    detectTask = measAlg.SourceDetectionTask(schema, config=detectConfig)
+        # Start with a minimal schema - only the fields all SourceCatalogs need
+        schema = afwTable.SourceTable.makeMinimalSchema()
 
-    table = afwTable.SourceTable.make(schema)
-    catalog = detectTask.makeSourceCatalog(table, diffim, sigma=psfSigma)
+        # Customize the detection task a bit (optional)
+        detectConfig = measAlg.SourceDetectionConfig()
+        detectConfig.returnOriginalFootprints = False  # should be the default
 
-    # Now do the merge.
-    if doMerge:
-        fpSet = catalog.fpSets.positive
-        fpSet.merge(catalog.fpSets.negative, grow, grow, False)
-        sources = afwTable.SourceCatalog(table)
-        fpSet.makeSources(sources)
+        psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
 
-        return sources
+        # code from imageDifference.py:
+        detectConfig.thresholdPolarity = "both"
+        detectConfig.thresholdValue = detectSigma
+        # detectConfig.nSigmaToGrow = psfSigma
+        detectConfig.reEstimateBackground = True  # if False, will fail often for faint sources on gradients?
+        detectConfig.thresholdType = "pixel_stdev"
 
-    else:
-        return detectTask, schema
+        # Create the detection task. We pass the schema so the task can declare a few flag fields
+        detectTask = measAlg.SourceDetectionTask(schema, config=detectConfig)
+
+        table = afwTable.SourceTable.make(schema)
+        catalog = detectTask.makeSourceCatalog(table, diffim, sigma=psfSigma)
+
+        # Now do the merge.
+        if doMerge:
+            fpSet = catalog.fpSets.positive
+            fpSet.merge(catalog.fpSets.negative, grow, grow, False)
+            sources = afwTable.SourceCatalog(table)
+            fpSet.makeSources(sources)
+
+            return sources
+
+        else:
+            return detectTask, schema
+
 
 # ######## UTILITIES FUNCTIONS FOR PLOTTING  ####
 
