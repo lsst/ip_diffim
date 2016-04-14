@@ -384,6 +384,11 @@ class DipoleFitAlgorithm(object):
         self.diffim = diffim
         self.posImage = posImage
         self.negImage = negImage
+        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
+                              'lsst.ip.diffim.DipoleFitAlgorithm', pexLog.Log.INFO)
+
+        import lsstDebug
+        self.debug = lsstDebug.Info(__name__).debug
 
     def genBgGradientModel(self, in_x, b=None, x1=0., y1=0., xy=None, x2=0., y2=0.):
         """Generate gradient model (2-d array) with up to 2nd-order polynomial
@@ -455,7 +460,7 @@ class DipoleFitAlgorithm(object):
     def genDipoleModel(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
                        b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
                        bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
-                       debug=False, **kwargs):
+                       **kwargs):
         """Generate dipole model with given parameters.
 
         This is the functor whose sum-of-squared difference from data
@@ -470,12 +475,12 @@ class DipoleFitAlgorithm(object):
         return algObject.genDipoleModelImpl(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=fluxNeg,
                                             b=b, x1=x1, y1=y1, xy=xy, x2=x2, y2=y2,
                                             bNeg=bNeg, x1Neg=x1Neg, y1Neg=y1Neg, xyNeg=xyNeg,
-                                            x2Neg=x2Neg, y2Neg=y2Neg, debug=debug, **kwargs)
+                                            x2Neg=x2Neg, y2Neg=y2Neg, **kwargs)
 
     def genDipoleModelImpl(self, x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
                            b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
                            bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
-                           debug=False, **kwargs):
+                           **kwargs):
 
         """Generate dipole model with given parameters. This is the functor
         whose sum-of-squared difference from data is minimized by
@@ -519,12 +524,13 @@ class DipoleFitAlgorithm(object):
         if fluxNeg is None:
             fluxNeg = flux
 
-        if debug:
-            print('%.2f %.2f %.2f %.2f %.2f %.2f' % (flux, fluxNeg, xcenPos, ycenPos, xcenNeg, ycenNeg))
+        if self.debug:
+            self.log.log(self.log.DEBUG, '%.2f %.2f %.2f %.2f %.2f %.2f' %
+                         (flux, fluxNeg, xcenPos, ycenPos, xcenNeg, ycenNeg))
             if x1 is not None:
-                print('     %.2f %.2f %.2f' % (b, x1, y1))
+                self.log.log(self.log.DEBUG, '     %.2f %.2f %.2f' % (b, x1, y1))
             if xy is not None:
-                print('     %.2f %.2f %.2f' % (xy, x2, y2))
+                self.log.log(self.log.DEBUG, '     %.2f %.2f %.2f' % (xy, x2, y2))
 
         posIm = self.genStarModel(bbox, psf, xcenPos, ycenPos, flux)
         negIm = self.genStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
@@ -705,7 +711,7 @@ class DipoleFitAlgorithm(object):
 
         # Display images, model fits and residuals (currently uses matplotlib display functions)
         if display:
-            self.displayFitResults(result, fp)
+            self.displayFitResults(fp, result)
 
         return result
 
@@ -795,8 +801,11 @@ class DipoleFitAlgorithm(object):
             return out, fitResult
         return out
 
-    def displayFitResults(self, result, footprint):
-        """Display data, model fits and residuals (currently uses matplotlib display functions)."""
+    def displayFitResults(self, footprint, result):
+        """Display data, model fits and residuals (currently uses matplotlib display functions).
+        @param footprint Footprint containing the dipole that was fit
+        @param result `lmfit.MinimizerResult` object returned by `lmfit` optimizer
+        """
 
         plt = ipUtils.importMatplotlib()
         if not plt:  # Exit silently if no matplotlib installed
