@@ -30,14 +30,15 @@ import lsst.meas.base as measBase
 from lsst.ip.diffim.dipoleFitTask import (DipoleFitAlgorithm, DipoleFitTask)
 import lsst.ip.diffim.utils as ipUtils
 
-# This file produces three unit tests of the DipoelFitAlgorithm and its related tasks and plugins.
-# Each test generates a fake image with two synthetic dipoles as input data.
-#
-# DipoleFitTest.testDipoleAlgorithm - tests the DipoleFitAlgorithm directly and ensures that the recovered
-#   fluxes and centroids are close to the input values.
-# DipoleFitTest.testDipoleTask - tests the DipoleFitTask on identical synthetic data, after running
-#   dipole detection on the image.
-# DipoleFitTest.testDipoleEdge - ensures correct handling of dipoles too close to the edge of the image.
+"""This file contains three unit tests of the DipoelFitAlgorithm and its related tasks and plugins.
+Each test generates a fake image with two synthetic dipoles as input data.
+
+DipoleFitTest.testDipoleAlgorithm - tests the DipoleFitAlgorithm directly and ensures that the recovered
+   fluxes and centroids are close to the input values.
+DipoleFitTest.testDipoleTask - tests the DipoleFitTask on identical synthetic data, after running
+   dipole detection on the image.
+DipoleFitTest.testDipoleEdge - ensures correct handling of dipoles too close to the edge of the image.
+"""
 
 
 class DipoleFitTestGlobalParams(object):
@@ -55,17 +56,25 @@ class DipoleFitTestGlobalParams(object):
     @var offsets: pixel coordinates between lobes of dipoles
     """
 
-    def __init__(self, xc=np.array([65.3, 24.2]), yc=np.array([38.6, 78.5])):
-        """Initialize the parameters."""
+    def __init__(self, xc=None, yc=None):
+        """Initialize the parameters.
+
+        @param xc iterable x coordinate (pixels) of center(s) of input dipole(s)
+        @param yc iterable y coordinate (pixels) of center(s) of input dipole(s)
+        """
         np.random.seed(666)
         self.display = False
         self.verbose = False
         self.w, self.h = 100, 100  # size of image
 
         self.xc = xc  # xcenters of two dipoles in image
+        if xc is None:
+            xc = self.xc = [65.3, 24.2]
         self.yc = yc  # ycenters of two dipoles
-        self.flux = np.array([2500., 2345.])  # fluxes of pos/neg lobes
-        self.gradientParams = np.array([10., 3., 5.])
+        if yc is None:
+            yc = self.yc = [38.6, 78.5]
+        self.flux = [2500., 2345.]  # fluxes of pos/neg lobes
+        self.gradientParams = [10., 3., 5.]
 
         self.offsets = np.array([-2., 2.])  # pixel coord offsets between lobes of dipoles
         self.testImage = ipUtils.DipoleTestImage(
@@ -74,34 +83,35 @@ class DipoleFitTestGlobalParams(object):
             xcenNeg=self.xc - self.offsets,
             ycenNeg=self.yc - self.offsets,
             flux=self.flux, fluxNeg=self.flux,
+            noise=2.,  # Note the input noise - this affects the relative tolerances used.
             gradientParams=self.gradientParams)
 
         self.catalog = self.testImage.detectDipoleSources()
+        self.rtol = 0.01  # This is okay given the default noise of 2. set above.
 
 
 # First, test the algorithm itself (fitDipole()):
-# Create a simulated diffim (with dipoles) and a linear background gradient in the pre-sub images
-#   then compare the input fluxes/centroids with the fitted results.
 class DipoleFitTest(lsst.utils.tests.TestCase):
-    """A test case for dipole fit algorithm/plugin/task.
+    """A test case for separately testing the dipole fit algorithm
+    directly, and the single frame measurement.
 
-    Test the dipole fitting algorithm on two dipoles within an image with
-    simulated noise.
+    In each test, create a simulated diffim with two dipoles, noise,
+    and a linear background gradient in the pre-sub images then
+    compare the input fluxes/centroids with the fitted results.
     """
 
     def testDipoleAlgorithm(self):
-        """Test the dipole fitting algorithm. Test that the resulting
-        fluxes/centroids are very close to the input values for both
-        dipoles in the image.
+        """Test the dipole fitting algorithm directly (fitDipole()).
+
+        Test that the resulting fluxes/centroids are very close to the
+        input values for both dipoles in the image.
         """
         params = DipoleFitTestGlobalParams()
+        rtol = params.rtol
 
-        if params.verbose:
-            for s in params.catalog:
-                fp = s.getFootprint()
-                print(fp.getBBox(), fp.getNpix())
-                for pk in fp.getPeaks():
-                    print('FOOTPRINT CENTER:', pk.getIy(), pk.getIx(), pk.getPeakValue())
+        for s in params.catalog:
+            fp = s.getFootprint()
+            self.assertTrue(len(fp.getPeaks()) == 2)
 
         offsets = params.offsets
         testImage = params.testImage
@@ -112,16 +122,18 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
                 verbose=params.verbose, display=params.display)
 
             self.assertClose((result.psfFitPosFlux + abs(result.psfFitNegFlux))/2.,
-                             params.flux[i], rtol=0.02)
-            self.assertClose(result.psfFitPosCentroidX, params.xc[i] + offsets[i], rtol=0.01)
-            self.assertClose(result.psfFitPosCentroidY, params.yc[i] + offsets[i], rtol=0.01)
-            self.assertClose(result.psfFitNegCentroidX, params.xc[i] - offsets[i], rtol=0.01)
-            self.assertClose(result.psfFitNegCentroidY, params.yc[i] - offsets[i], rtol=0.01)
+                             params.flux[i], rtol=rtol)
+            self.assertClose(result.psfFitPosCentroidX, params.xc[i] + offsets[i], rtol=rtol)
+            self.assertClose(result.psfFitPosCentroidY, params.yc[i] + offsets[i], rtol=rtol)
+            self.assertClose(result.psfFitNegCentroidX, params.xc[i] - offsets[i], rtol=rtol)
+            self.assertClose(result.psfFitNegCentroidY, params.yc[i] - offsets[i], rtol=rtol)
 
-    def runDetection(self, params):
+    def _runDetection(self, testImage):
+        """Run 'diaSource' detection on the diffim, including merging of
+        positive and negative sources.
+        """
 
         # Create the various tasks and schema -- avoid code reuse.
-        testImage = params.testImage
         detectTask, schema = testImage.detectDipoleSources(doMerge=False)
 
         measureConfig = measBase.SingleFrameMeasurementConfig()
@@ -163,28 +175,34 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         return sources
 
     def testDipoleTask(self):
-        """Test the dipole fitting singleFramePlugin. Test that the resulting
-        fluxes/centroids are entered into the correct slots of the
-        catalog, and have values that are very close to the input
-        values for both dipoles in the image.
+        """Test the dipole fitting singleFramePlugin.
+
+        Test that the resulting fluxes/centroids are entered into the
+        correct slots of the catalog, and have values that are very
+        close to the input values for both dipoles in the image.
+
+        Also test that the resulting fluxes are close to those
+        generated by the existing ip_diffim_DipoleMeasurement task
+        (PsfDipoleFit).
         """
         params = DipoleFitTestGlobalParams()
-        sources = self.runDetection(params)
+        rtol = params.rtol
+        sources = self._runDetection(params.testImage)
 
         offsets = params.offsets
         for i, r1 in enumerate(sources):
             result = r1.extract("ip_diffim_DipoleFit*")
             self.assertClose((result['ip_diffim_DipoleFit_pos_flux'] +
                               abs(result['ip_diffim_DipoleFit_neg_flux']))/2.,
-                             params.flux[i], rtol=0.02)
+                             params.flux[i], rtol=rtol)
             self.assertClose(result['ip_diffim_DipoleFit_pos_centroid_x'],
-                             params.xc[i] + offsets[i], rtol=0.01)
+                             params.xc[i] + offsets[i], rtol=rtol)
             self.assertClose(result['ip_diffim_DipoleFit_pos_centroid_y'],
-                             params.yc[i] + offsets[i], rtol=0.01)
+                             params.yc[i] + offsets[i], rtol=rtol)
             self.assertClose(result['ip_diffim_DipoleFit_neg_centroid_x'],
-                             params.xc[i] - offsets[i], rtol=0.01)
+                             params.xc[i] - offsets[i], rtol=rtol)
             self.assertClose(result['ip_diffim_DipoleFit_neg_centroid_y'],
-                             params.yc[i] - offsets[i], rtol=0.01)
+                             params.yc[i] - offsets[i], rtol=rtol)
             # Note this is dependent on the noise (variance) being realistic in the image.
             # otherwise it throws off the chi2 estimate, which is used for classification:
             self.assertTrue(result['ip_diffim_DipoleFit_flag_classification'])
@@ -195,19 +213,19 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
                               abs(result['ip_diffim_DipoleFit_neg_flux']))/2.,
                              (result2['ip_diffim_PsfDipoleFlux_pos_flux'] +
                               abs(result2['ip_diffim_PsfDipoleFlux_neg_flux']))/2.,
-                             rtol=0.02)
+                             rtol=rtol)
             self.assertClose(result['ip_diffim_DipoleFit_pos_centroid_x'],
                              result2['ip_diffim_PsfDipoleFlux_pos_centroid_x'],
-                             rtol=0.01)
+                             rtol=rtol)
             self.assertClose(result['ip_diffim_DipoleFit_pos_centroid_y'],
                              result2['ip_diffim_PsfDipoleFlux_pos_centroid_y'],
-                             rtol=0.01)
+                             rtol=rtol)
             self.assertClose(result['ip_diffim_DipoleFit_neg_centroid_x'],
                              result2['ip_diffim_PsfDipoleFlux_neg_centroid_x'],
-                             rtol=0.01)
+                             rtol=rtol)
             self.assertClose(result['ip_diffim_DipoleFit_neg_centroid_y'],
                              result2['ip_diffim_PsfDipoleFlux_neg_centroid_y'],
-                             rtol=0.01)
+                             rtol=rtol)
 
             if params.display:
                 params.testImage.displayCutouts(r1)
@@ -220,12 +238,14 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         return result
 
     def testDipoleEdge(self):
-        """Test the dipole fitting singleFramePlugin. Test that the dipoles
-        which are too close to the edge raise the correct exception.
+        """Test the edge case for dipole fitting singleFramePlugin.
+
+        Test that the dipoles which are too close to the edge are
+        indicated as so in the catalog.
         """
 
-        params = DipoleFitTestGlobalParams(xc=np.array([5.3, 2.2]), yc=np.array([2.6, 98.5]))
-        sources = self.runDetection(params)
+        params = DipoleFitTestGlobalParams(xc=[5.3, 2.2], yc=[2.6, 98.5])
+        sources = self._runDetection(params.testImage)
 
         for i, r1 in enumerate(sources):
             result = r1.extract("ip_diffim_DipoleFit*")
