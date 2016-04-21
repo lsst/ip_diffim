@@ -140,20 +140,54 @@ class DipoleMeasurementTask(SingleFrameMeasurementTask):
 
 \section ip_diffim_dipolemeas_Purpose   Description
 
-This class provies a specialized set of Source measurements that allow the user to test the hypothesis that
-the Source is a dipole.  This includes a set of measurements derived from intermediate base classes
+This class provides a default configuration for running Source measurement on image differences.
+
+These default plugins include:
+\dontinclude dipoleMeasurement.py
+\skip class DipoleMeasurementConfig
+\until self.doReplaceWithNoise
+
+These plugins enabled by default allow the user to test the hypothesis that the Source is a dipole.
+This includes a set of measurements derived from intermediate base classes
 DipoleCentroidAlgorithm and DipoleFluxAlgorithm.  Their respective algorithm control classes are defined in
-DipoleCentroidControl and DipoleFluxControl.  Each centroid and flux measurement will have .neg (negative)
-and .pos (positive lobe) fields.
+DipoleCentroidControl and DipoleFluxControl.  Each centroid and flux measurement will have _neg (negative)
+and _pos (positive lobe) fields.
 
 The first set of measurements uses a "naive" alrogithm for centroid and flux measurements, implemented in
 NaiveDipoleCentroidControl and NaiveDipoleFluxControl.  The algorithm uses a naive 3x3 weighted moment around
 the nominal centroids of each peak in the Source Footprint.  These algorithms fill the table fields
-centroid.dipole.naive.* and flux.dipole.naive.*.
+ip_diffim_NaiveDipoleCentroid* and ip_diffim_NaiveDipoleFlux*
 
 The second set of measurements undertakes a joint-Psf model on the negative and positive lobe simultaneously.
 This fit simultaneously solves for the negative and positive lobe centroids and fluxes using non-linear
-least squares minimization.  The fields are stored in table elements flux.dipole.psf.*.
+least squares minimization.  The fields are stored in table elements ip_diffim_PsfDipoleFlux*.
+
+Because this Task is just a config for SourceMeasurementTask, the same result may be acheived by manually
+editing the config and running SourceMeasurementTask. For example:
+
+\code
+config = SingleFrameMeasurementConfig()
+config.plugins.names = ["base_PsfFlux",
+                        "ip_diffim_PsfDipoleFlux",
+                        "ip_diffim_NaiveDipoleFlux",
+                        "ip_diffim_NaiveDipoleCentroid",
+                        "ip_diffim_ClassificationDipole",
+                        "base_CircularApertureFlux",
+                        "base_SkyCoord"]
+
+config.slots.calibFlux = None
+config.slots.modelFlux = None
+config.slots.instFlux = None
+config.slots.shape = None
+config.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
+config.doReplaceWithNoise = False
+
+schema = afwTable.SourceTable.makeMinimalSchema()
+task = SingleFrameMeasurementTask(schema, config=config)
+
+task.run(sources, exposure)
+\endcode
+
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -171,76 +205,14 @@ least squares minimization.  The fields are stored in table elements flux.dipole
 
 \section ip_diffim_dipolemeas_Config       Configuration parameters
 
-See \ref DipoleMeasurementConfig and \ref DipoleClassificationConfig
+See \ref DipoleMeasurementConfig
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 \section ip_diffim_dipolemeas_Metadata   Quantities set in Metadata
 
 No specific values are set in the Task metadata.  However, the Source schema are modified to store the
-results of the dipole-specific measurements.  These additional fields include:
-
- . classification.dipole : probability of being a dipole
-
- . centroid.dipole.naive.pos : unweighted 3x3 first moment centroid
-
- . centroid.dipole.naive.pos.err : covariance matrix for centroid.dipole.naive.pos
-
- . centroid.dipole.naive.pos.flags : set if the centroid.dipole.naive.pos measurement did not fully succeed
-
- . centroid.dipole.naive.neg : unweighted 3x3 first moment centroid
-
- . centroid.dipole.naive.neg.err : covariance matrix for centroid.dipole.naive.neg
-
- . centroid.dipole.naive.neg.flags : set if the centroid.dipole.naive.neg measurement did not fully succeed
-
- . flux.dipole.naive.pos : raw flux counts
-
- . flux.dipole.naive.pos.err : uncertainty for flux.dipole.naive.pos
-
- . flux.dipole.naive.pos.flags : set if the flux.dipole.naive.pos measurement failed
-
- . flux.dipole.naive.neg : raw flux counts
-
- . flux.dipole.naive.neg.err : uncertainty for flux.dipole.naive.neg
-
- . flux.dipole.naive.neg.flags : set if the flux.dipole.naive.neg measurement failed
-
- . flux.dipole.naive.npos : number of positive pixels
-
- . flux.dipole.naive.nneg : number of negative pixels
-
- . flux.dipole.psf.pos : jointly fitted psf flux counts
-
- . flux.dipole.psf.pos.err : uncertainty for flux.dipole.psf.pos
-
- . flux.dipole.psf.pos.flags : set if the flux.dipole.psf.pos measurement failed
-
- . flux.dipole.psf.neg : jointly fitted psf flux counts
-
- . flux.dipole.psf.neg.err : uncertainty for flux.dipole.psf.neg
-
- . flux.dipole.psf.neg.flags : set if the flux.dipole.psf.neg measurement failed
-
- . flux.dipole.psf.chi2dof : chi2 per degree of freedom of fit
-
- . flux.dipole.psf.centroid : average of the postive and negative lobe positions
-
- . flux.dipole.psf.centroid.err : covariance matrix for flux.dipole.psf.centroid
-
- . flux.dipole.psf.centroid.flags : set if the flux.dipole.psf.centroid measurement did not fully succeed
-
- . flux.dipole.psf.neg.centroid : psf fitted center of negative lobe
-
- . flux.dipole.psf.neg.centroid.err : covariance matrix for flux.dipole.psf.neg.centroid
-
- . flux.dipole.psf.neg.centroid.flags : set if the flux.dipole.psf.neg.centroid measurement did not fully succeed
-
- . flux.dipole.psf.pos.centroid : psf fitted center of positive lobe
-
- . flux.dipole.psf.pos.centroid.err : covariance matrix for flux.dipole.psf.pos.centroid
-
- . flux.dipole.psf.pos.centroid.flags : set if the flux.dipole.psf.pos.centroid measurement did not fully succeed
+results of the dipole-specific measurements.
 
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -321,27 +293,6 @@ Optionally display debugging information:
     ConfigClass = DipoleMeasurementConfig
     _DefaultName = "dipoleMeasurement"
 
-    def __init__(self, schema, algMetadata=None, **kwds):
-        """!Create the Task, and add Task-specific fields to the provided measurement table schema.
-
-        @param[in,out] schema        Schema object for measurement fields; modified in-place.
-        @param[in,out] algMetadata   Passed to MeasureSources object to be filled with
-                                     metadata by algorithms (e.g. radii for aperture photometry).
-        @param         **kwds        Passed to Task.__init__.
-        """
-
-        SingleFrameMeasurementTask.__init__(self, schema, algMetadata, **kwds)
-        self.dipoleAnalysis = DipoleAnalysis()
-
-
-    def run(self, sources, exposure, **kwds):
-        """!Run dipole measurement and classification
-        @param sources       diaSources that will be measured using dipole measurement
-        @param exposure      Exposure on which the diaSources were detected
-        @param **kwds        Sent to SingleFrameMeasurementTask
-        """
-
-        SingleFrameMeasurementTask.run(self, sources, exposure, **kwds)
 
 #########
 # Other Support classs
