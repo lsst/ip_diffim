@@ -131,8 +131,10 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
 class DipoleFitPlugin(measBase.SingleFramePlugin):
     """Subclass of SingleFramePlugin which can accept three input images
     in its measure() method and fits dipoles to all merged (two-peak)
-    footprints in a diffim/pos-im/neg-im simultaneously. The meat of
-    the fitting routines are in the class DipoleFitAlgorithm.
+    footprints in a diffim. If provided, it includes data from the
+    pre-subtraction posImage (science image) and optionally negImage
+    (template image) to constrain the fit. The meat of the fitting
+    routines are in the class DipoleFitAlgorithm.
 
     The motivation behind this plugin and the necessity for including more than
     one exposure are documented in DMTN-007 (http://dmtn-007.readthedocs.org).
@@ -434,6 +436,10 @@ class DipoleFitAlgorithm(object):
         bbox = fp.getBBox()
         bbox.grow(3)
         posImg = afwImage.ImageF(posImage.getMaskedImage().getImage(), bbox, afwImage.PARENT)
+
+        # This code constructs the footprint image so that we can identify the pixels that are
+        # outside the footprint (but within the bounding box). These are the pixels used for
+        # fitting the background.
         posHfp = afwDet.HeavyFootprintF(fp, posImage.getMaskedImage())
         posFpImg = ipUtils.getHeavyFootprintSubimage(posHfp, grow=3)
 
@@ -622,12 +628,18 @@ class DipoleFitAlgorithm(object):
         weights = 1. / subim.getArrays()[2]  # get the weights (=1/variance)
         if self.posImage is not None and rel_weight > 0.:
             posSubim = afwImage.MaskedImageF(self.posImage.getMaskedImage(), bbox, afwImage.PARENT)
-            negSubim = afwImage.MaskedImageF(self.negImage.getMaskedImage(), bbox, afwImage.PARENT)
+            if self.negImage is not None:
+                negSubim = afwImage.MaskedImageF(self.negImage.getMaskedImage(), bbox, afwImage.PARENT)
+            else:  # no template provided; generate it from the obs. and diffim
+                negSubim = posSubim.clone()
+                negSubim -= subim
             z = np.append([z], [posSubim.getArrays()[0],
                                 negSubim.getArrays()[0]], axis=0)
             # Weight the pos/neg images by rel_weight relative to the diffim
             weights = np.append([weights], [1. / posSubim.getArrays()[2] * rel_weight,
                                             1. / negSubim.getArrays()[2] * rel_weight], axis=0)
+        else:
+            rel_weight = 0.  # a short-cut for "don't include the pre-subtraction data"
 
         # Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
         gmod = lmfit.Model(DipoleFitAlgorithm.genDipoleModel, verbose=verbose)
@@ -710,7 +722,7 @@ class DipoleFitAlgorithm(object):
             posFlux = np.nansum(z[1, :])
             gmod.set_param_hint('flux', value=posFlux*1.5, min=0.1)
 
-            if separateNegParams:
+            if separateNegParams and self.negImage is not None:
                 bgParsNeg = self.fitBackgroundGradient(source, self.negImage, order=bgGradientOrder)
                 pbg = self.genBgGradientModel(in_x, tuple(bgParsNeg))
             z[2, :] -= pbg
@@ -793,9 +805,10 @@ class DipoleFitAlgorithm(object):
         """Wrapper around `fitDipoleImpl()` which performs the fit of a dipole
         model to an input difference image (actually, subimage bounded
         by the input source's footprint) and optionally constrain the
-        fit using the pre-subtraction images posImage and
-        negImage. Wraps the output into a `resultsOutput` object after
-        computing additional statistics such as orientation and SNR.
+        fit using the pre-subtraction images self.posImage (science) and
+        self.negImage (template). Wraps the output into a `resultsOutput`
+        named tuple after computing additional statistics such as
+        orientation and SNR.
 
         @param source Record containing the (merged) dipole source footprint detected on the diffim
         @param tol Tolerance parameter for scipy.leastsq() optimization
@@ -811,7 +824,7 @@ class DipoleFitAlgorithm(object):
         to be exactly equal in the fit.
         @param verbose Be verbose
         @param display Display input data, best fit model(s) and residuals in a matplotlib window.
-        @param return_fitObj In addition to the `resultsOutput` object, also returns the
+        @param return_fitObj In addition to the `resultsOutput` object, also return the
         `lmfit.MinimizerResult` object for debugging.
 
         @return resultsOutput object containing the fit parameters and other information.

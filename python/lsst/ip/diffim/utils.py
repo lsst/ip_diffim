@@ -1074,7 +1074,12 @@ def searchCatalog(catalog, x, y):
     """Search a catalog for a source whose footprint contains the given x, y pixel coordinates."""
     for i, s in enumerate(catalog):
         bbox = s.getFootprint().getBBox()
-        if bbox.contains(afwGeom.Point2D(x, y)):
-            print(i)
-            return s
+        try:
+            if bbox.contains(afwGeom.Point2D(x, y)):
+                print(i)
+                return s
+        except:
+            if bbox.contains(afwGeom.Point2I(int(x), int(y))):
+                print(i)
+                return s
 
