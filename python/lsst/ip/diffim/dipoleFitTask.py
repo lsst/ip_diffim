@@ -424,13 +424,30 @@ class DipoleFitAlgorithm(object):
         in_x[1, :] -= np.mean(in_x[1, :])
         return in_x
 
+    def _getHeavyFootprintSubimage(self, fp, badfill=np.nan, grow=0):
+        """Extract the image from a HeavyFootprint as an ImageF.
+
+        @param fp HeavyFootprint to use to generate the subimage
+        @param badfill Value to fill in pixels in extracted image that are outside the footprint
+        @param grow Optionally grow the footprint by this amount before extraction
+
+        @return an afw.image.ImageF containing the subimage
+        """
+        hfp = afwDet.HeavyFootprintF_cast(fp)
+        bbox = hfp.getBBox()
+        if grow > 0:
+            bbox.grow(grow)
+
+        subim2 = afwImage.ImageF(bbox, badfill)
+        afwDet.expandArray(hfp, hfp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
+        return subim2
+
     def fitBackgroundGradient(self, source, posImage, order=1):
         """ Fit a linear (polynomial) model of given order (max 2) to the background of a footprint.
         Only fit the pixels OUTSIDE of the footprint, but within its bounding box.
         TBD: look into whether afw_math background stuff -- see
         http://lsst-web.ncsa.illinois.edu/doxygen/x_masterDoxyDoc/_background_example.html
         """
-        from . import utils as ipUtils
 
         fp = source.getFootprint()
         bbox = fp.getBBox()
@@ -441,7 +458,7 @@ class DipoleFitAlgorithm(object):
         # outside the footprint (but within the bounding box). These are the pixels used for
         # fitting the background.
         posHfp = afwDet.HeavyFootprintF(fp, posImage.getMaskedImage())
-        posFpImg = ipUtils.getHeavyFootprintSubimage(posHfp, grow=3)
+        posFpImg = self._getHeavyFootprintSubimage(posHfp, grow=3)
 
         isBg = np.isnan(posFpImg.getArray()).ravel()
 
@@ -606,7 +623,7 @@ class DipoleFitAlgorithm(object):
 
     def fitDipoleImpl(self, source, tol=1e-7, rel_weight=0.5,
                       fitBgGradient=True, bgGradientOrder=1, maxSepInSigma=5.,
-                      separateNegParams=True, verbose=False, display=False):
+                      separateNegParams=True, verbose=False):
         """Fit a dipole model to an input difference image (actually,
         subimage bounded by the input source's footprint) and
         optionally constrain the fit using the pre-subtraction images
@@ -793,10 +810,6 @@ class DipoleFitAlgorithm(object):
             if separateNegParams:
                 print(result.ci_report())
 
-        # Display images, model fits and residuals (currently uses matplotlib display functions)
-        if display:
-            self.displayFitResults(fp, result)
-
         return result
 
     def fitDipole(self, source, tol=1e-7, rel_weight=0.1,
@@ -834,7 +847,12 @@ class DipoleFitAlgorithm(object):
         fitResult = self.fitDipoleImpl(
             source, tol=tol, rel_weight=rel_weight, fitBgGradient=fitBgGradient,
             maxSepInSigma=maxSepInSigma, separateNegParams=separateNegParams,
-            bgGradientOrder=bgGradientOrder, verbose=verbose, display=display)
+            bgGradientOrder=bgGradientOrder, verbose=verbose)
+
+        # Display images, model fits and residuals (currently uses matplotlib display functions)
+        if display:
+            fp = source.getFootprint()
+            self.displayFitResults(fp, fitResult)
 
         fitParams = fitResult.best_values
         if fitParams['flux'] <= 1.:   # usually around 0.1 -- the minimun flux allowed -- i.e. bad fit.
@@ -890,11 +908,21 @@ class DipoleFitAlgorithm(object):
         @param footprint Footprint containing the dipole that was fit
         @param result `lmfit.MinimizerResult` object returned by `lmfit` optimizer
         """
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError as err:
+            log = pexLog.Log(pexLog.getDefaultLog(),
+                             'lsst.ip.diffim.utils', pexLog.INFO)
+            log.warn('Unable to import matplotlib: %s' % err)
+            raise err
 
-        from . import utils as ipUtils
-        plt = ipUtils.importMatplotlib()
-        if not plt:  # Exit silently if no matplotlib installed
-            return
+        def display2dArray(arr, title='Data', extent=None):
+            """Use matplotlib.pyplot.imshow() to display a 2-D array with a given coordinate range.
+            """
+            fig = plt.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
+            plt.title(title)
+            plt.colorbar(fig, cmap='gray')
+            return fig
 
         z = result.data
         fit = result.best_fit
@@ -904,18 +932,20 @@ class DipoleFitAlgorithm(object):
             fig = plt.figure(figsize=(8, 8))
             for i in range(3):
                 plt.subplot(3, 3, i*3+1)
-                ipUtils.display2dArray(z[i, :], 'Data', True, extent=extent)
+                display2dArray(z[i, :], 'Data', extent=extent)
                 plt.subplot(3, 3, i*3+2)
-                ipUtils.display2dArray(fit[i, :], 'Model', True, extent=extent)
+                display2dArray(fit[i, :], 'Model', extent=extent)
                 plt.subplot(3, 3, i*3+3)
-                ipUtils.display2dArray(z[i, :] - fit[i, :], 'Residual', True, extent=extent)
+                display2dArray(z[i, :] - fit[i, :], 'Residual', extent=extent)
             return fig
         else:
             fig = plt.figure(figsize=(8, 2.5))
             plt.subplot(1, 3, 1)
-            ipUtils.display2dArray(z, 'Data', True, extent=extent)
+            display2dArray(z, 'Data', extent=extent)
             plt.subplot(1, 3, 2)
-            ipUtils.display2dArray(fit, 'Model', True, extent=extent)
+            display2dArray(fit, 'Model', extent=extent)
             plt.subplot(1, 3, 3)
-            ipUtils.display2dArray(z - fit, 'Residual', True, extent=extent)
+            display2dArray(z - fit, 'Residual', extent=extent)
             return fig
+
+        plt.show()

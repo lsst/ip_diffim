@@ -229,14 +229,6 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
                              result2['ip_diffim_PsfDipoleFlux_neg_centroid_y'],
                              rtol=rtol)
 
-            if params.display:
-                params.testImage.displayCutouts(r1)
-        if params.display:
-            plt = ipUtils.importMatplotlib()
-            if not plt:
-                return result
-            plt.show()
-
         return result
 
     def testDipoleTask(self):
