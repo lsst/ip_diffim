@@ -20,14 +20,8 @@ from __future__ import absolute_import, division, print_function
 # the GNU General Public License along with this program.  If not,
 # see <https://www.lsstcorp.org/LegalNotices/>.
 
-"""Tests of the DipoelFitAlgorithm and its related tasks and plugins.
+"""!Tests of the DipoleFitAlgorithm and its related tasks and plugins.
 Each test generates a fake image with two synthetic dipoles as input data.
-
-DipoleFitTest.testDipoleAlgorithm - tests the DipoleFitAlgorithm directly and ensures that the recovered
-   fluxes and centroids are close to the input values.
-DipoleFitTest.testDipoleTask - tests the DipoleFitTask on identical synthetic data, after running
-   dipole detection on the image.
-DipoleFitTest.testDipoleEdge - ensures correct handling of dipoles too close to the edge of the image.
 """
 
 import unittest
@@ -42,7 +36,7 @@ import lsst.ip.diffim.utils as ipUtils
 
 
 class DipoleFitTestGlobalParams(object):
-    """Class to initialize and store global parameters used by all tests below.
+    """!Class to initialize and store global parameters used by all tests below.
 
     @var display: Display (plot) the output dipole thumbnails (matplotlib)
     @var verbose: be verbose during fitting
@@ -54,7 +48,7 @@ class DipoleFitTestGlobalParams(object):
     """
 
     def __init__(self, xc=None, yc=None):
-        """Store the parameters, create the test image and run detection on it.
+        """!Store the parameters, create the test image and run detection on it.
 
         @param xc iterable x coordinate (pixels) of center(s) of input dipole(s)
         @param yc iterable y coordinate (pixels) of center(s) of input dipole(s)
@@ -90,7 +84,7 @@ class DipoleFitTestGlobalParams(object):
 
 
 class DipoleFitTest(lsst.utils.tests.TestCase):
-    """A test case for separately testing the dipole fit algorithm
+    """!A test case for separately testing the dipole fit algorithm
     directly, and the single frame measurement.
 
     In each test, create a simulated diffim with two dipoles, noise,
@@ -99,7 +93,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
     """
 
     def testDipoleAlgorithm(self):
-        """Test the dipole fitting algorithm directly (fitDipole()).
+        """!Test the dipole fitting algorithm directly (fitDipole()).
 
         Test that the resulting fluxes/centroids are very close to the
         input values for both dipoles in the image.
@@ -128,7 +122,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
             self.assertClose(result.psfFitNegCentroidY, params.yc[i] - offsets[i], rtol=rtol)
 
     def _runDetection(self, params):
-        """Run 'diaSource' detection on the diffim, including merging of
+        """!Run 'diaSource' detection on the diffim, including merging of
         positive and negative sources.
 
         Then run DipoleFitTask on the image and return the resulting catalog.
@@ -161,9 +155,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
 
         # Here is where we make the dipole fitting task. It can run the other measurements as well.
         # This is an example of how to pass it a custom config.
-        dpFitPluginConfig = DipoleFitPluginConfig()
-        dpFitPluginConfig.verbose = params.verbose
-        measureTask = DipoleFitTask(config=measureConfig, schema=schema, dpFitPluginConfig=dpFitPluginConfig)
+        measureTask = DipoleFitTask(config=measureConfig, schema=schema)
 
         table = afwTable.SourceTable.make(schema)
         detectResult = detectTask.run(table, testImage.diffim)
@@ -179,7 +171,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         return sources
 
     def _checkTaskOutput(self, params, sources, rtol=None):
-        """Compare the fluxes/centroids in `sources` are entered
+        """!Compare the fluxes/centroids in `sources` are entered
         into the correct slots of the catalog, and have values that
         are very close to the input values for both dipoles in the
         image.
@@ -232,7 +224,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         return result
 
     def testDipoleTask(self):
-        """Test the dipole fitting singleFramePlugin.
+        """!Test the dipole fitting singleFramePlugin.
 
         Test that the resulting fluxes/centroids are entered into the
         correct slots of the catalog, and have values that are very
@@ -246,10 +238,28 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         sources = self._runDetection(params)
         self._checkTaskOutput(params, sources)
 
+    def testDipoleTaskNoPosImage(self):
+        """!Test the dipole fitting singleFramePlugin in the case where no
+        `posImage` is provided. It should be the same as above because
+        `posImage` can be constructed from `diffim+negImage`.
+
+        Test that the resulting fluxes/centroids are entered into the
+        correct slots of the catalog, and have values that are very
+        close to the input values for both dipoles in the image.
+
+        Also test that the resulting fluxes are close to those
+        generated by the existing ip_diffim_DipoleMeasurement task
+        (PsfDipoleFit).
+        """
+        params = DipoleFitTestGlobalParams()
+        params.testImage.posImage = None
+        sources = self._runDetection(params)
+        self._checkTaskOutput(params, sources)
+
     def testDipoleTaskNoNegImage(self):
-        """Test the dipole fitting singleFramePlugin in the case where no
+        """!Test the dipole fitting singleFramePlugin in the case where no
         `negImage` is provided. It should be the same as above because
-        `negImage` can be constructed from `diffim-posImage`.
+        `negImage` can be constructed from `posImage-diffim`.
 
         Test that the resulting fluxes/centroids are entered into the
         correct slots of the catalog, and have values that are very
@@ -265,7 +275,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         self._checkTaskOutput(params, sources)
 
     def testDipoleTaskNoPreSubImages(self):
-        """Test the dipole fitting singleFramePlugin in the case where no
+        """!Test the dipole fitting singleFramePlugin in the case where no
         pre-subtraction data (`posImage` or `negImage`) are provided.
         In this case it just fits a dipole model to the diffim
         (dipole) image alone.
@@ -284,7 +294,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         self._checkTaskOutput(params, sources)
 
     def testDipoleEdge(self):
-        """Test the too-close-to-image-edge scenario for dipole fitting
+        """!Test the too-close-to-image-edge scenario for dipole fitting
         singleFramePlugin.
 
         Test that the dipoles which are too close to the edge are
@@ -304,7 +314,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
 
 
 def suite():
-    """Returns a suite containing all the test cases in this module."""
+    """!Returns a suite containing all the test cases in this module."""
 
     lsst.utils.tests.init()
 
@@ -315,7 +325,7 @@ def suite():
 
 
 def run(shouldExit=False):
-    """Run the tests"""
+    """!Run the tests"""
     lsst.utils.tests.run(suite(), shouldExit)
 
 if __name__ == "__main__":
