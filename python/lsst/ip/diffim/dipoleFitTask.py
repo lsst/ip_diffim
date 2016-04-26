@@ -42,8 +42,7 @@ __all__ = ("DipoleFitPluginConfig", "DipoleFitTask", "DipoleFitPlugin")
 
 
 class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
-    """
-    !Configuration for DipoleFitPlugin
+    """!Configuration for DipoleFitPlugin
     """
 
     maxSeparation = pexConfig.Field(
@@ -84,9 +83,9 @@ class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
 
 
 class DipoleFitTask(measBase.SingleFrameMeasurementTask):
-    """!This is a subclass of SingleFrameMeasurementTask which can accept
-    three input images in its run() method. Because it subclasses
-    SingleFrameMeasurementTask, and calls
+    """!Subclass of SingleFrameMeasurementTask which accepts up to three input images in its run() method.
+
+    Because it subclasses SingleFrameMeasurementTask, and calls
     SingleFrameMeasurementTask.run() from its run() method, it still
     can be used identically to a standard SingleFrameMeasurementTask.
     """
@@ -125,216 +124,6 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
 
         for source in sources:
             self.dipoleFitter.measure(source, exposure, posExp, negExp)
-
-
-@measBase.register("ip_diffim_DipoleFit")
-class DipoleFitPlugin(measBase.SingleFramePlugin):
-    """!Subclass of SingleFramePlugin which can accept three input images
-    in its measure() method and fits dipoles to all merged (two-peak)
-    footprints in a diffim. If provided, it includes data from the
-    pre-subtraction posImage (science image) and optionally negImage
-    (template image) to constrain the fit. The meat of the fitting
-    routines are in the class DipoleFitAlgorithm.
-
-    The motivation behind this plugin and the necessity for including more than
-    one exposure are documented in DMTN-007 (http://dmtn-007.readthedocs.org).
-
-    This class is named ip_diffim_DipoleFit so that it may be used alongside
-    the existing ip_diffim_DipoleMeasurement classes until such a time as those
-    are deemed to be replaceable by this.
-    """
-
-    ConfigClass = DipoleFitPluginConfig
-
-    FAILURE_EDGE = 1   # too close to the edge
-    FAILURE_FIT = 2    # failure in the fitting
-    FAILURE_NOT_DIPOLE = 4  # input source is not a putative dipole to begin with
-
-    @classmethod
-    def getExecutionOrder(cls):
-        # algorithms that require both getShape() and getCentroid(),
-        # in addition to a Footprint and its Peaks
-        return cls.FLUX_ORDER
-
-    def __init__(self, config, name, schema, metadata):
-        measBase.SingleFramePlugin.__init__(self, config, name, schema, metadata)
-
-        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
-                              'lsst.ip.diffim.DipoleFitPlugin', pexLog.Log.INFO)
-
-        self._setupSchema(config, name, schema, metadata)
-
-    def _setupSchema(self, config, name, schema, metadata):
-        # Get a FunctorKey that can quickly look up the "blessed" centroid value.
-        self.centroidKey = afwTable.Point2DKey(schema["slot_Centroid"])
-
-        # Add some fields for our outputs, and save their Keys.
-        # Use setattr() to programmatically set the pos/neg named attributes to values, e.g.
-        # self.posCentroidKeyX = 'ip_diffim_DipoleFit_pos_centroid_x'
-
-        for pos_neg in ['pos', 'neg']:
-
-            key = schema.addField(
-                schema.join(name, pos_neg, "flux"), type=float, units="dn",
-                doc="Dipole {0} lobe flux".format(pos_neg))
-            setattr(self, ''.join((pos_neg, 'FluxKey')), key)
-
-            key = schema.addField(
-                schema.join(name, pos_neg, "fluxSigma"), type=float, units="pixels",
-                doc="1-sigma uncertainty for {0} dipole flux".format(pos_neg))
-            setattr(self, ''.join((pos_neg, 'FluxSigmaKey')), key)
-
-            for x_y in ['x', 'y']:
-                key = schema.addField(
-                    schema.join(name, pos_neg, "centroid", x_y), type=float, units="pixels",
-                    doc="Dipole {0} lobe centroid".format(pos_neg))
-                setattr(self, ''.join((pos_neg, 'CentroidKey', x_y.upper())), key)
-
-        for x_y in ['x', 'y']:
-            key = schema.addField(
-                schema.join(name, "centroid", x_y), type=float, units="pixels",
-                doc="Dipole centroid")
-            setattr(self, ''.join(('centroidKey', x_y.upper())), key)
-
-        self.fluxKey = schema.addField(
-            schema.join(name, "flux"), type=float, units="dn",
-            doc="Dipole overall flux")
-
-        self.orientationKey = schema.addField(
-            schema.join(name, "orientation"), type=float, units="deg",
-            doc="Dipole orientation")
-
-        self.separationKey = schema.addField(
-            schema.join(name, "separation"), type=float, units="pixels",
-            doc="Pixel separation between positive and negative lobes of dipole")
-
-        self.chi2dofKey = schema.addField(
-            schema.join(name, "chi2dof"), type=float,
-            doc="Chi2 per degree of freedom of dipole fit")
-
-        self.signalToNoiseKey = schema.addField(
-            schema.join(name, "signalToNoise"), type=float,
-            doc="Estimated signal-to-noise of dipole fit")
-
-        self.classificationFlagKey = schema.addField(
-            schema.join(name, "flag", "classification"), type="Flag",
-            doc="Flag indicating diaSource is classified as a dipole")
-
-        self.flagKey = schema.addField(
-            schema.join(name, "flag"), type="Flag",
-            doc="General failure flag for dipole fit")
-
-        self.edgeFlagKey = schema.addField(
-            schema.join(name, "flag", "edge"), type="Flag",
-            doc="Flag set when dipole is too close to edge of image")
-
-    def measure(self, measRecord, exposure, posImage=None, negImage=None):
-        """!Perform the non-linear least squares minimization.
-
-        The main functionality of this routine was placed outside of
-        this plugin (into `DipoleFitAlgorithm.fitDipole()`) so that
-        `DipoleFitAlgorithm.fitDipole()` can be called separately for
-        testing (see `tests/testDipoleFitter.py`)
-        """
-
-        pks = measRecord.getFootprint().getPeaks()
-        if len(pks) <= 1:  # not a dipole for our analysis
-            self.fail(measRecord, measBase.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
-
-        result = None
-        try:
-            alg = DipoleFitAlgorithm(exposure, posImage=posImage, negImage=negImage)
-            result = alg.fitDipole(
-                measRecord, rel_weight=self.config.relWeight,
-                tol=self.config.tolerance,
-                maxSepInSigma=self.config.maxSeparation,
-                fitBgGradient=self.config.fitBgGradient,
-                separateNegParams=self.config.fitSeparateNegParams,
-                verbose=False, display=False)
-        except pexExcept.LengthError:
-            self.fail(measRecord, measBase.MeasurementError('edge failure', self.FAILURE_EDGE))
-        except Exception:
-            self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
-
-        if result is None:
-            return result
-
-        self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
-
-        if result.psfFitPosFlux <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
-            self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
-
-        # add chi2, coord/flux uncertainties (TBD), dipole classification
-
-        # Add the relevant values to the measRecord
-        measRecord[self.posFluxKey] = result.psfFitPosFlux
-        measRecord[self.posFluxSigmaKey] = result.psfFitSignaltoNoise   # to be changed to actual sigma!
-        measRecord[self.posCentroidKeyX] = result.psfFitPosCentroidX
-        measRecord[self.posCentroidKeyY] = result.psfFitPosCentroidY
-
-        measRecord[self.negFluxKey] = result.psfFitNegFlux
-        measRecord[self.negFluxSigmaKey] = result.psfFitSignaltoNoise   # to be changed to actual sigma!
-        measRecord[self.negCentroidKeyX] = result.psfFitNegCentroidX
-        measRecord[self.negCentroidKeyY] = result.psfFitNegCentroidY
-
-        # Dia source flux: average of pos+neg
-        measRecord[self.fluxKey] = (abs(result.psfFitPosFlux) + abs(result.psfFitNegFlux))/2.
-        measRecord[self.orientationKey] = result.psfFitOrientation
-        measRecord[self.separationKey] = np.sqrt((result.psfFitPosCentroidX - result.psfFitNegCentroidX)**2. +
-                                                 (result.psfFitPosCentroidY - result.psfFitNegCentroidY)**2.)
-        measRecord[self.centroidKeyX] = (result.psfFitPosCentroidX + result.psfFitNegCentroidX)/2.
-        measRecord[self.centroidKeyY] = (result.psfFitPosCentroidY + result.psfFitNegCentroidY)/2.
-
-        measRecord[self.signalToNoiseKey] = result.psfFitSignaltoNoise
-        measRecord[self.chi2dofKey] = result.psfFitRedChi2
-
-        self.doClassify(measRecord, result)
-
-    def doClassify(self, measRecord, result):
-        """!Determine if source is classified as dipole (similar to
-        orig. dipole classification task).
-        """
-
-        # First, does the total signal-to-noise surpass the minSn?
-        passesSn = measRecord[self.signalToNoiseKey] > self.config.minSn
-
-        # Second, are the pos/neg fluxes less than 1.0 and no more than 0.65 of the total flux?
-        # By default this will never happen since posFlux = negFlux.
-        passesFluxPos = (abs(measRecord[self.posFluxKey]) /
-                         (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
-        passesFluxPos &= (abs(measRecord[self.posFluxKey]) >= 1.0)
-        passesFluxNeg = (abs(measRecord[self.negFluxKey]) /
-                         (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
-        passesFluxNeg &= (abs(measRecord[self.negFluxKey]) >= 1.0)
-        allPass = (passesSn and passesFluxPos and passesFluxNeg)  # and passesChi2)
-
-        # Third, is it a good fit (chi2dof < 1)?
-        # Use scipy's chi2 cumulative distrib to estimate significance
-        # This doesn't really work since I don't trust the values in the variance plane (which
-        #   affects the least-sq weights, which affects the resulting chi2).
-        # But I'm going to keep this here for future use.
-        if False:
-            from scipy.stats import chi2
-            ndof = result.psfFitChi2 / measRecord[self.chi2dofKey]
-            significance = chi2.cdf(result.psfFitChi2, ndof)
-            passesChi2 = significance < self.config.maxChi2DoF
-            allPass = allPass and passesChi2
-
-        if allPass:  # Note cannot pass `allPass` into the `measRecord.set()` call below...?
-            measRecord.set(self.classificationFlagKey, True)
-        else:
-            measRecord.set(self.classificationFlagKey, False)
-
-    # TBD: need to catch more exceptions, set correct flags.
-    def fail(self, measRecord, error=None):
-        measRecord.set(self.flagKey, True)
-        if error is not None:
-            if error.getFlagBit() == self.FAILURE_EDGE:
-                measRecord.set(self.edgeFlagKey, True)
-            if error.getFlagBit() == self.FAILURE_FIT:
-                measRecord.set(self.flagKey, True)
-            if error.getFlagBit() == self.FAILURE_NOT_DIPOLE:
-                measRecord.set(self.flagKey, True)
 
 
 class DipoleFitAlgorithm(object):
@@ -389,35 +178,50 @@ class DipoleFitAlgorithm(object):
         import lsstDebug
         self.debug = lsstDebug.Info(__name__).debug
 
-    def genBgGradientModel(self, in_x, pars=()):
+    def genBackgroundModel(self, in_x, pars=None):
         """!Generate gradient model (2-d array) with up to 2nd-order polynomial
-        @param in_x Provides the input x,y grid upon which to compute the gradient
-        @param pars Up to 6 floats for up to 6 2nd-order 2-d polynomial gradient parameters.
-        If emtpy, do nothing (for speed).
+
+        @param in_x (2, w, h)-dimensional numpy array, containing the
+        input x,y meshgrid providing the coordinates upon which to
+        compute the gradient. This will typically be generated via
+        `_generateXYGrid()`. `w` and `h` correspond to the width and
+        height of the desired grid.
+        @param pars Up to 6 floats for up
+        to 6 2nd-order 2-d polynomial gradient parameters, in the
+        following order: (intercept, x, y, xy, x**2, y**2). If `pars`
+        is emtpy or None, do nothing (for speed).
 
         @return None, or 2-d numpy.array of width/height matching
         input bbox, containing computed gradient values.
         """
 
-        gradient = None
+        # Don't fit for other gradient parameters if the intercept is not included.
+        if (pars is None) or (len(pars) <= 0) or (pars[0] is None):
+            return
 
-        # Don't fit for other gradient parameters if the intercept is not allowed.
-        if len(pars) > 0 and pars[0] is not None:
-            y, x = in_x[0, :], in_x[1, :]
-            gradient = np.full_like(x, pars[0], dtype='float64')
-            if len(pars) > 1 and pars[1] is not None:
-                gradient += pars[1] * x
-            if len(pars) > 2 and pars[2] is not None:
-                gradient += pars[2] * y
-            if len(pars) > 3 and pars[3] is not None:
-                gradient += pars[3] * (x * y)
-            if len(pars) > 4 and pars[4] is not None:
-                gradient += pars[4] * (x * x)
-            if len(pars) > 5 and pars[5] is not None:
-                gradient += pars[5] * (y * y)
+        y, x = in_x[0, :], in_x[1, :]
+        gradient = np.full_like(x, pars[0], dtype='float64')
+        if len(pars) > 1 and pars[1] is not None:
+            gradient += pars[1] * x
+        if len(pars) > 2 and pars[2] is not None:
+            gradient += pars[2] * y
+        if len(pars) > 3 and pars[3] is not None:
+            gradient += pars[3] * (x * y)
+        if len(pars) > 4 and pars[4] is not None:
+            gradient += pars[4] * (x * x)
+        if len(pars) > 5 and pars[5] is not None:
+            gradient += pars[5] * (y * y)
+
         return gradient
 
     def _generateXYGrid(self, bbox):
+        """!Generate a meshgrid covering the x,y coordinates bounded by bbox
+
+        @param bbox input BoundingBox defining the coordinate limits
+        @return in_x (2, w, h)-dimensional numpy array containing the grid indexing over x- and
+        y- coordinates
+        """
+
         x, y = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
         in_x = np.array([y, x]).astype(np.float64)
         in_x[0, :] -= np.mean(in_x[0, :])
@@ -442,11 +246,19 @@ class DipoleFitAlgorithm(object):
         afwDet.expandArray(hfp, hfp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
         return subim2
 
-    def fitBackgroundGradient(self, source, posImage, order=1):
+    def fitFootprintBackground(self, source, posImage, order=1):
         """!Fit a linear (polynomial) model of given order (max 2) to the background of a footprint.
+
         Only fit the pixels OUTSIDE of the footprint, but within its bounding box.
         TBD: look into whether afw_math background stuff -- see
         http://lsst-web.ncsa.illinois.edu/doxygen/x_masterDoxyDoc/_background_example.html
+
+        @param source SourceRecord, the footprint of which is to be fit
+        @param posImage The exposure from which to extract the footprint subimage
+        @param order Polynomial order of background gradient to fit.
+
+        @return pars tuple of length (1 if order==0; 3 if order==1; 6 if order == 2),
+        containing the resulting fit parameters
         """
 
         fp = source.getFootprint()
@@ -485,7 +297,7 @@ class DipoleFitAlgorithm(object):
         return pars
 
     def genStarModel(self, bbox, psf, xcen, ycen, flux):
-        """!Generate model (2-d array) of a 'star' (single PSF) centered at given coordinates
+        """!Generate model (2-d Image) of a 'star' (single PSF) centered at given coordinates
 
         @param bbox Bounding box marking pixel coordinates for generated model
         @param psf Psf model used to generate the 'star'
@@ -493,7 +305,7 @@ class DipoleFitAlgorithm(object):
         @param ycen Desired y-centroid of the 'star'
         @param flux Desired flux of the 'star'
 
-        @return 2-d numpy.array of width/height matching input bbox,
+        @return 2-d Image of width/height matching input bbox,
         containing PSF with given centroid and flux
         """
 
@@ -527,7 +339,7 @@ class DipoleFitAlgorithm(object):
         This is the functor whose sum-of-squared difference from data
         is minimized by `lmfit`. Thus it must be static. However, it
         just defers to `self.genDipoleModelImpl()`, where `self` comes
-        out of kwargs['myself'].
+        out of kwargs['algObject'].
 
         @see genDipoleModelImpl
         """
@@ -555,9 +367,9 @@ class DipoleFitAlgorithm(object):
         @param ycenNeg Desired y-centroid of the negative lobe of the dipole
         @param fluxNeg Desired flux of the negative lobe of the dipole, set to 'flux' if None
         @param b, x1, y1, xy, x2, y2 Gradient parameters for positive lobe.
-        @see `genBgGradientModel`.
+        @see `genBackgroundModel`.
         @param bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg Gradient
-        parameters for negative lobe.  @see `genBgGradientModel`. Set
+        parameters for negative lobe.  @see `genBackgroundModel`. Set
         to the corresponding positive values if None.
 
         @param **kwargs Keyword arguments passed through `lmfit` and
@@ -601,12 +413,15 @@ class DipoleFitAlgorithm(object):
             in_x[0, :] -= in_x[0, :].mean()  # center it!
             in_x[1, :] -= in_x[1, :].mean()
 
-        gradient = self.genBgGradientModel(in_x, (b, x1, y1, xy, x2, y2))
-        gradientNeg = gradient
-        if bNeg is not None:
-            gradientNeg = self.genBgGradientModel(in_x, (bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg))
+        if b is not None:
+            gradient = self.genBackgroundModel(in_x, (b, x1, y1, xy, x2, y2))
 
-        if gradient is not None:
+            # If bNeg is None, then don't fit the negative background separately
+            if bNeg is not None:
+                gradientNeg = self.genBackgroundModel(in_x, (bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg))
+            else:
+                gradientNeg = gradient
+
             posIm.getArray()[:, :] += gradient
             negIm.getArray()[:, :] += gradientNeg
 
@@ -682,7 +497,7 @@ class DipoleFitAlgorithm(object):
         # First assume dipole is not separated by more than 5*psfSigma.
         maxSep = self.psfSigma * maxSepInSigma
 
-        # Note - this may be a cheat to assume the dipole is centered in center of the footprint.
+        # As an initial guess -- assume the dipole is close to the center of the footprint.
         if np.sum(np.sqrt((np.array(cenPos) - fpCentroid)**2.)) > maxSep:
             cenPos = fpCentroid
         if np.sum(np.sqrt((np.array(cenNeg) - fpCentroid)**2.)) > maxSep:
@@ -700,21 +515,6 @@ class DipoleFitAlgorithm(object):
         gmod.set_param_hint('ycenNeg', value=cenNeg[1],
                             min=cenNeg[1]-maxSep, max=cenNeg[1]+maxSep)
 
-        # Estimate starting flux. This strongly affects runtime performance so we want to make it close.
-        if False:
-            # Value to convert peak value to total flux based on flux within psf
-            psfImg = self.diffim.getPsf().computeImage()
-            pkToFlux = np.nansum(psfImg.getArray()) / self.diffim.getPsf().computePeak()
-
-            bg = np.nanmedian(diArr)  # Compute the dipole background (probably very close to zero)
-            startingPk = np.nanmax(diArr) - bg   # use the dipole peak for an estimate.
-            posFlux, negFlux = startingPk * pkToFlux, -startingPk * pkToFlux
-
-            if len(pks) >= 1:
-                posFlux = pks[0].getPeakValue() * pkToFlux
-            if len(pks) >= 2:
-                negFlux = pks[1].getPeakValue() * pkToFlux
-
         # Use the (flux under the dipole)*5 for an estimate.
         # Lots of testing showed that having startingFlux be too high was better than too low.
         startingFlux = np.nansum(np.abs(diArr) - np.nanmedian(np.abs(diArr))) * 5.
@@ -727,27 +527,28 @@ class DipoleFitAlgorithm(object):
             # TBD: set max negative lobe flux limit?
             gmod.set_param_hint('fluxNeg', value=np.abs(negFlux), min=0.1)
 
-        # Fixed parameters (dont fit for them if there are no pre-sub images or no gradient fit requested):
-        # Right now, we use the linear model to fit the background and initialize the parameters.
-        # It might be better to just subtract the linear model from the data and then don't fit the background
-        # again.
+        # Fixed parameters (don't fit for them if there are no pre-sub images or no gradient fit requested):
+        # Right now, we use the linear model to fit the background and then subtract it from the data and
+        # then don't fit the background again (this is faster).
+        # A slower alternative is to use the estimated background parameters as starting points in the
+        # integrated model fit. That is currently not performed here, but might be desirable in some cases.
         bgParsPos = bgParsNeg = (0., 0., 0.)
         if (rel_weight > 0. and fitBgGradient and bgGradientOrder >= 0):
             pbg = 0.
             bgFitImage = self.posImage if self.posImage is not None else self.negImage
             # Fit the gradient to the background (linear model)
-            bgParsPos = bgParsNeg = self.fitBackgroundGradient(source, bgFitImage, order=bgGradientOrder)
+            bgParsPos = bgParsNeg = self.fitFootprintBackground(source, bgFitImage, order=bgGradientOrder)
             # Generate the gradient and subtract it from the pre-subtraction image data
             in_x = self._generateXYGrid(bbox)
-            pbg = self.genBgGradientModel(in_x, tuple(bgParsPos))
+            pbg = self.genBackgroundModel(in_x, tuple(bgParsPos))
             z[1, :] -= pbg
             z[1, :] -= np.nanmedian(z[1, :])
             posFlux = np.nansum(z[1, :])
             gmod.set_param_hint('flux', value=posFlux*1.5, min=0.1)
 
             if separateNegParams and self.negImage is not None:
-                bgParsNeg = self.fitBackgroundGradient(source, self.negImage, order=bgGradientOrder)
-                pbg = self.genBgGradientModel(in_x, tuple(bgParsNeg))
+                bgParsNeg = self.fitFootprintBackground(source, self.negImage, order=bgGradientOrder)
+                pbg = self.genBackgroundModel(in_x, tuple(bgParsNeg))
             z[2, :] -= pbg
             z[2, :] -= np.nanmedian(z[2, :])
             if separateNegParams:
@@ -780,8 +581,7 @@ class DipoleFitAlgorithm(object):
         in_x[1, :] -= in_x[1, :].mean()
 
         # Instead of explicitly using a mask to ignore flagged pixels, just set the ignored pixels'
-        #  weights to 0 in the fit. Right now, this is not used. TBD: need to inspect mask planes to set
-        #  this mask.
+        #  weights to 0 in the fit. TBD: need to inspect mask planes to set this mask.
         mask = np.ones_like(z, dtype=bool)  # TBD: set mask values to False if the pixels are to be ignored
 
         # I'm not sure about the variance planes in the diffim (or convolved pre-sub. images
@@ -798,7 +598,7 @@ class DipoleFitAlgorithm(object):
 
         # Note that although we can, we're not required to set initial values for params here,
         # since we set their param_hint's above.
-        # add "method" param to not use 'leastsq' (==levenberg-marquardt), e.g. "method='nelder'"
+        # Can add "method" param to not use 'leastsq' (==levenberg-marquardt), e.g. "method='nelder'"
         result = gmod.fit(z, weights=weights, x=in_x,
                           verbose=verbose,
                           fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol, 'maxfev': 250},  # see scipy docs
@@ -820,7 +620,7 @@ class DipoleFitAlgorithm(object):
 
     def fitDipole(self, source, tol=1e-7, rel_weight=0.1,
                   fitBgGradient=True, maxSepInSigma=5., separateNegParams=True,
-                  bgGradientOrder=1, verbose=False, display=False, return_fitObj=False):
+                  bgGradientOrder=1, verbose=False, display=False):
         """!Wrapper around `fitDipoleImpl()` which performs the fit of a dipole
         model to an input difference image (actually, subimage bounded
         by the input source's footprint) and optionally constrain the
@@ -843,11 +643,9 @@ class DipoleFitAlgorithm(object):
         to be exactly equal in the fit.
         @param verbose Be verbose
         @param display Display input data, best fit model(s) and residuals in a matplotlib window.
-        @param return_fitObj In addition to the `resultsOutput` object, also return the
-        `lmfit.MinimizerResult` object for debugging.
 
         @return resultsOutput object containing the fit parameters and other information.
-        @return lmfit.MinimizerResult object if `return_fitObj` is True.
+        @return `lmfit.MinimizerResult` object for debugging and error estimation, etc.
         """
 
         fitResult = self.fitDipoleImpl(
@@ -905,9 +703,8 @@ class DipoleFitAlgorithm(object):
             fluxVal, -fluxValNeg, fluxErr, fluxErrNeg, centroid[0], centroid[1], angle,
             signalToNoise, fitResult.chisqr, fitResult.redchi)
 
-        if return_fitObj:  # for debugging
-            return out, fitResult
-        return out
+        # fitResult may be returned for debugging
+        return out, fitResult
 
     def displayFitResults(self, footprint, result):
         """!Display data, model fits and residuals (currently uses matplotlib display functions).
@@ -955,3 +752,230 @@ class DipoleFitAlgorithm(object):
             return fig
 
         plt.show()
+
+
+@measBase.register("ip_diffim_DipoleFit")
+class DipoleFitPlugin(measBase.SingleFramePlugin):
+    """!Subclass of SingleFramePlugin which fits dipoles to all merged (two-peak) diaSources
+
+    Accepts up to three input images in its measure() method. If these are
+    provided, it includes data from the pre-subtraction posImage
+    (science image) and optionally negImage (template image) to
+    constrain the fit. The meat of the fitting routines are in the
+    class DipoleFitAlgorithm.
+
+    The motivation behind this plugin and the necessity for including more than
+    one exposure are documented in DMTN-007 (http://dmtn-007.readthedocs.org).
+
+    This class is named ip_diffim_DipoleFit so that it may be used alongside
+    the existing ip_diffim_DipoleMeasurement classes until such a time as those
+    are deemed to be replaceable by this.
+    """
+
+    ConfigClass = DipoleFitPluginConfig
+    DipoleFitAlgorithmClass = DipoleFitAlgorithm  # Pointer to the class that performs the fit
+
+    FAILURE_EDGE = 1   # too close to the edge
+    FAILURE_FIT = 2    # failure in the fitting
+    FAILURE_NOT_DIPOLE = 4  # input source is not a putative dipole to begin with
+
+    @classmethod
+    def getExecutionOrder(cls):
+        """!Set execution order to FLUX_ORDER.
+
+        This includes algorithms that require both getShape() and getCentroid(),
+        in addition to a Footprint and its Peaks.
+        """
+        return cls.FLUX_ORDER
+
+    def __init__(self, config, name, schema, metadata):
+        measBase.SingleFramePlugin.__init__(self, config, name, schema, metadata)
+
+        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
+                              'lsst.ip.diffim.DipoleFitPlugin', pexLog.Log.INFO)
+
+        self._setupSchema(config, name, schema, metadata)
+
+    def _setupSchema(self, config, name, schema, metadata):
+        # Get a FunctorKey that can quickly look up the "blessed" centroid value.
+        self.centroidKey = afwTable.Point2DKey(schema["slot_Centroid"])
+
+        # Add some fields for our outputs, and save their Keys.
+        # Use setattr() to programmatically set the pos/neg named attributes to values, e.g.
+        # self.posCentroidKeyX = 'ip_diffim_DipoleFit_pos_centroid_x'
+
+        for pos_neg in ['pos', 'neg']:
+
+            key = schema.addField(
+                schema.join(name, pos_neg, "flux"), type=float, units="dn",
+                doc="Dipole {0} lobe flux".format(pos_neg))
+            setattr(self, ''.join((pos_neg, 'FluxKey')), key)
+
+            key = schema.addField(
+                schema.join(name, pos_neg, "fluxSigma"), type=float, units="pixels",
+                doc="1-sigma uncertainty for {0} dipole flux".format(pos_neg))
+            setattr(self, ''.join((pos_neg, 'FluxSigmaKey')), key)
+
+            for x_y in ['x', 'y']:
+                key = schema.addField(
+                    schema.join(name, pos_neg, "centroid", x_y), type=float, units="pixels",
+                    doc="Dipole {0} lobe centroid".format(pos_neg))
+                setattr(self, ''.join((pos_neg, 'CentroidKey', x_y.upper())), key)
+
+        for x_y in ['x', 'y']:
+            key = schema.addField(
+                schema.join(name, "centroid", x_y), type=float, units="pixels",
+                doc="Dipole centroid")
+            setattr(self, ''.join(('centroidKey', x_y.upper())), key)
+
+        self.fluxKey = schema.addField(
+            schema.join(name, "flux"), type=float, units="dn",
+            doc="Dipole overall flux")
+
+        self.orientationKey = schema.addField(
+            schema.join(name, "orientation"), type=float, units="deg",
+            doc="Dipole orientation")
+
+        self.separationKey = schema.addField(
+            schema.join(name, "separation"), type=float, units="pixels",
+            doc="Pixel separation between positive and negative lobes of dipole")
+
+        self.chi2dofKey = schema.addField(
+            schema.join(name, "chi2dof"), type=float,
+            doc="Chi2 per degree of freedom of dipole fit")
+
+        self.signalToNoiseKey = schema.addField(
+            schema.join(name, "signalToNoise"), type=float,
+            doc="Estimated signal-to-noise of dipole fit")
+
+        self.classificationFlagKey = schema.addField(
+            schema.join(name, "flag", "classification"), type="Flag",
+            doc="Flag indicating diaSource is classified as a dipole")
+
+        self.flagKey = schema.addField(
+            schema.join(name, "flag"), type="Flag",
+            doc="General failure flag for dipole fit")
+
+        self.edgeFlagKey = schema.addField(
+            schema.join(name, "flag", "edge"), type="Flag",
+            doc="Flag set when dipole is too close to edge of image")
+
+    def measure(self, measRecord, exposure, posExp=None, negExp=None):
+        """!Perform the non-linear least squares minimization on the putative dipole source.
+
+        @param measRecord   diaSources that will be measured using dipole measurement
+        @param exposure  Difference exposure on which the diaSources were detected; exposure = posExp - negExp
+        @param posExp    "Positive" exposure, typically a science exposure, or None if unavailable
+        @param negExp    "Negative" exposure, typically a template exposure, or None if unavailable
+        @param **kwds    Sent to SingleFrameMeasurementTask
+
+        @notes When posExp is None, will compute posImage = exposure + negExp.
+        Likewise, when negExp is None, will compute negImage = posExp - exposure.
+        If both posExp and negExp are none, will attempt to fit the dipole to just the exposure
+        with no constraint.
+
+        The main functionality of this routine was placed outside of
+        this plugin (into `DipoleFitAlgorithm.fitDipole()`) so that
+        `DipoleFitAlgorithm.fitDipole()` can be called separately for
+        testing (see `tests/testDipoleFitter.py`)
+        """
+
+        pks = measRecord.getFootprint().getPeaks()
+        if len(pks) <= 1:  # not a dipole for our analysis
+            self.fail(measRecord, measBase.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
+
+        result = None
+        try:
+            alg = self.DipoleFitAlgorithmClass(exposure, posImage=posExp, negImage=negExp)
+            result, _ = alg.fitDipole(
+                measRecord, rel_weight=self.config.relWeight,
+                tol=self.config.tolerance,
+                maxSepInSigma=self.config.maxSeparation,
+                fitBgGradient=self.config.fitBgGradient,
+                separateNegParams=self.config.fitSeparateNegParams,
+                verbose=False, display=False)
+        except pexExcept.LengthError:
+            self.fail(measRecord, measBase.MeasurementError('edge failure', self.FAILURE_EDGE))
+        except Exception:
+            self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
+
+        if result is None:
+            return result
+
+        self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
+
+        if result.psfFitPosFlux <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
+            self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
+
+        # add chi2, coord/flux uncertainties (TBD), dipole classification
+
+        # Add the relevant values to the measRecord
+        measRecord[self.posFluxKey] = result.psfFitPosFlux
+        measRecord[self.posFluxSigmaKey] = result.psfFitSignaltoNoise   # to be changed to actual sigma!
+        measRecord[self.posCentroidKeyX] = result.psfFitPosCentroidX
+        measRecord[self.posCentroidKeyY] = result.psfFitPosCentroidY
+
+        measRecord[self.negFluxKey] = result.psfFitNegFlux
+        measRecord[self.negFluxSigmaKey] = result.psfFitSignaltoNoise   # to be changed to actual sigma!
+        measRecord[self.negCentroidKeyX] = result.psfFitNegCentroidX
+        measRecord[self.negCentroidKeyY] = result.psfFitNegCentroidY
+
+        # Dia source flux: average of pos+neg
+        measRecord[self.fluxKey] = (abs(result.psfFitPosFlux) + abs(result.psfFitNegFlux))/2.
+        measRecord[self.orientationKey] = result.psfFitOrientation
+        measRecord[self.separationKey] = np.sqrt((result.psfFitPosCentroidX - result.psfFitNegCentroidX)**2. +
+                                                 (result.psfFitPosCentroidY - result.psfFitNegCentroidY)**2.)
+        measRecord[self.centroidKeyX] = (result.psfFitPosCentroidX + result.psfFitNegCentroidX)/2.
+        measRecord[self.centroidKeyY] = (result.psfFitPosCentroidY + result.psfFitNegCentroidY)/2.
+
+        measRecord[self.signalToNoiseKey] = result.psfFitSignaltoNoise
+        measRecord[self.chi2dofKey] = result.psfFitRedChi2
+
+        self.doClassify(measRecord, result)
+
+    def doClassify(self, measRecord, result):
+        """!Determine if source is classified as dipole.
+        """
+
+        # First, does the total signal-to-noise surpass the minSn?
+        passesSn = measRecord[self.signalToNoiseKey] > self.config.minSn
+
+        # Second, are the pos/neg fluxes greater than 1.0 and no more than 0.65 (param maxFluxRatio)
+        # of the total flux? By default this will never happen since posFlux = negFlux.
+        passesFluxPos = (abs(measRecord[self.posFluxKey]) /
+                         (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
+        passesFluxPos &= (abs(measRecord[self.posFluxKey]) >= 1.0)
+        passesFluxNeg = (abs(measRecord[self.negFluxKey]) /
+                         (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
+        passesFluxNeg &= (abs(measRecord[self.negFluxKey]) >= 1.0)
+        allPass = (passesSn and passesFluxPos and passesFluxNeg)  # and passesChi2)
+
+        # Third, is it a good fit (chi2dof < 1)?
+        # Use scipy's chi2 cumulative distrib to estimate significance
+        # This doesn't really work since I don't trust the values in the variance plane (which
+        #   affects the least-sq weights, which affects the resulting chi2).
+        # But I'm going to keep this here for future use.
+        if False:
+            from scipy.stats import chi2
+            ndof = result.psfFitChi2 / measRecord[self.chi2dofKey]
+            significance = chi2.cdf(result.psfFitChi2, ndof)
+            passesChi2 = significance < self.config.maxChi2DoF
+            allPass = allPass and passesChi2
+
+        if allPass:  # Note cannot pass `allPass` into the `measRecord.set()` call below...?
+            measRecord.set(self.classificationFlagKey, True)
+        else:
+            measRecord.set(self.classificationFlagKey, False)
+
+    def fail(self, measRecord, error=None):
+        """!Catch failures and set the correct flags.
+        """
+
+        measRecord.set(self.flagKey, True)
+        if error is not None:
+            if error.getFlagBit() == self.FAILURE_EDGE:
+                measRecord.set(self.edgeFlagKey, True)
+            if error.getFlagBit() == self.FAILURE_FIT:
+                measRecord.set(self.flagKey, True)
+            if error.getFlagBit() == self.FAILURE_NOT_DIPOLE:
+                measRecord.set(self.flagKey, True)

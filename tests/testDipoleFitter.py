@@ -110,7 +110,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         testImage = params.testImage
         for i, s in enumerate(catalog):
             alg = DipoleFitAlgorithm(testImage.diffim, testImage.posImage, testImage.negImage)
-            result = alg.fitDipole(
+            result, _ = alg.fitDipole(
                 s, rel_weight=0.5, separateNegParams=False,
                 verbose=params.verbose, display=params.display)
 
@@ -278,7 +278,8 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         """!Test the dipole fitting singleFramePlugin in the case where no
         pre-subtraction data (`posImage` or `negImage`) are provided.
         In this case it just fits a dipole model to the diffim
-        (dipole) image alone.
+        (dipole) image alone. Note that this test will only pass for
+        widely-separated dipoles.
 
         Test that the resulting fluxes/centroids are entered into the
         correct slots of the catalog, and have values that are very
