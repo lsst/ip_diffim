@@ -128,8 +128,8 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
 
 
 class DipoleModel(object):
-    """!Lightweight class containing methods for generating dipole models in
-    diffims, used by DipoleFitAlgorithm. 
+    """!Lightweight class containing methods for generating a dipole model for fitting
+    to sources in diffims, used by DipoleFitAlgorithm.
 
     This code is documented in DMTN-007.
     """
@@ -149,7 +149,7 @@ class DipoleModel(object):
         @param pars Up to 6 floats for up
         to 6 2nd-order 2-d polynomial gradient parameters, in the
         following order: (intercept, x, y, xy, x**2, y**2). If `pars`
-        is emtpy or None, do nothing (for speed).
+        is emtpy or None, do nothing and return None (for speed).
 
         @return None, or 2-d numpy.array of width/height matching
         input bbox, containing computed gradient values.
@@ -416,8 +416,8 @@ class DipoleFitAlgorithm(object):
         self.psfSigma = None
         if diffim is not None:
             self.psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
-        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
-                              'lsst.ip.diffim.DipoleFitAlgorithm', pexLog.Log.INFO)
+
+        self.log = pexLog.Log(pexLog.Log.getDefaultLog(), __name__, pexLog.Log.INFO)
 
         import lsstDebug
         self.debug = lsstDebug.Info(__name__).debug
@@ -727,8 +727,7 @@ class DipoleFitAlgorithm(object):
         try:
             import matplotlib.pyplot as plt
         except ImportError as err:
-            log = pexLog.Log(pexLog.getDefaultLog(),
-                             'lsst.ip.diffim.utils', pexLog.INFO)
+            log = pexLog.Log(pexLog.getDefaultLog(), __name__, pexLog.INFO)
             log.warn('Unable to import matplotlib: %s' % err)
             raise err
 
@@ -778,7 +777,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
     class DipoleFitAlgorithm.
 
     The motivation behind this plugin and the necessity for including more than
-    one exposure are documented in DMTN-007 (http://dmtn-007.readthedocs.org).
+    one exposure are documented in DMTN-007 (http://dmtn-007.lsst.io).
 
     This class is named ip_diffim_DipoleFit so that it may be used alongside
     the existing ip_diffim_DipoleMeasurement classes until such a time as those
@@ -804,8 +803,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
     def __init__(self, config, name, schema, metadata):
         measBase.SingleFramePlugin.__init__(self, config, name, schema, metadata)
 
-        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
-                              'lsst.ip.diffim.DipoleFitPlugin', pexLog.Log.INFO)
+        self.log = pexLog.Log(pexLog.Log.getDefaultLog(), name, pexLog.Log.INFO)
 
         self._setupSchema(config, name, schema, metadata)
 
@@ -986,9 +984,12 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         measRecord.set(self.flagKey, True)
         if error is not None:
+            self.log.warn('DipoleFitPlugin failed on record %d: %s' % (measRecord.getId(), str(error)))
             if error.getFlagBit() == self.FAILURE_EDGE:
                 measRecord.set(self.edgeFlagKey, True)
             if error.getFlagBit() == self.FAILURE_FIT:
                 measRecord.set(self.flagKey, True)
             if error.getFlagBit() == self.FAILURE_NOT_DIPOLE:
                 measRecord.set(self.flagKey, True)
+        else:
+            self.log.warn('DipoleFitPlugin failed on record %d' % measRecord.getId())
