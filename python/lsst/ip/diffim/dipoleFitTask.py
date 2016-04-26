@@ -126,59 +126,18 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
             self.dipoleFitter.measure(source, exposure, posExp, negExp)
 
 
-class DipoleFitAlgorithm(object):
-    """!Lightweight class containing methods for fitting dipoles in
-    diffims, used by DipoleFitPlugin.  This code is documented in
-    DMTN-007.
+class DipoleModel(object):
+    """!Lightweight class containing methods for generating dipole models in
+    diffims, used by DipoleFitAlgorithm. 
 
-    Below is a (somewhat incomplete) list of improvements
-    that would be worth investigating, given the time:
-
-    1. evaluate necessity for separate parameters for pos- and neg- images
-    2. only fit background OUTSIDE footprint (DONE) and dipole params INSIDE footprint (NOT DONE)?
-    3. correct normalization of least-squares weights based on variance planes
-    4. account for PSFs that vary across the exposures (should be happening by default?)
-    5. correctly account for NA/masks  (i.e., ignore!)
-    6. better exception handling in the plugin
-    7. better classification of dipoles (e.g. by comparing chi2 fit vs. monopole?)
-    8. (DONE) Initial fast estimate of background gradient(s) params -- perhaps using numpy.lstsq
-    9. (NOT NEEDED - see (1)) Initial fast test whether a background gradient needs to be fit
-    10. (DONE) better initial estimate for flux when there's a strong gradient
-    11. (DONE) requires a new package `lmfit` -- investiate others? (astropy/scipy/iminuit?)
+    This code is documented in DMTN-007.
     """
 
-    # This is just a private version number to sync with the ipython notebooks that I have been
-    # using for algorithm development.
-    _private_version_ = '0.0.4'
-
-    # Create a namedtuple to hold all of the relevant output from the lmfit results
-    resultsOutput = namedtuple('resultsOutput',
-                               ['psfFitPosCentroidX', 'psfFitPosCentroidY',
-                                'psfFitNegCentroidX', 'psfFitNegCentroidY', 'psfFitPosFlux',
-                                'psfFitNegFlux', 'psfFitPosFluxSigma', 'psfFitNegFluxSigma',
-                                'psfFitCentroidX', 'psfFitCentroidY', 'psfFitOrientation',
-                                'psfFitSignaltoNoise', 'psfFitChi2', 'psfFitRedChi2'])
-
-    def __init__(self, diffim, posImage=None, negImage=None):
-        """!Algorithm to run dipole measurement on a diaSource
-        @param diffim Exposure on which the diaSources were detected
-        @param posImage "Positive" exposure from which the template was subtracted
-        @param negImage "Negative" exposure which was subtracted from the posImage
-        """
-
-        self.diffim = diffim
-        self.posImage = posImage
-        self.negImage = negImage
-        self.psfSigma = None
-        if diffim is not None:
-            self.psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
-        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
-                              'lsst.ip.diffim.DipoleFitAlgorithm', pexLog.Log.INFO)
-
+    def __init__(self):
         import lsstDebug
         self.debug = lsstDebug.Info(__name__).debug
 
-    def genBackgroundModel(self, in_x, pars=None):
+    def makeBackgroundModel(self, in_x, pars=None):
         """!Generate gradient model (2-d array) with up to 2nd-order polynomial
 
         @param in_x (2, w, h)-dimensional numpy array, containing the
@@ -296,7 +255,7 @@ class DipoleFitAlgorithm(object):
         pars = np.linalg.lstsq(M, B)[0]
         return pars
 
-    def genStarModel(self, bbox, psf, xcen, ycen, flux):
+    def makeStarModel(self, bbox, psf, xcen, ycen, flux):
         """!Generate model (2-d Image) of a 'star' (single PSF) centered at given coordinates
 
         @param bbox Bounding box marking pixel coordinates for generated model
@@ -330,33 +289,33 @@ class DipoleFitAlgorithm(object):
         return p_Im
 
     @staticmethod
-    def genDipoleModel(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
-                       b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
-                       bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
-                       **kwargs):
+    def makeModel(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
+                  b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
+                  bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
+                  **kwargs):
         """!Generate dipole model with given parameters.
 
         This is the functor whose sum-of-squared difference from data
         is minimized by `lmfit`. Thus it must be static. However, it
-        just defers to `self.genDipoleModelImpl()`, where `self` comes
-        out of kwargs['algObject'].
+        just defers to `self.makeModelImpl()`, where `self` comes
+        out of kwargs['modelObj'].
 
-        @see genDipoleModelImpl
+        @see makeModelImpl
         """
-        algObject = kwargs.pop('algObject')
-        return algObject.genDipoleModelImpl(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=fluxNeg,
-                                            b=b, x1=x1, y1=y1, xy=xy, x2=x2, y2=y2,
-                                            bNeg=bNeg, x1Neg=x1Neg, y1Neg=y1Neg, xyNeg=xyNeg,
-                                            x2Neg=x2Neg, y2Neg=y2Neg, **kwargs)
+        modelObj = kwargs.pop('modelObj')
+        return modelObj.makeModelImpl(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=fluxNeg,
+                                      b=b, x1=x1, y1=y1, xy=xy, x2=x2, y2=y2,
+                                      bNeg=bNeg, x1Neg=x1Neg, y1Neg=y1Neg, xyNeg=xyNeg,
+                                      x2Neg=x2Neg, y2Neg=y2Neg, **kwargs)
 
-    def genDipoleModelImpl(self, x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
-                           b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
-                           bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
-                           **kwargs):
+    def makeModelImpl(self, x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
+                      b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
+                      bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
+                      **kwargs):
+        """!Generate dipole model with given parameters.
 
-        """!Generate dipole model with given parameters. This is the functor
-        whose sum-of-squared difference from data is minimized by
-        `lmfit`.
+        This is the function whose sum-of-squared difference from data
+        is minimized by `lmfit`.
 
         @param x Input independent variable. Used here as the grid on
         which to compute the background gradient model.
@@ -367,9 +326,9 @@ class DipoleFitAlgorithm(object):
         @param ycenNeg Desired y-centroid of the negative lobe of the dipole
         @param fluxNeg Desired flux of the negative lobe of the dipole, set to 'flux' if None
         @param b, x1, y1, xy, x2, y2 Gradient parameters for positive lobe.
-        @see `genBackgroundModel`.
+        @see `makeBackgroundModel`.
         @param bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg Gradient
-        parameters for negative lobe.  @see `genBackgroundModel`. Set
+        parameters for negative lobe. @see `makeBackgroundModel`. Set
         to the corresponding positive values if None.
 
         @param **kwargs Keyword arguments passed through `lmfit` and
@@ -403,8 +362,8 @@ class DipoleFitAlgorithm(object):
             if xy is not None:
                 self.log.log(self.log.DEBUG, '     %.2f %.2f %.2f' % (xy, x2, y2))
 
-        posIm = self.genStarModel(bbox, psf, xcenPos, ycenPos, flux)
-        negIm = self.genStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
+        posIm = self.makeStarModel(bbox, psf, xcenPos, ycenPos, flux)
+        negIm = self.makeStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
 
         in_x = x
         if in_x is None:  # use the footprint to generate the input grid
@@ -414,11 +373,11 @@ class DipoleFitAlgorithm(object):
             in_x[1, :] -= in_x[1, :].mean()
 
         if b is not None:
-            gradient = self.genBackgroundModel(in_x, (b, x1, y1, xy, x2, y2))
+            gradient = self.makeBackgroundModel(in_x, (b, x1, y1, xy, x2, y2))
 
             # If bNeg is None, then don't fit the negative background separately
             if bNeg is not None:
-                gradientNeg = self.genBackgroundModel(in_x, (bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg))
+                gradientNeg = self.makeBackgroundModel(in_x, (bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg))
             else:
                 gradientNeg = gradient
 
@@ -435,6 +394,60 @@ class DipoleFitAlgorithm(object):
             zout = np.append([zout], [posIm.getArray(), negIm.getArray()], axis=0)
 
         return zout
+
+
+class DipoleFitAlgorithm(object):
+    """!Lightweight class containing methods for fitting a dipole model in
+    a diffim, used by DipoleFitPlugin.
+
+    This code is documented in DMTN-007.
+
+    Below is a (somewhat incomplete) list of improvements
+    that would be worth investigating, given the time:
+
+    @todo evaluate necessity for separate parameters for pos- and neg- images
+    @todo only fit background OUTSIDE footprint (DONE) and dipole params INSIDE footprint (NOT DONE)?
+    @todo correct normalization of least-squares weights based on variance planes
+    @todo account for PSFs that vary across the exposures (should be happening by default?)
+    @todo correctly account for NA/masks  (i.e., ignore!)
+    @todo better exception handling in the plugin
+    @todo better classification of dipoles (e.g. by comparing chi2 fit vs. monopole?)
+    @todo (DONE) Initial fast estimate of background gradient(s) params -- perhaps using numpy.lstsq
+    @todo (NOT NEEDED - see (1)) Initial fast test whether a background gradient needs to be fit
+    @todo (DONE) better initial estimate for flux when there's a strong gradient
+    @todo (DONE) requires a new package `lmfit` -- investiate others? (astropy/scipy/iminuit?)
+    """
+
+    # This is just a private version number to sync with the ipython notebooks that I have been
+    # using for algorithm development.
+    _private_version_ = '0.0.5'
+
+    # Create a namedtuple to hold all of the relevant output from the lmfit results
+    resultsOutput = namedtuple('resultsOutput',
+                               ['psfFitPosCentroidX', 'psfFitPosCentroidY',
+                                'psfFitNegCentroidX', 'psfFitNegCentroidY', 'psfFitPosFlux',
+                                'psfFitNegFlux', 'psfFitPosFluxSigma', 'psfFitNegFluxSigma',
+                                'psfFitCentroidX', 'psfFitCentroidY', 'psfFitOrientation',
+                                'psfFitSignaltoNoise', 'psfFitChi2', 'psfFitRedChi2'])
+
+    def __init__(self, diffim, posImage=None, negImage=None):
+        """!Algorithm to run dipole measurement on a diaSource
+        @param diffim Exposure on which the diaSources were detected
+        @param posImage "Positive" exposure from which the template was subtracted
+        @param negImage "Negative" exposure which was subtracted from the posImage
+        """
+
+        self.diffim = diffim
+        self.posImage = posImage
+        self.negImage = negImage
+        self.psfSigma = None
+        if diffim is not None:
+            self.psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
+        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
+                              'lsst.ip.diffim.DipoleFitAlgorithm', pexLog.Log.INFO)
+
+        import lsstDebug
+        self.debug = lsstDebug.Info(__name__).debug
 
     def fitDipoleImpl(self, source, tol=1e-7, rel_weight=0.5,
                       fitBgGradient=True, bgGradientOrder=1, maxSepInSigma=5.,
@@ -480,7 +493,8 @@ class DipoleFitAlgorithm(object):
             rel_weight = 0.  # a short-cut for "don't include the pre-subtraction data"
 
         # Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
-        gmod = lmfit.Model(DipoleFitAlgorithm.genDipoleModel, verbose=verbose)
+        dipoleModel = DipoleModel()
+        gmod = lmfit.Model(dipoleModel.makeModelImpl, verbose=verbose)
 
         # Add the constraints for centroids, fluxes.
         # starting constraint - near centroid of footprint
@@ -537,18 +551,19 @@ class DipoleFitAlgorithm(object):
             pbg = 0.
             bgFitImage = self.posImage if self.posImage is not None else self.negImage
             # Fit the gradient to the background (linear model)
-            bgParsPos = bgParsNeg = self.fitFootprintBackground(source, bgFitImage, order=bgGradientOrder)
+            bgParsPos = bgParsNeg = dipoleModel.fitFootprintBackground(source, bgFitImage,
+                                                                       order=bgGradientOrder)
             # Generate the gradient and subtract it from the pre-subtraction image data
-            in_x = self._generateXYGrid(bbox)
-            pbg = self.genBackgroundModel(in_x, tuple(bgParsPos))
+            in_x = dipoleModel._generateXYGrid(bbox)
+            pbg = dipoleModel.makeBackgroundModel(in_x, tuple(bgParsPos))
             z[1, :] -= pbg
             z[1, :] -= np.nanmedian(z[1, :])
             posFlux = np.nansum(z[1, :])
             gmod.set_param_hint('flux', value=posFlux*1.5, min=0.1)
 
             if separateNegParams and self.negImage is not None:
-                bgParsNeg = self.fitFootprintBackground(source, self.negImage, order=bgGradientOrder)
-                pbg = self.genBackgroundModel(in_x, tuple(bgParsNeg))
+                bgParsNeg = dipoleModel.fitFootprintBackground(source, self.negImage, order=bgGradientOrder)
+                pbg = dipoleModel.makeBackgroundModel(in_x, tuple(bgParsNeg))
             z[2, :] -= pbg
             z[2, :] -= np.nanmedian(z[2, :])
             if separateNegParams:
@@ -605,7 +620,7 @@ class DipoleFitAlgorithm(object):
                           psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to genDipoleModel()
                           rel_weight=rel_weight,
                           footprint=fp,
-                          algObject=self)
+                          modelObj=dipoleModel)
 
         if verbose:  # the ci_report() seems to fail if neg params are constrained -- TBD why.
             # Never wanted in production - this takes a long time (longer than the fit!)
@@ -659,13 +674,11 @@ class DipoleFitAlgorithm(object):
             self.displayFitResults(fp, fitResult)
 
         fitParams = fitResult.best_values
-        if fitParams['flux'] <= 1.:   # usually around 0.1 -- the minimun flux allowed -- i.e. bad fit.
+        if fitParams['flux'] <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
             out = DipoleFitAlgorithm.resultsOutput(
                 np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
                 np.nan, np.nan, np.nan)
-            if return_fitObj:  # for debugging
-                return out, fitResult
-            return out
+            return out, fitResult
 
         centroid = ((fitParams['xcenPos'] + fitParams['xcenNeg']) / 2.,
                     (fitParams['ycenPos'] + fitParams['ycenNeg']) / 2.)
