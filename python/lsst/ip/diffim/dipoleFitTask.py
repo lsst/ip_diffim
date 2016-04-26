@@ -289,30 +289,10 @@ class DipoleModel(object):
 
         return p_Im
 
-    @staticmethod
-    def makeModel(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
+    def makeModel(self, x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
                   b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
                   bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
                   **kwargs):
-        """!Generate dipole model with given parameters.
-
-        This is the functor whose sum-of-squared difference from data
-        is minimized by `lmfit`. Thus it must be static. However, it
-        just defers to `self.makeModelImpl()`, where `self` comes
-        out of kwargs['modelObj'].
-
-        @see makeModelImpl
-        """
-        modelObj = kwargs.pop('modelObj')
-        return modelObj.makeModelImpl(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=fluxNeg,
-                                      b=b, x1=x1, y1=y1, xy=xy, x2=x2, y2=y2,
-                                      bNeg=bNeg, x1Neg=x1Neg, y1Neg=y1Neg, xyNeg=xyNeg,
-                                      x2Neg=x2Neg, y2Neg=y2Neg, **kwargs)
-
-    def makeModelImpl(self, x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
-                      b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
-                      bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
-                      **kwargs):
         """!Generate dipole model with given parameters.
 
         This is the function whose sum-of-squared difference from data
@@ -485,9 +465,33 @@ class DipoleFitAlgorithm(object):
         else:
             rel_weight = 0.  # a short-cut for "don't include the pre-subtraction data"
 
-        # Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
+        # It seems that `lmfit` requires a static functor as its optimized method, which eliminates
+        # the ability to pass a bound method or other class method. Here we write a wrapper which
+        # makes this possible.
+        def dipoleModelFunctor(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=None,
+                               b=None, x1=None, y1=None, xy=None, x2=None, y2=None,
+                               bNeg=None, x1Neg=None, y1Neg=None, xyNeg=None, x2Neg=None, y2Neg=None,
+                               **kwargs):
+            """!Generate dipole model with given parameters.
+
+            It simply defers to `modelObj.makeModel()`, where `modelObj` comes
+            out of `kwargs['modelObj']`.
+
+            @see DipoleModel.makeModel
+            """
+            modelObj = kwargs.pop('modelObj')
+            return modelObj.makeModel(x, flux, xcenPos, ycenPos, xcenNeg, ycenNeg, fluxNeg=fluxNeg,
+                                      b=b, x1=x1, y1=y1, xy=xy, x2=x2, y2=y2,
+                                      bNeg=bNeg, x1Neg=x1Neg, y1Neg=y1Neg, xyNeg=xyNeg,
+                                      x2Neg=x2Neg, y2Neg=y2Neg, **kwargs)
+
         dipoleModel = DipoleModel()
-        gmod = lmfit.Model(DipoleModel.makeModel, verbose=verbose)
+
+        modelFunctor = dipoleModelFunctor  # dipoleModel.makeModel does not work for now.
+        # Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
+        # Note we can also tell it to drop missing values from the data.
+        gmod = lmfit.Model(modelFunctor, verbose=verbose, missing='drop')
+        # independent_vars=independent_vars) #, param_names=param_names)
 
         # Add the constraints for centroids, fluxes.
         # starting constraint - near centroid of footprint
