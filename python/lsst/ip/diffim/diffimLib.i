@@ -93,10 +93,7 @@ namespace boost {
 
 %include "lsst/daf/base/persistenceMacros.i"
 %include "lsst/pex/config.h"            // LSST_CONTROL_FIELD.
-%include "lsst/meas/base/constants.h"
-%include "lsst/meas/base/exceptions.i"
-%include "lsst/meas/base/utilities.i"
-%include "lsst/meas/base/Algorithm.h"
+%import "lsst/meas/base/baseLib.i"
 
 %import  "lsst/afw/image/imageLib.i"
 %import  "lsst/afw/math/mathLib.i"
