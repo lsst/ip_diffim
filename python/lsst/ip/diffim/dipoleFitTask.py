@@ -33,6 +33,7 @@ import lsst.afw.detection as afwDet
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
+from lsst.pipe.base import Struct
 
 __all__ = ("DipoleFitPluginConfig", "DipoleFitTask", "DipoleFitPlugin")
 
@@ -422,14 +423,6 @@ class DipoleFitAlgorithm(object):
     # using for algorithm development.
     _private_version_ = '0.0.5'
 
-    # Create a namedtuple to hold all of the relevant output from the lmfit results
-    resultsOutput = namedtuple('resultsOutput',
-                               ['psfFitPosCentroidX', 'psfFitPosCentroidY',
-                                'psfFitNegCentroidX', 'psfFitNegCentroidY', 'psfFitPosFlux',
-                                'psfFitNegFlux', 'psfFitPosFluxSigma', 'psfFitNegFluxSigma',
-                                'psfFitCentroidX', 'psfFitCentroidY', 'psfFitOrientation',
-                                'psfFitSignaltoNoise', 'psfFitChi2', 'psfFitRedChi2'])
-
     def __init__(self, diffim, posImage=None, negImage=None):
         """!Algorithm to run dipole measurement on a diaSource
         @param diffim Exposure on which the diaSources were detected
@@ -494,7 +487,7 @@ class DipoleFitAlgorithm(object):
 
         # Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
         dipoleModel = DipoleModel()
-        gmod = lmfit.Model(dipoleModel.makeModelImpl, verbose=verbose)
+        gmod = lmfit.Model(DipoleModel.makeModel, verbose=verbose)
 
         # Add the constraints for centroids, fluxes.
         # starting constraint - near centroid of footprint
@@ -640,7 +633,7 @@ class DipoleFitAlgorithm(object):
         model to an input difference image (actually, subimage bounded
         by the input source's footprint) and optionally constrain the
         fit using the pre-subtraction images self.posImage (science) and
-        self.negImage (template). Wraps the output into a `resultsOutput`
+        self.negImage (template). Wraps the output into a `pipeBase.Struct`
         named tuple after computing additional statistics such as
         orientation and SNR.
 
@@ -659,7 +652,7 @@ class DipoleFitAlgorithm(object):
         @param verbose Be verbose
         @param display Display input data, best fit model(s) and residuals in a matplotlib window.
 
-        @return resultsOutput object containing the fit parameters and other information.
+        @return pipeBase.Struct object containing the fit parameters and other information.
         @return `lmfit.MinimizerResult` object for debugging and error estimation, etc.
         """
 
@@ -675,9 +668,11 @@ class DipoleFitAlgorithm(object):
 
         fitParams = fitResult.best_values
         if fitParams['flux'] <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
-            out = DipoleFitAlgorithm.resultsOutput(
-                np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
-                np.nan, np.nan, np.nan)
+            out = Struct(posCentroidX=np.nan, posCentroidY=np.nan,
+                         negCentroidX=np.nan, negCentroidY=np.nan,
+                         posFlux=np.nan, negFlux=np.nan, posFluxSigma=np.nan, negFluxSigma=np.nan,
+                         centroidX=np.nan, centroidY=np.nan, orientation=np.nan,
+                         signalToNoise=np.nan, chi2=np.nan, redChi2=np.nan)
             return out, fitResult
 
         centroid = ((fitParams['xcenPos'] + fitParams['xcenNeg']) / 2.,
@@ -711,10 +706,11 @@ class DipoleFitAlgorithm(object):
         except:  # catch divide by zero - should never happen.
             signalToNoise = np.nan
 
-        out = DipoleFitAlgorithm.resultsOutput(
-            fitParams['xcenPos'], fitParams['ycenPos'], fitParams['xcenNeg'], fitParams['ycenNeg'],
-            fluxVal, -fluxValNeg, fluxErr, fluxErrNeg, centroid[0], centroid[1], angle,
-            signalToNoise, fitResult.chisqr, fitResult.redchi)
+        out = Struct(posCentroidX=fitParams['xcenPos'], posCentroidY=fitParams['ycenPos'],
+                     negCentroidX=fitParams['xcenNeg'], negCentroidY=fitParams['ycenNeg'],
+                     posFlux=fluxVal, negFlux=-fluxValNeg, posFluxSigma=fluxErr, negFluxSigma=fluxErrNeg,
+                     centroidX=centroid[0], centroidY=centroid[1], orientation=angle,
+                     signalToNoise=signalToNoise, chi2=fitResult.chisqr, redChi2=fitResult.redchi)
 
         # fitResult may be returned for debugging
         return out, fitResult
@@ -917,36 +913,36 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
 
-        if result.psfFitPosFlux <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
+        if result.posFlux <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
             self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
 
         # add chi2, coord/flux uncertainties (TBD), dipole classification
 
         # Add the relevant values to the measRecord
-        measRecord[self.posFluxKey] = result.psfFitPosFlux
-        measRecord[self.posFluxSigmaKey] = result.psfFitSignaltoNoise   # to be changed to actual sigma!
-        measRecord[self.posCentroidKeyX] = result.psfFitPosCentroidX
-        measRecord[self.posCentroidKeyY] = result.psfFitPosCentroidY
+        measRecord[self.posFluxKey] = result.posFlux
+        measRecord[self.posFluxSigmaKey] = result.signalToNoise   # to be changed to actual sigma!
+        measRecord[self.posCentroidKeyX] = result.posCentroidX
+        measRecord[self.posCentroidKeyY] = result.posCentroidY
 
-        measRecord[self.negFluxKey] = result.psfFitNegFlux
-        measRecord[self.negFluxSigmaKey] = result.psfFitSignaltoNoise   # to be changed to actual sigma!
-        measRecord[self.negCentroidKeyX] = result.psfFitNegCentroidX
-        measRecord[self.negCentroidKeyY] = result.psfFitNegCentroidY
+        measRecord[self.negFluxKey] = result.negFlux
+        measRecord[self.negFluxSigmaKey] = result.signalToNoise   # to be changed to actual sigma!
+        measRecord[self.negCentroidKeyX] = result.negCentroidX
+        measRecord[self.negCentroidKeyY] = result.negCentroidY
 
         # Dia source flux: average of pos+neg
-        measRecord[self.fluxKey] = (abs(result.psfFitPosFlux) + abs(result.psfFitNegFlux))/2.
-        measRecord[self.orientationKey] = result.psfFitOrientation
-        measRecord[self.separationKey] = np.sqrt((result.psfFitPosCentroidX - result.psfFitNegCentroidX)**2. +
-                                                 (result.psfFitPosCentroidY - result.psfFitNegCentroidY)**2.)
-        measRecord[self.centroidKeyX] = (result.psfFitPosCentroidX + result.psfFitNegCentroidX)/2.
-        measRecord[self.centroidKeyY] = (result.psfFitPosCentroidY + result.psfFitNegCentroidY)/2.
+        measRecord[self.fluxKey] = (abs(result.posFlux) + abs(result.negFlux))/2.
+        measRecord[self.orientationKey] = result.orientation
+        measRecord[self.separationKey] = np.sqrt((result.posCentroidX - result.negCentroidX)**2. +
+                                                 (result.posCentroidY - result.negCentroidY)**2.)
+        measRecord[self.centroidKeyX] = result.centroidX
+        measRecord[self.centroidKeyY] = result.centroidY
 
-        measRecord[self.signalToNoiseKey] = result.psfFitSignaltoNoise
-        measRecord[self.chi2dofKey] = result.psfFitRedChi2
+        measRecord[self.signalToNoiseKey] = result.signalToNoise
+        measRecord[self.chi2dofKey] = result.redChi2
 
-        self.doClassify(measRecord, result)
+        self.doClassify(measRecord, result.chi2)
 
-    def doClassify(self, measRecord, result):
+    def doClassify(self, measRecord, chi2val):
         """!Determine if source is classified as dipole.
         """
 
@@ -970,8 +966,8 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         # But I'm going to keep this here for future use.
         if False:
             from scipy.stats import chi2
-            ndof = result.psfFitChi2 / measRecord[self.chi2dofKey]
-            significance = chi2.cdf(result.psfFitChi2, ndof)
+            ndof = chi2val / measRecord[self.chi2dofKey]
+            significance = chi2.cdf(chi2val, ndof)
             passesChi2 = significance < self.config.maxChi2DoF
             allPass = allPass and passesChi2
 

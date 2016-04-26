@@ -118,12 +118,12 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
                 s, rel_weight=0.5, separateNegParams=False,
                 verbose=params.verbose, display=params.display)
 
-            self.assertClose((result.psfFitPosFlux + abs(result.psfFitNegFlux))/2.,
+            self.assertClose((result.posFlux + abs(result.negFlux))/2.,
                              params.flux[i], rtol=rtol)
-            self.assertClose(result.psfFitPosCentroidX, params.xc[i] + offsets[i], rtol=rtol)
-            self.assertClose(result.psfFitPosCentroidY, params.yc[i] + offsets[i], rtol=rtol)
-            self.assertClose(result.psfFitNegCentroidX, params.xc[i] - offsets[i], rtol=rtol)
-            self.assertClose(result.psfFitNegCentroidY, params.yc[i] - offsets[i], rtol=rtol)
+            self.assertClose(result.posCentroidX, params.xc[i] + offsets[i], rtol=rtol)
+            self.assertClose(result.posCentroidY, params.yc[i] + offsets[i], rtol=rtol)
+            self.assertClose(result.negCentroidX, params.xc[i] - offsets[i], rtol=rtol)
+            self.assertClose(result.negCentroidY, params.yc[i] - offsets[i], rtol=rtol)
 
     def _runDetection(self, params):
         """!Run 'diaSource' detection on the diffim, including merging of
