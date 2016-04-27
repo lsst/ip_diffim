@@ -734,11 +734,11 @@ def plotWhisker(results, newWcs):
 
 
 class DipoleTestImage(object):
-    """Utility class for dipole measurement testing
+    """!Utility class for dipole measurement testing
 
     Generate an image with simulated dipoles and noise; store the original "pre-subtraction" images
     and catalogs as well.
-    Used to generate test data for DMTN-007.
+    Used to generate test data for DMTN-007 (http://dmtn-007.lsst.io).
     """
 
     def __init__(self, w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
@@ -759,7 +759,7 @@ class DipoleTestImage(object):
         self._makeDipoleImage()
 
     def _makeDipoleImage(self):
-        """Generate an exposure and catalog with the given dipole source(s)"""
+        """!Generate an exposure and catalog with the given dipole source(s)"""
 
         posImage, posCatalog = self._makeStarImage(
             xc=self.xcenPos, yc=self.ycenPos, flux=self.flux)
@@ -784,7 +784,7 @@ class DipoleTestImage(object):
             = dipole, posImage, posCatalog, negImage, negCatalog
 
     def _makeStarImage(self, xc=[15.3], yc=[18.6], flux=[2500], schema=None):
-        """Generate an exposure and catalog with the given stellar source(s)"""
+        """!Generate an exposure and catalog with the given stellar source(s)"""
 
         from lsst.meas.base.tests import TestDataset
         bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(self.w-1, self.h-1))
@@ -814,12 +814,11 @@ class DipoleTestImage(object):
         return fitResult
 
     def detectDipoleSources(self, doMerge=True, diffim=None, detectSigma=5.5, grow=3):
-        """Utility function for detecting dipoles.
+        """!Utility function for detecting dipoles.
 
         Detect pos/neg sources in the diffim, then merge them. A
         bigger "grow" parameter leads to a larger footprint which
         helps with dipole measurement for faint dipoles.
-
         """
 
         if diffim is None:

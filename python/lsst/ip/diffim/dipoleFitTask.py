@@ -117,9 +117,9 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
         @param negExp    "Negative" exposure, typically a template exposure, or None if unavailable
         @param **kwds    Sent to SingleFrameMeasurementTask
 
-        @notes When posExp is None, will compute posImage = exposure + negExp.
-        Likewise, when negExp is None, will compute negImage = posExp - exposure.
-        If both posExp and negExp are none, will attempt to fit the dipole to just the exposure
+        @note When `posExp` is `None`, will compute `posImage = exposure + negExp`.
+        Likewise, when `negExp` is `None`, will compute `negImage = posExp - exposure`.
+        If both `posExp` and `negExp` are `None`, will attempt to fit the dipole to just the `exposure`
         with no constraint.
         """
 
@@ -136,7 +136,7 @@ class DipoleModel(object):
     """!Lightweight class containing methods for generating a dipole model for fitting
     to sources in diffims, used by DipoleFitAlgorithm.
 
-    This code is documented in DMTN-007.
+    This code is documented in DMTN-007 (http://dmtn-007.lsst.io).
     """
 
     def __init__(self):
@@ -146,7 +146,7 @@ class DipoleModel(object):
     def makeBackgroundModel(self, in_x, pars=None):
         """!Generate gradient model (2-d array) with up to 2nd-order polynomial
 
-        @param in_x (2, w, h)-dimensional numpy array, containing the
+        @param in_x (2, w, h)-dimensional `numpy.array`, containing the
         input x,y meshgrid providing the coordinates upon which to
         compute the gradient. This will typically be generated via
         `_generateXYGrid()`. `w` and `h` correspond to the width and
@@ -154,7 +154,7 @@ class DipoleModel(object):
         @param pars Up to 6 floats for up
         to 6 2nd-order 2-d polynomial gradient parameters, in the
         following order: (intercept, x, y, xy, x**2, y**2). If `pars`
-        is emtpy or None, do nothing and return None (for speed).
+        is emtpy or `None`, do nothing and return `None` (for speed).
 
         @return None, or 2-d numpy.array of width/height matching
         input bbox, containing computed gradient values.
@@ -185,6 +185,8 @@ class DipoleModel(object):
         @param bbox input BoundingBox defining the coordinate limits
         @return in_x (2, w, h)-dimensional numpy array containing the grid indexing over x- and
         y- coordinates
+
+        @see makeBackgroundModel
         """
 
         x, y = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
@@ -194,13 +196,13 @@ class DipoleModel(object):
         return in_x
 
     def _getHeavyFootprintSubimage(self, fp, badfill=np.nan, grow=0):
-        """!Extract the image from a HeavyFootprint as an ImageF.
+        """!Extract the image from a `HeavyFootprint` as an `afwImage.ImageF`.
 
         @param fp HeavyFootprint to use to generate the subimage
         @param badfill Value to fill in pixels in extracted image that are outside the footprint
         @param grow Optionally grow the footprint by this amount before extraction
 
-        @return an afw.image.ImageF containing the subimage
+        @return an `afwImage.ImageF` containing the subimage
         """
         hfp = afwDet.HeavyFootprintF_cast(fp)
         bbox = hfp.getBBox()
@@ -215,15 +217,16 @@ class DipoleModel(object):
         """!Fit a linear (polynomial) model of given order (max 2) to the background of a footprint.
 
         Only fit the pixels OUTSIDE of the footprint, but within its bounding box.
-        TBD: look into whether afw_math background stuff -- see
-        http://lsst-web.ncsa.illinois.edu/doxygen/x_masterDoxyDoc/_background_example.html
 
         @param source SourceRecord, the footprint of which is to be fit
         @param posImage The exposure from which to extract the footprint subimage
         @param order Polynomial order of background gradient to fit.
 
-        @return pars tuple of length (1 if order==0; 3 if order==1; 6 if order == 2),
+        @return pars `tuple` of length (1 if order==0; 3 if order==1; 6 if order == 2),
         containing the resulting fit parameters
+
+        @todo look into whether to use afwMath background methods -- see
+        http://lsst-web.ncsa.illinois.edu/doxygen/x_masterDoxyDoc/_background_example.html
         """
 
         fp = source.getFootprint()
@@ -270,7 +273,7 @@ class DipoleModel(object):
         @param ycen Desired y-centroid of the 'star'
         @param flux Desired flux of the 'star'
 
-        @return 2-d Image of width/height matching input bbox,
+        @return 2-d stellar `afwImage.Image` of width/height matching input `bbox`,
         containing PSF with given centroid and flux
         """
 
@@ -312,21 +315,21 @@ class DipoleModel(object):
         @param ycenNeg Desired y-centroid of the negative lobe of the dipole
         @param fluxNeg Desired flux of the negative lobe of the dipole, set to 'flux' if None
         @param b, x1, y1, xy, x2, y2 Gradient parameters for positive lobe.
-        @see `makeBackgroundModel`.
-        @param bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg Gradient
-        parameters for negative lobe. @see `makeBackgroundModel`. Set
-        to the corresponding positive values if None.
+        @param bNeg, x1Neg, y1Neg, xyNeg, x2Neg, y2Neg Gradient parameters for negative lobe.
+        They are set to the corresponding positive values if None.
 
         @param **kwargs Keyword arguments passed through `lmfit` and
-        used by this functor. These must include:
-           @param psf Psf model used to generate the 'star'
-           @param rel_weight Used to signify least-squares weighting of posImage/negImage
+        used by this function. These must include:
+           - `psf` Psf model used to generate the 'star'
+           - `rel_weight` Used to signify least-squares weighting of posImage/negImage
            relative to diffim. If `rel_weight == 0` then posImage/negImage are ignored.
-           @param bbox Bounding box containing region to be modelled
+           - `bbox` Bounding box containing region to be modelled
 
-        @return numpy.array of width/height matching input bbox,
+        @see `makeBackgroundModel` for further parameter descriptions.
+
+        @return `numpy.array` of width/height matching input bbox,
         containing dipole model with given centroids and flux(es). If
-        rel_weight = 0, this is a 2-d array with dimensions matching
+        `rel_weight` = 0, this is a 2-d array with dimensions matching
         those of bbox; otherwise a stack of three such arrays,
         representing the dipole (diffim), positive and negative images
         respectively.
@@ -386,22 +389,22 @@ class DipoleFitAlgorithm(object):
     """!Lightweight class containing methods for fitting a dipole model in
     a diffim, used by DipoleFitPlugin.
 
-    This code is documented in DMTN-007.
+    This code is documented in DMTN-007 (http://dmtn-007.lsst.io).
 
     Below is a (somewhat incomplete) list of improvements
     that would be worth investigating, given the time:
 
-    @todo evaluate necessity for separate parameters for pos- and neg- images
-    @todo only fit background OUTSIDE footprint (DONE) and dipole params INSIDE footprint (NOT DONE)?
-    @todo correct normalization of least-squares weights based on variance planes
-    @todo account for PSFs that vary across the exposures (should be happening by default?)
-    @todo correctly account for NA/masks  (i.e., ignore!)
-    @todo better exception handling in the plugin
-    @todo better classification of dipoles (e.g. by comparing chi2 fit vs. monopole?)
-    @todo (DONE) Initial fast estimate of background gradient(s) params -- perhaps using numpy.lstsq
-    @todo (NOT NEEDED - see (1)) Initial fast test whether a background gradient needs to be fit
-    @todo (DONE) better initial estimate for flux when there's a strong gradient
-    @todo (DONE) requires a new package `lmfit` -- investiate others? (astropy/scipy/iminuit?)
+    @todo 1. evaluate necessity for separate parameters for pos- and neg- images
+    @todo 2. only fit background OUTSIDE footprint (DONE) and dipole params INSIDE footprint (NOT DONE)?
+    @todo 3. correct normalization of least-squares weights based on variance planes
+    @todo 4. account for PSFs that vary across the exposures (should be happening by default?)
+    @todo 5. correctly account for NA/masks  (i.e., ignore!)
+    @todo 6. better exception handling in the plugin
+    @todo 7. better classification of dipoles (e.g. by comparing chi2 fit vs. monopole?)
+    @todo 8. (DONE) Initial fast estimate of background gradient(s) params -- perhaps using numpy.lstsq
+    @todo 9. (NOT NEEDED - see (2)) Initial fast test whether a background gradient needs to be fit
+    @todo 10. (DONE) better initial estimate for flux when there's a strong gradient
+    @todo 11. (DONE) requires a new package `lmfit` -- investiate others? (astropy/scipy/iminuit?)
     """
 
     # This is just a private version number to sync with the ipython notebooks that I have been
@@ -435,9 +438,10 @@ class DipoleFitAlgorithm(object):
         optionally constrain the fit using the pre-subtraction images
         posImage and negImage.
 
-        @see `fitDipole()`
         @return `lmfit.MinimizerResult` object containing the fit
         parameters and other information.
+
+        @see `fitDipole()`
         """
 
         # Only import lmfit if someone wants to use the new DipoleFitAlgorithm.
@@ -658,22 +662,20 @@ class DipoleFitAlgorithm(object):
         @param bgGradientOrder Desired polynomial order of background gradient (allowed are [0,1,2])
         @param maxSepInSigma Allowed window of centroid parameters relative to peak in input source footprint
         @param separateNegParams Fit separate parameters to the flux and background gradient in
-        the negative images?
-        If true, this adds a separate parameter for the negative flux, and [1, 3, or 6] additional
-        parameters to fit for the background gradient in the negImage. Otherwise, the flux and
-        gradient parameters are constrained
-        to be exactly equal in the fit.
+        the negative images? If true, this adds a separate parameter for the negative flux, and [1, 3, or 6]
+        additional parameters to fit for the background gradient in the negImage. Otherwise, the flux and
+        gradient parameters are constrained to be exactly equal in the fit.
         @param verbose Be verbose
         @param display Display input data, best fit model(s) and residuals in a matplotlib window.
 
-        @return pipeBase.Struct object containing the fit parameters and other information.
+        @return `pipeBase.Struct` object containing the fit parameters and other information.
         @return `lmfit.MinimizerResult` object for debugging and error estimation, etc.
 
-        @note @param fitBackground has three options, thus it is an integer.
-        @item 0: do not fit background at all
-        @item 1 (default): pre-fit the background using linear least squares and then do not fit it as part
+        @note Parameter `fitBackground` has three options, thus it is an integer:
+        - 0: do not fit background at all
+        - 1 (default): pre-fit the background using linear least squares and then do not fit it as part
             of the dipole fitting optimization
-        @item 2: pre-fit the background using linear least squares (as in 1), and use the parameter
+        - 2: pre-fit the background using linear least squares (as in 1), and use the parameter
             estimates from that fit as starting parameters for an integrated "re-fit" of the background
             as part of the overall dipole fitting optimization.
         """
@@ -750,7 +752,7 @@ class DipoleFitAlgorithm(object):
             raise err
 
         def display2dArray(arr, title='Data', extent=None):
-            """!Use matplotlib.pyplot.imshow() to display a 2-D array with a given coordinate range.
+            """!Use `matplotlib.pyplot.imshow` to display a 2-D array with a given coordinate range.
             """
             fig = plt.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
             plt.title(title)
@@ -788,7 +790,7 @@ class DipoleFitAlgorithm(object):
 class DipoleFitPlugin(measBase.SingleFramePlugin):
     """!Subclass of SingleFramePlugin which fits dipoles to all merged (two-peak) diaSources
 
-    Accepts up to three input images in its measure() method. If these are
+    Accepts up to three input images in its `measure` method. If these are
     provided, it includes data from the pre-subtraction posImage
     (science image) and optionally negImage (template image) to
     constrain the fit. The meat of the fitting routines are in the
@@ -797,8 +799,8 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
     The motivation behind this plugin and the necessity for including more than
     one exposure are documented in DMTN-007 (http://dmtn-007.lsst.io).
 
-    This class is named ip_diffim_DipoleFit so that it may be used alongside
-    the existing ip_diffim_DipoleMeasurement classes until such a time as those
+    This class is named `ip_diffim_DipoleFit` so that it may be used alongside
+    the existing `ip_diffim_DipoleMeasurement` classes until such a time as those
     are deemed to be replaceable by this.
     """
 
@@ -811,9 +813,9 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
     @classmethod
     def getExecutionOrder(cls):
-        """!Set execution order to FLUX_ORDER.
+        """!Set execution order to `FLUX_ORDER`.
 
-        This includes algorithms that require both getShape() and getCentroid(),
+        This includes algorithms that require both `getShape()` and `getCentroid()`,
         in addition to a Footprint and its Peaks.
         """
         return cls.FLUX_ORDER
@@ -893,20 +895,19 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         """!Perform the non-linear least squares minimization on the putative dipole source.
 
         @param measRecord   diaSources that will be measured using dipole measurement
-        @param exposure  Difference exposure on which the diaSources were detected; exposure = posExp - negExp
+        @param exposure  Difference exposure on which the diaSources were detected; `exposure = posExp - negExp`
         @param posExp    "Positive" exposure, typically a science exposure, or None if unavailable
         @param negExp    "Negative" exposure, typically a template exposure, or None if unavailable
-        @param **kwds    Sent to SingleFrameMeasurementTask
 
-        @notes When posExp is None, will compute posImage = exposure + negExp.
-        Likewise, when negExp is None, will compute negImage = posExp - exposure.
-        If both posExp and negExp are none, will attempt to fit the dipole to just the exposure
+        @note When `posExp` is `None`, will compute `posImage = exposure + negExp`.
+        Likewise, when `negExp` is `None`, will compute `negImage = posExp - exposure`.
+        If both `posExp` and `negExp` are `None`, will attempt to fit the dipole to just the `exposure`
         with no constraint.
 
         The main functionality of this routine was placed outside of
         this plugin (into `DipoleFitAlgorithm.fitDipole()`) so that
         `DipoleFitAlgorithm.fitDipole()` can be called separately for
-        testing (see `tests/testDipoleFitter.py`)
+        testing (@see `tests/testDipoleFitter.py`)
         """
 
         pks = measRecord.getFootprint().getPeaks()
@@ -963,7 +964,11 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         self.doClassify(measRecord, result.chi2)
 
     def doClassify(self, measRecord, chi2val):
-        """!Determine if source is classified as dipole.
+        """!Determine if source is classified as dipole via three criteria:
+        - does the total signal-to-noise surpass the minSn?
+        - are the pos/neg fluxes greater than 1.0 and no more than 0.65 (param `maxFluxRatio`)
+            of the total flux? By default this will never happen since `posFlux == negFlux`.
+        - is it a good fit (`chi2dof` < 1)? (Currently not used.)
         """
 
         # First, does the total signal-to-noise surpass the minSn?
