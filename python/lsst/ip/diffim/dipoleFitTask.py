@@ -21,7 +21,6 @@ from __future__ import absolute_import, division, print_function
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
 
-from collections import namedtuple
 import numpy as np
 
 # LSST imports
@@ -59,9 +58,15 @@ class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
         dtype=float, default=1e-7,
         doc="Fit tolerance")
 
-    fitBgGradient = pexConfig.Field(
-        dtype=bool, default=True,
-        doc="Include parameters to fit for linear gradient in pre-sub. images")
+    fitBackground = pexConfig.Field(
+        dtype=int, default=1,
+        doc="""Set whether and how to fit for linear gradient in pre-sub. images. Possible values:
+        0: do not fit background at all
+        1 (default): pre-fit the background using linear least squares and then do not fit it as part
+            of the dipole fitting optimization
+        2: pre-fit the background using linear least squares (as in 1), and use the parameter
+            estimates from that fit as starting parameters for an integrated "re-fit" of the background
+        """)
 
     fitSeparateNegParams = pexConfig.Field(
         dtype=bool, default=False,
@@ -423,7 +428,7 @@ class DipoleFitAlgorithm(object):
         self.debug = lsstDebug.Info(__name__).debug
 
     def fitDipoleImpl(self, source, tol=1e-7, rel_weight=0.5,
-                      fitBgGradient=True, bgGradientOrder=1, maxSepInSigma=5.,
+                      fitBackground=1, bgGradientOrder=1, maxSepInSigma=5.,
                       separateNegParams=True, verbose=False):
         """!Fit a dipole model to an input difference image (actually,
         subimage bounded by the input source's footprint) and
@@ -539,35 +544,40 @@ class DipoleFitAlgorithm(object):
             gmod.set_param_hint('fluxNeg', value=np.abs(negFlux), min=0.1)
 
         # Fixed parameters (don't fit for them if there are no pre-sub images or no gradient fit requested):
-        # Right now, we use the linear model to fit the background and then subtract it from the data and
-        # then don't fit the background again (this is faster).
-        # A slower alternative is to use the estimated background parameters as starting points in the
-        # integrated model fit. That is currently not performed here, but might be desirable in some cases.
+        # Right now (fitBackground == 1), we fit a linear model to the background and then subtract
+        # it from the data and then don't fit the background again (this is faster).
+        # A slower alternative (fitBackground == 2) is to use the estimated background parameters as
+        # starting points in the integrated model fit. That is currently not performed by default,
+        # but might be desirable in some cases.
         bgParsPos = bgParsNeg = (0., 0., 0.)
-        if (rel_weight > 0. and fitBgGradient and bgGradientOrder >= 0):
+        if ((rel_weight > 0.) and (fitBackground != 0) and (bgGradientOrder >= 0)):
             pbg = 0.
             bgFitImage = self.posImage if self.posImage is not None else self.negImage
             # Fit the gradient to the background (linear model)
             bgParsPos = bgParsNeg = dipoleModel.fitFootprintBackground(source, bgFitImage,
                                                                        order=bgGradientOrder)
+
             # Generate the gradient and subtract it from the pre-subtraction image data
-            in_x = dipoleModel._generateXYGrid(bbox)
-            pbg = dipoleModel.makeBackgroundModel(in_x, tuple(bgParsPos))
-            z[1, :] -= pbg
-            z[1, :] -= np.nanmedian(z[1, :])
-            posFlux = np.nansum(z[1, :])
-            gmod.set_param_hint('flux', value=posFlux*1.5, min=0.1)
+            if fitBackground == 1:
+                in_x = dipoleModel._generateXYGrid(bbox)
+                pbg = dipoleModel.makeBackgroundModel(in_x, tuple(bgParsPos))
+                z[1, :] -= pbg
+                z[1, :] -= np.nanmedian(z[1, :])
+                posFlux = np.nansum(z[1, :])
+                gmod.set_param_hint('flux', value=posFlux*1.5, min=0.1)
 
-            if separateNegParams and self.negImage is not None:
-                bgParsNeg = dipoleModel.fitFootprintBackground(source, self.negImage, order=bgGradientOrder)
-                pbg = dipoleModel.makeBackgroundModel(in_x, tuple(bgParsNeg))
-            z[2, :] -= pbg
-            z[2, :] -= np.nanmedian(z[2, :])
-            if separateNegParams:
-                negFlux = np.nansum(z[2, :])
-                gmod.set_param_hint('fluxNeg', value=negFlux*1.5, min=0.1)
+                if separateNegParams and self.negImage is not None:
+                    bgParsNeg = dipoleModel.fitFootprintBackground(source, self.negImage,
+                                                                   order=bgGradientOrder)
+                    pbg = dipoleModel.makeBackgroundModel(in_x, tuple(bgParsNeg))
+                z[2, :] -= pbg
+                z[2, :] -= np.nanmedian(z[2, :])
+                if separateNegParams:
+                    negFlux = np.nansum(z[2, :])
+                    gmod.set_param_hint('fluxNeg', value=negFlux*1.5, min=0.1)
 
-            if False:  # we have subtracted the background from the images so dont fit anymore (faster!)
+            # Do not subtract the background from the images but include the background parameters in the fit
+            if fitBackground == 2:
                 if bgGradientOrder >= 0:
                     gmod.set_param_hint('b', value=bgParsPos[0])
                     if separateNegParams:
@@ -631,7 +641,7 @@ class DipoleFitAlgorithm(object):
         return result
 
     def fitDipole(self, source, tol=1e-7, rel_weight=0.1,
-                  fitBgGradient=True, maxSepInSigma=5., separateNegParams=True,
+                  fitBackground=1, maxSepInSigma=5., separateNegParams=True,
                   bgGradientOrder=1, verbose=False, display=False):
         """!Wrapper around `fitDipoleImpl()` which performs the fit of a dipole
         model to an input difference image (actually, subimage bounded
@@ -644,7 +654,7 @@ class DipoleFitAlgorithm(object):
         @param source Record containing the (merged) dipole source footprint detected on the diffim
         @param tol Tolerance parameter for scipy.leastsq() optimization
         @param rel_weight Weighting of posImage/negImage relative to the diffim in the fit
-        @param fitBgGradient Fit linear background gradient in posImage/negImage?
+        @param fitBackground How to fit linear background gradient in posImage/negImage (see notes)
         @param bgGradientOrder Desired polynomial order of background gradient (allowed are [0,1,2])
         @param maxSepInSigma Allowed window of centroid parameters relative to peak in input source footprint
         @param separateNegParams Fit separate parameters to the flux and background gradient in
@@ -658,10 +668,18 @@ class DipoleFitAlgorithm(object):
 
         @return pipeBase.Struct object containing the fit parameters and other information.
         @return `lmfit.MinimizerResult` object for debugging and error estimation, etc.
+
+        @note @param fitBackground has three options, thus it is an integer.
+        @item 0: do not fit background at all
+        @item 1 (default): pre-fit the background using linear least squares and then do not fit it as part
+            of the dipole fitting optimization
+        @item 2: pre-fit the background using linear least squares (as in 1), and use the parameter
+            estimates from that fit as starting parameters for an integrated "re-fit" of the background
+            as part of the overall dipole fitting optimization.
         """
 
         fitResult = self.fitDipoleImpl(
-            source, tol=tol, rel_weight=rel_weight, fitBgGradient=fitBgGradient,
+            source, tol=tol, rel_weight=rel_weight, fitBackground=fitBackground,
             maxSepInSigma=maxSepInSigma, separateNegParams=separateNegParams,
             bgGradientOrder=bgGradientOrder, verbose=verbose)
 
@@ -902,7 +920,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
                 measRecord, rel_weight=self.config.relWeight,
                 tol=self.config.tolerance,
                 maxSepInSigma=self.config.maxSeparation,
-                fitBgGradient=self.config.fitBgGradient,
+                fitBackground=self.config.fitBackground,
                 separateNegParams=self.config.fitSeparateNegParams,
                 verbose=False, display=False)
         except pexExcept.LengthError:
