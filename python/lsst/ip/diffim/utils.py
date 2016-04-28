@@ -1,6 +1,6 @@
 # 
 # LSST Data Management System
-# Copyright 2008, 2009, 2010 LSST Corporation.
+# Copyright 2008-2016 LSST Corporation.
 # 
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -33,6 +33,10 @@ import lsst.afw.display.utils as displayUtils
 import lsst.meas.algorithms as measAlg
 from . import diffimLib
 from . import diffimTools
+
+# Export DipoleTestImage to expose fake image generating funcs
+__all__ = ("DipoleTestImage")
+
 
 keptPlots = False                       # Have we arranged to keep spatial plots open?
 
@@ -710,4 +714,130 @@ def plotWhisker(results, newWcs):
     sp.quiver(X, Y, U, V)
     sp.set_title("WCS Residual")
     plt.show()
+
+
+class DipoleTestImage(object):
+    """!Utility class for dipole measurement testing
+
+    Generate an image with simulated dipoles and noise; store the original "pre-subtraction" images
+    and catalogs as well.
+    Used to generate test data for DMTN-007 (http://dmtn-007.lsst.io).
+    """
+
+    def __init__(self, w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
+                 psfSigma=2., flux=[30000.], fluxNeg=None, noise=10., gradientParams=None):
+        self.w = w
+        self.h = h
+        self.xcenPos = xcenPos
+        self.ycenPos = ycenPos
+        self.xcenNeg = xcenNeg
+        self.ycenNeg = ycenNeg
+        self.psfSigma = psfSigma
+        self.flux = flux
+        self.fluxNeg = fluxNeg
+        if fluxNeg is None:
+            self.fluxNeg = self.flux
+        self.noise = noise
+        self.gradientParams = gradientParams
+        self._makeDipoleImage()
+
+    def _makeDipoleImage(self):
+        """!Generate an exposure and catalog with the given dipole source(s)"""
+
+        posImage, posCatalog = self._makeStarImage(
+            xc=self.xcenPos, yc=self.ycenPos, flux=self.flux)
+
+        negImage, negCatalog = self._makeStarImage(
+            xc=self.xcenNeg, yc=self.ycenNeg, flux=self.fluxNeg)
+
+        dipole = posImage.clone()
+        di = dipole.getMaskedImage()
+        di -= negImage.getMaskedImage()
+
+        # Carry through pos/neg detection masks to new planes in diffim
+        dm = di.getMask()
+        posDetectedBits = posImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
+        negDetectedBits = negImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
+        pos_det = dm.addMaskPlane("DETECTED_POS")  # new mask plane -- different from "DETECTED"
+        neg_det = dm.addMaskPlane("DETECTED_NEG")  # new mask plane -- different from "DETECTED_NEGATIVE"
+        dma = dm.getArray()
+        # set the two custom mask planes to these new masks
+        dma[:, :] = posDetectedBits*pos_det + negDetectedBits*neg_det
+        self.diffim, self.posImage, self.posCatalog, self.negImage, self.negCatalog \
+            = dipole, posImage, posCatalog, negImage, negCatalog
+
+    def _makeStarImage(self, xc=[15.3], yc=[18.6], flux=[2500], schema=None):
+        """!Generate an exposure and catalog with the given stellar source(s)"""
+
+        from lsst.meas.base.tests import TestDataset
+        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(self.w-1, self.h-1))
+        dataset = TestDataset(bbox, psfSigma=self.psfSigma, threshold=1.)
+
+        for i in xrange(len(xc)):
+            dataset.addSource(flux=flux[i], centroid=afwGeom.Point2D(xc[i], yc[i]))
+
+        if schema is None:
+            schema = TestDataset.makeMinimalSchema()
+        exposure, catalog = dataset.realize(noise=self.noise, schema=schema)
+
+        if self.gradientParams is not None:
+            y, x = np.mgrid[:self.w, :self.h]
+            gp = self.gradientParams
+            gradient = gp[0] + gp[1] * x + gp[2] * y
+            if len(self.gradientParams) > 3:  # it includes a set of 2nd-order polynomial params
+                gradient += gp[3] * x*y + gp[4] * x*x + gp[5] * y*y
+            imgArr = exposure.getMaskedImage().getArrays()[0]
+            imgArr += gradient
+
+        return exposure, catalog
+
+    def fitDipoleSource(self, source, **kwds):
+        alg = dipoleFitTask.DipoleFitAlgorithm(self.diffim, self.posImage, self.negImage)
+        fitResult = alg.fitDipole(source, **kwds)
+        return fitResult
+
+    def detectDipoleSources(self, doMerge=True, diffim=None, detectSigma=5.5, grow=3):
+        """!Utility function for detecting dipoles.
+
+        Detect pos/neg sources in the diffim, then merge them. A
+        bigger "grow" parameter leads to a larger footprint which
+        helps with dipole measurement for faint dipoles.
+        """
+
+        if diffim is None:
+            diffim = self.diffim
+
+        # Start with a minimal schema - only the fields all SourceCatalogs need
+        schema = afwTable.SourceTable.makeMinimalSchema()
+
+        # Customize the detection task a bit (optional)
+        detectConfig = measAlg.SourceDetectionConfig()
+        detectConfig.returnOriginalFootprints = False  # should be the default
+
+        psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
+
+        # code from imageDifference.py:
+        detectConfig.thresholdPolarity = "both"
+        detectConfig.thresholdValue = detectSigma
+        # detectConfig.nSigmaToGrow = psfSigma
+        detectConfig.reEstimateBackground = True  # if False, will fail often for faint sources on gradients?
+        detectConfig.thresholdType = "pixel_stdev"
+
+        # Create the detection task. We pass the schema so the task can declare a few flag fields
+        detectTask = measAlg.SourceDetectionTask(schema, config=detectConfig)
+
+        table = afwTable.SourceTable.make(schema)
+        catalog = detectTask.makeSourceCatalog(table, diffim, sigma=psfSigma)
+
+        # Now do the merge.
+        if doMerge:
+            fpSet = catalog.fpSets.positive
+            fpSet.merge(catalog.fpSets.negative, grow, grow, False)
+            sources = afwTable.SourceCatalog(table)
+            fpSet.makeSources(sources)
+
+            return sources
+
+        else:
+            return detectTask, schema
 
