@@ -11,6 +11,7 @@ setupRequired(pex_logging)
 setupRequired(pex_policy)
 setupRequired(pipe_base)
 setupRequired(utils)
+setupRequired(lmfit)
 
 setupOptional(afwdata)
 setupOptional(matplotlib)
