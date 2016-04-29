@@ -19,7 +19,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
-        afwTable.Point2DKey.addFields(schema, "Centroid", "input centroid", "pixels")
+        afwTable.Point2DKey.addFields(schema, "Centroid", "input centroid", "pixel")
         schema.addField("PsfFlux_flux", type=float)
         schema.addField("PsfFlux_fluxSigma", type=float)
         schema.addField("PsfFlux_flag", type="Flag")

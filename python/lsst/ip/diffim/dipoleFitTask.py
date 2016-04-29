@@ -843,29 +843,29 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         for pos_neg in ['pos', 'neg']:
 
             key = schema.addField(
-                schema.join(name, pos_neg, "flux"), type=float, units="dn",
+                schema.join(name, pos_neg, "flux"), type=float, units="count",
                 doc="Dipole {0} lobe flux".format(pos_neg))
             setattr(self, ''.join((pos_neg, 'FluxKey')), key)
 
             key = schema.addField(
-                schema.join(name, pos_neg, "fluxSigma"), type=float, units="pixels",
+                schema.join(name, pos_neg, "fluxSigma"), type=float, units="pixel",
                 doc="1-sigma uncertainty for {0} dipole flux".format(pos_neg))
             setattr(self, ''.join((pos_neg, 'FluxSigmaKey')), key)
 
             for x_y in ['x', 'y']:
                 key = schema.addField(
-                    schema.join(name, pos_neg, "centroid", x_y), type=float, units="pixels",
+                    schema.join(name, pos_neg, "centroid", x_y), type=float, units="pixel",
                     doc="Dipole {0} lobe centroid".format(pos_neg))
                 setattr(self, ''.join((pos_neg, 'CentroidKey', x_y.upper())), key)
 
         for x_y in ['x', 'y']:
             key = schema.addField(
-                schema.join(name, "centroid", x_y), type=float, units="pixels",
+                schema.join(name, "centroid", x_y), type=float, units="pixel",
                 doc="Dipole centroid")
             setattr(self, ''.join(('centroidKey', x_y.upper())), key)
 
         self.fluxKey = schema.addField(
-            schema.join(name, "flux"), type=float, units="dn",
+            schema.join(name, "flux"), type=float, units="count",
             doc="Dipole overall flux")
 
         self.orientationKey = schema.addField(
@@ -873,7 +873,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             doc="Dipole orientation")
 
         self.separationKey = schema.addField(
-            schema.join(name, "separation"), type=float, units="pixels",
+            schema.join(name, "separation"), type=float, units="pixel",
             doc="Pixel separation between positive and negative lobes of dipole")
 
         self.chi2dofKey = schema.addField(

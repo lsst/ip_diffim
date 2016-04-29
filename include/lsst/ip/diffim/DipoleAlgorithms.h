@@ -236,8 +236,8 @@ public:
 
     NaiveDipoleFlux(Control const & ctrl, std::string const & name, afw::table::Schema & schema) :
         DipoleFluxAlgorithm(ctrl, name, schema, "raw flux counts"),
-        _numPositiveKey(schema.addField<int>(name+"_npos", "number of positive pixels", "dn")),
-        _numNegativeKey(schema.addField<int>(name+"_nneg", "number of negative pixels", "dn"))
+        _numPositiveKey(schema.addField<int>(name+"_npos", "number of positive pixels", "count")),
+        _numNegativeKey(schema.addField<int>(name+"_nneg", "number of negative pixels", "count"))
     {
     }
 
