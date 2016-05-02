@@ -52,7 +52,7 @@ def loadData(imFile=None):
     exposure.setPsf(psf)
 
     im = exposure.getMaskedImage().getImage()
-    im -= np.median(im.getArray())
+    im -= np.nanmedian(im.getArray())
 
     # Create the dipole
     offset = 3
@@ -77,8 +77,9 @@ def run(args):
     
     # And the measurement Task
     config = DipoleMeasurementTask.ConfigClass()
+    config.plugins.names.remove('base_SkyCoord')
+
     algMetadata = dafBase.PropertyList()
-    schema.addField(DipoleMeasurementTask._ClassificationFlag, "F", "probability of being a dipole")
     measureTask = DipoleMeasurementTask(schema, algMetadata, config=config)
 
     # Create the output table
@@ -97,7 +98,7 @@ def run(args):
     print "Merged %s Sources into %d diaSources (from %d +ve, %d -ve)" % (len(results.sources), 
         len(diaSources), results.fpSets.numPos, results.fpSets.numNeg)
 
-    measureTask.measure(exposure, diaSources)
+    measureTask.run(diaSources, exposure)
 
     # Display dipoles if debug enabled
     if args.debug:
@@ -109,7 +110,7 @@ def run(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(
-        description="Demonstrate the use of SourceDetectionTask and DipoleMeasurement}Task")
+        description="Demonstrate the use of SourceDetectionTask and DipoleMeasurementTask")
 
     parser.add_argument('--debug', '-d', action="store_true", help="Load debug.py?", default=False)
     parser.add_argument("--image", "-i", help="User defined image", default=None)

@@ -23,34 +23,77 @@ import numpy as np
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.detection as afwDetect
-import lsst.pipe.base as pipeBase
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.meas.deblender.baseline as deblendBaseline
-from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig
+from lsst.meas.base.pluginRegistry import register
+from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig, \
+    SingleFramePluginConfig, SingleFramePlugin
 import lsst.afw.display.ds9 as ds9
 
 __all__ = ("DipoleMeasurementConfig", "DipoleMeasurementTask", "DipoleAnalysis", "DipoleDeblender",
-           "SourceFlagChecker")
+           "SourceFlagChecker", "ClassificationDipoleConfig", "ClassificationDipolePlugin")
 
 
-class DipoleClassificationConfig(pexConfig.Config):
-    """!Classification of detected diaSources as dipole or not"""
+class ClassificationDipoleConfig(SingleFramePluginConfig):
+    """Configuration for classification of detected diaSources as dipole or not"""
     minSn = pexConfig.Field(
         doc="Minimum quadrature sum of positive+negative lobe S/N to be considered a dipole",
         dtype=float, default=np.sqrt(2) * 5.0,
         )
     maxFluxRatio = pexConfig.Field(
-        doc = "Maximum flux ratio in either lobe to be considered a dipole",
+        doc="Maximum flux ratio in either lobe to be considered a dipole",
         dtype = float, default = 0.65
         )
 
+
+@register("ip_diffim_ClassificationDipole")
+class ClassificationDipolePlugin(SingleFramePlugin):
+    """A plugin to classify whether a diaSource is a dipole.
+    """
+
+    ConfigClass = ClassificationDipoleConfig
+
+    @classmethod
+    def getExecutionOrder(cls):
+        return cls.CLASSIFY_ORDER
+
+    def __init__(self, config, name, schema, metadata):
+        SingleFramePlugin.__init__(self, config, name, schema, metadata)
+        self.dipoleAnalysis = DipoleAnalysis()
+        self.keyProbability = schema.addField(name + "_value", type="D",
+                                              doc="Set to 1 for dipoles, else 0.")
+        self.keyFlag = schema.addField(name + "_flag", type="Flag", doc="Set to 1 for any fatal failure.")
+
+    def measure(self, measRecord, exposure):
+            passesSn = self.dipoleAnalysis.getSn(measRecord) > self.config.minSn
+            negFlux = np.abs(measRecord.get("ip_diffim_PsfDipoleFlux_neg_flux"))
+            negFluxFlag = measRecord.get("ip_diffim_PsfDipoleFlux_neg_flag")
+            posFlux = np.abs(measRecord.get("ip_diffim_PsfDipoleFlux_pos_flux"))
+            posFluxFlag = measRecord.get("ip_diffim_PsfDipoleFlux_pos_flag")
+
+            if negFluxFlag or posFluxFlag:
+                self.fail(measRecord)
+                # continue on to classify
+
+            totalFlux = negFlux + posFlux
+
+            # If negFlux or posFlux are NaN, these evaluate to False
+            passesFluxNeg = (negFlux / totalFlux) < self.config.maxFluxRatio
+            passesFluxPos = (posFlux / totalFlux) < self.config.maxFluxRatio
+            if (passesSn and passesFluxPos and passesFluxNeg):
+                val = 1.0
+            else:
+                val = 0.0
+
+            measRecord.set(self.keyProbability, val)
+
+    def fail(self, measRecord, error=None):
+        measRecord.set(self.keyFlag, True)
+
+
 class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
     """!Measurement of detected diaSources as dipoles"""
-    classification = pexConfig.ConfigField(
-        dtype=DipoleClassificationConfig,
-        doc="Dipole classification config"
-        )
 
     def setDefaults(self):
         SingleFrameMeasurementConfig.setDefaults(self)
@@ -60,7 +103,10 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
                         "base_PsfFlux",
                         "ip_diffim_NaiveDipoleCentroid",
                         "ip_diffim_NaiveDipoleFlux",
-                        "ip_diffim_PsfDipoleFlux"]
+                        "ip_diffim_PsfDipoleFlux",
+                        "ip_diffim_ClassificationDipole",
+                        ]
+
         self.slots.calibFlux = None
         self.slots.modelFlux = None
         self.slots.instFlux = None
@@ -94,20 +140,54 @@ class DipoleMeasurementTask(SingleFrameMeasurementTask):
 
 \section ip_diffim_dipolemeas_Purpose   Description
 
-This class provies a specialized set of Source measurements that allow the user to test the hypothesis that
-the Source is a dipole.  This includes a set of measurements derived from intermediate base classes
+This class provides a default configuration for running Source measurement on image differences.
+
+These default plugins include:
+\dontinclude dipoleMeasurement.py
+\skip class DipoleMeasurementConfig
+\until self.doReplaceWithNoise
+
+These plugins enabled by default allow the user to test the hypothesis that the Source is a dipole.
+This includes a set of measurements derived from intermediate base classes
 DipoleCentroidAlgorithm and DipoleFluxAlgorithm.  Their respective algorithm control classes are defined in
-DipoleCentroidControl and DipoleFluxControl.  Each centroid and flux measurement will have .neg (negative)
-and .pos (positive lobe) fields.
+DipoleCentroidControl and DipoleFluxControl.  Each centroid and flux measurement will have _neg (negative)
+and _pos (positive lobe) fields.
 
 The first set of measurements uses a "naive" alrogithm for centroid and flux measurements, implemented in
 NaiveDipoleCentroidControl and NaiveDipoleFluxControl.  The algorithm uses a naive 3x3 weighted moment around
 the nominal centroids of each peak in the Source Footprint.  These algorithms fill the table fields
-centroid.dipole.naive.* and flux.dipole.naive.*.
+ip_diffim_NaiveDipoleCentroid* and ip_diffim_NaiveDipoleFlux*
 
 The second set of measurements undertakes a joint-Psf model on the negative and positive lobe simultaneously.
 This fit simultaneously solves for the negative and positive lobe centroids and fluxes using non-linear
-least squares minimization.  The fields are stored in table elements flux.dipole.psf.*.
+least squares minimization.  The fields are stored in table elements ip_diffim_PsfDipoleFlux*.
+
+Because this Task is just a config for SourceMeasurementTask, the same result may be acheived by manually
+editing the config and running SourceMeasurementTask. For example:
+
+\code
+config = SingleFrameMeasurementConfig()
+config.plugins.names = ["base_PsfFlux",
+                        "ip_diffim_PsfDipoleFlux",
+                        "ip_diffim_NaiveDipoleFlux",
+                        "ip_diffim_NaiveDipoleCentroid",
+                        "ip_diffim_ClassificationDipole",
+                        "base_CircularApertureFlux",
+                        "base_SkyCoord"]
+
+config.slots.calibFlux = None
+config.slots.modelFlux = None
+config.slots.instFlux = None
+config.slots.shape = None
+config.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
+config.doReplaceWithNoise = False
+
+schema = afwTable.SourceTable.makeMinimalSchema()
+task = SingleFrameMeasurementTask(schema, config=config)
+
+task.run(sources, exposure)
+\endcode
+
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -125,76 +205,14 @@ least squares minimization.  The fields are stored in table elements flux.dipole
 
 \section ip_diffim_dipolemeas_Config       Configuration parameters
 
-See \ref DipoleMeasurementConfig and \ref DipoleClassificationConfig
+See \ref DipoleMeasurementConfig
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 \section ip_diffim_dipolemeas_Metadata   Quantities set in Metadata
 
 No specific values are set in the Task metadata.  However, the Source schema are modified to store the
-results of the dipole-specific measurements.  These additional fields include:
-
- . classification.dipole : probability of being a dipole
-
- . centroid.dipole.naive.pos : unweighted 3x3 first moment centroid
-
- . centroid.dipole.naive.pos.err : covariance matrix for centroid.dipole.naive.pos
-
- . centroid.dipole.naive.pos.flags : set if the centroid.dipole.naive.pos measurement did not fully succeed
-
- . centroid.dipole.naive.neg : unweighted 3x3 first moment centroid
-
- . centroid.dipole.naive.neg.err : covariance matrix for centroid.dipole.naive.neg
-
- . centroid.dipole.naive.neg.flags : set if the centroid.dipole.naive.neg measurement did not fully succeed
-
- . flux.dipole.naive.pos : raw flux counts
-
- . flux.dipole.naive.pos.err : uncertainty for flux.dipole.naive.pos
-
- . flux.dipole.naive.pos.flags : set if the flux.dipole.naive.pos measurement failed
-
- . flux.dipole.naive.neg : raw flux counts
-
- . flux.dipole.naive.neg.err : uncertainty for flux.dipole.naive.neg
-
- . flux.dipole.naive.neg.flags : set if the flux.dipole.naive.neg measurement failed
-
- . flux.dipole.naive.npos : number of positive pixels
-
- . flux.dipole.naive.nneg : number of negative pixels
-
- . flux.dipole.psf.pos : jointly fitted psf flux counts
-
- . flux.dipole.psf.pos.err : uncertainty for flux.dipole.psf.pos
-
- . flux.dipole.psf.pos.flags : set if the flux.dipole.psf.pos measurement failed
-
- . flux.dipole.psf.neg : jointly fitted psf flux counts
-
- . flux.dipole.psf.neg.err : uncertainty for flux.dipole.psf.neg
-
- . flux.dipole.psf.neg.flags : set if the flux.dipole.psf.neg measurement failed
-
- . flux.dipole.psf.chi2dof : chi2 per degree of freedom of fit
-
- . flux.dipole.psf.centroid : average of the postive and negative lobe positions
-
- . flux.dipole.psf.centroid.err : covariance matrix for flux.dipole.psf.centroid
-
- . flux.dipole.psf.centroid.flags : set if the flux.dipole.psf.centroid measurement did not fully succeed
-
- . flux.dipole.psf.neg.centroid : psf fitted center of negative lobe
-
- . flux.dipole.psf.neg.centroid.err : covariance matrix for flux.dipole.psf.neg.centroid
-
- . flux.dipole.psf.neg.centroid.flags : set if the flux.dipole.psf.neg.centroid measurement did not fully succeed
-
- . flux.dipole.psf.pos.centroid : psf fitted center of positive lobe
-
- . flux.dipole.psf.pos.centroid.err : covariance matrix for flux.dipole.psf.pos.centroid
-
- . flux.dipole.psf.pos.centroid.flags : set if the flux.dipole.psf.pos.centroid measurement did not fully succeed
+results of the dipole-specific measurements.
 
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -274,67 +292,7 @@ Optionally display debugging information:
     """
     ConfigClass = DipoleMeasurementConfig
     _DefaultName = "dipoleMeasurement"
-    _ClassificationFlag = "classification_dipole"
 
-    def __init__(self, schema, algMetadata=None, **kwds):
-        """!Create the Task, and add Task-specific fields to the provided measurement table schema.
-
-        @param[in,out] schema        Schema object for measurement fields; modified in-place.
-        @param[in,out] algMetadata   Passed to MeasureSources object to be filled with
-                                     metadata by algorithms (e.g. radii for aperture photometry).
-        @param         **kwds        Passed to Task.__init__.
-        """
-        # NaiveDipoleCentroid_x/y and classification fields are not added by the algorithms
-        # In the interim, better to add here than to require in client code
-        # DM-3515 will provide for a more permanent solution
-        if self._ClassificationFlag not in schema.getNames():
-            schema.addField(self._ClassificationFlag, "F", "probability of being a dipole")
-
-        SingleFrameMeasurementTask.__init__(self, schema, algMetadata, **kwds)
-        self.dipoleAnalysis = DipoleAnalysis()
-
-    @pipeBase.timeMethod
-    def classify(self, sources):
-        """!Create the records needed for dipole classification, and run classifier
-
-        @param[in,out] sources       The diaSources to run classification on; modified in in-place
-        """
-
-        self.log.log(self.log.INFO, "Classifying %d sources" % len(sources))
-        if not sources:
-            return
-
-        ctrl = self.config.classification
-        try:
-            key = sources[0].getSchema().find(self._ClassificationFlag).getKey()
-        except Exception:
-            self.log.warn("Key %s not found in table" % (self._ClassificationFlag))
-            return
-
-        for source in sources:
-            passesSn = self.dipoleAnalysis.getSn(source) > ctrl.minSn
-
-            negFlux   = np.abs(source.get("ip_diffim_PsfDipoleFlux_neg_flux"))
-            posFlux   = np.abs(source.get("ip_diffim_PsfDipoleFlux_pos_flux"))
-            totalFlux = negFlux + posFlux
-            passesFluxNeg = (negFlux / totalFlux) < ctrl.maxFluxRatio
-            passesFluxPos = (posFlux / totalFlux) < ctrl.maxFluxRatio
-            if (passesSn and passesFluxPos and passesFluxNeg):
-                val = 1.0
-            else:
-                val = 0.0
-
-            source.set(key, val)
-
-    def run(self, sources, exposure, **kwds):
-        """!Run dipole measurement and classification
-        @param sources       diaSources that will be measured using dipole measurement
-        @param exposure      Exposure on which the diaSources were detected
-        @param **kwds        Sent to SingleFrameMeasurementTask
-        """
-
-        SingleFrameMeasurementTask.run(self, sources, exposure, **kwds)
-        self.classify(sources)
 
 #########
 # Other Support classs

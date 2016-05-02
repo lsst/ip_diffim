@@ -362,8 +362,6 @@ class DipoleMeasurementTaskTest(unittest.TestCase):
 
     def testMeasure(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
-        dipoleFlag = ipDiffim.DipoleMeasurementTask._ClassificationFlag
-        schema.addField(dipoleFlag, "F", "probability of being a dipole")
         task = ipDiffim.DipoleMeasurementTask(schema, config=self.config)
         table = afwTable.SourceTable.make(schema)
         sources = afwTable.SourceCatalog(table)
@@ -374,7 +372,7 @@ class DipoleMeasurementTaskTest(unittest.TestCase):
         # set it in source with the appropriate schema
         source.setFootprint(s.getFootprint())
         task.run(sources, exposure)
-        self.assertEqual(source.get(dipoleFlag), 1.0)
+        self.assertEqual(source.get("ip_diffim_ClassificationDipole_value"), 1.0)
 
 def suite():
     """Returns a suite containing all the test cases in this module."""
