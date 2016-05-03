@@ -12,7 +12,7 @@
 #ifndef LSST_IP_DIFFIM_BUILDSINGLEKERNELVISITOR_H
 #define LSST_IP_DIFFIM_BUILDSINGLEKERNELVISITOR_H
 
-#include "boost/shared_ptr.hpp"
+#include <memory>
 
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
@@ -30,7 +30,7 @@ namespace detail {
     class BuildSingleKernelVisitor : public lsst::afw::math::CandidateVisitor {
         typedef lsst::afw::image::MaskedImage<PixelT> MaskedImageT;
     public:
-        typedef boost::shared_ptr<BuildSingleKernelVisitor<PixelT> > Ptr;
+        typedef std::shared_ptr<BuildSingleKernelVisitor<PixelT> > Ptr;
 
         BuildSingleKernelVisitor(
             lsst::afw::math::KernelList const& basisList,
@@ -39,7 +39,7 @@ namespace detail {
         BuildSingleKernelVisitor(
             lsst::afw::math::KernelList const& basisList,
             lsst::pex::policy::Policy const& policy, 
-            boost::shared_ptr<Eigen::MatrixXd> hMat  
+            std::shared_ptr<Eigen::MatrixXd> hMat  
             );
         virtual ~BuildSingleKernelVisitor() {};
         
@@ -61,7 +61,7 @@ namespace detail {
     private:
         lsst::afw::math::KernelList const _basisList; ///< Basis set
         lsst::pex::policy::Policy _policy;            ///< Policy controlling behavior
-        boost::shared_ptr<Eigen::MatrixXd> _hMat;     ///< Regularization matrix
+        std::shared_ptr<Eigen::MatrixXd> _hMat;     ///< Regularization matrix
         ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
         bool _skipBuilt;                      ///< Skip over built candidates during processCandidate()
         int _nRejected;                       ///< Number of candidates rejected during processCandidate()
@@ -73,7 +73,7 @@ namespace detail {
     };
     
     template<typename PixelT>
-    boost::shared_ptr<BuildSingleKernelVisitor<PixelT> >
+    std::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor(
         lsst::afw::math::KernelList const& basisList,
         lsst::pex::policy::Policy const& policy
@@ -85,11 +85,11 @@ namespace detail {
     }
 
     template<typename PixelT>
-    boost::shared_ptr<BuildSingleKernelVisitor<PixelT> >
+    std::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor(
         lsst::afw::math::KernelList const& basisList,
         lsst::pex::policy::Policy const& policy,
-        boost::shared_ptr<Eigen::MatrixXd> hMat  
+        std::shared_ptr<Eigen::MatrixXd> hMat  
         ) {
 
         return typename BuildSingleKernelVisitor<PixelT>::Ptr(

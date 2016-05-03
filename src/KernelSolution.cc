@@ -13,7 +13,7 @@
 #include <algorithm>
 #include <limits>
 
-#include "boost/shared_ptr.hpp"
+#include <memory>
 #include "boost/timer.hpp" 
 
 #include "Eigen/Core"
@@ -55,8 +55,8 @@ namespace diffim {
     int KernelSolution::_SolutionId = 0;
 
     KernelSolution::KernelSolution(
-        boost::shared_ptr<Eigen::MatrixXd> mMat,
-        boost::shared_ptr<Eigen::VectorXd> bVec,
+        std::shared_ptr<Eigen::MatrixXd> mMat,
+        std::shared_ptr<Eigen::VectorXd> bVec,
         bool fitForBackground
         ) :
         _id(++_SolutionId),
@@ -186,7 +186,7 @@ namespace diffim {
             std::cout << aVec << std::endl;
         }
         
-        _aVec = boost::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(aVec));
+        _aVec = std::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(aVec));
     }
 
     /*******************************************************************************************************/
@@ -206,7 +206,7 @@ namespace diffim {
         _kSum(0.0)
     {
         std::vector<double> kValues(basisList.size());
-        _kernel = boost::shared_ptr<afwMath::Kernel>( 
+        _kernel = std::shared_ptr<afwMath::Kernel>( 
             new afwMath::LinearCombinationKernel(basisList, kValues) 
             );
     };
@@ -248,7 +248,7 @@ namespace diffim {
     }
 
     template <typename InputT>
-    std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double>
+    std::pair<std::shared_ptr<lsst::afw::math::Kernel>, double>
     StaticKernelSolution<InputT>::getSolutionPair() {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
@@ -275,13 +275,13 @@ namespace diffim {
         }
 
         lsst::afw::math::KernelList basisList = 
-            boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
+            std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
         
         unsigned int const nKernelParameters     = basisList.size();
         unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
         unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
 
-        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
+        std::vector<std::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
         
         /* Ignore buffers around edge of convolved images :
          * 
@@ -347,16 +347,16 @@ namespace diffim {
         afwImage::Image<PixelT> cimage(templateImage.getDimensions());
         
         /* Holds eigen representation of image convolved with all basis functions */
-        std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
+        std::vector<std::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
         
         /* Iterators over convolved image list and basis list */
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
+        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
             convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
             afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
 
-            boost::shared_ptr<Eigen::MatrixXd> cMat (
+            std::shared_ptr<Eigen::MatrixXd> cMat (
                 new Eigen::MatrixXd(imageToEigenMatrix(cimage).block(startRow, 
                                                                      startCol, 
                                                                      endRow-startRow, 
@@ -377,9 +377,9 @@ namespace diffim {
            (eigeniVariance, convolvedEigenList) must be the same size
         */
         Eigen::MatrixXd cMat(eigenTemplate.col(0).size(), nParameters);
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
+        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
             convolvedEigenList.begin();
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
+        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
             convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
             cMat.col(kidxj) = (*eiterj)->col(0);
@@ -438,7 +438,7 @@ namespace diffim {
         unsigned int const nParameters           = _aVec->size();
         unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
         unsigned int const nKernelParameters     = 
-            boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
+            std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
         if (nParameters != (nKernelParameters + nBackgroundParameters)) 
             throw LSST_EXCEPT(pexExcept::Exception, "Mismatched sizes in kernel solution");
 
@@ -529,8 +529,8 @@ namespace diffim {
         afwDet::Footprint::Ptr fullFp(new afwDet::Footprint(templateImage.getBBox()));
 
         afwMath::KernelList basisList = 
-            boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
-        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
+            std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
+        std::vector<std::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
 
         /* Only BAD pixels marked in this mask */
         afwImage::MaskPixel bitMask = 
@@ -623,11 +623,11 @@ namespace diffim {
         afwImage::Image<InputT> cimage(templateImage.getDimensions());
         
         /* Holds eigen representation of image convolved with all basis functions */
-        std::vector<boost::shared_ptr<Eigen::VectorXd> >
+        std::vector<std::shared_ptr<Eigen::VectorXd> >
             convolvedEigenList(nKernelParameters);
         
         /* Iterators over convolved image list and basis list */
-        typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiter = 
+        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiter = 
             convolvedEigenList.begin();
 
         /* Create C_i in the formalism of Alard & Lupton */
@@ -649,7 +649,7 @@ namespace diffim {
                 }
             }
 
-            boost::shared_ptr<Eigen::VectorXd> 
+            std::shared_ptr<Eigen::VectorXd> 
                 eigenCptr (new Eigen::VectorXd(eigenC));
             
             *eiter = eigenCptr;
@@ -661,9 +661,9 @@ namespace diffim {
         
         /* Load matrix with all convolved images */
         Eigen::MatrixXd cMat(eigenTemplate.size(), nParameters);
-        typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterj = 
+        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiterj = 
             convolvedEigenList.begin();
-        typename std::vector<boost::shared_ptr<Eigen::VectorXd> >::iterator eiterE = 
+        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiterE = 
             convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
             cMat.block(0, kidxj, eigenTemplate.size(), 1) = 
@@ -708,8 +708,8 @@ namespace diffim {
         }
 
         lsst::afw::math::KernelList basisList = 
-            boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
-        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
+            std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
+        std::vector<std::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
 
         /* Only BAD pixels marked in this mask */
         lsst::afw::image::Mask<lsst::afw::image::MaskPixel> sMask(pixelMask, true);
@@ -794,10 +794,10 @@ namespace diffim {
         afwImage::Image<InputT> cimage(templateImage.getDimensions());
         
         /* Holds eigen representation of image convolved with all basis functions */
-        std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
+        std::vector<std::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
         
         /* Iterators over convolved image list and basis list */
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
+        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
             convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
@@ -819,7 +819,7 @@ namespace diffim {
                 }
             }
             cMat = maskedcMat.block(0, 0, nGood, 1);
-            boost::shared_ptr<Eigen::MatrixXd> cMatPtr (new Eigen::MatrixXd(cMat));
+            std::shared_ptr<Eigen::MatrixXd> cMatPtr (new Eigen::MatrixXd(cMat));
             *eiter = cMatPtr;
         } 
 
@@ -833,9 +833,9 @@ namespace diffim {
            (eigeniVariance, convolvedEigenList) must be the same size
         */
         Eigen::MatrixXd cMat(eigenTemplate.col(0).size(), nParameters);
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
+        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
             convolvedEigenList.begin();
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
+        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
             convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
             cMat.col(kidxj) = (*eiterj)->col(0);
@@ -879,13 +879,13 @@ namespace diffim {
         }
 
         lsst::afw::math::KernelList basisList = 
-            boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
+            std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
 
         unsigned int const nKernelParameters     = basisList.size();
         unsigned int const nBackgroundParameters = this->_fitForBackground ? 1 : 0;
         unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
 
-        std::vector<boost::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
+        std::vector<std::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
 
         /* 
            NOTE : If we are using these views in Afw's Image space, we need to
@@ -1036,8 +1036,8 @@ namespace diffim {
 
         afwImage::Image<InputT> cimage(templateImage.getDimensions());
 
-        std::vector<boost::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
+        std::vector<std::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
+        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
             convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
@@ -1058,7 +1058,7 @@ namespace diffim {
                 nTerms += area;
             }
             
-            boost::shared_ptr<Eigen::MatrixXd> cMatPtr (new Eigen::MatrixXd(cMat));
+            std::shared_ptr<Eigen::MatrixXd> cMatPtr (new Eigen::MatrixXd(cMat));
             *eiter = cMatPtr;
             
         } 
@@ -1073,9 +1073,9 @@ namespace diffim {
            (eigeniVariance, convolvedEigenList) must be the same size
         */
         Eigen::MatrixXd cMat(eigenTemplate.col(0).size(), nParameters);
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
+        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
             convolvedEigenList.begin();
-        typename std::vector<boost::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
+        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
             convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
             cMat.col(kidxj) = (*eiterj)->col(0);
@@ -1104,7 +1104,7 @@ namespace diffim {
     RegularizedKernelSolution<InputT>::RegularizedKernelSolution(
         lsst::afw::math::KernelList const& basisList,
         bool fitForBackground,
-        boost::shared_ptr<Eigen::MatrixXd> hMat,
+        std::shared_ptr<Eigen::MatrixXd> hMat,
         lsst::pex::policy::Policy policy
         ) 
         :
@@ -1180,9 +1180,9 @@ namespace diffim {
     }
 
     template <typename InputT>
-    boost::shared_ptr<Eigen::MatrixXd> RegularizedKernelSolution<InputT>::getM(bool includeHmat) {
+    std::shared_ptr<Eigen::MatrixXd> RegularizedKernelSolution<InputT>::getM(bool includeHmat) {
         if (includeHmat == true) {
-            return (boost::shared_ptr<Eigen::MatrixXd>(
+            return (std::shared_ptr<Eigen::MatrixXd>(
                         new Eigen::MatrixXd(*(this->_mMat) + _lambda * (*_hMat))
                         ));
         }
@@ -1366,8 +1366,8 @@ namespace diffim {
             _nt = _nbases * _nkt + _nbt;
         }
         
-        boost::shared_ptr<Eigen::MatrixXd> mMat (new Eigen::MatrixXd(_nt, _nt));
-        boost::shared_ptr<Eigen::VectorXd> bVec (new Eigen::VectorXd(_nt));
+        std::shared_ptr<Eigen::MatrixXd> mMat (new Eigen::MatrixXd(_nt, _nt));
+        std::shared_ptr<Eigen::VectorXd> bVec (new Eigen::VectorXd(_nt));
         (*mMat).setZero();
         (*bVec).setZero();
 
@@ -1386,8 +1386,8 @@ namespace diffim {
     }
 
     void SpatialKernelSolution::addConstraint(float xCenter, float yCenter,
-                                              boost::shared_ptr<Eigen::MatrixXd> qMat,
-                                              boost::shared_ptr<Eigen::VectorXd> wVec) {
+                                              std::shared_ptr<Eigen::MatrixXd> qMat,
+                                              std::shared_ptr<Eigen::VectorXd> wVec) {
         
         pexLog::TTrace<8>("lsst.ip.diffim.SpatialKernelSolution.addConstraint", 
                           "Adding candidate at %f, %f", xCenter, yCenter);
@@ -1555,7 +1555,7 @@ namespace diffim {
                 kCoeffs[i] = (*_aVec)(i);
             }
             lsst::afw::math::KernelList basisList = 
-                boost::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
+                std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
             _kernel.reset(
                 new afwMath::LinearCombinationKernel(basisList, kCoeffs)
                 );

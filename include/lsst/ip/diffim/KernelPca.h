@@ -24,7 +24,7 @@ namespace detail {
     class KernelPca : public lsst::afw::image::ImagePca<ImageT> {
         typedef typename lsst::afw::image::ImagePca<ImageT> Super; ///< Base class
     public:
-        typedef typename boost::shared_ptr<KernelPca<ImageT> > Ptr;
+        typedef typename std::shared_ptr<KernelPca<ImageT> > Ptr;
         using lsst::afw::image::ImagePca<ImageT>::getEigenImages;
         using lsst::afw::image::ImagePca<ImageT>::getEigenValues;
         using lsst::afw::image::ImagePca<ImageT>::addImage;
@@ -40,9 +40,9 @@ namespace detail {
     class KernelPcaVisitor : public lsst::afw::math::CandidateVisitor {
     public:
         typedef lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> ImageT;
-        typedef boost::shared_ptr<KernelPcaVisitor<PixelT> > Ptr;
+        typedef std::shared_ptr<KernelPcaVisitor<PixelT> > Ptr;
         
-        KernelPcaVisitor(boost::shared_ptr<KernelPca<ImageT> > imagePca);
+        KernelPcaVisitor(std::shared_ptr<KernelPca<ImageT> > imagePca);
         virtual ~KernelPcaVisitor() {};
         
         lsst::afw::math::KernelList getEigenKernels();
@@ -50,13 +50,13 @@ namespace detail {
         void subtractMean();
         PTR(ImageT) returnMean() {return _mean;}
     private:
-        boost::shared_ptr<KernelPca<ImageT> > _imagePca;  ///< Structure to fill with images
+        std::shared_ptr<KernelPca<ImageT> > _imagePca;  ///< Structure to fill with images
         PTR(ImageT) _mean;                                ///< Mean image calculated before Pca
     };
 
     template<typename PixelT>
-    boost::shared_ptr<KernelPcaVisitor<PixelT> >
-    makeKernelPcaVisitor(boost::shared_ptr<KernelPca<typename KernelPcaVisitor<PixelT>::ImageT> > imagePca) {
+    std::shared_ptr<KernelPcaVisitor<PixelT> >
+    makeKernelPcaVisitor(std::shared_ptr<KernelPca<typename KernelPcaVisitor<PixelT>::ImageT> > imagePca) {
         return typename KernelPcaVisitor<PixelT>::Ptr(new KernelPcaVisitor<PixelT>(imagePca));
     };
 

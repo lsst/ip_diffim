@@ -34,8 +34,8 @@ namespace diffim {
     template <typename PixelT>
     class KernelCandidateDetection {
     public:
-        typedef boost::shared_ptr<KernelCandidateDetection> Ptr;
-        typedef boost::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
+        typedef std::shared_ptr<KernelCandidateDetection> Ptr;
+        typedef std::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
 
         KernelCandidateDetection(lsst::pex::policy::Policy const& policy);
 

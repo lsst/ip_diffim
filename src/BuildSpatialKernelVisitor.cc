@@ -9,7 +9,7 @@
  * @ingroup ip_diffim
  */
 
-#include "boost/shared_ptr.hpp" 
+#include <memory>
 #include "boost/timer.hpp" 
 
 #include "Eigen/Core"
@@ -113,7 +113,7 @@ namespace detail {
 
         /* */
 
-        _kernelSolution = boost::shared_ptr<SpatialKernelSolution>(
+        _kernelSolution = std::shared_ptr<SpatialKernelSolution>(
             new SpatialKernelSolution(basisList, spatialKernelFunction, background, policy));
     };
     

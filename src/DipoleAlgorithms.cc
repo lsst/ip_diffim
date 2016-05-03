@@ -37,7 +37,7 @@
 #   include "Minuit2/MnPrint.h"
 #endif
 
-#include "boost/shared_ptr.hpp"
+#include <memory>
 #include "lsst/pex/exceptions.h"
 #include "lsst/pex/logging/Trace.h"
 #include "lsst/afw/image.h"

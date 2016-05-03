@@ -92,7 +92,7 @@ namespace diffim {
         _footprints.clear();
 
         // List of Footprints
-        boost::shared_ptr<std::vector<afwDetect::Footprint::Ptr> > footprintListInPtr;
+        std::shared_ptr<std::vector<afwDetect::Footprint::Ptr> > footprintListInPtr;
 
         // Find detections
         afwDetect::Threshold threshold = 
