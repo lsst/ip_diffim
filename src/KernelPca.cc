@@ -55,7 +55,7 @@ namespace detail {
      */
     template<typename PixelT>
     KernelPcaVisitor<PixelT>::KernelPcaVisitor(
-        boost::shared_ptr<KernelPca<ImageT> > imagePca ///< Set of Images to initialise
+        std::shared_ptr<KernelPca<ImageT> > imagePca ///< Set of Images to initialise
         ) :
         afwMath::CandidateVisitor(),
         _imagePca(imagePca),

@@ -10,7 +10,7 @@ Python bindings for lsst::ip::diffim::detail code
 
 // Everything we will need in the _wrap.cc file
 %{
-#include "boost/shared_ptr.hpp"
+#include <memory>
 
 #include "lsst/pex/exceptions.h"
 #include "lsst/pex/logging.h"

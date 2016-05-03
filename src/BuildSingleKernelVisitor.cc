@@ -9,7 +9,7 @@
  * @ingroup ip_diffim
  */
 
-#include "boost/shared_ptr.hpp" 
+#include <memory>
 #include "Eigen/Core"
 
 #include "lsst/afw/math.h"
@@ -110,7 +110,7 @@ namespace detail {
         lsst::afw::math::KernelList const& basisList,   ///< List of basis kernels
             ///< for resulting LinearCombinationKernel
         lsst::pex::policy::Policy const& policy,  ///< Policy file directing behavior
-        boost::shared_ptr<Eigen::MatrixXd> hMat   ///< Regularization matrix
+        std::shared_ptr<Eigen::MatrixXd> hMat   ///< Regularization matrix
         ) :
         afwMath::CandidateVisitor(),
         _basisList(basisList),
@@ -283,13 +283,13 @@ namespace detail {
 
     template class BuildSingleKernelVisitor<PixelT>;
 
-    template boost::shared_ptr<BuildSingleKernelVisitor<PixelT> >
+    template std::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor<PixelT>(lsst::afw::math::KernelList const&,
                                          lsst::pex::policy::Policy const&);
 
-    template boost::shared_ptr<BuildSingleKernelVisitor<PixelT> >
+    template std::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor<PixelT>(lsst::afw::math::KernelList const&,
                                          lsst::pex::policy::Policy const&,
-                                         boost::shared_ptr<Eigen::MatrixXd>);
+                                         std::shared_ptr<Eigen::MatrixXd>);
 
 }}}} // end of namespace lsst::ip::diffim::detail

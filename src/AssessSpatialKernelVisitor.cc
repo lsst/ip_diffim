@@ -97,7 +97,7 @@ namespace detail {
         afwImage::Image<double> kImage(_spatialKernel->getDimensions());
         double kSum = _spatialKernel->computeImage(kImage, false, 
                                                    kCandidate->getXCenter(), kCandidate->getYCenter());
-        boost::shared_ptr<afwMath::Kernel>
+        std::shared_ptr<afwMath::Kernel>
             kernelPtr(new afwMath::FixedKernel(kImage));
         /* </hack> */
         

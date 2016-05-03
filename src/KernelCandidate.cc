@@ -100,13 +100,13 @@ namespace diffim {
     void KernelCandidate<PixelT>::build(
         lsst::afw::math::KernelList const& basisList
         ) {
-        build(basisList, boost::shared_ptr<Eigen::MatrixXd>());
+        build(basisList, std::shared_ptr<Eigen::MatrixXd>());
     }
 
     template <typename PixelT>
     void KernelCandidate<PixelT>::build(
         lsst::afw::math::KernelList const& basisList,
-        boost::shared_ptr<Eigen::MatrixXd> hMat
+        std::shared_ptr<Eigen::MatrixXd> hMat
         ) {
 
         /* Examine the policy for control over the variance estimate */
@@ -154,7 +154,7 @@ namespace diffim {
 
     template <typename PixelT>
     void KernelCandidate<PixelT>::_buildKernelSolution(lsst::afw::math::KernelList const& basisList,
-                                                       boost::shared_ptr<Eigen::MatrixXd> hMat)
+                                                       std::shared_ptr<Eigen::MatrixXd> hMat)
     {
         bool checkConditionNumber = _policy.getBool("checkConditionNumber");
         double maxConditionNumber = _policy.getDouble("maxConditionNumber");
@@ -177,7 +177,7 @@ namespace diffim {
                               "Using kernel regularization");
 
             if (_isInitialized) {
-                _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution<PixelT> >(
+                _kernelSolutionPca = std::shared_ptr<StaticKernelSolution<PixelT> >(
                     new RegularizedKernelSolution<PixelT>(basisList, _fitForBackground, hMat, _policy)
                     );
                 _kernelSolutionPca->build(*(_templateMaskedImage->getImage()),
@@ -195,7 +195,7 @@ namespace diffim {
                 _kernelSolutionPca->solve();
             }
             else {
-                _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution<PixelT> >(
+                _kernelSolutionOrig = std::shared_ptr<StaticKernelSolution<PixelT> >(
                     new RegularizedKernelSolution<PixelT>(basisList, _fitForBackground, hMat, _policy)
                     );
                 _kernelSolutionOrig->build(*(_templateMaskedImage->getImage()),
@@ -218,7 +218,7 @@ namespace diffim {
             pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build",
                               "Not using kernel regularization");
             if (_isInitialized) {
-                _kernelSolutionPca = boost::shared_ptr<StaticKernelSolution<PixelT> >(
+                _kernelSolutionPca = std::shared_ptr<StaticKernelSolution<PixelT> >(
                     new StaticKernelSolution<PixelT>(basisList, _fitForBackground)
                     );
                 _kernelSolutionPca->build(*(_templateMaskedImage->getImage()),
@@ -236,7 +236,7 @@ namespace diffim {
                 _kernelSolutionPca->solve();
             }
             else {
-                _kernelSolutionOrig = boost::shared_ptr<StaticKernelSolution<PixelT> >(
+                _kernelSolutionOrig = std::shared_ptr<StaticKernelSolution<PixelT> >(
                     new StaticKernelSolution<PixelT>(basisList, _fitForBackground)
                     );
                 _kernelSolutionOrig->build(*(_templateMaskedImage->getImage()),
@@ -371,7 +371,7 @@ namespace diffim {
     }
 
     template <typename PixelT>
-    boost::shared_ptr<StaticKernelSolution<PixelT> > KernelCandidate<PixelT>::getKernelSolution(
+    std::shared_ptr<StaticKernelSolution<PixelT> > KernelCandidate<PixelT>::getKernelSolution(
         CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
             if (_kernelSolutionOrig)
