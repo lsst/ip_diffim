@@ -27,7 +27,7 @@ import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
 import lsst.afw.display.ds9 as ds9
 import lsst.pipe.base as pipeBase
-from lsst.meas.algorithms.detection import BackgroundConfig
+from lsst.meas.algorithms import SubtractBackgroundConfig
 from . import utils as diUtils
 from . import diffimLib
 
@@ -122,7 +122,7 @@ class PsfMatchConfig(pexConfig.Config):
     detectionConfig = pexConfig.ConfigField("Controlling the detection of sources for kernel building",
                                             DetectionConfig)
     afwBackgroundConfig = pexConfig.ConfigField("Controlling the Afw background fitting",
-                                                BackgroundConfig)
+                                                SubtractBackgroundConfig)
 
     useAfwBackground = pexConfig.Field(
         dtype = bool,
