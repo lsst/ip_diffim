@@ -33,7 +33,6 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
-
 #include <array>
 
 #include "lsst/base.h"
