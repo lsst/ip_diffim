@@ -33,6 +33,8 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <array>
+
 #include "lsst/base.h"
 #include "lsst/pex/config.h"
 #include "ndarray/eigen.h"
@@ -153,7 +155,7 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
     ) :
     _ctrl(ctrl)
 {
-    static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
+    static std::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
         {"flag", "general failure flag, set if anything went wrong"},
         {"pos_flag", "failure flag for positive, set if anything went wrong"},
         {"neg_flag", "failure flag for negative, set if anything went wrong"}
@@ -176,7 +178,7 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
     meas::base::CentroidResultKey::addFields(schema, name, doc+": overall centroid", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_pos", doc + ": positive lobe", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_neg", doc + ": negative lobe", meas::base::SIGMA_ONLY);
-    static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
+    static std::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
         {"flag", "general failure flag, set if anything went wrong"},
         {"pos_flag", "failure flag for positive, set if anything went wrong"},
         {"neg_flag", "failure flag for negative, set if anything went wrong"}
@@ -193,7 +195,7 @@ inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
     ) :
     _ctrl(ctrl)
 {
-    static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
+    static std::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
         {"flag", "general failure flag, set if anything went wrong"},
         {"pos_flag", "failure flag for positive, set if anything went wrong"},
         {"neg_flag", "failure flag for negative, set if anything went wrong"}
@@ -211,7 +213,7 @@ inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
     ) :
     _ctrl(ctrl)
 {
-    static boost::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
+    static std::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
         {"flag", "general failure flag, set if anything went wrong"},
         {"pos_flag", "failure flag for positive, set if anything went wrong"},
         {"neg_flag", "failure flag for negative, set if anything went wrong"}
