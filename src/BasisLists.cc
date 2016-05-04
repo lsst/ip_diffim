@@ -57,7 +57,7 @@ namespace diffim {
         afwMath::KernelList kernelBasisList;
         for (int row = 0; row < signedHeight; ++row) {
             for (int col = 0; col < signedWidth; ++col) {
-                boost::shared_ptr<afwMath::Kernel> 
+                std::shared_ptr<afwMath::Kernel> 
                     kernelPtr(new afwMath::DeltaFunctionKernel(width, height, afwGeom::Point2I(col,row)));
                 kernelBasisList.push_back(kernelPtr);
             }
@@ -117,7 +117,7 @@ namespace diffim {
                     /* for 0th order term, skip polynomial */
                     (void)kernel.computeImage(image, true);
                     if (n == 0) {
-                        boost::shared_ptr<afwMath::Kernel> 
+                        std::shared_ptr<afwMath::Kernel> 
                             kernelPtr(new afwMath::FixedKernel(image));
                         kernelBasisList.push_back(kernelPtr);
                         continue;
@@ -136,7 +136,7 @@ namespace diffim {
                                                       v/static_cast<double>(halfWidth));
                         }
                     }
-                    boost::shared_ptr<afwMath::Kernel> 
+                    std::shared_ptr<afwMath::Kernel> 
                         kernelPtr(new afwMath::FixedKernel(image));
                     kernelBasisList.push_back(kernelPtr);
                     polynomial.setParameter(n, 0.);
@@ -147,7 +147,7 @@ namespace diffim {
     }
     
     
-    boost::shared_ptr<Eigen::MatrixXd>
+    std::shared_ptr<Eigen::MatrixXd>
     makeRegularizationMatrix(
         lsst::pex::policy::Policy policy
         ) {
@@ -188,7 +188,7 @@ namespace diffim {
         float borderPenalty  = policy.getDouble("regularizationBorderPenalty");
         bool fitForBackground = policy.getBool("fitForBackground");
         
-        boost::shared_ptr<Eigen::MatrixXd> bMat;
+        std::shared_ptr<Eigen::MatrixXd> bMat;
         if (regularizationType == "centralDifference") {
             int stencil = policy.getInt("centralRegularizationStencil");
             bMat = makeCentralDifferenceMatrix(width, height, stencil, borderPenalty, fitForBackground);
@@ -201,14 +201,14 @@ namespace diffim {
             throw LSST_EXCEPT(pexExcept::Exception, "regularizationType not recognized");
         }
         
-        boost::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd((*bMat).transpose() * (*bMat)));
+        std::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd((*bMat).transpose() * (*bMat)));
         return hMat;
     }
     
    /** 
     * @brief Generate regularization matrix for delta function kernels
     */
-    boost::shared_ptr<Eigen::MatrixXd>
+    std::shared_ptr<Eigen::MatrixXd>
     makeCentralDifferenceMatrix(
         int width,
         int height,
@@ -305,14 +305,14 @@ namespace diffim {
             }
         }
         
-        boost::shared_ptr<Eigen::MatrixXd> bMatPtr (new Eigen::MatrixXd(bMat));
+        std::shared_ptr<Eigen::MatrixXd> bMatPtr (new Eigen::MatrixXd(bMat));
         return bMatPtr;
     }
     
    /** 
     * @brief Generate regularization matrix for delta function kernels
     */
-    boost::shared_ptr<Eigen::MatrixXd>
+    std::shared_ptr<Eigen::MatrixXd>
     makeForwardDifferenceMatrix(
         int width,
         int height,
@@ -404,7 +404,7 @@ namespace diffim {
             }
         }
         
-        boost::shared_ptr<Eigen::MatrixXd> bMatPtr (new Eigen::MatrixXd(bTot));
+        std::shared_ptr<Eigen::MatrixXd> bMatPtr (new Eigen::MatrixXd(bTot));
         return bMatPtr;
     }
     
@@ -457,7 +457,7 @@ namespace diffim {
             if (i == 0) {
                 /* Make sure that it is normalized to kSum 1. */
                 (void)kernelListIn[i]->computeImage(image0, true);
-                boost::shared_ptr<afwMath::Kernel> 
+                std::shared_ptr<afwMath::Kernel> 
                     kernelPtr(new afwMath::FixedKernel(image0));
                 kernelListOut.push_back(kernelPtr);
                 
@@ -500,7 +500,7 @@ namespace diffim {
             image /= std::sqrt(kSum);
             /* image.writeFits(str(boost::format("out_k%d.fits") % i));  */
 
-            boost::shared_ptr<afwMath::Kernel> 
+            std::shared_ptr<afwMath::Kernel> 
                 kernelPtr(new afwMath::FixedKernel(image));
             kernelListOut.push_back(kernelPtr);
         }
@@ -512,7 +512,7 @@ namespace diffim {
    /** 
     * @brief Generate regularization matrix for delta function kernels
     */
-    boost::shared_ptr<Eigen::MatrixXd>
+    std::shared_ptr<Eigen::MatrixXd>
     makeFiniteDifferenceRegularizationDeprecated(
         unsigned int width,
         unsigned int height,
@@ -779,7 +779,7 @@ namespace diffim {
             std::cout << bMat << std::endl;
         }
         
-        boost::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd(bMat.transpose() * bMat));
+        std::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd(bMat.transpose() * bMat));
         return hMat;
     }
     

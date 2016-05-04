@@ -26,7 +26,7 @@ namespace detail {
     template<typename PixelT>
     class BuildSpatialKernelVisitor : public lsst::afw::math::CandidateVisitor {
     public:
-        typedef boost::shared_ptr<BuildSpatialKernelVisitor<PixelT> > Ptr;
+        typedef std::shared_ptr<BuildSpatialKernelVisitor<PixelT> > Ptr;
 
         BuildSpatialKernelVisitor(
             lsst::afw::math::KernelList const& basisList,  ///< Basis functions
@@ -40,18 +40,18 @@ namespace detail {
 
         void solveLinearEquation();
   
-        inline boost::shared_ptr<SpatialKernelSolution> getKernelSolution() {return _kernelSolution;}
+        inline std::shared_ptr<SpatialKernelSolution> getKernelSolution() {return _kernelSolution;}
 
         std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, 
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getSolutionPair();
 
     private:
-        boost::shared_ptr<SpatialKernelSolution> _kernelSolution;
+        std::shared_ptr<SpatialKernelSolution> _kernelSolution;
         int _nCandidates;                  ///< Number of candidates visited
     };
 
     template<typename PixelT>
-    boost::shared_ptr<BuildSpatialKernelVisitor<PixelT> >
+    std::shared_ptr<BuildSpatialKernelVisitor<PixelT> >
     makeBuildSpatialKernelVisitor(
         lsst::afw::math::KernelList const& basisList,
         lsst::afw::geom::Box2I const& regionBBox,

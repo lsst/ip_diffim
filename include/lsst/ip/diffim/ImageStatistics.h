@@ -36,7 +36,7 @@
 #define LSST_IP_DIFFIM_IMAGESTATISTICS_H
 
 #include <limits>
-#include "boost/shared_ptr.hpp"
+#include <memory>
 #include "lsst/afw/image.h"
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/logging/Trace.h"
@@ -57,7 +57,7 @@ namespace diffim {
     template <typename PixelT>
     class ImageStatistics {
     public:
-        typedef boost::shared_ptr<ImageStatistics> Ptr;
+        typedef std::shared_ptr<ImageStatistics> Ptr;
         typedef typename lsst::afw::image::MaskedImage<PixelT>::x_iterator x_iterator;
 
         ImageStatistics(lsst::pex::policy::Policy const& policy) : 

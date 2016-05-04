@@ -26,7 +26,7 @@ namespace detail {
     class AssessSpatialKernelVisitor : public lsst::afw::math::CandidateVisitor {
         typedef lsst::afw::image::MaskedImage<PixelT> MaskedImageT;
     public:
-        typedef boost::shared_ptr<AssessSpatialKernelVisitor<PixelT> > Ptr;
+        typedef std::shared_ptr<AssessSpatialKernelVisitor<PixelT> > Ptr;
 
         AssessSpatialKernelVisitor(
             lsst::afw::math::LinearCombinationKernel::Ptr spatialKernel,   ///< Spatially varying kernel 
@@ -56,7 +56,7 @@ namespace detail {
     };
 
     template<typename PixelT>
-    boost::shared_ptr<AssessSpatialKernelVisitor<PixelT> >
+    std::shared_ptr<AssessSpatialKernelVisitor<PixelT> >
     makeAssessSpatialKernelVisitor(
         lsst::afw::math::LinearCombinationKernel::Ptr spatialKernel,   
         lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground, 

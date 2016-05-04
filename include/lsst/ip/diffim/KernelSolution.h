@@ -12,7 +12,7 @@
 #ifndef LSST_IP_DIFFIM_KERNELSOLUTION_H
 #define LSST_IP_DIFFIM_KERNELSOLUTION_H
 
-#include "boost/shared_ptr.hpp"
+#include <memory>
 #include "Eigen/Core"
 
 #include "lsst/afw/math.h"
@@ -29,7 +29,7 @@ namespace diffim {
 
     class KernelSolution {
     public:
-        typedef boost::shared_ptr<KernelSolution> Ptr;
+        typedef std::shared_ptr<KernelSolution> Ptr;
         typedef lsst::afw::math::Kernel::Pixel PixelT;
         typedef lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> ImageT;
 
@@ -46,8 +46,8 @@ namespace diffim {
             SVD        = 1
         };
 
-        explicit KernelSolution(boost::shared_ptr<Eigen::MatrixXd> mMat,
-                                boost::shared_ptr<Eigen::VectorXd> bVec,
+        explicit KernelSolution(std::shared_ptr<Eigen::MatrixXd> mMat,
+                                std::shared_ptr<Eigen::VectorXd> bVec,
                                 bool fitForBackground);
         explicit KernelSolution(bool fitForBackground);
         explicit KernelSolution();
@@ -60,8 +60,8 @@ namespace diffim {
         virtual double getConditionNumber(ConditionNumberType conditionType);
         virtual double getConditionNumber(Eigen::MatrixXd mMat, ConditionNumberType conditionType);
 
-        inline boost::shared_ptr<Eigen::MatrixXd> getM() {return _mMat;}
-        inline boost::shared_ptr<Eigen::VectorXd> getB() {return _bVec;}
+        inline std::shared_ptr<Eigen::MatrixXd> getM() {return _mMat;}
+        inline std::shared_ptr<Eigen::VectorXd> getB() {return _bVec;}
         void printM() {std::cout << *_mMat << std::endl;}
         void printB() {std::cout << *_bVec << std::endl;}
         void printA() {std::cout << *_aVec << std::endl;}
@@ -69,9 +69,9 @@ namespace diffim {
 
     protected:
         int _id;                                                ///< Unique ID for object
-        boost::shared_ptr<Eigen::MatrixXd> _mMat;               ///< Derived least squares M matrix
-        boost::shared_ptr<Eigen::VectorXd> _bVec;               ///< Derived least squares B vector
-        boost::shared_ptr<Eigen::VectorXd> _aVec;               ///< Derived least squares solution matrix
+        std::shared_ptr<Eigen::MatrixXd> _mMat;               ///< Derived least squares M matrix
+        std::shared_ptr<Eigen::VectorXd> _bVec;               ///< Derived least squares B vector
+        std::shared_ptr<Eigen::VectorXd> _aVec;               ///< Derived least squares solution matrix
         KernelSolvedBy _solvedBy;                               ///< Type of algorithm used to make solution
         bool _fitForBackground;                                 ///< Background terms included in fit
         static int _SolutionId;                                 ///< Unique identifier for solution
@@ -81,7 +81,7 @@ namespace diffim {
     template <typename InputT>
     class StaticKernelSolution : public KernelSolution {
     public:
-        typedef boost::shared_ptr<StaticKernelSolution<InputT> > Ptr;
+        typedef std::shared_ptr<StaticKernelSolution<InputT> > Ptr;
 
         StaticKernelSolution(lsst::afw::math::KernelList const& basisList,
                              bool fitForBackground);
@@ -98,12 +98,12 @@ namespace diffim {
         virtual lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr makeKernelImage();
         virtual double getBackground();
         virtual double getKsum();
-        virtual std::pair<boost::shared_ptr<lsst::afw::math::Kernel>, double> getSolutionPair();
+        virtual std::pair<std::shared_ptr<lsst::afw::math::Kernel>, double> getSolutionPair();
 
     protected:
-        boost::shared_ptr<Eigen::MatrixXd> _cMat;               ///< K_i x R
-        boost::shared_ptr<Eigen::VectorXd> _iVec;               ///< Vectorized I
-        boost::shared_ptr<Eigen::VectorXd> _ivVec;              ///< Inverse variance
+        std::shared_ptr<Eigen::MatrixXd> _cMat;               ///< K_i x R
+        std::shared_ptr<Eigen::VectorXd> _iVec;               ///< Vectorized I
+        std::shared_ptr<Eigen::VectorXd> _ivVec;              ///< Inverse variance
 
         lsst::afw::math::Kernel::Ptr _kernel;                   ///< Derived single-object convolution kernel
         double _background;                                     ///< Derived differential background estimate
@@ -117,7 +117,7 @@ namespace diffim {
     template <typename InputT>
     class MaskedKernelSolution : public StaticKernelSolution<InputT> {
     public:
-        typedef boost::shared_ptr<MaskedKernelSolution<InputT> > Ptr;
+        typedef std::shared_ptr<MaskedKernelSolution<InputT> > Ptr;
 
         MaskedKernelSolution(lsst::afw::math::KernelList const& basisList,
                              bool fitForBackground);
@@ -146,11 +146,11 @@ namespace diffim {
     template <typename InputT>
     class RegularizedKernelSolution : public StaticKernelSolution<InputT> {
     public:
-        typedef boost::shared_ptr<RegularizedKernelSolution<InputT> > Ptr;
+        typedef std::shared_ptr<RegularizedKernelSolution<InputT> > Ptr;
 
         RegularizedKernelSolution(lsst::afw::math::KernelList const& basisList,
                                   bool fitForBackground,
-                                  boost::shared_ptr<Eigen::MatrixXd> hMat,
+                                  std::shared_ptr<Eigen::MatrixXd> hMat,
                                   lsst::pex::policy::Policy policy
                                   );
         virtual ~RegularizedKernelSolution() {};
@@ -159,10 +159,10 @@ namespace diffim {
         double estimateRisk(double maxCond);
 
         /* Include additive term (_lambda * _hMat) in M matrix? */
-        boost::shared_ptr<Eigen::MatrixXd> getM(bool includeHmat = true);
+        std::shared_ptr<Eigen::MatrixXd> getM(bool includeHmat = true);
 
     private:
-        boost::shared_ptr<Eigen::MatrixXd> _hMat;               ///< Regularization weights
+        std::shared_ptr<Eigen::MatrixXd> _hMat;               ///< Regularization weights
         double _lambda;                                         ///< Overall regularization strength
         lsst::pex::policy::Policy _policy;
 
@@ -172,7 +172,7 @@ namespace diffim {
 
     class SpatialKernelSolution : public KernelSolution {
     public:
-        typedef boost::shared_ptr<SpatialKernelSolution> Ptr;
+        typedef std::shared_ptr<SpatialKernelSolution> Ptr;
 
         /* Creates a polynomial SpatialFunction */
         SpatialKernelSolution(lsst::afw::math::KernelList const& basisList,
@@ -184,8 +184,8 @@ namespace diffim {
         virtual ~SpatialKernelSolution() {};
         
         void addConstraint(float xCenter, float yCenter,
-                           boost::shared_ptr<Eigen::MatrixXd> qMat,
-                           boost::shared_ptr<Eigen::VectorXd> wVec);
+                           std::shared_ptr<Eigen::MatrixXd> qMat,
+                           std::shared_ptr<Eigen::VectorXd> wVec);
 
         void solve();
         lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr makeKernelImage(lsst::afw::geom::Point2D const& pos);

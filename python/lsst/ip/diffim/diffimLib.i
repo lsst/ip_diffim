@@ -56,7 +56,7 @@ namespace boost {
 %apply double& OUTPUT { double& };
 
 %{
-#include "boost/shared_ptr.hpp"
+#include <memory>
 
 
 #include "lsst/pex/exceptions.h"
@@ -84,8 +84,8 @@ namespace boost {
 %}
 %include "ndarray.i"
 
-%template(PtrEigenMatrixXd) boost::shared_ptr<Eigen::MatrixXd>;
-%template(PtrEigenVectorXd) boost::shared_ptr<Eigen::VectorXd>;
+%template(PtrEigenMatrixXd) std::shared_ptr<Eigen::MatrixXd>;
+%template(PtrEigenVectorXd) std::shared_ptr<Eigen::VectorXd>;
 %declareNumPyConverters(Eigen::MatrixXd);
 %declareNumPyConverters(Eigen::VectorXd);
 %shared_ptr(Eigen::MatrixXd);
@@ -220,7 +220,7 @@ lsst::afw::image::Image<PIXTYPE>
 %inline %{
     lsst::ip::diffim::KernelCandidate<TYPE>::Ptr
         cast_KernelCandidate##NAME(lsst::afw::math::SpatialCellCandidate::Ptr candidate) {
-        return boost::dynamic_pointer_cast<lsst::ip::diffim::KernelCandidate<TYPE> >(candidate);
+        return std::dynamic_pointer_cast<lsst::ip::diffim::KernelCandidate<TYPE> >(candidate);
     }
 %}
 %enddef

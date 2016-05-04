@@ -172,7 +172,7 @@ namespace detail {
 
     template class KernelSumVisitor<PixelT>;
 
-    template boost::shared_ptr<KernelSumVisitor<PixelT> > 
+    template std::shared_ptr<KernelSumVisitor<PixelT> > 
     makeKernelSumVisitor<PixelT>(lsst::pex::policy::Policy const&);
 
 }}}} // end of namespace lsst::ip::diffim::detail

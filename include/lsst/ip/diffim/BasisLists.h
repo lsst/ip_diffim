@@ -12,7 +12,7 @@
 #ifndef LSST_IP_DIFFIM_BASISSETS_H
 #define LSST_IP_DIFFIM_BASISSETS_H
 
-#include "boost/shared_ptr.hpp"
+#include <memory>
 
 #include "Eigen/Core"
 
@@ -48,7 +48,7 @@ namespace diffim {
      * @note Calls either makeForwardDifferenceMatrix or
      * makeCentralDifferenceMatrix based on the policy file.
      */    
-    boost::shared_ptr<Eigen::MatrixXd> makeRegularizationMatrix(
+    std::shared_ptr<Eigen::MatrixXd> makeRegularizationMatrix(
         lsst::pex::policy::Policy policy
         );
 
@@ -63,7 +63,7 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */    
-    boost::shared_ptr<Eigen::MatrixXd> makeForwardDifferenceMatrix(
+    std::shared_ptr<Eigen::MatrixXd> makeForwardDifferenceMatrix(
         int width,
         int height,
         std::vector<int> const& orders,
@@ -82,7 +82,7 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */    
-    boost::shared_ptr<Eigen::MatrixXd> makeCentralDifferenceMatrix(
+    std::shared_ptr<Eigen::MatrixXd> makeCentralDifferenceMatrix(
         int width,
         int height,
         int stencil,
