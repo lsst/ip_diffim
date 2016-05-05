@@ -27,7 +27,7 @@ import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.pipe.base as pipeBase
-from lsst.meas.algorithms import SourceDetectionTask, getBackground
+from lsst.meas.algorithms import SourceDetectionTask, SubtractBackgroundTask
 from lsst.meas.base import SingleFrameMeasurementTask
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigDF, PsfMatchConfigAL
@@ -281,6 +281,10 @@ And finally provide some optional debugging displays:
         PsfMatchTask.__init__(self, *args, **kwargs)
         self.kConfig = self.config.kernel.active
         self._warper = afwMath.Warper.fromConfig(self.kConfig.warpingConfig)
+        # the background subtraction task uses a config from an unusual location,
+        # so cannot easily be constructed with makeSubtask
+        self.background = SubtractBackgroundTask(config=self.kConfig.afwBackgroundConfig, name="background",
+            parentTask=self)
         self.selectSchema = afwTable.SourceTable.makeMinimalSchema()
         self.selectAlgMetadata = dafBase.PropertyList()
         self.makeSubtask("selectDetection", schema=self.selectSchema)
@@ -635,7 +639,7 @@ And finally provide some optional debugging displays:
         maskArr = mi.getMask().getArray()
         miArr = np.ma.masked_array(imArr, mask=maskArr)
         try:
-            bkgd = getBackground(mi, self.kConfig.afwBackgroundConfig).getImageF()
+            bkgd = self.background.fitBackground(mi).getImageF()
         except Exception:
             self.log.warn("Failed to get background model.  Falling back to median background estimation")
             bkgd = np.ma.extras.median(miArr)
