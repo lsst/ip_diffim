@@ -35,9 +35,9 @@
 #ifndef LSST_IP_DIFFIM_IMAGESTATISTICS_H
 #define LSST_IP_DIFFIM_IMAGESTATISTICS_H
 
+#include <cmath>
 #include <limits>
 #include <memory>
-#include <cmath>
 
 #include "lsst/afw/image.h"
 #include "lsst/pex/policy/Policy.h"
