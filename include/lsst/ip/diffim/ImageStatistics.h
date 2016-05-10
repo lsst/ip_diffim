@@ -37,10 +37,11 @@
 
 #include <limits>
 #include <memory>
+#include <cmath>
+
 #include "lsst/afw/image.h"
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/logging/Trace.h"
-#include "lsst/utils/ieee.h"
 
 namespace lsst { 
 namespace ip { 
@@ -108,7 +109,7 @@ namespace diffim {
                      ptr != end; ++ptr) {
                     if (!((*ptr).mask() & _bpMask)) {
                         double const ivar = 1. / (*ptr).variance();
-                        if (lsst::utils::lsst_isfinite(ivar)) {
+                        if (std::isfinite(ivar)) {
                             _xsum  += (*ptr).image() * sqrt(ivar);
                             _x2sum += (*ptr).image() * (*ptr).image() * ivar;
                             _npix  += 1;
@@ -116,7 +117,7 @@ namespace diffim {
                     }
                 }
             }
-            if ((!lsst::utils::lsst_isfinite(_xsum)) || (!lsst::utils::lsst_isfinite(_x2sum))) {
+            if ((!std::isfinite(_xsum)) || (!std::isfinite(_x2sum))) {
                 throw LSST_EXCEPT(pexExcept::Exception, 
                                   "Nan/Inf in ImageStatistics.apply");
             }

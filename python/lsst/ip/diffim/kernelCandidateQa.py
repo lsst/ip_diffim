@@ -89,10 +89,10 @@ class KernelCandidateQa(object):
                        ("Anderson-Darling significance levels for the Normal distribution", 5),
                        ("Reduced chi^2 of the residual.", "likelihood"),
                        ("Mean squared error in diffim : Variance + Bias**2",),
-                       ("Centroid in X for this Kernel", "pixels"),
-                       ("Centroid in Y for this Kernel", "pixels"),
-                       ("Standard deviation in X for this Kernel", "pixels"),
-                       ("Standard deviation in Y for this Kernel", "pixels"),
+                       ("Centroid in X for this Kernel", "pixel"),
+                       ("Centroid in Y for this Kernel", "pixel"),
+                       ("Standard deviation in X for this Kernel", "pixel"),
+                       ("Standard deviation in Y for this Kernel", "pixel"),
                        ("Id for this KernelCandidate",)]
         metricMap = {}
         for name, mtype, comment in zip(nameList, typeList, commentList):
