@@ -39,6 +39,7 @@ from kernelCandidateQa import *
 from getTemplate import *
 from .diaCatalogSourceSelector import *
 from lsst.meas.base import wrapSimpleAlgorithm
+from dipoleFitTask import *
 
 # automatically register ip_diffim Algorithms
 wrapSimpleAlgorithm(NaiveDipoleCentroid, Control=DipoleCentroidControl, executionOrder=0.0)
