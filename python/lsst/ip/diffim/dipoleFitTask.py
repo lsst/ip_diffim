@@ -34,7 +34,7 @@ import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 from lsst.pipe.base import Struct
 
-__all__ = ("DipoleFitPluginConfig", "DipoleFitTask", "DipoleFitPlugin")
+__all__ = ("DipoleFitTask", "DipoleFitPlugin", "DipoleFitTaskConfig", "DipoleFitPluginConfig")
 
 
 # Create a new measurement task (`DipoleFitTask`) that can handle all other SFM tasks but can
@@ -88,6 +88,29 @@ class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
         (note this is actually a significance, not a chi2 value).""")
 
 
+class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
+    """!Measurement of detected diaSources as dipoles"""
+
+    def setDefaults(self):
+        measBase.SingleFrameMeasurementConfig.setDefaults(self)
+
+        self.plugins.names = ["base_CircularApertureFlux",
+                              "base_PixelFlags",
+                              "base_SkyCoord",
+                              "base_PsfFlux",
+                              "ip_diffim_NaiveDipoleCentroid",
+                              "ip_diffim_NaiveDipoleFlux",
+                              "ip_diffim_PsfDipoleFlux"
+                              ]
+
+        self.slots.calibFlux = None
+        self.slots.modelFlux = None
+        self.slots.instFlux = None
+        self.slots.shape = None
+        self.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
+        self.doReplaceWithNoise = False
+
+
 class DipoleFitTask(measBase.SingleFrameMeasurementTask):
     """!Subclass of SingleFrameMeasurementTask which accepts up to three input images in its run() method.
 
@@ -96,7 +119,7 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
     can be used identically to a standard SingleFrameMeasurementTask.
     """
 
-    ConfigClass = DipoleFitPluginConfig
+    ConfigClass = DipoleFitTaskConfig
     _DefaultName = "ip_diffim_DipoleFit"
 
     def __init__(self, schema, algMetadata=None, **kwds):
@@ -937,7 +960,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         if result is None:
             return result
 
-        self.log.log(self.log.DEBUG, "Dipole fit result: %s" % str(result))
+        self.log.log(self.log.DEBUG, "Dipole fit result: %d %s" % (measRecord.getId(), str(result)))
 
         if result.posFlux <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
             self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
@@ -1012,12 +1035,14 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         measRecord.set(self.flagKey, True)
         if error is not None:
-            self.log.warn('DipoleFitPlugin failed on record %d: %s' % (measRecord.getId(), str(error)))
             if error.getFlagBit() == self.FAILURE_EDGE:
+                self.log.warn('DipoleFitPlugin not run on record %d: %s' % (measRecord.getId(), str(error)))
                 measRecord.set(self.edgeFlagKey, True)
             if error.getFlagBit() == self.FAILURE_FIT:
+                self.log.warn('DipoleFitPlugin failed on record %d: %s' % (measRecord.getId(), str(error)))
                 measRecord.set(self.flagKey, True)
             if error.getFlagBit() == self.FAILURE_NOT_DIPOLE:
+                self.log.warn('DipoleFitPlugin not run on record %d: %s' % (measRecord.getId(), str(error)))
                 measRecord.set(self.flagKey, True)
         else:
             self.log.warn('DipoleFitPlugin failed on record %d' % measRecord.getId())
