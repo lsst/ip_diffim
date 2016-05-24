@@ -158,13 +158,17 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
 
         \param[in] exposure -- exposure (unused)
         \param[in] sensorRef -- a Butler data reference
-        \param[in] templateIdList -- list of data ids. Only visit used.
+        \param[in] templateIdList -- list of data ids, which should contain as single item. 
+                                     If there are multiple items, only the first is used. 
+                                     Only the entry 'visit' from the data id is used.
 
         \return a pipeBase.Struct
          - exposure: a template calexp
          - sources: source catalog measured on the template
         """
 
+        if len(templateIdList) == 0:
+            raise RuntimeError("No template supplied! Please supply a template visit id.")
         if len(templateIdList) > 1:
             self.log.warn("Multiple template visits supplied. Getting template from first visit: %s" %
                           (templateIdList[0]['visit']))
