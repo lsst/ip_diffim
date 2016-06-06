@@ -240,3 +240,5 @@ class DiaCatalogSourceSelectorTask(measAlg.StarSelectorTask):
         return Struct(
             starCat = starCat,
         )
+
+measAlg.starSelectorRegistry.register("diacatalog", DiaCatalogSourceSelectorTask)
