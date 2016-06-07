@@ -1,6 +1,6 @@
 #
 # LSST Data Management System
-# Copyright 2008, 2009, 2010 LSST Corporation.
+# Copyright 2008-2016 LSST Corporation.
 #
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -34,8 +34,8 @@ from . import diffimLib
 class DetectionConfig(pexConfig.Config):
     """!Configuration for detecting sources on images for building a PSF-matching kernel
 
-    Configuration for turning detected lsst.afw.detection.FootPrints into an acceptable 
-    (unmasked, high signal-to-noise, not too large or not too small) list of 
+    Configuration for turning detected lsst.afw.detection.FootPrints into an acceptable
+    (unmasked, high signal-to-noise, not too large or not too small) list of
     lsst.ip.diffim.KernelSources that are used to build the Psf-matching kernel"""
 
     detThreshold = pexConfig.Field(
@@ -114,7 +114,7 @@ class DetectionConfig(pexConfig.Config):
 class PsfMatchConfig(pexConfig.Config):
     """!Base configuration for Psf-matching
 
-    The base configuration of the Psf-matching kernel, and of the warping, detection, 
+    The base configuration of the Psf-matching kernel, and of the warping, detection,
     and background modeling subTasks."""
 
     warpingConfig = pexConfig.ConfigField("Config for warping exposures to a common alignment",
@@ -403,7 +403,7 @@ class PsfMatchConfigAL(PsfMatchConfig):
     )
     alardMinSigDeconv = pexConfig.Field(
         dtype = float,
-        doc = """Minimum Sigma (pixels) for Gaussians during deconvolution; 
+        doc = """Minimum Sigma (pixels) for Gaussians during deconvolution;
         make smaller than alardMinSig as this is only indirectly used""",
         default = 0.4,
         check = lambda x : x >= 0.25
@@ -542,12 +542,12 @@ class PsfMatchTask(pipeBase.Task):
 
 \section ip_diffim_psfmatch_Purpose   Description
 
-PsfMatchTask is a base class that implements the core functionality for matching the 
+PsfMatchTask is a base class that implements the core functionality for matching the
 Psfs of two images using a spatially varying Psf-matching lsst.afw.math.LinearCombinationKernel.
-The Task requires the user to provide an instance of an lsst.afw.math.SpatialCellSet, 
-filled with lsst.ip.diffim.KernelCandidate instances, and an lsst.afw.math.KernelList 
+The Task requires the user to provide an instance of an lsst.afw.math.SpatialCellSet,
+filled with lsst.ip.diffim.KernelCandidate instances, and an lsst.afw.math.KernelList
 of basis shapes that will be used for the decomposition.  If requested, the Task
-also performs background matching and returns the differential background model as an 
+also performs background matching and returns the differential background model as an
 lsst.afw.math.Kernel.SpatialFunction.
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -561,13 +561,13 @@ lsst.afw.math.Kernel.SpatialFunction.
 \section ip_diffim_psfmatch_IO        Invoking the Task
 
 As a base class, this Task is not directly invoked.  However, run() methods that are
-implemented on derived classes will make use of the core _solve() functionality, 
+implemented on derived classes will make use of the core _solve() functionality,
 which defines a sequence of lsst.afw.math.CandidateVisitor classes that iterate
 through the KernelCandidates, first building up a per-candidate solution and then
 building up a spatial model from the ensemble of candidates.  Sigma clipping is
-performed using the mean and standard deviation of all kernel sums (to reject 
-variable objects), on the per-candidate substamp diffim residuals 
-(to indicate a bad choice of kernel basis shapes for that particular object), 
+performed using the mean and standard deviation of all kernel sums (to reject
+variable objects), on the per-candidate substamp diffim residuals
+(to indicate a bad choice of kernel basis shapes for that particular object),
 and on the substamp diffim residuals using the spatial kernel fit (to indicate a bad
 choice of spatial kernel order, or poor constraints on the spatial model).  The
 _diagnostic() method logs information on the quality of the spatial fit, and also
@@ -585,22 +585,22 @@ See \ref PsfMatchConfig, \ref PsfMatchConfigAL, \ref PsfMatchConfigDF, and \ref 
 
 
 <DL>
-<DT> spatialConditionNum <DD> Condition number of the spatial kernel fit; 
+<DT> spatialConditionNum <DD> Condition number of the spatial kernel fit;
     via \link lsst.ip.diffim.PsfMatchTask._diagnostic PsfMatchTask._diagnostic \endlink </DD> </DT>
 <DT> spatialKernelSum <DD> Kernel sum (10^{-0.4 * &Delta; zeropoint}) of the spatial Psf-matching kernel;
     via \link lsst.ip.diffim.PsfMatchTask._diagnostic PsfMatchTask._diagnostic \endlink </DD> </DT>
 
 <DT> ALBasisNGauss <DD> If using sum-of-Gaussian basis, the number of gaussians used;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList 
+    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
     generateAlardLuptonBasisList\endlink </DD> </DT>
 <DT> ALBasisDegGauss <DD> If using sum-of-Gaussian basis, the degree of spatial variation of the Gaussians;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList 
+    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
     generateAlardLuptonBasisList\endlink </DD> </DT>
 <DT> ALBasisSigGauss <DD> If using sum-of-Gaussian basis, the widths (sigma) of the Gaussians;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList 
+    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
     generateAlardLuptonBasisList\endlink </DD> </DT>
 <DT> ALKernelSize <DD> If using sum-of-Gaussian basis, the kernel size;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList 
+    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
     generateAlardLuptonBasisList\endlink </DD> </DT>
 
 <DT> NFalsePositivesTotal <DD> Total number of diaSources;
@@ -611,13 +611,13 @@ See \ref PsfMatchConfig, \ref PsfMatchConfigAL, \ref PsfMatchConfigDF, and \ref 
     via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
 <DT> NFalsePositivesUnassociated <DD> Number of diaSources that are orphans;
     via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
-<DT> metric_MEAN <DD> Mean value of substamp diffim quality metrics across all KernelCandidates, 
+<DT> metric_MEAN <DD> Mean value of substamp diffim quality metrics across all KernelCandidates,
     for both the per-candidate (LOCAL) and SPATIAL residuals;
     via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
-<DT> metric_MEDIAN <DD> Median value of substamp diffim quality metrics across all KernelCandidates, 
+<DT> metric_MEDIAN <DD> Median value of substamp diffim quality metrics across all KernelCandidates,
     for both the per-candidate (LOCAL) and SPATIAL residuals;
     via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
-<DT> metric_STDEV <DD> Standard deviation of substamp diffim quality metrics across all KernelCandidates, 
+<DT> metric_STDEV <DD> Standard deviation of substamp diffim quality metrics across all KernelCandidates,
     for both the per-candidate (LOCAL) and SPATIAL residuals;
     via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
 </DL>
@@ -629,14 +629,14 @@ See \ref PsfMatchConfig, \ref PsfMatchConfigAL, \ref PsfMatchConfigDF, and \ref 
 
 
 The \link lsst.pipe.base.cmdLineTask.CmdLineTask command line task\endlink interface supports a
-flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py 
+flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py
 for this Task include:
 
 \code{.py}
     import sys
     import lsstDebug
     def DebugInfo(name):
-        di = lsstDebug.getInfo(name)          
+        di = lsstDebug.getInfo(name)
         if name == "lsst.ip.diffim.psfMatch":
             di.display = True                 # enable debug output
             di.maskTransparency = 80          # ds9 mask transparency
@@ -662,7 +662,7 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 \section ip_diffim_psfmatch_Example   Example code
 
 As a base class, there is no example code for PsfMatchTask.
-However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchTask\endlink, 
+However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchTask\endlink,
 \link lsst.ip.diffim.snapPsfMatch.SnapPsfMatchTask SnapPsfMatchTask\endlink, and
 \link lsst.ip.diffim.modelPsfMatch.ModelPsfMatchTask ModelPsfMatchTask\endlink.
 
@@ -678,7 +678,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         \param *args arguments to be passed to lsst.pipe.base.task.Task.__init__
         \param **kwargs keyword arguments to be passed to lsst.pipe.base.task.Task.__init__
 
-        The initialization sets the Psf-matching kernel configuration using the value of 
+        The initialization sets the Psf-matching kernel configuration using the value of
         self.config.kernel.active.  If the kernel is requested with regularization to moderate
         the bias/variance tradeoff, currently only used when a delta function kernel basis
         is provided, it creates a regularization matrix stored as member variable
@@ -785,7 +785,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
     def _displayDebug(self, kernelCellSet, spatialKernel, spatialBackground):
         """!Provide visualization of the inputs and ouputs to the Psf-matching code
 
-        @param kernelCellSet: the SpatialCellSet used in determining the matching kernel and background 
+        @param kernelCellSet: the SpatialCellSet used in determining the matching kernel and background
         @param spatialKernel: spatially varying Psf-matching kernel
         @param spatialBackground: spatially varying background-matching function
 
@@ -802,16 +802,16 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         ds9.setMaskTransparency(maskTransparency)
 
         if displayCandidates:
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground,
                                          frame=lsstDebug.frame,
                                          showBadCandidates=showBadCandidates)
             lsstDebug.frame += 1
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground,
                                          frame=lsstDebug.frame,
                                          showBadCandidates=showBadCandidates,
                                          kernels=True)
             lsstDebug.frame += 1
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground, 
+            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground,
                                          frame=lsstDebug.frame,
                                          showBadCandidates=showBadCandidates,
                                          resids=True)
@@ -832,7 +832,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
         """!Create Principal Component basis
 
-        If a principal component analysis is requested, typically when using a delta function basis, 
+        If a principal component analysis is requested, typically when using a delta function basis,
         perform the PCA here and return a new basis list containing the new principal components.
 
         @param kernelCellSet: a SpatialCellSet containing KernelCandidates, from which components are derived
@@ -893,9 +893,9 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
     def _solve(self, kernelCellSet, basisList, returnOnExcept=False):
         """!Solve for the PSF matching kernel
 
-        @param kernelCellSet: a SpatialCellSet to use in determining the matching kernel 
+        @param kernelCellSet: a SpatialCellSet to use in determining the matching kernel
           (typically as provided by _buildCellSet)
-        @param basisList: list of Kernels to be used in the decomposition of the spatially varying kernel 
+        @param basisList: list of Kernels to be used in the decomposition of the spatially varying kernel
           (typically as provided by makeKernelBasisList)
         @param returnOnExcept: if True then return (None, None) if an error occurs, else raise the exception
 
@@ -941,7 +941,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
                                  "Iteration %d, rejected %d candidates due to initial kernel fit" %
                                  (thisIteration, nRejectedSkf))
 
-                # Reject outliers in kernel sum 
+                # Reject outliers in kernel sum
                 ksv.resetKernelSum()
                 ksv.setMode(diffimLib.KernelSumVisitorF.AGGREGATE)
                 kernelCellSet.visitCandidates(ksv, nStarPerCell)

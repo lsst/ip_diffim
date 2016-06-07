@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-# 
+#
 # LSST Data Management System
-# Copyright 2008, 2009, 2010 LSST Corporation.
-# 
+# Copyright 2008-2016 LSST Corporation.
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -11,14 +11,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 from __future__ import division
@@ -28,7 +28,7 @@ import lsst.afw.image                    as afwImage
 import lsst.afw.geom                     as afwGeom
 import lsst.afw.detection                as afwDet
 import lsst.pex.policy                   as pexPolicy
-import lsst.pex.logging                  as pexLog 
+import lsst.pex.logging                  as pexLog
 import lsst.daf.persistence              as dafPersist
 import lsst.daf.base                     as dafBase
 import numpy as num
@@ -41,7 +41,7 @@ def parseOptions():
     """Parse the command line options."""
     parser = OptionParser(
             usage="""%prog cdDiffSources crDiffExposure
-            
+
 Read in sources and test for junk""")
     options, args = parser.parse_args()
     if len(args) != 2:
@@ -96,21 +96,21 @@ class DiaSourceAnalystConfig(pexConfig.Config):
 class DiaSourceAnalyst(object):
     def __init__(self, config):
         self.config = config
-            
+
         self.bitMask = 0
         srcBadMaskPlanes = self.config.srcBadMaskPlanes
         for maskPlane in srcBadMaskPlanes:
-            self.bitMask |= afwImage.MaskU_getPlaneBitMask(maskPlane) 
-        
+            self.bitMask |= afwImage.MaskU_getPlaneBitMask(maskPlane)
+
     def countDetected(self, mask):
         idxP = num.where(mask & afwImage.MaskU_getPlaneBitMask("DETECTED"))
         idxN = num.where(mask & afwImage.MaskU_getPlaneBitMask("DETECTED_NEGATIVE"))
         return len(idxP[0]), len(idxN[0])
-        
+
     def countMasked(self, mask):
         idxM = num.where(mask & self.bitMask)
         return len(idxM[0])
-        
+
     def countPolarity(self, mask, pixels):
         unmasked = ((mask & self.bitMask) == 0)
         idxP  = num.where( (pixels >= 0) & unmasked)
@@ -119,25 +119,25 @@ class DiaSourceAnalyst(object):
         fluxN = num.sum(pixels[idxN])
         #import pdb; pdb.set_trace()
         return len(idxP[0]), len(idxN[0]), fluxP, fluxN
-        
+
     def testSource(self, source, subMi):
-        imArr, maArr, varArr   = subMi.getArrays()    
+        imArr, maArr, varArr   = subMi.getArrays()
         flux                   = source.getApFlux()
-        
+
         nPixels                = subMi.getWidth() * subMi.getHeight()
         nPos, nNeg, fPos, fNeg = self.countPolarity(maArr, imArr)
         nDetPos, nDetNeg       = self.countDetected(maArr)
         nMasked                = self.countMasked(maArr)
         assert (nPixels == (nMasked + nPos + nNeg))
-        
-        # 1) Too many pixels in the detection are masked  
+
+        # 1) Too many pixels in the detection are masked
         fMasked    = (nMasked / nPixels)
         fMaskedTol = self.config.fBadPixels
         if fMasked > fMaskedTol:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
                 "Candidate %d : BAD fBadPixels %.2f > %.2f" % (source.getId(), fMasked, fMaskedTol))
             return False
-            
+
         if flux > 0:
             # positive-going source
             fluxRatio  = fPos / (fPos + abs(fNeg))
@@ -150,28 +150,28 @@ class DiaSourceAnalyst(object):
             ngoodRatio = nNeg / nPixels
             maskRatio  = nNeg / (nNeg + nMasked)
             npolRatio  = nNeg / (nNeg + nPos)
-        
+
         # 2) Not enough flux in unmasked correct-polarity pixels
         fluxRatioTolerance = self.config.fluxPolarityRatio
         if fluxRatio < fluxRatioTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                "Candidate %d : BAD flux polarity %.2f < %.2f (pos=%.2f neg=%.2f)" % (source.getId(), 
+                "Candidate %d : BAD flux polarity %.2f < %.2f (pos=%.2f neg=%.2f)" % (source.getId(),
                 fluxRatio, fluxRatioTolerance, fPos, fNeg))
             return False
-        
+
         # 3) Not enough unmasked pixels of correct polarity
         polarityTolerance = self.config.nPolarityRatio
         if npolRatio < polarityTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                "Candidate %d : BAD polarity count %.2f < %.2f (pos=%d neg=%d)" % (source.getId(), 
+                "Candidate %d : BAD polarity count %.2f < %.2f (pos=%d neg=%d)" % (source.getId(),
                 npolRatio, polarityTolerance, nPos, nNeg))
             return False
-            
+
         # 4) Too many masked vs. correct polarity pixels
         maskedTolerance = self.config.nMaskedRatio
         if maskRatio < maskedTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                "Candidate %d : BAD unmasked count %.2f < %.2f (pos=%d neg=%d mask=%d)" % (source.getId(), 
+                "Candidate %d : BAD unmasked count %.2f < %.2f (pos=%d neg=%d mask=%d)" % (source.getId(),
                 maskRatio, maskedTolerance, nPos, nNeg, nMasked))
             return False
 
@@ -179,15 +179,15 @@ class DiaSourceAnalyst(object):
         ngoodTolerance = self.config.nGoodRatio
         if ngoodRatio < ngoodTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                "Candidate %d : BAD good pixel count %.2f < %.2f (pos=%d neg=%d tot=%d)" % (source.getId(), 
+                "Candidate %d : BAD good pixel count %.2f < %.2f (pos=%d neg=%d tot=%d)" % (source.getId(),
                 ngoodRatio, ngoodTolerance, nPos, nNeg, nPixels))
             return False
-                    
+
         pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-            "Candidate %d : OK flux=%.2f nPos=%d nNeg=%d nTot=%d nDetPos=%d nDetNeg=%d fPos=%.2f fNeg=%2f" % (source.getId(),
-            flux, nPos, nNeg, nPixels, nDetPos, nDetNeg, fPos, fNeg))
-        return True                                        
-        
+            "Candidate %d : OK flux=%.2f nPos=%d nNeg=%d nTot=%d nDetPos=%d nDetNeg=%d fPos=%.2f fNeg=%2f" %
+            (source.getId(), flux, nPos, nNeg, nPixels, nDetPos, nDetNeg, fPos, fNeg))
+        return True
+
 
 def main():
     """Main program"""
@@ -197,21 +197,21 @@ def main():
     crDiffSources = readSourceSet(crDiffSourceFile)
     crDiffExposure = afwImage.ExposureF(crDiffExposureFile)
     #import pdb; pdb.set_trace()
-    
+
     analyst = DiaSourceAnalyst()
-    
+
     expX0 = crDiffExposure.getX0()
     expY0 = crDiffExposure.getY0()
     expX1 = expX0 + crDiffExposure.getWidth() - 1
     expY1 = expY0 + crDiffExposure.getHeight() - 1
-    
+
     for i in range(crDiffSources.size()):
         crDiffSource = crDiffSources[i]
 
         # This segfaults; revisit once the stack stabilizes
         #footprint    = crDiffSource.getFootprint()
         #bbox         = footprint.getBBox()
-        
+
         xAstrom      = crDiffSource.getXAstrom()
         yAstrom      = crDiffSource.getYAstrom()
         Ixx          = max(1.0, crDiffSource.getIxx())

@@ -1,7 +1,7 @@
-# 
+#
 # LSST Data Management System
-# Copyright 2008-2015 AURA/LSST.
-# 
+# Copyright 2008-2016 AURA/LSST.
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -9,14 +9,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
 import numpy as np
@@ -309,7 +309,8 @@ class SourceFlagChecker(object):
         The list of badFlags will be used to make a list of keys to check for measurement flags on.  By
         default the centroid keys are added to this list"""
 
-        self.badFlags = ['base_PixelFlags_flag_edge', 'base_PixelFlags_flag_interpolatedCenter', 'base_PixelFlags_flag_saturatedCenter']
+        self.badFlags = ['base_PixelFlags_flag_edge', 'base_PixelFlags_flag_interpolatedCenter',
+                        'base_PixelFlags_flag_saturatedCenter']
         if badFlags is not None:
             for flag in badFlags:
                 self.badFlags.append(flag)

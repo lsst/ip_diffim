@@ -1,6 +1,6 @@
 #
 # LSST Data Management System
-# Copyright 2008, 2009, 2010 LSST Corporation.
+# Copyright 2008-2016 LSST Corporation.
 #
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -9,7 +9,7 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -19,7 +19,7 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-import diffimLib 
+import diffimLib
 import lsst.pex.logging as pexLog
 import numpy as np
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
@@ -44,7 +44,8 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
     the input FWHM of the science and template images"""
 
     if config.kernelBasisSet != "alard-lupton":
-        raise RuntimeError("Cannot generate %s basis within generateAlardLuptonBasisList" % config.kernelBasisSet)
+        raise RuntimeError("Cannot generate %s basis within generateAlardLuptonBasisList" %
+                            config.kernelBasisSet)
 
     kernelSize     = config.kernelSize
     fwhmScaling    = config.kernelSizeFwhmScaling
@@ -58,7 +59,8 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
     if len(basisDegGauss) != basisNGauss:
         raise ValueError("len(basisDegGauss) != basisNGauss : %d vs %d" % (len(basisDegGauss), basisNGauss))
     if len(basisSigmaGauss) != basisNGauss:
-        raise ValueError("len(basisSigmaGauss) != basisNGauss : %d vs %d" % (len(basisSigmaGauss), basisNGauss))
+        raise ValueError("len(basisSigmaGauss) != basisNGauss : %d vs %d" %
+                         (len(basisSigmaGauss), basisNGauss))
     if (kernelSize % 2) != 1:
         raise ValueError("Only odd-sized Alard-Lupton bases allowed")
 

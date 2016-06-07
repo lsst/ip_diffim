@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import os, sys
+import os
+import sys
 import unittest
 import lsst.utils.tests as tests
 
@@ -14,7 +15,7 @@ import lsst.pex.config as pexConfig
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 
 class DiffimTestCases(unittest.TestCase):
-    
+
     def setUp(self):
         self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.subconfig = self.config.kernel.active
@@ -37,7 +38,7 @@ class DiffimTestCases(unittest.TestCase):
                                         "v5-e0-c011-a00.sci.fits")
             self.templateImage  = afwImage.MaskedImageF(defImagePath)
             self.scienceImage   = self.templateImage.Factory( self.templateImage.getDimensions() )
-            
+
             afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False)
 
     def tearDown(self):
@@ -47,7 +48,7 @@ class DiffimTestCases(unittest.TestCase):
         del self.gaussKernel
         if self.defDataDir:
             del self.templateImage
-            del self.scienceImage 
+            del self.scienceImage
 
     def testGetCollection(self):
         if not self.defDataDir:
@@ -99,7 +100,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertTrue(len(fpList3) == (len(fpList1)-3))
 
 #####
-        
+
 def suite():
     """Returns a suite containing all the test cases in this module."""
     tests.init()

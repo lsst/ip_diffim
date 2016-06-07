@@ -1,7 +1,7 @@
-# 
+#
 # LSST Data Management System
-# Copyright 2008, 2009, 2010 LSST Corporation.
-# 
+# Copyright 2008-2016 LSST Corporation.
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -9,14 +9,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import lsst.pex.config as pexConfig
@@ -108,17 +108,17 @@ class SnapPsfMatchTask(ImagePsfMatchTask):
 
 This Task differs from ImagePsfMatchTask in that it matches two Exposures assuming that the images have
 been acquired very closely in time.  Under this assumption, the astrometric misalignments and/or
-relative distortions should be within a pixel, and the Psf-shapes should be very similar.  As a 
-consequence, the default configurations for this class assume a very simple solution.  
+relative distortions should be within a pixel, and the Psf-shapes should be very similar.  As a
+consequence, the default configurations for this class assume a very simple solution.
 
- . The spatial variation in the kernel (SnapPsfMatchConfig.spatialKernelOrder) is assumed to be zero 
+ . The spatial variation in the kernel (SnapPsfMatchConfig.spatialKernelOrder) is assumed to be zero
 
  . With no spatial variation, we turn of the spatial clipping loops (SnapPsfMatchConfig.spatialKernelClipping)
- 
+
  . The differential background is _not_ fit for (SnapPsfMatchConfig.fitForBackground)
- 
+
  . The kernel is expected to be appx. a delta function, and has a small size (SnapPsfMatchConfig.kernelSize)
- 
+
 The sub-configurations for the Alard-Lupton (SnapPsfMatchConfigAL) and delta-function (SnapPsfMatchConfigDF)
 bases also are designed to generate a small, simple kernel.
 
@@ -133,7 +133,7 @@ ConfigClass is SnapPsfMatchConfig.
 
 \section ip_diffim_snappsfmatch_IO        Invoking the Task
 
-The Task is only configured to have a subtractExposures method, which in turn calls 
+The Task is only configured to have a subtractExposures method, which in turn calls
 ImagePsfMatchTask.subtractExposures.
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -154,14 +154,14 @@ See \ref ip_diffim_psfmatch_Metadata "PsfMatchTask"
 \section ip_diffim_snappsfmatch_Debug     Debug variables
 
 The \link lsst.pipe.base.cmdLineTask.CmdLineTask command line task\endlink interface supports a
-flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py 
+flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py
 for this Task include:
 
 \code{.py}
     import sys
     import lsstDebug
     def DebugInfo(name):
-        di = lsstDebug.getInfo(name)   
+        di = lsstDebug.getInfo(name)
         if name == "lsst.ip.diffim.psfMatch":
             di.display = True                 # enable debug output
             di.maskTransparency = 80          # ds9 mask transparency
@@ -177,7 +177,7 @@ for this Task include:
             di.displaySciIm = True            # show science image to match to
             di.displaySpatialCells = True     # show spatial cells
             di.displayDiffIm = True           # show difference image
-            di.showBadCandidates = True       # show the bad candidates (red) along with good (green) 
+            di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
         elif name == "lsst.ip.diffim.diaCatalogSourceSelector":
             di.display = False                # enable debug output
             di.maskTransparency = 30          # ds9 mask transparency
@@ -185,7 +185,7 @@ for this Task include:
             di.pauseAtEnd = False             # pause when done
         return di
     lsstDebug.Info = DebugInfo
-    lsstDebug.frame = 1      
+    lsstDebug.frame = 1
 \endcode
 
 Note that if you want addional logging info, you may add to your scripts:
@@ -201,12 +201,12 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 This code is snapPsfMatchTask.py in the examples directory, and can be run as \em e.g.
 \code
 examples/snapPsfMatchTask.py
-examples/snapPsfMatchTask.py --debug 
+examples/snapPsfMatchTask.py --debug
 examples/snapPsfMatchTask.py --debug --template /path/to/templateExp.fits --science /path/to/scienceExp.fits
 \endcode
 
 \dontinclude snapPsfMatchTask.py
-First, create a subclass of SnapPsfMatchTask that accepts two exposures.  Ideally these exposures would have 
+First, create a subclass of SnapPsfMatchTask that accepts two exposures.  Ideally these exposures would have
 been taken back-to-back, such that the pointing/background/Psf does not vary substantially between the two:
 \skip MySnapPsfMatchTask
 \until return
@@ -216,7 +216,7 @@ Note that these images must be readable as an lsst.afw.image.Exposure:
 \skip main
 \until parse_args
 
-We have enabled some minor display debugging in this script via the --debug option.  However, if you 
+We have enabled some minor display debugging in this script via the --debug option.  However, if you
 have an lsstDebug debug.py in your PYTHONPATH you will get additional debugging displays.  The following
 block checks for this script:
 \skip args.debug
@@ -230,7 +230,7 @@ Finally, we call a run method that we define below.  First set up a Config and c
 
 Make sure the images (if any) that were sent to the script exist on disk and are readable.  If no images
 are sent, make some fake data up for the sake of this example script (have a look at the code if you want
-more details on generateFakeImages; as a detail of how the fake images were made, you do have to fit for a 
+more details on generateFakeImages; as a detail of how the fake images were made, you do have to fit for a
 differential background):
 \skip requested
 \until sizeCellY

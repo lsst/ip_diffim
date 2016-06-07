@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import os, sys
+import os
+import sys
 import unittest
 import lsst.utils.tests as tests
 
@@ -204,7 +205,7 @@ class DiffimTestCases(unittest.TestCase):
 
         #Check that the source is set
         self.assertEqual(kc.getSource(), source)
-        self.assertEqual(kc.getCandidateRating(), source.getPsfFlux()) 
+        self.assertEqual(kc.getCandidateRating(), source.getPsfFlux())
 
         # But this should be set on construction
         try:
