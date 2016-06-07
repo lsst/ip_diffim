@@ -31,6 +31,7 @@ import lsst.afw.table as afwTable
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.display.utils as displayUtils
 import lsst.meas.algorithms as measAlg
+from .dipoleFitTask import DipoleFitAlgorithm
 from . import diffimLib
 from . import diffimTools
 
@@ -794,7 +795,7 @@ class DipoleTestImage(object):
         return exposure, catalog
 
     def fitDipoleSource(self, source, **kwds):
-        alg = dipoleFitTask.DipoleFitAlgorithm(self.diffim, self.posImage, self.negImage)
+        alg = DipoleFitAlgorithm(self.diffim, self.posImage, self.negImage)
         fitResult = alg.fitDipole(source, **kwds)
         return fitResult
 
