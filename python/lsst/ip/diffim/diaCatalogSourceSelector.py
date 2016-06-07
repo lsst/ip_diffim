@@ -29,7 +29,7 @@ import lsst.meas.algorithms as measAlg
 
 __all__ = ["DiaCatalogSourceSelectorConfig", "DiaCatalogSourceSelectorTask"]
 
-class DiaCatalogSourceSelectorConfig(measAlg.StarSelectorConfig):
+class DiaCatalogSourceSelectorConfig(measAlg.BaseStarSelectorConfig):
     # Selection cuts on the input source catalog
     fluxLim = pexConfig.Field(
         doc = "specify the minimum psfFlux for good Kernel Candidates",
@@ -70,7 +70,7 @@ class DiaCatalogSourceSelectorConfig(measAlg.StarSelectorConfig):
         default = 3.0
     )
     def setDefaults(self):
-        measAlg.StarSelectorConfig.setDefaults(self)
+        measAlg.BaseStarSelectorConfig.setDefaults(self)
         self.badFlags = [
             "base_PixelFlags_flag_edge",
             "base_PixelFlags_flag_interpolatedCenter",
@@ -104,7 +104,7 @@ class CheckSource(object):
 ## \copybrief DiaCatalogSourceSelectorTask
 ## \}
 
-class DiaCatalogSourceSelectorTask(measAlg.StarSelectorTask):
+class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
     """!Select sources for Kernel candidates
 
     @anchor DiaCatalogSourceSelectorTask_
