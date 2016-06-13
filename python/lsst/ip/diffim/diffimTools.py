@@ -1,6 +1,6 @@
 #
 # LSST Data Management System
-# Copyright 2008, 2009, 2010 LSST Corporation.
+# Copyright 2008-2016 LSST Corporation.
 #
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -37,7 +37,7 @@ import lsst.afw.detection as afwDetect
 import lsst.afw.math.mathLib as afwMath
 import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
-from .makeKernelBasisList import makeKernelBasisList 
+from .makeKernelBasisList import makeKernelBasisList
 
 # Helper functions for ipDiffim; mostly viewing of results and writing
 # debugging info to disk.
@@ -168,7 +168,7 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     # Add noise?
     if addNoise:
         sim   = makePoissonNoiseImage(sim)
-        tim   = makePoissonNoiseImage(tim) 
+        tim   = makePoissonNoiseImage(tim)
 
     # And turn into MaskedImages
     sim   = afwImage.ImageF(sim, bbox, afwImage.LOCAL)
@@ -230,7 +230,7 @@ def backgroundSubtract(config, maskedImages):
     for maskedImage in maskedImages:
         bctrl.setNxSample(maskedImage.getWidth()//binsize + 1)
         bctrl.setNySample(maskedImage.getHeight()//binsize + 1)
-        image   = maskedImage.getImage() 
+        image   = maskedImage.getImage()
         backobj = afwMath.makeBackground(image, bctrl)
 
         image  -= backobj.getImageF()
@@ -294,7 +294,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
     candidateOutList = []
     fsb = diffimLib.FindSetBitsU()
     badBitMask = 0
-    for mp in config.badMaskPlanes: 
+    for mp in config.badMaskPlanes:
         badBitMask |= afwImage.MaskU.getPlaneBitMask(mp)
     bbox = scienceExposure.getBBox()
 
@@ -307,7 +307,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
 
     for kernelCandidate in candidateInList:
         if not type(kernelCandidate) == afwTable.SourceRecord:
-            raise RuntimeError, ("Candiate not of type afwTable.SourceRecord")
+            raise RuntimeError("Candiate not of type afwTable.SourceRecord")
         bm1 = 0
         bm2 = 0
         center = afwGeom.Point2I(scienceExposure.getWcs().skyToPixel(kernelCandidate.getCoord()))
@@ -368,7 +368,7 @@ def sourceTableToCandidateList(sourceTable, templateExposure, scienceExposure, k
 
     policy = pexConfig.makePolicy(kConfig)
     for cand in footprintList:
-        bbox = cand['footprint'].getBBox() 
+        bbox = cand['footprint'].getBBox()
         tmi  = afwImage.MaskedImageF(templateExposure.getMaskedImage(), bbox)
         smi  = afwImage.MaskedImageF(scienceExposure.getMaskedImage(), bbox)
         kCand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
@@ -385,13 +385,14 @@ def sourceTableToCandidateList(sourceTable, templateExposure, scienceExposure, k
 
 
 class NbasisEvaluator(object):
-    """A functor to evaluate the Bayesian Information Criterion for the number of basis sets going into the kernel fitting"""
+    """A functor to evaluate the Bayesian Information Criterion for the number of basis sets
+    going into the kernel fitting"""
     def __init__(self, psfMatchConfig, psfFwhmPixTc, psfFwhmPixTnc):
         self.psfMatchConfig = psfMatchConfig
         self.psfFwhmPixTc = psfFwhmPixTc
         self.psfFwhmPixTnc = psfFwhmPixTnc
         if not self.psfMatchConfig.kernelBasisSet == "alard-lupton":
-            raise RuntimeError, "BIC only implemnted for AL (alard lupton) basis"
+            raise RuntimeError("BIC only implemnted for AL (alard lupton) basis")
 
     def __call__(self, kernelCellSet, log):
         d1, d2, d3 = self.psfMatchConfig.alardDegGauss
@@ -413,12 +414,13 @@ class NbasisEvaluator(object):
                             if cand.getStatus() != afwMath.SpatialCellCandidate.GOOD:
                                 continue
                             diffIm = cand.getDifferenceImage(diffimLib.KernelCandidateF.RECENT)
-                            bbox = cand.getKernel(diffimLib.KernelCandidateF.RECENT).shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
+                            bbox = cand.getKernel(diffimLib.KernelCandidateF.RECENT).shrinkBBox(
+                                                                            diffIm.getBBox(afwImage.LOCAL))
                             diffIm = type(diffIm)(diffIm, bbox, True)
                             chi2 = diffIm.getImage().getArray()**2 / diffIm.getVariance().getArray()
                             n = chi2.shape[0] * chi2.shape[1]
                             bic = np.sum(chi2) + k * np.log(n)
-                            if not bicArray.has_key(cand.getId()):
+                            if cand.getId() not in bicArray:
                                 bicArray[cand.getId()] = {}
                             bicArray[cand.getId()][(d1i, d2i, d3i)] = bic
 
@@ -431,7 +433,8 @@ class NbasisEvaluator(object):
             bestConfigs.append(bestConfig)
 
         counter = Counter(bestConfigs).most_common(3)
-        log.info("B.I.C. prefers basis complexity %s %d times; %s %d times; %s %d times" % (counter[0][0], counter[0][1],
-                                                                                            counter[1][0], counter[1][1],
-                                                                                            counter[2][0], counter[2][1]))
+        log.info("B.I.C. prefers basis complexity %s %d times; %s %d times; %s %d times" %
+                    (counter[0][0], counter[0][1],
+                    counter[1][0], counter[1][1],
+                    counter[2][0], counter[2][1]))
         return counter[0][0], counter[1][0], counter[2][0]

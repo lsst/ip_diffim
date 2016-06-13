@@ -12,7 +12,7 @@ import lsst.pex.config as pexConfig
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 
 class DiffimTestCases(unittest.TestCase):
-    
+
     def setUp(self):
         self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config.kernel.name = "DF"
@@ -30,7 +30,7 @@ class DiffimTestCases(unittest.TestCase):
         mi2.set(size//2, size//2, (kSum, 0x0, kSum))
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
-    
+
     def tearDown(self):
         del self.policy
         del self.kList
@@ -40,14 +40,14 @@ class DiffimTestCases(unittest.TestCase):
         ksv.setMode(ipDiffim.KernelSumVisitorF.AGGREGATE)
 
         # should fail, kernel not initialized
-        kc = self.makeCandidate(1, 0.0, 0.0) 
+        kc = self.makeCandidate(1, 0.0, 0.0)
         try:
             ksv.processCandidate(kc)
         except Exception:
             pass
         else:
             self.fail()
-            
+
         for kSum in kSums:
             kc = self.makeCandidate(kSum, 0., 0.)
             kc.build(self.kList)
@@ -92,7 +92,7 @@ class DiffimTestCases(unittest.TestCase):
             kcList.append(kc)
 
         ksv.processKsumDistribution()
-        
+
         ksv.setMode(ipDiffim.KernelSumVisitorF.REJECT)
         for kc in kcList:
             ksv.processCandidate(kc)
@@ -101,7 +101,7 @@ class DiffimTestCases(unittest.TestCase):
             else:
                 self.assertEqual(kc.getStatus(), afwMath.SpatialCellCandidate.GOOD)
 
-        if clipping: 
+        if clipping:
             self.assertEqual(ksv.getNRejected(), 1)
         else:
             self.assertEqual(ksv.getNRejected(), 0)
@@ -112,14 +112,14 @@ class DiffimTestCases(unittest.TestCase):
 
         sizeCellX = self.policy.get("sizeCellX")
         sizeCellY = self.policy.get("sizeCellY")
-        
+
         kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0,
                                                                              0),
                                                              afwGeom.Extent2I(sizeCellX * nCell,
                                                                               sizeCellY * nCell)),
                                                sizeCellX,
                                                sizeCellY)
-        
+
         for candX in range(nCell):
             for candY in range(nCell):
                 if candX == nCell // 2 and candY == nCell // 2:
@@ -142,7 +142,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(ksv.getNRejected(), 1)
 
 #####
-        
+
 def suite():
     """Returns a suite containing all the test cases in this module."""
     tests.init()

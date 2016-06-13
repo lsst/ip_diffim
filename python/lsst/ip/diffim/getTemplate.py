@@ -1,7 +1,7 @@
 from __future__ import division, absolute_import
 #
 # LSST Data Management System
-# Copyright 2015 LSST Corporation.
+# Copyright 2016 LSST Corporation.
 #
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -158,8 +158,8 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
 
         \param[in] exposure -- exposure (unused)
         \param[in] sensorRef -- a Butler data reference
-        \param[in] templateIdList -- list of data ids, which should contain as single item. 
-                                     If there are multiple items, only the first is used. 
+        \param[in] templateIdList -- list of data ids, which should contain as single item.
+                                     If there are multiple items, only the first is used.
                                      Only the entry 'visit' from the data id is used.
 
         \return a pipeBase.Struct

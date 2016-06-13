@@ -1,7 +1,7 @@
-# 
+#
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
-# 
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -9,14 +9,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
@@ -31,6 +31,7 @@ import lsst.afw.table as afwTable
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.display.utils as displayUtils
 import lsst.meas.algorithms as measAlg
+from .dipoleFitTask import DipoleFitAlgorithm
 from . import diffimLib
 from . import diffimTools
 
@@ -131,7 +132,7 @@ def showDiaSources(sources, exposure, isFlagged, isDipole, frame=None):
 def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadCandidates=True,
                          resids=False, kernels=False):
     """Display the Kernel candidates.
-    If kernel is provided include spatial model and residuals;  
+    If kernel is provided include spatial model and residuals;
     If chi is True, generate a plot of residuals/sqrt(variance), i.e. chi
     """
 
@@ -259,7 +260,7 @@ def showKernelBasis(kernel, frame=None):
 
 ###############
 
-def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True, 
+def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
                            numSample=128, keepPlots=True, maxCoeff = 10):
     """Plot the Kernel spatial model."""
 
@@ -410,7 +411,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
         keptPlots = True
 
 
-def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None, 
+def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
                      showCenter=True, showEllipticity=True):
     """Show a mosaic of Kernel images.
     """
@@ -466,7 +467,8 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
         i = 0
         with ds9.Buffering():
             for cen, shape in zip(centers, shapes):
-                bbox = mos.getBBox(i); i += 1
+                bbox = mos.getBBox(i)
+                i += 1
                 xc, yc = cen[0] + bbox.getMinX(),  cen[1] + bbox.getMinY()
                 if showCenter:
                     ds9.dot("+", xc, yc,  ctype=ds9.BLUE, frame=frame)
@@ -533,7 +535,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     sidx = idx[0][::stride], idx[1][::stride]
     allResids = fullIm[sidx] / np.sqrt(fullVar[sidx])
 
-    testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure, 
+    testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure,
                                                        exposure, config, pexLog.getDefaultLog())
     for fp in testFootprints:
         subexp = diffExposure.Factory(diffExposure, fp["footprint"].getBBox())
@@ -662,7 +664,8 @@ def printSkyDiffs(sources, wcs):
 def makeRegions(sources, outfilename, wcs=None):
     """Create regions file for ds9 from input source list"""
     fh = open(outfilename, "w")
-    fh.write("global color=red font=\"helvetica 10 normal\" select=1 highlite=1 edit=1 move=1 delete=1 include=1 fixed=0 source\nfk5\n")
+    fh.write("global color=red font=\"helvetica 10 normal\" "
+             "select=1 highlite=1 edit=1 move=1 delete=1 include=1 fixed=0 source\nfk5\n")
     for s in sources:
         if wcs:
             (ra, dec) = wcs.pixelToSky(s.getCentroid().getX(), s.getCentroid().getY()).getPosition()
@@ -792,7 +795,7 @@ class DipoleTestImage(object):
         return exposure, catalog
 
     def fitDipoleSource(self, source, **kwds):
-        alg = dipoleFitTask.DipoleFitAlgorithm(self.diffim, self.posImage, self.negImage)
+        alg = DipoleFitAlgorithm(self.diffim, self.posImage, self.negImage)
         fitResult = alg.fitDipole(source, **kwds)
         return fitResult
 

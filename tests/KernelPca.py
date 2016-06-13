@@ -55,7 +55,7 @@ class DiffimTestCases(unittest.TestCase):
             kImage1 *= 10000  # to get some decent peak source counts
             kImage1 += 10     # to get some sky background noise
 
-            if kRefIm == None:
+            if kRefIm is None:
                 kRefIm = kImage1
 
             kImage1 = diffimTools.makePoissonNoiseImage(kImage1)

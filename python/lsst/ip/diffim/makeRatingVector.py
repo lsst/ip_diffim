@@ -19,7 +19,7 @@ def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
         for y in (0, height):
             kSum = spatialKernel.computeImage(kImage, False, x, y)
             kSums.push_back(kSum)
-            
+
     #afwStat    = afwMath.makeStatistics(kSums, afwMath.MEAN | afwMath.STDEV)
     #kSumRating = sdqa.SdqaRating("lsst.ip.diffim.kernel_sum",
     #                             afwStat.getValue(afwMath.MEAN),
@@ -35,7 +35,7 @@ def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
             if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                 # this has been used for processing
                 nGood += 1
-    
+
                 xCand = int(cand.getXCenter())
                 yCand = int(cand.getYCenter())
 
@@ -46,7 +46,7 @@ def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
 
                 diffIm = cand.getDifferenceImage(kernel, background)
                 imstats.apply(diffIm)
-                
+
                 #candMean   = imstats.getMean()
                 #candRms    = imstats.getRms()
                 #candRating = sdqa.SdqaRating("lsst.ip.diffim.residuals_%d_%d" % (xCand, yCand),
@@ -74,5 +74,5 @@ def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
     #                 "Sdqa Rating %s : %.2f %.2f" % (sdqaVector[i].getName(),
     #                                                 sdqaVector[i].getValue(),
     #                                                 sdqaVector[i].getErr()))
-    #                 
+    #
     #return sdqaVector

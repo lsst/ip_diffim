@@ -200,7 +200,7 @@ class DiffimTestCases(unittest.TestCase):
         kernelCellSet1      = results1.kernelCellSet
 
         # And then take away XY0
-        templateSubImage.setXY0(afwGeom.Point2I(0, 0)) 
+        templateSubImage.setXY0(afwGeom.Point2I(0, 0))
         scienceSubImage.setXY0(afwGeom.Point2I(0, 0))
         results2  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
         spatialKernel2      = results2.psfMatchingKernel

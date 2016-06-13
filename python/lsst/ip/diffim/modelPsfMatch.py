@@ -1,6 +1,6 @@
 # LSST Data Management System
-# Copyright 2008, 2009, 2010 LSST Corporation.
-# 
+# Copyright 2008-2016 LSST Corporation.
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -8,14 +8,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import numpy as num
@@ -29,7 +29,7 @@ import lsst.meas.algorithms as measAlg
 import lsst.pipe.base as pipeBase
 from makeKernelBasisList import makeKernelBasisList
 from psfMatch import PsfMatchTask, PsfMatchConfigAL
-from . import utils as diUtils 
+from . import utils as diUtils
 import lsst.afw.display.ds9 as ds9
 
 sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
@@ -51,7 +51,7 @@ class ModelPsfMatchConfig(pexConfig.Config):
         self.kernel.active.kernelSumClipping = False
         self.kernel.active.spatialKernelClipping = False
         self.kernel.active.checkConditionNumber = False
-        
+
         # Variance is ill defined
         self.kernel.active.constantVarianceWeighting = True
 
@@ -87,12 +87,12 @@ class ModelPsfMatchTask(PsfMatchTask):
 \section ip_diffim_modelpsfmatch_Purpose   Description
 
 This Task differs from ImagePsfMatchTask in that it matches two Psf _models_, by realizing
-them in an Exposure-sized SpatialCellSet and then inserting each Psf-image pair into KernelCandidates.  
-Because none of the pairs of sources that are to be matched should be invalid, all sigma clipping is 
-turned off in ModelPsfMatchConfig.  And because there is no tracked _variance_ in the Psf images, the 
+them in an Exposure-sized SpatialCellSet and then inserting each Psf-image pair into KernelCandidates.
+Because none of the pairs of sources that are to be matched should be invalid, all sigma clipping is
+turned off in ModelPsfMatchConfig.  And because there is no tracked _variance_ in the Psf images, the
 debugging and logging QA info should be interpreted with caution.
 
-One item of note is that the sizes of Psf models are fixed (e.g. its defined as a 21x21 matrix).  When the 
+One item of note is that the sizes of Psf models are fixed (e.g. its defined as a 21x21 matrix).  When the
 Psf-matching kernel is being solved for, the Psf "image" is convolved with each kernel basis function,
 leading to a loss of information around the borders.  This pixel loss will be problematic for the numerical
 stability of the kernel solution if the size of the convolution kernel (set by ModelPsfMatchConfig.kernelSize)
@@ -101,9 +101,9 @@ than their image-matching counterparts.  If the size of the kernel is too small,
 look "boxy"; if the kernel is too large, the kernel solution will be "noisy".  This is a trade-off that
 needs careful attention for a given dataset.
 
-The primary use case for this Task is in matching an Exposure to a constant-across-the-sky Psf model for the 
+The primary use case for this Task is in matching an Exposure to a constant-across-the-sky Psf model for the
 purposes of image coaddition.  It is important to note that in the code, the "template" Psf is the Psf
-that the science image gets matched to.  In this sense the order of template and science image are 
+that the science image gets matched to.  In this sense the order of template and science image are
 reversed, compared to ImagePsfMatchTask, which operates on the template image.
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -135,14 +135,14 @@ See \ref ip_diffim_psfmatch_Metadata "PsfMatchTask"
 \section ip_diffim_modelpsfmatch_Debug     Debug variables
 
 The \link lsst.pipe.base.cmdLineTask.CmdLineTask command line task\endlink interface supports a
-flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py 
+flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py
 for this Task include:
 
 \code{.py}
     import sys
     import lsstDebug
     def DebugInfo(name):
-        di = lsstDebug.getInfo(name)   
+        di = lsstDebug.getInfo(name)
         if name == "lsst.ip.diffim.psfMatch":
             di.display = True                 # global
             di.maskTransparency = 80          # ds9 mask transparency
@@ -157,7 +157,7 @@ for this Task include:
             di.displaySpatialCells = True     # show spatial cells before the fit
         return di
     lsstDebug.Info = DebugInfo
-    lsstDebug.frame = 1      
+    lsstDebug.frame = 1
 \endcode
 
 Note that if you want addional logging info, you may add to your scripts:
@@ -173,7 +173,7 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 This code is modelPsfMatchTask.py in the examples directory, and can be run as \em e.g.
 \code
 examples/modelPsfMatchTask.py
-examples/modelPsfMatchTask.py --debug 
+examples/modelPsfMatchTask.py --debug
 examples/modelPsfMatchTask.py --debug --template /path/to/templateExp.fits --science /path/to/scienceExp.fits
 \endcode
 
@@ -188,7 +188,7 @@ Note that these images must be readable as an lsst.afw.image.Exposure:
 \skip main
 \until parse_args
 
-We have enabled some minor display debugging in this script via the --debug option.  However, if you 
+We have enabled some minor display debugging in this script via the --debug option.  However, if you
 have an lsstDebug debug.py in your PYTHONPATH you will get additional debugging displays.  The following
 block checks for this script:
 \skip args.debug
@@ -246,8 +246,8 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         @param kernelSum: A multipicative factor to apply to the kernel sum (default=1.0)
 
         @return
-        - psfMatchedExposure: the Psf-matched Exposure.  This has the same parent bbox, Wcs, Calib and 
-            Filter as the input Exposure but no Psf.  In theory the Psf should equal referencePsfModel but 
+        - psfMatchedExposure: the Psf-matched Exposure.  This has the same parent bbox, Wcs, Calib and
+            Filter as the input Exposure but no Psf.  In theory the Psf should equal referencePsfModel but
             the match is likely not exact.
         - psfMatchingKernel: the spatially varying Psf-matching kernel
         - kernelCellSet: SpatialCellSet used to solve for the Psf-matching kernel
@@ -291,7 +291,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         # when PSF-matching one model to another.
         doNormalize = True
         afwMath.convolve(psfMatchedMaskedImage, maskedImage, psfMatchingKernel, doNormalize)
-        
+
         self.log.log(pexLog.Log.INFO, "done")
         return pipeBase.Struct(psfMatchedExposure=psfMatchedExposure,
                                psfMatchingKernel=psfMatchingKernel,
@@ -328,15 +328,15 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         if (referencePsfModel.getKernel().getDimensions() != sciencePsfModel.getKernel().getDimensions()):
             pexLog.Trace(self.log.getName(), 1,
                          "ERROR: Dimensions of reference Psf and science Psf different; exiting")
-            raise RuntimeError, "ERROR: Dimensions of reference Psf and science Psf different; exiting"
+            raise RuntimeError("ERROR: Dimensions of reference Psf and science Psf different; exiting")
 
         psfWidth, psfHeight = referencePsfModel.getKernel().getDimensions()
         maxKernelSize = min(psfWidth, psfHeight) - 1
         if maxKernelSize % 2 == 0:
             maxKernelSize -= 1
         if self.kConfig.kernelSize > maxKernelSize:
-            raise ValueError, "Kernel size (%d) too big to match Psfs of size %d; reduce to at least %d" % (
-                self.kConfig.kernelSize, psfWidth, maxKernelSize)
+            raise ValueError("Kernel size (%d) too big to match Psfs of size %d; reduce to at least %d" % (
+                self.kConfig.kernelSize, psfWidth, maxKernelSize))
 
         # Infer spatial order of Psf model!
         #
@@ -355,8 +355,8 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
             if (order != order // 1):
                 pexLog.Trace(self.log.getName(), 3, "Problem inferring spatial order of image's Psf")
             else:
-                pexLog.Trace(self.log.getName(), 2, "Spatial order of Psf = %d; matching kernel order = %d" % (
-                        order, self.kConfig.spatialKernelOrder))
+                pexLog.Trace(self.log.getName(), 2, "Spatial order of Psf = %d; matching kernel order = %d" %
+                             (order, self.kConfig.spatialKernelOrder))
 
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0,   scienceY0   = scienceBBox.getMin()
@@ -405,7 +405,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                 # The image to convolve is the science image, to the reference Psf.
                 kc = diffimLib.makeKernelCandidate(posX, posY, scienceMI, referenceMI, policy)
                 kernelCellSet.insertCandidate(kc)
-        
+
         import lsstDebug
         display = lsstDebug.Info(__name__).display
         displaySpatialCells = lsstDebug.Info(__name__).displaySpatialCells

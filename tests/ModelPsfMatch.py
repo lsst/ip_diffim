@@ -40,9 +40,9 @@ class PsfMatchTestCases(unittest.TestCase):
         for order in (0, 1):
             for ksum in (0.5, 1.0, 2.7):
                 self.runMatch(kOrder = order, kSumIn = ksum)
-        
+
     def runMatch(self, kOrder = 0, kSumIn = 3.7):
-        self.subconfig.spatialKernelOrder = kOrder 
+        self.subconfig.spatialKernelOrder = kOrder
 
         psf = measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma2)
         psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)

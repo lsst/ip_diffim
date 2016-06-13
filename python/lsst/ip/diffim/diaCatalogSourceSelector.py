@@ -1,7 +1,7 @@
-# 
+#
 # LSST Data Management System
-# Copyright 2008, 2009, 2010 LSST Corporation.
-# 
+# Copyright 2008-2016 LSST Corporation.
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -9,14 +9,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import numpy as np
@@ -29,7 +29,7 @@ import lsst.meas.algorithms as measAlg
 
 __all__ = ["DiaCatalogSourceSelectorConfig", "DiaCatalogSourceSelectorTask"]
 
-class DiaCatalogSourceSelectorConfig(measAlg.StarSelectorConfig):
+class DiaCatalogSourceSelectorConfig(measAlg.BaseStarSelectorConfig):
     # Selection cuts on the input source catalog
     fluxLim = pexConfig.Field(
         doc = "specify the minimum psfFlux for good Kernel Candidates",
@@ -70,7 +70,7 @@ class DiaCatalogSourceSelectorConfig(measAlg.StarSelectorConfig):
         default = 3.0
     )
     def setDefaults(self):
-        measAlg.StarSelectorConfig.setDefaults(self)
+        measAlg.BaseStarSelectorConfig.setDefaults(self)
         self.badFlags = [
             "base_PixelFlags_flag_edge",
             "base_PixelFlags_flag_interpolatedCenter",
@@ -91,7 +91,7 @@ class CheckSource(object):
         for k in self.keys:
             if source.get(k):
                 return False
-        if self.fluxLim != None and source.getPsfFlux() < self.fluxLim: # ignore faint objects
+        if self.fluxLim is not None and source.getPsfFlux() < self.fluxLim: # ignore faint objects
             return False
         if self.fluxMax != 0.0 and source.getPsfFlux() > self.fluxMax: # ignore bright objects
             return False
@@ -104,11 +104,11 @@ class CheckSource(object):
 ## \copybrief DiaCatalogSourceSelectorTask
 ## \}
 
-class DiaCatalogSourceSelectorTask(measAlg.StarSelectorTask):
+class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
     """!Select sources for Kernel candidates
 
     @anchor DiaCatalogSourceSelectorTask_
-    
+
     @section ip_diffim_diaCatalogSourceSelector_Contents  Contents
 
      - @ref ip_diffim_diaCatalogSourceSelector_Purpose
@@ -163,13 +163,13 @@ class DiaCatalogSourceSelectorTask(measAlg.StarSelectorTask):
     usesMatches = True # selectStars uses (requires) its matches argument
 
     def selectStars(self, exposure, sourceCat, matches=None):
-        """Select sources for Kernel candidates 
-        
+        """Select sources for Kernel candidates
+
         @param[in] exposure  the exposure containing the sources
         @param[in] sourceCat  catalog of sources that may be stars (an lsst.afw.table.SourceCatalog)
         @param[in] matches  a match vector as produced by meas_astrom; required
                             (defaults to None to match the StarSelector API and improve error handling)
-        
+
         @return an lsst.pipe.base.Struct containing:
         - starCat  a list of sources to be used as kernel candidates
         """
@@ -182,7 +182,7 @@ class DiaCatalogSourceSelectorTask(measAlg.StarSelectorTask):
             raise RuntimeError("DiaCatalogSourceSelector requires matches")
 
         mi = exposure.getMaskedImage()
-        
+
         if display:
             if displayExposure:
                 ds9.mtv(mi, title="Kernel candidates", frame=lsstDebug.frame)
@@ -218,9 +218,11 @@ class DiaCatalogSourceSelectorTask(measAlg.StarSelectorTask):
                             doColorCut = False
                             isRightColor = True
                         else:
-                            isRightColor = (gMag-rMag) >= self.config.grMin and (gMag-rMag) <= self.config.grMax
-                        
-                    isRightType  = (self.config.selectStar and isStar) or (self.config.selectGalaxy and not isStar)
+                            isRightColor = (gMag-rMag) >= self.config.grMin \
+                                            and (gMag-rMag) <= self.config.grMax
+
+                    isRightType  = (self.config.selectStar and isStar) \
+                                    or (self.config.selectGalaxy and not isStar)
                     isRightVar   = (self.config.includeVariable) or (self.config.includeVariable is isVar)
                     if isRightType and isRightVar and isRightColor:
                         starCat.append(source)
@@ -240,3 +242,5 @@ class DiaCatalogSourceSelectorTask(measAlg.StarSelectorTask):
         return Struct(
             starCat = starCat,
         )
+
+measAlg.starSelectorRegistry.register("diacatalog", DiaCatalogSourceSelectorTask)

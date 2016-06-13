@@ -19,7 +19,7 @@ class DiffimTestCases(unittest.TestCase):
         self.subconfig = self.config.kernel.active
 
         # Test was put together before the min size went to 21
-        self.subconfig.kernelSize = 19 
+        self.subconfig.kernelSize = 19
 
         self.subconfig.scaleByFwhm = False
         self.subconfig.fitForBackground = True
@@ -86,7 +86,7 @@ class DiffimTestCases(unittest.TestCase):
                    1.218095e+01,
                    1.138120e-02,
                    5.099318e-03]
-        
+
         self.basisList = afwMath.KernelList()
         for i in range(len(order)):
             im  = afwImage.ImageD(basisList0[order[i]].getDimensions())
@@ -108,7 +108,7 @@ class DiffimTestCases(unittest.TestCase):
         # being a factor of -1 different, therefore the coefficients
         # need to be a factor of -1 different as well.
         self.parity = [1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1]
-        
+
     def tearDown(self):
         del self.policy
         del self.tmi
@@ -116,7 +116,7 @@ class DiffimTestCases(unittest.TestCase):
         del self.basisList
         del self.footprints
         del self.kernelCellSet
-            
+
     def testSingleNoVariation(self):
         self.policy.set('constantVarianceWeighting', True)
         self.policy.set('spatialKernelOrder', 0)
@@ -125,16 +125,16 @@ class DiffimTestCases(unittest.TestCase):
         # Place candidate footprints within the spatial grid
         for fp in self.footprints:
             bbox = fp.getBBox()
-        
+
             # Grab the centers in the parent's coordinate system
             xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
             yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
-        
+
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
-        
+
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
-        
+
             # Hotpants centroids go from -1 to 1
             # Only one passes
             if xC > 150 and yC > 150:
@@ -167,7 +167,7 @@ class DiffimTestCases(unittest.TestCase):
                              0.000000,
                              0.000001,
                              0.602642 ]
-        
+
         HPspatialSolution = HPsingleSolution
 
         singleSolution = cand.getKernel(ipDiffim.KernelCandidateF.RECENT).getKernelParameters()
@@ -190,13 +190,13 @@ class DiffimTestCases(unittest.TestCase):
         # Place candidate footprints within the spatial grid
         for fp in self.footprints:
             bbox = fp.getBBox()
-        
+
             # Grab the centers in the parent's coordinate system
             xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
             yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
-        
+
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
-        
+
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
 
@@ -211,7 +211,7 @@ class DiffimTestCases(unittest.TestCase):
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
-        bbox  = self.kernelCellSet.getBBox()        
+        bbox  = self.kernelCellSet.getBBox()
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
         bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
@@ -249,16 +249,16 @@ class DiffimTestCases(unittest.TestCase):
         # Place candidate footprints within the spatial grid
         for fp in self.footprints:
             bbox = fp.getBBox()
-        
+
             # Grab the centers in the parent's coordinate system
             xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
             yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
-        
+
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
-        
+
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
-        
+
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
                 cand = ipDiffim.makeKernelCandidate( (xC - 0.5 * self.smi.getWidth()) /
@@ -320,7 +320,7 @@ class DiffimTestCases(unittest.TestCase):
             self.assertAlmostEqual(HPspatialSolution[i][0] * self.parity[i], spatialSolution[i][0], 5)
             self.assertAlmostEqual(HPspatialSolution[i][1] * self.parity[i], spatialSolution[i][2], 5)
             self.assertAlmostEqual(HPspatialSolution[i][2] * self.parity[i], spatialSolution[i][1], 5)
-            
+
         self.assertAlmostEqual(sb.getParameters()[0], HPspatialSolution[-1], 5)
 
     def testFourBgVariation(self):
@@ -329,7 +329,7 @@ class DiffimTestCases(unittest.TestCase):
         # LSST represent the background in the matrix math.  HP has
         # each pixel have its own coordinate (which goes from -1 to 1
         # across the entire image, by the way), whereas we give all
-        # the LSST pixels within a stamp the same coordinate.  
+        # the LSST pixels within a stamp the same coordinate.
 
         # To make this comparison, I go ahead and edit the Hotpants
         # code to give each pixel the same weight.  For reference this
@@ -338,9 +338,9 @@ class DiffimTestCases(unittest.TestCase):
         #        //xf = (i - rPixX2) / rPixX2;
         #        xf = (xi - rPixX2) / rPixX2;
         #
-        #            //yf = (j - rPixY2) / rPixY2; 
-        #            yf = (yi - rPixY2) / rPixY2; 
-        
+        #            //yf = (j - rPixY2) / rPixY2;
+        #            yf = (yi - rPixY2) / rPixY2;
+
         self.policy.set('constantVarianceWeighting', True)
         self.policy.set('spatialKernelOrder', 0)
         self.policy.set('spatialBgOrder', 1)
@@ -348,16 +348,16 @@ class DiffimTestCases(unittest.TestCase):
         # Place candidate footprints within the spatial grid
         for fp in self.footprints:
             bbox = fp.getBBox()
-        
+
             # Grab the centers in the parent's coordinate system
             xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
             yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
-        
+
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
-        
+
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
-        
+
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
                 cand = ipDiffim.makeKernelCandidate( (xC - 0.5 * self.smi.getWidth()) /
@@ -392,8 +392,8 @@ class DiffimTestCases(unittest.TestCase):
                               [ 0.782113,
                                -0.910963,
                                -0.106636] ]
-       
-        
+
+
         bspkv.solveLinearEquation()
         sk, sb = bspkv.getSolutionPair()
         spatialSolution = sk.getKernelParameters()
@@ -412,16 +412,16 @@ class DiffimTestCases(unittest.TestCase):
         # Place candidate footprints within the spatial grid
         for fp in self.footprints:
             bbox = fp.getBBox()
-        
+
             # Grab the centers in the parent's coordinate system
             xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
             yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
-        
+
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
-        
+
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
-        
+
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
                 cand = ipDiffim.makeKernelCandidate( (xC - 0.5 * self.smi.getWidth()) /
@@ -432,7 +432,7 @@ class DiffimTestCases(unittest.TestCase):
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
-        bbox  = self.kernelCellSet.getBBox()        
+        bbox  = self.kernelCellSet.getBBox()
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
         bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
@@ -475,7 +475,7 @@ class DiffimTestCases(unittest.TestCase):
                               [  0.782113,
                                 -0.910963,
                                 -0.106636] ]
-        
+
         bspkv.solveLinearEquation()
         sk, sb = bspkv.getSolutionPair()
         spatialSolution = sk.getSpatialParameters()
@@ -493,25 +493,25 @@ class DiffimTestCases(unittest.TestCase):
     def testAllBgVariation2(self):
         # OK, I ran HP on all the things in this image.  Enough for
         # second order spatial variation
-        
+
         self.policy.set('constantVarianceWeighting', True)
         self.policy.set('spatialKernelOrder', 0)
         self.policy.set('spatialBgOrder', 2)
-        
+
         # Ignore the whole kernelCellSet thing
         cands = []
         for fp in self.footprints:
             bbox = fp.getBBox()
-        
+
             # Grab the centers in the parent's coordinate system
             xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
             yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
-        
+
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
-        
+
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
-        
+
             # Hotpants centroids go from -1 to 1
             cand = ipDiffim.makeKernelCandidate( (xC - 0.5 * self.smi.getWidth()) /
                                                  (0.5 * self.smi.getWidth()),
@@ -521,7 +521,7 @@ class DiffimTestCases(unittest.TestCase):
             cands.append(cand)
 
         # Visitors
-        bbox  = self.kernelCellSet.getBBox()        
+        bbox  = self.kernelCellSet.getBBox()
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
         bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
@@ -564,25 +564,25 @@ class DiffimTestCases(unittest.TestCase):
     def testAllKernelVariation2(self):
         # OK, I ran HP on all the things in this image.  Enough for
         # second order spatial variation
-        
+
         self.policy.set('constantVarianceWeighting', True)
         self.policy.set('spatialKernelOrder', 2)
         self.policy.set('spatialBgOrder', 0)
-        
+
         # Ignore the whole kernelCellSet thing
         cands = []
         for fp in self.footprints:
             bbox = fp.getBBox()
-        
+
             # Grab the centers in the parent's coordinate system
             xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
             yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
-        
+
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
-        
+
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
-        
+
             # Hotpants centroids go from -1 to 1
             cand = ipDiffim.makeKernelCandidate( (xC - 0.5 * self.smi.getWidth()) /
                                                  (0.5 * self.smi.getWidth()),
@@ -592,7 +592,7 @@ class DiffimTestCases(unittest.TestCase):
             cands.append(cand)
 
         # Visitors
-        bbox  = self.kernelCellSet.getBBox()        
+        bbox  = self.kernelCellSet.getBBox()
         bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
         bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
 
@@ -679,25 +679,25 @@ class DiffimTestCases(unittest.TestCase):
     def testAllVariation2(self):
         # OK, I ran HP on all the things in this image.  Enough for
         # second order spatial variation
-        
+
         self.policy.set('constantVarianceWeighting', True)
         self.policy.set('spatialKernelOrder', 2)
         self.policy.set('spatialBgOrder', 2)
-        
+
         # Ignore the whole kernelCellSet thing
         cands = []
         for fp in self.footprints:
             bbox = fp.getBBox()
-        
+
             # Grab the centers in the parent's coordinate system
             xC   = int(0.5 * ( bbox.getMinX() + bbox.getMaxX() ))
             yC   = int(0.5 * ( bbox.getMinY() + bbox.getMaxY() ))
-        
+
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
-        
+
             tsmi  = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
             ssmi  = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
-        
+
             # Hotpants centroids go from -1 to 1
             cand = ipDiffim.makeKernelCandidate( (xC - 0.5 * self.smi.getWidth()) /
                                                  (0.5 * self.smi.getWidth()),
@@ -781,7 +781,7 @@ class DiffimTestCases(unittest.TestCase):
                                0.132670,
                               -0.571923,
                               -0.284670] ]
-        
+
         bspkv.solveLinearEquation()
         sk, sb = bspkv.getSolutionPair()
         spatialSolution = sk.getSpatialParameters()
@@ -798,7 +798,7 @@ class DiffimTestCases(unittest.TestCase):
             self.assertAlmostEqual(HPspatialSolution[-1][spReorder[i]], spatialSolution[i], 5)
 
 #####
-        
+
 def suite():
     """Returns a suite containing all the test cases in this module."""
     tests.init()
