@@ -1,7 +1,7 @@
 from __future__ import absolute_import, division, print_function
 #
 # LSST Data Management System
-# Copyright 2008-2016 AURA/LSST.
+# Copyright 2016 AURA/LSST.
 #
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -22,29 +22,34 @@ from __future__ import absolute_import, division, print_function
 #
 
 import numpy as np
-from scipy.stats import sigmaclip
 from scipy.fftpack import fft2, ifft2, ifftshift
-from scipy.ndimage.filters import convolve
+from scipy.ndimage.filters import convolve as scipy_convolve
 
 import lsst.afw.image as afwImage
 import lsst.meas.algorithms as measAlg
 import lsst.afw.math as afwMath
 
-__all__ = ("performExposureDecorrelation")
+__all__ = ("decorrelateExposure", "computeDecorrelationKernel", "doConvolve",
+           "computeClippedImageStats")
 
 
-def computeClippedImageStats(im, low=3, high=3):
-    """! Utility function for sigma-clipped array statistics.
-    @param im   A numpy array. Should work on any dimensions/shape.
-    @param low  Lower bound factor of sigma clipping. Default is 3.
-    @param high  Upper bound factor of sigma clipping. Default is 3.
-    @return sigma-clipped mean and std of input array
+def computeClippedImageStats(im):
+    """! Utility function for sigma-clipped array statistics on an image or exposure.
+    @param im An afw.Exposure, masked image, or image.
+    @return sigma-clipped mean, std, and variance of input array
     """
-    _, low, upp = sigmaclip(im, low=low, high=high)
-    tmp = im[(im > low) & (im < upp)]
-    mean1 = np.nanmean(tmp)
-    sig1 = np.nanstd(tmp)
-    return mean1, sig1
+    statsControl = afwMath.StatisticsControl()
+    statsControl.setNumSigmaClip(3.)
+    statsControl.setNumIter(3)
+    statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(["INTRP", "EDGE",
+                                                            "DETECTED", "BAD",
+                                                            "NO_DATA", "DETECTED_NEGATIVE"]))
+    statObj = afwMath.makeStatistics(im, afwMath.MEANCLIP | afwMath.STDEVCLIP | afwMath.VARIANCECLIP,
+                                     statsControl)
+    mean = statObj.getValue(afwMath.MEANCLIP)
+    std = statObj.getValue(afwMath.STDEVCLIP)
+    var = statObj.getValue(afwMath.VARIANCECLIP)
+    return mean, std, var
 
 
 def getImageGrid(im):
@@ -60,26 +65,19 @@ def getImageGrid(im):
     return x0im, y0im
 
 
-def computeDecorrelationCorrectionKernel(kappa, sig1=0.2, sig2=0.2):
+def computeDecorrelationKernel(kappa, sig1=0.2, sig2=0.2):
     """! Compute the Lupton/ZOGY post-conv. kernel for decorrelating an
     image difference, based on the PSF-matching kernel.
-    @param kappa  A matching kernel array derived from Alard & Lupton PSF matching
+    @param kappa  A matching kernel 2-d numpy.array derived from Alard & Lupton PSF matching
     @param sig1   Average sqrt(variance) of template image used for PSF matching
     @param sig2   Average sqrt(variance) of science image used for PSF matching
     @return a 2-d numpy.array containing the correction kernel
 
     @note As currently implemented, kappa is a static (single) kernel.
     """
-    def post_conv_kernel_ft2(kernel, sig1=1., sig2=1.):
-        kft = fft2(kernel)
-        return np.sqrt((sig1**2 + sig2**2) / (sig1**2 + sig2**2 * kft**2))
-
-    def post_conv_kernel2(kernel, sig1=1., sig2=1.):
-        kft = post_conv_kernel_ft2(kernel, sig1, sig2)
-        out = ifft2(kft)
-        return out
-
-    pck = post_conv_kernel2(kappa, sig1=sig2, sig2=sig1)
+    kft = fft2(kappa)
+    kft = np.sqrt((sig1**2 + sig2**2) / (sig1**2 + sig2**2 * kft**2))
+    pck = ifft2(kft)
     pck = ifftshift(pck.real)
 
     # I think we may need to "reverse" the PSF, as in the ZOGY (and Kaiser) papers...
@@ -91,8 +89,8 @@ def computeDecorrelationCorrectionKernel(kappa, sig1=0.2, sig2=0.2):
 
 
 def computeCorrectedDiffimPsf(kappa, im2_psf, sig1=0.2, sig2=0.2):
-    """! Compute the (decorrelated) difference image's new PSF:
-    post_conv_psf = phi_1(k) * sym.sqrt((sig1**2 + sig2**2) / (sig1**2 + sig2**2 * kappa_ft(k)**2))
+    """! Compute the (decorrelated) difference image's new PSF.
+    new_psf = phi_1(k) * sqrt((sig1**2 + sig2**2) / (sig1**2 + sig2**2 * kappa_ft(k)**2))
 
     @param kappa  A matching kernel array derived from Alard & Lupton PSF matching
     @param im2_psf The uncorrected psf array of the science image (and also of the diffim)
@@ -102,12 +100,13 @@ def computeCorrectedDiffimPsf(kappa, im2_psf, sig1=0.2, sig2=0.2):
     """
     def post_conv_psf_ft2(psf, kernel, sig1=1., sig2=1.):
         # Pad psf or kernel symmetrically to make them the same size!
+        # Note this assumes they are both square (width == height)
         if psf.shape[0] < kernel.shape[0]:
-            while psf.shape[0] < kernel.shape[0]:
-                psf = np.pad(psf, (1, 1), mode='constant')
+            diff = (kernel.shape[0] - psf.shape[0]) // 2
+            psf = np.pad(psf, (diff, diff), mode='constant')
         elif psf.shape[0] > kernel.shape[0]:
-            while psf.shape[0] > kernel.shape[0]:
-                kernel = np.pad(kernel, (1, 1), mode='constant')
+            diff = (psf.shape[0] - kernel.shape[0]) // 2
+            kernel = np.pad(kernel, (diff, diff), mode='constant')
         psf_ft = fft2(psf)
         kft = fft2(kernel)
         out = psf_ft * np.sqrt((sig1**2 + sig2**2) / (sig1**2 + sig2**2 * kft**2))
@@ -118,38 +117,90 @@ def computeCorrectedDiffimPsf(kappa, im2_psf, sig1=0.2, sig2=0.2):
         out = ifft2(kft)
         return out
 
-    im2_psf_small = im2_psf
-    # First compute the science image's (im2's) psf, subset on -16:15 coords
-    if im2_psf.shape[0] > 50:
-        x0im, y0im = getImageGrid(im2_psf)
-        x = np.arange(-16, 16, 1)
-        y = x.copy()
-        x0, y0 = np.meshgrid(x, y)
-        im2_psf_small = im2_psf[(x0im.max()+x.min()+1):(x0im.max()-x.min()+1),
-                                (y0im.max()+y.min()+1):(y0im.max()-y.min()+1)]
-    pcf = post_conv_psf(psf=im2_psf_small, kernel=kappa, sig1=sig2, sig2=sig1)
+    pcf = post_conv_psf(psf=im2_psf, kernel=kappa, sig1=sig2, sig2=sig1)
     pcf = pcf.real / pcf.real.sum()
     return pcf
 
 
-def performExposureDecorrelation(templateExposure, exposure, subtractedExposure, psfMatchingKernel, log):
-    """! Compute decorrelation correction on an image difference exposure, given the
-    input template/science exposures and the (potentially spatially-varying) PSF matching kernel.
+def fixEvenKernel(kernel):
+    """! Take a kernel with even dimensions and make them odd, centered correctly.
+    @param kernel a numpy.array
+    @return a fixed kernel numpy.array
+    """
+    # Make sure the peak (close to a delta-function) is in the center!
+    maxloc = np.unravel_index(np.argmax(kernel), kernel.shape)
+    out = np.roll(kernel, kernel.shape[0]//2 - maxloc[0], axis=0)
+    out = np.roll(out, out.shape[1]//2 - maxloc[1], axis=1)
+    # Make sure it is odd-dimensioned by trimming it.
+    if (out.shape[0] % 2) == 0:
+        maxloc = np.unravel_index(np.argmax(out), out.shape)
+        if out.shape[0] - maxloc[0] > maxloc[0]:
+            out = out[:-1, :]
+        else:
+            out = out[1:, :]
+        if out.shape[1] - maxloc[1] > maxloc[1]:
+            out = out[:, :-1]
+        else:
+            out = out[:, 1:]
+    return out
 
-    @param templateExposure the template afwImage.Exposure used for PSF matching
-    @param exposure the science afwImage.Exposure used for PSF matching
-    @param subtractedExposure the resulting subtracted exposure produced by 
+
+def doConvolve(exposure, kernel, use_scipy=False):
+    """! Convolve an Exposure with a convolution kernel.
+    @param exposure Input afw.image.Exposure to be convolved.
+    @param kernel Input 2-d numpy.array to convolve the image with
+    @param use_scipy Use scipy to do convolution instead of afwMath
+    @return a new Exposure with the convolved pixels.
+
+    @note we use afwMath.convolve() but keep scipy.convolve for debugging.
+    """
+    outExp = kern = None
+    fkernel = fixEvenKernel(kernel)
+    if use_scipy:
+        pci = scipy_convolve(exposure.getMaskedImage().getImage().getArray(),
+                             fkernel, mode='constant', cval=np.nan)
+        outExp = exposure.clone()
+        outExp.getMaskedImage().getImage().getArray()[:, :] = pci
+        kern = fkernel
+
+    else:
+        kernelImg = afwImage.ImageD(fkernel.shape[0], fkernel.shape[1])
+        kernelImg.getArray()[:, :] = fkernel
+        kern = afwMath.FixedKernel(kernelImg)
+        maxloc = np.unravel_index(np.argmax(fkernel), fkernel.shape)
+        kern.setCtrX(maxloc[0])
+        kern.setCtrY(maxloc[1])
+        outExp = exposure.clone()  # Do this to keep WCS, PSF, masks, etc.
+        convCntrl = afwMath.ConvolutionControl(False, True, 0)
+        afwMath.convolve(outExp.getMaskedImage(), exposure.getMaskedImage(), kern, convCntrl)
+
+    return outExp, kern
+
+
+def decorrelateExposure(templateExposure, exposure, subtractedExposure, psfMatchingKernel, log):
+    """! Compute decorrelation correction on an image difference exposure.
+
+    Currently can accept a spatially varying kernel but in this case it simply uses a static
+    kernel from the center of the exposure.
+
+    @param templateExposure[in] the template afwImage.Exposure used for PSF matching
+    @param exposure[in] the science afwImage.Exposure used for PSF matching
+    @param subtractedExposure[in] the subtracted exposure produced by 
     ip_diffim.ImagePsfMatchTask.subtractExposures()
     @param psfMatchingKernel an (optionally spatially-varying) PSF matching kernel produced 
     by ip_diffim.ImagePsfMatchTask.subtractExposures()
     @param log an input pexLog for outputting messages
 
-    @return the corrected subtractedExposure (updated in-place) with an updated PSF, and
-    the decorrelation correction kernel (which may be ignored)
+    @return the the decorrelated diffim and decorrelation correction kernel (which may be ignored)
+    The returned decorrelated diffim has an updated PSF as well.
 
+    @note the subtractedExposure is NOT updated
     @note Here we currently convert a spatially-varying matching kernel into a constant kernel, 
-    just compute it for the center of the image.
-    @note Still TBD: do we need to modify the new subtractedExposure's variance plane?
+    just by computing it at the center of the image (tickets DM-6243, DM-6244).
+    @note We are also using a constant accross-the-image measure of sigma (sqrt(variance)) to compute
+    the decorrelation kernel.
+    @note Still TBD (ticket DM-6580): understand whether the convolution is correctly modifying 
+    the variance plane of the new subtractedExposure.
     """
     kimg = None
     try:
@@ -164,28 +215,25 @@ def performExposureDecorrelation(templateExposure, exposure, subtractedExposure,
         kimg = psfMatchingKernel.computeImage()
 
     # Compute the images' sigmas (sqrt of variance)
-    sig1 = templateExposure.getMaskedImage().getVariance().getArray()
-    sig1squared, _ = computeClippedImageStats(sig1)
+    _, _, sig1squared = computeClippedImageStats(templateExposure.getMaskedImage())
     sig1 = np.sqrt(sig1squared)
 
-    sig2 = exposure.getMaskedImage().getVariance().getArray()
-    sig2squared, _ = computeClippedImageStats(sig2)
+    _, _, sig2squared = computeClippedImageStats(exposure.getMaskedImage())
     sig2 = np.sqrt(sig2squared)
 
-    corrKernel = computeDecorrelationCorrectionKernel(kimg.getArray(), sig1=sig1, sig2=sig2)
-    # Eventually, use afwMath.convolve(), but for now we just use scipy.
+    corrKernel = computeDecorrelationKernel(kimg.getArray(), sig1=sig1, sig2=sig2)
+    fcorrKernel = fixEvenKernel(corrKernel)
     log.info("Decorrelation: Convolving.")
-    pci = convolve(subtractedExposure.getMaskedImage().getImage().getArray(),
-                   corrKernel, mode='constant')
-    subtractedExposure.getMaskedImage().getImage().getArray()[:, :] = pci
+    correctedExposure, corrKern = doConvolve(subtractedExposure, fcorrKernel)
     log.info("Decorrelation: Finished with convolution.")
 
     # Compute the subtracted exposure's updated psf
     psf = subtractedExposure.getPsf().computeImage().getArray()
-    psfc = computeCorrectedDiffimPsf(corrKernel, psf, sig1=sig1, sig2=sig2)
-    psfcI = afwImage.ImageD(subtractedExposure.getPsf().computeImage().getBBox())
+    psfc = computeCorrectedDiffimPsf(fcorrKernel, psf, sig1=sig1, sig2=sig2)
+    psfcI = afwImage.ImageD(psfc.shape[0], psfc.shape[1])
     psfcI.getArray()[:, :] = psfc
     psfcK = afwMath.FixedKernel(psfcI)
     psfNew = measAlg.KernelPsf(psfcK)
-    subtractedExposure.setPsf(psfNew)
-    return subtractedExposure, corrKernel
+    correctedExposure.setPsf(psfNew)
+
+    return correctedExposure, corrKern
