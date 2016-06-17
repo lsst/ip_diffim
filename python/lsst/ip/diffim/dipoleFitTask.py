@@ -22,6 +22,7 @@ from __future__ import absolute_import, division, print_function
 #
 
 import numpy as np
+import warnings
 
 # LSST imports
 import lsst.afw.geom as afwGeom
@@ -650,13 +651,16 @@ class DipoleFitAlgorithm(object):
         # Note that although we can, we're not required to set initial values for params here,
         # since we set their param_hint's above.
         # Can add "method" param to not use 'leastsq' (==levenberg-marquardt), e.g. "method='nelder'"
-        result = gmod.fit(z, weights=weights, x=in_x,
-                          verbose=verbose,
-                          fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol, 'maxfev': 250},  # see scipy docs
-                          psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to genDipoleModel()
-                          rel_weight=rel_weight,
-                          footprint=fp,
-                          modelObj=dipoleModel)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")  # temporarily turn off silly lmfit warnings
+            result = gmod.fit(z, weights=weights, x=in_x,
+                              verbose=verbose,
+                              fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol,
+                                       'maxfev': 250},  # see scipy docs
+                              psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to genDipoleModel()
+                              rel_weight=rel_weight,
+                              footprint=fp,
+                              modelObj=dipoleModel)
 
         if verbose:  # the ci_report() seems to fail if neg params are constrained -- TBD why.
             # Never wanted in production - this takes a long time (longer than the fit!)
@@ -1042,7 +1046,8 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
                 self.log.warn('DipoleFitPlugin failed on record %d: %s' % (measRecord.getId(), str(error)))
                 measRecord.set(self.flagKey, True)
             if error.getFlagBit() == self.FAILURE_NOT_DIPOLE:
-                self.log.warn('DipoleFitPlugin not run on record %d: %s' % (measRecord.getId(), str(error)))
+                self.log.log(self.log.DEBUG, 'DipoleFitPlugin not run on record %d: %s' %
+                             (measRecord.getId(), str(error)))
                 measRecord.set(self.flagKey, True)
         else:
             self.log.warn('DipoleFitPlugin failed on record %d' % measRecord.getId())
