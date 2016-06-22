@@ -56,7 +56,7 @@ class ClassificationDipolePlugin(SingleFramePlugin):
 
     @classmethod
     def getExecutionOrder(cls):
-        return cls.CLASSIFY_ORDER
+        return cls.APCORR_ORDER
 
     def __init__(self, config, name, schema, metadata):
         SingleFramePlugin.__init__(self, config, name, schema, metadata)
