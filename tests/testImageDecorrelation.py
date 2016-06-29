@@ -29,9 +29,8 @@ import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
 import lsst.meas.algorithms as measAlg
-import lsst.pex.logging as pexLog
 
-import lsst.ip.diffim.imageDecorrelation as ipDiffim_id
+from lsst.ip.diffim.imageDecorrelation import DecorrelateALKernelTask
 
 def singleGaussian2d(x, y, xc, yc, sigma_x=1., sigma_y=1., theta=0.):
     """! Generate a 2-d Gaussian, possibly elongated and rotated, on a grid of pixel
@@ -184,6 +183,13 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
             = makeFakeImages(sig1=self.sig1, sig2=self.sig2, psf1=self.psf1_sigma, psf2=self.psf2_sigma,
                              n_sources=50, verbose=True)
 
+        self.statsControl = afwMath.StatisticsControl()
+        self.statsControl.setNumSigmaClip(3.)
+        self.statsControl.setNumIter(3)
+        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(["INTRP", "EDGE",
+                                                                     "DETECTED", "BAD",
+                                                                     "NO_DATA", "DETECTED_NEGATIVE"]))
+
     def tearDown(self):
         del self.im1ex
         del self.im2ex
@@ -233,18 +239,15 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         # Uncorrected diffim exposure - variance is wrong (too low)
         self.assertNotClose(tmpArr[~np.isnan(tmpArr)].var(), expected_var, rtol=0.1)
 
-        log = pexLog.Log(pexLog.Log.getDefaultLog(), 'testImageDecorrelation', pexLog.Log.INFO)
-        # This corrects the diffExp in-place:
-        corrected_diffExp, corrKernel = ipDiffim_id.decorrelateExposure(self.im1ex, self.im2ex,
-                                                                        diffExp, mKernel, log)
+        task = DecorrelateALKernelTask()
+        decorrResult = task.run(self.im1ex, self.im2ex, diffExp, mKernel)
+        corrected_diffExp = decorrResult.correctedExposure
 
         # Corrected diffim - variance should be close to expected.
-        corrected_diffArr = corrected_diffExp.getMaskedImage().getImage().getArray()
-        corrected_diffArr = corrected_diffArr[15:-15, 15:-15]
-        var = corrected_diffArr[~np.isnan(corrected_diffArr)].var()
-        print(var)
-        _, _, var = ipDiffim_id.computeClippedImageStats(corrected_diffExp.getMaskedImage())
-        print(var)  # why is this not ignoring the "edge" mask?
+        statObj = afwMath.makeStatistics(corrected_diffExp.getMaskedImage(), afwMath.VARIANCE,
+                                         self.statsControl)
+        var = statObj.getValue(afwMath.VARIANCE)
+        print(var, expected_var)
         self.assertClose(var, expected_var, rtol=0.02)
 
 
