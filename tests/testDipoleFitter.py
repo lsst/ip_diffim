@@ -154,10 +154,6 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
                                        "ip_diffim_NaiveDipoleFlux",
                                        "ip_diffim_PsfDipoleFlux"]
 
-        # Disable aperture correction, which requires having an ApCorrMap attached to
-        # the Exposure (it'll warn if it's not present and we don't explicitly disable it).
-        measureConfig.doApplyApCorr = "no"
-
         # Here is where we make the dipole fitting task. It can run the other measurements as well.
         # This is an example of how to pass it a custom config.
         measureTask = DipoleFitTask(config=measureConfig, schema=schema)

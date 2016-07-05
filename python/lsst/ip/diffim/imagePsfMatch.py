@@ -63,7 +63,6 @@ class ImagePsfMatchConfig(pexConfig.Config):
         self.selectDetection.thresholdValue = 10.0
 
         # Minimal set of measurments for star selection
-        self.selectMeasurement.doApplyApCorr = "no"
         self.selectMeasurement.algorithms.names.clear()
         self.selectMeasurement.algorithms.names = ('base_SdssCentroid', 'base_PsfFlux', 'base_PixelFlags',
                                                    'base_SdssShape', 'base_GaussianFlux', 'base_SkyCoord')
