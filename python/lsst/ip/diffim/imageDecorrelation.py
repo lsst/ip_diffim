@@ -22,8 +22,7 @@ from __future__ import absolute_import, division, print_function
 #
 
 import numpy as np
-from scipy.fftpack import fft2, ifft2, ifftshift
-from scipy.ndimage.filters import convolve as scipy_convolve
+import scipy.fftpack
 
 import lsst.afw.image as afwImage
 import lsst.meas.algorithms as measAlg
@@ -39,10 +38,13 @@ class DecorrelateALKernelConfig(pexConfig.Config):
     \anchor DecorrelateALKernelConfig_
 
     \brief Configuration parameters for the DecorrelateALKernelTask
-
-    Currently there are no parameters for DecorrelateALKernelTask.
     """
-    pass
+
+    ignoreMaskPlanes = pexConfig.ListField(
+        dtype = str,
+        doc = """Mask planes to ignore for sigma-clipped statistics""",
+        default = ("INTRP", "EDGE", "DETECTED", "SAT", "CR", "BAD", "NO_DATA", "DETECTED_NEGATIVE")
+    )
 
 ## \addtogroup LSST_task_documentation
 ## \{
@@ -125,24 +127,42 @@ class DecorrelateALKernelTask(pipeBase.Task):
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(["INTRP", "EDGE",
-                                                                     "DETECTED", "BAD",
-                                                                     "NO_DATA", "DETECTED_NEGATIVE"]))
+        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(self.config.ignoreMaskPlanes))
+
+    def computeVarianceMean(self, exposure):
+        statObj = afwMath.makeStatistics(exposure.getMaskedImage().getVariance(),
+                                         exposure.getMaskedImage().getMask(),
+                                         afwMath.MEANCLIP, self.statsControl)
+        var = statObj.getValue(afwMath.MEANCLIP)
+        return var
 
     @pipeBase.timeMethod
-    def run(self, templateExposure, exposure, subtractedExposure, psfMatchingKernel):
+    def run(self, exposure, templateExposure, subtractedExposure, psfMatchingKernel,
+            xcen=None, ycen=None, svar=None, tvar=None):
         """! Perform decorrelation of an image difference exposure.
 
         Decorrelates the diffim due to the convolution of the templateExposure with the
         A&L PSF matching kernel. Currently can accept a spatially varying matching kernel but in
-        this case it simply uses a static kernel from the center of the exposure.
+        this case it simply uses a static kernel from the center of the exposure. The decorrelation
+        is described in [DMTN-021, Equation 1](http://dmtn-021.lsst.io/#equation-1), where
+        `exposure` is I_1; templateExposure is I_2; `subtractedExposure` is D(k);
+        `psfMatchingKernel` is kappa; and svar and tvar are their respective
+        variances (see below).
 
-        @param[in] templateExposure the template afwImage.Exposure used for PSF matching
         @param[in] exposure the science afwImage.Exposure used for PSF matching
+        @param[in] templateExposure the template afwImage.Exposure used for PSF matching
         @param[in] subtractedExposure the subtracted exposure produced by
         `ip_diffim.ImagePsfMatchTask.subtractExposures()`
         @param[in] psfMatchingKernel an (optionally spatially-varying) PSF matching kernel produced
         by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
+        @param[in] xcen X-pixel coordinate to use for computing constant matching kernel to use
+        If `None` (default), then use the center of the image.
+        @param[in] ycen Y-pixel coordinate to use for computing constant matching kernel to use
+        If `None` (default), then use the center of the image.
+        @param[in] svar image variance for science image
+        If `None` (default) then compute the variance over the entire input science image.
+        @param[in] tvar image variance for template image
+        If `None` (default) then compute the variance over the entire input template image.
 
         @return a `pipeBase.Struct` containing:
             * `correctedExposure`: the decorrelated diffim
@@ -159,35 +179,40 @@ class DecorrelateALKernelTask(pipeBase.Task):
         """
         self.log.info("Starting.")
         kimg = None
-        try:
-            if psfMatchingKernel.isSpatiallyVarying():
-                spatialKernel = psfMatchingKernel
-                kimg = afwImage.ImageD(spatialKernel.getDimensions())
-                bbox = subtractedExposure.getBBox()
-                xcen = (bbox.getBeginX() + bbox.getEndX()) / 2.
-                ycen = (bbox.getBeginY() + bbox.getEndY()) / 2.
-                spatialKernel.computeImage(kimg, True, xcen, ycen)
-        except:  # Not a spatially-varying kernel (usually not true)
-            kimg = psfMatchingKernel.computeImage()
 
-        # Compute the images' sigmas (sqrt of variance)
-        statObj = afwMath.makeStatistics(templateExposure.getMaskedImage().getVariance(), afwMath.MEANCLIP,
-                                         self.statsControl)
-        sig1 = np.sqrt(statObj.getValue(afwMath.MEANCLIP))
+        spatialKernel = psfMatchingKernel
+        kimg = afwImage.ImageD(spatialKernel.getDimensions())
+        bbox = subtractedExposure.getBBox()
+        if xcen is None:
+            xcen = (bbox.getBeginX() + bbox.getEndX()) / 2.
+        if ycen is None:
+            ycen = (bbox.getBeginY() + bbox.getEndY()) / 2.
+        self.log.info("Using matching kernel computed at (%d, %d)" % (xcen, ycen))
+        spatialKernel.computeImage(kimg, True, xcen, ycen)
 
-        statObj = afwMath.makeStatistics(exposure.getMaskedImage().getVariance(), afwMath.MEANCLIP,
-                                         self.statsControl)
-        sig2 = np.sqrt(statObj.getValue(afwMath.MEANCLIP))
+        if False:  # debug code to save spatially varying kernel for analysis
+            import cPickle
+            import gzip
+            cPickle.dump(spatialKernel, gzip.GzipFile('spatialKernel.p.gz', 'wb'))
 
-        corrKernel = DecorrelateALKernelTask._computeDecorrelationKernel(kimg.getArray(), sig1=sig1, sig2=sig2)
-        fcorrKernel = DecorrelateALKernelTask._fixEvenKernel(corrKernel)
+        if svar is None:
+            svar = self.computeVarianceMean(exposure)
+        self.log.info("Variance (science): %f" % svar)
+        if tvar is None:
+            tvar = self.computeVarianceMean(templateExposure)
+        self.log.info("Variance (template): %f" % tvar)
+
+        var = self.computeVarianceMean(subtractedExposure)
+        self.log.info("Variance (uncorrected diffim): %f" % var)
+
+        corrKernel = DecorrelateALKernelTask._computeDecorrelationKernel(kimg.getArray(), svar, tvar)
         self.log.info("Convolving.")
-        correctedExposure, corrKern = DecorrelateALKernelTask._doConvolve(subtractedExposure, fcorrKernel)
+        correctedExposure, corrKern = DecorrelateALKernelTask._doConvolve(subtractedExposure, corrKernel)
         self.log.info("Updating correctedExposure and its PSF.")
 
         # Compute the subtracted exposure's updated psf
         psf = subtractedExposure.getPsf().computeImage().getArray()
-        psfc = DecorrelateALKernelTask.computeCorrectedDiffimPsf(fcorrKernel, psf, sig1=sig1, sig2=sig2)
+        psfc = DecorrelateALKernelTask.computeCorrectedDiffimPsf(corrKernel, psf, svar=svar, tvar=tvar)
         psfcI = afwImage.ImageD(psfc.shape[0], psfc.shape[1])
         psfcI.getArray()[:, :] = psfc
         psfcK = afwMath.FixedKernel(psfcI)
@@ -195,43 +220,48 @@ class DecorrelateALKernelTask(pipeBase.Task):
         correctedExposure.setPsf(psfNew)
         self.log.info("Complete.")
 
+        var = self.computeVarianceMean(correctedExposure)
+        self.log.info("Variance (corrected diffim): %f" % var)
+
         return pipeBase.Struct(correctedExposure=correctedExposure, correctionKernel=corrKern)
 
     @staticmethod
-    def _computeDecorrelationKernel(kappa, sig1=0.2, sig2=0.2):
+    def _computeDecorrelationKernel(kappa, svar=0.04, tvar=0.04):
         """! Compute the Lupton/ZOGY post-conv. kernel for decorrelating an
         image difference, based on the PSF-matching kernel.
         @param kappa  A matching kernel 2-d numpy.array derived from Alard & Lupton PSF matching
-        @param sig1   Average sqrt(variance) of template image used for PSF matching
-        @param sig2   Average sqrt(variance) of science image used for PSF matching
+        @param svar   Average variance of science image used for PSF matching
+        @param tvar   Average variance of template image used for PSF matching
         @return a 2-d numpy.array containing the correction kernel
 
-        @note As currently implemented, kappa is a static (single) kernel.
+        @note As currently implemented, kappa is a static (single, non-spatially-varying) kernel.
         """
-        kft = fft2(kappa)
-        kft = np.sqrt((sig1**2 + sig2**2) / (sig1**2 + sig2**2 * kft**2))
-        pck = ifft2(kft)
-        pck = ifftshift(pck.real)
+        kappa = DecorrelateALKernelTask._fixOddKernel(kappa)
+        kft = scipy.fftpack.fft2(kappa)
+        kft = np.sqrt((svar + tvar) / (svar + tvar * kft**2))
+        pck = scipy.fftpack.ifft2(kft)
+        pck = scipy.fftpack.ifftshift(pck.real)
+        fkernel = DecorrelateALKernelTask._fixEvenKernel(pck)
 
         # I think we may need to "reverse" the PSF, as in the ZOGY (and Kaiser) papers...
         # This is the same as taking the complex conjugate in Fourier space before FFT-ing back to real space.
         if False:  # TBD: figure this out. For now, we are turning it off.
-            pck = pck[::-1, :]
+            fkernel = fkernel[::-1, :]
 
-        return pck
+        return fkernel
 
     @staticmethod
-    def computeCorrectedDiffimPsf(kappa, psf, sig1=0.2, sig2=0.2):
+    def computeCorrectedDiffimPsf(kappa, psf, svar=0.04, tvar=0.04):
         """! Compute the (decorrelated) difference image's new PSF.
-        new_psf = psf(k) * sqrt((sig1**2 + sig2**2) / (sig1**2 + sig2**2 * kappa_ft(k)**2))
+        new_psf = psf(k) * sqrt((svar + tvar) / (svar + tvar * kappa_ft(k)**2))
 
         @param kappa  A matching kernel array derived from Alard & Lupton PSF matching
         @param psf    The uncorrected psf array of the science image (and also of the diffim)
-        @param sig1   Average sqrt(variance) of template image used for PSF matching
-        @param sig2   Average sqrt(variance) of science image used for PSF matching
+        @param svar   Average variance of science image used for PSF matching
+        @param tvar   Average variance of template image used for PSF matching
         @return a 2-d numpy.array containing the new PSF
         """
-        def post_conv_psf_ft2(psf, kernel, sig1=1., sig2=1.):
+        def post_conv_psf_ft2(psf, kernel, svar, tvar):
             # Pad psf or kernel symmetrically to make them the same size!
             # Note this assumes they are both square (width == height)
             if psf.shape[0] < kernel.shape[0]:
@@ -240,19 +270,40 @@ class DecorrelateALKernelTask(pipeBase.Task):
             elif psf.shape[0] > kernel.shape[0]:
                 diff = (psf.shape[0] - kernel.shape[0]) // 2
                 kernel = np.pad(kernel, (diff, diff), mode='constant')
-            psf_ft = fft2(psf)
-            kft = fft2(kernel)
-            out = psf_ft * np.sqrt((sig1**2 + sig2**2) / (sig1**2 + sig2**2 * kft**2))
+            psf_ft = scipy.fftpack.fft2(psf)
+            kft = scipy.fftpack.fft2(kernel)
+            out = psf_ft * np.sqrt((svar + tvar) / (svar + tvar * kft**2))
             return out
 
-        def post_conv_psf(psf, kernel, sig1=1., sig2=1.):
-            kft = post_conv_psf_ft2(psf, kernel, sig1, sig2)
-            out = ifft2(kft)
+        def post_conv_psf(psf, kernel, svar, tvar):
+            kft = post_conv_psf_ft2(psf, kernel, svar, tvar)
+            out = scipy.fftpack.ifft2(kft)
             return out
 
-        pcf = post_conv_psf(psf=psf, kernel=kappa, sig1=sig2, sig2=sig1)
+        pcf = post_conv_psf(psf=psf, kernel=kappa, svar=svar, tvar=tvar)
         pcf = pcf.real / pcf.real.sum()
         return pcf
+
+    @staticmethod
+    def _fixOddKernel(kernel):
+        """! Take a kernel with odd dimensions and make them even for FFT
+
+        @param kernel a numpy.array
+        @return a fixed kernel numpy.array. Returns a copy if the dimensions needed to change;
+        otherwise just return the input kernel.
+        """
+        # Note this works best for the FFT if we left-pad
+        out = kernel
+        changed = False
+        if (out.shape[0] % 2) == 1:
+            out = np.pad(out, ((1, 0), (0, 0)), mode='constant')
+            changed = True
+        if (out.shape[1] % 2) == 1:
+            out = np.pad(out, ((0, 0), (1, 0)), mode='constant')
+            changed = True
+        if changed:
+            out *= (np.mean(kernel) / np.mean(out))  # need to re-scale to same mean for FFT
+        return out
 
     @staticmethod
     def _fixEvenKernel(kernel):
@@ -288,12 +339,10 @@ class DecorrelateALKernelTask(pipeBase.Task):
         @note We use afwMath.convolve() but keep scipy.convolve for debugging.
         @note We re-center the kernel if necessary and return the possibly re-centered kernel
         """
-        fkernel = DecorrelateALKernelTask._fixEvenKernel(kernel)
-
-        kernelImg = afwImage.ImageD(fkernel.shape[0], fkernel.shape[1])
-        kernelImg.getArray()[:, :] = fkernel
+        kernelImg = afwImage.ImageD(kernel.shape[0], kernel.shape[1])
+        kernelImg.getArray()[:, :] = kernel
         kern = afwMath.FixedKernel(kernelImg)
-        maxloc = np.unravel_index(np.argmax(fkernel), fkernel.shape)
+        maxloc = np.unravel_index(np.argmax(kernel), kernel.shape)
         kern.setCtrX(maxloc[0])
         kern.setCtrY(maxloc[1])
         outExp = exposure.clone()  # Do this to keep WCS, PSF, masks, etc.

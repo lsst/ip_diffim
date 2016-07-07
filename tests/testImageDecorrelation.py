@@ -32,7 +32,12 @@ import lsst.meas.algorithms as measAlg
 
 from lsst.ip.diffim.imageDecorrelation import DecorrelateALKernelTask
 
-def singleGaussian2d(x, y, xc, yc, sigma_x=1., sigma_y=1., theta=0.):
+
+def setup_module(module):
+    lsst.utils.tests.init()
+
+
+def singleGaussian2d(x, y, xc, yc, sigma_x=1., sigma_y=1., theta=0., ampl=1.):
     """! Generate a 2-d Gaussian, possibly elongated and rotated, on a grid of pixel
     coordinates given by x,y.
     @param x,y each a 1-d numpy.array containing x- and y- coordinates for independent variables,
@@ -40,7 +45,10 @@ def singleGaussian2d(x, y, xc, yc, sigma_x=1., sigma_y=1., theta=0.):
     @param xc,yc each a float giving the centroid of the gaussian
     @param sigma_x,sigma_y each a float giving the sigma of the gaussian
     @param theta a float giving the rotation of the gaussian (degrees)
+    @param ampl a float giving the amplitude of the gaussian
     @return a 2-d numpy.array containing the normalized 2-d Gaussian
+
+    @Note this can be done in `astropy.modeling` but for now we have it explicitly here.
     """
     theta = (theta/180.) * np.pi
     cos_theta2, sin_theta2 = np.cos(theta)**2., np.sin(theta)**2.
@@ -54,25 +62,27 @@ def singleGaussian2d(x, y, xc, yc, sigma_x=1., sigma_y=1., theta=0.):
     return out
 
 
-def makeFakeImages(xim=None, yim=None, sig1=0.2, sig2=0.2, psf1=2.2, psf2=3.3, offset=None,
-                   psf_yvary_factor=0., varSourceChange=1/50., theta1=0., theta2=0., im2background=0.,
+def makeFakeImages(xim=None, yim=None, svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, offset=None,
+                   psf_yvary_factor=0., varSourceChange=1/50., theta1=0., theta2=0., im1background=0.,
                    n_sources=500, seed=66, verbose=False):
     """! Make two exposures: a template and a science exposure.
     Add random sources of identical flux, with randomly-distributed fluxes and a given PSF, then add noise.
+    In all cases below, index (1) is the science image, and (2) is the template.
     @param xim,yim image pixel coordinates on which to generate the image grid. Default is (-256:256).
-    @param sig1,sig2 std. dev. of noise to be generated on input images. Defalt is 0.2 for both.
+    @param svar,tar variance of noise to be generated on science/template images. Default is 0.04 for both.
     @param psf1,psf2 std. dev. of (Gaussian) PSFs for the two images in x,y direction. Default is
-    [2.2, 2.2] and [3.3, 3.3] for im1 and im2 respectively.
+    [3.3, 3.3] and [2.2, 2.2] for im1 and im2 respectively.
     @param offset add a constant (pixel) astrometric offset between the two images
-    @param psf_yvary_factor vary the PSF of the science image by this much across the image
+    @param psf_yvary_factor vary the y-width of the PSF across the x-axis of the science image (zero,
+    the default, means no variation)
     @param varSourceChange add this amount of fractional flux to a single source closest to
     the center of the science image
-    @param im2background add a constant value to the science image
+    @param im1background add a constant value to the science image
     @param n_sources the number of sources to add to the images
     @param seed the numpy random seed to set prior to image generation
     @param verbose be verbose
 
-    @return im1, im2: the template and science afwImage.Exposures
+    @return im1, im2: the science and template afwImage.Exposures
 
     @note having sources near the edges really messes up the
     fitting (probably because of the convolution). So we make sure no
@@ -84,17 +94,17 @@ def makeFakeImages(xim=None, yim=None, sig1=0.2, sig2=0.2, psf1=2.2, psf2=3.3, o
     """
     np.random.seed(seed)
 
-    psf1 = [2.2, 2.2] if psf1 is None else psf1
-    if not hasattr(psf1, "__len__"):
+    psf1 = [3.3, 3.3] if psf1 is None else psf1
+    if not hasattr(psf1, "__len__") and not isinstance(psf1, basestring):
         psf1 = [psf1, psf1]
-    psf2 = [3.3, 3.3] if psf2 is None else psf2
-    if not hasattr(psf2, "__len__"):
+    psf2 = [2.2, 2.2] if psf2 is None else psf2
+    if not hasattr(psf2, "__len__") and not isinstance(psf2, basestring):
         psf2 = [psf2, psf2]
     offset = [0., 0.] if offset is None else offset   # astrometric offset (pixels) between the two images
     if verbose:
-        print('Template PSF:', psf1, theta1)
-        print('Science PSF:', psf2, theta2)
-        print(np.sqrt(psf2[0]**2 - psf1[0]**2))
+        print('Science PSF:', psf1, theta1)
+        print('Template PSF:', psf2, theta2)
+        print(np.sqrt(psf1[0]**2 - psf2[0]**2))
         print('Offset:', offset)
 
     xim = np.arange(-256, 256, 1) if xim is None else xim
@@ -107,48 +117,48 @@ def makeFakeImages(xim=None, yim=None, sig1=0.2, sig2=0.2, psf1=2.2, psf2=3.3, o
     # Make the source closest to the center of the image the one that increases in flux
     ind = np.argmin(xposns**2. + yposns**2.)
 
-    im1 = np.random.normal(scale=sig1, size=x0im.shape)  # sigma of template
-    im2 = np.random.normal(scale=sig2, size=x0im.shape)  # sigma of science image
+    im1 = np.random.normal(scale=np.sqrt(svar), size=x0im.shape)  # variance of science image
+    im2 = np.random.normal(scale=np.sqrt(tvar), size=x0im.shape)  # variance of template
 
-    # variation in y-width of psf in science image across (x-dim of) image:
-    psf2_yvary = psf_yvary_factor * (yim.mean() - yposns) / yim.max()
+    # vary the y-width of psf across x-axis of science image (zero means no variation):
+    psf1_yvary = psf_yvary_factor * (yim.mean() - yposns) / yim.max()
     if verbose:
-        print('PSF y spatial-variation:', psf2_yvary.min(), psf2_yvary.max())
+        print('PSF y spatial-variation:', psf1_yvary.min(), psf1_yvary.max())
 
     for i in range(n_sources):
         flux = fluxes[i]
-        tmp1 = flux * singleGaussian2d(x0im, y0im, xposns[i], yposns[i], psf1[0], psf1[1], theta=theta1)
-        im1 += tmp1
+        tmp = flux * singleGaussian2d(x0im, y0im, xposns[i], yposns[i], psf2[0], psf2[1], theta=theta2)
+        im2 += tmp
         if i == ind:
             flux += flux * varSourceChange
-        tmp2 = flux * singleGaussian2d(x0im, y0im, xposns[i]+offset[0], yposns[i]+offset[1],
-                                       psf2[0], psf2[1]+psf2_yvary[i], theta=theta2)
-        im2 += tmp2
+        tmp = flux * singleGaussian2d(x0im, y0im, xposns[i]+offset[0], yposns[i]+offset[1],
+                                      psf1[0], psf1[1]+psf1_yvary[i], theta=theta1)
+        im1 += tmp
 
-    # Add a (constant, for now) background offset to im2
-    if im2background != 0.:  # im2background = 10.
+    # Add a (constant, for now) background offset to science image
+    if im1background != 0.:  # im1background = 10.
         if verbose:
-            print('Background:', im2background)
-        im2 += im2background
+            print('Background:', im1background)
+        im1 += im1background
 
     im1_psf = singleGaussian2d(x0im, y0im, 0, 0, psf1[0], psf1[1], theta=theta1)
     im2_psf = singleGaussian2d(x0im, y0im, offset[0], offset[1], psf2[0], psf2[1], theta=theta2)
 
-    def makeExposure(imgArray, psfArray, imgSigma):
+    def makeExposure(imgArray, psfArray, imgVariance):
         """! Convert an image numpy.array and corresponding PSF numpy.array into an exposure.
 
-        Add the (constant) variance plane equal to imgSigma**2.
+        Add the (constant) variance plane equal to `imgVariance`.
 
         @param imgArray 2-d numpy.array containing the image
         @param psfArray 2-d numpy.array containing the PSF image
-        @param imgSigma std. deviation of input image (equal to sqrt(variance))
+        @param imgVariance variance of input image
         @return a new exposure containing the image, PSF and desired variance plane
         """
         # All this code to convert the template image array/psf array into an exposure.
         bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(imgArray.shape[0]-1, imgArray.shape[1]-1))
         im1ex = afwImage.ExposureD(bbox)
         im1ex.getMaskedImage().getImage().getArray()[:, :] = imgArray
-        im1ex.getMaskedImage().getVariance().getArray()[:, :] = imgSigma**2.
+        im1ex.getMaskedImage().getVariance().getArray()[:, :] = imgVariance
         psfBox = afwGeom.Box2I(afwGeom.Point2I(-20, -20), afwGeom.Point2I(20, 20))  # a 41x41 pixel psf
         psf = afwImage.ImageD(psfBox)
         psfBox.shift(afwGeom.Extent2I(256, 256))
@@ -159,8 +169,8 @@ def makeFakeImages(xim=None, yim=None, sig1=0.2, sig2=0.2, psf1=2.2, psf2=3.3, o
         im1ex.setPsf(psfNew)
         return im1ex
 
-    im1ex = makeExposure(im1, im1_psf, sig1)
-    im2ex = makeExposure(im2, im2_psf, sig2)
+    im1ex = makeExposure(im1, im1_psf, svar)  # Science image
+    im2ex = makeExposure(im2, im2_psf, tvar)  # Template
 
     return im1ex, im2ex
 
@@ -170,102 +180,130 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
     """
 
     def setUp(self):
-        """!Generate a fake aligned template and science image and analyse the noise in the
-        resulting diffim. First, use a non-spatially-varying psf.
-        """
-
-        self.psf1_sigma = 2.2  # sigma of psf of template image
-        self.psf2_sigma = 3.3  # sigma of psf of science image
-        self.sig1 = 0.2  # std.dev of noise in template image
-        self.sig2 = 0.2  # std.dev of noise in science image
-
-        self.im1ex, self.im2ex \
-            = makeFakeImages(sig1=self.sig1, sig2=self.sig2, psf1=self.psf1_sigma, psf2=self.psf2_sigma,
-                             n_sources=50, verbose=True)
+        self.psf1_sigma = 3.3  # sigma of psf of science image
+        self.psf2_sigma = 2.2  # sigma of psf of template image
 
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(["INTRP", "EDGE",
+        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(["INTRP", "EDGE", "SAT", "CR",
                                                                      "DETECTED", "BAD",
                                                                      "NO_DATA", "DETECTED_NEGATIVE"]))
+
+    def _setUpImages(self, svar=0.04, tvar=0.04):
+        """!Generate a fake aligned template and science image.
+        """
+
+        self.svar = svar  # variance of noise in science image
+        self.tvar = tvar  # variance of noise in template image
+
+        self.im1ex, self.im2ex \
+            = makeFakeImages(svar=self.svar, tvar=self.tvar, psf1=self.psf1_sigma, psf2=self.psf2_sigma,
+                             n_sources=50, verbose=False)
+
+    def _computeVarianceMean(self, maskedIm):
+        statObj = afwMath.makeStatistics(maskedIm.getVariance(),
+                                         maskedIm.getMask(), afwMath.MEANCLIP,
+                                         self.statsControl)
+        mn = statObj.getValue(afwMath.MEANCLIP)
+        return mn
+
+    def _computePixelVariance(self, maskedIm):
+        statObj = afwMath.makeStatistics(maskedIm, afwMath.VARIANCECLIP,
+                                         self.statsControl)
+        var = statObj.getValue(afwMath.VARIANCECLIP)
+        return var
 
     def tearDown(self):
         del self.im1ex
         del self.im2ex
 
-    def testDiffimCorrection(self):
-        """! Check that the variance of the corrected diffim matches the theoretical value
-        (to within a 1% tolerance).
+    def _testImages(self):
+        """Check that the variance of the corrected diffim matches the theoretical value.
         """
-
         # Create the matching kernel. We used Gaussian PSFs for im1 and im2, so we can compute the "expected"
         # matching kernel sigma.
         psf1_sig = self.im1ex.getPsf().computeShape().getDeterminantRadius()
         psf2_sig = self.im2ex.getPsf().computeShape().getDeterminantRadius()
-        sig_match = np.sqrt((psf2_sig**2. - psf1_sig**2.))
-        self.assertClose(sig_match, np.sqrt((self.psf2_sigma**2. - self.psf1_sigma**2.)), rtol=1e-5)
-        #matchingKernel = measAlg.SingleGaussianPsf(31, 31, sig_match)
+        sig_match = np.sqrt((psf1_sig**2. - psf2_sig**2.))
+        # Sanity check - make sure PSFs are correct.
+        self.assertClose(sig_match, np.sqrt((self.psf1_sigma**2. - self.psf2_sigma**2.)), rtol=1e-5)
+        # mKernel = measAlg.SingleGaussianPsf(31, 31, sig_match)
         x0 = np.arange(-16, 16, 1)
         y0 = x0.copy()
         x0im, y0im = np.meshgrid(x0, y0)
-        matchingKernel = singleGaussian2d(x0im, y0im, 0., 0., sigma_x=sig_match, sigma_y=sig_match)
+        matchingKernel = singleGaussian2d(x0im, y0im, -1., -1., sigma_x=sig_match, sigma_y=sig_match)
         kernelImg = afwImage.ImageD(matchingKernel.shape[0], matchingKernel.shape[1])
         kernelImg.getArray()[:, :] = matchingKernel
         mKernel = afwMath.FixedKernel(kernelImg)
-        mKernel = measAlg.KernelPsf(mKernel)
 
         # Create the matched template by convolving the template with the matchingKernel
-        from scipy.ndimage.filters import convolve
-        im1 = self.im1ex.getMaskedImage().getImage().getArray()
-        matched_im1 = convolve(im1, matchingKernel, mode='constant')
-        matched_im1ex = self.im1ex.clone()
-        matched_im1ex.getMaskedImage().getImage().getArray()[:, :] = matched_im1
+        matched_im2ex = self.im2ex.clone()
+        convCntrl = afwMath.ConvolutionControl(False, True, 0)
+        afwMath.convolve(matched_im2ex.getMaskedImage(), self.im2ex.getMaskedImage(), mKernel, convCntrl)
 
         # Expected (ideal) variance of difference image
-        expected_var = self.sig1**2 + self.sig2**2
+        expected_var = self.svar + self.tvar
         print('Expected variance:', expected_var)
 
-        im2 = self.im2ex.getMaskedImage().getImage().getArray()
-        print(np.nan_to_num(matched_im1 - im2).var())
-        # Uncorrected diffim - variance is wrong (too low)
-        self.assertNotClose(np.nan_to_num(matched_im1 - im2).var(), expected_var, rtol=0.1)
-        # In fact, it should have an (incorrect) variance that is close to the variance of the science image.
-        self.assertClose((matched_im1 - im2)[~np.isnan(matched_im1 - im2)].var(), self.sig2**2., rtol=0.1)
+        # Uncorrected diffim exposure - variance plane is wrong (too low)
+        tmp_diffExp = self.im1ex.getMaskedImage().clone()
+        tmp_diffExp -= matched_im2ex.getMaskedImage()
+        var = self._computeVarianceMean(tmp_diffExp)
+        self.assertLess(var, expected_var)
 
-        diffExp = matched_im1ex.clone()
-        tmpArr = diffExp.getMaskedImage().getImage().getArray()
-        tmpArr -= self.im2ex.getMaskedImage().getImage().getArray()
-        # Uncorrected diffim exposure - variance is wrong (too low)
-        self.assertNotClose(tmpArr[~np.isnan(tmpArr)].var(), expected_var, rtol=0.1)
+        # Create the diffim (uncorrected)
+        diffExp = self.im1ex.clone()
+        tmp = diffExp.getMaskedImage()
+        tmp -= matched_im2ex.getMaskedImage()
+        # Uncorrected diffim exposure - variance is wrong (too low) - same as above but on pixels
+        var = self._computePixelVariance(diffExp.getMaskedImage())
+        self.assertLess(var, expected_var)
+
+        # Uncorrected diffim exposure - variance plane is wrong (too low)
+        mn = self._computeVarianceMean(diffExp.getMaskedImage())
+        self.assertLess(mn, expected_var)
+        print('UNCORRECTED VARIANCE:', var, mn)
 
         task = DecorrelateALKernelTask()
         decorrResult = task.run(self.im1ex, self.im2ex, diffExp, mKernel)
         corrected_diffExp = decorrResult.correctedExposure
 
         # Corrected diffim - variance should be close to expected.
-        statObj = afwMath.makeStatistics(corrected_diffExp.getMaskedImage(), afwMath.VARIANCE,
-                                         self.statsControl)
-        var = statObj.getValue(afwMath.VARIANCE)
-        print(var, expected_var)
-        self.assertClose(var, expected_var, rtol=0.02)
+        # We set the tolerance a bit higher here since the simulated images have many bright stars
+        var = self._computePixelVariance(corrected_diffExp.getMaskedImage())
+        self.assertClose(var, expected_var, rtol=0.05)
+
+        # Check statistics of variance plane in corrected diffim
+        mn = self._computeVarianceMean(corrected_diffExp.getMaskedImage())
+        print('CORRECTED VARIANCE:', var, mn)
+        self.assertClose(mn, expected_var, rtol=0.02)
+        self.assertClose(var, mn, rtol=0.05)
+
+    def testDiffimCorrection_same_variance(self):
+        """Test decorrelated diffim from two images with the same variance.
+        """
+        self._setUpImages(svar=0.04, tvar=0.04)
+        self._testImages()
+
+    def testDiffimCorrection_higher_science_variance(self):
+        """Test decorrelated diffim when the science image variance is higher than that of the template.
+        """
+        self._setUpImages(svar=0.08, tvar=0.04)
+        self._testImages()
+
+    def testDiffimCorrection_higher_template_variance(self):
+        """Test decorrelated diffim when the template variance is higher than that of the science img.
+        """
+        self._setUpImages(svar=0.04, tvar=0.08)
+        self._testImages()
 
 
-def suite():
-    """!Returns a suite containing all the test cases in this module."""
+class MemoryTester(lsst.utils.tests.MemoryTestCase):
+    pass
 
-    lsst.utils.tests.init()
-
-    suites = []
-    suites += unittest.makeSuite(DiffimCorrectionTest)
-    suites += unittest.makeSuite(lsst.utils.tests.MemoryTestCase)
-    return unittest.TestSuite(suites)
-
-
-def run(shouldExit=False):
-    """!Run the tests"""
-    lsst.utils.tests.run(suite(), shouldExit)
 
 if __name__ == "__main__":
-    run(True)
+    lsst.utils.tests.init()
+    unittest.main()
 
