@@ -90,7 +90,10 @@ class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
 
 
 class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
-    """!Measurement of detected diaSources as dipoles"""
+    """!Measurement of detected diaSources as dipoles
+
+    Currently we keep the "old" DipoleMeasurement algorithms turned on.
+    """
 
     def setDefaults(self):
         measBase.SingleFrameMeasurementConfig.setDefaults(self)
@@ -101,7 +104,8 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
                               "base_PsfFlux",
                               "ip_diffim_NaiveDipoleCentroid",
                               "ip_diffim_NaiveDipoleFlux",
-                              "ip_diffim_PsfDipoleFlux"
+                              "ip_diffim_PsfDipoleFlux",
+                              "ip_diffim_ClassificationDipole"
                               ]
 
         self.slots.calibFlux = None
