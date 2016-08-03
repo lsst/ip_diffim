@@ -23,8 +23,8 @@ import numpy as np
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.detection as afwDetect
-import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
+from lsst.log import Log
 import lsst.meas.deblender.baseline as deblendBaseline
 from lsst.meas.base.pluginRegistry import register
 from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig, \
@@ -449,8 +449,8 @@ class DipoleDeblender(object):
 
         # Always deblend as Psf
         self.psfChisqCut1 = self.psfChisqCut2 = self.psfChisqCut2b = np.inf
-        self.log = pexLog.Log(pexLog.Log.getDefaultLog(),
-                              'lsst.ip.diffim.DipoleDeblender', pexLog.Log.INFO)
+        self.log = Log.getLogger('lsst.ip.diffim.DipoleDeblender')
+        self.log.setLevel(Log.INFO)
         self.sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
     def __call__(self, source, exposure):
@@ -502,7 +502,7 @@ class DipoleDeblender(object):
                 fpres.peaks.append(pkres)
 
             for pki,(pk,pkres,pkF) in enumerate(zip(dpeaks, fpres.peaks, peaksF)):
-                self.log.logdebug('Peak %i' % pki)
+                self.log.debug('Peak %i', pki)
                 deblendBaseline._fitPsf(fp, fmask, pk, pkF, pkres, fbb, dpeaks, peaksF, self.log,
                                          cpsf, psfFwhmPix,
                                          subimage.getMaskedImage().getImage(),
@@ -521,11 +521,11 @@ class DipoleDeblender(object):
             else:
                 suffix = "neg"
             c = peak.psfFitCenter
-            self.log.info("deblended.centroid.dipole.psf.%s %f %f" % (
-                suffix, c[0], c[1]))
-            self.log.info("deblended.chi2dof.dipole.%s %f" % (
-                suffix, peak.psfFitChisq / peak.psfFitDof))
-            self.log.info("deblended.flux.dipole.psf.%s %f" % (
-                suffix, peak.psfFitFlux * np.sum(peak.templateImage.getArray())))
+            self.log.info("deblended.centroid.dipole.psf.%s %f %f",
+                suffix, c[0], c[1])
+            self.log.info("deblended.chi2dof.dipole.%s %f",
+                suffix, peak.psfFitChisq / peak.psfFitDof)
+            self.log.info("deblended.flux.dipole.psf.%s %f",
+                suffix, peak.psfFitFlux * np.sum(peak.templateImage.getArray()))
             peakList.append(peak.peak)
         return deblendedSource

@@ -445,7 +445,7 @@ And finally provide some optional debugging displays:
             lsstDebug.frame += 1
 
         if templateFwhmPix and scienceFwhmPix:
-            self.log.info("Matching Psf FWHM %.2f -> %.2f pix" % (templateFwhmPix, scienceFwhmPix))
+            self.log.info("Matching Psf FWHM %.2f -> %.2f pix", templateFwhmPix, scienceFwhmPix)
 
         if self.kConfig.useBicForKernelBasis:
             tmpKernelCellSet = self._buildCellSet(templateMaskedImage,
@@ -744,7 +744,7 @@ And finally provide some optional debugging displays:
             smi  = afwImage.MaskedImageF(scienceMaskedImage, bbox)
             cand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
 
-            self.log.logdebug("Candidate %d at %f, %f" % (cand.getId(), cand.getXCenter(), cand.getYCenter()))
+            self.log.debug("Candidate %d at %f, %f", cand.getId(), cand.getXCenter(), cand.getYCenter())
             kernelCellSet.insertCandidate(cand)
 
         return kernelCellSet
@@ -770,12 +770,12 @@ And finally provide some optional debugging displays:
         templateLimit  = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getEnd()))
         scienceLimit   = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getEnd()))
 
-        self.log.info("Template Wcs : %f,%f -> %f,%f" %
-                      (templateOrigin[0], templateOrigin[1],
-                       templateLimit[0], templateLimit[1]))
-        self.log.info("Science Wcs : %f,%f -> %f,%f" %
-                      (scienceOrigin[0], scienceOrigin[1],
-                       scienceLimit[0], scienceLimit[1]))
+        self.log.info("Template Wcs : %f,%f -> %f,%f",
+                      templateOrigin[0], templateOrigin[1],
+                      templateLimit[0], templateLimit[1])
+        self.log.info("Science Wcs : %f,%f -> %f,%f",
+                      scienceOrigin[0], scienceOrigin[1],
+                      scienceLimit[0], scienceLimit[1])
 
         templateBBox = afwGeom.Box2D(templateOrigin.getPosition(), templateLimit.getPosition())
         scienceBBox  = afwGeom.Box2D(scienceOrigin.getPosition(), scienceLimit.getPosition())

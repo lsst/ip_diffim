@@ -259,7 +259,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
 
         maskedImage = exposure.getMaskedImage()
 
-        self.log.log(pexLog.Log.INFO, "compute Psf-matching kernel")
+        self.log.info("compute Psf-matching kernel")
         kernelCellSet = self._buildCellSet(exposure, referencePsfModel)
         width, height = referencePsfModel.getLocalKernel().getDimensions()
         psfAttr1 = measAlg.PsfAttributes(exposure.getPsf(), width//2, height//2)
@@ -281,7 +281,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
             kParameters[0] = kernelSum
             psfMatchingKernel.setKernelParameters(kParameters)
 
-        self.log.log(pexLog.Log.INFO, "Psf-match science exposure to reference")
+        self.log.info("Psf-match science exposure to reference")
         psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(), exposure.getWcs())
         psfMatchedExposure.setFilter(exposure.getFilter())
         psfMatchedExposure.setCalib(exposure.getCalib())
@@ -292,7 +292,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         doNormalize = True
         afwMath.convolve(psfMatchedMaskedImage, maskedImage, psfMatchingKernel, doNormalize)
 
-        self.log.log(pexLog.Log.INFO, "done")
+        self.log.info("done")
         return pipeBase.Struct(psfMatchedExposure=psfMatchedExposure,
                                psfMatchingKernel=psfMatchingKernel,
                                kernelCellSet=kernelCellSet,
