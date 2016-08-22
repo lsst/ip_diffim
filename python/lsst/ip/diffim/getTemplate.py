@@ -158,9 +158,10 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
 
         \param[in] exposure -- exposure (unused)
         \param[in] sensorRef -- a Butler data reference
-        \param[in] templateIdList -- list of data ids, which should contain as single item.
+        \param[in] templateIdList -- list of data ids, which should contain a single item.
                                      If there are multiple items, only the first is used.
-                                     Only the entry 'visit' from the data id is used.
+                                     The sensorRef.dataId is updated with the dictionary in
+                                     'templateIdList[0]'
 
         \return a pipeBase.Struct
          - exposure: a template calexp
@@ -174,7 +175,8 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
                           (templateIdList[0]['visit']))
 
         templateId = sensorRef.dataId.copy()
-        templateId["visit"] = templateIdList[0]['visit']
+        templateId.update(templateIdList[0])
+
         self.log.info("Fetching calexp (%s) as template." % (templateId))
 
         butler = sensorRef.getButler()
