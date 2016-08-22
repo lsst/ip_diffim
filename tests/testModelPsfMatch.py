@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import unittest
-import lsst.utils.tests as tests
+import lsst.utils.tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
@@ -9,7 +9,7 @@ import lsst.meas.algorithms as measAlg
 import lsst.pex.logging as pexLog
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
-class PsfMatchTestCases(unittest.TestCase):
+class PsfMatchTestCases(lsst.utils.tests.TestCase):
 
     def setUp(self):
         self.config    = ipDiffim.ModelPsfMatchTask.ConfigClass()
@@ -59,18 +59,12 @@ class PsfMatchTestCases(unittest.TestCase):
         del self.exp
         del self.subconfig
 
-def suite():
-    """Returns a suite containing all the test cases in this module."""
-    tests.init()
+class TestMemory(lsst.utils.tests.MemoryTestCase):
+    pass
 
-    suites = []
-    suites += unittest.makeSuite(PsfMatchTestCases)
-    suites += unittest.makeSuite(tests.MemoryTestCase)
-    return unittest.TestSuite(suites)
-
-def run(doExit=False):
-    """Run the tests"""
-    tests.run(suite(), doExit)
+def setup_module(module):
+    lsst.utils.tests.init()
 
 if __name__ == "__main__":
-    run(True)
+    lsst.utils.tests.init()
+    unittest.main()
