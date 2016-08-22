@@ -156,7 +156,7 @@ class DiffimTestCases(unittest.TestCase):
             if maskPlane not in maskPlanes:
                 maskVal = afwImage.MaskU.getPlaneBitMask(maskPlane)
                 break
-        self.assertTrue(maskVal > 0)
+        self.assertGreater(maskVal, 0)
 
         numArray = num.ones((20, 20))
         mi       = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
