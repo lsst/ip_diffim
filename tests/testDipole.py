@@ -24,7 +24,7 @@ import unittest
 
 import numpy as np
 
-import lsst.utils.tests as tests
+import lsst.utils.tests
 import lsst.daf.base as dafBase
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.image as afwImage
@@ -115,7 +115,7 @@ def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.2):
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-class DipoleAlgorithmTest(unittest.TestCase):
+class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
     """ A test case for dipole algorithms"""
     def setUp(self):
         self.w, self.h = 100, 100 # size of image
@@ -350,7 +350,7 @@ class DipoleAlgorithmTest(unittest.TestCase):
         dpDeblender = ipDiffim.DipoleDeblender()
         dpDeblender(source, exposure)
 
-class DipoleMeasurementTaskTest(unittest.TestCase):
+class DipoleMeasurementTaskTest(lsst.utils.tests.TestCase):
     """A test case for the DipoleMeasurementTask.  Essentially just
     test the classification flag since the invididual algorithms are
     tested above"""
@@ -374,21 +374,12 @@ class DipoleMeasurementTaskTest(unittest.TestCase):
         task.run(sources, exposure)
         self.assertEqual(source.get("ip_diffim_ClassificationDipole_value"), 1.0)
 
-def suite():
-    """Returns a suite containing all the test cases in this module."""
+class TestMemory(lsst.utils.tests.MemoryTestCase):
+    pass
 
-    tests.init()
-
-    suites = []
-    suites += unittest.makeSuite(DipoleAlgorithmTest)
-    suites += unittest.makeSuite(DipoleMeasurementTaskTest)
-    suites += unittest.makeSuite(tests.MemoryTestCase)
-    return unittest.TestSuite(suites)
-
-def run(shouldExit = False):
-    """Run the tests"""
-    tests.run(suite(), shouldExit)
+def setup_module(module):
+    lsst.utils.tests.init()
 
 if __name__ == "__main__":
-    run(True)
-
+    lsst.utils.tests.init()
+    unittest.main()
