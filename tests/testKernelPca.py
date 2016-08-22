@@ -76,23 +76,23 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         eVal2 = imagePca2.getEigenValues()
 
         # First term is far more signficant without mean subtraction
-        self.assertTrue(eVal2[0] > eVal1[0])
+        self.assertGreater(eVal2[0], eVal1[0])
 
         # Last term basically zero with mean subtraction
         self.assertAlmostEqual(eVal1[-1], 0.0)
 
         # Extra image with mean subtraction
-        self.assertTrue(len(pcaBasisList1) == (len(eVal1) + 1))
+        self.assertEqual(len(pcaBasisList1), (len(eVal1) + 1))
 
         # Same shape
-        self.assertTrue(len(pcaBasisList2) == len(eVal2))
+        self.assertEqual(len(pcaBasisList2), len(eVal2))
 
         # Mean kernel close to kRefIm
         kImageM = afwImage.ImageD(gaussKernel.getDimensions())
         pcaBasisList1[0].computeImage(kImageM, False)
         for y in range(kRefIm.getHeight()):
             for x in range(kRefIm.getWidth()):
-                self.assertTrue( abs(kRefIm.get(x, y) - kImageM.get(x, y)) / kRefIm.get(x, y) < 0.2 )
+                self.assertLess(abs(kRefIm.get(x, y) - kImageM.get(x, y)) / kRefIm.get(x, y), 0.2 )
 
         # First mean-unsubtracted Pca kernel close to kRefIm (normalized to peak of 1.0)
         kImage0 = afwImage.ImageD(gaussKernel.getDimensions())
@@ -101,7 +101,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kRefIm /= maxVal
         for y in range(kRefIm.getHeight()):
             for x in range(kRefIm.getWidth()):
-                self.assertTrue( abs(kRefIm.get(x, y) - kImage0.get(x, y)) / kRefIm.get(x, y) < 0.2 )
+                self.assertLess(abs(kRefIm.get(x, y) - kImage0.get(x, y)) / kRefIm.get(x, y), 0.2 )
 
     def testImagePca(self):
         # Test out the ImagePca behavior
