@@ -23,7 +23,7 @@
 #
 import unittest
 import numpy as np
-import lsst.utils.tests as tests
+import lsst.utils.tests
 import lsst.afw.table as afwTable
 import lsst.afw.coord as afwCoord
 import lsst.afw.geom as afwGeom
@@ -33,7 +33,7 @@ import lsst.ip.diffim as ipDiffim
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-class DiaCatalogSourceSelectorTest(unittest.TestCase):
+class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
 
     def setUp(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
@@ -116,19 +116,12 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
             sources = self.sourceSelector.selectStars(self.exposure, self.srcCat, matches).starCat
             self.assertEqual(len(sources), nSrc-4)
 
-def suite():
-    """Returns a suite containing all the test cases in this module."""
+class TestMemory(lsst.utils.tests.MemoryTestCase):
+    pass
 
-    tests.init()
-
-    suites = []
-    suites += unittest.makeSuite(DiaCatalogSourceSelectorTest)
-    suites += unittest.makeSuite(tests.MemoryTestCase)
-    return unittest.TestSuite(suites)
-
-def run(shouldExit = False):
-    """Run the tests"""
-    tests.run(suite(), shouldExit)
+def setup_module(module):
+    lsst.utils.tests.init()
 
 if __name__ == "__main__":
-    run(True)
+    lsst.utils.tests.init()
+    unittest.main()
