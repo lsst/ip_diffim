@@ -68,7 +68,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList1 = kcDetect.getFootprints()
 
-        self.assertTrue(len(fpList1) != 0)
+        self.assertNotEqual(len(fpList1), 0)
 
         for fp in fpList1:
             bbox = fp.getBBox()
@@ -88,7 +88,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             tmask.getWidth()//2, tmask.getHeight()//2, maskVal)
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList2 = kcDetect.getFootprints()
-        self.assertTrue(len(fpList2) == (len(fpList1)-1))
+        self.assertEqual(len(fpList2), (len(fpList1)-1))
 
         # add a masked pixel to the science image and make sure you don't get it
         afwImage.MaskedImageF(self.scienceImage, fpList1[1].getBBox(), afwImage.LOCAL).getMask().set(
@@ -97,7 +97,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             smask.getWidth()//2, smask.getHeight()//2, maskVal)
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList3 = kcDetect.getFootprints()
-        self.assertTrue(len(fpList3) == (len(fpList1)-3))
+        self.assertEqual(len(fpList3), (len(fpList1)-3))
 
 #####
 
