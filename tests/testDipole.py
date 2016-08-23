@@ -38,8 +38,6 @@ display = False
 np.random.seed(666)
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
 
 def makePluginAndCat(alg, name, control, metadata=False, centroid=None):
     schema = afwTable.SourceTable.makeMinimalSchema()
@@ -125,9 +123,6 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
     def setUp(self):
         self.w, self.h = 100, 100  # size of image
         self.xc, self.yc = 50, 50  # location of center of dipole
-
-    def tearDown(self):
-        pass
 
     def testNaiveDipoleCentroid(self):
         control = ipDiffim.DipoleCentroidControl()
@@ -310,8 +305,8 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         self.assertAlmostEqual(1e-4*fneg*negPsfSum, 1e-4*source.get("ip_diffim_PsfDipoleFlux_neg_flux"), 2)
         self.assertAlmostEqual(1e-4*fpos*posPsfSum, 1e-4*source.get("ip_diffim_PsfDipoleFlux_pos_flux"), 2)
 
-        self.assertTrue(source.get("ip_diffim_PsfDipoleFlux_pos_fluxSigma") > 0.0)
-        self.assertTrue(source.get("ip_diffim_PsfDipoleFlux_neg_fluxSigma") > 0.0)
+        self.assertGreater(source.get("ip_diffim_PsfDipoleFlux_pos_fluxSigma"), 0.0)
+        self.assertGreater(source.get("ip_diffim_PsfDipoleFlux_neg_fluxSigma"), 0.0)
         self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_neg_flag"), False)
         self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_pos_flag"), False)
 
@@ -324,7 +319,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_neg_flag"), False)
         self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_pos_flag"), False)
 
-        self.assertTrue(source.get("ip_diffim_PsfDipoleFlux_chi2dof") > 0.0)
+        self.assertGreater(source.get("ip_diffim_PsfDipoleFlux_chi2dof"), 0.0)
 
     def measureDipole(self, s, exp):
         msConfig = ipDiffim.DipoleMeasurementConfig()
