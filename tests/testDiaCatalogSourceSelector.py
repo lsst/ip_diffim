@@ -31,8 +31,6 @@ import lsst.afw.image as afwImage
 from lsst.meas.algorithms import LoadReferenceObjectsTask, getRefFluxField
 import lsst.ip.diffim as ipDiffim
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
 
 class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
 
