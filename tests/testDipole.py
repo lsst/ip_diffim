@@ -114,8 +114,6 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
 
     return psf, psfSum, exp, s
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
 
 class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
     """ A test case for dipole algorithms"""
