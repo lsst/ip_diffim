@@ -30,12 +30,6 @@ import lsst.ip.diffim as ipDiffim
 
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
     def testDiaSourceAnalystConfig(self):
         config = ipDiffim.DiaSourceAnalystConfig()
         config.validate()
