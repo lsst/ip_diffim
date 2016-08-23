@@ -37,12 +37,6 @@ logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
 class DiffimTestCases(unittest.TestCase):
 
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
     def testNoMask(self):
         mask = afwImage.MaskU(afwGeom.Extent2I(20, 20))
         mask.set(0)
