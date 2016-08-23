@@ -37,9 +37,14 @@ import lsst.pex.logging as logging
 verbosity = 4
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
+# known input images
+try:
+    defDataDir = lsst.utils.getPackageDir('afwdata')
+except Exception:
+    defDataDir = None
+
+
 # This one tests convolve and subtract
-
-
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
     # D = I - (K.x.T + bg)
@@ -55,14 +60,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.gaussFunction = afwMath.GaussianFunction2D(2, 3)
         self.gaussKernel = afwMath.AnalyticKernel(self.gSize, self.gSize, self.gaussFunction)
 
-        # known input images
-        try:
-            self.defDataDir = lsst.utils.getPackageDir('afwdata')
-        except Exception:
-            self.defDataDir = None
-
-        if self.defDataDir:
-            defImagePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
+        if defDataDir:
+            defImagePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
                                         "v5-e0-c011-a00.sci.fits")
             self.templateImage = afwImage.MaskedImageF(defImagePath)
             self.scienceImage = self.templateImage.Factory(self.templateImage.getDimensions())
@@ -73,7 +72,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         del self.subconfig
         del self.gaussFunction
         del self.gaussKernel
-        if self.defDataDir:
+        if defDataDir:
             del self.templateImage
             del self.scienceImage
 
@@ -114,11 +113,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             for i in range(diffIm2.getWidth()):
                 self.assertAlmostEqual(diffIm2.getImage().get(i, j), 0., 4)
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testConvolveAndSubtract(self):
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
-
         self.runConvolveAndSubtract1(bgVal=0)
         self.runConvolveAndSubtract1(bgVal=10)
         # this one uses a function

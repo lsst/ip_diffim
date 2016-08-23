@@ -20,6 +20,12 @@ logging.Trace_setVerbosity('ImagePsfMatchTask', verbosity)
 
 display = False
 
+# known input images
+try:
+    defDataDir = lsst.utils.getPackageDir('afwdata')
+except Exception:
+    defDataDir = None
+
 
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
@@ -37,16 +43,11 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # Impacts some of the test values
         self.subconfig.constantVarianceWeighting = True
 
-        try:
-            self.defDataDir = lsst.utils.getPackageDir('afwdata')
-        except Exception:
-            self.defDataDir = None
+        if defDataDir:
 
-        if self.defDataDir:
-
-            defTemplatePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
+            defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
                                            "v5-e0-c011-a00.sci.fits")
-            defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v26-e0",
+            defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a00.sci.fits")
 
             self.scienceImage = afwImage.ExposureF(defSciencePath)
@@ -73,7 +74,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
     def tearDown(self):
         del self.config
-        if self.defDataDir:
+        if defDataDir:
             del self.scienceImage
             del self.templateImage
             del self.psf
@@ -82,11 +83,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.runModelType(fitForBackground=True)
         self.runModelType(fitForBackground=False)
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def runModelType(self, fitForBackground):
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
-
         self.subconfig.fitForBackground = fitForBackground
 
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
@@ -162,12 +160,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.assertAlmostEqual(backgroundModel1(10, 10), 0.0, delta=1e-7)
             self.assertAlmostEqual(backgroundModel2(10, 10), 0.0, delta=1e-7)
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testWarping(self):
-        # Should fail since images are not aligned
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
-
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
         scienceSubImage = afwImage.ExposureF(self.scienceImage, self.bbox)
         psfmatch = ipDiffim.ImagePsfMatchTask(config=self.config)
@@ -182,11 +176,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.runXY0('polynomial')
         self.runXY0('chebyshev1')
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def runXY0(self, poly, fitForBackground=False):
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
-
         self.subconfig.spatialModelType = poly
         self.subconfig.fitForBackground = fitForBackground
 

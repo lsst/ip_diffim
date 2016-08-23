@@ -16,6 +16,12 @@ import lsst.afw.table as afwTable
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
+# known input images
+try:
+    defDataDir = lsst.utils.getPackageDir('afwdata')
+except Exception:
+    defDataDir = None
+
 
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
@@ -39,16 +45,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.policy.set('checkConditionNumber', False)  # just in case
         self.policy.set("useRegularization", False)
 
-        # known input images
-        try:
-            self.defDataDir = lsst.utils.getPackageDir('afwdata')
-        except Exception:
-            self.defDataDir = None
-
-        if self.defDataDir:
-            defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v26-e0",
+        if defDataDir:
+            defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a10.sci.fits")
-            defTemplatePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
+            defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
                                            "v5-e0-c011-a10.sci.fits")
 
             scienceExposure = afwImage.ExposureF(defSciencePath)
@@ -107,12 +107,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 else:
                     self.assertAlmostEqual(kImage.get(i, j), 0., 5)
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testConstructor(self):
         # Original and uninitialized
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
-
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.templateExposure2.getMaskedImage(),
                                        self.scienceImage2.getMaskedImage(),
@@ -163,11 +160,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         else:
             self.fail()
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testSourceStats(self):
-        # Original and uninitialized
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
         source = self.ss.addNew()
         source.setId(1)
         source.set(self.table.getCentroidKey().getX(), 276)
@@ -183,11 +177,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testSourceConstructor(self):
-        # Original and uninitialized
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
         source = self.ss.addNew()
         source.setId(1)
         source.set(self.table.getCentroidKey().getX(), 276)
@@ -253,11 +244,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testDeltaFunctionScaled(self, scaling=2.7, bg=11.3):
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
-
         sIm = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), True)
         sIm *= scaling
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
@@ -282,11 +270,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
                                          bg=bg)
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testDeltaFunction(self):
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
-
         # Match an image to itself, with delta-function basis set
         # No regularization
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
@@ -342,11 +327,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT))
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testGaussianWithNoise(self):
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
-
         # Convolve a real image with a gaussian and try and recover
         # it.  Add noise and perform the same test.
 
@@ -484,20 +466,14 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         else:
             self.fail()
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testConstantWeighting(self):
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
-
         self.policy.set("fitForBackground", False)
         self.testGaussian()
         self.testGaussianWithNoise()
 
+    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testNoBackgroundFit(self):
-        if not self.defDataDir:
-            print >> sys.stderr, "Warning: afwdata is not set up"
-            return
-
         self.policy.set("constantVarianceWeighting", True)
         self.testGaussian()
 
@@ -527,7 +503,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         del self.policy
         del self.table
         del self.ss
-        if self.defDataDir:
+        if defDataDir:
             del self.scienceImage2
             del self.templateExposure2
 
