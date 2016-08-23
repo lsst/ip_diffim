@@ -33,18 +33,19 @@ import lsst.daf.base as dafBase
 import lsst.pex.logging as pexLog
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
+
 class PsfMatchTestCases(lsst.utils.tests.TestCase):
 
     def setUp(self):
-        self.configAL    = ipDiffim.SnapPsfMatchTask.ConfigClass()
+        self.configAL = ipDiffim.SnapPsfMatchTask.ConfigClass()
         self.configAL.kernel.name = "AL"
         self.subconfigAL = self.configAL.kernel.active
 
-        self.configDF    = ipDiffim.SnapPsfMatchTask.ConfigClass()
+        self.configDF = ipDiffim.SnapPsfMatchTask.ConfigClass()
         self.configDF.kernel.name = "DF"
         self.subconfigDF = self.configDF.kernel.active
 
-        self.configDFr    = ipDiffim.SnapPsfMatchTask.ConfigClass()
+        self.configDFr = ipDiffim.SnapPsfMatchTask.ConfigClass()
         self.configDFr.kernel.name = "DF"
         self.subconfigDFr = self.configDFr.kernel.active
 
@@ -56,11 +57,11 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
         self.subconfigDFr.afwBackgroundConfig.useApprox = False
 
         # variance is a hack
-        self.subconfigAL.singleKernelClipping   = False
-        self.subconfigAL.spatialKernelClipping  = False
-        self.subconfigDF.singleKernelClipping   = False
-        self.subconfigDF.spatialKernelClipping  = False
-        self.subconfigDFr.singleKernelClipping  = False
+        self.subconfigAL.singleKernelClipping = False
+        self.subconfigAL.spatialKernelClipping = False
+        self.subconfigDF.singleKernelClipping = False
+        self.subconfigDF.spatialKernelClipping = False
+        self.subconfigDFr.singleKernelClipping = False
         self.subconfigDFr.spatialKernelClipping = False
 
         # Send fake kernel a differential background
@@ -70,11 +71,11 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
         self.subconfigDFr.fitForBackground = True
 
         # Make ideal PSF
-        self.ksize  = 21
+        self.ksize = 21
         self.sigma = 2.0
         self.psf = measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma)
 
-    def makeWcs(self, offset = 0):
+    def makeWcs(self, offset=0):
         # taken from $AFW_DIR/tests/testMakeWcs.py
         metadata = dafBase.PropertySet()
         metadata.set("SIMPLE", "T")
@@ -97,16 +98,16 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
         return afwImage.makeWcs(metadata)
 
     def testSnap(self):
-        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
+        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue=self.bgValue)
 
-        tWcs = self.makeWcs(offset = 0)
-        sWcs = self.makeWcs(offset = 0)
+        tWcs = self.makeWcs(offset=0)
+        sWcs = self.makeWcs(offset=0)
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
         sExp.setPsf(self.psf)
-        psfMatchAL   = ipDiffim.SnapPsfMatchTask(config=self.configAL)
-        psfMatchDF   = ipDiffim.SnapPsfMatchTask(config=self.configDF)
-        psfMatchDFr  = ipDiffim.SnapPsfMatchTask(config=self.configDFr)
+        psfMatchAL = ipDiffim.SnapPsfMatchTask(config=self.configAL)
+        psfMatchDF = ipDiffim.SnapPsfMatchTask(config=self.configDF)
+        psfMatchDFr = ipDiffim.SnapPsfMatchTask(config=self.configDFr)
         psfMatchAL.subtractMaskedImages(tMi, sMi, psfMatchAL.makeCandidateList(tExp, sExp, self.ksize))
         psfMatchDF.subtractMaskedImages(tMi, sMi, psfMatchDF.makeCandidateList(tExp, sExp, self.ksize))
         psfMatchDFr.subtractMaskedImages(tMi, sMi, psfMatchDFr.makeCandidateList(tExp, sExp, self.ksize))
@@ -117,8 +118,10 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
         del self.configDFr
         del self.psf
 
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
+
 
 def setup_module(module):
     lsst.utils.tests.init()

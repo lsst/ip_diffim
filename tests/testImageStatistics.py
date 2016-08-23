@@ -35,10 +35,11 @@ import numpy as num
 verbosity = 1
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
+
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.subconfig = self.config.kernel["DF"]
         self.policy = pexConfig.makePolicy(self.subconfig)
 
@@ -47,10 +48,10 @@ class DiffimTestCases(unittest.TestCase):
 
     def testImageStatisticsNan(self, core=3):
         numArray = num.zeros((20, 20))
-        mi       = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
-                mi.set( i, j, (numArray[j][i], 0x0, 0) )
+                mi.set(i, j, (numArray[j][i], 0x0, 0))
 
         # inverse variance weight of 0 is NaN
         imstat = ipDiffim.ImageStatisticsF(self.policy)
@@ -63,10 +64,10 @@ class DiffimTestCases(unittest.TestCase):
 
     def testImageStatisticsZero(self):
         numArray = num.zeros((20, 20))
-        mi       = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
-                mi.set( i, j, (numArray[j][i], 0x0, 1) )
+                mi.set(i, j, (numArray[j][i], 0x0, 1))
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)
         imstat.apply(mi)
@@ -77,10 +78,10 @@ class DiffimTestCases(unittest.TestCase):
 
     def testImageStatisticsOne(self):
         numArray = num.ones((20, 20))
-        mi       = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
-                mi.set( i, j, (numArray[j][i], 0x0, 1) )
+                mi.set(i, j, (numArray[j][i], 0x0, 1))
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)
         imstat.apply(mi)
@@ -91,25 +92,25 @@ class DiffimTestCases(unittest.TestCase):
 
     def testImageStatisticsCore(self, core=3):
         numArray = num.ones((20, 20))
-        mi       = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
-                mi.set( i, j, (numArray[j][i], 0x0, 1) )
+                mi.set(i, j, (numArray[j][i], 0x0, 1))
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)
         imstat.apply(mi, core)
 
         self.assertEqual(imstat.getMean(), 1)
         self.assertEqual(imstat.getRms(), 0)
-        self.assertEqual(imstat.getNpix(), (2*core+1)**2 )
+        self.assertEqual(imstat.getNpix(), (2*core+1)**2)
 
     def testImageStatisticsGeneral(self):
         numArray = num.ones((20, 20))
-        mi       = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
                 val = i + 2.3 * j
-                mi.set( i, j, (val, 0x0, 1) )
+                mi.set(i, j, (val, 0x0, 1))
                 numArray[j][i] = val
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)
@@ -128,17 +129,17 @@ class DiffimTestCases(unittest.TestCase):
     def testImageStatisticsMask1(self):
         # Mask value that gets ignored
         maskPlane = self.policy.getStringArray("badMaskPlanes")[0]
-        maskVal   = afwImage.MaskU.getPlaneBitMask(maskPlane)
+        maskVal = afwImage.MaskU.getPlaneBitMask(maskPlane)
         numArray = num.ones((20, 19))
-        mi       = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
                 val = i + 2.3 * j
 
                 if i == 19:
-                    mi.set( i, j, (val, maskVal, 1) )
+                    mi.set(i, j, (val, maskVal, 1))
                 else:
-                    mi.set( i, j, (val, 0x0, 1) )
+                    mi.set(i, j, (val, 0x0, 1))
                     numArray[j][i] = val
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)
@@ -159,16 +160,16 @@ class DiffimTestCases(unittest.TestCase):
         self.assertGreater(maskVal, 0)
 
         numArray = num.ones((20, 20))
-        mi       = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
                 val = i + 2.3 * j
 
                 if i == 19:
-                    mi.set( i, j, (val, maskVal, 1) )
+                    mi.set(i, j, (val, maskVal, 1))
                     numArray[j][i] = val
                 else:
-                    mi.set( i, j, (val, 0x0, 1) )
+                    mi.set(i, j, (val, 0x0, 1))
                     numArray[j][i] = val
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)
@@ -184,6 +185,7 @@ class DiffimTestCases(unittest.TestCase):
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
+
 
 def setup_module(module):
     lsst.utils.tests.init()

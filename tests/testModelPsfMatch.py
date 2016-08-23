@@ -9,20 +9,21 @@ import lsst.meas.algorithms as measAlg
 import lsst.pex.logging as pexLog
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
+
 class PsfMatchTestCases(lsst.utils.tests.TestCase):
 
     def setUp(self):
-        self.config    = ipDiffim.ModelPsfMatchTask.ConfigClass()
+        self.config = ipDiffim.ModelPsfMatchTask.ConfigClass()
         self.subconfig = self.config.kernel.active
         self.subconfig.scaleByFwhm = False
         self.subconfig.kernelSize = 9
         self.subconfig.kernelSizeMin = 9
 
         self.imsize = 2 * self.subconfig.sizeCellX
-        self.ksize  = 11
+        self.ksize = 11
         self.sigma1 = 2.0
         self.sigma2 = 3.7
-        self.exp    = afwImage.ExposureF(afwGeom.Extent2I(self.imsize, self.imsize))
+        self.exp = afwImage.ExposureF(afwGeom.Extent2I(self.imsize, self.imsize))
         self.exp.setPsf(measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma1))
 
     def testTooBig(self):
@@ -39,14 +40,14 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
     def testMatch(self):
         for order in (0, 1):
             for ksum in (0.5, 1.0, 2.7):
-                self.runMatch(kOrder = order, kSumIn = ksum)
+                self.runMatch(kOrder=order, kSumIn=ksum)
 
-    def runMatch(self, kOrder = 0, kSumIn = 3.7):
+    def runMatch(self, kOrder=0, kSumIn=3.7):
         self.subconfig.spatialKernelOrder = kOrder
 
         psf = measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma2)
         psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
-        results = psfMatch.run(self.exp, psf, kernelSum = kSumIn)
+        results = psfMatch.run(self.exp, psf, kernelSum=kSumIn)
 
         matchingKernel = results.psfMatchingKernel
 
@@ -59,8 +60,10 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
         del self.exp
         del self.subconfig
 
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
+
 
 def setup_module(module):
     lsst.utils.tests.init()

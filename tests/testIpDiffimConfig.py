@@ -27,7 +27,9 @@ import unittest
 import lsst.utils.tests
 import lsst.ip.diffim as ipDiffim
 
+
 class DiffimTestCases(lsst.utils.tests.TestCase):
+
     def setUp(self):
         pass
 
@@ -80,8 +82,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
 #####
 
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
+
 
 def setup_module(module):
     lsst.utils.tests.init()

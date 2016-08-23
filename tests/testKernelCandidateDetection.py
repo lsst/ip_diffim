@@ -14,18 +14,19 @@ import lsst.pex.config as pexConfig
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 
+
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
     def setUp(self):
-        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.subconfig = self.config.kernel.active
-        self.policy    = pexConfig.makePolicy(self.subconfig)
-        self.kSize     = self.policy.getInt('kernelSize')
+        self.policy = pexConfig.makePolicy(self.subconfig)
+        self.kSize = self.policy.getInt('kernelSize')
 
         # gaussian reference kernel
-        self.gSize         = self.kSize
+        self.gSize = self.kSize
         self.gaussFunction = afwMath.GaussianFunction2D(2, 3)
-        self.gaussKernel   = afwMath.AnalyticKernel(self.gSize, self.gSize, self.gaussFunction)
+        self.gaussKernel = afwMath.AnalyticKernel(self.gSize, self.gSize, self.gaussFunction)
 
         # known input images
         try:
@@ -36,8 +37,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         if self.defDataDir:
             defImagePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
                                         "v5-e0-c011-a00.sci.fits")
-            self.templateImage  = afwImage.MaskedImageF(defImagePath)
-            self.scienceImage   = self.templateImage.Factory( self.templateImage.getDimensions() )
+            self.templateImage = afwImage.MaskedImageF(defImagePath)
+            self.scienceImage = self.templateImage.Factory(self.templateImage.getDimensions())
 
             afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False)
 
@@ -58,11 +59,11 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # NOTE - you need to subtract off background from the image
         # you run detection on.  Here it is the template.
         bgConfig = self.subconfig.afwBackgroundConfig
-        diffimTools.backgroundSubtract(bgConfig, [self.templateImage,])
+        diffimTools.backgroundSubtract(bgConfig, [self.templateImage, ])
 
         detConfig = self.subconfig.detectionConfig
         maskPlane = detConfig.badMaskPlanes[0]
-        maskVal   = afwImage.MaskU.getPlaneBitMask(maskPlane)
+        maskVal = afwImage.MaskU.getPlaneBitMask(maskPlane)
 
         kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
         kcDetect.apply(self.templateImage, self.scienceImage)
@@ -72,8 +73,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for fp in fpList1:
             bbox = fp.getBBox()
-            tmi  = afwImage.MaskedImageF(self.templateImage, bbox, afwImage.LOCAL)
-            smi  = afwImage.MaskedImageF(self.scienceImage, bbox, afwImage.LOCAL)
+            tmi = afwImage.MaskedImageF(self.templateImage, bbox, afwImage.LOCAL)
+            smi = afwImage.MaskedImageF(self.scienceImage, bbox, afwImage.LOCAL)
             tmask = tmi.getMask()
             smask = smi.getMask()
 
@@ -101,8 +102,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
 #####
 
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
+
 
 def setup_module(module):
     lsst.utils.tests.init()

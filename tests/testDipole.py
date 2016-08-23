@@ -39,6 +39,8 @@ np.random.seed(666)
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
 def makePluginAndCat(alg, name, control, metadata=False, centroid=None):
     schema = afwTable.SourceTable.makeMinimalSchema()
     if centroid:
@@ -53,14 +55,15 @@ def makePluginAndCat(alg, name, control, metadata=False, centroid=None):
     cat = afwTable.SourceCatalog(schema)
     return plugin, cat
 
-def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.2):
+
+def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     # Make random noise image: set image plane to normal distribution
-    image = afwImage.MaskedImageF(w,h)
+    image = afwImage.MaskedImageF(w, h)
     image.set(0)
     array = image.getImage().getArray()
-    array[:,:] = np.random.randn(w,h)
+    array[:, :] = np.random.randn(w, h)
     # Set variance to 1.0
-    var   = image.getVariance()
+    var = image.getVariance()
     var.set(1.0)
 
     if display:
@@ -78,7 +81,7 @@ def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.2):
 
     # Create the dipole, offset by fracOffset of the Psf FWHM (pixels)
     offset = fracOffset * psfFwhmPix // 2
-    array  = image.getImage().getArray()
+    array = image.getImage().getArray()
     xp, yp = xc - psfw//2 + offset, yc - psfh//2 + offset
     array[yp:yp+psfh, xp:xp+psfw] += psfim.getArray()
 
@@ -115,11 +118,13 @@ def createDipole(w, h, xc, yc, scaling = 100.0, fracOffset = 1.2):
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
 class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
     """ A test case for dipole algorithms"""
+
     def setUp(self):
-        self.w, self.h = 100, 100 # size of image
-        self.xc, self.yc = 50, 50 # location of center of dipole
+        self.w, self.h = 100, 100  # size of image
+        self.xc, self.yc = 50, 50  # location of center of dipole
 
     def tearDown(self):
         pass
@@ -134,7 +139,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         source.setFootprint(s.getFootprint())
         plugin.measure(source, exposure)
         for key in ("_pos_x", "_pos_y", "_pos_xSigma", "_pos_ySigma", "_pos_flag",
-            "_neg_x", "_neg_y", "_neg_xSigma", "_neg_ySigma", "_neg_flag"):
+                    "_neg_x", "_neg_y", "_neg_xSigma", "_neg_ySigma", "_neg_flag"):
             try:
                 source.get("test"+key)
             except Exception:
@@ -151,7 +156,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         source.setFootprint(s.getFootprint())
         plugin.measure(source, exposure)
         for key in ("_pos_flux", "_pos_fluxSigma", "_pos_flag", "_npos",
-            "_neg_flux", "_neg_fluxSigma", "_neg_flag", "_nneg"):
+                    "_neg_flux", "_neg_fluxSigma", "_neg_flag", "_nneg"):
             try:
                 source.get("test"+key)
             except Exception:
@@ -169,7 +174,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         source.setFootprint(s.getFootprint())
         plugin.measure(source, exposure)
         for key in ("_pos_flux", "_pos_fluxSigma", "_pos_flag",
-            "_neg_flux", "_neg_fluxSigma", "_neg_flag"):
+                    "_neg_flux", "_neg_fluxSigma", "_neg_flag"):
             try:
                 source.get("test"+key)
             except Exception:
@@ -188,14 +193,14 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         negPsf /= negPeak
         posPsf /= posPeak
 
-        model    = afwImage.ImageF(fp.getBBox())
+        model = afwImage.ImageF(fp.getBBox())
         negModel = afwImage.ImageF(fp.getBBox())
         posModel = afwImage.ImageF(fp.getBBox())
 
         # The center of the Psf should be at negCenter, posCenter
         negPsfBBox = negPsf.getBBox()
         posPsfBBox = posPsf.getBBox()
-        modelBBox  = model.getBBox()
+        modelBBox = model.getBBox()
 
         # Portion of the negative Psf that overlaps the montage
         negOverlapBBox = afwGeom.Box2I(negPsfBBox)
@@ -207,16 +212,16 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         posOverlapBBox.clip(modelBBox)
         self.assertFalse(posOverlapBBox.isEmpty())
 
-        negPsfSubim    = type(negPsf)(negPsf, negOverlapBBox)
-        modelSubim     = type(model)(model, negOverlapBBox)
-        negModelSubim  = type(negModel)(negModel, negOverlapBBox)
-        modelSubim    += negPsfSubim  # just for debugging
+        negPsfSubim = type(negPsf)(negPsf, negOverlapBBox)
+        modelSubim = type(model)(model, negOverlapBBox)
+        negModelSubim = type(negModel)(negModel, negOverlapBBox)
+        modelSubim += negPsfSubim  # just for debugging
         negModelSubim += negPsfSubim  # for fitting
 
-        posPsfSubim    = type(posPsf)(posPsf, posOverlapBBox)
-        modelSubim     = type(model)(model, posOverlapBBox)
-        posModelSubim  = type(posModel)(posModel, posOverlapBBox)
-        modelSubim    += posPsfSubim
+        posPsfSubim = type(posPsf)(posPsf, posOverlapBBox)
+        modelSubim = type(model)(model, posOverlapBBox)
+        posModelSubim = type(posModel)(posModel, posOverlapBBox)
+        modelSubim += posPsfSubim
         posModelSubim += posPsfSubim
 
         data = afwImage.ImageF(exposure.getMaskedImage().getImage(), fp.getBBox())
@@ -243,30 +248,30 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         fneg, fpos = lsq.getSolution()
 
         # Should be exaxtly the same as each other
-        self.assertAlmostEqual(1e-2*fneg0,  1e-2*fneg)
-        self.assertAlmostEqual(1e-2*fpos0,  1e-2*fpos)
+        self.assertAlmostEqual(1e-2*fneg0, 1e-2*fneg)
+        self.assertAlmostEqual(1e-2*fpos0, 1e-2*fpos)
 
         # Recreate model
-        fitted  = afwImage.ImageF(fp.getBBox())
-        negFit  = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT, True)
+        fitted = afwImage.ImageF(fp.getBBox())
+        negFit = type(negPsf)(negPsf, negOverlapBBox, afwImage.PARENT, True)
         negFit *= float(fneg)
-        posFit  = type(posPsf)(posPsf, posOverlapBBox, afwImage.PARENT, True)
+        posFit = type(posPsf)(posPsf, posOverlapBBox, afwImage.PARENT, True)
         posFit *= float(fpos)
 
-        fitSubim  = type(fitted)(fitted, negOverlapBBox)
+        fitSubim = type(fitted)(fitted, negOverlapBBox)
         fitSubim += negFit
-        fitSubim  = type(fitted)(fitted, posOverlapBBox)
+        fitSubim = type(fitted)(fitted, posOverlapBBox)
         fitSubim += posFit
         if display:
             ds9.mtv(fitted, frame=7, title="Fitted model")
 
-        fitted   -= data
+        fitted -= data
 
         if display:
             ds9.mtv(fitted, frame=8, title="Residuals")
 
-        fitted   *= fitted
-        fitted   /= var
+        fitted *= fitted
+        fitted /= var
 
         if display:
             ds9.mtv(fitted, frame=9, title="Chi2")
@@ -277,8 +282,8 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc, scaling=scaling)
         source = self.measureDipole(s, exposure)
         # Recreate the simultaneous joint Psf fit in python
-        fp     = source.getFootprint()
-        peaks  = fp.getPeaks()
+        fp = source.getFootprint()
+        peaks = fp.getPeaks()
         speaks = [(p.getPeakValue(), p) for p in peaks]
         speaks.sort()
         dpeaks = [speaks[0][1], speaks[-1][1]]
@@ -292,7 +297,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         # gets smaller this will be worse.  This works for scaling =
         # 100.
         self.assertAlmostEqual(1e-2*scaling, -1e-2*fneg, 2)
-        self.assertAlmostEqual(1e-2*scaling,  1e-2*fpos, 2)
+        self.assertAlmostEqual(1e-2*scaling, 1e-2*fpos, 2)
 
         # Now compare the LeastSquares results fitted here to the C++
         # implementation: Since total flux is returned, and this is of
@@ -350,10 +355,12 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         dpDeblender = ipDiffim.DipoleDeblender()
         dpDeblender(source, exposure)
 
+
 class DipoleMeasurementTaskTest(lsst.utils.tests.TestCase):
     """A test case for the DipoleMeasurementTask.  Essentially just
     test the classification flag since the invididual algorithms are
     tested above"""
+
     def setUp(self):
         self.config = ipDiffim.DipoleMeasurementConfig()
 
@@ -374,8 +381,10 @@ class DipoleMeasurementTaskTest(lsst.utils.tests.TestCase):
         task.run(sources, exposure)
         self.assertEqual(source.get("ip_diffim_ClassificationDipole_value"), 1.0)
 
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
+
 
 def setup_module(module):
     lsst.utils.tests.init()

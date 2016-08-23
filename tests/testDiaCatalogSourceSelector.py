@@ -33,6 +33,7 @@ import lsst.ip.diffim as ipDiffim
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
 class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
 
     def setUp(self):
@@ -64,7 +65,7 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
             refSrc = refCat.addNew()
             srcSrc = srcCat.addNew()
 
-            coord  = afwCoord.Coord(afwGeom.Point2D(*np.random.randn(2)), afwGeom.degrees)
+            coord = afwCoord.Coord(afwGeom.Point2D(*np.random.randn(2)), afwGeom.degrees)
 
             refSrc.set("g_flux", 10**(-0.4*18))
             refSrc.set("r_flux", 10**(-0.4*18))
@@ -83,9 +84,9 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
         return mat
 
     def testCuts(self):
-        nSrc     = 5
+        nSrc = 5
 
-        refCat   = self.makeRefCatalog()
+        refCat = self.makeRefCatalog()
 
         matches = self.makeMatches(refCat, self.srcCat, nSrc)
         sources = self.sourceSelector.selectStars(self.exposure, self.srcCat, matches).starCat
@@ -116,8 +117,10 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
             sources = self.sourceSelector.selectStars(self.exposure, self.srcCat, matches).starCat
             self.assertEqual(len(sources), nSrc-4)
 
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
+
 
 def setup_module(module):
     lsst.utils.tests.init()

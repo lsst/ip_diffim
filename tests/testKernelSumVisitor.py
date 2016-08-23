@@ -11,22 +11,23 @@ import lsst.pex.config as pexConfig
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
 
+
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
     def setUp(self):
-        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config.kernel.name = "DF"
         self.subconfig = self.config.kernel.active
 
         self.policy = pexConfig.makePolicy(self.subconfig)
-        self.kList  = ipDiffim.makeKernelBasisList(self.subconfig)
+        self.kList = ipDiffim.makeKernelBasisList(self.subconfig)
 
-    def makeCandidate(self, kSum, x, y, size = 51):
+    def makeCandidate(self, kSum, x, y, size=51):
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
-        mi1.getVariance().set(1.0) # avoid NaNs
+        mi1.getVariance().set(1.0)  # avoid NaNs
         mi1.set(size//2, size//2, (1, 0x0, 1))
         mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
-        mi2.getVariance().set(1.0) # avoid NaNs
+        mi2.getVariance().set(1.0)  # avoid NaNs
         mi2.set(size//2, size//2, (kSum, 0x0, kSum))
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
@@ -35,7 +36,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         del self.policy
         del self.kList
 
-    def testAggregate(self, kSums = [1., 1., 1., 1., 2., 3., 4.]):
+    def testAggregate(self, kSums=[1., 1., 1., 1., 2., 3., 4.]):
         ksv = ipDiffim.KernelSumVisitorF(self.policy)
         ksv.setMode(ipDiffim.KernelSumVisitorF.AGGREGATE)
 
@@ -72,12 +73,11 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                          self.policy.get("maxKsumSigma") * ksv.getkSumStd())
         self.assertEqual(ksv.getkSumNpts(), len(kSums))
 
-
     def testReject(self):
-        self.doReject(clipping = False)
-        self.doReject(clipping = True)
+        self.doReject(clipping=False)
+        self.doReject(clipping=True)
 
-    def doReject(self, clipping, kSums = [1., 1., 1., 1., 2., 3., 4., 50.]):
+    def doReject(self, clipping, kSums=[1., 1., 1., 1., 2., 3., 4., 50.]):
         self.policy.set("kernelSumClipping", clipping)
         ksv = ipDiffim.KernelSumVisitorF(self.policy)
         ksv.setMode(ipDiffim.KernelSumVisitorF.AGGREGATE)
@@ -106,8 +106,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         else:
             self.assertEqual(ksv.getNRejected(), 0)
 
-
-    def testVisit(self, nCell = 3):
+    def testVisit(self, nCell=3):
         ksv = ipDiffim.makeKernelSumVisitor(self.policy)
 
         sizeCellX = self.policy.get("sizeCellX")
@@ -143,8 +142,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
 #####
 
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
+
 
 def setup_module(module):
     lsst.utils.tests.init()

@@ -12,14 +12,15 @@ import lsst.pex.config as pexConfig
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
+
 class DiffimTestCases(lsst.utils.tests.TestCase):
-    
+
     def setUp(self):
-        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config.kernel.name = "DF"
         self.subconfig = self.config.kernel.active
 
-        self.kList  = ipDiffim.makeKernelBasisList(self.subconfig)
+        self.kList = ipDiffim.makeKernelBasisList(self.subconfig)
         self.policy = pexConfig.makePolicy(self.subconfig)
         self.policy.set("useRegularization", False)
 
@@ -28,26 +29,26 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         del self.policy
         del self.kList
 
-    def makeCandidate(self, kSum, x, y, size = 51):
+    def makeCandidate(self, kSum, x, y, size=51):
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
-        mi1.getVariance().set(1.0) # avoid NaNs
+        mi1.getVariance().set(1.0)  # avoid NaNs
         mi1.set(size//2, size//2, (1, 0x0, 1))
         mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
-        mi2.getVariance().set(1.0) # avoid NaNs
+        mi2.getVariance().set(1.0)  # avoid NaNs
         mi2.set(size//2, size//2, (kSum, 0x0, kSum))
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
 
-    def testGaussian(self, size = 51):
+    def testGaussian(self, size=51):
         gaussFunction = afwMath.GaussianFunction2D(2, 3)
-        gaussKernel   = afwMath.AnalyticKernel(size, size, gaussFunction)
-        
+        gaussKernel = afwMath.AnalyticKernel(size, size, gaussFunction)
+
         imagePca1 = ipDiffim.KernelPcaD()  # mean subtract
         imagePca2 = ipDiffim.KernelPcaD()  # don't mean subtract
-        kpv1      = ipDiffim.KernelPcaVisitorF(imagePca1)
-        kpv2      = ipDiffim.KernelPcaVisitorF(imagePca2)
+        kpv1 = ipDiffim.KernelPcaVisitorF(imagePca1)
+        kpv2 = ipDiffim.KernelPcaVisitorF(imagePca2)
 
-        kRefIm    = None
+        kRefIm = None
 
         for i in range(100):
             kImage1 = afwImage.ImageD(gaussKernel.getDimensions())
@@ -63,7 +64,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             imagePca1.addImage(kImage1, 1.0)
             imagePca2.addImage(kImage2, 1.0)
-                           
+
         kpv1.subtractMean()
 
         imagePca1.analyze()
@@ -71,7 +72,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         pcaBasisList1 = kpv1.getEigenKernels()
         pcaBasisList2 = kpv2.getEigenKernels()
-        
+
         eVal1 = imagePca1.getEigenValues()
         eVal2 = imagePca2.getEigenValues()
 
@@ -92,16 +93,16 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         pcaBasisList1[0].computeImage(kImageM, False)
         for y in range(kRefIm.getHeight()):
             for x in range(kRefIm.getWidth()):
-                self.assertLess(abs(kRefIm.get(x, y) - kImageM.get(x, y)) / kRefIm.get(x, y), 0.2 )
+                self.assertLess(abs(kRefIm.get(x, y) - kImageM.get(x, y)) / kRefIm.get(x, y), 0.2)
 
         # First mean-unsubtracted Pca kernel close to kRefIm (normalized to peak of 1.0)
         kImage0 = afwImage.ImageD(gaussKernel.getDimensions())
         pcaBasisList2[0].computeImage(kImage0, False)
-        maxVal  = afwMath.makeStatistics(kRefIm, afwMath.MAX).getValue(afwMath.MAX)
+        maxVal = afwMath.makeStatistics(kRefIm, afwMath.MAX).getValue(afwMath.MAX)
         kRefIm /= maxVal
         for y in range(kRefIm.getHeight()):
             for x in range(kRefIm.getWidth()):
-                self.assertLess(abs(kRefIm.get(x, y) - kImage0.get(x, y)) / kRefIm.get(x, y), 0.2 )
+                self.assertLess(abs(kRefIm.get(x, y) - kImage0.get(x, y)) / kRefIm.get(x, y), 0.2)
 
     def testImagePca(self):
         # Test out the ImagePca behavior
@@ -124,8 +125,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         for i in range(len(eigenImages)):
             for j in range(i, len(eigenImages)):
                 print i, j, afwImage.innerProduct(eigenImages[i], eigenImages[j])
-        
-       
+
     def testEigenValues(self):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc1.build(self.kList)
@@ -154,7 +154,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.assertAlmostEqual(eigenValues[0], 1.0)
         self.assertAlmostEqual(eigenValues[1], 0.0)
         self.assertAlmostEqual(eigenValues[2], 0.0)
-        
+
     def testMeanSubtraction(self):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc1.build(self.kList)
@@ -170,7 +170,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kpv.processCandidate(kc1)
         kpv.processCandidate(kc2)
         kpv.processCandidate(kc3)
-        kpv.subtractMean() # subtract it *from* imagePca
+        kpv.subtractMean()  # subtract it *from* imagePca
 
         imagePca.analyze()
         eigenImages = imagePca.getEigenImages()
@@ -197,20 +197,20 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 else:
                     self.assertAlmostEqual(imageMean.get(x, y), 0.0)
 
-    def testVisit(self, nCell = 3):
+    def testVisit(self, nCell=3):
         imagePca = ipDiffim.KernelPcaD()
         kpv = ipDiffim.makeKernelPcaVisitor(imagePca)
 
         sizeCellX = self.policy.get("sizeCellX")
         sizeCellY = self.policy.get("sizeCellY")
-        
+
         kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0,
                                                                              0),
                                                              afwGeom.Extent2I(sizeCellX * nCell,
                                                                               sizeCellY * nCell)),
                                                sizeCellX,
                                                sizeCellY)
-        
+
         for candX in range(nCell):
             for candY in range(nCell):
                 if candX == nCell // 2 and candY == nCell // 2:
@@ -237,11 +237,13 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.assertAlmostEqual(eigenValues[0], 1.0)
         self.assertAlmostEqual(eigenValues[1], 0.0)
         self.assertAlmostEqual(eigenValues[2], 0.0)
-        
+
 #####
-        
+
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
+
 
 def setup_module(module):
     lsst.utils.tests.init()

@@ -306,4 +306,3 @@ class MemoryTester(lsst.utils.tests.MemoryTestCase):
 if __name__ == "__main__":
     lsst.utils.tests.init()
     unittest.main()
-

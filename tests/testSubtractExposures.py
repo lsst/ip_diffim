@@ -20,12 +20,13 @@ logging.Trace_setVerbosity('ImagePsfMatchTask', verbosity)
 
 display = False
 
+
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
     # D = I - (K.x.T + bg)
 
     def setUp(self):
-        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config.kernel.name = "AL"
         self.subconfig = self.config.kernel.active
 
@@ -48,8 +49,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             defSciencePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a00.sci.fits")
 
-            self.scienceImage   = afwImage.ExposureF(defSciencePath)
-            self.templateImage  = afwImage.ExposureF(defTemplatePath)
+            self.scienceImage = afwImage.ExposureF(defSciencePath)
+            self.templateImage = afwImage.ExposureF(defTemplatePath)
 
             bgConfig = self.subconfig.afwBackgroundConfig
             bgConfig.useApprox = False
@@ -58,14 +59,14 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                            [self.templateImage.getMaskedImage(),
                                             self.scienceImage.getMaskedImage()])
 
-            self.offset   = 1500
-            self.bbox     = afwGeom.Box2I(afwGeom.Point2I(0, self.offset),
-                                          afwGeom.Point2I(511, 2046))
+            self.offset = 1500
+            self.bbox = afwGeom.Box2I(afwGeom.Point2I(0, self.offset),
+                                      afwGeom.Point2I(511, 2046))
             self.subconfig.spatialKernelOrder = 1
             self.subconfig.spatialBgOrder = 0
 
             # Take a stab at a PSF.  This is needed to get the KernelCandidateList if you don't provide one.
-            ksize  = 21
+            ksize = 21
             sigma = 2.0
             self.psf = measAlg.DoubleGaussianPsf(ksize, ksize, sigma)
             self.scienceImage.setPsf(self.psf)
@@ -78,8 +79,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             del self.psf
 
     def testModelType(self):
-        self.runModelType(fitForBackground = True)
-        self.runModelType(fitForBackground = False)
+        self.runModelType(fitForBackground=True)
+        self.runModelType(fitForBackground=False)
 
     def runModelType(self, fitForBackground):
         if not self.defDataDir:
@@ -89,27 +90,27 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.subconfig.fitForBackground = fitForBackground
 
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
+        scienceSubImage = afwImage.ExposureF(self.scienceImage, self.bbox)
 
         self.subconfig.spatialModelType = 'chebyshev1'
         psfmatch1 = ipDiffim.ImagePsfMatchTask(config=self.config)
-        results1 = psfmatch1.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
-        spatialKernel1      = results1.psfMatchingKernel
-        backgroundModel1    = results1.backgroundModel
+        results1 = psfmatch1.subtractExposures(templateSubImage, scienceSubImage, doWarping=True)
+        spatialKernel1 = results1.psfMatchingKernel
+        backgroundModel1 = results1.backgroundModel
 
         self.subconfig.spatialModelType = 'polynomial'
         psfmatch2 = ipDiffim.ImagePsfMatchTask(config=self.config)
-        results2 = psfmatch2.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
-        spatialKernel2      = results2.psfMatchingKernel
-        backgroundModel2    = results2.backgroundModel
+        results2 = psfmatch2.subtractExposures(templateSubImage, scienceSubImage, doWarping=True)
+        spatialKernel2 = results2.psfMatchingKernel
+        backgroundModel2 = results2.backgroundModel
 
         # Got the types right?
         self.assertTrue(
             spatialKernel1.getSpatialFunctionList()[0].toString().startswith('Chebyshev1Function2')
-            )
+        )
         self.assertTrue(
             spatialKernel2.getSpatialFunctionList()[0].toString().startswith('PolynomialFunction2')
-            )
+        )
 
         # First order term has zero spatial variation and sum = kernel sum
         kp1par0 = spatialKernel1.getSpatialFunctionList()[0].getParameters()
@@ -168,10 +169,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             return
 
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
+        scienceSubImage = afwImage.ExposureF(self.scienceImage, self.bbox)
         psfmatch = ipDiffim.ImagePsfMatchTask(config=self.config)
         try:
-            psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = False)
+            psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping=False)
         except Exception:
             pass
         else:
@@ -181,7 +182,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.runXY0('polynomial')
         self.runXY0('chebyshev1')
 
-    def runXY0(self, poly, fitForBackground = False):
+    def runXY0(self, poly, fitForBackground=False):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
@@ -190,22 +191,22 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.subconfig.fitForBackground = fitForBackground
 
         templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
-        scienceSubImage  = afwImage.ExposureF(self.scienceImage, self.bbox)
+        scienceSubImage = afwImage.ExposureF(self.scienceImage, self.bbox)
 
         # Have an XY0
-        psfmatch  = ipDiffim.ImagePsfMatchTask(config=self.config)
-        results1  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
-        spatialKernel1      = results1.psfMatchingKernel
-        backgroundModel1    = results1.backgroundModel
-        kernelCellSet1      = results1.kernelCellSet
+        psfmatch = ipDiffim.ImagePsfMatchTask(config=self.config)
+        results1 = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping=True)
+        spatialKernel1 = results1.psfMatchingKernel
+        backgroundModel1 = results1.backgroundModel
+        kernelCellSet1 = results1.kernelCellSet
 
         # And then take away XY0
         templateSubImage.setXY0(afwGeom.Point2I(0, 0))
         scienceSubImage.setXY0(afwGeom.Point2I(0, 0))
-        results2  = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping = True)
-        spatialKernel2      = results2.psfMatchingKernel
-        backgroundModel2    = results2.backgroundModel
-        kernelCellSet2      = results2.kernelCellSet
+        results2 = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping=True)
+        spatialKernel2 = results2.psfMatchingKernel
+        backgroundModel2 = results2.backgroundModel
+        kernelCellSet2 = results2.kernelCellSet
 
         # need to count up the candidates first, since its a running tally
         count = 0
@@ -228,8 +229,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 self.assertAlmostEqual(cand1.getYCenter(), cand2.getYCenter() + self.offset, delta=1e-1)
 
                 # kernels are the same
-                im1   = cand1.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
-                im2   = cand2.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
+                im1 = cand1.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
+                im2 = cand2.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
                 for y in range(im1.getHeight()):
                     for x in range(im1.getWidth()):
                         self.assertAlmostEqual(im1.get(x, y), im2.get(x, y), delta=1e-7)
@@ -264,8 +265,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
 #####
 
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
+
 
 def setup_module(module):
     lsst.utils.tests.init()

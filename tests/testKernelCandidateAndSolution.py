@@ -16,6 +16,7 @@ import lsst.afw.table as afwTable
 
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
+
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
     def setUp(self):
@@ -29,13 +30,13 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.table.defineCentroid("Centroid")
         self.ss = afwTable.SourceCatalog(self.table)
 
-        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config.kernel.name = "DF"
         self.subconfig = self.config.kernel.active
 
         self.policy = pexConfig.makePolicy(self.subconfig)
-        self.policy.set('fitForBackground', True) # we are testing known background recovery here
-        self.policy.set('checkConditionNumber', False) # just in case
+        self.policy.set('fitForBackground', True)  # we are testing known background recovery here
+        self.policy.set('checkConditionNumber', False)  # just in case
         self.policy.set("useRegularization", False)
 
         # known input images
@@ -50,7 +51,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             defTemplatePath = os.path.join(self.defDataDir, "DC3a-Sim", "sci", "v5-e0",
                                            "v5-e0-c011-a10.sci.fits")
 
-            scienceExposure  = afwImage.ExposureF(defSciencePath)
+            scienceExposure = afwImage.ExposureF(defSciencePath)
             templateExposure = afwImage.ExposureF(defTemplatePath)
             # set XY0 = 0
             scienceExposure.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
@@ -58,7 +59,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             # do the warping first so we don't have any masked pixels in the postage stamps
             warper = afwMath.Warper.fromConfig(self.subconfig.warpingConfig)
             templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
-                destBBox = scienceExposure.getBBox())
+                                                   destBBox=scienceExposure.getBBox())
 
             # Change xy0
             # Nice star at position 276, 717
@@ -66,22 +67,22 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             # No masked pixels in this one
             self.x02 = 276
             self.y02 = 717
-            size     = 40
+            size = 40
             bbox2 = afwGeom.Box2I(afwGeom.Point2I(self.x02 - size, self.y02 - size),
                                   afwGeom.Point2I(self.x02 + size, self.y02 + size))
-            self.scienceImage2  = afwImage.ExposureF(scienceExposure, bbox2, afwImage.LOCAL)
+            self.scienceImage2 = afwImage.ExposureF(scienceExposure, bbox2, afwImage.LOCAL)
             self.templateExposure2 = afwImage.ExposureF(templateExposure, bbox2, afwImage.LOCAL)
 
     def addNoise(self, mi):
-        img       = mi.getImage()
-        seed      = int(afwMath.makeStatistics(mi.getVariance(), afwMath.MEDIAN).getValue())
-        rdm       = afwMath.Random(afwMath.Random.MT19937, seed)
-        rdmImage  = img.Factory(img.getDimensions())
+        img = mi.getImage()
+        seed = int(afwMath.makeStatistics(mi.getVariance(), afwMath.MEDIAN).getValue())
+        rdm = afwMath.Random(afwMath.Random.MT19937, seed)
+        rdmImage = img.Factory(img.getDimensions())
         afwMath.randomGaussianImage(rdmImage, rdm)
-        img      += rdmImage
+        img += rdmImage
         return afwMath.makeStatistics(rdmImage, afwMath.MEAN).getValue(afwMath.MEAN)
 
-    def verifyDeltaFunctionSolution(self, solution, kSum = 1.0, bg = 0.0):
+    def verifyDeltaFunctionSolution(self, solution, kSum=1.0, bg=0.0):
         # when kSum = 1.0, this agrees to the default precision.  when
         # kSum != 1.0 I need to go to only 4 digits.
         #
@@ -96,7 +97,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         #
         kSumSolution = solution.getKsum()
         self.assertAlmostEqual(kSumSolution, kSum, 5)
-
 
         kImage = solution.makeKernelImage()
         for j in range(kImage.getHeight()):
@@ -183,7 +183,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
 
-
     def testSourceConstructor(self):
         # Original and uninitialized
         if not self.defDataDir:
@@ -203,7 +202,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # Kernel not initialized
         self.assertEqual(kc.isInitialized(), False)
 
-        #Check that the source is set
+        # Check that the source is set
         self.assertEqual(kc.getSource(), source)
         self.assertEqual(kc.getCandidateRating(), source.getPsfFlux())
 
@@ -254,12 +253,12 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
 
-    def testDeltaFunctionScaled(self, scaling = 2.7, bg = 11.3):
+    def testDeltaFunctionScaled(self, scaling=2.7, bg=11.3):
         if not self.defDataDir:
             print >> sys.stderr, "Warning: afwdata is not set up"
             return
 
-        sIm  = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), True)
+        sIm = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), True)
         sIm *= scaling
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.templateExposure2.getMaskedImage(),
@@ -269,10 +268,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
-                                         kSum = scaling)
+                                         kSum=scaling)
 
-
-        sIm  = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), True)
+        sIm = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), True)
         sIm += bg
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.templateExposure2.getMaskedImage(),
@@ -282,7 +280,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
-                                         bg = bg)
+                                         bg=bg)
 
     def testDeltaFunction(self):
         if not self.defDataDir:
@@ -354,9 +352,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         gsize = self.policy.getInt("kernelSize")
         gaussFunction = afwMath.GaussianFunction2D(2, 3)
-        gaussKernel   = afwMath.AnalyticKernel(gsize, gsize, gaussFunction)
-        kImageIn      = afwImage.ImageD(afwGeom.Extent2I(gsize, gsize))
-        kSumIn        = gaussKernel.computeImage(kImageIn, False)
+        gaussKernel = afwMath.AnalyticKernel(gsize, gsize, gaussFunction)
+        kImageIn = afwImage.ImageD(afwGeom.Extent2I(gsize, gsize))
+        kSumIn = gaussKernel.computeImage(kImageIn, False)
 
         imX, imY = self.templateExposure2.getMaskedImage().getDimensions()
         smi = afwImage.MaskedImageF(afwGeom.Extent2I(imX, imY))
@@ -403,7 +401,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         #ds9.mtv(kImageIn, frame=3)
         #ds9.mtv(kImageOut, frame=4)
 
-
         soln = kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT)
         self.assertAlmostEqual(soln.getKsum(), kSumIn, 3)
         if not (self.policy.get("fitForBackground")):
@@ -414,8 +411,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 if kImageIn.get(i, j) > 1e-2:
                     self.assertAlmostEqual(kImageOut.get(i, j), kImageIn.get(i, j), 2)
 
-
-    def testGaussian(self, imsize = 50):
+    def testGaussian(self, imsize=50):
         # Convolve a delta function with a known gaussian; try to
         # recover using delta-function basis
 
@@ -423,8 +419,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         tsize = imsize + gsize
 
         gaussFunction = afwMath.GaussianFunction2D(2, 3)
-        gaussKernel   = afwMath.AnalyticKernel(gsize, gsize, gaussFunction)
-        kImageIn      = afwImage.ImageD(afwGeom.Extent2I(gsize, gsize))
+        gaussKernel = afwMath.AnalyticKernel(gsize, gsize, gaussFunction)
+        kImageIn = afwImage.ImageD(afwGeom.Extent2I(gsize, gsize))
         gaussKernel.computeImage(kImageIn, False)
 
         # template image with a single hot pixel in the exact center
@@ -452,7 +448,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 self.assertEqual(tmi2.getMask().get(i, j), 0)
                 self.assertEqual(smi2.getMask().get(i, j), 0)
 
-
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi2, smi2, self.policy)
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
@@ -467,7 +462,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             for i in range(kImageOut.getWidth()):
                 self.assertAlmostEqual(kImageOut.get(i, j)/kImageIn.get(i, j), 1.0, 5)
 
-    def testZeroVariance(self, imsize = 50):
+    def testZeroVariance(self, imsize=50):
         gsize = self.policy.getInt("kernelSize")
         tsize = imsize + gsize
 
@@ -519,7 +514,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         nSeen = 0
         for cell in kernelCellSet.getCellList():
             for cand in cell.begin(True):
-                cand  = ipDiffim.cast_KernelCandidateF(cand)
+                cand = ipDiffim.cast_KernelCandidateF(cand)
                 self.assertEqual(cand.getStatus(), afwMath.SpatialCellCandidate.GOOD)
                 nSeen += 1
         self.assertEqual(nSeen, 1)
@@ -527,7 +522,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def dontTestDisp(self):
         ds9.mtv(self.scienceImage2, frame=1)
         ds9.mtv(self.templateExposure2, frame=2)
-
 
     def tearDown(self):
         del self.policy
@@ -539,8 +533,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
 #####
 
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
+
 
 def setup_module(module):
     lsst.utils.tests.init()
