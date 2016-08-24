@@ -23,7 +23,7 @@
 #
 import unittest
 import numpy as np
-import lsst.utils.tests as tests
+import lsst.utils.tests
 import lsst.afw.table as afwTable
 import lsst.afw.coord as afwCoord
 import lsst.afw.geom as afwGeom
@@ -31,9 +31,8 @@ import lsst.afw.image as afwImage
 from lsst.meas.algorithms import LoadReferenceObjectsTask, getRefFluxField
 import lsst.ip.diffim as ipDiffim
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-class DiaCatalogSourceSelectorTest(unittest.TestCase):
+class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
 
     def setUp(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
@@ -64,7 +63,7 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
             refSrc = refCat.addNew()
             srcSrc = srcCat.addNew()
 
-            coord  = afwCoord.Coord(afwGeom.Point2D(*np.random.randn(2)), afwGeom.degrees)
+            coord = afwCoord.Coord(afwGeom.Point2D(*np.random.randn(2)), afwGeom.degrees)
 
             refSrc.set("g_flux", 10**(-0.4*18))
             refSrc.set("r_flux", 10**(-0.4*18))
@@ -83,9 +82,9 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
         return mat
 
     def testCuts(self):
-        nSrc     = 5
+        nSrc = 5
 
-        refCat   = self.makeRefCatalog()
+        refCat = self.makeRefCatalog()
 
         matches = self.makeMatches(refCat, self.srcCat, nSrc)
         sources = self.sourceSelector.selectStars(self.exposure, self.srcCat, matches).starCat
@@ -116,19 +115,14 @@ class DiaCatalogSourceSelectorTest(unittest.TestCase):
             sources = self.sourceSelector.selectStars(self.exposure, self.srcCat, matches).starCat
             self.assertEqual(len(sources), nSrc-4)
 
-def suite():
-    """Returns a suite containing all the test cases in this module."""
 
-    tests.init()
+class TestMemory(lsst.utils.tests.MemoryTestCase):
+    pass
 
-    suites = []
-    suites += unittest.makeSuite(DiaCatalogSourceSelectorTest)
-    suites += unittest.makeSuite(tests.MemoryTestCase)
-    return unittest.TestSuite(suites)
 
-def run(shouldExit = False):
-    """Run the tests"""
-    tests.run(suite(), shouldExit)
+def setup_module(module):
+    lsst.utils.tests.init()
 
 if __name__ == "__main__":
-    run(True)
+    lsst.utils.tests.init()
+    unittest.main()

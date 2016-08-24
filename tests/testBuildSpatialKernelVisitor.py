@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import unittest
-import lsst.utils.tests as tests
+import lsst.utils.tests
 
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -15,25 +15,26 @@ pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 # as reducing a delta function basis set into a Pca basis set, look at
 # FitSpatialKernelFromCandidates.py
 
+
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.config    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config.kernel.name = "AL"
         self.subconfig = self.config.kernel.active
 
         self.policy = pexConfig.makePolicy(self.subconfig)
-        self.size   = 51
+        self.size = 51
 
     def tearDown(self):
         del self.policy
 
     def makeCandidate(self, kSum, x, y):
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
-        mi1.getVariance().set(1.0) # avoid NaNs
+        mi1.getVariance().set(1.0)  # avoid NaNs
         mi1.set(self.size//2, self.size//2, (1, 0x0, 1))
         mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
-        mi2.getVariance().set(1.0) # avoid NaNs
+        mi2.getVariance().set(1.0)  # avoid NaNs
         mi2.set(self.size//2, self.size//2, (kSum, 0x0, kSum))
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
@@ -108,7 +109,6 @@ class DiffimTestCases(unittest.TestCase):
         else:
             self.fail()
 
-
     def testAlSpatialModel(self):
         self.runAlSpatialModel(0, 0)
         self.runAlSpatialModel(1, 0)
@@ -166,18 +166,13 @@ class DiffimTestCases(unittest.TestCase):
 
 #####
 
-def suite():
-    """Returns a suite containing all the test cases in this module."""
-    tests.init()
+class TestMemory(lsst.utils.tests.MemoryTestCase):
+    pass
 
-    suites = []
-    suites += unittest.makeSuite(DiffimTestCases)
-    suites += unittest.makeSuite(tests.MemoryTestCase)
-    return unittest.TestSuite(suites)
 
-def run(doExit=False):
-    """Run the tests"""
-    tests.run(suite(), doExit)
+def setup_module(module):
+    lsst.utils.tests.init()
 
 if __name__ == "__main__":
-    run(True)
+    lsst.utils.tests.init()
+    unittest.main()

@@ -315,21 +315,13 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
             self.assertTrue(result.get("ip_diffim_DipoleFit_flag"))
 
 
-def suite():
-    """!Returns a suite containing all the test cases in this module."""
+class TestMemory(lsst.utils.tests.MemoryTestCase):
+    pass
 
+
+def setup_module(module):
     lsst.utils.tests.init()
 
-    suites = []
-    suites += unittest.makeSuite(DipoleFitTest)
-    suites += unittest.makeSuite(lsst.utils.tests.MemoryTestCase)
-    return unittest.TestSuite(suites)
-
-
-def run(shouldExit=False):
-    """!Run the tests"""
-    lsst.utils.tests.run(suite(), shouldExit)
-
 if __name__ == "__main__":
-    run(True)
-
+    lsst.utils.tests.init()
+    unittest.main()

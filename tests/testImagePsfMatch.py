@@ -23,7 +23,7 @@
 #
 
 import unittest
-import lsst.utils.tests as tests
+import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -34,18 +34,19 @@ import lsst.meas.algorithms as measAlg
 import lsst.pex.logging as pexLog
 pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
 
+
 class PsfMatchTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.configAL    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.configAL = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configAL.kernel.name = "AL"
         self.subconfigAL = self.configAL.kernel.active
 
-        self.configDF    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.configDF = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configDF.kernel.name = "DF"
         self.subconfigDF = self.configDF.kernel.active
 
-        self.configDFr    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.configDFr = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configDFr.kernel.name = "DF"
         self.subconfigDFr = self.configDFr.kernel.active
 
@@ -61,11 +62,11 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfigDFr.constantVarianceWeighting = False
 
         # variance is a hack
-        self.subconfigAL.singleKernelClipping   = False
-        self.subconfigAL.spatialKernelClipping  = False
-        self.subconfigDF.singleKernelClipping   = False
-        self.subconfigDF.spatialKernelClipping  = False
-        self.subconfigDFr.singleKernelClipping  = False
+        self.subconfigAL.singleKernelClipping = False
+        self.subconfigAL.spatialKernelClipping = False
+        self.subconfigDF.singleKernelClipping = False
+        self.subconfigDF.spatialKernelClipping = False
+        self.subconfigDFr.singleKernelClipping = False
         self.subconfigDFr.spatialKernelClipping = False
 
         # Send fake kernel a differential background
@@ -75,11 +76,11 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfigDFr.fitForBackground = True
 
         # Make ideal PSF
-        self.ksize  = 21
+        self.ksize = 21
         self.sigma = 2.0
         self.psf = measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma)
 
-    def makeWcs(self, offset = 0):
+    def makeWcs(self, offset=0):
         # taken from $AFW_DIR/tests/testMakeWcs.py
         metadata = dafBase.PropertySet()
         metadata.set("SIMPLE", "T")
@@ -102,17 +103,17 @@ class PsfMatchTestCases(unittest.TestCase):
         return afwImage.makeWcs(metadata)
 
     def testWarping(self):
-        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
+        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue=self.bgValue)
 
-        tWcs = self.makeWcs(offset = 0)
-        sWcs = self.makeWcs(offset = 1)
+        tWcs = self.makeWcs(offset=0)
+        sWcs = self.makeWcs(offset=1)
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
 
         # Should fail due to registration problem
-        psfMatchAL  = ipDiffim.ImagePsfMatchTask(config=self.configAL)
+        psfMatchAL = ipDiffim.ImagePsfMatchTask(config=self.configAL)
         try:
-            psfMatchAL.subtractExposures(tExp, sExp, doWarping = True)
+            psfMatchAL.subtractExposures(tExp, sExp, doWarping=True)
         except Exception as e:
             print "testWarning failed with %r" % (e,)
             pass
@@ -121,25 +122,25 @@ class PsfMatchTestCases(unittest.TestCase):
 
     def testSubtractExposures(self):
         # Test all 3 options
-        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
+        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue=self.bgValue)
 
-        tWcs = self.makeWcs(offset = 0)
-        sWcs = self.makeWcs(offset = 1)
+        tWcs = self.makeWcs(offset=0)
+        sWcs = self.makeWcs(offset=1)
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
         sExp.setPsf(self.psf)
 
-        psfMatchAL  = ipDiffim.ImagePsfMatchTask(config=self.configAL)
-        psfMatchDF  = ipDiffim.ImagePsfMatchTask(config=self.configDF)
+        psfMatchAL = ipDiffim.ImagePsfMatchTask(config=self.configAL)
+        psfMatchDF = ipDiffim.ImagePsfMatchTask(config=self.configDF)
         psfMatchDFr = ipDiffim.ImagePsfMatchTask(config=self.configDFr)
 
         self.assertEqual(psfMatchAL.useRegularization, False)
         self.assertEqual(psfMatchDF.useRegularization, False)
         self.assertEqual(psfMatchDFr.useRegularization, True)
 
-        resultsAL  = psfMatchAL.subtractExposures(tExp, sExp, doWarping = True)
-        psfMatchDF.subtractExposures(tExp, sExp, doWarping = True)
-        psfMatchDFr.subtractExposures(tExp, sExp, doWarping = True)
+        resultsAL = psfMatchAL.subtractExposures(tExp, sExp, doWarping=True)
+        psfMatchDF.subtractExposures(tExp, sExp, doWarping=True)
+        psfMatchDFr.subtractExposures(tExp, sExp, doWarping=True)
 
         self.assertEqual(type(resultsAL.subtractedExposure), afwImage.ExposureF)
         self.assertEqual(type(resultsAL.psfMatchingKernel), afwMath.LinearCombinationKernel)
@@ -148,27 +149,27 @@ class PsfMatchTestCases(unittest.TestCase):
 
     def testMatchExposures(self):
         # Only test 1 option
-        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
+        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue=self.bgValue)
 
-        tWcs = self.makeWcs(offset = 0)
-        sWcs = self.makeWcs(offset = 1)
+        tWcs = self.makeWcs(offset=0)
+        sWcs = self.makeWcs(offset=1)
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
         sExp.setPsf(self.psf)
 
         psfMatchAL = ipDiffim.ImagePsfMatchTask(config=self.configAL)
-        resultsAL  = psfMatchAL.matchExposures(tExp, sExp,
-                                               templateFwhmPix = 2.0, scienceFwhmPix = 3.0, doWarping = True)
+        resultsAL = psfMatchAL.matchExposures(tExp, sExp,
+                                              templateFwhmPix=2.0, scienceFwhmPix=3.0, doWarping=True)
         self.assertEqual(type(resultsAL.matchedExposure), afwImage.ExposureF)
         self.assertEqual(type(resultsAL.psfMatchingKernel), afwMath.LinearCombinationKernel)
         self.assertEqual(type(resultsAL.backgroundModel), afwMath.Function2D)
         self.assertEqual(type(resultsAL.kernelCellSet), afwMath.SpatialCellSet)
 
-    def testPca(self, nTerms = 3):
-        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = self.bgValue)
+    def testPca(self, nTerms=3):
+        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue=self.bgValue)
 
-        tWcs = self.makeWcs(offset = 0)
-        sWcs = self.makeWcs(offset = 0)
+        tWcs = self.makeWcs(offset=0)
+        sWcs = self.makeWcs(offset=0)
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
         sExp.setPsf(self.psf)
@@ -176,9 +177,9 @@ class PsfMatchTestCases(unittest.TestCase):
         self.subconfigDF.usePcaForSpatialKernel = True
         self.subconfigDF.numPrincipalComponents = nTerms
 
-        psfMatchDF  = ipDiffim.ImagePsfMatchTask(config=self.configDF)
+        psfMatchDF = ipDiffim.ImagePsfMatchTask(config=self.configDF)
         candList = psfMatchDF.makeCandidateList(tExp, sExp, self.ksize)
-        resultsDF   = psfMatchDF.subtractMaskedImages(tMi, sMi, candList)
+        resultsDF = psfMatchDF.subtractMaskedImages(tMi, sMi, candList)
 
         spatialKernel = resultsDF.psfMatchingKernel
         spatialKernelSolution = spatialKernel.getSpatialParameters()
@@ -211,7 +212,7 @@ class PsfMatchTestCases(unittest.TestCase):
         # Quick note; you shouldn't change confake here, since the
         # candidates in the KernelCellSet are initialized in
         # makeFakeKernelSet
-        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue = 0.0, addNoise = False)
+        tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue=0.0, addNoise=False)
 
         svar = sMi.getVariance()
         svar.set(1.0)
@@ -240,18 +241,14 @@ class PsfMatchTestCases(unittest.TestCase):
         del self.configDFr
         del self.psf
 
-def suite():
-    """Returns a suite containing all the test cases in this module."""
-    tests.init()
 
-    suites = []
-    suites += unittest.makeSuite(PsfMatchTestCases)
-    suites += unittest.makeSuite(tests.MemoryTestCase)
-    return unittest.TestSuite(suites)
+class TestMemory(lsst.utils.tests.MemoryTestCase):
+    pass
 
-def run(doExit=False):
-    """Run the tests"""
-    tests.run(suite(), doExit)
+
+def setup_module(module):
+    lsst.utils.tests.init()
 
 if __name__ == "__main__":
-    run(True)
+    lsst.utils.tests.init()
+    unittest.main()

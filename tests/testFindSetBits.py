@@ -24,7 +24,7 @@
 
 
 import unittest
-import lsst.utils.tests as tests
+import lsst.utils.tests
 
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -34,18 +34,13 @@ import lsst.pex.logging as logging
 verbosity = 1
 logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
 
+
 class DiffimTestCases(unittest.TestCase):
-
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
 
     def testNoMask(self):
         mask = afwImage.MaskU(afwGeom.Extent2I(20, 20))
         mask.set(0)
-        fsb  = ipDiffim.FindSetBitsU()
+        fsb = ipDiffim.FindSetBitsU()
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(0, 10),
                              afwGeom.Point2I(9, 12))
@@ -59,13 +54,13 @@ class DiffimTestCases(unittest.TestCase):
         bitmaskBad = mask.getPlaneBitMask('BAD')
         fsb = ipDiffim.FindSetBitsU()
 
-        bbox     = afwGeom.Box2I(afwGeom.Point2I(9, 10),
-                                 afwGeom.Point2I(11, 12))
-        submask  = afwImage.MaskU(mask, bbox, afwImage.LOCAL)
+        bbox = afwGeom.Box2I(afwGeom.Point2I(9, 10),
+                             afwGeom.Point2I(11, 12))
+        submask = afwImage.MaskU(mask, bbox, afwImage.LOCAL)
         submask |= bitmaskBad
 
-        bbox2    = afwGeom.Box2I(afwGeom.Point2I(8, 8),
-                                 afwGeom.Point2I(19, 19))
+        bbox2 = afwGeom.Box2I(afwGeom.Point2I(8, 8),
+                              afwGeom.Point2I(19, 19))
         fsb.apply(afwImage.MaskU(mask, bbox2, afwImage.LOCAL))
 
         self.assertEqual(fsb.getBits(), bitmaskBad)
@@ -77,36 +72,32 @@ class DiffimTestCases(unittest.TestCase):
         bitmaskSat = mask.getPlaneBitMask('SAT')
         fsb = ipDiffim.FindSetBitsU()
 
-        bbox      = afwGeom.Box2I(afwGeom.Point2I(9, 10),
-                                  afwGeom.Point2I(11, 12))
-        submask   = afwImage.MaskU(mask, bbox, afwImage.LOCAL)
-        submask  |= bitmaskBad
+        bbox = afwGeom.Box2I(afwGeom.Point2I(9, 10),
+                             afwGeom.Point2I(11, 12))
+        submask = afwImage.MaskU(mask, bbox, afwImage.LOCAL)
+        submask |= bitmaskBad
 
-        bbox2     = afwGeom.Box2I(afwGeom.Point2I(8, 8),
-                                  afwGeom.Point2I(19, 19))
-        submask2  = afwImage.MaskU(mask, bbox2, afwImage.LOCAL)
+        bbox2 = afwGeom.Box2I(afwGeom.Point2I(8, 8),
+                              afwGeom.Point2I(19, 19))
+        submask2 = afwImage.MaskU(mask, bbox2, afwImage.LOCAL)
         submask2 |= bitmaskSat
 
-        bbox3     = afwGeom.Box2I(afwGeom.Point2I(0, 0),
-                                  afwGeom.Point2I(19, 19))
+        bbox3 = afwGeom.Box2I(afwGeom.Point2I(0, 0),
+                              afwGeom.Point2I(19, 19))
         fsb.apply(afwImage.MaskU(mask, bbox3, afwImage.LOCAL))
 
         self.assertEqual(fsb.getBits(), bitmaskBad | bitmaskSat)
 
 #####
 
-def suite():
-    """Returns a suite containing all the test cases in this module."""
-    tests.init()
 
-    suites = []
-    suites += unittest.makeSuite(DiffimTestCases)
-    suites += unittest.makeSuite(tests.MemoryTestCase)
-    return unittest.TestSuite(suites)
+class TestMemory(lsst.utils.tests.MemoryTestCase):
+    pass
 
-def run(doExit=False):
-    """Run the tests"""
-    tests.run(suite(), doExit)
+
+def setup_module(module):
+    lsst.utils.tests.init()
 
 if __name__ == "__main__":
-    run(True)
+    lsst.utils.tests.init()
+    unittest.main()
