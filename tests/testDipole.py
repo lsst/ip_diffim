@@ -35,7 +35,6 @@ import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
 
 display = False
-np.random.seed(666)
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 
@@ -381,6 +380,7 @@ class TestMemory(lsst.utils.tests.MemoryTestCase):
 
 def setup_module(module):
     lsst.utils.tests.init()
+    np.random.seed(666)
 
 if __name__ == "__main__":
     lsst.utils.tests.init()
