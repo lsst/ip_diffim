@@ -137,34 +137,46 @@ void NaiveDipoleCentroid::measure(
 ) const {
     afw::detection::PeakCatalog const& peaks = source.getFootprint()->getPeaks();
 
-    naiveCentroid(source, exposure, peaks[0].getI(), (peaks[0].getPeakValue() >= 0 ?
-                                                       getPositiveKeys() :
-                                                       getNegativeKeys()));
-    if (peaks.size() > 1) {
-        naiveCentroid(source, exposure, peaks[1].getI(), (peaks[1].getPeakValue() >= 0 ?
-                                                           getPositiveKeys() :
-                                                           getNegativeKeys()));
+    int posInd = 0;
+    double posValue = peaks[posInd].getPeakValue(), negValue = 0;
+    if (posValue < 0.) { /* All peaks are negative so use the *most* negative value */
+       posInd = peaks.size() - 1;
+       posValue = peaks[posInd].getPeakValue();
+    }
+    naiveCentroid(source, exposure, peaks[posInd].getI(),
+                 (posValue >= 0 ? getPositiveKeys() : getNegativeKeys()));
+
+    if (posValue > 0. && posInd == 0 && peaks.size() > 1) { /* See if there's also a negative peak */
+       int negInd = peaks.size() - 1;
+       negValue = peaks[negInd].getPeakValue();
+       if (posValue > 0. && negValue < 0.) {
+          naiveCentroid(source, exposure, peaks[negInd].getI(),
+                        (negValue >= 0 ? getPositiveKeys() : getNegativeKeys()));
+       }
     }
 
-    mergeCentroids(source);
+    mergeCentroids(source, posValue, negValue);
 
 }
 
-void NaiveDipoleCentroid::mergeCentroids(afw::table::SourceRecord & source) const {
+void NaiveDipoleCentroid::mergeCentroids(afw::table::SourceRecord & source,
+                                         double posValue, double negValue) const {
 
-    float pos_x, pos_y;
-    float neg_x, neg_y;
+   double pos_x, pos_y, pos_f;
+   double neg_x, neg_y, neg_f;
 
     pos_x = source.get(getPositiveKeys().getX());
     pos_y = source.get(getPositiveKeys().getY());
+    pos_f = posValue;
 
     neg_x = source.get(getNegativeKeys().getX());
     neg_y = source.get(getNegativeKeys().getY());
+    neg_f = -negValue;
 
     if(std::isfinite(pos_x) && std::isfinite(pos_y) &&
        std::isfinite(neg_x) && std::isfinite(neg_y)) {
-        source.set(getCenterKeys().getX(), 0.5*(pos_x + neg_x));
-        source.set(getCenterKeys().getY(), 0.5*(pos_y + neg_y));
+       source.set(getCenterKeys().getX(), (pos_x * pos_f + neg_x * neg_f) / (pos_f + neg_f));
+       source.set(getCenterKeys().getY(), (pos_y * pos_f + neg_y * neg_f) / (pos_f + neg_f));
     } else if (std::isfinite(pos_x) && std::isfinite(pos_y)) {
         source.set(getCenterKeys().getX(), pos_x);
         source.set(getCenterKeys().getY(), pos_y);

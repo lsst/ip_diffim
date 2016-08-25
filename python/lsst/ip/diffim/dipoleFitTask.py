@@ -46,6 +46,11 @@ class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
     """!Configuration for DipoleFitPlugin
     """
 
+    fitAllDiaSources = pexConfig.Field(
+        dtype=float, default=False,
+        doc="""Attempte dipole fit of all diaSources (otherwise just the ones consisting of overlapping
+        positive and negative footprints)""")
+
     maxSeparation = pexConfig.Field(
         dtype=float, default=5.,
         doc="Assume dipole is not separated by more than maxSeparation * psfSigma")
@@ -102,10 +107,15 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
                               "base_PixelFlags",
                               "base_SkyCoord",
                               "base_PsfFlux",
+                              "base_GaussianCentroid",
+                              "base_PeakLikelihoodFlux",
+                              "base_PeakCentroid",
+                              "base_SdssCentroid",
+                              "base_NaiveCentroid",
                               "ip_diffim_NaiveDipoleCentroid",
                               "ip_diffim_NaiveDipoleFlux",
                               "ip_diffim_PsfDipoleFlux",
-                              "ip_diffim_ClassificationDipole"
+                              "ip_diffim_ClassificationDipole",
                               ]
 
         self.slots.calibFlux = None
@@ -538,10 +548,11 @@ class DipoleFitAlgorithm(object):
         cenNeg = cenPos = fpCentroid
 
         pks = fp.getPeaks()
+
         if len(pks) >= 1:
             cenPos = pks[0].getF()    # if individual (merged) peaks were detected, use those
-        if len(pks) >= 2:
-            cenNeg = pks[1].getF()
+        if len(pks) >= 2:    # peaks are already sorted by centroid flux so take the most negative one
+            cenNeg = pks[-1].getF()
 
         # For close/faint dipoles the starting locs (min/max) might be way off, let's help them a bit.
         # First assume dipole is not separated by more than 5*psfSigma.
@@ -919,6 +930,10 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             schema.join(name, "flag", "classification"), type="Flag",
             doc="Flag indicating diaSource is classified as a dipole")
 
+        self.classificationAttemptedFlagKey = schema.addField(
+            schema.join(name, "flag", "classificationAttempted"), type="Flag",
+            doc="Flag indicating diaSource was attempted to be classified as a dipole")
+
         self.flagKey = schema.addField(
             schema.join(name, "flag"), type="Flag",
             doc="General failure flag for dipole fit")
@@ -946,11 +961,21 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         testing (@see `tests/testDipoleFitter.py`)
         """
 
-        pks = measRecord.getFootprint().getPeaks()
-        if len(pks) <= 1:  # not a dipole for our analysis
-            self.fail(measRecord, measBase.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
-
         result = None
+        pks = measRecord.getFootprint().getPeaks()
+
+        # Check if the footprint consists of a putative dipole - else don't fit it.
+        if (
+                (len(pks) <= 1) or  # one peak in the footprint - not a dipole
+                (len(pks) > 1 and (np.sign(pks[0].getPeakValue()) ==
+                                   np.sign(pks[-1].getPeakValue())))  # peaks are same sign - not a dipole
+        ):
+            measRecord.set(self.classificationFlagKey, False)
+            measRecord.set(self.classificationAttemptedFlagKey, False)
+            self.fail(measRecord, measBase.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
+            if not self.config.fitAllDiaSources:
+                return result
+
         try:
             alg = self.DipoleFitAlgorithmClass(exposure, posImage=posExp, negImage=negExp)
             result, _ = alg.fitDipole(
@@ -966,6 +991,8 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
 
         if result is None:
+            measRecord.set(self.classificationFlagKey, False)
+            measRecord.set(self.classificationAttemptedFlagKey, False)
             return result
 
         self.log.log(self.log.DEBUG, "Dipole fit result: %d %s" % (measRecord.getId(), str(result)))
@@ -974,7 +1001,6 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
 
         # add chi2, coord/flux uncertainties (TBD), dipole classification
-
         # Add the relevant values to the measRecord
         measRecord[self.posFluxKey] = result.posFlux
         measRecord[self.posFluxSigmaKey] = result.signalToNoise   # to be changed to actual sigma!
@@ -1032,6 +1058,8 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             passesChi2 = significance < self.config.maxChi2DoF
             allPass = allPass and passesChi2
 
+        measRecord.set(self.classificationAttemptedFlagKey, True)
+
         if allPass:  # Note cannot pass `allPass` into the `measRecord.set()` call below...?
             measRecord.set(self.classificationFlagKey, True)
         else:
@@ -1052,6 +1080,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             if error.getFlagBit() == self.FAILURE_NOT_DIPOLE:
                 self.log.log(self.log.DEBUG, 'DipoleFitPlugin not run on record %d: %s' %
                              (measRecord.getId(), str(error)))
+                measRecord.set(self.classificationAttemptedFlagKey, False)
                 measRecord.set(self.flagKey, True)
         else:
             self.log.warn('DipoleFitPlugin failed on record %d' % measRecord.getId())
