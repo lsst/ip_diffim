@@ -118,6 +118,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
     """ A test case for dipole algorithms"""
 
     def setUp(self):
+        np.random.seed(666)
         self.w, self.h = 100, 100  # size of image
         self.xc, self.yc = 50, 50  # location of center of dipole
 
@@ -354,6 +355,7 @@ class DipoleMeasurementTaskTest(lsst.utils.tests.TestCase):
     tested above"""
 
     def setUp(self):
+        np.random.seed(666)
         self.config = ipDiffim.DipoleMeasurementConfig()
 
     def tearDown(self):
@@ -380,7 +382,6 @@ class TestMemory(lsst.utils.tests.MemoryTestCase):
 
 def setup_module(module):
     lsst.utils.tests.init()
-    np.random.seed(666)
 
 if __name__ == "__main__":
     lsst.utils.tests.init()
