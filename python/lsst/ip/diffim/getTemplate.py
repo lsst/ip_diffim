@@ -154,13 +154,15 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
     _DefaultName = "GetCalexpAsTemplateTask"
 
     def run(self, exposure, sensorRef, templateIdList):
-        """!Return a calexp exposure with same ccd as input sensorRef.
+        """!Return a calexp exposure with based on input sensorRef.
+
+        Construct a dataId based on the sensorRef.dataId combined
+        with the specifications from the first dataId in templateIdList
 
         \param[in] exposure -- exposure (unused)
         \param[in] sensorRef -- a Butler data reference
-        \param[in] templateIdList -- list of data ids, which should contain as single item.
+        \param[in] templateIdList -- list of data ids, which should contain a single item.
                                      If there are multiple items, only the first is used.
-                                     Only the entry 'visit' from the data id is used.
 
         \return a pipeBase.Struct
          - exposure: a template calexp
@@ -174,7 +176,8 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
                           (templateIdList[0]['visit']))
 
         templateId = sensorRef.dataId.copy()
-        templateId["visit"] = templateIdList[0]['visit']
+        templateId.update(templateIdList[0])
+
         self.log.info("Fetching calexp (%s) as template." % (templateId))
 
         butler = sensorRef.getButler()

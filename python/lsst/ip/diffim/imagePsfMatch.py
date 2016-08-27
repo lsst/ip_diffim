@@ -344,18 +344,20 @@ And finally provide some optional debugging displays:
             else:
                 pexLog.Trace(self.log.getName(), 1, "ERROR: Input images not registered")
                 raise RuntimeError("Input images not registered")
+
         if templateFwhmPix is None:
             if not templateExposure.hasPsf():
                 self.log.warn("No estimate of Psf FWHM for template image")
             else:
                 templateFwhmPix = self.getFwhmPix(templateExposure.getPsf())
+                self.log.info("templateFwhmPix: {}".format(templateFwhmPix))
 
         if scienceFwhmPix is None:
             if not scienceExposure.hasPsf():
                 self.log.warn("No estimate of Psf FWHM for science image")
             else:
                 scienceFwhmPix = self.getFwhmPix(scienceExposure.getPsf())
-
+                self.log.info("scienceFwhmPix: {}".format(scienceFwhmPix))
 
         kernelSize = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix)[0].getWidth()
         candidateList = self.makeCandidateList(templateExposure, scienceExposure, kernelSize, candidateList)
