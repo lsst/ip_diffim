@@ -107,10 +107,12 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
                               "base_PixelFlags",
                               "base_SkyCoord",
                               "base_PsfFlux",
+                              "base_SdssCentroid",
+                              "base_SdssShape",
                               "base_GaussianCentroid",
+                              "base_GaussianFlux",
                               "base_PeakLikelihoodFlux",
                               "base_PeakCentroid",
-                              "base_SdssCentroid",
                               "base_NaiveCentroid",
                               "ip_diffim_NaiveDipoleCentroid",
                               "ip_diffim_NaiveDipoleFlux",
@@ -121,7 +123,7 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
         self.slots.calibFlux = None
         self.slots.modelFlux = None
         self.slots.instFlux = None
-        self.slots.shape = None
+        self.slots.shape = "base_SdssShape"
         self.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
         self.doReplaceWithNoise = False
 
