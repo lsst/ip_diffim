@@ -41,6 +41,7 @@ __all__ = ("DipoleTestImage")
 
 keptPlots = False                       # Have we arranged to keep spatial plots open?
 
+
 def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=ds9.GREEN, symb="+", size=2):
     """Draw the (XAstrom, YAstrom) positions of a set of Sources.  Image has the given XY0"""
 
@@ -57,6 +58,8 @@ def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=ds9.GREEN, symb="+", size=2):
 #
 # Kernel display utilities
 #
+
+
 def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
                            ctype=None, ctypeUnused=None, ctypeBad=None, size=3,
                            frame=None, title="Spatial Cells"):
@@ -129,6 +132,7 @@ def showDiaSources(sources, exposure, isFlagged, isDipole, frame=None):
     mosaicImage = mos.makeMosaic(frame=frame, title=title)
     return mosaicImage
 
+
 def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadCandidates=True,
                          resids=False, kernels=False):
     """Display the Kernel candidates.
@@ -198,14 +202,14 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
             im_resid.append(resid)
 
             # residuals using spatial model
-            ski  = afwImage.ImageD(kernel.getDimensions())
+            ski = afwImage.ImageD(kernel.getDimensions())
             kernel.computeImage(ski, False, int(cand.getXCenter()), int(cand.getYCenter()))
-            sk   = afwMath.FixedKernel(ski)
-            sbg  = 0.0
+            sk = afwMath.FixedKernel(ski)
+            sbg = 0.0
             if background:
                 sbg = background(int(cand.getXCenter()), int(cand.getYCenter()))
             sresid = cand.getDifferenceImage(sk, sbg)
-            resid  = sresid
+            resid = sresid
             if resids:
                 resid = sresid.getImage()
                 resid /= var
@@ -225,7 +229,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
 
             if False and np.isnan(rchi2):
                 ds9.mtv(cand.getScienceMaskedImage.getImage(), title="candidate", frame=1)
-                print "rating",  cand.getCandidateRating()
+                print "rating", cand.getCandidateRating()
 
             im = cand.getScienceMaskedImage()
             center = (candidateIndex, cand.getXCenter() - im.getX0(), cand.getYCenter() - im.getY0())
@@ -245,6 +249,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
 
     return mosaicImage
 
+
 def showKernelBasis(kernel, frame=None):
     """Display a Kernel's basis images
     """
@@ -260,8 +265,9 @@ def showKernelBasis(kernel, frame=None):
 
 ###############
 
+
 def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
-                           numSample=128, keepPlots=True, maxCoeff = 10):
+                           numSample=128, keepPlots=True, maxCoeff=10):
     """Plot the Kernel spatial model."""
 
     try:
@@ -326,11 +332,11 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
 
     for k in range(maxCoeff):
         func = kernel.getSpatialFunction(k)
-        dfGood = zGood[:,k] - np.array([func(pos.getX(), pos.getY()) for pos in candPos])
+        dfGood = zGood[:, k] - np.array([func(pos.getX(), pos.getY()) for pos in candPos])
         yMin = dfGood.min()
         yMax = dfGood.max()
         if numBad > 0:
-            dfBad = zBad[:,k] - np.array([func(pos.getX(), pos.getY()) for pos in badPos])
+            dfBad = zBad[:, k] - np.array([func(pos.getX(), pos.getY()) for pos in badPos])
             # Can really screw up the range...
             yMin = min([yMin, dfBad.min()])
             yMax = max([yMax, dfBad.max()])
@@ -365,9 +371,9 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
 
         # UL
         ax = fig.add_axes((0.1, 0.55, 0.35, 0.35))
-        ax.plot(-2.5*np.log10(candAmps), zGood[:,k], 'b+')
+        ax.plot(-2.5*np.log10(candAmps), zGood[:, k], 'b+')
         if numBad > 0:
-            ax.plot(-2.5*np.log10(badAmps), zBad[:,k], 'r+')
+            ax.plot(-2.5*np.log10(badAmps), zBad[:, k], 'r+')
         ax.set_title("Basis Coefficients")
         ax.set_xlabel("Instr mag")
         ax.set_ylabel("Coeff")
@@ -469,9 +475,9 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
             for cen, shape in zip(centers, shapes):
                 bbox = mos.getBBox(i)
                 i += 1
-                xc, yc = cen[0] + bbox.getMinX(),  cen[1] + bbox.getMinY()
+                xc, yc = cen[0] + bbox.getMinX(), cen[1] + bbox.getMinY()
                 if showCenter:
-                    ds9.dot("+", xc, yc,  ctype=ds9.BLUE, frame=frame)
+                    ds9.dot("+", xc, yc, ctype=ds9.BLUE, frame=frame)
 
                 if showEllipticity:
                     ixx, ixy, iyy = shape
@@ -479,13 +485,14 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
 
     return mos
 
+
 def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCellSet,
                        kernel, background, testSources, config,
-                       origVariance = False, nptsFull = 1e6, keepPlots = True, titleFs=14):
+                       origVariance=False, nptsFull=1e6, keepPlots=True, titleFs=14):
     """Plot diffim residuals for LOCAL and SPATIAL models"""
     candidateResids = []
-    spatialResids   = []
-    nonfitResids    = []
+    spatialResids = []
+    nonfitResids = []
 
     for cell in kernelCellSet.getCellList():
         for cand in cell.begin(True): # only look at good ones
@@ -493,20 +500,20 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
             if not (cand.getStatus() == afwMath.SpatialCellCandidate.GOOD):
                 continue
 
-            cand    = diffimLib.cast_KernelCandidateF(cand)
-            diffim  = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
-            orig    = cand.getScienceMaskedImage()
+            cand = diffimLib.cast_KernelCandidateF(cand)
+            diffim = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
+            orig = cand.getScienceMaskedImage()
 
-            ski     = afwImage.ImageD(kernel.getDimensions())
+            ski = afwImage.ImageD(kernel.getDimensions())
             kernel.computeImage(ski, False, int(cand.getXCenter()), int(cand.getYCenter()))
-            sk      = afwMath.FixedKernel(ski)
-            sbg     = background(int(cand.getXCenter()), int(cand.getYCenter()))
+            sk = afwMath.FixedKernel(ski)
+            sbg = background(int(cand.getXCenter()), int(cand.getYCenter()))
             sdiffim = cand.getDifferenceImage(sk, sbg)
 
             # trim edgs due to convolution
-            bbox    = kernel.shrinkBBox(diffim.getBBox())
-            tdiffim  = diffim.Factory(diffim, bbox)
-            torig    = orig.Factory(orig, bbox)
+            bbox = kernel.shrinkBBox(diffim.getBBox())
+            tdiffim = diffim.Factory(diffim, bbox)
+            torig = orig.Factory(orig, bbox)
             tsdiffim = sdiffim.Factory(sdiffim, bbox)
 
             if origVariance:
@@ -520,14 +527,14 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
                 spatialResids.append(np.ravel(tsdiffim.getImage().getArray() /
                                               np.sqrt(tsdiffim.getVariance().getArray())))
 
-    fullIm   = diffExposure.getMaskedImage().getImage().getArray()
+    fullIm = diffExposure.getMaskedImage().getImage().getArray()
     fullMask = diffExposure.getMaskedImage().getMask().getArray()
     if origVariance:
-        fullVar  = exposure.getMaskedImage().getVariance().getArray()
+        fullVar = exposure.getMaskedImage().getVariance().getArray()
     else:
-        fullVar  = diffExposure.getMaskedImage().getVariance().getArray()
+        fullVar = diffExposure.getMaskedImage().getVariance().getArray()
 
-    bitmaskBad  = 0
+    bitmaskBad = 0
     bitmaskBad |= afwImage.MaskU.getPlaneBitMask('NO_DATA')
     bitmaskBad |= afwImage.MaskU.getPlaneBitMask('SAT')
     idx = np.where((fullMask & bitmaskBad) == 0)
@@ -539,7 +546,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
                                                        exposure, config, pexLog.getDefaultLog())
     for fp in testFootprints:
         subexp = diffExposure.Factory(diffExposure, fp["footprint"].getBBox())
-        subim  = subexp.getMaskedImage().getImage()
+        subim = subexp.getMaskedImage().getImage()
         if origVariance:
             subvar = afwImage.ExposureF(exposure, fp["footprint"].getBBox()).getMaskedImage().getVariance()
         else:
@@ -547,8 +554,8 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
         nonfitResids.append(np.ravel(subim.getArray() / np.sqrt(subvar.getArray())))
 
     candidateResids = np.ravel(np.array(candidateResids))
-    spatialResids   = np.ravel(np.array(spatialResids))
-    nonfitResids    = np.ravel(np.array(nonfitResids))
+    spatialResids = np.ravel(np.array(spatialResids))
+    nonfitResids = np.ravel(np.array(nonfitResids))
 
     try:
         import pylab
@@ -572,32 +579,32 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     sp2 = pylab.subplot(222, sharex=sp1, sharey=sp1)
     sp3 = pylab.subplot(223, sharex=sp1, sharey=sp1)
     sp4 = pylab.subplot(224, sharex=sp1, sharey=sp1)
-    xs  = np.arange(-5, 5.05, 0.1)
-    ys  = 1. / np.sqrt(2 * np.pi) * np.exp( -0.5 * xs**2 )
+    xs = np.arange(-5, 5.05, 0.1)
+    ys = 1. / np.sqrt(2 * np.pi) * np.exp(-0.5 * xs**2)
 
     sp1.hist(candidateResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
              % (np.mean(candidateResids), np.var(candidateResids)))
     sp1.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp1.set_title("Candidates: basis fit", fontsize=titleFs-2)
-    sp1.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
+    sp1.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs-6))
 
     sp2.hist(spatialResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
              % (np.mean(spatialResids), np.var(spatialResids)))
     sp2.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp2.set_title("Candidates: spatial fit", fontsize=titleFs-2)
-    sp2.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
+    sp2.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs-6))
 
     sp3.hist(nonfitResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
              % (np.mean(nonfitResids), np.var(nonfitResids)))
     sp3.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp3.set_title("Control sample: spatial fit", fontsize=titleFs-2)
-    sp3.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
+    sp3.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs-6))
 
     sp4.hist(allResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
              % (np.mean(allResids), np.var(allResids)))
     sp4.plot(xs, ys, "r-", lw=2, label="N(0,1)")
     sp4.set_title("Full image (subsampled)", fontsize=titleFs-2)
-    sp4.legend(loc=1, fancybox=True, shadow=True, prop = FontProperties(size=titleFs-6))
+    sp4.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs-6))
 
     pylab.setp(sp1.get_xticklabels()+sp1.get_yticklabels(), fontsize=titleFs-4)
     pylab.setp(sp2.get_xticklabels()+sp2.get_yticklabels(), fontsize=titleFs-4)
@@ -622,6 +629,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
         atexit.register(show)
         keptPlots = True
 
+
 def calcCentroid(arr):
     """Calculate first moment of a (kernel) image"""
     y, x = arr.shape
@@ -634,6 +642,7 @@ def calcCentroid(arr):
     narr = yarr*sarr
     centy = narr.sum()/sarrSum
     return centx, centy
+
 
 def calcWidth(arr, centx, centy):
     """Calculate second moment of a (kernel) image"""
@@ -649,6 +658,7 @@ def calcWidth(arr, centx, centy):
     ystd = np.sqrt(narr.sum()/sarrSum)
     return xstd, ystd
 
+
 def printSkyDiffs(sources, wcs):
     """Print differences in sky coordinates between source Position and its Centroid mapped through Wcs"""
     for s in sources:
@@ -661,6 +671,7 @@ def printSkyDiffs(sources, wcs):
         if np.isfinite(dra) and np.isfinite(ddec):
             print dra, ddec
 
+
 def makeRegions(sources, outfilename, wcs=None):
     """Create regions file for ds9 from input source list"""
     fh = open(outfilename, "w")
@@ -672,9 +683,10 @@ def makeRegions(sources, outfilename, wcs=None):
         else:
             (ra, dec) = s.getCoord().getPosition()
         if np.isfinite(ra) and np.isfinite(dec):
-            fh.write("circle(%f,%f,2\")\n"%(ra,dec))
+            fh.write("circle(%f,%f,2\")\n"%(ra, dec))
     fh.flush()
     fh.close()
+
 
 def showSourceSetSky(sSet, wcs, xy0, frame=0, ctype=ds9.GREEN, symb="+", size=2):
     """Draw the (RA, Dec) positions of a set of Sources. Image has the XY0."""
@@ -685,14 +697,15 @@ def showSourceSetSky(sSet, wcs, xy0, frame=0, ctype=ds9.GREEN, symb="+", size=2)
             yc -= xy0[1]
             ds9.dot(symb, xc, yc, frame=frame, ctype=ctype, size=size)
 
+
 def plotWhisker(results, newWcs):
     """Plot whisker diagram of astromeric offsets between results.matches"""
     refCoordKey = results.matches[0].first.getTable().getCoordKey()
     inCentroidKey = results.matches[0].second.getTable().getCentroidKey()
     positions = [m.first.get(refCoordKey) for m in results.matches]
     residuals = [m.first.get(refCoordKey).getOffsetFrom(
-                       newWcs.pixelToSky(m.second.get(inCentroidKey))) for
-                       m in results.matches]
+        newWcs.pixelToSky(m.second.get(inCentroidKey))) for
+        m in results.matches]
     import matplotlib.pyplot as plt
     fig = plt.figure()
     sp = fig.add_subplot(1, 1, 0)
@@ -843,4 +856,3 @@ class DipoleTestImage(object):
 
         else:
             return detectTask, schema
-

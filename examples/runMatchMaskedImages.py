@@ -12,15 +12,16 @@ from lsst.pex.logging import Log
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 
+
 def main():
     imageProcDir = lsst.utils.getPackageDir('ip_diffim')
 
-    defSciencePath  = None
+    defSciencePath = None
     defTemplatePath = None
-    defOutputPath   = 'matchedImage.fits'
-    defVerbosity    = 5
-    defFwhm         = 3.5
-    
+    defOutputPath = 'matchedImage.fits'
+    defVerbosity = 5
+    defFwhm = 3.5
+
     usage = """usage: %%prog [options] [scienceImage [templateImage [outputImage]]]]
 
 Notes:
@@ -32,7 +33,7 @@ Notes:
 - default templateMaskedImage=%s
 - default outputImage=%s 
 """ % (defSciencePath, defTemplatePath, defOutputPath)
-    
+
     parser = optparse.OptionParser(usage)
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
                       help='verbosity of Trace messages')
@@ -44,22 +45,22 @@ Notes:
                       help='Science Image Psf Fwhm (pixel)')
     parser.add_option('--fwhmT', type=float,
                       help='Template Image Psf Fwhm (pixel)')
-                      
+
     (options, args) = parser.parse_args()
-    
+
     def getArg(ind, defValue):
         if ind < len(args):
             return args[ind]
         return defValue
-    
-    sciencePath     = getArg(0, defSciencePath)
-    templatePath    = getArg(1, defTemplatePath)
-    outputPath      = getArg(2, defOutputPath)
+
+    sciencePath = getArg(0, defSciencePath)
+    templatePath = getArg(1, defTemplatePath)
+    outputPath = getArg(2, defOutputPath)
 
     if sciencePath == None or templatePath == None:
         parser.print_help()
         sys.exit(1)
-    
+
     print 'Science image: ', sciencePath
     print 'Template image:', templatePath
     print 'Output image:  ', outputPath
@@ -87,11 +88,11 @@ Notes:
     if options.verbosity > 0:
         print 'Verbosity =', options.verbosity
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
-        
+
     ####
-        
+
     templateMaskedImage = afwImage.MaskedImageF(templatePath)
-    scienceMaskedImage  = afwImage.MaskedImageF(sciencePath)
+    scienceMaskedImage = afwImage.MaskedImageF(sciencePath)
 
     config = ipDiffim.ImagePsfMatch.ConfigClass()
     config.kernel.name = "AL"
@@ -105,8 +106,8 @@ Notes:
             print 'NOTE: no background subtraction at all is requested'
 
     psfmatch = ipDiffim.ImagePsfMatch(subconfig)
-    results  = psfmatch.matchMaskedImages(templateMaskedImage, scienceMaskedImage,
-                                          templateFwhmPix = fwhmT, scienceFwhmPix = fwhmS)
+    results = psfmatch.matchMaskedImages(templateMaskedImage, scienceMaskedImage,
+                                         templateFwhmPix=fwhmT, scienceFwhmPix=fwhmS)
 
     matchMaskedImage = results[0]
     matchMaskedImage.writeFits(outputPath)
@@ -114,9 +115,10 @@ Notes:
     if False:
         spatialKernel = results[1]
         print spatialKernel.getSpatialParameters()
-    
+
     if display:
         ds9.mtv(differenceMaskedImage)
+
 
 def run():
     Log.getDefaultLog()

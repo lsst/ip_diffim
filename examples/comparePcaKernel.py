@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-# 
+#
 # LSST Data Management System
 # Copyright 2008, 2009, 2010 LSST Corporation.
-# 
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -11,14 +11,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
@@ -37,40 +37,40 @@ display = True
 verbosity = 5
 pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
 
-defDataDir   = lsst.utils.getPackageDir('afwdata')
+defDataDir = lsst.utils.getPackageDir('afwdata')
 imageProcDir = lsst.utils.getPackageDir('ip_diffim')
 
 if len(sys.argv) == 1:
     defTemplatePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2_tmpl")
-    defSciencePath  = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2")
+    defSciencePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2")
     templateMaskedImage = afwImage.MaskedImageF(defTemplatePath)
-    scienceMaskedImage  = afwImage.MaskedImageF(defSciencePath)
+    scienceMaskedImage = afwImage.MaskedImageF(defSciencePath)
     bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(512, 512))
     templateMaskedImage = afwImage.MaskedImageF(templateMaskedImage, bbox, afwImage.LOCAL)
-    scienceMaskedImage  = afwImage.MaskedImageF(scienceMaskedImage, bbox, afwImage.LOCAL)
-    
+    scienceMaskedImage = afwImage.MaskedImageF(scienceMaskedImage, bbox, afwImage.LOCAL)
+
 elif len(sys.argv) == 3:
     defTemplatePath = sys.argv[1]
-    defSciencePath  = sys.argv[2]
+    defSciencePath = sys.argv[2]
     templateMaskedImage = afwImage.MaskedImageF(defTemplatePath)
-    scienceMaskedImage  = afwImage.MaskedImageF(defSciencePath)
+    scienceMaskedImage = afwImage.MaskedImageF(defSciencePath)
 else:
     sys.exit(1)
-    
 
-configAL    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+
+configAL = ipDiffim.ImagePsfMatchTask.ConfigClass()
 configAL.kernel.name = "AL"
 subconfigAL = configAL.kernel.active
 
-configDF    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+configDF = ipDiffim.ImagePsfMatchTask.ConfigClass()
 configDF.kernel.name = "DF"
 subconfigDF = configDF.kernel.active
 
-configDFr    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+configDFr = ipDiffim.ImagePsfMatchTask.ConfigClass()
 configDFr.kernel.name = "DF"
 subconfigDFr = configDFr.kernel.active
 
-subconfigDF.useRegularization  = False
+subconfigDF.useRegularization = False
 subconfigDFr.useRegularization = True
 
 for param in [["spatialKernelOrder", 0],
@@ -88,29 +88,29 @@ footprints = kcDetect.getFootprints()
 
 # delta function
 psfmatch1 = ipDiffim.ImagePsfMatchTask(config=configDF)
-results1  = psfmatch1.run(templateMaskedImage, scienceMaskedImage, 
-                          "subtractMaskedImages", candidateList = footprints)
-diffim1        = results1.subtractedImage
+results1 = psfmatch1.run(templateMaskedImage, scienceMaskedImage,
+                         "subtractMaskedImages", candidateList=footprints)
+diffim1 = results1.subtractedImage
 spatialKernel1 = results1.psfMatchingKernel
-spatialBg1     = results1.backgroundModel
+spatialBg1 = results1.backgroundModel
 kernelCellSet1 = results1.kernelCellSet
 
 # alard lupton
 psfmatch2 = ipDiffim.ImagePsfMatchTask(config=configAL)
-results2  = psfmatch2.run(templateMaskedImage, scienceMaskedImage, 
-                          "subtractMaskedImages", candidateList = footprints)
-diffim2        = results2.subtractedImage
+results2 = psfmatch2.run(templateMaskedImage, scienceMaskedImage,
+                         "subtractMaskedImages", candidateList=footprints)
+diffim2 = results2.subtractedImage
 spatialKernel2 = results2.psfMatchingKernel
-spatialBg2     = results2.backgroundModel
+spatialBg2 = results2.backgroundModel
 kernelCellSet2 = results2.kernelCellSet
 
 # regularized delta function
 psfmatch3 = ipDiffim.ImagePsfMatchTask(config=configDFr)
-results3  = psfmatch3.run(templateMaskedImage, scienceMaskedImage, 
-                          "subtractMaskedImages", candidateList = footprints)
-diffim3        = results3.subtractedImage
+results3 = psfmatch3.run(templateMaskedImage, scienceMaskedImage,
+                         "subtractMaskedImages", candidateList=footprints)
+diffim3 = results3.subtractedImage
 spatialKernel3 = results3.psfMatchingKernel
-spatialBg3     = results3.backgroundModel
+spatialBg3 = results3.backgroundModel
 kernelCellSet3 = results3.kernelCellSet
 
 
@@ -121,23 +121,22 @@ basisList3 = spatialKernel3.getKernelList()
 frame = 1
 for idx in range(min(5, len(basisList1))):
     kernel = basisList1[idx]
-    im     = afwImage.ImageD(spatialKernel1.getDimensions())
-    ksum   = kernel.computeImage(im, False)    
+    im = afwImage.ImageD(spatialKernel1.getDimensions())
+    ksum = kernel.computeImage(im, False)
     ds9.mtv(im, frame=frame)
     frame += 1
 
 for idx in range(min(5, len(basisList2))):
     kernel = basisList2[idx]
-    im     = afwImage.ImageD(spatialKernel2.getDimensions())
-    ksum   = kernel.computeImage(im, False)    
+    im = afwImage.ImageD(spatialKernel2.getDimensions())
+    ksum = kernel.computeImage(im, False)
     ds9.mtv(im, frame=frame)
     frame += 1
 
 
 for idx in range(min(5, len(basisList3))):
     kernel = basisList3[idx]
-    im     = afwImage.ImageD(spatialKernel3.getDimensions())
-    ksum   = kernel.computeImage(im, False)    
+    im = afwImage.ImageD(spatialKernel3.getDimensions())
+    ksum = kernel.computeImage(im, False)
     ds9.mtv(im, frame=frame)
     frame += 1
-

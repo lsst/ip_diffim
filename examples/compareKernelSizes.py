@@ -8,13 +8,14 @@ from lsst.pipe.tasks.imageDifference import ImageDifferenceTask
 # the kernel size.
 
 # Run like a Task, as in:
-# compareKernelSizes.py . --id visit=865833781 raft=2,2 sensor=1,1 --configfile imageDifferenceConfig.py --output=tmplsstdiff 
+# compareKernelSizes.py . --id visit=865833781 raft=2,2 sensor=1,1
+# --configfile imageDifferenceConfig.py --output=tmplsstdiff
 
 kSizes = np.arange(13, 33, 2)
 gSizes = np.arange(2, 5, 0.25)
 
-kSums  = []
-cNums  = []
+kSums = []
+cNums = []
 
 for kSize in kSizes:
     for gSize in gSizes:
@@ -32,8 +33,10 @@ for kSize in kSizes:
 
         ## Hack around the lack of metadata being returned in cmdLineTask
         tmp = ImageDifferenceTask()
-        parsedCmd = tmp._makeArgumentParser().parse_args(config=tmp.ConfigClass(), args=task_args, log=tmp.log, override=tmp.applyOverrides)
-        task = ImageDifferenceTask(name = ImageDifferenceTask._DefaultName, config=parsedCmd.config, log=parsedCmd.log)
+        parsedCmd = tmp._makeArgumentParser().parse_args(config=tmp.ConfigClass(), args=task_args,
+                                                         log=tmp.log, override=tmp.applyOverrides)
+        task = ImageDifferenceTask(name=ImageDifferenceTask._DefaultName,
+                                   config=parsedCmd.config, log=parsedCmd.log)
         results = task.run(parsedCmd.dataRefList[0])
 
         try:
@@ -45,18 +48,19 @@ for kSize in kSizes:
         else:
             kSums.append(kSum)
             cNums.append(cNum)
-        
+
 fig = plt.figure()
 data = np.array(kSums).reshape(len(kSizes), len(gSizes)).T
 ymin = kSizes.min()
 ymax = kSizes.max()
 xmin = gSizes.min()
 xmax = gSizes.max()
-im1 = plt.imshow(data, origin='lower', cmap=plt.cm.jet, extent=[ymin, ymax, xmin, xmax], interpolation="nearest", aspect="auto")
+im1 = plt.imshow(data, origin='lower', cmap=plt.cm.jet, extent=[
+                 ymin, ymax, xmin, xmax], interpolation="nearest", aspect="auto")
 plt.title("Kernel Sum")
 plt.xlabel("Kernel Size")
 plt.ylabel("Stamp Grow")
-plt.colorbar(im1, ax = fig.gca(), orientation="horizontal")
+plt.colorbar(im1, ax=fig.gca(), orientation="horizontal")
 
 fig = plt.figure()
 data = np.array(np.log10(cNums)).reshape(len(kSizes), len(gSizes)).T
@@ -64,10 +68,11 @@ ymin = kSizes.min()
 ymax = kSizes.max()
 xmin = gSizes.min()
 xmax = gSizes.max()
-im2 = plt.imshow(data, origin='lower', cmap=plt.cm.jet, extent=[ymin, ymax, xmin, xmax], interpolation="nearest", aspect="auto")
+im2 = plt.imshow(data, origin='lower', cmap=plt.cm.jet, extent=[
+                 ymin, ymax, xmin, xmax], interpolation="nearest", aspect="auto")
 plt.title("log10(Condition Number)")
 plt.xlabel("Kernel Size")
 plt.ylabel("Stamp Grow")
-plt.colorbar(im2, ax = fig.gca(), orientation="horizontal")
+plt.colorbar(im2, ax=fig.gca(), orientation="horizontal")
 
 plt.show()

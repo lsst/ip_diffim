@@ -6,23 +6,24 @@ import lsst.ip.diffim as ipDiffim
 import lsst.daf.base as dafBase
 from lsst.pex.logging import Log
 
+
 def main():
     usage = """runWarpExposure.py refExposure towarpExposure outputExposure"""
     parser = optparse.OptionParser(usage)
     (options, args) = parser.parse_args()
-    
+
     def getArg(ind):
         if ind < len(args):
             return args[ind]
-    
-    refWcsPath  = getArg(0)
-    toWarpPath  = getArg(1)
-    warpedPath  = getArg(2)
+
+    refWcsPath = getArg(0)
+    toWarpPath = getArg(1)
+    warpedPath = getArg(2)
 
     if refWcsPath == None or toWarpPath == None or warpedPath == None:
         parser.print_help()
         sys.exit(1)
-         
+
     print 'Reference exposure: ', refWcsPath
     print 'Exposure to be warped: ', toWarpPath
     print 'Output exposure:  ', warpedPath
@@ -33,11 +34,12 @@ def main():
     config = ipDiffim.ImagePsfMatchTask.ConfigClass()
     subconfig = config.kernel.active
     warper = afwMath.Warper.fromConfig(subconfig.warpingConfig)
-    warpedExposure = warper.warpExposure(refWcsExposure.getWcs(), 
+    warpedExposure = warper.warpExposure(refWcsExposure.getWcs(),
                                          toWarpExposure,
-                                         destBBox = refWcsExposure.getBBox())
+                                         destBBox=refWcsExposure.getBBox())
     warpedExposure.writeFits(warpedPath)
-    
+
+
 def run():
     Log.getDefaultLog()
     memId0 = dafBase.Citizen_getNextMemId()

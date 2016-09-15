@@ -25,30 +25,31 @@ writefits = False
 
 CFHTTORUN = 'cal-53535-i-797722_1'
 
+
 class DiffimTestCases(unittest.TestCase):
-    
+
     # D = I - (K.x.T + bg)
     def setUp(self, CFHT=True):
         lambdaValue = 1.0
 
-        self.config1    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config1 = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config1.kernel.name = "DF"
         self.subconfig1 = self.config1.kernel.active
 
-        self.config2    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config2 = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config2.kernel.name = "DF"
         self.subconfig2 = self.config2.kernel.active
 
-        self.config3    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config3 = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config3.kernel.name = "DF"
         self.subconfig3 = self.config3.kernel.active
 
-        self.config4    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.config4 = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.config4.kernel.name = "DF"
         self.subconfig4 = self.config4.kernel.active
 
         self.subconfig1.useRegularization = False
-        
+
         self.subconfig2.useRegularization = True
         self.subconfig2.lambdaType = "absolute"
         self.subconfig2.lambdaValue = lambdaValue
@@ -67,55 +68,56 @@ class DiffimTestCases(unittest.TestCase):
         self.subconfig4.regularizationType = "forwardDifference"
         self.subconfig4.forwardRegularizationOrders = [1, 2]
 
-        
-
         self.kList1 = ipDiffim.makeKernelBasisList(self.subconfig1)
-        self.bskv1  = ipDiffim.BuildSingleKernelVisitorF(self.kList1, pexConfig.makePolicy(self.subconfig1))
+        self.bskv1 = ipDiffim.BuildSingleKernelVisitorF(self.kList1, pexConfig.makePolicy(self.subconfig1))
 
         self.kList2 = ipDiffim.makeKernelBasisList(self.subconfig2)
-        self.hMat2  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig2))
-        self.bskv2  = ipDiffim.BuildSingleKernelVisitorF(self.kList2, pexConfig.makePolicy(self.subconfig2), self.hMat2)
+        self.hMat2 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig2))
+        self.bskv2 = ipDiffim.BuildSingleKernelVisitorF(
+            self.kList2, pexConfig.makePolicy(self.subconfig2), self.hMat2)
 
         self.kList3 = ipDiffim.makeKernelBasisList(self.subconfig3)
-        self.hMat3  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig3))
-        self.bskv3  = ipDiffim.BuildSingleKernelVisitorF(self.kList3, pexConfig.makePolicy(self.subconfig3), self.hMat3)
+        self.hMat3 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig3))
+        self.bskv3 = ipDiffim.BuildSingleKernelVisitorF(
+            self.kList3, pexConfig.makePolicy(self.subconfig3), self.hMat3)
 
         self.kList4 = ipDiffim.makeKernelBasisList(self.subconfig4)
-        self.hMat4  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig4))
-        self.bskv4  = ipDiffim.BuildSingleKernelVisitorF(self.kList4, pexConfig.makePolicy(self.subconfig4), self.hMat4)
+        self.hMat4 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig4))
+        self.bskv4 = ipDiffim.BuildSingleKernelVisitorF(
+            self.kList4, pexConfig.makePolicy(self.subconfig4), self.hMat4)
 
         # known input images
         defDataDir = lsst.utils.getPackageDir('afwdata')
         if CFHT:
-            defSciencePath  = os.path.join(defDataDir, 'CFHT', 'D4', CFHTTORUN)
+            defSciencePath = os.path.join(defDataDir, 'CFHT', 'D4', CFHTTORUN)
             defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', CFHTTORUN+'_tmpl')
 
             # no need to remap
-            self.scienceExposure   = afwImage.ExposureF(defSciencePath)
-            self.templateExposure  = afwImage.ExposureF(defTemplatePath)
+            self.scienceExposure = afwImage.ExposureF(defSciencePath)
+            self.templateExposure = afwImage.ExposureF(defTemplatePath)
         else:
             defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a00.sci")
             defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
                                            "v5-e0-c011-a00.sci")
-            
-            self.scienceExposure   = afwImage.ExposureF(defSciencePath)
-            self.templateExposure  = afwImage.ExposureF(defTemplatePath)
+
+            self.scienceExposure = afwImage.ExposureF(defSciencePath)
+            self.templateExposure = afwImage.ExposureF(defTemplatePath)
             warper = afwMath.Warper.fromConfig(self.subconfig1.warpingConfig)
             self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
-                                                        destBBox = self.scienceExposure.getBBox())
+                                                        destBBox=self.scienceExposure.getBBox())
 
         diffimTools.backgroundSubtract(self.subconfig1.afwBackgroundConfig,
                                        [self.scienceExposure.getMaskedImage(),
                                         self.templateExposure.getMaskedImage()])
 
         # image statistics
-        self.dStats  = ipDiffim.ImageStatisticsF()
+        self.dStats = ipDiffim.ImageStatisticsF()
 
         #
         tmi = self.templateExposure.getMaskedImage()
         smi = self.scienceExposure.getMaskedImage()
-        
+
         detConfig = self.subconfig1.detectionConfig
         detPolicy = pexConfig.makePolicy(detConfig)
         detPolicy.set("detThreshold", 50.)
@@ -123,7 +125,7 @@ class DiffimTestCases(unittest.TestCase):
         kcDetect = ipDiffim.KernelCandidateDetectionF(detPolicy)
         kcDetect.apply(tmi, smi)
         self.footprints = kcDetect.getFootprints()
-        
+
     def tearDown(self):
         del self.subconfig1
         del self.subconfig2
@@ -142,43 +144,43 @@ class DiffimTestCases(unittest.TestCase):
         del self.templateExposure
 
     def apply(self, policy, visitor, xloc, yloc, tmi, smi):
-        kc     = ipDiffim.makeKernelCandidate(xloc, yloc, tmi, smi, policy)
+        kc = ipDiffim.makeKernelCandidate(xloc, yloc, tmi, smi, policy)
         visitor.processCandidate(kc)
-        kim    = kc.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
+        kim = kc.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
         diffIm = kc.getDifferenceImage(ipDiffim.KernelCandidateF.RECENT)
-        kSum   = kc.getKsum(ipDiffim.KernelCandidateF.RECENT)
-        bg     = kc.getBackground(ipDiffim.KernelCandidateF.RECENT)
+        kSum = kc.getKsum(ipDiffim.KernelCandidateF.RECENT)
+        bg = kc.getBackground(ipDiffim.KernelCandidateF.RECENT)
 
         bbox = kc.getKernel(ipDiffim.KernelCandidateF.RECENT).shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
         diffIm = afwImage.MaskedImageF(diffIm, bbox, afwImage.LOCAL)
         self.dStats.apply(diffIm)
-        
-        dmean = afwMath.makeStatistics(diffIm.getImage(),    afwMath.MEAN).getValue()
-        dstd  = afwMath.makeStatistics(diffIm.getImage(),    afwMath.STDEV).getValue()
+
+        dmean = afwMath.makeStatistics(diffIm.getImage(), afwMath.MEAN).getValue()
+        dstd = afwMath.makeStatistics(diffIm.getImage(), afwMath.STDEV).getValue()
         vmean = afwMath.makeStatistics(diffIm.getVariance(), afwMath.MEAN).getValue()
         return kSum, bg, dmean, dstd, vmean, kim, diffIm, kc
-        
+
     def applyVisitor(self, invert=False, xloc=397, yloc=580):
         print '# %.2f %.2f' % (xloc, yloc)
         #if xloc != 1312 and yloc != 160:
         #    return
-        
+
         imsize = int(3 * self.subconfig1.kernelSize)
 
         # chop out a region around a known object
         bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize/2,
                                              yloc - imsize/2),
                              afwGeom.Point2I(xloc + imsize/2,
-                                             yloc + imsize/2) )
+                                             yloc + imsize/2))
 
         # sometimes the box goes off the image; no big deal...
         try:
             if invert:
-                tmi  = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
-                smi  = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                tmi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                smi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
             else:
-                smi  = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
-                tmi  = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                smi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                tmi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
         except Exception:
             return None
 
@@ -220,7 +222,6 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut2.writeFits('k2.fits')
             diffIm2.writeFits('d2')
 
-
         # regularized delta function kernel
         logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFrC9 run')
         results3 = self.apply(pexConfig.makePolicy(self.subconfig3), self.bskv3, xloc, yloc, tmi, smi)
@@ -257,18 +258,18 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut2.writeFits('k4.fits')
             diffIm2.writeFits('d4')
 
-
         raw_input('Next: ')
 
     def testFunctor(self):
         for fp in self.footprints:
             # note this returns the kernel images
-            self.applyVisitor(invert=False, 
-                              xloc= int(0.5 * ( fp.getBBox().getMinX() + fp.getBBox().getMaxX() )),
-                              yloc= int(0.5 * ( fp.getBBox().getMinY() + fp.getBBox().getMaxY() )))
-       
+            self.applyVisitor(invert=False,
+                              xloc=int(0.5 * (fp.getBBox().getMinX() + fp.getBBox().getMaxX())),
+                              yloc=int(0.5 * (fp.getBBox().getMinY() + fp.getBBox().getMaxY())))
+
 #####
-        
+
+
 def suite():
     """Returns a suite containing all the test cases in this module."""
     tests.init()
@@ -277,6 +278,7 @@ def suite():
     suites += unittest.makeSuite(DiffimTestCases)
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
+
 
 def run(doExit=False):
     """Run the tests"""

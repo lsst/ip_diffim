@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-# 
+#
 # LSST Data Management System
 # Copyright 2008, 2009, 2010 LSST Corporation.
-# 
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -11,14 +11,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
@@ -49,69 +49,69 @@ constantVarianceWeighting = True
 defSciencePath = None
 defTemplatePath = None
 
+
 class DiffimTestCases(unittest.TestCase):
     # D = I - (K.x.T + bg)
+
     def setUp(self):
-        self.configAL    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.configAL = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configAL.kernel.name = "AL"
         self.subconfigAL = self.configAL.kernel.active
 
-        self.configDF    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.configDF = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configDF.kernel.name = "DF"
         self.subconfigDF = self.configDF.kernel.active
 
-        self.configDFr    = ipDiffim.ImagePsfMatchTask.ConfigClass()
+        self.configDFr = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.configDFr.kernel.name = "DF"
         self.subconfigDFr = self.configDFr.kernel.active
 
-        self.subconfigDF.useRegularization  = False
+        self.subconfigDF.useRegularization = False
         self.subconfigDFr.useRegularization = True
-        self.subconfigDFr.lambdaValue       = 1000.0
+        self.subconfigDFr.lambdaValue = 1000.0
 
-        self.subconfigAL.fitForBackground  = fitForBackground
-        self.subconfigDF.fitForBackground  = fitForBackground
+        self.subconfigAL.fitForBackground = fitForBackground
+        self.subconfigDF.fitForBackground = fitForBackground
         self.subconfigDFr.fitForBackground = fitForBackground
 
-        self.subconfigAL.constantVarianceWeighting  = constantVarianceWeighting
-        self.subconfigDF.constantVarianceWeighting  = constantVarianceWeighting 
+        self.subconfigAL.constantVarianceWeighting = constantVarianceWeighting
+        self.subconfigDF.constantVarianceWeighting = constantVarianceWeighting
         self.subconfigDFr.constantVarianceWeighting = constantVarianceWeighting
 
-        self.kListAL  = ipDiffim.makeKernelBasisList(self.subconfigAL)
-        self.kListDF  = ipDiffim.makeKernelBasisList(self.subconfigDF)
+        self.kListAL = ipDiffim.makeKernelBasisList(self.subconfigAL)
+        self.kListDF = ipDiffim.makeKernelBasisList(self.subconfigDF)
         self.kListDFr = ipDiffim.makeKernelBasisList(self.subconfigDFr)
-        self.hMatDFr  = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfigDFr))
+        self.hMatDFr = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfigDFr))
 
-        self.bskvAL  = ipDiffim.BuildSingleKernelVisitorF(self.kListAL, pexConfig.makePolicy(self.subconfigAL))
-        self.bskvDF  = ipDiffim.BuildSingleKernelVisitorF(self.kListDF, pexConfig.makePolicy(self.subconfigDF))
-        self.bskvDFr = ipDiffim.BuildSingleKernelVisitorF(self.kListDFr,  pexConfig.makePolicy(self.subconfigDF), 
-                                                          self.hMatDFr) 
+        self.bskvAL = ipDiffim.BuildSingleKernelVisitorF(self.kListAL, pexConfig.makePolicy(self.subconfigAL))
+        self.bskvDF = ipDiffim.BuildSingleKernelVisitorF(self.kListDF, pexConfig.makePolicy(self.subconfigDF))
+        self.bskvDFr = ipDiffim.BuildSingleKernelVisitorF(self.kListDFr, pexConfig.makePolicy(self.subconfigDF),
+                                                          self.hMatDFr)
 
         defSciencePath = globals()['defSciencePath']
         defTemplatePath = globals()['defTemplatePath']
         if defSciencePath and defTemplatePath:
-            self.scienceExposure   = afwImage.ExposureF(defSciencePath)
-            self.templateExposure  = afwImage.ExposureF(defTemplatePath)
+            self.scienceExposure = afwImage.ExposureF(defSciencePath)
+            self.templateExposure = afwImage.ExposureF(defTemplatePath)
         else:
             defDataDir = lsst.utils.getPackageDir('afwdata')
             defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
                                           "v26-e0-c011-a00.sci")
             defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
                                            "v5-e0-c011-a00.sci")
-            
-            self.scienceExposure   = afwImage.ExposureF(defSciencePath)
-            self.templateExposure  = afwImage.ExposureF(defTemplatePath)
+
+            self.scienceExposure = afwImage.ExposureF(defSciencePath)
+            self.templateExposure = afwImage.ExposureF(defTemplatePath)
             warper = afwMath.Warper.fromConfig(self.subconfigAL.warpingConfig)
             self.templateExposure = warper.warpExposure(self.scienceExposure.getWcs(), self.templateExposure,
-                                                        destBBox = self.scienceExposure.getBBox())
-
+                                                        destBBox=self.scienceExposure.getBBox())
 
         # image statistics
-        self.dStats  = ipDiffim.ImageStatisticsF()
+        self.dStats = ipDiffim.ImageStatisticsF()
 
         #
         tmi = self.templateExposure.getMaskedImage()
         smi = self.scienceExposure.getMaskedImage()
-
 
         # Object detection
         detConfig = self.subconfigAL.detectionConfig
@@ -123,7 +123,6 @@ class DiffimTestCases(unittest.TestCase):
         kcDetect.apply(tmi, smi)
         self.footprints = kcDetect.getFootprints()
 
-        
     def tearDown(self):
         del self.kListAL
         del self.kListDF
@@ -137,22 +136,22 @@ class DiffimTestCases(unittest.TestCase):
         del self.footprints
 
     def apply(self, policy, visitor, xloc, yloc, tmi, smi):
-        kc     = ipDiffim.makeKernelCandidate(xloc, yloc, tmi, smi, policy)
+        kc = ipDiffim.makeKernelCandidate(xloc, yloc, tmi, smi, policy)
         visitor.processCandidate(kc)
-        kim    = kc.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
+        kim = kc.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
         diffIm = kc.getDifferenceImage(ipDiffim.KernelCandidateF.RECENT)
-        kSum   = kc.getKsum(ipDiffim.KernelCandidateF.RECENT)
-        bg     = kc.getBackground(ipDiffim.KernelCandidateF.RECENT)
+        kSum = kc.getKsum(ipDiffim.KernelCandidateF.RECENT)
+        bg = kc.getBackground(ipDiffim.KernelCandidateF.RECENT)
 
         bbox = kc.getKernel(ipDiffim.KernelCandidateF.RECENT).shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
         diffIm = afwImage.MaskedImageF(diffIm, bbox, afwImage.LOCAL)
         self.dStats.apply(diffIm)
-        
-        dmean = afwMath.makeStatistics(diffIm.getImage(),    afwMath.MEAN).getValue()
-        dstd  = afwMath.makeStatistics(diffIm.getImage(),    afwMath.STDEV).getValue()
+
+        dmean = afwMath.makeStatistics(diffIm.getImage(), afwMath.MEAN).getValue()
+        dstd = afwMath.makeStatistics(diffIm.getImage(), afwMath.STDEV).getValue()
         vmean = afwMath.makeStatistics(diffIm.getVariance(), afwMath.MEAN).getValue()
         return kSum, bg, dmean, dstd, vmean, kim, diffIm, kc
-        
+
     def applyVisitor(self, invert=False, xloc=397, yloc=580):
         print '# %.2f %.2f' % (xloc, yloc)
 
@@ -162,16 +161,16 @@ class DiffimTestCases(unittest.TestCase):
         bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize/2,
                                              yloc - imsize/2),
                              afwGeom.Point2I(xloc + imsize/2,
-                                             yloc + imsize/2) )
+                                             yloc + imsize/2))
 
         # sometimes the box goes off the image; no big deal...
         try:
             if invert:
-                tmi  = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
-                smi  = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                tmi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                smi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
             else:
-                smi  = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
-                tmi  = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                smi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                tmi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
         except Exception:
             return None
 
@@ -255,12 +254,13 @@ class DiffimTestCases(unittest.TestCase):
     def testFunctor(self):
         for fp in self.footprints:
             # note this returns the kernel images
-            self.applyVisitor(invert=False, 
-                              xloc= int(0.5 * ( fp.getBBox().getMinX() + fp.getBBox().getMaxX() )),
-                              yloc= int(0.5 * ( fp.getBBox().getMinY() + fp.getBBox().getMaxY() )))
-       
+            self.applyVisitor(invert=False,
+                              xloc=int(0.5 * (fp.getBBox().getMinX() + fp.getBBox().getMaxX())),
+                              yloc=int(0.5 * (fp.getBBox().getMinY() + fp.getBBox().getMaxY())))
+
 #####
-        
+
+
 def suite():
     """Returns a suite containing all the test cases in this module."""
     tests.init()
@@ -269,6 +269,7 @@ def suite():
     suites += unittest.makeSuite(DiffimTestCases)
     suites += unittest.makeSuite(tests.MemoryTestCase)
     return unittest.TestSuite(suites)
+
 
 def run(doExit=False):
     """Run the tests"""
@@ -288,5 +289,5 @@ if __name__ == "__main__":
     if opt.defTemplatePath and opt.defSciencePath:
         defTemplatePath = opt.defTemplatePath
         defSciencePath = opt.defSciencePath
-        
+
     run(True)

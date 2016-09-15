@@ -30,16 +30,17 @@ import lsst.afw.image as afwImage
 __all__ = ["GetCoaddAsTemplateTask", "GetCoaddAsTemplateConfig",
            "GetCalexpAsTemplateTask", "GetCalexpAsTemplateConfig"]
 
+
 class GetCoaddAsTemplateConfig(pexConfig.Config):
     templateBorderSize = pexConfig.Field(
-        dtype = int,
-        default = 10,
-        doc = "Number of pixels to grow the requested template image to account for warping"
-        )
+        dtype=int,
+        default=10,
+        doc="Number of pixels to grow the requested template image to account for warping"
+    )
     coaddName = pexConfig.Field(
-        doc = "coadd name: typically one of deep or goodSeeing",
-        dtype = str,
-        default = "deep",
+        doc="coadd name: typically one of deep or goodSeeing",
+        dtype=str,
+        default="deep",
     )
 
 
@@ -129,8 +130,8 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
         coaddExposure.setPsf(coaddPsf)
         coaddExposure.setFilter(coaddFilter)
-        return pipeBase.Struct(exposure = coaddExposure,
-                               sources = None)
+        return pipeBase.Struct(exposure=coaddExposure,
+                               sources=None)
 
 
 class GetCalexpAsTemplateConfig(pexConfig.Config):
@@ -138,7 +139,7 @@ class GetCalexpAsTemplateConfig(pexConfig.Config):
         dtype=bool,
         default=True,
         doc="Add background to calexp before processing it."
-        )
+    )
 
 
 class GetCalexpAsTemplateTask(pipeBase.Task):
@@ -191,5 +192,5 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
             raise pipeBase.TaskError("Template has no psf")
 
         templateSources = butler.get(datasetType="src", dataId=templateId)
-        return pipeBase.Struct(exposure = template,
-                               sources = templateSources)
+        return pipeBase.Struct(exposure=template,
+                               sources=templateSources)

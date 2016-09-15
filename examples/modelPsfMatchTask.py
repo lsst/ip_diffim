@@ -32,13 +32,16 @@ import lsst.daf.base as dafBase
 import lsst.meas.algorithms as measAlg
 from lsst.ip.diffim import ModelPsfMatchTask
 
+
 class MyModelPsfMatchTask(ModelPsfMatchTask):
     """An override for ModelPsfMatchTask"""
+
     def __init__(self, *args, **kwargs):
-    	ModelPsfMatchTask.__init__(self, *args, **kwargs)
+        ModelPsfMatchTask.__init__(self, *args, **kwargs)
 
     def run(self, templateExp, scienceExp):
         return ModelPsfMatchTask.run(self, scienceExp, templateExp.getPsf())
+
 
 def createImageAndKernel(sigma, psfSize, image):
     function = afwMath.GaussianFunction2D(sigma, sigma)
@@ -50,10 +53,11 @@ def createImageAndKernel(sigma, psfSize, image):
 
     # Trim off the border pixels
     bbox = kernel.shrinkBBox(cim.getBBox(afwImage.LOCAL))
-    cim  = afwImage.ImageF(cim, bbox, afwImage.LOCAL)    
-    cim.setXY0(0,0)
+    cim = afwImage.ImageF(cim, bbox, afwImage.LOCAL)
+    cim.setXY0(0, 0)
 
     return cim, psf
+
 
 def generateFakeData():
     cellSize = 128
@@ -67,11 +71,11 @@ def generateFakeData():
     for x in range(nCell):
         for y in range(nCell):
             templateIm.set(x * cellSize + cellSize // 2 + border - 1,
-                y * cellSize + cellSize // 2 + border - 1,
-                counts)
+                           y * cellSize + cellSize // 2 + border - 1,
+                           counts)
             scienceIm.set(x * cellSize + cellSize // 2 + border - 1,
-                y * cellSize + cellSize // 2 + border - 1,
-                counts)
+                          y * cellSize + cellSize // 2 + border - 1,
+                          counts)
 
     templateImage, templatePsf = createImageAndKernel(3.0, psfSize, templateIm)
     scienceImage, sciencePsf = createImageAndKernel(2.0, psfSize, scienceIm)
@@ -85,6 +89,7 @@ def generateFakeData():
     # Note here that the template image contains a reference Psf, that the science image gets matched to.
     return templateExp, scienceExp
 
+
 def run(args):
     #
     # Create the Config and use sum of gaussian basis
@@ -94,27 +99,27 @@ def run(args):
 
     # Run the requested method of the Task
     if args.template is not None and args.science is not None:
-    	if not os.path.isfile(args.template):
-    		raise Exception, "Template image %s does not exist" % (args.template)
-    	if not os.path.isfile(args.science):
-    		raise Exception, "Science image %s does not exist" % (args.science)
+        if not os.path.isfile(args.template):
+            raise Exception, "Template image %s does not exist" % (args.template)
+        if not os.path.isfile(args.science):
+            raise Exception, "Science image %s does not exist" % (args.science)
 
-    	try:
-    		templateExp = afwImage.ExposureF(args.template)
-    	except pexExcept.LsstCppException, e:
-    		raise Exception, "Cannot read template image %s" % (args.template)
-    	try:
-    		scienceExp = afwImage.ExposureF(args.science)
-    	except pexExcept.LsstCppException, e:
-    		raise Exception, "Cannot read science image %s" % (args.science)
+        try:
+            templateExp = afwImage.ExposureF(args.template)
+        except pexExcept.LsstCppException, e:
+            raise Exception, "Cannot read template image %s" % (args.template)
+        try:
+            scienceExp = afwImage.ExposureF(args.science)
+        except pexExcept.LsstCppException, e:
+            raise Exception, "Cannot read science image %s" % (args.science)
     else:
-    	templateExp, scienceExp = generateFakeData()
-    	config.kernel.active.sizeCellX = 128
-    	config.kernel.active.sizeCellY = 128
+        templateExp, scienceExp = generateFakeData()
+        config.kernel.active.sizeCellX = 128
+        config.kernel.active.sizeCellY = 128
 
     if args.debug:
-    	ds9.mtv(templateExp, frame=1, title="Example script: Input Template")
-    	ds9.mtv(scienceExp, frame=2, title="Example script: Input Science Image")
+        ds9.mtv(templateExp, frame=1, title="Example script: Input Template")
+        ds9.mtv(scienceExp, frame=2, title="Example script: Input Science Image")
 
     # Create the Task
     psfMatchTask = MyModelPsfMatchTask(config=config)
@@ -123,12 +128,12 @@ def run(args):
     result = psfMatchTask.run(templateExp, scienceExp)
 
     if args.debug:
-    	# See if the LSST debug has incremented the frame number; if not start with frame 3
-    	try:
-    		frame = debug.lsstDebug.frame+1
-    	except Exception:
-    		frame = 3
-    	ds9.mtv(result.psfMatchedExposure, frame=frame, title="Example script: Matched Science Image")
+        # See if the LSST debug has incremented the frame number; if not start with frame 3
+        try:
+            frame = debug.lsstDebug.frame+1
+        except Exception:
+            frame = 3
+        ds9.mtv(result.psfMatchedExposure, frame=frame, title="Example script: Matched Science Image")
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 

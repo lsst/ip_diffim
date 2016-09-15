@@ -14,17 +14,18 @@ import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 
+
 def main():
     defDataDir = lsst.utils.getPackageDir('afwdata')
     imageProcDir = lsst.utils.getPackageDir('ip_diffim')
 
-    defSciencePath  = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0", "v26-e0-c011-a10.sci")
+    defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0", "v26-e0-c011-a10.sci")
     defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0", "v5-e0-c011-a10.sci")
 
-    defOutputPath   = 'diffExposure.fits'
-    defVerbosity    = 5
-    defFwhm         = 3.5
-    sigma2fwhm      = 2. * num.sqrt(2. * num.log(2.))
+    defOutputPath = 'diffExposure.fits'
+    defVerbosity = 5
+    defFwhm = 3.5
+    sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
     usage = """usage: %%prog [options] [scienceExposure [templateExposure [outputExposure]]]]
 
@@ -37,7 +38,7 @@ Notes:
 - default templateExposure=%s
 - default outputExposure=%s 
 """ % (defSciencePath, defTemplatePath, defOutputPath)
-    
+
     parser = optparse.OptionParser(usage)
     parser.add_option('-v', '--verbosity', type=int, default=defVerbosity,
                       help='verbosity of Trace messages')
@@ -51,16 +52,16 @@ Notes:
                       help='Template Image Psf Fwhm (pixel)')
 
     (options, args) = parser.parse_args()
-    
+
     def getArg(ind, defValue):
         if ind < len(args):
             return args[ind]
         return defValue
-    
-    sciencePath     = getArg(0, defSciencePath)
-    templatePath    = getArg(1, defTemplatePath)
-    outputPath      = getArg(2, defOutputPath)
-    
+
+    sciencePath = getArg(0, defSciencePath)
+    templatePath = getArg(1, defTemplatePath)
+    outputPath = getArg(2, defOutputPath)
+
     if sciencePath == None or templatePath == None:
         parser.print_help()
         sys.exit(1)
@@ -70,8 +71,8 @@ Notes:
     print 'Output exposure:  ', outputPath
 
     templateExposure = afwImage.ExposureF(templatePath)
-    scienceExposure  = afwImage.ExposureF(sciencePath)
-    
+    scienceExposure = afwImage.ExposureF(sciencePath)
+
     config = ipDiffim.ImagePsfMatchTask.ConfigClass()
     config.kernel.name = "AL"
     subconfig = config.kernel.active
@@ -113,7 +114,7 @@ Notes:
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
     ####
-        
+
     if bgSub:
         diffimTools.backgroundSubtract(subconfig.afwBackgroundConfig,
                                        [templateExposure.getMaskedImage(),
@@ -123,20 +124,21 @@ Notes:
             print 'NOTE: no background subtraction at all is requested'
 
     psfmatch = ipDiffim.ImagePsfMatchTask(config)
-    results  = psfmatch.run(templateExposure, scienceExposure, "subtractExposures",
-                            templateFwhmPix = fwhmT, scienceFwhmPix = fwhmS)
+    results = psfmatch.run(templateExposure, scienceExposure, "subtractExposures",
+                           templateFwhmPix=fwhmT, scienceFwhmPix=fwhmS)
 
     differenceExposure = results.subtractedImage
     differenceExposure.writeFits(outputPath)
 
     if False:
         psfMatchingKernel = results.psfMatchingKernel
-        backgroundModel   = results.backgroundModel
-        kernelCellSet     = results.kernelCellSet
-        
+        backgroundModel = results.backgroundModel
+        kernelCellSet = results.kernelCellSet
+
         diffimTools.writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel,
                                        re.sub('.fits', '', outputPath))
-        
+
+
 def run():
     Log.getDefaultLog()
     main()

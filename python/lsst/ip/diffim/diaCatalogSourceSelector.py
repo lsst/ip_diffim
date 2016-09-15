@@ -29,46 +29,48 @@ import lsst.meas.algorithms as measAlg
 
 __all__ = ["DiaCatalogSourceSelectorConfig", "DiaCatalogSourceSelectorTask"]
 
+
 class DiaCatalogSourceSelectorConfig(measAlg.BaseStarSelectorConfig):
     # Selection cuts on the input source catalog
     fluxLim = pexConfig.Field(
-        doc = "specify the minimum psfFlux for good Kernel Candidates",
-        dtype = float,
-        default = 0.0,
-        check = lambda x: x >= 0.0,
+        doc="specify the minimum psfFlux for good Kernel Candidates",
+        dtype=float,
+        default=0.0,
+        check=lambda x: x >= 0.0,
     )
     fluxMax = pexConfig.Field(
-        doc = "specify the maximum psfFlux for good Kernel Candidates (ignored if == 0)",
-        dtype = float,
-        default = 0.0,
-        check = lambda x: x >= 0.0,
+        doc="specify the maximum psfFlux for good Kernel Candidates (ignored if == 0)",
+        dtype=float,
+        default=0.0,
+        check=lambda x: x >= 0.0,
     )
     # Selection cuts on the reference catalog
     selectStar = pexConfig.Field(
-        doc = "Select objects that are flagged as stars",
-        dtype = bool,
-        default = True
+        doc="Select objects that are flagged as stars",
+        dtype=bool,
+        default=True
     )
     selectGalaxy = pexConfig.Field(
-        doc = "Select objects that are flagged as galaxies",
-        dtype = bool,
-        default = False
+        doc="Select objects that are flagged as galaxies",
+        dtype=bool,
+        default=False
     )
     includeVariable = pexConfig.Field(
-        doc = "Include objects that are known to be variable",
-        dtype = bool,
-        default = False
+        doc="Include objects that are known to be variable",
+        dtype=bool,
+        default=False
     )
     grMin = pexConfig.Field(
-        doc = "Minimum g-r color for selection (inclusive)",
-        dtype = float,
-        default = 0.0
+        doc="Minimum g-r color for selection (inclusive)",
+        dtype=float,
+        default=0.0
     )
     grMax = pexConfig.Field(
-        doc = "Maximum g-r color for selection (inclusive)",
-        dtype = float,
-        default = 3.0
+        doc="Maximum g-r color for selection (inclusive)",
+        dtype=float,
+        default=3.0
     )
+
     def setDefaults(self):
         measAlg.BaseStarSelectorConfig.setDefaults(self)
         self.badFlags = [
@@ -103,6 +105,7 @@ class CheckSource(object):
 ## \ref DiaCatalogSourceSelectorTask_ "DiaCatalogSourceSelectorTask"
 ## \copybrief DiaCatalogSourceSelectorTask
 ## \}
+
 
 class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
     """!Select sources for Kernel candidates
@@ -219,11 +222,11 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
                             isRightColor = True
                         else:
                             isRightColor = (gMag-rMag) >= self.config.grMin \
-                                            and (gMag-rMag) <= self.config.grMax
+                                and (gMag-rMag) <= self.config.grMax
 
                     isRightType  = (self.config.selectStar and isStar) \
-                                    or (self.config.selectGalaxy and not isStar)
-                    isRightVar   = (self.config.includeVariable) or (self.config.includeVariable is isVar)
+                        or (self.config.selectGalaxy and not isStar)
+                    isRightVar = (self.config.includeVariable) or (self.config.includeVariable is isVar)
                     if isRightType and isRightVar and isRightColor:
                         starCat.append(source)
                         symb, ctype = "+", ds9.GREEN
@@ -240,7 +243,7 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
                 raw_input("Continue? y[es] p[db] ")
 
         return Struct(
-            starCat = starCat,
+            starCat=starCat,
         )
 
 measAlg.starSelectorRegistry.register("diacatalog", DiaCatalogSourceSelectorTask)

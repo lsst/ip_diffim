@@ -1,6 +1,6 @@
 # LSST Data Management System
 # Copyright 2008, 2009, 2010, 2011 LSST Corporation.
-# 
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -8,14 +8,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import sys
@@ -26,11 +26,12 @@ import lsst.ip.diffim as ipDiffim
 from lsst.pex.logging import Log, Trace
 
 
-def subtractSnaps(snap1, snap2, subconfig, doWarping = False):
+def subtractSnaps(snap1, snap2, subconfig, doWarping=False):
     psfmatch = ipDiffim.SnapPsfMatchTask(subconfig)
-    results  = psfmatch.run(snap1, snap2, "subtractExposures", doWarping = doWarping)
+    results = psfmatch.run(snap1, snap2, "subtractExposures", doWarping=doWarping)
     return results.subtractedImage
-    
+
+
 def main():
     defVerbosity = 5
 
@@ -55,17 +56,18 @@ def main():
 
     print 'Verbosity =', options.verbosity
     Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
-         
-    snap1Exp   = afwImage.ExposureF(options.s1)
-    snap2Exp   = afwImage.ExposureF(options.s2)
 
-    config     = ipDiffim.SnapPsfMatchTask.ConfigClass()
+    snap1Exp = afwImage.ExposureF(options.s1)
+    snap2Exp = afwImage.ExposureF(options.s2)
+
+    config = ipDiffim.SnapPsfMatchTask.ConfigClass()
     config.kernel.name = "AL"
-    subconfig  = config.kernel.active
+    subconfig = config.kernel.active
 
-    snapDiff   = subtractSnaps(snap1Exp, snap2Exp, subconfig, doWarping = options.warp)
+    snapDiff = subtractSnaps(snap1Exp, snap2Exp, subconfig, doWarping=options.warp)
     snapDiff.writeFits(options.sdiff)
-    
+
+
 def run():
     Log.getDefaultLog()
     main()
@@ -74,5 +76,9 @@ if __name__ == '__main__':
     run()
 
 # For debugging script:
-# 
-# python examples/runSubtractSnaps.py --s1 ~/LSST/becker_2012_0209_181253/update/calexp/v886894611-fr/R22/S11.fits --s2 ~/LSST/becker_2012_0209_181253/update/calexp/v886264371-fr/R22/S11.fits --sdiff sdiff.fits --warp
+#
+# python examples/runSubtractSnaps.py --s1
+# ~/LSST/becker_2012_0209_181253/update/calexp/v886894611-fr/R22/S11.fits
+# --s2
+# ~/LSST/becker_2012_0209_181253/update/calexp/v886264371-fr/R22/S11.fits
+# --sdiff sdiff.fits --warp

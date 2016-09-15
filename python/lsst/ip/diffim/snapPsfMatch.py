@@ -23,8 +23,10 @@ import lsst.pex.config as pexConfig
 from psfMatch import PsfMatchConfigDF, PsfMatchConfigAL
 from imagePsfMatch import ImagePsfMatchTask, ImagePsfMatchConfig
 
+
 class SnapPsfMatchConfigDF(PsfMatchConfigDF):
     """Delta-function Psf-matching config optimized for snap subtraction"""
+
     def setDefaults(self):
         PsfMatchConfigDF.setDefaults(self)
 
@@ -36,8 +38,10 @@ class SnapPsfMatchConfigDF(PsfMatchConfigDF):
         self.subtractMeanForPca = True
         self.numPrincipalComponents = 5
 
+
 class SnapPsfMatchConfigAL(PsfMatchConfigAL):
     """Sum-of-Gaussian (Alard-Lupton) Psf-matching config optimized for snap subtraction"""
+
     def setDefaults(self):
         PsfMatchConfigAL.setDefaults(self)
 
@@ -46,20 +50,21 @@ class SnapPsfMatchConfigAL(PsfMatchConfigAL):
         self.alardDegGauss = (4, 2)
         self.alardSigGauss = (1.0, 2.5)
 
+
 class SnapPsfMatchConfig(ImagePsfMatchConfig):
     kernel = pexConfig.ConfigChoiceField(
-        doc = "kernel type",
-        typemap = dict(
-            AL = SnapPsfMatchConfigAL,
-            DF = SnapPsfMatchConfigDF
+        doc="kernel type",
+        typemap=dict(
+            AL=SnapPsfMatchConfigAL,
+            DF=SnapPsfMatchConfigDF
         ),
-        default = "AL",
+        default="AL",
     )
 
     doWarping = pexConfig.Field(
-        dtype = bool,
-        doc   = "Warp the snaps?",
-        default = False
+        dtype=bool,
+        doc="Warp the snaps?",
+        default=False
     )
 
     def setDefaults(self):
@@ -83,6 +88,7 @@ class SnapPsfMatchConfig(ImagePsfMatchConfig):
 ## \ref SnapPsfMatchTask_ "SnapPsfMatchTask"
 ## \copybrief SnapPsfMatchTask
 ## \}
+
 
 class SnapPsfMatchTask(ImagePsfMatchTask):
     """!
@@ -253,14 +259,13 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
 
     # Override ImagePsfMatchTask.subtractExposures to set doWarping on config.doWarping
     def subtractExposures(self, templateExposure, scienceExposure,
-                          templateFwhmPix = None, scienceFwhmPix = None,
-                          candidateList = None):
+                          templateFwhmPix=None, scienceFwhmPix=None,
+                          candidateList=None):
         return ImagePsfMatchTask.subtractExposures(self,
-            templateExposure = templateExposure,
-            scienceExposure = scienceExposure,
-            templateFwhmPix = templateFwhmPix,
-            scienceFwhmPix = scienceFwhmPix,
-            candidateList = candidateList,
-            doWarping = self.config.doWarping,
-        )
-
+                                                   templateExposure=templateExposure,
+                                                   scienceExposure=scienceExposure,
+                                                   templateFwhmPix=templateFwhmPix,
+                                                   scienceFwhmPix=scienceFwhmPix,
+                                                   candidateList=candidateList,
+                                                   doWarping=self.config.doWarping,
+                                                   )

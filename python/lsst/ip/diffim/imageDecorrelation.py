@@ -41,9 +41,9 @@ class DecorrelateALKernelConfig(pexConfig.Config):
     """
 
     ignoreMaskPlanes = pexConfig.ListField(
-        dtype = str,
-        doc = """Mask planes to ignore for sigma-clipped statistics""",
-        default = ("INTRP", "EDGE", "DETECTED", "SAT", "CR", "BAD", "NO_DATA", "DETECTED_NEGATIVE")
+        dtype=str,
+        doc="""Mask planes to ignore for sigma-clipped statistics""",
+        default=("INTRP", "EDGE", "DETECTED", "SAT", "CR", "BAD", "NO_DATA", "DETECTED_NEGATIVE")
     )
 
 ## \addtogroup LSST_task_documentation
@@ -52,6 +52,7 @@ class DecorrelateALKernelConfig(pexConfig.Config):
 ## \ref DecorrelateALKernelTask_ "DecorrelateALKernelTask"
 ##      Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
 ## \}
+
 
 class DecorrelateALKernelTask(pipeBase.Task):
     """!

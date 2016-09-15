@@ -27,13 +27,14 @@ import sys
 import numpy as np
 
 import lsst.utils
-import lsst.daf.base               as dafBase
-import lsst.afw.table              as afwTable
-import lsst.afw.image              as afwImage
-import lsst.afw.display.ds9        as ds9
-import lsst.meas.algorithms        as measAlg
+import lsst.daf.base as dafBase
+import lsst.afw.table as afwTable
+import lsst.afw.image as afwImage
+import lsst.afw.display.ds9 as ds9
+import lsst.meas.algorithms as measAlg
 from lsst.meas.algorithms.detection import SourceDetectionTask
 from lsst.ip.diffim import DipoleMeasurementTask, DipoleAnalysis
+
 
 def loadData(imFile=None):
     """Prepare the data we need to run the example"""
@@ -56,10 +57,11 @@ def loadData(imFile=None):
 
     # Create the dipole
     offset = 3
-    tmpim = im.getArray()[:-offset,:-offset]
-    im.getArray()[offset:,offset:] -= tmpim
+    tmpim = im.getArray()[:-offset, :-offset]
+    im.getArray()[offset:, offset:] -= tmpim
 
     return exposure
+
 
 def run(args):
     exposure = loadData(args.image)
@@ -67,14 +69,14 @@ def run(args):
         ds9.mtv(exposure, frame=1)
 
     schema = afwTable.SourceTable.makeMinimalSchema()
-        
+
     # Create the detection task
     config = SourceDetectionTask.ConfigClass()
     config.thresholdPolarity = "both"
     config.background.isNanSafe = True
     config.thresholdValue = 3
     detectionTask = SourceDetectionTask(config=config, schema=schema)
-    
+
     # And the measurement Task
     config = DipoleMeasurementTask.ConfigClass()
     config.plugins.names.remove('base_SkyCoord')
@@ -84,7 +86,7 @@ def run(args):
 
     # Create the output table
     tab = afwTable.SourceTable.make(schema)
-    
+
     # Process the data
     results = detectionTask.run(tab, exposure)
 
@@ -95,8 +97,8 @@ def run(args):
     diaSources = afwTable.SourceCatalog(tab)
     fpSet.makeSources(diaSources)
 
-    print "Merged %s Sources into %d diaSources (from %d +ve, %d -ve)" % (len(results.sources), 
-        len(diaSources), results.fpSets.numPos, results.fpSets.numNeg)
+    print "Merged %s Sources into %d diaSources (from %d +ve, %d -ve)" % (len(results.sources),
+                                                                          len(diaSources), results.fpSets.numPos, results.fpSets.numNeg)
 
     measureTask.run(diaSources, exposure)
 
@@ -104,7 +106,7 @@ def run(args):
     if args.debug:
         dpa = DipoleAnalysis()
         dpa.displayDipoles(exposure, diaSources)
- 
+
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 if __name__ == "__main__":

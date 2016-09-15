@@ -30,6 +30,7 @@ import lsst.afw.math as afwMath
 from . import diffimLib
 from .utils import calcCentroid, calcWidth
 
+
 class KernelCandidateQa(object):
 
     def __init__(self, nKernelSpatial):
@@ -43,13 +44,13 @@ class KernelCandidateQa(object):
         """
         self.fields = []
         self.fields.append(afwTable.Field["PointD"]("RegisterRefPosition",
-                                              "Position of reference object for registration (radians)."))
+                                                    "Position of reference object for registration (radians)."))
         #TODO check units of the following angles
         self.fields.append(afwTable.Field["Angle"]("RegisterResidualBearing",
-                                              "Angle of residual wrt declination parallel in radians"))
+                                                   "Angle of residual wrt declination parallel in radians"))
 
         self.fields.append(afwTable.Field["Angle"]("RegisterResidualDistance",
-                                              "Offset of residual in radians"))
+                                                   "Offset of residual in radians"))
         metricMap = self.makeMetricMap()
 
         for kType in ("LOCAL", "SPATIAL"):
@@ -80,12 +81,12 @@ class KernelCandidateQa(object):
         commentList = [("Mean of KernelCandidate diffim", "sigma"),
                        ("Median of KernelCandidate diffim", "sigma"),
                        ("Inner quartile range of KernelCandidate diffim", "sigma"),
-                       ("Standard deviation of KernelCandidate diffim","sigma"),
+                       ("Standard deviation of KernelCandidate diffim", "sigma"),
                        ("D from K-S test of diffim pixels relative to Normal", ),
                        ("Prob from K-S test of diffim pixels relative to Normal", "likelihood"),
                        ("Anderson-Darling test statistic of diffim pixels relative to Normal", ),
-                       ("Critical values for the significance levels in KCDiffimADSig.  If A2 is greater "+\
-                       "than this number, hypothesis that the distributions are similar can be rejected.", 5),
+                       ("Critical values for the significance levels in KCDiffimADSig.  If A2 is greater " +
+                        "than this number, hypothesis that the distributions are similar can be rejected.", 5),
                        ("Anderson-Darling significance levels for the Normal distribution", 5),
                        ("Reduced chi^2 of the residual.", "likelihood"),
                        ("Mean squared error in diffim : Variance + Bias**2",),
@@ -96,10 +97,9 @@ class KernelCandidateQa(object):
                        ("Id for this KernelCandidate",)]
         metricMap = {}
         for name, mtype, comment in zip(nameList, typeList, commentList):
-            metricMap[name] = {'type':mtype, 'comment':comment}
+            metricMap[name] = {'type': mtype, 'comment': comment}
 
         return metricMap
-
 
     def addToSchema(self, inSourceCatalog):
         """Add the to-be-generated QA keys to the Source schema"""
@@ -153,7 +153,7 @@ class KernelCandidateQa(object):
         iqr = np.percentile(data, 75.) - np.percentile(data, 25.)
 
         #Calculte chisquare of the residual
-        chisq=np.sum(np.power(data, 2.))
+        chisq = np.sum(np.power(data, 2.))
 
         # Mean squared error: variance + bias**2
         # Bias = |data - model| = mean of diffim
@@ -165,7 +165,7 @@ class KernelCandidateQa(object):
         # If scipy is not set up, return zero for the stats
         try:
             #In try block because of risk of divide by zero
-            rchisq=chisq/(len(data)-1-dof)
+            rchisq = chisq/(len(data)-1-dof)
             # K-S test on the diffim to a Normal distribution
             import scipy.stats
             D, prob = scipy.stats.kstest(data, 'norm')
@@ -185,7 +185,6 @@ class KernelCandidateQa(object):
         return {"mean": mean, "stdev": stdev, "median": median, "iqr": iqr,
                 "D": D, "prob": prob, "A2": A2, "crit": crit, "sig": sig,
                 "rchisq": rchisq, "mseResids": mseResids}
-
 
     def apply(self, candidateList, spatialKernel, spatialBackground, dof=0):
         """Evaluate the QA metrics for all KernelCandidates in the
@@ -210,23 +209,23 @@ class KernelCandidateQa(object):
 
                 localResults = self._calculateStats(di, dof=dof)
 
-                metrics = {"KCDiffimMean_LOCAL":localResults["mean"],
-                           "KCDiffimMedian_LOCAL":localResults["median"],
-                           "KCDiffimIQR_LOCAL":localResults["iqr"],
-                           "KCDiffimStDev_LOCAL":localResults["stdev"],
-                           "KCDiffimKSD_LOCAL":localResults["D"],
-                           "KCDiffimKSProb_LOCAL":localResults["prob"],
-                           "KCDiffimADA2_LOCAL":localResults["A2"],
-                           "KCDiffimADCrit_LOCAL":localResults["crit"],
-                           "KCDiffimADSig_LOCAL":localResults["sig"],
-                           "KCDiffimChiSq_LOCAL":localResults["rchisq"],
-                           "KCDiffimMseResids_LOCAL":localResults["mseResids"],
-                           "KCKernelCentX_LOCAL":centx,
-                           "KCKernelCentY_LOCAL":centy,
-                           "KCKernelStdX_LOCAL":stdx,
-                           "KCKernelStdY_LOCAL":stdy,
-                           "KernelCandidateId_LOCAL":kernelCandidate.getId(),
-                           "KernelCoeffValues_LOCAL":kernelValues}
+                metrics = {"KCDiffimMean_LOCAL": localResults["mean"],
+                           "KCDiffimMedian_LOCAL": localResults["median"],
+                           "KCDiffimIQR_LOCAL": localResults["iqr"],
+                           "KCDiffimStDev_LOCAL": localResults["stdev"],
+                           "KCDiffimKSD_LOCAL": localResults["D"],
+                           "KCDiffimKSProb_LOCAL": localResults["prob"],
+                           "KCDiffimADA2_LOCAL": localResults["A2"],
+                           "KCDiffimADCrit_LOCAL": localResults["crit"],
+                           "KCDiffimADSig_LOCAL": localResults["sig"],
+                           "KCDiffimChiSq_LOCAL": localResults["rchisq"],
+                           "KCDiffimMseResids_LOCAL": localResults["mseResids"],
+                           "KCKernelCentX_LOCAL": centx,
+                           "KCKernelCentY_LOCAL": centy,
+                           "KCKernelStdX_LOCAL": stdx,
+                           "KCKernelStdY_LOCAL": stdy,
+                           "KernelCandidateId_LOCAL": kernelCandidate.getId(),
+                           "KernelCoeffValues_LOCAL": kernelValues}
                 for k in metrics.keys():
                     key = schema[k].asKey()
                     setter = getattr(source, "set"+key.getTypeString())
@@ -240,7 +239,7 @@ class KernelCandidateQa(object):
 
             # Calculate spatial model evaluated at each position, for
             # all candidates
-            skim  = afwImage.ImageD(spatialKernel.getDimensions())
+            skim = afwImage.ImageD(spatialKernel.getDimensions())
             spatialKernel.computeImage(skim, False, kernelCandidate.getXCenter(),
                                        kernelCandidate.getYCenter())
             centx, centy = calcCentroid(skim.getArray())
@@ -253,30 +252,30 @@ class KernelCandidateQa(object):
 
             # Kernel mse
             if lkim is not None:
-                skim     -= lkim
-                bias      = np.mean(skim.getArray())
-                variance  = np.mean(np.power(skim.getArray(), 2.))
+                skim -= lkim
+                bias = np.mean(skim.getArray())
+                variance = np.mean(np.power(skim.getArray(), 2.))
                 mseKernel = bias**2 + variance
             else:
                 mseKernel = -99.999
 
-            metrics = {"KCDiffimMean_SPATIAL":spatialResults["mean"],
-                       "KCDiffimMedian_SPATIAL":spatialResults["median"],
-                       "KCDiffimIQR_SPATIAL":spatialResults["iqr"],
-                       "KCDiffimStDev_SPATIAL":spatialResults["stdev"],
-                       "KCDiffimKSD_SPATIAL":spatialResults["D"],
-                       "KCDiffimKSProb_SPATIAL":spatialResults["prob"],
-                       "KCDiffimADA2_SPATIAL":spatialResults["A2"],
-                       "KCDiffimADCrit_SPATIAL":spatialResults["crit"],
-                       "KCDiffimADSig_SPATIAL":spatialResults["sig"],
-                       "KCDiffimChiSq_SPATIAL":spatialResults["rchisq"],
-                       "KCDiffimMseResids_SPATIAL":spatialResults["mseResids"],
-                       "KCDiffimMseKernel_SPATIAL":mseKernel,
-                       "KCKernelCentX_SPATIAL":centx,
-                       "KCKernelCentY_SPATIAL":centy,
-                       "KCKernelStdX_SPATIAL":stdx,
-                       "KCKernelStdY_SPATIAL":stdy,
-                       "KernelCandidateId_SPATIAL":kernelCandidate.getId()}
+            metrics = {"KCDiffimMean_SPATIAL": spatialResults["mean"],
+                       "KCDiffimMedian_SPATIAL": spatialResults["median"],
+                       "KCDiffimIQR_SPATIAL": spatialResults["iqr"],
+                       "KCDiffimStDev_SPATIAL": spatialResults["stdev"],
+                       "KCDiffimKSD_SPATIAL": spatialResults["D"],
+                       "KCDiffimKSProb_SPATIAL": spatialResults["prob"],
+                       "KCDiffimADA2_SPATIAL": spatialResults["A2"],
+                       "KCDiffimADCrit_SPATIAL": spatialResults["crit"],
+                       "KCDiffimADSig_SPATIAL": spatialResults["sig"],
+                       "KCDiffimChiSq_SPATIAL": spatialResults["rchisq"],
+                       "KCDiffimMseResids_SPATIAL": spatialResults["mseResids"],
+                       "KCDiffimMseKernel_SPATIAL": mseKernel,
+                       "KCKernelCentX_SPATIAL": centx,
+                       "KCKernelCentY_SPATIAL": centy,
+                       "KCKernelStdX_SPATIAL": stdx,
+                       "KCKernelStdY_SPATIAL": stdy,
+                       "KernelCandidateId_SPATIAL": kernelCandidate.getId()}
             for k in metrics.keys():
                 key = schema[k].asKey()
                 setter = getattr(source, "set"+key.getTypeString())
@@ -330,4 +329,3 @@ class KernelCandidateQa(object):
                 metadata.add("%s_MEAN" % (kName), np.mean(vals[idx]))
                 metadata.add("%s_MEDIAN" % (kName), np.median(vals[idx]))
                 metadata.add("%s_STDEV" % (kName), np.std(vals[idx]))
-
