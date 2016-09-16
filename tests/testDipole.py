@@ -305,8 +305,8 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
 
         self.assertGreater(source.get("ip_diffim_PsfDipoleFlux_pos_fluxSigma"), 0.0)
         self.assertGreater(source.get("ip_diffim_PsfDipoleFlux_neg_fluxSigma"), 0.0)
-        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_neg_flag"), False)
-        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_pos_flag"), False)
+        self.assertFalse(source.get("ip_diffim_PsfDipoleFlux_neg_flag"))
+        self.assertFalse(source.get("ip_diffim_PsfDipoleFlux_pos_flag"))
 
         self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_centroid_x"), 50.0, 1)
         self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_centroid_y"), 50.0, 1)
@@ -314,8 +314,8 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_neg_centroid_y"), negCenter[1], 1)
         self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_pos_centroid_x"), posCenter[0], 1)
         self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_pos_centroid_y"), posCenter[1], 1)
-        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_neg_flag"), False)
-        self.assertEqual(source.get("ip_diffim_PsfDipoleFlux_pos_flag"), False)
+        self.assertFalse(source.get("ip_diffim_PsfDipoleFlux_neg_flag"))
+        self.assertFalse(source.get("ip_diffim_PsfDipoleFlux_pos_flag"))
 
         self.assertGreater(source.get("ip_diffim_PsfDipoleFlux_chi2dof"), 0.0)
 

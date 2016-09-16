@@ -132,7 +132,7 @@ class DiaSourceAnalyst(object):
         nPos, nNeg, fPos, fNeg = self.countPolarity(maArr, imArr)
         nDetPos, nDetNeg = self.countDetected(maArr)
         nMasked = self.countMasked(maArr)
-        assert (nPixels == (nMasked + nPos + nNeg))
+        assert(nPixels == (nMasked + nPos + nNeg))
 
         # 1) Too many pixels in the detection are masked
         fMasked = (nMasked / nPixels)
