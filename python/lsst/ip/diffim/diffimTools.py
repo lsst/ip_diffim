@@ -29,7 +29,7 @@ from collections import Counter
 import numpy as np
 
 # all the c++ level classes and routines
-import diffimLib
+from . import diffimLib
 
 # all the other LSST packages
 import lsst.afw.geom as afwGeom

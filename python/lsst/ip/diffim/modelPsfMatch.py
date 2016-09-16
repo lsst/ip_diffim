@@ -21,7 +21,7 @@ from builtins import range
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import numpy as num
-import diffimLib
+from . import diffimLib
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath

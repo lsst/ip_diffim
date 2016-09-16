@@ -1,5 +1,5 @@
 # all the c++ level classes and routines
-import diffimLib
+from . import diffimLib
 
 # all the other LSST packages
 import lsst.afw.image as afwImage

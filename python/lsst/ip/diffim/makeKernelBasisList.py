@@ -20,7 +20,7 @@ from builtins import range
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-import diffimLib
+from . import diffimLib
 import lsst.pex.logging as pexLog
 import numpy as np
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
