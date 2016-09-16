@@ -1,3 +1,4 @@
+from __future__ import print_function
 #
 # LSST Data Management System
 # Copyright 2008, 2009, 2010 LSST Corporation.
@@ -39,9 +40,9 @@ kim2 = afwImage.ImageD(klist[0].getDimensions())
 for k1 in range(0, len(klist)):
     klist[k1].computeImage(kim1, False)
     # Only first term should have sum != 0.0
-    print k1, num.sum(num.ravel(kim1.getArray()))
+    print(k1, num.sum(num.ravel(kim1.getArray())))
 
-print
+print()
 
 for k1 in range(0, len(klist)):
     klist[k1].computeImage(kim1, False)
@@ -51,4 +52,4 @@ for k1 in range(0, len(klist)):
         klist[k2].computeImage(kim2, False)
         arr2 = kim2.getArray().ravel()
         # Not orthonormal tho
-        print k1, k2, num.inner(arr1, arr2)
+        print(k1, k2, num.inner(arr1, arr2))

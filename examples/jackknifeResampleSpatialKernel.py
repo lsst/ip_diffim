@@ -22,6 +22,7 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
+from __future__ import print_function
 import os
 import sys
 import unittest
@@ -168,7 +169,7 @@ class DiffimTestCases(unittest.TestCase):
 
         goodList = []
         for cell in cellSet.getCellList():
-            print
+            print()
             for cand in cell.begin(False):
                 cand = ipDiffim.cast_KernelCandidateF(cand)
 
@@ -183,7 +184,7 @@ class DiffimTestCases(unittest.TestCase):
         for idx in range(len(goodList)):
             cid = goodList[idx]
 
-            print # clear the screen
+            print() # clear the screen
             pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
                          "Removing candidate %d" % (cid))
 
@@ -228,7 +229,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def test(self):
         if not defDataDir:
-            print >> sys.stderr, "Warning: afwdata not set up; not running JackknifeResampleSpatialKernel.py"
+            print("Warning: afwdata not set up; not running JackknifeResampleSpatialKernel.py", file=sys.stderr)
             return
 
         self.runTest(mode="AL")

@@ -1,3 +1,4 @@
+from __future__ import print_function
 import lsst.utils
 import sys
 import os
@@ -61,32 +62,32 @@ Notes:
         parser.print_help()
         sys.exit(1)
 
-    print 'Science image: ', sciencePath
-    print 'Template image:', templatePath
-    print 'Output image:  ', outputPath
+    print('Science image: ', sciencePath)
+    print('Template image:', templatePath)
+    print('Output image:  ', outputPath)
 
     fwhmS = defFwhm
     if options.fwhmS:
-        print 'FwhmS =', options.fwhmS
+        print('FwhmS =', options.fwhmS)
         fwhmS = options.fwhmS
 
     fwhmT = defFwhm
     if options.fwhmT:
-        print 'Fwhmt =', options.fwhmT
+        print('Fwhmt =', options.fwhmT)
         fwhmT = options.fwhmT
 
     display = False
     if options.display:
-        print 'Display =', options.display
+        print('Display =', options.display)
         display = True
 
     bgSub = False
     if options.bg:
-        print 'Background subtract =', options.bg
+        print('Background subtract =', options.bg)
         bgSub = True
 
     if options.verbosity > 0:
-        print 'Verbosity =', options.verbosity
+        print('Verbosity =', options.verbosity)
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
     ####
@@ -103,7 +104,7 @@ Notes:
                                        [templateMaskedImage, scienceMaskedImage])
     else:
         if subconfig.fitForBackground == False:
-            print 'NOTE: no background subtraction at all is requested'
+            print('NOTE: no background subtraction at all is requested')
 
     psfmatch = ipDiffim.ImagePsfMatch(subconfig)
     results = psfmatch.matchMaskedImages(templateMaskedImage, scienceMaskedImage,
@@ -114,7 +115,7 @@ Notes:
 
     if False:
         spatialKernel = results[1]
-        print spatialKernel.getSpatialParameters()
+        print(spatialKernel.getSpatialParameters())
 
     if display:
         ds9.mtv(differenceMaskedImage)

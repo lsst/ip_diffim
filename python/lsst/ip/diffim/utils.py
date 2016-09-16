@@ -21,6 +21,7 @@
 #
 
 """Support utilities for Measuring sources"""
+from __future__ import print_function
 import numpy as np
 import lsst.pex.logging as pexLog
 import lsst.afw.detection as afwDet
@@ -229,7 +230,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
 
             if False and np.isnan(rchi2):
                 ds9.mtv(cand.getScienceMaskedImage.getImage(), title="candidate", frame=1)
-                print "rating", cand.getCandidateRating()
+                print("rating", cand.getCandidateRating())
 
             im = cand.getScienceMaskedImage()
             center = (candidateIndex, cand.getXCenter() - im.getX0(), cand.getYCenter() - im.getY0())
@@ -273,8 +274,8 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
     try:
         import matplotlib.pyplot as plt
         import matplotlib.colors
-    except ImportError, e:
-        print "Unable to import numpy and matplotlib: %s" % e
+    except ImportError as e:
+        print("Unable to import numpy and matplotlib: %s" % e)
         return
 
     x0 = kernelCellSet.getBBox().getBeginX()
@@ -294,7 +295,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
             candCenter = afwGeom.PointD(cand.getXCenter(), cand.getYCenter())
             try:
                 im = cand.getTemplateMaskedImage()
-            except Exception, e:
+            except Exception as e:
                 continue
 
             targetFits = badFits if cand.isBad() else candFits
@@ -406,12 +407,12 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
     if keepPlots and not keptPlots:
         # Keep plots open when done
         def show():
-            print "%s: Please close plots when done." % __name__
+            print("%s: Please close plots when done." % __name__)
             try:
                 plt.show()
             except Exception:
                 pass
-            print "Plots closed, exiting..."
+            print("Plots closed, exiting...")
         import atexit
         atexit.register(show)
         keptPlots = True
@@ -560,8 +561,8 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     try:
         import pylab
         from matplotlib.font_manager import FontProperties
-    except ImportError, e:
-        print "Unable to import pylab: %s" % e
+    except ImportError as e:
+        print("Unable to import pylab: %s" % e)
         return
 
     fig = pylab.figure()
@@ -619,12 +620,12 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     if keepPlots and not keptPlots:
         # Keep plots open when done
         def show():
-            print "%s: Please close plots when done." % __name__
+            print("%s: Please close plots when done." % __name__)
             try:
                 pylab.show()
             except Exception:
                 pass
-            print "Plots closed, exiting..."
+            print("Plots closed, exiting...")
         import atexit
         atexit.register(show)
         keptPlots = True
@@ -669,7 +670,7 @@ def printSkyDiffs(sources, wcs):
         ddec = 3600*(sPosition.getY() - wcs.pixelToSky(sCentroid.getX(),
                                                        sCentroid.getY()).getPosition().getY())/0.2
         if np.isfinite(dra) and np.isfinite(ddec):
-            print dra, ddec
+            print(dra, ddec)
 
 
 def makeRegions(sources, outfilename, wcs=None):

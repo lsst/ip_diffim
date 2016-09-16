@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 #
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
@@ -20,8 +21,8 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import lsst.pex.config as pexConfig
-from psfMatch import PsfMatchConfigDF, PsfMatchConfigAL
-from imagePsfMatch import ImagePsfMatchTask, ImagePsfMatchConfig
+from .psfMatch import PsfMatchConfigDF, PsfMatchConfigAL
+from .imagePsfMatch import ImagePsfMatchTask, ImagePsfMatchConfig
 
 
 class SnapPsfMatchConfigDF(PsfMatchConfigDF):

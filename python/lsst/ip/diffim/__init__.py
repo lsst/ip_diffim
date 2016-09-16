@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 #
 # LSST Data Management System
 # Copyright 2008, 2009, 2010 LSST Corporation.
@@ -26,21 +27,21 @@ from .version import *
 from .diffimLib import *
 
 # python code
-from psfMatch import *
-from imagePsfMatch import *
-from modelPsfMatch import *
-from snapPsfMatch import *
-from diaSourceAnalysis import *
-from makeKernelBasisList import *
-from diaCatalogSourceSelector import *
-from dipoleMeasurement import *
-from diffimTools import *
-from kernelCandidateQa import *
-from getTemplate import *
+from .psfMatch import *
+from .imagePsfMatch import *
+from .modelPsfMatch import *
+from .snapPsfMatch import *
+from .diaSourceAnalysis import *
+from .makeKernelBasisList import *
+from .diaCatalogSourceSelector import *
+from .dipoleMeasurement import *
+from .diffimTools import *
+from .kernelCandidateQa import *
+from .getTemplate import *
 from .diaCatalogSourceSelector import *
 from lsst.meas.base import wrapSimpleAlgorithm
-from dipoleFitTask import *
-from imageDecorrelation import *
+from .dipoleFitTask import *
+from .imageDecorrelation import *
 
 # automatically register ip_diffim Algorithms
 wrapSimpleAlgorithm(NaiveDipoleCentroid, Control=DipoleCentroidControl, executionOrder=0.0)

@@ -22,6 +22,7 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
+from __future__ import print_function
 import os
 import unittest
 import lsst.utils.tests as tests
@@ -153,7 +154,7 @@ class DiffimTestCases(unittest.TestCase):
         return kSum, bg, dmean, dstd, vmean, kim, diffIm, kc
 
     def applyVisitor(self, invert=False, xloc=397, yloc=580):
-        print '# %.2f %.2f' % (xloc, yloc)
+        print('# %.2f %.2f' % (xloc, yloc))
 
         imsize = int(3 * self.subconfigAL.kernelSize)
 
@@ -185,10 +186,10 @@ class DiffimTestCases(unittest.TestCase):
             ipDiffim.KernelSolution.EIGENVALUE)
         kcDF.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
             ipDiffim.KernelSolution.SVD)
-        print 'DF Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
+        print('DF Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                     self.dStats.getRms(),
                                                                                     kSumDF, bgDF,
-                                                                                    dmeanDF, dstdDF, vmeanDF)
+                                                                                    dmeanDF, dstdDF, vmeanDF))
         if display:
             ds9.mtv(tmi, frame=1) # ds9 switches frame 0 and 1 for some reason
             ds9.mtv(smi, frame=0)
@@ -211,10 +212,10 @@ class DiffimTestCases(unittest.TestCase):
             ipDiffim.KernelSolution.EIGENVALUE)
         kcDFr.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
             ipDiffim.KernelSolution.SVD)
-        print 'DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
+        print('DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                      self.dStats.getRms(),
                                                                                      kSumDFr, bgDFr,
-                                                                                     dmeanDFr, dstdDFr, vmeanDFr)
+                                                                                     dmeanDFr, dstdDFr, vmeanDFr))
         if display:
             ds9.mtv(tmi, frame=4)
             ds9.mtv(smi, frame=5)
@@ -235,10 +236,10 @@ class DiffimTestCases(unittest.TestCase):
             ipDiffim.KernelSolution.EIGENVALUE)
         kcAL.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
             ipDiffim.KernelSolution.SVD)
-        print 'AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
+        print('AL Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                     self.dStats.getRms(),
                                                                                     kSumAL, bgAL,
-                                                                                    dmeanAL, dstdAL, vmeanAL)
+                                                                                    dmeanAL, dstdAL, vmeanAL))
         # outputs
         if display:
             ds9.mtv(tmi, frame=8)

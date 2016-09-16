@@ -21,6 +21,7 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
+from __future__ import print_function
 import os
 import sys
 
@@ -95,18 +96,18 @@ def run(args):
     # Run the requested method of the Task
     if args.template is not None and args.science is not None:
         if not os.path.isfile(args.template):
-            raise Exception, "Template image %s does not exist" % (args.template)
+            raise Exception("Template image %s does not exist" % (args.template))
         if not os.path.isfile(args.science):
-            raise Exception, "Science image %s does not exist" % (args.science)
+            raise Exception("Science image %s does not exist" % (args.science))
 
         try:
             templateExp = afwImage.ExposureF(args.template)
-        except pexExcept.LsstCppException, e:
-            raise Exception, "Cannot read template image %s" % (args.template)
+        except pexExcept.LsstCppException as e:
+            raise Exception("Cannot read template image %s" % (args.template))
         try:
             scienceExp = afwImage.ExposureF(args.science)
-        except pexExcept.LsstCppException, e:
-            raise Exception, "Cannot read science image %s" % (args.science)
+        except pexExcept.LsstCppException as e:
+            raise Exception("Cannot read science image %s" % (args.science))
     else:
         templateExp, scienceExp = generateFakeImages()
         config.kernel.active.sizeCellX = 128
@@ -129,7 +130,7 @@ def run(args):
         except Exception:
             frame = 3
         ds9.mtv(result.matchedExposure, frame=frame, title="Example script: Matched Template Image")
-        if result.getDict().has_key("subtractedExposure"):
+        if "subtractedExposure" in result.getDict():
             ds9.mtv(result.subtractedExposure, frame=frame+1, title="Example script: Subtracted Image")
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -152,6 +153,6 @@ if __name__ == "__main__":
             # Since I am displaying 2 images here, set the starting frame number for the LSST debug LSST
             debug.lsstDebug.frame = 3
         except ImportError as e:
-            print >> sys.stderr, e
+            print(e, file=sys.stderr)
 
     run(args)

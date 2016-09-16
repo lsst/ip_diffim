@@ -1,3 +1,4 @@
+from __future__ import print_function
 import lsst.utils
 import sys
 import os
@@ -66,9 +67,9 @@ Notes:
         parser.print_help()
         sys.exit(1)
 
-    print 'Science exposure: ', sciencePath
-    print 'Template exposure:', templatePath
-    print 'Output exposure:  ', outputPath
+    print('Science exposure: ', sciencePath)
+    print('Template exposure:', templatePath)
+    print('Output exposure:  ', outputPath)
 
     templateExposure = afwImage.ExposureF(templatePath)
     scienceExposure = afwImage.ExposureF(sciencePath)
@@ -84,8 +85,8 @@ Notes:
             psfAttr = measAlg.PsfAttributes(scienceExposure.getPsf(), width//2, height//2)
             s = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT) # gaussian sigma in pixels
             fwhm = s * sigma2fwhm
-            print 'NOTE: Embedded Psf has FwhmS =', fwhm
-        print 'USING: FwhmS =', options.fwhmS
+            print('NOTE: Embedded Psf has FwhmS =', fwhm)
+        print('USING: FwhmS =', options.fwhmS)
         fwhmS = options.fwhmS
 
     fwhmT = defFwhm
@@ -95,22 +96,22 @@ Notes:
             psfAttr = measAlg.PsfAttributes(templateExposure.getPsf(), width//2, height//2)
             s = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT) # gaussian sigma in pixels
             fwhm = s * sigma2fwhm
-            print 'NOTE: Embedded Psf has FwhmT =', fwhm
-        print 'USING: FwhmT =', options.fwhmT
+            print('NOTE: Embedded Psf has FwhmT =', fwhm)
+        print('USING: FwhmT =', options.fwhmT)
         fwhmT = options.fwhmT
 
     display = False
     if options.display:
-        print 'Display =', options.display
+        print('Display =', options.display)
         display = True
 
     bgSub = False
     if options.bg:
-        print 'Background subtract =', options.bg
+        print('Background subtract =', options.bg)
         bgSub = True
 
     if options.verbosity > 0:
-        print 'Verbosity =', options.verbosity
+        print('Verbosity =', options.verbosity)
         Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
     ####
@@ -121,7 +122,7 @@ Notes:
                                         scienceExposure.getMaskedImage()])
     else:
         if subconfig.fitForBackground == False:
-            print 'NOTE: no background subtraction at all is requested'
+            print('NOTE: no background subtraction at all is requested')
 
     psfmatch = ipDiffim.ImagePsfMatchTask(config)
     results = psfmatch.run(templateExposure, scienceExposure, "subtractExposures",

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import os
 import sys
 import unittest
@@ -121,16 +122,16 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # But this should be set on construction
         try:
             kc.getCandidateRating()
-        except Exception, e:
-            print e
+        except Exception as e:
+            print(e)
             self.fail()
 
         # And these should be filled
         try:
             kc.getTemplateMaskedImage()
             kc.getScienceMaskedImage()
-        except Exception, e:
-            print e
+        except Exception as e:
+            print(e)
             self.fail()
 
         # And of the right type
@@ -149,7 +150,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                             kc.getDifferenceImage):
                 try:
                     kMethod(kType)
-                except Exception, e:
+                except Exception as e:
                     pass
                 else:
                     self.fail()
@@ -200,16 +201,16 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # But this should be set on construction
         try:
             kc.getCandidateRating()
-        except Exception, e:
-            print e
+        except Exception as e:
+            print(e)
             self.fail()
 
         # And these should be filled
         try:
             kc.getTemplateMaskedImage()
             kc.getScienceMaskedImage()
-        except Exception, e:
-            print e
+        except Exception as e:
+            print(e)
             self.fail()
 
         # And of the right type
@@ -228,7 +229,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                             kc.getDifferenceImage):
                 try:
                     kMethod(kType)
-                except Exception, e:
+                except Exception as e:
                     pass
                 else:
                     self.fail()
@@ -295,15 +296,15 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                             kc.getDifferenceImage):
                 try:
                     kMethod(kType)
-                except Exception, e:
-                    print kMethod, e
+                except Exception as e:
+                    print(kMethod, e)
                     self.fail()
                 else:
                     pass
         try:
             kc.getImage()
         except Exception:
-            print kMethod, e
+            print(kMethod, e)
             self.fail()
         else:
             pass
@@ -319,10 +320,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                             kc.getDifferenceImage):
                 try:
                     kMethod(kType)
-                except Exception, e:
+                except Exception as e:
                     pass
                 else:
-                    print kMethod
+                    print(kMethod)
                     self.fail()
 
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT))

@@ -1,3 +1,4 @@
+from __future__ import print_function
 #
 # LSST Data Management System
 # Copyright 2008, 2009, 2010 LSST Corporation.
@@ -93,14 +94,14 @@ try:
     spatialKernel = results.psfMatchingKernel
     spatialBg = results.backgroundModel
     kernelCellSet = results.kernelCellSet
-except Exception, e:
-    print 'FAIL'
+except Exception as e:
+    print('FAIL')
     sys.exit(1)
 
 if False:
-    print spatialKernel.getSpatialFunctionList()[0].toString()
-    print spatialKernel.getKernelParameters()
-    print spatialKernel.getSpatialParameters()
+    print(spatialKernel.getSpatialFunctionList()[0].toString())
+    print(spatialKernel.getKernelParameters())
+    print(spatialKernel.getSpatialParameters())
     import pdb
     pdb.set_trace()
 

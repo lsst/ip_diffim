@@ -22,6 +22,7 @@
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
 
+from __future__ import print_function
 import unittest
 import lsst.utils.tests
 import lsst.afw.image as afwImage
@@ -115,7 +116,7 @@ class PsfMatchTestCases(unittest.TestCase):
         try:
             psfMatchAL.subtractExposures(tExp, sExp, doWarping=True)
         except Exception as e:
-            print "testWarning failed with %r" % (e,)
+            print("testWarning failed with %r" % (e,))
             pass
         else:
             self.fail()

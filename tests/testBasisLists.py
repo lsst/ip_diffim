@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import numpy as num
 
 import unittest
@@ -182,7 +183,7 @@ class DiffimTestCases(unittest.TestCase):
         try:
             self.policyDF.set("centralRegularizationStencil", 1)
             ipDiffim.makeRegularizationMatrix(self.policyDF)
-        except Exception, e:  # stencil of 1 not allowed
+        except Exception as e:  # stencil of 1 not allowed
             pass
         else:
             self.fail()
@@ -190,8 +191,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policyDF.set("centralRegularizationStencil", 5)
         try:
             ipDiffim.makeRegularizationMatrix(self.policyDF)
-        except Exception, e:  # stencil of 5 allowed
-            print e
+        except Exception as e:  # stencil of 5 allowed
+            print(e)
             self.fail()
         else:
             pass
@@ -199,8 +200,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policyDF.set("centralRegularizationStencil", 9)
         try:
             ipDiffim.makeRegularizationMatrix(self.policyDF)
-        except Exception, e:  # stencil of 9 allowed
-            print e
+        except Exception as e:  # stencil of 9 allowed
+            print(e)
             self.fail()
         else:
             pass
@@ -208,7 +209,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policyDF.set("regularizationBorderPenalty", -1.0)
         try:
             ipDiffim.makeRegularizationMatrix(self.policyDF)
-        except Exception, e:  # border penalty > 0
+        except Exception as e:  # border penalty > 0
             pass
         else:
             self.fail()
@@ -216,8 +217,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policyDF.set("regularizationBorderPenalty", 0.0)
         try:
             ipDiffim.makeRegularizationMatrix(self.policyDF)
-        except Exception, e:  # border penalty > 0
-            print e
+        except Exception as e:  # border penalty > 0
+            print(e)
             self.fail()
         else:
             pass
@@ -227,7 +228,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policyDF.set("forwardRegularizationOrders", 0)
         try:
             ipDiffim.makeRegularizationMatrix(self.policyDF)
-        except Exception, e:  # order 1..3 allowed
+        except Exception as e:  # order 1..3 allowed
             pass
         else:
             self.fail()
@@ -235,8 +236,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policyDF.set("forwardRegularizationOrders", 1)
         try:
             ipDiffim.makeRegularizationMatrix(self.policyDF)
-        except Exception, e:  # order 1..3 allowed
-            print e
+        except Exception as e:  # order 1..3 allowed
+            print(e)
             self.fail()
         else:
             pass
@@ -244,7 +245,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policyDF.set("forwardRegularizationOrders", 4)
         try:
             ipDiffim.makeRegularizationMatrix(self.policyDF)
-        except Exception, e:  # order 1..3 allowed
+        except Exception as e:  # order 1..3 allowed
             pass
         else:
             self.fail()
@@ -254,7 +255,7 @@ class DiffimTestCases(unittest.TestCase):
         try:
             ipDiffim.makeRegularizationMatrix(self.policyDF)
         except Exception as e:  # order 1..3 allowed
-            print e
+            print(e)
             self.fail()
         else:
             pass

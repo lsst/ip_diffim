@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
 #
@@ -27,8 +28,8 @@ import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.meas.algorithms as measAlg
 import lsst.pipe.base as pipeBase
-from makeKernelBasisList import makeKernelBasisList
-from psfMatch import PsfMatchTask, PsfMatchConfigAL
+from .makeKernelBasisList import makeKernelBasisList
+from .psfMatch import PsfMatchTask, PsfMatchConfigAL
 from . import utils as diUtils
 import lsst.afw.display.ds9 as ds9
 

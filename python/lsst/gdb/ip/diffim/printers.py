@@ -1,3 +1,4 @@
+from __future__ import print_function
 import gdb
 import re
 import sys
@@ -41,7 +42,7 @@ try:
 
 except ImportError:
     def register(*args, **kwargs):
-        print >> sys.stderr, "Your version of gdb is too old to load the ip.diffim python pretty printers"
+        print("Your version of gdb is too old to load the ip.diffim python pretty printers", file=sys.stderr)
         pass
 
     pass

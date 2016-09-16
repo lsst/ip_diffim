@@ -1,3 +1,4 @@
+from __future__ import print_function
 import lsst.ip.diffim as ipDiffim
 
 import sys
@@ -20,7 +21,7 @@ import lsst.afw.display.ds9 as ds9
 def pcapsf_read_boost(fn):
     import lsst.meas.algorithms as measAlgorithms # needed to register pcaPsf formatter
 
-    print '# Reading', fn,
+    print('# Reading', fn, end=' ')
     loc = dafPersist.LogicalLocation(fn)
     storageList = dafPersist.StorageList()
     additionalData = dafBase.PropertySet()

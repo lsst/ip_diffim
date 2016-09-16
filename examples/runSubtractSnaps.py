@@ -1,3 +1,4 @@
+from __future__ import print_function
 # LSST Data Management System
 # Copyright 2008, 2009, 2010, 2011 LSST Corporation.
 #
@@ -54,7 +55,7 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    print 'Verbosity =', options.verbosity
+    print('Verbosity =', options.verbosity)
     Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
 
     snap1Exp = afwImage.ExposureF(options.s1)

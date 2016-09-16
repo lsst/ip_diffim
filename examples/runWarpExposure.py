@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys
 import optparse
 import lsst.afw.math as afwMath
@@ -24,9 +25,9 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    print 'Reference exposure: ', refWcsPath
-    print 'Exposure to be warped: ', toWarpPath
-    print 'Output exposure:  ', warpedPath
+    print('Reference exposure: ', refWcsPath)
+    print('Exposure to be warped: ', toWarpPath)
+    print('Output exposure:  ', warpedPath)
 
     refWcsExposure = afwImage.ExposureF(refWcsPath)
     toWarpExposure = afwImage.ExposureF(toWarpPath)
@@ -46,8 +47,8 @@ def run():
     main()
     # check for memory leaks
     if dafBase.Citizen_census(0, memId0) != 0:
-        print dafBase.Citizen_census(0, memId0), 'Objects leaked:'
-        print dafBase.Citizen_census(dafBase.cout, memId0)
+        print(dafBase.Citizen_census(0, memId0), 'Objects leaked:')
+        print(dafBase.Citizen_census(dafBase.cout, memId0))
 
 if __name__ == '__main__':
     run()

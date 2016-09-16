@@ -22,6 +22,7 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
+from __future__ import print_function
 import os
 import sys
 import numpy as np
@@ -45,7 +46,7 @@ def loadData(imFile=None):
         imFile = os.path.join(afwdataDir, "CFHT", "D4", "cal-53535-i-797722_small_1.fits")
     else:
         if not os.path.isfile(imFile):
-            print >> sys.stderr, "Input file %s does not exist" % (imFile)
+            print("Input file %s does not exist" % (imFile), file=sys.stderr)
             sys.exit(1)
 
     exposure = afwImage.ExposureF(imFile)
@@ -97,8 +98,8 @@ def run(args):
     diaSources = afwTable.SourceCatalog(tab)
     fpSet.makeSources(diaSources)
 
-    print "Merged %s Sources into %d diaSources (from %d +ve, %d -ve)" % (len(results.sources),
-                                                                          len(diaSources), results.fpSets.numPos, results.fpSets.numNeg)
+    print("Merged %s Sources into %d diaSources (from %d +ve, %d -ve)" % (len(results.sources),
+                                                                          len(diaSources), results.fpSets.numPos, results.fpSets.numNeg))
 
     measureTask.run(diaSources, exposure)
 
@@ -124,6 +125,6 @@ if __name__ == "__main__":
             import debug
             debug.lsstDebug.frame = 2
         except ImportError as e:
-            print >> sys.stderr, e
+            print(e, file=sys.stderr)
 
     run(args)

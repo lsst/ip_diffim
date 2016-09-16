@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import os
 import sys
 import unittest
@@ -161,7 +162,7 @@ class DiffimTestCases(unittest.TestCase):
         return kSum, bg, dmean, dstd, vmean, kim, diffIm, kc
 
     def applyVisitor(self, invert=False, xloc=397, yloc=580):
-        print '# %.2f %.2f' % (xloc, yloc)
+        print('# %.2f %.2f' % (xloc, yloc))
         #if xloc != 1312 and yloc != 160:
         #    return
 
