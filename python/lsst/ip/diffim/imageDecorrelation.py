@@ -1,4 +1,6 @@
 from __future__ import absolute_import, division, print_function
+from future import standard_library
+standard_library.install_aliases()
 #
 # LSST Data Management System
 # Copyright 2016 AURA/LSST.
@@ -192,9 +194,9 @@ class DecorrelateALKernelTask(pipeBase.Task):
         spatialKernel.computeImage(kimg, True, xcen, ycen)
 
         if False:  # debug code to save spatially varying kernel for analysis
-            import cPickle
+            import pickle
             import gzip
-            cPickle.dump(spatialKernel, gzip.GzipFile('spatialKernel.p.gz', 'wb'))
+            pickle.dump(spatialKernel, gzip.GzipFile('spatialKernel.p.gz', 'wb'))
 
         if svar is None:
             svar = self.computeVarianceMean(exposure)

@@ -22,6 +22,9 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 from __future__ import division
+from builtins import input
+from builtins import range
+from builtins import object
 
 from optparse import OptionParser
 import lsst.afw.image as afwImage
@@ -232,6 +235,6 @@ def main():
 
         if analyst.testSource(crDiffSource, subMi):
             ds9.mtv(subExp, frame=1)
-            raw_input('Next: ')
+            input('Next: ')
 if __name__ == "__main__":
     main()

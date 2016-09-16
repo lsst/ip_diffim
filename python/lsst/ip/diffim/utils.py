@@ -22,6 +22,10 @@
 
 """Support utilities for Measuring sources"""
 from __future__ import print_function
+from builtins import zip
+from builtins import str
+from builtins import range
+from builtins import object
 import numpy as np
 import lsst.pex.logging as pexLog
 import lsst.afw.detection as afwDet
@@ -790,7 +794,7 @@ class DipoleTestImage(object):
         bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(self.w-1, self.h-1))
         dataset = TestDataset(bbox, psfSigma=self.psfSigma, threshold=1.)
 
-        for i in xrange(len(xc)):
+        for i in range(len(xc)):
             dataset.addSource(flux=flux[i], centroid=afwGeom.Point2D(xc[i], yc[i]))
 
         if schema is None:

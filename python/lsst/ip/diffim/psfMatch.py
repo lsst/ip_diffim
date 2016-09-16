@@ -1,3 +1,5 @@
+from builtins import str
+from builtins import range
 #
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
@@ -688,7 +690,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         self.kConfig = self.config.kernel.active
 
         #
-        if 'useRegularization' in self.kConfig.keys():
+        if 'useRegularization' in list(self.kConfig.keys()):
             self.useRegularization = self.kConfig.useRegularization
         else:
             self.useRegularization = False

@@ -1,3 +1,5 @@
+from builtins import input
+from builtins import object
 #
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
@@ -240,7 +242,7 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
         if display:
             lsstDebug.frame += 1
             if pauseAtEnd:
-                raw_input("Continue? y[es] p[db] ")
+                input("Continue? y[es] p[db] ")
 
         return Struct(
             starCat=starCat,

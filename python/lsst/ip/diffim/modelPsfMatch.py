@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from builtins import range
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
 #

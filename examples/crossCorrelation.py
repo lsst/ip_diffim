@@ -1,3 +1,4 @@
+from builtins import range
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.ip.diffim as ipDiffim
 import lsst.afw.geom as afwGeom

@@ -1,3 +1,5 @@
+from builtins import range
+from builtins import object
 #
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
@@ -434,9 +436,9 @@ class NbasisEvaluator(object):
                             bicArray[cand.getId()][(d1i, d2i, d3i)] = bic
 
         bestConfigs = []
-        candIds = bicArray.keys()
+        candIds = list(bicArray.keys())
         for candId in candIds:
-            cconfig, cvals = bicArray[candId].keys(), bicArray[candId].values()
+            cconfig, cvals = list(bicArray[candId].keys()), list(bicArray[candId].values())
             idx = np.argsort(cvals)
             bestConfig = cconfig[idx[0]]
             bestConfigs.append(bestConfig)

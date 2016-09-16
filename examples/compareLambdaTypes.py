@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import print_function
+from builtins import input
 import os
 import sys
 import unittest
@@ -259,7 +260,7 @@ class DiffimTestCases(unittest.TestCase):
             kImageOut2.writeFits('k4.fits')
             diffIm2.writeFits('d4')
 
-        raw_input('Next: ')
+        input('Next: ')
 
     def testFunctor(self):
         for fp in self.footprints:

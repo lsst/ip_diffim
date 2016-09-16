@@ -23,6 +23,7 @@
 #
 
 from __future__ import print_function
+from builtins import range
 import unittest
 import lsst.utils.tests
 import lsst.afw.image as afwImage

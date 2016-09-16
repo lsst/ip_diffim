@@ -23,6 +23,7 @@
 #
 
 from __future__ import print_function
+from builtins import input
 import os
 import unittest
 import lsst.utils.tests as tests
@@ -250,7 +251,7 @@ class DiffimTestCases(unittest.TestCase):
             kImageOutAL.writeFits('kAL.fits')
             diffImAL.writeFits('dAL')
 
-        raw_input('Next: ')
+        input('Next: ')
 
     def testFunctor(self):
         for fp in self.footprints:

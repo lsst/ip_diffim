@@ -1,3 +1,5 @@
+from builtins import zip
+from builtins import object
 #
 # LSST Data Management System
 # Copyright 2008-2016 AURA/LSST.
