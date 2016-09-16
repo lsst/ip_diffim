@@ -216,43 +216,43 @@ examples/snapPsfMatchTask.py --debug --template /path/to/templateExp.fits --scie
 First, create a subclass of SnapPsfMatchTask that accepts two exposures.  Ideally these exposures would have
 been taken back-to-back, such that the pointing/background/Psf does not vary substantially between the two:
 \skip MySnapPsfMatchTask
-\until return
+@until return
 
 And allow the user the freedom to either run the script in default mode, or point to their own images on disk.
 Note that these images must be readable as an lsst.afw.image.Exposure:
 \skip main
-\until parse_args
+@until parse_args
 
 We have enabled some minor display debugging in this script via the --debug option.  However, if you
 have an lsstDebug debug.py in your PYTHONPATH you will get additional debugging displays.  The following
 block checks for this script:
 \skip args.debug
-\until sys.stderr
+@until sys.stderr
 
 
 \dontinclude snapPsfMatchTask.py
 Finally, we call a run method that we define below.  First set up a Config and choose the basis set to use:
 \skip run(args)
-\until AL
+@until AL
 
 Make sure the images (if any) that were sent to the script exist on disk and are readable.  If no images
 are sent, make some fake data up for the sake of this example script (have a look at the code if you want
 more details on generateFakeImages; as a detail of how the fake images were made, you do have to fit for a
 differential background):
 \skip requested
-\until sizeCellY
+@until sizeCellY
 
 Display the two images if --debug:
 \skip args.debug
-\until Science
+@until Science
 
 Create and run the Task:
 \skip Create
-\until result
+@until result
 
 And finally provide optional debugging display of the Psf-matched (via the Psf models) science image:
 \skip args.debug
-\until result.subtractedExposure
+@until result.subtractedExposure
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
     """

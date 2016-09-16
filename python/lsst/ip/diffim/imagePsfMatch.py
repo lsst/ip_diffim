@@ -229,39 +229,39 @@ examples/imagePsfMatchTask.py --debug --template /path/to/templateExp.fits --sci
 \dontinclude imagePsfMatchTask.py
 Create a subclass of ImagePsfMatchTask that allows us to either match exposures, or subtract exposures:
 \skip MyImagePsfMatchTask
-\until self.subtractExposures
+@until self.subtractExposures
 
 And allow the user the freedom to either run the script in default mode, or point to their own images on disk.
 Note that these images must be readable as an lsst.afw.image.Exposure:
 \skip main
-\until parse_args
+@until parse_args
 
 We have enabled some minor display debugging in this script via the --debug option.  However, if you
 have an lsstDebug debug.py in your PYTHONPATH you will get additional debugging displays.  The following
 block checks for this script:
 \skip args.debug
-\until sys.stderr
+@until sys.stderr
 
 \dontinclude imagePsfMatchTask.py
 Finally, we call a run method that we define below.  First set up a Config and modify some of the parameters.
 E.g. use an "Alard-Lupton" sum-of-Gaussian basis, fit for a differential background, and use low order spatial
 variation in the kernel and background:
 \skip run(args)
-\until spatialBgOrder
+@until spatialBgOrder
 
 Make sure the images (if any) that were sent to the script exist on disk and are readable.  If no images
 are sent, make some fake data up for the sake of this example script (have a look at the code if you want
 more details on generateFakeImages):
 \skip requested
-\until sizeCellY
+@until sizeCellY
 
 Create and run the Task:
 \skip Create
-\until args.mode
+@until args.mode
 
 And finally provide some optional debugging displays:
 \skip args.debug
-\until result.subtractedExposure
+@until result.subtractedExposure
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
     """

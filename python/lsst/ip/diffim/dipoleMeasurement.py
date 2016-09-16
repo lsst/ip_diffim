@@ -149,7 +149,7 @@ This class provides a default configuration for running Source measurement on im
 These default plugins include:
 \dontinclude dipoleMeasurement.py
 \skip class DipoleMeasurementConfig
-\until self.doReplaceWithNoise
+@until self.doReplaceWithNoise
 
 These plugins enabled by default allow the user to test the hypothesis that the Source is a dipole.
 This includes a set of measurements derived from intermediate base classes
@@ -256,41 +256,41 @@ examples/dipoleMeasTask.py --debug --image /path/to/image.fits
 Start the processing by parsing the command line, where the user has the option of enabling debugging output
 and/or sending their own image for demonstration (in case they have not downloaded the afwdata package).
 \skip main
-\until run
+@until run
 
 \dontinclude dipoleMeasTask.py
 The processing occurs in the run function.  We first extract an exposure from disk or afwdata, displaying
 it if requested:
 \skip args
-\until mtv
+@until mtv
 
 Create a default source schema that we will append fields to as we add more algorithms:
 \skip makeMinimalSchema
-\until makeMinimalSchema
+@until makeMinimalSchema
 
 Create the detection and measurement Tasks, with some minor tweaking of their configs:
 \skip Create
-\until measureTask
+@until measureTask
 
 Having fully initialied the schema, we create a Source table from it:
 \skip output
-\until SourceTable
+@until SourceTable
 
 Run detection:
 \skip Process
-\until detectionTask
+@until detectionTask
 
 Because we are looking for dipoles, we need to merge the positive and negative detections:
 \skip Merge
-\until numNeg
+@until numNeg
 
 Finally, perform measurement (both standard and dipole-specialized) on the merged sources:
 \skip measureTask
-\until measureTask
+@until measureTask
 
 Optionally display debugging information:
 \skip Display
-\until displayDipoles
+@until displayDipoles
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
     """
