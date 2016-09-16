@@ -228,7 +228,7 @@ class KernelCandidateQa(object):
                            "KCKernelStdY_LOCAL": stdy,
                            "KernelCandidateId_LOCAL": kernelCandidate.getId(),
                            "KernelCoeffValues_LOCAL": kernelValues}
-                for k in list(metrics.keys()):
+                for k in metrics:
                     key = schema[k].asKey()
                     setter = getattr(source, "set"+key.getTypeString())
                     setter(key, metrics[k])
@@ -278,7 +278,7 @@ class KernelCandidateQa(object):
                        "KCKernelStdX_SPATIAL": stdx,
                        "KCKernelStdY_SPATIAL": stdy,
                        "KernelCandidateId_SPATIAL": kernelCandidate.getId()}
-            for k in list(metrics.keys()):
+            for k in metrics:
                 key = schema[k].asKey()
                 setter = getattr(source, "set"+key.getTypeString())
                 setter(key, metrics[k])
@@ -288,7 +288,7 @@ class KernelCandidateQa(object):
         positives) from all the Sources in the sourceCatalog"""
         for source in sourceCatalog:
             sourceId = source.getId()
-            if sourceId in list(wcsresids.keys()):
+            if sourceId in wcsresids:
                 #Note that the residuals are not delta RA, delta Dec
                 #From the source code "bearing (angle wrt a declination parallel) and distance
                 coord, resids = wcsresids[sourceId]

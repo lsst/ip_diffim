@@ -690,7 +690,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         self.kConfig = self.config.kernel.active
 
         #
-        if 'useRegularization' in list(self.kConfig.keys()):
+        if 'useRegularization' in self.kConfig:
             self.useRegularization = self.kConfig.useRegularization
         else:
             self.useRegularization = False

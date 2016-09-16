@@ -436,8 +436,7 @@ class NbasisEvaluator(object):
                             bicArray[cand.getId()][(d1i, d2i, d3i)] = bic
 
         bestConfigs = []
-        candIds = list(bicArray.keys())
-        for candId in candIds:
+        for candId in bicArray:
             cconfig, cvals = list(bicArray[candId].keys()), list(bicArray[candId].values())
             idx = np.argsort(cvals)
             bestConfig = cconfig[idx[0]]
