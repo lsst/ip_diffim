@@ -91,7 +91,7 @@ class DetectionConfig(pexConfig.Config):
                  2*fpGrowKernelScaling*kernelSize.  With the value
                  of 1.0, the remaining pixels in each KernelCandiate
                  after convolution by the basis functions will be
-                 eqaul to the kernel size iteslf.""",
+                 equal to the kernel size itself.""",
         default=1.0,
         check=lambda x: x >= 1.0
     )
