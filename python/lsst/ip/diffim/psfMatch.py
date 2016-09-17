@@ -1,4 +1,4 @@
-from builtins import str
+#from builtins import str
 from builtins import range
 #
 # LSST Data Management System
