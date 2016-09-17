@@ -1,4 +1,3 @@
-from builtins import range
 #!/usr/bin/env python
 
 #
@@ -23,6 +22,8 @@ from builtins import range
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
+from __future__ import division
+from builtins import range
 import os
 import sys
 import unittest
@@ -80,8 +81,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def runConvolveAndSubtract1(self, bgVal=0, xloc=408, yloc=580):
         imsize = int(5 * self.kSize)
 
-        p0 = afwGeom.Point2I(xloc - imsize/2, yloc - imsize/2)
-        p1 = afwGeom.Point2I(xloc + imsize/2, yloc + imsize/2)
+        p0 = afwGeom.Point2I(xloc - imsize//2, yloc - imsize//2)
+        p1 = afwGeom.Point2I(xloc + imsize//2, yloc + imsize//2)
         bbox = afwGeom.Box2I(p0, p1)
 
         tmi = afwImage.MaskedImageF(self.templateImage, bbox, afwImage.LOCAL)
@@ -99,8 +100,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def runConvolveAndSubtract2(self, bgOrder=0, xloc=408, yloc=580):
         imsize = int(5 * self.kSize)
 
-        p0 = afwGeom.Point2I(xloc - imsize/2, yloc - imsize/2)
-        p1 = afwGeom.Point2I(xloc + imsize/2, yloc + imsize/2)
+        p0 = afwGeom.Point2I(xloc - imsize//2, yloc - imsize//2)
+        p1 = afwGeom.Point2I(xloc + imsize//2, yloc + imsize//2)
         bbox = afwGeom.Box2I(p0, p1)
 
         tmi = afwImage.MaskedImageF(self.templateImage, bbox, afwImage.LOCAL)
