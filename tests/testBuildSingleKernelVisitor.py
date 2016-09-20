@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from __future__ import print_function
+from builtins import range
 import unittest
 import lsst.utils.tests
 
@@ -68,8 +70,8 @@ class DiffimTestCases(unittest.TestCase):
             kc1.getKernelSolution(ipDiffim.KernelCandidateF.RECENT)
             kc2.getKernelSolution(ipDiffim.KernelCandidateF.RECENT)
             kc3.getKernelSolution(ipDiffim.KernelCandidateF.RECENT)
-        except Exception, e:
-            print e
+        except Exception as e:
+            print(e)
             self.fail()
 
         # Its not the Pca one
@@ -77,7 +79,7 @@ class DiffimTestCases(unittest.TestCase):
             kc1.getKernelSolution(ipDiffim.KernelCandidateF.PCA)
             kc2.getKernelSolution(ipDiffim.KernelCandidateF.PCA)
             kc3.getKernelSolution(ipDiffim.KernelCandidateF.PCA)
-        except Exception, e:
+        except Exception as e:
             pass
         else:
             self.fail()

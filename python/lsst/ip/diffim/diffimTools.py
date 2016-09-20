@@ -1,3 +1,5 @@
+from builtins import range
+from builtins import object
 #
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
@@ -27,7 +29,7 @@ from collections import Counter
 import numpy as np
 
 # all the c++ level classes and routines
-import diffimLib
+from . import diffimLib
 
 # all the other LSST packages
 import lsst.afw.geom as afwGeom
@@ -46,13 +48,15 @@ from .makeKernelBasisList import makeKernelBasisList
 # Add noise
 #######
 
-def makeFlatNoiseImage(mi, seedStat = afwMath.MAX):
-    img       = mi.getImage()
-    seed      = int(10. * afwMath.makeStatistics(mi.getImage(), seedStat).getValue() + 1)
-    rdm       = afwMath.Random(afwMath.Random.MT19937, seed)
-    rdmImage  = img.Factory(img.getDimensions())
+
+def makeFlatNoiseImage(mi, seedStat=afwMath.MAX):
+    img = mi.getImage()
+    seed = int(10. * afwMath.makeStatistics(mi.getImage(), seedStat).getValue() + 1)
+    rdm = afwMath.Random(afwMath.Random.MT19937, seed)
+    rdmImage = img.Factory(img.getDimensions())
     afwMath.randomGaussianImage(rdmImage, rdm)
     return rdmImage
+
 
 def makePoissonNoiseImage(im):
     """Return a Poisson noise image based on im
@@ -79,28 +83,31 @@ def makePoissonNoiseImage(im):
 # gaussian) and the other is a convolution of this with a spatially
 # varying kernel.
 #######
+
+
 def fakeCoeffs():
-    kCoeffs = ((  1.0,     0.0,       0.0),
-               (  0.005,  -0.000001,  0.000001),
-               (  0.005,   0.000004,  0.000004),
-               ( -0.001,  -0.000030,  0.000030),
-               ( -0.001,   0.000015,  0.000015),
-               ( -0.005,  -0.000050,  0.000050))
+    kCoeffs = ((1.0, 0.0, 0.0),
+               (0.005, -0.000001, 0.000001),
+               (0.005, 0.000004, 0.000004),
+               (-0.001, -0.000030, 0.000030),
+               (-0.001, 0.000015, 0.000015),
+               (-0.005, -0.000050, 0.000050))
     return kCoeffs
 
-def makeFakeKernelSet(sizeCell = 128, nCell = 3,
-                      deltaFunctionCounts = 1.e4, tGaussianWidth = 1.0,
-                      addNoise = True, bgValue = 100., display = False):
+
+def makeFakeKernelSet(sizeCell=128, nCell=3,
+                      deltaFunctionCounts=1.e4, tGaussianWidth=1.0,
+                      addNoise=True, bgValue=100., display=False):
 
     from . import imagePsfMatch
-    configFake               = imagePsfMatch.ImagePsfMatchConfig()
-    configFake.kernel.name   = "AL"
-    subconfigFake            = configFake.kernel.active
-    subconfigFake.alardNGauss   = 1
-    subconfigFake.alardSigGauss = [2.5,]
-    subconfigFake.alardDegGauss = [2,]
-    subconfigFake.sizeCellX     = sizeCell
-    subconfigFake.sizeCellY     = sizeCell
+    configFake = imagePsfMatch.ImagePsfMatchConfig()
+    configFake.kernel.name = "AL"
+    subconfigFake = configFake.kernel.active
+    subconfigFake.alardNGauss = 1
+    subconfigFake.alardSigGauss = [2.5, ]
+    subconfigFake.alardDegGauss = [2, ]
+    subconfigFake.sizeCellX = sizeCell
+    subconfigFake.sizeCellY = sizeCell
     subconfigFake.spatialKernelOrder = 1
     subconfigFake.spatialModelType = "polynomial"
     subconfigFake.singleKernelClipping = False   # variance is a hack
@@ -111,10 +118,10 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     policyFake = pexConfig.makePolicy(subconfigFake)
 
     basisList = makeKernelBasisList(subconfigFake)
-    kSize     = subconfigFake.kernelSize
+    kSize = subconfigFake.kernelSize
 
     # This sets the final extent of each convolved delta function
-    gaussKernelWidth   = sizeCell // 2
+    gaussKernelWidth = sizeCell//2
 
     # This sets the scale over which pixels are correlated in the
     # spatial convolution; should be at least as big as the kernel you
@@ -125,30 +132,30 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     border = (gaussKernelWidth + spatialKernelWidth)//2
 
     # Make a fake image with a matrix of delta functions
-    totalSize = nCell * sizeCell + 2 * border
-    tim       = afwImage.ImageF(afwGeom.Extent2I(totalSize, totalSize))
+    totalSize = nCell * sizeCell + 2*border
+    tim = afwImage.ImageF(afwGeom.Extent2I(totalSize, totalSize))
     for x in range(nCell):
         for y in range(nCell):
-            tim.set(x * sizeCell + sizeCell // 2 + border - 1,
-                    y * sizeCell + sizeCell // 2 + border - 1,
+            tim.set(x*sizeCell + sizeCell//2 + border - 1,
+                    y*sizeCell + sizeCell//2 + border - 1,
                     deltaFunctionCounts)
 
     # Turn this into stars with a narrow width; conserve counts
     gaussFunction = afwMath.GaussianFunction2D(tGaussianWidth, tGaussianWidth)
-    gaussKernel   = afwMath.AnalyticKernel(gaussKernelWidth, gaussKernelWidth, gaussFunction)
+    gaussKernel = afwMath.AnalyticKernel(gaussKernelWidth, gaussKernelWidth, gaussFunction)
     cim = afwImage.ImageF(tim.getDimensions())
     afwMath.convolve(cim, tim, gaussKernel, True)
     tim = cim
 
     # Trim off border pixels
     bbox = gaussKernel.shrinkBBox(tim.getBBox(afwImage.LOCAL))
-    tim  = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
+    tim = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
 
     # Now make a science image which is this convolved with some
     # spatial function.  Use input basis list.
     polyFunc = afwMath.PolynomialFunction2D(1)
-    kCoeffs  = fakeCoeffs()
-    nToUse   = min(len(kCoeffs), len(basisList))
+    kCoeffs = fakeCoeffs()
+    nToUse = min(len(kCoeffs), len(basisList))
 
     # Make the full convolved science image
     sKernel = afwMath.LinearCombinationKernel(afwMath.KernelList(basisList[:nToUse]), polyFunc)
@@ -160,28 +167,28 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
     bbox = sKernel.shrinkBBox(sim.getBBox(afwImage.LOCAL))
 
     # Add background
-    sim  += bgValue
+    sim += bgValue
 
     # Watch out for negative values
-    tim  += 2 * np.abs(np.min(tim.getArray()))
+    tim += 2 * np.abs(np.min(tim.getArray()))
 
     # Add noise?
     if addNoise:
-        sim   = makePoissonNoiseImage(sim)
-        tim   = makePoissonNoiseImage(tim)
+        sim = makePoissonNoiseImage(sim)
+        tim = makePoissonNoiseImage(tim)
 
     # And turn into MaskedImages
-    sim   = afwImage.ImageF(sim, bbox, afwImage.LOCAL)
-    svar  = afwImage.ImageF(sim, True)
+    sim = afwImage.ImageF(sim, bbox, afwImage.LOCAL)
+    svar = afwImage.ImageF(sim, True)
     smask = afwImage.MaskU(sim.getDimensions())
     smask.set(0x0)
-    sMi   = afwImage.MaskedImageF(sim, smask, svar)
+    sMi = afwImage.MaskedImageF(sim, smask, svar)
 
-    tim   = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
-    tvar  = afwImage.ImageF(tim, True)
+    tim = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
+    tvar = afwImage.ImageF(tim, True)
     tmask = afwImage.MaskU(tim.getDimensions())
     tmask.set(0x0)
-    tMi   = afwImage.MaskedImageF(tim, tmask, tvar)
+    tMi = afwImage.MaskedImageF(tim, tmask, tvar)
 
     if display:
         import lsst.afw.display.ds9 as ds9
@@ -210,8 +217,8 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
             kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policyFake)
             kernelCellSet.insertCandidate(kc)
 
-    tMi.setXY0(0,0)
-    sMi.setXY0(0,0)
+    tMi.setXY0(0, 0)
+    sMi.setXY0(0, 0)
     return tMi, sMi, sKernel, kernelCellSet, configFake
 
 
@@ -222,18 +229,18 @@ def makeFakeKernelSet(sizeCell = 128, nCell = 3,
 def backgroundSubtract(config, maskedImages):
     backgrounds = []
     t0 = time.time()
-    algorithm   = config.algorithm
-    binsize     = config.binSize
+    algorithm = config.algorithm
+    binsize = config.binSize
     undersample = config.undersampleStyle
-    bctrl       = afwMath.BackgroundControl(algorithm)
+    bctrl = afwMath.BackgroundControl(algorithm)
     bctrl.setUndersampleStyle(undersample)
     for maskedImage in maskedImages:
         bctrl.setNxSample(maskedImage.getWidth()//binsize + 1)
         bctrl.setNySample(maskedImage.getHeight()//binsize + 1)
-        image   = maskedImage.getImage()
+        image = maskedImage.getImage()
         backobj = afwMath.makeBackground(image, bctrl)
 
-        image  -= backobj.getImageF()
+        image -= backobj.getImageF()
         backgrounds.append(backobj.getImageF())
         del backobj
 
@@ -245,6 +252,7 @@ def backgroundSubtract(config, maskedImages):
 #######
 # More coarse debugging
 #######
+
 
 def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir):
     if not os.path.isdir(outdir):
@@ -263,16 +271,17 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
                 kernel.writeFits(os.path.join(outdir, 'kernel_c%d_x%d_y%d.fits' % (idCand, xCand, yCand)))
 
                 # Diffim from spatial model
-                ski   = afwImage.ImageD(kernel.getDimensions())
+                ski = afwImage.ImageD(kernel.getDimensions())
                 psfMatchingKernel.computeImage(ski, False, xCand, yCand)
-                sk    = afwMath.FixedKernel(ski)
-                sbg   = backgroundModel(xCand, yCand)
-                sdmi  = cand.getDifferenceImage(sk, sbg)
+                sk = afwMath.FixedKernel(ski)
+                sbg = backgroundModel(xCand, yCand)
+                sdmi = cand.getDifferenceImage(sk, sbg)
                 sdmi.writeFits(os.path.join(outdir, 'sdiffim_c%d_x%d_y%d.fits' % (idCand, xCand, yCand)))
 
 #######
 # Converting types
 #######
+
 
 def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, kernelSize, config, log):
     """ Takes an input list of Sources that were selected to constrain
@@ -316,10 +325,10 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
         if center[1] < bbox.getMinY() or center[1] > bbox.getMaxY():
             continue
 
-        xmin   = center[0] - fpGrowPix
-        xmax   = center[0] + fpGrowPix
-        ymin   = center[1] - fpGrowPix
-        ymax   = center[1] + fpGrowPix
+        xmin = center[0] - fpGrowPix
+        xmax = center[0] + fpGrowPix
+        ymin = center[1] - fpGrowPix
+        ymax = center[1] + fpGrowPix
 
         # Keep object centered
         if (xmin - bbox.getMinX()) < 0:
@@ -347,9 +356,10 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
             pass
         else:
             if not((bm1 & badBitMask) or (bm2 & badBitMask)):
-                candidateOutList.append({'source':kernelCandidate, 'footprint':afwDetect.Footprint(kbbox)})
+                candidateOutList.append({'source': kernelCandidate, 'footprint': afwDetect.Footprint(kbbox)})
     log.info("Selected %d / %d sources for KernelCandidacy" % (len(candidateOutList), len(candidateInList)))
     return candidateOutList
+
 
 def sourceTableToCandidateList(sourceTable, templateExposure, scienceExposure, kConfig, dConfig, log,
                                basisList, doBuild=False):
@@ -369,8 +379,8 @@ def sourceTableToCandidateList(sourceTable, templateExposure, scienceExposure, k
     policy = pexConfig.makePolicy(kConfig)
     for cand in footprintList:
         bbox = cand['footprint'].getBBox()
-        tmi  = afwImage.MaskedImageF(templateExposure.getMaskedImage(), bbox)
-        smi  = afwImage.MaskedImageF(scienceExposure.getMaskedImage(), bbox)
+        tmi = afwImage.MaskedImageF(templateExposure.getMaskedImage(), bbox)
+        smi = afwImage.MaskedImageF(scienceExposure.getMaskedImage(), bbox)
         kCand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
         if doBuild:
             visitor.processCandidate(kCand)
@@ -387,6 +397,7 @@ def sourceTableToCandidateList(sourceTable, templateExposure, scienceExposure, k
 class NbasisEvaluator(object):
     """A functor to evaluate the Bayesian Information Criterion for the number of basis sets
     going into the kernel fitting"""
+
     def __init__(self, psfMatchConfig, psfFwhmPixTc, psfFwhmPixTnc):
         self.psfMatchConfig = psfMatchConfig
         self.psfFwhmPixTc = psfFwhmPixTc
@@ -415,7 +426,7 @@ class NbasisEvaluator(object):
                                 continue
                             diffIm = cand.getDifferenceImage(diffimLib.KernelCandidateF.RECENT)
                             bbox = cand.getKernel(diffimLib.KernelCandidateF.RECENT).shrinkBBox(
-                                                                            diffIm.getBBox(afwImage.LOCAL))
+                                diffIm.getBBox(afwImage.LOCAL))
                             diffIm = type(diffIm)(diffIm, bbox, True)
                             chi2 = diffIm.getImage().getArray()**2 / diffIm.getVariance().getArray()
                             n = chi2.shape[0] * chi2.shape[1]
@@ -425,16 +436,15 @@ class NbasisEvaluator(object):
                             bicArray[cand.getId()][(d1i, d2i, d3i)] = bic
 
         bestConfigs = []
-        candIds = bicArray.keys()
-        for candId in candIds:
-            cconfig, cvals = bicArray[candId].keys(), bicArray[candId].values()
+        for candId in bicArray:
+            cconfig, cvals = list(bicArray[candId].keys()), list(bicArray[candId].values())
             idx = np.argsort(cvals)
             bestConfig = cconfig[idx[0]]
             bestConfigs.append(bestConfig)
 
         counter = Counter(bestConfigs).most_common(3)
         log.info("B.I.C. prefers basis complexity %s %d times; %s %d times; %s %d times" %
-                    (counter[0][0], counter[0][1],
-                    counter[1][0], counter[1][1],
-                    counter[2][0], counter[2][1]))
+                 (counter[0][0], counter[0][1],
+                     counter[1][0], counter[1][1],
+                     counter[2][0], counter[2][1]))
         return counter[0][0], counter[1][0], counter[2][0]

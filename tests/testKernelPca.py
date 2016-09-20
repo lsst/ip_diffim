@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from __future__ import print_function
+from builtins import range
 import unittest
 
 import lsst.utils.tests
@@ -124,7 +126,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # NOTE : this needs to be changed once ticket #1649 is resolved
         for i in range(len(eigenImages)):
             for j in range(i, len(eigenImages)):
-                print i, j, afwImage.innerProduct(eigenImages[i], eigenImages[j])
+                print(i, j, afwImage.innerProduct(eigenImages[i], eigenImages[j]))
 
     def testEigenValues(self):
         kc1 = self.makeCandidate(1, 0.0, 0.0)

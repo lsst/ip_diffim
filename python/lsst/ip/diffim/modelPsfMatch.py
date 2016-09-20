@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+from builtins import range
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
 #
@@ -19,7 +21,7 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import numpy as num
-import diffimLib
+from . import diffimLib
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -27,22 +29,23 @@ import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.meas.algorithms as measAlg
 import lsst.pipe.base as pipeBase
-from makeKernelBasisList import makeKernelBasisList
-from psfMatch import PsfMatchTask, PsfMatchConfigAL
+from .makeKernelBasisList import makeKernelBasisList
+from .psfMatch import PsfMatchTask, PsfMatchConfigAL
 from . import utils as diUtils
 import lsst.afw.display.ds9 as ds9
 
 sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
 
+
 class ModelPsfMatchConfig(pexConfig.Config):
     """!Configuration for model-to-model Psf matching"""
 
     kernel = pexConfig.ConfigChoiceField(
-        doc = "kernel type",
-        typemap = dict(
-            AL = PsfMatchConfigAL,
-            ),
-        default = "AL",
+        doc="kernel type",
+        typemap=dict(
+            AL=PsfMatchConfigAL,
+        ),
+        default="AL",
     )
 
     def setDefaults(self):
@@ -65,6 +68,7 @@ class ModelPsfMatchConfig(pexConfig.Config):
 ## \ref ModelPsfMatchTask_ "ModelPsfMatchTask"
 ## \copybrief ModelPsfMatchTask
 ## \}
+
 
 class ModelPsfMatchTask(PsfMatchTask):
     """!
@@ -181,43 +185,43 @@ examples/modelPsfMatchTask.py --debug --template /path/to/templateExp.fits --sci
 Create a subclass of ModelPsfMatchTask that accepts two exposures.  Note that the "template" exposure
 contains the Psf that will get matched to, and the "science" exposure is the one that will be convolved:
 \skip MyModelPsfMatchTask
-\until return
+@until return
 
 And allow the user the freedom to either run the script in default mode, or point to their own images on disk.
 Note that these images must be readable as an lsst.afw.image.Exposure:
 \skip main
-\until parse_args
+@until parse_args
 
 We have enabled some minor display debugging in this script via the --debug option.  However, if you
 have an lsstDebug debug.py in your PYTHONPATH you will get additional debugging displays.  The following
 block checks for this script:
 \skip args.debug
-\until sys.stderr
+@until sys.stderr
 
 \dontinclude modelPsfMatchTask.py
 Finally, we call a run method that we define below.  First set up a Config and modify some of the parameters.
 In particular we don't want to "grow" the sizes of the kernel or KernelCandidates, since we are operating with
 fixed--size images (i.e. the size of the input Psf models).
 \skip run(args)
-\until False
+@until False
 
 Make sure the images (if any) that were sent to the script exist on disk and are readable.  If no images
 are sent, make some fake data up for the sake of this example script (have a look at the code if you want
 more details on generateFakeData):
 \skip requested
-\until sizeCellY
+@until sizeCellY
 
 Display the two images if --debug:
 \skip args.debug
-\until Science
+@until Science
 
 Create and run the Task:
 \skip Create
-\until result
+@until result
 
 And finally provide optional debugging display of the Psf-matched (via the Psf models) science image:
 \skip args.debug
-\until result.psfMatchedExposure
+@until result.psfMatchedExposure
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -269,7 +273,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         fwhm1 = s1 * sigma2fwhm # science Psf
         fwhm2 = s2 * sigma2fwhm # template Psf
 
-        basisList = makeKernelBasisList(self.kConfig, fwhm1, fwhm2, metadata = self.metadata)
+        basisList = makeKernelBasisList(self.kConfig, fwhm1, fwhm2, metadata=self.metadata)
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
 
         if psfMatchingKernel.isSpatiallyVarying():
@@ -347,19 +351,19 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         # Roots are [-3 +/- sqrt(9 - 8 * (1 - N))] / 2
         #
         nParameters = sciencePsfModel.getKernel().getNSpatialParameters()
-        root        = num.sqrt(9 - 8 * (1 - nParameters))
-        if (root != root // 1):            # We know its an integer solution
+        root = num.sqrt(9 - 8*(1 - nParameters))
+        if (root != root//1):            # We know its an integer solution
             pexLog.Trace(self.log.getName(), 3, "Problem inferring spatial order of image's Psf")
         else:
-            order       = (root - 3) / 2
-            if (order != order // 1):
+            order = (root - 3)/2
+            if (order != order//1):
                 pexLog.Trace(self.log.getName(), 3, "Problem inferring spatial order of image's Psf")
             else:
                 pexLog.Trace(self.log.getName(), 2, "Spatial order of Psf = %d; matching kernel order = %d" %
                              (order, self.kConfig.spatialKernelOrder))
 
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
-        scienceX0,   scienceY0   = scienceBBox.getMin()
+        scienceX0, scienceY0 = scienceBBox.getMin()
 
         sizeCellX = self.kConfig.sizeCellX
         sizeCellY = self.kConfig.sizeCellY
@@ -368,39 +372,39 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
             afwGeom.Box2I(afwGeom.Point2I(scienceX0, scienceY0),
                           afwGeom.Extent2I(regionSizeX, regionSizeY)),
             sizeCellX, sizeCellY
-            )
+        )
 
-        nCellX    = regionSizeX // sizeCellX
-        nCellY    = regionSizeY // sizeCellY
-        dimenR    = referencePsfModel.getKernel().getDimensions()
-        dimenS    = sciencePsfModel.getKernel().getDimensions()
+        nCellX = regionSizeX//sizeCellX
+        nCellY = regionSizeY//sizeCellY
+        dimenR = referencePsfModel.getKernel().getDimensions()
+        dimenS = sciencePsfModel.getKernel().getDimensions()
 
         policy = pexConfig.makePolicy(self.kConfig)
         for row in range(nCellY):
             # place at center of cell
-            posY = sizeCellY * row + sizeCellY // 2 + scienceY0
+            posY = sizeCellY * row + sizeCellY//2 + scienceY0
 
             for col in range(nCellX):
                 # place at center of cell
-                posX = sizeCellX * col + sizeCellX // 2 + scienceX0
+                posX = sizeCellX * col + sizeCellX//2 + scienceX0
 
                 pexLog.Trace(self.log.getName(), 5, "Creating Psf candidate at %.1f %.1f" % (posX, posY))
 
                 # reference kernel image, at location of science subimage
                 kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY)).convertF()
-                kernelMaskR   = afwImage.MaskU(dimenR)
+                kernelMaskR = afwImage.MaskU(dimenR)
                 kernelMaskR.set(0)
-                kernelVarR    = afwImage.ImageF(dimenR)
+                kernelVarR = afwImage.ImageF(dimenR)
                 kernelVarR.set(1.0)
-                referenceMI   = afwImage.MaskedImageF(kernelImageR, kernelMaskR, kernelVarR)
+                referenceMI = afwImage.MaskedImageF(kernelImageR, kernelMaskR, kernelVarR)
 
                 # kernel image we are going to convolve
                 kernelImageS = sciencePsfModel.computeImage(afwGeom.Point2D(posX, posY)).convertF()
-                kernelMaskS   = afwImage.MaskU(dimenS)
+                kernelMaskS = afwImage.MaskU(dimenS)
                 kernelMaskS.set(0)
-                kernelVarS    = afwImage.ImageF(dimenS)
+                kernelVarS = afwImage.ImageF(dimenS)
                 kernelVarS.set(1.0)
-                scienceMI     = afwImage.MaskedImageF(kernelImageS, kernelMaskS, kernelVarS)
+                scienceMI = afwImage.MaskedImageF(kernelImageS, kernelMaskS, kernelVarS)
 
                 # The image to convolve is the science image, to the reference Psf.
                 kc = diffimLib.makeKernelCandidate(posX, posY, scienceMI, referenceMI, policy)
@@ -416,7 +420,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
             ds9.setMaskTransparency(maskTransparency)
         if display and displaySpatialCells:
             diUtils.showKernelSpatialCells(exposure.getMaskedImage(), kernelCellSet,
-                symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
-                size=4, frame=lsstDebug.frame, title="Image to be convolved")
+                                           symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
+                                           size=4, frame=lsstDebug.frame, title="Image to be convolved")
             lsstDebug.frame += 1
         return kernelCellSet

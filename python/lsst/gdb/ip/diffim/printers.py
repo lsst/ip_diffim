@@ -1,14 +1,19 @@
+from __future__ import print_function
+from builtins import object
 import gdb
-import re, sys
-    
+import re
+import sys
+
 try:
     import gdb.printing
 
     # example from meas_alg
     class CRPixelPrinter(object):
         "Print a CRPixel"
+
         def __init__(self, val):
             self.val = val
+
         def to_string(self):
             return "{id=%d (%d, %d)}" % (self.val["id"], self.val["col"], self.val["row"])
 
@@ -38,8 +43,7 @@ try:
 
 except ImportError:
     def register(*args, **kwargs):
-        print >> sys.stderr, "Your version of gdb is too old to load the ip.diffim python pretty printers"
+        print("Your version of gdb is too old to load the ip.diffim python pretty printers", file=sys.stderr)
         pass
-    
-    pass
 
+    pass

@@ -1,5 +1,5 @@
 # all the c++ level classes and routines
-import diffimLib
+from . import diffimLib
 
 # all the other LSST packages
 import lsst.afw.image as afwImage
@@ -7,12 +7,13 @@ import lsst.afw.math as afwMath
 
 # Basically deprecated until SDQA is replaced
 
+
 def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
-    imstats    = diffimLib.ImageStatisticsF()
+    imstats = diffimLib.ImageStatisticsF()
     #sdqaVector = sdqa.SdqaRatingSet()
 
     width, height = spatialKernel.getDimensions()
-    kImage        = afwImage.ImageD(width, height)
+    kImage = afwImage.ImageD(width, height)
     # find the kernel sum and its Rms by looking at the 4 corners of the image
     kSums = afwMath.vectorD()
     for x in (0, width):
@@ -28,7 +29,7 @@ def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
     #sdqaVector.append(kSumRating)
 
     nGood = 0
-    nBad  = 0
+    nBad = 0
     for cell in kernelCellSet.getCellList():
         for cand in cell.begin(False): # False = include bad candidates
             cand = diffimLib.cast_KernelCandidateF(cand)

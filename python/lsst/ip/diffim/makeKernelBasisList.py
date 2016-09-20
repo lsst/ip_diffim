@@ -1,3 +1,4 @@
+from builtins import range
 #
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
@@ -19,10 +20,11 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-import diffimLib
+from . import diffimLib
 import lsst.pex.logging as pexLog
 import numpy as np
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
+
 
 def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
                         basisDegGauss=None, metadata=None):
@@ -38,6 +40,7 @@ def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
     else:
         raise ValueError("Cannot generate %s basis set" % (config.kernelBasisSet))
 
+
 def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
                                  basisDegGauss=None, metadata=None):
     """Generate an Alard-Lupton kernel basis based upon the Config and
@@ -45,14 +48,14 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
 
     if config.kernelBasisSet != "alard-lupton":
         raise RuntimeError("Cannot generate %s basis within generateAlardLuptonBasisList" %
-                            config.kernelBasisSet)
+                           config.kernelBasisSet)
 
-    kernelSize     = config.kernelSize
-    fwhmScaling    = config.kernelSizeFwhmScaling
-    basisNGauss    = config.alardNGauss
-    basisSigmaGauss  = config.alardSigGauss
+    kernelSize = config.kernelSize
+    fwhmScaling = config.kernelSizeFwhmScaling
+    basisNGauss = config.alardNGauss
+    basisSigmaGauss = config.alardSigGauss
     basisGaussBeta = config.alardGaussBeta
-    basisMinSigma  = config.alardMinSig
+    basisMinSigma = config.alardMinSig
     if basisDegGauss is None:
         basisDegGauss = config.alardDegGauss
 
@@ -73,7 +76,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
 
         return diffimLib.makeAlardLuptonBasisList(kernelSize//2, basisNGauss, basisSigmaGauss, basisDegGauss)
 
-    targetSigma    = targetFwhmPix / sigma2fwhm
+    targetSigma = targetFwhmPix / sigma2fwhm
     referenceSigma = referenceFwhmPix / sigma2fwhm
     pexLog.Trace("lsst.ip.diffim.generateAlardLuptonBasisList", 2,
                  "Generating matching bases for sigma %.2f pix -> %.2f pix" % (targetSigma, referenceSigma))
@@ -116,12 +119,12 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
 
         # Any other Gaussians above basisNGauss=1 come from a scaling
         # relationship: Sig_i+1 / Sig_i = basisGaussBeta
-        for i in range(nAppended,basisNGauss):
+        for i in range(nAppended, basisNGauss):
             basisSigmaGauss.append(basisSigmaGauss[-1]*basisGaussBeta)
 
-        kernelSize  = int(fwhmScaling * basisSigmaGauss[-1])
+        kernelSize = int(fwhmScaling * basisSigmaGauss[-1])
         kernelSize += 0 if kernelSize%2 else 1 # Make sure it's odd
-        kernelSize  = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
+        kernelSize = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
 
     else:
         # Deconvolution; Define the progression of Gaussians using a
@@ -148,12 +151,12 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
             basisSigmaGauss.append(kernelSigma)
             nAppended = 1
 
-        for i in range(nAppended,basisNGauss):
+        for i in range(nAppended, basisNGauss):
             basisSigmaGauss.append(basisSigmaGauss[-1]*basisGaussBeta)
 
-        kernelSize  = int(fwhmScaling * basisSigmaGauss[-1])
+        kernelSize = int(fwhmScaling * basisSigmaGauss[-1])
         kernelSize += 0 if kernelSize%2 else 1 # Make sure it's odd
-        kernelSize  = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
+        kernelSize = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
 
         # Now build a deconvolution set from these sigmas
         sig0 = basisSigmaGauss[0]
@@ -162,10 +165,10 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         basisSigmaGauss = []
         for n in range(1, 3):
             for j in range(n):
-                sigma2jn  = (n - j) * sig1**2
+                sigma2jn = (n - j)*sig1**2
                 sigma2jn += j * sig2**2
-                sigma2jn -= (n + 1) * sig0**2
-                sigmajn   = np.sqrt(sigma2jn)
+                sigma2jn -= (n + 1)*sig0**2
+                sigmajn = np.sqrt(sigma2jn)
                 basisSigmaGauss.append(sigmajn)
 
         basisSigmaGauss.sort()
@@ -179,4 +182,3 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         metadata.add("ALKernelSize", kernelSize)
 
     return diffimLib.makeAlardLuptonBasisList(kernelSize//2, basisNGauss, basisSigmaGauss, basisDegGauss)
-

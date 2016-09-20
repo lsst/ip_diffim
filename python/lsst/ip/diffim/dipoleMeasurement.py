@@ -1,3 +1,5 @@
+from builtins import zip
+from builtins import object
 #
 # LSST Data Management System
 # Copyright 2008-2016 AURA/LSST.
@@ -40,11 +42,11 @@ class ClassificationDipoleConfig(SingleFramePluginConfig):
     minSn = pexConfig.Field(
         doc="Minimum quadrature sum of positive+negative lobe S/N to be considered a dipole",
         dtype=float, default=np.sqrt(2) * 5.0,
-        )
+    )
     maxFluxRatio = pexConfig.Field(
         doc="Maximum flux ratio in either lobe to be considered a dipole",
-        dtype = float, default = 0.65
-        )
+        dtype=float, default=0.65
+    )
 
 
 @register("ip_diffim_ClassificationDipole")
@@ -66,27 +68,27 @@ class ClassificationDipolePlugin(SingleFramePlugin):
         self.keyFlag = schema.addField(name + "_flag", type="Flag", doc="Set to 1 for any fatal failure.")
 
     def measure(self, measRecord, exposure):
-            passesSn = self.dipoleAnalysis.getSn(measRecord) > self.config.minSn
-            negFlux = np.abs(measRecord.get("ip_diffim_PsfDipoleFlux_neg_flux"))
-            negFluxFlag = measRecord.get("ip_diffim_PsfDipoleFlux_neg_flag")
-            posFlux = np.abs(measRecord.get("ip_diffim_PsfDipoleFlux_pos_flux"))
-            posFluxFlag = measRecord.get("ip_diffim_PsfDipoleFlux_pos_flag")
+        passesSn = self.dipoleAnalysis.getSn(measRecord) > self.config.minSn
+        negFlux = np.abs(measRecord.get("ip_diffim_PsfDipoleFlux_neg_flux"))
+        negFluxFlag = measRecord.get("ip_diffim_PsfDipoleFlux_neg_flag")
+        posFlux = np.abs(measRecord.get("ip_diffim_PsfDipoleFlux_pos_flux"))
+        posFluxFlag = measRecord.get("ip_diffim_PsfDipoleFlux_pos_flag")
 
-            if negFluxFlag or posFluxFlag:
-                self.fail(measRecord)
-                # continue on to classify
+        if negFluxFlag or posFluxFlag:
+            self.fail(measRecord)
+            # continue on to classify
 
-            totalFlux = negFlux + posFlux
+        totalFlux = negFlux + posFlux
 
-            # If negFlux or posFlux are NaN, these evaluate to False
-            passesFluxNeg = (negFlux / totalFlux) < self.config.maxFluxRatio
-            passesFluxPos = (posFlux / totalFlux) < self.config.maxFluxRatio
-            if (passesSn and passesFluxPos and passesFluxNeg):
-                val = 1.0
-            else:
-                val = 0.0
+        # If negFlux or posFlux are NaN, these evaluate to False
+        passesFluxNeg = (negFlux / totalFlux) < self.config.maxFluxRatio
+        passesFluxPos = (posFlux / totalFlux) < self.config.maxFluxRatio
+        if (passesSn and passesFluxPos and passesFluxNeg):
+            val = 1.0
+        else:
+            val = 0.0
 
-            measRecord.set(self.keyProbability, val)
+        measRecord.set(self.keyProbability, val)
 
     def fail(self, measRecord, error=None):
         measRecord.set(self.keyFlag, True)
@@ -120,6 +122,8 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
 ## \ref DipoleMeasurementTask_ "DipoleMeasurementTask"
 ## \copybrief DipoleMeasurementTask
 ## \}
+
+
 class DipoleMeasurementTask(SingleFrameMeasurementTask):
     """!
 \anchor DipoleMeasurementTask_
@@ -145,7 +149,7 @@ This class provides a default configuration for running Source measurement on im
 These default plugins include:
 \dontinclude dipoleMeasurement.py
 \skip class DipoleMeasurementConfig
-\until self.doReplaceWithNoise
+@until self.doReplaceWithNoise
 
 These plugins enabled by default allow the user to test the hypothesis that the Source is a dipole.
 This includes a set of measurements derived from intermediate base classes
@@ -252,41 +256,41 @@ examples/dipoleMeasTask.py --debug --image /path/to/image.fits
 Start the processing by parsing the command line, where the user has the option of enabling debugging output
 and/or sending their own image for demonstration (in case they have not downloaded the afwdata package).
 \skip main
-\until run
+@until run
 
 \dontinclude dipoleMeasTask.py
 The processing occurs in the run function.  We first extract an exposure from disk or afwdata, displaying
 it if requested:
 \skip args
-\until mtv
+@until mtv
 
 Create a default source schema that we will append fields to as we add more algorithms:
 \skip makeMinimalSchema
-\until makeMinimalSchema
+@until makeMinimalSchema
 
 Create the detection and measurement Tasks, with some minor tweaking of their configs:
 \skip Create
-\until measureTask
+@until measureTask
 
 Having fully initialied the schema, we create a Source table from it:
 \skip output
-\until SourceTable
+@until SourceTable
 
 Run detection:
 \skip Process
-\until detectionTask
+@until detectionTask
 
 Because we are looking for dipoles, we need to merge the positive and negative detections:
 \skip Merge
-\until numNeg
+@until numNeg
 
 Finally, perform measurement (both standard and dipole-specialized) on the merged sources:
 \skip measureTask
-\until measureTask
+@until measureTask
 
 Optionally display debugging information:
 \skip Display
-\until displayDipoles
+@until displayDipoles
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
     """
@@ -300,6 +304,7 @@ Optionally display debugging information:
 
 class SourceFlagChecker(object):
     """!Functor class to check whether a diaSource has flags set that should cause it to be labeled bad."""
+
     def __init__(self, sources, badFlags=None):
         """!Constructor
 
@@ -310,7 +315,7 @@ class SourceFlagChecker(object):
         default the centroid keys are added to this list"""
 
         self.badFlags = ['base_PixelFlags_flag_edge', 'base_PixelFlags_flag_interpolatedCenter',
-                        'base_PixelFlags_flag_saturatedCenter']
+                         'base_PixelFlags_flag_saturatedCenter']
         if badFlags is not None:
             for flag in badFlags:
                 self.badFlags.append(flag)
@@ -326,8 +331,10 @@ class SourceFlagChecker(object):
                 return False
         return True
 
+
 class DipoleAnalysis(object):
     """!Functor class that provides (S/N, position, orientation) of measured dipoles"""
+
     def __init__(self):
         """!Constructor"""
         pass
@@ -383,7 +390,7 @@ class DipoleAnalysis(object):
             return None
 
         dx, dy = posCenX-negCenX, posCenY-negCenY
-        angle  = afwGeom.Angle(np.arctan2(dx, dy), afwGeom.radians)
+        angle = afwGeom.Angle(np.arctan2(dx, dy), afwGeom.radians)
         return angle
 
     def displayDipoles(self, exposure, sources):
@@ -411,7 +418,7 @@ class DipoleAnalysis(object):
                     isdipole = source.get("classification.dipole")
                     if isdipole and np.isfinite(isdipole):
                         # Dipole
-                        ctype= "green"
+                        ctype = "green"
                     else:
                         # Not dipole
                         ctype = "red"
@@ -430,7 +437,6 @@ class DipoleAnalysis(object):
             lsstDebug.frame += 1
 
 
-
 class DipoleDeblender(object):
     """!Functor to deblend a source as a dipole, and return a new source with deblended footprints.
 
@@ -444,6 +450,7 @@ class DipoleDeblender(object):
        Not actively being used, but there is a unit test for it in
        dipoleAlgorithm.py.
     """
+
     def __init__(self):
         # Set up defaults to send to deblender
 
@@ -454,19 +461,19 @@ class DipoleDeblender(object):
         self.sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
     def __call__(self, source, exposure):
-        fp     = source.getFootprint()
-        peaks  = fp.getPeaks()
+        fp = source.getFootprint()
+        peaks = fp.getPeaks()
         peaksF = [pk.getF() for pk in peaks]
-        fbb    = fp.getBBox()
-        fmask  = afwImage.MaskU(fbb)
+        fbb = fp.getBBox()
+        fmask = afwImage.MaskU(fbb)
         fmask.setXY0(fbb.getMinX(), fbb.getMinY())
         afwDetect.setMaskFromFootprint(fmask, fp, 1)
 
-        psf        = exposure.getPsf()
-        psfSigPix  = psf.computeShape().getDeterminantRadius()
+        psf = exposure.getPsf()
+        psfSigPix = psf.computeShape().getDeterminantRadius()
         psfFwhmPix = psfSigPix * self.sigma2fwhm
-        subimage   = afwImage.ExposureF(exposure, fbb, True)
-        cpsf       = deblendBaseline.CachingPsf(psf)
+        subimage = afwImage.ExposureF(exposure, fbb, True)
+        cpsf = deblendBaseline.CachingPsf(psf)
 
         # if fewer than 2 peaks, just return a copy of the source
         if len(peaks) < 2:
@@ -485,34 +492,33 @@ class DipoleDeblender(object):
         if True:
             # Call top-level deblend task
             fpres = deblendBaseline.deblend(fp, exposure.getMaskedImage(), psf, psfFwhmPix,
-                                            log = self.log,
-                                            psfChisqCut1 = self.psfChisqCut1,
-                                            psfChisqCut2 = self.psfChisqCut2,
-                                            psfChisqCut2b = self.psfChisqCut2b)
+                                            log=self.log,
+                                            psfChisqCut1=self.psfChisqCut1,
+                                            psfChisqCut2=self.psfChisqCut2,
+                                            psfChisqCut2b=self.psfChisqCut2b)
         else:
             # Call lower-level _fit_psf task
 
             # Prepare results structure
             fpres = deblendBaseline.PerFootprint()
             fpres.peaks = []
-            for pki,pk in enumerate(dpeaks):
+            for pki, pk in enumerate(dpeaks):
                 pkres = deblendBaseline.PerPeak()
                 pkres.peak = pk
                 pkres.pki = pki
                 fpres.peaks.append(pkres)
 
-            for pki,(pk,pkres,pkF) in enumerate(zip(dpeaks, fpres.peaks, peaksF)):
+            for pki, (pk, pkres, pkF) in enumerate(zip(dpeaks, fpres.peaks, peaksF)):
                 self.log.debug('Peak %i', pki)
                 deblendBaseline._fitPsf(fp, fmask, pk, pkF, pkres, fbb, dpeaks, peaksF, self.log,
-                                         cpsf, psfFwhmPix,
-                                         subimage.getMaskedImage().getImage(),
-                                         subimage.getMaskedImage().getVariance(),
-                                         self.psfChisqCut1, self.psfChisqCut2, self.psfChisqCut2b)
-
+                                        cpsf, psfFwhmPix,
+                                        subimage.getMaskedImage().getImage(),
+                                        subimage.getMaskedImage().getVariance(),
+                                        self.psfChisqCut1, self.psfChisqCut2, self.psfChisqCut2b)
 
         deblendedSource = source.getTable().copyRecord(source)
         deblendedSource.setParent(source.getId())
-        peakList        = deblendedSource.getFootprint().getPeaks()
+        peakList = deblendedSource.getFootprint().getPeaks()
         peakList.clear()
 
         for i, peak in enumerate(fpres.peaks):
@@ -522,10 +528,10 @@ class DipoleDeblender(object):
                 suffix = "neg"
             c = peak.psfFitCenter
             self.log.info("deblended.centroid.dipole.psf.%s %f %f",
-                suffix, c[0], c[1])
+                          suffix, c[0], c[1])
             self.log.info("deblended.chi2dof.dipole.%s %f",
-                suffix, peak.psfFitChisq / peak.psfFitDof)
+                          suffix, peak.psfFitChisq / peak.psfFitDof)
             self.log.info("deblended.flux.dipole.psf.%s %f",
-                suffix, peak.psfFitFlux * np.sum(peak.templateImage.getArray()))
+                          suffix, peak.psfFitFlux * np.sum(peak.templateImage.getArray()))
             peakList.append(peak.peak)
         return deblendedSource
