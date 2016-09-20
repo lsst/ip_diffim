@@ -181,6 +181,7 @@ class DiffimTestCases(unittest.TestCase):
     def testCentralRegularization(self):
         #
         self.policyDF.set("regularizationType", "centralDifference")
+        
         try:
             self.policyDF.set("centralRegularizationStencil", 1)
             ipDiffim.makeRegularizationMatrix(self.policyDF)

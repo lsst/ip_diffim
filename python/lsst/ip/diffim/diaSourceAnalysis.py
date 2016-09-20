@@ -162,32 +162,32 @@ class DiaSourceAnalyst(object):
         fluxRatioTolerance = self.config.fluxPolarityRatio
         if fluxRatio < fluxRatioTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                         "Candidate %d : BAD flux polarity %.2f < %.2f (pos=%.2f neg=%.2f)" % (source.getId(),
-                                                                                               fluxRatio, fluxRatioTolerance, fPos, fNeg))
+                         "Candidate %d : BAD flux polarity %.2f < %.2f (pos=%.2f neg=%.2f)" % 
+                         (source.getId(), fluxRatio, fluxRatioTolerance, fPos, fNeg))
             return False
 
         # 3) Not enough unmasked pixels of correct polarity
         polarityTolerance = self.config.nPolarityRatio
         if npolRatio < polarityTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                         "Candidate %d : BAD polarity count %.2f < %.2f (pos=%d neg=%d)" % (source.getId(),
-                                                                                            npolRatio, polarityTolerance, nPos, nNeg))
+                         "Candidate %d : BAD polarity count %.2f < %.2f (pos=%d neg=%d)" % 
+                         (source.getId(), npolRatio, polarityTolerance, nPos, nNeg))
             return False
 
         # 4) Too many masked vs. correct polarity pixels
         maskedTolerance = self.config.nMaskedRatio
         if maskRatio < maskedTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                         "Candidate %d : BAD unmasked count %.2f < %.2f (pos=%d neg=%d mask=%d)" % (source.getId(),
-                                                                                                    maskRatio, maskedTolerance, nPos, nNeg, nMasked))
+                         "Candidate %d : BAD unmasked count %.2f < %.2f (pos=%d neg=%d mask=%d)" % 
+                         (source.getId(), maskRatio, maskedTolerance, nPos, nNeg, nMasked))
             return False
 
         # 5) Too few unmasked, correct polarity pixels
         ngoodTolerance = self.config.nGoodRatio
         if ngoodRatio < ngoodTolerance:
             pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                         "Candidate %d : BAD good pixel count %.2f < %.2f (pos=%d neg=%d tot=%d)" % (source.getId(),
-                                                                                                     ngoodRatio, ngoodTolerance, nPos, nNeg, nPixels))
+                         "Candidate %d : BAD good pixel count %.2f < %.2f (pos=%d neg=%d tot=%d)" % 
+                         (source.getId(), ngoodRatio, ngoodTolerance, nPos, nNeg, nPixels))
             return False
 
         pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,

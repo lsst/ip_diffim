@@ -1,5 +1,3 @@
-from __future__ import print_function
-from builtins import range
 #
 # LSST Data Management System
 # Copyright 2008, 2009, 2010 LSST Corporation.
@@ -22,6 +20,8 @@ from builtins import range
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
+from __future__ import print_function
+from builtins import range
 import os
 import sys
 import lsst.utils
@@ -174,8 +174,8 @@ if display:
     mos.drawLabels(frame=frame)
 
     # Background
-    backgroundIm = afwImage.ImageF(afwGeom.Extent2I(
-        templateExposure.getWidth(), templateExposure.getHeight()), 0)
+    backgroundIm = afwImage.ImageF(afwGeom.Extent2I(templateExposure.getWidth(), 
+                                   templateExposure.getHeight()), 0)
     backgroundIm += spatialBg
     frame += 1
     ds9.mtv(backgroundIm, frame=frame, title="Background model")

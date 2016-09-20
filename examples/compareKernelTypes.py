@@ -160,10 +160,10 @@ class DiffimTestCases(unittest.TestCase):
         imsize = int(3 * self.subconfigAL.kernelSize)
 
         # chop out a region around a known object
-        bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize/2,
-                                             yloc - imsize/2),
-                             afwGeom.Point2I(xloc + imsize/2,
-                                             yloc + imsize/2))
+        bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize//2,
+                                             yloc - imsize//2),
+                             afwGeom.Point2I(xloc + imsize//2,
+                                             yloc + imsize//2))
 
         # sometimes the box goes off the image; no big deal...
         try:

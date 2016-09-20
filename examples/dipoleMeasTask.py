@@ -99,7 +99,9 @@ def run(args):
     fpSet.makeSources(diaSources)
 
     print("Merged %s Sources into %d diaSources (from %d +ve, %d -ve)" % (len(results.sources),
-                                                                          len(diaSources), results.fpSets.numPos, results.fpSets.numNeg))
+                                                                          len(diaSources), 
+                                                                          results.fpSets.numPos, 
+                                                                          results.fpSets.numNeg))
 
     measureTask.run(diaSources, exposure)
 

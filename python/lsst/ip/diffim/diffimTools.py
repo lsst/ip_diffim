@@ -121,7 +121,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     kSize = subconfigFake.kernelSize
 
     # This sets the final extent of each convolved delta function
-    gaussKernelWidth = sizeCell // 2
+    gaussKernelWidth = sizeCell//2
 
     # This sets the scale over which pixels are correlated in the
     # spatial convolution; should be at least as big as the kernel you
@@ -132,12 +132,12 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     border = (gaussKernelWidth + spatialKernelWidth)//2
 
     # Make a fake image with a matrix of delta functions
-    totalSize = nCell * sizeCell + 2 * border
+    totalSize = nCell * sizeCell + 2*border
     tim = afwImage.ImageF(afwGeom.Extent2I(totalSize, totalSize))
     for x in range(nCell):
         for y in range(nCell):
-            tim.set(x * sizeCell + sizeCell // 2 + border - 1,
-                    y * sizeCell + sizeCell // 2 + border - 1,
+            tim.set(x*sizeCell + sizeCell//2 + border - 1,
+                    y*sizeCell + sizeCell//2 + border - 1,
                     deltaFunctionCounts)
 
     # Turn this into stars with a narrow width; conserve counts

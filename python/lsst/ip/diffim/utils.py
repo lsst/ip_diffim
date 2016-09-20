@@ -585,7 +585,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     sp3 = pylab.subplot(223, sharex=sp1, sharey=sp1)
     sp4 = pylab.subplot(224, sharex=sp1, sharey=sp1)
     xs = np.arange(-5, 5.05, 0.1)
-    ys = 1. / np.sqrt(2 * np.pi) * np.exp(-0.5 * xs**2)
+    ys = 1. / np.sqrt(2*np.pi)*np.exp(-0.5*xs**2)
 
     sp1.hist(candidateResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
              % (np.mean(candidateResids), np.var(candidateResids)))

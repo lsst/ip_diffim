@@ -55,8 +55,8 @@ ymin = kSizes.min()
 ymax = kSizes.max()
 xmin = gSizes.min()
 xmax = gSizes.max()
-im1 = plt.imshow(data, origin='lower', cmap=plt.cm.jet, extent=[
-                 ymin, ymax, xmin, xmax], interpolation="nearest", aspect="auto")
+im1 = plt.imshow(data, origin='lower', cmap=plt.cm.jet, extent=[ymin, ymax, xmin, xmax], 
+                 interpolation="nearest", aspect="auto")
 plt.title("Kernel Sum")
 plt.xlabel("Kernel Size")
 plt.ylabel("Stamp Grow")
@@ -68,8 +68,8 @@ ymin = kSizes.min()
 ymax = kSizes.max()
 xmin = gSizes.min()
 xmax = gSizes.max()
-im2 = plt.imshow(data, origin='lower', cmap=plt.cm.jet, extent=[
-                 ymin, ymax, xmin, xmax], interpolation="nearest", aspect="auto")
+im2 = plt.imshow(data, origin='lower', cmap=plt.cm.jet, extent=[ymin, ymax, xmin, xmax], 
+                 interpolation="nearest", aspect="auto")
 plt.title("log10(Condition Number)")
 plt.xlabel("Kernel Size")
 plt.ylabel("Stamp Grow")

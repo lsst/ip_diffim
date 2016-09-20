@@ -165,9 +165,9 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         basisSigmaGauss = []
         for n in range(1, 3):
             for j in range(n):
-                sigma2jn = (n - j) * sig1**2
+                sigma2jn = (n - j)*sig1**2
                 sigma2jn += j * sig2**2
-                sigma2jn -= (n + 1) * sig0**2
+                sigma2jn -= (n + 1)*sig0**2
                 sigmajn = np.sqrt(sigma2jn)
                 basisSigmaGauss.append(sigmajn)
 

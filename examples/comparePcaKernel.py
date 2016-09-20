@@ -1,4 +1,3 @@
-from builtins import range
 #!/usr/bin/env python
 
 #
@@ -23,6 +22,7 @@ from builtins import range
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
+from builtins import range
 import os
 import sys
 import lsst.utils

@@ -351,12 +351,12 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         # Roots are [-3 +/- sqrt(9 - 8 * (1 - N))] / 2
         #
         nParameters = sciencePsfModel.getKernel().getNSpatialParameters()
-        root = num.sqrt(9 - 8 * (1 - nParameters))
-        if (root != root // 1):            # We know its an integer solution
+        root = num.sqrt(9 - 8*(1 - nParameters))
+        if (root != root//1):            # We know its an integer solution
             pexLog.Trace(self.log.getName(), 3, "Problem inferring spatial order of image's Psf")
         else:
-            order = (root - 3) / 2
-            if (order != order // 1):
+            order = (root - 3)/2
+            if (order != order//1):
                 pexLog.Trace(self.log.getName(), 3, "Problem inferring spatial order of image's Psf")
             else:
                 pexLog.Trace(self.log.getName(), 2, "Spatial order of Psf = %d; matching kernel order = %d" %
@@ -374,19 +374,19 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
             sizeCellX, sizeCellY
         )
 
-        nCellX = regionSizeX // sizeCellX
-        nCellY = regionSizeY // sizeCellY
+        nCellX = regionSizeX//sizeCellX
+        nCellY = regionSizeY//sizeCellY
         dimenR = referencePsfModel.getKernel().getDimensions()
         dimenS = sciencePsfModel.getKernel().getDimensions()
 
         policy = pexConfig.makePolicy(self.kConfig)
         for row in range(nCellY):
             # place at center of cell
-            posY = sizeCellY * row + sizeCellY // 2 + scienceY0
+            posY = sizeCellY * row + sizeCellY//2 + scienceY0
 
             for col in range(nCellX):
                 # place at center of cell
-                posX = sizeCellX * col + sizeCellX // 2 + scienceX0
+                posX = sizeCellX * col + sizeCellX//2 + scienceX0
 
                 pexLog.Trace(self.log.getName(), 5, "Creating Psf candidate at %.1f %.1f" % (posX, posY))
 

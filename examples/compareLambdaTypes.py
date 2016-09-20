@@ -75,18 +75,18 @@ class DiffimTestCases(unittest.TestCase):
 
         self.kList2 = ipDiffim.makeKernelBasisList(self.subconfig2)
         self.hMat2 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig2))
-        self.bskv2 = ipDiffim.BuildSingleKernelVisitorF(
-            self.kList2, pexConfig.makePolicy(self.subconfig2), self.hMat2)
+        self.bskv2 = ipDiffim.BuildSingleKernelVisitorF(self.kList2, 
+                                                        pexConfig.makePolicy(self.subconfig2), self.hMat2)
 
         self.kList3 = ipDiffim.makeKernelBasisList(self.subconfig3)
         self.hMat3 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig3))
-        self.bskv3 = ipDiffim.BuildSingleKernelVisitorF(
-            self.kList3, pexConfig.makePolicy(self.subconfig3), self.hMat3)
+        self.bskv3 = ipDiffim.BuildSingleKernelVisitorF(self.kList3, 
+                                                        pexConfig.makePolicy(self.subconfig3), self.hMat3)
 
         self.kList4 = ipDiffim.makeKernelBasisList(self.subconfig4)
         self.hMat4 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig4))
-        self.bskv4 = ipDiffim.BuildSingleKernelVisitorF(
-            self.kList4, pexConfig.makePolicy(self.subconfig4), self.hMat4)
+        self.bskv4 = ipDiffim.BuildSingleKernelVisitorF(self.kList4, 
+                                                        pexConfig.makePolicy(self.subconfig4), self.hMat4)
 
         # known input images
         defDataDir = lsst.utils.getPackageDir('afwdata')
@@ -170,10 +170,10 @@ class DiffimTestCases(unittest.TestCase):
         imsize = int(3 * self.subconfig1.kernelSize)
 
         # chop out a region around a known object
-        bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize/2,
-                                             yloc - imsize/2),
-                             afwGeom.Point2I(xloc + imsize/2,
-                                             yloc + imsize/2))
+        bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize//2,
+                                             yloc - imsize//2),
+                             afwGeom.Point2I(xloc + imsize//2,
+                                             yloc + imsize//2))
 
         # sometimes the box goes off the image; no big deal...
         try:

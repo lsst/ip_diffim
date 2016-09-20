@@ -167,7 +167,7 @@ class KernelCandidateQa(object):
         # If scipy is not set up, return zero for the stats
         try:
             #In try block because of risk of divide by zero
-            rchisq = chisq/(len(data)-1-dof)
+            rchisq = chisq/(len(data) - 1 - dof)
             # K-S test on the diffim to a Normal distribution
             import scipy.stats
             D, prob = scipy.stats.kstest(data, 'norm')
