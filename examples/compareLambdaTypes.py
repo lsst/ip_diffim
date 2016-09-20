@@ -91,8 +91,8 @@ class DiffimTestCases(unittest.TestCase):
         # known input images
         defDataDir = lsst.utils.getPackageDir('afwdata')
         if CFHT:
-            defSciencePath = os.path.join(defDataDir, 'CFHT', 'D4', CFHTTORUN)
-            defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', CFHTTORUN+'_tmpl')
+            defSciencePath = os.path.join(defDataDir, 'CFHT', 'D4', CFHTTORUN+'.fits')
+            defTemplatePath = os.path.join(defDataDir, 'CFHT', 'D4', CFHTTORUN+'_tmpl.fits')
 
             # no need to remap
             self.scienceExposure = afwImage.ExposureF(defSciencePath)
