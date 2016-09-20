@@ -138,7 +138,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
     @pipeBase.timeMethod
     def run(self, exposure, templateExposure, subtractedExposure, psfMatchingKernel,
-            xcen=None, ycen=None, svar=None, tvar=None):
+            preConvKernel=None, xcen=None, ycen=None, svar=None, tvar=None):
         """! Perform decorrelation of an image difference exposure.
 
         Decorrelates the diffim due to the convolution of the templateExposure with the
@@ -155,6 +155,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
         `ip_diffim.ImagePsfMatchTask.subtractExposures()`
         @param[in] psfMatchingKernel an (optionally spatially-varying) PSF matching kernel produced
         by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
+        @param[in] preConvKernel thePSF kernel image applied as a pre-convolution
+        filter to the science image. If `None` (default), assume that doPreConvolve was set to False.
         @param[in] xcen X-pixel coordinate to use for computing constant matching kernel to use
         If `None` (default), then use the center of the image.
         @param[in] ycen Y-pixel coordinate to use for computing constant matching kernel to use
@@ -180,20 +182,25 @@ class DecorrelateALKernelTask(pipeBase.Task):
         self.log.info("Starting.")
         kimg = None
 
-        spatialKernel = psfMatchingKernel
-        kimg = afwImage.ImageD(spatialKernel.getDimensions())
+        # spatialKernel = psfMatchingKernel
+        # kimg = psfMatchingKernel.computeKernelImage()
+        kimg = afwImage.ImageD(psfMatchingKernel.getDimensions())
         bbox = subtractedExposure.getBBox()
         if xcen is None:
             xcen = (bbox.getBeginX() + bbox.getEndX()) / 2.
         if ycen is None:
             ycen = (bbox.getBeginY() + bbox.getEndY()) / 2.
         self.log.info("Using matching kernel computed at (%d, %d)" % (xcen, ycen))
-        spatialKernel.computeImage(kimg, True, xcen, ycen)
+        psfMatchingKernel.computeImage(kimg, True, xcen, ycen)
 
-        if False:  # debug code to save spatially varying kernel for analysis
-            import cPickle
-            import gzip
-            cPickle.dump(spatialKernel, gzip.GzipFile('spatialKernel.p.gz', 'wb'))
+        if preConvKernel is not None:
+            preConvKernel = preConvKernel.computeKernelImage()
+            preConvKernel = preConvKernel.getArray()
+
+        # if False:  # debug code to save spatially varying kernel for analysis
+        #     import cPickle
+        #     import gzip
+        #     cPickle.dump(spatialKernel, gzip.GzipFile('spatialKernel.p.gz', 'wb'))
 
         if svar is None:
             svar = self.computeVarianceMean(exposure)
@@ -205,7 +212,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
         var = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance (uncorrected diffim): %f" % var)
 
-        corrKernel = DecorrelateALKernelTask._computeDecorrelationKernel(kimg.getArray(), svar, tvar)
+        corrKernel = DecorrelateALKernelTask._computeDecorrelationKernel(kimg.getArray(), svar, tvar,
+                                                                         preConvKernel=preConvKernel)
         self.log.info("Convolving.")
         correctedExposure, corrKern = DecorrelateALKernelTask._doConvolve(subtractedExposure, corrKernel)
         self.log.info("Updating correctedExposure and its PSF.")
@@ -226,19 +234,29 @@ class DecorrelateALKernelTask(pipeBase.Task):
         return pipeBase.Struct(correctedExposure=correctedExposure, correctionKernel=corrKern)
 
     @staticmethod
-    def _computeDecorrelationKernel(kappa, svar=0.04, tvar=0.04):
+    def _computeDecorrelationKernel(kappa, svar=0.04, tvar=0.04, preConvKernel=None):
         """! Compute the Lupton/ZOGY post-conv. kernel for decorrelating an
         image difference, based on the PSF-matching kernel.
         @param kappa  A matching kernel 2-d numpy.array derived from Alard & Lupton PSF matching
         @param svar   Average variance of science image used for PSF matching
         @param tvar   Average variance of template image used for PSF matching
+        @param preConvKernel the PSF kernel image applied as a pre-convolution
+        filter to the science image. If `None` (default), assume that doPreConvolve was set to False.
         @return a 2-d numpy.array containing the correction kernel
 
         @note As currently implemented, kappa is a static (single, non-spatially-varying) kernel.
         """
+
         kappa = DecorrelateALKernelTask._fixOddKernel(kappa)
         kft = scipy.fftpack.fft2(kappa)
-        kft = np.sqrt((svar + tvar) / (svar + tvar * kft**2))
+
+        pcMft = 1.0
+        if preConvKernel is not None:
+            pcM = DecorrelateALKernelTask._fixOddKernel(preConvKernel)
+            kappa = DecorrelateALKernelTask._matchKernelDims(kappa, pcM, keepMean=True)
+            pcMft = scipy.fftpack.fft2(pcM)
+            kft = scipy.fftpack.fft2(kappa)
+        kft = np.sqrt((svar + tvar) / (svar * pcMft**2. + tvar * kft**2.))
         pck = scipy.fftpack.ifft2(kft)
         pck = scipy.fftpack.ifftshift(pck.real)
         fkernel = DecorrelateALKernelTask._fixEvenKernel(pck)
@@ -326,6 +344,32 @@ class DecorrelateALKernelTask(pipeBase.Task):
                 out = out[:, :-1]
             else:
                 out = out[:, 1:]
+        return out
+
+    @staticmethod
+    def _matchKernelDims(kernel1, kernel2, keepMean=True):
+        """! Match the dimensions of two kernels, matching location of center
+        @param kernel1 a square numpy.array
+        @param kernel2 a square numpy.array
+        @param keepMean a boolean, maintain the mean pixel values of the adjusted kernel?
+        @return a fixed kernel numpy.array
+
+        Return a new kernel that equals kernel1 with size matched to that of kernel2.
+        If kernel2 is smaller than kernel1. Resize the kernel symmetrically.
+        """
+        out = None
+        origMean = np.mean(kernel1)
+        if kernel1.shape[0] < kernel2.shape[0]:
+            dimdiff = (kernel2.shape[0] - kernel1.shape[0])//2
+            out = np.pad(kernel1, ((dimdiff, dimdiff), (dimdiff, dimdiff)),
+                         mode='constant', constant_values=0.)
+        elif kernel1.shape[0] > kernel2.shape[0]:
+            dimdiff = (kernel1.shape[0] - kernel2.shape[0])//2
+            out = kernel1[dimdiff:-dimdiff, dimdiff:-dimdiff]
+        else:
+            out = kernel1.copy()
+        newMean = np.mean(out)
+        out *= (origMean / newMean)
         return out
 
     @staticmethod
