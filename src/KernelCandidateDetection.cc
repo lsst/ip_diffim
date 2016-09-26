@@ -167,7 +167,7 @@ namespace diffim {
          * it.
          * 
          */
-        if (fp->getNpix() > fpNpixMax) {
+        if (fp->getNpix() > static_cast<std::size_t>(fpNpixMax)) {
             pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
                               "Footprint has too many pix: %d (max =%d)", 
                               fp->getNpix(), fpNpixMax);
