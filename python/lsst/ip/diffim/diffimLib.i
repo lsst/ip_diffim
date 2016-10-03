@@ -80,7 +80,7 @@ namespace boost {
 %initializeNumPy(ip_diffim)
 %{
 #include "ndarray/swig.h"
-#include "ndarray/swig/eigen.h"
+#include "ndarray/converter/eigen.h"
 %}
 %include "ndarray.i"
 
