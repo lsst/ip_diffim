@@ -201,43 +201,56 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
         #
         starCat = SourceCatalog(sourceCat.schema)
 
+        if display and displayExposure:
+            symbs = []
+            ctypes = []
+
         doColorCut = True
-        with ds9.Buffering():
-            refSchema = matches[0][0].schema
-            rRefFluxField = measAlg.getRefFluxField(refSchema, "r")
-            gRefFluxField = measAlg.getRefFluxField(refSchema, "g")
-            for ref, source, d in matches:
-                if not isGoodSource(source):
-                    symb, ctype = "+", ds9.RED
-                else:
-                    isStar = not ref.get("resolved")
-                    isVar = not ref.get("photometric")
-                    gMag = None
-                    rMag = None
-                    if doColorCut:
-                        try:
-                            gMag = -2.5 * np.log10(ref.get(gRefFluxField))
-                            rMag = -2.5 * np.log10(ref.get(rRefFluxField))
-                        except KeyError:
-                            self.log.warn("Cannot cut on color info; fields 'g' and 'r' do not exist")
-                            doColorCut = False
-                            isRightColor = True
-                        else:
-                            isRightColor = (gMag-rMag) >= self.config.grMin \
-                                and (gMag-rMag) <= self.config.grMax
 
-                    isRightType  = (self.config.selectStar and isStar) \
-                        or (self.config.selectGalaxy and not isStar)
-                    isRightVar = (self.config.includeVariable) or (self.config.includeVariable is isVar)
-                    if isRightType and isRightVar and isRightColor:
-                        starCat.append(source)
-                        symb, ctype = "+", ds9.GREEN
-                    else:
-                        symb, ctype = "o", ds9.BLUE
-
+        refSchema = matches[0][0].schema
+        rRefFluxField = measAlg.getRefFluxField(refSchema, "r")
+        gRefFluxField = measAlg.getRefFluxField(refSchema, "g")
+        for ref, source, d in matches:
+            if not isGoodSource(source):
                 if display and displayExposure:
-                    ds9.dot(symb, source.getX() - mi.getX0(), source.getY() - mi.getY0(),
-                            size=4, ctype=ctype, frame=lsstDebug.frame)
+                    symbs.append("+")
+                    ctypes.append(ds9.RED)
+            else:
+                isStar = not ref.get("resolved")
+                isVar = not ref.get("photometric")
+                gMag = None
+                rMag = None
+                if doColorCut:
+                    try:
+                        gMag = -2.5 * np.log10(ref.get(gRefFluxField))
+                        rMag = -2.5 * np.log10(ref.get(rRefFluxField))
+                    except KeyError:
+                        self.log.warn("Cannot cut on color info; fields 'g' and 'r' do not exist")
+                        doColorCut = False
+                        isRightColor = True
+                    else:
+                        isRightColor = (gMag-rMag) >= self.config.grMin \
+                            and (gMag-rMag) <= self.config.grMax
+
+                isRightType  = (self.config.selectStar and isStar) \
+                    or (self.config.selectGalaxy and not isStar)
+                isRightVar = (self.config.includeVariable) or (self.config.includeVariable is isVar)
+                if isRightType and isRightVar and isRightColor:
+                    starCat.append(source)
+                    if display and displayExposure:
+                        symbs.append("+")
+                        ctypes.append(ds9.GREEN)
+                elif display and displayExposure:
+                    symbs.append("o")
+                    ctypes.append(ds9.BLUE)
+
+
+        if display and displayExposure:
+            with ds9.Buffering():
+                for (ref, source, d), symb, ctype in zip(matches, symbs, ctypes):
+                    if display and displayExposure:
+                        ds9.dot(symb, source.getX() - mi.getX0(), source.getY() - mi.getY0(),
+                                size=4, ctype=ctype, frame=lsstDebug.frame)
 
         if display:
             lsstDebug.frame += 1
