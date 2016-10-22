@@ -24,10 +24,10 @@ from builtins import range
 import time
 import numpy as num
 import lsst.afw.image as afwImage
-import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
 import lsst.afw.display.ds9 as ds9
+import lsst.log as log
 import lsst.pipe.base as pipeBase
 from lsst.meas.algorithms import SubtractBackgroundConfig
 from . import utils as diUtils
@@ -655,8 +655,8 @@ for this Task include:
 
 Note that if you want addional logging info, you may add to your scripts:
 \code{.py}
-import lsst.pex.logging as pexLog
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
+import lsst.log.utils as logUtils
+logUtils.traceSetAt("ip.diffim", 4)
 \endcode
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -860,8 +860,8 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         if eSum == 0.0:
             raise RuntimeError("Eigenvalues sum to zero")
         for j in range(len(eigenValues)):
-            pexLog.Trace(self.log.getName()+"._solve", 6,
-                         "Eigenvalue %d : %f (%f)" % (j, eigenValues[j], eigenValues[j]/eSum))
+            log.log("TRACE5." + self.log.getName() + "._solve", log.DEBUG,
+                    "Eigenvalue %d : %f (%f)", j, eigenValues[j], eigenValues[j]/eSum)
 
         nToUse = min(nComponents, len(eigenValues))
         trimBasisList = afwMath.KernelList()
@@ -933,13 +933,13 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
                 # Make sure there are no uninitialized candidates as active occupants of Cell
                 nRejectedSkf = -1
                 while (nRejectedSkf != 0):
-                    pexLog.Trace(self.log.getName()+"._solve", 2,
-                                 "Building single kernels...")
+                    log.log("TRACE1." + self.log.getName() + "._solve", log.DEBUG,
+                            "Building single kernels...")
                     kernelCellSet.visitCandidates(singlekv, nStarPerCell)
                     nRejectedSkf = singlekv.getNRejected()
-                    pexLog.Trace(self.log.getName()+"._solve", 2,
-                                 "Iteration %d, rejected %d candidates due to initial kernel fit" %
-                                 (thisIteration, nRejectedSkf))
+                    log.log("TRACE1." + self.log.getName() + "._solve", log.DEBUG,
+                            "Iteration %d, rejected %d candidates due to initial kernel fit",
+                            thisIteration, nRejectedSkf)
 
                 # Reject outliers in kernel sum
                 ksv.resetKernelSum()
@@ -950,9 +950,9 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
                 kernelCellSet.visitCandidates(ksv, nStarPerCell)
 
                 nRejectedKsum = ksv.getNRejected()
-                pexLog.Trace(self.log.getName()+"._solve", 2,
-                             "Iteration %d, rejected %d candidates due to kernel sum" %
-                             (thisIteration, nRejectedKsum))
+                log.log("TRACE1." + self.log.getName() + "._solve", log.DEBUG,
+                        "Iteration %d, rejected %d candidates due to kernel sum",
+                        thisIteration, nRejectedKsum)
 
                 # Do we jump back to the top without incrementing thisIteration?
                 if nRejectedKsum > 0:
@@ -965,12 +965,13 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
                 # the spatial fit to these kernels
 
                 if (usePcaForSpatialKernel):
-                    pexLog.Trace(self.log.getName()+"._solve", 1, "Building Pca basis")
+                    log.log("TRACE0." + self.log.getName() + "._solve", log.DEBUG,
+                            "Building Pca basis")
 
                     nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
-                    pexLog.Trace(self.log.getName()+"._solve", 2,
-                                 "Iteration %d, rejected %d candidates due to Pca kernel fit" % (
-                        thisIteration, nRejectedPca))
+                    log.log("TRACE1." + self.log.getName() + "._solve", log.DEBUG,
+                            "Iteration %d, rejected %d candidates due to Pca kernel fit",
+                            thisIteration, nRejectedPca)
 
                     # We don't want to continue on (yet) with the
                     # spatial modeling, because we have bad objects
@@ -992,8 +993,8 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
                 spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, policy)
                 kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
-                pexLog.Trace(self.log.getName()+"._solve", 3,
-                             "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
+                log.log("TRACE2." + self.log.getName() + "._solve", log.DEBUG,
+                        "Spatial kernel built with %d candidates", spatialkv.getNCandidates())
                 spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
                 # Check the quality of the spatial fit (look at residuals)
@@ -1001,11 +1002,11 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
                 kernelCellSet.visitCandidates(assesskv, nStarPerCell)
                 nRejectedSpatial = assesskv.getNRejected()
                 nGoodSpatial = assesskv.getNGood()
-                pexLog.Trace(self.log.getName()+"._solve", 2,
-                             "Iteration %d, rejected %d candidates due to spatial kernel fit" % (
-                    thisIteration, nRejectedSpatial))
-                pexLog.Trace(self.log.getName()+"._solve", 2,
-                             "%d candidates used in fit" % (nGoodSpatial))
+                log.log("TRACE1." + self.log.getName() + "._solve", log.DEBUG,
+                        "Iteration %d, rejected %d candidates due to spatial kernel fit",
+                        thisIteration, nRejectedSpatial)
+                log.log("TRACE1." + self.log.getName() + "._solve", log.DEBUG,
+                        "%d candidates used in fit", nGoodSpatial)
 
                 # If only nGoodSpatial == 0, might be other candidates in the cells
                 if nGoodSpatial == 0 and nRejectedSpatial == 0:
@@ -1020,27 +1021,28 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
 
             # Final fit if above did not converge
             if (nRejectedSpatial > 0) and (thisIteration == maxSpatialIterations):
-                pexLog.Trace(self.log.getName()+"._solve", 2, "Final spatial fit")
+                log.log("TRACE1." + self.log.getName() + "._solve", log.DEBUG, "Final spatial fit")
                 if (usePcaForSpatialKernel):
                     nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
                 regionBBox = kernelCellSet.getBBox()
                 spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, policy)
                 kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
-                pexLog.Trace(self.log.getName()+"._solve", 3,
-                             "Spatial kernel built with %d candidates" % (spatialkv.getNCandidates()))
+                log.log("TRACE2." + self.log.getName() + "._solve", log.DEBUG,
+                        "Spatial kernel built with %d candidates", spatialkv.getNCandidates())
                 spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
             spatialSolution = spatialkv.getKernelSolution()
 
         except Exception as e:
             self.log.error("ERROR: Unable to calculate psf matching kernel")
-            pexLog.Trace(self.log.getName()+"._solve", 2, str(e))
+
+            log.log("TRACE1." + self.log.getName() + "._solve", log.DEBUG, str(e))
             raise e
 
         t1 = time.time()
-        pexLog.Trace(self.log.getName()+"._solve", 1,
-                     "Total time to compute the spatial kernel : %.2f s" % (t1 - t0))
+        log.log("TRACE0." + self.log.getName() + "._solve", log.DEBUG,
+                "Total time to compute the spatial kernel : %.2f s", (t1 - t0))
 
         if display:
             self._displayDebug(kernelCellSet, spatialKernel, spatialBackground)

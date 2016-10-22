@@ -4,10 +4,10 @@ import lsst.utils.tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
+import lsst.log.utils as logUtils
 import lsst.meas.algorithms as measAlg
 
-import lsst.pex.logging as pexLog
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
+logUtils.traceSetAt("ip.diffim", 4)
 
 
 class PsfMatchTestCases(lsst.utils.tests.TestCase):

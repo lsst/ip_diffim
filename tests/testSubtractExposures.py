@@ -9,15 +9,15 @@ import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+from lsst.log import Log
+import lsst.log.utils as logUtils
 import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
-import lsst.pex.logging as logging
 import lsst.ip.diffim.diffimTools as diffimTools
 
-
-verbosity = 5
-logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
-logging.Trace_setVerbosity('ImagePsfMatchTask', verbosity)
+verbosity = 4
+logUtils.traceSetAt("ip.diffim", verbosity)
+Log.getLogger('psfMatch').setLevel(Log.INFO)
 
 display = False
 

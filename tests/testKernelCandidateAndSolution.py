@@ -11,12 +11,12 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
-import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
+import lsst.log.utils as logUtils
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.table as afwTable
 
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
+logUtils.traceSetAt("ip.diffim", 4)
 
 # known input images
 try:

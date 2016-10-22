@@ -19,9 +19,9 @@
 
 #include "lsst/afw/math.h"
 #include "lsst/afw/geom.h"
+#include "lsst/log/Log.h"
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/exceptions/Runtime.h"
-#include "lsst/pex/logging/Trace.h"
 
 #include "lsst/ip/diffim/KernelCandidate.h"
 #include "lsst/ip/diffim/KernelSolution.h"
@@ -29,7 +29,6 @@
 
 namespace afwMath        = lsst::afw::math;
 namespace afwGeom        = lsst::afw::geom;
-namespace pexLogging     = lsst::pex::logging; 
 namespace pexPolicy      = lsst::pex::policy; 
 namespace pexExcept      = lsst::pex::exceptions; 
 
@@ -129,13 +128,13 @@ namespace detail {
         }
         if (!(kCandidate->isInitialized())) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-            pexLogging::TTrace<3>("lsst.ip.diffim.BuildSpatialKernelVisitor.processCandidate", 
-                                  "Cannot process candidate %d, continuing", kCandidate->getId());
+            LOGL_DEBUG("TRACE2.ip.diffim.BuildSpatialKernelVisitor.processCandidate",
+                       "Cannot process candidate %d, continuing", kCandidate->getId());
             return;
         }
         
-        pexLogging::TTrace<6>("lsst.ip.diffim.BuildSpatialKernelVisitor.processCandidate", 
-                              "Processing candidate %d", kCandidate->getId());
+        LOGL_DEBUG("TRACE5.ip.diffim.BuildSpatialKernelVisitor.processCandidate",
+                   "Processing candidate %d", kCandidate->getId());
         _nCandidates += 1;
 
         /* 
