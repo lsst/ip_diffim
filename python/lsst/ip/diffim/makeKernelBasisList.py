@@ -21,7 +21,7 @@ from builtins import range
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 from . import diffimLib
-import lsst.pex.logging as pexLog
+from lsst.log import Log
 import numpy as np
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
@@ -78,8 +78,8 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
 
     targetSigma = targetFwhmPix / sigma2fwhm
     referenceSigma = referenceFwhmPix / sigma2fwhm
-    pexLog.Trace("lsst.ip.diffim.generateAlardLuptonBasisList", 2,
-                 "Generating matching bases for sigma %.2f pix -> %.2f pix" % (targetSigma, referenceSigma))
+    logger = Log.getLogger("lsst.ip.diffim.generateAlardLuptonBasisList")
+    logger.debug("Generating matching bases for sigma %.2f pix -> %.2f pix", targetSigma, referenceSigma)
 
     # Modify the size of Alard Lupton kernels based upon the images FWHM
     #

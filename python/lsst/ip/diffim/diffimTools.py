@@ -37,7 +37,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDetect
 import lsst.afw.math.mathLib as afwMath
-import lsst.pex.logging as pexLog
+from lsst.log import Log
 import lsst.pex.config as pexConfig
 from .makeKernelBasisList import makeKernelBasisList
 
@@ -245,8 +245,8 @@ def backgroundSubtract(config, maskedImages):
         del backobj
 
     t1 = time.time()
-    pexLog.Trace("lsst.ip.diffim.backgroundSubtract", 1,
-                 "Total time for background subtraction : %.2f s" % (t1-t0))
+    logger = Log.getLogger("ip.diffim.backgroundSubtract")
+    logger.debug("Total time for background subtraction : %.2f s", (t1-t0))
     return backgrounds
 
 #######
@@ -312,7 +312,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
         fpGrowPix = int(config.fpGrowKernelScaling * kernelSize + 0.5)
     else:
         fpGrowPix = config.fpGrowPix
-    log.info("Growing %d kernel candidate stars by %d pixels" % (len(candidateInList), fpGrowPix))
+    log.info("Growing %d kernel candidate stars by %d pixels", len(candidateInList), fpGrowPix)
 
     for kernelCandidate in candidateInList:
         if not type(kernelCandidate) == afwTable.SourceRecord:
@@ -357,7 +357,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
         else:
             if not((bm1 & badBitMask) or (bm2 & badBitMask)):
                 candidateOutList.append({'source': kernelCandidate, 'footprint': afwDetect.Footprint(kbbox)})
-    log.info("Selected %d / %d sources for KernelCandidacy" % (len(candidateOutList), len(candidateInList)))
+    log.info("Selected %d / %d sources for KernelCandidacy", len(candidateOutList), len(candidateInList))
     return candidateOutList
 
 
@@ -443,8 +443,8 @@ class NbasisEvaluator(object):
             bestConfigs.append(bestConfig)
 
         counter = Counter(bestConfigs).most_common(3)
-        log.info("B.I.C. prefers basis complexity %s %d times; %s %d times; %s %d times" %
-                 (counter[0][0], counter[0][1],
-                     counter[1][0], counter[1][1],
-                     counter[2][0], counter[2][1]))
+        log.info("B.I.C. prefers basis complexity %s %d times; %s %d times; %s %d times",
+                 counter[0][0], counter[0][1],
+                 counter[1][0], counter[1][1],
+                 counter[2][0], counter[2][1])
         return counter[0][0], counter[1][0], counter[2][0]
