@@ -492,7 +492,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         nSeen = 0
         for cell in kernelCellSet.getCellList():
             for cand in cell.begin(True):
-                cand = ipDiffim.cast_KernelCandidateF(cand)
+                cand = ipDiffim.KernelCandidateF.cast(cand)
                 self.assertEqual(cand.getStatus(), afwMath.SpatialCellCandidate.GOOD)
                 nSeen += 1
         self.assertEqual(nSeen, 1)

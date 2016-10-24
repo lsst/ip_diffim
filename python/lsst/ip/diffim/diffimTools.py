@@ -260,7 +260,7 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
 
     for cell in kernelCellSet.getCellList():
         for cand in cell.begin(False): # False = include bad candidates
-            cand = diffimLib.cast_KernelCandidateF(cand)
+            cand = diffimLib.KernelCandidateF.cast(cand)
             if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                 xCand = int(cand.getXCenter())
                 yCand = int(cand.getYCenter())
@@ -421,7 +421,7 @@ class NbasisEvaluator(object):
 
                     for cell in kernelCellSet.getCellList():
                         for cand in cell.begin(False): # False = include bad candidates
-                            cand = diffimLib.cast_KernelCandidateF(cand)
+                            cand = diffimLib.KernelCandidateF.cast(cand)
                             if cand.getStatus() != afwMath.SpatialCellCandidate.GOOD:
                                 continue
                             diffIm = cand.getDifferenceImage(diffimLib.KernelCandidateF.RECENT)

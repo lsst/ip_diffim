@@ -154,7 +154,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
-                cand = ipDiffim.cast_KernelCandidateF(cand)
+                cand = ipDiffim.KernelCandidateF.cast(cand)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
 
@@ -219,7 +219,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
-                cand = ipDiffim.cast_KernelCandidateF(cand)
+                cand = ipDiffim.KernelCandidateF.cast(cand)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
 
@@ -277,7 +277,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
-                cand = ipDiffim.cast_KernelCandidateF(cand)
+                cand = ipDiffim.KernelCandidateF.cast(cand)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
 
@@ -377,7 +377,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
-                cand = ipDiffim.cast_KernelCandidateF(cand)
+                cand = ipDiffim.KernelCandidateF.cast(cand)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
 
@@ -439,7 +439,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
-                cand = ipDiffim.cast_KernelCandidateF(cand)
+                cand = ipDiffim.KernelCandidateF.cast(cand)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
 

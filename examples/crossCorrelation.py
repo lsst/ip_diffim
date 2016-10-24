@@ -36,7 +36,7 @@ def makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot=False):
     d2 = []
 
     for i in range(len(candList)):
-        cand1 = ipDiffim.cast_KernelCandidateF(kernelCellSet.getCandidateById(candList[i]))
+        cand1 = ipDiffim.KernelCandidateF.cast(kernelCellSet.getCandidateById(candList[i]))
         x1 = cand1.getXCenter()
         y1 = cand1.getYCenter()
 
@@ -55,7 +55,7 @@ def makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot=False):
         kVector1 = kImage1.getArray().ravel()
 
         for j in range(i+1, len(candList)):
-            cand2 = ipDiffim.cast_KernelCandidateF(kernelCellSet.getCandidateById(candList[j]))
+            cand2 = ipDiffim.KernelCandidateF.cast(kernelCellSet.getCandidateById(candList[j]))
             x2 = cand2.getXCenter()
             y2 = cand2.getYCenter()
 

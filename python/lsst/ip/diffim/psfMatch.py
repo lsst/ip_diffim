@@ -743,7 +743,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         nTot = 0
         for cell in kernelCellSet.getCellList():
             for cand in cell.begin(False): # False = include bad candidates
-                cand = diffimLib.cast_KernelCandidateF(cand)
+                cand = diffimLib.KernelCandidateF.cast(cand)
                 nTot += 1
                 if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                     nGood += 1
