@@ -223,9 +223,10 @@ lsst::afw::image::Image<PIXTYPE>
         return std::dynamic_pointer_cast<lsst::ip::diffim::KernelCandidate<TYPE> >(candidate);
     }
 %}
+%castShared(lsst::ip::diffim::KernelCandidate<TYPE>, lsst::afw::math::SpatialCellImageCandidate);
+%castShared(lsst::ip::diffim::KernelCandidate<TYPE>, lsst::afw::math::SpatialCellCandidate);
 %enddef
 
-%include "lsst/ip/diffim/KernelCandidate.h"
 %KernelCandidatePtr(F, float);
 
 %include "lsst/ip/diffim/KernelCandidate.h"
