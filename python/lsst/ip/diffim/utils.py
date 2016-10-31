@@ -80,7 +80,7 @@ def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
 
             goodies = ctypeBad is None
             for cand in cell.begin(goodies):
-                cand = diffimLib.cast_KernelCandidateF(cand)
+                cand = diffimLib.KernelCandidateF.cast(cand)
                 xc, yc = cand.getXCenter() + origin[0], cand.getYCenter() + origin[1]
                 if cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
                     color = ctypeBad
@@ -158,7 +158,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
     candidateIndex = 0
     for cell in kernelCellSet.getCellList():
         for cand in cell.begin(False): # include bad candidates
-            cand = diffimLib.cast_KernelCandidateF(cand)
+            cand = diffimLib.KernelCandidateF.cast(cand)
 
             # Original difference image; if does not exist, skip candidate
             try:
@@ -293,7 +293,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
     badAmps = list()
     for cell in kernelCellSet.getCellList():
         for cand in cell.begin(False):
-            cand = diffimLib.cast_KernelCandidateF(cand)
+            cand = diffimLib.KernelCandidateF.cast(cand)
             if not showBadCandidates and cand.isBad():
                 continue
             candCenter = afwGeom.PointD(cand.getXCenter(), cand.getYCenter())
@@ -505,7 +505,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
             if not (cand.getStatus() == afwMath.SpatialCellCandidate.GOOD):
                 continue
 
-            cand = diffimLib.cast_KernelCandidateF(cand)
+            cand = diffimLib.KernelCandidateF.cast(cand)
             diffim = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
             orig = cand.getScienceMaskedImage()
 

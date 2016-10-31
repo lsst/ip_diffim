@@ -32,7 +32,7 @@ def makeRatingVector(kernelCellSet, spatialKernel, spatialBg):
     nBad = 0
     for cell in kernelCellSet.getCellList():
         for cand in cell.begin(False): # False = include bad candidates
-            cand = diffimLib.cast_KernelCandidateF(cand)
+            cand = diffimLib.KernelCandidateF.cast(cand)
             if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                 # this has been used for processing
                 nGood += 1

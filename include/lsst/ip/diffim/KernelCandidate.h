@@ -35,15 +35,10 @@ namespace diffim {
      * @ingroup ip_diffim
      */
     template <typename _PixelT>
-    class KernelCandidate :
-        public afw::math::SpatialCellImageCandidate<afw::math::Kernel::Pixel> {
+    class KernelCandidate : public afw::math::SpatialCellImageCandidate {
     public:
         typedef afw::image::Image<afw::math::Kernel::Pixel> ImageT;
         typedef _PixelT PixelT;         // _after_ afw::math::Kernel::Pixel
-
-    private:
-        using afw::math::SpatialCellImageCandidate<afw::math::Kernel::Pixel>::_image;
-
     public:
         typedef std::shared_ptr<KernelCandidate> Ptr;
         typedef std::shared_ptr<afw::image::MaskedImage<PixelT> > MaskedImagePtr;

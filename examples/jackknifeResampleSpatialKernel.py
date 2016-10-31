@@ -157,7 +157,7 @@ class DiffimTestCases(unittest.TestCase):
         # cellSet.getCandidateById(id).setStatus(value)
         for cell in cellSet.getCellList():
             for cand in cell.begin(False):
-                cand = ipDiffim.cast_KernelCandidateF(cand)
+                cand = ipDiffim.KernelCandidateF.cast(cand)
                 if (cand.getId() == cid):
                     cand.setStatus(value)
                     return cand
@@ -172,7 +172,7 @@ class DiffimTestCases(unittest.TestCase):
         for cell in cellSet.getCellList():
             print()
             for cand in cell.begin(False):
-                cand = ipDiffim.cast_KernelCandidateF(cand)
+                cand = ipDiffim.KernelCandidateF.cast(cand)
 
                 if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                     goodList.append(cand.getId())

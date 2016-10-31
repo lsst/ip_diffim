@@ -257,7 +257,7 @@ class DiffimTestCases(unittest.TestCase):
 
         for cell in kernelCellSet.getCellList():
             for cand in cell.begin(False):
-                cand = ipDiffim.cast_KernelCandidateF(cand)
+                cand = ipDiffim.KernelCandidateF.cast(cand)
                 self.assertEqual(cand.getStatus(), afwMath.SpatialCellCandidate.GOOD)
 
     def tearDown(self):

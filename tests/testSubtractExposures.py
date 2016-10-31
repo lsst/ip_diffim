@@ -213,8 +213,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 if cand1.getStatus() == afwMath.SpatialCellCandidate.BAD:
                     continue
 
-                cand1 = ipDiffim.cast_KernelCandidateF(cand1)
-                cand2 = ipDiffim.cast_KernelCandidateF(kernelCellSet2.getCandidateById(cand1.getId()+count))
+                cand1 = ipDiffim.KernelCandidateF.cast(cand1)
+                cand2 = ipDiffim.KernelCandidateF.cast(kernelCellSet2.getCandidateById(cand1.getId()+count))
 
                 # positions are nearly the same (different at the 0.01 pixel level)
                 self.assertAlmostEqual(cand1.getXCenter(), cand2.getXCenter(), delta=1e-1)

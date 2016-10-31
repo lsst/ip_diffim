@@ -39,7 +39,7 @@ namespace diffim {
         MaskedImagePtr const& scienceMaskedImage,
         lsst::pex::policy::Policy const& policy
         ) :
-        lsst::afw::math::SpatialCellImageCandidate<lsst::afw::math::Kernel::Pixel>(xCenter, yCenter),
+        lsst::afw::math::SpatialCellImageCandidate(xCenter, yCenter),
         _templateMaskedImage(templateMaskedImage),
         _scienceMaskedImage(scienceMaskedImage),
         _varianceEstimate(),
@@ -78,7 +78,7 @@ namespace diffim {
         MaskedImagePtr const& scienceMaskedImage,
         lsst::pex::policy::Policy const& policy
         ) :
-        lsst::afw::math::SpatialCellImageCandidate<lsst::afw::math::Kernel::Pixel>(source->getX(), source->getY()),
+        lsst::afw::math::SpatialCellImageCandidate(source->getX(), source->getY()),
         _templateMaskedImage(templateMaskedImage),
         _scienceMaskedImage(scienceMaskedImage),
         _varianceEstimate(),
