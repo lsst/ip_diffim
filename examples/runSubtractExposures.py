@@ -7,9 +7,7 @@ import re
 import numpy as num
 
 import lsst.afw.image as afwImage
-
-from lsst.pex.logging import Trace
-from lsst.pex.logging import Log
+import lsst.log.utils as logUtils
 import lsst.meas.algorithms as measAlg
 
 import lsst.ip.diffim as ipDiffim
@@ -112,7 +110,7 @@ Notes:
 
     if options.verbosity > 0:
         print('Verbosity =', options.verbosity)
-        Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
+        logUtils.traceSetAt("ip.diffim", options.verbosity)
 
     ####
 
@@ -141,7 +139,6 @@ Notes:
 
 
 def run():
-    Log.getDefaultLog()
     main()
 
 if __name__ == '__main__':

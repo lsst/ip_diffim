@@ -4,11 +4,11 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import numpy as num
-import lsst.pex.logging as pexLogging
+import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
-verbosity = 5
-pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
+verbosity = 4
+logUtils.traceSetAt("ip.diffim", verbosity)
 
 imSize = 2**7
 kSize = 2**5 + 1

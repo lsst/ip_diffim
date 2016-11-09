@@ -34,13 +34,16 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
-import lsst.pex.logging as pexLog
+from lsst.log import Log
+import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
 import lsst.afw.display.ds9 as ds9
 
-verbosity = 3
-pexLog.Trace_setVerbosity('lsst.ip.diffim', verbosity)
+verbosity = 2
+logUtils.traceSetAt("ip.diffim", verbosity)
+
+logger = Log.getLogger("ip.diffim.JackknifeResampleKernel")
 
 display = False
 writefits = False
@@ -97,18 +100,12 @@ class DiffimTestCases(unittest.TestCase):
 
     def stats(self, cid, diffim, core=5):
         self.dStats.apply(diffim)
-        pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
-                     "Candidate %d : Residuals all (%d px): %.3f +/- %.3f" % (cid,
-                                                                              self.dStats.getNpix(),
-                                                                              self.dStats.getMean(),
-                                                                              self.dStats.getRms()))
+        logger.debug("Candidate %d : Residuals all (%d px): %.3f +/- %.3f",
+                     cid, self.dStats.getNpix(), self.dStats.getMean(), self.dStats.getRms())
 
         self.dStats.apply(diffim, core)
-        pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
-                     "Candidate %d : Residuals core (%d px): %.3f +/- %.3f" % (cid,
-                                                                               self.dStats.getNpix(),
-                                                                               self.dStats.getMean(),
-                                                                               self.dStats.getRms()))
+        logger.debug("Candidate %d : Residuals core (%d px): %.3f +/- %.3f",
+                     cid, self.dStats.getNpix(), self.dStats.getMean(), self.dStats.getRms())
 
     def assess(self, cand, kFn1, bgFn1, kFn2, bgFn2, frame0):
         tmi = cand.getTemplateMaskedImage()
@@ -144,12 +141,10 @@ class DiffimTestCases(unittest.TestCase):
             ds9.mtv(im2, frame=frame0+4)
             ds9.mtv(d2, frame=frame0+5)
 
-        pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
-                     "Full Spatial Model")
+        logger.debug("Full Spatial Model")
         self.stats(cand.getId(), d1)
 
-        pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
-                     "N-1 Spatial Model")
+        logger.debug("N-1 Spatial Model")
         self.stats(cand.getId(), d2)
 
     def setStatus(self, cellSet, cid, value):
@@ -186,8 +181,7 @@ class DiffimTestCases(unittest.TestCase):
             cid = goodList[idx]
 
             print() # clear the screen
-            pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
-                         "Removing candidate %d" % (cid))
+            logger.debug("Removing candidate %d", cid)
 
             cand = self.setStatus(cellSet, cid, afwMath.SpatialCellCandidate.BAD)
 
@@ -211,8 +205,7 @@ class DiffimTestCases(unittest.TestCase):
             self.setStatus(cellSet, cid, afwMath.SpatialCellCandidate.GOOD)
 
     def runTest(self, mode):
-        pexLog.Trace("lsst.ip.diffim.JackknifeResampleKernel", 1,
-                     "Mode %s" % (mode))
+        logger.debug("Mode %s", mode)
         if mode == "DF":
             self.config = self.subconfigDF
         elif mode == "DFr":

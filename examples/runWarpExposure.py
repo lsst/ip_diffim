@@ -5,7 +5,6 @@ import lsst.afw.math as afwMath
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
 import lsst.daf.base as dafBase
-from lsst.pex.logging import Log
 
 
 def main():
@@ -42,7 +41,6 @@ def main():
 
 
 def run():
-    Log.getDefaultLog()
     memId0 = dafBase.Citizen_getNextMemId()
     main()
     # check for memory leaks

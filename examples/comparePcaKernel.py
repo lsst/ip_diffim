@@ -29,14 +29,14 @@ import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image.imageLib as afwImage
 import lsst.ip.diffim as ipDiffim
-import lsst.pex.logging as pexLogging
+import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
 
 display = True
 
-verbosity = 5
-pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
+verbosity = 4
+logUtils.traceSetAt("ip.diffim", verbosity)
 
 defDataDir = lsst.utils.getPackageDir('afwdata')
 imageProcDir = lsst.utils.getPackageDir('ip_diffim')

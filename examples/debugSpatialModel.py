@@ -30,7 +30,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
-import lsst.pex.logging as pexLogging
+import lsst.log.utils as logUtils
 
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.display.utils as displayUtils
@@ -40,8 +40,8 @@ display = True
 fwhm = 6.8
 warp = True
 
-verbosity = 5
-pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
+verbosity = 4
+logUtils.traceSetAt("ip.diffim", verbosity)
 
 defDataDir = lsst.utils.getPackageDir('afwdata')
 imageProcDir = lsst.utils.getPackageDir('ip_diffim')

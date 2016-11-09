@@ -32,14 +32,14 @@ import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 import lsst.ip.diffim as ipDiffim
-import lsst.pex.logging as logging
 
 import lsst.afw.display.ds9 as ds9
 
-verbosity = 5
-logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
+verbosity = 4
+logUtils.traceSetAt("ip.diffim", verbosity)
 
 display = True
 writefits = False
