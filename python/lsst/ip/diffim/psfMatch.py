@@ -1034,7 +1034,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
             spatialSolution = spatialkv.getKernelSolution()
 
         except Exception as e:
-            pexLog.Trace(self.log.getName()+"._solve", 1, "ERROR: Unable to calculate psf matching kernel")
+            self.log.error("ERROR: Unable to calculate psf matching kernel")
             pexLog.Trace(self.log.getName()+"._solve", 2, str(e))
             raise e
 

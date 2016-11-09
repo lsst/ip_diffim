@@ -330,8 +330,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         if referencePsfModel is None or sciencePsfModel is None:
             raise RuntimeError("ERROR: Psf matching is only implemented for KernelPsfs")
         if (referencePsfModel.getKernel().getDimensions() != sciencePsfModel.getKernel().getDimensions()):
-            pexLog.Trace(self.log.getName(), 1,
-                         "ERROR: Dimensions of reference Psf and science Psf different; exiting")
+            self.log.error("ERROR: Dimensions of reference Psf and science Psf different; exiting")
             raise RuntimeError("ERROR: Dimensions of reference Psf and science Psf different; exiting")
 
         psfWidth, psfHeight = referencePsfModel.getKernel().getDimensions()
