@@ -36,6 +36,7 @@ import lsst.afw.display.ds9 as ds9
 import lsst.afw.display.utils as displayUtils
 from lsst.log import Log
 import lsst.meas.algorithms as measAlg
+import lsst.meas.base as measBase
 from .dipoleFitTask import DipoleFitAlgorithm
 from . import diffimLib
 from . import diffimTools
@@ -439,13 +440,17 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
             ny = 1
 
     schema = afwTable.SourceTable.makeMinimalSchema()
-    control = measAlg.GaussianCentroidControl()
-    centroider = measAlg.MeasureSourcesBuilder().addAlgorithm(control).build(schema)
-    sdssShape = measAlg.SdssShapeControl()
-    shaper = measAlg.MeasureSourcesBuilder().addAlgorithm(sdssShape).build(schema)
+    centroidName = "base_GaussianCentroid"
+    shapeName = "base_SdssShape"
+    control = measBase.GaussianCentroidControl()
+    schema.getAliasMap().set("slot_Centroid", centroidName)
+    schema.getAliasMap().set("slot_Centroid_flag", centroidName+"_flag")
+    centroider = measBase.GaussianCentroidAlgorithm(control, centroidName, schema)
+    sdssShape = measBase.SdssShapeControl()
+    shaper = measBase.SdssShapeAlgorithm(sdssShape, shapeName, schema)
     table = afwTable.SourceTable.make(schema)
-    table.defineCentroid(control.name)
-    table.defineShape(sdssShape.name)
+    table.defineCentroid(centroidName)
+    table.defineShape(shapeName)
 
     centers = []
     shapes = []
@@ -459,17 +464,20 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
             lab = "Kernel(%d,%d)=%.2f" % (x, y, ksum) if False else ""
             mos.append(im, lab)
 
-            exp = afwImage.makeExposure(afwImage.makeMaskedImage(im))
+            # GaussianCentroidAlgorithm.measure requires an exposure of floats
+            exp = afwImage.makeExposure(afwImage.makeMaskedImage(im.convertF()))
             w, h = im.getWidth(), im.getHeight()
-            cen = afwGeom.PointD(w//2, h//2)
+            centerX = im.getX0() + w//2
+            centerY = im.getY0() + h//2
             src = table.makeRecord()
             foot = afwDet.Footprint(exp.getBBox())
+            foot.addPeak(centerX, centerY, 1)
             src.setFootprint(foot)
 
-            centroider.apply(src, exp, cen)
+            centroider.measure(src, exp)
             centers.append((src.getX(), src.getY()))
 
-            shaper.apply(src, exp, cen)
+            shaper.measure(src, exp)
             shapes.append((src.getIxx(), src.getIxy(), src.getIyy()))
 
     mos.makeMosaic(frame=frame, title=title if title else "Model Kernel", mode=nx)
