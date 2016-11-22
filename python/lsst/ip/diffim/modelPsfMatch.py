@@ -48,6 +48,12 @@ class ModelPsfMatchConfig(pexConfig.Config):
         default="AL",
     )
 
+    padPsf = pexConfig.Field(
+        dtype=bool,
+        doc="Grow PSF dimensions to largest PSF dimension on input exposure; else clip to smallest",
+        default=False,
+    )
+
     def setDefaults(self):
         # No sigma clipping
         self.kernel.active.singleKernelClipping = False
@@ -255,6 +261,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
             the match is likely not exact.
         - psfMatchingKernel: the spatially varying Psf-matching kernel
         - kernelCellSet: SpatialCellSet used to solve for the Psf-matching kernel
+        - referencePsfModel: Validated and/or modified reference model used
 
         Raise a RuntimeError if the Exposure does not contain a Psf model
         """
@@ -264,7 +271,9 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         maskedImage = exposure.getMaskedImage()
 
         self.log.info("compute Psf-matching kernel")
-        kernelCellSet = self._buildCellSet(exposure, referencePsfModel)
+        result = self._buildCellSet(exposure, referencePsfModel)
+        kernelCellSet = result.kernelCellSet
+        referencePsfModel = result.referencePsfModel
         width, height = referencePsfModel.getLocalKernel().getDimensions()
         psfAttr1 = measAlg.PsfAttributes(exposure.getPsf(), width//2, height//2)
         psfAttr2 = measAlg.PsfAttributes(referencePsfModel, width//2, height//2)
@@ -300,7 +309,9 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         return pipeBase.Struct(psfMatchedExposure=psfMatchedExposure,
                                psfMatchingKernel=psfMatchingKernel,
                                kernelCellSet=kernelCellSet,
-                               metadata=self.metadata)
+                               metadata=self.metadata,
+                               referencePsfModel=referencePsfModel,
+                               )
 
     def _diagnostic(self, kernelCellSet, spatialSolution, spatialKernel, spatialBg):
         """!Print diagnostic information on spatial kernel and background fit
@@ -315,54 +326,28 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         @param exposure: The science exposure that will be convolved; must contain a Psf
         @param referencePsfModel: Psf model to match to
 
-        @return kernelCellSet: a SpatialCellSet to be used by self._solve
+        @return
+            -kernelCellSet: a SpatialCellSet to be used by self._solve
+            -referencePsfModel: Validated and/or modified reference model used to populate the SpatialCellSet
 
-        Raise a RuntimeError if the reference Psf model and science Psf model have different dimensions
+        If the reference Psf model and science Psf model have different dimensions,
+        adjust the referencePsfModel (the model to which the exposure PSF will be matched)
+        to match that of the science Psf. If the science Psf dimensions vary across the image,
+        as is common with a WarpedPsf, either pad or clip (depending on config.padPsf)
+        the dimensions to be constant.
         """
         scienceBBox = exposure.getBBox()
         sciencePsfModel = exposure.getPsf()
-        # The Psf base class does not support getKernel() in general, as there are some Psf
-        # classes for which this is not meaningful.
-        # Many Psfs we use in practice are KernelPsfs, and this algorithm will work fine for them,
-        # but someday it should probably be modified to support arbitrary Psfs.
-        referencePsfModel = measAlg.KernelPsf.swigConvert(referencePsfModel)
-        sciencePsfModel = measAlg.KernelPsf.swigConvert(sciencePsfModel)
-        if referencePsfModel is None or sciencePsfModel is None:
-            raise RuntimeError("ERROR: Psf matching is only implemented for KernelPsfs")
-        if (referencePsfModel.getKernel().getDimensions() != sciencePsfModel.getKernel().getDimensions()):
-            self.log.error("ERROR: Dimensions of reference Psf and science Psf different; exiting")
-            raise RuntimeError("ERROR: Dimensions of reference Psf and science Psf different; exiting")
 
-        psfWidth, psfHeight = referencePsfModel.getKernel().getDimensions()
+        dimenR = referencePsfModel.getLocalKernel().getDimensions()
+        psfWidth, psfHeight = dimenR
+
         maxKernelSize = min(psfWidth, psfHeight) - 1
         if maxKernelSize % 2 == 0:
             maxKernelSize -= 1
         if self.kConfig.kernelSize > maxKernelSize:
             raise ValueError("Kernel size (%d) too big to match Psfs of size %d; reduce to at least %d" % (
                 self.kConfig.kernelSize, psfWidth, maxKernelSize))
-
-        # Infer spatial order of Psf model!
-        #
-        # Infer from the number of spatial parameters.
-        # (O + 1) * (O + 2) / 2 = N
-        # O^2 + 3 * O + 2 * (1 - N) = 0
-        #
-        # Roots are [-3 +/- sqrt(9 - 8 * (1 - N))] / 2
-        #
-        nParameters = sciencePsfModel.getKernel().getNSpatialParameters()
-        root = num.sqrt(9 - 8*(1 - nParameters))
-        if (root != root//1):            # We know its an integer solution
-            log.log("TRACE2." + self.log.getName(), log.DEBUG,
-                    "Problem inferring spatial order of image's Psf")
-        else:
-            order = (root - 3)/2
-            if (order != order//1):
-                log.log("TRACE2." + self.log.getName(), log.DEBUG,
-                        "Problem inferring spatial order of image's Psf")
-            else:
-                log.log("TRACE1" + self.log.getName(), log.DEBUG,
-                        "Spatial order of Psf = %d; matching kernel order = %d",
-                        order, self.kConfig.spatialKernelOrder)
 
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0, scienceY0 = scienceBBox.getMin()
@@ -378,8 +363,30 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
 
         nCellX = regionSizeX//sizeCellX
         nCellY = regionSizeY//sizeCellY
-        dimenR = referencePsfModel.getKernel().getDimensions()
-        dimenS = sciencePsfModel.getKernel().getDimensions()
+
+        # Survey the PSF dimensions of the Spatial Cell Set
+        # to identify the minimum enclosed or maximum bounding square BBox.
+        # This loop can be made faster with a cheaper method to inspect PSF dimensions
+        widthList = []
+        heightList = []
+        for row in range(nCellY):
+            posY = sizeCellY*row + sizeCellY//2 + scienceY0
+            for col in range(nCellX):
+                posX = sizeCellX*col + sizeCellX//2 + scienceX0
+                widthS, heightS = sciencePsfModel.getLocalKernel(afwGeom.Point2D(posX, posY)).getDimensions()
+                widthList.append(widthS)
+                heightList.append(heightS)
+
+        lenMax = max(max(heightList), max(widthList))
+        lenMin = min(min(heightList), min(widthList))
+
+        lenPsfScience = lenMax if self.config.padPsf else lenMin
+        dimenS = afwGeom.Extent2I(lenPsfScience, lenPsfScience)
+
+        if (dimenR != dimenS):
+            self.log.info("Adjusting dimensions of reference PSF model from %s to %s" % (dimenR, dimenS))
+            referencePsfModel = referencePsfModel.resized(lenPsfScience, lenPsfScience)
+            dimenR = dimenS
 
         policy = pexConfig.makePolicy(self.kConfig)
         for row in range(nCellY):
@@ -402,7 +409,24 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                 referenceMI = afwImage.MaskedImageF(kernelImageR, kernelMaskR, kernelVarR)
 
                 # kernel image we are going to convolve
-                kernelImageS = sciencePsfModel.computeImage(afwGeom.Point2D(posX, posY)).convertF()
+                rawKernel = sciencePsfModel.computeKernelImage(afwGeom.Point2D(posX, posY)).convertF()
+                if rawKernel.getDimensions() == dimenR:
+                    kernelImageS = rawKernel
+                else:
+                    # make image of proper size
+                    kernelImageS = afwImage.ImageF(dimenR)
+                    if self.config.padPsf:
+                        bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((lenMax - rawKernel.getWidth())//2,
+                                                                    (lenMax - rawKernel.getHeight())//2),
+                                                    rawKernel.getDimensions())
+                        kernelImageS.assign(rawKernel, bboxToPlace)
+                    else:
+                        bboxToExtract = afwGeom.Box2I(afwGeom.Point2I((rawKernel.getWidth() - lenMin)//2,
+                                                                      (rawKernel.getHeight() - lenMin)//2),
+                                                      dimenR)
+                        rawKernel.setXY0(0, 0)
+                        kernelImageS = rawKernel.Factory(rawKernel, bboxToExtract)
+
                 kernelMaskS = afwImage.MaskU(dimenS)
                 kernelMaskS.set(0)
                 kernelVarS = afwImage.ImageF(dimenS)
@@ -426,4 +450,6 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                                            symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
                                            size=4, frame=lsstDebug.frame, title="Image to be convolved")
             lsstDebug.frame += 1
-        return kernelCellSet
+        return pipeBase.Struct(kernelCellSet=kernelCellSet,
+                               referencePsfModel=referencePsfModel,
+                               )
