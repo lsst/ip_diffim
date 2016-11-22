@@ -6,10 +6,10 @@ import lsst.utils.tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
-import lsst.pex.logging as pexLog
+import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
+logUtils.traceSetAt("ip.diffim", 4)
 
 # This tests the basics of the BuildSpatialKernelVisitor.  E.g. that
 # it makes the right size solution.  For more complex behaviors such

@@ -28,8 +28,8 @@
 #include "lsst/afw/image.h"
 #include "lsst/afw/detection.h"
 #include "lsst/afw/detection/FootprintArray.cc"
+#include "lsst/log/Log.h"
 #include "lsst/pex/exceptions/Runtime.h"
-#include "lsst/pex/logging/Trace.h"
 
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelSolution.h"
@@ -44,7 +44,6 @@ namespace afwDet         = lsst::afw::detection;
 namespace afwMath        = lsst::afw::math;
 namespace afwGeom        = lsst::afw::geom;
 namespace afwImage       = lsst::afw::image;
-namespace pexLog         = lsst::pex::logging; 
 namespace pexExcept      = lsst::pex::exceptions;
 
 namespace lsst { 
@@ -104,8 +103,8 @@ namespace diffim {
             Eigen::VectorXd eValues = eVecValues.eigenvalues();
             double eMax = eValues.maxCoeff();
             double eMin = eValues.minCoeff();
-            pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.getConditionNumber", 
-                              "EIGENVALUE eMax / eMin = %.3e", eMax / eMin);
+            LOGL_DEBUG("TRACE3.ip.diffim.KernelSolution.getConditionNumber",
+                       "EIGENVALUE eMax / eMin = %.3e", eMax / eMin);
             return (eMax / eMin);
             break;
             }
@@ -114,8 +113,8 @@ namespace diffim {
             Eigen::VectorXd sValues = mMat.jacobiSvd().singularValues();
             double sMax = sValues.maxCoeff();
             double sMin = sValues.minCoeff();
-            pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.getConditionNumber", 
-                              "SVD eMax / eMin = %.3e", sMax / sMin);
+            LOGL_DEBUG("TRACE3.ip.diffim.KernelSolution.getConditionNumber",
+                       "SVD eMax / eMin = %.3e", sMax / sMin);
             return (sMax / sMin);
             break;
             }
@@ -143,15 +142,15 @@ namespace diffim {
         boost::timer t;
         t.restart();
 
-        pexLog::TTrace<4>("lsst.ip.difim.KernelSolution.solve", 
-                          "Solving for kernel");
+        LOGL_DEBUG("TRACE2.ip.diffim.KernelSolution.solve",
+                   "Solving for kernel");
 		_solvedBy = LU;
 		Eigen::FullPivLU<Eigen::MatrixXd> lu(mMat);
 		if (lu.isInvertible()) {
 			aVec = lu.solve(bVec);
 		} else {
-			pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
-							  "Unable to determine kernel via LU");
+			LOGL_DEBUG("TRACE3.ip.diffim.KernelSolution.solve",
+                                   "Unable to determine kernel via LU");
 			/* LAST RESORT */
 			try {
 				
@@ -170,16 +169,16 @@ namespace diffim {
 			} catch (pexExcept::Exception& e) {
 				
 				_solvedBy = NONE;
-				pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
-								  "Unable to determine kernel via eigen-values");
+				LOGL_DEBUG("TRACE3.ip.diffim.KernelSolution.solve",
+                                           "Unable to determine kernel via eigen-values");
 				
 				throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution");
 			}
 		}
 
         double time = t.elapsed();
-        pexLog::TTrace<5>("lsst.ip.diffim.KernelSolution.solve", 
-                          "Compute time for matrix math : %.2f s", time);
+        LOGL_DEBUG("TRACE3.ip.diffim.KernelSolution.solve",
+                   "Compute time for matrix math : %.2f s", time);
 
         if (DEBUG_MATRIX) {
 		  std::cout << "A " << std::endl;
@@ -368,8 +367,8 @@ namespace diffim {
         } 
 
         double time = t.elapsed();
-        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.build", 
-                          "Total compute time to do basis convolutions : %.2f s", time);
+        LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.build",
+                   "Total compute time to do basis convolutions : %.2f s", time);
         t.restart();
         
         /* 
@@ -399,10 +398,10 @@ namespace diffim {
 
     template <typename InputT>
     void StaticKernelSolution<InputT>::solve() {
-        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.solve", 
-                          "mMat is %d x %d; bVec is %d; cMat is %d x %d; vVec is %d; iVec is %d", 
-                          (*_mMat).rows(), (*_mMat).cols(), (*_bVec).size(),
-                          (*_cMat).rows(), (*_cMat).cols(), (*_ivVec).size(), (*_iVec).size());
+        LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.solve",
+                   "mMat is %d x %d; bVec is %d; cMat is %d x %d; vVec is %d; iVec is %d",
+                   (*_mMat).rows(), (*_mMat).cols(), (*_bVec).size(),
+                   (*_cMat).rows(), (*_cMat).cols(), (*_ivVec).size(), (*_iVec).size());
 
         /* If I put this here I can't check for condition number before solving */
         /*
@@ -655,8 +654,8 @@ namespace diffim {
             *eiter = eigenCptr;
         }
         double time = t.elapsed();
-        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.buildWithMask", 
-                          "Total compute time to do basis convolutions : %.2f s", time);
+        LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.buildWithMask",
+                   "Total compute time to do basis convolutions : %.2f s", time);
         t.restart();
         
         /* Load matrix with all convolved images */
@@ -730,10 +729,10 @@ namespace diffim {
         */
         /* Ignore known EDGE pixels for speed */
         afwGeom::Box2I shrunkLocalBBox = (*kiter)->shrinkBBox(templateImage.getBBox(afwImage::LOCAL));
-        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
-                          "Limits of good pixels after convolution: %d,%d -> %d,%d (local)", 
-                          shrunkLocalBBox.getMinX(), shrunkLocalBBox.getMinY(), 
-                          shrunkLocalBBox.getMaxX(), shrunkLocalBBox.getMaxY());
+        LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
+                   "Limits of good pixels after convolution: %d,%d -> %d,%d (local)",
+                   shrunkLocalBBox.getMinX(), shrunkLocalBBox.getMinY(),
+                   shrunkLocalBBox.getMaxX(), shrunkLocalBBox.getMaxY());
 
         /* Subimages are addressed in raw pixel coordinates */
         unsigned int startCol = shrunkLocalBBox.getMinX();
@@ -824,8 +823,8 @@ namespace diffim {
         } 
 
         double time = t.elapsed();
-        pexLog::TTrace<5>("lsst.ip.diffim.StaticKernelSolution.build", 
-                          "Total compute time to do basis convolutions : %.2f s", time);
+        LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.build",
+                   "Total compute time to do basis convolutions : %.2f s", time);
         t.restart();
         
         /* 
@@ -913,10 +912,10 @@ namespace diffim {
                                                                          
         afwGeom::Box2I shrunkBBox = (*kiter)->shrinkBBox(templateImage.getBBox());
 
-        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
-                          "Limits of good pixels after convolution: %d,%d -> %d,%d", 
-                          shrunkBBox.getMinX(), shrunkBBox.getMinY(), 
-                          shrunkBBox.getMaxX(), shrunkBBox.getMaxY());
+        LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
+                   "Limits of good pixels after convolution: %d,%d -> %d,%d",
+                   shrunkBBox.getMinX(), shrunkBBox.getMinY(),
+                   shrunkBBox.getMaxX(), shrunkBBox.getMaxY());
 
         unsigned int const startCol = shrunkBBox.getMinX();
         unsigned int const startRow = shrunkBBox.getMinY();
@@ -976,18 +975,18 @@ namespace diffim {
         afwGeom::Box2I rBox = afwGeom::Box2I(afwGeom::Point2I(maskEndCol + 1, maskStartRow),
                                              afwGeom::Point2I(endCol, maskEndRow));
 
-        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
-                          "Upper good pixel region: %d,%d -> %d,%d", 
-                          tBox.getMinX(), tBox.getMinY(), tBox.getMaxX(), tBox.getMaxY());
-        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
-                          "Bottom good pixel region: %d,%d -> %d,%d", 
-                          bBox.getMinX(), bBox.getMinY(), bBox.getMaxX(), bBox.getMaxY());
-        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
-                          "Left good pixel region: %d,%d -> %d,%d", 
-                          lBox.getMinX(), lBox.getMinY(), lBox.getMaxX(), lBox.getMaxY());
-        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
-                          "Right good pixel region: %d,%d -> %d,%d", 
-                          rBox.getMinX(), rBox.getMinY(), rBox.getMaxX(), rBox.getMaxY());
+        LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
+                   "Upper good pixel region: %d,%d -> %d,%d",
+                   tBox.getMinX(), tBox.getMinY(), tBox.getMaxX(), tBox.getMaxY());
+        LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
+                   "Bottom good pixel region: %d,%d -> %d,%d",
+                   bBox.getMinX(), bBox.getMinY(), bBox.getMaxX(), bBox.getMaxY());
+        LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
+                   "Left good pixel region: %d,%d -> %d,%d",
+                   lBox.getMinX(), lBox.getMinY(), lBox.getMaxX(), lBox.getMaxY());
+        LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
+                   "Right good pixel region: %d,%d -> %d,%d",
+                   rBox.getMinX(), rBox.getMinY(), rBox.getMaxX(), rBox.getMaxY());
 
         std::vector<afwGeom::Box2I> boxArray;
         boxArray.push_back(tBox);
@@ -1064,8 +1063,8 @@ namespace diffim {
         } 
         
         double time = t.elapsed();
-        pexLog::TTrace<5>("lsst.ip.diffim.MaskedKernelSolution.build", 
-                          "Total compute time to do basis convolutions : %.2f s", time);
+        LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
+                   "Total compute time to do basis convolutions : %.2f s", time);
         t.restart();
 
         /* 
@@ -1128,9 +1127,9 @@ namespace diffim {
                 eValues(i) = 0.0;
             }
             else if ((eMax / eValues(i)) > maxCond) {
-                pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateRisk", 
-                                  "Truncating eValue %d; %.5e / %.5e = %.5e vs. %.5e",
-                                  i, eMax, eValues(i), eMax / eValues(i), maxCond);
+                LOGL_DEBUG("TRACE3.ip.diffim.RegularizedKernelSolution.estimateRisk",
+                           "Truncating eValue %d; %.5e / %.5e = %.5e vs. %.5e",
+                           i, eMax, eValues(i), eMax / eValues(i), maxCond);
                 eValues(i) = 0.0;
             }
             else {
@@ -1162,18 +1161,18 @@ namespace diffim {
                 throw LSST_EXCEPT(pexExcept::Exception, "Matrix size mismatch");
 
             double risk   = term1(0) + 2 * (term2a - term2b(0));
-            pexLog::TTrace<6>("lsst.ip.diffim.RegularizedKernelSolution.estimateRisk", 
-                              "Lambda = %.3f, Risk = %.5e", 
-                              l, risk);
-            pexLog::TTrace<7>("lsst.ip.diffim.RegularizedKernelSolution.estimateRisk", 
-                              "%.5e + 2 * (%.5e - %.5e)", 
-                              term1(0), term2a, term2b(0));
+            LOGL_DEBUG("TRACE4.ip.diffim.RegularizedKernelSolution.estimateRisk",
+                       "Lambda = %.3f, Risk = %.5e",
+                       l, risk);
+            LOGL_DEBUG("TRACE5.ip.diffim.RegularizedKernelSolution.estimateRisk",
+                       "%.5e + 2 * (%.5e - %.5e)",
+                       term1(0), term2a, term2b(0));
             risks.push_back(risk);
         }
         std::vector<double>::iterator it = min_element(risks.begin(), risks.end());
         int index = distance(risks.begin(), it);
-        pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.estimateRisk", 
-                          "Minimum Risk = %.3e at lambda = %.3e", risks[index], lambdas[index]);
+        LOGL_DEBUG("TRACE3.ip.diffim.RegularizedKernelSolution.estimateRisk",
+                   "Minimum Risk = %.3e at lambda = %.3e", risks[index], lambdas[index]);
 
         return lambdas[index];
         
@@ -1194,10 +1193,10 @@ namespace diffim {
     template <typename InputT>
     void RegularizedKernelSolution<InputT>::solve() {
 
-        pexLog::TTrace<5>("lsst.ip.diffim.RegularizedKernelSolution.solve", 
-                          "cMat is %d x %d; vVec is %d; iVec is %d; hMat is %d x %d", 
-                          (*this->_cMat).rows(), (*this->_cMat).cols(), (*this->_ivVec).size(), 
-                          (*this->_iVec).size(), (*_hMat).rows(), (*_hMat).cols());
+        LOGL_DEBUG("TRACE3.ip.diffim.RegularizedKernelSolution.solve",
+                   "cMat is %d x %d; vVec is %d; iVec is %d; hMat is %d x %d",
+                   (*this->_cMat).rows(), (*this->_cMat).cols(), (*this->_ivVec).size(),
+                   (*this->_iVec).size(), (*_hMat).rows(), (*_hMat).cols());
 
         if (DEBUG_MATRIX2) {
             std::cout << "ID: " << (this->_id) << std::endl;
@@ -1288,8 +1287,8 @@ namespace diffim {
             throw LSST_EXCEPT(pexExcept::Exception, "lambdaType in Policy not recognized");
         }
         
-        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
-                          "Applying kernel regularization with lambda = %.2e", _lambda);
+        LOGL_DEBUG("TRACE3.ip.diffim.RegularizedKernelSolution.solve",
+                   "Applying kernel regularization with lambda = %.2e", _lambda);
         
         
         try {
@@ -1378,10 +1377,10 @@ namespace diffim {
             new afwMath::LinearCombinationKernel(basisList, *_spatialKernelFunction)
             );
 
-        pexLog::TTrace<5>("lsst.ip.diffim.SpatialKernelSolution", 
-                          "Initializing with size %d %d %d and constant first term = %s",
-                          _nkt, _nbt, _nt,
-                          _constantFirstTerm ? "true" : "false");
+        LOGL_DEBUG("TRACE3.ip.diffim.SpatialKernelSolution",
+                   "Initializing with size %d %d %d and constant first term = %s",
+                   _nkt, _nbt, _nt,
+                   _constantFirstTerm ? "true" : "false");
         
     }
 
@@ -1389,8 +1388,8 @@ namespace diffim {
                                               std::shared_ptr<Eigen::MatrixXd> qMat,
                                               std::shared_ptr<Eigen::VectorXd> wVec) {
         
-        pexLog::TTrace<8>("lsst.ip.diffim.SpatialKernelSolution.addConstraint", 
-                          "Adding candidate at %f, %f", xCenter, yCenter);
+        LOGL_DEBUG("TRACE5.ip.diffim.SpatialKernelSolution.addConstraint",
+                   "Adding candidate at %f, %f", xCenter, yCenter);
 
         /* Calculate P matrices */
         /* Pure kernel terms */

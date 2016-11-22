@@ -30,8 +30,8 @@ from optparse import OptionParser
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.detection as afwDet
+from lsst.log import Log
 import lsst.pex.policy as pexPolicy
-import lsst.pex.logging as pexLog
 import lsst.daf.persistence as dafPersist
 import lsst.daf.base as dafBase
 import numpy as num
@@ -103,6 +103,7 @@ class DiaSourceAnalyst(object):
 
     def __init__(self, config):
         self.config = config
+        self.log = Log.getLogger("ip.diffim.DiaSourceAnalysis")
 
         self.bitMask = 0
         srcBadMaskPlanes = self.config.srcBadMaskPlanes
@@ -141,8 +142,7 @@ class DiaSourceAnalyst(object):
         fMasked = (nMasked / nPixels)
         fMaskedTol = self.config.fBadPixels
         if fMasked > fMaskedTol:
-            pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                         "Candidate %d : BAD fBadPixels %.2f > %.2f" % (source.getId(), fMasked, fMaskedTol))
+            self.log.debug("Candidate %d : BAD fBadPixels %.2f > %.2f", source.getId(), fMasked, fMaskedTol)
             return False
 
         if flux > 0:
@@ -161,38 +161,33 @@ class DiaSourceAnalyst(object):
         # 2) Not enough flux in unmasked correct-polarity pixels
         fluxRatioTolerance = self.config.fluxPolarityRatio
         if fluxRatio < fluxRatioTolerance:
-            pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                         "Candidate %d : BAD flux polarity %.2f < %.2f (pos=%.2f neg=%.2f)" % 
-                         (source.getId(), fluxRatio, fluxRatioTolerance, fPos, fNeg))
+            self.log.debug("Candidate %d : BAD flux polarity %.2f < %.2f (pos=%.2f neg=%.2f)",
+                           source.getId(), fluxRatio, fluxRatioTolerance, fPos, fNeg)
             return False
 
         # 3) Not enough unmasked pixels of correct polarity
         polarityTolerance = self.config.nPolarityRatio
         if npolRatio < polarityTolerance:
-            pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                         "Candidate %d : BAD polarity count %.2f < %.2f (pos=%d neg=%d)" % 
-                         (source.getId(), npolRatio, polarityTolerance, nPos, nNeg))
+            self.log.debug("Candidate %d : BAD polarity count %.2f < %.2f (pos=%d neg=%d)",
+                           source.getId(), npolRatio, polarityTolerance, nPos, nNeg)
             return False
 
         # 4) Too many masked vs. correct polarity pixels
         maskedTolerance = self.config.nMaskedRatio
         if maskRatio < maskedTolerance:
-            pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                         "Candidate %d : BAD unmasked count %.2f < %.2f (pos=%d neg=%d mask=%d)" % 
-                         (source.getId(), maskRatio, maskedTolerance, nPos, nNeg, nMasked))
+            self.log.debug("Candidate %d : BAD unmasked count %.2f < %.2f (pos=%d neg=%d mask=%d)",
+                           source.getId(), maskRatio, maskedTolerance, nPos, nNeg, nMasked)
             return False
 
         # 5) Too few unmasked, correct polarity pixels
         ngoodTolerance = self.config.nGoodRatio
         if ngoodRatio < ngoodTolerance:
-            pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                         "Candidate %d : BAD good pixel count %.2f < %.2f (pos=%d neg=%d tot=%d)" % 
-                         (source.getId(), ngoodRatio, ngoodTolerance, nPos, nNeg, nPixels))
+            self.log.debug("Candidate %d : BAD good pixel count %.2f < %.2f (pos=%d neg=%d tot=%d)",
+                           source.getId(), ngoodRatio, ngoodTolerance, nPos, nNeg, nPixels)
             return False
 
-        pexLog.Trace("lsst.ip.diffim.DiaSourceAnalysis", 1,
-                     "Candidate %d : OK flux=%.2f nPos=%d nNeg=%d nTot=%d nDetPos=%d nDetNeg=%d fPos=%.2f fNeg=%2f" %
-                     (source.getId(), flux, nPos, nNeg, nPixels, nDetPos, nDetNeg, fPos, fNeg))
+        self.log.debug("Candidate %d : OK flux=%.2f nPos=%d nNeg=%d nTot=%d nDetPos=%d nDetNeg=%d fPos=%.2f fNeg=%2f",
+                       source.getId(), flux, nPos, nNeg, nPixels, nDetPos, nDetNeg, fPos, fNeg)
         return True
 
 

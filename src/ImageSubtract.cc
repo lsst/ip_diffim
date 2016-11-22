@@ -42,9 +42,7 @@
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
 #include "lsst/afw/geom.h"
-
-#include "lsst/pex/logging/Trace.h"
-#include "lsst/pex/logging/Log.h"
+#include "lsst/log/Log.h"
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/exceptions/Runtime.h"
 
@@ -54,7 +52,6 @@ namespace afwGeom    = lsst::afw::geom;
 namespace afwImage   = lsst::afw::image;
 namespace afwMath    = lsst::afw::math;
 namespace pexExcept  = lsst::pex::exceptions; 
-namespace pexLog     = lsst::pex::logging; 
 namespace pexPolicy  = lsst::pex::policy; 
 
 namespace lsst { 
@@ -147,8 +144,8 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     }
 
     double time = t.elapsed();
-    pexLog::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
-                      "Total compute time to convolve and subtract : %.2f s", time);
+    LOGL_DEBUG("TRACE4.ip.diffim.convolveAndSubtract",
+               "Total compute time to convolve and subtract : %.2f s", time);
 
     return convolvedMaskedImage;
 }
@@ -200,8 +197,8 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     convolvedMaskedImage.getVariance()->assign(*scienceMaskedImage.getVariance());
     
     double time = t.elapsed();
-    pexLog::TTrace<5>("lsst.ip.diffim.convolveAndSubtract", 
-                      "Total compute time to convolve and subtract : %.2f s", time);
+    LOGL_DEBUG("TRACE4.ip.diffim.convolveAndSubtract",
+               "Total compute time to convolve and subtract : %.2f s", time);
 
     return convolvedMaskedImage;
 }

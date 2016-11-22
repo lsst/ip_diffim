@@ -20,7 +20,6 @@
 #
 import numpy as np
 import lsst.daf.base as dafBase
-import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -211,8 +210,8 @@ for this Task include:
 
 Note that if you want addional logging info, you may add to your scripts:
 \code{.py}
-import lsst.pex.logging as pexLog
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
+import lsst.log.utils as logUtils
+logUtils.traceSetAt("ip.diffim", 4)
 \endcode
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -344,7 +343,7 @@ And finally provide some optional debugging displays:
                                                              templateExposure, destBBox=scienceExposure.getBBox())
                 templateExposure.setPsf(templatePsf)
             else:
-                pexLog.Trace(self.log.getName(), 1, "ERROR: Input images not registered")
+                self.log.error("ERROR: Input images not registered")
                 raise RuntimeError("Input images not registered")
 
         if templateFwhmPix is None:
@@ -425,7 +424,7 @@ And finally provide some optional debugging displays:
             raise RuntimeError("Candidate list must be populated by makeCandidateList")
 
         if not self._validateSize(templateMaskedImage, scienceMaskedImage):
-            pexLog.Trace(self.log.getName(), 1, "ERROR: Input images different size")
+            self.log.error("ERROR: Input images different size")
             raise RuntimeError("Input images different size")
 
         if display and displayTemplate:

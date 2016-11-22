@@ -11,15 +11,14 @@
 #include <limits>
 
 #include "lsst/afw/math.h"
+#include "lsst/log/Log.h"
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/exceptions/Runtime.h"
-#include "lsst/pex/logging/Trace.h"
 
 #include "lsst/ip/diffim/KernelCandidate.h"
 #include "lsst/ip/diffim/KernelSumVisitor.h"
 
 namespace afwMath        = lsst::afw::math;
-namespace pexLogging     = lsst::pex::logging; 
 namespace pexPolicy      = lsst::pex::policy; 
 namespace pexExcept      = lsst::pex::exceptions; 
 
@@ -96,8 +95,8 @@ namespace detail {
             throw LSST_EXCEPT(pexExcept::LogicError,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
-        pexLogging::TTrace<6>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
-                              "Processing candidate %d, mode %d", kCandidate->getId(), _mode);
+        LOGL_DEBUG("TRACE5.ip.diffim.KernelSumVisitor.processCandidate",
+                   "Processing candidate %d, mode %d", kCandidate->getId(), _mode);
         
         /* Grab all kernel sums and look for outliers */
         if (_mode == AGGREGATE) {
@@ -110,16 +109,16 @@ namespace detail {
 
                 if (fabs(kSum - _kSumMean) > _dkSumMax) {
                     kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-                    pexLogging::TTrace<4>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
-                                          "Rejecting candidate %d; bad source kernel sum : (%.2f)",
-                                          kCandidate->getId(),
-                                          kSum);
+                    LOGL_DEBUG("TRACE3.ip.diffim.KernelSumVisitor.processCandidate",
+                               "Rejecting candidate %d; bad source kernel sum : (%.2f)",
+                               kCandidate->getId(),
+                               kSum);
                     _nRejected += 1;
                 }
             }
             else {
-                pexLogging::TTrace<6>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
-                                      "Sigma clipping not enabled");
+                LOGL_DEBUG("TRACE5.ip.diffim.KernelSumVisitor.processCandidate",
+                           "Sigma clipping not enabled");
             }
         }
     }
@@ -131,8 +130,8 @@ namespace detail {
                               "Unable to determine kernel sum; 0 candidates");
         }
         else if (_kSums.size() == 1) {
-            pexLogging::TTrace<2>("lsst.ip.diffim.KernelSumVisitor.processKsumDistribution", 
-                                  "WARNING: only 1 kernel candidate");
+            LOGL_DEBUG("TRACE1.ip.diffim.KernelSumVisitor.processKsumDistribution",
+                       "WARNING: only 1 kernel candidate");
             
             _kSumMean = _kSums[0];
             _kSumStd  = 0.0;
@@ -163,9 +162,9 @@ namespace detail {
             }
         }
         _dkSumMax = _policy.getDouble("maxKsumSigma") * _kSumStd;
-        pexLogging::TTrace<2>("lsst.ip.diffim.KernelSumVisitor.processCandidate", 
-                              "Kernel Sum Distribution : %.3f +/- %.3f (%d points)", 
-                              _kSumMean, _kSumStd, _kSumNpts);
+        LOGL_DEBUG("TRACE1.ip.diffim.KernelSumVisitor.processCandidate",
+                   "Kernel Sum Distribution : %.3f +/- %.3f (%d points)",
+                   _kSumMean, _kSumStd, _kSumNpts);
     }
     
     typedef float PixelT;

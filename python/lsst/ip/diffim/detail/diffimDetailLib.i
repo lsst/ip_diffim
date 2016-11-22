@@ -13,7 +13,6 @@ Python bindings for lsst::ip::diffim::detail code
 #include <memory>
 
 #include "lsst/pex/exceptions.h"
-#include "lsst/pex/logging.h"
 #include "lsst/afw/detection.h"
 #include "lsst/afw/math.h"
 #include "lsst/afw/geom.h" 

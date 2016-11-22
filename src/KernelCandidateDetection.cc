@@ -12,9 +12,9 @@
 #include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/detection.h"
+#include "lsst/log/Log.h"
 #include "lsst/pex/exceptions/Exception.h"
 #include "lsst/pex/policy/Policy.h"
-#include "lsst/pex/logging/Trace.h"
 
 #include "lsst/ip/diffim/FindSetBits.h"
 #include "lsst/ip/diffim/KernelCandidateDetection.h"
@@ -22,7 +22,6 @@
 namespace afwGeom   = lsst::afw::geom;
 namespace afwImage  = lsst::afw::image;
 namespace afwDetect = lsst::afw::detection;
-namespace pexLog    = lsst::pex::logging; 
 namespace pexExcept = lsst::pex::exceptions; 
 
 namespace lsst { 
@@ -44,14 +43,14 @@ namespace diffim {
             try {
                 _badBitMask |= afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask(*mi);
             } catch (pexExcept::Exception& e) {
-                pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection",
-                                  "Cannot update bad bit mask with %s", (*mi).c_str());
-                pexLog::TTrace<7>("lsst.ip.diffim.KernelCandidateDetection",
-                                  e.what());
+                LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection",
+                           "Cannot update bad bit mask with %s", (*mi).c_str());
+                LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidateDetection",
+                           e.what());
             }
         }
-        pexLog::TTrace<4>("lsst.ip.diffim.KernelCandidateDetection", 
-                          "Using bad bit mask %d", _badBitMask);
+        LOGL_DEBUG("TRACE2.ip.diffim.KernelCandidateDetection",
+                   "Using bad bit mask %d", _badBitMask);
     }
         
         
@@ -107,9 +106,9 @@ namespace diffim {
             // Get the associated footprints
 
             footprintListInPtr = footprintSet.getFootprints();
-            pexLog::TTrace<4>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                              "Found %d total footprints in template above %.3f %s",
-                              footprintListInPtr->size(), detThreshold, detThresholdType.c_str());
+            LOGL_DEBUG("TRACE2.ip.diffim.KernelCandidateDetection.apply",
+                       "Found %d total footprints in template above %.3f %s",
+                       footprintListInPtr->size(), detThreshold, detThresholdType.c_str());
         }
         else {
             afwDetect::FootprintSet footprintSet(
@@ -119,17 +118,17 @@ namespace diffim {
                 fpNpixMin);
             
             footprintListInPtr = footprintSet.getFootprints();
-            pexLog::TTrace<4>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                              "Found %d total footprints in science image above %.3f %s",
-                              footprintListInPtr->size(), detThreshold, detThresholdType.c_str());
+            LOGL_DEBUG("TRACE2.ip.diffim.KernelCandidateDetection.apply",
+                       "Found %d total footprints in science image above %.3f %s",
+                       footprintListInPtr->size(), detThreshold, detThresholdType.c_str());
         }    
         
         // Iterate over footprints, look for "good" ones
         for (std::vector<afwDetect::Footprint::Ptr>::iterator i = footprintListInPtr->begin(); 
              i != footprintListInPtr->end(); ++i) {
             
-            pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                              "Processing footprint %d", (*i)->getId());
+            LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection.apply",
+                       "Processing footprint %d", (*i)->getId());
             growCandidate((*i), fpGrowPix, templateMaskedImage, scienceMaskedImage);
         }
         
@@ -138,9 +137,9 @@ namespace diffim {
                               "Unable to find any footprints for Psf matching");
         }
         
-        pexLog::TTrace<1>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                          "Found %d clean footprints above threshold %.3f",
-                          _footprints.size(), detThreshold);
+        LOGL_DEBUG("TRACE1.ip.diffim.KernelCandidateDetection.apply",
+                   "Found %d clean footprints above threshold %.3f",
+                   _footprints.size(), detThreshold);
         
     }
     
@@ -168,9 +167,9 @@ namespace diffim {
          * 
          */
         if (fp->getNpix() > static_cast<std::size_t>(fpNpixMax)) {
-            pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                              "Footprint has too many pix: %d (max =%d)", 
-                              fp->getNpix(), fpNpixMax);
+            LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection.apply",
+                       "Footprint has too many pix: %d (max =%d)",
+                       fp->getNpix(), fpNpixMax);
             
             int xc = int(0.5 * (fpBBox.getMinX() + fpBBox.getMaxX()));
             int yc = int(0.5 * (fpBBox.getMinY() + fpBBox.getMaxY()));
@@ -180,7 +179,7 @@ namespace diffim {
             return growCandidate(fpCore, fpGrowPix, templateMaskedImage, scienceMaskedImage);
         } 
 
-        pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
+        LOGL_DEBUG("TRACE5.ip.diffim.KernelCandidateDetection.apply", 
                           "Original footprint in parent : %d,%d -> %d,%d -> %d,%d",
                           fpBBox.getMinX(), fpBBox.getMinY(), 
                           int(0.5 * (fpBBox.getMinX() + fpBBox.getMaxX())),
@@ -211,19 +210,19 @@ namespace diffim {
         /* Next we look at the image within this Footprint.  
          */
         afwGeom::Box2I fpGrowBBox = fpGrow->getBBox();
-        pexLog::TTrace<8>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                          "Grown footprint in parent : %d,%d -> %d,%d -> %d,%d",
-                          fpGrowBBox.getMinX(), fpGrowBBox.getMinY(), 
-                          int(0.5 * (fpGrowBBox.getMinX() + fpGrowBBox.getMaxX())),
-                          int(0.5 * (fpGrowBBox.getMinY() + fpGrowBBox.getMaxY())),
-                          fpGrowBBox.getMaxX(), fpGrowBBox.getMaxY());
+        LOGL_DEBUG("TRACE5.ip.diffim.KernelCandidateDetection.apply",
+                   "Grown footprint in parent : %d,%d -> %d,%d -> %d,%d",
+                   fpGrowBBox.getMinX(), fpGrowBBox.getMinY(),
+                   int(0.5 * (fpGrowBBox.getMinX() + fpGrowBBox.getMaxX())),
+                   int(0.5 * (fpGrowBBox.getMinY() + fpGrowBBox.getMaxY())),
+                   fpGrowBBox.getMaxX(), fpGrowBBox.getMaxY());
 
         /* Failure Condition 2) 
          * Grown off the image
          */
         if (!(templateMaskedImage->getBBox().contains(fpGrowBBox))) {
-            pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                              "Footprint grown off image"); 
+            LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection.apply",
+                       "Footprint grown off image");
             return false;
         }
         
@@ -236,25 +235,25 @@ namespace diffim {
             // Search for any masked pixels within the footprint
             fsb.apply(*(templateSubimage.getMask()));
             if (fsb.getBits() & _badBitMask) {
-                pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                                  "Footprint has masked pix (vals=%d) in image to convolve", 
-                                  fsb.getBits()); 
+                LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection.apply",
+                           "Footprint has masked pix (vals=%d) in image to convolve",
+                           fsb.getBits());
                 subimageHasFailed = true;
             }
             
             fsb.apply(*(scienceSubimage.getMask()));
             if (fsb.getBits() & _badBitMask) {
-                pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply", 
-                                  "Footprint has masked pix (vals=%d) in image not to convolve", 
-                                  fsb.getBits());
+                LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection.apply",
+                           "Footprint has masked pix (vals=%d) in image not to convolve",
+                           fsb.getBits());
                 subimageHasFailed = true;
             }
             
         } catch (pexExcept::Exception& e) {
-            pexLog::TTrace<6>("lsst.ip.diffim.KernelCandidateDetection.apply",
-                              "Exception caught extracting Footprint");
-            pexLog::TTrace<7>("lsst.ip.diffim.KernelCandidateDetection.apply",
-                              e.what());
+            LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection.apply",
+                       "Exception caught extracting Footprint");
+            LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidateDetection.apply",
+                       e.what());
             subimageHasFailed = true;
         }
         if (subimageHasFailed) {

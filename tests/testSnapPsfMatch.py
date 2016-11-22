@@ -29,9 +29,9 @@ import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.daf.base as dafBase
+import lsst.log.utils as logUtils
 
-import lsst.pex.logging as pexLog
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
+logUtils.traceSetAt("ip.diffim", 4)
 
 
 class PsfMatchTestCases(lsst.utils.tests.TestCase):

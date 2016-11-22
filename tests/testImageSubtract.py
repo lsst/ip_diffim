@@ -34,10 +34,10 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
-import lsst.pex.logging as logging
+import lsst.log.utils as logUtils
 
-verbosity = 4
-logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
+verbosity = 3
+logUtils.traceSetAt("ip.diffim", verbosity)
 
 # known input images
 try:

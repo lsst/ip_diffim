@@ -11,9 +11,9 @@
 
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
+#include "lsst/log/Log.h"
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/exceptions/Runtime.h"
-#include "lsst/pex/logging/Trace.h"
 
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelCandidate.h"
@@ -23,7 +23,6 @@
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
-namespace pexLogging     = lsst::pex::logging; 
 namespace pexPolicy      = lsst::pex::policy; 
 namespace pexExcept      = lsst::pex::exceptions; 
 
@@ -81,13 +80,13 @@ namespace detail {
         }
         if (!(kCandidate->isInitialized())) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-            pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                  "Cannot process candidate %d, continuing", kCandidate->getId());
+            LOGL_DEBUG("TRACE2.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                       "Cannot process candidate %d, continuing", kCandidate->getId());
             return;
         }
         
-        pexLogging::TTrace<2>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                              "Processing candidate %d", kCandidate->getId());
+        LOGL_DEBUG("TRACE1.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                   "Processing candidate %d", kCandidate->getId());
 
         /* 
            Note - this is a hack until the Kernel API is upgraded by the
@@ -117,38 +116,38 @@ namespace detail {
             else
                 _imstats.apply(diffim);
         } catch (pexExcept::Exception& e) {
-            pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                  "Unable to calculate imstats for Candidate %d", kCandidate->getId()); 
+            LOGL_DEBUG("TRACE2.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                       "Unable to calculate imstats for Candidate %d", kCandidate->getId());
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
             return;
         }
 
         _nProcessed += 1;
         
-        pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                              "Chi2 = %.3f", _imstats.getVariance());
-        pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
-                              "X = %.2f Y = %.2f",
-                              kCandidate->getXCenter(), 
-                              kCandidate->getYCenter());
-        pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
-                              "Kernel Sum = %.3f", kSum);
-        pexLogging::TTrace<5>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
-                              "Background = %.3f", background);
-        pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
-                              "Candidate %d resids = %.3f +/- %.3f sigma (%d pix)",
-                              kCandidate->getId(),
-                              _imstats.getMean(),
-                              _imstats.getRms(),
-                              _imstats.getNpix());
+        LOGL_DEBUG("TRACE4.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                   "Chi2 = %.3f", _imstats.getVariance());
+        LOGL_DEBUG("TRACE4.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                   "X = %.2f Y = %.2f",
+                   kCandidate->getXCenter(),
+                   kCandidate->getYCenter());
+        LOGL_DEBUG("TRACE4.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                   "Kernel Sum = %.3f", kSum);
+        LOGL_DEBUG("TRACE4.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                   "Background = %.3f", background);
+        LOGL_DEBUG("TRACE2.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                   "Candidate %d resids = %.3f +/- %.3f sigma (%d pix)",
+                   kCandidate->getId(),
+                   _imstats.getMean(),
+                   _imstats.getRms(),
+                   _imstats.getNpix());
         
         bool meanIsNan = std::isnan(_imstats.getMean());
         bool rmsIsNan  = std::isnan(_imstats.getRms());
         if (meanIsNan || rmsIsNan) {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-            pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                  "Rejecting candidate %d, encountered NaN",
-                                  kCandidate->getId());
+            LOGL_DEBUG("TRACE3.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                       "Rejecting candidate %d, encountered NaN",
+                       kCandidate->getId());
             _nRejected += 1;
             return;
         }
@@ -156,33 +155,33 @@ namespace detail {
         if (_policy.getBool("spatialKernelClipping")) {            
             if (fabs(_imstats.getMean()) > _policy.getDouble("candidateResidualMeanMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-                pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                      "Rejecting candidate %d; bad mean residual : |%.3f| > %.3f",
-                                      kCandidate->getId(),
-                                      _imstats.getMean(),
-                                      _policy.getDouble("candidateResidualMeanMax"));
+                LOGL_DEBUG("TRACE3.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                           "Rejecting candidate %d; bad mean residual : |%.3f| > %.3f",
+                           kCandidate->getId(),
+                           _imstats.getMean(),
+                           _policy.getDouble("candidateResidualMeanMax"));
                 _nRejected += 1;
             }
             else if (_imstats.getRms() > _policy.getDouble("candidateResidualStdMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
-                pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                      "Rejecting candidate %d; bad residual rms : %.3f > %.3f",
-                                      kCandidate->getId(),
-                                      _imstats.getRms(),
-                                      _policy.getDouble("candidateResidualStdMax"));
+                LOGL_DEBUG("TRACE3.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                           "Rejecting candidate %d; bad residual rms : %.3f > %.3f",
+                           kCandidate->getId(),
+                           _imstats.getRms(),
+                           _policy.getDouble("candidateResidualStdMax"));
                 _nRejected += 1;
             }
             else {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::GOOD);
-                pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                      "Spatial kernel OK");
+                LOGL_DEBUG("TRACE3.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                           "Spatial kernel OK");
                 _nGood += 1;
             }
         }
         else {
             kCandidate->setStatus(afwMath::SpatialCellCandidate::GOOD);
-            pexLogging::TTrace<6>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                  "Sigma clipping not enabled");
+            LOGL_DEBUG("TRACE5.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                       "Sigma clipping not enabled");
             _nGood += 1;
         }
 
@@ -191,18 +190,18 @@ namespace detail {
             try {
                 _imstats.apply(diffim, _coreRadius);
             } catch (pexExcept::Exception& e) {
-                pexLogging::TTrace<3>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate", 
-                                      "Unable to calculate core imstats for Candidate %d", 
-                                      kCandidate->getId()); 
+                LOGL_DEBUG("TRACE2.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                           "Unable to calculate core imstats for Candidate %d",
+                           kCandidate->getId());
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 return;
             }
-            pexLogging::TTrace<4>("lsst.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
-                                  "Candidate %d core resids = %.3f +/- %.3f sigma (%d pix)",
-                                  kCandidate->getId(),
-                                  _imstats.getMean(),
-                                  _imstats.getRms(),
-                                  _imstats.getNpix());
+            LOGL_DEBUG("TRACE3.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
+                       "Candidate %d core resids = %.3f +/- %.3f sigma (%d pix)",
+                       kCandidate->getId(),
+                       _imstats.getMean(),
+                       _imstats.getRms(),
+                       _imstats.getNpix());
         }
     }
 

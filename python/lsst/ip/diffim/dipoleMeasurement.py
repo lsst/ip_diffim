@@ -456,8 +456,7 @@ class DipoleDeblender(object):
 
         # Always deblend as Psf
         self.psfChisqCut1 = self.psfChisqCut2 = self.psfChisqCut2b = np.inf
-        self.log = Log.getLogger('lsst.ip.diffim.DipoleDeblender')
-        self.log.setLevel(Log.INFO)
+        self.log = Log.getLogger('ip.diffim.DipoleDeblender')
         self.sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
     def __call__(self, source, exposure):

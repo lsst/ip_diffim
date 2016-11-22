@@ -31,8 +31,8 @@ import lsst.daf.base as dafBase
 import lsst.meas.algorithms as measAlg
 from lsst.ip.diffim import SnapPsfMatchTask, diffimTools
 
-import lsst.pex.logging as pexLog
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
+import lsst.log.utils as logUtils
+logUtils.traceSetAt("ip.diffim", 4)
 
 
 class MySnapPsfMatchTask(SnapPsfMatchTask):

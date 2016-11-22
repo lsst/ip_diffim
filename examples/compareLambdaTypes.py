@@ -12,13 +12,15 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
-import lsst.pex.logging as logging
+from lsst.log import Log
+import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
 import lsst.afw.display.ds9 as ds9
 
-verbosity = 7
-logging.Trace_setVerbosity('lsst.ip.diffim', verbosity)
+logUtils.traceSetAt("ip.diffim", 6)
+logger = Log.getLogger("ip.diffim.compareLambdaTypes")
+logger.setLevel(Log.DEBUG)
 
 display = True
 writefits = False
@@ -187,14 +189,14 @@ class DiffimTestCases(unittest.TestCase):
             return None
 
         # delta function kernel
-        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DF run')
+        logger.debug('DF run')
         results1 = self.apply(pexConfig.makePolicy(self.subconfig1), self.bskv1, xloc, yloc, tmi, smi)
         kSum1, bg1, dmean1, dstd1, vmean1, kImageOut1, diffIm1, kc1 = results1
         res = 'DF residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                              self.dStats.getRms(),
                                                                              kSum1, bg1,
                                                                              dmean1, dstd1, vmean1)
-        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, res)
+        logger.debug(res)
         if display:
             ds9.mtv(tmi, frame=1) # ds9 switches frame 0 and 1 for some reason
             ds9.mtv(smi, frame=0)
@@ -207,14 +209,14 @@ class DiffimTestCases(unittest.TestCase):
             diffIm1.writeFits('d1.fits')
 
         # regularized delta function kernel
-        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFrC5 run')
+        logger.debug('DFrC5 run')
         results2 = self.apply(pexConfig.makePolicy(self.subconfig2), self.bskv2, xloc, yloc, tmi, smi)
         kSum2, bg2, dmean2, dstd2, vmean2, kImageOut2, diffIm2, kc2 = results2
         res = 'DFrC5 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                 self.dStats.getRms(),
                                                                                 kSum2, bg2,
                                                                                 dmean2, dstd2, vmean2)
-        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, res)
+        logger.debug(res)
         if display:
             ds9.mtv(tmi, frame=4)
             ds9.mtv(smi, frame=5)
@@ -225,14 +227,14 @@ class DiffimTestCases(unittest.TestCase):
             diffIm2.writeFits('d2')
 
         # regularized delta function kernel
-        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFrC9 run')
+        logger.debug('DFrC9 run')
         results3 = self.apply(pexConfig.makePolicy(self.subconfig3), self.bskv3, xloc, yloc, tmi, smi)
         kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3, kc3 = results3
         res = 'DFrC9 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                 self.dStats.getRms(),
                                                                                 kSum3, bg3,
                                                                                 dmean3, dstd3, vmean3)
-        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, res)
+        logger.debug(res)
         if display:
             ds9.mtv(tmi, frame=8)
             ds9.mtv(smi, frame=9)
@@ -243,14 +245,14 @@ class DiffimTestCases(unittest.TestCase):
             diffIm2.writeFits('d3')
 
         # regularized delta function kernel
-        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, 'DFrF12 run')
+        logger.debug('DFrF12 run')
         results4 = self.apply(pexConfig.makePolicy(self.subconfig4), self.bskv4, xloc, yloc, tmi, smi)
         kSum4, bg4, dmean4, dstd4, vmean4, kImageOut4, diffIm4, kc4 = results4
         res = 'DFrF12 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
                                                                                  self.dStats.getRms(),
                                                                                  kSum4, bg4,
                                                                                  dmean4, dstd4, vmean4)
-        logging.Trace("lsst.ip.diffim.compareLambdaTypes", 1, res)
+        logger.debug(res)
         if display:
             ds9.mtv(tmi, frame=12)
             ds9.mtv(smi, frame=13)

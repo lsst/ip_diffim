@@ -198,8 +198,8 @@ for this Task include:
 
 Note that if you want addional logging info, you may add to your scripts:
 \code{.py}
-import lsst.pex.logging as pexLog
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
+import lsst.log.utils as logUtils
+logUtils.traceSetAt("ip.diffim", 4)
 \endcode
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

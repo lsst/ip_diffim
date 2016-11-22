@@ -40,8 +40,8 @@
 #include <memory>
 
 #include "lsst/afw/image.h"
+#include "lsst/log/Log.h"
 #include "lsst/pex/policy/Policy.h"
-#include "lsst/pex/logging/Trace.h"
 
 namespace lsst { 
 namespace ip { 
@@ -71,10 +71,10 @@ namespace diffim {
                 try {
                     _bpMask |= lsst::afw::image::Mask<lsst::afw::image::MaskPixel>::getPlaneBitMask(*mi);
                 } catch (pexExcept::Exception& e) {
-                    lsst::pex::logging::TTrace<6>("lsst.ip.diffim.ImageStatistics",
-                                                  "Cannot update bad bit mask with %s", (*mi).c_str());
-                    lsst::pex::logging::TTrace<7>("lsst.ip.diffim.ImageStatistics",
-                                                  e.what());
+                    LOGL_DEBUG("TRACE4.ip.diffim.ImageStatistics",
+                               "Cannot update bad bit mask with %s", (*mi).c_str());
+                    LOGL_DEBUG("TRACE5.ip.diffim.ImageStatistics",
+                               e.what());
                 }
             }
         } ;

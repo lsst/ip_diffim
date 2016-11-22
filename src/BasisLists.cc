@@ -15,17 +15,16 @@
 
 #include "lsst/pex/exceptions/Exception.h"
 #include "lsst/pex/policy/Policy.h"
-#include "lsst/pex/logging/Trace.h"
 #include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
+#include "lsst/log/Log.h"
 #include "lsst/ip/diffim/BasisLists.h"
 
 namespace pexExcept  = lsst::pex::exceptions;
 namespace afwGeom    = lsst::afw::geom;
 namespace afwImage   = lsst::afw::image;
 namespace afwMath    = lsst::afw::math;
-namespace pexLogging     = lsst::pex::logging; 
 
 namespace lsst { 
 namespace ip { 
@@ -105,8 +104,8 @@ namespace diffim {
             double sig  = sigGauss[i];
             int deg     = degGauss[i];
 
-            pexLogging::TTrace<2>("lsst.ip.diffim.BasisLists.makeAlardLuptonBasisList", 
-                                  "Gaussian %d : sigma %.2f degree %d", i, sig, deg);
+            LOGL_DEBUG("TRACE1.ip.diffim.BasisLists.makeAlardLuptonBasisList",
+                       "Gaussian %d : sigma %.2f degree %d", i, sig, deg);
             
             afwMath::GaussianFunction2<Pixel> gaussian(sig, sig);
             afwMath::AnalyticKernel kernel(fullWidth, fullWidth, gaussian);

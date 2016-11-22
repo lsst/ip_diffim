@@ -11,15 +11,14 @@
 
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
+#include "lsst/log/Log.h"
 #include "lsst/pex/exceptions/Runtime.h"
-#include "lsst/pex/logging/Trace.h"
 
 #include "lsst/ip/diffim/KernelCandidate.h"
 #include "lsst/ip/diffim/KernelPca.h"
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
-namespace pexLogging     = lsst::pex::logging; 
 namespace pexExcept      = lsst::pex::exceptions; 
 
 namespace lsst { 
@@ -94,8 +93,8 @@ namespace detail {
             throw LSST_EXCEPT(pexExcept::LogicError,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
-        pexLogging::TTrace<6>("lsst.ip.diffim.SetPcaImageVisitor.processCandidate", 
-                              "Processing candidate %d", kCandidate->getId());
+        LOGL_DEBUG("TRACE5.ip.diffim.SetPcaImageVisitor.processCandidate",
+                   "Processing candidate %d", kCandidate->getId());
         
         try {
             /* Normalize to unit sum */
@@ -135,8 +134,8 @@ namespace detail {
            the remaining terms carry less of the power than if you do
            subtract off the mean.  (0.041223/(1-0.876046) < 0.373870).
          */
-        pexLogging::TTrace<6>("lsst.ip.diffim.KernelPcaVisitor.subtractMean", 
-                              "Subtracting mean feature before Pca");
+        LOGL_DEBUG("TRACE5.ip.diffim.KernelPcaVisitor.subtractMean",
+                   "Subtracting mean feature before Pca");
         
         _mean = _imagePca->getMean();
         KernelPca<ImageT>::ImageList imageList = _imagePca->getImageList();

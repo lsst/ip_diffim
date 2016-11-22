@@ -25,9 +25,9 @@ from . import diffimLib
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.pex.logging as pexLog
-import lsst.pex.config as pexConfig
+import lsst.log as log
 import lsst.meas.algorithms as measAlg
+import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigAL
@@ -166,8 +166,8 @@ for this Task include:
 
 Note that if you want addional logging info, you may add to your scripts:
 \code{.py}
-import lsst.pex.logging as pexLog
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 5)
+import lsst.log.utils as logUtils
+logUtils.traceSetAt("ip.diffim", 4)
 \endcode
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -330,8 +330,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         if referencePsfModel is None or sciencePsfModel is None:
             raise RuntimeError("ERROR: Psf matching is only implemented for KernelPsfs")
         if (referencePsfModel.getKernel().getDimensions() != sciencePsfModel.getKernel().getDimensions()):
-            pexLog.Trace(self.log.getName(), 1,
-                         "ERROR: Dimensions of reference Psf and science Psf different; exiting")
+            self.log.error("ERROR: Dimensions of reference Psf and science Psf different; exiting")
             raise RuntimeError("ERROR: Dimensions of reference Psf and science Psf different; exiting")
 
         psfWidth, psfHeight = referencePsfModel.getKernel().getDimensions()
@@ -353,14 +352,17 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         nParameters = sciencePsfModel.getKernel().getNSpatialParameters()
         root = num.sqrt(9 - 8*(1 - nParameters))
         if (root != root//1):            # We know its an integer solution
-            pexLog.Trace(self.log.getName(), 3, "Problem inferring spatial order of image's Psf")
+            log.log("TRACE2." + self.log.getName(), log.DEBUG,
+                    "Problem inferring spatial order of image's Psf")
         else:
             order = (root - 3)/2
             if (order != order//1):
-                pexLog.Trace(self.log.getName(), 3, "Problem inferring spatial order of image's Psf")
+                log.log("TRACE2." + self.log.getName(), log.DEBUG,
+                        "Problem inferring spatial order of image's Psf")
             else:
-                pexLog.Trace(self.log.getName(), 2, "Spatial order of Psf = %d; matching kernel order = %d" %
-                             (order, self.kConfig.spatialKernelOrder))
+                log.log("TRACE1" + self.log.getName(), log.DEBUG,
+                        "Spatial order of Psf = %d; matching kernel order = %d",
+                        order, self.kConfig.spatialKernelOrder)
 
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0, scienceY0 = scienceBBox.getMin()
@@ -388,7 +390,8 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                 # place at center of cell
                 posX = sizeCellX * col + sizeCellX//2 + scienceX0
 
-                pexLog.Trace(self.log.getName(), 5, "Creating Psf candidate at %.1f %.1f" % (posX, posY))
+                log.log("TRACE4." + self.log.getName(), log.DEBUG,
+                        "Creating Psf candidate at %.1f %.1f", posX, posY)
 
                 # reference kernel image, at location of science subimage
                 kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY)).convertF()

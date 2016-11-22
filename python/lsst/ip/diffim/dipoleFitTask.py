@@ -33,8 +33,8 @@ import lsst.afw.image as afwImage
 import lsst.meas.base as measBase
 import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDet
+from lsst.log import Log
 import lsst.pex.exceptions as pexExcept
-import lsst.pex.logging as pexLog
 import lsst.pex.config as pexConfig
 from lsst.pipe.base import Struct
 
@@ -185,6 +185,7 @@ class DipoleModel(object):
     def __init__(self):
         import lsstDebug
         self.debug = lsstDebug.Info(__name__).debug
+        self.log = Log.getLogger(__name__)
 
     def makeBackgroundModel(self, in_x, pars=None):
         """!Generate gradient model (2-d array) with up to 2nd-order polynomial
@@ -387,12 +388,12 @@ class DipoleModel(object):
             fluxNeg = flux
 
         if self.debug:
-            self.log.log(self.log.DEBUG, '%.2f %.2f %.2f %.2f %.2f %.2f' %
-                         (flux, fluxNeg, xcenPos, ycenPos, xcenNeg, ycenNeg))
+            self.log.debug('%.2f %.2f %.2f %.2f %.2f %.2f',
+                           flux, fluxNeg, xcenPos, ycenPos, xcenNeg, ycenNeg)
             if x1 is not None:
-                self.log.log(self.log.DEBUG, '     %.2f %.2f %.2f' % (b, x1, y1))
+                self.log.debug('     %.2f %.2f %.2f', b, x1, y1)
             if xy is not None:
-                self.log.log(self.log.DEBUG, '     %.2f %.2f %.2f' % (xy, x2, y2))
+                self.log.debug('     %.2f %.2f %.2f', xy, x2, y2)
 
         posIm = self.makeStarModel(bbox, psf, xcenPos, ycenPos, flux)
         negIm = self.makeStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
@@ -469,7 +470,7 @@ class DipoleFitAlgorithm(object):
         if diffim is not None:
             self.psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
 
-        self.log = pexLog.Log(pexLog.Log.getDefaultLog(), __name__, pexLog.Log.INFO)
+        self.log = Log.getLogger(__name__)
 
         import lsstDebug
         self.debug = lsstDebug.Info(__name__).debug
@@ -799,8 +800,7 @@ class DipoleFitAlgorithm(object):
         try:
             import matplotlib.pyplot as plt
         except ImportError as err:
-            log = pexLog.Log(pexLog.getDefaultLog(), __name__, pexLog.INFO)
-            log.warn('Unable to import matplotlib: %s' % err)
+            self.log.warn('Unable to import matplotlib: %s', err)
             raise err
 
         def display2dArray(arr, title='Data', extent=None):
@@ -875,7 +875,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
     def __init__(self, config, name, schema, metadata):
         measBase.SingleFramePlugin.__init__(self, config, name, schema, metadata)
 
-        self.log = pexLog.Log(pexLog.Log.getDefaultLog(), name, pexLog.Log.INFO)
+        self.log = Log.getLogger(name)
 
         self._setupSchema(config, name, schema, metadata)
 
@@ -1000,7 +1000,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             measRecord.set(self.classificationAttemptedFlagKey, False)
             return result
 
-        self.log.log(self.log.DEBUG, "Dipole fit result: %d %s" % (measRecord.getId(), str(result)))
+        self.log.debug("Dipole fit result: %d %s", measRecord.getId(), str(result))
 
         if result.posFlux <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
             self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
@@ -1077,15 +1077,15 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         measRecord.set(self.flagKey, True)
         if error is not None:
             if error.getFlagBit() == self.FAILURE_EDGE:
-                self.log.warn('DipoleFitPlugin not run on record %d: %s' % (measRecord.getId(), str(error)))
+                self.log.warn('DipoleFitPlugin not run on record %d: %s', measRecord.getId(), str(error))
                 measRecord.set(self.edgeFlagKey, True)
             if error.getFlagBit() == self.FAILURE_FIT:
-                self.log.warn('DipoleFitPlugin failed on record %d: %s' % (measRecord.getId(), str(error)))
+                self.log.warn('DipoleFitPlugin failed on record %d: %s', measRecord.getId(), str(error))
                 measRecord.set(self.flagKey, True)
             if error.getFlagBit() == self.FAILURE_NOT_DIPOLE:
-                self.log.log(self.log.DEBUG, 'DipoleFitPlugin not run on record %d: %s' %
-                             (measRecord.getId(), str(error)))
+                self.log.debug('DipoleFitPlugin not run on record %d: %s',
+                               measRecord.getId(), str(error))
                 measRecord.set(self.classificationAttemptedFlagKey, False)
                 measRecord.set(self.flagKey, True)
         else:
-            self.log.warn('DipoleFitPlugin failed on record %d' % measRecord.getId())
+            self.log.warn('DipoleFitPlugin failed on record %d', measRecord.getId())

@@ -7,9 +7,7 @@ import optparse
 import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
 import lsst.afw.display.ds9 as ds9
-
-from lsst.pex.logging import Trace
-from lsst.pex.logging import Log
+import lsst.log.utils as logUtils
 
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
@@ -89,7 +87,7 @@ Notes:
 
     if options.verbosity > 0:
         print('Verbosity =', options.verbosity)
-        Trace.setVerbosity('lsst.ip.diffim', options.verbosity)
+        logUtils.traceSetAt("ip.diffim", options.verbosity)
 
     ####
 
@@ -123,7 +121,6 @@ Notes:
 
 
 def run():
-    Log.getDefaultLog()
     memId0 = dafBase.Citizen_getNextMemId()
     main()
     # check for memory leaks

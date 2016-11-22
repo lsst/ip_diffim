@@ -13,8 +13,8 @@
 
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
+#include "lsst/log/Log.h"
 #include "lsst/pex/exceptions/Runtime.h"
-#include "lsst/pex/logging/Trace.h"
 
 #include "lsst/ip/diffim/KernelCandidate.h"
 #include "lsst/ip/diffim/ImageSubtract.h"
@@ -23,9 +23,7 @@
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
-namespace pexLog         = lsst::pex::logging;
 namespace pexExcept      = lsst::pex::exceptions;
-namespace pexLogging     = lsst::pex::logging;
 
 namespace lsst {
 namespace ip {
@@ -59,16 +57,16 @@ namespace diffim {
         try {
             imstats.apply(*_scienceMaskedImage, candidateCoreRadius);
         } catch (pexExcept::Exception& e) {
-            pexLogging::TTrace<3>("lsst.ip.diffim.KernelCandidate",
-                                  "Unable to calculate core imstats for ranking Candidate %d", this->getId()); 
+            LOGL_DEBUG("TRACE2.ip.diffim.KernelCandidate",
+                       "Unable to calculate core imstats for ranking Candidate %d", this->getId());
             this->setStatus(afwMath::SpatialCellCandidate::BAD);
             return;
         }
 
         _coreFlux = imstats.getMean();
-        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                          "Candidate %d at %.2f %.2f with ranking %.2f", 
-                          this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);
+        LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate",
+                   "Candidate %d at %.2f %.2f with ranking %.2f",
+                   this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);
     }
 
     template <typename PixelT>
@@ -91,9 +89,9 @@ namespace diffim {
         _kernelSolutionOrig(),
         _kernelSolutionPca()
     {
-        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                          "Candidate %d at %.2f %.2f with ranking %.2f", 
-                          this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);
+        LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate",
+                   "Candidate %d at %.2f %.2f with ranking %.2f",
+                   this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);
     }
 
     template <typename PixelT>
@@ -123,8 +121,8 @@ namespace diffim {
                 varValue = 1.0;
             else
                 varValue = varStats.getValue(afwMath::MEDIAN);
-            pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                              "Candidate %d using constant variance of %.2f", this->getId(), varValue);
+            LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate",
+                       "Candidate %d using constant variance of %.2f", this->getId(), varValue);
             var = varValue;
 
         }
@@ -173,8 +171,8 @@ namespace diffim {
         /* Do we have a regularization matrix?  If so use it */
         if (hMat) {
             _useRegularization = true;
-            pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build", 
-                              "Using kernel regularization");
+            LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate.build",
+                       "Using kernel regularization");
 
             if (_isInitialized) {
                 _kernelSolutionPca = std::shared_ptr<StaticKernelSolution<PixelT> >(
@@ -185,9 +183,9 @@ namespace diffim {
                                           *_varianceEstimate);
                 if (checkConditionNumber) {
                     if (_kernelSolutionPca->getConditionNumber(ctype) > maxConditionNumber) {
-                        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                                          "Candidate %d solution has bad condition number",
-                                          this->getId());
+                        LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate",
+                                   "Candidate %d solution has bad condition number",
+                                   this->getId());
                         this->setStatus(afwMath::SpatialCellCandidate::BAD);
                         return;
                     }
@@ -203,9 +201,9 @@ namespace diffim {
                                            *_varianceEstimate);
                 if (checkConditionNumber) {
                     if (_kernelSolutionOrig->getConditionNumber(ctype) > maxConditionNumber) {
-                        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                                          "Candidate %d solution has bad condition number",
-                                          this->getId());
+                        LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate",
+                                   "Candidate %d solution has bad condition number",
+                                   this->getId());
                         this->setStatus(afwMath::SpatialCellCandidate::BAD);
                         return;
                     }
@@ -215,8 +213,8 @@ namespace diffim {
         }
         else {
             _useRegularization = false;
-            pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate.build",
-                              "Not using kernel regularization");
+            LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate.build",
+                       "Not using kernel regularization");
             if (_isInitialized) {
                 _kernelSolutionPca = std::shared_ptr<StaticKernelSolution<PixelT> >(
                     new StaticKernelSolution<PixelT>(basisList, _fitForBackground)
@@ -226,9 +224,9 @@ namespace diffim {
                                           *_varianceEstimate);
                 if (checkConditionNumber) {
                     if (_kernelSolutionPca->getConditionNumber(ctype) > maxConditionNumber) {
-                        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                                          "Candidate %d solution has bad condition number",
-                                          this->getId());
+                        LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate",
+                                   "Candidate %d solution has bad condition number",
+                                   this->getId());
                         this->setStatus(afwMath::SpatialCellCandidate::BAD);
                         return;
                     }
@@ -244,9 +242,9 @@ namespace diffim {
                                            *_varianceEstimate);
                 if (checkConditionNumber) {
                     if (_kernelSolutionOrig->getConditionNumber(ctype) > maxConditionNumber) {
-                        pexLog::TTrace<5>("lsst.ip.diffim.KernelCandidate",
-                                          "Candidate %d solution has bad condition number",
-                                          this->getId());
+                        LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate",
+                                   "Candidate %d solution has bad condition number",
+                                   this->getId());
                         this->setStatus(afwMath::SpatialCellCandidate::BAD);
                         return;
                     }

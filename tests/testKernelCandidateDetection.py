@@ -10,10 +10,10 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
-import lsst.pex.logging as pexLog
+import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
-pexLog.Trace_setVerbosity('lsst.ip.diffim', 3)
+logUtils.traceSetAt("ip.diffim", 2)
 
 # known input images
 try:

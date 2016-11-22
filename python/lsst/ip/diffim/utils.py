@@ -27,7 +27,6 @@ from builtins import str
 from builtins import range
 from builtins import object
 import numpy as np
-import lsst.pex.logging as pexLog
 import lsst.afw.detection as afwDet
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -35,6 +34,7 @@ import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.afw.display.ds9 as ds9
 import lsst.afw.display.utils as displayUtils
+from lsst.log import Log
 import lsst.meas.algorithms as measAlg
 from .dipoleFitTask import DipoleFitAlgorithm
 from . import diffimLib
@@ -548,7 +548,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     allResids = fullIm[sidx] / np.sqrt(fullVar[sidx])
 
     testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure,
-                                                       exposure, config, pexLog.getDefaultLog())
+                                                       exposure, config, Log.getDefaultLogger())
     for fp in testFootprints:
         subexp = diffExposure.Factory(diffExposure, fp["footprint"].getBBox())
         subim = subexp.getMaskedImage().getImage()

@@ -4,13 +4,13 @@ import lsst.ip.diffim as ipDiffim
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.pex.logging as pexLogging
 import lsst.afw.display.ds9 as ds9
+import lsst.log.utils as logUtils
 import pylab
 import numpy as num
 
-verbosity = 5
-pexLogging.Trace_setVerbosity("lsst.ip.diffim", verbosity)
+verbosity = 4
+logUtils.traceSetAt("ip.diffim", verbosity)
 
 # Define the diagnostic functions on the goodness of fit of the
 # spatial model (k_s) to each individual kernel (k)

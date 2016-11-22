@@ -39,7 +39,6 @@
 
 #include <memory>
 #include "lsst/pex/exceptions.h"
-#include "lsst/pex/logging/Trace.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/detection.h"
 #include "lsst/afw/detection/FootprintArray.cc"
