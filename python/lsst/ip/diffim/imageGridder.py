@@ -44,27 +44,27 @@ class ImageGridderConfig(pexConfig.Config):
     """
 
     gridSizeX = pexConfig.Field(
-        dtype=int,
-        doc="""Pixel dimensions of each grid in x direction""",
+        dtype = int,
+        doc = """Pixel dimensions of each grid in x direction""",
         default = 10
     )
 
     gridSizeY = pexConfig.Field(
-        dtype=int,
-        doc="""Pixel dimensions of each grid in y direction""",
+        dtype = int,
+        doc = """Pixel dimensions of each grid in y direction""",
         default = 10
     )
 
     gridStepX = pexConfig.Field(
-        dtype=int,
-        doc="""Spacing between subsequent grids in x direction. If equal to gridSizeX, then
+        dtype = int,
+        doc = """Spacing between subsequent grids in x direction. If equal to gridSizeX, then
                there is no overlap in the x direction.""",
         default = 10
     )
 
     gridStepY = pexConfig.Field(
-        dtype=int,
-        doc="""Spacing between subsequent grids in y direction. If equal to gridSizeY, then
+        dtype = int,
+        doc = """Spacing between subsequent grids in y direction. If equal to gridSizeY, then
                there is no overlap in the y direction.""",
         default = 10
     )
@@ -92,6 +92,12 @@ class ImageGridderConfig(pexConfig.Config):
         dtype = bool,
         doc = "Scale gridSize/borderSize/overlapSize by PSF FWHM?",
         default = True
+    )
+
+    ignoreMaskPlanes = pexConfig.ListField(
+        dtype=str,
+        doc="""Mask planes to ignore for sigma-clipped statistics""",
+        default=("INTRP", "EDGE", "DETECTED", "SAT", "CR", "BAD", "NO_DATA", "DETECTED_NEGATIVE")
     )
 
 
@@ -164,13 +170,6 @@ class ImageGridderTask(pipeBase.Task):
         self.statsControl.setNumIter(3)
         self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(self.config.ignoreMaskPlanes))
 
-    def computeVarianceMean(self, exposure):
-        statObj = afwMath.makeStatistics(exposure.getMaskedImage().getVariance(),
-                                         exposure.getMaskedImage().getMask(),
-                                         afwMath.MEANCLIP, self.statsControl)
-        var = statObj.getValue(afwMath.MEANCLIP)
-        return var
-
     @pipeBase.timeMethod
     def run(self, exposure):
         """! Perform an operation on the given exposure.
@@ -185,7 +184,7 @@ class ImageGridderTask(pipeBase.Task):
         """
         self.log.info("Processing.")
 
-        grid = self._generateGrid()
+        grid = self._generateGrid(exposure.getBBox())
 
     def runSubImage(self, subImage, exposure):
         """! Perform an operation on the given subImage.
@@ -199,8 +198,53 @@ class ImageGridderTask(pipeBase.Task):
         self.log.info("Processing on box: %s" % str(subImage.getBBox()))
         pass
 
+    def _generateGrid(self, exposure):
+        """! Generate two lists of bounding boxes that evenly grid `exposure`
+
+        Grid (subimage) centers will be spaced by gridStepX/Y. Then the grid will be adjusted
+        as little as possible to evenly cover the input exposure (if rejiggerGridOption is True).
+        Then the bounding boxes will be expanded by borderSizeX/Y. The expanded bounding
+        boxes will be adjusted to ensure that they intersect the exposure's bounding box.
+        The resulting lists of bounding boxes and corresponding expanded bounding boxes will
+        be returned.
+
+        @param[in] exposure an `afwImage.Exposure` whose full bounding box is to be evenly gridded.
+        @return tupole containing two lists of `afwGeom.BoundingBox`es
+        """
+        # Extract the config parameters for conciseness.
+        gridSizeX = self.config.gridSizeX
+        gridSizeY = self.config.gridSizeY
+        gridStepX = self.config.gridStepX
+        gridStepY = self.config.gridStepY
+        borderSizeX = self.config.borderSizeX
+        borderSizeY = self.config.borderSizeY
+        rejiggerGridOption = self.config.rejiggerGridOption
+        scaleByFwhm = self.config.scaleByFwhm
+
+        if scaleByFwhm:
+            psfFwhm = exposure.getPsf().computeShape().getDeterminantRadius() * 2. * np.sqrt(2. * np.log(2.))
+            gridSizeX *= psfFwhm
+            gridSizeY *= psfFwhm
+            gridStepX *= psfFwhm
+            gridStepY *= psfFwhm
+            borderSizeX *= psfFwhm
+            borderSizeY *= psfFwhm
+
+
+    def _computeVarianceMean(self, subImage):
+        """! Utility function: compute mean of variance plane of subimage
+
+        @param[in] subImage the sub-image of `exposure` upon which to operate
+        @return float clipped mean of masked variance plane of subImage
+        """
+        statObj = afwMath.makeStatistics(subImage.getMaskedImage().getVariance(),
+                                         subImage.getMaskedImage().getMask(),
+                                         afwMath.MEANCLIP, self.statsControl)
+        var = statObj.getValue(afwMath.MEANCLIP)
+        return var
+
     def _computePsf(self, subImage):
-        """! Compute Psf at center of subImage.
+        """! Utility function: compute Psf at center of subImage.
 
         TBD: is this computing the Psf at the center of the subimage (i.e. center of its bounding box)?
 
@@ -208,9 +252,3 @@ class ImageGridderTask(pipeBase.Task):
         @return 2d numpy.array of Psf for calculations.
         """
         return subImage.getPsf().computeImage().getArray()
-
-    def _generateGrid(self):
-        """! Generate a list of bounding boxes given by grid parameters in config
-
-        @return list of `afwGeom.BoundingBox`es
-        """
