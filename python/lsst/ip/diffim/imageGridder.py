@@ -209,7 +209,7 @@ class ImageGridderTask(pipeBase.Task):
         be returned.
 
         @param[in] exposure an `afwImage.Exposure` whose full bounding box is to be evenly gridded.
-        @return tupole containing two lists of `afwGeom.BoundingBox`es
+        @return tuple containing two lists of `afwGeom.BoundingBox`es
         """
         # Extract the config parameters for conciseness.
         gridSizeX = self.config.gridSizeX
@@ -223,12 +223,34 @@ class ImageGridderTask(pipeBase.Task):
 
         if scaleByFwhm:
             psfFwhm = exposure.getPsf().computeShape().getDeterminantRadius() * 2. * np.sqrt(2. * np.log(2.))
-            gridSizeX *= psfFwhm
-            gridSizeY *= psfFwhm
-            gridStepX *= psfFwhm
-            gridStepY *= psfFwhm
-            borderSizeX *= psfFwhm
-            borderSizeY *= psfFwhm
+            def rescaleValue(val):
+                return np.rint(val * psfFwhm).astype(int)
+            gridSizeX = rescaleValue(gridSizeX)
+            gridSizeY = rescaleValue(gridSizeY)
+            gridStepX = rescaleValue(gridStepX)
+            gridStepY = rescaleValue(gridStepY)
+            borderSizeX = rescaleValue(borderSizeX)
+            borderSizeY = rescaleValue(borderSizeY)
+
+
+        bbox = exposure.getBBox()
+
+        nGridX = bbox.getWidth() // gridStepX
+
+        # first "main" box at 0,0
+        bbox0 = afwGeom.Box2I(afwGeom.Point2I(bbox.getBegin()), afwGeom.Extent2I(gridSizeX, gridSizeY))
+        # first expanded box
+        bbox1 = afwGeom.Box2I(bbox0)
+        bbox1.grow(afwGeom.Extent2I(borderSizeX, borderSizeY))
+
+        def offsetAndClipBoxes(bbox0, bbox1, xoff, yoff, bbox):
+            bb0 = afwGeom.Box2I(bbox0)
+            bb0.shift(afwGeom.Extent2I(xoff, yoff))
+            bb0.clip(bbox)
+            bb1 = afwGeom.Box2I(bbox1)
+            bb1.shift(afwGeom.Extent2I(xoff, yoff))
+            bb1.clip(bbox)
+            return bb0, bb1
 
 
     def _computeVarianceMean(self, subImage):
