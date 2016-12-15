@@ -373,7 +373,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
             posY = sizeCellY*row + sizeCellY//2 + scienceY0
             for col in range(nCellX):
                 posX = sizeCellX*col + sizeCellX//2 + scienceX0
-                widthS, heightS = sciencePsfModel.getLocalKernel(afwGeom.Point2D(posX, posY)).getDimensions()
+                widthS, heightS = sciencePsfModel.computeBBox(afwGeom.Point2D(posX, posY)).getDimensions()
                 widthList.append(widthS)
                 heightList.append(heightS)
 
