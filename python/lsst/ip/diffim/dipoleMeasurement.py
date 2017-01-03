@@ -499,15 +499,9 @@ class DipoleDeblender(object):
             # Call lower-level _fit_psf task
 
             # Prepare results structure
-            fpres = deblendBaseline.PerFootprint()
-            fpres.peaks = []
-            for pki, pk in enumerate(dpeaks):
-                pkres = deblendBaseline.PerPeak()
-                pkres.peak = pk
-                pkres.pki = pki
-                fpres.peaks.append(pkres)
+            fpres = deblendBaseline.DeblenderResult(fp, exposure.getMaskedImage(), psf, psfFwhmPix, self.log)
 
-            for pki, (pk, pkres, pkF) in enumerate(zip(dpeaks, fpres.peaks, peaksF)):
+            for pki, (pk, pkres, pkF) in enumerate(zip(dpeaks, fpres.deblendedParents[0].peaks, peaksF)):
                 self.log.debug('Peak %i', pki)
                 deblendBaseline._fitPsf(fp, fmask, pk, pkF, pkres, fbb, dpeaks, peaksF, self.log,
                                         cpsf, psfFwhmPix,
@@ -520,7 +514,7 @@ class DipoleDeblender(object):
         peakList = deblendedSource.getFootprint().getPeaks()
         peakList.clear()
 
-        for i, peak in enumerate(fpres.peaks):
+        for i, peak in enumerate(fpres.deblendedParents[0].peaks):
             if peak.psfFitFlux > 0:
                 suffix = "pos"
             else:
