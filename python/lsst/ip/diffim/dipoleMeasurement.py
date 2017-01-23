@@ -471,7 +471,7 @@ class DipoleDeblender(object):
         psf = exposure.getPsf()
         psfSigPix = psf.computeShape().getDeterminantRadius()
         psfFwhmPix = psfSigPix * self.sigma2fwhm
-        subimage = afwImage.ExposureF(exposure, fbb, True)
+        subimage = afwImage.ExposureF(exposure, bbox=fbb, deep=True)
         cpsf = deblendBaseline.CachingPsf(psf)
 
         # if fewer than 2 peaks, just return a copy of the source
