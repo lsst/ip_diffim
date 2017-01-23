@@ -211,8 +211,8 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
             p1 = afwGeom.Point2I(xCoord + stampHalfWidth,
                                  yCoord + stampHalfWidth)
             bbox = afwGeom.Box2I(p0, p1)
-            tsi = afwImage.MaskedImageF(tMi, bbox, afwImage.LOCAL)
-            ssi = afwImage.MaskedImageF(sMi, bbox, afwImage.LOCAL)
+            tsi = afwImage.MaskedImageF(tMi, bbox, origin=afwImage.LOCAL)
+            ssi = afwImage.MaskedImageF(sMi, bbox, origin=afwImage.LOCAL)
 
             kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policyFake)
             kernelCellSet.insertCandidate(kc)
@@ -347,9 +347,9 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
 
         kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
         try:
-            fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, False).getMask())
+            fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, deep=False).getMask())
             bm1 = fsb.getBits()
-            fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, False).getMask())
+            fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, deep=False).getMask())
             bm2 = fsb.getBits()
         except Exception:
             pass
