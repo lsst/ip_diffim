@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 #
 # LSST Data Management System
 # Copyright 2008-2016 AURA/LSST.
@@ -22,9 +20,12 @@
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
 
-from __future__ import print_function
-from builtins import range
+from __future__ import absolute_import, division, print_function
+
 import unittest
+
+from builtins import range
+
 import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath

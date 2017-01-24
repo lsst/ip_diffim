@@ -19,12 +19,13 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
+from __future__ import absolute_import, division, print_function
 
-"""Quality Assessment class for Kernel Candidates"""
 from builtins import zip
 from builtins import object
 import numpy as np
 import numpy.ma as ma
+
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
@@ -34,6 +35,7 @@ from .utils import calcCentroid, calcWidth
 
 
 class KernelCandidateQa(object):
+    """Quality Assessment class for Kernel Candidates"""
 
     def __init__(self, nKernelSpatial):
         """Class to undertake QA of KernelCandidates after modeling of
@@ -47,7 +49,7 @@ class KernelCandidateQa(object):
         self.fields = []
         self.fields.append(afwTable.Field["PointD"]("RegisterRefPosition",
                                                     "Position of reference object for registration (radians)."))
-        #TODO check units of the following angles
+        # TODO check units of the following angles
         self.fields.append(afwTable.Field["Angle"]("RegisterResidualBearing",
                                                    "Angle of residual wrt declination parallel in radians"))
 
@@ -154,7 +156,7 @@ class KernelCandidateQa(object):
         data = ma.getdata(diArr[~diArr.mask])
         iqr = np.percentile(data, 75.) - np.percentile(data, 25.)
 
-        #Calculte chisquare of the residual
+        # Calculte chisquare of the residual
         chisq = np.sum(np.power(data, 2.))
 
         # Mean squared error: variance + bias**2
@@ -166,7 +168,7 @@ class KernelCandidateQa(object):
 
         # If scipy is not set up, return zero for the stats
         try:
-            #In try block because of risk of divide by zero
+            # In try block because of risk of divide by zero
             rchisq = chisq/(len(data) - 1 - dof)
             # K-S test on the diffim to a Normal distribution
             import scipy.stats
@@ -289,8 +291,8 @@ class KernelCandidateQa(object):
         for source in sourceCatalog:
             sourceId = source.getId()
             if sourceId in wcsresids:
-                #Note that the residuals are not delta RA, delta Dec
-                #From the source code "bearing (angle wrt a declination parallel) and distance
+                # Note that the residuals are not delta RA, delta Dec
+                # From the source code "bearing (angle wrt a declination parallel) and distance
                 coord, resids = wcsresids[sourceId]
                 key = source.schema["RegisterResidualBearing"].asKey()
                 setter = getattr(source, "set"+key.getTypeString())

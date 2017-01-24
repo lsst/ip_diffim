@@ -19,14 +19,15 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-
 """Support utilities for Measuring sources"""
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
+
 from builtins import zip
 from builtins import str
 from builtins import range
 from builtins import object
 import numpy as np
+
 import lsst.afw.detection as afwDet
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage

@@ -1,7 +1,3 @@
-from __future__ import absolute_import, division, print_function
-from builtins import str
-from builtins import range
-from builtins import object
 #
 # LSST Data Management System
 # Copyright 2008-2016 AURA/LSST.
@@ -23,11 +19,15 @@ from builtins import object
 # the GNU General Public License along with this program.  If not,
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
+from __future__ import absolute_import, division, print_function
 
 import numpy as np
 import warnings
 
-# LSST imports
+from builtins import str
+from builtins import range
+from builtins import object
+
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.meas.base as measBase
