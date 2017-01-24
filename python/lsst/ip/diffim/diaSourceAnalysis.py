@@ -21,12 +21,14 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import division
+from __future__ import division, print_function
+
+from optparse import OptionParser
+
 from builtins import input
 from builtins import range
 from builtins import object
 
-from optparse import OptionParser
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.detection as afwDet
@@ -125,7 +127,6 @@ class DiaSourceAnalyst(object):
         idxN = num.where((pixels < 0) & unmasked)
         fluxP = num.sum(pixels[idxP])
         fluxN = num.sum(pixels[idxN])
-        #import pdb; pdb.set_trace()
         return len(idxP[0]), len(idxN[0]), fluxP, fluxN
 
     def testSource(self, source, subMi):
@@ -198,7 +199,6 @@ def main():
 
     crDiffSources = readSourceSet(crDiffSourceFile)
     crDiffExposure = afwImage.ExposureF(crDiffExposureFile)
-    #import pdb; pdb.set_trace()
 
     analyst = DiaSourceAnalyst()
 
@@ -210,9 +210,9 @@ def main():
     for i in range(crDiffSources.size()):
         crDiffSource = crDiffSources[i]
 
-        # This segfaults; revisit once the stack stabilizes
-        #footprint    = crDiffSource.getFootprint()
-        #bbox         = footprint.getBBox()
+        # TODO This segfaults; revisit once the stack stabilizes
+        # footprint    = crDiffSource.getFootprint()
+        # bbox         = footprint.getBBox()
 
         xAstrom = crDiffSource.getXAstrom()
         yAstrom = crDiffSource.getYAstrom()

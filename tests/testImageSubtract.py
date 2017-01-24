@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 #
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
@@ -21,13 +19,13 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-
-from __future__ import division
-from builtins import range
+from __future__ import absolute_import, division, print_function
 import os
 import unittest
-import lsst.utils.tests
 
+from builtins import range
+
+import lsst.utils.tests
 import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage

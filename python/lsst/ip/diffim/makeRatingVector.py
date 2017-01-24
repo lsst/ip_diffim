@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function
+
 # all the c++ level classes and routines
 from . import diffimLib
 

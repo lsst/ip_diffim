@@ -1,10 +1,10 @@
-#!/usr/bin/env python
-from builtins import range
+from __future__ import absolute_import, division, print_function
 import unittest
 import numpy as num
 
-import lsst.utils.tests
+from builtins import range
 
+import lsst.utils.tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
