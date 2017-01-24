@@ -1,8 +1,9 @@
-from __future__ import print_function
-from builtins import object
+from __future__ import absolute_import, division, print_function
+
 import gdb
-import re
 import sys
+
+from builtins import object
 
 try:
     import gdb.printing
@@ -28,14 +29,12 @@ try:
         for p in printers:
             gdb.printing.register_pretty_printer(obj, p)
 
-    #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
     def build_ip_diffim_dictionary():
         printer = gdb.printing.RegexpCollectionPrettyPrinter("ip_diffim")
 
         # example from meas_alg
-        #printer.add_printer('lsst::meas::algorithms::CRPixel',
-        #                    '^lsst::meas::algorithms::CRPixel', CRPixelPrinter)
+        # printer.add_printer('lsst::meas::algorithms::CRPixel',
+        #                     '^lsst::meas::algorithms::CRPixel', CRPixelPrinter)
 
         return printer
 

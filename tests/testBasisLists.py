@@ -1,11 +1,10 @@
-#!/usr/bin/env python
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
+import unittest
+
 from builtins import range
 import numpy as num
 
-import unittest
 import lsst.utils.tests
-
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim

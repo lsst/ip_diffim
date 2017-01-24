@@ -1,6 +1,3 @@
-from __future__ import absolute_import, division, print_function
-from builtins import range
-from past.builtins import basestring
 #
 # LSST Data Management System
 # Copyright 2016 AURA/LSST.
@@ -21,9 +18,11 @@ from past.builtins import basestring
 # You should have received a copy of the LSST License Statement and
 # the GNU General Public License along with this program.  If not,
 # see <https://www.lsstcorp.org/LegalNotices/>.
-
+from __future__ import absolute_import, division, print_function
 import unittest
 
+from builtins import range
+from past.builtins import basestring
 import numpy as np
 
 import lsst.utils.tests
