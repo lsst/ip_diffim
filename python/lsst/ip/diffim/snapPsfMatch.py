@@ -19,8 +19,8 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
+from __future__ import absolute_import, division, print_function
 
-from __future__ import absolute_import
 import lsst.pex.config as pexConfig
 from .psfMatch import PsfMatchConfigDF, PsfMatchConfigAL
 from .imagePsfMatch import ImagePsfMatchTask, ImagePsfMatchConfig

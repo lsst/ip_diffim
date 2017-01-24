@@ -1,5 +1,3 @@
-#from builtins import str
-from builtins import range
 #
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
@@ -21,8 +19,12 @@ from builtins import range
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
+from __future__ import absolute_import, division, print_function
 import time
-import numpy as num
+
+import numpy as np
+from builtins import range
+
 import lsst.afw.image as afwImage
 import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
@@ -142,11 +144,11 @@ class PsfMatchConfig(pexConfig.Config):
         doc="Type of basis set for PSF matching kernel.",
         default="alard-lupton",
         allowed={
-            "alard-lupton" : """Alard-Lupton sum-of-gaussians basis set,
+            "alard-lupton": """Alard-Lupton sum-of-gaussians basis set,
                            * The first term has no spatial variation
                            * The kernel sum is conserved
                            * You may want to turn off 'usePcaForSpatialKernel'""",
-            "delta-function" : """Delta-function kernel basis set,
+            "delta-function": """Delta-function kernel basis set,
                            * You may enable the option useRegularization
                            * You should seriously consider usePcaForSpatialKernel, which will also
                              enable kernel sum conservation for the delta function kernels"""
@@ -547,7 +549,7 @@ class PsfMatchTask(pipeBase.Task):
 PsfMatchTask is a base class that implements the core functionality for matching the
 Psfs of two images using a spatially varying Psf-matching lsst.afw.math.LinearCombinationKernel.
 The Task requires the user to provide an instance of an lsst.afw.math.SpatialCellSet,
-filled with lsst.ip.diffim.KernelCandidate instances, and an lsst.afw.math.KernelList
+filled with lsst.ip.diffim.KernelCandidate instances, and a list of lsst.afw.math.Kernels
 of basis shapes that will be used for the decomposition.  If requested, the Task
 also performs background matching and returns the differential background model as an
 lsst.afw.math.Kernel.SpatialFunction.
@@ -729,7 +731,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         # Look at how well the solution is constrained
         nBasisKernels = spatialKernel.getNBasisKernels()
         nKernelTerms = spatialKernel.getNSpatialParameters()
-        if nKernelTerms == 0: # order 0
+        if nKernelTerms == 0:  # order 0
             nKernelTerms = 1
 
         # Not fit for
@@ -742,8 +744,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         nBad = 0
         nTot = 0
         for cell in kernelCellSet.getCellList():
-            for cand in cell.begin(False): # False = include bad candidates
-                cand = diffimLib.KernelCandidateF.cast(cand)
+            for cand in cell.begin(False):  # False = include bad candidates
                 nTot += 1
                 if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                     nGood += 1
@@ -856,7 +857,7 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         eigenValues = imagePca.getEigenValues()
         pcaBasisList = importStarVisitor.getEigenKernels()
 
-        eSum = num.sum(eigenValues)
+        eSum = np.sum(eigenValues)
         if eSum == 0.0:
             raise RuntimeError("Eigenvalues sum to zero")
         for j in range(len(eigenValues)):
@@ -864,13 +865,13 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
                     "Eigenvalue %d : %f (%f)", j, eigenValues[j], eigenValues[j]/eSum)
 
         nToUse = min(nComponents, len(eigenValues))
-        trimBasisList = afwMath.KernelList()
+        trimBasisList = []
         for j in range(nToUse):
             # Check for NaNs?
             kimage = afwImage.ImageD(pcaBasisList[j].getDimensions())
             pcaBasisList[j].computeImage(kimage, False)
-            if not (True in num.isnan(kimage.getArray())):
-                trimBasisList.push_back(pcaBasisList[j])
+            if not (True in np.isnan(kimage.getArray())):
+                trimBasisList.append(pcaBasisList[j])
 
         # Put all the power in the first kernel, which will not vary spatially
         spatialBasisList = diffimLib.renormalizeKernelList(trimBasisList)

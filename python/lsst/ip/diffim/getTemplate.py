@@ -1,4 +1,3 @@
-from __future__ import division, absolute_import
 #
 # LSST Data Management System
 # Copyright 2016 LSST Corporation.
@@ -20,8 +19,10 @@ from __future__ import division, absolute_import
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
+from __future__ import absolute_import, division, print_function
 
-import numpy
+import numpy as np
+
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.afw.geom as afwGeom
@@ -90,7 +91,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
         # assemble coadd exposure from subregions of patches
         coaddExposure = afwImage.ExposureF(coaddBBox, coaddWcs)
-        coaddExposure.getMaskedImage().set(numpy.nan, afwImage.MaskU.getPlaneBitMask("NO_DATA"), numpy.nan)
+        coaddExposure.getMaskedImage().set(np.nan, afwImage.MaskU.getPlaneBitMask("NO_DATA"), np.nan)
         nPatchesFound = 0
         coaddFilter = None
         coaddPsf = None

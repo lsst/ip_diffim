@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-from builtins import range
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
 #
@@ -20,7 +18,11 @@ from builtins import range
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
+from __future__ import absolute_import, division, print_function
+
+from builtins import range
 import numpy as num
+
 from . import diffimLib
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -277,10 +279,10 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         width, height = referencePsfModel.getLocalKernel().getDimensions()
         psfAttr1 = measAlg.PsfAttributes(exposure.getPsf(), width//2, height//2)
         psfAttr2 = measAlg.PsfAttributes(referencePsfModel, width//2, height//2)
-        s1 = psfAttr1.computeGaussianWidth(psfAttr1.ADAPTIVE_MOMENT) # gaussian sigma in pixels
-        s2 = psfAttr2.computeGaussianWidth(psfAttr2.ADAPTIVE_MOMENT) # gaussian sigma in pixels
-        fwhm1 = s1 * sigma2fwhm # science Psf
-        fwhm2 = s2 * sigma2fwhm # template Psf
+        s1 = psfAttr1.computeGaussianWidth(psfAttr1.ADAPTIVE_MOMENT)  # gaussian sigma in pixels
+        s2 = psfAttr2.computeGaussianWidth(psfAttr2.ADAPTIVE_MOMENT)  # gaussian sigma in pixels
+        fwhm1 = s1 * sigma2fwhm  # science Psf
+        fwhm2 = s2 * sigma2fwhm  # template Psf
 
         basisList = makeKernelBasisList(self.kConfig, fwhm1, fwhm2, metadata=self.metadata)
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
