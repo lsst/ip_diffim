@@ -25,7 +25,6 @@
 from __future__ import division
 from builtins import range
 import os
-import sys
 import unittest
 import lsst.utils.tests
 
@@ -85,12 +84,12 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         p1 = afwGeom.Point2I(xloc + imsize//2, yloc + imsize//2)
         bbox = afwGeom.Box2I(p0, p1)
 
-        tmi = afwImage.MaskedImageF(self.templateImage, bbox, afwImage.LOCAL)
-        smi = afwImage.MaskedImageF(self.scienceImage, bbox, afwImage.LOCAL)
+        tmi = afwImage.MaskedImageF(self.templateImage, bbox, origin=afwImage.LOCAL)
+        smi = afwImage.MaskedImageF(self.scienceImage, bbox, origin=afwImage.LOCAL)
         diffIm = ipDiffim.convolveAndSubtract(tmi, smi, self.gaussKernel, bgVal)
 
-        bbox = self.gaussKernel.shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
-        diffIm2 = afwImage.MaskedImageF(diffIm, bbox, afwImage.LOCAL)
+        bbox = self.gaussKernel.shrinkBBox(diffIm.getBBox(origin=afwImage.LOCAL))
+        diffIm2 = afwImage.MaskedImageF(diffIm, bbox, origin=afwImage.LOCAL)
 
         # image is empty (or the additional background you subtracted off)
         for j in range(diffIm2.getHeight()):
@@ -104,13 +103,13 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         p1 = afwGeom.Point2I(xloc + imsize//2, yloc + imsize//2)
         bbox = afwGeom.Box2I(p0, p1)
 
-        tmi = afwImage.MaskedImageF(self.templateImage, bbox, afwImage.LOCAL)
-        smi = afwImage.MaskedImageF(self.scienceImage, bbox, afwImage.LOCAL)
+        tmi = afwImage.MaskedImageF(self.templateImage, bbox, origin=afwImage.LOCAL)
+        smi = afwImage.MaskedImageF(self.scienceImage, bbox, origin=afwImage.LOCAL)
         bgFunc = afwMath.PolynomialFunction2D(bgOrder)  # coeffs are 0. by default
         diffIm = ipDiffim.convolveAndSubtract(tmi, smi, self.gaussKernel, bgFunc)
 
-        bbox = self.gaussKernel.shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
-        diffIm2 = afwImage.MaskedImageF(diffIm, bbox, afwImage.LOCAL)
+        bbox = self.gaussKernel.shrinkBBox(diffIm.getBBox(origin=afwImage.LOCAL))
+        diffIm2 = afwImage.MaskedImageF(diffIm, bbox, origin=afwImage.LOCAL)
         for j in range(diffIm2.getHeight()):
             for i in range(diffIm2.getWidth()):
                 self.assertAlmostEqual(diffIm2.getImage().get(i, j), 0., 4)

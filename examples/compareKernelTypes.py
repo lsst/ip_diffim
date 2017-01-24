@@ -87,7 +87,8 @@ class DiffimTestCases(unittest.TestCase):
 
         self.bskvAL = ipDiffim.BuildSingleKernelVisitorF(self.kListAL, pexConfig.makePolicy(self.subconfigAL))
         self.bskvDF = ipDiffim.BuildSingleKernelVisitorF(self.kListDF, pexConfig.makePolicy(self.subconfigDF))
-        self.bskvDFr = ipDiffim.BuildSingleKernelVisitorF(self.kListDFr, pexConfig.makePolicy(self.subconfigDF),
+        self.bskvDFr = ipDiffim.BuildSingleKernelVisitorF(self.kListDFr,
+                                                          pexConfig.makePolicy(self.subconfigDF),
                                                           self.hMatDFr)
 
         defSciencePath = globals()['defSciencePath']
@@ -146,7 +147,7 @@ class DiffimTestCases(unittest.TestCase):
         bg = kc.getBackground(ipDiffim.KernelCandidateF.RECENT)
 
         bbox = kc.getKernel(ipDiffim.KernelCandidateF.RECENT).shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
-        diffIm = afwImage.MaskedImageF(diffIm, bbox, afwImage.LOCAL)
+        diffIm = afwImage.MaskedImageF(diffIm, bbox, origin=afwImage.LOCAL)
         self.dStats.apply(diffIm)
 
         dmean = afwMath.makeStatistics(diffIm.getImage(), afwMath.MEAN).getValue()
@@ -168,11 +169,15 @@ class DiffimTestCases(unittest.TestCase):
         # sometimes the box goes off the image; no big deal...
         try:
             if invert:
-                tmi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
-                smi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                tmi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox,
+                                            origin=afwImage.LOCAL)
+                smi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox,
+                                            orign=afwImage.LOCAL)
             else:
-                smi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
-                tmi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                smi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox,
+                                            origin=afwImage.LOCAL)
+                tmi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox,
+                                            origin=afwImage.LOCAL)
         except Exception:
             return None
 
@@ -192,7 +197,7 @@ class DiffimTestCases(unittest.TestCase):
                                                                                     kSumDF, bgDF,
                                                                                     dmeanDF, dstdDF, vmeanDF))
         if display:
-            ds9.mtv(tmi, frame=1) # ds9 switches frame 0 and 1 for some reason
+            ds9.mtv(tmi, frame=1)  # ds9 switches frame 0 and 1 for some reason
             ds9.mtv(smi, frame=0)
             ds9.mtv(kImageOutDF, frame=2)
             ds9.mtv(diffImDF, frame=3)
@@ -213,10 +218,8 @@ class DiffimTestCases(unittest.TestCase):
             ipDiffim.KernelSolution.EIGENVALUE)
         kcDFr.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
             ipDiffim.KernelSolution.SVD)
-        print('DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' % (self.dStats.getMean(),
-                                                                                     self.dStats.getRms(),
-                                                                                     kSumDFr, bgDFr,
-                                                                                     dmeanDFr, dstdDFr, vmeanDFr))
+        print('DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' %
+              (self.dStats.getMean(), self.dStats.getRms(), kSumDFr, bgDFr, dmeanDFr, dstdDFr, vmeanDFr))
         if display:
             ds9.mtv(tmi, frame=4)
             ds9.mtv(smi, frame=5)

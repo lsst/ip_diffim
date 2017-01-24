@@ -146,7 +146,7 @@ class PsfMatchTestCases(unittest.TestCase):
 
         self.assertEqual(type(resultsAL.subtractedExposure), afwImage.ExposureF)
         self.assertEqual(type(resultsAL.psfMatchingKernel), afwMath.LinearCombinationKernel)
-        self.assertEqual(type(resultsAL.backgroundModel), afwMath.Function2D)
+        self.assertEqual(type(resultsAL.backgroundModel), afwMath.Chebyshev1Function2D)
         self.assertEqual(type(resultsAL.kernelCellSet), afwMath.SpatialCellSet)
 
     def testMatchExposures(self):
@@ -164,7 +164,7 @@ class PsfMatchTestCases(unittest.TestCase):
                                               templateFwhmPix=2.0, scienceFwhmPix=3.0, doWarping=True)
         self.assertEqual(type(resultsAL.matchedExposure), afwImage.ExposureF)
         self.assertEqual(type(resultsAL.psfMatchingKernel), afwMath.LinearCombinationKernel)
-        self.assertEqual(type(resultsAL.backgroundModel), afwMath.Function2D)
+        self.assertEqual(type(resultsAL.backgroundModel), afwMath.Chebyshev1Function2D)
         self.assertEqual(type(resultsAL.kernelCellSet), afwMath.SpatialCellSet)
 
     def testPca(self, nTerms=3):

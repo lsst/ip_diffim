@@ -1,6 +1,3 @@
-from builtins import range
-#!/usr/bin/env python
-
 #
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
@@ -23,7 +20,10 @@ from builtins import range
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 import unittest
+
+from builtins import range
 import numpy as np
+
 import lsst.utils.tests
 import lsst.afw.table as afwTable
 import lsst.afw.coord as afwCoord
@@ -53,7 +53,7 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
         del self.srcCat
 
     def makeRefCatalog(self):
-        schema = LoadReferenceObjectsTask.makeMinimalSchema(filterNameList=["g", "r"], addFluxSigma=False, 
+        schema = LoadReferenceObjectsTask.makeMinimalSchema(filterNameList=["g", "r"], addFluxSigma=False,
                                                             addIsPhotometric=True, addIsResolved=True)
         catalog = afwTable.SimpleCatalog(schema)
         return catalog
@@ -78,7 +78,9 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
             for flag in self.sourceSelector.config.badFlags:
                 srcSrc.set(flag, False)
 
-        mat = afwTable.matchRaDec(refCat, srcCat, 1.0 * afwGeom.arcseconds, False)
+        mc = afwTable.MatchControl()
+        mc.symmetricMatch = False
+        mat = afwTable.matchRaDec(refCat, srcCat, 1.0 * afwGeom.arcseconds, mc)
         self.assertEqual(len(mat), nSrc)
         return mat
 

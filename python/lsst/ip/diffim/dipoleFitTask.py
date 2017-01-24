@@ -248,13 +248,12 @@ class DipoleModel(object):
 
         @return an `afwImage.ImageF` containing the subimage
         """
-        hfp = afwDet.HeavyFootprintF_cast(fp)
-        bbox = hfp.getBBox()
+        bbox = fp.getBBox()
         if grow > 0:
             bbox.grow(grow)
 
         subim2 = afwImage.ImageF(bbox, badfill)
-        afwDet.expandArray(hfp, hfp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
+        afwDet.expandArray(fp, fp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
         return subim2
 
     def fitFootprintBackground(self, source, posImage, order=1):
@@ -495,16 +494,16 @@ class DipoleFitAlgorithm(object):
 
         fp = source.getFootprint()
         bbox = fp.getBBox()
-        subim = afwImage.MaskedImageF(self.diffim.getMaskedImage(), bbox, afwImage.PARENT)
+        subim = afwImage.MaskedImageF(self.diffim.getMaskedImage(), bbox=bbox, origin=afwImage.PARENT)
 
         z = diArr = subim.getArrays()[0]
         weights = 1. / subim.getArrays()[2]  # get the weights (=1/variance)
 
         if rel_weight > 0. and ((self.posImage is not None) or (self.negImage is not None)):
             if self.negImage is not None:
-                negSubim = afwImage.MaskedImageF(self.negImage.getMaskedImage(), bbox, afwImage.PARENT)
+                negSubim = afwImage.MaskedImageF(self.negImage.getMaskedImage(), bbox, origin=afwImage.PARENT)
             if self.posImage is not None:
-                posSubim = afwImage.MaskedImageF(self.posImage.getMaskedImage(), bbox, afwImage.PARENT)
+                posSubim = afwImage.MaskedImageF(self.posImage.getMaskedImage(), bbox, origin=afwImage.PARENT)
             if self.posImage is None:  # no science image provided; generate it from diffim + negImage
                 posSubim = subim.clone()
                 posSubim += negSubim
@@ -760,7 +759,7 @@ class DipoleFitAlgorithm(object):
         # Also extract the stderr of flux estimate.
         def computeSumVariance(exposure, footprint):
             box = footprint.getBBox()
-            subim = afwImage.MaskedImageF(exposure.getMaskedImage(), box, afwImage.PARENT)
+            subim = afwImage.MaskedImageF(exposure.getMaskedImage(), box, origin=afwImage.PARENT)
             return np.sqrt(np.nansum(subim.getArrays()[1][:, :]))
 
         fluxVal = fluxVar = fitParams['flux']

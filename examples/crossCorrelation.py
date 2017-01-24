@@ -27,7 +27,7 @@ def makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot=False):
 
     candList = []
     for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(True): # only look at non-bad candidates
+        for cand in cell.begin(True):  # only look at non-bad candidates
             if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                 candList.append(cand.getId())
 
@@ -36,7 +36,7 @@ def makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot=False):
     d2 = []
 
     for i in range(len(candList)):
-        cand1 = ipDiffim.KernelCandidateF.cast(kernelCellSet.getCandidateById(candList[i]))
+        cand1 = kernelCellSet.getCandidateById(candList[i])
         x1 = cand1.getXCenter()
         y1 = cand1.getYCenter()
 
@@ -55,7 +55,7 @@ def makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot=False):
         kVector1 = kImage1.getArray().ravel()
 
         for j in range(i+1, len(candList)):
-            cand2 = ipDiffim.KernelCandidateF.cast(kernelCellSet.getCandidateById(candList[j]))
+            cand2 = kernelCellSet.getCandidateById(candList[j])
             x2 = cand2.getXCenter()
             y2 = cand2.getYCenter()
 
@@ -203,7 +203,7 @@ def testAutoCorrelation(orderMake, orderFit, inMi=None, display=False):
     basicGaussian2 = afwMath.GaussianFunction2D(5., 3., 0.5 * num.pi)
     basicKernel2 = afwMath.AnalyticKernel(kSize, kSize, basicGaussian2)
 
-    basisList = afwMath.KernelList()
+    basisList = []
     basisList.append(basicKernel1)
     basisList.append(basicKernel2)
 

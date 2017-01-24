@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 from __future__ import print_function
-from builtins import range
 import os
-import sys
 import unittest
-import lsst.utils.tests
 
+from builtins import range
+
+import lsst.utils.tests
 import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -72,8 +72,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             size = 40
             bbox2 = afwGeom.Box2I(afwGeom.Point2I(self.x02 - size, self.y02 - size),
                                   afwGeom.Point2I(self.x02 + size, self.y02 + size))
-            self.scienceImage2 = afwImage.ExposureF(scienceExposure, bbox2, afwImage.LOCAL)
-            self.templateExposure2 = afwImage.ExposureF(templateExposure, bbox2, afwImage.LOCAL)
+            self.scienceImage2 = afwImage.ExposureF(scienceExposure, bbox2, origin=afwImage.LOCAL)
+            self.templateExposure2 = afwImage.ExposureF(templateExposure, bbox2, origin=afwImage.LOCAL)
 
     def addNoise(self, mi):
         img = mi.getImage()
@@ -136,8 +136,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.fail()
 
         # And of the right type
-        self.assertEqual(type(kc.getTemplateMaskedImage()), type(afwImage.MaskedImageF()))
-        self.assertEqual(type(kc.getScienceMaskedImage()), type(afwImage.MaskedImageF()))
+        self.assertEqual(type(kc.getTemplateMaskedImage()), afwImage.MaskedImageF)
+        self.assertEqual(type(kc.getScienceMaskedImage()), afwImage.MaskedImageF)
 
         # None of these should work
         for kType in (ipDiffim.KernelCandidateF.ORIG,
@@ -215,8 +215,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.fail()
 
         # And of the right type
-        self.assertEqual(type(kc.getTemplateMaskedImage()), type(afwImage.MaskedImageF()))
-        self.assertEqual(type(kc.getScienceMaskedImage()), type(afwImage.MaskedImageF()))
+        self.assertEqual(type(kc.getTemplateMaskedImage()), afwImage.MaskedImageF)
+        self.assertEqual(type(kc.getScienceMaskedImage()), afwImage.MaskedImageF)
 
         # None of these should work
         for kType in (ipDiffim.KernelCandidateF.ORIG,
@@ -248,7 +248,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
     @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testDeltaFunctionScaled(self, scaling=2.7, bg=11.3):
-        sIm = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), True)
+        sIm = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), deep=True)
         sIm *= scaling
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.templateExposure2.getMaskedImage(),
@@ -260,7 +260,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
                                          kSum=scaling)
 
-        sIm = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), True)
+        sIm = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), deep=True)
         sIm += bg
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.templateExposure2.getMaskedImage(),
@@ -346,8 +346,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         bbox = gaussKernel.shrinkBBox(smi.getBBox(afwImage.LOCAL))
 
-        tmi2 = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), bbox, afwImage.LOCAL)
-        smi2 = afwImage.MaskedImageF(smi, bbox, afwImage.LOCAL)
+        tmi2 = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), bbox, origin=afwImage.LOCAL)
+        smi2 = afwImage.MaskedImageF(smi, bbox, origin=afwImage.LOCAL)
 
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
@@ -355,8 +355,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
 
-        #ds9.mtv(kImageIn, frame=1)
-        #ds9.mtv(kImageOut, frame=2)
+        # ds9.mtv(kImageIn, frame=1)
+        # ds9.mtv(kImageOut, frame=2)
 
         soln = kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT)
         self.assertAlmostEqual(soln.getKsum(), kSumIn)
@@ -382,8 +382,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
 
-        #ds9.mtv(kImageIn, frame=3)
-        #ds9.mtv(kImageOut, frame=4)
+        # ds9.mtv(kImageIn, frame=3)
+        # ds9.mtv(kImageOut, frame=4)
 
         soln = kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT)
         self.assertAlmostEqual(soln.getKsum(), kSumIn, 3)
@@ -423,8 +423,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # grab only the non-masked subregion
         bbox = gaussKernel.shrinkBBox(smi.getBBox(afwImage.LOCAL))
 
-        tmi2 = afwImage.MaskedImageF(tmi, bbox, afwImage.LOCAL)
-        smi2 = afwImage.MaskedImageF(smi, bbox, afwImage.LOCAL)
+        tmi2 = afwImage.MaskedImageF(tmi, bbox, origin=afwImage.LOCAL)
+        smi2 = afwImage.MaskedImageF(smi, bbox, origin=afwImage.LOCAL)
 
         # make sure its a valid subregion!
         for j in range(tmi2.getHeight()):
@@ -492,7 +492,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         nSeen = 0
         for cell in kernelCellSet.getCellList():
             for cand in cell.begin(True):
-                cand = ipDiffim.KernelCandidateF.cast(cand)
                 self.assertEqual(cand.getStatus(), afwMath.SpatialCellCandidate.GOOD)
                 nSeen += 1
         self.assertEqual(nSeen, 1)
