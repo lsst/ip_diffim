@@ -64,11 +64,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.footprints.append(afwDet.Footprint(afwGeom.Box2I(
                 afwGeom.Point2I(xc, yc), afwGeom.Extent2I(1, 1))))
 
-        # detConfig.detThresholdType = "stdev"
-        # kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
-        # kcDetect.apply(self.smi, self.tmi)
-        # self.footprints = kcDetect.getFootprints()
-
         # Make a basis list that hotpants has been run with
         nGauss = 1
         sGauss = [3.]
@@ -794,8 +789,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         spatialSolution = sb.getParameters()
         for i in range(len(spatialSolution)):
             self.assertAlmostEqual(HPspatialSolution[-1][spReorder[i]], spatialSolution[i], 5)
-
-#####
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
