@@ -39,7 +39,7 @@ namespace detail {
         BuildSingleKernelVisitor(
             lsst::afw::math::KernelList const& basisList,
             lsst::pex::policy::Policy const& policy, 
-            std::shared_ptr<Eigen::MatrixXd> hMat  
+            Eigen::MatrixXd const& hMat  
             );
         virtual ~BuildSingleKernelVisitor() {};
         
@@ -61,7 +61,7 @@ namespace detail {
     private:
         lsst::afw::math::KernelList const _basisList; ///< Basis set
         lsst::pex::policy::Policy _policy;            ///< Policy controlling behavior
-        std::shared_ptr<Eigen::MatrixXd> _hMat;     ///< Regularization matrix
+        Eigen::MatrixXd const _hMat;          ///< Regularization matrix
         ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
         bool _skipBuilt;                      ///< Skip over built candidates during processCandidate()
         int _nRejected;                       ///< Number of candidates rejected during processCandidate()
@@ -89,7 +89,7 @@ namespace detail {
     makeBuildSingleKernelVisitor(
         lsst::afw::math::KernelList const& basisList,
         lsst::pex::policy::Policy const& policy,
-        std::shared_ptr<Eigen::MatrixXd> hMat  
+        Eigen::MatrixXd const & hMat
         ) {
 
         return typename BuildSingleKernelVisitor<PixelT>::Ptr(

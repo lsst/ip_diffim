@@ -13,6 +13,7 @@
 #define LSST_IP_DIFFIM_KERNELSUMVISITOR_H
 
 #include <memory>
+
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
 #include "lsst/pex/policy/Policy.h"
