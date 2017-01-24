@@ -18,7 +18,10 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
+from __future__ import absolute_import, division, print_function
+
 import numpy as np
+
 import lsst.daf.base as dafBase
 import lsst.pex.config as pexConfig
 import lsst.afw.image as afwImage
@@ -340,7 +343,8 @@ And finally provide some optional debugging displays:
                 self.log.info("Astrometrically registering template to science image")
                 templatePsf = templateExposure.getPsf()
                 templateExposure = self._warper.warpExposure(scienceExposure.getWcs(),
-                                                             templateExposure, destBBox=scienceExposure.getBBox())
+                                                             templateExposure,
+                                                             destBBox=scienceExposure.getBBox())
                 templateExposure.setPsf(templatePsf)
             else:
                 self.log.error("ERROR: Input images not registered")
@@ -643,7 +647,7 @@ And finally provide some optional debugging displays:
             self.log.warn("Failed to get background model.  Falling back to median background estimation")
             bkgd = np.ma.extras.median(miArr)
 
-        #Take off background for detection
+        # Take off background for detection
         mi -= bkgd
         try:
             table.setMetadata(self.selectAlgMetadata)

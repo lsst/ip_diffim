@@ -12,6 +12,7 @@ setupRequired(pex_policy)
 setupRequired(pipe_base)
 setupRequired(utils)
 setupRequired(lmfit)
+setupRequired(pybind11)
 
 setupOptional(afwdata)
 setupOptional(matplotlib)

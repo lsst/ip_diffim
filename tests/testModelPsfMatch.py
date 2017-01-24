@@ -1,5 +1,6 @@
-#!/usr/bin/env python
+from __future__ import absolute_import, division, print_function
 import unittest
+
 import lsst.utils.tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage

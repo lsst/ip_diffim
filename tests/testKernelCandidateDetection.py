@@ -1,10 +1,10 @@
-from builtins import range
-#!/usr/bin/env python
+from __future__ import absolute_import, division, print_function
 import os
-import sys
 import unittest
-import lsst.utils.tests
 
+from builtins import range
+
+import lsst.utils.tests
 import lsst.utils
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -72,8 +72,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for fp in fpList1:
             bbox = fp.getBBox()
-            tmi = afwImage.MaskedImageF(self.templateImage, bbox, afwImage.LOCAL)
-            smi = afwImage.MaskedImageF(self.scienceImage, bbox, afwImage.LOCAL)
+            tmi = afwImage.MaskedImageF(self.templateImage, bbox, origin=afwImage.LOCAL)
+            smi = afwImage.MaskedImageF(self.scienceImage, bbox, origin=afwImage.LOCAL)
             tmask = tmi.getMask()
             smask = smi.getMask()
 
@@ -84,16 +84,16 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                     self.assertEqual(smask.get(i, j), 0)
 
         # add a masked pixel to the template image and make sure you don't get it
-        afwImage.MaskedImageF(self.templateImage, fpList1[0].getBBox(), afwImage.LOCAL).getMask().set(
+        afwImage.MaskedImageF(self.templateImage, fpList1[0].getBBox(), origin=afwImage.LOCAL).getMask().set(
             tmask.getWidth()//2, tmask.getHeight()//2, maskVal)
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList2 = kcDetect.getFootprints()
         self.assertEqual(len(fpList2), (len(fpList1)-1))
 
         # add a masked pixel to the science image and make sure you don't get it
-        afwImage.MaskedImageF(self.scienceImage, fpList1[1].getBBox(), afwImage.LOCAL).getMask().set(
+        afwImage.MaskedImageF(self.scienceImage, fpList1[1].getBBox(), origin=afwImage.LOCAL).getMask().set(
             smask.getWidth()//2, smask.getHeight()//2, maskVal)
-        afwImage.MaskedImageF(self.scienceImage, fpList1[2].getBBox(), afwImage.LOCAL).getMask().set(
+        afwImage.MaskedImageF(self.scienceImage, fpList1[2].getBBox(), origin=afwImage.LOCAL).getMask().set(
             smask.getWidth()//2, smask.getHeight()//2, maskVal)
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList3 = kcDetect.getFootprints()
