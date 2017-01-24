@@ -60,8 +60,7 @@ def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=ds9.GREEN, symb="+", size=2):
             else:
                 ds9.dot(symb, xc, yc, frame=frame, ctype=ctype, size=size)
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-#
+
 # Kernel display utilities
 #
 
@@ -81,7 +80,6 @@ def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
 
             goodies = ctypeBad is None
             for cand in cell.begin(goodies):
-                cand = diffimLib.KernelCandidateF.cast(cand)
                 xc, yc = cand.getXCenter() + origin[0], cand.getYCenter() + origin[1]
                 if cand.getStatus() == afwMath.SpatialCellCandidate.BAD:
                     color = ctypeBad
@@ -133,7 +131,6 @@ def showDiaSources(sources, exposure, isFlagged, isDipole, frame=None):
             ctype = ds9.GREEN
             lab += "OK"
         mos.append(im.makeMosaic(), lab, ctype)
-        #print source.getId()
     title = "Dia Sources"
     mosaicImage = mos.makeMosaic(frame=frame, title=title)
     return mosaicImage
@@ -158,9 +155,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
     candidateCentersBad = []
     candidateIndex = 0
     for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(False): # include bad candidates
-            cand = diffimLib.KernelCandidateF.cast(cand)
-
+        for cand in cell.begin(False):  # include bad candidates
             # Original difference image; if does not exist, skip candidate
             try:
                 resid = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
@@ -197,7 +192,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
             if resids:
                 var = resid.getVariance()
                 var = var.Factory(var, True)
-                np.sqrt(var.getArray(), var.getArray()) # inplace sqrt
+                np.sqrt(var.getArray(), var.getArray())  # inplace sqrt
                 resid = resid.getImage()
                 resid /= var
                 bbox = kernel.shrinkBBox(resid.getBBox())
@@ -294,7 +289,6 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
     badAmps = list()
     for cell in kernelCellSet.getCellList():
         for cand in cell.begin(False):
-            cand = diffimLib.KernelCandidateF.cast(cand)
             if not showBadCandidates and cand.isBad():
                 continue
             candCenter = afwGeom.PointD(cand.getXCenter(), cand.getYCenter())
@@ -358,7 +352,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
 
         fig.clf()
         try:
-            fig.canvas._tkcanvas._root().lift() # == Tk's raise, but raise is a python reserved word
+            fig.canvas._tkcanvas._root().lift()  # == Tk's raise, but raise is a python reserved word
         except Exception:                                 # protect against API changes
             pass
 
@@ -366,8 +360,8 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
 
         # LL
         ax = fig.add_axes((0.1, 0.05, 0.35, 0.35))
-        vmin = fRange.min() # - 0.05 * np.fabs(fRange.min())
-        vmax = fRange.max() # + 0.05 * np.fabs(fRange.max())
+        vmin = fRange.min()  # - 0.05 * np.fabs(fRange.min())
+        vmax = fRange.max()  # + 0.05 * np.fabs(fRange.max())
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
         im = ax.imshow(fRange, aspect='auto', norm=norm,
                        extent=[0, kernelCellSet.getBBox().getWidth()-1,
@@ -508,12 +502,11 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     nonfitResids = []
 
     for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(True): # only look at good ones
+        for cand in cell.begin(True):  # only look at good ones
             # Be sure
             if not (cand.getStatus() == afwMath.SpatialCellCandidate.GOOD):
                 continue
 
-            cand = diffimLib.KernelCandidateF.cast(cand)
             diffim = cand.getDifferenceImage(diffimLib.KernelCandidateF.ORIG)
             orig = cand.getScienceMaskedImage()
 
@@ -580,7 +573,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     fig = pylab.figure()
     fig.clf()
     try:
-        fig.canvas._tkcanvas._root().lift() # == Tk's raise, but raise is a python reserved word
+        fig.canvas._tkcanvas._root().lift()  # == Tk's raise, but raise is a python reserved word
     except Exception:                                 # protect against API changes
         pass
     if origVariance:
@@ -660,7 +653,7 @@ def calcCentroid(arr):
 def calcWidth(arr, centx, centy):
     """Calculate second moment of a (kernel) image"""
     y, x = arr.shape
-    #Square the flux so we don't have to deal with negatives
+    # Square the flux so we don't have to deal with negatives
     sarr = arr*arr
     xarr = np.asarray([[el for el in range(x)] for el2 in range(y)])
     yarr = np.asarray([[el2 for el in range(x)] for el2 in range(y)])
@@ -733,8 +726,8 @@ def plotWhisker(results, newWcs):
     distance = [x[1].asArcseconds() for x in residuals]
     distance.append(0.2)
     distance = np.asarray(distance)[xidxs]
-    #NOTE: This assumes that the bearing is measured positive from +RA through North.
-    #From the documentation this is not clear.
+    # NOTE: This assumes that the bearing is measured positive from +RA through North.
+    # From the documentation this is not clear.
     bearing = [x[0].asRadians() for x in residuals]
     bearing.append(0)
     bearing = np.asarray(bearing)[xidxs]
@@ -746,6 +739,7 @@ def plotWhisker(results, newWcs):
 
 
 class DipoleTestImage(object):
+
     """!Utility class for dipole measurement testing
 
     Generate an image with simulated dipoles and noise; store the original "pre-subtraction" images

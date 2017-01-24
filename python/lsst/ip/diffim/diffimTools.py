@@ -158,7 +158,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     nToUse = min(len(kCoeffs), len(basisList))
 
     # Make the full convolved science image
-    sKernel = afwMath.LinearCombinationKernel(afwMath.KernelList(basisList[:nToUse]), polyFunc)
+    sKernel = afwMath.LinearCombinationKernel(basisList[:nToUse], polyFunc)
     sKernel.setSpatialParameters(kCoeffs[:nToUse])
     sim = afwImage.ImageF(tim.getDimensions())
     afwMath.convolve(sim, tim, sKernel, True)
@@ -259,8 +259,7 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
         os.makedirs(outdir)
 
     for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(False): # False = include bad candidates
-            cand = diffimLib.KernelCandidateF.cast(cand)
+        for cand in cell.begin(False):  # False = include bad candidates
             if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                 xCand = int(cand.getXCenter())
                 yCand = int(cand.getYCenter())
@@ -420,8 +419,7 @@ class NbasisEvaluator(object):
                     kernelCellSet.visitCandidates(visitor, bicConfig.nStarPerCell)
 
                     for cell in kernelCellSet.getCellList():
-                        for cand in cell.begin(False): # False = include bad candidates
-                            cand = diffimLib.KernelCandidateF.cast(cand)
+                        for cand in cell.begin(False):  # False = include bad candidates
                             if cand.getStatus() != afwMath.SpatialCellCandidate.GOOD:
                                 continue
                             diffIm = cand.getDifferenceImage(diffimLib.KernelCandidateF.RECENT)

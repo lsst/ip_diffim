@@ -152,7 +152,6 @@ class DiffimTestCases(unittest.TestCase):
         # cellSet.getCandidateById(id).setStatus(value)
         for cell in cellSet.getCellList():
             for cand in cell.begin(False):
-                cand = ipDiffim.KernelCandidateF.cast(cand)
                 if (cand.getId() == cid):
                     cand.setStatus(value)
                     return cand
@@ -167,8 +166,6 @@ class DiffimTestCases(unittest.TestCase):
         for cell in cellSet.getCellList():
             print()
             for cand in cell.begin(False):
-                cand = ipDiffim.KernelCandidateF.cast(cand)
-
                 if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                     goodList.append(cand.getId())
                 else:
@@ -180,7 +177,7 @@ class DiffimTestCases(unittest.TestCase):
         for idx in range(len(goodList)):
             cid = goodList[idx]
 
-            print() # clear the screen
+            print()  # clear the screen
             logger.debug("Removing candidate %d", cid)
 
             cand = self.setStatus(cellSet, cid, afwMath.SpatialCellCandidate.BAD)
@@ -192,9 +189,9 @@ class DiffimTestCases(unittest.TestCase):
             spatialkv.solveLinearEquation()
             jkKernel, jkBg = spatialkv.getSolutionPair()
 
-            #jkResults = psfmatch._solve(cellSet, kernel.getKernelList())
-            #jkKernel  = jkResults[1]
-            #jkBg      = jkResults[2]
+            # jkResults = psfmatch._solve(cellSet, kernel.getKernelList())
+            # jkKernel  = jkResults[1]
+            # jkBg      = jkResults[2]
 
             # lots of windows
             # self.assess(cand, kernel, bg, jkKernel, jkBg, 6*idx+1)
@@ -223,7 +220,8 @@ class DiffimTestCases(unittest.TestCase):
 
     def test(self):
         if not defDataDir:
-            print("Warning: afwdata not set up; not running JackknifeResampleSpatialKernel.py", file=sys.stderr)
+            print("Warning: afwdata not set up; not running JackknifeResampleSpatialKernel.py",
+                  file=sys.stderr)
             return
 
         self.runTest(mode="AL")

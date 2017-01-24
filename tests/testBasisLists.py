@@ -140,10 +140,10 @@ class DiffimTestCases(unittest.TestCase):
         # no constraints on first kernels norm
         self.assertNotEqual(num.sum(num.ravel(kimage2.getArray())**2), 1.)
         self.assertNotEqual(num.sum(num.ravel(kimage3.getArray())**2), 1.)
-        basisListIn = afwMath.KernelList()
-        basisListIn.push_back(gaussKernel1)
-        basisListIn.push_back(gaussKernel2)
-        basisListIn.push_back(gaussKernel3)
+        basisListIn = []
+        basisListIn.append(gaussKernel1)
+        basisListIn.append(gaussKernel2)
+        basisListIn.append(gaussKernel3)
 
         # outputs
         basisListOut = ipDiffim.renormalizeKernelList(basisListIn)
