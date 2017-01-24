@@ -88,15 +88,13 @@ void declareKernelCandidate(py::module &mod, std::string const &suffix) {
                                       KernelCandidate<PixelT>::getDifferenceImage,
             "kernel"_a, "background"_a);
     cls.def("isInitialized", &KernelCandidate<PixelT>::isInitialized);
-
     cls.def("build", (void (KernelCandidate<PixelT>::*)(afw::math::KernelList const &)) &
                          KernelCandidate<PixelT>::build,
             "basisList"_a);
-    cls.def("build", (void (KernelCandidate<PixelT>::*)(afw::math::KernelList const &,
-                                                        std::shared_ptr<Eigen::MatrixXd>)) &
-                         KernelCandidate<PixelT>::build,
+    cls.def("build",
+            (void (KernelCandidate<PixelT>::*)(afw::math::KernelList const &, Eigen::MatrixXd const &)) &
+                KernelCandidate<PixelT>::build,
             "basisList"_a, "hMat"_a);
-
     mod.def("makeKernelCandidate",
             (std::shared_ptr<KernelCandidate<PixelT>>(*)(
                 float const, float const, std::shared_ptr<afw::image::MaskedImage<PixelT>> const &,
@@ -127,6 +125,7 @@ PYBIND11_PLUGIN(_kernelCandidate) {
 
     return mod.ptr();
 }
-}
-}
-}  // namespace lsst::ip::diffim
+
+}  // diffim
+}  // ip
+}  // lsst
