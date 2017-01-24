@@ -146,8 +146,7 @@ namespace diffim {
     }
     
     
-    std::shared_ptr<Eigen::MatrixXd>
-    makeRegularizationMatrix(
+    Eigen::MatrixXd makeRegularizationMatrix(
         lsst::pex::policy::Policy policy
         ) {
         
@@ -187,7 +186,7 @@ namespace diffim {
         float borderPenalty  = policy.getDouble("regularizationBorderPenalty");
         bool fitForBackground = policy.getBool("fitForBackground");
         
-        std::shared_ptr<Eigen::MatrixXd> bMat;
+        Eigen::MatrixXd bMat;
         if (regularizationType == "centralDifference") {
             int stencil = policy.getInt("centralRegularizationStencil");
             bMat = makeCentralDifferenceMatrix(width, height, stencil, borderPenalty, fitForBackground);
@@ -200,15 +199,14 @@ namespace diffim {
             throw LSST_EXCEPT(pexExcept::Exception, "regularizationType not recognized");
         }
         
-        std::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd((*bMat).transpose() * (*bMat)));
+        Eigen::MatrixXd hMat = bMat.transpose() * bMat;
         return hMat;
     }
     
    /** 
     * @brief Generate regularization matrix for delta function kernels
     */
-    std::shared_ptr<Eigen::MatrixXd>
-    makeCentralDifferenceMatrix(
+    Eigen::MatrixXd makeCentralDifferenceMatrix(
         int width,
         int height,
         int stencil,
@@ -304,15 +302,13 @@ namespace diffim {
             }
         }
         
-        std::shared_ptr<Eigen::MatrixXd> bMatPtr (new Eigen::MatrixXd(bMat));
-        return bMatPtr;
+        return bMat;
     }
     
    /** 
     * @brief Generate regularization matrix for delta function kernels
     */
-    std::shared_ptr<Eigen::MatrixXd>
-    makeForwardDifferenceMatrix(
+    Eigen::MatrixXd makeForwardDifferenceMatrix(
         int width,
         int height,
         std::vector<int> const& orders,
@@ -403,8 +399,7 @@ namespace diffim {
             }
         }
         
-        std::shared_ptr<Eigen::MatrixXd> bMatPtr (new Eigen::MatrixXd(bTot));
-        return bMatPtr;
+        return bTot;
     }
     
     
@@ -511,8 +506,7 @@ namespace diffim {
    /** 
     * @brief Generate regularization matrix for delta function kernels
     */
-    std::shared_ptr<Eigen::MatrixXd>
-    makeFiniteDifferenceRegularizationDeprecated(
+    Eigen::MatrixXd makeFiniteDifferenceRegularizationDeprecated(
         unsigned int width,
         unsigned int height,
         unsigned int order,
@@ -778,7 +772,7 @@ namespace diffim {
             std::cout << bMat << std::endl;
         }
         
-        std::shared_ptr<Eigen::MatrixXd> hMat (new Eigen::MatrixXd(bMat.transpose() * bMat));
+        Eigen::MatrixXd hMat = bMat.transpose() * bMat;
         return hMat;
     }
     

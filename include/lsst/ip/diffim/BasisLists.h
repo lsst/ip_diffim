@@ -9,10 +9,11 @@
  * @ingroup ip_diffim
  */
 
-#ifndef LSST_IP_DIFFIM_BASISSETS_H
-#define LSST_IP_DIFFIM_BASISSETS_H
+#ifndef LSST_IP_DIFFIM_BASISSLISTS_H
+#define LSST_IP_DIFFIM_BASISSLISTS_H
 
 #include <memory>
+#include <vector>
 
 #include "Eigen/Core"
 
@@ -48,7 +49,7 @@ namespace diffim {
      * @note Calls either makeForwardDifferenceMatrix or
      * makeCentralDifferenceMatrix based on the policy file.
      */    
-    std::shared_ptr<Eigen::MatrixXd> makeRegularizationMatrix(
+    Eigen::MatrixXd makeRegularizationMatrix(
         lsst::pex::policy::Policy policy
         );
 
@@ -63,10 +64,10 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */    
-    std::shared_ptr<Eigen::MatrixXd> makeForwardDifferenceMatrix(
+    Eigen::MatrixXd makeForwardDifferenceMatrix(
         int width,
         int height,
-        std::vector<int> const& orders,
+        std::vector<int> const & orders,
         float borderPenalty,
         bool fitForBackground
         );
@@ -82,7 +83,7 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */    
-    std::shared_ptr<Eigen::MatrixXd> makeCentralDifferenceMatrix(
+    Eigen::MatrixXd makeCentralDifferenceMatrix(
         int width,
         int height,
         int stencil,
@@ -123,10 +124,10 @@ namespace diffim {
      * @ingroup ip_diffim
      */    
     lsst::afw::math::KernelList makeAlardLuptonBasisList(
-        int halfWidth,                ///< size is 2*N + 1
-        int nGauss,                   ///< number of gaussians
-        std::vector<double> const& sigGauss,   ///< width of the gaussians
-        std::vector<int>    const& degGauss    ///< local spatial variation of gaussians
+        int halfWidth,
+        int nGauss,
+        std::vector<double> const& sigGauss,
+        std::vector<int>    const& degGauss
         );
 
 }}} // end of namespace lsst::ip::diffim
