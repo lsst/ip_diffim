@@ -1,3 +1,9 @@
 # -*- python -*-
 from lsst.sconsUtils import scripts
-scripts.BasicSConscript.python(['diffimDetailLib'])
+scripts.BasicSConscript.pybind11([
+    "assessSpatialKernelVisitor",
+    "buildSingleKernelVisitor",
+    "buildSpatialKernelVisitor",
+    "kernelPca",
+    "kernelSumVisitor",
+])

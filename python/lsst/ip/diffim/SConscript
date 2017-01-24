@@ -1,3 +1,12 @@
-# -*- python -*-
+## -*- python -*-
 from lsst.sconsUtils import scripts
-scripts.BasicSConscript.python(['diffimLib'])
+scripts.BasicSConscript.pybind11([
+    "basisLists",
+    "dipoleAlgorithms",
+    "findSetBits",
+    "imageStatistics",
+    "imageSubtract",
+    "kernelCandidate",
+    "kernelCandidateDetection",
+    "kernelSolution",
+])

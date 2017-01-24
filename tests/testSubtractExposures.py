@@ -1,10 +1,9 @@
-from builtins import range
-#!/usr/bin/env python
 import os
-import sys
 import unittest
-import lsst.utils.tests
 
+from builtins import range
+
+import lsst.utils.tests
 import lsst.utils
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -213,8 +212,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 if cand1.getStatus() == afwMath.SpatialCellCandidate.BAD:
                     continue
 
-                cand1 = ipDiffim.KernelCandidateF.cast(cand1)
-                cand2 = ipDiffim.KernelCandidateF.cast(kernelCellSet2.getCandidateById(cand1.getId()+count))
+                cand2 = kernelCellSet2.getCandidateById(cand1.getId()+count)
 
                 # positions are nearly the same (different at the 0.01 pixel level)
                 self.assertAlmostEqual(cand1.getXCenter(), cand2.getXCenter(), delta=1e-1)
