@@ -98,13 +98,13 @@ namespace diffim {
     void KernelCandidate<PixelT>::build(
         lsst::afw::math::KernelList const& basisList
         ) {
-        build(basisList, std::shared_ptr<Eigen::MatrixXd>());
+        build(basisList, Eigen::MatrixXd());
     }
 
     template <typename PixelT>
     void KernelCandidate<PixelT>::build(
         lsst::afw::math::KernelList const& basisList,
-        std::shared_ptr<Eigen::MatrixXd> hMat
+        Eigen::MatrixXd const& hMat
         ) {
 
         /* Examine the policy for control over the variance estimate */
@@ -152,7 +152,7 @@ namespace diffim {
 
     template <typename PixelT>
     void KernelCandidate<PixelT>::_buildKernelSolution(lsst::afw::math::KernelList const& basisList,
-                                                       std::shared_ptr<Eigen::MatrixXd> hMat)
+                                                       Eigen::MatrixXd const& hMat)
     {
         bool checkConditionNumber = _policy.getBool("checkConditionNumber");
         double maxConditionNumber = _policy.getDouble("maxConditionNumber");
@@ -169,7 +169,7 @@ namespace diffim {
         }
 
         /* Do we have a regularization matrix?  If so use it */
-        if (hMat) {
+        if (hMat.size() > 0) {
             _useRegularization = true;
             LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate.build",
                        "Using kernel regularization");

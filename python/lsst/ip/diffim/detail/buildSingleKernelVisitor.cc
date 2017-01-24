@@ -54,11 +54,11 @@ template <typename PixelT>
 void declareBuildSingleKernelVisitor(py::module& mod, std::string const& suffix) {
     py::class_<BuildSingleKernelVisitor<PixelT>, std::shared_ptr<BuildSingleKernelVisitor<PixelT>>,
                afw::math::CandidateVisitor>
-        cls(mod, ("BuildSingleKernelVisitor" + suffix).c_str());
+            cls(mod, ("BuildSingleKernelVisitor" + suffix).c_str());
 
     cls.def(py::init<afw::math::KernelList, pex::policy::Policy>(), "basisList"_a, "policy"_a);
-    cls.def(py::init<afw::math::KernelList, pex::policy::Policy, std::shared_ptr<Eigen::MatrixXd>>(),
-            "basisList"_a, "policy"_a, "hMat"_a);
+    cls.def(py::init<afw::math::KernelList, pex::policy::Policy, Eigen::MatrixXd const&>(), "basisList"_a,
+            "policy"_a, "hMat"_a);
 
     cls.def("setSkipBuilt", &BuildSingleKernelVisitor<PixelT>::setSkipBuilt, "skip"_a);
     cls.def("getNRejected", &BuildSingleKernelVisitor<PixelT>::getNRejected);
@@ -66,14 +66,15 @@ void declareBuildSingleKernelVisitor(py::module& mod, std::string const& suffix)
     cls.def("reset", &BuildSingleKernelVisitor<PixelT>::reset);
     cls.def("processCandidate", &BuildSingleKernelVisitor<PixelT>::processCandidate, "candidate"_a);
 
-    mod.def("makeBuildSingleKernelVisitor", (std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(*)(
-                                                afw::math::KernelList const&, pex::policy::Policy const&)) &
-                                                makeBuildSingleKernelVisitor<PixelT>,
+    mod.def("makeBuildSingleKernelVisitor",
+            (std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(*)(afw::math::KernelList const&,
+                                                                  pex::policy::Policy const&)) &
+                    makeBuildSingleKernelVisitor<PixelT>,
             "basisList"_a, "policy"_a);
     mod.def("makeBuildSingleKernelVisitor",
             (std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(*)(
-                afw::math::KernelList const&, pex::policy::Policy const&, std::shared_ptr<Eigen::MatrixXd>)) &
-                makeBuildSingleKernelVisitor<PixelT>,
+                    afw::math::KernelList const&, pex::policy::Policy const&, Eigen::MatrixXd const&)) &
+                    makeBuildSingleKernelVisitor<PixelT>,
             "basisList"_a, "policy"_a, "hMat"_a);
 }
 
@@ -92,7 +93,8 @@ PYBIND11_PLUGIN(_buildSingleKernelVisitor) {
 
     return mod.ptr();
 }
-}
-}
-}
-}  // lsst::ip::diffim::detail
+
+}  // detail
+}  // diffim
+}  // ip
+}  // lsst

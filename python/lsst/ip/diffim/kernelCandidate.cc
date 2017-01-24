@@ -51,15 +51,15 @@ template <typename PixelT>
 void declareKernelCandidate(py::module &mod, std::string const &suffix) {
     py::class_<KernelCandidate<PixelT>, std::shared_ptr<KernelCandidate<PixelT>>,
                afw::math::SpatialCellImageCandidate>
-        cls(mod, ("KernelCandidate" + suffix).c_str());
+            cls(mod, ("KernelCandidate" + suffix).c_str());
 
     using CandidateSwitch = typename KernelCandidate<PixelT>::CandidateSwitch;
 
     py::enum_<CandidateSwitch>(cls, "CandidateSwitch")
-        .value("ORIG", CandidateSwitch::ORIG)
-        .value("PCA", CandidateSwitch::PCA)
-        .value("RECENT", CandidateSwitch::RECENT)
-        .export_values();
+            .value("ORIG", CandidateSwitch::ORIG)
+            .value("PCA", CandidateSwitch::PCA)
+            .value("RECENT", CandidateSwitch::RECENT)
+            .export_values();
 
     cls.def(py::init<float const, float const, std::shared_ptr<afw::image::MaskedImage<PixelT>> const &,
                      std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, pex::policy::Policy const &>(),
@@ -80,35 +80,33 @@ void declareKernelCandidate(py::module &mod, std::string const &suffix) {
     cls.def("getImage", &KernelCandidate<PixelT>::getImage);
     cls.def("getKernelSolution", &KernelCandidate<PixelT>::getKernelSolution, "cand"_a);
     cls.def("getDifferenceImage",
-            (afw::image::MaskedImage<PixelT>(KernelCandidate<PixelT>::*)(CandidateSwitch)) &
-                KernelCandidate<PixelT>::getDifferenceImage,
+            (afw::image::MaskedImage<PixelT> (KernelCandidate<PixelT>::*)(CandidateSwitch)) &
+                    KernelCandidate<PixelT>::getDifferenceImage,
             "cand"_a);
-    cls.def("getDifferenceImage", (afw::image::MaskedImage<PixelT>(KernelCandidate<PixelT>::*)(
-                                      std::shared_ptr<afw::math::Kernel>, double)) &
-                                      KernelCandidate<PixelT>::getDifferenceImage,
+    cls.def("getDifferenceImage", (afw::image::MaskedImage<PixelT> (KernelCandidate<PixelT>::*)(
+                                          std::shared_ptr<afw::math::Kernel>, double)) &
+                                          KernelCandidate<PixelT>::getDifferenceImage,
             "kernel"_a, "background"_a);
     cls.def("isInitialized", &KernelCandidate<PixelT>::isInitialized);
-
     cls.def("build", (void (KernelCandidate<PixelT>::*)(afw::math::KernelList const &)) &
-                         KernelCandidate<PixelT>::build,
+                             KernelCandidate<PixelT>::build,
             "basisList"_a);
-    cls.def("build", (void (KernelCandidate<PixelT>::*)(afw::math::KernelList const &,
-                                                        std::shared_ptr<Eigen::MatrixXd>)) &
-                         KernelCandidate<PixelT>::build,
+    cls.def("build",
+            (void (KernelCandidate<PixelT>::*)(afw::math::KernelList const &, Eigen::MatrixXd const &)) &
+                    KernelCandidate<PixelT>::build,
             "basisList"_a, "hMat"_a);
-
     mod.def("makeKernelCandidate",
             (std::shared_ptr<KernelCandidate<PixelT>>(*)(
-                float const, float const, std::shared_ptr<afw::image::MaskedImage<PixelT>> const &,
-                std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, pex::policy::Policy const &)) &
-                makeKernelCandidate,
+                    float const, float const, std::shared_ptr<afw::image::MaskedImage<PixelT>> const &,
+                    std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, pex::policy::Policy const &)) &
+                    makeKernelCandidate,
             "xCenter"_a, "yCenter"_a, "templateMaskedImage"_a, "scienceMaskedImage"_a, "policy"_a);
     mod.def("makeKernelCandidate",
             (std::shared_ptr<KernelCandidate<PixelT>>(*)(
-                std::shared_ptr<afw::table::SourceRecord> const &,
-                std::shared_ptr<afw::image::MaskedImage<PixelT>> const &,
-                std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, pex::policy::Policy const &)) &
-                makeKernelCandidate,
+                    std::shared_ptr<afw::table::SourceRecord> const &,
+                    std::shared_ptr<afw::image::MaskedImage<PixelT>> const &,
+                    std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, pex::policy::Policy const &)) &
+                    makeKernelCandidate,
             "source"_a, "templateMaskedImage"_a, "scienceMaskedImage"_a, "policy"_a);
 }
 
@@ -127,6 +125,7 @@ PYBIND11_PLUGIN(_kernelCandidate) {
 
     return mod.ptr();
 }
-}
-}
-}  // namespace lsst::ip::diffim
+
+}  // diffim
+}  // ip
+}  // lsst

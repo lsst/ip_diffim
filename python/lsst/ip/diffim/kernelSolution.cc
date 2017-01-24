@@ -45,37 +45,37 @@ namespace {
 void declareKernelSolution(py::module &mod) {
     py::class_<KernelSolution, std::shared_ptr<KernelSolution>> cls(mod, "KernelSolution");
 
-    cls.def(py::init<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::VectorXd>, bool>(), "mMat"_a,
-            "bVec"_a, "fitForBackground"_a);
+    cls.def(py::init<Eigen::MatrixXd, Eigen::VectorXd, bool>(), "mMat"_a, "bVec"_a, "fitForBackground"_a);
     cls.def(py::init<bool>(), "fitForBackground"_a);
     cls.def(py::init<>());
 
     py::enum_<KernelSolution::KernelSolvedBy>(cls, "KernelSolvedBy")
-        .value("NONE", KernelSolution::KernelSolvedBy::NONE)
-        .value("CHOLESKY_LDLT", KernelSolution::KernelSolvedBy::CHOLESKY_LDLT)
-        .value("CHOLESKY_LLT", KernelSolution::KernelSolvedBy::CHOLESKY_LLT)
-        .value("LU", KernelSolution::KernelSolvedBy::LU)
-        .value("EIGENVECTOR", KernelSolution::KernelSolvedBy::EIGENVECTOR)
-        .export_values();
+            .value("NONE", KernelSolution::KernelSolvedBy::NONE)
+            .value("CHOLESKY_LDLT", KernelSolution::KernelSolvedBy::CHOLESKY_LDLT)
+            .value("CHOLESKY_LLT", KernelSolution::KernelSolvedBy::CHOLESKY_LLT)
+            .value("LU", KernelSolution::KernelSolvedBy::LU)
+            .value("EIGENVECTOR", KernelSolution::KernelSolvedBy::EIGENVECTOR)
+            .export_values();
 
     py::enum_<KernelSolution::ConditionNumberType>(cls, "ConditionNumberType")
-        .value("EIGENVALUE", KernelSolution::ConditionNumberType::EIGENVALUE)
-        .value("SVD", KernelSolution::ConditionNumberType::SVD)
-        .export_values();
+            .value("EIGENVALUE", KernelSolution::ConditionNumberType::EIGENVALUE)
+            .value("SVD", KernelSolution::ConditionNumberType::SVD)
+            .export_values();
 
     cls.def("solve", (void (KernelSolution::*)()) & KernelSolution::solve);
-    cls.def("solve", (void (KernelSolution::*)(Eigen::MatrixXd, Eigen::VectorXd)) & KernelSolution::solve,
+    cls.def("solve", (void (KernelSolution::*)(Eigen::MatrixXd const &, Eigen::VectorXd const &)) &
+                             KernelSolution::solve,
             "mMat"_a, "bVec"_a);
     cls.def("getSolvedBy", &KernelSolution::getSolvedBy);
     cls.def("getConditionNumber", (double (KernelSolution::*)(KernelSolution::ConditionNumberType)) &
-                                      KernelSolution::getConditionNumber,
+                                          KernelSolution::getConditionNumber,
             "conditionType"_a);
     cls.def("getConditionNumber",
-            (double (KernelSolution::*)(Eigen::MatrixXd, KernelSolution::ConditionNumberType)) &
-                KernelSolution::getConditionNumber,
+            (double (KernelSolution::*)(Eigen::MatrixXd const &, KernelSolution::ConditionNumberType)) &
+                    KernelSolution::getConditionNumber,
             "mMat"_a, "conditionType"_a);
-    cls.def("getM", &KernelSolution::getM);
-    cls.def("getB", &KernelSolution::getB);
+    cls.def("getM", &KernelSolution::getM, py::return_value_policy::copy);
+    cls.def("getB", &KernelSolution::getB, py::return_value_policy::copy);
     cls.def("printM", &KernelSolution::printM);
     cls.def("printB", &KernelSolution::printB);
     cls.def("printA", &KernelSolution::printA);
@@ -92,7 +92,7 @@ void declareKernelSolution(py::module &mod) {
 template <typename InputT>
 void declareStaticKernelSolution(py::module &mod, std::string const &suffix) {
     py::class_<StaticKernelSolution<InputT>, std::shared_ptr<StaticKernelSolution<InputT>>, KernelSolution>
-        cls(mod, ("StaticKernelSolution" + suffix).c_str());
+            cls(mod, ("StaticKernelSolution" + suffix).c_str());
 
     cls.def(py::init<lsst::afw::math::KernelList const &, bool>(), "basisList"_a, "fitForBackground"_a);
 
@@ -117,7 +117,7 @@ template <typename InputT>
 void declareMaskedKernelSolution(py::module &mod, std::string const &suffix) {
     py::class_<MaskedKernelSolution<InputT>, std::shared_ptr<MaskedKernelSolution<InputT>>,
                StaticKernelSolution<InputT>>
-        cls(mod, ("MaskedKernelSolution" + suffix).c_str());
+            cls(mod, ("MaskedKernelSolution" + suffix).c_str());
 
     cls.def(py::init<lsst::afw::math::KernelList const &, bool>(), "basisList"_a, "fitForBackground"_a);
 
@@ -140,9 +140,9 @@ template <typename InputT>
 void declareRegularizedKernelSolution(py::module &mod, std::string const &suffix) {
     py::class_<RegularizedKernelSolution<InputT>, std::shared_ptr<RegularizedKernelSolution<InputT>>,
                StaticKernelSolution<InputT>>
-        cls(mod, ("RegularizedKernelSolution" + suffix).c_str());
+            cls(mod, ("RegularizedKernelSolution" + suffix).c_str());
 
-    cls.def(py::init<lsst::afw::math::KernelList const &, bool, std::shared_ptr<Eigen::MatrixXd>,
+    cls.def(py::init<lsst::afw::math::KernelList const &, bool, Eigen::MatrixXd const &,
                      pex::policy::Policy>(),
             "basisList"_a, "fitForBackground"_a, "hMat"_a, "policy"_a);
 
@@ -150,6 +150,7 @@ void declareRegularizedKernelSolution(py::module &mod, std::string const &suffix
             (void (RegularizedKernelSolution<InputT>::*)()) & RegularizedKernelSolution<InputT>::solve);
     cls.def("getLambda", &RegularizedKernelSolution<InputT>::getLambda);
     cls.def("estimateRisk", &RegularizedKernelSolution<InputT>::estimateRisk, "maxCond"_a);
+    cls.def("getM", &RegularizedKernelSolution<InputT>::getM);
 }
 
 /**
@@ -157,7 +158,7 @@ void declareRegularizedKernelSolution(py::module &mod, std::string const &suffix
  */
 void declareSpatialKernelSolution(py::module &mod) {
     py::class_<SpatialKernelSolution, std::shared_ptr<SpatialKernelSolution>, KernelSolution> cls(
-        mod, "SpatialKernelSolution");
+            mod, "SpatialKernelSolution");
 
     cls.def(py::init<lsst::afw::math::KernelList const &, lsst::afw::math::Kernel::SpatialFunctionPtr,
                      lsst::afw::math::Kernel::SpatialFunctionPtr, pex::policy::Policy>(),
