@@ -79,10 +79,12 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     # Create the dipole, offset by fracOffset of the Psf FWHM (pixels)
     offset = fracOffset * psfFwhmPix // 2
     array = image.getImage().getArray()
-    xp, yp = xc - psfw//2 + offset, yc - psfh//2 + offset
+    xp = int(xc - psfw//2 + offset)
+    yp = int(yc - psfh//2 + offset)
     array[yp:yp+psfh, xp:xp+psfw] += psfim.getArray()
 
-    xn, yn = xc - psfw//2 - offset, yc - psfh//2 - offset
+    xn = int(xc - psfw//2 - offset)
+    yn = int(yc - psfh//2 - offset)
     array[yn:yn+psfh, xn:xn+psfw] -= psfim.getArray()
 
     if display:
