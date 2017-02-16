@@ -44,41 +44,41 @@ class ImageGridderConfig(pexConfig.Config):
     """
 
     gridSizeX = pexConfig.Field(
-        dtype = int,
-        doc = """Pixel dimensions of each grid in x direction""",
-        default = 10
+        dtype = float,
+        doc = """Pixel dimensions of each grid cell in x direction""",
+        default = 10.
     )
 
     gridSizeY = pexConfig.Field(
-        dtype = int,
-        doc = """Pixel dimensions of each grid in y direction""",
-        default = 10
+        dtype = float,
+        doc = """Pixel dimensions of each grid cell in y direction""",
+        default = 10.
     )
 
     gridStepX = pexConfig.Field(
-        dtype = int,
-        doc = """Spacing between subsequent grids in x direction. If equal to gridSizeX, then
+        dtype = float,
+        doc = """Spacing between subsequent grid cells in x direction. If equal to gridSizeX, then
                there is no overlap in the x direction.""",
-        default = 10
+        default = 10.
     )
 
     gridStepY = pexConfig.Field(
-        dtype = int,
-        doc = """Spacing between subsequent grids in y direction. If equal to gridSizeY, then
+        dtype = float,
+        doc = """Spacing between subsequent grid cells in y direction. If equal to gridSizeY, then
                there is no overlap in the y direction.""",
-        default = 10
+        default = 10.
     )
 
     borderSizeX = pexConfig.Field(
-        dtype = int,
-        doc = """Pixel dimensions of border in +/- x direction""",
-        default = 5
+        dtype = float,
+        doc = """Pixel dimensions of cell border in +/- x direction""",
+        default = 5.
     )
 
     borderSizeY = pexConfig.Field(
-        dtype = int,
-        doc = """Pixel dimensions of border in +/- y direction""",
-        default = 5
+        dtype = float,
+        doc = """Pixel dimensions of cell border in +/- y direction""",
+        default = 5.
     )
 
     rejiggerGridOption = pexConfig.Field(
@@ -90,7 +90,7 @@ class ImageGridderConfig(pexConfig.Config):
 
     scaleByFwhm = pexConfig.Field(
         dtype = bool,
-        doc = "Scale gridSize/borderSize/overlapSize by PSF FWHM?",
+        doc = "Scale gridSize/gridStep/borderSize/overlapSize by PSF FWHM?",
         default = True
     )
 
@@ -197,7 +197,8 @@ class ImageGridderTask(pipeBase.Task):
 
         Return an image or exposure of the same dimensions as `subImage`.
         Can use `expandedSubImage`, an expanded region of the original exposure,
-        to perform computations.
+        to perform computations. *This is the method that subclassess will want
+        to override.*
 
         @param[in] subImage the sub-image of `exposure` upon which to operate
         @param[in] expandedSubImage the expanded sub-image of `exposure` upon which to operate
@@ -244,6 +245,8 @@ class ImageGridderTask(pipeBase.Task):
 
         @notes Current known issues:
         1. This currently will not correctly handle overlapping patches.
+           It will work, but it currently does not average the pixels in the
+           overlaps.
         2. This currently does not correctly handle varying PSFs (in fact,
            it just copies over the PSF from the original exposure)
         3. This logic currently makes *two* copies of the original exposure
