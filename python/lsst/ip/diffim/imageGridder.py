@@ -38,9 +38,9 @@ __all__ = ("ImageGridderTask", "ImageGridderConfig")
 
 class ExampleImageGridSubtaskConfig(pexConfig.Config):
     """!
-    \anchor ImageGridderConfig_
+    \anchor ExampleImageGridSubtaskConfig_
 
-    \brief Configuration parameters for the ImageGridderTask
+    \brief Configuration parameters for the ExampleImageGridSubtask
     """
     addAmount = pexConfig.Field(
         dtype=float,
@@ -50,7 +50,7 @@ class ExampleImageGridSubtaskConfig(pexConfig.Config):
 
 class ExampleImageGridSubtask(pipeBase.Task):
     ConfigClass = ExampleImageGridSubtaskConfig
-    _defaultName = "exampleImageGridSubtask"
+    _defaultName = "ip_diffim_ExampleImageGridSubtask"
 
     def __init__(self, *args, **kwargs):
         """! Create the image gridding subTask
@@ -59,22 +59,17 @@ class ExampleImageGridSubtask(pipeBase.Task):
         """
         pipeBase.Task.__init__(self, *args, **kwargs)
 
-    def run(self, subImage, expandedSubImage, fullBBox, **kwargs):
-        """! Perform an operation on the given subImage.
+    def run(self, subExp, expandedSubExp, fullBBox, **kwargs):
+        """! Add `addAmount` to given subExposure.
 
-        Return an image or exposure of the same dimensions as `subImage`.
-        Can use `expandedSubImage`, an expanded region of the original exposure,
-        to perform computations. *This is the method that subclassess will want
-        to override.*
-
-        @param[in] subImage the sub-image of `exposure` upon which to operate
-        @param[in] expandedSubImage the expanded sub-image of `exposure` upon which to operate
+        @param[in] subExp the sub-exposure of `exposure` upon which to operate
+        @param[in] expandedSubExp the expanded sub-exposure of `exposure` upon which to operate
         @param[in] fullBBox the bounding box of the original exposure
-        @return a `afw.Image` or `afw.Exposure`
+        @return a `afw.Exp` or `afw.Exposure`
         """
-        img = subImage.getImage()
+        img = subExp.getMaskedImage()
         img += self.config.addAmount
-        return subImage
+        return subExp
 
 
 class ImageGridderConfig(pexConfig.Config):
@@ -138,6 +133,17 @@ class ImageGridderConfig(pexConfig.Config):
         dtype=bool,
         doc="Scale gridSize/gridStep/borderSize/overlapSize by PSF FWHM?",
         default=True
+    )
+
+    reduceOperation = pexConfig.ChoiceField(
+        dtype=str,
+        doc="""Operation to use for combining subimages into new image.""",
+        default="copy",
+        allowed={
+            "copy": "copy pixels directly from subimage (non-deterministic for overlaps)",
+            "sum": "add pixels from overlaps (probably never wanted; used for testing)",
+            "average": "average pixels from overlaps"
+        }
     )
 
     ignoreMaskPlanes = pexConfig.ListField(
@@ -239,21 +245,20 @@ class ImageGridderTask(pipeBase.Task):
         return newMI
 
     @pipeBase.timeMethod
-    def runSubtask(self, subImage, expandedSubImage, fullBBox, **kwargs):
-        """! Run subtask to perform an operation on the given subImage.
+    def runSubtask(self, subExp, expandedSubExp, fullBBox, **kwargs):
+        """! Run subtask to perform an operation on the given subExposure.
 
-        Return an image or exposure of the same dimensions as `subImage`.
-        Can use `expandedSubImage`, an expanded region of the original exposure,
-        to perform computations. *This is the method that subclassess will want
-        to override.*
+        Return an exposure of the same dimensions as `subExp`.
+        Can use `expandedSubExp`, an expanded region of the original exposure,
+        to perform computations.
 
-        @param[in] subImage the sub-image of `exposure` upon which to operate
-        @param[in] expandedSubImage the expanded sub-image of `exposure` upon which to operate
+        @param[in] subExp the sub-exposure of `exposure` upon which to operate
+        @param[in] expandedSubExp the expanded sub-exposure of `exposure` upon which to operate
         @param[in] fullBBox the bounding box of the original exposure
         @return a `afw.Image` or `afw.Exposure`
         """
-        subImage = self.gridSubtask.run(subImage, expandedSubImage, fullBBox, **kwargs)
-        return subImage
+        subExp = self.gridSubtask.run(subExp, expandedSubExp, fullBBox, **kwargs)
+        return subExp
 
     def _makePatches(self, exposure, **kwargs):
         """! Perform `runSubImage` on each patch
@@ -268,44 +273,59 @@ class ImageGridderTask(pipeBase.Task):
         if len(boxes0) != len(boxes1):
             raise Exception('Uh oh!')   # TBD: define a specific exception to raise
 
-        mi = exposure.getMaskedImage()
+        #mi = exposure.getMaskedImage()
         patches = []
         for i in range(len(boxes0)):
             self.log.info("Processing on box: %s" % str(boxes0[i]))
-            subImage = afwImage.MaskedImageF(mi, boxes0[i]).clone()
-            expandedSubImage = afwImage.MaskedImageF(mi, boxes1[i]).clone()
-            result = self.runSubtask(subImage, expandedSubImage, exposure.getBBox(), **kwargs)
+            subExp = afwImage.ExposureF(exposure, boxes0[i]).clone()
+            expandedSubExp = afwImage.ExposureF(exposure, boxes1[i]).clone()
+            result = self.runSubtask(subExp, expandedSubExp, exposure.getBBox(), **kwargs)
             patches.append(result)
 
         return patches
 
     def _reduceImage(self, patches, exposure, **kwargs):
-        """! Reduce a set of image patches into a final image
+        """! Reduce a set of exposure patches into a final image
 
-        Return an image or exposure of the same dimensions as `exposure`.
+        Return an exposure of the same dimensions as `exposure`.
         `patches` is expected to have been produced by `makePatches`.
 
-        @param[in] patches list of subImages of `exposure` to merge
+        @param[in] patches list of subExposures of `exposure` to merge
         @param[in] exposure the original exposure which is used as the template
         @return a `afw.Image` or `afw.Exposure`
 
-        @notes Current known issues:
-        1. This currently will not correctly handle overlapping patches.
-           It will work, but it currently does not average the pixels in the
-           overlaps.
+        @notes Notes and currently known issues:
+        1. This currently *should* correctly handle overlapping patches.
+           For overlapping patches, use `config.reduceOperation='average'.
         2. This currently does not correctly handle varying PSFs (in fact,
            it just copies over the PSF from the original exposure)
         3. This logic currently makes *two* copies of the original exposure
-           (one here and one in `_makePatches`)
+           (one here and one in `_makePatches`). It is also slow.
         """
         newExp = afwImage.ExposureF(exposure).clone()
         newMI = newExp.getMaskedImage()
-        #  TEST (make sure we are actually setting pixels in the new image):
-        newMI.getImage().getArray()[:, :] = 100.
-        #  END TEST
+        newMI.getImage()[:, :] = 0.
+        newMI.getVariance()[:, :] = 0.
+
+        reduceOp = self.config.reduceOperation
+        if reduceOp == 'average':  # make an array to keep track of weights
+            weights = afwImage.ImageF(newMI.getBBox())  # Needs to be a float to divide later.
+
         for patch in patches:
-            subim = afwImage.MaskedImageF(newMI, patch.getBBox())
-            subim.getImage()[:, :] = patch.getImage()[:, :]
+            subExp = afwImage.ExposureF(newExp, patch.getBBox())
+            subMI = subExp.getMaskedImage()
+            patchMI = patch.getMaskedImage()
+            if reduceOp == 'copy':
+                subMI[:, :] = patchMI
+            elif reduceOp == 'sum':
+                subMI += patchMI
+            elif reduceOp == 'average':
+                subMI += patchMI
+                wsubim = afwImage.ImageF(weights, patch.getBBox())
+                wsubim += 1.
+
+        if reduceOp == 'average':
+            newMI /= weights
         return newExp
 
     def _generateGrid(self, exposure):
