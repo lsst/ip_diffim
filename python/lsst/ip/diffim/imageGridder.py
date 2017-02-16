@@ -24,7 +24,7 @@ standard_library.install_aliases()
 #
 
 import numpy as np
-import scipy.fftpack
+#import scipy.fftpack
 
 import lsst.afw.image as afwImage
 import lsst.meas.algorithms as measAlg
@@ -36,6 +36,47 @@ import lsst.pipe.base as pipeBase
 __all__ = ("ImageGridderTask", "ImageGridderConfig")
 
 
+class ExampleImageGridSubtaskConfig(pexConfig.Config):
+    """!
+    \anchor ImageGridderConfig_
+
+    \brief Configuration parameters for the ImageGridderTask
+    """
+    addAmount = pexConfig.Field(
+        dtype=float,
+        doc="""Amount to add to image""",
+        default=10.
+    )
+
+class ExampleImageGridSubtask(pipeBase.Task):
+    ConfigClass = ExampleImageGridSubtaskConfig
+    _defaultName = "exampleImageGridSubtask"
+
+    def __init__(self, *args, **kwargs):
+        """! Create the image gridding subTask
+        @param *args arguments to be passed to lsst.pipe.base.task.Task.__init__
+        @param **kwargs keyword arguments to be passed to lsst.pipe.base.task.Task.__init__
+        """
+        pipeBase.Task.__init__(self, *args, **kwargs)
+
+    def run(self, subImage, expandedSubImage, fullBBox, **kwargs):
+        """! Perform an operation on the given subImage.
+
+        Return an image or exposure of the same dimensions as `subImage`.
+        Can use `expandedSubImage`, an expanded region of the original exposure,
+        to perform computations. *This is the method that subclassess will want
+        to override.*
+
+        @param[in] subImage the sub-image of `exposure` upon which to operate
+        @param[in] expandedSubImage the expanded sub-image of `exposure` upon which to operate
+        @param[in] fullBBox the bounding box of the original exposure
+        @return a `afw.Image` or `afw.Exposure`
+        """
+        img = subImage.getImage()
+        img += self.config.addAmount
+        return subImage
+
+
 class ImageGridderConfig(pexConfig.Config):
     """!
     \anchor ImageGridderConfig_
@@ -43,55 +84,60 @@ class ImageGridderConfig(pexConfig.Config):
     \brief Configuration parameters for the ImageGridderTask
     """
 
+    gridSubtask = pexConfig.ConfigurableField(
+        doc="Subtask to run on each subimage",
+        target=ExampleImageGridSubtask,
+    )
+
     gridSizeX = pexConfig.Field(
-        dtype = float,
-        doc = """Pixel dimensions of each grid cell in x direction""",
-        default = 10.
+        dtype=float,
+        doc="""Pixel dimensions of each grid cell in x direction""",
+        default=10.
     )
 
     gridSizeY = pexConfig.Field(
-        dtype = float,
-        doc = """Pixel dimensions of each grid cell in y direction""",
-        default = 10.
+        dtype=float,
+        doc="""Pixel dimensions of each grid cell in y direction""",
+        default=10.
     )
 
     gridStepX = pexConfig.Field(
-        dtype = float,
-        doc = """Spacing between subsequent grid cells in x direction. If equal to gridSizeX, then
+        dtype=float,
+        doc="""Spacing between subsequent grid cells in x direction. If equal to gridSizeX, then
                there is no overlap in the x direction.""",
-        default = 10.
+        default=10.
     )
 
     gridStepY = pexConfig.Field(
-        dtype = float,
-        doc = """Spacing between subsequent grid cells in y direction. If equal to gridSizeY, then
+        dtype=float,
+        doc="""Spacing between subsequent grid cells in y direction. If equal to gridSizeY, then
                there is no overlap in the y direction.""",
-        default = 10.
+        default=10.
     )
 
     borderSizeX = pexConfig.Field(
-        dtype = float,
-        doc = """Pixel dimensions of cell border in +/- x direction""",
-        default = 5.
+        dtype=float,
+        doc="""Pixel dimensions of cell border in +/- x direction""",
+        default=5.
     )
 
     borderSizeY = pexConfig.Field(
-        dtype = float,
-        doc = """Pixel dimensions of cell border in +/- y direction""",
-        default = 5.
+        dtype=float,
+        doc="""Pixel dimensions of cell border in +/- y direction""",
+        default=5.
     )
 
     rejiggerGridOption = pexConfig.Field(
-        dtype = str,
-        doc = """Adjust grid to fit in image by either modifying the 'spacing' (allowing overlaps),
+        dtype=str,
+        doc="""Adjust grid to fit in image by either modifying the 'spacing' (allowing overlaps),
                  or the 'size' of the grids""",
-        default = 'spacing'
+        default='spacing'
     )
 
     scaleByFwhm = pexConfig.Field(
-        dtype = bool,
-        doc = "Scale gridSize/gridStep/borderSize/overlapSize by PSF FWHM?",
-        default = True
+        dtype=bool,
+        doc="Scale gridSize/gridStep/borderSize/overlapSize by PSF FWHM?",
+        default=True
     )
 
     ignoreMaskPlanes = pexConfig.ListField(
@@ -165,6 +211,7 @@ class ImageGridderTask(pipeBase.Task):
         """
         pipeBase.Task.__init__(self, *args, **kwargs)
 
+        self.makeSubtask("gridSubtask")
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
@@ -192,8 +239,8 @@ class ImageGridderTask(pipeBase.Task):
         return newMI
 
     @pipeBase.timeMethod
-    def runSubImage(self, subImage, expandedSubImage, fullBBox, **kwargs):
-        """! Perform an operation on the given subImage.
+    def runSubtask(self, subImage, expandedSubImage, fullBBox, **kwargs):
+        """! Run subtask to perform an operation on the given subImage.
 
         Return an image or exposure of the same dimensions as `subImage`.
         Can use `expandedSubImage`, an expanded region of the original exposure,
@@ -205,8 +252,7 @@ class ImageGridderTask(pipeBase.Task):
         @param[in] fullBBox the bounding box of the original exposure
         @return a `afw.Image` or `afw.Exposure`
         """
-        img = subImage.getImage()
-        img += 100.
+        subImage = self.gridSubtask.run(subImage, expandedSubImage, fullBBox, **kwargs)
         return subImage
 
     def _makePatches(self, exposure, **kwargs):
@@ -228,7 +274,7 @@ class ImageGridderTask(pipeBase.Task):
             self.log.info("Processing on box: %s" % str(boxes0[i]))
             subImage = afwImage.MaskedImageF(mi, boxes0[i]).clone()
             expandedSubImage = afwImage.MaskedImageF(mi, boxes1[i]).clone()
-            result = self.runSubImage(subImage, expandedSubImage, exposure.getBBox(), **kwargs)
+            result = self.runSubtask(subImage, expandedSubImage, exposure.getBBox(), **kwargs)
             patches.append(result)
 
         return patches
