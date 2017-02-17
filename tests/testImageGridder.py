@@ -24,17 +24,10 @@ from past.builtins import basestring
 
 import unittest
 
-#import numpy as np
-
 import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.pex.config as pexConfig
 import lsst.meas.algorithms as measAlg
-#import lsst.pipe.base as pipeBase
-#import lsst.afw.geom as afwGeom
-#import lsst.afw.math as afwMath
-#import lsst.meas.algorithms as measAlg
-
 from lsst.ip.diffim.imageGridder import (ImageGridderTask, ImageGridderConfig,
                                          ImageGridSubtask, ImageGridSubtaskConfig)
 
@@ -86,11 +79,11 @@ class TestImageGridderConfig(ImageGridderConfig):
 
     \brief Configuration parameters for the TestImageGridderTask
     """
-
     gridSubtask = pexConfig.ConfigurableField(
         doc="Subtask to run on each subimage",
         target=TestImageGridSubtask,
     )
+
 
 class ImageGridderTest(lsst.utils.tests.TestCase):
     """!A test case for the image gridded processing task

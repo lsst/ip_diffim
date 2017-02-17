@@ -31,7 +31,8 @@ import lsst.afw.geom as afwGeom
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 
-__all__ = ("ImageGridderTask", "ImageGridderConfig")
+__all__ = ("ImageGridderTask", "ImageGridderConfig",
+           "ImageGridSubtask", "ImageGridSubtaskConfig")
 
 
 class ImageGridSubtaskConfig(pexConfig.Config):
@@ -40,40 +41,39 @@ class ImageGridSubtaskConfig(pexConfig.Config):
 
     \brief Configuration parameters for the ImageGridSubtask
     """
-    addAmount = pexConfig.Field(
-        dtype=float,
-        doc="""Amount to add to image""",
-        default=10.
-    )
+    pass
 
 class ImageGridSubtask(pipeBase.Task):
     """!
     \anchor ImageGridSubtask_
 
-    \brief Base class for any task that is to be passed as `ImageGridderConfig.gridSubtask`
+    \brief Simple example and base class for any task that is to be
+    used as `ImageGridderConfig.gridSubtask`
+
     """
     ConfigClass = ImageGridSubtaskConfig
     _DefaultName = "ip_diffim_ImageGridSubtask"
 
     def __init__(self, *args, **kwargs):
         """! Create the image gridding subTask
-        @param *args arguments to be passed to lsst.pipe.base.task.Task.__init__
-        @param **kwargs keyword arguments to be passed to lsst.pipe.base.task.Task.__init__
+        @param *args arguments to be passed to
+        lsst.pipe.base.task.Task.__init__
+        @param **kwargs keyword arguments to be passed to
+        lsst.pipe.base.task.Task.__init__
         """
         pipeBase.Task.__init__(self, *args, **kwargs)
 
     def run(self, subExp, expandedSubExp, fullBBox, **kwargs):
-        """! Add `addAmount` to given subExposure.
+        """! Perform operation on given sub-xposure
 
-        @param[in] subExp the sub-exposure of `exposure` upon which to operate
-        @param[in] expandedSubExp the expanded sub-exposure of `exposure` upon which to operate
+        @param[in] subExp the sub-exposure upon which to
+        operate
+        @param[in] expandedSubExp the expanded sub-exposure
+        upon which to operate
         @param[in] fullBBox the bounding box of the original exposure
-        @return a `afw.Exp` or `afw.Exposure`
+        @return a `afw.Exposure`
         """
-        subExp = subExp.clone()
-        img = subExp.getMaskedImage()
-        img += self.config.addAmount
-        return subExp
+        pass
 
 
 class ImageGridderConfig(pexConfig.Config):
@@ -102,15 +102,15 @@ class ImageGridderConfig(pexConfig.Config):
 
     gridStepX = pexConfig.Field(
         dtype=float,
-        doc="""Spacing between subsequent grid cells in x direction. If equal to gridSizeX, then
-               there is no overlap in the x direction.""",
+        doc="""Spacing between subsequent grid cells in x direction. If equal to
+               gridSizeX, then there is no overlap in the x direction.""",
         default=10.
     )
 
     gridStepY = pexConfig.Field(
         dtype=float,
-        doc="""Spacing between subsequent grid cells in y direction. If equal to gridSizeY, then
-               there is no overlap in the y direction.""",
+        doc="""Spacing between subsequent grid cells in y direction. If equal to
+               gridSizeY, then there is no overlap in the y direction.""",
         default=10.
     )
 
@@ -128,8 +128,9 @@ class ImageGridderConfig(pexConfig.Config):
 
     rejiggerGridOption = pexConfig.Field(
         dtype=str,
-        doc="""Adjust grid to fit in image by either modifying the 'spacing' (allowing overlaps),
-                 or the 'size' of the grids""",
+        doc="""Adjust grid to fit in image by either modifying the 'spacing'
+               (allowing overlaps), or the 'size' of the grids, or 'none' if
+               not at all""",
         default='spacing'
     )
 
@@ -161,7 +162,7 @@ class ImageGridderConfig(pexConfig.Config):
 ## \{
 ## \page ImageGridderTask
 ## \ref ImageGridderTask_ "ImageGridderTask"
-##      Task for performing operations on an image over a specified grid
+##      Task for performing operations on an image over a regular-spaced grid
 ## \}
 
 
@@ -169,7 +170,7 @@ class ImageGridderTask(pipeBase.Task):
     """!
     \anchor ImageGridderTask_
 
-    \brief Break an image task in to subimages on a grid and perform
+    \brief Break an image in to subimages on a grid and perform
     the same operation on each.
 
     \section ip_diffim_imageGridder_ImageGridderTask_Contents Contents
@@ -187,7 +188,7 @@ class ImageGridderTask(pipeBase.Task):
     stitched back together into a new, full-sized modified image.
 
     The actual operation is performed by a subTask passed to the
-    config.  The input exposure will be pre-subimaged, but the `run`
+    config. The input exposure will be pre-subimaged, but the `run`
     method of the subtask will also have access to the entire
     (original) image.
 
@@ -209,17 +210,19 @@ class ImageGridderTask(pipeBase.Task):
 
     \section ip_diffim_imageGridder_ImageGridderTask_Example	Example of using ImageGridderTask
 
-    As it is a base class, this task has no standalone example, however its unit test
-    \link tests/testImageGridder testImageGridder\endlink implements a basic subclass for testing.
-
+    This task has an example simple implementation of the use of
+    ImageGridSubtask/Config in its unit test
+    \link tests/testImageGridder testImageGridder\endlink.
     """
     ConfigClass = ImageGridderConfig
     _DefaultName = "ip_diffim_imageGridder"
 
     def __init__(self, *args, **kwargs):
         """! Create the image gridding Task
-        @param *args arguments to be passed to lsst.pipe.base.task.Task.__init__
-        @param **kwargs keyword arguments to be passed to lsst.pipe.base.task.Task.__init__
+        @param *args arguments to be passed to
+        lsst.pipe.base.task.Task.__init__
+        @param **kwargs keyword arguments to be passed to
+        lsst.pipe.base.task.Task.__init__
         """
         pipeBase.Task.__init__(self, *args, **kwargs)
 
@@ -233,13 +236,15 @@ class ImageGridderTask(pipeBase.Task):
     def run(self, exposure, returnPatches=False, **kwargs):
         """! Perform an operation on the given exposure.
 
-        Break the exposure into sub-exps on a grid (parameters given by `ImageGridderConfig`)
-        and perform `runSubtask` on each. Stitch together the resulting sub-exps generated by
-        (or modified by) `runSubtask` into a final exposure of the same dimensions as the
-        input `exposure`.
+        Break the exposure into sub-exps on a grid (parameters given
+        by `ImageGridderConfig`) and perform `runSubtask` on
+        each. Stitch together the resulting sub-exps generated by (or
+        modified by) `runSubtask` into a final exposure of the same
+        dimensions as the input `exposure`.
 
         @param[in] exposure the full exposure to process
         @return a `afw.Exposure`
+
         """
         self.log.info("Processing.")
 
@@ -284,7 +289,7 @@ class ImageGridderTask(pipeBase.Task):
         self.log.info("Processing %d sub-exposures" % len(boxes0))
         patches = []
         for i in range(len(boxes0)):
-            #self.log.info("Processing on box: %s" % str(boxes0[i]))  # Wow! log.info() is slow!
+            # self.log.info("Processing on box: %s" % str(boxes0[i]))  # Wow! log.info() is slow!
             subExp = afwImage.ExposureF(exposure, boxes0[i])  #.clone()
             expandedSubExp = afwImage.ExposureF(exposure, boxes1[i])  #.clone()
             result = self.runSubtask(subExp, expandedSubExp, exposure.getBBox(), **kwargs)
@@ -339,15 +344,20 @@ class ImageGridderTask(pipeBase.Task):
     def _generateGrid(self, exposure):
         """! Generate two lists of bounding boxes that evenly grid `exposure`
 
-        Grid (subimage) centers will be spaced by gridStepX/Y. Then the grid will be adjusted
-        as little as possible to evenly cover the input exposure (if rejiggerGridOption is True).
-        Then the bounding boxes will be expanded by borderSizeX/Y. The expanded bounding
-        boxes will be adjusted to ensure that they intersect the exposure's bounding box.
-        The resulting lists of bounding boxes and corresponding expanded bounding boxes will
-        be returned, and also set to `self.boxes0`, `self.boxes1`.
+        Grid (subimage) centers will be spaced by gridStepX/Y. Then
+        the grid will be adjusted as little as possible to evenly
+        cover the input exposure (if rejiggerGridOption is not
+        'none').  Then the bounding boxes will be expanded by
+        borderSizeX/Y. The expanded bounding boxes will be adjusted to
+        ensure that they intersect the exposure's bounding box.  The
+        resulting lists of bounding boxes and corresponding expanded
+        bounding boxes will be returned, and also set to
+        `self.boxes0`, `self.boxes1`.
 
-        @param[in] exposure an `afwImage.Exposure` whose full bounding box is to be evenly gridded.
-        @return tuple containing two lists of `afwGeom.BoundingBox`es
+        @param[in] exposure an `afwImage.Exposure` whose full bounding
+        box is to be evenly gridded.  @return tuple containing two
+        lists of `afwGeom.BoundingBox`es
+
         """
         # Extract the config parameters for conciseness.
         gridSizeX = self.config.gridSizeX
@@ -360,7 +370,8 @@ class ImageGridderTask(pipeBase.Task):
         scaleByFwhm = self.config.scaleByFwhm
 
         if scaleByFwhm:
-            psfFwhm = exposure.getPsf().computeShape().getDeterminantRadius() * 2. * np.sqrt(2. * np.log(2.))
+            psfFwhm = (exposure.getPsf().computeShape().getDeterminantRadius() *
+                       2. * np.sqrt(2. * np.log(2.)))
 
             def rescaleValue(val):
                 return np.rint(val * psfFwhm).astype(int)
@@ -374,13 +385,13 @@ class ImageGridderTask(pipeBase.Task):
 
         bbox = exposure.getBBox()
         nGridX = bbox.getWidth() // gridStepX
-        if rejiggerGridOption:
+        if rejiggerGridOption == 'spacing':
             nGridX = bbox.getWidth() / gridStepX
             # Readjust gridStepX so that it fits perfectly in the image.
             gridStepX = float(bbox.getWidth() - gridSizeX) / float(nGridX)
 
         nGridY = bbox.getWidth() // gridStepY
-        if rejiggerGridOption:
+        if rejiggerGridOption == 'spacing':
             nGridY = bbox.getWidth() / gridStepY
             # Readjust gridStepY so that it fits perfectly in the image.
             gridStepY = float(bbox.getHeight() - gridSizeY) / float(nGridY)
@@ -467,9 +478,11 @@ class ImageGridderTask(pipeBase.Task):
     def _computePsf(self, subImage):
         """! Utility function: compute Psf at center of subImage.
 
-        TBD: is this computing the Psf at the center of the subimage (i.e. center of its bounding box)?
+        TBD: is this computing the Psf at the center of the subimage
+        (i.e. center of its bounding box)?
 
         @param[in] subImage the sub-image of `exposure` upon which to operate
         @return 2d numpy.array of Psf for calculations.
+
         """
         return subImage.getPsf().computeImage().getArray()
