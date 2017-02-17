@@ -24,10 +24,8 @@ standard_library.install_aliases()
 #
 
 import numpy as np
-#import scipy.fftpack
 
 import lsst.afw.image as afwImage
-import lsst.meas.algorithms as measAlg
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.pex.config as pexConfig
@@ -36,11 +34,11 @@ import lsst.pipe.base as pipeBase
 __all__ = ("ImageGridderTask", "ImageGridderConfig")
 
 
-class ExampleImageGridSubtaskConfig(pexConfig.Config):
+class ImageGridSubtaskConfig(pexConfig.Config):
     """!
-    \anchor ExampleImageGridSubtaskConfig_
+    \anchor ImageGridSubtaskConfig_
 
-    \brief Configuration parameters for the ExampleImageGridSubtask
+    \brief Configuration parameters for the ImageGridSubtask
     """
     addAmount = pexConfig.Field(
         dtype=float,
@@ -48,9 +46,14 @@ class ExampleImageGridSubtaskConfig(pexConfig.Config):
         default=10.
     )
 
-class ExampleImageGridSubtask(pipeBase.Task):
-    ConfigClass = ExampleImageGridSubtaskConfig
-    _defaultName = "ip_diffim_ExampleImageGridSubtask"
+class ImageGridSubtask(pipeBase.Task):
+    """!
+    \anchor ImageGridSubtask_
+
+    \brief Base class for any task that is to be passed as `ImageGridderConfig.gridSubtask`
+    """
+    ConfigClass = ImageGridSubtaskConfig
+    _DefaultName = "ip_diffim_ImageGridSubtask"
 
     def __init__(self, *args, **kwargs):
         """! Create the image gridding subTask
@@ -82,7 +85,7 @@ class ImageGridderConfig(pexConfig.Config):
 
     gridSubtask = pexConfig.ConfigurableField(
         doc="Subtask to run on each subimage",
-        target=ExampleImageGridSubtask,
+        target=ImageGridSubtask,
     )
 
     gridSizeX = pexConfig.Field(
@@ -166,7 +169,8 @@ class ImageGridderTask(pipeBase.Task):
     """!
     \anchor ImageGridderTask_
 
-    \brief Break an image task in to subimages on a grid and perform the same operation on each.
+    \brief Break an image task in to subimages on a grid and perform
+    the same operation on each.
 
     \section ip_diffim_imageGridder_ImageGridderTask_Contents Contents
 
@@ -178,13 +182,14 @@ class ImageGridderTask(pipeBase.Task):
 
     \section ip_diffim_imageGridder_ImageGridderTask_Purpose	Description
 
-    Abstract super-task (run method not implemented) that enables a subclassed task
-    to perform 'simple' operations on each subimage of a larger image, and then have
-    those subimages stitched back together into a new, full-sized modified image.
+    Task that can perform 'simple' operations on a gridded set of
+    subimages of a larger image, and then have those subimages
+    stitched back together into a new, full-sized modified image.
 
-    A subclass task will override the run method to perform operations on a passed image
-    or exposure. This passed exposure will be pre-subimaged, but the function will also
-    have access to the entire (original) image.
+    The actual operation is performed by a subTask passed to the
+    config.  The input exposure will be pre-subimaged, but the `run`
+    method of the subtask will also have access to the entire
+    (original) image.
 
     \section ip_diffim_imageGridder_ImageGridderTask_Initialize       Task initialization
 
@@ -279,7 +284,7 @@ class ImageGridderTask(pipeBase.Task):
         self.log.info("Processing %d sub-exposures" % len(boxes0))
         patches = []
         for i in range(len(boxes0)):
-            #self.log.info("Processing on box: %s" % str(boxes0[i]))  # Wow! this is slow!
+            #self.log.info("Processing on box: %s" % str(boxes0[i]))  # Wow! log.info() is slow!
             subExp = afwImage.ExposureF(exposure, boxes0[i])  #.clone()
             expandedSubExp = afwImage.ExposureF(exposure, boxes1[i])  #.clone()
             result = self.runSubtask(subExp, expandedSubExp, exposure.getBBox(), **kwargs)
@@ -303,7 +308,7 @@ class ImageGridderTask(pipeBase.Task):
         2. This currently does not correctly handle varying PSFs (in fact,
            it just copies over the PSF from the original exposure)
         3. This logic currently makes *two* copies of the original exposure
-           (one here and one in `_makePatches`). It is also slow.
+           (one here and one in `gridSubtask.run()`).
         """
         newExp = afwImage.ExposureF(exposure).clone()
         newMI = newExp.getMaskedImage()

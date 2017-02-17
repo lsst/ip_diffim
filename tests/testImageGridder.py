@@ -1,0 +1,151 @@
+from __future__ import absolute_import, division, print_function
+from builtins import range
+from past.builtins import basestring
+#
+# LSST Data Management System
+# Copyright 2016 AURA/LSST.
+#
+# This product includes software developed by the
+# LSST Project (http://www.lsst.org/).
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
+# see <https://www.lsstcorp.org/LegalNotices/>.
+
+import unittest
+
+#import numpy as np
+
+import lsst.utils.tests
+import lsst.afw.image as afwImage
+import lsst.pex.config as pexConfig
+import lsst.meas.algorithms as measAlg
+#import lsst.pipe.base as pipeBase
+#import lsst.afw.geom as afwGeom
+#import lsst.afw.math as afwMath
+#import lsst.meas.algorithms as measAlg
+
+from lsst.ip.diffim.imageGridder import (ImageGridderTask, ImageGridderConfig,
+                                         ImageGridSubtask, ImageGridSubtaskConfig)
+
+
+def setup_module(module):
+    lsst.utils.tests.init()
+
+
+class TestImageGridSubtaskConfig(ImageGridSubtaskConfig):
+    """!
+    \anchor TestImageGridSubtaskConfig_
+
+    \brief Configuration parameters for the TestImageGridSubtask
+    """
+    addAmount = pexConfig.Field(
+        dtype=float,
+        doc="""Amount to add to image""",
+        default=10.
+    )
+
+class TestImageGridSubtask(ImageGridSubtask):
+    ConfigClass = TestImageGridSubtaskConfig
+    _DefaultName = "ip_diffim_TestImageGridSubtask"
+
+    def __init__(self, *args, **kwargs):
+        """! Create the image gridding subTask
+        @param *args arguments to be passed to lsst.pipe.base.task.Task.__init__
+        @param **kwargs keyword arguments to be passed to lsst.pipe.base.task.Task.__init__
+        """
+        ImageGridSubtask.__init__(self, *args, **kwargs)
+
+    def run(self, subExp, expandedSubExp, fullBBox, **kwargs):
+        """! Add `addAmount` to given subExposure.
+
+        @param[in] subExp the sub-exposure of `exposure` upon which to operate
+        @param[in] expandedSubExp the expanded sub-exposure of `exposure` upon which to operate
+        @param[in] fullBBox the bounding box of the original exposure
+        @return a `afw.Exp` or `afw.Exposure`
+        """
+        subExp = subExp.clone()
+        img = subExp.getMaskedImage()
+        img += self.config.addAmount
+        return subExp
+
+
+class TestImageGridderConfig(ImageGridderConfig):
+    """!
+    \anchor TestImageGridderConfig_
+
+    \brief Configuration parameters for the TestImageGridderTask
+    """
+
+    gridSubtask = pexConfig.ConfigurableField(
+        doc="Subtask to run on each subimage",
+        target=TestImageGridSubtask,
+    )
+
+class ImageGridderTest(lsst.utils.tests.TestCase):
+    """!A test case for the image gridded processing task
+    """
+
+    def setUp(self):
+        self.exposure = afwImage.ExposureF(128, 128)
+        self.exposure.setPsf(measAlg.DoubleGaussianPsf(11, 11, 2.0, 3.7))
+        mi = self.exposure.getMaskedImage()
+        mi[:, :] = 0.
+
+    def tearDown(self):
+        del self.exposure
+
+    def testExampleTaskNoOverlaps(self):
+        """Test sample grid task that adds 5.0 to input image and uses
+        default 'copy' `reduceOperation`.
+        """
+        config = TestImageGridderConfig()
+        task = ImageGridderTask(config)
+        config.gridSubtask.addAmount = 5.
+        newExp = task.run(self.exposure)
+        newMI = newExp.getMaskedImage()
+        newArr = newMI.getImage().getArray()
+        mi = self.exposure.getMaskedImage()
+
+        self.assertClose(mi.getImage().getArray().mean(), newArr.mean() - 5.)
+        self.assertClose(newArr.mean(), 5.)
+        self.assertClose(newArr.min(), 5.)
+        self.assertClose(newArr.max(), 5.)
+
+    def testExampleTaskWithOverlaps(self):
+        """Test sample grid task that adds 5.0 to input image and uses
+        'average' `reduceOperation`.
+        """
+        config = TestImageGridderConfig()
+        config.gridStepX = config.gridStepY = 8
+        config.reduceOperation = 'average'
+        task = ImageGridderTask(config)
+        config.gridSubtask.addAmount = 5.
+        newExp = task.run(self.exposure)
+        newMI = newExp.getMaskedImage()
+        newArr = newMI.getImage().getArray()
+        mi = self.exposure.getMaskedImage()
+
+        self.assertClose(mi.getImage().getArray().mean(), newArr.mean() - 5.)
+        self.assertClose(newArr.mean(), 5.)
+        self.assertClose(newArr.min(), 5.)
+        self.assertClose(newArr.max(), 5.)
+
+
+class MemoryTester(lsst.utils.tests.MemoryTestCase):
+    pass
+
+
+if __name__ == "__main__":
+    lsst.utils.tests.init()
+    unittest.main()
