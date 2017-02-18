@@ -289,7 +289,7 @@ class ImageGridderTask(pipeBase.Task):
         self.log.info("Processing %d sub-exposures" % len(boxes0))
         patches = []
         for i in range(len(boxes0)):
-            # self.log.info("Processing on box: %s" % str(boxes0[i]))  # Wow! log.info() is slow!
+            #self.log.info("Processing on box: %s" % str(boxes0[i]))  # Wow! log.info() is slow???
             subExp = afwImage.ExposureF(exposure, boxes0[i])  #.clone()
             expandedSubExp = afwImage.ExposureF(exposure, boxes1[i])  #.clone()
             result = self.runSubtask(subExp, expandedSubExp, exposure.getBBox(), **kwargs)
@@ -341,7 +341,7 @@ class ImageGridderTask(pipeBase.Task):
             newMI /= weights
         return newExp
 
-    def _generateGrid(self, exposure):
+    def _generateGrid(self, exposure): #, forceEvenSized=True):
         """! Generate two lists of bounding boxes that evenly grid `exposure`
 
         Grid (subimage) centers will be spaced by gridStepX/Y. Then
@@ -355,8 +355,11 @@ class ImageGridderTask(pipeBase.Task):
         `self.boxes0`, `self.boxes1`.
 
         @param[in] exposure an `afwImage.Exposure` whose full bounding
-        box is to be evenly gridded.  @return tuple containing two
-        lists of `afwGeom.BoundingBox`es
+        box is to be evenly gridded.
+        @param[in] forceEvenSized force grid elements to have even x- and
+        y- dimensions (for ZOGY)
+
+        @return tuple containing two lists of `afwGeom.BoundingBox`es
 
         """
         # Extract the config parameters for conciseness.
@@ -413,6 +416,9 @@ class ImageGridderTask(pipeBase.Task):
             bb1 = afwGeom.Box2I(bbox1)
             bb1.shift(afwGeom.Extent2I(xoff, yoff))
             bb1.clip(bbox)
+            # if forceEvenSized:
+            #     bb0.grow(afwGeom.Extent2I(bb0.getWidth() % 2, bb0.getHeight() % 2))
+            #    bb1.grow(afwGeom.Extent2I(bb1.getWidth() % 2, bb1.getHeight() % 2))
             return bb0, bb1
 
         boxes0 = []
