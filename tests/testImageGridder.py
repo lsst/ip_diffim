@@ -98,6 +98,36 @@ class ImageGridderTest(lsst.utils.tests.TestCase):
     def tearDown(self):
         del self.exposure
 
+    def testGridValidity(self):
+        """!Test sample grids with various spacings and sizes and other options.
+
+        Try to see if we can break it.
+        """
+        config = TestImageGridderConfig()
+        config.reduceOperation = 'copy'
+        expectedVal = 1.
+        config.gridSubtask.addAmount = expectedVal
+
+        for scaleByFwhm in (False, True):
+            config.scaleByFwhm = scaleByFwhm
+            for gsx in range(51, 1, -10):
+                config.gridStepX = config.gridSizeX = gsx
+                for gsy in range(51, 1, -10):
+                    config.gridStepY = config.gridSizeY = gsy
+
+                    task = ImageGridderTask(config)
+                    boxes = task._generateGrid(self.exposure)
+                    if len(boxes[0]) > 1000:  # bypass to prevent slow testing
+                        continue
+                    newExp = task.run(self.exposure)
+                    newMI = newExp.getMaskedImage()
+                    newArr = newMI.getImage().getArray()
+                    mi = self.exposure.getMaskedImage()
+
+                    mn = newArr.mean()
+                    self.assertClose(mi.getImage().getArray().mean(), mn - expectedVal)
+                    self.assertClose(mn, expectedVal)
+
     def testExampleTaskNoOverlaps(self):
         """Test sample grid task that adds 5.0 to input image and uses
         default 'copy' `reduceOperation`.
