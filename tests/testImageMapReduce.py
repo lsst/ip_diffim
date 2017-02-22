@@ -30,7 +30,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.pex.config as pexConfig
 import lsst.meas.algorithms as measAlg
-from lsst.ip.diffim.imageGridder import (ImageMapReduceTask, ImageMapReduceConfig,
+from lsst.ip.diffim.imageMapReduce import (ImageMapReduceTask, ImageMapReduceConfig,
                                          ImageMapperSubtask, ImageMapperSubtaskConfig,
                                          ImageReducerSubtask, ImageReducerSubtaskConfig)
 
