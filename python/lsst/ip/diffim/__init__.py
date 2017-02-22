@@ -40,6 +40,7 @@ from .diaCatalogSourceSelector import *
 from lsst.meas.base import wrapSimpleAlgorithm
 from .dipoleFitTask import *
 from .imageDecorrelation import *
+from .imageMapReduce import *
 from .version import *
 
 # automatically register ip_diffim Algorithms
