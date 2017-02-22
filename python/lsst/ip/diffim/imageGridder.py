@@ -72,7 +72,7 @@ class ImageGridSubtask(pipeBase.Task):
         @param[in] expandedSubExp the expanded sub-exposure
         upon which to operate
         @param[in] fullBBox the bounding box of the original exposure
-        @return a `afw.Exposure`
+        @return anything, including an a `afw.Exposure`
         """
         pass
 
@@ -87,6 +87,22 @@ class ImageGridderConfig(pexConfig.Config):
     gridSubtask = pexConfig.ConfigurableField(
         doc="Subtask to run on each subimage",
         target=ImageGridSubtask,
+    )
+
+    # Separate gridCentroidsX and gridCentroidsY since pexConfig.ListField accepts limited dtypes
+    #  (i.e., no Point2D)
+    gridCentroidsX = pexConfig.ListField(
+        dtype=float,
+        doc="Input X centroids around which to place subimages. If None, use grid config options below.",
+        optional=True,
+        default=None
+    )
+
+    gridCentroidsY = pexConfig.ListField(
+        dtype=float,
+        doc="Input Y centroids around which to place subimages. If None, use grid config options below.",
+        optional=True,
+        default=None
     )
 
     gridSizeX = pexConfig.Field(
@@ -156,6 +172,8 @@ class ImageGridderConfig(pexConfig.Config):
         doc="""Operation to use for combining subimages into new image.""",
         default="copy",
         allowed={
+            "none": """simply return a list of values and not re-mapping results into
+                       a new image""",
             "copy": "copy pixels directly from subimage (non-deterministic for overlaps)",
             "sum": "add pixels from overlaps (probably never wanted; used for testing)",
             "average": "average pixels from overlaps"
@@ -254,7 +272,7 @@ class ImageGridderTask(pipeBase.Task):
         dimensions as the input `exposure`.
 
         @param[in] exposure the full exposure to process
-        @return a `afw.Exposure`
+        @return anything, including an `afw.Exposure`
 
         """
         self.log.info("Processing.")
@@ -330,6 +348,9 @@ class ImageGridderTask(pipeBase.Task):
         3. This logic currently makes *two* copies of the original exposure
            (one here and one in `gridSubtask.run()`).
         """
+        if self.config.reduceOperation == 'none':
+            return patches  # this is likely a non-image-type, such as a list of floats.
+
         newExp = afwImage.ExposureF(exposure).clone()
         newMI = newExp.getMaskedImage()
         newMI.getImage()[:, :] = 0.
@@ -375,8 +396,8 @@ class ImageGridderTask(pipeBase.Task):
         y- dimensions (for ZOGY)
 
         @return tuple containing two lists of `afwGeom.BoundingBox`es
-
         """
+
         # Extract the config parameters for conciseness.
         gridSizeX = self.config.gridSizeX
         gridSizeY = self.config.gridSizeY
@@ -435,6 +456,26 @@ class ImageGridderTask(pipeBase.Task):
         bbox1 = afwGeom.Box2I(bbox0)
         bbox1.grow(afwGeom.Extent2I(borderSizeX, borderSizeY))
 
+        self.boxes0 = []  # "main" boxes; store in task so can be extracted if needed
+        self.boxes1 = []  # "expanded" boxes
+
+        # use given centroids as centers for bounding boxes
+        if self.config.gridCentroidsX is not None and len(self.config.gridCentroidsX) > 0:
+            for i, centroidX in enumerate(self.config.gridCentroidsX):
+                centroidY = self.config.gridCentroidsY[i]
+                centroid = afwGeom.Point2D(centroidX, centroidY)
+                bb0 = afwGeom.Box2I(bbox0)
+                xoff = int(np.floor(centroid.getX())) - bb0.getWidth()//2
+                yoff = int(np.floor(centroid.getY())) - bb0.getHeight()//2
+                bb0.shift(afwGeom.Extent2I(xoff, yoff))
+                bb0.clip(bbox)
+                self.boxes0.append(bb0)
+                bb1 = afwGeom.Box2I(bbox1)
+                bb1.shift(afwGeom.Extent2I(xoff, yoff))
+                bb1.clip(bbox)
+                self.boxes1.append(bb1)
+            return self.boxes0, self.boxes1
+
         # Offset the "main" (bbox0) and "expanded" (bbox1) bboxes by xoff, yoff. Clip them by the
         # exposure's bbox.
         def offsetAndClipBoxes(bbox0, bbox1, xoff, yoff, bbox):
@@ -451,8 +492,6 @@ class ImageGridderTask(pipeBase.Task):
                 bb1.grow(afwGeom.Extent2I(bb1.getWidth() % 2, bb1.getHeight() % 2))
             return bb0, bb1
 
-        boxes0 = []
-        boxes1 = []
         xoff = 0
         while(xoff <= bbox.getWidth()):
             yoff = 0
@@ -460,11 +499,11 @@ class ImageGridderTask(pipeBase.Task):
                 bb0, bb1 = offsetAndClipBoxes(bbox0, bbox1, xoff, yoff, bbox)
                 yoff += gridStepY
                 if bb0.getArea() > 0 and bb1.getArea() > 0:
-                    boxes0.append(bb0)
-                    boxes1.append(bb1)
+                    self.boxes0.append(bb0)
+                    self.boxes1.append(bb1)
             xoff += gridStepX
 
-        return boxes0, boxes1
+        return self.boxes0, self.boxes1
 
     def _plotBoxGrid(self, boxes, bbox, **kwargs):
         """! Plot a grid of boxes using matplotlib.
