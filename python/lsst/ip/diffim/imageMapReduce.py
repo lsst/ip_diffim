@@ -284,15 +284,15 @@ class ImageMapReduceTask(pipeBase.Task):
     \brief Break an image in to subimages on a grid and perform
     the same operation on each.
 
-    \section ip_diffim_imageGridder_ImageMapReduceTask_Contents Contents
+    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Contents Contents
 
-      - \ref ip_diffim_imageGridder_ImageMapReduceTask_Purpose
-      - \ref ip_diffim_imageGridder_ImageMapReduceTask_Config
-      - \ref ip_diffim_imageGridder_ImageMapReduceTask_Run
-      - \ref ip_diffim_imageGridder_ImageMapReduceTask_Debug
-      - \ref ip_diffim_imageGridder_ImageMapReduceTask_Example
+      - \ref ip_diffim_imageMapReduce_ImageMapReduceTask_Purpose
+      - \ref ip_diffim_imageMapReduce_ImageMapReduceTask_Config
+      - \ref ip_diffim_imageMapReduce_ImageMapReduceTask_Run
+      - \ref ip_diffim_imageMapReduce_ImageMapReduceTask_Debug
+      - \ref ip_diffim_imageMapReduce_ImageMapReduceTask_Example
 
-    \section ip_diffim_imageGridder_ImageMapReduceTask_Purpose	Description
+    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Purpose	Description
 
     Task that can perform 'simple' operations on a gridded set of
     subimages of a larger image, and then have those subimages
@@ -304,30 +304,30 @@ class ImageMapReduceTask(pipeBase.Task):
     (original) image. The reducing operation is also handled by a
     subtask.
 
-    \section ip_diffim_imageGridder_ImageMapReduceTask_Initialize       Task initialization
+    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Initialize       Task initialization
 
     \copydoc \_\_init\_\_
 
-    \section ip_diffim_imageGridder_ImageMapReduceTask_Run       Invoking the Task
+    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Run       Invoking the Task
 
     \copydoc run
 
-    \section ip_diffim_imageGridder_ImageMapReduceTask_Config       Configuration parameters
+    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Config       Configuration parameters
 
     See \ref ImageMapReduceConfig
 
-    \section ip_diffim_imageGridder_ImageMapReduceTask_Debug		Debug variables
+    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Debug		Debug variables
 
     This task has no debug variables
 
-    \section ip_diffim_imageGridder_ImageMapReduceTask_Example	Example of using ImageMapReduceTask
+    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Example	Example of using ImageMapReduceTask
 
     This task has an example simple implementation of the use of
     ImageMapperSubtask/Config in its unit test
     \link tests/testImageMapReduce testImageMapReduce\endlink.
     """
     ConfigClass = ImageMapReduceConfig
-    _DefaultName = "ip_diffim_imageGridder"
+    _DefaultName = "ip_diffim_imageMapReduce"
 
     def __init__(self, *args, **kwargs):
         """! Create the image gridding Task
