@@ -31,29 +31,30 @@ import lsst.afw.geom as afwGeom
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 
-__all__ = ("ImageGridderTask", "ImageGridderConfig",
-           "ImageGridSubtask", "ImageGridSubtaskConfig")
+__all__ = ("ImageMapReduceTask", "ImageMapReduceConfig",
+           "ImageMapperSubtask", "ImageMapperSubtaskConfig",
+           "ImageReducerSubtask", "ImageReducerSubtaskConfig")
 
 
-class ImageGridSubtaskConfig(pexConfig.Config):
+class ImageMapperSubtaskConfig(pexConfig.Config):
     """!
-    \anchor ImageGridSubtaskConfig_
+    \anchor ImageMapperSubtaskConfig_
 
-    \brief Configuration parameters for the ImageGridSubtask
+    \brief Configuration parameters for the ImageMapperSubtask
     """
     pass
 
 
-class ImageGridSubtask(pipeBase.Task):
+class ImageMapperSubtask(pipeBase.Task):
     """!
-    \anchor ImageGridSubtask_
+    \anchor ImageMapperSubtask_
 
     \brief Simple example and base class for any task that is to be
-    used as `ImageGridderConfig.gridSubtask`
+    used as `ImageMapReduceConfig.mapperSubtask`
 
     """
-    ConfigClass = ImageGridSubtaskConfig
-    _DefaultName = "ip_diffim_ImageGridSubtask"
+    ConfigClass = ImageMapperSubtaskConfig
+    _DefaultName = "ip_diffim_ImageMapperSubtask"
 
     def __init__(self, *args, **kwargs):
         """! Create the image gridding subTask
@@ -77,16 +78,110 @@ class ImageGridSubtask(pipeBase.Task):
         pass
 
 
-class ImageGridderConfig(pexConfig.Config):
+class ImageReducerSubtaskConfig(pexConfig.Config):
     """!
-    \anchor ImageGridderConfig_
+    \anchor ImageReducerSubtaskConfig_
 
-    \brief Configuration parameters for the ImageGridderTask
+    \brief Configuration parameters for the ImageReducerSubtask
+    """
+    reduceOperation = pexConfig.ChoiceField(
+        dtype=str,
+        doc="""Operation to use for reducing subimages into new image.""",
+        default="copy",
+        allowed={
+            "none": """simply return a list of values and not re-map results into
+                       a new image (noop operation)""",
+            "copy": """copy pixels directly from subimage (non-deterministic for overlaps)
+                       into correct location in new exposure""",
+            "sum": """add pixels from overlaps (probably never wanted; used for testing)
+                       into correct location in new exposure""",
+            "average": """same as copy, but average pixels from overlaps"""
+        }
+    )
+
+
+class ImageReducerSubtask(pipeBase.Task):
+    """!
+    \anchor ImageReducerSubtask_
+
+    \brief Simple example and base class for any task that is to be
+    used as `ImageMapReduceConfig.reducerSubtask`
+
+    """
+    ConfigClass = ImageReducerSubtaskConfig
+    _DefaultName = "ip_diffim_ImageReducerSubtask"
+
+    def __init__(self, *args, **kwargs):
+        """! Create the image gridding subTask
+        @param *args arguments to be passed to
+        lsst.pipe.base.task.Task.__init__
+        @param **kwargs keyword arguments to be passed to
+        lsst.pipe.base.task.Task.__init__
+        """
+        pipeBase.Task.__init__(self, *args, **kwargs)
+
+    def run(self, patches, exposure, **kwargs):
+        """! Reduce a set of sub-exposure patches into a final exposure
+
+        Return an exposure of the same dimensions as `exposure`.
+
+        @param[in] patches list of subExposures of `exposure` to merge
+        @param[in] exposure the original exposure which is used as the template
+        @return a `afw.Exposure`
+
+        @notes Notes and currently known issues:
+        1. This currently *should* correctly handle overlapping patches.
+           For overlapping patches, use `config.reduceOperation='average'.
+        2. This currently does not correctly handle varying PSFs (in fact,
+           it just copies over the PSF from the original exposure)
+        3. This logic currently makes *two* copies of the original exposure
+           (one here and one in `mapperSubtask.run()`).
+        """
+        if self.config.reduceOperation == 'none':
+            return patches  # this is likely a non-image-type, such as a list of floats.
+
+        newExp = afwImage.ExposureF(exposure).clone()
+        newMI = newExp.getMaskedImage()
+        newMI.getImage()[:, :] = 0.
+        newMI.getVariance()[:, :] = 0.
+
+        reduceOp = self.config.reduceOperation
+        if reduceOp == 'average':  # make an array to keep track of weights
+            weights = afwImage.ImageF(newMI.getBBox())  # Needs to be a float to divide later.
+
+        for patch in patches:
+            subExp = afwImage.ExposureF(newExp, patch.getBBox())
+            subMI = subExp.getMaskedImage()
+            patchMI = patch.getMaskedImage()
+            if reduceOp == 'copy':
+                subMI[:, :] = patchMI
+            elif reduceOp == 'sum':
+                subMI += patchMI
+            elif reduceOp == 'average':
+                subMI += patchMI
+                wsubim = afwImage.ImageF(weights, patch.getBBox())
+                wsubim += 1.
+
+        if reduceOp == 'average':
+            newMI /= weights
+        return newExp
+
+
+class ImageMapReduceConfig(pexConfig.Config):
+    """!
+    \anchor ImageMapReduceConfig_
+
+    \brief Configuration parameters for the ImageMapReduceTask
     """
 
-    gridSubtask = pexConfig.ConfigurableField(
+    mapperSubtask = pexConfig.ConfigurableField(
         doc="Subtask to run on each subimage",
-        target=ImageGridSubtask,
+        target=ImageMapperSubtask,
+    )
+
+    reducerSubtask = pexConfig.ConfigurableField(
+        doc="Subtask to combine results of mapperSubTask",
+        target=ImageReducerSubtask,
     )
 
     # Separate gridCentroidsX and gridCentroidsY since pexConfig.ListField accepts limited dtypes
@@ -167,19 +262,6 @@ class ImageGridderConfig(pexConfig.Config):
         default=True
     )
 
-    reduceOperation = pexConfig.ChoiceField(
-        dtype=str,
-        doc="""Operation to use for combining subimages into new image.""",
-        default="copy",
-        allowed={
-            "none": """simply return a list of values and not re-mapping results into
-                       a new image""",
-            "copy": "copy pixels directly from subimage (non-deterministic for overlaps)",
-            "sum": "add pixels from overlaps (probably never wanted; used for testing)",
-            "average": "average pixels from overlaps"
-        }
-    )
-
     ignoreMaskPlanes = pexConfig.ListField(
         dtype=str,
         doc="""Mask planes to ignore for sigma-clipped statistics""",
@@ -189,28 +271,28 @@ class ImageGridderConfig(pexConfig.Config):
 
 ## \addtogroup LSST_task_documentation
 ## \{
-## \page ImageGridderTask
-## \ref ImageGridderTask_ "ImageGridderTask"
+## \page ImageMapReduceTask
+## \ref ImageMapReduceTask_ "ImageMapReduceTask"
 ##      Task for performing operations on an image over a regular-spaced grid
 ## \}
 
 
-class ImageGridderTask(pipeBase.Task):
+class ImageMapReduceTask(pipeBase.Task):
     """!
-    \anchor ImageGridderTask_
+    \anchor ImageMapReduceTask_
 
     \brief Break an image in to subimages on a grid and perform
     the same operation on each.
 
-    \section ip_diffim_imageGridder_ImageGridderTask_Contents Contents
+    \section ip_diffim_imageGridder_ImageMapReduceTask_Contents Contents
 
-      - \ref ip_diffim_imageGridder_ImageGridderTask_Purpose
-      - \ref ip_diffim_imageGridder_ImageGridderTask_Config
-      - \ref ip_diffim_imageGridder_ImageGridderTask_Run
-      - \ref ip_diffim_imageGridder_ImageGridderTask_Debug
-      - \ref ip_diffim_imageGridder_ImageGridderTask_Example
+      - \ref ip_diffim_imageGridder_ImageMapReduceTask_Purpose
+      - \ref ip_diffim_imageGridder_ImageMapReduceTask_Config
+      - \ref ip_diffim_imageGridder_ImageMapReduceTask_Run
+      - \ref ip_diffim_imageGridder_ImageMapReduceTask_Debug
+      - \ref ip_diffim_imageGridder_ImageMapReduceTask_Example
 
-    \section ip_diffim_imageGridder_ImageGridderTask_Purpose	Description
+    \section ip_diffim_imageGridder_ImageMapReduceTask_Purpose	Description
 
     Task that can perform 'simple' operations on a gridded set of
     subimages of a larger image, and then have those subimages
@@ -219,31 +301,32 @@ class ImageGridderTask(pipeBase.Task):
     The actual operation is performed by a subTask passed to the
     config. The input exposure will be pre-subimaged, but the `run`
     method of the subtask will also have access to the entire
-    (original) image.
+    (original) image. The reducing operation is also handled by a
+    subtask.
 
-    \section ip_diffim_imageGridder_ImageGridderTask_Initialize       Task initialization
+    \section ip_diffim_imageGridder_ImageMapReduceTask_Initialize       Task initialization
 
     \copydoc \_\_init\_\_
 
-    \section ip_diffim_imageGridder_ImageGridderTask_Run       Invoking the Task
+    \section ip_diffim_imageGridder_ImageMapReduceTask_Run       Invoking the Task
 
     \copydoc run
 
-    \section ip_diffim_imageGridder_ImageGridderTask_Config       Configuration parameters
+    \section ip_diffim_imageGridder_ImageMapReduceTask_Config       Configuration parameters
 
-    See \ref ImageGridderConfig
+    See \ref ImageMapReduceConfig
 
-    \section ip_diffim_imageGridder_ImageGridderTask_Debug		Debug variables
+    \section ip_diffim_imageGridder_ImageMapReduceTask_Debug		Debug variables
 
     This task has no debug variables
 
-    \section ip_diffim_imageGridder_ImageGridderTask_Example	Example of using ImageGridderTask
+    \section ip_diffim_imageGridder_ImageMapReduceTask_Example	Example of using ImageMapReduceTask
 
     This task has an example simple implementation of the use of
-    ImageGridSubtask/Config in its unit test
-    \link tests/testImageGridder testImageGridder\endlink.
+    ImageMapperSubtask/Config in its unit test
+    \link tests/testImageMapReduce testImageMapReduce\endlink.
     """
-    ConfigClass = ImageGridderConfig
+    ConfigClass = ImageMapReduceConfig
     _DefaultName = "ip_diffim_imageGridder"
 
     def __init__(self, *args, **kwargs):
@@ -255,57 +338,35 @@ class ImageGridderTask(pipeBase.Task):
         """
         pipeBase.Task.__init__(self, *args, **kwargs)
 
-        self.makeSubtask("gridSubtask")
+        self.makeSubtask("mapperSubtask")
+        self.makeSubtask("reducerSubtask")
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
         self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(self.config.ignoreMaskPlanes))
 
     @pipeBase.timeMethod
-    def run(self, exposure, returnPatches=False, **kwargs):
-        """! Perform an operation on the given exposure.
+    def run(self, exposure, **kwargs):
+        """! Perform a map-reduce operation on the given exposure.
 
         Break the exposure into sub-exps on a grid (parameters given
-        by `ImageGridderConfig`) and perform `runSubtask` on
-        each. Stitch together the resulting sub-exps generated by (or
-        modified by) `runSubtask` into a final exposure of the same
-        dimensions as the input `exposure`.
+        by `ImageMapReduceConfig`) and perform `mapperSubtask.run()` on
+        each. Reduce the resulting sub-exps by running `reducerSubtask.run()`.
 
         @param[in] exposure the full exposure to process
-        @return anything, including an `afw.Exposure`
+        @return output of `reducerSubtask.run()`
 
         """
         self.log.info("Processing.")
 
-        patches = self._makePatches(exposure, **kwargs)
-        if returnPatches:
-            return patches
-
+        patches = self._runMapper(exposure, **kwargs)
         newMI = self._reduceImage(patches, exposure, **kwargs)
         return newMI
 
-    def runSubtask(self, subExp, expandedSubExp, fullBBox, **kwargs):
-        """! Run subtask to perform an operation on the given subExposure.
+    def _runMapper(self, exposure, doClone=False, **kwargs):
+        """! Perform `mapperSubtask.run()` on each patch given by grid
 
-        Return an exposure of the same dimensions as `subExp`.
-        Can use `expandedSubExp`, an expanded region of the original exposure,
-        to perform computations. `subExp` and `expandedSubExp` should be considered
-        *read-only* -- if you want to make changes to `subExp` it is recommended that
-        you clone it first, and return the cloned, modified sub-exposure. This
-        will be done in `gridSubtask.run()`.
-
-        @param[in] subExp the sub-exposure of `exposure` upon which to operate
-        @param[in] expandedSubExp the expanded sub-exposure of `exposure` upon which to operate
-        @param[in] fullBBox the bounding box of the original exposure
-        @return a `afw.Image` or `afw.Exposure`
-        """
-        subExp = self.gridSubtask.run(subExp, expandedSubExp, fullBBox, **kwargs)
-        return subExp
-
-    def _makePatches(self, exposure, doClone=False, **kwargs):
-        """! Perform `runSubtask` on each patch
-
-        Perform `runSubtask` on each patch across a grid on `exposure` generated by
+        Perform `mapperSubtask.run()` on each patch across a grid on `exposure` generated by
         `generateGrid`.
 
         @param[in] exposure the original exposure which is used as the template.
@@ -325,70 +386,37 @@ class ImageGridderTask(pipeBase.Task):
             if doClone:
                 subExp = subExp.clone()
                 expandedSubExp = expandedSubExp.clone()
-            result = self.runSubtask(subExp, expandedSubExp, exposure.getBBox(), **kwargs)
+            result = self.mapperSubtask.run(subExp, expandedSubExp, exposure.getBBox(), **kwargs)
             patches.append(result)
 
         return patches
 
     def _reduceImage(self, patches, exposure, **kwargs):
-        """! Reduce a set of sub-exposure patches into a final exposure
+        """! Reduce/merge a set of sub-exposure patches into a final exposure
 
         Return an exposure of the same dimensions as `exposure`.
-        `patches` is expected to have been produced by `makePatches`.
+        `patches` is expected to have been produced by `runMapper`.
 
         @param[in] patches list of subExposures of `exposure` to merge
-        @param[in] exposure the original exposure which is used as the template
+        @param[in] exposure the original exposure
         @return a `afw.Exposure`
-
-        @notes Notes and currently known issues:
-        1. This currently *should* correctly handle overlapping patches.
-           For overlapping patches, use `config.reduceOperation='average'.
-        2. This currently does not correctly handle varying PSFs (in fact,
-           it just copies over the PSF from the original exposure)
-        3. This logic currently makes *two* copies of the original exposure
-           (one here and one in `gridSubtask.run()`).
         """
-        if self.config.reduceOperation == 'none':
-            return patches  # this is likely a non-image-type, such as a list of floats.
-
-        newExp = afwImage.ExposureF(exposure).clone()
-        newMI = newExp.getMaskedImage()
-        newMI.getImage()[:, :] = 0.
-        newMI.getVariance()[:, :] = 0.
-
-        reduceOp = self.config.reduceOperation
-        if reduceOp == 'average':  # make an array to keep track of weights
-            weights = afwImage.ImageF(newMI.getBBox())  # Needs to be a float to divide later.
-
-        for patch in patches:
-            subExp = afwImage.ExposureF(newExp, patch.getBBox())
-            subMI = subExp.getMaskedImage()
-            patchMI = patch.getMaskedImage()
-            if reduceOp == 'copy':
-                subMI[:, :] = patchMI
-            elif reduceOp == 'sum':
-                subMI += patchMI
-            elif reduceOp == 'average':
-                subMI += patchMI
-                wsubim = afwImage.ImageF(weights, patch.getBBox())
-                wsubim += 1.
-
-        if reduceOp == 'average':
-            newMI /= weights
-        return newExp
+        result = self.reducerSubtask.run(patches, exposure, **kwargs)
+        return result
 
     def _generateGrid(self, exposure, forceEvenSized=False):
         """! Generate two lists of bounding boxes that evenly grid `exposure`
 
-        Grid (subimage) centers will be spaced by gridStepX/Y. Then
-        the grid will be adjusted as little as possible to evenly
-        cover the input exposure (if adjustGridOption is not
-        'none').  Then the bounding boxes will be expanded by
-        borderSizeX/Y. The expanded bounding boxes will be adjusted to
-        ensure that they intersect the exposure's bounding box.  The
-        resulting lists of bounding boxes and corresponding expanded
-        bounding boxes will be returned, and also set to
-        `self.boxes0`, `self.boxes1`.
+        Unless the config was provided with `centroidCoordsX` and
+        `centroidCoordsY`, grid (subimage) centers will be spaced
+        evenly by gridStepX/Y. Then the grid will be adjusted as
+        little as possible to evenly cover the input exposure (if
+        adjustGridOption is not 'none'). Then the bounding boxes will
+        be expanded by borderSizeX/Y. The expanded bounding boxes will
+        be adjusted to ensure that they intersect the exposure's
+        bounding box.  The resulting lists of bounding boxes and
+        corresponding expanded bounding boxes will be returned, and
+        also set to `self.boxes0`, `self.boxes1`.
 
         @param[in] exposure an `afwImage.Exposure` whose full bounding
         box is to be evenly gridded.
@@ -397,7 +425,6 @@ class ImageGridderTask(pipeBase.Task):
 
         @return tuple containing two lists of `afwGeom.BoundingBox`es
         """
-
         # Extract the config parameters for conciseness.
         gridSizeX = self.config.gridSizeX
         gridSizeY = self.config.gridSizeY

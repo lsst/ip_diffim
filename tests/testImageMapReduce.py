@@ -30,19 +30,20 @@ import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.pex.config as pexConfig
 import lsst.meas.algorithms as measAlg
-from lsst.ip.diffim.imageGridder import (ImageGridderTask, ImageGridderConfig,
-                                         ImageGridSubtask, ImageGridSubtaskConfig)
+from lsst.ip.diffim.imageGridder import (ImageMapReduceTask, ImageMapReduceConfig,
+                                         ImageMapperSubtask, ImageMapperSubtaskConfig,
+                                         ImageReducerSubtask, ImageReducerSubtaskConfig)
 
 
 def setup_module(module):
     lsst.utils.tests.init()
 
 
-class TestImageGridSubtaskConfig(ImageGridSubtaskConfig):
+class TestImageMapperSubtaskConfig(ImageMapperSubtaskConfig):
     """!
-    \anchor TestImageGridSubtaskConfig_
+    \anchor TestImageMapperSubtaskConfig_
 
-    \brief Configuration parameters for the TestImageGridSubtask
+    \brief Configuration parameters for the TestImageMapperSubtask
     """
     addAmount = pexConfig.Field(
         dtype=float,
@@ -50,16 +51,17 @@ class TestImageGridSubtaskConfig(ImageGridSubtaskConfig):
         default=10.
     )
 
-class TestImageGridSubtask(ImageGridSubtask):
-    ConfigClass = TestImageGridSubtaskConfig
-    _DefaultName = "ip_diffim_TestImageGridSubtask"
+
+class TestImageMapperSubtask(ImageMapperSubtask):
+    ConfigClass = TestImageMapperSubtaskConfig
+    _DefaultName = "ip_diffim_TestImageMapperSubtask"
 
     def __init__(self, *args, **kwargs):
         """! Create the image gridding subTask
         @param *args arguments to be passed to lsst.pipe.base.task.Task.__init__
         @param **kwargs keyword arguments to be passed to lsst.pipe.base.task.Task.__init__
         """
-        ImageGridSubtask.__init__(self, *args, **kwargs)
+        ImageMapperSubtask.__init__(self, *args, **kwargs)
 
     def run(self, subExp, expandedSubExp, fullBBox, **kwargs):
         """! Add `addAmount` to given subExposure.
@@ -74,27 +76,29 @@ class TestImageGridSubtask(ImageGridSubtask):
         img += self.config.addAmount
         return subExp
 
-class TestImageGridderConfig(ImageGridderConfig):
-    """!
-    \anchor TestImageGridderConfig_
 
-    \brief Configuration parameters for the TestImageGridderTask
+class TestImageMapReduceConfig(ImageMapReduceConfig):
+    """!
+    \anchor TestImageMapReduceConfig_
+
+    \brief Configuration parameters for the TestImageMapReduceTask
     """
-    gridSubtask = pexConfig.ConfigurableField(
-        doc="Subtask to run on each subimage",
-        target=TestImageGridSubtask,
+    mapperSubtask = pexConfig.ConfigurableField(
+        doc="Mapper subtask to run on each subimage",
+        target=TestImageMapperSubtask,
     )
 
-class TestImageGridSubtask2(ImageGridSubtask):
-    ConfigClass = TestImageGridSubtaskConfig
-    _DefaultName = "ip_diffim_TestImageGridSubtask2"
+
+class TestImageMapperSubtask2(ImageMapperSubtask):
+    ConfigClass = TestImageMapperSubtaskConfig
+    _DefaultName = "ip_diffim_TestImageMapperSubtask2"
 
     def __init__(self, *args, **kwargs):
         """! Create the image gridding subTask
         @param *args arguments to be passed to lsst.pipe.base.task.Task.__init__
         @param **kwargs keyword arguments to be passed to lsst.pipe.base.task.Task.__init__
         """
-        ImageGridSubtask.__init__(self, *args, **kwargs)
+        ImageMapperSubtask.__init__(self, *args, **kwargs)
 
     def run(self, subExp, expandedSubExp, fullBBox, **kwargs):
         """!Return the mean of the given subExposure.
@@ -106,19 +110,20 @@ class TestImageGridSubtask2(ImageGridSubtask):
         """
         return subExp.getMaskedImage().getImage().getArray().mean()
 
-class TestImageGridderConfig2(ImageGridderConfig):
-    """!
-    \anchor TestImageGridderConfig_
 
-    \brief Configuration parameters for the TestImageGridderTask2
+class TestImageMapReduceConfig2(ImageMapReduceConfig):
+    """!
+    \anchor TestImageMapReduceConfig_
+
+    \brief Configuration parameters for the TestImageMapReduceTask2
     """
-    gridSubtask = pexConfig.ConfigurableField(
-        doc="Subtask to run on each subimage",
-        target=TestImageGridSubtask2,
+    mapperSubtask = pexConfig.ConfigurableField(
+        doc="Mapper subtask to run on each subimage",
+        target=TestImageMapperSubtask2,
     )
 
 
-class ImageGridderTest(lsst.utils.tests.TestCase):
+class ImageMapReduceTest(lsst.utils.tests.TestCase):
     """!A test case for the image gridded processing task
     """
 
@@ -135,9 +140,9 @@ class ImageGridderTest(lsst.utils.tests.TestCase):
         """Test sample grid task that adds 5.0 to input image and uses
         default 'copy' `reduceOperation`.
         """
-        config = TestImageGridderConfig()
-        task = ImageGridderTask(config)
-        config.gridSubtask.addAmount = 5.
+        config = TestImageMapReduceConfig()
+        task = ImageMapReduceTask(config)
+        config.mapperSubtask.addAmount = 5.
         newExp = task.run(self.exposure)
         newMI = newExp.getMaskedImage()
         newArr = newMI.getImage().getArray()
@@ -152,11 +157,11 @@ class ImageGridderTest(lsst.utils.tests.TestCase):
         """Test sample grid task that adds 5.0 to input image and uses
         'average' `reduceOperation`.
         """
-        config = TestImageGridderConfig()
+        config = TestImageMapReduceConfig()
         config.gridStepX = config.gridStepY = 8
-        config.reduceOperation = 'average'
-        task = ImageGridderTask(config)
-        config.gridSubtask.addAmount = 5.
+        config.reducerSubtask.reduceOperation = 'average'
+        task = ImageMapReduceTask(config)
+        config.mapperSubtask.addAmount = 5.
         newExp = task.run(self.exposure)
         newMI = newExp.getMaskedImage()
         newArr = newMI.getImage().getArray()
@@ -171,10 +176,10 @@ class ImageGridderTest(lsst.utils.tests.TestCase):
         """Test sample grid task that returns the mean of the subimages and uses
         'none' `reduceOperation`.
         """
-        config = TestImageGridderConfig2()
+        config = TestImageMapReduceConfig2()
         config.gridStepX = config.gridStepY = 8
-        config.reduceOperation = 'none'
-        task = ImageGridderTask(config)
+        config.reducerSubtask.reduceOperation = 'none'
+        task = ImageMapReduceTask(config)
         subMeans = task.run(self.exposure)
 
         self.assertEqual(len(subMeans), len(task.boxes0))
@@ -185,32 +190,28 @@ class ImageGridderTest(lsst.utils.tests.TestCase):
         returns the mean of the subimages surrounding those centroids using 'none'
         for `reduceOperation`.
         """
-        config = TestImageGridderConfig2()
+        config = TestImageMapReduceConfig2()
         config.gridStepX = config.gridStepY = 8
-        config.reduceOperation = 'none'
+        config.reducerSubtask.reduceOperation = 'none'
         centroidsX = [i for i in np.linspace(0, 128, 50)]
         centroidsY = centroidsX
         config.gridCentroidsX = centroidsX
         config.gridCentroidsY = centroidsY
-        task = ImageGridderTask(config)
+        task = ImageMapReduceTask(config)
         subMeans = task.run(self.exposure)
 
         self.assertEqual(len(subMeans), len(centroidsX))
         self.assertClose(subMeans[0], 0.)
-
-    ## TBD: make task where 'gridCentroids' is not None; ensure validity and
-    ##  if 'reduceOperation' = 'none' that the length of the resulting list
-    ##  is the same as the input centroids
 
     def testGridValidity(self):
         """!Test sample grids with various spacings and sizes and other options.
 
         Try to see if we can break it.
         """
-        config = TestImageGridderConfig()
-        config.reduceOperation = 'copy'
+        config = TestImageMapReduceConfig()
+        config.reducerSubtask.reduceOperation = 'copy'
         expectedVal = 1.
-        config.gridSubtask.addAmount = expectedVal
+        config.mapperSubtask.addAmount = expectedVal
 
         for scaleByFwhm in (False, True):
             config.scaleByFwhm = scaleByFwhm
@@ -219,7 +220,7 @@ class ImageGridderTest(lsst.utils.tests.TestCase):
                 for gsy in range(51, 1, -10):
                     config.gridStepY = config.gridSizeY = gsy
 
-                    task = ImageGridderTask(config)
+                    task = ImageMapReduceTask(config)
                     boxes = task._generateGrid(self.exposure)
                     if len(boxes[0]) > 1000:  # bypass to prevent slow testing
                         continue
@@ -231,6 +232,7 @@ class ImageGridderTest(lsst.utils.tests.TestCase):
                     mn = newArr.mean()
                     self.assertClose(mi.getImage().getArray().mean(), mn - expectedVal)
                     self.assertClose(mn, expectedVal)
+
 
 class MemoryTester(lsst.utils.tests.MemoryTestCase):
     pass
