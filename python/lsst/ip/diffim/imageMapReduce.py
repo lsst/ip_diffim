@@ -342,10 +342,6 @@ class ImageMapReduceTask(pipeBase.Task):
 
         self.makeSubtask("mapperSubtask")
         self.makeSubtask("reducerSubtask")
-        self.statsControl = afwMath.StatisticsControl()
-        self.statsControl.setNumSigmaClip(3.)
-        self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(self.config.ignoreMaskPlanes))
 
     @pipeBase.timeMethod
     def run(self, exposure, **kwargs):
@@ -570,27 +566,3 @@ class ImageMapReduceTask(pipeBase.Task):
             plotBox(b)
         plt.xlim(bbox.getBeginX(), bbox.getEndX())
         plt.ylim(bbox.getBeginY(), bbox.getEndY())
-
-    def _computeVarianceMean(self, subImage):
-        """! Utility function: compute mean of variance plane of subimage
-
-        @param subImage the sub-image of `exposure` upon which to operate
-        @return float clipped mean of masked variance plane of subImage
-        """
-        statObj = afwMath.makeStatistics(subImage.getMaskedImage().getVariance(),
-                                         subImage.getMaskedImage().getMask(),
-                                         afwMath.MEANCLIP, self.statsControl)
-        var = statObj.getValue(afwMath.MEANCLIP)
-        return var
-
-    def _computePsf(self, subImage):
-        """! Utility function: compute Psf at center of subImage.
-
-        TBD: is this computing the Psf at the center of the subimage
-        (i.e. center of its bounding box)?
-
-        @param subImage the sub-image of `exposure` upon which to operate
-        @return 2d numpy.array of Psf for calculations.
-
-        """
-        return subImage.getPsf().computeImage().getArray()
