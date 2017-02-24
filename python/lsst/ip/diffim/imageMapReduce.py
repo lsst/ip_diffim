@@ -340,12 +340,9 @@ class ImageMapReduceTask(pipeBase.Task):
         """
         pipeBase.Task.__init__(self, *args, **kwargs)
 
+        self.boxes0 = self.boxes1 = None
         self.makeSubtask("mapperSubtask")
         self.makeSubtask("reducerSubtask")
-        self.statsControl = afwMath.StatisticsControl()
-        self.statsControl.setNumSigmaClip(3.)
-        self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(self.config.ignoreMaskPlanes))
 
     @pipeBase.timeMethod
     def run(self, exposure, **kwargs):
@@ -378,7 +375,9 @@ class ImageMapReduceTask(pipeBase.Task):
         in that case, the sub-exps do not have to be considered as read-only.
         @return a list of `afwExposure`s
         """
-        boxes0, boxes1 = self._generateGrid(exposure)
+        boxes0, boxes1 = self.boxes0, self.boxes1
+        if boxes0 is None:
+            boxes0, boxes1 = self._generateGrid(exposure)
         if len(boxes0) != len(boxes1):
             raise Exception('Uh oh!')   # TBD: define a specific exception to raise
 
@@ -545,7 +544,8 @@ class ImageMapReduceTask(pipeBase.Task):
         import matplotlib.pyplot as plt
 
         bbox = exposure.getBBox()
-        boxes0, boxes1 = self._generateGrid(exposure)
+        if self.boxes0 is None:
+            boxes0, boxes1 = self._generateGrid(exposure)
         self._plotBoxGrid(boxes0[::3], bbox, ls='--')
         # reset the color cycle -- see
         # http://stackoverflow.com/questions/24193174/reset-color-cycle-in-matplotlib
@@ -570,27 +570,3 @@ class ImageMapReduceTask(pipeBase.Task):
             plotBox(b)
         plt.xlim(bbox.getBeginX(), bbox.getEndX())
         plt.ylim(bbox.getBeginY(), bbox.getEndY())
-
-    def _computeVarianceMean(self, subImage):
-        """! Utility function: compute mean of variance plane of subimage
-
-        @param subImage the sub-image of `exposure` upon which to operate
-        @return float clipped mean of masked variance plane of subImage
-        """
-        statObj = afwMath.makeStatistics(subImage.getMaskedImage().getVariance(),
-                                         subImage.getMaskedImage().getMask(),
-                                         afwMath.MEANCLIP, self.statsControl)
-        var = statObj.getValue(afwMath.MEANCLIP)
-        return var
-
-    def _computePsf(self, subImage):
-        """! Utility function: compute Psf at center of subImage.
-
-        TBD: is this computing the Psf at the center of the subimage
-        (i.e. center of its bounding box)?
-
-        @param subImage the sub-image of `exposure` upon which to operate
-        @return 2d numpy.array of Psf for calculations.
-
-        """
-        return subImage.getPsf().computeImage().getArray()
