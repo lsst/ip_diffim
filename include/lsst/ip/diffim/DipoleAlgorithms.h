@@ -79,12 +79,11 @@ public:
  */
 class DipoleCentroidAlgorithm : public meas::base::SimpleAlgorithm {
 public:
-    enum {
-        FAILURE=meas::base::FlagHandler::FAILURE,
-        POS_FAILURE,
-        NEG_FAILURE,
-        N_FLAGS
-    };
+
+    static meas::base::FlagDefinition const FAILURE;
+    static meas::base::FlagDefinition const POS_FLAG;
+    static meas::base::FlagDefinition const NEG_FLAG;
+    static meas::base::FlagDefinitionList const & getFlagDefinitions();
 
     typedef DipoleCentroidControl Control;
 
@@ -115,12 +114,11 @@ protected:
  */
 class DipoleFluxAlgorithm : public meas::base::SimpleAlgorithm {
 public:
-    enum {
-        FAILURE=meas::base::FlagHandler::FAILURE,
-        POS_FAILURE,
-        NEG_FAILURE,
-        N_FLAGS
-    };
+
+    static meas::base::FlagDefinition const FAILURE;
+    static meas::base::FlagDefinition const POS_FLAG;
+    static meas::base::FlagDefinition const NEG_FLAG;
+    static meas::base::FlagDefinitionList const & getFlagDefinitions();
 
     /// A typedef to the Control object for this algorithm, defined above.
     /// The control object contains the configuration parameters for this algorithm.
@@ -155,12 +153,7 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
     ) :
     _ctrl(ctrl)
 {
-    static std::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
-        {"flag", "general failure flag, set if anything went wrong"},
-        {"pos_flag", "failure flag for positive, set if anything went wrong"},
-        {"neg_flag", "failure flag for negative, set if anything went wrong"}
-    }};
-    _flagHandler = meas::base::FlagHandler::addFields(schema, name, flagDefs.begin(), flagDefs.end());
+    _flagHandler = meas::base::FlagHandler::addFields(schema, name, getFlagDefinitions());
     meas::base::CentroidResultKey::addFields(schema, name, doc+": overall centroid", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_pos", doc+": positive lobe", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_neg", doc+": negative lobe", meas::base::SIGMA_ONLY);
@@ -175,16 +168,12 @@ inline DipoleCentroidAlgorithm::DipoleCentroidAlgorithm(
     ) :
     _ctrl(ctrl)
 {
+    _flagHandler = meas::base::FlagHandler::addFields(schema, name, getFlagDefinitions());
     meas::base::CentroidResultKey::addFields(schema, name, doc+": overall centroid", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_pos", doc + ": positive lobe", meas::base::SIGMA_ONLY);
     meas::base::CentroidResultKey::addFields(schema, name+"_neg", doc + ": negative lobe", meas::base::SIGMA_ONLY);
-    static std::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
-        {"flag", "general failure flag, set if anything went wrong"},
-        {"pos_flag", "failure flag for positive, set if anything went wrong"},
-        {"neg_flag", "failure flag for negative, set if anything went wrong"}
-    }};
-    _flagHandler = meas::base::FlagHandler::addFields(schema, name, flagDefs.begin(), flagDefs.end());
     _centerKeys = ResultKey(schema[name]);
+
     _positiveKeys = ResultKey(schema[name+"_pos"]);
     _negativeKeys = ResultKey(schema[name+"_neg"]);
 }
@@ -195,12 +184,7 @@ inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
     ) :
     _ctrl(ctrl)
 {
-    static std::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
-        {"flag", "general failure flag, set if anything went wrong"},
-        {"pos_flag", "failure flag for positive, set if anything went wrong"},
-        {"neg_flag", "failure flag for negative, set if anything went wrong"}
-    }};
-    _flagHandler = meas::base::FlagHandler::addFields(schema, name, flagDefs.begin(), flagDefs.end());
+    _flagHandler = meas::base::FlagHandler::addFields(schema, name, getFlagDefinitions());
     meas::base::FluxResultKey::addFields(schema, name+"_pos", doc+": positive lobe");
     meas::base::FluxResultKey::addFields(schema, name+"_neg", doc+": negative lobe");
     _positiveKeys = ResultKey(positiveKeys);
@@ -213,12 +197,7 @@ inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
     ) :
     _ctrl(ctrl)
 {
-    static std::array<meas::base::FlagDefinition,N_FLAGS> const flagDefs = {{
-        {"flag", "general failure flag, set if anything went wrong"},
-        {"pos_flag", "failure flag for positive, set if anything went wrong"},
-        {"neg_flag", "failure flag for negative, set if anything went wrong"}
-    }};
-    _flagHandler = meas::base::FlagHandler::addFields(schema, name, flagDefs.begin(), flagDefs.end());
+    _flagHandler = meas::base::FlagHandler::addFields(schema, name, getFlagDefinitions());
     meas::base::FluxResultKey::addFields(schema, name+"_pos", doc+": positive lobe");
     meas::base::FluxResultKey::addFields(schema, name+"_neg", doc+": negative lobe");
     _positiveKeys = ResultKey(schema[name+"_pos"]);
@@ -263,12 +242,6 @@ private:
  */
 class NaiveDipoleCentroid : public DipoleCentroidAlgorithm {
 public:
-    enum {
-        FAILURE=meas::base::FlagHandler::FAILURE,
-        POS_FLAGS,
-        NEG_FLAGS,
-        N_FLAGS
-    };
 
     NaiveDipoleCentroid(Control const & ctrl, std::string const & name, afw::table::Schema & schema);
     /**
