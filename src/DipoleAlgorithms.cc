@@ -56,6 +56,30 @@ namespace afwGeom = lsst::afw::geom;
 
 namespace lsst { namespace ip { namespace diffim {
 
+namespace {
+meas::base::FlagDefinitionList dipoleFluxFlagDefinitions;
+}
+
+meas::base::FlagDefinition const DipoleFluxAlgorithm::FAILURE = dipoleFluxFlagDefinitions.addFailureFlag();
+meas::base::FlagDefinition const DipoleFluxAlgorithm::POS_FLAG = dipoleFluxFlagDefinitions.add("pos_flag", "failure flag for positive, set if anything went wrong");
+meas::base::FlagDefinition const DipoleFluxAlgorithm::NEG_FLAG = dipoleFluxFlagDefinitions.add("neg_flag", "failure flag for negative, set if anything went wrong");
+
+meas::base::FlagDefinitionList const & DipoleFluxAlgorithm::getFlagDefinitions() {
+    return dipoleFluxFlagDefinitions;
+}
+
+namespace {
+meas::base::FlagDefinitionList dipoleCentroidFlagDefinitions;
+}
+
+meas::base::FlagDefinition const DipoleCentroidAlgorithm::FAILURE = dipoleCentroidFlagDefinitions.addFailureFlag();
+meas::base::FlagDefinition const DipoleCentroidAlgorithm::POS_FLAG = dipoleCentroidFlagDefinitions.add("pos_flag", "failure flag for positive, set if anything went wrong");
+meas::base::FlagDefinition const DipoleCentroidAlgorithm::NEG_FLAG = dipoleCentroidFlagDefinitions.add("neg_flag", "failure flag for negative, set if anything went wrong");
+
+meas::base::FlagDefinitionList const & DipoleCentroidAlgorithm::getFlagDefinitions() {
+    return dipoleCentroidFlagDefinitions;
+}
+
     int const NEGCENTXPAR(0); // Parameter for the x-component of the negative lobe centroid
     int const NEGCENTYPAR(1); // Parameter for the y-component of the negative lobe centroid
     int const NEGFLUXPAR(2);  // Parameter for the flux of the negative lobe
