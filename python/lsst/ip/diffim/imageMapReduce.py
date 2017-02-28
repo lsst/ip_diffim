@@ -88,7 +88,7 @@ class ImageReducerSubtaskConfig(pexConfig.Config):
                        into correct location in new exposure""",
             "sum": """add pixels from overlaps (probably never wanted; used for testing)
                        into correct location in new exposure""",
-            "average": """same as copy, but average pixels from overlaps"""
+            "average": """same as copy, but average pixels from overlaps (NaNs ignored)"""
         }
     )
 
@@ -128,7 +128,8 @@ class ImageReducerSubtask(pipeBase.Task):
            For overlapping patches, use `config.reduceOperation='average'`.
         2. This currently does not correctly handle varying PSFs (in fact,
            it just copies over the PSF from the original exposure)
-        3. This logic currently makes *two* copies of the original exposure
+        3. To be done: correct handling of masks as well.
+        4. This logic currently makes *two* copies of the original exposure
            (one here and one in `mapperSubtask.run()`).
         """
         if self.config.reduceOperation == 'none':
@@ -147,14 +148,29 @@ class ImageReducerSubtask(pipeBase.Task):
             subExp = afwImage.ExposureF(newExp, patch.getBBox())
             subMI = subExp.getMaskedImage()
             patchMI = patch.getMaskedImage()
+            isNan = (np.isnan(patchMI.getImage().getArray()) |
+                     np.isnan(patchMI.getVariance().getArray()))
+            noNans = np.sum(isNan) <= 0
             if reduceOp == 'copy':
-                subMI[:, :] = patchMI
-            elif reduceOp == 'sum':
-                subMI += patchMI
-            elif reduceOp == 'average':
-                subMI += patchMI
-                wsubim = afwImage.ImageF(weights, patch.getBBox())
-                wsubim += 1.
+                if noNans:
+                    subMI[:, :] = patchMI
+                else:
+                    isNotNan = ~isNan
+                    subMI.getImage().getArray()[isNotNan] = patchMI.getImage().getArray()[isNotNan]
+                    subMI.getVariance().getArray()[isNotNan] = patchMI.getVariance().getArray()[isNotNan]
+            if reduceOp == 'sum' or reduceOp == 'average':  # much of these two is the same
+                if noNans:
+                    subMI += patchMI
+                    if reduceOp == 'average':
+                        wsubim = afwImage.ImageF(weights, patch.getBBox())
+                        wsubim += 1.
+                else:
+                    isNotNan = ~isNan
+                    subMI.getImage().getArray()[isNotNan] += patchMI.getImage().getArray()[isNotNan]
+                    subMI.getVariance().getArray()[isNotNan] += patchMI.getVariance().getArray()[isNotNan]
+                    if reduceOp == 'average':
+                        wsubim = afwImage.ImageF(weights, patch.getBBox())
+                        wsubim.getArray()[isNotNan] += 1.
 
         if reduceOp == 'average':
             newMI /= weights
@@ -359,9 +375,9 @@ class ImageMapReduceTask(pipeBase.Task):
 
         self.log.info("Processing %d sub-exposures" % len(boxes0))
         patches = []
-        for i in range(len(boxes0)):
-            subExp = afwImage.ExposureF(exposure, boxes0[i])
-            expandedSubExp = afwImage.ExposureF(exposure, boxes1[i])
+        for box0, box1 in zip(boxes0, boxes1): #i in range(len(boxes0)):
+            subExp = afwImage.ExposureF(exposure, box0) #boxes0[i])
+            expandedSubExp = afwImage.ExposureF(exposure, box1) #boxes1[i])
             if doClone:
                 subExp = subExp.clone()
                 expandedSubExp = expandedSubExp.clone()
@@ -431,6 +447,8 @@ class ImageMapReduceTask(pipeBase.Task):
 
         psfFwhm = (exposure.getPsf().computeShape().getDeterminantRadius() *
                    2. * np.sqrt(2. * np.log(2.)))
+        if scaleByFwhm:
+            self.log.info("Scaling grid parameters by %f" % psfFwhm)
 
         def rescaleValue(val):
             if scaleByFwhm:
@@ -528,7 +546,7 @@ class ImageMapReduceTask(pipeBase.Task):
 
         return self.boxes0, self.boxes1
 
-    def _plotBoxes(self, exposure):
+    def _plotBoxes(self, exposure, skip=3):
         """Plot both grids of boxes using matplotlib.
 
         Will compute the grid via `_generateGrid` if
@@ -538,17 +556,20 @@ class ImageMapReduceTask(pipeBase.Task):
         ----------
         exposure : afwImage.Exposure
             Exposure whose bounding box is gridded by this task.
+        skip : int
+            Plot every skip-ped box (help make plots less confusing)
         """
         import matplotlib.pyplot as plt
 
         bbox = exposure.getBBox()
-        if self.boxes0 is None:
+        boxes0, boxes1 = self.boxes0, self.boxes1
+        if boxes0 is None:
             boxes0, boxes1 = self._generateGrid(exposure)
-        self._plotBoxGrid(boxes0[::3], bbox, ls='--')
+        self._plotBoxGrid(boxes0[::skip], bbox, ls='--')
         # reset the color cycle -- see
         # http://stackoverflow.com/questions/24193174/reset-color-cycle-in-matplotlib
         plt.gca().set_prop_cycle(None)
-        self._plotBoxGrid(boxes1[::3], bbox, ls=':')
+        self._plotBoxGrid(boxes1[::skip], bbox, ls=':')
 
     def _plotBoxGrid(self, boxes, bbox, **kwargs):
         """Plot a grid of boxes using matplotlib.
