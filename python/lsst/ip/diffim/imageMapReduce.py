@@ -142,7 +142,7 @@ class ImageReducerSubtask(pipeBase.Task):
         if self.config.reduceOperation == 'none':
             return patches  # this is likely a non-image-type, such as a list of floats.
 
-        newExp = afwImage.ExposureF(exposure).clone()
+        newExp = exposure.clone()
         newMI = newExp.getMaskedImage()
         newMI.getImage()[:, :] = 0.
         newMI.getVariance()[:, :] = 0.
