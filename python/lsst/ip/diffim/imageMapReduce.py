@@ -24,6 +24,8 @@ standard_library.install_aliases()
 #
 
 import numpy as np
+import abc
+from future.utils import with_metaclass
 
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -37,53 +39,43 @@ __all__ = ("ImageMapReduceTask", "ImageMapReduceConfig",
 
 
 class ImageMapperSubtaskConfig(pexConfig.Config):
-    """!
-    \anchor ImageMapperSubtaskConfig_
-
-    \brief Configuration parameters for the ImageMapperSubtask
+    """Configuration parameters for the ImageMapperSubtask
     """
     pass
 
 
-class ImageMapperSubtask(pipeBase.Task):
-    """!
-    \anchor ImageMapperSubtask_
-
-    \brief Simple example and base class for any task that is to be
+class ImageMapperSubtask(with_metaclass(abc.ABCMeta, pipeBase.Task)):
+    """Abstract base class for any task that is to be
     used as `ImageMapReduceConfig.mapperSubtask`
-
     """
     ConfigClass = ImageMapperSubtaskConfig
     _DefaultName = "ip_diffim_ImageMapperSubtask"
 
-    def __init__(self, *args, **kwargs):
-        """! Create the image gridding subTask
-        @param *args arguments to be passed to
-        lsst.pipe.base.task.Task.__init__
-        @param **kwargs keyword arguments to be passed to
-        lsst.pipe.base.task.Task.__init__
-        """
-        pipeBase.Task.__init__(self, *args, **kwargs)
-
     def run(self, subExp, expandedSubExp, fullBBox, **kwargs):
-        """! Perform operation on given sub-xposure
+        """Perform operation on given sub-exposure.
 
-        @param subExp the sub-exposure upon which to
-        operate
-        @param expandedSubExp the expanded sub-exposure
-        upon which to operate
-        @param fullBBox the bounding box of the original exposure
-        @param **kwargs additional keyword arguments
-        @return anything, including an a `afw.Exposure`
+        To be implemented by subclasses.
+
+        Parameters
+        ----------
+        subExp : afw.Exposure
+            the sub-exposure upon which to operate
+        expandedSubExp : afw.Exposure
+            the expanded sub-exposure upon which to operate
+        fullBBox : afwGeom.BoundingBox
+            the bounding box of the original exposure
+        kwargs :
+            additional keyword arguments
+
+        Returns
+        -------
+        anything, including an a `afw.Exposure`
         """
         pass
 
 
 class ImageReducerSubtaskConfig(pexConfig.Config):
-    """!
-    \anchor ImageReducerSubtaskConfig_
-
-    \brief Configuration parameters for the ImageReducerSubtask
+    """Configuration parameters for the ImageReducerSubtask
     """
     reduceOperation = pexConfig.ChoiceField(
         dtype=str,
@@ -102,38 +94,38 @@ class ImageReducerSubtaskConfig(pexConfig.Config):
 
 
 class ImageReducerSubtask(pipeBase.Task):
-    """!
-    \anchor ImageReducerSubtask_
+    """Base class for any task that is to be
+    used as `ImageMapReduceConfig.reducerSubtask`.
 
-    \brief Simple example and base class for any task that is to be
-    used as `ImageMapReduceConfig.reducerSubtask`
-
+    Basic reduce operations are provided by the `run` method
+    of this class, to be selected by its config.
     """
     ConfigClass = ImageReducerSubtaskConfig
     _DefaultName = "ip_diffim_ImageReducerSubtask"
 
-    def __init__(self, *args, **kwargs):
-        """! Create the image gridding subTask
-        @param *args arguments to be passed to
-        lsst.pipe.base.task.Task.__init__
-        @param **kwargs keyword arguments to be passed to
-        lsst.pipe.base.task.Task.__init__
-        """
-        pipeBase.Task.__init__(self, *args, **kwargs)
-
     def run(self, patches, exposure, **kwargs):
-        """! Reduce a set of sub-exposure patches into a final exposure
+        """Reduce a set of sub-exposure patches into a final exposure
 
         Return an exposure of the same dimensions as `exposure`.
 
-        @param patches list of subExposures of `exposure` to merge
-        @param exposure the original exposure which is used as the template
-        @param **kwargs additional keyword arguments
-        @return a `afw.Exposure`
+        Parameters
+        ----------
+        patches : list of afwImage.Exposure
+             list of subExposures of `exposure` to merge
+        exposure : afwImage.Exposure
+            the original exposure which is used as the template
+        kwargs :
+            additional keyword arguments
 
-        @note Notes and currently known issues:
-        1. This currently *should* correctly handle overlapping patches.
-           For overlapping patches, use `config.reduceOperation='average'.
+        Returns
+        -------
+        an `afw.Exposure` or a list, depending on `config.reduceOperation`.
+
+        Notes
+        -----
+        And currently known issues:
+        1. This currently should correctly handle overlapping patches.
+           For overlapping patches, use `config.reduceOperation='average'`.
         2. This currently does not correctly handle varying PSFs (in fact,
            it just copies over the PSF from the original exposure)
         3. This logic currently makes *two* copies of the original exposure
@@ -170,12 +162,8 @@ class ImageReducerSubtask(pipeBase.Task):
 
 
 class ImageMapReduceConfig(pexConfig.Config):
-    """!
-    \anchor ImageMapReduceConfig_
-
-    \brief Configuration parameters for the ImageMapReduceTask
+    """Configuration parameters for the ImageMapReduceTask
     """
-
     mapperSubtask = pexConfig.ConfigurableField(
         doc="Subtask to run on each subimage",
         target=ImageMapperSubtask,
@@ -190,14 +178,16 @@ class ImageMapReduceConfig(pexConfig.Config):
     #  (i.e., no Point2D)
     gridCentroidsX = pexConfig.ListField(
         dtype=float,
-        doc="Input X centroids around which to place subimages. If None, use grid config options below.",
+        doc="""Input X centroids around which to place subimages.
+               If None, use grid config options below.""",
         optional=True,
         default=None
     )
 
     gridCentroidsY = pexConfig.ListField(
         dtype=float,
-        doc="Input Y centroids around which to place subimages. If None, use grid config options below.",
+        doc="""Input Y centroids around which to place subimages.
+               If None, use grid config options below.""",
         optional=True,
         default=None
     )
@@ -260,7 +250,7 @@ class ImageMapReduceConfig(pexConfig.Config):
     scaleByFwhm = pexConfig.Field(
         dtype=bool,
         doc="""Scale gridSize/gridStep/borderSize/overlapSize by PSF FWHM rather
-        than pixels?""",
+               than pixels?""",
         default=True
     )
 
@@ -280,63 +270,33 @@ class ImageMapReduceConfig(pexConfig.Config):
 
 
 class ImageMapReduceTask(pipeBase.Task):
-    """!
-    \anchor ImageMapReduceTask_
-
-    \brief Break an image in to subimages on a grid and perform
-    the same operation on each.
-
-    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Contents Contents
-
-      - \ref ip_diffim_imageMapReduce_ImageMapReduceTask_Purpose
-      - \ref ip_diffim_imageMapReduce_ImageMapReduceTask_Config
-      - \ref ip_diffim_imageMapReduce_ImageMapReduceTask_Run
-      - \ref ip_diffim_imageMapReduce_ImageMapReduceTask_Debug
-      - \ref ip_diffim_imageMapReduce_ImageMapReduceTask_Example
-
-    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Purpose	Description
+    """Split an Exposure into subExposures (optionally on a grid) and
+    perform the same operation on each.
 
     Task that can perform 'simple' operations on a gridded set of
-    subimages of a larger image, and then have those subimages
-    stitched back together into a new, full-sized modified image.
+    subExposures of a larger Exposure, and then (by default) have
+    those subExposures stitched back together into a new, full-sized
+    image.
 
-    The actual operation is performed by a subTask passed to the
-    config. The input exposure will be pre-subimaged, but the `run`
-    method of the subtask will also have access to the entire
-    (original) image. The reducing operation is also handled by a
-    subtask.
-
-    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Initialize       Task initialization
-
-    \copydoc \_\_init\_\_
-
-    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Run       Invoking the Task
-
-    \copydoc run
-
-    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Config       Configuration parameters
-
-    See \ref ImageMapReduceConfig
-
-    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Debug		Debug variables
-
-    This task has no debug variables
-
-    \section ip_diffim_imageMapReduce_ImageMapReduceTask_Example	Example of using ImageMapReduceTask
-
-    This task has an example simple implementation of the use of
-    ImageMapperSubtask/Config in its unit test
-    \link tests/testImageMapReduce testImageMapReduce\endlink.
+    The actual operations are performed by two subTasks passed to the
+    config. The input exposure will be pre-split, but the `run` method
+    of the subtask will also have access to the entire (original)
+    image. The reducing operation is handled by the second subtask.
     """
     ConfigClass = ImageMapReduceConfig
     _DefaultName = "ip_diffim_imageMapReduce"
 
     def __init__(self, *args, **kwargs):
-        """! Create the image gridding Task
-        @param *args arguments to be passed to
-        lsst.pipe.base.task.Task.__init__
-        @param **kwargs keyword arguments to be passed to
-        lsst.pipe.base.task.Task.__init__
+        """Create the image map-reduce task
+
+        Parameters
+        ----------
+        args :
+            arguments to be passed to
+            `lsst.pipe.base.task.Task.__init__`
+        kwargs :
+            additional keyword arguments to be passed to
+            `lsst.pipe.base.task.Task.__init__`
         """
         pipeBase.Task.__init__(self, *args, **kwargs)
 
@@ -346,34 +306,50 @@ class ImageMapReduceTask(pipeBase.Task):
 
     @pipeBase.timeMethod
     def run(self, exposure, **kwargs):
-        """! Perform a map-reduce operation on the given exposure.
+        """Perform a map-reduce operation on the given exposure.
 
-        Break the exposure into sub-exps on a grid (parameters given
+        Split the exposure into sub-exps on a grid (parameters given
         by `ImageMapReduceConfig`) and perform `mapperSubtask.run()` on
         each. Reduce the resulting sub-exps by running `reducerSubtask.run()`.
 
-        @param exposure the full exposure to process
-        @param **kwargs additional keyword arguments
-        @return output of `reducerSubtask.run()`
+        Parameters
+        ----------
+        exposure : afwImage.ExposureF
+            the full exposure to process
+        kwargs :
+            additional keyword arguments to be passed to
+            subtask `run` methods
 
+        Returns
+        -------
+        output of `reducerSubtask.run()`
         """
         self.log.info("Processing.")
 
         patches = self._runMapper(exposure, **kwargs)
-        newMI = self._reduceImage(patches, exposure, **kwargs)
-        return newMI
+        result = self._reduceImage(patches, exposure, **kwargs)
+        return result
 
     def _runMapper(self, exposure, doClone=False, **kwargs):
-        """! Perform `mapperSubtask.run()` on each patch
+        """Perform `mapperSubtask.run()` on each patch
 
-        Perform `mapperSubtask.run()` on each patch across a grid on `exposure`
-        generated by `generateGrid`.
+        Perform `mapperSubtask.run()` on each patch across a
+        grid on `exposure` generated by `generateGrid`.
 
-        @param exposure the original exposure which is used as the template.
-        @param doClone if True, clone the subimages before passing to subtask;
-        @param **kwargs additional keyword arguments
-        in that case, the sub-exps do not have to be considered as read-only.
-        @return a list of `afwExposure`s
+        Parameters
+        ----------
+        exposure : afwImage.ExposureF
+            the original exposure which is used as the template
+        doClone : boolean
+            if True, clone the subimages before passing to subtask;
+            in that case, the sub-exps do not have to be considered as read-only
+        kwargs :
+            additional keyword arguments to be passed to
+            `mapperSubtask.run`
+
+        Returns
+        -------
+        a list of `afwExposure`s or other values returned by `mapperSubtask.run`.
         """
         boxes0, boxes1 = self.boxes0, self.boxes1
         if boxes0 is None:
@@ -395,21 +371,30 @@ class ImageMapReduceTask(pipeBase.Task):
         return patches
 
     def _reduceImage(self, patches, exposure, **kwargs):
-        """! Reduce/merge a set of sub-exposure patches into a final exposure
+        """Reduce/merge a set of sub-exposure patches into a final exposure
 
         Return an exposure of the same dimensions as `exposure`.
         `patches` is expected to have been produced by `runMapper`.
 
-        @param patches list of subExposures of `exposure` to merge
-        @param exposure the original exposure
-        @param **kwargs additional keyword arguments
-        @return a `afw.Exposure`
+        Parameters
+        ----------
+        patches : list
+            list of subExposures of `exposure` to merge
+        exposure : afwImage.Exposure
+            the original exposure
+        **kwargs :
+            additional keyword arguments
+
+        Returns
+        -------
+        Output of `reducerSubtask.run` which may be an `afw.Exposure` or
+        another iterable.
         """
         result = self.reducerSubtask.run(patches, exposure, **kwargs)
         return result
 
     def _generateGrid(self, exposure, forceEvenSized=False):
-        """! Generate two lists of bounding boxes that evenly grid `exposure`
+        """Generate two lists of bounding boxes that evenly grid `exposure`
 
         Unless the config was provided with `centroidCoordsX` and
         `centroidCoordsY`, grid (subimage) centers are spaced
@@ -422,11 +407,16 @@ class ImageMapReduceTask(pipeBase.Task):
         boxes and corresponding expanded bounding boxes are
         returned, and also set to `self.boxes0`, `self.boxes1`.
 
-        @param exposure an `afwImage.Exposure` whose full bounding
-        box is to be evenly gridded.
-        @param forceEvenSized force grid elements to have even x- and
-        y- dimensions (for ZOGY)
-        @return tuple containing two lists of `afwGeom.BoundingBox`es
+        Parameters
+        ----------
+        exposure : afwImage.Exposure`
+            input exposure whose full bounding box is to be evenly gridded.
+        forceEvenSized : boolean
+            force grid elements to have even-valued x- and y- dimensions? (for ZOGY)
+
+        Returns
+        -------
+        tuple containing two lists of `afwGeom.BoundingBox`es
         """
         # Extract the config parameters for conciseness.
         gridSizeX = self.config.gridSizeX
@@ -506,9 +496,12 @@ class ImageMapReduceTask(pipeBase.Task):
                 self.boxes1.append(bb1)
             return self.boxes0, self.boxes1
 
-        # Offset the "main" (bbox0) and "expanded" (bbox1) bboxes by xoff, yoff.
-        # Clip them by the exposure's bbox.
         def offsetAndClipBoxes(bbox0, bbox1, xoff, yoff, bbox):
+            """Offset the "main" (bbox0) and "expanded" (bbox1) bboxes
+            by xoff, yoff.
+
+            Clip them by the exposure's bbox.
+            """
             xoff = int(np.floor(xoff))
             yoff = int(np.floor(yoff))
             bb0 = afwGeom.Box2I(bbox0)
@@ -536,10 +529,15 @@ class ImageMapReduceTask(pipeBase.Task):
         return self.boxes0, self.boxes1
 
     def _plotBoxes(self, exposure):
-        """! Plot both grids of boxes using matplotlib.
+        """Plot both grids of boxes using matplotlib.
 
-        `self.boxes0` and `self.boxes1` must have been set.
-        @param exposure an input afwImage.Exposure
+        Will compute the grid via `_generateGrid` if
+        `self.boxes0` and `self.boxes1` have not already been set.
+
+        Parameters
+        ----------
+        exposure : afwImage.Exposure
+            Exposure whose bounding box is gridded by this task.
         """
         import matplotlib.pyplot as plt
 
@@ -553,11 +551,16 @@ class ImageMapReduceTask(pipeBase.Task):
         self._plotBoxGrid(boxes1[::3], bbox, ls=':')
 
     def _plotBoxGrid(self, boxes, bbox, **kwargs):
-        """! Plot a grid of boxes using matplotlib.
+        """Plot a grid of boxes using matplotlib.
 
-        @param boxes a list of `afwGeom.BoundingBox`es
-        @param bbox an overall bounding box
-        @param **kwargs additional keyword arguments
+        Parameters
+        ----------
+        boxes : list
+            a list of `afwGeom.BoundingBox`es
+        bbox : afwGeom.BoundingBox
+            an overall bounding box
+        **kwargs :
+            additional keyword arguments for matplotlib
         """
         import matplotlib.pyplot as plt
 
