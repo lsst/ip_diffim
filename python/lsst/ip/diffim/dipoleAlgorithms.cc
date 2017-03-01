@@ -26,7 +26,7 @@
 
 #include "lsst/ip/diffim/DipoleAlgorithms.h"
 #include "lsst/meas/base/Algorithm.h"
-#include "lsst/pex/config/pybind11.h"  // for LSST_DECLARE_CONTROL_FIELD
+#include "lsst/pex/config/python.h"  // for LSST_DECLARE_CONTROL_FIELD
 
 namespace py = pybind11;
 using namespace pybind11::literals;
