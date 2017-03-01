@@ -91,7 +91,7 @@ void declareDipoleFluxAlgorithm(py::module &mod) {
 }
 
 void declareNaiveDipoleFlux(py::module &mod) {
-    py::class_<NaiveDipoleFlux, DipoleFluxAlgorithm> cls(mod, "NaiveDipoleFlux");
+    py::class_<NaiveDipoleFlux, std::shared_ptr<NaiveDipoleFlux>, DipoleFluxAlgorithm> cls(mod, "NaiveDipoleFlux");
 
     cls.def(py::init<NaiveDipoleFlux::Control const &, std::string const &, afw::table::Schema &>(), "ctrl"_a,
             "name"_a, "schema"_a);
@@ -101,7 +101,7 @@ void declareNaiveDipoleFlux(py::module &mod) {
 }
 
 void declareNaiveDipoleCentroid(py::module &mod) {
-    py::class_<NaiveDipoleCentroid, DipoleCentroidAlgorithm> cls(mod, "NaiveDipoleCentroid");
+    py::class_<NaiveDipoleCentroid, std::shared_ptr<NaiveDipoleCentroid>, DipoleCentroidAlgorithm> cls(mod, "NaiveDipoleCentroid");
 
     cls.attr("FAILURE") = py::cast(static_cast<int>(NaiveDipoleCentroid::FAILURE));
     cls.attr("POS_FLAGS") = py::cast(static_cast<int>(NaiveDipoleCentroid::POS_FLAGS));
@@ -121,7 +121,7 @@ void declareNaiveDipoleCentroid(py::module &mod) {
 }
 
 void declarePsfDipoleFlux(py::module &mod) {
-    py::class_<PsfDipoleFlux, DipoleFluxAlgorithm> cls(mod, "PsfDipoleFlux");
+    py::class_<PsfDipoleFlux, std::shared_ptr<PsfDipoleFlux>, DipoleFluxAlgorithm> cls(mod, "PsfDipoleFlux");
 
     cls.def(py::init<PsfDipoleFlux::Control const &, std::string const &, afw::table::Schema &>(), "ctrl"_a,
             "name"_a, "schema"_a);
