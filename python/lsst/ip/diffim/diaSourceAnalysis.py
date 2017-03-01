@@ -61,8 +61,7 @@ def readSourceSet(boostFile):
     additionalData = dafBase.PropertySet()
     persistence = dafPersist.Persistence.getPersistence(pexPolicy.Policy())
     storageList.append(persistence.getRetrieveStorage("BoostStorage", loc))
-    psvptr = persistence.unsafeRetrieve("PersistableSourceVector", storageList, additionalData)
-    psv = afwDet.PersistableSourceVector.swigConvert(psvptr)
+    psv = persistence.unsafeRetrieve("PersistableSourceVector", storageList, additionalData)
     return psv.getSources()
 
 
