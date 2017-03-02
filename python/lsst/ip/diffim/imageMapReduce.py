@@ -39,39 +39,69 @@ __all__ = ("ImageMapReduceTask", "ImageMapReduceConfig",
 
 
 class ImageMapperSubtaskConfig(pexConfig.Config):
-    """Configuration parameters for the ImageMapperSubtask
+    """Configuration parameters for ImageMapperSubtask
     """
     pass
 
 
 class ImageMapperSubtask(with_metaclass(abc.ABCMeta, pipeBase.Task)):
     """Abstract base class for any task that is to be
-    used as `ImageMapReduceConfig.mapperSubtask`
+    used as `ImageMapReduceConfig.mapperSubtask`.
+
+    An `ImageMapperSubtask` is responsible for processing individual
+    sub-exposures in its `run` method, which is called from
+    `ImageMapReduceTask.run`. `run` may return a processed new
+    sub-exposure which can be be "stitched" back into a new resulting
+    larger exposure (depending on the configured
+    `ImageReducerSubtask`); otherwise if it does not return an
+    afw.Exposure, then the
+    `ImageReducerSubtask.config.reducerSubtask.reduceOperation`
+    should be set to 'none' and the result will be propagated
+    as-is.
     """
     ConfigClass = ImageMapperSubtaskConfig
     _DefaultName = "ip_diffim_ImageMapperSubtask"
 
-    def run(self, subExp, expandedSubExp, fullBBox, **kwargs):
-        """Perform operation on given sub-exposure.
+    @abc.abstractmethod
+    def run(self, subExposure, expandedSubExposure, fullBBox, **kwargs):
+        """Perform operation on given `subExposure`.
 
-        To be implemented by subclasses.
+        To be implemented by subclasses. See class docstring for more
+        details. This method is given the `subExposure` which
+        is to be operated upon, and an `expandedSubExposure` which
+        will contain `subExposure` with additional surrounding
+        pixels. This allows for, for example, convolutions (which
+        should be performed on `expandedSubExposure`), to prevent the
+        returned sub-exposure from containing invalid pixels.
+
+        This method may return a new, processed sub-exposure which can
+        be be "stitched" back into a new resulting larger exposure
+        (depending on the paired, configured `ImageReducerSubtask`);
+        otherwise if it does not return an afw.Exposure, then the
+        `ImageReducerSubtask.config.mapperSubtask.reduceOperation`
+        should be set to 'none' and the result will be propagated
+        as-is.
 
         Parameters
         ----------
-        subExp : afw.Exposure
+        subExposure : afw.Exposure
             the sub-exposure upon which to operate
-        expandedSubExp : afw.Exposure
+        expandedSubExposure : afw.Exposure
             the expanded sub-exposure upon which to operate
         fullBBox : afwGeom.BoundingBox
             the bounding box of the original exposure
         kwargs :
-            additional keyword arguments
+            additional keyword arguments propagated from
+            `ImageMapReduceTask.run`.
 
         Returns
         -------
-        anything, including an a `afw.Exposure`
+        A `pipeBase.Struct containing the result of the `subExposure` processing,
+        which may itself be of any type. See above for details. If it is an
+        afwImage.Exposure (processed sub-exposure), then the name in the Struct
+        should be 'subExposure'. This is implemented here as an example only.
         """
-        pass
+        return pipeBase.Struct(subExposure=subExposure)
 
 
 class ImageReducerSubtaskConfig(pexConfig.Config):
@@ -80,15 +110,16 @@ class ImageReducerSubtaskConfig(pexConfig.Config):
     reduceOperation = pexConfig.ChoiceField(
         dtype=str,
         doc="""Operation to use for reducing subimages into new image.""",
-        default="copy",
+        default="average",
         allowed={
-            "none": """simply return a list of values and not re-map results into
+            "none": """simply return a list of values and don't re-map results into
                        a new image (noop operation)""",
-            "copy": """copy pixels directly from subimage (non-deterministic for overlaps)
-                       into correct location in new exposure""",
+            "copy": """copy pixels directly from subimage into correct location in
+                       new exposure (potentially non-deterministic for overlaps)""",
             "sum": """add pixels from overlaps (probably never wanted; used for testing)
                        into correct location in new exposure""",
-            "average": """same as copy, but average pixels from overlaps (NaNs ignored)"""
+            "average": """same as copy, but also average pixels from overlapped regions
+                       (NaNs ignored)"""
         }
     )
 
@@ -103,51 +134,71 @@ class ImageReducerSubtask(pipeBase.Task):
     ConfigClass = ImageReducerSubtaskConfig
     _DefaultName = "ip_diffim_ImageReducerSubtask"
 
-    def run(self, patches, exposure, **kwargs):
-        """Reduce a set of sub-exposure patches into a final exposure
+    def run(self, mapperResults, exposure, **kwargs):
+        """Reduce a list of items produced by `ImageMapperSubtask`.
 
-        Return an exposure of the same dimensions as `exposure`.
+        If `self.config.reduceOperation` is not 'none', then expect
+        that the `pipeBase.Struct`s in the `mapperResults` list
+        contain sub-exposures named 'subExposure', to be stitched back
+        into a single Exposure with the same dimensions, PSF, and mask
+        as the input `exposure`. Otherwise, the `mapperResults` list
+        is simply returned directly.
 
         Parameters
         ----------
-        patches : list of afwImage.Exposure
-             list of subExposures of `exposure` to merge
+        mapperResults : list
+            list of `pipeBase.Struct` returned by `ImageMapperSubtask.run`.
         exposure : afwImage.Exposure
-            the original exposure which is used as the template
+            the original exposure which is cloned to use as the
+            basis for the resulting exposure (if
+            self.config.mapperSubtask.reduceOperation is not 'none')
         kwargs :
-            additional keyword arguments
+            additional keyword arguments propagaged from
+            `ImageMapReduceTask.run`.
 
         Returns
         -------
-        an `afw.Exposure` or a list, depending on `config.reduceOperation`.
+        A `pipeBase.Struct` containing either an `afw.Exposure` (named 'exposure')
+        or a list (named 'result'), depending on `config.reduceOperation`.
 
         Notes
         -----
         And currently known issues:
-        1. This currently should correctly handle overlapping patches.
-           For overlapping patches, use `config.reduceOperation='average'`.
+        1. This currently should correctly handle overlapping sub-exposures.
+           For overlapping sub-exposures, use `config.reduceOperation='average'`.
         2. This currently does not correctly handle varying PSFs (in fact,
            it just copies over the PSF from the original exposure)
         3. To be done: correct handling of masks as well.
         4. This logic currently makes *two* copies of the original exposure
-           (one here and one in `mapperSubtask.run()`).
+           (one here and one in `mapperSubtask.run()`). Possibly of concern
+           for large images on memory-constrained systems.
         """
+        # No-op; simply pass mapperResults directly to ImageMapReduceTask.run
         if self.config.reduceOperation == 'none':
-            return patches  # this is likely a non-image-type, such as a list of floats.
+            return pipeBase.Struct(result=mapperResults)
 
         newExp = exposure.clone()
         newMI = newExp.getMaskedImage()
-        newMI.getImage()[:, :] = 0.
-        newMI.getVariance()[:, :] = 0.
 
         reduceOp = self.config.reduceOperation
-        if reduceOp == 'average':  # make an array to keep track of weights
-            weights = afwImage.ImageF(newMI.getBBox())  # Needs to be a float to divide later.
+        if reduceOp == 'copy':
+            newMI.getImage()[:, :] = np.nan
+            newMI.getVariance()[:, :] = np.nan
+        else:
+            newMI.getImage()[:, :] = 0.
+            newMI.getVariance()[:, :] = 0.
+            if reduceOp == 'average':  # make an array to keep track of weights
+                weights = afwImage.ImageF(newMI.getBBox())  # must be a float to divide later.
 
-        for patch in patches:
-            subExp = afwImage.ExposureF(newExp, patch.getBBox())
+        for item in mapperResults:
+            item = item.subExposure  # Expected named value in the pipeBase.Struct
+            if not (isinstance(item, afwImage.ExposureF) or isinstance(item, afwImage.ExposureI) or
+                    isinstance(item, afwImage.ExposureU) or isinstance(item, afwImage.ExposureD)):
+                raise TypeError("""Expecting an Exposure type, got %s.
+                                   Consider using `reduceOperation="none".""" % str(type(item)))
+            subExp = afwImage.ExposureF(newExp, item.getBBox())
             subMI = subExp.getMaskedImage()
-            patchMI = patch.getMaskedImage()
+            patchMI = item.getMaskedImage()
             isNan = (np.isnan(patchMI.getImage().getArray()) |
                      np.isnan(patchMI.getVariance().getArray()))
             noNans = np.sum(isNan) <= 0
@@ -158,23 +209,26 @@ class ImageReducerSubtask(pipeBase.Task):
                     isNotNan = ~isNan
                     subMI.getImage().getArray()[isNotNan] = patchMI.getImage().getArray()[isNotNan]
                     subMI.getVariance().getArray()[isNotNan] = patchMI.getVariance().getArray()[isNotNan]
-            if reduceOp == 'sum' or reduceOp == 'average':  # much of these two is the same
+            if reduceOp == 'sum' or reduceOp == 'average':  # much of these two options is the same
                 if noNans:
                     subMI += patchMI
                     if reduceOp == 'average':
-                        wsubim = afwImage.ImageF(weights, patch.getBBox())
+                        # wsubim is a view into the `weights` Image, so here we simply add one to
+                        # the region of `weights` confined by `item.getBBox()`.
+                        wsubim = afwImage.ImageF(weights, item.getBBox())
                         wsubim += 1.
                 else:
                     isNotNan = ~isNan
                     subMI.getImage().getArray()[isNotNan] += patchMI.getImage().getArray()[isNotNan]
                     subMI.getVariance().getArray()[isNotNan] += patchMI.getVariance().getArray()[isNotNan]
                     if reduceOp == 'average':
-                        wsubim = afwImage.ImageF(weights, patch.getBBox())
+                        wsubim = afwImage.ImageF(weights, item.getBBox())
                         wsubim.getArray()[isNotNan] += 1.
 
         if reduceOp == 'average':
             newMI /= weights
-        return newExp
+
+        return pipeBase.Struct(exposure=newExp)
 
 
 class ImageMapReduceConfig(pexConfig.Config):
@@ -191,7 +245,8 @@ class ImageMapReduceConfig(pexConfig.Config):
     )
 
     # Separate gridCentroidsX and gridCentroidsY since pexConfig.ListField accepts limited dtypes
-    #  (i.e., no Point2D)
+    #  (i.e., no Point2D). The resulting set of centroids is the "vertical stack" of
+    #  `gridCentroidsX` and `gridCentroidsY`.
     gridCentroidsX = pexConfig.ListField(
         dtype=float,
         doc="""Input X centroids around which to place subimages.
@@ -240,21 +295,24 @@ class ImageMapReduceConfig(pexConfig.Config):
 
     borderSizeX = pexConfig.Field(
         dtype=float,
-        doc="""Dimensions of cell border in +/- x direction""",
+        doc="""Dimensions of grid cell border in +/- x direction, to be used
+               for generating `expandedSubExposure`.""",
         default=5.,
         check=lambda x: x > 0.
     )
 
     borderSizeY = pexConfig.Field(
         dtype=float,
-        doc="""Dimensions of cell border in +/- y direction""",
+        doc="""Dimensions of grid cell border in +/- y direction, to be used
+               for generating `expandedSubExposure`.""",
         default=5.,
         check=lambda x: x > 0.
     )
 
     adjustGridOption = pexConfig.ChoiceField(
         dtype=str,
-        doc="""Whether and how to adjust grid to fit evenly within image""",
+        doc="""Whether and how to adjust grid to fit evenly within, and cover entire
+               image""",
         default="spacing",
         allowed={
             "spacing": "adjust spacing between centers of grid cells (allowing overlaps)",
@@ -289,15 +347,19 @@ class ImageMapReduceTask(pipeBase.Task):
     """Split an Exposure into subExposures (optionally on a grid) and
     perform the same operation on each.
 
-    Task that can perform 'simple' operations on a gridded set of
-    subExposures of a larger Exposure, and then (by default) have
-    those subExposures stitched back together into a new, full-sized
-    image.
+    Perform 'simple' operations on a gridded set of subExposures of a
+    larger Exposure, and then (by default) have those subExposures
+    stitched back together into a new, full-sized image.
+
+    Contrary to the expectation given by its name, this task does not
+    perform these operations in parallel, although it could be updatd
+    to provide such functionality.
 
     The actual operations are performed by two subTasks passed to the
-    config. The input exposure will be pre-split, but the `run` method
-    of the subtask will also have access to the entire (original)
-    image. The reducing operation is handled by the second subtask.
+    config. The exposure passed to this task's `run` method will be
+    divided, and those subExposures will be passed to the subTasks,
+    along with the original exposure. The reducing operation is
+    performed by the second subtask.
     """
     ConfigClass = ImageMapReduceConfig
     _DefaultName = "ip_diffim_imageMapReduce"
@@ -324,9 +386,10 @@ class ImageMapReduceTask(pipeBase.Task):
     def run(self, exposure, **kwargs):
         """Perform a map-reduce operation on the given exposure.
 
-        Split the exposure into sub-exps on a grid (parameters given
-        by `ImageMapReduceConfig`) and perform `mapperSubtask.run()` on
-        each. Reduce the resulting sub-exps by running `reducerSubtask.run()`.
+        Split the exposure into sub-expposures on a grid (parameters
+        given by `ImageMapReduceConfig`) and perform
+        `config.mapperSubtask.run()` on each. Reduce the resulting
+        sub-exposures by running `config.reducerSubtask.run()`.
 
         Parameters
         ----------
@@ -339,18 +402,19 @@ class ImageMapReduceTask(pipeBase.Task):
         Returns
         -------
         output of `reducerSubtask.run()`
-        """
-        self.log.info("Processing.")
 
-        patches = self._runMapper(exposure, **kwargs)
-        result = self._reduceImage(patches, exposure, **kwargs)
+        """
+        mapperResults = self._runMapper(exposure, **kwargs)
+        result = self._reduceImage(mapperResults, exposure, **kwargs)
         return result
 
     def _runMapper(self, exposure, doClone=False, **kwargs):
-        """Perform `mapperSubtask.run()` on each patch
+        """Perform `mapperSubtask.run` on each sub-exposure
 
-        Perform `mapperSubtask.run()` on each patch across a
-        grid on `exposure` generated by `generateGrid`.
+        Perform `mapperSubtask.run` on each sub-exposure across a
+        grid on `exposure` generated by `_generateGrid`. Also pass to
+        `mapperSubtask.run` an 'expanded sub-exposure' containing the
+        same region as the sub-exposure but with an expanded bounding box.
 
         Parameters
         ----------
@@ -365,37 +429,37 @@ class ImageMapReduceTask(pipeBase.Task):
 
         Returns
         -------
-        a list of `afwExposure`s or other values returned by `mapperSubtask.run`.
+        a list of `pipeBase.Struct`s as returned by `mapperSubtask.run`.
         """
-        boxes0, boxes1 = self.boxes0, self.boxes1
-        if boxes0 is None:
-            boxes0, boxes1 = self._generateGrid(exposure)
-        if len(boxes0) != len(boxes1):
-            raise Exception('Uh oh!')   # TBD: define a specific exception to raise
+        if self.boxes0 is None:
+            self._generateGrid(exposure)
+        if len(self.boxes0) != len(self.boxes1):
+            raise ValueError('Bounding boxes list and expanded bounding boxes list are of different lengths')
 
-        self.log.info("Processing %d sub-exposures" % len(boxes0))
-        patches = []
-        for box0, box1 in zip(boxes0, boxes1): #i in range(len(boxes0)):
-            subExp = afwImage.ExposureF(exposure, box0) #boxes0[i])
-            expandedSubExp = afwImage.ExposureF(exposure, box1) #boxes1[i])
+        self.log.info("Processing %d sub-exposures", len(self.boxes0))
+        mapperResults = []
+        for box0, box1 in zip(self.boxes0, self.boxes1):
+            subExp = afwImage.ExposureF(exposure, box0)
+            expandedSubExp = afwImage.ExposureF(exposure, box1)
             if doClone:
                 subExp = subExp.clone()
                 expandedSubExp = expandedSubExp.clone()
             result = self.mapperSubtask.run(subExp, expandedSubExp, exposure.getBBox(), **kwargs)
-            patches.append(result)
+            mapperResults.append(result)
 
-        return patches
+        return mapperResults
 
-    def _reduceImage(self, patches, exposure, **kwargs):
-        """Reduce/merge a set of sub-exposure patches into a final exposure
+    def _reduceImage(self, mapperResults, exposure, **kwargs):
+        """Reduce/merge a set of sub-exposures into a final result
 
         Return an exposure of the same dimensions as `exposure`.
-        `patches` is expected to have been produced by `runMapper`.
+        `mapperResults` is expected to have been produced by `runMapper`.
 
         Parameters
         ----------
-        patches : list
-            list of subExposures of `exposure` to merge
+        mapperResults : list
+            list of `pipeBase.Struct`, each of which was produced by
+            `config.mapperSubtask`
         exposure : afwImage.Exposure
             the original exposure
         **kwargs :
@@ -403,36 +467,32 @@ class ImageMapReduceTask(pipeBase.Task):
 
         Returns
         -------
-        Output of `reducerSubtask.run` which may be an `afw.Exposure` or
-        another iterable.
+        Output of `reducerSubtask.run` which is a `pipeBase.Struct`.
         """
-        result = self.reducerSubtask.run(patches, exposure, **kwargs)
+        result = self.reducerSubtask.run(mapperResults, exposure, **kwargs)
         return result
 
     def _generateGrid(self, exposure, forceEvenSized=False):
         """Generate two lists of bounding boxes that evenly grid `exposure`
 
         Unless the config was provided with `centroidCoordsX` and
-        `centroidCoordsY`, grid (subimage) centers are spaced
-        evenly by gridStepX/Y. Then the grid is adjusted as
-        little as possible to evenly cover the input exposure (if
+        `centroidCoordsY`, grid (subimage) centers are spaced evenly
+        by gridStepX/Y. Then the grid is adjusted as little as
+        possible to evenly cover the input exposure (if
         adjustGridOption is not 'none'). Then the second set of
         bounding boxes is expanded by borderSizeX/Y. The expanded
-        bounding boxes are adjusted to ensure that they intersect
-        the exposure's bounding box. The resulting lists of bounding
-        boxes and corresponding expanded bounding boxes are
-        returned, and also set to `self.boxes0`, `self.boxes1`.
+        bounding boxes are adjusted to ensure that they intersect the
+        exposure's bounding box. The resulting lists of bounding boxes
+        and corresponding expanded bounding boxes are set to
+        `self.boxes0`, `self.boxes1`.
 
         Parameters
         ----------
-        exposure : afwImage.Exposure`
+        exposure : `afwImage.Exposure`
             input exposure whose full bounding box is to be evenly gridded.
         forceEvenSized : boolean
-            force grid elements to have even-valued x- and y- dimensions? (for ZOGY)
-
-        Returns
-        -------
-        tuple containing two lists of `afwGeom.BoundingBox`es
+            force grid elements to have even-valued x- and y- dimensions?
+            (Potentially useful if doing Fourier transform of subExposures.)
         """
         # Extract the config parameters for conciseness.
         gridSizeX = self.config.gridSizeX
@@ -478,15 +538,19 @@ class ImageMapReduceTask(pipeBase.Task):
             nGridX = bbox.getWidth() / gridStepX
             # Readjust gridStepX so that it fits perfectly in the image.
             gridStepX = float(bbox.getWidth() - gridSizeX) / float(nGridX)
-            if gridStepX <= 0:
-                gridStepX = 1
+            if gridStepX < 1:
+                raise ValueError('X grid spacing is too small (or negative): %f' % gridStepX)
 
         if adjustGridOption == 'spacing':
             nGridY = bbox.getWidth() / gridStepY
             # Readjust gridStepY so that it fits perfectly in the image.
             gridStepY = float(bbox.getHeight() - gridSizeY) / float(nGridY)
-            if gridStepY <= 0:
-                gridStepY = 1
+            if gridStepY < 1:
+                raise ValueError('Y grid spacing is too small (or negative): %f' % gridStepY)
+
+        if adjustGridOption == 'size':
+            gridSizeX = gridStepX
+            gridSizeY = gridStepY
 
         # first "main" box at 0,0
         bbox0 = afwGeom.Box2I(afwGeom.Point2I(bbox.getBegin()), afwGeom.Extent2I(gridSizeX, gridSizeY))
@@ -544,8 +608,6 @@ class ImageMapReduceTask(pipeBase.Task):
                     self.boxes1.append(bb1)
             xoff += gridStepX
 
-        return self.boxes0, self.boxes1
-
     def _plotBoxes(self, exposure, skip=3):
         """Plot both grids of boxes using matplotlib.
 
@@ -562,14 +624,13 @@ class ImageMapReduceTask(pipeBase.Task):
         import matplotlib.pyplot as plt
 
         bbox = exposure.getBBox()
-        boxes0, boxes1 = self.boxes0, self.boxes1
-        if boxes0 is None:
-            boxes0, boxes1 = self._generateGrid(exposure)
-        self._plotBoxGrid(boxes0[::skip], bbox, ls='--')
+        if self.boxes0 is None:
+            self._generateGrid(exposure)
+        self._plotBoxGrid(self.boxes0[::skip], bbox, ls='--')
         # reset the color cycle -- see
         # http://stackoverflow.com/questions/24193174/reset-color-cycle-in-matplotlib
         plt.gca().set_prop_cycle(None)
-        self._plotBoxGrid(boxes1[::skip], bbox, ls=':')
+        self._plotBoxGrid(self.boxes1[::skip], bbox, ls=':')
 
     def _plotBoxGrid(self, boxes, bbox, **kwargs):
         """Plot a grid of boxes using matplotlib.
