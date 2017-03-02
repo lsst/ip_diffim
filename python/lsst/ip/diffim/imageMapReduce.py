@@ -99,7 +99,8 @@ class ImageMapperSubtask(with_metaclass(abc.ABCMeta, pipeBase.Task)):
         A `pipeBase.Struct containing the result of the `subExposure` processing,
         which may itself be of any type. See above for details. If it is an
         afwImage.Exposure (processed sub-exposure), then the name in the Struct
-        should be 'subExposure'. This is implemented here as an example only.
+        should be 'subExposure'. This is implemented here as a pass-through
+        example only.
         """
         return pipeBase.Struct(subExposure=subExposure)
 
