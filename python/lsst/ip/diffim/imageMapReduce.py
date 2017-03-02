@@ -609,7 +609,7 @@ class ImageMapReduceTask(pipeBase.Task):
                     self.boxes1.append(bb1)
             xoff += gridStepX
 
-    def _plotBoxes(self, exposure, skip=3):
+    def _plotBoxes(self, fullBBox, skip=3):
         """Plot both grids of boxes using matplotlib.
 
         Will compute the grid via `_generateGrid` if
@@ -624,14 +624,13 @@ class ImageMapReduceTask(pipeBase.Task):
         """
         import matplotlib.pyplot as plt
 
-        bbox = exposure.getBBox()
         if self.boxes0 is None:
-            self._generateGrid(exposure)
-        self._plotBoxGrid(self.boxes0[::skip], bbox, ls='--')
+            raise RuntimeError('Cannot plot boxes. Run _generateGrid first.')
+        self._plotBoxGrid(self.boxes0[::skip], fullBBox, ls='--')
         # reset the color cycle -- see
         # http://stackoverflow.com/questions/24193174/reset-color-cycle-in-matplotlib
         plt.gca().set_prop_cycle(None)
-        self._plotBoxGrid(self.boxes1[::skip], bbox, ls=':')
+        self._plotBoxGrid(self.boxes1[::skip], fullBBox, ls=':')
 
     def _plotBoxGrid(self, boxes, bbox, **kwargs):
         """Plot a grid of boxes using matplotlib.
