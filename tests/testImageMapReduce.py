@@ -142,6 +142,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
     """A test case for the image gridded processing task
     """
     def setUp(self):
+        self.longMessage = True
         self._makeImage()
 
     def tearDown(self):
@@ -172,8 +173,8 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         newArr = newMI.getImage().getArray()
         isnan = np.isnan(newArr)
         if not withNaNs:
-            self.assertTrue(np.sum(isnan) == 0,
-                            msg='Failed on withNaNs: %s' % str(withNaNs))
+            self.assertEqual(np.sum(isnan), 0,
+                             msg='Failed on withNaNs: %s' % str(withNaNs))
 
         mi = self.exposure.getMaskedImage().getImage().getArray()
         if reduceOp != 'sum':
@@ -199,18 +200,18 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         mi = self.exposure.getMaskedImage()
         isnan = np.isnan(newArr)
         if not withNaNs:
-            self.assertTrue(np.sum(isnan) == 0,
-                            msg='Failed on withNaNs: %s' % str(withNaNs))
+            self.assertEqual(np.sum(isnan), 0,
+                             msg='Failed on withNaNs: %s' % str(withNaNs))
 
         mi = self.exposure.getMaskedImage().getImage().getArray()
         self.assertFloatsAlmostEqual(mi[~isnan], newArr[~isnan] - 5.,
                                      msg='Failed on withNaNs: %s' % str(withNaNs))
 
-    def _testAverageVersusCopy(self):
+    def testAverageVersusCopy(self):
         self.testAverageVersusCopy(withNaNs=False)
         self.testAverageVersusCopy(withNaNs=True)
 
-    def testAverageVersusCopy(self, withNaNs=False):
+    def _testAverageVersusCopy(self, withNaNs=False):
         """Re-run `testExampleTaskNoOverlaps` and `testExampleTaskWithOverlaps`
         on a more complex image (with random noise). Ensure that the results are
         identical.
@@ -238,7 +239,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         newMA1 = newMI1.getImage().getArray()
         isnan = np.isnan(newMA1)
         if not withNaNs:
-            self.assertTrue(np.sum(isnan) == 0)
+            self.assertEqual(np.sum(isnan), 0)
         newMA2 = newMI2.getImage().getArray()
 
         self.assertFloatsAlmostEqual(newMA1[~isnan], newMA2[~isnan])
@@ -373,14 +374,14 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
             newMI = newExp.getMaskedImage()
             newArr = newMI.getImage().getArray()
             isnan = np.isnan(newArr)
-            self.assertTrue(np.sum(isnan) == 0, msg='Failed NaN (%d), on config: %s' %
-                            (np.sum(isnan), str(config)))
+            self.assertEqual(np.sum(isnan), 0, msg='Failed NaN (%d), on config: %s' %
+                             (np.sum(isnan), str(config)))
 
             mi = self.exposure.getMaskedImage().getImage().getArray()
             self.assertFloatsAlmostEqual(mi[~isnan], newArr[~isnan] - expectedVal,
                                          msg='Failed on config: %s' % str(config))
 
-        self.assertTrue(lenBoxes[0] < lenBoxes[1], msg='Failed lengths on config: %s' %
+        self.assertLess(lenBoxes[0], lenBoxes[1], msg='Failed lengths on config: %s' %
                         str(config))
 
 

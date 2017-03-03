@@ -138,6 +138,10 @@ class ImageReducerSubtask(pipeBase.Task):
     def run(self, mapperResults, exposure, **kwargs):
         """Reduce a list of items produced by `ImageMapperSubtask`.
 
+        Either stitch the passed `mapperResults` list
+        together into a new Exposure (default) or pass it through
+        (if `self.config.reduceOperation` is 'none').
+
         If `self.config.reduceOperation` is not 'none', then expect
         that the `pipeBase.Struct`s in the `mapperResults` list
         contain sub-exposures named 'subExposure', to be stitched back
@@ -168,7 +172,8 @@ class ImageReducerSubtask(pipeBase.Task):
         1. This currently should correctly handle overlapping sub-exposures.
            For overlapping sub-exposures, use `config.reduceOperation='average'`.
         2. This currently does not correctly handle varying PSFs (in fact,
-           it just copies over the PSF from the original exposure)
+           it just copies over the PSF from the original exposure). To be
+           investigated in DM-9629.
         3. To be done: correct handling of masks as well.
         4. This logic currently makes *two* copies of the original exposure
            (one here and one in `mapperSubtask.run()`). Possibly of concern
@@ -247,7 +252,8 @@ class ImageMapReduceConfig(pexConfig.Config):
 
     # Separate gridCentroidsX and gridCentroidsY since pexConfig.ListField accepts limited dtypes
     #  (i.e., no Point2D). The resulting set of centroids is the "vertical stack" of
-    #  `gridCentroidsX` and `gridCentroidsY`.
+    #  `gridCentroidsX` and `gridCentroidsY`, i.e. for (1,2), (3,4) respectively, the
+    #   resulting centroids are ((1,3), (2,4)).
     gridCentroidsX = pexConfig.ListField(
         dtype=float,
         doc="""Input X centroids around which to place subimages.
