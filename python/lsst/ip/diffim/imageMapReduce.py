@@ -215,6 +215,7 @@ class ImageReducerSubtask(pipeBase.Task):
                     isNotNan = ~isNan
                     subMI.getImage().getArray()[isNotNan] = patchMI.getImage().getArray()[isNotNan]
                     subMI.getVariance().getArray()[isNotNan] = patchMI.getVariance().getArray()[isNotNan]
+
             if reduceOp == 'sum' or reduceOp == 'average':  # much of these two options is the same
                 if noNans:
                     subMI += patchMI

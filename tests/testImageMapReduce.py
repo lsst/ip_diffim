@@ -208,31 +208,28 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
                                      msg='Failed on withNaNs: %s' % str(withNaNs))
 
     def testAverageVersusCopy(self):
-        self.testAverageVersusCopy(withNaNs=False)
-        self.testAverageVersusCopy(withNaNs=True)
+        self._testAverageVersusCopy(withNaNs=False)
+        self._testAverageVersusCopy(withNaNs=True)
 
     def _testAverageVersusCopy(self, withNaNs=False):
         """Re-run `testExampleTaskNoOverlaps` and `testExampleTaskWithOverlaps`
         on a more complex image (with random noise). Ensure that the results are
-        identical.
+        identical (within between 'copy' and 'average' reduceOperation.
         """
         exposure1 = self.exposure.clone()
         img = exposure1.getMaskedImage().getImage()
         afwMath.randomGaussianImage(img, afwMath.Random())
+        exposure2 = exposure1.clone()
+
         config = AddAmountImageMapReduceConfig()
         task = ImageMapReduceTask(config)
         config.mapperSubtask.addAmount = 5.
         newExp = task.run(exposure1, addNans=withNaNs).exposure
         newMI1 = newExp.getMaskedImage()
 
-        exposure2 = self.exposure.clone()
-        img = exposure2.getMaskedImage().getImage()
-        afwMath.randomGaussianImage(img, afwMath.Random())
-        config = AddAmountImageMapReduceConfig()
         config.gridStepX = config.gridStepY = 8
         config.reducerSubtask.reduceOperation = 'average'
         task = ImageMapReduceTask(config)
-        config.mapperSubtask.addAmount = 5.
         newExp = task.run(exposure2, addNans=withNaNs).exposure
         newMI2 = newExp.getMaskedImage()
 
@@ -242,7 +239,9 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
             self.assertEqual(np.sum(isnan), 0)
         newMA2 = newMI2.getImage().getArray()
 
-        self.assertFloatsAlmostEqual(newMA1[~isnan], newMA2[~isnan])
+        # Because the average uses a float accumulator, we can have differences, set a tolerance.
+        # Turns out (in practice for this test), only 7 pixels seem to have a small difference.
+        self.assertFloatsAlmostEqual(newMA1[~isnan], newMA2[~isnan], rtol=1e-7)
 
     def testMean(self):
         """Test sample grid task that returns the mean of the subimages and uses
