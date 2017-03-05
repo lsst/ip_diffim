@@ -19,10 +19,12 @@
  * the GNU General Public License along with this program.  If not,
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
+
+#include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
+
 #include <memory>
 #include <string>
-
-#include <pybind11/pybind11.h>
 
 #include "lsst/ip/diffim/DipoleAlgorithms.h"
 #include "lsst/meas/base/Algorithm.h"
@@ -67,10 +69,11 @@ void declareDipoleCentroidAlgorithm(py::module &mod) {
     py::class_<DipoleCentroidAlgorithm, std::shared_ptr<DipoleCentroidAlgorithm>, meas::base::SimpleAlgorithm>
             cls(mod, "_DipoleCentroidAlgorithm");
 
-    cls.attr("FAILURE") = py::cast(static_cast<int>(DipoleCentroidAlgorithm::FAILURE));
-    cls.attr("POS_FAILURE") = py::cast(static_cast<int>(DipoleCentroidAlgorithm::POS_FAILURE));
-    cls.attr("NEG_FAILURE") = py::cast(static_cast<int>(DipoleCentroidAlgorithm::NEG_FAILURE));
-    cls.attr("N_FLAGS") = py::cast(static_cast<int>(DipoleCentroidAlgorithm::N_FLAGS));
+    cls.attr("FAILURE") = py::cast(DipoleCentroidAlgorithm::FAILURE);
+    cls.attr("POS_FLAG") = py::cast(DipoleCentroidAlgorithm::POS_FLAG);
+    cls.attr("NEG_FLAG") = py::cast(DipoleCentroidAlgorithm::NEG_FLAG);
+    cls.def_static("getFlagDefinitions", &DipoleCentroidAlgorithm::getFlagDefinitions,
+                   py::return_value_policy::copy);
 
     cls.def("getPositiveKeys", &DipoleCentroidAlgorithm::getPositiveKeys);
     cls.def("getNegativeKeys", &DipoleCentroidAlgorithm::getNegativeKeys);
@@ -81,10 +84,11 @@ void declareDipoleFluxAlgorithm(py::module &mod) {
     py::class_<DipoleFluxAlgorithm, std::shared_ptr<DipoleFluxAlgorithm>, meas::base::SimpleAlgorithm> cls(
             mod, "_DipoleFluxAlgorithm");
 
-    cls.attr("FAILURE") = py::cast(static_cast<int>(DipoleFluxAlgorithm::FAILURE));
-    cls.attr("POS_FAILURE") = py::cast(static_cast<int>(DipoleFluxAlgorithm::POS_FAILURE));
-    cls.attr("NEG_FAILURE") = py::cast(static_cast<int>(DipoleFluxAlgorithm::NEG_FAILURE));
-    cls.attr("N_FLAGS") = py::cast(static_cast<int>(DipoleFluxAlgorithm::N_FLAGS));
+    cls.attr("FAILURE") = py::cast(DipoleFluxAlgorithm::FAILURE);
+    cls.attr("POS_FLAG") = py::cast(DipoleFluxAlgorithm::POS_FLAG);
+    cls.attr("NEG_FLAG") = py::cast(DipoleFluxAlgorithm::NEG_FLAG);
+    cls.def_static("getFlagDefinitions", &DipoleFluxAlgorithm::getFlagDefinitions,
+                   py::return_value_policy::copy);
 
     cls.def("getPositiveKeys", &DipoleFluxAlgorithm::getPositiveKeys);
     cls.def("getNegativeKeys", &DipoleFluxAlgorithm::getNegativeKeys);
@@ -104,11 +108,6 @@ void declareNaiveDipoleFlux(py::module &mod) {
 void declareNaiveDipoleCentroid(py::module &mod) {
     py::class_<NaiveDipoleCentroid, std::shared_ptr<NaiveDipoleCentroid>, DipoleCentroidAlgorithm> cls(
             mod, "NaiveDipoleCentroid");
-
-    cls.attr("FAILURE") = py::cast(static_cast<int>(NaiveDipoleCentroid::FAILURE));
-    cls.attr("POS_FLAGS") = py::cast(static_cast<int>(NaiveDipoleCentroid::POS_FLAGS));
-    cls.attr("NEG_FLAGS") = py::cast(static_cast<int>(NaiveDipoleCentroid::NEG_FLAGS));
-    cls.attr("N_FLAGS") = py::cast(static_cast<int>(NaiveDipoleCentroid::N_FLAGS));
 
     cls.def(py::init<NaiveDipoleCentroid::Control const &, std::string const &, afw::table::Schema &>(),
             "ctrl"_a, "name"_a, "schema"_a);
