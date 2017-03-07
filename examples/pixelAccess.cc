@@ -36,8 +36,8 @@ Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
     
     if (cswitch == 3) {
         /* a list of images - in diffim each one of these is associated with a basis function */
-        std::vector<std::shared_ptr<Eigen::VectorXd> > imageList(nParameters);
-        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiter = imageList.begin();
+        std::vector<Eigen::VectorXd> imageList(nParameters);
+        typename std::vector<Eigen::VectorXd>::iterator eiter = imageList.begin();
         afwImage::Image<ImageT> cimage(varianceEstimate.getDimensions());
         for (int i = 1; eiter != imageList.end(); ++eiter, ++i) {
             cimage = i; /* give it a value */
@@ -45,7 +45,7 @@ Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
                                                                             endRow-startRow, 
                                                                             endCol-startCol);
             cMat.resize(cMat.rows()*cMat.cols(), 1);
-            std::shared_ptr<Eigen::VectorXd> vMat (new Eigen::VectorXd(cMat.col(0)));
+            Eigen::VectorXd vMat = cMat.col(0);
             *eiter = vMat;
         } 
         
@@ -58,11 +58,11 @@ Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
         Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
         
         Eigen::MatrixXd cMat(eigeniVarianceV.size(), nParameters);
-        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiterj = imageList.begin();
-        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiterE = imageList.end();
+        typename std::vector<Eigen::VectorXd>::iterator eiterj = imageList.begin();
+        typename std::vector<Eigen::VectorXd>::iterator eiterE = imageList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
             cMat.block(0, kidxj, eigeniVarianceV.size(), 1) = 
-                Eigen::MatrixXd(**eiterj).block(0, 0, eigeniVarianceV.size(), 1);
+                Eigen::MatrixXd(*eiterj).block(0, 0, eigeniVarianceV.size(), 1);
         }
         
         // Caculate the variance-weighted pixel values
@@ -75,8 +75,8 @@ Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
     }
     else if (cswitch == 2) {
         /* a list of images - in diffim each one of these is associated with a basis function */
-        std::vector<std::shared_ptr<Eigen::VectorXd> > imageList(nParameters);
-        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiter = imageList.begin();
+        std::vector<Eigen::VectorXd> imageList(nParameters);
+        typename std::vector<Eigen::VectorXd>::iterator eiter = imageList.begin();
         afwImage::Image<ImageT> cimage(varianceEstimate.getDimensions());
         for (int i = 1; eiter != imageList.end(); ++eiter, ++i) {
             cimage = i; /* give it a value */
@@ -85,7 +85,7 @@ Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
                                                                             endRow-startRow, 
                                                                             endCol-startCol);
             cMat.resize(cMat.rows()*cMat.cols(), 1);
-            std::shared_ptr<Eigen::VectorXd> vMat (new Eigen::VectorXd(cMat.col(0)));
+            Eigen::VectorXd vMat = cMat.col(0);
             *eiter = vMat;
         } 
         
@@ -97,14 +97,14 @@ Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
         eigeniVarianceM.resize(eigeniVarianceM.rows()*eigeniVarianceM.cols(), 1);
         Eigen::VectorXd eigeniVarianceV      = eigeniVarianceM.col(0);
         
-        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiteri = imageList.begin();
-        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiterE = imageList.end();
+        typename std::vector<Eigen::VectorXd>::iterator eiteri = imageList.begin();
+        typename std::vector<Eigen::VectorXd>::iterator eiterE = imageList.end();
         for (unsigned int kidxi = 0; eiteri != eiterE; eiteri++, kidxi++) {
-            Eigen::VectorXd eiteriDotiVariance = ((*eiteri)->array() * eigeniVarianceV.array()).matrix();
+            Eigen::VectorXd eiteriDotiVariance = (eiteri->array() * eigeniVarianceV.array()).matrix();
             
-            typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiterj = eiteri;
+            typename std::vector<Eigen::VectorXd>::iterator eiterj = eiteri;
             for (unsigned int kidxj = kidxi; eiterj != eiterE; eiterj++, kidxj++) {
-                mMat(kidxi, kidxj) = (eiteriDotiVariance.array() * (**eiterj).array()).sum();
+                mMat(kidxi, kidxj) = (eiteriDotiVariance.array() * eiterj->array()).sum();
                 mMat(kidxj, kidxi) = mMat(kidxi, kidxj);
             }
         }

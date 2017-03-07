@@ -178,7 +178,7 @@ namespace diffim {
             );
         void build(
             afw::math::KernelList const& basisList,
-            std::shared_ptr<Eigen::MatrixXd> hMat
+            Eigen::MatrixXd const& hMat
             );
 
     private:
@@ -199,7 +199,7 @@ namespace diffim {
         std::shared_ptr<StaticKernelSolution<PixelT> > _kernelSolutionPca;  ///< Most recent  solution
 
         void _buildKernelSolution(afw::math::KernelList const& basisList,
-                                  std::shared_ptr<Eigen::MatrixXd> hMat);
+                                  Eigen::MatrixXd const& hMat);
     };
 
 

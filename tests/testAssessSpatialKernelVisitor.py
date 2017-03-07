@@ -1,10 +1,10 @@
-#!/usr/bin/env python
-from builtins import range
+from __future__ import absolute_import, division, print_function
 import unittest
 import numpy as num
 
-import lsst.utils.tests
+from builtins import range
 
+import lsst.utils.tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -37,10 +37,10 @@ class DiffimTestCases(unittest.TestCase):
         basicGaussian2 = afwMath.GaussianFunction2D(5., 3., 0.5 * num.pi)
         basicKernel2 = afwMath.AnalyticKernel(self.ksize, self.ksize, basicGaussian2)
 
-        basisList = afwMath.KernelList()
+        basisList = []
         basisList.append(basicKernel1)
         basisList.append(basicKernel2)
-        basisList = afwMath.KernelList(ipDiffim.renormalizeKernelList(basisList))
+        basisList = ipDiffim.renormalizeKernelList(basisList)
 
         spatialKernelFunction = afwMath.PolynomialFunction2D(order)
         spatialKernel = afwMath.LinearCombinationKernel(basisList, spatialKernelFunction)
@@ -64,8 +64,8 @@ class DiffimTestCases(unittest.TestCase):
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(25, 25),
                              afwGeom.Point2I(75, 75))
-        si = afwImage.MaskedImageF(si, bbox, afwImage.LOCAL)
-        ti = afwImage.MaskedImageF(ti, bbox, afwImage.LOCAL)
+        si = afwImage.MaskedImageF(si, bbox, origin=afwImage.LOCAL)
+        ti = afwImage.MaskedImageF(ti, bbox, origin=afwImage.LOCAL)
         kc = ipDiffim.KernelCandidateF(50., 50., ti, si, self.policy)
 
         sBg = afwMath.PolynomialFunction2D(1)
@@ -98,13 +98,13 @@ class DiffimTestCases(unittest.TestCase):
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(25, 25),
                              afwGeom.Point2I(75, 75))
-        si = afwImage.MaskedImageF(si, bbox, afwImage.LOCAL)
-        ti = afwImage.MaskedImageF(ti, bbox, afwImage.LOCAL)
+        si = afwImage.MaskedImageF(si, bbox, origin=afwImage.LOCAL)
+        ti = afwImage.MaskedImageF(ti, bbox, origin=afwImage.LOCAL)
         kc = ipDiffim.KernelCandidateF(50., 50., ti, si, self.policy)
 
         badGaussian = afwMath.GaussianFunction2D(1., 1., 0.)
         badKernel = afwMath.AnalyticKernel(self.ksize, self.ksize, badGaussian)
-        basisList = afwMath.KernelList()
+        basisList = []
         basisList.append(badKernel)
         badSpatialKernelFunction = afwMath.PolynomialFunction2D(0)
         badSpatialKernel = afwMath.LinearCombinationKernel(basisList, badSpatialKernelFunction)

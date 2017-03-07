@@ -27,8 +27,7 @@ def pcapsf_read_boost(fn):
     additionalData = dafBase.PropertySet()
     persistence = dafPersist.Persistence.getPersistence(pexPolicy.Policy())
     storageList.append(persistence.getRetrieveStorage("BoostStorage", loc))
-    psfptr = persistence.unsafeRetrieve("Psf", storageList, additionalData)
-    psf = afwDet.Psf.swigConvert(psfptr)
+    psf = persistence.unsafeRetrieve("Psf", storageList, additionalData)
     return psf
 
 if __name__ == '__main__':

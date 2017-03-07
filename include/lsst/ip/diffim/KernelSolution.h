@@ -46,32 +46,32 @@ namespace diffim {
             SVD        = 1
         };
 
-        explicit KernelSolution(std::shared_ptr<Eigen::MatrixXd> mMat,
-                                std::shared_ptr<Eigen::VectorXd> bVec,
+        explicit KernelSolution(Eigen::MatrixXd mMat,
+                                Eigen::VectorXd bVec,
                                 bool fitForBackground);
         explicit KernelSolution(bool fitForBackground);
         explicit KernelSolution();
 
         virtual ~KernelSolution() {};
         virtual void solve();
-        virtual void solve(Eigen::MatrixXd mMat, 
-                           Eigen::VectorXd bVec);
+        virtual void solve(Eigen::MatrixXd const& mMat, 
+                           Eigen::VectorXd const& bVec);
         KernelSolvedBy getSolvedBy() {return _solvedBy;} 
         virtual double getConditionNumber(ConditionNumberType conditionType);
-        virtual double getConditionNumber(Eigen::MatrixXd mMat, ConditionNumberType conditionType);
+        virtual double getConditionNumber(Eigen::MatrixXd const& mMat, ConditionNumberType conditionType);
 
-        inline std::shared_ptr<Eigen::MatrixXd> getM() {return _mMat;}
-        inline std::shared_ptr<Eigen::VectorXd> getB() {return _bVec;}
-        void printM() {std::cout << *_mMat << std::endl;}
-        void printB() {std::cout << *_bVec << std::endl;}
-        void printA() {std::cout << *_aVec << std::endl;}
+        inline Eigen::MatrixXd const& getM() {return _mMat;}
+        inline Eigen::VectorXd const& getB() {return _bVec;}
+        void printM() {std::cout << _mMat << std::endl;}
+        void printB() {std::cout << _bVec << std::endl;}
+        void printA() {std::cout << _aVec << std::endl;}
         inline int getId() const { return _id; }
 
     protected:
         int _id;                                                ///< Unique ID for object
-        std::shared_ptr<Eigen::MatrixXd> _mMat;               ///< Derived least squares M matrix
-        std::shared_ptr<Eigen::VectorXd> _bVec;               ///< Derived least squares B vector
-        std::shared_ptr<Eigen::VectorXd> _aVec;               ///< Derived least squares solution matrix
+        Eigen::MatrixXd _mMat;               ///< Derived least squares M matrix
+        Eigen::VectorXd _bVec;               ///< Derived least squares B vector
+        Eigen::VectorXd _aVec;               ///< Derived least squares solution matrix
         KernelSolvedBy _solvedBy;                               ///< Type of algorithm used to make solution
         bool _fitForBackground;                                 ///< Background terms included in fit
         static int _SolutionId;                                 ///< Unique identifier for solution
@@ -101,9 +101,9 @@ namespace diffim {
         virtual std::pair<std::shared_ptr<lsst::afw::math::Kernel>, double> getSolutionPair();
 
     protected:
-        std::shared_ptr<Eigen::MatrixXd> _cMat;               ///< K_i x R
-        std::shared_ptr<Eigen::VectorXd> _iVec;               ///< Vectorized I
-        std::shared_ptr<Eigen::VectorXd> _ivVec;              ///< Inverse variance
+        Eigen::MatrixXd _cMat;               ///< K_i x R
+        Eigen::VectorXd _iVec;               ///< Vectorized I
+        Eigen::VectorXd _ivVec;              ///< Inverse variance
 
         lsst::afw::math::Kernel::Ptr _kernel;                   ///< Derived single-object convolution kernel
         double _background;                                     ///< Derived differential background estimate
@@ -150,7 +150,7 @@ namespace diffim {
 
         RegularizedKernelSolution(lsst::afw::math::KernelList const& basisList,
                                   bool fitForBackground,
-                                  std::shared_ptr<Eigen::MatrixXd> hMat,
+                                  Eigen::MatrixXd const& hMat,
                                   lsst::pex::policy::Policy policy
                                   );
         virtual ~RegularizedKernelSolution() {};
@@ -159,10 +159,10 @@ namespace diffim {
         double estimateRisk(double maxCond);
 
         /* Include additive term (_lambda * _hMat) in M matrix? */
-        std::shared_ptr<Eigen::MatrixXd> getM(bool includeHmat = true);
+        Eigen::MatrixXd getM(bool includeHmat = true);
 
     private:
-        std::shared_ptr<Eigen::MatrixXd> _hMat;               ///< Regularization weights
+        Eigen::MatrixXd const _hMat;               ///< Regularization weights
         double _lambda;                                         ///< Overall regularization strength
         lsst::pex::policy::Policy _policy;
 
@@ -184,8 +184,8 @@ namespace diffim {
         virtual ~SpatialKernelSolution() {};
         
         void addConstraint(float xCenter, float yCenter,
-                           std::shared_ptr<Eigen::MatrixXd> qMat,
-                           std::shared_ptr<Eigen::VectorXd> wVec);
+                           Eigen::MatrixXd const& qMat,
+                           Eigen::VectorXd const& wVec);
 
         void solve();
         lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr makeKernelImage(lsst::afw::geom::Point2D const& pos);

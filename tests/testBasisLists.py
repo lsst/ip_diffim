@@ -1,11 +1,10 @@
-#!/usr/bin/env python
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
+import unittest
+
 from builtins import range
 import numpy as num
 
-import unittest
 import lsst.utils.tests
-
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -140,10 +139,10 @@ class DiffimTestCases(unittest.TestCase):
         # no constraints on first kernels norm
         self.assertNotEqual(num.sum(num.ravel(kimage2.getArray())**2), 1.)
         self.assertNotEqual(num.sum(num.ravel(kimage3.getArray())**2), 1.)
-        basisListIn = afwMath.KernelList()
-        basisListIn.push_back(gaussKernel1)
-        basisListIn.push_back(gaussKernel2)
-        basisListIn.push_back(gaussKernel3)
+        basisListIn = []
+        basisListIn.append(gaussKernel1)
+        basisListIn.append(gaussKernel2)
+        basisListIn.append(gaussKernel3)
 
         # outputs
         basisListOut = ipDiffim.renormalizeKernelList(basisListIn)

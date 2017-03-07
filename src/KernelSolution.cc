@@ -54,8 +54,8 @@ namespace diffim {
     int KernelSolution::_SolutionId = 0;
 
     KernelSolution::KernelSolution(
-        std::shared_ptr<Eigen::MatrixXd> mMat,
-        std::shared_ptr<Eigen::VectorXd> bVec,
+        Eigen::MatrixXd mMat,
+        Eigen::VectorXd bVec,
         bool fitForBackground
         ) :
         _id(++_SolutionId),
@@ -87,14 +87,14 @@ namespace diffim {
     {};
 
     void KernelSolution::solve() {
-        solve(*_mMat, *_bVec);
+        solve(_mMat, _bVec);
     }
 
     double KernelSolution::getConditionNumber(ConditionNumberType conditionType) {
-        return getConditionNumber(*_mMat, conditionType);
+        return getConditionNumber(_mMat, conditionType);
     }
 
-    double KernelSolution::getConditionNumber(Eigen::MatrixXd mMat, 
+    double KernelSolution::getConditionNumber(Eigen::MatrixXd const& mMat, 
                                               ConditionNumberType conditionType) {
         switch (conditionType) {
         case EIGENVALUE: 
@@ -127,8 +127,8 @@ namespace diffim {
         }
     }
 
-    void KernelSolution::solve(Eigen::MatrixXd mMat,
-                               Eigen::VectorXd bVec) {
+    void KernelSolution::solve(Eigen::MatrixXd const& mMat,
+                               Eigen::VectorXd const& bVec) {
         
         if (DEBUG_MATRIX) {
             std::cout << "M " << std::endl;
@@ -185,7 +185,7 @@ namespace diffim {
             std::cout << aVec << std::endl;
         }
         
-        _aVec = std::shared_ptr<Eigen::VectorXd>(new Eigen::VectorXd(aVec));
+        _aVec = aVec;
     }
 
     /*******************************************************************************************************/
@@ -334,8 +334,8 @@ namespace diffim {
                                                                               endRow-startRow, 
                                                                               endCol-startCol);
         Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(varianceEstimate).block(
-	    startRow, startCol, endRow-startRow, endCol-startCol
-	).array().inverse().matrix();
+    	    startRow, startCol, endRow-startRow, endCol-startCol
+    	).array().inverse().matrix();
 
         /* Resize into 1-D for later usage */
         eigenTemplate.resize(eigenTemplate.rows()*eigenTemplate.cols(), 1);
@@ -346,22 +346,19 @@ namespace diffim {
         afwImage::Image<PixelT> cimage(templateImage.getDimensions());
         
         /* Holds eigen representation of image convolved with all basis functions */
-        std::vector<std::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
+        std::vector<Eigen::MatrixXd> convolvedEigenList(nKernelParameters);
         
         /* Iterators over convolved image list and basis list */
-        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
-            convolvedEigenList.begin();
+        typename std::vector<Eigen::MatrixXd>::iterator eiter = convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
             afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
 
-            std::shared_ptr<Eigen::MatrixXd> cMat (
-                new Eigen::MatrixXd(imageToEigenMatrix(cimage).block(startRow, 
-                                                                     startCol, 
-                                                                     endRow-startRow, 
-                                                                     endCol-startCol))
-                );
-            cMat->resize(cMat->rows()*cMat->cols(), 1);
+            Eigen::MatrixXd cMat = imageToEigenMatrix(cimage).block(startRow, 
+                                                                    startCol, 
+                                                                    endRow-startRow, 
+                                                                    endCol-startCol);
+            cMat.resize(cMat.size(), 1);
             *eiter = cMat;
 
         } 
@@ -376,46 +373,38 @@ namespace diffim {
            (eigeniVariance, convolvedEigenList) must be the same size
         */
         Eigen::MatrixXd cMat(eigenTemplate.col(0).size(), nParameters);
-        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
-            convolvedEigenList.begin();
-        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
-            convolvedEigenList.end();
+        typename std::vector<Eigen::MatrixXd>::iterator eiterj = convolvedEigenList.begin();
+        typename std::vector<Eigen::MatrixXd>::iterator eiterE = convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-            cMat.col(kidxj) = (*eiterj)->col(0);
+            cMat.col(kidxj) = eiterj->col(0);
         }
         /* Treat the last "image" as all 1's to do the background calculation. */
         if (_fitForBackground)
             cMat.col(nParameters-1).fill(1.);
 
-        _cMat.reset(new Eigen::MatrixXd(cMat));
-        _ivVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
-        _iVec.reset(new Eigen::VectorXd(eigenScience.col(0)));
+        _cMat = cMat;
+        _ivVec = eigeniVariance.col(0);
+        _iVec = eigenScience.col(0);
 
         /* Make these outside of solve() so I can check condition number */
-        _mMat.reset(new Eigen::MatrixXd((*_cMat).transpose() * ((*_ivVec).asDiagonal() * (*_cMat))));
-        _bVec.reset(new Eigen::VectorXd((*_cMat).transpose() * ((*_ivVec).asDiagonal() * (*_iVec))));
+        _mMat = _cMat.transpose() * (_ivVec.asDiagonal() * _cMat);
+        _bVec = _cMat.transpose() * (_ivVec.asDiagonal() * _iVec);
     }
 
     template <typename InputT>
     void StaticKernelSolution<InputT>::solve() {
         LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.solve",
                    "mMat is %d x %d; bVec is %d; cMat is %d x %d; vVec is %d; iVec is %d",
-                   (*_mMat).rows(), (*_mMat).cols(), (*_bVec).size(),
-                   (*_cMat).rows(), (*_cMat).cols(), (*_ivVec).size(), (*_iVec).size());
-
-        /* If I put this here I can't check for condition number before solving */
-        /*
-        _mMat.reset(new Eigen::MatrixXd((*_cMat).transpose() * ((*_ivVec).asDiagonal() * (*_cMat))));
-        _bVec.reset(new Eigen::VectorXd((*_cMat).transpose() * ((*_ivVec).asDiagonal() * (*_iVec))));
-        */
+                   _mMat.rows(), _mMat.cols(), _bVec.size(),
+                   _cMat.rows(), _cMat.cols(), _ivVec.size(), _iVec.size());
 
         if (DEBUG_MATRIX) {
             std::cout << "C" << std::endl;
-            std::cout << (*_cMat) << std::endl;
+            std::cout << _cMat << std::endl;
             std::cout << "iV" << std::endl;
-            std::cout << (*_ivVec) << std::endl;
+            std::cout << _ivVec << std::endl;
             std::cout << "I" << std::endl;
-            std::cout << (*_iVec) << std::endl;
+            std::cout << _iVec << std::endl;
         }
 
         try {
@@ -434,7 +423,7 @@ namespace diffim {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot make solution");
         }
 
-        unsigned int const nParameters           = _aVec->size();
+        unsigned int const nParameters           = _aVec.size();
         unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
         unsigned int const nKernelParameters     = 
             std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
@@ -444,11 +433,11 @@ namespace diffim {
         /* Fill in the kernel results */
         std::vector<double> kValues(nKernelParameters);
         for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
-            if (std::isnan((*_aVec)(idx))) {
+            if (std::isnan(_aVec(idx))) {
                 throw LSST_EXCEPT(pexExcept::Exception, 
                                   str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
             }
-            kValues[idx] = (*_aVec)(idx);
+            kValues[idx] = _aVec(idx);
         }
         _kernel->setKernelParameters(kValues);
 
@@ -458,12 +447,12 @@ namespace diffim {
         _kSum  = _kernel->computeImage(*image, false);              
         
         if (_fitForBackground) {
-            if (std::isnan((*_aVec)(nParameters-1))) {
+            if (std::isnan(_aVec(nParameters-1))) {
                 throw LSST_EXCEPT(pexExcept::Exception, 
                                   str(boost::format("Unable to determine background solution %d (nan)") % 
                                       (nParameters-1)));
             }
-            _background = (*_aVec)(nParameters-1);
+            _background = _aVec(nParameters-1);
         }
     }        
 
@@ -490,7 +479,7 @@ namespace diffim {
          * 
          * Code would be:
          * 
-         * Eigen::MatrixXd             cov    = (*_mMat).transpose() * (*_mMat);
+         * Eigen::MatrixXd             cov    = _mMat.transpose() * _mMat;
          * Eigen::LLT<Eigen::MatrixXd> llt    = cov.llt();
          * Eigen::MatrixXd             error2 = llt.matrixL().transpose().inverse()*llt.matrixL().inverse();
          */
@@ -622,12 +611,10 @@ namespace diffim {
         afwImage::Image<InputT> cimage(templateImage.getDimensions());
         
         /* Holds eigen representation of image convolved with all basis functions */
-        std::vector<std::shared_ptr<Eigen::VectorXd> >
-            convolvedEigenList(nKernelParameters);
+        std::vector<Eigen::VectorXd> convolvedEigenList(nKernelParameters);
         
         /* Iterators over convolved image list and basis list */
-        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiter = 
-            convolvedEigenList.begin();
+        typename std::vector<Eigen::VectorXd>::iterator eiter =  convolvedEigenList.begin();
 
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
@@ -648,10 +635,7 @@ namespace diffim {
                 }
             }
 
-            std::shared_ptr<Eigen::VectorXd> 
-                eigenCptr (new Eigen::VectorXd(eigenC));
-            
-            *eiter = eigenCptr;
+            *eiter = eigenC;
         }
         double time = t.elapsed();
         LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.buildWithMask",
@@ -660,31 +644,23 @@ namespace diffim {
         
         /* Load matrix with all convolved images */
         Eigen::MatrixXd cMat(eigenTemplate.size(), nParameters);
-        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiterj = 
-            convolvedEigenList.begin();
-        typename std::vector<std::shared_ptr<Eigen::VectorXd> >::iterator eiterE = 
-            convolvedEigenList.end();
+        typename std::vector<Eigen::VectorXd>::iterator eiterj = convolvedEigenList.begin();
+        typename std::vector<Eigen::VectorXd>::iterator eiterE = convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
             cMat.block(0, kidxj, eigenTemplate.size(), 1) = 
-                Eigen::MatrixXd(**eiterj).block(0, 0, eigenTemplate.size(), 1);
+                Eigen::MatrixXd(*eiterj).block(0, 0, eigenTemplate.size(), 1);
         }
         /* Treat the last "image" as all 1's to do the background calculation. */
         if (this->_fitForBackground)
             cMat.col(nParameters-1).fill(1.);
         
-        this->_cMat.reset(new Eigen::MatrixXd(cMat));
-        //this->_ivVec.reset(new Eigen::VectorXd((eigenVariance.template cast<double>()).cwise().inverse()));
-        //this->_iVec.reset(new Eigen::VectorXd(eigenScience.template cast<double>()));
-        this->_ivVec.reset(new Eigen::VectorXd(eigenVariance.array().inverse().matrix()));
-        this->_iVec.reset(new Eigen::VectorXd(eigenScience));
+        this->_cMat = cMat;
+        this->_ivVec = eigenVariance.array().inverse().matrix();
+        this->_iVec = eigenScience;
 
         /* Make these outside of solve() so I can check condition number */
-        this->_mMat.reset(
-            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
-            );
-        this->_bVec.reset(
-            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
-            );
+        this->_mMat = this->_cMat.transpose() * this->_ivVec.asDiagonal() * (this->_cMat);
+        this->_bVec = this->_cMat.transpose() * this->_ivVec.asDiagonal() * (this->_iVec);
     }
 
 
@@ -793,11 +769,10 @@ namespace diffim {
         afwImage::Image<InputT> cimage(templateImage.getDimensions());
         
         /* Holds eigen representation of image convolved with all basis functions */
-        std::vector<std::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
+        std::vector<Eigen::MatrixXd> convolvedEigenList(nKernelParameters);
         
         /* Iterators over convolved image list and basis list */
-        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
-            convolvedEigenList.begin();
+        typename std::vector<Eigen::MatrixXd>::iterator eiter = convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
             afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
@@ -806,7 +781,7 @@ namespace diffim {
                                                                     startCol, 
                                                                     endRow-startRow, 
                                                                     endCol-startCol);
-            cMat.resize(cMat.rows() * cMat.cols(), 1);
+            cMat.resize(cMat.size(), 1);
 
             /* Do masking */
             Eigen::MatrixXd maskedcMat(cMat.rows(), 1);
@@ -818,8 +793,7 @@ namespace diffim {
                 }
             }
             cMat = maskedcMat.block(0, 0, nGood, 1);
-            std::shared_ptr<Eigen::MatrixXd> cMatPtr (new Eigen::MatrixXd(cMat));
-            *eiter = cMatPtr;
+            *eiter = cMat;
         } 
 
         double time = t.elapsed();
@@ -832,28 +806,22 @@ namespace diffim {
            (eigeniVariance, convolvedEigenList) must be the same size
         */
         Eigen::MatrixXd cMat(eigenTemplate.col(0).size(), nParameters);
-        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
-            convolvedEigenList.begin();
-        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
-            convolvedEigenList.end();
+        typename std::vector<Eigen::MatrixXd>::iterator eiterj = convolvedEigenList.begin();
+        typename std::vector<Eigen::MatrixXd>::iterator eiterE = convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-            cMat.col(kidxj) = (*eiterj)->col(0);
+            cMat.col(kidxj) = eiterj->col(0);
         }
         /* Treat the last "image" as all 1's to do the background calculation. */
         if (this->_fitForBackground)
             cMat.col(nParameters-1).fill(1.);
 
-        this->_cMat.reset(new Eigen::MatrixXd(cMat));
-        this->_ivVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
-        this->_iVec.reset(new Eigen::VectorXd(eigenScience.col(0)));
+        this->_cMat = cMat;
+        this->_ivVec = eigeniVariance.col(0);
+        this->_iVec = eigenScience.col(0);
 
         /* Make these outside of solve() so I can check condition number */
-        this->_mMat.reset(
-            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
-            );
-        this->_bVec.reset(
-            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
-            );
+        this->_mMat = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_cMat;
+        this->_bVec = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_iVec;
         
     }
 
@@ -1035,9 +1003,8 @@ namespace diffim {
 
         afwImage::Image<InputT> cimage(templateImage.getDimensions());
 
-        std::vector<std::shared_ptr<Eigen::MatrixXd> > convolvedEigenList(nKernelParameters);
-        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiter = 
-            convolvedEigenList.begin();
+        std::vector<Eigen::MatrixXd> convolvedEigenList(nKernelParameters);
+        typename std::vector<Eigen::MatrixXd>::iterator eiter = convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
             afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
@@ -1057,8 +1024,7 @@ namespace diffim {
                 nTerms += area;
             }
             
-            std::shared_ptr<Eigen::MatrixXd> cMatPtr (new Eigen::MatrixXd(cMat));
-            *eiter = cMatPtr;
+            *eiter = cMat;
             
         } 
         
@@ -1072,29 +1038,22 @@ namespace diffim {
            (eigeniVariance, convolvedEigenList) must be the same size
         */
         Eigen::MatrixXd cMat(eigenTemplate.col(0).size(), nParameters);
-        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterj = 
-            convolvedEigenList.begin();
-        typename std::vector<std::shared_ptr<Eigen::MatrixXd> >::iterator eiterE = 
-            convolvedEigenList.end();
+        typename std::vector<Eigen::MatrixXd>::iterator eiterj = convolvedEigenList.begin();
+        typename std::vector<Eigen::MatrixXd>::iterator eiterE = convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-            cMat.col(kidxj) = (*eiterj)->col(0);
+            cMat.col(kidxj) = eiterj->col(0);
         }
         /* Treat the last "image" as all 1's to do the background calculation. */
         if (this->_fitForBackground)
             cMat.col(nParameters-1).fill(1.);
 
-        this->_cMat.reset(new Eigen::MatrixXd(cMat));
-        this->_ivVec.reset(new Eigen::VectorXd(eigeniVariance.col(0)));
-        this->_iVec.reset(new Eigen::VectorXd(eigenScience.col(0)));
+        this->_cMat = cMat;
+        this->_ivVec = eigeniVariance.col(0);
+        this->_iVec = eigenScience.col(0);
 
         /* Make these outside of solve() so I can check condition number */
-        this->_mMat.reset(
-            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
-            );
-        this->_bVec.reset(
-            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
-            );
-        
+        this->_mMat = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_cMat;
+        this->_bVec = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_iVec;        
     }
     /*******************************************************************************************************/
 
@@ -1103,7 +1062,7 @@ namespace diffim {
     RegularizedKernelSolution<InputT>::RegularizedKernelSolution(
         lsst::afw::math::KernelList const& basisList,
         bool fitForBackground,
-        std::shared_ptr<Eigen::MatrixXd> hMat,
+        Eigen::MatrixXd const& hMat,
         lsst::pex::policy::Policy policy
         ) 
         :
@@ -1114,11 +1073,11 @@ namespace diffim {
 
     template <typename InputT>
     double RegularizedKernelSolution<InputT>::estimateRisk(double maxCond) {
-        Eigen::MatrixXd vMat      = (this->_cMat)->jacobiSvd().matrixV();
+        Eigen::MatrixXd vMat      = this->_cMat.jacobiSvd().matrixV();
         Eigen::MatrixXd vMatvMatT = vMat * vMat.transpose();
 
         /* Find pseudo inverse of mMat, which may be ill conditioned */
-        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(*(this->_mMat));
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(this->_mMat);
         Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
         Eigen::VectorXd eValues = eVecValues.eigenvalues();
         double eMax = eValues.maxCoeff();
@@ -1142,21 +1101,21 @@ namespace diffim {
         std::vector<double> risks;
         for (unsigned int i = 0; i < lambdas.size(); i++) {
             double l = lambdas[i];
-            Eigen::MatrixXd mLambda = *(this->_mMat) + l * (*_hMat);
+            Eigen::MatrixXd mLambda = this->_mMat + l * _hMat;
             
             try {
-                KernelSolution::solve(mLambda, *(this->_bVec));
+                KernelSolution::solve(mLambda, this->_bVec);
             } catch (pexExcept::Exception &e) {
                 LSST_EXCEPT_ADD(e, "Unable to solve regularized kernel matrix");
                 throw e;
             }
-            Eigen::VectorXd term1 = (this->_aVec->transpose() * vMatvMatT * *(this->_aVec));
+            Eigen::VectorXd term1 = (this->_aVec.transpose() * vMatvMatT * this->_aVec);
             if (term1.size() != 1)
                 throw LSST_EXCEPT(pexExcept::Exception, "Matrix size mismatch");
 
             double term2a = (vMatvMatT * mLambda.inverse()).trace();
 
-            Eigen::VectorXd term2b = (this->_aVec->transpose() * (mInv * *(this->_bVec)));
+            Eigen::VectorXd term2b = (this->_aVec.transpose() * (mInv * this->_bVec));
             if (term2b.size() != 1)
                 throw LSST_EXCEPT(pexExcept::Exception, "Matrix size mismatch");
 
@@ -1179,11 +1138,9 @@ namespace diffim {
     }
 
     template <typename InputT>
-    std::shared_ptr<Eigen::MatrixXd> RegularizedKernelSolution<InputT>::getM(bool includeHmat) {
+    Eigen::MatrixXd RegularizedKernelSolution<InputT>::getM(bool includeHmat) {
         if (includeHmat == true) {
-            return (std::shared_ptr<Eigen::MatrixXd>(
-                        new Eigen::MatrixXd(*(this->_mMat) + _lambda * (*_hMat))
-                        ));
+            return this->_mMat + _lambda * _hMat;
         }
         else {
             return this->_mMat;
@@ -1195,28 +1152,24 @@ namespace diffim {
 
         LOGL_DEBUG("TRACE3.ip.diffim.RegularizedKernelSolution.solve",
                    "cMat is %d x %d; vVec is %d; iVec is %d; hMat is %d x %d",
-                   (*this->_cMat).rows(), (*this->_cMat).cols(), (*this->_ivVec).size(),
-                   (*this->_iVec).size(), (*_hMat).rows(), (*_hMat).cols());
+                   this->_cMat.rows(), this->_cMat.cols(), this->_ivVec.size(),
+                   this->_iVec.size(), _hMat.rows(), _hMat.cols());
 
         if (DEBUG_MATRIX2) {
             std::cout << "ID: " << (this->_id) << std::endl;
             std::cout << "C:" << std::endl;
-            std::cout << (*this->_cMat) << std::endl;
+            std::cout << this->_cMat << std::endl;
             std::cout << "Sigma^{-1}:" << std::endl;
-            std::cout << Eigen::MatrixXd((*this->_ivVec).asDiagonal()) << std::endl;
+            std::cout << Eigen::MatrixXd(this->_ivVec.asDiagonal()) << std::endl;
             std::cout << "Y:" << std::endl;
-            std::cout << (*this->_iVec) << std::endl;
+            std::cout << this->_iVec << std::endl;
             std::cout << "H:" << std::endl;
-            std::cout << (*_hMat) << std::endl;
+            std::cout << _hMat << std::endl;
         }
 
 
-        this->_mMat.reset(
-            new Eigen::MatrixXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_cMat))
-            );
-        this->_bVec.reset(
-            new Eigen::VectorXd(this->_cMat->transpose() * this->_ivVec->asDiagonal() * *(this->_iVec))
-            );
+        this->_mMat = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_cMat;
+        this->_bVec = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_iVec;
         
         
         /* See N.R. 18.5
@@ -1273,7 +1226,7 @@ namespace diffim {
             _lambda = _policy.getDouble("lambdaValue");
         }
         else if (lambdaType ==  "relative") {
-            _lambda  = this->_mMat->trace() / this->_hMat->trace();
+            _lambda  = this->_mMat.trace() / this->_hMat.trace();
             _lambda *= _policy.getDouble("lambdaScaling");
         }
         else if (lambdaType ==  "minimizeBiasedRisk") {
@@ -1292,7 +1245,7 @@ namespace diffim {
         
         
         try {
-            KernelSolution::solve(*(this->_mMat) + _lambda * (*_hMat), *(this->_bVec));
+            KernelSolution::solve(this->_mMat + _lambda * _hMat, this->_bVec);
         } catch (pexExcept::Exception &e) {
             LSST_EXCEPT_ADD(e, "Unable to solve static kernel matrix");
             throw e;
@@ -1365,10 +1318,10 @@ namespace diffim {
             _nt = _nbases * _nkt + _nbt;
         }
         
-        std::shared_ptr<Eigen::MatrixXd> mMat (new Eigen::MatrixXd(_nt, _nt));
-        std::shared_ptr<Eigen::VectorXd> bVec (new Eigen::VectorXd(_nt));
-        (*mMat).setZero();
-        (*bVec).setZero();
+        Eigen::MatrixXd mMat(_nt, _nt);
+        Eigen::VectorXd bVec(_nt);
+        mMat.setZero();
+        bVec.setZero();
 
         this->_mMat = mMat;
         this->_bVec = bVec;
@@ -1385,8 +1338,8 @@ namespace diffim {
     }
 
     void SpatialKernelSolution::addConstraint(float xCenter, float yCenter,
-                                              std::shared_ptr<Eigen::MatrixXd> qMat,
-                                              std::shared_ptr<Eigen::VectorXd> wVec) {
+                                              Eigen::MatrixXd const& qMat,
+                                              Eigen::VectorXd const& wVec) {
         
         LOGL_DEBUG("TRACE5.ip.diffim.SpatialKernelSolution.addConstraint",
                    "Adding candidate at %f, %f", xCenter, yCenter);
@@ -1436,8 +1389,8 @@ namespace diffim {
         
         if (DEBUG_MATRIX) {
             std::cout << "Spatial matrix inputs" << std::endl;
-            std::cout << "M " << (*qMat) << std::endl;
-            std::cout << "B " << (*wVec) << std::endl;
+            std::cout << "M " << qMat << std::endl;
+            std::cout << "B " << wVec << std::endl;
         }
 
         /* first index to start the spatial blocks; default=0 for non-constant first term */
@@ -1451,48 +1404,48 @@ namespace diffim {
             m0 = 1;       /* we need to manually fill in the first (non-spatial) terms below */
             dm = _nkt-1;  /* need to shift terms due to lack of spatial variation in first term */
             
-            (*_mMat)(0, 0) += (*qMat)(0,0);
+            _mMat(0, 0) += qMat(0,0);
             for(int m2 = 1; m2 < _nbases; m2++)  {
-                (*_mMat).block(0, m2*_nkt-dm, 1, _nkt) += (*qMat)(0,m2) * pK.transpose();
+                _mMat.block(0, m2*_nkt-dm, 1, _nkt) += qMat(0,m2) * pK.transpose();
             }
-            (*_bVec)(0) += (*wVec)(0);
+            _bVec(0) += wVec(0);
             
             if (_fitForBackground) {
-                (*_mMat).block(0, mb, 1, _nbt) += (*qMat)(0,_nbases) * pB.transpose();
+                _mMat.block(0, mb, 1, _nbt) += qMat(0,_nbases) * pB.transpose();
             }
         }
         
         /* Fill in the spatial blocks */
         for(int m1 = m0; m1 < _nbases; m1++)  {
             /* Diagonal kernel-kernel term; only use upper triangular part of pKpKt */
-            (*_mMat).block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += 
-                (pKpKt * (*qMat)(m1,m1)).triangularView<Eigen::Upper>();
+            _mMat.block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += 
+                (pKpKt * qMat(m1,m1)).triangularView<Eigen::Upper>();
             
             /* Kernel-kernel terms */
             for(int m2 = m1+1; m2 < _nbases; m2++)  {
-                (*_mMat).block(m1*_nkt-dm, m2*_nkt-dm, _nkt, _nkt) += (*qMat)(m1,m2) * pKpKt;
+                _mMat.block(m1*_nkt-dm, m2*_nkt-dm, _nkt, _nkt) += qMat(m1,m2) * pKpKt;
             }
 
             if (_fitForBackground) {
                 /* Kernel cross terms with background */
-                (*_mMat).block(m1*_nkt-dm, mb, _nkt, _nbt) += (*qMat)(m1,_nbases) * pKpBt;
+                _mMat.block(m1*_nkt-dm, mb, _nkt, _nbt) += qMat(m1,_nbases) * pKpBt;
             }
             
             /* B vector */
-            (*_bVec).segment(m1*_nkt-dm, _nkt) += (*wVec)(m1) * pK;
+            _bVec.segment(m1*_nkt-dm, _nkt) += wVec(m1) * pK;
         }
         
         if (_fitForBackground) {
             /* Background-background terms only */
-            (*_mMat).block(mb, mb, _nbt, _nbt) +=  
-                (pBpBt * (*qMat)(_nbases,_nbases)).triangularView<Eigen::Upper>();
-            (*_bVec).segment(mb, _nbt)         += (*wVec)(_nbases) * pB;
+            _mMat.block(mb, mb, _nbt, _nbt) +=  
+                (pBpBt * qMat(_nbases,_nbases)).triangularView<Eigen::Upper>();
+            _bVec.segment(mb, _nbt)         += wVec(_nbases) * pB;
         }
         
         if (DEBUG_MATRIX) {
             std::cout << "Spatial matrix outputs" << std::endl;
-            std::cout << "mMat " << (*_mMat) << std::endl;
-            std::cout << "bVec " << (*_bVec) << std::endl;
+            std::cout << "mMat " << _mMat << std::endl;
+            std::cout << "bVec " << _bVec << std::endl;
         }
 
     }
@@ -1512,7 +1465,7 @@ namespace diffim {
         /* Fill in the other half of mMat */
         for (int i = 0; i < _nt; i++) {
             for (int j = i+1; j < _nt; j++) {
-                (*_mMat)(j,i) = (*_mMat)(i,j);
+                _mMat(j,i) = _mMat(i,j);
             }
         }
 
@@ -1545,13 +1498,13 @@ namespace diffim {
             /* Set the basis coefficients */
             std::vector<double> kCoeffs(_nbases);
             for (int i = 0; i < _nbases; i++) {
-                if (std::isnan((*_aVec)(i))) {
+                if (std::isnan(_aVec(i))) {
                     throw LSST_EXCEPT(
                         pexExcept::Exception, 
                         str(boost::format(
                                 "I. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % i % cNumber));
                 }
-                kCoeffs[i] = (*_aVec)(i);
+                kCoeffs[i] = _aVec(i);
             }
             lsst::afw::math::KernelList basisList = 
                 std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
@@ -1569,23 +1522,23 @@ namespace diffim {
 
                 /* Deal with the possibility the first term doesn't vary spatially */
                 if ((i == 0) && (_constantFirstTerm)) {
-                    if (std::isnan((*_aVec)(idx))) {
+                    if (std::isnan(_aVec(idx))) {
                         throw LSST_EXCEPT(
                             pexExcept::Exception, 
                             str(boost::format(
                                     "II. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % idx % cNumber));
                     }
-                    kCoeffs[i][0] = (*_aVec)(idx++);
+                    kCoeffs[i][0] = _aVec(idx++);
                 }
                 else {
                     for (int j = 0; j < _nkt; j++) {
-                        if (std::isnan((*_aVec)(idx))) {
+                        if (std::isnan(_aVec(idx))) {
                             throw LSST_EXCEPT(
                                 pexExcept::Exception, 
                                 str(boost::format(
                                         "III. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % idx % cNumber));
                         }
-                        kCoeffs[i][j] = (*_aVec)(idx++);
+                        kCoeffs[i][j] = _aVec(idx++);
                     }
                 }
             }
@@ -1601,12 +1554,12 @@ namespace diffim {
         if (_fitForBackground) {
             for (int i = 0; i < _nbt; i++) {
                 int idx = _nt - _nbt + i;
-                if (std::isnan((*_aVec)(idx))) {
+                if (std::isnan(_aVec(idx))) {
                     throw LSST_EXCEPT(pexExcept::Exception, 
                                       str(boost::format(
                            "Unable to determine spatial background solution %d (nan)") % (idx)));
                 }
-                bgCoeffs[i] = (*_aVec)(idx);
+                bgCoeffs[i] = _aVec(idx);
             }
         }
         else {

@@ -77,17 +77,17 @@ class DiffimTestCases(unittest.TestCase):
 
         self.kList2 = ipDiffim.makeKernelBasisList(self.subconfig2)
         self.hMat2 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig2))
-        self.bskv2 = ipDiffim.BuildSingleKernelVisitorF(self.kList2, 
+        self.bskv2 = ipDiffim.BuildSingleKernelVisitorF(self.kList2,
                                                         pexConfig.makePolicy(self.subconfig2), self.hMat2)
 
         self.kList3 = ipDiffim.makeKernelBasisList(self.subconfig3)
         self.hMat3 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig3))
-        self.bskv3 = ipDiffim.BuildSingleKernelVisitorF(self.kList3, 
+        self.bskv3 = ipDiffim.BuildSingleKernelVisitorF(self.kList3,
                                                         pexConfig.makePolicy(self.subconfig3), self.hMat3)
 
         self.kList4 = ipDiffim.makeKernelBasisList(self.subconfig4)
         self.hMat4 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig4))
-        self.bskv4 = ipDiffim.BuildSingleKernelVisitorF(self.kList4, 
+        self.bskv4 = ipDiffim.BuildSingleKernelVisitorF(self.kList4,
                                                         pexConfig.makePolicy(self.subconfig4), self.hMat4)
 
         # known input images
@@ -156,7 +156,7 @@ class DiffimTestCases(unittest.TestCase):
         bg = kc.getBackground(ipDiffim.KernelCandidateF.RECENT)
 
         bbox = kc.getKernel(ipDiffim.KernelCandidateF.RECENT).shrinkBBox(diffIm.getBBox(afwImage.LOCAL))
-        diffIm = afwImage.MaskedImageF(diffIm, bbox, afwImage.LOCAL)
+        diffIm = afwImage.MaskedImageF(diffIm, bbox, origin=afwImage.LOCAL)
         self.dStats.apply(diffIm)
 
         dmean = afwMath.makeStatistics(diffIm.getImage(), afwMath.MEAN).getValue()
@@ -166,9 +166,6 @@ class DiffimTestCases(unittest.TestCase):
 
     def applyVisitor(self, invert=False, xloc=397, yloc=580):
         print('# %.2f %.2f' % (xloc, yloc))
-        #if xloc != 1312 and yloc != 160:
-        #    return
-
         imsize = int(3 * self.subconfig1.kernelSize)
 
         # chop out a region around a known object
@@ -180,11 +177,15 @@ class DiffimTestCases(unittest.TestCase):
         # sometimes the box goes off the image; no big deal...
         try:
             if invert:
-                tmi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
-                smi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                tmi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox,
+                                            origin=afwImage.LOCAL)
+                smi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox,
+                                            origin=afwImage.LOCAL)
             else:
-                smi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox, afwImage.LOCAL)
-                tmi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox, afwImage.LOCAL)
+                smi = afwImage.MaskedImageF(self.scienceExposure.getMaskedImage(), bbox,
+                                            origin=afwImage.LOCAL)
+                tmi = afwImage.MaskedImageF(self.templateExposure.getMaskedImage(), bbox,
+                                            origin=afwImage.LOCAL)
         except Exception:
             return None
 
@@ -198,7 +199,7 @@ class DiffimTestCases(unittest.TestCase):
                                                                              dmean1, dstd1, vmean1)
         logger.debug(res)
         if display:
-            ds9.mtv(tmi, frame=1) # ds9 switches frame 0 and 1 for some reason
+            ds9.mtv(tmi, frame=1)  # ds9 switches frame 0 and 1 for some reason
             ds9.mtv(smi, frame=0)
             ds9.mtv(kImageOut1, frame=2)
             ds9.mtv(diffIm1, frame=3)

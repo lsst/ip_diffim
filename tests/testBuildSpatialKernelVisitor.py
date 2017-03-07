@@ -1,8 +1,9 @@
-from builtins import range
-#!/usr/bin/env python
+from __future__ import absolute_import, division, print_function
 import unittest
-import lsst.utils.tests
 
+from builtins import range
+
+import lsst.utils.tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim

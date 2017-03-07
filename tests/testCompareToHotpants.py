@@ -1,6 +1,8 @@
-from builtins import range
-#!/usr/bin/env python
+from __future__ import absolute_import, division, print_function
 import unittest
+
+from builtins import range
+
 import lsst.utils.tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -34,7 +36,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.tmi.setXY0(0, 0)
 
         # Run detection
-        #detConfig = self.subconfig.detectionConfig
+        # detConfig = self.subconfig.detectionConfig
         # Note here regarding detConfig:
         #
         # If I set detThresholdType = "pixel_stdev", I get slightly
@@ -62,11 +64,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.footprints.append(afwDet.Footprint(afwGeom.Box2I(
                 afwGeom.Point2I(xc, yc), afwGeom.Extent2I(1, 1))))
 
-        #detConfig.detThresholdType = "stdev"
-        #kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
-        #kcDetect.apply(self.smi, self.tmi)
-        #self.footprints = kcDetect.getFootprints()
-
         # Make a basis list that hotpants has been run with
         nGauss = 1
         sGauss = [3.]
@@ -89,12 +86,12 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                    1.138120e-02,
                    5.099318e-03]
 
-        self.basisList = afwMath.KernelList()
+        self.basisList = []
         for i in range(len(order)):
             im = afwImage.ImageD(basisList0[order[i]].getDimensions())
             basisList0[order[i]].computeImage(im, False)
             im /= scaling[i]
-            #im.writeFits('k%d.fits' % (i))
+            # im.writeFits('k%d.fits' % (i))
             k = afwMath.FixedKernel(im)
             self.basisList.append(k)
 
@@ -134,8 +131,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
 
-            tsmi = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
-            ssmi = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
+            tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
+            ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
 
             # Hotpants centroids go from -1 to 1
             # Only one passes
@@ -154,7 +151,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
-                cand = ipDiffim.KernelCandidateF.cast(cand)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
 
@@ -199,8 +195,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
 
-            tsmi = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
-            ssmi = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
+            tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
+            ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
 
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
@@ -219,7 +215,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
-                cand = ipDiffim.KernelCandidateF.cast(cand)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
 
@@ -258,8 +253,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
 
-            tsmi = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
-            ssmi = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
+            tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
+            ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
 
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
@@ -277,7 +272,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
-                cand = ipDiffim.KernelCandidateF.cast(cand)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
 
@@ -357,8 +351,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
 
-            tsmi = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
-            ssmi = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
+            tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
+            ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
 
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
@@ -377,7 +371,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
-                cand = ipDiffim.KernelCandidateF.cast(cand)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
 
@@ -420,8 +413,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
 
-            tsmi = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
-            ssmi = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
+            tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
+            ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
 
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
@@ -439,7 +432,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
-                cand = ipDiffim.KernelCandidateF.cast(cand)
                 bsikv.processCandidate(cand)
                 bspkv.processCandidate(cand)
 
@@ -510,8 +502,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
 
-            tsmi = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
-            ssmi = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
+            tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
+            ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
 
             # Hotpants centroids go from -1 to 1
             cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth()) /
@@ -581,8 +573,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
 
-            tsmi = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
-            ssmi = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
+            tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
+            ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
 
             # Hotpants centroids go from -1 to 1
             cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth()) /
@@ -696,8 +688,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
 
-            tsmi = afwImage.MaskedImageF(self.tmi, bbox, afwImage.LOCAL)
-            ssmi = afwImage.MaskedImageF(self.smi, bbox, afwImage.LOCAL)
+            tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
+            ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
 
             # Hotpants centroids go from -1 to 1
             cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth()) /
@@ -797,8 +789,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         spatialSolution = sb.getParameters()
         for i in range(len(spatialSolution)):
             self.assertAlmostEqual(HPspatialSolution[-1][spReorder[i]], spatialSolution[i], 5)
-
-#####
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):

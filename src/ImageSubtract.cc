@@ -244,7 +244,7 @@ p_INSTANTIATE_convolveAndSubtract(MaskedImage, TYPE)
  * Here are the instantiations.
  *
  * Do we need double diffim code?  It isn't sufficient to remove it here; you'll have to also remove at
- * least SpatialModelKernel<double> and swig instantiations thereof
+ * least SpatialModelKernel<double>
  */
 INSTANTIATE_convolveAndSubtract(float);
 INSTANTIATE_convolveAndSubtract(double);

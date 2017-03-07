@@ -1,5 +1,3 @@
-from builtins import input
-from builtins import object
 #
 # LSST Data Management System
 # Copyright 2008-2016 LSST Corporation.
@@ -21,6 +19,10 @@ from builtins import object
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
+from __future__ import absolute_import, division, print_function
+
+from builtins import input
+from builtins import object
 import numpy as np
 
 from lsst.afw.table import SourceCatalog
@@ -95,9 +97,9 @@ class CheckSource(object):
         for k in self.keys:
             if source.get(k):
                 return False
-        if self.fluxLim is not None and source.getPsfFlux() < self.fluxLim: # ignore faint objects
+        if self.fluxLim is not None and source.getPsfFlux() < self.fluxLim:  # ignore faint objects
             return False
-        if self.fluxMax != 0.0 and source.getPsfFlux() > self.fluxMax: # ignore bright objects
+        if self.fluxMax != 0.0 and source.getPsfFlux() > self.fluxMax:  # ignore bright objects
             return False
         return True
 
@@ -165,7 +167,7 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
     into your `debug.py` file and run your task with the `--debug` flag.
     """
     ConfigClass = DiaCatalogSourceSelectorConfig
-    usesMatches = True # selectStars uses (requires) its matches argument
+    usesMatches = True  # selectStars uses (requires) its matches argument
 
     def selectStars(self, exposure, sourceCat, matches=None):
         """Select sources for Kernel candidates
@@ -229,11 +231,9 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
                         doColorCut = False
                         isRightColor = True
                     else:
-                        isRightColor = (gMag-rMag) >= self.config.grMin \
-                            and (gMag-rMag) <= self.config.grMax
+                        isRightColor = (gMag-rMag) >= self.config.grMin and (gMag-rMag) <= self.config.grMax
 
-                isRightType  = (self.config.selectStar and isStar) \
-                    or (self.config.selectGalaxy and not isStar)
+                isRightType = (self.config.selectStar and isStar) or (self.config.selectGalaxy and not isStar)
                 isRightVar = (self.config.includeVariable) or (self.config.includeVariable is isVar)
                 if isRightType and isRightVar and isRightColor:
                     starCat.append(source)
@@ -243,7 +243,6 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
                 elif display and displayExposure:
                     symbs.append("o")
                     ctypes.append(ds9.BLUE)
-
 
         if display and displayExposure:
             with ds9.Buffering():

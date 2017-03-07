@@ -158,7 +158,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     nToUse = min(len(kCoeffs), len(basisList))
 
     # Make the full convolved science image
-    sKernel = afwMath.LinearCombinationKernel(afwMath.KernelList(basisList[:nToUse]), polyFunc)
+    sKernel = afwMath.LinearCombinationKernel(basisList[:nToUse], polyFunc)
     sKernel.setSpatialParameters(kCoeffs[:nToUse])
     sim = afwImage.ImageF(tim.getDimensions())
     afwMath.convolve(sim, tim, sKernel, True)
@@ -211,8 +211,8 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
             p1 = afwGeom.Point2I(xCoord + stampHalfWidth,
                                  yCoord + stampHalfWidth)
             bbox = afwGeom.Box2I(p0, p1)
-            tsi = afwImage.MaskedImageF(tMi, bbox, afwImage.LOCAL)
-            ssi = afwImage.MaskedImageF(sMi, bbox, afwImage.LOCAL)
+            tsi = afwImage.MaskedImageF(tMi, bbox, origin=afwImage.LOCAL)
+            ssi = afwImage.MaskedImageF(sMi, bbox, origin=afwImage.LOCAL)
 
             kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policyFake)
             kernelCellSet.insertCandidate(kc)
@@ -259,8 +259,7 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
         os.makedirs(outdir)
 
     for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(False): # False = include bad candidates
-            cand = diffimLib.KernelCandidateF.cast(cand)
+        for cand in cell.begin(False):  # False = include bad candidates
             if cand.getStatus() == afwMath.SpatialCellCandidate.GOOD:
                 xCand = int(cand.getXCenter())
                 yCand = int(cand.getYCenter())
@@ -348,9 +347,9 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
 
         kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
         try:
-            fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, False).getMask())
+            fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, deep=False).getMask())
             bm1 = fsb.getBits()
-            fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, False).getMask())
+            fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, deep=False).getMask())
             bm2 = fsb.getBits()
         except Exception:
             pass
@@ -420,8 +419,7 @@ class NbasisEvaluator(object):
                     kernelCellSet.visitCandidates(visitor, bicConfig.nStarPerCell)
 
                     for cell in kernelCellSet.getCellList():
-                        for cand in cell.begin(False): # False = include bad candidates
-                            cand = diffimLib.KernelCandidateF.cast(cand)
+                        for cand in cell.begin(False):  # False = include bad candidates
                             if cand.getStatus() != afwMath.SpatialCellCandidate.GOOD:
                                 continue
                             diffIm = cand.getDifferenceImage(diffimLib.KernelCandidateF.RECENT)

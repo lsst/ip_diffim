@@ -1,9 +1,9 @@
-#!/usr/bin/env python
-from __future__ import print_function
-from builtins import range
+from __future__ import absolute_import, division, print_function
 import unittest
-import lsst.utils.tests
 
+from builtins import range
+
+import lsst.utils.tests
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -12,7 +12,6 @@ import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
 logUtils.traceSetAt("ip.diffim", 4)
-#import lsst.afw.display.ds9 as ds9
 
 
 class DiffimTestCases(unittest.TestCase):
@@ -125,8 +124,8 @@ class DiffimTestCases(unittest.TestCase):
         kpv.processCandidate(kc3)
         kpv.subtractMean()
         imagePca.analyze()
-        eigenKernels = afwMath.KernelList()
-        eigenKernels.push_back(kpv.getEigenKernels()[0])
+        eigenKernels = []
+        eigenKernels.append(kpv.getEigenKernels()[0])
         self.assertEqual(len(eigenKernels), 1)  # the other eKernels are 0.0 and you can't get their coeffs!
 
         # do twice to mimic a Pca loop
@@ -195,8 +194,8 @@ class DiffimTestCases(unittest.TestCase):
         kpv.processCandidate(kc3)
         kpv.subtractMean()
         imagePca.analyze()
-        eigenKernels = afwMath.KernelList()
-        eigenKernels.push_back(kpv.getEigenKernels()[0])
+        eigenKernels = []
+        eigenKernels.append(kpv.getEigenKernels()[0])
         self.assertEqual(len(eigenKernels), 1)
 
         # bogus candidate
@@ -257,15 +256,12 @@ class DiffimTestCases(unittest.TestCase):
 
         for cell in kernelCellSet.getCellList():
             for cand in cell.begin(False):
-                cand = ipDiffim.KernelCandidateF.cast(cand)
                 self.assertEqual(cand.getStatus(), afwMath.SpatialCellCandidate.GOOD)
 
     def tearDown(self):
         del self.config
         del self.policy
         del self.kList
-
-#####
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):

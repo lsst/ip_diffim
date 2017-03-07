@@ -113,7 +113,6 @@ if display:
     # Inputs
     for cell in kernelCellSet.getCellList():
         for cand in cell.begin(False): # False = include bad candidates
-            cand = ipDiffim.KernelCandidateF.cast(cand)
             rchi2 = cand.getChi2()
 
             # No kernels made

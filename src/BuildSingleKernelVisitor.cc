@@ -108,7 +108,7 @@ namespace detail {
         lsst::afw::math::KernelList const& basisList,   ///< List of basis kernels
             ///< for resulting LinearCombinationKernel
         lsst::pex::policy::Policy const& policy,  ///< Policy file directing behavior
-        std::shared_ptr<Eigen::MatrixXd> hMat   ///< Regularization matrix
+        Eigen::MatrixXd const& hMat   ///< Regularization matrix
         ) :
         afwMath::CandidateVisitor(),
         _basisList(basisList),
@@ -288,6 +288,6 @@ namespace detail {
     template std::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor<PixelT>(lsst::afw::math::KernelList const&,
                                          lsst::pex::policy::Policy const&,
-                                         std::shared_ptr<Eigen::MatrixXd>);
+                                         Eigen::MatrixXd const &);
 
 }}}} // end of namespace lsst::ip::diffim::detail
