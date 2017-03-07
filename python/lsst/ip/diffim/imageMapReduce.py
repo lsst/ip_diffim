@@ -261,18 +261,19 @@ class ImageReducerSubtask(pipeBase.Task):
                     subMI.getVariance().getArray()[isNotNan] = patchMI.getVariance().getArray()[isNotNan]
 
             if reduceOp == 'sum' or reduceOp == 'average':  # much of these two options is the same
-                # wsubim is a view into the `weights` Image, so here we simply add one to
-                # the region of `weights` confined by `item.getBBox()`.
-                wsubim = afwImage.ImageF(weights, item.getBBox())
                 if noNans:
                     subMI += patchMI
                     if reduceOp == 'average':
+                        # wsubim is a view into the `weights` Image, so here we simply add one to
+                        # the region of `weights` confined by `item.getBBox()`.
+                        wsubim = afwImage.ImageF(weights, item.getBBox())
                         wsubim += 1.
                 else:
                     isNotNan = ~isNan
                     subMI.getImage().getArray()[isNotNan] += patchMI.getImage().getArray()[isNotNan]
                     subMI.getVariance().getArray()[isNotNan] += patchMI.getVariance().getArray()[isNotNan]
                     if reduceOp == 'average':
+                        wsubim = afwImage.ImageF(weights, item.getBBox())
                         wsubim.getArray()[isNotNan] += 1.
 
         if reduceOp == 'average':
