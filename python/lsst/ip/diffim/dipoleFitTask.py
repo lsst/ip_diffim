@@ -253,7 +253,7 @@ class DipoleModel(object):
             bbox.grow(grow)
 
         subim2 = afwImage.ImageF(bbox, badfill)
-        afwDet.expandArray(fp, fp.getImageArray(), subim2.getArray(), bbox.getCorners()[0])
+        fp.getSpans().unflatten(subim2.getArray(), fp.getImageArray(), bbox.getCorners()[0])
         return subim2
 
     def fitFootprintBackground(self, source, posImage, order=1):
