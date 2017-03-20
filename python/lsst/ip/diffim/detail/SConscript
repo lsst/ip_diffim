@@ -6,4 +6,4 @@ scripts.BasicSConscript.pybind11([
     "buildSpatialKernelVisitor",
     "kernelPca",
     "kernelSumVisitor",
-])
+], addUnderscore=False)

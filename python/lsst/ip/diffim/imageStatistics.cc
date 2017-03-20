@@ -19,11 +19,11 @@
  * the GNU General Public License along with this program.  If not,
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
+#include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
+
 #include <memory>
 #include <string>
-
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 
 #include "lsst/afw/image/MaskedImage.h"
 #include "lsst/ip/diffim/ImageStatistics.h"
@@ -70,8 +70,11 @@ void declareImageStatistics(py::module &mod, std::string const &suffix) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(_imageStatistics) {
-    py::module mod("_imageStatistics", "Python wrapper for ImageStatistics.h");
+PYBIND11_PLUGIN(imageStatistics) {
+    py::module::import("lsst.pex.policy");
+    py::module::import("lsst.afw.image");
+
+    py::module mod("imageStatistics");
 
     declareImageStatistics<int>(mod, "I");
     declareImageStatistics<float>(mod, "F");
@@ -79,6 +82,7 @@ PYBIND11_PLUGIN(_imageStatistics) {
 
     return mod.ptr();
 }
-}
-}
-}  // namespace lsst::ip::diffim
+
+}  // diffim
+}  // ip
+}  // lsst

@@ -19,9 +19,9 @@
  * the GNU General Public License along with this program.  If not,
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
-#include <string>
+#include "pybind11/pybind11.h"
 
-#include <pybind11/pybind11.h>
+#include <string>
 
 #include "lsst/afw/image/LsstImageTypes.h"
 #include "lsst/ip/diffim/FindSetBits.h"
@@ -55,13 +55,16 @@ void declareFindSetBits(py::module& mod, std::string const& suffix) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(_findSetBits) {
-    py::module mod("_findSetBits", "Python wrapper for FindSetBits.h");
+PYBIND11_PLUGIN(findSetBits) {
+    py::module::import("lsst.afw.image");
+
+    py::module mod("findSetBits");
 
     declareFindSetBits<afw::image::Mask<afw::image::MaskPixel>>(mod, "U");
 
     return mod.ptr();
 }
-}
-}
-}  // namespace lsst::ip::diffim
+
+}  // diffim
+}  // ip
+}  // lsst

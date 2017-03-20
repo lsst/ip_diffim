@@ -95,6 +95,8 @@ void declareDipoleFluxAlgorithm(py::module &mod) {
 }
 
 void declareNaiveDipoleFlux(py::module &mod) {
+    py::module::import("lsst.meas.base");
+
     py::class_<NaiveDipoleFlux, std::shared_ptr<NaiveDipoleFlux>, DipoleFluxAlgorithm> cls(mod,
                                                                                            "NaiveDipoleFlux");
 
@@ -136,7 +138,11 @@ void declarePsfDipoleFlux(py::module &mod) {
 }  // namespace lsst::ip::diffim::<anonymous>
 
 PYBIND11_PLUGIN(_dipoleAlgorithms) {
-    py::module mod("_dipoleAlgorithms", "Python wrapper for DipoleAlgorithms.h");
+    py::module::import("lsst.afw.table");
+    py::module::import("lsst.meas.base");
+    py::module::import("lsst.pex.config");
+
+    py::module mod("_dipoleAlgorithms");
 
     declareDipoleCentroidControl(mod);
     declareDipoleFluxControl(mod);

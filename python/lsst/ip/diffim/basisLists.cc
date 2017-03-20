@@ -19,9 +19,11 @@
  * the GNU General Public License along with this program.  If not,
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
+#include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
+
 #include <Eigen/Core>
+
 #include "numpy/arrayobject.h"
 #include "ndarray/pybind11.h"
 
@@ -34,8 +36,11 @@ namespace lsst {
 namespace ip {
 namespace diffim {
 
-PYBIND11_PLUGIN(_basisLists) {
-    py::module mod("_basisLists", "Python wrapper for BasisLists.h");
+PYBIND11_PLUGIN(basisLists) {
+    py::module::import("lsst.afw.math");
+    py::module::import("lsst.pex.policy");
+
+    py::module mod("basisLists");
 
     // Need to import numpy for ndarray and eigen conversions
     if (_import_array() < 0) {
@@ -55,6 +60,7 @@ PYBIND11_PLUGIN(_basisLists) {
 
     return mod.ptr();
 }
-}
-}
-}  // namespace lsst::ip::diffim
+
+}  // diffim
+}  // ip
+}  // lsst

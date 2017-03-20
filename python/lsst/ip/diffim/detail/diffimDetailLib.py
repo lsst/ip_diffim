@@ -1,7 +1,7 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, division, print_function
 
-from ._assessSpatialKernelVisitor import *
-from ._buildSingleKernelVisitor import *
-from ._buildSpatialKernelVisitor import *
-from ._kernelPca import *
-from ._kernelSumVisitor import *
+from .assessSpatialKernelVisitor import *
+from .buildSingleKernelVisitor import *
+from .buildSpatialKernelVisitor import *
+from .kernelPca import *
+from .kernelSumVisitor import *

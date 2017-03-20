@@ -1,20 +1,36 @@
-from __future__ import absolute_import
+#
+# LSST Data Management System
+#
+# This product includes software developed by the
+# LSST Project (http://www.lsst.org/).
+# See the COPYRIGHT file
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
+# see <https://www.lsstcorp.org/LegalNotices/>.
+#
+from __future__ import absolute_import, division, print_function
 
-import lsst.afw.image
-import lsst.afw.math
-import lsst.afw.detection
-import lsst.afw.table
-import lsst.meas.base
-import lsst.pex.policy
-
+# C++ wrapper
 # hoist symbols lsst.ip.diffim.detail up into lsst.ip.diffim
 from .detail import *
 
-from ._basisLists import *
+from .basisLists import *
 from ._dipoleAlgorithms import *
-from ._findSetBits import *
-from ._imageStatistics import *
-from ._imageSubtract import *
-from ._kernelCandidate import *
-from ._kernelCandidateDetection import *
-from ._kernelSolution import *
+from .findSetBits import *
+from .imageStatistics import *
+from .imageSubtract import *
+from .kernelCandidate import *
+from .kernelCandidateDetection import *
+from .kernelSolution import *
+

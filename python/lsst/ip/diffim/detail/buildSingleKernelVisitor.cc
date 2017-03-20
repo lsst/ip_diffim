@@ -19,11 +19,12 @@
  * the GNU General Public License along with this program.  If not,
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
+#include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
+
 #include <memory>
 #include <string>
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 #include <Eigen/Core>
 #include "numpy/arrayobject.h"
 #include "ndarray/pybind11.h"
@@ -80,8 +81,11 @@ void declareBuildSingleKernelVisitor(py::module& mod, std::string const& suffix)
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_PLUGIN(_buildSingleKernelVisitor) {
-    py::module mod("_buildSingleKernelVisitor", "Python wrapper for BuildSingleKernelVisitor.h");
+PYBIND11_PLUGIN(buildSingleKernelVisitor) {
+    py::module::import("lsst.afw.math");
+    py::module::import("lsst.pex.policy");
+
+    py::module mod("buildSingleKernelVisitor");
 
     // Need to import numpy for ndarray and eigen conversions
     if (_import_array() < 0) {

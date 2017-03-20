@@ -2,11 +2,13 @@
 from lsst.sconsUtils import scripts
 scripts.BasicSConscript.pybind11([
     "basisLists",
-    "dipoleAlgorithms",
     "findSetBits",
     "imageStatistics",
     "imageSubtract",
     "kernelCandidate",
     "kernelCandidateDetection",
     "kernelSolution",
-])
+], addUnderscore=False)
+
+# Plugin registration fails if this does not have an underscore
+scripts.BasicSConscript.pybind11(["dipoleAlgorithms"])

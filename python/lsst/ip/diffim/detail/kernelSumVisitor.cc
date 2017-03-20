@@ -19,11 +19,10 @@
  * the GNU General Public License along with this program.  If not,
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
+#include "pybind11/pybind11.h"
+
 #include <memory>
 #include <string>
-
-#include <pybind11/pybind11.h>
-//#include <pybind11/stl.h>
 
 #include "lsst/afw/math/SpatialCell.h"
 #include "lsst/ip/diffim/KernelSumVisitor.h"
@@ -75,14 +74,18 @@ void declareKernelSumVisitor(py::module& mod, std::string const& suffix) {
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_PLUGIN(_kernelSumVisitor) {
-    py::module mod("_kernelSumVisitor", "Python wrapper for KernelSumVisitor.h");
+PYBIND11_PLUGIN(kernelSumVisitor) {
+    py::module::import("lsst.afw.math");
+    py::module::import("lsst.pex.policy");
+
+    py::module mod("kernelSumVisitor");
 
     declareKernelSumVisitor<float>(mod, "F");
 
     return mod.ptr();
 }
-}
-}
-}
-}  // lsst::ip::diffim::detail
+
+}  // detail
+}  // diffim
+}  // ip
+}  // lsst

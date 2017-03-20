@@ -19,14 +19,15 @@
  * the GNU General Public License along with this program.  If not,
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
-#include <memory>
-#include <string>
+#include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 #include "Eigen/Core"
 #include "numpy/arrayobject.h"
 #include "ndarray/pybind11.h"
+
+#include <memory>
+#include <string>
 
 #include "lsst/afw/math/SpatialCell.h"
 #include "lsst/ip/diffim/KernelCandidate.h"
@@ -112,8 +113,13 @@ void declareKernelCandidate(py::module &mod, std::string const &suffix) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(_kernelCandidate) {
-    py::module mod("_kernelCandidate", "Python wrapper for KernelCandidate.h");
+PYBIND11_PLUGIN(kernelCandidate) {
+    py::module::import("lsst.afw.image");
+    py::module::import("lsst.afw.math");
+    py::module::import("lsst.afw.table");
+    py::module::import("lsst.pex.policy");
+
+    py::module mod("kernelCandidate");
 
     // Need to import numpy for ndarray and eigen conversions
     if (_import_array() < 0) {
