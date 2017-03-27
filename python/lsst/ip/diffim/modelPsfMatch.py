@@ -50,12 +50,6 @@ class ModelPsfMatchConfig(pexConfig.Config):
         default="AL",
     )
 
-    padPsf = pexConfig.Field(
-        dtype=bool,
-        doc="Grow PSF dimensions to largest PSF dimension on input exposure; else clip to smallest",
-        default=False,
-    )
-
     def setDefaults(self):
         # No sigma clipping
         self.kernel.active.singleKernelClipping = False
@@ -416,17 +410,10 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                 else:
                     # make image of proper size
                     kernelImageS = afwImage.ImageF(dimenR)
-                    if self.config.padPsf:
-                        bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((lenMax - rawKernel.getWidth())//2,
-                                                                    (lenMax - rawKernel.getHeight())//2),
-                                                    rawKernel.getDimensions())
-                        kernelImageS.assign(rawKernel, bboxToPlace)
-                    else:
-                        bboxToExtract = afwGeom.Box2I(afwGeom.Point2I((rawKernel.getWidth() - lenMin)//2,
-                                                                      (rawKernel.getHeight() - lenMin)//2),
-                                                      dimenR)
-                        rawKernel.setXY0(0, 0)
-                        kernelImageS = rawKernel.Factory(rawKernel, bboxToExtract)
+                    bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((lenPsfScience - rawKernel.getWidth())//2,
+                                                                (lenPsfScience - rawKernel.getHeight())//2),
+                                                rawKernel.getDimensions())
+                    kernelImageS.assign(rawKernel, bboxToPlace)
 
                 kernelMaskS = afwImage.MaskU(dimenS)
                 kernelMaskS.set(0)
