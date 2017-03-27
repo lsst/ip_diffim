@@ -368,7 +368,6 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
 
         # Survey the PSF dimensions of the Spatial Cell Set
         # to identify the minimum enclosed or maximum bounding square BBox.
-        # This loop can be made faster with a cheaper method to inspect PSF dimensions
         widthList = []
         heightList = []
         for row in range(nCellY):
