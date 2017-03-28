@@ -27,8 +27,10 @@ import numpy as np
 import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.pex.config as pexConfig
+import lsst.afw.geom as afwGeom
+import lsst.daf.base as dafBase
 import lsst.meas.algorithms as measAlg
+import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 
 from lsst.ip.diffim.imageMapReduce import (ImageMapReduceTask, ImageMapReduceConfig,
@@ -38,6 +40,52 @@ from lsst.ip.diffim.imageMapReduce import (ImageMapReduceTask, ImageMapReduceCon
 
 def setup_module(module):
     lsst.utils.tests.init()
+
+
+def makeWcs(offset=0):
+    # taken from $AFW_DIR/tests/testMakeWcs.py
+    metadata = dafBase.PropertySet()
+    metadata.set("SIMPLE", "T")
+    metadata.set("BITPIX", -32)
+    metadata.set("NAXIS", 2)
+    metadata.set("NAXIS1", 1024)
+    metadata.set("NAXIS2", 1153)
+    metadata.set("RADECSYS", 'FK5')
+    metadata.set("EQUINOX", 2000.)
+    metadata.setDouble("CRVAL1", 215.604025685476)
+    metadata.setDouble("CRVAL2", 53.1595451514076)
+    metadata.setDouble("CRPIX1", 1109.99981456774 + offset)
+    metadata.setDouble("CRPIX2", 560.018167811613 + offset)
+    metadata.set("CTYPE1", 'RA---SIN')
+    metadata.set("CTYPE2", 'DEC--SIN')
+    metadata.setDouble("CD1_1", 5.10808596133527E-05)
+    metadata.setDouble("CD1_2", 1.85579539217196E-07)
+    metadata.setDouble("CD2_2", -5.10281493481982E-05)
+    metadata.setDouble("CD2_1", -8.27440751733828E-07)
+    return afwImage.makeWcs(metadata)
+
+
+def getPsfMoments(psfArray):
+    # Borrowed and modified from meas_algorithms/testCoaddPsf
+    sumx2 = sumy2 = sumy = sumx = sumf = 0.0
+    for x in range(psfArray.shape[0]):
+        for y in range(psfArray.shape[1]):
+            f = psfArray[x, y]
+            sumx2 += x*x*f
+            sumy2 += y*y*f
+            sumx += x*f
+            sumy += y*f
+            sumf += f
+    xbar = sumx/sumf
+    ybar = sumy/sumf
+    mxx = sumx2 - 2*xbar*sumx + xbar*xbar*sumf
+    myy = sumy2 - 2*ybar*sumy + ybar*ybar*sumf
+    return sumf, xbar, ybar, mxx, myy
+
+
+def getPsfSecondMoments(psfArray):
+    sum, xbar, ybar, mxx, myy = getPsfMoments(psfArray)
+    return mxx, myy
 
 
 class AddAmountImageMapperSubtaskConfig(ImageMapperSubtaskConfig):
@@ -153,6 +201,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         self.exposure.setPsf(measAlg.DoubleGaussianPsf(11, 11, 2.0, 3.7))
         mi = self.exposure.getMaskedImage()
         mi.set(0.)
+        self.exposure.setWcs(makeWcs())  # required for PSF construction via CoaddPsf
 
     def testCopySumNoOverlaps(self):
         self._testCopySumNoOverlaps(reduceOp='copy', withNaNs=False)
@@ -162,7 +211,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
 
     def _testCopySumNoOverlaps(self, reduceOp='copy', withNaNs=False):
         """Test sample grid task that adds 5.0 to input image and uses
-        default 'copy' `reduceOperation`. Optionally add NaNs to subimages.
+        `reduceOperation = 'copy'`. Optionally add NaNs to subimages.
         """
         config = AddAmountImageMapReduceConfig()
         task = ImageMapReduceTask(config)
@@ -180,6 +229,8 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         if reduceOp != 'sum':
             self.assertFloatsAlmostEqual(mi[~isnan], newArr[~isnan] - 5.,
                                          msg='Failed on withNaNs: %s' % str(withNaNs))
+        else:  # We don't construct a new PSF if reduceOperation == 'copy'.
+            self._testCoaddPsf(newExp)
 
     def testAverageWithOverlaps(self):
         self._testAverageWithOverlaps(withNaNs=False)
@@ -206,6 +257,37 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         mi = self.exposure.getMaskedImage().getImage().getArray()
         self.assertFloatsAlmostEqual(mi[~isnan], newArr[~isnan] - 5.,
                                      msg='Failed on withNaNs: %s' % str(withNaNs))
+        self._testCoaddPsf(newExp)
+
+    def _testCoaddPsf(self, newExposure):
+        """Test that the new CoaddPsf of the `newExposure` returns PSF images
+        ~identical to the input PSF of `self.exposure` across a grid
+        covering the entire exposure bounding box.
+        """
+        origPsf = self.exposure.getPsf()
+        newPsf = newExposure.getPsf()
+        self.assertTrue(isinstance(newPsf, measAlg.CoaddPsf))
+        extentX = int(self.exposure.getWidth()*0.05)
+        extentY = int(self.exposure.getHeight()*0.05)
+        for x in np.linspace(extentX, self.exposure.getWidth()-extentX, 10):
+            for y in np.linspace(extentY, self.exposure.getHeight()-extentY, 10):
+                point = afwGeom.Point2D(np.rint(x), np.rint(y))
+                oPsf = origPsf.computeImage(point).getArray()
+                nPsf = newPsf.computeImage(point).getArray()
+                if oPsf.shape[0] < nPsf.shape[0]:  # sometimes CoaddPsf does this.
+                    oPsf = np.pad(oPsf, ((1, 1), (0, 0)), mode='constant')
+                elif oPsf.shape[0] > nPsf.shape[0]:
+                    nPsf = np.pad(nPsf, ((1, 1), (0, 0)), mode='constant')
+                if oPsf.shape[1] < nPsf.shape[1]:  # sometimes CoaddPsf does this.
+                    oPsf = np.pad(oPsf, ((0, 0), (1, 1)), mode='constant')
+                elif oPsf.shape[1] > nPsf.shape[1]:
+                    nPsf = np.pad(nPsf, ((0, 0), (1, 1)), mode='constant')
+                # pixel-wise comparison -- pretty stringent
+                self.assertFloatsAlmostEqual(oPsf, nPsf, atol=1e-4, msg='Failed on Psf')
+
+                origMmts = np.array(getPsfSecondMoments(oPsf))
+                newMmts = np.array(getPsfSecondMoments(nPsf))
+                self.assertFloatsAlmostEqual(origMmts, newMmts, atol=1e-4, msg='Failed on Psf')
 
     def testAverageVersusCopy(self):
         self._testAverageVersusCopy(withNaNs=False)
