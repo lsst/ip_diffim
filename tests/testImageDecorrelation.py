@@ -30,8 +30,16 @@ import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
 import lsst.meas.algorithms as measAlg
+import lsst.daf.base as dafBase
 
-from lsst.ip.diffim.imageDecorrelation import DecorrelateALKernelTask
+from lsst.ip.diffim.imageDecorrelation import (DecorrelateALKernelTask,
+                                               DecorrelateALKernelMapReduceConfig)
+from lsst.ip.diffim.imageMapReduce import ImageMapReduceTask
+
+try:
+    type(verbose)
+except NameError:
+    verbose = False
 
 
 def setup_module(module):
@@ -64,7 +72,7 @@ def singleGaussian2d(x, y, xc, yc, sigma_x=1., sigma_y=1., theta=0., ampl=1.):
 
 
 def makeFakeImages(xim=None, yim=None, svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, offset=None,
-                   psf_yvary_factor=0., varSourceChange=1/50., theta1=0., theta2=0., im1background=0.,
+                   psf_yvary_factor=0., varSourceChange=1/50., theta1=0., theta2=0.,
                    n_sources=500, seed=66, verbose=False):
     """! Make two exposures: a template and a science exposure.
     Add random sources of identical flux, with randomly-distributed fluxes and a given PSF, then add noise.
@@ -78,7 +86,6 @@ def makeFakeImages(xim=None, yim=None, svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2,
     the default, means no variation)
     @param varSourceChange add this amount of fractional flux to a single source closest to
     the center of the science image
-    @param im1background add a constant value to the science image
     @param n_sources the number of sources to add to the images
     @param seed the numpy random seed to set prior to image generation
     @param verbose be verbose
@@ -136,14 +143,37 @@ def makeFakeImages(xim=None, yim=None, svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2,
                                       psf1[0], psf1[1]+psf1_yvary[i], theta=theta1)
         im1 += tmp
 
-    # Add a (constant, for now) background offset to science image
-    if im1background != 0.:  # im1background = 10.
-        if verbose:
-            print('Background:', im1background)
-        im1 += im1background
-
     im1_psf = singleGaussian2d(x0im, y0im, 0, 0, psf1[0], psf1[1], theta=theta1)
     im2_psf = singleGaussian2d(x0im, y0im, offset[0], offset[1], psf2[0], psf2[1], theta=theta2)
+
+    def makeWcs(offset=0):
+        """ Make a fake Wcs
+
+        Parameters
+        ----------
+        offset : float
+          offset the Wcs by this many pixels.
+        """
+        # taken from $AFW_DIR/tests/testMakeWcs.py
+        metadata = dafBase.PropertySet()
+        metadata.set("SIMPLE", "T")
+        metadata.set("BITPIX", -32)
+        metadata.set("NAXIS", 2)
+        metadata.set("NAXIS1", 1024)
+        metadata.set("NAXIS2", 1153)
+        metadata.set("RADECSYS", 'FK5')
+        metadata.set("EQUINOX", 2000.)
+        metadata.setDouble("CRVAL1", 215.604025685476)
+        metadata.setDouble("CRVAL2", 53.1595451514076)
+        metadata.setDouble("CRPIX1", 1109.99981456774 + offset)
+        metadata.setDouble("CRPIX2", 560.018167811613 + offset)
+        metadata.set("CTYPE1", 'RA---SIN')
+        metadata.set("CTYPE2", 'DEC--SIN')
+        metadata.setDouble("CD1_1", 5.10808596133527E-05)
+        metadata.setDouble("CD1_2", 1.85579539217196E-07)
+        metadata.setDouble("CD2_2", -5.10281493481982E-05)
+        metadata.setDouble("CD2_1", -8.27440751733828E-07)
+        return afwImage.makeWcs(metadata)
 
     def makeExposure(imgArray, psfArray, imgVariance):
         """! Convert an image numpy.array and corresponding PSF numpy.array into an exposure.
@@ -168,6 +198,8 @@ def makeFakeImages(xim=None, yim=None, svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2,
         psfK = afwMath.FixedKernel(psf)
         psfNew = measAlg.KernelPsf(psfK)
         im1ex.setPsf(psfNew)
+        wcs = makeWcs()
+        im1ex.setWcs(wcs)
         return im1ex
 
     im1ex = makeExposure(im1, im1_psf, svar)  # Science image
@@ -191,7 +223,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
                                                                      "DETECTED", "BAD",
                                                                      "NO_DATA", "DETECTED_NEGATIVE"]))
 
-    def _setUpImages(self, svar=0.04, tvar=0.04):
+    def _setUpImages(self, svar=0.04, tvar=0.04, varyPsf=0.):
         """!Generate a fake aligned template and science image.
         """
 
@@ -200,7 +232,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
 
         self.im1ex, self.im2ex \
             = makeFakeImages(svar=self.svar, tvar=self.tvar, psf1=self.psf1_sigma, psf2=self.psf2_sigma,
-                             n_sources=50, verbose=False)
+                             n_sources=50, psf_yvary_factor=varyPsf, verbose=False)
 
     def _computeVarianceMean(self, maskedIm):
         statObj = afwMath.makeStatistics(maskedIm.getVariance(),
@@ -219,8 +251,8 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         del self.im1ex
         del self.im2ex
 
-    def _testImages(self):
-        """Check that the variance of the corrected diffim matches the theoretical value.
+    def _makeAndTestUncorrectedDiffim(self):
+        """Create the (un-decorrelated) diffim, and verify that its variance is too low.
         """
         # Create the matching kernel. We used Gaussian PSFs for im1 and im2, so we can compute the "expected"
         # matching kernel sigma.
@@ -245,31 +277,42 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
 
         # Expected (ideal) variance of difference image
         expected_var = self.svar + self.tvar
-        print('Expected variance:', expected_var)
+        if verbose:
+            print('EXPECTED VARIANCE:', expected_var)
 
+        # Create the diffim (uncorrected)
         # Uncorrected diffim exposure - variance plane is wrong (too low)
         tmp_diffExp = self.im1ex.getMaskedImage().clone()
         tmp_diffExp -= matched_im2ex.getMaskedImage()
         var = self._computeVarianceMean(tmp_diffExp)
         self.assertLess(var, expected_var)
 
-        # Create the diffim (uncorrected)
+        # Uncorrected diffim exposure - variance is wrong (too low) - same as above but on pixels
         diffExp = self.im1ex.clone()
         tmp = diffExp.getMaskedImage()
         tmp -= matched_im2ex.getMaskedImage()
-        # Uncorrected diffim exposure - variance is wrong (too low) - same as above but on pixels
         var = self._computePixelVariance(diffExp.getMaskedImage())
         self.assertLess(var, expected_var)
 
         # Uncorrected diffim exposure - variance plane is wrong (too low)
         mn = self._computeVarianceMean(diffExp.getMaskedImage())
         self.assertLess(mn, expected_var)
-        print('UNCORRECTED VARIANCE:', var, mn)
+        if verbose:
+            print('UNCORRECTED VARIANCE:', var, mn)
 
+        return diffExp, mKernel, expected_var
+
+    def _runDecorrelationTask(self, diffExp, mKernel):
+        """ Run the decorrelation task on the given diffim with the given matching kernel
+        """
         task = DecorrelateALKernelTask()
         decorrResult = task.run(self.im1ex, self.im2ex, diffExp, mKernel)
         corrected_diffExp = decorrResult.correctedExposure
+        return corrected_diffExp
 
+    def _testDecorrelation(self, expected_var, corrected_diffExp):
+        """ Check that the variance of the corrected diffim matches the theoretical value.
+        """
         # Corrected diffim - variance should be close to expected.
         # We set the tolerance a bit higher here since the simulated images have many bright stars
         var = self._computePixelVariance(corrected_diffExp.getMaskedImage())
@@ -277,27 +320,64 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
 
         # Check statistics of variance plane in corrected diffim
         mn = self._computeVarianceMean(corrected_diffExp.getMaskedImage())
-        print('CORRECTED VARIANCE:', var, mn)
+        if verbose:
+            print('CORRECTED VARIANCE:', var, mn)
         self.assertClose(mn, expected_var, rtol=0.02)
         self.assertClose(var, mn, rtol=0.05)
 
-    def testDiffimCorrection_same_variance(self):
-        """Test decorrelated diffim from two images with the same variance.
+    def _testDiffimCorrection(self, svar, tvar):
+        """ Run decorrelation and check the variance of the corrected diffim.
         """
-        self._setUpImages(svar=0.04, tvar=0.04)
-        self._testImages()
+        self._setUpImages(svar=svar, tvar=tvar)
+        diffExp, mKernel, expected_var = self._makeAndTestUncorrectedDiffim()
+        corrected_diffExp = self._runDecorrelationTask(diffExp, mKernel)
+        self._testDecorrelation(expected_var, corrected_diffExp)
 
-    def testDiffimCorrection_higher_science_variance(self):
-        """Test decorrelated diffim when the science image variance is higher than that of the template.
+    def testDiffimCorrection(self):
+        """Test decorrelated diffim from images with different combinations of variances.
         """
-        self._setUpImages(svar=0.08, tvar=0.04)
-        self._testImages()
+        # Same variance
+        self._testDiffimCorrection(svar=0.04, tvar=0.04)
+        # Science image variance is higher than that of the template.
+        self._testDiffimCorrection(svar=0.08, tvar=0.04)
+        # Template variance is higher than that of the science img.
+        self._testDiffimCorrection(svar=0.04, tvar=0.08)
 
-    def testDiffimCorrection_higher_template_variance(self):
-        """Test decorrelated diffim when the template variance is higher than that of the science img.
+    def _runDecorrelationTaskMapReduced(self, diffExp, mKernel):
+        """ Run decorrelation using the imageMapReducer.
         """
-        self._setUpImages(svar=0.04, tvar=0.08)
-        self._testImages()
+        config = DecorrelateALKernelMapReduceConfig()
+        config.borderSizeX = config.borderSizeY = 3
+        config.reducerSubtask.reduceOperation = 'average'
+        task = ImageMapReduceTask(config=config)
+        decorrResult = task.run(diffExp, template=self.im2ex, science=self.im1ex,
+                                psfMatchingKernel=mKernel, forceEvenSized=True)
+        corrected_diffExp = decorrResult.exposure
+        return corrected_diffExp
+
+    def _testDiffimCorrection_mapReduced(self, svar, tvar, varyPsf=0.0):
+        """ Run decorrelation using the imageMapReduce task, and check the variance of
+            the corrected diffim.
+        """
+        self._setUpImages(svar=svar, tvar=tvar, varyPsf=varyPsf)
+        diffExp, mKernel, expected_var = self._makeAndTestUncorrectedDiffim()
+        corrected_diffExp = self._runDecorrelationTaskMapReduced(diffExp, mKernel)
+        self._testDecorrelation(expected_var, corrected_diffExp)
+        # Also compare the diffim generated here vs. the non-ImageMapReduce one
+        corrected_diffExp_OLD = self._runDecorrelationTask(diffExp, mKernel)
+        self.assertMaskedImagesNearlyEqual(corrected_diffExp.getMaskedImage(),
+                                           corrected_diffExp_OLD.getMaskedImage())
+
+    def testDiffimCorrection_mapReduced(self):
+        """Test decorrelated diffim when using the imageMapReduce task.
+           Compare results with those from the original DecorrelateALKernelTask.
+        """
+        # Same variance
+        self._testDiffimCorrection_mapReduced(svar=0.04, tvar=0.04)
+        # Science image variance is higher than that of the template.
+        self._testDiffimCorrection_mapReduced(svar=0.04, tvar=0.08)
+        # Template variance is higher than that of the science img.
+        self._testDiffimCorrection_mapReduced(svar=0.08, tvar=0.04)
 
 
 class MemoryTester(lsst.utils.tests.MemoryTestCase):

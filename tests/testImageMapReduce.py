@@ -111,9 +111,9 @@ class AddAmountImageMapperSubtask(ImageMapperSubtask):
 
         Parameters
         ----------
-        subExposure : `afwImage.ExposureF`
+        subExposure : `afwImage.Exposure`
             Input `subExposure` upon which to operate
-        expandedSubExp : `afwImage.ExposureF`
+        expandedSubExp : `afwImage.Exposure`
             Input expanded subExposure (not used here)
         fullBBox : `afwGeom.BoundingBox`
             Bounding box of original exposure (not used here)
@@ -156,9 +156,9 @@ class GetMeanImageMapperSubtask(ImageMapperSubtask):
 
         Parameters
         ----------
-        subExposure : `afwImage.ExposureF`
+        subExposure : `afwImage.Exposure`
             Input `subExposure` upon which to operate
-        expandedSubExp : `afwImage.ExposureF`
+        expandedSubExp : `afwImage.Exposure`
             Input expanded subExposure (not used here)
         fullBBox : `afwGeom.BoundingBox`
             Bounding box of original exposure (not used here)
