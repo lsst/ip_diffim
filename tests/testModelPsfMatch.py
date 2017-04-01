@@ -64,9 +64,9 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
         psfModel = measAlg.DoubleGaussianPsf(self.ksize + 2, self.ksize + 2, self.sigma2)
         psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
         results = psfMatch.run(self.exp, psfModel)
-        self.assertEqual(results.referencePsfModel.computeImage().getDimensions(),
+        self.assertEqual(results.psfMatchedExposure.getPsf().computeImage().getDimensions(),
                          self.exp.getPsf().computeImage().getDimensions())
-        self.assertEqual(results.referencePsfModel.getSigma1(), self.sigma2)
+        self.assertEqual(results.psfMatchedExposure.getPsf().getSigma1(), self.sigma2)
 
     def tearDown(self):
         del self.exp

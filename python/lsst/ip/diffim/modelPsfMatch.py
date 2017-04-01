@@ -300,6 +300,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(), exposure.getWcs())
         psfMatchedExposure.setFilter(exposure.getFilter())
         psfMatchedExposure.setCalib(exposure.getCalib())
+        psfMatchedExposure.setPsf(referencePsfModel)
         psfMatchedMaskedImage = psfMatchedExposure.getMaskedImage()
 
         # Normalize the psf-matching kernel while convolving since its magnitude is meaningless
@@ -312,7 +313,6 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                                psfMatchingKernel=psfMatchingKernel,
                                kernelCellSet=kernelCellSet,
                                metadata=self.metadata,
-                               referencePsfModel=referencePsfModel,
                                )
 
     def _diagnostic(self, kernelCellSet, spatialSolution, spatialKernel, spatialBg):
