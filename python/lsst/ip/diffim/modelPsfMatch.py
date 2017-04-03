@@ -21,7 +21,7 @@
 from __future__ import absolute_import, division, print_function
 
 from builtins import range
-import numpy as num
+import numpy as np
 
 from . import diffimLib
 import lsst.afw.geom as afwGeom
@@ -38,11 +38,11 @@ import lsst.afw.display.ds9 as ds9
 
 __all__ = ("ModelPsfMatchTask", "ModelPsfMatchConfig")
 
-sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
+sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 
 def nextOddInteger(x):
-    nextInt = int(num.ceil(x))
+    nextInt = int(np.ceil(x))
     return nextInt + 1 if nextInt % 2 == 0 else nextInt
 
 
@@ -311,11 +311,11 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
 
         if psfMatchingKernel.isSpatiallyVarying():
-            sParameters = num.array(psfMatchingKernel.getSpatialParameters())
+            sParameters = np.array(psfMatchingKernel.getSpatialParameters())
             sParameters[0][0] = kernelSum
             psfMatchingKernel.setSpatialParameters(sParameters)
         else:
-            kParameters = num.array(psfMatchingKernel.getKernelParameters())
+            kParameters = np.array(psfMatchingKernel.getKernelParameters())
             kParameters[0] = kernelSum
             psfMatchingKernel.setKernelParameters(kParameters)
 
