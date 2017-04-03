@@ -21,7 +21,7 @@
 from __future__ import absolute_import, division, print_function
 
 from builtins import range
-import numpy as num
+import numpy as np
 
 from . import diffimLib
 import lsst.afw.geom as afwGeom
@@ -36,7 +36,14 @@ from .psfMatch import PsfMatchTask, PsfMatchConfigAL
 from . import utils as diUtils
 import lsst.afw.display.ds9 as ds9
 
-sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
+__all__ = ("ModelPsfMatchTask", "ModelPsfMatchConfig")
+
+sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
+
+
+def nextOddInteger(x):
+    nextInt = int(np.ceil(x))
+    return nextInt + 1 if nextInt % 2 == 0 else nextInt
 
 
 class ModelPsfMatchConfig(pexConfig.Config):
@@ -49,11 +56,27 @@ class ModelPsfMatchConfig(pexConfig.Config):
         ),
         default="AL",
     )
-
-    padPsf = pexConfig.Field(
+    doAutoPadPsf = pexConfig.Field(
         dtype=bool,
-        doc="Grow PSF dimensions to largest PSF dimension on input exposure; else clip to smallest",
-        default=False,
+        doc=("If too small, automatically pad the science Psf? "
+             "Pad to smallest dimensions appropriate for the matching kernel dimensions, "
+             "as specified by autoPadPsfTo. If false, pad by the padPsfBy config."),
+        default=True,
+    )
+    autoPadPsfTo = pexConfig.RangeField(
+        dtype=float,
+        doc=("Minimum Science Psf dimensions as a fraction of matching kernel dimensions. "
+             "If the dimensions of the Psf to be matched are less than the "
+             "matching kernel dimensions * autoPadPsfTo, pad Science Psf to this size. "
+             "Ignored if doAutoPadPsf=False."),
+        default=1.4,
+        min=1.0,
+        max=2.0
+    )
+    padPsfBy = pexConfig.Field(
+        dtype=int,
+        doc="Pixels (even) to pad Science Psf by before matching. Ignored if doAutoPadPsf=True",
+        default=0,
     )
 
     def setDefaults(self):
@@ -288,11 +311,11 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
 
         if psfMatchingKernel.isSpatiallyVarying():
-            sParameters = num.array(psfMatchingKernel.getSpatialParameters())
+            sParameters = np.array(psfMatchingKernel.getSpatialParameters())
             sParameters[0][0] = kernelSum
             psfMatchingKernel.setSpatialParameters(sParameters)
         else:
-            kParameters = num.array(psfMatchingKernel.getKernelParameters())
+            kParameters = np.array(psfMatchingKernel.getKernelParameters())
             kParameters[0] = kernelSum
             psfMatchingKernel.setKernelParameters(kParameters)
 
@@ -344,13 +367,6 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         dimenR = referencePsfModel.getLocalKernel().getDimensions()
         psfWidth, psfHeight = dimenR
 
-        maxKernelSize = min(psfWidth, psfHeight) - 1
-        if maxKernelSize % 2 == 0:
-            maxKernelSize -= 1
-        if self.kConfig.kernelSize > maxKernelSize:
-            raise ValueError("Kernel size (%d) too big to match Psfs of size %d; reduce to at least %d" % (
-                self.kConfig.kernelSize, psfWidth, maxKernelSize))
-
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0, scienceY0 = scienceBBox.getMin()
 
@@ -368,7 +384,6 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
 
         # Survey the PSF dimensions of the Spatial Cell Set
         # to identify the minimum enclosed or maximum bounding square BBox.
-        # This loop can be made faster with a cheaper method to inspect PSF dimensions
         widthList = []
         heightList = []
         for row in range(nCellY):
@@ -379,15 +394,42 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                 widthList.append(widthS)
                 heightList.append(heightS)
 
-        lenMax = max(max(heightList), max(widthList))
-        lenMin = min(min(heightList), min(widthList))
+        psfSize = max(max(heightList), max(widthList))
 
-        lenPsfScience = lenMax if self.config.padPsf else lenMin
-        dimenS = afwGeom.Extent2I(lenPsfScience, lenPsfScience)
+        if self.config.doAutoPadPsf:
+            minPsfSize = nextOddInteger(self.kConfig.kernelSize*self.config.autoPadPsfTo)
+            paddingPix = max(0, minPsfSize - psfSize)
+        else:
+            if self.config.padPsfBy % 2 != 0:
+                raise ValueError("Config padPsfBy (%i pixels) must be even number." %
+                                 self.config.padPsfBy)
+            paddingPix = self.config.padPsfBy
+
+        if paddingPix > 0:
+            self.log.info("Padding Science PSF from (%s, %s) to (%s, %s) pixels" %
+                          (psfSize, psfSize, paddingPix + psfSize, paddingPix + psfSize))
+            psfSize += paddingPix
+
+        # Check that PSF is larger than the matching kernel
+        maxKernelSize = psfSize - 1
+        if maxKernelSize % 2 == 0:
+            maxKernelSize -= 1
+        if self.kConfig.kernelSize > maxKernelSize:
+            message = """
+                Kernel size (%d) too big to match Psfs of size %d.
+                Please reconfigure by setting one of the following:
+                1) kernel size to <= %d
+                2) doAutoPadPsf=True
+                3) padPsfBy to >= %s
+                """ % (self.kConfig.kernelSize, psfSize,
+                       maxKernelSize, self.kConfig.kernelSize - maxKernelSize)
+            raise ValueError(message)
+
+        dimenS = afwGeom.Extent2I(psfSize, psfSize)
 
         if (dimenR != dimenS):
             self.log.info("Adjusting dimensions of reference PSF model from %s to %s" % (dimenR, dimenS))
-            referencePsfModel = referencePsfModel.resized(lenPsfScience, lenPsfScience)
+            referencePsfModel = referencePsfModel.resized(psfSize, psfSize)
             dimenR = dimenS
 
         policy = pexConfig.makePolicy(self.kConfig)
@@ -417,17 +459,10 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                 else:
                     # make image of proper size
                     kernelImageS = afwImage.ImageF(dimenR)
-                    if self.config.padPsf:
-                        bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((lenMax - rawKernel.getWidth())//2,
-                                                                    (lenMax - rawKernel.getHeight())//2),
-                                                    rawKernel.getDimensions())
-                        kernelImageS.assign(rawKernel, bboxToPlace)
-                    else:
-                        bboxToExtract = afwGeom.Box2I(afwGeom.Point2I((rawKernel.getWidth() - lenMin)//2,
-                                                                      (rawKernel.getHeight() - lenMin)//2),
-                                                      dimenR)
-                        rawKernel.setXY0(0, 0)
-                        kernelImageS = rawKernel.Factory(rawKernel, bboxToExtract)
+                    bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((psfSize - rawKernel.getWidth())//2,
+                                                                (psfSize - rawKernel.getHeight())//2),
+                                                rawKernel.getDimensions())
+                    kernelImageS.assign(rawKernel, bboxToPlace)
 
                 kernelMaskS = afwImage.MaskU(dimenS)
                 kernelMaskS.set(0)
