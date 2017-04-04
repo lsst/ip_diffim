@@ -1,6 +1,6 @@
 #
 # LSST Data Management System
-# Copyright 2016 AURA/LSST.
+# Copyright 2016-2017 AURA/LSST.
 #
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -365,7 +365,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         self._testDecorrelation(expected_var, corrected_diffExp)
         # Also compare the diffim generated here vs. the non-ImageMapReduce one
         corrected_diffExp_OLD = self._runDecorrelationTask(diffExp, mKernel)
-        self.assertMaskedImagesNearlyEqual(corrected_diffExp.getMaskedImage(),
+        self.assertMaskedImagesAlmostEqual(corrected_diffExp.getMaskedImage(),
                                            corrected_diffExp_OLD.getMaskedImage())
 
     def testDiffimCorrection_mapReduced(self):
