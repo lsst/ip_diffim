@@ -260,7 +260,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         psf2_sig = self.im2ex.getPsf().computeShape().getDeterminantRadius()
         sig_match = np.sqrt((psf1_sig**2. - psf2_sig**2.))
         # Sanity check - make sure PSFs are correct.
-        self.assertClose(sig_match, np.sqrt((self.psf1_sigma**2. - self.psf2_sigma**2.)), rtol=1e-5)
+        self.assertFloatsAlmostEqual(sig_match, np.sqrt((self.psf1_sigma**2. - self.psf2_sigma**2.)), rtol=1e-5)
         # mKernel = measAlg.SingleGaussianPsf(31, 31, sig_match)
         x0 = np.arange(-16, 16, 1)
         y0 = x0.copy()
@@ -316,14 +316,14 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         # Corrected diffim - variance should be close to expected.
         # We set the tolerance a bit higher here since the simulated images have many bright stars
         var = self._computePixelVariance(corrected_diffExp.getMaskedImage())
-        self.assertClose(var, expected_var, rtol=0.05)
+        self.assertFloatsAlmostEqual(var, expected_var, rtol=0.05)
 
         # Check statistics of variance plane in corrected diffim
         mn = self._computeVarianceMean(corrected_diffExp.getMaskedImage())
         if verbose:
             print('CORRECTED VARIANCE:', var, mn)
-        self.assertClose(mn, expected_var, rtol=0.02)
-        self.assertClose(var, mn, rtol=0.05)
+        self.assertFloatsAlmostEqual(mn, expected_var, rtol=0.02)
+        self.assertFloatsAlmostEqual(var, mn, rtol=0.05)
 
     def _testDiffimCorrection(self, svar, tvar):
         """ Run decorrelation and check the variance of the corrected diffim.
