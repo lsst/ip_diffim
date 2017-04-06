@@ -19,10 +19,10 @@
  * the GNU General Public License along with this program.  If not,
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
+#include "pybind11/pybind11.h"
+
 #include <memory>
 
-#include <pybind11/pybind11.h>
-//#include <pybind11/stl.h>
 #include "Eigen/Core"
 #include "numpy/arrayobject.h"
 #include "ndarray/pybind11.h"
@@ -173,8 +173,13 @@ void declareSpatialKernelSolution(py::module &mod) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(_kernelSolution) {
-    py::module mod("_kernelSolution", "Python wrapper for KernelSolution.h");
+PYBIND11_PLUGIN(kernelSolution) {
+    py::module::import("lsst.afw.geom");
+    py::module::import("lsst.afw.image");
+    py::module::import("lsst.afw.math");
+    py::module::import("lsst.pex.policy");
+
+    py::module mod("kernelSolution");
 
     // Need to import numpy for ndarray and eigen conversions
     if (_import_array() < 0) {

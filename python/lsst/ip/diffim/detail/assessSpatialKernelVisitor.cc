@@ -19,11 +19,10 @@
  * the GNU General Public License along with this program.  If not,
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
+#include "pybind11/pybind11.h"
+
 #include <memory>
 #include <string>
-
-#include <pybind11/pybind11.h>
-//#include <pybind11/stl.h>
 
 #include "lsst/afw/math/SpatialCell.h"
 #include "lsst/ip/diffim/AssessSpatialKernelVisitor.h"
@@ -67,14 +66,18 @@ void declareAssessSpatialKernelVisitor(py::module& mod, std::string const& suffi
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_PLUGIN(_assessSpatialKernelVisitor) {
-    py::module mod("_assessSpatialKernelVisitor", "Python wrapper for AssessSpatialKernelVisitor.h");
+PYBIND11_PLUGIN(assessSpatialKernelVisitor) {
+    py::module::import("lsst.afw.math");
+    py::module::import("lsst.pex.policy");
+
+    py::module mod("assessSpatialKernelVisitor");
 
     declareAssessSpatialKernelVisitor<float>(mod, "F");
 
     return mod.ptr();
 }
-}
-}
-}
-}  // lsst::ip::diffim::detail
+
+}  // detail
+}  // diffim
+}  // ip
+}  // lsst

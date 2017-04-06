@@ -19,8 +19,8 @@
  * the GNU General Public License along with this program.  If not,
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
-#include <pybind11/pybind11.h>
-//#include <pybind11/stl.h>
+#include "pybind11/pybind11.h"
+
 #include "Eigen/Core"
 #include "numpy/arrayobject.h"
 #include "ndarray/pybind11.h"
@@ -70,8 +70,11 @@ void declareConvolveAndSubtract(py::module &mod) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(_imageSubtract) {
-    py::module mod("_imageSubtract", "Python wrapper for ImageSubtract.h");
+PYBIND11_PLUGIN(imageSubtract) {
+    py::module::import("lsst.afw.image");
+    py::module::import("lsst.afw.math");
+
+    py::module mod("imageSubtract");
 
     // Need to import numpy for ndarray and eigen conversions
     if (_import_array() < 0) {
@@ -84,6 +87,7 @@ PYBIND11_PLUGIN(_imageSubtract) {
 
     return mod.ptr();
 }
-}
-}
-}  // namespace lsst::ip::diffim
+
+}  // diffim
+}  // ip
+}  // lsst

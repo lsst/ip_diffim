@@ -19,11 +19,11 @@
  * the GNU General Public License along with this program.  If not,
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
+#include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
+
 #include <memory>
 #include <string>
-
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 
 #include "lsst/afw/image/ImagePca.h"
 #include "lsst/afw/math/Kernel.h"
@@ -86,15 +86,19 @@ void declareKernelPcaVisitor(py::module& mod, std::string const& suffix) {
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_PLUGIN(_kernelPca) {
-    py::module mod("_kernelPca", "Python wrapper for KernelPca.h");
+PYBIND11_PLUGIN(kernelPca) {
+    py::module::import("lsst.afw.image");
+    py::module::import("lsst.afw.math");
+
+    py::module mod("kernelPca");
 
     declareKernelPca<afw::math::Kernel::Pixel>(mod, "D");
     declareKernelPcaVisitor<float>(mod, "F");
 
     return mod.ptr();
 }
-}
-}
-}
+
+}  // detail
+}  // diffim
+}  // ip
 }  // lsst::ip::diffim::detail
