@@ -89,9 +89,9 @@ class ModelPsfMatchConfig(pexConfig.Config):
         # Variance is ill defined
         self.kernel.active.constantVarianceWeighting = True
 
-        # Psfs are typically small; reduce the kernel size
-        self.kernel.active.kernelSizeMin = 11
-        self.kernel.active.kernelSize = 11
+        # Do not change specified kernel size
+        self.kernel.active.scaleByFwhm = False
+
 
 ## \addtogroup LSST_task_documentation
 ## \{
