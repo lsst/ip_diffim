@@ -34,7 +34,7 @@ namespace detail {
      * @brief A class to accumulate kernel sums across SpatialCells 
      *
      * @code
-        Policy::Ptr policy(new Policy);
+        std::shared_ptr<Policy> policy(new Policy);
         policy->set("kernelSumClipping", false);
         policy->set("maxKsumSigma", 3.0);
      

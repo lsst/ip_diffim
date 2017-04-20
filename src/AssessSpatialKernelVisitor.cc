@@ -52,7 +52,7 @@ namespace detail {
      */
     template<typename PixelT>
     AssessSpatialKernelVisitor<PixelT>::AssessSpatialKernelVisitor(
-        lsst::afw::math::LinearCombinationKernel::Ptr spatialKernel,   ///< Spatially varying kernel model
+        std::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatialKernel,   ///< Spatially varying kernel model
         lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground, ///< Spatially varying backgound model
         lsst::pex::policy::Policy const& policy                        ///< Policy file directing behavior
         ) : 

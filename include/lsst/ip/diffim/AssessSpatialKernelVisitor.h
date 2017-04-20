@@ -29,7 +29,7 @@ namespace detail {
         typedef std::shared_ptr<AssessSpatialKernelVisitor<PixelT> > Ptr;
 
         AssessSpatialKernelVisitor(
-            lsst::afw::math::LinearCombinationKernel::Ptr spatialKernel,   ///< Spatially varying kernel 
+            std::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatialKernel,   ///< Spatially varying kernel
             lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground, ///< Spatially varying background
             lsst::pex::policy::Policy const& policy                        ///< Policy file 
             );
@@ -43,7 +43,7 @@ namespace detail {
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
 
     private:
-        lsst::afw::math::LinearCombinationKernel::Ptr _spatialKernel;   ///< Spatial kernel function
+        std::shared_ptr<lsst::afw::math::LinearCombinationKernel> _spatialKernel;   ///< Spatial kernel function
         lsst::afw::math::Kernel::SpatialFunctionPtr _spatialBackground; ///< Spatial background function
         lsst::pex::policy::Policy _policy;            ///< Policy controlling behavior
         ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
@@ -58,12 +58,12 @@ namespace detail {
     template<typename PixelT>
     std::shared_ptr<AssessSpatialKernelVisitor<PixelT> >
     makeAssessSpatialKernelVisitor(
-        lsst::afw::math::LinearCombinationKernel::Ptr spatialKernel,   
+        std::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatialKernel,
         lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground, 
         lsst::pex::policy::Policy const& policy                        
          ) {
 
-        return typename AssessSpatialKernelVisitor<PixelT>::Ptr(
+        return std::shared_ptr<AssessSpatialKernelVisitor<PixelT>>(
             new AssessSpatialKernelVisitor<PixelT>(spatialKernel, spatialBackground, policy)
             );
     }

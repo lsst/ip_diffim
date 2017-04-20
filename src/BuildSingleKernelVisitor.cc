@@ -42,7 +42,7 @@ namespace detail {
      * @brief Builds the convolution kernel for a given candidate
      *
      * @code
-        Policy::Ptr policy(new Policy);
+        std::shared_ptr<Policy> policy(new Policy);
         policy->set("constantVarianceWeighting", false);
         policy->set("iterateSingleKernel", false);
         policy->set("singleKernelClipping", true);

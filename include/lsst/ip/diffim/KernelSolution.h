@@ -94,8 +94,8 @@ namespace diffim {
         virtual void build(lsst::afw::image::Image<InputT> const &templateImage,
                            lsst::afw::image::Image<InputT> const &scienceImage,
                            lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate);
-        virtual lsst::afw::math::Kernel::Ptr getKernel();
-        virtual lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr makeKernelImage();
+        virtual std::shared_ptr<lsst::afw::math::Kernel> getKernel();
+        virtual std::shared_ptr<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>> makeKernelImage();
         virtual double getBackground();
         virtual double getKsum();
         virtual std::pair<std::shared_ptr<lsst::afw::math::Kernel>, double> getSolutionPair();
@@ -105,7 +105,7 @@ namespace diffim {
         Eigen::VectorXd _iVec;               ///< Vectorized I
         Eigen::VectorXd _ivVec;              ///< Inverse variance
 
-        lsst::afw::math::Kernel::Ptr _kernel;                   ///< Derived single-object convolution kernel
+        std::shared_ptr<lsst::afw::math::Kernel> _kernel;                   ///< Derived single-object convolution kernel
         double _background;                                     ///< Derived differential background estimate
         double _kSum;                                           ///< Derived kernel sum
 
@@ -188,15 +188,15 @@ namespace diffim {
                            Eigen::VectorXd const& wVec);
 
         void solve();
-        lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr makeKernelImage(lsst::afw::geom::Point2D const& pos);
-        std::pair<lsst::afw::math::LinearCombinationKernel::Ptr,
+        std::shared_ptr<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>> makeKernelImage(lsst::afw::geom::Point2D const& pos);
+        std::pair<std::shared_ptr<lsst::afw::math::LinearCombinationKernel>,
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getSolutionPair();
 
     private:
         lsst::afw::math::Kernel::SpatialFunctionPtr _spatialKernelFunction; ///< Spatial function for Kernel
         bool _constantFirstTerm;                                            ///< Is the first term constant
 
-        lsst::afw::math::LinearCombinationKernel::Ptr _kernel;   ///< Spatial convolution kernel
+        std::shared_ptr<lsst::afw::math::LinearCombinationKernel> _kernel;   ///< Spatial convolution kernel
         lsst::afw::math::Kernel::SpatialFunctionPtr _background; ///< Spatial background model
         double _kSum;                                            ///< Derived kernel sum
 

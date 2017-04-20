@@ -58,7 +58,7 @@ namespace detail {
     template<typename PixelT>
     std::shared_ptr<KernelSumVisitor<PixelT> >
     makeKernelSumVisitor(lsst::pex::policy::Policy const& policy) {
-        return typename KernelSumVisitor<PixelT>::Ptr(new KernelSumVisitor<PixelT>(policy));
+        return std::shared_ptr<KernelSumVisitor<PixelT>>(new KernelSumVisitor<PixelT>(policy));
     }
 
 }}}} // end of namespace lsst::ip::diffim::detail

@@ -49,7 +49,7 @@ int main() {
         afwMath::Kernel::SpatialFunctionPtr spatialFunction(spatialKernelFunction->clone());
         spatialFunctionList.push_back(spatialFunction);
     }
-    afwMath::LinearCombinationKernel::Ptr spatialKernel(
+    std::shared_ptr<afwMath::LinearCombinationKernel> spatialKernel(
         new afwMath::LinearCombinationKernel(basisList, spatialFunctionList)
         );
     /* Set up some fake terms */
@@ -65,11 +65,11 @@ int main() {
     spatialKernel->setSpatialParameters(kCoeffs);
     
     unsigned int loc = 50;
-    afwImage::MaskedImage<PixelT>::Ptr mimg1(
+    std::shared_ptr<afwImage::MaskedImage<PixelT>> mimg1(
         new afwImage::MaskedImage<PixelT>(afwGeom::Extent2I(100,100))
         );
     *mimg1->at(loc, loc) = afwImage::MaskedImage<PixelT>::Pixel(1, 0x0, 1);
-    afwImage::MaskedImage<PixelT>::Ptr mimg2(
+    std::shared_ptr<afwImage::MaskedImage<PixelT>> mimg2(
         new afwImage::MaskedImage<PixelT>(mimg1->getDimensions())
         );
     afwMath::convolve(*mimg2, *mimg1, *spatialKernel, false);

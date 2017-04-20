@@ -65,11 +65,11 @@ namespace detail {
     lsst::afw::math::KernelList KernelPcaVisitor<PixelT>::getEigenKernels() {
         afwMath::KernelList kernelList;
 
-        std::vector<typename ImageT::Ptr> eigenImages = _imagePca->getEigenImages();
+        std::vector<std::shared_ptr<ImageT>> eigenImages = _imagePca->getEigenImages();
         int ncomp = eigenImages.size();
 
         if (_mean) {
-            kernelList.push_back(afwMath::Kernel::Ptr(
+            kernelList.push_back(std::shared_ptr<afwMath::Kernel>(
                                      new afwMath::FixedKernel(
                                          afwImage::Image<afwMath::Kernel::Pixel>
                                          (*_mean, true))));
@@ -77,7 +77,7 @@ namespace detail {
         for (int i = 0; i < ncomp; i++) {
             afwImage::Image<afwMath::Kernel::Pixel> img = 
                 afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[i], true);
-            kernelList.push_back(afwMath::Kernel::Ptr(
+            kernelList.push_back(std::shared_ptr<afwMath::Kernel>(
                                      new afwMath::FixedKernel(img)
                                      ));
         }
