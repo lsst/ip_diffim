@@ -346,6 +346,8 @@ And finally provide some optional debugging displays:
                                                              templateExposure,
                                                              destBBox=scienceExposure.getBBox())
                 templateExposure.setPsf(templatePsf)
+                print('HERE!!!')
+                templateExposure.writeFits('WARPEDTEMPLATE.fits')
             else:
                 self.log.error("ERROR: Input images not registered")
                 raise RuntimeError("Input images not registered")

@@ -71,13 +71,14 @@ def singleGaussian2d(x, y, xc, yc, sigma_x=1., sigma_y=1., theta=0., ampl=1.):
     return out
 
 
-def makeFakeImages(xim=None, yim=None, svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, offset=None,
+def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, offset=None,
                    psf_yvary_factor=0., varSourceChange=1/50., theta1=0., theta2=0.,
                    n_sources=500, seed=66, verbose=False):
     """! Make two exposures: a template and a science exposure.
-    Add random sources of identical flux, with randomly-distributed fluxes and a given PSF, then add noise.
+    Add random sources with randomly-distributed and identical fluxes and a given PSF, then add noise.
     In all cases below, index (1) is the science image, and (2) is the template.
-    @param xim,yim image pixel coordinates on which to generate the image grid. Default is (-256:256).
+    @param size tuple givein image pixel size. Pixel coordinates are set to
+    (-size[0]//2:size[0]//2, -size[1]//2:size[1]//2)
     @param svar,tar variance of noise to be generated on science/template images. Default is 0.04 for both.
     @param psf1,psf2 std. dev. of (Gaussian) PSFs for the two images in x,y direction. Default is
     [3.3, 3.3] and [2.2, 2.2] for im1 and im2 respectively.
@@ -115,18 +116,18 @@ def makeFakeImages(xim=None, yim=None, svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2,
         print(np.sqrt(psf1[0]**2 - psf2[0]**2))
         print('Offset:', offset)
 
-    xim = np.arange(-256, 256, 1) if xim is None else xim
-    yim = xim.copy() if yim is None else yim
+    xim = np.arange(-size[0]//2, size[0]//2, 1)
+    yim = np.arange(-size[1]//2, size[1]//2, 1)
     x0im, y0im = np.meshgrid(xim, yim)
+    im1 = np.random.normal(scale=np.sqrt(svar), size=x0im.shape)  # variance of science image
+    im2 = np.random.normal(scale=np.sqrt(tvar), size=x0im.shape)  # variance of template
+
     fluxes = np.random.uniform(50, 30000, n_sources)
     xposns = np.random.uniform(xim.min()+16, xim.max()-5, n_sources)
     yposns = np.random.uniform(yim.min()+16, yim.max()-5, n_sources)
 
     # Make the source closest to the center of the image the one that increases in flux
     ind = np.argmin(xposns**2. + yposns**2.)
-
-    im1 = np.random.normal(scale=np.sqrt(svar), size=x0im.shape)  # variance of science image
-    im2 = np.random.normal(scale=np.sqrt(tvar), size=x0im.shape)  # variance of template
 
     # vary the y-width of psf across x-axis of science image (zero means no variation):
     psf1_yvary = psf_yvary_factor * (yim.mean() - yposns) / yim.max()
@@ -190,9 +191,9 @@ def makeFakeImages(xim=None, yim=None, svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2,
         im1ex = afwImage.ExposureD(bbox)
         im1ex.getMaskedImage().getImage().getArray()[:, :] = imgArray
         im1ex.getMaskedImage().getVariance().getArray()[:, :] = imgVariance
-        psfBox = afwGeom.Box2I(afwGeom.Point2I(-20, -20), afwGeom.Point2I(20, 20))  # a 41x41 pixel psf
+        psfBox = afwGeom.Box2I(afwGeom.Point2I(-12, -12), afwGeom.Point2I(12, 12))  # a 25x25 pixel psf
         psf = afwImage.ImageD(psfBox)
-        psfBox.shift(afwGeom.Extent2I(256, 256))
+        psfBox.shift(afwGeom.Extent2I(size[0]//2, size[1]//2))
         im1_psf_sub = psfArray[psfBox.getMinX():psfBox.getMaxX()+1, psfBox.getMinY():psfBox.getMaxY()+1]
         psf.getArray()[:, :] = im1_psf_sub
         psfK = afwMath.FixedKernel(psf)
@@ -260,7 +261,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         psf2_sig = self.im2ex.getPsf().computeShape().getDeterminantRadius()
         sig_match = np.sqrt((psf1_sig**2. - psf2_sig**2.))
         # Sanity check - make sure PSFs are correct.
-        self.assertFloatsAlmostEqual(sig_match, np.sqrt((self.psf1_sigma**2. - self.psf2_sigma**2.)), rtol=1e-5)
+        self.assertFloatsAlmostEqual(sig_match, np.sqrt((self.psf1_sigma**2. - self.psf2_sigma**2.)), rtol=2e-5)
         # mKernel = measAlg.SingleGaussianPsf(31, 31, sig_match)
         x0 = np.arange(-16, 16, 1)
         y0 = x0.copy()
@@ -365,7 +366,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         self._testDecorrelation(expected_var, corrected_diffExp)
         # Also compare the diffim generated here vs. the non-ImageMapReduce one
         corrected_diffExp_OLD = self._runDecorrelationTask(diffExp, mKernel)
-        self.assertMaskedImagesAlmostEqual(corrected_diffExp.getMaskedImage(),
+        self.assertMaskedImagesNearlyEqual(corrected_diffExp.getMaskedImage(),
                                            corrected_diffExp_OLD.getMaskedImage())
 
     def testDiffimCorrection_mapReduced(self):

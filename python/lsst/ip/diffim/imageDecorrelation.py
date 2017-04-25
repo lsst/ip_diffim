@@ -208,7 +208,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         correctedExposure, corrKern = DecorrelateALKernelTask._doConvolve(subtractedExposure, corrKernel)
 
         # Compute the subtracted exposure's updated psf
-        psf = subtractedExposure.getPsf().computeImage(afwGeom.Point2D(xcen, ycen)).getArray()
+        psf = subtractedExposure.getPsf().computeKernelImage(afwGeom.Point2D(xcen, ycen)).getArray()
         psfc = DecorrelateALKernelTask.computeCorrectedDiffimPsf(corrKernel, psf, svar=svar, tvar=tvar)
         psfcI = afwImage.ImageD(psfc.shape[0], psfc.shape[1])
         psfcI.getArray()[:, :] = psfc
