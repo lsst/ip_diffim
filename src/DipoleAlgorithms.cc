@@ -41,7 +41,6 @@
 #include "lsst/pex/exceptions.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/detection.h"
-#include "lsst/afw/detection/FootprintArray.cc"
 #include "lsst/afw/table.h"
 #include "lsst/afw/math.h"
 #include "lsst/afw/geom.h"
@@ -217,11 +216,10 @@ void NaiveDipoleCentroid::fail(afw::table::SourceRecord & measRecord,
 
 namespace {
 
-class NaiveDipoleFootprinter : public afw::detection::FootprintFunctor< afw::image::MaskedImage<float> > {
+class NaiveDipoleFootprinter {
 public:
-    explicit NaiveDipoleFootprinter(afw::image::MaskedImage<float> const& mimage ///< Image the source lives in
-        ) : afw::detection::FootprintFunctor< afw::image::MaskedImage<float> >(mimage),
-            _sumPositive(0.0), _sumNegative(0.0), _numPositive(0), _numNegative(0) {}
+    explicit NaiveDipoleFootprinter() : _sumPositive(0.0), _sumNegative(0.0), _numPositive(0),
+                                        _numNegative(0) {}
 
     /// Reset everything for a new Footprint
     void reset() {
@@ -230,13 +228,10 @@ public:
     }
     void reset(afwDet::Footprint const&) {}
 
-    /// method called for each pixel by apply()
-    void operator()( afw::image::MaskedImage<float>::xy_locator loc, ///< locator pointing at the pixel
-                    int,                                   ///< column-position of pixel
-                    int                                    ///< row-position of pixel
-                   ) {
-        afw::image::MaskedImage<float>::Image::Pixel ival = loc.image(0, 0);
-        afw::image::MaskedImage<float>::Image::Pixel vval = loc.variance(0, 0);
+    /// method called for each pixel by applyFunctor
+    void operator() (afw::geom::Point2I const & pos,
+                     afw::image::MaskedImage<float>::Image::Pixel const & ival,
+                     afw::image::MaskedImage<float>::Image::Pixel const & vval) {
         if (ival >= 0.0) {
             _sumPositive += ival;
             _varPositive += vval;
@@ -276,8 +271,9 @@ void NaiveDipoleFlux::measure(
 ) const {
     typedef afw::image::Exposure<float>::MaskedImageT MaskedImageT;
 
-    NaiveDipoleFootprinter functor(exposure.getMaskedImage());
-    functor.apply(*source.getFootprint());
+    NaiveDipoleFootprinter functor;
+    source.getFootprint()->getSpans()->applyFunctor(functor, *(exposure.getMaskedImage().getImage()),
+                                                     *(exposure.getMaskedImage().getVariance()));
 
     source.set(getPositiveKeys().getFlux(), functor.getSumPositive());
     source.set(getPositiveKeys().getFluxSigma(), ::sqrt(functor.getVarPositive()));
@@ -286,6 +282,7 @@ void NaiveDipoleFlux::measure(
     source.set(getNegativeKeys().getFlux(), functor.getSumNegative());
     source.set(getNegativeKeys().getFluxSigma(), ::sqrt(functor.getVarNegative()));
     source.set(_numNegativeKey, functor.getNumNegative());
+    functor.reset();
 }
 
 void NaiveDipoleFlux::fail(afw::table::SourceRecord & measRecord, meas::base::MeasurementError * error) const {

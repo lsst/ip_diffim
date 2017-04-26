@@ -22,23 +22,23 @@
 namespace afwGeom   = lsst::afw::geom;
 namespace afwImage  = lsst::afw::image;
 namespace afwDetect = lsst::afw::detection;
-namespace pexExcept = lsst::pex::exceptions; 
+namespace pexExcept = lsst::pex::exceptions;
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 
-    
+
     template <typename PixelT>
     KernelCandidateDetection<PixelT>::KernelCandidateDetection(
         lsst::pex::policy::Policy const& policy
         ) :
-        _policy(policy), 
-        _badBitMask(0), 
-        _footprints(std::vector<lsst::afw::detection::Footprint::Ptr>()) {
+        _policy(policy),
+        _badBitMask(0),
+        _footprints(std::vector<std::shared_ptr<lsst::afw::detection::Footprint>>()) {
 
         std::vector<std::string> detBadMaskPlanes = _policy.getStringArray("badMaskPlanes");
-        for (std::vector<std::string>::iterator mi = detBadMaskPlanes.begin(); 
+        for (std::vector<std::string>::iterator mi = detBadMaskPlanes.begin();
              mi != detBadMaskPlanes.end(); ++mi){
             try {
                 _badBitMask |= afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask(*mi);
@@ -52,10 +52,10 @@ namespace diffim {
         LOGL_DEBUG("TRACE2.ip.diffim.KernelCandidateDetection",
                    "Using bad bit mask %d", _badBitMask);
     }
-        
-        
 
-    /** 
+
+
+    /**
      * @brief Runs Detection on a single image for significant peaks, and checks
      * returned Footprints for Masked pixels.
      *
@@ -78,11 +78,11 @@ namespace diffim {
         MaskedImagePtr const& templateMaskedImage,
         MaskedImagePtr const& scienceMaskedImage
         ) {
-        
+
         // Parse the Policy
         int fpNpixMin                = _policy.getInt("fpNpixMin");
         int fpGrowPix                = _policy.getInt("fpGrowPix");
-        
+
         bool detOnTemplate           = _policy.getBool("detOnTemplate");
         double detThreshold          = _policy.getDouble("detThreshold");
         std::string detThresholdType = _policy.getString("detThresholdType");
@@ -91,15 +91,15 @@ namespace diffim {
         _footprints.clear();
 
         // List of Footprints
-        std::shared_ptr<std::vector<afwDetect::Footprint::Ptr> > footprintListInPtr;
+        std::shared_ptr<std::vector<std::shared_ptr<afwDetect::Footprint>>> footprintListInPtr;
 
         // Find detections
-        afwDetect::Threshold threshold = 
+        afwDetect::Threshold threshold =
             afwDetect::createThreshold(detThreshold, detThresholdType);
 
         if (detOnTemplate == true) {
             afwDetect::FootprintSet footprintSet(
-                *(templateMaskedImage), 
+                *(templateMaskedImage),
                 threshold,
                 "",
                 fpNpixMin);
@@ -112,40 +112,40 @@ namespace diffim {
         }
         else {
             afwDetect::FootprintSet footprintSet(
-                *(scienceMaskedImage), 
+                *(scienceMaskedImage),
                 threshold,
                 "",
                 fpNpixMin);
-            
+
             footprintListInPtr = footprintSet.getFootprints();
             LOGL_DEBUG("TRACE2.ip.diffim.KernelCandidateDetection.apply",
                        "Found %d total footprints in science image above %.3f %s",
                        footprintListInPtr->size(), detThreshold, detThresholdType.c_str());
-        }    
-        
+        }
+
         // Iterate over footprints, look for "good" ones
-        for (std::vector<afwDetect::Footprint::Ptr>::iterator i = footprintListInPtr->begin(); 
+        for (std::vector<std::shared_ptr<afwDetect::Footprint>>::iterator i = footprintListInPtr->begin();
              i != footprintListInPtr->end(); ++i) {
-            
+
             LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection.apply",
                        "Processing footprint %d", (*i)->getId());
             growCandidate((*i), fpGrowPix, templateMaskedImage, scienceMaskedImage);
         }
-        
+
         if (_footprints.size() == 0) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception,
                               "Unable to find any footprints for Psf matching");
         }
-        
+
         LOGL_DEBUG("TRACE1.ip.diffim.KernelCandidateDetection.apply",
                    "Found %d clean footprints above threshold %.3f",
                    _footprints.size(), detThreshold);
-        
+
     }
-    
+
     template <typename PixelT>
     bool KernelCandidateDetection<PixelT>::growCandidate(
-        lsst::afw::detection::Footprint::Ptr fp, 
+        std::shared_ptr<lsst::afw::detection::Footprint> fp,
         int fpGrowPix,
         MaskedImagePtr const& templateMaskedImage,
         MaskedImagePtr const& scienceMaskedImage
@@ -157,57 +157,60 @@ namespace diffim {
          * mask planes it looks through.
          */
         FindSetBits<afwImage::Mask<afwImage::MaskPixel> > fsb;
-        
+
         afwGeom::Box2I fpBBox = fp->getBBox();
-        /* Failure Condition 1) 
-         * 
+        /* Failure Condition 1)
+         *
          * Footprint has too many pixels off the bat.  We don't want to throw
          * away these guys, they have alot of signal!  Lets just use the core of
          * it.
-         * 
+         *
          */
-        if (fp->getNpix() > static_cast<std::size_t>(fpNpixMax)) {
+        if (fp->getArea() > static_cast<std::size_t>(fpNpixMax)) {
             LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection.apply",
                        "Footprint has too many pix: %d (max =%d)",
-                       fp->getNpix(), fpNpixMax);
-            
+                       fp->getArea(), fpNpixMax);
+
             int xc = int(0.5 * (fpBBox.getMinX() + fpBBox.getMaxX()));
             int yc = int(0.5 * (fpBBox.getMinY() + fpBBox.getMaxY()));
-            afwDetect::Footprint::Ptr fpCore(
-                new afwDetect::Footprint(afwGeom::Box2I(afwGeom::Point2I(xc, yc), afwGeom::Extent2I(1,1)))
+            std::shared_ptr<afwDetect::Footprint> fpCore(
+                new afwDetect::Footprint(
+                    std::make_shared<afwGeom::SpanSet>(afwGeom::Box2I(afwGeom::Point2I(xc, yc),
+                                                       afwGeom::Extent2I(1,1))))
                 );
             return growCandidate(fpCore, fpGrowPix, templateMaskedImage, scienceMaskedImage);
-        } 
+        }
 
-        LOGL_DEBUG("TRACE5.ip.diffim.KernelCandidateDetection.apply", 
+        LOGL_DEBUG("TRACE5.ip.diffim.KernelCandidateDetection.apply",
                           "Original footprint in parent : %d,%d -> %d,%d -> %d,%d",
-                          fpBBox.getMinX(), fpBBox.getMinY(), 
+                          fpBBox.getMinX(), fpBBox.getMinY(),
                           int(0.5 * (fpBBox.getMinX() + fpBBox.getMaxX())),
                           int(0.5 * (fpBBox.getMinY() + fpBBox.getMaxY())),
                           fpBBox.getMaxX(), fpBBox.getMaxY());
-        
+
         /* Grow the footprint
          * flag true  = isotropic grow   = slow
          * flag false = 'manhattan grow' = fast
-         * 
+         *
          * The manhattan masks are rotated 45 degree w.r.t. the coordinate
          * system.  They intersect the vertices of the rectangle that would
          * connect pixels (X0,Y0) (X1,Y0), (X0,Y1), (X1,Y1).
-         * 
+         *
          * The isotropic masks do take considerably longer to grow and are
          * basically elliptical.  X0, X1, Y0, Y1 delimit the extent of the
          * ellipse.
-         * 
+         *
          * In both cases, since the masks aren't rectangles oriented with
          * the image coordinate system, when we DO extract such rectangles
          * as subimages for kernel fitting, some corner pixels can be found
          * in multiple subimages.
-         * 
+         *
          */
-        afwDetect::Footprint::Ptr fpGrow = 
-            afwDetect::growFootprint(fp, fpGrowPix, false);
-        
-        /* Next we look at the image within this Footprint.  
+        std::shared_ptr<afwDetect::Footprint> fpGrow = std::make_shared<afwDetect::Footprint>(
+            fp->getSpans()->dilated(fpGrowPix, afwGeom::Stencil::MANHATTAN)
+        );
+
+        /* Next we look at the image within this Footprint.
          */
         afwGeom::Box2I fpGrowBBox = fpGrow->getBBox();
         LOGL_DEBUG("TRACE5.ip.diffim.KernelCandidateDetection.apply",
@@ -217,7 +220,7 @@ namespace diffim {
                    int(0.5 * (fpGrowBBox.getMinY() + fpGrowBBox.getMaxY())),
                    fpGrowBBox.getMaxX(), fpGrowBBox.getMaxY());
 
-        /* Failure Condition 2) 
+        /* Failure Condition 2)
          * Grown off the image
          */
         if (!(templateMaskedImage->getBBox().contains(fpGrowBBox))) {
@@ -225,13 +228,13 @@ namespace diffim {
                        "Footprint grown off image");
             return false;
         }
-        
+
         /* Grab subimages; report any exception */
         bool subimageHasFailed = false;
         try {
             afwImage::MaskedImage<PixelT> templateSubimage(*templateMaskedImage, fpGrowBBox);
             afwImage::MaskedImage<PixelT> scienceSubimage(*scienceMaskedImage, fpGrowBBox);
-            
+
             // Search for any masked pixels within the footprint
             fsb.apply(*(templateSubimage.getMask()));
             if (fsb.getBits() & _badBitMask) {
@@ -240,7 +243,7 @@ namespace diffim {
                            fsb.getBits());
                 subimageHasFailed = true;
             }
-            
+
             fsb.apply(*(scienceSubimage.getMask()));
             if (fsb.getBits() & _badBitMask) {
                 LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection.apply",
@@ -248,7 +251,7 @@ namespace diffim {
                            fsb.getBits());
                 subimageHasFailed = true;
             }
-            
+
         } catch (pexExcept::Exception& e) {
             LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection.apply",
                        "Exception caught extracting Footprint");
@@ -273,4 +276,3 @@ namespace diffim {
     template class KernelCandidateDetection<PixelT>;
 
 }}} // end of namespace lsst::ip::diffim
-

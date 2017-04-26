@@ -61,8 +61,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         for xc, yc in [(32, 32), (96, 32), (160, 32),
                        (96, 95), (31, 96), (160, 96),
                        (96, 160), (160, 160), (32, 160)]:
-            self.footprints.append(afwDet.Footprint(afwGeom.Box2I(
-                afwGeom.Point2I(xc, yc), afwGeom.Extent2I(1, 1))))
+            self.footprints.append(afwDet.Footprint(afwGeom.SpanSet(
+                afwGeom.Box2I(afwGeom.Point2I(xc, yc),
+                              afwGeom.Extent2I(1, 1)))))
 
         # Make a basis list that hotpants has been run with
         nGauss = 1

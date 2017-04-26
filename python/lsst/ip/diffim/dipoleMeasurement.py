@@ -469,7 +469,7 @@ class DipoleDeblender(object):
         fbb = fp.getBBox()
         fmask = afwImage.MaskU(fbb)
         fmask.setXY0(fbb.getMinX(), fbb.getMinY())
-        afwDetect.setMaskFromFootprint(fmask, fp, 1)
+        fp.spans.setMask(fmask, 1)
 
         psf = exposure.getPsf()
         psfSigPix = psf.computeShape().getDeterminantRadius()

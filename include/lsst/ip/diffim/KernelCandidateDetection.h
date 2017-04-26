@@ -2,7 +2,7 @@
 /**
  * @file KernelCandidateDetection.h
  *
- * @brief Detect candidates for kernels within 2 images 
+ * @brief Detect candidates for kernels within 2 images
  *
  * @author Andrew Becker, University of Washington
  *
@@ -16,8 +16,8 @@
 #include "lsst/afw/detection/Footprint.h"
 #include "lsst/pex/policy/Policy.h"
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 
     /**
@@ -30,7 +30,7 @@ namespace diffim {
      * @param policy  Policy for operations; in particular object detection
      *
      * @ingroup ip_diffim
-     */    
+     */
     template <typename PixelT>
     class KernelCandidateDetection {
     public:
@@ -43,21 +43,21 @@ namespace diffim {
 
         void apply(MaskedImagePtr const& templateMaskedImage,
                    MaskedImagePtr const& scienceMaskedImage);
-        
-        bool growCandidate(lsst::afw::detection::Footprint::Ptr fp,
+
+        bool growCandidate(std::shared_ptr<lsst::afw::detection::Footprint> fp,
                            int fpGrowPix,
                            MaskedImagePtr const& templateMaskedImage,
                            MaskedImagePtr const& scienceMaskedImage);
 
-        std::vector<lsst::afw::detection::Footprint::Ptr> getFootprints() {return _footprints;};
+        std::vector<std::shared_ptr<lsst::afw::detection::Footprint>> getFootprints() {return _footprints;};
 
     private:
         lsst::pex::policy::Policy _policy;
         lsst::afw::image::MaskPixel _badBitMask;
-        std::vector<lsst::afw::detection::Footprint::Ptr> _footprints;
+        std::vector<std::shared_ptr<lsst::afw::detection::Footprint>> _footprints;
     };
 
 
 }}} // end of namespace lsst::ip::diffim
-        
+
 #endif

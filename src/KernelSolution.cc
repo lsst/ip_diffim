@@ -14,7 +14,7 @@
 #include <limits>
 
 #include <memory>
-#include "boost/timer.hpp" 
+#include "boost/timer.hpp"
 
 #include "Eigen/Core"
 #include "Eigen/Cholesky"
@@ -27,7 +27,6 @@
 #include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/detection.h"
-#include "lsst/afw/detection/FootprintArray.cc"
 #include "lsst/log/Log.h"
 #include "lsst/pex/exceptions/Runtime.h"
 
@@ -46,10 +45,10 @@ namespace afwGeom        = lsst::afw::geom;
 namespace afwImage       = lsst::afw::image;
 namespace pexExcept      = lsst::pex::exceptions;
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
-    
+
     /* Unique identifier for solution */
     int KernelSolution::_SolutionId = 0;
 
@@ -94,10 +93,10 @@ namespace diffim {
         return getConditionNumber(_mMat, conditionType);
     }
 
-    double KernelSolution::getConditionNumber(Eigen::MatrixXd const& mMat, 
+    double KernelSolution::getConditionNumber(Eigen::MatrixXd const& mMat,
                                               ConditionNumberType conditionType) {
         switch (conditionType) {
-        case EIGENVALUE: 
+        case EIGENVALUE:
             {
             Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(mMat);
             Eigen::VectorXd eValues = eVecValues.eigenvalues();
@@ -108,7 +107,7 @@ namespace diffim {
             return (eMax / eMin);
             break;
             }
-        case SVD: 
+        case SVD:
             {
             Eigen::VectorXd sValues = mMat.jacobiSvd().singularValues();
             double sMax = sValues.maxCoeff();
@@ -129,7 +128,7 @@ namespace diffim {
 
     void KernelSolution::solve(Eigen::MatrixXd const& mMat,
                                Eigen::VectorXd const& bVec) {
-        
+
         if (DEBUG_MATRIX) {
             std::cout << "M " << std::endl;
             std::cout << mMat << std::endl;
@@ -153,25 +152,25 @@ namespace diffim {
                                    "Unable to determine kernel via LU");
 			/* LAST RESORT */
 			try {
-				
+
 				_solvedBy = EIGENVECTOR;
 				Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(mMat);
 				Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
 				Eigen::VectorXd eValues = eVecValues.eigenvalues();
-				
+
 				for (int i = 0; i != eValues.rows(); ++i) {
 					if (eValues(i) != 0.0) {
 						eValues(i) = 1.0/eValues(i);
 					}
 				}
-				
+
 				aVec = rMat * eValues.asDiagonal() * rMat.transpose() * bVec;
 			} catch (pexExcept::Exception& e) {
-				
+
 				_solvedBy = NONE;
 				LOGL_DEBUG("TRACE3.ip.diffim.KernelSolution.solve",
                                            "Unable to determine kernel via eigen-values");
-				
+
 				throw LSST_EXCEPT(pexExcept::Exception, "Unable to determine kernel solution");
 			}
 		}
@@ -184,7 +183,7 @@ namespace diffim {
 		  std::cout << "A " << std::endl;
             std::cout << aVec << std::endl;
         }
-        
+
         _aVec = aVec;
     }
 
@@ -194,7 +193,7 @@ namespace diffim {
     StaticKernelSolution<InputT>::StaticKernelSolution(
         lsst::afw::math::KernelList const& basisList,
         bool fitForBackground
-        ) 
+        )
         :
         KernelSolution(fitForBackground),
         _cMat(),
@@ -205,8 +204,8 @@ namespace diffim {
         _kSum(0.0)
     {
         std::vector<double> kValues(basisList.size());
-        _kernel = std::shared_ptr<afwMath::Kernel>( 
-            new afwMath::LinearCombinationKernel(basisList, kValues) 
+        _kernel = std::shared_ptr<afwMath::Kernel>(
+            new afwMath::LinearCombinationKernel(basisList, kValues)
             );
     };
 
@@ -226,7 +225,7 @@ namespace diffim {
         afwImage::Image<afwMath::Kernel::Pixel>::Ptr image(
             new afwImage::Image<afwMath::Kernel::Pixel>(_kernel->getDimensions())
             );
-        (void)_kernel->computeImage(*image, false);              
+        (void)_kernel->computeImage(*image, false);
         return image;
     }
 
@@ -265,44 +264,44 @@ namespace diffim {
 
         afwMath::Statistics varStats = afwMath::makeStatistics(varianceEstimate, afwMath::MIN);
         if (varStats.getValue(afwMath::MIN) < 0.0) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception,
                               "Error: variance less than 0.0");
         }
         if (varStats.getValue(afwMath::MIN) == 0.0) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception,
                               "Error: variance equals 0.0, cannot inverse variance weight");
         }
 
-        lsst::afw::math::KernelList basisList = 
+        lsst::afw::math::KernelList basisList =
             std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
-        
+
         unsigned int const nKernelParameters     = basisList.size();
         unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
         unsigned int const nParameters           = nKernelParameters + nBackgroundParameters;
 
         std::vector<std::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
-        
+
         /* Ignore buffers around edge of convolved images :
-         * 
+         *
          * If the kernel has width 5, it has center pixel 2.  The first good pixel
          * is the (5-2)=3rd pixel, which is array index 2, and ends up being the
          * index of the central pixel.
-         * 
+         *
          * You also have a buffer of unusable pixels on the other side, numbered
          * width-center-1.  The last good usable pixel is N-width+center+1.
-         * 
+         *
          * Example : the kernel is width = 5, center = 2
-         * 
+         *
          * ---|---|-c-|---|---|
-         * 
+         *
          * the image is width = N
          * convolve this with the kernel, and you get
-         * 
+         *
          * |-x-|-x-|-g-|---|---| ... |---|---|-g-|-x-|-x-|
-         * 
+         *
          * g = first/last good pixel
          * x = bad
-         * 
+         *
          * the first good pixel is the array index that has the value "center", 2
          * the last good pixel has array index N-(5-2)+1
          * eg. if N = 100, you want to use up to index 97
@@ -323,15 +322,15 @@ namespace diffim {
 
         boost::timer t;
         t.restart();
-        
+
         /* Eigen representation of input images; only the pixels that are unconvolved in cimage below */
-        Eigen::MatrixXd eigenTemplate = imageToEigenMatrix(templateImage).block(startRow, 
-                                                                                startCol, 
-                                                                                endRow-startRow, 
+        Eigen::MatrixXd eigenTemplate = imageToEigenMatrix(templateImage).block(startRow,
+                                                                                startCol,
+                                                                                endRow-startRow,
                                                                                 endCol-startCol);
-        Eigen::MatrixXd eigenScience = imageToEigenMatrix(scienceImage).block(startRow, 
-                                                                              startCol, 
-                                                                              endRow-startRow, 
+        Eigen::MatrixXd eigenScience = imageToEigenMatrix(scienceImage).block(startRow,
+                                                                              startCol,
+                                                                              endRow-startRow,
                                                                               endCol-startCol);
         Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(varianceEstimate).block(
     	    startRow, startCol, endRow-startRow, endCol-startCol
@@ -341,34 +340,34 @@ namespace diffim {
         eigenTemplate.resize(eigenTemplate.rows()*eigenTemplate.cols(), 1);
         eigenScience.resize(eigenScience.rows()*eigenScience.cols(), 1);
         eigeniVariance.resize(eigeniVariance.rows()*eigeniVariance.cols(), 1);
-        
+
         /* Holds image convolved with basis function */
         afwImage::Image<PixelT> cimage(templateImage.getDimensions());
-        
+
         /* Holds eigen representation of image convolved with all basis functions */
         std::vector<Eigen::MatrixXd> convolvedEigenList(nKernelParameters);
-        
+
         /* Iterators over convolved image list and basis list */
         typename std::vector<Eigen::MatrixXd>::iterator eiter = convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
             afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
 
-            Eigen::MatrixXd cMat = imageToEigenMatrix(cimage).block(startRow, 
-                                                                    startCol, 
-                                                                    endRow-startRow, 
+            Eigen::MatrixXd cMat = imageToEigenMatrix(cimage).block(startRow,
+                                                                    startCol,
+                                                                    endRow-startRow,
                                                                     endCol-startCol);
             cMat.resize(cMat.size(), 1);
             *eiter = cMat;
 
-        } 
+        }
 
         double time = t.elapsed();
         LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.build",
                    "Total compute time to do basis convolutions : %.2f s", time);
         t.restart();
-        
-        /* 
+
+        /*
            Load matrix with all values from convolvedEigenList : all images
            (eigeniVariance, convolvedEigenList) must be the same size
         */
@@ -425,16 +424,16 @@ namespace diffim {
 
         unsigned int const nParameters           = _aVec.size();
         unsigned int const nBackgroundParameters = _fitForBackground ? 1 : 0;
-        unsigned int const nKernelParameters     = 
+        unsigned int const nKernelParameters     =
             std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList().size();
-        if (nParameters != (nKernelParameters + nBackgroundParameters)) 
+        if (nParameters != (nKernelParameters + nBackgroundParameters))
             throw LSST_EXCEPT(pexExcept::Exception, "Mismatched sizes in kernel solution");
 
         /* Fill in the kernel results */
         std::vector<double> kValues(nKernelParameters);
         for (unsigned int idx = 0; idx < nKernelParameters; idx++) {
             if (std::isnan(_aVec(idx))) {
-                throw LSST_EXCEPT(pexExcept::Exception, 
+                throw LSST_EXCEPT(pexExcept::Exception,
                                   str(boost::format("Unable to determine kernel solution %d (nan)") % idx));
             }
             kValues[idx] = _aVec(idx);
@@ -444,17 +443,17 @@ namespace diffim {
         ImageT::Ptr image (
             new ImageT(_kernel->getDimensions())
             );
-        _kSum  = _kernel->computeImage(*image, false);              
-        
+        _kSum  = _kernel->computeImage(*image, false);
+
         if (_fitForBackground) {
             if (std::isnan(_aVec(nParameters-1))) {
-                throw LSST_EXCEPT(pexExcept::Exception, 
-                                  str(boost::format("Unable to determine background solution %d (nan)") % 
+                throw LSST_EXCEPT(pexExcept::Exception,
+                                  str(boost::format("Unable to determine background solution %d (nan)") %
                                       (nParameters-1)));
             }
             _background = _aVec(nParameters-1);
         }
-    }        
+    }
 
 
     template <typename InputT>
@@ -462,9 +461,9 @@ namespace diffim {
         throw LSST_EXCEPT(pexExcept::Exception, "Uncertainty calculation not supported");
 
         /* Estimate of parameter uncertainties comes from the inverse of the
-         * covariance matrix (noise spectrum).  
+         * covariance matrix (noise spectrum).
          * N.R. 15.4.8 to 15.4.15
-         * 
+         *
          * Since this is a linear problem no need to use Fisher matrix
          * N.R. 15.5.8
          *
@@ -476,9 +475,9 @@ namespace diffim {
          * Cov       =  L L^t
          * Cov^(-1)  = (L L^t)^(-1)
          *           = (L^T)^-1 L^(-1)
-         * 
+         *
          * Code would be:
-         * 
+         *
          * Eigen::MatrixXd             cov    = _mMat.transpose() * _mMat;
          * Eigen::LLT<Eigen::MatrixXd> llt    = cov.llt();
          * Eigen::MatrixXd             error2 = llt.matrixL().transpose().inverse()*llt.matrixL().inverse();
@@ -505,24 +504,25 @@ namespace diffim {
 
         afwMath::Statistics varStats = afwMath::makeStatistics(varianceEstimate, afwMath::MIN);
         if (varStats.getValue(afwMath::MIN) < 0.0) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception,
                               "Error: variance less than 0.0");
         }
         if (varStats.getValue(afwMath::MIN) == 0.0) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception,
                               "Error: variance equals 0.0, cannot inverse variance weight");
         }
 
         /* Full footprint of all input images */
-        afwDet::Footprint::Ptr fullFp(new afwDet::Footprint(templateImage.getBBox()));
+        std::shared_ptr<afwDet::Footprint> fullFp(
+            new afwDet::Footprint(std::make_shared<afwGeom::SpanSet>(templateImage.getBBox())));
 
-        afwMath::KernelList basisList = 
+        afwMath::KernelList basisList =
             std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
         std::vector<std::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
 
         /* Only BAD pixels marked in this mask */
-        afwImage::MaskPixel bitMask = 
-            (afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD") | 
+        afwImage::MaskPixel bitMask =
+            (afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD") |
              afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("SAT") |
              afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("NO_DATA") |
              afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("EDGE"));
@@ -534,50 +534,46 @@ namespace diffim {
         /* And spread it by the kernel half width */
         int growPix = (*kiter)->getCtr().getX();
         afwDet::FootprintSet maskedFpSetGrown(maskFpSet, growPix, true);
-        
+
 #if 0
-        for (typename afwDet::FootprintSet::FootprintList::iterator 
+        for (typename afwDet::FootprintSet::FootprintList::iterator
                  ptr = maskedFpSetGrown.getFootprints()->begin(),
-                 end = maskedFpSetGrown.getFootprints()->end(); 
-             ptr != end; 
+                 end = maskedFpSetGrown.getFootprints()->end();
+             ptr != end;
              ++ptr) {
-            
-            afwDet::setMaskFromFootprint(finalMask, 
+
+            afwDet::setMaskFromFootprint(finalMask,
                                          (**ptr),
                                          afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD"));
         }
 #endif
 
         afwImage::Mask<afwImage::MaskPixel> finalMask(pixelMask.getDimensions());
-        afwDet::setMaskFromFootprintList(&finalMask, 
-                                         *(maskedFpSetGrown.getFootprints()),
-                                         afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD"));
+        for (auto const & foot : *(maskedFpSetGrown.getFootprints())) {
+            foot->getSpans()->setMask(finalMask, afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD"));
+        }
         pixelMask.writeFits("pixelmask.fits");
         finalMask.writeFits("finalmask.fits");
 
 
-        ndarray::Array<int, 1, 1> maskArray = 
+        ndarray::Array<int, 1, 1> maskArray =
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
-        afwDet::flattenArray(*fullFp, finalMask.getArray(), 
-                             maskArray, templateImage.getXY0()); /* Need to fake the XY0 */
+        fullFp->getSpans()->flatten(maskArray, finalMask.getArray(), templateImage.getXY0());
         ndarray::EigenView<int, 1, 1> maskEigen(maskArray);
 
-        ndarray::Array<InputT, 1, 1> arrayTemplate = 
+        ndarray::Array<InputT, 1, 1> arrayTemplate =
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
-        afwDet::flattenArray(*fullFp, templateImage.getArray(), 
-                             arrayTemplate, templateImage.getXY0());
+        fullFp->getSpans()->flatten(arrayTemplate, templateImage.getArray(), templateImage.getXY0());
         ndarray::EigenView<InputT, 1, 1> eigenTemplate0(arrayTemplate);
 
-        ndarray::Array<InputT, 1, 1> arrayScience = 
+        ndarray::Array<InputT, 1, 1> arrayScience =
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
-        afwDet::flattenArray(*fullFp, scienceImage.getArray(), 
-                             arrayScience, scienceImage.getXY0());
+        fullFp->getSpans()->flatten(arrayScience, scienceImage.getArray(), scienceImage.getXY0());
         ndarray::EigenView<InputT, 1, 1> eigenScience0(arrayScience);
 
-        ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance = 
+        ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance =
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
-        afwDet::flattenArray(*fullFp, varianceEstimate.getArray(), 
-                             arrayVariance, varianceEstimate.getXY0());
+        fullFp->getSpans()->flatten(arrayVariance, varianceEstimate.getArray(), varianceEstimate.getXY0());
         ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance0(arrayVariance);
 
         int nGood = 0;
@@ -609,10 +605,10 @@ namespace diffim {
 
         /* Holds image convolved with basis function */
         afwImage::Image<InputT> cimage(templateImage.getDimensions());
-        
+
         /* Holds eigen representation of image convolved with all basis functions */
         std::vector<Eigen::VectorXd> convolvedEigenList(nKernelParameters);
-        
+
         /* Iterators over convolved image list and basis list */
         typename std::vector<Eigen::VectorXd>::iterator eiter =  convolvedEigenList.begin();
 
@@ -620,10 +616,9 @@ namespace diffim {
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
             afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
 
-            ndarray::Array<InputT, 1, 1> arrayC = 
+            ndarray::Array<InputT, 1, 1> arrayC =
                 ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
-            afwDet::flattenArray(*fullFp, cimage.getArray(), 
-                                 arrayC, cimage.getXY0());
+            fullFp->getSpans()->flatten(arrayC, cimage.getArray(), cimage.getXY0());
             ndarray::EigenView<InputT, 1, 1> eigenC0(arrayC);
 
             Eigen::VectorXd eigenC(nGood);
@@ -641,19 +636,19 @@ namespace diffim {
         LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.buildWithMask",
                    "Total compute time to do basis convolutions : %.2f s", time);
         t.restart();
-        
+
         /* Load matrix with all convolved images */
         Eigen::MatrixXd cMat(eigenTemplate.size(), nParameters);
         typename std::vector<Eigen::VectorXd>::iterator eiterj = convolvedEigenList.begin();
         typename std::vector<Eigen::VectorXd>::iterator eiterE = convolvedEigenList.end();
         for (unsigned int kidxj = 0; eiterj != eiterE; eiterj++, kidxj++) {
-            cMat.block(0, kidxj, eigenTemplate.size(), 1) = 
+            cMat.block(0, kidxj, eigenTemplate.size(), 1) =
                 Eigen::MatrixXd(*eiterj).block(0, 0, eigenTemplate.size(), 1);
         }
         /* Treat the last "image" as all 1's to do the background calculation. */
         if (this->_fitForBackground)
             cMat.col(nParameters-1).fill(1.);
-        
+
         this->_cMat = cMat;
         this->_ivVec = eigenVariance.array().inverse().matrix();
         this->_iVec = eigenScience;
@@ -674,22 +669,22 @@ namespace diffim {
 
         afwMath::Statistics varStats = afwMath::makeStatistics(varianceEstimate, afwMath::MIN);
         if (varStats.getValue(afwMath::MIN) < 0.0) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception,
                               "Error: variance less than 0.0");
         }
         if (varStats.getValue(afwMath::MIN) == 0.0) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception,
                               "Error: variance equals 0.0, cannot inverse variance weight");
         }
 
-        lsst::afw::math::KernelList basisList = 
+        lsst::afw::math::KernelList basisList =
             std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
         std::vector<std::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
 
         /* Only BAD pixels marked in this mask */
         lsst::afw::image::Mask<lsst::afw::image::MaskPixel> sMask(pixelMask, true);
-        afwImage::MaskPixel bitMask = 
-            (afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD") | 
+        afwImage::MaskPixel bitMask =
+            (afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("BAD") |
              afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("SAT") |
              afwImage::Mask<afwImage::MaskPixel>::getPlaneBitMask("EDGE"));
         sMask &= bitMask;
@@ -723,18 +718,18 @@ namespace diffim {
         t.restart();
 
         /* Eigen representation of input images; only the pixels that are unconvolved in cimage below */
-        Eigen::MatrixXi eMask = maskToEigenMatrix(sMask).block(startRow, 
-                                                               startCol, 
-                                                               endRow-startRow, 
+        Eigen::MatrixXi eMask = maskToEigenMatrix(sMask).block(startRow,
+                                                               startCol,
+                                                               endRow-startRow,
                                                                endCol-startCol);
 
-        Eigen::MatrixXd eigenTemplate = imageToEigenMatrix(templateImage).block(startRow, 
-                                                                                startCol, 
-                                                                                endRow-startRow, 
+        Eigen::MatrixXd eigenTemplate = imageToEigenMatrix(templateImage).block(startRow,
+                                                                                startCol,
+                                                                                endRow-startRow,
                                                                                 endCol-startCol);
-        Eigen::MatrixXd eigenScience = imageToEigenMatrix(scienceImage).block(startRow, 
-                                                                              startCol, 
-                                                                              endRow-startRow, 
+        Eigen::MatrixXd eigenScience = imageToEigenMatrix(scienceImage).block(startRow,
+                                                                              startCol,
+                                                                              endRow-startRow,
                                                                               endCol-startCol);
         Eigen::MatrixXd eigeniVariance = imageToEigenMatrix(varianceEstimate).block(
 	    startRow, startCol, endRow-startRow, endCol-startCol
@@ -767,19 +762,19 @@ namespace diffim {
 
         /* Holds image convolved with basis function */
         afwImage::Image<InputT> cimage(templateImage.getDimensions());
-        
+
         /* Holds eigen representation of image convolved with all basis functions */
         std::vector<Eigen::MatrixXd> convolvedEigenList(nKernelParameters);
-        
+
         /* Iterators over convolved image list and basis list */
         typename std::vector<Eigen::MatrixXd>::iterator eiter = convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
             afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
-            
-            Eigen::MatrixXd cMat = imageToEigenMatrix(cimage).block(startRow, 
-                                                                    startCol, 
-                                                                    endRow-startRow, 
+
+            Eigen::MatrixXd cMat = imageToEigenMatrix(cimage).block(startRow,
+                                                                    startCol,
+                                                                    endRow-startRow,
                                                                     endCol-startCol);
             cMat.resize(cMat.size(), 1);
 
@@ -794,14 +789,14 @@ namespace diffim {
             }
             cMat = maskedcMat.block(0, 0, nGood, 1);
             *eiter = cMat;
-        } 
+        }
 
         double time = t.elapsed();
         LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.build",
                    "Total compute time to do basis convolutions : %.2f s", time);
         t.restart();
-        
-        /* 
+
+        /*
            Load matrix with all values from convolvedEigenList : all images
            (eigeniVariance, convolvedEigenList) must be the same size
         */
@@ -822,7 +817,7 @@ namespace diffim {
         /* Make these outside of solve() so I can check condition number */
         this->_mMat = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_cMat;
         this->_bVec = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_iVec;
-        
+
     }
 
     /* NOTE - this was written before the ndarray unification.  I am rewriting
@@ -837,15 +832,15 @@ namespace diffim {
 
         afwMath::Statistics varStats = afwMath::makeStatistics(varianceEstimate, afwMath::MIN);
         if (varStats.getValue(afwMath::MIN) < 0.0) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception,
                               "Error: variance less than 0.0");
         }
         if (varStats.getValue(afwMath::MIN) == 0.0) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception,
                               "Error: variance equals 0.0, cannot inverse variance weight");
         }
 
-        lsst::afw::math::KernelList basisList = 
+        lsst::afw::math::KernelList basisList =
             std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(this->_kernel)->getKernelList();
 
         unsigned int const nKernelParameters     = basisList.size();
@@ -854,7 +849,7 @@ namespace diffim {
 
         std::vector<std::shared_ptr<afwMath::Kernel> >::const_iterator kiter = basisList.begin();
 
-        /* 
+        /*
            NOTE : If we are using these views in Afw's Image space, we need to
            make sure and compensate for the XY0 of the image:
 
@@ -864,7 +859,7 @@ namespace diffim {
            int maskEndCol   = maskBox.getMaxX();
            int maskEndRow   = maskBox.getMaxY();
 
-        
+
           If we are going to be doing the slicing in Eigen matrices derived from
           the images, ignore the XY0.
 
@@ -877,7 +872,7 @@ namespace diffim {
 
         */
 
-                                                                         
+
         afwGeom::Box2I shrunkBBox = (*kiter)->shrinkBBox(templateImage.getBBox());
 
         LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
@@ -899,7 +894,7 @@ namespace diffim {
            accounted for.  However, we still need to be aware of this fact if
            addressing subregions of an Eigen matrix.  This is why the slicing is
            done in Afw, its cleaner.
-           
+
            Please see examples/maskedKernel.cc for elaboration on some of the
            tests done to make sure this indexing gets done right.
 
@@ -912,7 +907,7 @@ namespace diffim {
         int maskEndCol   = maskBox.getMaxX();
         int maskEndRow   = maskBox.getMaxY();
 
-        /* 
+        /*
 
         |---------------------------|
         |      Kernel Boundary      |
@@ -927,19 +922,19 @@ namespace diffim {
         |  |---------------------|  |
         |                           |
         |---------------------------|
-       
+
         4 regions we want to extract from the pixels: top bottom left right
 
         */
         afwGeom::Box2I tBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskEndRow + 1),
                                              afwGeom::Point2I(endCol, endRow));
-        
+
         afwGeom::Box2I bBox = afwGeom::Box2I(afwGeom::Point2I(startCol, startRow),
                                              afwGeom::Point2I(endCol, maskStartRow - 1));
-        
+
         afwGeom::Box2I lBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskStartRow),
                                              afwGeom::Point2I(maskStartCol - 1, maskEndRow));
-        
+
         afwGeom::Box2I rBox = afwGeom::Box2I(afwGeom::Point2I(maskEndCol + 1, maskStartRow),
                                              afwGeom::Point2I(endCol, maskEndRow));
 
@@ -960,7 +955,7 @@ namespace diffim {
         boxArray.push_back(tBox);
         boxArray.push_back(bBox);
         boxArray.push_back(lBox);
-        boxArray.push_back(rBox);        
+        boxArray.push_back(rBox);
 
         int totalSize = tBox.getWidth() * tBox.getHeight();
         totalSize    += bBox.getWidth() * bBox.getHeight();
@@ -973,10 +968,10 @@ namespace diffim {
         eigenTemplate.setZero();
         eigenScience.setZero();
         eigeniVariance.setZero();
-        
+
         boost::timer t;
         t.restart();
- 
+
         int nTerms = 0;
         typename std::vector<afwGeom::Box2I>::iterator biter = boxArray.begin();
         for (; biter != boxArray.end(); ++biter) {
@@ -989,7 +984,7 @@ namespace diffim {
             Eigen::MatrixXd eTemplate = imageToEigenMatrix(siTemplate);
             Eigen::MatrixXd eScience = imageToEigenMatrix(siScience);
             Eigen::MatrixXd eiVarEstimate = imageToEigenMatrix(sVarEstimate).array().inverse().matrix();
-            
+
             eTemplate.resize(area, 1);
             eScience.resize(area, 1);
             eiVarEstimate.resize(area, 1);
@@ -1023,17 +1018,17 @@ namespace diffim {
 
                 nTerms += area;
             }
-            
+
             *eiter = cMat;
-            
-        } 
-        
+
+        }
+
         double time = t.elapsed();
         LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
                    "Total compute time to do basis convolutions : %.2f s", time);
         t.restart();
 
-        /* 
+        /*
            Load matrix with all values from convolvedEigenList : all images
            (eigeniVariance, convolvedEigenList) must be the same size
         */
@@ -1053,7 +1048,7 @@ namespace diffim {
 
         /* Make these outside of solve() so I can check condition number */
         this->_mMat = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_cMat;
-        this->_bVec = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_iVec;        
+        this->_bVec = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_iVec;
     }
     /*******************************************************************************************************/
 
@@ -1064,7 +1059,7 @@ namespace diffim {
         bool fitForBackground,
         Eigen::MatrixXd const& hMat,
         lsst::pex::policy::Policy policy
-        ) 
+        )
         :
         StaticKernelSolution<InputT>(basisList, fitForBackground),
         _hMat(hMat),
@@ -1102,7 +1097,7 @@ namespace diffim {
         for (unsigned int i = 0; i < lambdas.size(); i++) {
             double l = lambdas[i];
             Eigen::MatrixXd mLambda = this->_mMat + l * _hMat;
-            
+
             try {
                 KernelSolution::solve(mLambda, this->_bVec);
             } catch (pexExcept::Exception &e) {
@@ -1134,7 +1129,7 @@ namespace diffim {
                    "Minimum Risk = %.3e at lambda = %.3e", risks[index], lambdas[index]);
 
         return lambdas[index];
-        
+
     }
 
     template <typename InputT>
@@ -1170,28 +1165,28 @@ namespace diffim {
 
         this->_mMat = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_cMat;
         this->_bVec = this->_cMat.transpose() * this->_ivVec.asDiagonal() * this->_iVec;
-        
-        
+
+
         /* See N.R. 18.5
-           
+
            Matrix equation to solve is Y = C a + N
            Y   = vectorized version of I (I = image to not convolve)
            C_i = K_i (x) R (R = image to convolve)
            a   = kernel coefficients
            N   = noise
-           
+
            If we reweight everything by the inverse square root of the noise
            covariance, we get a linear model with the identity matrix for
            the noise.  The problem can then be solved using least squares,
            with the normal equations
-           
+
               C^T Y = C^T C a
 
-           or 
-           
+           or
+
               b = M a
 
-           with 
+           with
 
               b = C^T Y
               M = C^T C
@@ -1199,29 +1194,29 @@ namespace diffim {
 
 
            We can regularize the least square problem
-  
+
               Y = C a + lambda a^T H a       (+ N, which can be ignored)
 
            or the normal equations
 
               (C^T C + lambda H) a = C^T Y
- 
-              
+
+
            The solution to the regularization of the least squares problem is
 
               a = (C^T C + lambda H)^{-1} C^T Y
 
-           The approximation to Y is 
+           The approximation to Y is
 
               C a = C (C^T C + lambda H)^{-1} C^T Y
- 
-           with smoothing matrix 
 
-              S = C (C^T C + lambda H)^{-1} C^T 
+           with smoothing matrix
+
+              S = C (C^T C + lambda H)^{-1} C^T
 
         */
-        
-        std::string lambdaType = _policy.getString("lambdaType");        
+
+        std::string lambdaType = _policy.getString("lambdaType");
         if (lambdaType == "absolute") {
             _lambda = _policy.getDouble("lambdaValue");
         }
@@ -1239,11 +1234,11 @@ namespace diffim {
         else {
             throw LSST_EXCEPT(pexExcept::Exception, "lambdaType in Policy not recognized");
         }
-        
+
         LOGL_DEBUG("TRACE3.ip.diffim.RegularizedKernelSolution.solve",
                    "Applying kernel regularization with lambda = %.2e", _lambda);
-        
-        
+
+
         try {
             KernelSolution::solve(this->_mMat + _lambda * _hMat, this->_bVec);
         } catch (pexExcept::Exception &e) {
@@ -1258,9 +1253,9 @@ namespace diffim {
     std::vector<double> RegularizedKernelSolution<InputT>::_createLambdaSteps() {
         std::vector<double> lambdas;
 
-        std::string lambdaStepType = _policy.getString("lambdaStepType");    
+        std::string lambdaStepType = _policy.getString("lambdaStepType");
         if (lambdaStepType == "linear") {
-            double lambdaLinMin   = _policy.getDouble("lambdaLinMin");        
+            double lambdaLinMin   = _policy.getDouble("lambdaLinMin");
             double lambdaLinMax   = _policy.getDouble("lambdaLinMax");
             double lambdaLinStep  = _policy.getDouble("lambdaLinStep");
             for (double l = lambdaLinMin; l <= lambdaLinMax; l += lambdaLinStep) {
@@ -1268,7 +1263,7 @@ namespace diffim {
             }
         }
         else if (lambdaStepType == "log") {
-            double lambdaLogMin   = _policy.getDouble("lambdaLogMin");        
+            double lambdaLogMin   = _policy.getDouble("lambdaLogMin");
             double lambdaLogMax   = _policy.getDouble("lambdaLogMax");
             double lambdaLogStep  = _policy.getDouble("lambdaLogStep");
             for (double l = lambdaLogMin; l <= lambdaLogMax; l += lambdaLogStep) {
@@ -1317,7 +1312,7 @@ namespace diffim {
         } else {
             _nt = _nbases * _nkt + _nbt;
         }
-        
+
         Eigen::MatrixXd mMat(_nt, _nt);
         Eigen::VectorXd bVec(_nt);
         mMat.setZero();
@@ -1334,13 +1329,13 @@ namespace diffim {
                    "Initializing with size %d %d %d and constant first term = %s",
                    _nkt, _nbt, _nt,
                    _constantFirstTerm ? "true" : "false");
-        
+
     }
 
     void SpatialKernelSolution::addConstraint(float xCenter, float yCenter,
                                               Eigen::MatrixXd const& qMat,
                                               Eigen::VectorXd const& wVec) {
-        
+
         LOGL_DEBUG("TRACE5.ip.diffim.SpatialKernelSolution.addConstraint",
                    "Adding candidate at %f, %f", xCenter, yCenter);
 
@@ -1356,7 +1351,7 @@ namespace diffim {
             paramsK[idx] = 0.0;
         }
         Eigen::MatrixXd pKpKt = (pK * pK.transpose());
-        
+
         Eigen::VectorXd pB;
         Eigen::MatrixXd pBpBt;
         Eigen::MatrixXd pKpBt;
@@ -1373,11 +1368,11 @@ namespace diffim {
                 paramsB[idx] = 0.0;
             }
             pBpBt = (pB * pB.transpose());
-            
+
             /* Cross terms */
             pKpBt = (pK * pB.transpose());
         }
-        
+
         if (DEBUG_MATRIX) {
             std::cout << "Spatial weights" << std::endl;
             std::cout << "pKpKt " << pKpKt << std::endl;
@@ -1386,7 +1381,7 @@ namespace diffim {
                 std::cout << "pKpBt " << pKpBt << std::endl;
             }
         }
-        
+
         if (DEBUG_MATRIX) {
             std::cout << "Spatial matrix inputs" << std::endl;
             std::cout << "M " << qMat << std::endl;
@@ -1394,33 +1389,33 @@ namespace diffim {
         }
 
         /* first index to start the spatial blocks; default=0 for non-constant first term */
-        int m0 = 0; 
+        int m0 = 0;
         /* how many rows/cols to adjust the matrices/vectors; default=0 for non-constant first term */
-        int dm = 0; 
+        int dm = 0;
         /* where to start the background terms; this is always true */
         int mb = _nt - _nbt;
-        
+
         if (_constantFirstTerm) {
             m0 = 1;       /* we need to manually fill in the first (non-spatial) terms below */
             dm = _nkt-1;  /* need to shift terms due to lack of spatial variation in first term */
-            
+
             _mMat(0, 0) += qMat(0,0);
             for(int m2 = 1; m2 < _nbases; m2++)  {
                 _mMat.block(0, m2*_nkt-dm, 1, _nkt) += qMat(0,m2) * pK.transpose();
             }
             _bVec(0) += wVec(0);
-            
+
             if (_fitForBackground) {
                 _mMat.block(0, mb, 1, _nbt) += qMat(0,_nbases) * pB.transpose();
             }
         }
-        
+
         /* Fill in the spatial blocks */
         for(int m1 = m0; m1 < _nbases; m1++)  {
             /* Diagonal kernel-kernel term; only use upper triangular part of pKpKt */
-            _mMat.block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) += 
+            _mMat.block(m1*_nkt-dm, m1*_nkt-dm, _nkt, _nkt) +=
                 (pKpKt * qMat(m1,m1)).triangularView<Eigen::Upper>();
-            
+
             /* Kernel-kernel terms */
             for(int m2 = m1+1; m2 < _nbases; m2++)  {
                 _mMat.block(m1*_nkt-dm, m2*_nkt-dm, _nkt, _nkt) += qMat(m1,m2) * pKpKt;
@@ -1430,18 +1425,18 @@ namespace diffim {
                 /* Kernel cross terms with background */
                 _mMat.block(m1*_nkt-dm, mb, _nkt, _nbt) += qMat(m1,_nbases) * pKpBt;
             }
-            
+
             /* B vector */
             _bVec.segment(m1*_nkt-dm, _nkt) += wVec(m1) * pK;
         }
-        
+
         if (_fitForBackground) {
             /* Background-background terms only */
-            _mMat.block(mb, mb, _nbt, _nbt) +=  
+            _mMat.block(mb, mb, _nbt, _nbt) +=
                 (pBpBt * qMat(_nbases,_nbases)).triangularView<Eigen::Upper>();
             _bVec.segment(mb, _nbt)         += wVec(_nbases) * pB;
         }
-        
+
         if (DEBUG_MATRIX) {
             std::cout << "Spatial matrix outputs" << std::endl;
             std::cout << "mMat " << _mMat << std::endl;
@@ -1457,7 +1452,7 @@ namespace diffim {
         afwImage::Image<afwMath::Kernel::Pixel>::Ptr image(
             new afwImage::Image<afwMath::Kernel::Pixel>(_kernel->getDimensions())
             );
-        (void)_kernel->computeImage(*image, false, pos[0], pos[1]);              
+        (void)_kernel->computeImage(*image, false, pos[0], pos[1]);
         return image;
     }
 
@@ -1479,41 +1474,41 @@ namespace diffim {
         _setKernel();
     }
 
-    std::pair<afwMath::LinearCombinationKernel::Ptr, 
+    std::pair<afwMath::LinearCombinationKernel::Ptr,
             afwMath::Kernel::SpatialFunctionPtr> SpatialKernelSolution::getSolutionPair() {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
         }
-        
+
         return std::make_pair(_kernel, _background);
     }
-    
+
     void SpatialKernelSolution::_setKernel() {
         /* Report on condition number */
         double cNumber = this->getConditionNumber(EIGENVALUE);
-        
+
         if (_nkt == 1) {
             /* Not spatially varying; this fork is a specialization for convolution speed--up */
-            
+
             /* Set the basis coefficients */
             std::vector<double> kCoeffs(_nbases);
             for (int i = 0; i < _nbases; i++) {
                 if (std::isnan(_aVec(i))) {
                     throw LSST_EXCEPT(
-                        pexExcept::Exception, 
+                        pexExcept::Exception,
                         str(boost::format(
                                 "I. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % i % cNumber));
                 }
                 kCoeffs[i] = _aVec(i);
             }
-            lsst::afw::math::KernelList basisList = 
+            lsst::afw::math::KernelList basisList =
                 std::dynamic_pointer_cast<afwMath::LinearCombinationKernel>(_kernel)->getKernelList();
             _kernel.reset(
                 new afwMath::LinearCombinationKernel(basisList, kCoeffs)
                 );
         }
         else {
-            
+
             /* Set the kernel coefficients */
             std::vector<std::vector<double> > kCoeffs;
             kCoeffs.reserve(_nbases);
@@ -1524,7 +1519,7 @@ namespace diffim {
                 if ((i == 0) && (_constantFirstTerm)) {
                     if (std::isnan(_aVec(idx))) {
                         throw LSST_EXCEPT(
-                            pexExcept::Exception, 
+                            pexExcept::Exception,
                             str(boost::format(
                                     "II. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % idx % cNumber));
                     }
@@ -1534,7 +1529,7 @@ namespace diffim {
                     for (int j = 0; j < _nkt; j++) {
                         if (std::isnan(_aVec(idx))) {
                             throw LSST_EXCEPT(
-                                pexExcept::Exception, 
+                                pexExcept::Exception,
                                 str(boost::format(
                                         "III. Unable to determine spatial kernel solution %d (nan).  Condition number = %.3e") % idx % cNumber));
                         }
@@ -1547,7 +1542,7 @@ namespace diffim {
 
         /* Set kernel Sum */
         ImageT::Ptr image (new ImageT(_kernel->getDimensions()));
-        _kSum  = _kernel->computeImage(*image, false);              
+        _kSum  = _kernel->computeImage(*image, false);
 
         /* Set the background coefficients */
         std::vector<double> bgCoeffs(_fitForBackground ? _nbt : 1);
@@ -1555,7 +1550,7 @@ namespace diffim {
             for (int i = 0; i < _nbt; i++) {
                 int idx = _nt - _nbt + i;
                 if (std::isnan(_aVec(idx))) {
-                    throw LSST_EXCEPT(pexExcept::Exception, 
+                    throw LSST_EXCEPT(pexExcept::Exception,
                                       str(boost::format(
                            "Unable to determine spatial background solution %d (nan)") % (idx)));
                 }
