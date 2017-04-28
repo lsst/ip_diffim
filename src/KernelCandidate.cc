@@ -255,7 +255,7 @@ namespace diffim {
     }
 
     template <typename PixelT>
-    lsst::afw::math::Kernel::Ptr KernelCandidate<PixelT>::getKernel(CandidateSwitch cand) const {
+    std::shared_ptr<lsst::afw::math::Kernel> KernelCandidate<PixelT>::getKernel(CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
             if (_kernelSolutionOrig)
                 return _kernelSolutionOrig->getKernel();
@@ -336,7 +336,7 @@ namespace diffim {
     }
 
     template <typename PixelT>
-    KernelCandidate<PixelT>::ImageT::Ptr KernelCandidate<PixelT>::getKernelImage(
+    std::shared_ptr<typename KernelCandidate<PixelT>::ImageT> KernelCandidate<PixelT>::getKernelImage(
         CandidateSwitch cand) const {
         if (cand == KernelCandidate::ORIG) {
             if (_kernelSolutionOrig)
@@ -364,7 +364,7 @@ namespace diffim {
     }
 
     template <typename PixelT>
-    KernelCandidate<PixelT>::ImageT::ConstPtr KernelCandidate<PixelT>::getImage() const {
+    std::shared_ptr<typename KernelCandidate<PixelT>::ImageT const> KernelCandidate<PixelT>::getImage() const {
         return getKernelImage(KernelCandidate::ORIG);
     }
 
@@ -430,7 +430,7 @@ namespace diffim {
 
     template <typename PixelT>
     lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::getDifferenceImage(
-        lsst::afw::math::Kernel::Ptr kernel,
+        std::shared_ptr<lsst::afw::math::Kernel> kernel,
         double background
         ) {
         /* Make diffim and set chi2 from result */

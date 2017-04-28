@@ -116,7 +116,7 @@ Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
         std::vector<std::shared_ptr<afwImage::Image<ImageT> > > imageList(nParameters);
         typename std::vector<std::shared_ptr<afwImage::Image<ImageT> > >::iterator citer=imageList.begin();
         for (int i = 1; citer != imageList.end(); ++citer, ++i) {
-            *citer = typename afwImage::Image<ImageT>::Ptr(
+            *citer = std::shared_ptr<afwImage::Image<ImageT>>(
                 new afwImage::Image<ImageT>(varianceEstimate.getDimensions())
                 );
             **citer = i; /* give it a value */

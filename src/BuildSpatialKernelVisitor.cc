@@ -43,7 +43,7 @@ namespace detail {
      * @brief Creates a spatial kernel and background from a list of candidates
      *
      * @code
-        Policy::Ptr policy(new Policy);
+        std::shared_ptr<Policy> policy(new Policy);
         policy->set("spatialKernelOrder", spatialKernelOrder);
         policy->set("spatialBgOrder", spatialBgOrder);
         policy->set("kernelBasisSet", "delta-function");
@@ -53,7 +53,7 @@ namespace detail {
                                                                       *policy);
         kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
         spatialKernelFitter.solveLinearEquation();
-        std::pair<afwMath::LinearCombinationKernel::Ptr, 
+        std::pair<std::shared_ptr<afwMath::LinearCombinationKernel>,
             afwMath::Kernel::SpatialFunctionPtr> kb = spatialKernelFitter.getKernelSolution();
         spatialKernel     = kb.first;
         spatialBackground = kb.second; 
@@ -159,7 +159,7 @@ namespace detail {
     }
 
     template<typename PixelT>
-    std::pair<afwMath::LinearCombinationKernel::Ptr, afwMath::Kernel::SpatialFunctionPtr>
+    std::pair<std::shared_ptr<afwMath::LinearCombinationKernel>, afwMath::Kernel::SpatialFunctionPtr>
     BuildSpatialKernelVisitor<PixelT>::getSolutionPair() {
         return _kernelSolution->getSolutionPair();
     }

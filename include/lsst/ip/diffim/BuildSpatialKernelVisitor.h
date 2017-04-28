@@ -42,7 +42,7 @@ namespace detail {
   
         inline std::shared_ptr<SpatialKernelSolution> getKernelSolution() {return _kernelSolution;}
 
-        std::pair<lsst::afw::math::LinearCombinationKernel::Ptr, 
+        std::pair<std::shared_ptr<lsst::afw::math::LinearCombinationKernel>,
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getSolutionPair();
 
     private:
@@ -58,7 +58,7 @@ namespace detail {
         lsst::pex::policy::Policy policy
         ) {
 
-        return typename BuildSpatialKernelVisitor<PixelT>::Ptr(
+        return std::shared_ptr<BuildSpatialKernelVisitor<PixelT>>(
             new BuildSpatialKernelVisitor<PixelT>(basisList, regionBBox, policy)
             );
     }

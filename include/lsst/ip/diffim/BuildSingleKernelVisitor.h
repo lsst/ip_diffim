@@ -79,7 +79,7 @@ namespace detail {
         lsst::pex::policy::Policy const& policy
         ) {
 
-        return typename BuildSingleKernelVisitor<PixelT>::Ptr(
+        return std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(
             new BuildSingleKernelVisitor<PixelT>(basisList, policy)
             );
     }
@@ -92,7 +92,7 @@ namespace detail {
         Eigen::MatrixXd const & hMat
         ) {
 
-        return typename BuildSingleKernelVisitor<PixelT>::Ptr(
+        return std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(
             new BuildSingleKernelVisitor<PixelT>(basisList, policy, hMat)
             );
     }

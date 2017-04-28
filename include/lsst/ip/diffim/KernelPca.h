@@ -57,7 +57,7 @@ namespace detail {
     template<typename PixelT>
     std::shared_ptr<KernelPcaVisitor<PixelT> >
     makeKernelPcaVisitor(std::shared_ptr<KernelPca<typename KernelPcaVisitor<PixelT>::ImageT> > imagePca) {
-        return typename KernelPcaVisitor<PixelT>::Ptr(new KernelPcaVisitor<PixelT>(imagePca));
+        return std::shared_ptr<KernelPcaVisitor<PixelT>>(new KernelPcaVisitor<PixelT>(imagePca));
     };
 
 }}}} // end of namespace lsst::ip::diffim::detail

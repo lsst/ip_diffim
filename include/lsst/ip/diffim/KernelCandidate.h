@@ -102,7 +102,7 @@ namespace diffim {
          * @brief Return results of kernel solution
          *
          */
-        afw::math::Kernel::Ptr getKernel(CandidateSwitch cand) const;
+        std::shared_ptr<afw::math::Kernel> getKernel(CandidateSwitch cand) const;
         double getBackground(CandidateSwitch cand) const;
         double getKsum(CandidateSwitch cand) const;
         PTR(ImageT) getKernelImage(CandidateSwitch cand) const;
@@ -120,7 +120,7 @@ namespace diffim {
          * @note Useful for spatial modeling
          */
         afw::image::MaskedImage<PixelT> getDifferenceImage(
-            afw::math::Kernel::Ptr kernel,
+            std::shared_ptr<afw::math::Kernel> kernel,
             double background
             );
 
@@ -222,7 +222,7 @@ namespace diffim {
                         std::shared_ptr<afw::image::MaskedImage<PixelT> > const& scienceMaskedImage,
                         pex::policy::Policy const& policy){
 
-        return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(xCenter, yCenter,
+        return std::shared_ptr<KernelCandidate<PixelT>>(new KernelCandidate<PixelT>(xCenter, yCenter,
                                                                                  templateMaskedImage,
                                                                                  scienceMaskedImage,
                                                                                  policy));
@@ -246,10 +246,10 @@ namespace diffim {
                         std::shared_ptr<afw::image::MaskedImage<PixelT> > const& scienceMaskedImage,
                         pex::policy::Policy const& policy){
 
-        return typename KernelCandidate<PixelT>::Ptr(new KernelCandidate<PixelT>(source,
-                                                                                 templateMaskedImage,
-                                                                                 scienceMaskedImage,
-                                                                                 policy));
+        return std::shared_ptr<KernelCandidate<PixelT>>(new KernelCandidate<PixelT>(source,
+                                                                                    templateMaskedImage,
+                                                                                    scienceMaskedImage,
+                                                                                    policy));
     }
 
 

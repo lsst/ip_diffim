@@ -210,7 +210,7 @@ namespace diffim {
     };
 
     template <typename InputT>
-    lsst::afw::math::Kernel::Ptr StaticKernelSolution<InputT>::getKernel() {
+    std::shared_ptr<lsst::afw::math::Kernel> StaticKernelSolution<InputT>::getKernel() {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
         }
@@ -218,11 +218,11 @@ namespace diffim {
     }
 
     template <typename InputT>
-    lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr StaticKernelSolution<InputT>::makeKernelImage() {
+    std::shared_ptr<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>> StaticKernelSolution<InputT>::makeKernelImage() {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
         }
-        afwImage::Image<afwMath::Kernel::Pixel>::Ptr image(
+        std::shared_ptr<afwImage::Image<afwMath::Kernel::Pixel>> image(
             new afwImage::Image<afwMath::Kernel::Pixel>(_kernel->getDimensions())
             );
         (void)_kernel->computeImage(*image, false);
@@ -440,7 +440,7 @@ namespace diffim {
         }
         _kernel->setKernelParameters(kValues);
 
-        ImageT::Ptr image (
+        std::shared_ptr<ImageT> image (
             new ImageT(_kernel->getDimensions())
             );
         _kSum  = _kernel->computeImage(*image, false);
@@ -1321,7 +1321,7 @@ namespace diffim {
         this->_mMat = mMat;
         this->_bVec = bVec;
 
-        _kernel = afwMath::LinearCombinationKernel::Ptr(
+        _kernel = std::shared_ptr<afwMath::LinearCombinationKernel>(
             new afwMath::LinearCombinationKernel(basisList, *_spatialKernelFunction)
             );
 
@@ -1445,11 +1445,11 @@ namespace diffim {
 
     }
 
-    lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>::Ptr SpatialKernelSolution::makeKernelImage(afwGeom::Point2D const& pos) {
+    std::shared_ptr<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>> SpatialKernelSolution::makeKernelImage(afwGeom::Point2D const& pos) {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
         }
-        afwImage::Image<afwMath::Kernel::Pixel>::Ptr image(
+        std::shared_ptr<afwImage::Image<afwMath::Kernel::Pixel>> image(
             new afwImage::Image<afwMath::Kernel::Pixel>(_kernel->getDimensions())
             );
         (void)_kernel->computeImage(*image, false, pos[0], pos[1]);
@@ -1474,7 +1474,7 @@ namespace diffim {
         _setKernel();
     }
 
-    std::pair<afwMath::LinearCombinationKernel::Ptr,
+    std::pair<std::shared_ptr<afwMath::LinearCombinationKernel>,
             afwMath::Kernel::SpatialFunctionPtr> SpatialKernelSolution::getSolutionPair() {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return solution");
@@ -1541,7 +1541,7 @@ namespace diffim {
         }
 
         /* Set kernel Sum */
-        ImageT::Ptr image (new ImageT(_kernel->getDimensions()));
+        std::shared_ptr<ImageT> image (new ImageT(_kernel->getDimensions()));
         _kSum  = _kernel->computeImage(*image, false);
 
         /* Set the background coefficients */
