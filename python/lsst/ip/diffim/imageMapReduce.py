@@ -28,7 +28,6 @@ import abc
 from future.utils import with_metaclass
 
 import lsst.afw.image as afwImage
-import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.meas.algorithms as measAlg
@@ -165,7 +164,10 @@ class ImageReducerSubtaskConfig(pexConfig.Config):
             "sum": """add pixels from overlaps (probably never wanted; used for testing)
                        into correct location in new exposure""",
             "average": """same as copy, but also average pixels from overlapped regions
-                       (NaNs ignored)"""
+                       (NaNs ignored)""",
+            "coaddPsf": """Instead of constructing an Exposure, take a list of returned
+                       PSFs and use CoaddPsf to construct a single PSF that covers the
+                       entire input exposure""",
         }
     )
 
@@ -229,6 +231,11 @@ class ImageReducerSubtask(pipeBase.Task):
         if self.config.reduceOperation == 'none':
             return pipeBase.Struct(result=mapperResults)
 
+        if self.config.reduceOperation == 'coaddPsf':
+            # Each element of `mapperResults` should contain 'psf' and 'bbox'
+            coaddPsf = self._constructPsf(mapperResults, exposure)
+            return pipeBase.Struct(result=coaddPsf)
+
         newExp = exposure.clone()
         newMI = newExp.getMaskedImage()
 
@@ -270,8 +277,12 @@ class ImageReducerSubtask(pipeBase.Task):
 
         if reduceOp == 'average':
             wts = weights.getArray().astype(np.float)
+            self.log.info('AVERAGE: Maximum overlap: %f', wts.max())
+            self.log.info('AVERAGE: Average overlap: %f', np.nanmean(wts))
             newMI.getImage().getArray()[:, :] /= wts
             newMI.getVariance().getArray()[:, :] /= wts
+            wtsZero = wts == 0.
+            newMI.getImage().getArray()[wtsZero] = newMI.getVariance().getArray()[wtsZero] = np.nan
             # TBD: set mask to something for pixels where wts == 0. Shouldn't happen. (DM-10009)
 
         # Not sure how to construct a PSF when reduceOp=='copy'...
@@ -312,13 +323,18 @@ class ImageReducerSubtask(pipeBase.Task):
         # WCSs are the same, which they better be!).
         wcsref = exposure.getWcs()
         for i, res in enumerate(mapperResults):
-            subExp = res.subExposure
-            if subExp.getWcs() != wcsref:
-                raise ValueError('Wcs of subExposure is different from exposure')
             record = mycatalog.getTable().makeRecord()
-            record.setPsf(subExp.getPsf())
-            record.setWcs(subExp.getWcs())
-            record.setBBox(subExp.getBBox())
+            if 'subExposure' in res.getDict():
+                subExp = res.subExposure
+                if subExp.getWcs() != wcsref:
+                    raise ValueError('Wcs of subExposure is different from exposure')
+                record.setPsf(subExp.getPsf())
+                record.setWcs(subExp.getWcs())
+                record.setBBox(subExp.getBBox())
+            elif 'psf' in res.getDict():
+                record.setPsf(res.psf)
+                record.setWcs(wcsref)
+                record.setBBox(res.bbox)
             record['weight'] = 1.0
             record['id'] = i
             mycatalog.append(record)
@@ -424,6 +440,12 @@ class ImageMapReduceConfig(pexConfig.Config):
         doc="""Scale gridSize/gridStep/borderSize/overlapSize by PSF FWHM rather
                than pixels?""",
         default=True
+    )
+
+    returnSubImages = pexConfig.Field(
+        dtype=bool,
+        doc="""Return the input subExposures alongside the processed ones (for debugging)""",
+        default=False
     )
 
     ignoreMaskPlanes = pexConfig.ListField(
@@ -545,6 +567,10 @@ class ImageMapReduceTask(pipeBase.Task):
                 subExp = subExp.clone()
                 expandedSubExp = expandedSubExp.clone()
             result = self.mapperSubtask.run(subExp, expandedSubExp, exposure.getBBox(), **kwargs)
+            if self.config.returnSubImages:
+                toAdd = pipeBase.Struct(inputSubExposure=subExp,
+                                        inputExpandedSubExposure=expandedSubExp)
+                result.mergeItems(toAdd, 'inputSubExposure', 'inputExpandedSubExposure')
             mapperResults.append(result)
 
         return mapperResults
@@ -654,6 +680,8 @@ class ImageMapReduceTask(pipeBase.Task):
         if adjustGridOption == 'size':
             gridSizeX = gridStepX
             gridSizeY = gridStepY
+
+        print('Grid parameters:', gridSizeX, gridSizeY, gridStepX, gridStepY, borderSizeX, borderSizeY)
 
         # first "main" box at 0,0
         bbox0 = afwGeom.Box2I(afwGeom.Point2I(bbox.getBegin()), afwGeom.Extent2I(gridSizeX, gridSizeY))
