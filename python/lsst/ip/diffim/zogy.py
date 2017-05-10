@@ -182,8 +182,36 @@ class ZogyTask(pipeBase.Task):
                 ycen = (bbox1.getBeginY() + bbox1.getEndY()) / 2.
                 return exposure.getPsf().computeKernelImage(afwGeom.Point2D(xcen, ycen)).getArray()
 
-        self.im1_psf = selectPsf(psf1, self.template)
-        self.im2_psf = selectPsf(psf2, self.science)
+        psf1 = selectPsf(psf1, self.template)
+        psf2 = selectPsf(psf2, self.science)
+
+        def _filterPsf(psf):
+            """Filter a noisy Psf to remove artifacts. Subject of future research."""
+            noisePix = np.concatenate((psf[:5, :].flatten(), psf[:, :5].flatten(),
+                                       psf[-5:, :].flatten(), psf[:, -5:].flatten()))
+            psf[psf < np.std(noisePix)*4.0] = 0.
+            # psf[0:10, :] = psf[:, 0:10] = psf[31:41, :] = psf[:, 31:41] = 0
+            psf /= psf.sum()
+            return psf
+
+        if self.config.doFilterPsfs:  # default True
+            # Note this *really* helps for measured psfs.
+            psf1 = _filterPsf(psf1)
+            psf2 = _filterPsf(psf2)
+
+        def _makePsfSquare(psf):
+            if psf.shape[0] < psf.shape[1]:
+                # Sometimes CoaddPsf does this. Make it square.
+                psf = np.pad(psf, ((1, 1), (0, 0)), mode='constant')
+            elif psf.shape[0] > psf.shape[1]:
+                psf = np.pad(psf, ((0, 0), (1, 1)), mode='constant')
+            return psf
+
+        psf1 = _makePsfSquare(psf1)
+        psf2 = _makePsfSquare(psf2)
+
+        self.im1_psf = psf1
+        self.im2_psf = psf2
 
         # Make sure PSFs are the same size. Assume they're square...
         if self.im1_psf.shape[0] < self.im2_psf.shape[0]:
@@ -212,15 +240,15 @@ class ZogyTask(pipeBase.Task):
         return var
 
     @staticmethod
-    def _padPsfToSize(psf, size):
-        """Zero-pad `psf` to the dimensions given by `size`.
+    def _padPsf(psf, size):
+        """Zero-pad `psf` with the given number of pixels
 
         Parameters
         ----------
         psf : 2D numpy.array
             Input psf to be padded
         size : list
-            Two element list containing the dimensions to pad the `psf` to
+            Two element list containing the dimensions to pad the `psf` with
 
         Returns
         -------
@@ -255,8 +283,8 @@ class ZogyTask(pipeBase.Task):
         psf : 2D numpy.array
             The padded copy of the input `psf`.
         """
-        return ZogyTask._padPsfToSize(psf, (im.shape[0]//2 - psf.shape[0]//2,
-                                            im.shape[1]//2 - psf.shape[1]//2))
+        return ZogyTask._padPsf(psf, (im.shape[0]//2 - psf.shape[0]//2,
+                                      im.shape[1]//2 - psf.shape[1]//2))
 
     def computePrereqs(self, psf1=None, psf2=None, padSize=0):
         """Compute standard ZOGY quantities used by (nearly) all methods.
@@ -288,8 +316,8 @@ class ZogyTask(pipeBase.Task):
         padSize = self.padSize if padSize is None else padSize
         Pr, Pn = psf1, psf2
         if padSize > 0:
-            Pr = ZogyTask._padPsfToSize(psf1, (padSize, padSize))
-            Pn = ZogyTask._padPsfToSize(psf2, (padSize, padSize))
+            Pr = ZogyTask._padPsf(psf1, (padSize, padSize))
+            Pn = ZogyTask._padPsf(psf2, (padSize, padSize))
 
         sigR, sigN = self.sig1, self.sig2
         Pr_hat = np.fft.fft2(Pr)
@@ -335,8 +363,8 @@ class ZogyTask(pipeBase.Task):
         def _filterKernel(K, trim_amount):
             # Filter the wings of Kn, Kr, set to zero
             ps = trim_amount
-            K[:ps, :] = K[-ps:, :] = 0
-            K[:, :ps] = K[:, -ps:] = 0
+            K[:ps[0], :] = K[-ps[0]:, :] = 0
+            K[:, :ps[1]] = K[:, -ps[1]:] = 0
             return K
 
         Kr_hat = self.Fr * preqs.Pr_hat / preqs.denom
@@ -344,7 +372,8 @@ class ZogyTask(pipeBase.Task):
         if debug and self.config.doTrimKernels:  # default False
             # Suggestion from Barak to trim Kr and Kn to remove artifacts
             # Here we just filter them (in image space) to keep them the same size
-            ps = (Kn_hat.shape[1] - 80)//2
+            print("HERE")
+            ps = ((Kn_hat.shape[0] - 30)//2, (Kn_hat.shape[1] - 30)//2)
             Kn = _filterKernel(np.fft.ifft2(Kn_hat), ps)
             Kn_hat = np.fft.fft2(Kn)
             Kr = _filterKernel(np.fft.ifft2(Kr_hat), ps)
@@ -434,17 +463,19 @@ class ZogyTask(pipeBase.Task):
         """
         preqs = self.computePrereqs(padSize=padSize)
 
-        delta = 0.
-        if debug:
-            delta = 1.  # Regularize the ratio, a possible option to remove artifacts
-        Kr_hat = (preqs.Pr_hat + delta) / (preqs.denom + delta)
-        Kn_hat = (preqs.Pn_hat + delta) / (preqs.denom + delta)
+        #delta = 0.
+        #if debug:
+        #    delta = 1.  # Regularize the ratio, a possible option to remove artifacts
+        #Kr_hat = (preqs.Pr_hat + delta) / (preqs.denom + delta)
+        #Kn_hat = (preqs.Pn_hat + delta) / (preqs.denom + delta)
+        Kr_hat = self.Fr * preqs.Pr_hat / preqs.denom
+        Kn_hat = self.Fn * preqs.Pn_hat / preqs.denom
         Kr = np.fft.ifft2(Kr_hat).real
         Kr = np.roll(np.roll(Kr, -1, 0), -1, 1)
         Kn = np.fft.ifft2(Kn_hat).real
         Kn = np.roll(np.roll(Kn, -1, 0), -1, 1)
 
-        def _trimKernel(self, K, trim_amount):
+        def _trimKernel(K, trim_amount):
             # Trim out the wings of Kn, Kr (see notebook #15)
             # only necessary if it's from a measured psf and PsfEx seems to always make PSFs of size 41x41
             ps = trim_amount
@@ -862,11 +893,14 @@ class ZogyMapperSubtask(ZogyTask, ImageMapperSubtask):
         def _filterPsf(psf):
             """Filter a noisy Psf to remove artifacts. Subject of future research."""
             # only necessary if it's from a measured psf and PsfEx seems to always make PSFs of size 41x41
-            if psf.shape[0] == 41:  # its from a measured psf
-                psf = psf.copy()
-                psf[psf < 0] = 0
-                psf[0:10, :] = psf[:, 0:10] = psf[31:41, :] = psf[:, 31:41] = 0
-                psf /= psf.sum()
+            #if psf.shape[0] == 41:  # its from a measured psf
+            print("HERE: FILTERING")
+            psf = psf.copy()
+            noisePix = np.concatenate((psf[0:5, :].flatten(), psf[:, 0:5].flatten(),
+                                       psf[-5:, :].flatten(), psf[:, -5:].flatten()))
+            psf[psf < np.std(noisePix)*3.5] = 0.
+            #psf[0:10, :] = psf[:, 0:10] = psf[31:41, :] = psf[:, 31:41] = 0
+            psf /= psf.sum()
 
             return psf
 
