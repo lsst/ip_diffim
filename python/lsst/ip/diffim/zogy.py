@@ -34,10 +34,12 @@ import lsst.pipe.base as pipeBase
 import lsst.log
 
 from .imageMapReduce import (ImageMapReduceConfig, ImageMapperSubtask,
-                             ImageMapperSubtaskConfig)
+                             ImageMapReduceTask)
+from .imagePsfMatch import (ImagePsfMatchTask, ImagePsfMatchConfig)
 
 __all__ = ["ZogyTask", "ZogyConfig",
-           "ZogyMapperSubtask", "ZogyMapReduceConfig"]
+           "ZogyMapperSubtask", "ZogyMapReduceConfig",
+           "ZogyImagePsfMatchConfig", "ZogyImagePsfMatchTask"]
 
 
 """Tasks for performing the "Proper image subtraction" algorithm of
@@ -128,7 +130,7 @@ class ZogyTask(pipeBase.Task):
     ConfigClass = ZogyConfig
     _DefaultName = "ip_diffim_Zogy"
 
-    def __init__(self, templateExposure, scienceExposure, sig1=None, sig2=None,
+    def __init__(self, templateExposure=None, scienceExposure=None, sig1=None, sig2=None,
                  psf1=None, psf2=None, *args, **kwargs):
         """Create the ZOGY task.
 
@@ -159,6 +161,44 @@ class ZogyTask(pipeBase.Task):
             `lsst.pipe.base.task.Task.__init__`
         """
         pipeBase.Task.__init__(self, *args, **kwargs)
+        self.template = self.science = None
+        self.setup(templateExposure=templateExposure, scienceExposure=scienceExposure,
+                   sig1=sig1, sig2=sig2, psf1=psf1, psf2=psf2, *args, **kwargs)
+
+    def setup(self, templateExposure=None, scienceExposure=None, sig1=None, sig2=None,
+              psf1=None, psf2=None, *args, **kwargs):
+        """Set up the ZOGY task.
+
+        Parameters
+        ----------
+        templateExposure : lsst.afw.image.Exposure
+            Template exposure ("Reference image" in ZOGY (2016)).
+        scienceExposure : lsst.afw.image.Exposure
+            Science exposure ("New image" in ZOGY (2016)). Must have already been
+            registered and photmetrically matched to template.
+        sig1 : float
+            (Optional) sqrt(variance) of `templateExposure`. If `None`, it is
+            computed from the sqrt(mean) of the `templateExposure` variance image.
+        sig2 : float
+            (Optional) sqrt(variance) of `scienceExposure`. If `None`, it is
+            computed from the sqrt(mean) of the `scienceExposure` variance image.
+        psf1 : 2D numpy.array
+            (Optional) 2D array containing the PSF image for the template. If
+            `None`, it is extracted from the PSF taken at the center of `templateExposure`.
+        psf2 : 2D numpy.array
+            (Optional) 2D array containing the PSF image for the science img. If
+            `None`, it is extracted from the PSF taken at the center of `scienceExposure`.
+        args :
+            additional arguments to be passed to
+            `lsst.pipe.base.task.Task.__init__`
+        kwargs :
+            additional keyword arguments to be passed to
+            `lsst.pipe.base.task.Task.__init__`
+        """
+        if self.template is None and templateExposure is None:
+            return
+        if self.science is None and scienceExposure is None:
+            return
 
         self.template = templateExposure
         self.science = scienceExposure
@@ -898,3 +938,72 @@ class ZogyMapReduceConfig(ImageMapReduceConfig):
         doc='Zogy subtask to run on each sub-image',
         target=ZogyMapperSubtask
     )
+
+
+class ZogyImagePsfMatchConfig(ImagePsfMatchConfig):
+    zogyConfig = pexConfig.ConfigField(
+        dtype=ZogyConfig,
+        doc='ZogyTask config to use when running on complete exposure (non spatially-varying)',
+    )
+
+    zogyMapReduceConfig = pexConfig.ConfigField(
+        dtype=ZogyMapReduceConfig,
+        doc='ZogyMapReduce config to use when running Zogy on each sub-image (spatially-varying)',
+    )
+
+
+class ZogyImagePsfMatchTask(ImagePsfMatchTask):
+    ConfigClass = ZogyImagePsfMatchConfig
+
+    def __init__(self, *args, **kwargs):
+        ImagePsfMatchTask.__init__(self, *args, **kwargs)
+
+    def setDefaults(self):
+        config = self.config.zogyMapReduceConfig
+        config.gridStepX = config.gridStepY = 9
+        config.gridSizeX = config.gridSizeY = 20
+        config.borderSizeX = config.borderSizeY = 6
+        config.reducerSubtask.reduceOperation = 'average'
+
+    def subtractExposures(self, templateExposure, scienceExposure,
+                          doWarping=True, spatiallyVarying=True, inImageSpace=False,
+                          doPreConvolve=False):
+
+        if not self._validateWcs(templateExposure, scienceExposure):
+            if doWarping:
+                self.log.info("Astrometrically registering template to science image")
+                templatePsf = templateExposure.getPsf()
+                templateExposure = self._warper.warpExposure(scienceExposure.getWcs(),
+                                                             templateExposure,
+                                                             destBBox=scienceExposure.getBBox())
+                templateExposure.setPsf(templatePsf)
+                #print('HERE!!!')
+                #templateExposure.writeFits('WARPEDTEMPLATE.fits')
+            else:
+                self.log.error("ERROR: Input images not registered")
+                raise RuntimeError("Input images not registered")
+
+        if spatiallyVarying:
+            config = self.config.zogyMapReduceConfig
+            task = ImageMapReduceTask(config=config)
+            results = task.run(scienceExposure, template=templateExposure, inImageSpace=inImageSpace,
+                               doScorr=doPreConvolve, forceEvenSized=True)
+        else:
+            config = self.config.zogyConfig
+            task = ZogyTask(scienceExposure=scienceExposure, templateExposure=templateExposure,
+                            config=config)
+            if not doPreConvolve:
+                D = task.computeDiffim(inImageSpace=inImageSpace)
+            else:
+                D = task.computeScorr(inImageSpace=inImageSpace)
+
+            results = pipeBase.Struct(exposure=D)
+
+        results.warpedExposure = templateExposure
+        results.subtractedExposure = results.exposure
+        return results
+
+    def subtractMaskedImages(self, templateExposure, scienceExposure,
+                             doWarping=True, spatiallyVarying=True, inImageSpace=False,
+                             doPreConvolve=False):
+        pass  # not implemented
