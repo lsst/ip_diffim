@@ -513,7 +513,7 @@ class ZogyTask(pipeBase.Task):
         tmp = D.getMaskedImage()
         tmp -= exp1.getMaskedImage()
         tmp /= preqs.Fd
-        return pipeBase.Struct(D=D)
+        return pipeBase.Struct(D=D, R=exp1)
 
     def _setNewPsf(self, exposure, psfArr):
         """Utility method to set an exposure's PSF when provided as a 2-d numpy.array
@@ -554,8 +554,8 @@ class ZogyTask(pipeBase.Task):
             padSize = self.padSize if padSize is None else padSize
             res = self.computeDiffimImageSpace(padSize=padSize, **kwargs)
             D = res.D
-            if returnMatchedTemplate:  # not implemented yet
-                R = None
+            if returnMatchedTemplate:
+                R = res.R
         else:
             res = self.computeDiffimFourierSpace(**kwargs)
             D = self.science.clone()
