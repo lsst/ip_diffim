@@ -345,7 +345,7 @@ class ZogyTask(pipeBase.Task):
         return res
 
     # In all functions, im1 is R (reference, or template) and im2 is N (new, or science)
-    def computeDiffimFourierSpace(self, debug=False, **kwargs):
+    def computeDiffimFourierSpace(self, debug=False, returnMatchedTemplate=False, **kwargs):
         """Compute ZOGY diffim `D` as proscribed in ZOGY (2016) manuscript
 
         Compute the ZOGY eqn. (13):
@@ -401,21 +401,28 @@ class ZogyTask(pipeBase.Task):
             N_hat = np.fft.fft2(im2)
 
             D_hat = Kr_hat * N_hat
+            D_hat_R = Kn_hat * R_hat
             if not doAdd:
-                D_hat -= Kn_hat * R_hat
+                D_hat -= D_hat_R
             else:
-                D_hat += Kn_hat * R_hat
+                D_hat += D_hat_R
 
             D = np.fft.ifft2(D_hat)
             D = np.fft.ifftshift(D.real) / preqs.Fd
-            return D
+
+            R = None
+            if returnMatchedTemplate:
+                R = np.fft.ifft2(D_hat_R)
+                R = np.fft.ifftshift(R.real) / preqs.Fd
+
+            return D, R
 
         # First do the image
-        D = processImages(self.im1, self.im2, doAdd=False)
+        D, R = processImages(self.im1, self.im2, doAdd=False)
         # Do the exact same thing to the var images, except add them
-        D_var = processImages(self.im1_var, self.im2_var, doAdd=True)
+        D_var, R_var = processImages(self.im1_var, self.im2_var, doAdd=True)
 
-        return pipeBase.Struct(D=D, D_var=D_var)
+        return pipeBase.Struct(D=D, D_var=D_var, R=R, R_var=R_var)
 
     def _doConvolve(self, exposure, kernel, recenterKernel=False):
         """! Convolve an Exposure with a decorrelation convolution kernel.
@@ -506,7 +513,7 @@ class ZogyTask(pipeBase.Task):
         tmp = D.getMaskedImage()
         tmp -= exp1.getMaskedImage()
         tmp /= preqs.Fd
-        return D
+        return pipeBase.Struct(D=D)
 
     def _setNewPsf(self, exposure, psfArr):
         """Utility method to set an exposure's PSF when provided as a 2-d numpy.array
@@ -518,7 +525,8 @@ class ZogyTask(pipeBase.Task):
         exposure.setPsf(psfNew)
         return exposure
 
-    def computeDiffim(self, inImageSpace=None, padSize=None, **kwargs):
+    def computeDiffim(self, inImageSpace=None, padSize=None,
+                      returnMatchedTemplate=False, **kwargs):
         """Wrapper method to compute ZOGY proper diffim
 
         This method should be used as the public interface for
@@ -540,19 +548,27 @@ class ZogyTask(pipeBase.Task):
            the proper image difference, including correct variance,
            masks, and PSF
         """
+        R = None
         inImageSpace = self.config.inImageSpace if inImageSpace is None else inImageSpace
         if inImageSpace:
             padSize = self.padSize if padSize is None else padSize
-            D = self.computeDiffimImageSpace(padSize=padSize, **kwargs)
+            res = self.computeDiffimImageSpace(padSize=padSize, **kwargs)
+            D = res.D
+            if returnMatchedTemplate:  # not implemented yet
+                R = None
         else:
             res = self.computeDiffimFourierSpace(**kwargs)
             D = self.science.clone()
             D.getMaskedImage().getImage().getArray()[:, :] = res.D
             D.getMaskedImage().getVariance().getArray()[:, :] = res.D_var
+            if returnMatchedTemplate:
+                R = self.science.clone()
+                R.getMaskedImage().getImage().getArray()[:, :] = res.R
+                R.getMaskedImage().getVariance().getArray()[:, :] = res.R_var
 
         psf = self.computeDiffimPsf()
         D = self._setNewPsf(D, psf)
-        return D
+        return pipeBase.Struct(D=D, R=R)
 
     def computeDiffimPsf(self, padSize=0, keepFourier=False, psf1=None, psf2=None):
         """Compute the ZOGY diffim PSF (ZOGY manuscript eq. 14)
@@ -763,7 +779,8 @@ class ZogyTask(pipeBase.Task):
         S.getMaskedImage().getVariance().getArray()[:, :] = S_var
         S = self._setNewPsf(S, Pd)
 
-        return S, D  # also return diffim since it was calculated and might be desired
+        # also return diffim since it was calculated and might be desired
+        return pipeBase.Struct(S=S, D=D)
 
     def computeScorr(self, xVarAst=0., yVarAst=0., inImageSpace=None, padSize=0, **kwargs):
         """Wrapper method to compute ZOGY corrected likelihood image, optimal for
@@ -788,7 +805,8 @@ class ZogyTask(pipeBase.Task):
         """
         inImageSpace = self.config.inImageSpace if inImageSpace is None else inImageSpace
         if inImageSpace:
-            S, _ = self.computeScorrImageSpace(xVarAst=xVarAst, yVarAst=yVarAst, padSize=padSize)
+            res = self.computeScorrImageSpace(xVarAst=xVarAst, yVarAst=yVarAst, padSize=padSize)
+            S = res.S
         else:
             res = self.computeScorrFourierSpace(xVarAst=xVarAst, yVarAst=yVarAst)
 
@@ -797,7 +815,7 @@ class ZogyTask(pipeBase.Task):
             S.getMaskedImage().getVariance().getArray()[:, :] = res.S_var
             S = self._setNewPsf(S, res.Dpsf)
 
-        return S
+        return pipeBase.Struct(S=S)
 
 
 class ZogyMapperSubtask(ZogyTask, ImageMapperSubtask):
@@ -924,9 +942,11 @@ class ZogyMapperSubtask(ZogyTask, ImageMapperSubtask):
                         sig1=sig1, sig2=sig2, psf1=psf1b, psf2=psf2b, config=config)
 
         if not doScorr:
-            D = task.computeDiffim(**kwargs)
+            res = task.computeDiffim(**kwargs)
+            D = res.D
         else:
-            D = task.computeScorr(**kwargs)
+            res = task.computeScorr(**kwargs)
+            D = res.R
 
         outExp = D.Factory(D, subExposure.getBBox())
         out = pipeBase.Struct(subExposure=outExp)
@@ -977,8 +997,8 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
                                                              templateExposure,
                                                              destBBox=scienceExposure.getBBox())
                 templateExposure.setPsf(templatePsf)
-                #print('HERE!!!')
-                #templateExposure.writeFits('WARPEDTEMPLATE.fits')
+                print('HERE!!!')
+                templateExposure.writeFits('WARPEDTEMPLATE_ZOGY.fits')
             else:
                 self.log.error("ERROR: Input images not registered")
                 raise RuntimeError("Input images not registered")
@@ -993,14 +1013,14 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
             task = ZogyTask(scienceExposure=scienceExposure, templateExposure=templateExposure,
                             config=config)
             if not doPreConvolve:
-                D = task.computeDiffim(inImageSpace=inImageSpace)
+                results = task.computeDiffim(inImageSpace=inImageSpace)
             else:
-                D = task.computeScorr(inImageSpace=inImageSpace)
+                results = task.computeScorr(inImageSpace=inImageSpace)
 
-            results = pipeBase.Struct(exposure=D)
-
+        #results = pipeBase.Struct(exposure=D)
+        results.subtractedExposure = results.D
+        results.matchedExposure = results.R
         results.warpedExposure = templateExposure
-        results.subtractedExposure = results.exposure
         return results
 
     def subtractMaskedImages(self, templateExposure, scienceExposure,
