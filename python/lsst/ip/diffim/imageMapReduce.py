@@ -279,6 +279,8 @@ class ImageReducerSubtask(pipeBase.Task):
             wts = weights.getArray().astype(np.float)
             self.log.info('AVERAGE: Maximum overlap: %f', wts.max())
             self.log.info('AVERAGE: Average overlap: %f', np.nanmean(wts))
+            self.log.info('AVERAGE: Minimum overlap: %f', wts.min())
+            self.log.info('AVERAGE: Number of zero pixels: %f', np.sum(wts == 0))
             newMI.getImage().getArray()[:, :] /= wts
             newMI.getVariance().getArray()[:, :] /= wts
             wtsZero = wts == 0.
@@ -681,7 +683,8 @@ class ImageMapReduceTask(pipeBase.Task):
             gridSizeX = gridStepX
             gridSizeY = gridStepY
 
-        print('Grid parameters:', gridSizeX, gridSizeY, gridStepX, gridStepY, borderSizeX, borderSizeY)
+        self.log.info('Grid parameters: %d, %d; %d, %d; %d, %d', gridSizeX, gridSizeY,
+                      gridStepX, gridStepY, borderSizeX, borderSizeY)
 
         # first "main" box at 0,0
         bbox0 = afwGeom.Box2I(afwGeom.Point2I(bbox.getBegin()), afwGeom.Extent2I(gridSizeX, gridSizeY))

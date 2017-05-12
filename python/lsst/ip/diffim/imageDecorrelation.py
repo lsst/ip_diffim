@@ -34,10 +34,12 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.log
 
-from .imageMapReduce import (ImageMapReduceConfig, ImageMapperSubtask)
+from .imageMapReduce import (ImageMapReduceConfig, ImageMapReduceTask,
+                             ImageMapperSubtask)
 
 __all__ = ("DecorrelateALKernelTask", "DecorrelateALKernelConfig",
-           "DecorrelateALKernelMapperSubtask", "DecorrelateALKernelMapReduceConfig")
+           "DecorrelateALKernelMapperSubtask", "DecorrelateALKernelMapReduceConfig",
+           "DecorrelateALKernelSpatialConfig", "DecorrelateALKernelSpatialTask")
 
 
 class DecorrelateALKernelConfig(pexConfig.Config):
@@ -440,3 +442,71 @@ class DecorrelateALKernelMapReduceConfig(ImageMapReduceConfig):
         doc='A&L decorrelation subtask to run on each sub-image',
         target=DecorrelateALKernelMapperSubtask
     )
+
+
+class DecorrelateALKernelSpatialConfig(pexConfig.Config):
+    decorrelateConfig = pexConfig.ConfigField(
+        dtype=DecorrelateALKernelConfig,
+        doc='DecorrelateALKernel config to use when running on complete exposure (non spatially-varying)',
+    )
+
+    decorrelateMapReduceConfig = pexConfig.ConfigField(
+        dtype=DecorrelateALKernelMapReduceConfig,
+        doc='DecorrelateALKernelMapReduce config to use when running on each sub-image (spatially-varying)',
+    )
+
+
+class DecorrelateALKernelSpatialTask(pipeBase.Task):
+    ConfigClass = DecorrelateALKernelSpatialConfig
+    _DefaultName = "ip_diffim_decorrelateALKernelSpatial"
+
+    def __init__(self, *args, **kwargs):
+        pipeBase.Task.__init__(self, *args, **kwargs)
+        self.setDefaults()  # Why do I need to explicitly call this?
+
+        self.statsControl = afwMath.StatisticsControl()
+        self.statsControl.setNumSigmaClip(3.)
+        self.statsControl.setNumIter(3)
+        ignoreMaskPlanes = ("INTRP", "EDGE", "DETECTED", "SAT", "CR", "BAD", "NO_DATA", "DETECTED_NEGATIVE")
+        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(ignoreMaskPlanes))
+
+    def computeVarianceMean(self, exposure):
+        statObj = afwMath.makeStatistics(exposure.getMaskedImage().getVariance(),
+                                         exposure.getMaskedImage().getMask(),
+                                         afwMath.MEANCLIP, self.statsControl)
+        var = statObj.getValue(afwMath.MEANCLIP)
+        return var
+
+    def setDefaults(self):
+        config = self.config.decorrelateMapReduceConfig
+        config.gridStepX = config.gridStepY = 9
+        config.gridSizeX = config.gridSizeY = 20
+        config.borderSizeX = config.borderSizeY = 6
+        config.reducerSubtask.reduceOperation = 'average'
+
+    def run(self, scienceExposure, templateExposure, subtractedExposure, psfMatchingKernel,
+            spatiallyVarying=True, doPreConvolve=False):
+
+        svar = self.computeVarianceMean(scienceExposure)
+        tvar = self.computeVarianceMean(templateExposure)
+        self.log.info("Variance (science, template): (%f, %f)", svar, tvar)
+
+        var = self.computeVarianceMean(subtractedExposure)
+        self.log.info("Variance (uncorrected diffim): %f", var)
+
+        if spatiallyVarying:
+            config = self.config.decorrelateMapReduceConfig
+            task = ImageMapReduceTask(config=config)
+            results = task.run(subtractedExposure, science=scienceExposure,
+                               template=templateExposure, psfMatchingKernel=psfMatchingKernel,
+                               preConvKernel=None, forceEvenSized=True)
+            results.correctedExposure = results.exposure
+        else:
+            config = self.config.decorrelateConfig
+            task = DecorrelateALKernelTask(config=config)
+            results = task.run(scienceExposure, templateExposure,
+                               subtractedExposure, psfMatchingKernel)
+
+        var = self.computeVarianceMean(results.correctedExposure)
+        self.log.info("Variance (corrected diffim): %f", var)
+        return results

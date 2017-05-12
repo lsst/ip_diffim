@@ -977,6 +977,7 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
 
     def __init__(self, *args, **kwargs):
         ImagePsfMatchTask.__init__(self, *args, **kwargs)
+        self.setDefaults()  # Why do I need to explicitly call this?
 
     def setDefaults(self):
         config = self.config.zogyMapReduceConfig
@@ -1005,9 +1006,12 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
 
         if spatiallyVarying:
             config = self.config.zogyMapReduceConfig
+
             task = ImageMapReduceTask(config=config)
             results = task.run(scienceExposure, template=templateExposure, inImageSpace=inImageSpace,
                                doScorr=doPreConvolve, forceEvenSized=True)
+            results.D = results.exposure
+            print(results)
         else:
             config = self.config.zogyConfig
             task = ZogyTask(scienceExposure=scienceExposure, templateExposure=templateExposure,
@@ -1016,10 +1020,11 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
                 results = task.computeDiffim(inImageSpace=inImageSpace)
             else:
                 results = task.computeScorr(inImageSpace=inImageSpace)
+            results.matchedExposure = results.R
 
         #results = pipeBase.Struct(exposure=D)
         results.subtractedExposure = results.D
-        results.matchedExposure = results.R
+        #results.matchedExposure = results.R
         results.warpedExposure = templateExposure
         return results
 
