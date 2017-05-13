@@ -1004,14 +1004,24 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
                 self.log.error("ERROR: Input images not registered")
                 raise RuntimeError("Input images not registered")
 
+        def gm(exp):
+            return exp.getMaskedImage().getMask().getArray()
+        def ga(exp):
+            return exp.getMaskedImage().getImage().getArray()
+
         if spatiallyVarying:
             config = self.config.zogyMapReduceConfig
-
             task = ImageMapReduceTask(config=config)
             results = task.run(scienceExposure, template=templateExposure, inImageSpace=inImageSpace,
                                doScorr=doPreConvolve, forceEvenSized=True)
             results.D = results.exposure
-            print(results)
+            gm(results.D)[:, :] = np.bitwise_or(gm(results.D)[:, :], gm(scienceExposure)[:, :])
+            gm(results.D)[:, :] = np.bitwise_or(gm(results.D)[:, :], gm(templateExposure)[:, :])
+            badBits = results.D.getMaskedImage().getMask().getPlaneBitMask("BAD")
+            gm(results.D)[np.isnan(ga(results.D))] = badBits
+            gm(results.D)[np.isnan(ga(scienceExposure))] = badBits
+            gm(results.D)[np.isnan(ga(templateExposure))] = badBits
+            print(results)  # Need to get it to somehow return the matchedExposure (convolved template) too!
         else:
             config = self.config.zogyConfig
             task = ZogyTask(scienceExposure=scienceExposure, templateExposure=templateExposure,
