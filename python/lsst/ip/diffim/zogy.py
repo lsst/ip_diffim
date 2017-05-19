@@ -1005,8 +1005,10 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
                 raise RuntimeError("Input images not registered")
 
         def gm(exp):
-            return exp.getMaskedImage().getMask().getArray()
+            return exp.getMaskedImage().getMask()
         def ga(exp):
+            return exp.getMaskedImage().getImage().getArray()
+        def gv(exp):
             return exp.getMaskedImage().getImage().getArray()
 
         if spatiallyVarying:
@@ -1015,13 +1017,21 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
             results = task.run(scienceExposure, template=templateExposure, inImageSpace=inImageSpace,
                                doScorr=doPreConvolve, forceEvenSized=True)
             results.D = results.exposure
-            gm(results.D)[:, :] = np.bitwise_or(gm(results.D)[:, :], gm(scienceExposure)[:, :])
-            gm(results.D)[:, :] = np.bitwise_or(gm(results.D)[:, :], gm(templateExposure)[:, :])
-            badBits = results.D.getMaskedImage().getMask().getPlaneBitMask("BAD")
-            gm(results.D)[np.isnan(ga(results.D))] = badBits
-            gm(results.D)[np.isnan(ga(scienceExposure))] = badBits
-            gm(results.D)[np.isnan(ga(templateExposure))] = badBits
-            print(results)  # Need to get it to somehow return the matchedExposure (convolved template) too!
+            print('RESULTS:', results)
+            print("HERE:", results.exposure)
+            mask = results.D.getMaskedImage().getMask()
+            badBits = mask.getPlaneBitMask(['UNMASKEDNAN', 'NO_DATA', 'BAD', 'EDGE', 'SUSPECT', 'CR', 'SAT'])
+            badBitsNan = mask.getPlaneBitMask(['UNMASKEDNAN'])
+            mask |= gm(scienceExposure)
+            mask |= gm(templateExposure)
+            gm(results.D)[:, :] = mask
+            gm(results.D).getArray()[np.isnan(ga(results.D))] = badBitsNan
+            gm(results.D).getArray()[np.isnan(ga(scienceExposure))] = badBitsNan
+            gm(results.D).getArray()[np.isnan(ga(templateExposure))] = badBitsNan
+            # The CoaddPsf apparently cannot be used for detection as it doesn't have a
+            #  getImage() or computeShape() method (which uses getAveragePosition(), which apparently
+            #  is not implemented correctly.
+            # Need to get it to return the matchedExposure (convolved template) too, for dipole fitting.
         else:
             config = self.config.zogyConfig
             task = ZogyTask(scienceExposure=scienceExposure, templateExposure=templateExposure,

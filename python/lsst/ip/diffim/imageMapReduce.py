@@ -526,7 +526,9 @@ class ImageMapReduceTask(pipeBase.Task):
         output of `reducerSubtask.run()`
 
         """
+        self.log.info("Mapper sub-task: %s", self.mapperSubtask._DefaultName)
         mapperResults = self._runMapper(exposure, **kwargs)
+        self.log.info("Reducer sub-task: %s", self.reducerSubtask._DefaultName)
         result = self._reduceImage(mapperResults, exposure, **kwargs)
         return result
 
@@ -559,8 +561,6 @@ class ImageMapReduceTask(pipeBase.Task):
             raise ValueError('Bounding boxes list and expanded bounding boxes list are of different lengths')
 
         self.log.info("Processing %d sub-exposures", len(self.boxes0))
-        self.log.info("Mapper sub-task: %s", self.mapperSubtask._DefaultName)
-        self.log.info("Reducer sub-task: %s", self.reducerSubtask._DefaultName)
         mapperResults = []
         for box0, box1 in zip(self.boxes0, self.boxes1):
             subExp = exposure.Factory(exposure, box0)
