@@ -1,0 +1,44 @@
+CameraMapper INFO: Unable to locate calibRegistry registry in root: calibRegistry.sqlite3
+CameraMapper INFO: Unable to locate calibRegistry registry in current dir: ./calibRegistry.sqlite3
+CameraMapper INFO: Loading Posix registry from /Users/dreiss/DATA/HiTS_from_meredith/ingested_15A38
+CameraMapper INFO: Unable to locate registry registry in root: registry.sqlite3
+CameraMapper INFO: Unable to locate registry registry in current dir: ./registry.sqlite3
+CameraMapper INFO: Unable to locate calibRegistry registry in root: calibRegistry.sqlite3
+CameraMapper INFO: Unable to locate calibRegistry registry in current dir: ./calibRegistry.sqlite3
+CameraMapper INFO: Loading Posix registry from /Users/dreiss/DATA/HiTS_from_meredith/processed_15A38
+CameraMapper INFO: Unable to locate registry registry in root: registry.sqlite3
+CameraMapper INFO: Unable to locate registry registry in current dir: ./registry.sqlite3
+CameraMapper INFO: Unable to locate calibRegistry registry in root: calibRegistry.sqlite3
+CameraMapper INFO: Unable to locate calibRegistry registry in current dir: ./calibRegistry.sqlite3
+CameraMapper INFO: Loading Posix registry from /Users/dreiss/DATA/HiTS_from_meredith/diffim_15A38_ZOGY_g
+root WARN: No data found for dataId=OrderedDict([('visit', 411033), ('ccdnum', 2)])
+root INFO: Running: /Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 --output diffim_15A38_ZOGY_g -C config.py --clobber-config --no-versions
+imageDifference INFO: Processing DataId(initialdata={'visit': 411033, 'ccdnum': 1}, tag=set([]))
+imageDifference.getTemplate INFO: Fetching calexp (DataId(initialdata={'ccdnum': 1, 'visit': 410927}, tag=set([]))) as template.
+imageDifference INFO: Running Zogy algorithm: spatiallyVarying=False
+psfMatch INFO: Template Wcs : 2.685407,-0.019428 -> 2.690625,-0.022033
+psfMatch INFO: Science Wcs : 2.685479,-0.019446 -> 2.690699,-0.022051
+psfMatch INFO: Astrometrically registering template to science image
+imageDifference INFO: Running diaSource detection
+imageDifference.detection INFO: Detected 89 positive sources to 5 sigma.
+imageDifference.detection INFO: Detected 114 negative sources to 5 sigma
+imageDifference INFO: Merging detections into 145 sources
+imageDifference INFO: Running diaSource measurement
+imageDifference.measurement INFO: Measuring 145 sources (145 parents, 0 children) 
+ip_diffim_DipoleFit WARN: DipoleFitPlugin not run on record 176537333552644303: edge failure
+ip_diffim_DipoleFit WARN: DipoleFitPlugin not run on record 176537333552644368: edge failure
+imageDifference INFO: Processing DataId(initialdata={'visit': 411033, 'ccdnum': 3}, tag=set([]))
+imageDifference.getTemplate INFO: Fetching calexp (DataId(initialdata={'ccdnum': 3, 'visit': 410927}, tag=set([]))) as template.
+imageDifference INFO: Running Zogy algorithm: spatiallyVarying=False
+psfMatch INFO: Template Wcs : 2.696246,-0.019433 -> 2.701469,-0.022046
+psfMatch INFO: Science Wcs : 2.696320,-0.019449 -> 2.701544,-0.022060
+psfMatch INFO: Astrometrically registering template to science image
+imageDifference INFO: Running diaSource detection
+imageDifference.detection INFO: Detected 72 positive sources to 5 sigma.
+imageDifference.detection INFO: Detected 156 negative sources to 5 sigma
+imageDifference INFO: Merging detections into 147 sources
+imageDifference INFO: Running diaSource measurement
+imageDifference.measurement INFO: Measuring 147 sources (147 parents, 0 children) 
+ip_diffim_DipoleFit WARN: DipoleFitPlugin not run on record 176537342142578931: edge failure
+Exposure means 1: (109.06510158615897, 109.01057434082031) (104.22534220604086, 104.17869567871094)
+Exposure means 1: (103.73217767717105, 103.6800308227539) (99.08273685506113, 99.02040100097656)

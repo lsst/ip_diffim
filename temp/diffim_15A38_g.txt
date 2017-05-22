@@ -1,0 +1,73 @@
+CameraMapper INFO: Unable to locate calibRegistry registry in root: calibRegistry.sqlite3
+CameraMapper INFO: Unable to locate calibRegistry registry in current dir: ./calibRegistry.sqlite3
+CameraMapper INFO: Loading Posix registry from /Users/dreiss/DATA/HiTS_from_meredith/ingested_15A38
+CameraMapper INFO: Unable to locate registry registry in root: registry.sqlite3
+CameraMapper INFO: Unable to locate registry registry in current dir: ./registry.sqlite3
+CameraMapper INFO: Unable to locate calibRegistry registry in root: calibRegistry.sqlite3
+CameraMapper INFO: Unable to locate calibRegistry registry in current dir: ./calibRegistry.sqlite3
+CameraMapper INFO: Loading Posix registry from /Users/dreiss/DATA/HiTS_from_meredith/processed_15A38
+CameraMapper INFO: Unable to locate registry registry in root: registry.sqlite3
+CameraMapper INFO: Unable to locate registry registry in current dir: ./registry.sqlite3
+CameraMapper INFO: Unable to locate calibRegistry registry in root: calibRegistry.sqlite3
+CameraMapper INFO: Unable to locate calibRegistry registry in current dir: ./calibRegistry.sqlite3
+CameraMapper INFO: Loading Posix registry from /Users/dreiss/DATA/HiTS_from_meredith/diffim_15A38_g
+root WARN: No data found for dataId=OrderedDict([('visit', 411033), ('ccdnum', 2)])
+root INFO: Running: /Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 --output diffim_15A38_g -C config.py --clobber-config --clobber-config --no-versions
+imageDifference INFO: Processing DataId(initialdata={'visit': 411033, 'ccdnum': 1}, tag=set([]))
+imageDifference.getTemplate INFO: Fetching calexp (DataId(initialdata={'ccdnum': 1, 'visit': 410927}, tag=set([]))) as template.
+imageDifference INFO: Source selection via src product
+/Users/dreiss/lsstsw/stack/DarwinX86/meas_algorithms/13.0-12-gfeff4b0/python/lsst/meas/algorithms/objectSizeStarSelector.py:400: RuntimeWarning: invalid value encountered in less
+  bad = numpy.logical_or(bad, width < self.config.widthMin)
+/Users/dreiss/lsstsw/stack/DarwinX86/meas_algorithms/13.0-12-gfeff4b0/python/lsst/meas/algorithms/objectSizeStarSelector.py:401: RuntimeWarning: invalid value encountered in greater
+  bad = numpy.logical_or(bad, width > self.config.widthMax)
+imageDifference INFO: Selected 40 / 1520 sources for Psf matching (11 for control sample)
+imageDifference INFO: Subtracting images
+imageDifference.subtract INFO: Template Wcs : 2.685407,-0.019428 -> 2.690625,-0.022033
+imageDifference.subtract INFO: Science Wcs : 2.685479,-0.019446 -> 2.690699,-0.022051
+imageDifference.subtract INFO: Astrometrically registering template to science image
+imageDifference.subtract INFO: templateFwhmPix: 4.18339547219
+imageDifference.subtract INFO: scienceFwhmPix: 4.48823885329
+imageDifference.subtract INFO: Growing 40 kernel candidate stars by 21 pixels
+imageDifference.subtract INFO: Selected 40 / 40 sources for KernelCandidacy
+imageDifference.subtract INFO: Matching Psf FWHM 4.18 -> 4.49 pix
+imageDifference.subtract INFO: Final spatial kernel sum 0.967
+imageDifference.subtract INFO: Spatial model condition number 5.322e+08
+imageDifference.subtract INFO: Doing stats of kernel candidates used in the spatial fit.
+imageDifference.subtract INFO: 40 candidates total, 12 rejected, 28 used
+imageDifference.subtract INFO: Spatial kernel model well constrained; 28 candidates, 3 terms, 27 bases
+imageDifference.subtract INFO: Spatial background model appears well constrained; 28 candidates, 1 terms
+imageDifference INFO: Computing diffim PSF
+imageDifference INFO: Running diaSource detection
+imageDifference.detection INFO: Detected 74 positive sources to 5.5 sigma.
+imageDifference.detection INFO: Detected 128 negative sources to 5.5 sigma
+imageDifference INFO: Merging detections into 150 sources
+imageDifference INFO: Running diaSource measurement
+imageDifference.measurement INFO: Measuring 150 sources (150 parents, 0 children) 
+ip_diffim_DipoleFit WARN: DipoleFitPlugin failed on record 176537333552644362: dipole fit failure
+ip_diffim_DipoleFit WARN: DipoleFitPlugin failed on record 176537333552644441: dipole fit failure
+imageDifference INFO: Processing DataId(initialdata={'visit': 411033, 'ccdnum': 3}, tag=set([]))
+imageDifference.getTemplate INFO: Fetching calexp (DataId(initialdata={'ccdnum': 3, 'visit': 410927}, tag=set([]))) as template.
+imageDifference INFO: Source selection via src product
+imageDifference INFO: Selected 39 / 1815 sources for Psf matching (10 for control sample)
+imageDifference INFO: Subtracting images
+imageDifference.subtract INFO: Template Wcs : 2.696246,-0.019433 -> 2.701469,-0.022046
+imageDifference.subtract INFO: Science Wcs : 2.696320,-0.019449 -> 2.701544,-0.022060
+imageDifference.subtract INFO: Astrometrically registering template to science image
+imageDifference.subtract INFO: templateFwhmPix: 4.04286851291
+imageDifference.subtract INFO: scienceFwhmPix: 4.43116455899
+imageDifference.subtract INFO: Growing 39 kernel candidate stars by 21 pixels
+imageDifference.subtract INFO: Selected 36 / 39 sources for KernelCandidacy
+imageDifference.subtract INFO: Matching Psf FWHM 4.04 -> 4.43 pix
+imageDifference.subtract INFO: Final spatial kernel sum 0.975
+imageDifference.subtract INFO: Spatial model condition number 2.893e+08
+imageDifference.subtract INFO: Doing stats of kernel candidates used in the spatial fit.
+imageDifference.subtract INFO: 36 candidates total, 11 rejected, 25 used
+imageDifference.subtract INFO: Spatial kernel model well constrained; 25 candidates, 3 terms, 27 bases
+imageDifference.subtract INFO: Spatial background model appears well constrained; 25 candidates, 1 terms
+imageDifference INFO: Computing diffim PSF
+imageDifference INFO: Running diaSource detection
+imageDifference.detection INFO: Detected 80 positive sources to 5.5 sigma.
+imageDifference.detection INFO: Detected 101 negative sources to 5.5 sigma
+imageDifference INFO: Merging detections into 110 sources
+imageDifference INFO: Running diaSource measurement
+imageDifference.measurement INFO: Measuring 110 sources (110 parents, 0 children) 

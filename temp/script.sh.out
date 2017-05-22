@@ -1,0 +1,16 @@
+[1]    Done                          ~/Applications/Emacs.app/Contents/MacOS/Emacs script.sh
+'diffim_config_TEMPLATE.py' -> 'config.py'
+A&L
+66.007u 3.070s 1:09.09 99.9%	0+0k 0+72io 0pf+0w
+'diffim_config_TEMPLATE.py' -> 'config.py'
+A&L decorrelated
+51.939u 2.082s 0:54.00 100.0%	0+0k 0+13io 0pf+0w
+'diffim_config_TEMPLATE.py' -> 'config.py'
+A&L decorrelated (spatial)
+49.087u 2.050s 0:51.11 100.0%	0+0k 0+17io 0pf+0w
+'diffim_config_TEMPLATE.py' -> 'config.py'
+ZOGY
+57.201u 8.239s 1:05.88 99.3%	0+0k 66+86io 160pf+0w
+'diffim_config_TEMPLATE.py' -> 'config.py'
+ZOGY (spatial)
+230.033u 5.862s 3:57.21 99.4%	0+0k 3+124io 14001pf+0w
