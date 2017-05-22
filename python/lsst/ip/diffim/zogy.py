@@ -239,14 +239,14 @@ class ZogyTask(pipeBase.Task):
         self.sig2 = np.sqrt(self._computeVarianceMean(self.science)) if sig2 is None else sig2
 
         # Zogy doesn't correct nonzero backgrounds (unlike AL) so subtract them here.
-        mn1 = self._computeImageMean(self.template)
-        mn2 = self._computeImageMean(self.science)
-        if not np.isnan(mn1):  # and np.abs(mn1) > 1:
-            mi = self.template.getMaskedImage()
-            mi -= mn1
-        if not np.isnan(mn2):  # and np.abs(mn2) > 1:
-            mi = self.science.getMaskedImage()
-            mi -= mn2
+        # mn1 = self._computeImageMean(self.template)
+        # mn2 = self._computeImageMean(self.science)
+        # if not np.isnan(mn1):  # and np.abs(mn1) > 1:
+        #     mi = self.template.getMaskedImage()
+        #     mi -= mn1
+        # if not np.isnan(mn2):  # and np.abs(mn2) > 1:
+        #     mi = self.science.getMaskedImage()
+        #     mi -= mn2
 
         self.Fr = self.config.templateFluxScaling  # default is 1
         self.Fn = self.config.scienceFluxScaling  # default is 1
@@ -261,14 +261,14 @@ class ZogyTask(pipeBase.Task):
         var = statObj.getValue(afwMath.MEANCLIP)
         return var
 
-    def _computeImageMean(self, exposure):
-        """Compute the sigma-clipped mean of the variance image of `exposure`.
-        """
-        statObj = afwMath.makeStatistics(exposure.getMaskedImage().getImage(),
-                                         exposure.getMaskedImage().getMask(),
-                                         afwMath.MEANCLIP, self.statsControl)
-        var = statObj.getValue(afwMath.MEANCLIP)
-        return var
+    # def _computeImageMean(self, exposure):
+    #     """Compute the sigma-clipped mean of the variance image of `exposure`.
+    #     """
+    #     statObj = afwMath.makeStatistics(exposure.getMaskedImage().getImage(),
+    #                                      exposure.getMaskedImage().getMask(),
+    #                                      afwMath.MEANCLIP, self.statsControl)
+    #     var = statObj.getValue(afwMath.MEANCLIP)
+    #     return var
 
     @staticmethod
     def _padPsfToSize(psf, size):
@@ -1000,14 +1000,41 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
 
     def setDefaults(self):
         config = self.config.zogyMapReduceConfig
-        config.gridStepX = config.gridStepY = 9
+        config.gridStepX = config.gridStepY = 19
         config.gridSizeX = config.gridSizeY = 20
         config.borderSizeX = config.borderSizeY = 6
         config.reducerSubtask.reduceOperation = 'average'
 
+    def _computeImageMean(self, exposure):
+        """Compute the sigma-clipped mean of the pixels image of `exposure`.
+        """
+        statsControl = afwMath.StatisticsControl()
+        statsControl.setNumSigmaClip(3.)
+        statsControl.setNumIter(3)
+        ignoreMaskPlanes = ("INTRP", "EDGE", "DETECTED", "SAT", "CR", "BAD", "NO_DATA", "DETECTED_NEGATIVE")
+        statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(ignoreMaskPlanes))
+        statObj = afwMath.makeStatistics(exposure.getMaskedImage().getImage(),
+                                         exposure.getMaskedImage().getMask(),
+                                         afwMath.MEANCLIP|afwMath.MEDIAN, statsControl)
+        mn = statObj.getValue(afwMath.MEANCLIP)
+        med = statObj.getValue(afwMath.MEDIAN)
+        return mn, med
+
     def subtractExposures(self, templateExposure, scienceExposure,
                           doWarping=True, spatiallyVarying=True, inImageSpace=False,
                           doPreConvolve=False):
+
+        mn1 = self._computeImageMean(templateExposure)
+        mn2 = self._computeImageMean(scienceExposure)
+        print("Exposure means 1:", mn1, mn2)
+        # print(templateExposure.getMetadata().get(u'BGMEAN'),
+        #       scienceExposure.getMetadata().get(u'BGMEAN'))
+        if not np.isnan(mn1[0]) and np.abs(mn1[0]) > 1:
+            mi = templateExposure.getMaskedImage()
+            mi -= mn1[0]
+        if not np.isnan(mn2[0]) and np.abs(mn2[0]) > 1:
+            mi = scienceExposure.getMaskedImage()
+            mi -= mn2[0]
 
         if not self._validateWcs(templateExposure, scienceExposure):
             if doWarping:
@@ -1017,7 +1044,6 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
                                                              templateExposure,
                                                              destBBox=scienceExposure.getBBox())
                 templateExposure.setPsf(templatePsf)
-                print('HERE!!!')
                 templateExposure.writeFits('WARPEDTEMPLATE_ZOGY.fits')
             else:
                 self.log.error("ERROR: Input images not registered")
@@ -1029,34 +1055,6 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
             return exp.getMaskedImage().getImage().getArray()
         def gv(exp):
             return exp.getMaskedImage().getImage().getArray()
-
-        def _computeImageMean(exposure):
-            """Compute the sigma-clipped mean of the pixels image of `exposure`.
-            """
-            statsControl = afwMath.StatisticsControl()
-            statsControl.setNumSigmaClip(3.)
-            statsControl.setNumIter(3)
-            ignoreMaskPlanes = ("INTRP", "EDGE", "DETECTED", "SAT", "CR", "BAD", "NO_DATA", "DETECTED_NEGATIVE")
-            statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(ignoreMaskPlanes))
-            statObj = afwMath.makeStatistics(exposure.getMaskedImage().getImage(),
-                                             exposure.getMaskedImage().getMask(),
-                                             afwMath.MEANCLIP|afwMath.MEDIAN, statsControl)
-            mn = statObj.getValue(afwMath.MEANCLIP)
-            med = statObj.getValue(afwMath.MEDIAN)
-            return mn, med
-
-        mn1 = _computeImageMean(templateExposure)
-        mn2 = _computeImageMean(scienceExposure)
-        print("Exposure means:", mn1, mn2)
-        if not np.isnan(mn1[0]) and np.abs(mn1[0]) > 1:
-            mi = templateExposure.getMaskedImage()
-            mi -= mn1[0]
-        if not np.isnan(mn2[0]) and np.abs(mn2[0]) > 1:
-            mi = scienceExposure.getMaskedImage()
-            mi -= mn2[0]
-        mn1 = _computeImageMean(templateExposure)
-        mn2 = _computeImageMean(scienceExposure)
-        print("Exposure means:", mn1, mn2)
 
         if spatiallyVarying:
             config = self.config.zogyMapReduceConfig
@@ -1083,9 +1081,10 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
                             config=config)
             if not doPreConvolve:
                 results = task.computeDiffim(inImageSpace=inImageSpace)
+                results.matchedExposure = results.R
             else:
                 results = task.computeScorr(inImageSpace=inImageSpace)
-            results.matchedExposure = results.R
+                results.D = results.S
 
         #results = pipeBase.Struct(exposure=D)
         results.subtractedExposure = results.D
