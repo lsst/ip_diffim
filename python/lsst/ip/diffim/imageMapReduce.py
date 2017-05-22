@@ -673,7 +673,7 @@ class ImageMapReduceTask(pipeBase.Task):
                 raise ValueError('X grid spacing is too small (or negative): %f' % gridStepX)
 
         if adjustGridOption == 'spacing':
-            nGridY = bbox.getWidth() / gridStepY
+            nGridY = bbox.getHeight() / gridStepY
             # Readjust gridStepY so that it fits perfectly in the image.
             gridStepY = float(bbox.getHeight() - gridSizeY) / float(nGridY)
             if gridStepY < 1:
