@@ -1027,8 +1027,6 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
         mn1 = self._computeImageMean(templateExposure)
         mn2 = self._computeImageMean(scienceExposure)
         print("Exposure means 1:", mn1, mn2)
-        # print(templateExposure.getMetadata().get(u'BGMEAN'),
-        #       scienceExposure.getMetadata().get(u'BGMEAN'))
         if not np.isnan(mn1[0]) and np.abs(mn1[0]) > 1:
             mi = templateExposure.getMaskedImage()
             mi -= mn1[0]
@@ -1062,15 +1060,6 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
             results = task.run(scienceExposure, template=templateExposure, inImageSpace=inImageSpace,
                                doScorr=doPreConvolve, forceEvenSized=True)
             results.D = results.exposure
-            mask = results.D.getMaskedImage().getMask()
-            badBits = mask.getPlaneBitMask(['UNMASKEDNAN', 'NO_DATA', 'BAD', 'EDGE', 'SUSPECT', 'CR', 'SAT'])
-            badBitsNan = mask.getPlaneBitMask(['UNMASKEDNAN'])
-            mask |= gm(scienceExposure)
-            mask |= gm(templateExposure)
-            gm(results.D)[:, :] = mask
-            gm(results.D).getArray()[np.isnan(ga(results.D))] = badBitsNan
-            gm(results.D).getArray()[np.isnan(ga(scienceExposure))] = badBitsNan
-            gm(results.D).getArray()[np.isnan(ga(templateExposure))] = badBitsNan
             # The CoaddPsf apparently cannot be used for detection as it doesn't have a
             #  getImage() or computeShape() method (which uses getAveragePosition(), which apparently
             #  is not implemented correctly.
@@ -1085,6 +1074,17 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
             else:
                 results = task.computeScorr(inImageSpace=inImageSpace)
                 results.D = results.S
+
+        # Make sure masks of input images are propagated to diffim
+        mask = results.D.getMaskedImage().getMask()
+        badBits = mask.getPlaneBitMask(['UNMASKEDNAN', 'NO_DATA', 'BAD', 'EDGE', 'SUSPECT', 'CR', 'SAT'])
+        badBitsNan = mask.getPlaneBitMask(['UNMASKEDNAN'])
+        mask |= gm(scienceExposure)
+        mask |= gm(templateExposure)
+        gm(results.D)[:, :] = mask
+        gm(results.D).getArray()[np.isnan(ga(results.D))] = badBitsNan
+        gm(results.D).getArray()[np.isnan(ga(scienceExposure))] = badBitsNan
+        gm(results.D).getArray()[np.isnan(ga(templateExposure))] = badBitsNan
 
         #results = pipeBase.Struct(exposure=D)
         results.subtractedExposure = results.D
