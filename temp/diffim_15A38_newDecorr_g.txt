@@ -37,15 +37,22 @@ imageDifference.subtract INFO: 40 candidates total, 12 rejected, 28 used
 imageDifference.subtract INFO: Spatial kernel model well constrained; 28 candidates, 3 terms, 27 bases
 imageDifference.subtract INFO: Spatial background model appears well constrained; 28 candidates, 1 terms
 imageDifference INFO: Computing diffim PSF
-imageDifference FATAL: Failed on dataId=DataId(initialdata={'visit': 411033, 'ccdnum': 1}, tag=set([])): local variable 'spatiallyVarying' referenced before assignment
-Traceback (most recent call last):
-  File "/Users/dreiss/lsstsw/stack/DarwinX86/pipe_base/13.0-3-g7fa07e0+1/python/lsst/pipe/base/cmdLineTask.py", line 347, in __call__
-    result = task.run(dataRef, **kwargs)
-  File "/Users/dreiss/lsstsw/stack/DarwinX86/pipe_base/13.0-3-g7fa07e0+1/python/lsst/pipe/base/timer.py", line 121, in wrapper
-    res = func(self, *args, **keyArgs)
-  File "/Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/python/lsst/pipe/tasks/imageDifference.py", line 579, in run
-    spatiallyVarying)
-UnboundLocalError: local variable 'spatiallyVarying' referenced before assignment
+imageDifference INFO: Running A&L decorrelation: spatiallyVarying=False
+ip_diffim_decorrelateALKernelSpatial INFO: Variance (science, template): (65.018659, 66.272833)
+ip_diffim_decorrelateALKernelSpatial INFO: Variance (uncorrected diffim): 83.092885
+ip_diffim_decorrelateALKernel INFO: Using matching kernel computed at (1024, 2048)
+ip_diffim_decorrelateALKernel INFO: Variance (science, template): (65.018659, 66.272833)
+ip_diffim_decorrelateALKernel INFO: Variance (uncorrected diffim): 83.092885
+ip_diffim_decorrelateALKernel INFO: Variance (corrected diffim): 144.060847
+ip_diffim_decorrelateALKernelSpatial INFO: Variance (corrected diffim): 144.060847
+imageDifference INFO: Running diaSource detection
+imageDifference.detection INFO: Detected 67 positive sources to 5 sigma.
+imageDifference.detection INFO: Detected 76 negative sources to 5 sigma
+imageDifference INFO: Merging detections into 100 sources
+imageDifference INFO: Running diaSource measurement
+imageDifference.measurement INFO: Measuring 100 sources (100 parents, 0 children) 
+ip_diffim_DipoleFit WARN: DipoleFitPlugin failed on record 176537333552644335: dipole fit failure
+ip_diffim_DipoleFit WARN: DipoleFitPlugin failed on record 176537333552644339: dipole fit failure
 imageDifference INFO: Processing DataId(initialdata={'visit': 411033, 'ccdnum': 3}, tag=set([]))
 imageDifference.getTemplate INFO: Fetching calexp (DataId(initialdata={'ccdnum': 3, 'visit': 410927}, tag=set([]))) as template.
 imageDifference INFO: Source selection via src product
@@ -66,12 +73,19 @@ imageDifference.subtract INFO: 36 candidates total, 11 rejected, 25 used
 imageDifference.subtract INFO: Spatial kernel model well constrained; 25 candidates, 3 terms, 27 bases
 imageDifference.subtract INFO: Spatial background model appears well constrained; 25 candidates, 1 terms
 imageDifference INFO: Computing diffim PSF
-imageDifference FATAL: Failed on dataId=DataId(initialdata={'visit': 411033, 'ccdnum': 3}, tag=set([])): local variable 'spatiallyVarying' referenced before assignment
-Traceback (most recent call last):
-  File "/Users/dreiss/lsstsw/stack/DarwinX86/pipe_base/13.0-3-g7fa07e0+1/python/lsst/pipe/base/cmdLineTask.py", line 347, in __call__
-    result = task.run(dataRef, **kwargs)
-  File "/Users/dreiss/lsstsw/stack/DarwinX86/pipe_base/13.0-3-g7fa07e0+1/python/lsst/pipe/base/timer.py", line 121, in wrapper
-    res = func(self, *args, **keyArgs)
-  File "/Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/python/lsst/pipe/tasks/imageDifference.py", line 579, in run
-    spatiallyVarying)
-UnboundLocalError: local variable 'spatiallyVarying' referenced before assignment
+imageDifference INFO: Running A&L decorrelation: spatiallyVarying=False
+ip_diffim_decorrelateALKernelSpatial INFO: Variance (science, template): (60.878735, 62.073134)
+ip_diffim_decorrelateALKernelSpatial INFO: Variance (uncorrected diffim): 73.713203
+ip_diffim_decorrelateALKernel INFO: Using matching kernel computed at (1024, 2048)
+ip_diffim_decorrelateALKernel INFO: Variance (science, template): (60.878735, 62.073134)
+ip_diffim_decorrelateALKernel INFO: Variance (uncorrected diffim): 73.713203
+ip_diffim_decorrelateALKernel INFO: Variance (corrected diffim): 126.216716
+ip_diffim_decorrelateALKernelSpatial INFO: Variance (corrected diffim): 126.216716
+imageDifference INFO: Running diaSource detection
+imageDifference.detection INFO: Detected 70 positive sources to 5 sigma.
+imageDifference.detection INFO: Detected 80 negative sources to 5 sigma
+imageDifference INFO: Merging detections into 88 sources
+imageDifference INFO: Running diaSource measurement
+imageDifference.measurement INFO: Measuring 88 sources (88 parents, 0 children) 
+ip_diffim_DipoleFit WARN: DipoleFitPlugin failed on record 176537342142578840: dipole fit failure
+ip_diffim_DipoleFit WARN: DipoleFitPlugin failed on record 176537342142578858: dipole fit failure

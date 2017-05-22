@@ -4,6 +4,7 @@ echo "config.doDecorrelation=False" >> config.py
 echo "config.detection.thresholdValue=5.5" >> config.py
 
 echo 'A&L'
+grep -v '#' config.py
 time \
     $PIPE_TASKS_DIR/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 \
                                        --output diffim_15A38_g -C config.py --clobber-config \
@@ -15,6 +16,7 @@ echo "config.doDecorrelation=True" >> config.py
 echo "config.doSpatiallyVarying=False" >> config.py
 
 echo 'A&L decorrelated'
+grep -v '#' config.py
 time \
     $PIPE_TASKS_DIR/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 \
                                        --output diffim_15A38_newDecorr_g -C config.py --clobber-config \
@@ -26,6 +28,7 @@ echo "config.doDecorrelation=True" >> config.py
 echo "config.doSpatiallyVarying=True" >> config.py
 
 echo 'A&L decorrelated (spatial)'
+grep -v '#' config.py
 time \
     $PIPE_TASKS_DIR/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 \
                                        --output diffim_15A38_newDecorrSpatial_g -C config.py --clobber-config \
@@ -36,6 +39,7 @@ echo "config.subtractAlgorithm='ZOGY'" >> config.py
 echo "config.doSpatiallyVarying=False" >> config.py
 
 echo 'ZOGY'
+grep -v '#' config.py
 time \
     $PIPE_TASKS_DIR/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 \
                                        --output diffim_15A38_ZOGY_g -C config.py --clobber-config \
@@ -46,6 +50,7 @@ echo "config.subtractAlgorithm='ZOGY'" >> config.py
 echo "config.doSpatiallyVarying=True" >> config.py
 
 echo 'ZOGY (spatial)'
+grep -v '#' config.py
 time \
     $PIPE_TASKS_DIR/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 \
                                        --output diffim_15A38_ZOGYspatial_g -C config.py --clobber-config \

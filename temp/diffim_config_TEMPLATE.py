@@ -4,4 +4,5 @@ config.getTemplate.retarget(GetCalexpAsTemplateTask)
 # config.doPreConvolve=False
 #config.doWriteMatchedExp=True
 #config.doUseRegister=True
+config.doWriteSubtractedExp=True
 config.detection.thresholdValue=5.0
