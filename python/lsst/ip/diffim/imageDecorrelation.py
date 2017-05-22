@@ -501,6 +501,12 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
                                template=templateExposure, psfMatchingKernel=psfMatchingKernel,
                                preConvKernel=None, forceEvenSized=True)
             results.correctedExposure = results.exposure
+
+            # Make sure masks of input image are propagated to diffim
+            def gm(exp):
+                return exp.getMaskedImage().getMask()
+            gm(results.correctedExposure)[:, :] = gm(subtractedExposure)
+
         else:
             config = self.config.decorrelateConfig
             task = DecorrelateALKernelTask(config=config)
