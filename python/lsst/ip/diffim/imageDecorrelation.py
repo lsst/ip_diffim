@@ -479,7 +479,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
 
     def setDefaults(self):
         config = self.config.decorrelateMapReduceConfig
-        config.gridStepX = config.gridStepY = 9
+        config.gridStepX = config.gridStepY = 19
         config.gridSizeX = config.gridSizeY = 20
         config.borderSizeX = config.borderSizeY = 6
         config.reducerSubtask.reduceOperation = 'average'
