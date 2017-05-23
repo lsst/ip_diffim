@@ -1,4 +1,4 @@
-'diffim_config_TEMPLATE.py' -> 'config.py'
+'diffim_config_TEMPLATE.py' -> 'config1.py'
 A&L
 from lsst.ip.diffim.getTemplate import GetCalexpAsTemplateTask
 config.getTemplate.retarget(GetCalexpAsTemplateTask)
@@ -7,8 +7,8 @@ config.detection.thresholdValue=5.0
 config.subtractAlgorithm='AL'
 config.doDecorrelation=False
 config.detection.thresholdValue=5.5
-69.187u 3.316s 1:12.73 99.6%	0+0k 144+114io 147pf+0w
-'diffim_config_TEMPLATE.py' -> 'config.py'
+[2] 88773
+'diffim_config_TEMPLATE.py' -> 'config2.py'
 A&L decorrelated
 from lsst.ip.diffim.getTemplate import GetCalexpAsTemplateTask
 config.getTemplate.retarget(GetCalexpAsTemplateTask)
@@ -17,8 +17,8 @@ config.detection.thresholdValue=5.0
 config.subtractAlgorithm='AL'
 config.doDecorrelation=True
 config.doSpatiallyVarying=False
-85.875u 3.452s 1:29.36 99.9%	0+0k 1+45io 0pf+0w
-'diffim_config_TEMPLATE.py' -> 'config.py'
+[3] 88776
+'diffim_config_TEMPLATE.py' -> 'config3.py'
 A&L decorrelated (spatial)
 from lsst.ip.diffim.getTemplate import GetCalexpAsTemplateTask
 config.getTemplate.retarget(GetCalexpAsTemplateTask)
@@ -27,8 +27,12 @@ config.detection.thresholdValue=5.0
 config.subtractAlgorithm='AL'
 config.doDecorrelation=True
 config.doSpatiallyVarying=True
-297.241u 4.426s 5:02.76 99.6%	0+0k 980+60io 13998pf+0w
-'diffim_config_TEMPLATE.py' -> 'config.py'
+295.457u 4.411s 5:00.67 99.7%	0+0k 13+79io 147pf+0w
+[3]  - Done                          /Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 --output diffim_15A38_newDecorr_g -C config2.py --clobber-config --no-versions >& diffim_15A38_newDecorr_g.txt
+89.346u 3.680s 1:33.29 99.7%	0+0k 137+75io 150pf+0w
+[2]  - Done                          /Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 --output diffim_15A38_g -C config1.py --clobber-config --clobber-config --no-versions >& diffim_15A38_g.txt
+70.214u 3.515s 1:13.93 99.7%	0+0k 166+63io 161pf+0w
+'diffim_config_TEMPLATE.py' -> 'config4.py'
 ZOGY
 from lsst.ip.diffim.getTemplate import GetCalexpAsTemplateTask
 config.getTemplate.retarget(GetCalexpAsTemplateTask)
@@ -36,8 +40,8 @@ config.doWriteSubtractedExp=True
 config.detection.thresholdValue=5.0
 config.subtractAlgorithm='ZOGY'
 config.doSpatiallyVarying=False
-56.253u 8.483s 1:05.64 98.6%	0+0k 588+96io 14006pf+0w
-'diffim_config_TEMPLATE.py' -> 'config.py'
+[2] 89078
+'diffim_config_TEMPLATE.py' -> 'config5.py'
 ZOGY (spatial)
 from lsst.ip.diffim.getTemplate import GetCalexpAsTemplateTask
 config.getTemplate.retarget(GetCalexpAsTemplateTask)
@@ -45,4 +49,11 @@ config.doWriteSubtractedExp=True
 config.detection.thresholdValue=5.0
 config.subtractAlgorithm='ZOGY'
 config.doSpatiallyVarying=True
-241.781u 6.647s 4:10.30 99.2%	0+0k 840+117io 14001pf+0w
+235.294u 6.212s 4:03.36 99.2%	0+0k 94+131io 7371pf+0w
+[2]  - Done                          /Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 --output diffim_15A38_ZOGY_g -C config4.py --clobber-config --no-versions >& diffim_15A38_ZOGY_g.txt
+55.885u 8.607s 1:06.12 97.5%	0+0k 359+119io 8116pf+0w
+removed 'config1.py'
+removed 'config2.py'
+removed 'config3.py'
+removed 'config4.py'
+removed 'config5.py'

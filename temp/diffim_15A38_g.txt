@@ -12,7 +12,7 @@ CameraMapper INFO: Unable to locate calibRegistry registry in root: calibRegistr
 CameraMapper INFO: Unable to locate calibRegistry registry in current dir: ./calibRegistry.sqlite3
 CameraMapper INFO: Loading Posix registry from /Users/dreiss/DATA/HiTS_from_meredith/diffim_15A38_g
 root WARN: No data found for dataId=OrderedDict([('visit', 411033), ('ccdnum', 2)])
-root INFO: Running: /Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 --output diffim_15A38_g -C config.py --clobber-config --clobber-config --no-versions
+root INFO: Running: /Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 --output diffim_15A38_g -C config1.py --clobber-config --clobber-config --no-versions
 imageDifference INFO: Processing DataId(initialdata={'visit': 411033, 'ccdnum': 1}, tag=set([]))
 imageDifference.getTemplate INFO: Fetching calexp (DataId(initialdata={'ccdnum': 1, 'visit': 410927}, tag=set([]))) as template.
 imageDifference INFO: Source selection via src product
@@ -41,7 +41,7 @@ imageDifference INFO: Running diaSource detection
 imageDifference.detection INFO: Detected 74 positive sources to 5.5 sigma.
 imageDifference.detection INFO: Detected 128 negative sources to 5.5 sigma
 imageDifference INFO: Merging detections into 150 sources
-imageDifference INFO: Running diaSource measurement
+imageDifference INFO: Running diaSource measurement: dipoleFitting=True
 imageDifference.measurement INFO: Measuring 150 sources (150 parents, 0 children) 
 ip_diffim_DipoleFit WARN: DipoleFitPlugin failed on record 176537333552644362: dipole fit failure
 ip_diffim_DipoleFit WARN: DipoleFitPlugin failed on record 176537333552644441: dipole fit failure
@@ -69,5 +69,9 @@ imageDifference INFO: Running diaSource detection
 imageDifference.detection INFO: Detected 80 positive sources to 5.5 sigma.
 imageDifference.detection INFO: Detected 101 negative sources to 5.5 sigma
 imageDifference INFO: Merging detections into 110 sources
-imageDifference INFO: Running diaSource measurement
+imageDifference INFO: Running diaSource measurement: dipoleFitting=True
 imageDifference.measurement INFO: Measuring 110 sources (110 parents, 0 children) 
+HAS MATCHEDEXPOSURE
+HERE: DONE with measurement
+HAS MATCHEDEXPOSURE
+HERE: DONE with measurement

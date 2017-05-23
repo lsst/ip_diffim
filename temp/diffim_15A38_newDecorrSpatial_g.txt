@@ -12,7 +12,7 @@ CameraMapper INFO: Unable to locate calibRegistry registry in root: calibRegistr
 CameraMapper INFO: Unable to locate calibRegistry registry in current dir: ./calibRegistry.sqlite3
 CameraMapper INFO: Loading Posix registry from /Users/dreiss/DATA/HiTS_from_meredith/diffim_15A38_newDecorrSpatial_g
 root WARN: No data found for dataId=OrderedDict([('visit', 411033), ('ccdnum', 2)])
-root INFO: Running: /Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 --output diffim_15A38_newDecorrSpatial_g -C config.py --clobber-config --no-versions
+root INFO: Running: /Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/bin/imageDifference.py processed_15A38 --id visit=411033 ccdnum=1..3 --templateId visit=410927 --output diffim_15A38_newDecorrSpatial_g -C config3.py --clobber-config --no-versions
 imageDifference INFO: Processing DataId(initialdata={'visit': 411033, 'ccdnum': 1}, tag=set([]))
 imageDifference.getTemplate INFO: Fetching calexp (DataId(initialdata={'ccdnum': 1, 'visit': 410927}, tag=set([]))) as template.
 imageDifference INFO: Source selection via src product
@@ -37,9 +37,9 @@ imageDifference.subtract INFO: 40 candidates total, 12 rejected, 28 used
 imageDifference.subtract INFO: Spatial kernel model well constrained; 28 candidates, 3 terms, 27 bases
 imageDifference.subtract INFO: Spatial background model appears well constrained; 28 candidates, 1 terms
 imageDifference INFO: Computing diffim PSF
-imageDifference INFO: Running A&L decorrelation: spatiallyVarying=True
-ip_diffim_decorrelateALKernelSpatial INFO: Variance (science, template): (65.018659, 66.272833)
-ip_diffim_decorrelateALKernelSpatial INFO: Variance (uncorrected diffim): 83.092885
+imageDifference.decorrelate INFO: Running A&L decorrelation: spatiallyVarying=True
+imageDifference.decorrelate INFO: Variance (science, template): (65.018659, 66.272833)
+imageDifference.decorrelate INFO: Variance (uncorrected diffim): 83.092885
 ip_diffim_imageMapReduce INFO: Mapper sub-task: ip_diffim_decorrelateALKernelMapper
 ip_diffim_imageMapReduce INFO: Scaling grid parameters by 4.488239
 ip_diffim_imageMapReduce INFO: Grid parameters: 90, 90; 81, 83; 27, 27
@@ -53,12 +53,12 @@ ip_diffim_imageMapReduce.reducerSubtask INFO: AVERAGE: Number of zero pixels: 42
   newMI.getImage().getArray()[:, :] /= wts
 /Users/dreiss/GIT_REPOS/TICKETS/DM-9989/ip_diffim/python/lsst/ip/diffim/imageMapReduce.py:285: RuntimeWarning: invalid value encountered in true_divide
   newMI.getVariance().getArray()[:, :] /= wts
-ip_diffim_decorrelateALKernelSpatial INFO: Variance (corrected diffim): 143.513029
+imageDifference.decorrelate INFO: Variance (corrected diffim): 143.844300
 imageDifference INFO: Running diaSource detection
 imageDifference.detection INFO: Detected 67 positive sources to 5 sigma.
 imageDifference.detection INFO: Detected 74 negative sources to 5 sigma
 imageDifference INFO: Merging detections into 98 sources
-imageDifference INFO: Running diaSource measurement
+imageDifference INFO: Running diaSource measurement: dipoleFitting=True
 imageDifference.measurement INFO: Measuring 98 sources (98 parents, 0 children) 
 imageDifference INFO: Processing DataId(initialdata={'visit': 411033, 'ccdnum': 3}, tag=set([]))
 imageDifference.getTemplate INFO: Fetching calexp (DataId(initialdata={'ccdnum': 3, 'visit': 410927}, tag=set([]))) as template.
@@ -80,9 +80,9 @@ imageDifference.subtract INFO: 36 candidates total, 11 rejected, 25 used
 imageDifference.subtract INFO: Spatial kernel model well constrained; 25 candidates, 3 terms, 27 bases
 imageDifference.subtract INFO: Spatial background model appears well constrained; 25 candidates, 1 terms
 imageDifference INFO: Computing diffim PSF
-imageDifference INFO: Running A&L decorrelation: spatiallyVarying=True
-ip_diffim_decorrelateALKernelSpatial INFO: Variance (science, template): (60.878735, 62.073134)
-ip_diffim_decorrelateALKernelSpatial INFO: Variance (uncorrected diffim): 73.713203
+imageDifference.decorrelate INFO: Running A&L decorrelation: spatiallyVarying=True
+imageDifference.decorrelate INFO: Variance (science, template): (60.878735, 62.073134)
+imageDifference.decorrelate INFO: Variance (uncorrected diffim): 73.713203
 ip_diffim_imageMapReduce INFO: Mapper sub-task: ip_diffim_decorrelateALKernelMapper
 ip_diffim_imageMapReduce INFO: Scaling grid parameters by 4.431165
 ip_diffim_imageMapReduce INFO: Grid parameters: 89, 89; 80, 82; 27, 27
@@ -92,7 +92,7 @@ ip_diffim_imageMapReduce.reducerSubtask INFO: AVERAGE: Maximum overlap: 4.000000
 ip_diffim_imageMapReduce.reducerSubtask INFO: AVERAGE: Average overlap: 1.156950
 ip_diffim_imageMapReduce.reducerSubtask INFO: AVERAGE: Minimum overlap: 0.000000
 ip_diffim_imageMapReduce.reducerSubtask INFO: AVERAGE: Number of zero pixels: 460519.000000
-ip_diffim_decorrelateALKernelSpatial INFO: Variance (corrected diffim): 126.271567
+imageDifference.decorrelate INFO: Variance (corrected diffim): 126.367076
 imageDifference INFO: Running diaSource detection
 imageDifference FATAL: Failed on dataId=DataId(initialdata={'visit': 411033, 'ccdnum': 3}, tag=set([])): cannot convert float NaN to integer
 Traceback (most recent call last):
@@ -100,7 +100,7 @@ Traceback (most recent call last):
     result = task.run(dataRef, **kwargs)
   File "/Users/dreiss/lsstsw/stack/DarwinX86/pipe_base/13.0-3-g7fa07e0+1/python/lsst/pipe/base/timer.py", line 121, in wrapper
     res = func(self, *args, **keyArgs)
-  File "/Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/python/lsst/pipe/tasks/imageDifference.py", line 602, in run
+  File "/Users/dreiss/GIT_REPOS/TICKETS/DM-9989/pipe_tasks/python/lsst/pipe/tasks/imageDifference.py", line 606, in run
     doSmooth=not self.config.doPreConvolve
   File "/Users/dreiss/lsstsw/stack/DarwinX86/pipe_base/13.0-3-g7fa07e0+1/python/lsst/pipe/base/timer.py", line 121, in wrapper
     res = func(self, *args, **keyArgs)
@@ -111,3 +111,5 @@ Traceback (most recent call last):
   File "/Users/dreiss/lsstsw/stack/DarwinX86/meas_algorithms/13.0-12-gfeff4b0/python/lsst/meas/algorithms/detection.py", line 360, in detectFootprints
     kWidth = (int(sigma * 7 + 0.5) // 2) * 2 + 1 # make sure it is odd
 ValueError: cannot convert float NaN to integer
+HAS MATCHEDEXPOSURE
+HERE: DONE with measurement
