@@ -455,6 +455,12 @@ class DecorrelateALKernelSpatialConfig(pexConfig.Config):
         doc='DecorrelateALKernelMapReduce config to use when running on each sub-image (spatially-varying)',
     )
 
+    def setDefaults(self):
+        self.decorrelateMapReduceConfig.gridStepX = self.decorrelateMapReduceConfig.gridStepY = 19
+        self.decorrelateMapReduceConfig.gridSizeX = self.decorrelateMapReduceConfig.gridSizeY = 20
+        self.decorrelateMapReduceConfig.borderSizeX = self.decorrelateMapReduceConfig.borderSizeY = 6
+        self.decorrelateMapReduceConfig.reducerSubtask.reduceOperation = 'average'
+
 
 class DecorrelateALKernelSpatialTask(pipeBase.Task):
     ConfigClass = DecorrelateALKernelSpatialConfig
@@ -462,7 +468,6 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
 
     def __init__(self, *args, **kwargs):
         pipeBase.Task.__init__(self, *args, **kwargs)
-        self.setDefaults()  # Why do I need to explicitly call this?
 
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
@@ -477,15 +482,10 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
         var = statObj.getValue(afwMath.MEANCLIP)
         return var
 
-    def setDefaults(self):
-        config = self.config.decorrelateMapReduceConfig
-        config.gridStepX = config.gridStepY = 19
-        config.gridSizeX = config.gridSizeY = 20
-        config.borderSizeX = config.borderSizeY = 6
-        config.reducerSubtask.reduceOperation = 'average'
-
     def run(self, scienceExposure, templateExposure, subtractedExposure, psfMatchingKernel,
             spatiallyVarying=True, doPreConvolve=False):
+
+        self.log.info('Running A&L decorrelation: spatiallyVarying=%r' % spatiallyVarying)
 
         svar = self.computeVarianceMean(scienceExposure)
         tvar = self.computeVarianceMean(templateExposure)

@@ -990,13 +990,18 @@ class ZogyImagePsfMatchConfig(ImagePsfMatchConfig):
         doc='ZogyMapReduce config to use when running Zogy on each sub-image (spatially-varying)',
     )
 
+    def setDefaults(self):
+        self.zogyMapReduceConfig.gridStepX = self.zogyMapReduceConfig.gridStepY = 19
+        self.zogyMapReduceConfig.gridSizeX = self.zogyMapReduceConfig.gridSizeY = 20
+        self.zogyMapReduceConfig.borderSizeX = self.zogyMapReduceConfig.borderSizeY = 6
+        self.zogyMapReduceConfig.reducerSubtask.reduceOperation = 'average'
+
 
 class ZogyImagePsfMatchTask(ImagePsfMatchTask):
     ConfigClass = ZogyImagePsfMatchConfig
 
     def __init__(self, *args, **kwargs):
         ImagePsfMatchTask.__init__(self, *args, **kwargs)
-        self.setDefaults()  # Why do I need to explicitly call this?
 
     def setDefaults(self):
         config = self.config.zogyMapReduceConfig
@@ -1033,6 +1038,8 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
         if not np.isnan(mn2[0]) and np.abs(mn2[0]) > 1:
             mi = scienceExposure.getMaskedImage()
             mi -= mn2[0]
+
+        self.log.info('Running Zogy algorithm: spatiallyVarying=%r' % spatiallyVarying)
 
         if not self._validateWcs(templateExposure, scienceExposure):
             if doWarping:
