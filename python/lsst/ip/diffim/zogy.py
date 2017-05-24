@@ -766,7 +766,7 @@ class ZogyTask(pipeBase.Task):
         preqs = self.computePrereqs(padSize=0)
 
         padSize = self.padSize if padSize is None else padSize
-        D = self.computeDiffimImageSpace(padSize=padSize)
+        D = self.computeDiffimImageSpace(padSize=padSize).D
         Pd = self.computeDiffimPsf()
         D = self._setNewPsf(D, Pd)
         Pd_bar = np.fliplr(np.flipud(Pd))
@@ -965,7 +965,7 @@ class ZogyMapperSubtask(ZogyTask, ImageMapperSubtask):
             D = res.D
         else:
             res = task.computeScorr(**kwargs)
-            D = res.R
+            D = res.S
 
         outExp = D.Factory(D, subExposure.getBBox())
         out = pipeBase.Struct(subExposure=outExp)
