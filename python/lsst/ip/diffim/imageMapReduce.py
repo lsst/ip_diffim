@@ -288,8 +288,8 @@ class ImageReducerSubtask(pipeBase.Task):
             # set mask to something for pixels where wts == 0. Shouldn't happen. (DM-10009)
             # happens sometimes if operation failed on a certain subexposure
             mask = newMI.getMask()
-            bad = mask.addMaskPlane('NAUGHTY')
-            bad = mask.getPlaneBitMask(['NAUGHTY'])
+            bad = mask.addMaskPlane('BAD_MAPREDUCED')
+            bad = mask.getPlaneBitMask(['BAD_MAPREDUCED', 'BAD'])
             mask.getArray()[wtsZero] |= bad
 
         # Not sure how to construct a PSF when reduceOp=='copy'...
