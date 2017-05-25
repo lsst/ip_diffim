@@ -382,6 +382,10 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         nCellX = regionSizeX//sizeCellX
         nCellY = regionSizeY//sizeCellY
 
+        if nCellX == 0 or nCellY == 0:
+            raise ValueError("Exposure dimensions=%s and sizeCell=(%s, %s). Insufficient area to match" %
+                             (scienceBBox.getDimensions(), sizeCellX, sizeCellY))
+
         # Survey the PSF dimensions of the Spatial Cell Set
         # to identify the minimum enclosed or maximum bounding square BBox.
         widthList = []
