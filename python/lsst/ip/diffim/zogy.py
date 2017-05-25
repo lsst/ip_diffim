@@ -1089,9 +1089,9 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
         mask |= gm(scienceExposure)
         mask |= gm(templateExposure)
         gm(results.D)[:, :] = mask
-        gm(results.D).getArray()[np.isnan(ga(results.D))] = badBitsNan
-        gm(results.D).getArray()[np.isnan(ga(scienceExposure))] = badBitsNan
-        gm(results.D).getArray()[np.isnan(ga(templateExposure))] = badBitsNan
+        gm(results.D).getArray()[np.isnan(ga(results.D))] |= badBitsNan
+        gm(results.D).getArray()[np.isnan(ga(scienceExposure))] |= badBitsNan
+        gm(results.D).getArray()[np.isnan(ga(templateExposure))] |= badBitsNan
 
         #results = pipeBase.Struct(exposure=D)
         results.subtractedExposure = results.D

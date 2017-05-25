@@ -280,12 +280,17 @@ class ImageReducerSubtask(pipeBase.Task):
             self.log.info('AVERAGE: Maximum overlap: %f', wts.max())
             self.log.info('AVERAGE: Average overlap: %f', np.nanmean(wts))
             self.log.info('AVERAGE: Minimum overlap: %f', wts.min())
-            self.log.info('AVERAGE: Number of zero pixels: %f', np.sum(wts == 0))
+            self.log.info('AVERAGE: Number of zero pixels: %f %f', np.sum(wts == 0), np.sum(wts != 0))
             newMI.getImage().getArray()[:, :] /= wts
             newMI.getVariance().getArray()[:, :] /= wts
             wtsZero = wts == 0.
             newMI.getImage().getArray()[wtsZero] = newMI.getVariance().getArray()[wtsZero] = np.nan
-            # TBD: set mask to something for pixels where wts == 0. Shouldn't happen. (DM-10009)
+            # set mask to something for pixels where wts == 0. Shouldn't happen. (DM-10009)
+            # happens sometimes if operation failed on a certain subexposure
+            mask = newMI.getMask()
+            bad = mask.addMaskPlane('NAUGHTY')
+            bad = mask.getPlaneBitMask(['NAUGHTY'])
+            mask.getArray()[wtsZero] |= bad
 
         # Not sure how to construct a PSF when reduceOp=='copy'...
         if reduceOp == 'sum' or reduceOp == 'average':
