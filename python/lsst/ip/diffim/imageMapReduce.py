@@ -281,16 +281,18 @@ class ImageReducerSubtask(pipeBase.Task):
             self.log.info('AVERAGE: Average overlap: %f', np.nanmean(wts))
             self.log.info('AVERAGE: Minimum overlap: %f', wts.min())
             self.log.info('AVERAGE: Number of zero pixels: %f %f', np.sum(wts == 0), np.sum(wts != 0))
+            wtsZero = wts == 0.
+            wts[wtsZero] = 9e-29  # avoid division by zero warnings
             newMI.getImage().getArray()[:, :] /= wts
             newMI.getVariance().getArray()[:, :] /= wts
-            wtsZero = wts == 0.
-            newMI.getImage().getArray()[wtsZero] = newMI.getVariance().getArray()[wtsZero] = np.nan
-            # set mask to something for pixels where wts == 0. Shouldn't happen. (DM-10009)
-            # happens sometimes if operation failed on a certain subexposure
-            mask = newMI.getMask()
-            bad = mask.addMaskPlane('INVALID_MAPREDUCED')
-            bad = mask.getPlaneBitMask(['INVALID_MAPREDUCED', 'BAD', 'NO_DATA'])
-            mask.getArray()[wtsZero] |= bad
+            if np.sum(wtsZero) > 0:
+                newMI.getImage().getArray()[wtsZero] = newMI.getVariance().getArray()[wtsZero] = np.nan
+                # set mask to something for pixels where wts == 0. Shouldn't happen. (DM-10009)
+                # happens sometimes if operation failed on a certain subexposure
+                mask = newMI.getMask()
+                bad = mask.addMaskPlane('INVALID_MAPREDUCED')
+                bad = mask.getPlaneBitMask(['INVALID_MAPREDUCED', 'BAD', 'NO_DATA'])
+                mask.getArray()[wtsZero] |= bad
 
         # Not sure how to construct a PSF when reduceOp=='copy'...
         if reduceOp == 'sum' or reduceOp == 'average':
