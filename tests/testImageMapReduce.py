@@ -342,35 +342,35 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         self.assertFloatsAlmostEqual(np.array(subMeans), firstPixel)
 
     def testGridCentroids(self):
-        """Test sample grid task which is provided a set of `gridCentroids` and
+        """Test sample grid task which is provided a set of `cellCentroids` and
         returns the mean of the subimages surrounding those centroids using 'none'
         for `reduceOperation`.
         """
         config = GetMeanImageMapReduceConfig()
         config.gridStepX = config.gridStepY = 8.
         config.reducerSubtask.reduceOperation = 'none'
-        config.gridCentroidsX = [i for i in np.linspace(0, 128, 50)]
-        config.gridCentroidsY = config.gridCentroidsX
+        config.cellCentroidsX = [i for i in np.linspace(0, 128, 50)]
+        config.cellCentroidsY = config.cellCentroidsX
         task = ImageMapReduceTask(config)
         testExposure = self.exposure.clone()
         testExposure.getMaskedImage().set(1.234)
         subMeans = task.run(testExposure).result
         subMeans = [x.subExposure for x in subMeans]
 
-        self.assertEqual(len(subMeans), len(config.gridCentroidsX))
+        self.assertEqual(len(subMeans), len(config.cellCentroidsX))
         firstPixel = testExposure.getMaskedImage().getImage().getArray()[0, 0]
         self.assertFloatsAlmostEqual(np.array(subMeans), firstPixel)
 
     def testGridCentroidsWrongLength(self):
-        """Test sample grid task which is provided a set of `gridCentroids` and
+        """Test sample grid task which is provided a set of `cellCentroids` and
         returns the mean of the subimages surrounding those centroids using 'none'
         for `reduceOperation`. In this case, we ensure that len(task.boxes0) !=
         len(task.boxes1) and check for ValueError.
         """
         config = GetMeanImageMapReduceConfig()
         config.reducerSubtask.reduceOperation = 'none'
-        config.gridCentroidsX = [i for i in np.linspace(0, 128, 50)]
-        config.gridCentroidsY = [i for i in np.linspace(0, 128, 50)]
+        config.cellCentroidsX = [i for i in np.linspace(0, 128, 50)]
+        config.cellCentroidsY = [i for i in np.linspace(0, 128, 50)]
         task = ImageMapReduceTask(config)
         task._generateGrid(self.exposure)
         del task.boxes0[-1]  # remove the last box
@@ -438,14 +438,14 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
             config.scaleByFwhm = scaleByFwhm
             if scaleByFwhm:
                 config.gridStepX = float(gstepx)
-                config.gridSizeX = float(gsizex)
+                config.cellSizeX = float(gsizex)
                 config.gridStepY = float(gstepy)
-                config.gridSizeY = float(gsizey)
+                config.cellSizeY = float(gsizey)
             else:  # otherwise the grid is too fine and elements too small.
                 config.gridStepX = gstepx * 3.
-                config.gridSizeX = gsizex * 3.
+                config.cellSizeX = gsizex * 3.
                 config.gridStepY = gstepy * 3.
-                config.gridSizeY = gsizey * 3.
+                config.cellSizeY = gsizey * 3.
             config.adjustGridOption = adjustGridOption
             task = ImageMapReduceTask(config)
             task._generateGrid(self.exposure)

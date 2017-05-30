@@ -457,7 +457,7 @@ class DecorrelateALKernelSpatialConfig(pexConfig.Config):
 
     def setDefaults(self):
         self.decorrelateMapReduceConfig.gridStepX = self.decorrelateMapReduceConfig.gridStepY = 19
-        self.decorrelateMapReduceConfig.gridSizeX = self.decorrelateMapReduceConfig.gridSizeY = 20
+        self.decorrelateMapReduceConfig.cellSizeX = self.decorrelateMapReduceConfig.cellSizeY = 20
         self.decorrelateMapReduceConfig.borderSizeX = self.decorrelateMapReduceConfig.borderSizeY = 6
         self.decorrelateMapReduceConfig.reducerSubtask.reduceOperation = 'average'
 

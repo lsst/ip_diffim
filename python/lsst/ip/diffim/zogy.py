@@ -992,7 +992,7 @@ class ZogyImagePsfMatchConfig(ImagePsfMatchConfig):
 
     def setDefaults(self):
         self.zogyMapReduceConfig.gridStepX = self.zogyMapReduceConfig.gridStepY = 19
-        self.zogyMapReduceConfig.gridSizeX = self.zogyMapReduceConfig.gridSizeY = 20
+        self.zogyMapReduceConfig.cellSizeX = self.zogyMapReduceConfig.cellSizeY = 20
         self.zogyMapReduceConfig.borderSizeX = self.zogyMapReduceConfig.borderSizeY = 6
         self.zogyMapReduceConfig.reducerSubtask.reduceOperation = 'average'
 
@@ -1006,7 +1006,7 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
     def setDefaults(self):
         config = self.config.zogyMapReduceConfig
         config.gridStepX = config.gridStepY = 19
-        config.gridSizeX = config.gridSizeY = 20
+        config.cellSizeX = config.cellSizeY = 20
         config.borderSizeX = config.borderSizeY = 6
         config.reducerSubtask.reduceOperation = 'average'
 
