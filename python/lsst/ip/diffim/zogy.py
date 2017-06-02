@@ -166,7 +166,7 @@ class ZogyTask(pipeBase.Task):
                    sig1=sig1, sig2=sig2, psf1=psf1, psf2=psf2, *args, **kwargs)
 
     def setup(self, templateExposure=None, scienceExposure=None, sig1=None, sig2=None,
-              psf1=None, psf2=None, *args, **kwargs):
+              psf1=None, psf2=None, correctBackground=False, *args, **kwargs):
         """Set up the ZOGY task.
 
         Parameters
@@ -188,6 +188,9 @@ class ZogyTask(pipeBase.Task):
         psf2 : 2D numpy.array
             (Optional) 2D array containing the PSF image for the science img. If
             `None`, it is extracted from the PSF taken at the center of `scienceExposure`.
+        correctBackground : bool
+            (Optional) subtract sigma-clipped mean of exposures. Zogy doesn't correct
+            nonzero backgrounds (unlike AL) so subtract them here.
         args :
             additional arguments to be passed to
             `lsst.pipe.base.task.Task.__init__`
@@ -239,14 +242,18 @@ class ZogyTask(pipeBase.Task):
         self.sig2 = np.sqrt(self._computeVarianceMean(self.science)) if sig2 is None else sig2
 
         # Zogy doesn't correct nonzero backgrounds (unlike AL) so subtract them here.
-        # mn1 = self._computeImageMean(self.template)
-        # mn2 = self._computeImageMean(self.science)
-        # if not np.isnan(mn1):  # and np.abs(mn1) > 1:
-        #     mi = self.template.getMaskedImage()
-        #     mi -= mn1
-        # if not np.isnan(mn2):  # and np.abs(mn2) > 1:
-        #     mi = self.science.getMaskedImage()
-        #     mi -= mn2
+        if correctBackground:
+            def _subtractImageMean(exposure):
+                """Compute the sigma-clipped mean of the image of `exposure`."""
+                mi = exposure.getMaskedImage()
+                statObj = afwMath.makeStatistics(mi.getImage(), mi.getMask(),
+                                                 afwMath.MEANCLIP, self.statsControl)
+                mean = statObj.getValue(afwMath.MEANCLIP)
+                if not np.isnan(mean):
+                    mi -= mean
+
+            _subtractImageMean(self.template)
+            _subtractImageMean(self.science)
 
         self.Fr = self.config.templateFluxScaling  # default is 1
         self.Fn = self.config.scienceFluxScaling  # default is 1
@@ -260,15 +267,6 @@ class ZogyTask(pipeBase.Task):
                                          afwMath.MEANCLIP, self.statsControl)
         var = statObj.getValue(afwMath.MEANCLIP)
         return var
-
-    # def _computeImageMean(self, exposure):
-    #     """Compute the sigma-clipped mean of the variance image of `exposure`.
-    #     """
-    #     statObj = afwMath.makeStatistics(exposure.getMaskedImage().getImage(),
-    #                                      exposure.getMaskedImage().getMask(),
-    #                                      afwMath.MEANCLIP, self.statsControl)
-    #     var = statObj.getValue(afwMath.MEANCLIP)
-    #     return var
 
     @staticmethod
     def _padPsfToSize(psf, size):
