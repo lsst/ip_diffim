@@ -281,15 +281,15 @@ class ImageReducerSubtask(pipeBase.Task):
             self.log.info('AVERAGE: Maximum overlap: %f', wts.max())
             self.log.info('AVERAGE: Average overlap: %f', np.nanmean(wts))
             self.log.info('AVERAGE: Minimum overlap: %f', wts.min())
-            self.log.info('AVERAGE: Number of zero pixels: %f (%f%%)', np.sum(wts == 0),
-                          np.mean(wts == 0) * 100.)
             wtsZero = wts == 0.
+            self.log.info('AVERAGE: Number of zero pixels: %f (%f%%)', np.sum(wtsZero),
+                          np.mean(wtsZero) * 100.)
             wts[wtsZero] = 1e-29  # avoid division by zero warnings -- will set to nan and flag them below
             newMI.getImage().getArray()[:, :] /= wts
             newMI.getVariance().getArray()[:, :] /= wts
             if np.sum(wtsZero) > 0:
                 newMI.getImage().getArray()[wtsZero] = newMI.getVariance().getArray()[wtsZero] = np.nan
-                # set mask to something for pixels where wts == 0. Shouldn't happen. (DM-10009)
+                # set mask to something for pixels where wts == 0.
                 # happens sometimes if operation failed on a certain subexposure
                 mask = newMI.getMask()
                 # New mask plane - for debugging map-reduced images

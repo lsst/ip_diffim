@@ -1031,7 +1031,7 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
 
         mn1 = self._computeImageMean(templateExposure)
         mn2 = self._computeImageMean(scienceExposure)
-        print("Exposure means 1:", mn1, mn2)
+        self.log.info("Exposure means=%f, %f; median=%f, %f:" % (mn1[0], mn2[0], mn1[1], mn2[1]))
         if not np.isnan(mn1[0]) and np.abs(mn1[0]) > 1:
             mi = templateExposure.getMaskedImage()
             mi -= mn1[0]
