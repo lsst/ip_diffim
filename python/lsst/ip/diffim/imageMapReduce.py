@@ -57,7 +57,7 @@ two subtasks, `ImageMapperSubtask` and `ImageReducerSubtask`.
 dimensions to be processed, and then calls the `run` methods of the
 `ImageMapperSubtask` and `ImageReducerSubtask` on those sub-exposures.
 `ImageMapReduceTask` may be configured with a list of sub-exposure
-centroids (`config.gridCentroidsX` and `config.gridCentroidsY`) and a
+centroids (`config.cellCentroidsX` and `config.cellCentroidsY`) and a
 single pair of bounding boxes defining their dimensions, or a set of
 parameters defining a regular grid of centroids (`config.gridStepX`
 and `config.gridStepY`).
@@ -357,11 +357,11 @@ class ImageMapReduceConfig(pexConfig.Config):
         target=ImageReducerSubtask,
     )
 
-    # Separate gridCentroidsX and gridCentroidsY since pexConfig.ListField accepts limited dtypes
+    # Separate cellCentroidsX and cellCentroidsY since pexConfig.ListField accepts limited dtypes
     #  (i.e., no Point2D). The resulting set of centroids is the "vertical stack" of
-    #  `gridCentroidsX` and `gridCentroidsY`, i.e. for (1,2), (3,4) respectively, the
+    #  `cellCentroidsX` and `cellCentroidsY`, i.e. for (1,2), (3,4) respectively, the
     #   resulting centroids are ((1,3), (2,4)).
-    gridCentroidsX = pexConfig.ListField(
+    cellCentroidsX = pexConfig.ListField(
         dtype=float,
         doc="""Input X centroids around which to place subimages.
                If None, use grid config options below.""",
@@ -369,7 +369,7 @@ class ImageMapReduceConfig(pexConfig.Config):
         default=None
     )
 
-    gridCentroidsY = pexConfig.ListField(
+    cellCentroidsY = pexConfig.ListField(
         dtype=float,
         doc="""Input Y centroids around which to place subimages.
                If None, use grid config options below.""",
@@ -377,14 +377,14 @@ class ImageMapReduceConfig(pexConfig.Config):
         default=None
     )
 
-    gridSizeX = pexConfig.Field(
+    cellSizeX = pexConfig.Field(
         dtype=float,
         doc="""Dimensions of each grid cell in x direction""",
         default=10.,
         check=lambda x: x > 0.
     )
 
-    gridSizeY = pexConfig.Field(
+    cellSizeY = pexConfig.Field(
         dtype=float,
         doc="""Dimensions of each grid cell in y direction""",
         default=10.,
@@ -394,7 +394,7 @@ class ImageMapReduceConfig(pexConfig.Config):
     gridStepX = pexConfig.Field(
         dtype=float,
         doc="""Spacing between subsequent grid cells in x direction. If equal to
-               gridSizeX, then there is no overlap in the x direction.""",
+               cellSizeX, then there is no overlap in the x direction.""",
         default=10.,
         check=lambda x: x > 0.
     )
@@ -402,7 +402,7 @@ class ImageMapReduceConfig(pexConfig.Config):
     gridStepY = pexConfig.Field(
         dtype=float,
         doc="""Spacing between subsequent grid cells in y direction. If equal to
-               gridSizeY, then there is no overlap in the y direction.""",
+               cellSizeY, then there is no overlap in the y direction.""",
         default=10.,
         check=lambda x: x > 0.
     )
@@ -437,7 +437,7 @@ class ImageMapReduceConfig(pexConfig.Config):
 
     scaleByFwhm = pexConfig.Field(
         dtype=bool,
-        doc="""Scale gridSize/gridStep/borderSize/overlapSize by PSF FWHM rather
+        doc="""Scale cellSize/gridStep/borderSize/overlapSize by PSF FWHM rather
                than pixels?""",
         default=True
     )
@@ -524,7 +524,9 @@ class ImageMapReduceTask(pipeBase.Task):
         output of `reducerSubtask.run()`
 
         """
+        self.log.info("Mapper sub-task: %s", self.mapperSubtask._DefaultName)
         mapperResults = self._runMapper(exposure, **kwargs)
+        self.log.info("Reducer sub-task: %s", self.reducerSubtask._DefaultName)
         result = self._reduceImage(mapperResults, exposure, **kwargs)
         return result
 
@@ -557,8 +559,6 @@ class ImageMapReduceTask(pipeBase.Task):
             raise ValueError('Bounding boxes list and expanded bounding boxes list are of different lengths')
 
         self.log.info("Processing %d sub-exposures", len(self.boxes0))
-        self.log.info("Mapper sub-task: %s", self.mapperSubtask._DefaultName)
-        self.log.info("Reducer sub-task: %s", self.reducerSubtask._DefaultName)
         mapperResults = []
         for box0, box1 in zip(self.boxes0, self.boxes1):
             subExp = exposure.Factory(exposure, box0)
@@ -601,8 +601,8 @@ class ImageMapReduceTask(pipeBase.Task):
     def _generateGrid(self, exposure, forceEvenSized=False, **kwargs):
         """Generate two lists of bounding boxes that evenly grid `exposure`
 
-        Unless the config was provided with `centroidCoordsX` and
-        `centroidCoordsY`, grid (subimage) centers are spaced evenly
+        Unless the config was provided with `cellCentroidsX` and
+        `cellCentroidsY`, grid (subimage) centers are spaced evenly
         by gridStepX/Y. Then the grid is adjusted as little as
         possible to evenly cover the input exposure (if
         adjustGridOption is not 'none'). Then the second set of
@@ -622,69 +622,71 @@ class ImageMapReduceTask(pipeBase.Task):
         """
         # kwargs are ignored, but necessary to enable optional passing of
         # `forceEvenSized` from `_runMapper`.
+        bbox = exposure.getBBox()
 
         # Extract the config parameters for conciseness.
-        gridSizeX = self.config.gridSizeX
-        gridSizeY = self.config.gridSizeY
+        cellCentroidsX = self.config.cellCentroidsX
+        cellCentroidsY = self.config.cellCentroidsY
+        cellSizeX = self.config.cellSizeX
+        cellSizeY = self.config.cellSizeY
         gridStepX = self.config.gridStepX
         gridStepY = self.config.gridStepY
         borderSizeX = self.config.borderSizeX
         borderSizeY = self.config.borderSizeY
         adjustGridOption = self.config.adjustGridOption
         scaleByFwhm = self.config.scaleByFwhm
-        bbox = exposure.getBBox()
 
-        psfFwhm = (exposure.getPsf().computeShape().getDeterminantRadius() *
-                   2. * np.sqrt(2. * np.log(2.)))
-        if scaleByFwhm:
-            self.log.info("Scaling grid parameters by %f" % psfFwhm)
+        if cellCentroidsX is None or len(cellCentroidsX) <= 0:
+            # Not given centroids; construct them from cellSize/gridStep
 
-        def rescaleValue(val):
+            psfFwhm = (exposure.getPsf().computeShape().getDeterminantRadius() *
+                       2.*np.sqrt(2.*np.log(2.)))
             if scaleByFwhm:
-                return np.rint(val * psfFwhm).astype(int)
+                self.log.info("Scaling grid parameters by %f" % psfFwhm)
+
+            def rescaleValue(val):
+                if scaleByFwhm:
+                    return np.rint(val*psfFwhm).astype(int)
+                else:
+                    return np.rint(val).astype(int)
+
+            cellSizeX = rescaleValue(cellSizeX)
+            cellSizeY = rescaleValue(cellSizeY)
+            gridStepX = rescaleValue(gridStepX)
+            gridStepY = rescaleValue(gridStepY)
+            borderSizeX = rescaleValue(borderSizeX)
+            borderSizeY = rescaleValue(borderSizeY)
+
+            nGridX = bbox.getWidth()//gridStepX
+            nGridY = bbox.getHeight()//gridStepY
+
+            if adjustGridOption == 'spacing':
+                # Readjust spacings so that they fit perfectly in the image.
+                nGridX = bbox.getWidth()//cellSizeX + 1
+                nGridY = bbox.getHeight()//cellSizeY + 1
+                xLinSpace = np.linspace(cellSizeX//2, bbox.getWidth() - cellSizeX//2, nGridX)
+                yLinSpace = np.linspace(cellSizeY//2, bbox.getHeight() - cellSizeY//2, nGridY)
+
+            elif adjustGridOption == 'size':
+                cellSizeX = gridStepX
+                cellSizeY = gridStepY
+                xLinSpace = np.arange(cellSizeX//2, bbox.getWidth() + cellSizeX//2, cellSizeX)
+                yLinSpace = np.arange(cellSizeY//2, bbox.getHeight() + cellSizeY//2, cellSizeY)
+                cellSizeX += 1  # add 1 to make sure there are no gaps
+                cellSizeY += 1
+
             else:
-                return np.rint(val).astype(int)
+                xLinSpace = np.arange(cellSizeX//2, bbox.getWidth() + cellSizeX//2, gridStepX)
+                yLinSpace = np.arange(cellSizeY//2, bbox.getHeight() + cellSizeY//2, gridStepY)
 
-        gridSizeX = rescaleValue(gridSizeX)
-        if gridSizeX > bbox.getWidth():
-            gridSizeX = bbox.getWidth()
-        gridSizeY = rescaleValue(gridSizeY)
-        if gridSizeY > bbox.getHeight():
-            gridSizeY = bbox.getHeight()
-        gridStepX = rescaleValue(gridStepX)
-        if gridStepX > bbox.getWidth():
-            gridStepX = bbox.getWidth()
-        gridStepY = rescaleValue(gridStepY)
-        if gridStepY > bbox.getHeight():
-            gridStepY = bbox.getHeight()
-        borderSizeX = rescaleValue(borderSizeX)
-        borderSizeY = rescaleValue(borderSizeY)
+            cellCentroids = [(x, y) for x in xLinSpace for y in yLinSpace]
 
-        nGridX = bbox.getWidth() // gridStepX
-        nGridY = bbox.getHeight() // gridStepY
-
-        if adjustGridOption == 'spacing':
-            nGridX = bbox.getWidth() / gridStepX
-            # Readjust gridStepX so that it fits perfectly in the image.
-            gridStepX = float(bbox.getWidth() - gridSizeX) / float(nGridX)
-            if gridStepX < 1:
-                raise ValueError('X grid spacing is too small (or negative): %f' % gridStepX)
-
-        if adjustGridOption == 'spacing':
-            nGridY = bbox.getWidth() / gridStepY
-            # Readjust gridStepY so that it fits perfectly in the image.
-            gridStepY = float(bbox.getHeight() - gridSizeY) / float(nGridY)
-            if gridStepY < 1:
-                raise ValueError('Y grid spacing is too small (or negative): %f' % gridStepY)
-
-        if adjustGridOption == 'size':
-            gridSizeX = gridStepX
-            gridSizeY = gridStepY
-
-        print('Grid parameters:', gridSizeX, gridSizeY, gridStepX, gridStepY, borderSizeX, borderSizeY)
+        else:
+            # in py3 zip returns an iterator, but want to test length below, so use this instead:
+            cellCentroids = [(cellCentroidsX[i], cellCentroidsY[i]) for i in range(len(cellCentroidsX))]
 
         # first "main" box at 0,0
-        bbox0 = afwGeom.Box2I(afwGeom.Point2I(bbox.getBegin()), afwGeom.Extent2I(gridSizeX, gridSizeY))
+        bbox0 = afwGeom.Box2I(afwGeom.Point2I(bbox.getBegin()), afwGeom.Extent2I(cellSizeX, cellSizeY))
         # first expanded box
         bbox1 = afwGeom.Box2I(bbox0)
         bbox1.grow(afwGeom.Extent2I(borderSizeX, borderSizeY))
@@ -692,76 +694,48 @@ class ImageMapReduceTask(pipeBase.Task):
         self.boxes0 = []  # "main" boxes; store in task so can be extracted if needed
         self.boxes1 = []  # "expanded" boxes
 
-        # use given centroids as centers for bounding boxes
-        if self.config.gridCentroidsX is not None and len(self.config.gridCentroidsX) > 0:
-            for i, centroidX in enumerate(self.config.gridCentroidsX):
-                centroidY = self.config.gridCentroidsY[i]
-                centroid = afwGeom.Point2D(centroidX, centroidY)
+        def _makeBoxEvenSized(bb):
+            """Force a bounding-box to have dimensions that are modulo 2."""
+
+            if bb.getWidth() % 2 == 1:  # grow to the right
+                bb.include(afwGeom.Point2I(bb.getMaxX()+1, bb.getMaxY()))  # Expand by 1 pixel!
+                bb.clip(bbox)
+                if bb.getWidth() % 2 == 1:  # clipped at right -- so grow to the left
+                    bb.include(afwGeom.Point2I(bb.getMinX()-1, bb.getMaxY()))
+                    bb.clip(bbox)
+            if bb.getHeight() % 2 == 1:  # grow upwards
+                bb.include(afwGeom.Point2I(bb.getMaxX(), bb.getMaxY()+1))  # Expand by 1 pixel!
+                bb.clip(bbox)
+                if bb.getHeight() % 2 == 1:  # clipped upwards -- so grow down
+                    bb.include(afwGeom.Point2I(bb.getMaxX(), bb.getMinY()-1))
+                    bb.clip(bbox)
+            if bb.getWidth() % 2 == 1 or bb.getHeight() % 2 == 1:  # Box is probably too big
+                raise RuntimeError('Cannot make bounding box even-sized. Probably too big.')
+
+            return bb
+
+        # Use given or grid-parameterized centroids as centers for bounding boxes
+        if cellCentroids is not None and len(cellCentroids) > 0:
+            for x, y in cellCentroids:
+                centroid = afwGeom.Point2D(x, y)
                 bb0 = afwGeom.Box2I(bbox0)
                 xoff = int(np.floor(centroid.getX())) - bb0.getWidth()//2
                 yoff = int(np.floor(centroid.getY())) - bb0.getHeight()//2
                 bb0.shift(afwGeom.Extent2I(xoff, yoff))
                 bb0.clip(bbox)
-                self.boxes0.append(bb0)
+                if forceEvenSized:
+                    bb0 = _makeBoxEvenSized(bb0)
                 bb1 = afwGeom.Box2I(bbox1)
                 bb1.shift(afwGeom.Extent2I(xoff, yoff))
                 bb1.clip(bbox)
-                self.boxes1.append(bb1)
-            return self.boxes0, self.boxes1
+                if forceEvenSized:
+                    bb1 = _makeBoxEvenSized(bb1)
 
-        def offsetAndClipBoxes(bbox0, bbox1, xoff, yoff, bbox):
-            """Offset the "main" (bbox0) and "expanded" (bbox1) bboxes
-            by xoff, yoff.
-
-            Clip them by the exposure's bbox.
-            """
-            xoff = int(np.floor(xoff))
-            yoff = int(np.floor(yoff))
-            bb0 = afwGeom.Box2I(bbox0)
-            bb0.shift(afwGeom.Extent2I(xoff, yoff))
-            bb0.clip(bbox)
-            bb1 = afwGeom.Box2I(bbox1)
-            bb1.shift(afwGeom.Extent2I(xoff, yoff))
-            bb1.clip(bbox)
-            if forceEvenSized:
-                if bb0.getWidth() % 2 == 1:  # grow to the right
-                    bb0.include(afwGeom.Point2I(bb0.getMaxX()+1, bb0.getMaxY())) # Expand by 1 pixel!
-                    bb0.clip(bbox)
-                    if bb0.getWidth() % 2 == 1:  # clipped at right -- so grow to the left
-                        bb0.include(afwGeom.Point2I(bb0.getMinX()-1, bb0.getMaxY()))
-                        bb0.clip(bbox)
-                if bb0.getHeight() % 2 == 1: # grow upwards
-                    bb0.include(afwGeom.Point2I(bb0.getMaxX(), bb0.getMaxY()+1)) # Expand by 1 pixel!
-                    bb0.clip(bbox)
-                    if bb0.getHeight() % 2 == 1: # clipped upwards -- so grow down
-                        bb0.include(afwGeom.Point2I(bb0.getMaxX(), bb0.getMinY()-1))
-                        bb0.clip(bbox)
-
-                if bb1.getWidth() % 2 == 1:  # grow to the left
-                    bb1.include(afwGeom.Point2I(bb1.getMaxX()+1, bb1.getMaxY())) # Expand by 1 pixel!
-                    bb1.clip(bbox)
-                    if bb1.getWidth() % 2 == 1:  # clipped at right -- so grow to the left
-                        bb1.include(afwGeom.Point2I(bb1.getMinX()-1, bb1.getMaxY()))
-                        bb1.clip(bbox)
-                if bb1.getHeight() % 2 == 1: # grow downwards
-                    bb1.include(afwGeom.Point2I(bb1.getMaxX(), bb1.getMaxY()+1)) # Expand by 1 pixel!
-                    bb1.clip(bbox)
-                    if bb1.getHeight() % 2 == 1: # clipped upwards -- so grow down
-                        bb1.include(afwGeom.Point2I(bb1.getMaxX(), bb1.getMinY()-1))
-                        bb1.clip(bbox)
-
-            return bb0, bb1
-
-        xoff = 0
-        while(xoff <= bbox.getWidth()):
-            yoff = 0
-            while(yoff <= bbox.getHeight()):
-                bb0, bb1 = offsetAndClipBoxes(bbox0, bbox1, xoff, yoff, bbox)
-                yoff += gridStepY
-                if bb0.getArea() > 0 and bb1.getArea() > 0:
+                if bb0.getArea() > 1 and bb1.getArea() > 1:
                     self.boxes0.append(bb0)
                     self.boxes1.append(bb1)
-            xoff += gridStepX
+
+        return self.boxes0, self.boxes1
 
     def plotBoxes(self, fullBBox, skip=3):
         """Plot both grids of boxes using matplotlib.
