@@ -34,10 +34,12 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.log
 
-from .imageMapReduce import (ImageMapReduceConfig, ImageMapperSubtask)
+from .imageMapReduce import (ImageMapReduceConfig, ImageMapReduceTask,
+                             ImageMapperSubtask)
 
 __all__ = ("DecorrelateALKernelTask", "DecorrelateALKernelConfig",
-           "DecorrelateALKernelMapperSubtask", "DecorrelateALKernelMapReduceConfig")
+           "DecorrelateALKernelMapperSubtask", "DecorrelateALKernelMapReduceConfig",
+           "DecorrelateALKernelSpatialConfig", "DecorrelateALKernelSpatialTask")
 
 
 class DecorrelateALKernelConfig(pexConfig.Config):
@@ -67,7 +69,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
     \brief Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
 
-    \section pipe_tasks_multiBand_Contents Contents
+    \section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Contents      Contents
 
       - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Purpose
       - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Config
@@ -109,7 +111,6 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
     \section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Config       Configuration parameters
 
-    This task currently has no relevant configuration parameters.
     See \ref DecorrelateALKernelConfig
 
     \section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Debug		Debug variables
@@ -119,8 +120,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
     \section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Example	Example of using DecorrelateALKernelTask
 
     This task has no standalone example, however it is applied as a
-    subtask of \link pipe.tasks.imageDifference.ImageDifferenceTask ImageDifferenceTask\endlink .
-
+    subtask of pipe.tasks.imageDifference.ImageDifferenceTask.
     """
     ConfigClass = DecorrelateALKernelConfig
     _DefaultName = "ip_diffim_decorrelateALKernel"
@@ -376,9 +376,9 @@ class DecorrelateALKernelMapperSubtask(DecorrelateALKernelTask, ImageMapperSubta
 
         Parameters
         ----------
-        subExposure : afw.Exposure
+        subExposure : lsst.afw.image.Exposure
             the sub-exposure of the diffim
-        expandedSubExposure : afw.Exposure
+        expandedSubExposure : lsst.afw.image.Exposure
             the expanded sub-exposure upon which to operate
         fullBBox : afwGeom.BoundingBox
             the bounding box of the original exposure
@@ -393,21 +393,25 @@ class DecorrelateALKernelMapperSubtask(DecorrelateALKernelTask, ImageMapperSubta
             `psfMatchingKernel` is not `None`.
         psfMatchingKernel : Alternative parameter for passing the
             A&L `psfMatchingKernel` directly.
+        preConvKernel : If not None, then pre-filtering was applied
+            to science exposure, and this is the pre-convolution
+            kernel.
         kwargs :
             additional keyword arguments propagated from
             `ImageMapReduceTask.run`.
 
         Returns
         -------
-        A `pipeBase.Struct containing the result of the `subExposure`
-        processing, labelled 'subExposure'. It also returns the
-        'decorrelationKernel', although that currently is not used.
+        A `pipeBase.Struct` containing:
+        * `subExposure` : the result of the `subExposure` processing.
+        * `decorrelationKernel` : the decorrelation kernel, currently
+          not used.
 
         Notes
         -----
         This `run` method accepts parameters identical to those of
         `ImageMapperSubtask.run`, since it is called from the
-        `ImageMapperTask`.  See that class for more information.
+        `ImageMapperTask`. See that class for more information.
         """
         templateExposure = template  # input template
         scienceExposure = science  # input science image
@@ -440,3 +444,187 @@ class DecorrelateALKernelMapReduceConfig(ImageMapReduceConfig):
         doc='A&L decorrelation subtask to run on each sub-image',
         target=DecorrelateALKernelMapperSubtask
     )
+
+
+## \addtogroup LSST_task_documentation
+## \{
+## \page DecorrelateALKernelSpatialTask
+## \ref DecorrelateALKernelSpatialTask_ "DecorrelateALKernelSpatialTask"
+##      Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference,
+##      allowing for spatial variations in PSF and noise
+## \}
+
+
+class DecorrelateALKernelSpatialConfig(pexConfig.Config):
+    """Configuration parameters for the DecorrelateALKernelSpatialTask.
+    """
+    decorrelateConfig = pexConfig.ConfigField(
+        dtype=DecorrelateALKernelConfig,
+        doc='DecorrelateALKernel config to use when running on complete exposure (non spatially-varying)',
+    )
+
+    decorrelateMapReduceConfig = pexConfig.ConfigField(
+        dtype=DecorrelateALKernelMapReduceConfig,
+        doc='DecorrelateALKernelMapReduce config to use when running on each sub-image (spatially-varying)',
+    )
+
+    ignoreMaskPlanes = pexConfig.ListField(
+        dtype=str,
+        doc="""Mask planes to ignore for sigma-clipped statistics""",
+        default=("INTRP", "EDGE", "DETECTED", "SAT", "CR", "BAD", "NO_DATA", "DETECTED_NEGATIVE")
+    )
+
+    def setDefaults(self):
+        self.decorrelateMapReduceConfig.gridStepX = self.decorrelateMapReduceConfig.gridStepY = 19
+        self.decorrelateMapReduceConfig.cellSizeX = self.decorrelateMapReduceConfig.cellSizeY = 20
+        self.decorrelateMapReduceConfig.borderSizeX = self.decorrelateMapReduceConfig.borderSizeY = 6
+        self.decorrelateMapReduceConfig.reducerSubtask.reduceOperation = 'average'
+
+
+class DecorrelateALKernelSpatialTask(pipeBase.Task):
+    """!
+    \anchor DecorrelateALKernelSpatialTask_
+
+    \brief Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
+
+    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Contents       Contents
+
+      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Purpose
+      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Config
+      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Run
+      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Debug
+      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Example
+
+    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Purpose	Description
+
+    Pipe-task that removes the neighboring-pixel covariance in an
+    image difference that are added when the template image is
+    convolved with the Alard-Lupton PSF matching kernel.
+
+    This task is a simple wrapper around \ref DecorrelateALKernelTask,
+    which takes a `spatiallyVarying` parameter in its `run` method. If
+    it is `False`, then it simply calls the `run` method of \ref
+    DecorrelateALKernelTask. If it is True, then it uses the \ref
+    ImageMapReduceTask framework to break the exposures into
+    subExposures on a grid, and performs the `run` method of \ref
+    DecorrelateALKernelTask on each subExposure. This enables it to
+    account for spatially-varying PSFs and noise in the exposures when
+    performing the decorrelation.
+
+    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Initialize       Task initialization
+
+    \copydoc \_\_init\_\_
+
+    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Run       Invoking the Task
+
+    \copydoc run
+
+    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Config       Configuration parameters
+
+    See \ref DecorrelateALKernelSpatialConfig
+
+    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Debug		Debug variables
+
+    This task has no debug variables
+
+    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Example	Example of using DecorrelateALKernelSpatialTask
+
+    This task has no standalone example, however it is applied as a
+    subtask of pipe.tasks.imageDifference.ImageDifferenceTask.
+    There is also an example of its use in `tests/testImageDecorrelation.py`.
+    """
+    ConfigClass = DecorrelateALKernelSpatialConfig
+    _DefaultName = "ip_diffim_decorrelateALKernelSpatial"
+
+    def __init__(self, *args, **kwargs):
+        """Create the image decorrelation Task
+
+        Parameters
+        ----------
+        args :
+            arguments to be passed to
+            `lsst.pipe.base.task.Task.__init__`
+        kwargs :
+            additional keyword arguments to be passed to
+            `lsst.pipe.base.task.Task.__init__`
+        """
+        pipeBase.Task.__init__(self, *args, **kwargs)
+
+        self.statsControl = afwMath.StatisticsControl()
+        self.statsControl.setNumSigmaClip(3.)
+        self.statsControl.setNumIter(3)
+        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(self.config.ignoreMaskPlanes))
+
+    def computeVarianceMean(self, exposure):
+        """Compute the mean of the variance plane of `exposure`.
+        """
+        statObj = afwMath.makeStatistics(exposure.getMaskedImage().getVariance(),
+                                         exposure.getMaskedImage().getMask(),
+                                         afwMath.MEANCLIP, self.statsControl)
+        var = statObj.getValue(afwMath.MEANCLIP)
+        return var
+
+    def run(self, scienceExposure, templateExposure, subtractedExposure, psfMatchingKernel,
+            spatiallyVarying=True, doPreConvolve=False):
+        """! Perform decorrelation of an image difference exposure.
+
+        Decorrelates the diffim due to the convolution of the
+        templateExposure with the A&L psfMatchingKernel. If
+        `spatiallyVarying` is True, it utilizes the spatially varying
+        matching kernel via the `imageMapReduce` framework to perform
+        spatially-varying decorrelation on a grid of subExposures.
+
+        Parameters
+        ----------
+        scienceExposure : lsst.afw.image.Exposure
+           the science Exposure used for PSF matching
+        templateExposure : lsst.afw.image.Exposure
+           the template Exposure used for PSF matching
+        subtractedExposure : lsst.afw.image.Exposure
+           the subtracted Exposure produced by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
+        psfMatchingKernel :
+           an (optionally spatially-varying) PSF matching kernel produced
+           by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
+        spatiallyVarying : bool
+           if True, perform the spatially-varying operation
+        doPreConvolve : bool
+           if True, the scienceExposure has been pre-filtered with its PSF. (Currently
+           this option is experimental.)
+
+        Returns
+        -------
+        a `pipeBase.Struct` containing:
+            * `correctedExposure`: the decorrelated diffim
+        """
+        self.log.info('Running A&L decorrelation: spatiallyVarying=%r' % spatiallyVarying)
+
+        svar = self.computeVarianceMean(scienceExposure)
+        tvar = self.computeVarianceMean(templateExposure)
+
+        var = self.computeVarianceMean(subtractedExposure)
+
+        if spatiallyVarying:
+            self.log.info("Variance (science, template): (%f, %f)", svar, tvar)
+            self.log.info("Variance (uncorrected diffim): %f", var)
+            config = self.config.decorrelateMapReduceConfig
+            task = ImageMapReduceTask(config=config)
+            results = task.run(subtractedExposure, science=scienceExposure,
+                               template=templateExposure, psfMatchingKernel=psfMatchingKernel,
+                               preConvKernel=None, forceEvenSized=True)
+            results.correctedExposure = results.exposure
+
+            # Make sure masks of input image are propagated to diffim
+            def gm(exp):
+                return exp.getMaskedImage().getMask()
+            gm(results.correctedExposure)[:, :] = gm(subtractedExposure)
+
+            var = self.computeVarianceMean(results.correctedExposure)
+            self.log.info("Variance (corrected diffim): %f", var)
+
+        else:
+            config = self.config.decorrelateConfig
+            task = DecorrelateALKernelTask(config=config)
+            results = task.run(scienceExposure, templateExposure,
+                               subtractedExposure, psfMatchingKernel)
+
+        return results

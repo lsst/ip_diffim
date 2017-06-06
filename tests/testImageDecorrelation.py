@@ -33,7 +33,9 @@ import lsst.meas.algorithms as measAlg
 import lsst.daf.base as dafBase
 
 from lsst.ip.diffim.imageDecorrelation import (DecorrelateALKernelTask,
-                                               DecorrelateALKernelMapReduceConfig)
+                                               DecorrelateALKernelMapReduceConfig,
+                                               DecorrelateALKernelSpatialConfig,
+                                               DecorrelateALKernelSpatialTask)
 from lsst.ip.diffim.imageMapReduce import ImageMapReduceTask
 
 try:
@@ -325,6 +327,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
             print('CORRECTED VARIANCE:', var, mn)
         self.assertFloatsAlmostEqual(mn, expected_var, rtol=0.02)
         self.assertFloatsAlmostEqual(var, mn, rtol=0.05)
+        return var, mn
 
     def _testDiffimCorrection(self, svar, tvar):
         """ Run decorrelation and check the variance of the corrected diffim.
@@ -370,8 +373,8 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
                                            corrected_diffExp_OLD.getMaskedImage())
 
     def testDiffimCorrection_mapReduced(self):
-        """Test decorrelated diffim when using the imageMapReduce task.
-           Compare results with those from the original DecorrelateALKernelTask.
+        """ Test decorrelated diffim when using the imageMapReduce task.
+            Compare results with those from the original DecorrelateALKernelTask.
         """
         # Same variance
         self._testDiffimCorrection_mapReduced(svar=0.04, tvar=0.04)
@@ -380,6 +383,43 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         # Template variance is higher than that of the science img.
         self._testDiffimCorrection_mapReduced(svar=0.08, tvar=0.04)
 
+    def _runDecorrelationSpatialTask(self, diffExp, mKernel, spatiallyVarying=False):
+        """ Run decorrelation using the DecorrelateALKernelSpatialTask.
+        """
+        config = DecorrelateALKernelSpatialConfig()
+        task = DecorrelateALKernelSpatialTask(config=config)
+        decorrResult = task.run(scienceExposure=self.im1ex, templateExposure=self.im2ex,
+                                subtractedExposure=diffExp, psfMatchingKernel=mKernel,
+                                spatiallyVarying=spatiallyVarying)
+        corrected_diffExp = decorrResult.correctedExposure
+        return corrected_diffExp
+
+    def _testDiffimCorrection_spatialTask(self, svar, tvar, varyPsf=0.0):
+        """Run decorrelation using the DecorrelateALKernelSpatialTask, and
+        check the variance of the corrected diffim. Do it for `spatiallyVarying` both
+        True and False. Also compare the variances between the two `spatiallyVarying`
+        cases.
+        """
+        self._setUpImages(svar=svar, tvar=tvar, varyPsf=varyPsf)
+        diffExp, mKernel, expected_var = self._makeAndTestUncorrectedDiffim()
+        variances = []
+        for spatiallyVarying in [False, True]:
+            corrected_diffExp = self._runDecorrelationSpatialTask(diffExp, mKernel,
+                                                                  spatiallyVarying)
+            var, mn = self._testDecorrelation(expected_var, corrected_diffExp)
+            variances.append(var)
+        self.assertFloatsAlmostEqual(variances[0], variances[1], rtol=0.03)
+
+    def testDiffimCorrection_spatialTask(self):
+        """Test decorrelated diffim when using the DecorrelateALKernelSpatialTask.
+           Compare results with those from the original DecorrelateALKernelTask.
+        """
+        # Same variance
+        self._testDiffimCorrection_spatialTask(svar=0.04, tvar=0.04)
+        # Science image variance is higher than that of the template.
+        self._testDiffimCorrection_spatialTask(svar=0.04, tvar=0.08)
+        # Template variance is higher than that of the science img.
+        self._testDiffimCorrection_spatialTask(svar=0.08, tvar=0.04)
 
 class MemoryTester(lsst.utils.tests.MemoryTestCase):
     pass
