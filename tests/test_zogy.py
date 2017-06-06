@@ -28,7 +28,8 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 from test_imageDecorrelation import makeFakeImages
 
-from lsst.ip.diffim.zogy import ZogyTask, ZogyConfig, ZogyMapReduceConfig
+from lsst.ip.diffim.zogy import ZogyTask, ZogyConfig, ZogyMapReduceConfig, \
+    ZogyImagePsfMatchConfig, ZogyImagePsfMatchTask
 from lsst.ip.diffim.imageMapReduce import ImageMapReduceTask
 
 try:
@@ -65,7 +66,7 @@ class ZogyTest(lsst.utils.tests.TestCase):
 
         seed = 666
         self.im1ex, self.im2ex \
-            = makeFakeImages(svar=self.svar, tvar=self.tvar,
+            = makeFakeImages(size=(255, 257), svar=self.svar, tvar=self.tvar,
                              psf1=self.psf1_sigma, psf2=self.psf2_sigma,
                              n_sources=10, psf_yvary_factor=varyPsf,
                              seed=seed, verbose=False)
@@ -137,7 +138,7 @@ class ZogyTest(lsst.utils.tests.TestCase):
         task = ZogyTask(templateExposure=self.im2ex, scienceExposure=self.im1ex, config=config)
         D_F = task.computeDiffim(inImageSpace=False)
         D_R = task.computeDiffim(inImageSpace=True)
-        self._compareExposures(D_F, D_R)
+        self._compareExposures(D_F.D, D_R.D)
 
     def _testZogyScorr(self, varAst=0.):
         """Compute Zogy likelihood images (Scorr) using Fourier- and Real-space methods.
@@ -148,7 +149,7 @@ class ZogyTest(lsst.utils.tests.TestCase):
         task = ZogyTask(templateExposure=self.im2ex, scienceExposure=self.im1ex, config=config)
         D_F = task.computeScorr(inImageSpace=False, xVarAst=varAst, yVarAst=varAst)
         D_R = task.computeScorr(inImageSpace=True, xVarAst=varAst, yVarAst=varAst)
-        self._compareExposures(D_F, D_R, Scorr=True)
+        self._compareExposures(D_F.S, D_R.S, Scorr=True)
 
     def testZogyScorr(self):
         """Compute Zogy likelihood images (Scorr) using Fourier- and Real-space methods.
@@ -173,7 +174,7 @@ class ZogyTest(lsst.utils.tests.TestCase):
         if inImageSpace:
             config.gridStepX = config.gridStepY = 8
             config.borderSizeX = config.borderSizeY = 6  # need larger border size for image-space run
-        config.reducerSubtask.reduceOperation = 'average'
+        config.reducer.reduceOperation = 'average'
         task = ImageMapReduceTask(config=config)
         D_mapReduced = task.run(self.im1ex, template=self.im2ex, inImageSpace=inImageSpace,
                                 doScorr=doScorr, forceEvenSized=True, **kwargs).exposure
@@ -181,9 +182,9 @@ class ZogyTest(lsst.utils.tests.TestCase):
         config = ZogyConfig()
         task = ZogyTask(templateExposure=self.im2ex, scienceExposure=self.im1ex, config=config)
         if not doScorr:
-            D = task.computeDiffim(inImageSpace=inImageSpace, **kwargs)
+            D = task.computeDiffim(inImageSpace=inImageSpace, **kwargs).D
         else:
-            D = task.computeScorr(inImageSpace=inImageSpace, **kwargs)
+            D = task.computeScorr(inImageSpace=inImageSpace, **kwargs).S
 
         self._compareExposures(D_mapReduced, D, tol=0.04, Scorr=doScorr)
 
@@ -202,6 +203,83 @@ class ZogyTest(lsst.utils.tests.TestCase):
         self._testZogyDiffimMapReduced(inImageSpace=True, doScorr=True)
         self._testZogyDiffimMapReduced(inImageSpace=False, doScorr=True, xVarAst=0.1, yVarAst=0.1)
         self._testZogyDiffimMapReduced(inImageSpace=True, doScorr=True, xVarAst=0.1, yVarAst=0.1)
+
+    def _testZogyImagePsfMatchTask(self, spatiallyVarying=False, inImageSpace=False,
+                                   doScorr=False, **kwargs):
+        """Test running Zogy using ZogyImagePsfMatchTask framework.
+
+        Compare resulting diffim version with original, non-spatially-varying version.
+        """
+        config = ZogyImagePsfMatchConfig()
+        task = ZogyImagePsfMatchTask(config=config)
+        result = task.subtractExposures(self.im2ex, self.im1ex, inImageSpace=inImageSpace,
+                                        doWarping=False, spatiallyVarying=spatiallyVarying)
+        D_fromTask = result.subtractedExposure
+
+        config = ZogyConfig()
+        task = ZogyTask(templateExposure=self.im2ex, scienceExposure=self.im1ex, config=config)
+        D = task.computeDiffim(inImageSpace=inImageSpace, **kwargs).D
+        self._compareExposures(D_fromTask, D, tol=0.04, Scorr=doScorr)
+
+    def testZogyImagePsfMatchTask(self):
+        """Test running ZogyTask both with and without the spatiallyVarying option.
+        """
+        self._setUpImages()
+        self._testZogyImagePsfMatchTask(inImageSpace=False)
+        self._testZogyImagePsfMatchTask(inImageSpace=True)
+        self._testZogyImagePsfMatchTask(inImageSpace=False, spatiallyVarying=True)
+        self._testZogyImagePsfMatchTask(inImageSpace=True, spatiallyVarying=True)
+
+    def testZogyImagePsfMatchTaskDifferentPsfSizes(self):
+        """Test running ZogyTask both with and without the spatiallyVarying option.
+
+        Here we artificially set the two images to have PSFs with different dimensions
+        to ensure this edge case passes. This also tests cases where one of the PSFs
+        is not square.
+        """
+        import lsst.afw.geom as afwGeom
+        import lsst.meas.algorithms as measAlg
+
+        # All this to grow the PSF of im1ex by a few pixels:
+        def _growPsf(exp, extraPix=(2, 3)):
+            bbox = exp.getBBox()
+            center = ((bbox.getBeginX() + bbox.getEndX()) // 2., (bbox.getBeginY() + bbox.getEndY()) // 2.)
+            center = afwGeom.Point2D(center[0], center[1])
+            kern = exp.getPsf().computeKernelImage(center).convertF()
+            kernSize = kern.getDimensions()
+            paddedKern = afwImage.ImageF(kernSize[0] + extraPix[0], kernSize[1] + extraPix[1])
+            bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((kernSize[0] + extraPix[0] - kern.getWidth()) // 2,
+                                                        (kernSize[1] + extraPix[1] - kern.getHeight()) // 2),
+                                        kern.getDimensions())
+            paddedKern.assign(kern, bboxToPlace)
+            fixedKern = afwMath.FixedKernel(paddedKern.convertD())
+            psfNew = measAlg.KernelPsf(fixedKern, center)
+            exp.setPsf(psfNew)
+            return exp
+
+        def _runAllTests():
+            self._testZogyImagePsfMatchTask(inImageSpace=False)
+            self._testZogyImagePsfMatchTask(inImageSpace=True)
+            self._testZogyImagePsfMatchTask(inImageSpace=False, spatiallyVarying=True)
+            self._testZogyImagePsfMatchTask(inImageSpace=True, spatiallyVarying=True)
+
+        # Try a range of PSF size combinations...
+        self._setUpImages()
+        self.im1ex = _growPsf(self.im1ex, (2, 3))
+        _runAllTests()
+
+        self.im2ex = _growPsf(self.im2ex, (3, 2))
+        _runAllTests()
+
+        self._setUpImages()
+        self.im2ex = _growPsf(self.im2ex, (1, 0))
+        _runAllTests()
+
+        self.im2ex = _growPsf(self.im2ex, (3, 6))
+        _runAllTests()
+
+        self.im1ex = _growPsf(self.im1ex, (5, 6))
+        _runAllTests()
 
 
 class MemoryTester(lsst.utils.tests.MemoryTestCase):

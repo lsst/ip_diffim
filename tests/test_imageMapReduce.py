@@ -34,8 +34,8 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 
 from lsst.ip.diffim.imageMapReduce import (ImageMapReduceTask, ImageMapReduceConfig,
-                                           ImageMapperSubtask, ImageMapperSubtaskConfig,
-                                           ImageReducerSubtask, ImageReducerSubtaskConfig)
+                                           ImageMapper, ImageMapperConfig,
+                                           ImageReducer, ImageReducerConfig)
 
 
 def setup_module(module):
@@ -88,8 +88,8 @@ def getPsfSecondMoments(psfArray):
     return mxx, myy
 
 
-class AddAmountImageMapperSubtaskConfig(ImageMapperSubtaskConfig):
-    """Configuration parameters for the AddAmountImageMapperSubtask
+class AddAmountImageMapperConfig(ImageMapperConfig):
+    """Configuration parameters for the AddAmountImageMapper
     """
     addAmount = pexConfig.Field(
         dtype=float,
@@ -98,11 +98,11 @@ class AddAmountImageMapperSubtaskConfig(ImageMapperSubtaskConfig):
     )
 
 
-class AddAmountImageMapperSubtask(ImageMapperSubtask):
+class AddAmountImageMapper(ImageMapper):
     """Image mapper subTask that adds a constant value to the input subexposure
     """
-    ConfigClass = AddAmountImageMapperSubtaskConfig
-    _DefaultName = "ip_diffim_AddAmountImageMapperSubtask"
+    ConfigClass = AddAmountImageMapperConfig
+    _DefaultName = "ip_diffim_AddAmountImageMapper"
 
     def run(self, subExposure, expandedSubExp, fullBBox, addNans=False, **kwargs):
         """Add `addAmount` to given `subExposure`.
@@ -138,18 +138,18 @@ class AddAmountImageMapperSubtask(ImageMapperSubtask):
 class AddAmountImageMapReduceConfig(ImageMapReduceConfig):
     """Configuration parameters for the AddAmountImageMapReduceTask
     """
-    mapperSubtask = pexConfig.ConfigurableField(
+    mapper = pexConfig.ConfigurableField(
         doc="Mapper subtask to run on each subimage",
-        target=AddAmountImageMapperSubtask,
+        target=AddAmountImageMapper,
     )
 
 
-class GetMeanImageMapperSubtask(ImageMapperSubtask):
+class GetMeanImageMapper(ImageMapper):
     """ImageMapper subtask that computes and returns the mean value of the
     input sub-exposure
     """
-    ConfigClass = AddAmountImageMapperSubtaskConfig  # Doesn't need its own config
-    _DefaultName = "ip_diffim_GetMeanImageMapperSubtask"
+    ConfigClass = AddAmountImageMapperConfig  # Doesn't need its own config
+    _DefaultName = "ip_diffim_GetMeanImageMapper"
 
     def run(self, subExposure, expandedSubExp, fullBBox, **kwargs):
         """Compute the mean of the given `subExposure`
@@ -180,9 +180,9 @@ class GetMeanImageMapperSubtask(ImageMapperSubtask):
 class GetMeanImageMapReduceConfig(ImageMapReduceConfig):
     """Configuration parameters for the GetMeanImageMapReduceTask
     """
-    mapperSubtask = pexConfig.ConfigurableField(
+    mapper = pexConfig.ConfigurableField(
         doc="Mapper subtask to run on each subimage",
-        target=GetMeanImageMapperSubtask,
+        target=GetMeanImageMapper,
     )
 
 
@@ -215,8 +215,8 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         """
         config = AddAmountImageMapReduceConfig()
         task = ImageMapReduceTask(config)
-        config.mapperSubtask.addAmount = 5.
-        config.reducerSubtask.reduceOperation = reduceOp
+        config.mapper.addAmount = 5.
+        config.reducer.reduceOperation = reduceOp
         newExp = task.run(self.exposure, addNans=withNaNs).exposure
         newMI = newExp.getMaskedImage()
         newArr = newMI.getImage().getArray()
@@ -242,9 +242,9 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         """
         config = AddAmountImageMapReduceConfig()
         config.gridStepX = config.gridStepY = 8.
-        config.reducerSubtask.reduceOperation = 'average'
+        config.reducer.reduceOperation = 'average'
         task = ImageMapReduceTask(config)
-        config.mapperSubtask.addAmount = 5.
+        config.mapper.addAmount = 5.
         newExp = task.run(self.exposure, addNans=withNaNs).exposure
         newMI = newExp.getMaskedImage()
         newArr = newMI.getImage().getArray()
@@ -305,12 +305,12 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
 
         config = AddAmountImageMapReduceConfig()
         task = ImageMapReduceTask(config)
-        config.mapperSubtask.addAmount = 5.
+        config.mapper.addAmount = 5.
         newExp = task.run(exposure1, addNans=withNaNs).exposure
         newMI1 = newExp.getMaskedImage()
 
         config.gridStepX = config.gridStepY = 8.
-        config.reducerSubtask.reduceOperation = 'average'
+        config.reducer.reduceOperation = 'average'
         task = ImageMapReduceTask(config)
         newExp = task.run(exposure2, addNans=withNaNs).exposure
         newMI2 = newExp.getMaskedImage()
@@ -330,7 +330,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         'none' `reduceOperation`.
         """
         config = GetMeanImageMapReduceConfig()
-        config.reducerSubtask.reduceOperation = 'none'
+        config.reducer.reduceOperation = 'none'
         task = ImageMapReduceTask(config)
         testExposure = self.exposure.clone()
         testExposure.getMaskedImage().set(1.234)
@@ -348,7 +348,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         """
         config = GetMeanImageMapReduceConfig()
         config.gridStepX = config.gridStepY = 8.
-        config.reducerSubtask.reduceOperation = 'none'
+        config.reducer.reduceOperation = 'none'
         config.cellCentroidsX = [i for i in np.linspace(0, 128, 50)]
         config.cellCentroidsY = config.cellCentroidsX
         task = ImageMapReduceTask(config)
@@ -368,7 +368,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         len(task.boxes1) and check for ValueError.
         """
         config = GetMeanImageMapReduceConfig()
-        config.reducerSubtask.reduceOperation = 'none'
+        config.reducer.reduceOperation = 'none'
         config.cellCentroidsX = [i for i in np.linspace(0, 128, 50)]
         config.cellCentroidsY = [i for i in np.linspace(0, 128, 50)]
         task = ImageMapReduceTask(config)
@@ -386,9 +386,9 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         config.gridStepX = config.gridStepY = 8.
         config.cellCentroidsX = [i for i in np.linspace(0, 128, 50)]
         config.cellCentroidsY = config.cellCentroidsX
-        config.reducerSubtask.reduceOperation = 'average'
+        config.reducer.reduceOperation = 'average'
         task = ImageMapReduceTask(config)
-        config.mapperSubtask.addAmount = 5.
+        config.mapper.addAmount = 5.
         newExp = task.run(self.exposure).exposure
         newMI = newExp.getMaskedImage()
         newArr = newMI.getImage().getArray()
@@ -407,13 +407,13 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         self.assertEqual(np.sum(np.isnan(newArr)), nMasked)
 
     def testNotNoneReduceWithNonExposureMapper(self):
-        """Test that a combination of a mapperSubtask that returns a non-exposure
-        cannot work correctly with a reducerSubtask with reduceOperation='none'.
+        """Test that a combination of a mapper that returns a non-exposure
+        cannot work correctly with a reducer with reduceOperation='none'.
         Should raise a TypeError.
         """
         config = GetMeanImageMapReduceConfig()  # mapper returns a float (mean)
         config.gridStepX = config.gridStepY = 8.
-        config.reducerSubtask.reduceOperation = 'average'  # not 'none'!
+        config.reducer.reduceOperation = 'average'  # not 'none'!
         task = ImageMapReduceTask(config)
         with self.assertRaises(TypeError):
             task.run(self.exposure)
@@ -431,7 +431,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
                         for gstepy in range(11, 3, -4):
                             for gsizey in gstepy + np.array([0, 1, 2]):
                                 config = AddAmountImageMapReduceConfig()
-                                config.reducerSubtask.reduceOperation = reduceOp
+                                config.reducer.reduceOperation = reduceOp
                                 n_tests += 1
                                 self._runGridValidity(config, gstepx, gsizex,
                                                       gstepy, gsizey, adjustGridOption,
@@ -461,7 +461,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         expectedVal : `float`
             float to add to exposure (to compare for testing)
         """
-        config.mapperSubtask.addAmount = expectedVal
+        config.mapper.addAmount = expectedVal
         lenBoxes = [0, 0]
         for scaleByFwhm in (True, False):
             config.scaleByFwhm = scaleByFwhm

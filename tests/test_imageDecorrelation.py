@@ -120,7 +120,7 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
 
     xim = np.arange(-size[0]//2, size[0]//2, 1)
     yim = np.arange(-size[1]//2, size[1]//2, 1)
-    x0im, y0im = np.meshgrid(xim, yim)
+    x0im, y0im = np.meshgrid(yim, xim)
     im1 = np.random.normal(scale=np.sqrt(svar), size=x0im.shape)  # variance of science image
     im2 = np.random.normal(scale=np.sqrt(tvar), size=x0im.shape)  # variance of template
 
@@ -189,7 +189,7 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
         @return a new exposure containing the image, PSF and desired variance plane
         """
         # All this code to convert the template image array/psf array into an exposure.
-        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(imgArray.shape[0]-1, imgArray.shape[1]-1))
+        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(imgArray.shape[1]-1, imgArray.shape[0]-1))
         im1ex = afwImage.ExposureD(bbox)
         im1ex.getMaskedImage().getImage().getArray()[:, :] = imgArray
         im1ex.getMaskedImage().getVariance().getArray()[:, :] = imgVariance
@@ -353,7 +353,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         """
         config = DecorrelateALKernelMapReduceConfig()
         config.borderSizeX = config.borderSizeY = 3
-        config.reducerSubtask.reduceOperation = 'average'
+        config.reducer.reduceOperation = 'average'
         task = ImageMapReduceTask(config=config)
         decorrResult = task.run(diffExp, template=self.im2ex, science=self.im1ex,
                                 psfMatchingKernel=mKernel, forceEvenSized=True)
