@@ -489,12 +489,12 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
 
         svar = self.computeVarianceMean(scienceExposure)
         tvar = self.computeVarianceMean(templateExposure)
-        self.log.info("Variance (science, template): (%f, %f)", svar, tvar)
 
         var = self.computeVarianceMean(subtractedExposure)
-        self.log.info("Variance (uncorrected diffim): %f", var)
 
         if spatiallyVarying:
+            self.log.info("Variance (science, template): (%f, %f)", svar, tvar)
+            self.log.info("Variance (uncorrected diffim): %f", var)
             config = self.config.decorrelateMapReduceConfig
             task = ImageMapReduceTask(config=config)
             results = task.run(subtractedExposure, science=scienceExposure,
