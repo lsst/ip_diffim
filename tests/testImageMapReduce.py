@@ -341,7 +341,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         firstPixel = testExposure.getMaskedImage().getImage().getArray()[0, 0]
         self.assertFloatsAlmostEqual(np.array(subMeans), firstPixel)
 
-    def testGridCentroids(self):
+    def testCellCentroids(self):
         """Test sample grid task which is provided a set of `cellCentroids` and
         returns the mean of the subimages surrounding those centroids using 'none'
         for `reduceOperation`.
@@ -361,7 +361,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         firstPixel = testExposure.getMaskedImage().getImage().getArray()[0, 0]
         self.assertFloatsAlmostEqual(np.array(subMeans), firstPixel)
 
-    def testGridCentroidsWrongLength(self):
+    def testCellCentroidsWrongLength(self):
         """Test sample grid task which is provided a set of `cellCentroids` and
         returns the mean of the subimages surrounding those centroids using 'none'
         for `reduceOperation`. In this case, we ensure that len(task.boxes0) !=
@@ -376,6 +376,35 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         del task.boxes0[-1]  # remove the last box
         with self.assertRaises(ValueError):
             task.run(self.exposure)
+
+    def testMasks(self):
+        """Test the mask for an exposure produced by a sample grid task
+        where we provide a set of `cellCentroids` and thus should have
+        many invalid pixels.
+        """
+        config = AddAmountImageMapReduceConfig()
+        config.gridStepX = config.gridStepY = 8.
+        config.cellCentroidsX = [i for i in np.linspace(0, 128, 50)]
+        config.cellCentroidsY = config.cellCentroidsX
+        config.reducerSubtask.reduceOperation = 'average'
+        task = ImageMapReduceTask(config)
+        config.mapperSubtask.addAmount = 5.
+        newExp = task.run(self.exposure).exposure
+        newMI = newExp.getMaskedImage()
+        newArr = newMI.getImage().getArray()
+        mi = self.exposure.getMaskedImage()
+        isnan = np.isnan(newArr)
+        self.assertGreater(np.sum(isnan), 1000)
+
+        mi = self.exposure.getMaskedImage().getImage().getArray()
+        self.assertFloatsAlmostEqual(mi[~isnan], newArr[~isnan] - 5.)
+
+        mask = newMI.getMask()  # Now check the mask
+        self.assertGreater(mask.getMaskPlane('INVALID_MAPREDUCE'), 0)
+        maskBit = mask.getPlaneBitMask('INVALID_MAPREDUCE')
+        nMasked = np.sum(np.bitwise_and(mask.getArray(), maskBit) != 0)
+        self.assertGreater(nMasked, 1000)
+        self.assertEqual(np.sum(np.isnan(newArr)), nMasked)
 
     def testNotNoneReduceWithNonExposureMapper(self):
         """Test that a combination of a mapperSubtask that returns a non-exposure
