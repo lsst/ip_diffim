@@ -444,7 +444,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
 
                 # reference kernel image, at location of science subimage
                 kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY)).convertF()
-                kernelMaskR = afwImage.MaskU(dimenR)
+                kernelMaskR = afwImage.Mask(dimenR)
                 kernelMaskR.set(0)
                 kernelVarR = afwImage.ImageF(dimenR)
                 kernelVarR.set(1.0)
@@ -462,7 +462,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                                                 rawKernel.getDimensions())
                     kernelImageS.assign(rawKernel, bboxToPlace)
 
-                kernelMaskS = afwImage.MaskU(dimenS)
+                kernelMaskS = afwImage.Mask(dimenS)
                 kernelMaskS.set(0)
                 kernelVarS = afwImage.ImageF(dimenS)
                 kernelVarS.set(1.0)

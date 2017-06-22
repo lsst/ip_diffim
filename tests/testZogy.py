@@ -52,9 +52,10 @@ class ZogyTest(lsst.utils.tests.TestCase):
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(["INTRP", "EDGE", "SAT", "CR",
-                                                                     "DETECTED", "BAD",
-                                                                     "NO_DATA", "DETECTED_NEGATIVE"]))
+        self.statsControl.setAndMask(afwImage.Mask\
+                                     .getPlaneBitMask(["INTRP", "EDGE", "SAT", "CR",
+                                                       "DETECTED", "BAD",
+                                                       "NO_DATA", "DETECTED_NEGATIVE"]))
 
     def _setUpImages(self, svar=100., tvar=100., varyPsf=0.):
         """Generate a fake aligned template and science image.

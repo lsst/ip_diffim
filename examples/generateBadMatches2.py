@@ -29,7 +29,7 @@ def makeTest1(doAddNoise):
     kernel1.computeImage(image1, doNorm)
     image1 *= scaling # total counts = scaling
     image1 = image1.convertF()
-    mask1 = afwImage.MaskU(kernel1.getDimensions())
+    mask1 = afwImage.Mask(kernel1.getDimensions())
     var1 = afwImage.ImageF(image1, True)
     mi1 = afwImage.MaskedImageF(image1, mask1, var1)
     if doAddNoise:
@@ -41,7 +41,7 @@ def makeTest1(doAddNoise):
     kernel2.computeImage(image2, doNorm)
     image2 *= scaling # total counts = scaling
     image2 = image2.convertF()
-    mask2 = afwImage.MaskU(kernel2.getDimensions())
+    mask2 = afwImage.Mask(kernel2.getDimensions())
     var2 = afwImage.ImageF(image2, True)
     mi2 = afwImage.MaskedImageF(image2, mask2, var2)
     if doAddNoise:
@@ -68,7 +68,7 @@ def makeTest2(doAddNoise, shiftX=int(2.0 * gScale), shiftY=int(1.0 * gScale)):
     image1 /= counts
     image1 *= scaling
     ###
-    mask1 = afwImage.MaskU(kernel1.getDimensions())
+    mask1 = afwImage.Mask(kernel1.getDimensions())
     var1 = afwImage.ImageF(image1, True)
     mi1 = afwImage.MaskedImageF(image1, mask1, var1)
     if doAddNoise:
@@ -80,7 +80,7 @@ def makeTest2(doAddNoise, shiftX=int(2.0 * gScale), shiftY=int(1.0 * gScale)):
     kernel2.computeImage(image2, doNorm)
     image2 *= scaling # total counts = scaling
     image2 = image2.convertF()
-    mask2 = afwImage.MaskU(kernel2.getDimensions())
+    mask2 = afwImage.Mask(kernel2.getDimensions())
     var2 = afwImage.ImageF(image2, True)
     mi2 = afwImage.MaskedImageF(image2, mask2, var2)
     if doAddNoise:
@@ -96,7 +96,7 @@ def makeTest3(doAddNoise):
     kernel1.computeImage(image1, doNorm)
     image1 *= scaling # total counts = scaling
     image1 = image1.convertF()
-    mask1 = afwImage.MaskU(kernel1.getDimensions())
+    mask1 = afwImage.Mask(kernel1.getDimensions())
     var1 = afwImage.ImageF(image1, True)
     mi1 = afwImage.MaskedImageF(image1, mask1, var1)
 
@@ -106,7 +106,7 @@ def makeTest3(doAddNoise):
     kernel2.computeImage(image2, doNorm)
     image2 *= scaling # total counts = scaling
     image2 = image2.convertF()
-    mask2 = afwImage.MaskU(kernel2.getDimensions())
+    mask2 = afwImage.Mask(kernel2.getDimensions())
     var2 = afwImage.ImageF(image2, True)
     mi2 = afwImage.MaskedImageF(image2, mask2, var2)
 
@@ -118,7 +118,7 @@ def makeTest3(doAddNoise):
     image3 /= counts
     image3 *= scaling
 
-    mask3 = afwImage.MaskU(image3.getDimensions())
+    mask3 = afwImage.Mask(image3.getDimensions())
     var3 = afwImage.ImageF(image3, True)
     mi3 = afwImage.MaskedImageF(image3, mask3, var3)
 

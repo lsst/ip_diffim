@@ -130,7 +130,7 @@ class DiffimTestCases(unittest.TestCase):
     def testImageStatisticsMask1(self):
         # Mask value that gets ignored
         maskPlane = self.policy.getStringArray("badMaskPlanes")[0]
-        maskVal = afwImage.MaskU.getPlaneBitMask(maskPlane)
+        maskVal = afwImage.Mask.getPlaneBitMask(maskPlane)
         numArray = num.ones((20, 19))
         mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
@@ -156,7 +156,7 @@ class DiffimTestCases(unittest.TestCase):
         maskPlanes = self.policy.getStringArray("badMaskPlanes")
         for maskPlane in ("BAD", "EDGE", "CR", "SAT", "INTRP"):
             if maskPlane not in maskPlanes:
-                maskVal = afwImage.MaskU.getPlaneBitMask(maskPlane)
+                maskVal = afwImage.Mask.getPlaneBitMask(maskPlane)
                 break
         self.assertGreater(maskVal, 0)
 

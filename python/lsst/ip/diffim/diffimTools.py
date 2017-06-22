@@ -180,13 +180,13 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     # And turn into MaskedImages
     sim = afwImage.ImageF(sim, bbox, afwImage.LOCAL)
     svar = afwImage.ImageF(sim, True)
-    smask = afwImage.MaskU(sim.getDimensions())
+    smask = afwImage.Mask(sim.getDimensions())
     smask.set(0x0)
     sMi = afwImage.MaskedImageF(sim, smask, svar)
 
     tim = afwImage.ImageF(tim, bbox, afwImage.LOCAL)
     tvar = afwImage.ImageF(tim, True)
-    tmask = afwImage.MaskU(tim.getDimensions())
+    tmask = afwImage.Mask(tim.getDimensions())
     tmask.set(0x0)
     tMi = afwImage.MaskedImageF(tim, tmask, tvar)
 
@@ -303,7 +303,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
     fsb = diffimLib.FindSetBitsU()
     badBitMask = 0
     for mp in config.badMaskPlanes:
-        badBitMask |= afwImage.MaskU.getPlaneBitMask(mp)
+        badBitMask |= afwImage.Mask.getPlaneBitMask(mp)
     bbox = scienceExposure.getBBox()
 
     # Size to grow Sources

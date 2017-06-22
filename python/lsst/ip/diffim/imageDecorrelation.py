@@ -135,7 +135,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(self.config.ignoreMaskPlanes))
+        self.statsControl.setAndMask(afwImage.Mask\
+                                     .getPlaneBitMask(self.config.ignoreMaskPlanes))
 
     def computeVarianceMean(self, exposure):
         statObj = afwMath.makeStatistics(exposure.getMaskedImage().getVariance(),
@@ -553,7 +554,8 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(self.config.ignoreMaskPlanes))
+        self.statsControl.setAndMask(afwImage.Mask\
+                                     .getPlaneBitMask(self.config.ignoreMaskPlanes))
 
     def computeVarianceMean(self, exposure):
         """Compute the mean of the variance plane of `exposure`.

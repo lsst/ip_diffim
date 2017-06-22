@@ -21,7 +21,7 @@ def makeTest1(doAddNoise):
     kernel1.computeImage(image1, False)
     image1 *= 10000
     image1 = image1.convertF()
-    mask1 = afwImage.MaskU(kernel1.getDimensions())
+    mask1 = afwImage.Mask(kernel1.getDimensions())
     var1 = afwImage.ImageF(image1, True)
     mi1 = afwImage.MaskedImageF(image1, mask1, var1)
     if doAddNoise:
@@ -33,7 +33,7 @@ def makeTest1(doAddNoise):
     kernel2.computeImage(image2, False)
     image2 *= 10000
     image2 = image2.convertF()
-    mask2 = afwImage.MaskU(kernel2.getDimensions())
+    mask2 = afwImage.Mask(kernel2.getDimensions())
     var2 = afwImage.ImageF(image2, True)
     mi2 = afwImage.MaskedImageF(image2, mask2, var2)
     if doAddNoise:
@@ -57,7 +57,7 @@ def makeTest2(doAddNoise, shiftX=5, shiftY=3):
     subregB = afwImage.ImageF(image1, boxB, afwImage.PARENT, True)
     subregA += subregB
     ###
-    mask1 = afwImage.MaskU(kernel1.getDimensions())
+    mask1 = afwImage.Mask(kernel1.getDimensions())
     var1 = afwImage.ImageF(image1, True)
     mi1 = afwImage.MaskedImageF(image1, mask1, var1)
     if doAddNoise:
@@ -69,7 +69,7 @@ def makeTest2(doAddNoise, shiftX=5, shiftY=3):
     kernel2.computeImage(image2, False)
     image2 *= 10000
     image2 = image2.convertF()
-    mask2 = afwImage.MaskU(kernel2.getDimensions())
+    mask2 = afwImage.Mask(kernel2.getDimensions())
     var2 = afwImage.ImageF(image2, True)
     mi2 = afwImage.MaskedImageF(image2, mask2, var2)
     if doAddNoise:
