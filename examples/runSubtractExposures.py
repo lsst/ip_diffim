@@ -8,7 +8,6 @@ import numpy as num
 
 import lsst.afw.image as afwImage
 import lsst.log.utils as logUtils
-import lsst.meas.algorithms as measAlg
 
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
@@ -79,10 +78,7 @@ Notes:
     fwhmS = defFwhm
     if options.fwhmS:
         if scienceExposure.hasPsf():
-            width, height = scienceExposure.getPsf().getKernel().getDimensions()
-            psfAttr = measAlg.PsfAttributes(scienceExposure.getPsf(), width//2, height//2)
-            s = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT) # gaussian sigma in pixels
-            fwhm = s * sigma2fwhm
+            fwhm = scienceExposure.getPsf().computeShape().getDeterminantRadius() * sigma2fwhm
             print('NOTE: Embedded Psf has FwhmS =', fwhm)
         print('USING: FwhmS =', options.fwhmS)
         fwhmS = options.fwhmS
@@ -90,10 +86,7 @@ Notes:
     fwhmT = defFwhm
     if options.fwhmT:
         if templateExposure.hasPsf():
-            width, height = templateExposure.getPsf().getKernel().getDimensions()
-            psfAttr = measAlg.PsfAttributes(templateExposure.getPsf(), width//2, height//2)
-            s = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT) # gaussian sigma in pixels
-            fwhm = s * sigma2fwhm
+            fwhm = templateExposure.getPsf().computeShape().getDeterminantRadius() * sigma2fwhm
             print('NOTE: Embedded Psf has FwhmT =', fwhm)
         print('USING: FwhmT =', options.fwhmT)
         fwhmT = options.fwhmT

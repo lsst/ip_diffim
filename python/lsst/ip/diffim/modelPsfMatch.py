@@ -28,7 +28,6 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.log as log
-import lsst.meas.algorithms as measAlg
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from .makeKernelBasisList import makeKernelBasisList
@@ -299,15 +298,10 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         result = self._buildCellSet(exposure, referencePsfModel)
         kernelCellSet = result.kernelCellSet
         referencePsfModel = result.referencePsfModel
-        width, height = referencePsfModel.getLocalKernel().getDimensions()
-        psfAttr1 = measAlg.PsfAttributes(exposure.getPsf(), width//2, height//2)
-        psfAttr2 = measAlg.PsfAttributes(referencePsfModel, width//2, height//2)
-        s1 = psfAttr1.computeGaussianWidth(psfAttr1.ADAPTIVE_MOMENT)  # gaussian sigma in pixels
-        s2 = psfAttr2.computeGaussianWidth(psfAttr2.ADAPTIVE_MOMENT)  # gaussian sigma in pixels
-        fwhm1 = s1 * sigma2fwhm  # science Psf
-        fwhm2 = s2 * sigma2fwhm  # template Psf
+        fwhmScience = exposure.getPsf().computeShape().getDeterminantRadius() * sigma2fwhm
+        fwhmModel = referencePsfModel.computeShape().getDeterminantRadius() * sigma2fwhm
 
-        basisList = makeKernelBasisList(self.kConfig, fwhm1, fwhm2, metadata=self.metadata)
+        basisList = makeKernelBasisList(self.kConfig, fwhmScience, fwhmModel, metadata=self.metadata)
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
 
         if psfMatchingKernel.isSpatiallyVarying():
