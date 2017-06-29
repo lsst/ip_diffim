@@ -4,11 +4,11 @@ import sys
 import os
 import optparse
 import re
-import numpy as num
+import numpy as np
 
 import lsst.afw.image as afwImage
 import lsst.log.utils as logUtils
-import lsst.meas.algorithms as measAlg
+from lsst.meas.algorithms import SingleGaussianPsf
 
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
@@ -16,15 +16,14 @@ import lsst.ip.diffim.diffimTools as diffimTools
 
 def main():
     defDataDir = lsst.utils.getPackageDir('afwdata')
-    imageProcDir = lsst.utils.getPackageDir('ip_diffim')
 
-    defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0", "v26-e0-c011-a10.sci")
-    defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0", "v5-e0-c011-a10.sci")
+    defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0", "v26-e0-c011-a10.sci.fits")
+    defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0", "v5-e0-c011-a10.sci.fits")
 
     defOutputPath = 'diffExposure.fits'
-    defVerbosity = 5
+    defVerbosity = 0
     defFwhm = 3.5
-    sigma2fwhm = 2. * num.sqrt(2. * num.log(2.))
+    sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
     usage = """usage: %%prog [options] [scienceExposure [templateExposure [outputExposure]]]]
 
@@ -35,7 +34,7 @@ Notes:
 - the template exposure is convolved, the science exposure is not
 - default scienceExposure=%s
 - default templateExposure=%s
-- default outputExposure=%s 
+- default outputExposure=%s
 """ % (defSciencePath, defTemplatePath, defOutputPath)
 
     parser = optparse.OptionParser(usage)
@@ -61,7 +60,7 @@ Notes:
     templatePath = getArg(1, defTemplatePath)
     outputPath = getArg(2, defOutputPath)
 
-    if sciencePath == None or templatePath == None:
+    if sciencePath is None or templatePath is None:
         parser.print_help()
         sys.exit(1)
 
@@ -79,10 +78,7 @@ Notes:
     fwhmS = defFwhm
     if options.fwhmS:
         if scienceExposure.hasPsf():
-            width, height = scienceExposure.getPsf().getKernel().getDimensions()
-            psfAttr = measAlg.PsfAttributes(scienceExposure.getPsf(), width//2, height//2)
-            s = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT) # gaussian sigma in pixels
-            fwhm = s * sigma2fwhm
+            fwhm = scienceExposure.getPsf().computeShape().getDeterminantRadius() * sigma2fwhm
             print('NOTE: Embedded Psf has FwhmS =', fwhm)
         print('USING: FwhmS =', options.fwhmS)
         fwhmS = options.fwhmS
@@ -90,18 +86,10 @@ Notes:
     fwhmT = defFwhm
     if options.fwhmT:
         if templateExposure.hasPsf():
-            width, height = templateExposure.getPsf().getKernel().getDimensions()
-            psfAttr = measAlg.PsfAttributes(templateExposure.getPsf(), width//2, height//2)
-            s = psfAttr.computeGaussianWidth(psfAttr.ADAPTIVE_MOMENT) # gaussian sigma in pixels
-            fwhm = s * sigma2fwhm
+            fwhm = templateExposure.getPsf().computeShape().getDeterminantRadius() * sigma2fwhm
             print('NOTE: Embedded Psf has FwhmT =', fwhm)
         print('USING: FwhmT =', options.fwhmT)
         fwhmT = options.fwhmT
-
-    display = False
-    if options.display:
-        print('Display =', options.display)
-        display = True
 
     bgSub = False
     if options.bg:
@@ -119,14 +107,21 @@ Notes:
                                        [templateExposure.getMaskedImage(),
                                         scienceExposure.getMaskedImage()])
     else:
-        if subconfig.fitForBackground == False:
+        if not subconfig.fitForBackground:
             print('NOTE: no background subtraction at all is requested')
 
-    psfmatch = ipDiffim.ImagePsfMatchTask(config)
-    results = psfmatch.run(templateExposure, scienceExposure, "subtractExposures",
-                           templateFwhmPix=fwhmT, scienceFwhmPix=fwhmS)
+    # ImagePsfMatchTask requires a candidateList or that the exposoure have a PSF for detection
+    if not scienceExposure.hasPsf():
+        sigmaS = fwhmS/sigma2fwhm
+        kSize = int(6 * sigmaS)  # minimum kernel size for FWHM
+        oddKSize = kSize + 1 if kSize % 2 == 0 else kSize
+        scienceExposure.setPsf(SingleGaussianPsf(oddKSize, oddKSize, sigmaS))
 
-    differenceExposure = results.subtractedImage
+    psfmatch = ipDiffim.ImagePsfMatchTask(config)
+    results = psfmatch.subtractExposures(templateExposure, scienceExposure,
+                                         templateFwhmPix=fwhmT, scienceFwhmPix=fwhmS)
+
+    differenceExposure = results.subtractedExposure
     differenceExposure.writeFits(outputPath)
 
     if False:
@@ -140,6 +135,7 @@ Notes:
 
 def run():
     main()
+
 
 if __name__ == '__main__':
     run()
