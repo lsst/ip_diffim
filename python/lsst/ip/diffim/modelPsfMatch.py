@@ -426,8 +426,13 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         dimenS = afwGeom.Extent2I(psfSize, psfSize)
 
         if (dimenR != dimenS):
-            self.log.info("Adjusting dimensions of reference PSF model from %s to %s" % (dimenR, dimenS))
-            referencePsfModel = referencePsfModel.resized(psfSize, psfSize)
+            try:
+                referencePsfModel = referencePsfModel.resized(psfSize, psfSize)
+                self.log.info("Adjusted dimensions of reference PSF model from %s to %s" % (dimenR, dimenS))
+            except Exception as e:
+                self.log.warn("Zero padding or clipping the reference PSF model of type %s and dimensions %s"
+                              " to the science Psf dimensions %s because: %s",
+                              referencePsfModel.__class__.__name__, dimenR, dimenS, e)
             dimenR = dimenS
 
         policy = pexConfig.makePolicy(self.kConfig)
@@ -443,30 +448,10 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                         "Creating Psf candidate at %.1f %.1f", posX, posY)
 
                 # reference kernel image, at location of science subimage
-                kernelImageR = referencePsfModel.computeImage(afwGeom.Point2D(posX, posY)).convertF()
-                kernelMaskR = afwImage.Mask(dimenR)
-                kernelMaskR.set(0)
-                kernelVarR = afwImage.ImageF(dimenR)
-                kernelVarR.set(1.0)
-                referenceMI = afwImage.MaskedImageF(kernelImageR, kernelMaskR, kernelVarR)
+                referenceMI = self._makePsfMaskedImage(referencePsfModel, posX, posY, dimensions=dimenR)
 
                 # kernel image we are going to convolve
-                rawKernel = sciencePsfModel.computeKernelImage(afwGeom.Point2D(posX, posY)).convertF()
-                if rawKernel.getDimensions() == dimenR:
-                    kernelImageS = rawKernel
-                else:
-                    # make image of proper size
-                    kernelImageS = afwImage.ImageF(dimenR)
-                    bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((psfSize - rawKernel.getWidth())//2,
-                                                                (psfSize - rawKernel.getHeight())//2),
-                                                rawKernel.getDimensions())
-                    kernelImageS.assign(rawKernel, bboxToPlace)
-
-                kernelMaskS = afwImage.Mask(dimenS)
-                kernelMaskS.set(0)
-                kernelVarS = afwImage.ImageF(dimenS)
-                kernelVarS.set(1.0)
-                scienceMI = afwImage.MaskedImageF(kernelImageS, kernelMaskS, kernelVarS)
+                scienceMI = self._makePsfMaskedImage(sciencePsfModel, posX, posY, dimensions=dimenR)
 
                 # The image to convolve is the science image, to the reference Psf.
                 kc = diffimLib.makeKernelCandidate(posX, posY, scienceMI, referenceMI, policy)
@@ -488,3 +473,23 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         return pipeBase.Struct(kernelCellSet=kernelCellSet,
                                referencePsfModel=referencePsfModel,
                                )
+
+    def _makePsfMaskedImage(self, psfModel, posX, posY, dimensions=None):
+        """! Return a MaskedImage of the a PSF Model of specified dimensions
+        """
+        rawKernel = psfModel.computeKernelImage(afwGeom.Point2D(posX, posY)).convertF()
+        if dimensions is None:
+            dimensions = rawKernel.getDimensions()
+        if rawKernel.getDimensions() == dimensions:
+            kernelIm = rawKernel
+        else:
+            # make image of proper size
+            kernelIm = afwImage.ImageF(dimensions)
+            bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((dimensions.getX() - rawKernel.getWidth())//2,
+                                                        (dimensions.getY() - rawKernel.getHeight())//2),
+                                        rawKernel.getDimensions())
+            kernelIm.assign(rawKernel, bboxToPlace)
+
+        kernelMask = afwImage.Mask(dimensions, 0x0)
+        kernelVar = afwImage.ImageF(dimensions, 1.0)
+        return afwImage.MaskedImageF(kernelIm, kernelMask, kernelVar)
