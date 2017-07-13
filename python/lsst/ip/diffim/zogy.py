@@ -166,7 +166,8 @@ class ZogyTask(pipeBase.Task):
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.MaskU.getPlaneBitMask(self.config.ignoreMaskPlanes))
+        self.statsControl.setAndMask(afwImage.Mask\
+                                     .getPlaneBitMask(self.config.ignoreMaskPlanes))
 
         self.im1 = self.template.getMaskedImage().getImage().getArray()
         self.im2 = self.science.getMaskedImage().getImage().getArray()

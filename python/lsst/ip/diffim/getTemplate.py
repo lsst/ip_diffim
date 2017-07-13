@@ -91,7 +91,8 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
         # assemble coadd exposure from subregions of patches
         coaddExposure = afwImage.ExposureF(coaddBBox, coaddWcs)
-        coaddExposure.getMaskedImage().set(np.nan, afwImage.MaskU.getPlaneBitMask("NO_DATA"), np.nan)
+        coaddExposure.getMaskedImage().set(np.nan, afwImage.Mask\
+                                           .getPlaneBitMask("NO_DATA"), np.nan)
         nPatchesFound = 0
         coaddFilter = None
         coaddPsf = None

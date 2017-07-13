@@ -467,7 +467,7 @@ class DipoleDeblender(object):
         peaks = fp.getPeaks()
         peaksF = [pk.getF() for pk in peaks]
         fbb = fp.getBBox()
-        fmask = afwImage.MaskU(fbb)
+        fmask = afwImage.Mask(fbb)
         fmask.setXY0(fbb.getMinX(), fbb.getMinY())
         fp.spans.setMask(fmask, 1)
 

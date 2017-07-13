@@ -62,7 +62,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         detConfig = self.subconfig.detectionConfig
         maskPlane = detConfig.badMaskPlanes[0]
-        maskVal = afwImage.MaskU.getPlaneBitMask(maskPlane)
+        maskVal = afwImage.Mask.getPlaneBitMask(maskPlane)
 
         kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
         kcDetect.apply(self.templateImage, self.scienceImage)

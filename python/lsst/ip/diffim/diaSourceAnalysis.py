@@ -109,11 +109,11 @@ class DiaSourceAnalyst(object):
         self.bitMask = 0
         srcBadMaskPlanes = self.config.srcBadMaskPlanes
         for maskPlane in srcBadMaskPlanes:
-            self.bitMask |= afwImage.MaskU_getPlaneBitMask(maskPlane)
+            self.bitMask |= afwImage.Mask.getPlaneBitMask(maskPlane)
 
     def countDetected(self, mask):
-        idxP = num.where(mask & afwImage.MaskU_getPlaneBitMask("DETECTED"))
-        idxN = num.where(mask & afwImage.MaskU_getPlaneBitMask("DETECTED_NEGATIVE"))
+        idxP = num.where(mask & afwImage.Mask.getPlaneBitMask("DETECTED"))
+        idxN = num.where(mask & afwImage.Mask.getPlaneBitMask("DETECTED_NEGATIVE"))
         return len(idxP[0]), len(idxN[0])
 
     def countMasked(self, mask):

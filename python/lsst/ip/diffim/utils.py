@@ -542,8 +542,8 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
         fullVar = diffExposure.getMaskedImage().getVariance().getArray()
 
     bitmaskBad = 0
-    bitmaskBad |= afwImage.MaskU.getPlaneBitMask('NO_DATA')
-    bitmaskBad |= afwImage.MaskU.getPlaneBitMask('SAT')
+    bitmaskBad |= afwImage.Mask.getPlaneBitMask('NO_DATA')
+    bitmaskBad |= afwImage.Mask.getPlaneBitMask('SAT')
     idx = np.where((fullMask & bitmaskBad) == 0)
     stride = int(len(idx[0]) // nptsFull)
     sidx = idx[0][::stride], idx[1][::stride]
