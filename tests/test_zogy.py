@@ -26,7 +26,7 @@ import numpy as np
 import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-from testImageDecorrelation import makeFakeImages
+from test_imageDecorrelation import makeFakeImages
 
 from lsst.ip.diffim.zogy import ZogyTask, ZogyConfig, ZogyMapReduceConfig
 from lsst.ip.diffim.imageMapReduce import ImageMapReduceTask
