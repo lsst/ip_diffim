@@ -35,10 +35,10 @@ import lsst.pipe.base as pipeBase
 import lsst.log
 
 from .imageMapReduce import (ImageMapReduceConfig, ImageMapReduceTask,
-                             ImageMapperSubtask)
+                             ImageMapper)
 
 __all__ = ("DecorrelateALKernelTask", "DecorrelateALKernelConfig",
-           "DecorrelateALKernelMapperSubtask", "DecorrelateALKernelMapReduceConfig",
+           "DecorrelateALKernelMapper", "DecorrelateALKernelMapReduceConfig",
            "DecorrelateALKernelSpatialConfig", "DecorrelateALKernelSpatialTask")
 
 
@@ -349,8 +349,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
         return outExp, kern
 
 
-class DecorrelateALKernelMapperSubtask(DecorrelateALKernelTask, ImageMapperSubtask):
-    """Task to be used as an ImageMapperSubtask for performing
+class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
+    """Task to be used as an ImageMapper for performing
     A&L decorrelation on subimages on a grid across a A&L difference image.
 
     This task subclasses DecorrelateALKernelTask in order to implement
@@ -411,7 +411,7 @@ class DecorrelateALKernelMapperSubtask(DecorrelateALKernelTask, ImageMapperSubta
         Notes
         -----
         This `run` method accepts parameters identical to those of
-        `ImageMapperSubtask.run`, since it is called from the
+        `ImageMapper.run`, since it is called from the
         `ImageMapperTask`. See that class for more information.
         """
         templateExposure = template  # input template
@@ -439,11 +439,11 @@ class DecorrelateALKernelMapperSubtask(DecorrelateALKernelTask, ImageMapperSubta
 
 class DecorrelateALKernelMapReduceConfig(ImageMapReduceConfig):
     """Configuration parameters for the ImageMapReduceTask to direct it to use
-       DecorrelateALKernelMapperSubtask as its mapperSubtask for A&L decorrelation.
+       DecorrelateALKernelMapper as its mapper for A&L decorrelation.
     """
-    mapperSubtask = pexConfig.ConfigurableField(
-        doc='A&L decorrelation subtask to run on each sub-image',
-        target=DecorrelateALKernelMapperSubtask
+    mapper = pexConfig.ConfigurableField(
+        doc='A&L decorrelation task to run on each sub-image',
+        target=DecorrelateALKernelMapper
     )
 
 
@@ -479,7 +479,7 @@ class DecorrelateALKernelSpatialConfig(pexConfig.Config):
         self.decorrelateMapReduceConfig.gridStepX = self.decorrelateMapReduceConfig.gridStepY = 19
         self.decorrelateMapReduceConfig.cellSizeX = self.decorrelateMapReduceConfig.cellSizeY = 20
         self.decorrelateMapReduceConfig.borderSizeX = self.decorrelateMapReduceConfig.borderSizeY = 6
-        self.decorrelateMapReduceConfig.reducerSubtask.reduceOperation = 'average'
+        self.decorrelateMapReduceConfig.reducer.reduceOperation = 'average'
 
 
 class DecorrelateALKernelSpatialTask(pipeBase.Task):
