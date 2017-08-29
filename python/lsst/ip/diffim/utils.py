@@ -768,11 +768,12 @@ class DipoleTestImage(object):
     def _makeDipoleImage(self):
         """!Generate an exposure and catalog with the given dipole source(s)"""
 
+        # Must seed the pos/neg images with different values to ensure they get different noise realizations
         posImage, posCatalog = self._makeStarImage(
-            xc=self.xcenPos, yc=self.ycenPos, flux=self.flux)
+            xc=self.xcenPos, yc=self.ycenPos, flux=self.flux, randomSeed=111)
 
         negImage, negCatalog = self._makeStarImage(
-            xc=self.xcenNeg, yc=self.ycenNeg, flux=self.fluxNeg)
+            xc=self.xcenNeg, yc=self.ycenNeg, flux=self.fluxNeg, randomSeed=222)
 
         dipole = posImage.clone()
         di = dipole.getMaskedImage()
@@ -790,7 +791,7 @@ class DipoleTestImage(object):
         self.diffim, self.posImage, self.posCatalog, self.negImage, self.negCatalog \
             = dipole, posImage, posCatalog, negImage, negCatalog
 
-    def _makeStarImage(self, xc=[15.3], yc=[18.6], flux=[2500], schema=None):
+    def _makeStarImage(self, xc=[15.3], yc=[18.6], flux=[2500], schema=None, randomSeed=None):
         """!Generate an exposure and catalog with the given stellar source(s)"""
 
         from lsst.meas.base.tests import TestDataset
@@ -802,7 +803,7 @@ class DipoleTestImage(object):
 
         if schema is None:
             schema = TestDataset.makeMinimalSchema()
-        exposure, catalog = dataset.realize(noise=self.noise, schema=schema)
+        exposure, catalog = dataset.realize(noise=self.noise, schema=schema, randomSeed=randomSeed)
 
         if self.gradientParams is not None:
             y, x = np.mgrid[:self.w, :self.h]
@@ -820,14 +821,37 @@ class DipoleTestImage(object):
         fitResult = alg.fitDipole(source, **kwds)
         return fitResult
 
-    def detectDipoleSources(self, doMerge=True, diffim=None, detectSigma=5.5, grow=3):
+    def detectDipoleSources(self, doMerge=True, diffim=None, detectSigma=5.5, grow=3, minBinSize=32):
         """!Utility function for detecting dipoles.
 
         Detect pos/neg sources in the diffim, then merge them. A
         bigger "grow" parameter leads to a larger footprint which
         helps with dipole measurement for faint dipoles.
-        """
 
+        Parameters
+        ----------
+        doMerge : `bool`
+           Whether to merge the positive and negagive detections into a single source table
+        diffim : `lsst.afw.image.exposure.exposure.ExposureF`
+           Difference image on which to perform detection
+        detectSigma : `float`
+           Threshold for object detection
+        grow : `int`
+           Number of pixels to grow the footprints before merging
+        minBinSize : `int`
+           Minimum bin size for the background (re)estimation (only applies if the default leads to
+           min(nBinX, nBinY) < fit order so the default config parameter needs to be decreased, but not
+           to a value smaller than minBinSize, in which case the fitting algorithm will take over and
+           decrease the fit order appropriately.)
+
+        Returns
+        -------
+        sources : `lsst.afw.table.SourceCatalog`
+           If doMerge=True, the merged source catalog is returned OR
+        detectTask : `lsst.meas.algorithms.SourceDetectionTask`
+        schema : `lsst.afw.table.Schema`
+           If doMerge=False, the source detection task and its schema are returned
+        """
         if diffim is None:
             diffim = self.diffim
 
@@ -846,6 +870,10 @@ class DipoleTestImage(object):
         # detectConfig.nSigmaToGrow = psfSigma
         detectConfig.reEstimateBackground = True  # if False, will fail often for faint sources on gradients?
         detectConfig.thresholdType = "pixel_stdev"
+        # Test images are often quite small, so may need to adjust background binSize
+        while ((min(diffim.getWidth(), diffim.getHeight()))//detectConfig.background.binSize <
+               detectConfig.background.approxOrderX and detectConfig.background.binSize > minBinSize):
+            detectConfig.background.binSize = max(minBinSize, detectConfig.background.binSize//2)
 
         # Create the detection task. We pass the schema so the task can declare a few flag fields
         detectTask = measAlg.SourceDetectionTask(schema, config=detectConfig)
