@@ -59,7 +59,6 @@ class DipoleTestImage(object):
         @param flux iterable fluxes of pos/neg lobes of dipole(s)
         @param gradientParams iterable three parameters for linear background gradient
         """
-        np.random.seed(666)
         self.display = False  # Display (plot) the output dipole thumbnails (matplotlib)
         self.verbose = False  # be verbose during fitting
 
@@ -104,7 +103,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         input values for both dipoles in the image.
         """
         params = DipoleTestImage()
-        catalog = params.testImage.detectDipoleSources()
+        catalog = params.testImage.detectDipoleSources(minBinSize=32)
 
         for s in catalog:
             fp = s.getFootprint()
@@ -135,7 +134,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
 
         # Create the various tasks and schema -- avoid code reuse.
         testImage = params.testImage
-        detectTask, schema = testImage.detectDipoleSources(doMerge=False)
+        detectTask, schema = testImage.detectDipoleSources(doMerge=False, minBinSize=32)
 
         measureConfig = measBase.SingleFrameMeasurementConfig()
 
