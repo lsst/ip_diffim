@@ -32,8 +32,7 @@ import lsst.pipe.base as pipeBase
 
 from .imageMapReduce import (ImageMapReduceConfig, ImageMapper,
                              ImageMapReduceTask)
-from .imagePsfMatch import (ImagePsfMatchTask, ImagePsfMatchConfig,
-                            subtractAlgorithmRegistry)
+from .imagePsfMatch import (ImagePsfMatchTask, ImagePsfMatchConfig)
 
 __all__ = ["ZogyTask", "ZogyConfig",
            "ZogyMapper", "ZogyMapReduceConfig",
@@ -1181,6 +1180,3 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
                              doWarping=True, spatiallyVarying=True, inImageSpace=False,
                              doPreConvolve=False):
         raise NotImplementedError
-
-
-subtractAlgorithmRegistry.register('zogy', ZogyImagePsfMatchTask)
