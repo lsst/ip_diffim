@@ -43,6 +43,10 @@ from .dipoleFitTask import *
 from .imageDecorrelation import *
 from .imageMapReduce import *
 from .zogy import *
+from .registerImage import *
+from .makeDiffim import *
+from .processDiffim import *
+from .imageDifference import *
 from .version import *
 
 # automatically register ip_diffim Algorithms
