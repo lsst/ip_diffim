@@ -36,7 +36,7 @@ import lsst.afw.detection as afwDet
 from lsst.log import Log
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
-from lsst.pipe.base import Struct
+from lsst.pipe.base import Struct, timeMethod
 
 __all__ = ("DipoleFitTask", "DipoleFitPlugin", "DipoleFitTaskConfig", "DipoleFitPluginConfig")
 
@@ -151,6 +151,7 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
         self.dipoleFitter = DipoleFitPlugin(dpFitPluginConfig, name=self._DefaultName,
                                             schema=schema, metadata=algMetadata)
 
+    @timeMethod
     def run(self, sources, exposure, posExp=None, negExp=None, **kwds):
         """!Run dipole measurement and classification
 
