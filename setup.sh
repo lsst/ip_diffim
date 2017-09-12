@@ -6,16 +6,16 @@ setup -t b2983 obs_decam
 
 cd ~/GIT_REPOS/TICKETS/DM-3704/temp
 
-git clone https://github.com/lsst/ip_diffim
-cd ip_diffim
+git clone https://github.com/lsst/pipe_tasks
+cd pipe_tasks
 git checkout u/djreiss/DM-3704
-setup -r . -t b2984
+setup -r . -t b2983
 scons
 cd ..
 
-git clone https://github.com/lsst/pipe_tasks
+git clone https://github.com/lsst/ip_diffim
 cd ip_diffim
 git checkout u/djreiss/DM-3704
-setup -r . -t b2984
+setup -r . -t b2983
 scons
 cd ..

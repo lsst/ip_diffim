@@ -267,6 +267,38 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
             raise pipeBase.TaskError("Exposure has no psf")
         sciencePsf = exposure.getPsf()
 
+        # compute scienceSigmaOrig: sigma of PSF of science image
+        scienceSigmaOrig = sciencePsf.computeShape().getDeterminantRadius()
+        scienceSigmaPost = scienceSigmaOrig
+        # compute scienceSigmaPost: sigma of PSF of science image after pre-convolution (A&L)
+        if self.config.doPreConvolve:
+            scienceSigmaPost = scienceSigmaOrig * math.sqrt(2)
+
+        # If requested, find sources in the image
+        selectSourceRes = None
+        selectSources = None
+        kernelSources = None
+        matches = None
+        if self.config.doSelectSources:
+            selectSourcesRes = self.runSelectSources(exposure, templateExposure,
+                                                     templateSources, scienceSigmaPost,
+                                                     idFactory, sensorRef=sensorRef)
+            selectSources = selectSourcesRes.selectSources
+            kernelSources = selectSourcesRes.kernelSources
+            matches = selectSourcesRes.matches
+
+        allresids = {}
+        if self.config.doUseRegister:
+            res = self.runRegister(exposure, templateExposure, templateSources,
+                                   selectSources, idFactory=None)
+            wcsResults = res.wcsResults
+            templateExposure = res.templateExposure
+            # Create debugging outputs on the astrometric
+            # residuals as a function of position.  Persistence
+            # not yet implemented; expected on (I believe) #2636.
+            if self.config.doDebugRegister:
+                allresids = self.runDebugRegister(wcsResults, matches)
+
         if self.config.subtract.name == 'zogy':
             spatiallyVarying = self.config.doSpatiallyVarying
             subtractRes = self.subtract.subtractExposures(templateExposure, exposure,
@@ -275,9 +307,6 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
             subtractedExposure = subtractRes.subtractedExposure
 
         elif self.config.subtract.name == 'al':
-            # compute scienceSigmaOrig: sigma of PSF of science image before pre-convolution
-            scienceSigmaOrig = sciencePsf.computeShape().getDeterminantRadius()
-
             # if requested, convolve the science exposure with its PSF
             # (properly, this should be a cross-correlation, but our code does not yet support that)
             # compute scienceSigmaPost: sigma of science exposure with pre-convolution, if done,
@@ -297,34 +326,6 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
                     preConvPsf = srcPsf
                 afwMath.convolve(destMI, srcMI, preConvPsf.getLocalKernel(), convControl)
                 exposure.setMaskedImage(destMI)
-                scienceSigmaPost = scienceSigmaOrig * math.sqrt(2)
-            else:
-                scienceSigmaPost = scienceSigmaOrig
-
-            # If requested, find sources in the image
-            selectSourceRes = None
-            selectSources = None
-            kernelSources = None
-            matches = None
-            if self.config.doSelectSources:
-                selectSourcesRes = self.runSelectSources(exposure, templateExposure,
-                                                         templateSources, scienceSigmaPost,
-                                                         idFactory, sensorRef=sensorRef)
-                selectSources = selectSourcesRes.selectSources
-                kernelSources = selectSourcesRes.kernelSources
-                matches = selectSourcesRes.matches
-
-            allresids = {}
-            if self.config.doUseRegister:
-                res = self.runRegister(exposure, templateExposure, templateSources,
-                                       selectSources, idFactory=None)
-                wcsResults = res.wcsResults
-                templateExposure = res.templateExposure
-                # Create debugging outputs on the astrometric
-                # residuals as a function of position.  Persistence
-                # not yet implemented; expected on (I believe) #2636.
-                if self.config.doDebugRegister:
-                    allresids = self.runDebugRegister(wcsResults, matches)
 
             # warp template exposure to match exposure,
             # PSF match template exposure to exposure,
@@ -474,7 +475,10 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
         wcsResults = self.fitAstrometry(templateSources, templateExposure, selectSources)
         warpedExp = self.register.warpExposure(templateExposure, wcsResults.wcs,
                                                exposure.getWcs(), exposure.getBBox())
+        # Psf seems to get removed by the registration, so re-add it.
+        templPsf = templateExposure.getPsf()
         templateExposure = warpedExp
+        templateExposure.setPsf(templPsf)
         return pipeBase.Struct(wcsResults=wcsResults,
                                templateExposure=templateExposure)
 

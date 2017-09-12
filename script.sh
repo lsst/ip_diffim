@@ -63,3 +63,9 @@ processDiffim.py decamDirTest2 --output decamDirTest2a \
                     --configfile processDiffimConfig.py --clobber-config --clobber-versions
 
 ls -al decamDirTest2a/deepDiff/v289820/diaSrc-11.fits decamDirTestOLD/deepDiff/v289820//diaSrc-11.fits
+
+
+
+# Test with `doUseRegister=True` -- seems to work now that I fixed it
+imageDifference2.py calexpDir_b1631 --output decamDirTest_Zogy_noSpatial_doRegister --id visit=289820 ccdnum=11 --templateId visit=288976 --configfile diffimconfig.py --clobber-config --clobber-versions --config makeDiffim.subtract='zogy' --config makeDiffim.doUseRegister=True
+
