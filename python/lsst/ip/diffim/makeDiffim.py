@@ -57,7 +57,7 @@ class MakeDiffimConfig(pexConfig.Config):
     """Config for MakeDiffimTask
     """
     doAddCalexpBackground = pexConfig.Field(dtype=bool, default=True,
-                                            doc="Add background to calexp before processing it.  "
+                                            doc="Add background to calexp before processing it. "
                                                 "Useful as ipDiffim does background matching.")
     doUseRegister = pexConfig.Field(dtype=bool, default=True,
                                     doc="Use image-to-image registration to align template with "
@@ -247,10 +247,6 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
 
         # Retrieve the science image we wish to analyze
         exposure = sensorRef.get("calexp", immediate=True)
-        if self.config.doAddCalexpBackground:
-            mi = exposure.getMaskedImage()
-            mi += sensorRef.get("calexpBackground").getImage()
-
         template = self.getTemplate.run(exposure, sensorRef, templateIdList=templateIdList)
 
         result = self.doMakeDiffim(template, exposure, idFactory=idFactory,
@@ -303,10 +299,16 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
             spatiallyVarying = self.config.doSpatiallyVarying
             subtractRes = self.subtract.subtractExposures(templateExposure, exposure,
                                                           doWarping=True,
-                                                          spatiallyVarying=spatiallyVarying)
+                                                          spatiallyVarying=spatiallyVarying,
+                                                          doPreConvolve=self.config.doPreConvolve)
             subtractedExposure = subtractRes.subtractedExposure
 
         elif self.config.subtract.name == 'al':
+            # Useful since AL can match backgrounds (Zogy cannot)
+            if self.config.doAddCalexpBackground:
+                mi = exposure.getMaskedImage()
+                mi += sensorRef.get("calexpBackground").getImage()
+
             # if requested, convolve the science exposure with its PSF
             # (properly, this should be a cross-correlation, but our code does not yet support that)
             # compute scienceSigmaPost: sigma of science exposure with pre-convolution, if done,
