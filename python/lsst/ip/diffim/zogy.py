@@ -243,6 +243,9 @@ class ZogyTask(pipeBase.Task):
         elif (pShape2[1] < pShape1[1]):
             psf2 = np.pad(psf2, ((0, 0), (0, pShape1[1] - pShape2[1])), mode='constant', constant_values=0.)
 
+        psf1[psf1 < 1e-4] = 1e-4
+        psf2[psf2 < 1e-4] = 1e-4
+
         # PSFs' centers may be offset relative to each other; now fix that!
         maxLoc1 = np.unravel_index(np.argmax(psf1), psf1.shape)
         maxLoc2 = np.unravel_index(np.argmax(psf2), psf2.shape)
