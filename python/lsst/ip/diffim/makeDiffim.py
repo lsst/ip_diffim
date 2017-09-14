@@ -313,6 +313,7 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
             # (properly, this should be a cross-correlation, but our code does not yet support that)
             # compute scienceSigmaPost: sigma of science exposure with pre-convolution, if done,
             # else sigma of original science exposure
+            preConvKernel = None
             if self.config.doPreConvolve:
                 convControl = afwMath.ConvolutionControl()
                 # cannot convolve in place, so make a new MI to receive convolved image
@@ -361,10 +362,14 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
             # Perform diffim decorrelation
             if self.config.doDecorrelation:
                 spatiallyVarying = self.config.doSpatiallyVarying
+                preConvKernel = None
+                if preConvPsf is not None:
+                    preConvKernel = preConvPsf.getLocalKernel()
                 decorrResult = self.decorrelate.run(exposure, templateExposure,
                                                     subtractedExposure,
                                                     subtractRes.psfMatchingKernel,
-                                                    spatiallyVarying=spatiallyVarying)
+                                                    spatiallyVarying=spatiallyVarying,
+                                                    preConvKernel=preConvKernel)
                 subtractedExposure = decorrResult.correctedExposure
                 subtractRes.subtractedExposure = subtractedExposure
 

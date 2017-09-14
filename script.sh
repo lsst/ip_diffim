@@ -69,3 +69,15 @@ ls -al decamDirTest2a/deepDiff/v289820/diaSrc-11.fits decamDirTestOLD/deepDiff/v
 # Test with `doUseRegister=True` -- seems to work now that I fixed it
 imageDifference2.py calexpDir_b1631 --output decamDirTest_Zogy_noSpatial_doRegister --id visit=289820 ccdnum=11 --templateId visit=288976 --configfile diffimconfig.py --clobber-config --clobber-versions --config makeDiffim.subtract='zogy' --config makeDiffim.doUseRegister=True
 
+
+# Test Zogy making Scorr image (param doPreConvolve=True)
+imageDifference2.py calexpDir_b1631 --output decamDirTest_ZogyScorr_noSpatial --id visit=289820 ccdnum=11 --templateId visit=288976 --configfile diffimconfig.py --clobber-config --clobber-versions --config makeDiffim.subtract='zogy' --config makeDiffim.doPreConvolve=True
+
+
+# Test decorrelation + preconvolution
+# Need to switch the template and visit Id here...
+imageDifference2.py calexpDir_b1631 --output decamDirTest_ALDpreconv --id visit=288976 ccdnum=11 --templateId visit=289820 --configfile diffimconfig.py --clobber-config --clobber-versions --config makeDiffim.subtract='al' --config makeDiffim.doPreConvolve=True --config makeDiffim.doDecorrelation=False
+imageDifference2.py calexpDir_b1631 --output decamDirTest_ALDecorPreconv --id visit=288976 ccdnum=11 --templateId visit=289820 --configfile diffimconfig.py --clobber-config --clobber-versions --config makeDiffim.subtract='al' --config makeDiffim.doPreConvolve=True --config makeDiffim.doDecorrelation=True
+
+# Huh, there's an offset in the diffim with preconv=true (even with decorr=false). Test in the original version.
+imageDifference.py calexpDir_b1631 --output decamDirTest_ALpreconv_OLD --id visit=288976 ccdnum=11 --templateId visit=289820 --configfile diffimconfig_OLD.py  --clobber-config --clobber-versions --config subtract='al' --config doPreConvolve=True --config doDecorrelation=False

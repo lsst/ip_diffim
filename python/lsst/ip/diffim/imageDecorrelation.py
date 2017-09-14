@@ -282,6 +282,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         kft = np.sqrt((svar + tvar) / denom)
         pck = np.fft.ifft2(kft)
         pck = np.fft.ifftshift(pck.real)
+
         fkernel = DecorrelateALKernelTask._fixEvenKernel(pck)
         if preConvKernel is not None:
             # This is not pretty but seems to be necessary as the preConvKernel term seems to lead
