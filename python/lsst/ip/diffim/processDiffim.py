@@ -86,6 +86,11 @@ class ProcessDiffimConfig(pexConfig.Config):
     diaSourceMatchRadius = pexConfig.Field(dtype=float, default=0.5,
                                            doc="Match radius (in arcseconds) "
                                                "for DiaSource to Source association")
+    isPreConvolved = pexConfig.Field(dtype=bool, default=False,
+                                     doc="Diffim is pre-convolved (doPreConvolve=True in makeDiffim)")
+    isDecorrelated = pexConfig.Field(dtype=bool, default=True,
+                                     doc="Diffim is decorrelated (doDecorrelation=True in makeDiffim")
+
 
     def setDefaults(self):
         # defaults are OK for catalog and diacatalog
@@ -195,14 +200,17 @@ class ProcessDiffimTask(pipeBase.CmdLineTask):
 
         # TODO: isPreConvolved needs to be somehow extracted from subtractedExposure.
         result = self.doProcessDiffim(subtractedExposure, exposure, matchedExposure,
-                                      isPreConvolved=False, selectSources=None, idFactory=idFactory,
+                                      isPreConvolved=self.config.isPreConvolved,
+                                      isDecorrelated=self.config.isDecorrelated,
+                                      selectSources=None, idFactory=idFactory,
                                       sensorRef=sensorRef)
 
         return result
 
     @pipeBase.timeMethod
     def doProcessDiffim(self, subtractedExposure, scienceExposure, matchedTemplateExposure,
-                        isPreConvolved=False, selectSources=None, idFactory=None, sensorRef=None):
+                        isPreConvolved=False, isDecorrelated=True, selectSources=None,
+                        idFactory=None, sensorRef=None):
         self.log.info("Running diaSource detection")
         # Erase existing detection mask planes
         mask = subtractedExposure.getMaskedImage().getMask()
@@ -233,11 +241,15 @@ class ProcessDiffimTask(pipeBase.CmdLineTask):
                 # Just fit dipole in diffim
                 self.measurement.run(diaSources, subtractedExposure)
             else:
-                # Use (matched) template and science image (if avail.) to constrain dipole fitting
-                if matchedTemplateExposure is not None:
+                # Use science image (if avail.) to constrain dipole fitting; matchedTemplate is
+                # computed in measurement.run() from scienceExposure - subtractedExposure.
+                if matchedTemplateExposure is not None and not isDecorrelated:
                     self.measurement.run(diaSources, subtractedExposure, scienceExposure,
                                          matchedTemplateExposure)
                 else:
+                    # If decorrelation is turned on, we don't want to use the matchedTemplate, since it
+                    # is not decorrelated. If we don't pass the matchedTemplate, then the dipoleFitter
+                    # automatically creates from scienceExposure - subtractedExposure.
                     self.measurement.run(diaSources, subtractedExposure, scienceExposure)
 
         # Match with the calexp sources if possible
