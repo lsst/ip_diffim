@@ -1,6 +1,4 @@
 from __future__ import absolute_import, division, print_function
-from future import standard_library
-standard_library.install_aliases()
 #
 # LSST Data Management System
 # Copyright 2016 AURA/LSST.
@@ -31,7 +29,6 @@ import lsst.meas.algorithms as measAlg
 import lsst.afw.math as afwMath
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-import lsst.log
 
 from .imageMapReduce import (ImageMapReduceConfig, ImageMapper,
                              ImageMapReduceTask)
@@ -122,6 +119,9 @@ class ZogyConfig(pexConfig.Config):
     )
 
 
+MIN_KERNEL = 1.0e-4
+
+
 class ZogyTask(pipeBase.Task):
     """Task to perform ZOGY proper image subtraction. See module-level documentation for
     additional details.
@@ -210,8 +210,8 @@ class ZogyTask(pipeBase.Task):
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.Mask\
-                                     .getPlaneBitMask(self.config.ignoreMaskPlanes))
+        self.statsControl.setAndMask(afwImage.Mask.getPlaneBitMask(
+            self.config.ignoreMaskPlanes))
 
         self.im1 = self.template.getMaskedImage().getImage().getArray()
         self.im2 = self.science.getMaskedImage().getImage().getArray()
@@ -231,23 +231,50 @@ class ZogyTask(pipeBase.Task):
         self.im2_psf = selectPsf(psf2, self.science)
 
         # Make sure PSFs are the same size. Messy, but should work for all cases.
-        pShape1 = self.im1_psf.shape
-        pShape2 = self.im2_psf.shape
+        psf1 = self.im1_psf
+        psf2 = self.im2_psf
+        pShape1 = psf1.shape
+        pShape2 = psf2.shape
         if (pShape1[0] < pShape2[0]):
-            self.im1_psf = np.pad(self.im1_psf, ((0, pShape2[0] - pShape1[0]), (0, 0)),
-                                  mode='constant', constant_values=0.)
+            psf1 = np.pad(psf1, ((0, pShape2[0] - pShape1[0]), (0, 0)), mode='constant', constant_values=0.)
         elif (pShape2[0] < pShape1[0]):
-            self.im2_psf = np.pad(self.im2_psf, ((0, pShape1[0] - pShape2[0]), (0, 0)),
-                                  mode='constant', constant_values=0.)
+            psf2 = np.pad(psf2, ((0, pShape1[0] - pShape2[0]), (0, 0)), mode='constant', constant_values=0.)
         if (pShape1[1] < pShape2[1]):
-            self.im1_psf = np.pad(self.im1_psf, ((0, 0), (0, pShape2[1] - pShape1[1])),
-                                  mode='constant', constant_values=0.)
+            psf1 = np.pad(psf1, ((0, 0), (0, pShape2[1] - pShape1[1])), mode='constant', constant_values=0.)
         elif (pShape2[1] < pShape1[1]):
-            self.im2_psf = np.pad(self.im2_psf, ((0, 0), (0, pShape1[1] - pShape2[1])),
-                                  mode='constant', constant_values=0.)
+            psf2 = np.pad(psf2, ((0, 0), (0, pShape1[1] - pShape2[1])), mode='constant', constant_values=0.)
+
+        # PSFs' centers may be offset relative to each other; now fix that!
+        maxLoc1 = np.unravel_index(np.argmax(psf1), psf1.shape)
+        maxLoc2 = np.unravel_index(np.argmax(psf2), psf2.shape)
+        # *Very* rarely happens but if they're off by >1 pixel, do it more than once.
+        while (maxLoc1[0] != maxLoc2[0]) or (maxLoc1[1] != maxLoc2[1]):
+            if maxLoc1[0] > maxLoc2[0]:
+                psf2[1:, :] = psf2[:-1, :]
+            elif maxLoc1[0] < maxLoc2[0]:
+                psf1[1:, :] = psf1[:-1, :]
+            if maxLoc1[1] > maxLoc2[1]:
+                psf2[:, 1:] = psf2[:, :-1]
+            elif maxLoc1[1] < maxLoc2[1]:
+                psf1[:, 1:] = psf1[:, :-1]
+            maxLoc1 = np.unravel_index(np.argmax(psf1), psf1.shape)
+            maxLoc2 = np.unravel_index(np.argmax(psf2), psf2.shape)
+
+        # Make sure there are no div-by-zeros
+        psf1[psf1 < MIN_KERNEL] = MIN_KERNEL
+        psf2[psf2 < MIN_KERNEL] = MIN_KERNEL
+
+        self.im1_psf = psf1
+        self.im2_psf = psf2
 
         self.sig1 = np.sqrt(self._computeVarianceMean(self.template)) if sig1 is None else sig1
         self.sig2 = np.sqrt(self._computeVarianceMean(self.science)) if sig2 is None else sig2
+        # if sig1 or sig2 are NaN, then the entire region being Zogy-ed is masked.
+        # Don't worry about it - the result will be masked but avoid warning messages.
+        if np.isnan(self.sig1) or self.sig1 == 0:
+            self.sig1 = 1.
+        if np.isnan(self.sig2) or self.sig2 == 0:
+            self.sig2 = 1.
 
         # Zogy doesn't correct nonzero backgrounds (unlike AL) so subtract them here.
         if correctBackground:
@@ -330,14 +357,17 @@ class ZogyTask(pipeBase.Task):
         if padSize > 0:
             Pr = ZogyTask._padPsfToSize(psf1, (psf1.shape[0] + padSize, psf1.shape[1] + padSize))
             Pn = ZogyTask._padPsfToSize(psf2, (psf2.shape[0] + padSize, psf2.shape[1] + padSize))
+        # Make sure there are no div-by-zeros
+        psf1[np.abs(psf1) <= MIN_KERNEL] = MIN_KERNEL
+        psf2[np.abs(psf2) <= MIN_KERNEL] = MIN_KERNEL
 
         sigR, sigN = self.sig1, self.sig2
         Pr_hat = np.fft.fft2(Pr)
-        Pr_hat2 = np.conj(Pr_hat) * Pr_hat  # np.abs(Pr_hat)**2)
+        Pr_hat2 = np.conj(Pr_hat) * Pr_hat
         Pn_hat = np.fft.fft2(Pn)
-        Pn_hat2 = np.conj(Pn_hat) * Pn_hat  # np.abs(Pn_hat)**2))
+        Pn_hat2 = np.conj(Pn_hat) * Pn_hat
         denom = np.sqrt((sigN**2 * self.Fr**2 * Pr_hat2) + (sigR**2 * self.Fn**2 * Pn_hat2))
-        Fd = self.Fr*self.Fn / np.sqrt(sigN**2 * self.Fr**2 + sigR**2 * self.Fn**2)
+        Fd = self.Fr * self.Fn / np.sqrt(sigN**2 * self.Fr**2 + sigR**2 * self.Fn**2)
 
         res = pipeBase.Struct(
             Pr=Pr, Pn=Pn, Pr_hat=Pr_hat, Pn_hat=Pn_hat, denom=denom, Fd=Fd
@@ -687,6 +717,20 @@ class ZogyTask(pipeBase.Task):
         - S_var : the corrected variance image (denominator of eq. 25 of ZOGY (2016))
         - Dpsf : the PSF of the diffim D, likely never to be used.
         """
+        # Some masked regions are NaN or infinite!, and FFTs no likey.
+        def fix_nans(im):
+            """Replace any NaNs or Infs with the mean of the image."""
+            isbad = ~np.isfinite(im)
+            if np.any(isbad):
+                im[isbad] = np.nan
+                im[isbad] = np.nanmean(im)
+            return im
+
+        self.im1 = fix_nans(self.im1)
+        self.im2 = fix_nans(self.im2)
+        self.im1_var = fix_nans(self.im1_var)
+        self.im2_var = fix_nans(self.im2_var)
+
         # Do all in fourier space (needs image-sized PSFs)
         psf1 = ZogyTask._padPsfToSize(self.im1_psf, self.im1.shape)
         psf2 = ZogyTask._padPsfToSize(self.im2_psf, self.im2.shape)
@@ -705,9 +749,9 @@ class ZogyTask(pipeBase.Task):
 
         # Adjust the variance planes of the two images to contribute to the final detection
         # (eq's 26-29).
-        Pn_hat2 = np.conj(preqs.Pn_hat) * preqs.Pn_hat  # np.abs(preqs.Pn_hat)**2.
+        Pn_hat2 = np.conj(preqs.Pn_hat) * preqs.Pn_hat
         Kr_hat = self.Fr * self.Fn**2. * np.conj(preqs.Pr_hat) * Pn_hat2 / preqs.denom**2.
-        Pr_hat2 = np.conj(preqs.Pr_hat) * preqs.Pr_hat  # np.abs(preqs.Pr_hat)**2.
+        Pr_hat2 = np.conj(preqs.Pr_hat) * preqs.Pr_hat
         Kn_hat = self.Fn * self.Fr**2. * np.conj(preqs.Pn_hat) * Pr_hat2 / preqs.denom**2.
 
         Kr_hat2 = np.fft.fft2(np.fft.ifft2(Kr_hat)**2.)
@@ -766,9 +810,9 @@ class ZogyTask(pipeBase.Task):
 
         # Adjust the variance planes of the two images to contribute to the final detection
         # (eq's 26-29).
-        Pn_hat2 = np.conj(preqs.Pn_hat) * preqs.Pn_hat  # np.abs(Pn_hat)**2. # np.abs(Pn_hat*np.conj(Pn_hat))
+        Pn_hat2 = np.conj(preqs.Pn_hat) * preqs.Pn_hat
         Kr_hat = self.Fr * self.Fn**2. * np.conj(preqs.Pr_hat) * Pn_hat2 / preqs.denom**2.
-        Pr_hat2 = np.conj(preqs.Pr_hat) * preqs.Pr_hat  # np.abs(Pr_hat)**2. # np.abs(Pr_hat*np.conj(Pr_hat))
+        Pr_hat2 = np.conj(preqs.Pr_hat) * preqs.Pr_hat
         Kn_hat = self.Fn * self.Fr**2. * np.conj(preqs.Pn_hat) * Pr_hat2 / preqs.denom**2.
 
         Kr = np.fft.ifft2(Kr_hat).real
@@ -989,10 +1033,11 @@ class ZogyImagePsfMatchConfig(ImagePsfMatchConfig):
     )
 
     def setDefaults(self):
-        self.zogyMapReduceConfig.gridStepX = self.zogyMapReduceConfig.gridStepY = 19
-        self.zogyMapReduceConfig.cellSizeX = self.zogyMapReduceConfig.cellSizeY = 20
-        self.zogyMapReduceConfig.borderSizeX = self.zogyMapReduceConfig.borderSizeY = 6
+        self.zogyMapReduceConfig.gridStepX = self.zogyMapReduceConfig.gridStepY = 40
+        self.zogyMapReduceConfig.cellSizeX = self.zogyMapReduceConfig.cellSizeY = 41
+        self.zogyMapReduceConfig.borderSizeX = self.zogyMapReduceConfig.borderSizeY = 8
         self.zogyMapReduceConfig.reducer.reduceOperation = 'average'
+        self.zogyConfig.inImageSpace = False
 
 
 class ZogyImagePsfMatchTask(ImagePsfMatchTask):
@@ -1092,15 +1137,18 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
         def ga(exp):
             return exp.getMaskedImage().getImage().getArray()
 
+        if self.config.zogyConfig.inImageSpace:
+            inImageSpace = True  # Override
+        self.log.info('Running Zogy algorithm: inImageSpace=%r' % inImageSpace)
         if spatiallyVarying:
             config = self.config.zogyMapReduceConfig
             task = ImageMapReduceTask(config=config)
             results = task.run(scienceExposure, template=templateExposure, inImageSpace=inImageSpace,
-                               doScorr=doPreConvolve, forceEvenSized=True)
+                               doScorr=doPreConvolve, forceEvenSized=False)
             results.D = results.exposure
             # The CoaddPsf, when used for detection does not utilize its spatially-varying
             #   properties; it simply computes the PSF at its getAveragePosition().
-            # Here, we need to get it to return the matchedExposure (convolved template)
+            # TODO: we need to get it to return the matchedExposure (convolved template)
             #   too, for dipole fitting; but the imageMapReduce task might need to be engineered
             #   for this purpose.
         else:

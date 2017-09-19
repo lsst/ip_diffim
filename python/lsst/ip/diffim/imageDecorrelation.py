@@ -1,6 +1,4 @@
 from __future__ import absolute_import, division, print_function
-from future import standard_library
-standard_library.install_aliases()
 #
 # LSST Data Management System
 # Copyright 2016 AURA/LSST.
@@ -24,7 +22,6 @@ standard_library.install_aliases()
 #
 
 import numpy as np
-import scipy.fftpack
 
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
@@ -147,7 +144,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
     @pipeBase.timeMethod
     def run(self, exposure, templateExposure, subtractedExposure, psfMatchingKernel,
-            xcen=None, ycen=None, svar=None, tvar=None):
+            preConvKernel=None, xcen=None, ycen=None, svar=None, tvar=None):
         """! Perform decorrelation of an image difference exposure.
 
         Decorrelates the diffim due to the convolution of the templateExposure with the
@@ -164,6 +161,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         `ip_diffim.ImagePsfMatchTask.subtractExposures()`
         @param[in] psfMatchingKernel an (optionally spatially-varying) PSF matching kernel produced
         by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
+        @param[in] preConvKernel if not None, then the `exposure` was pre-convolved with this kernel
         @param[in] xcen X-pixel coordinate to use for computing constant matching kernel to use
         If `None` (default), then use the center of the image.
         @param[in] ycen Y-pixel coordinate to use for computing constant matching kernel to use
@@ -202,10 +200,28 @@ class DecorrelateALKernelTask(pipeBase.Task):
             tvar = self.computeVarianceMean(templateExposure)
         self.log.info("Variance (science, template): (%f, %f)", svar, tvar)
 
+        # Should not happen unless entire image has been masked, which could happen
+        # if this is a small subimage of the main exposure. In this case, just return a full NaN
+        # exposure
+        if np.isnan(svar) or np.isnan(tvar):
+            # Double check that one of the exposures is all NaNs
+            if (np.all(np.isnan(exposure.getMaskedImage().getImage().getArray())) or
+                    np.all(np.isnan(templateExposure.getMaskedImage().getImage().getArray()))):
+                self.log.warn('Template or science image is entirely NaNs: skipping decorrelation.')
+                outExposure = subtractedExposure.clone()
+                return pipeBase.Struct(correctedExposure=outExposure, correctionKernel=None)
+
         var = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance (uncorrected diffim): %f", var)
 
-        corrKernel = DecorrelateALKernelTask._computeDecorrelationKernel(kimg.getArray(), svar, tvar)
+        pck = None
+        if preConvKernel is not None:
+            self.log.info('Using a pre-convolution kernel as part of decorrelation.')
+            kimg2 = afwImage.ImageD(preConvKernel.getDimensions())
+            preConvKernel.computeImage(kimg2, False)
+            pck = kimg2.getArray()
+        corrKernel = DecorrelateALKernelTask._computeDecorrelationKernel(kimg.getArray(), svar, tvar,
+                                                                         pck)
         correctedExposure, corrKern = DecorrelateALKernelTask._doConvolve(subtractedExposure, corrKernel)
 
         # Compute the subtracted exposure's updated psf
@@ -223,22 +239,50 @@ class DecorrelateALKernelTask(pipeBase.Task):
         return pipeBase.Struct(correctedExposure=correctedExposure, correctionKernel=corrKern)
 
     @staticmethod
-    def _computeDecorrelationKernel(kappa, svar=0.04, tvar=0.04):
-        """! Compute the Lupton/ZOGY post-conv. kernel for decorrelating an
+    def _computeDecorrelationKernel(kappa, svar=0.04, tvar=0.04, preConvKernel=None):
+        """! Compute the Lupton decorrelation post-conv. kernel for decorrelating an
         image difference, based on the PSF-matching kernel.
         @param kappa  A matching kernel 2-d numpy.array derived from Alard & Lupton PSF matching
         @param svar   Average variance of science image used for PSF matching
         @param tvar   Average variance of template image used for PSF matching
+        @param preConvKernel If not None, then pre-filtering was applied
+            to science exposure, and this is the pre-convolution kernel.
         @return a 2-d numpy.array containing the correction kernel
 
         @note As currently implemented, kappa is a static (single, non-spatially-varying) kernel.
         """
+        # Psf should not be <= 0, and messes up denominator; set the minimum value to MIN_KERNEL
+        MIN_KERNEL = 1.0e-4
+
         kappa = DecorrelateALKernelTask._fixOddKernel(kappa)
-        kft = scipy.fftpack.fft2(kappa)
-        kft = np.sqrt((svar + tvar) / (svar + tvar * kft**2))
-        pck = scipy.fftpack.ifft2(kft)
-        pck = scipy.fftpack.ifftshift(pck.real)
+        if preConvKernel is not None:
+            mk = DecorrelateALKernelTask._fixOddKernel(preConvKernel)
+            # Need to make them the same size
+            if kappa.shape[0] < mk.shape[0]:
+                diff = (mk.shape[0] - kappa.shape[0]) // 2
+                kappa = np.pad(kappa, (diff, diff), mode='constant')
+            elif kappa.shape[0] > mk.shape[0]:
+                diff = (kappa.shape[0] - mk.shape[0]) // 2
+                mk = np.pad(mk, (diff, diff), mode='constant')
+
+        kft = np.fft.fft2(kappa)
+        kft2 = np.conj(kft) * kft
+        kft2[np.abs(kft2) < MIN_KERNEL] = MIN_KERNEL
+        denom = svar + tvar * kft2
+        if preConvKernel is not None:
+            mk = np.fft.fft2(mk)
+            mk2 = np.conj(mk) * mk
+            mk2[np.abs(mk2) < MIN_KERNEL] = MIN_KERNEL
+            denom = svar * mk2 + tvar * kft2
+        denom[np.abs(denom) < MIN_KERNEL] = MIN_KERNEL
+        kft = np.sqrt((svar + tvar) / denom)
+        pck = np.fft.ifft2(kft)
+        pck = np.fft.ifftshift(pck.real)
         fkernel = DecorrelateALKernelTask._fixEvenKernel(pck)
+        if preConvKernel is not None:
+            # This is not pretty but seems to be necessary as the preConvKernel term seems to lead
+            # to a kernel that amplifies the noise way too much.
+            fkernel[fkernel > -np.min(fkernel)] = -np.min(fkernel)
 
         # I think we may need to "reverse" the PSF, as in the ZOGY (and Kaiser) papers...
         # This is the same as taking the complex conjugate in Fourier space before FFT-ing back to real space.
@@ -267,14 +311,14 @@ class DecorrelateALKernelTask(pipeBase.Task):
             elif psf.shape[0] > kernel.shape[0]:
                 diff = (psf.shape[0] - kernel.shape[0]) // 2
                 kernel = np.pad(kernel, (diff, diff), mode='constant')
-            psf_ft = scipy.fftpack.fft2(psf)
-            kft = scipy.fftpack.fft2(kernel)
+            psf_ft = np.fft.fft2(psf)
+            kft = np.fft.fft2(kernel)
             out = psf_ft * np.sqrt((svar + tvar) / (svar + tvar * kft**2))
             return out
 
         def post_conv_psf(psf, kernel, svar, tvar):
             kft = post_conv_psf_ft2(psf, kernel, svar, tvar)
-            out = scipy.fftpack.ifft2(kft)
+            out = np.fft.ifft2(kft)
             return out
 
         pcf = post_conv_psf(psf=psf, kernel=kappa, svar=svar, tvar=tvar)
@@ -333,7 +377,6 @@ class DecorrelateALKernelTask(pipeBase.Task):
         @return a new Exposure with the convolved pixels and the (possibly
         re-centered) kernel.
 
-        @note We use afwMath.convolve() but keep scipy.convolve for debugging.
         @note We re-center the kernel if necessary and return the possibly re-centered kernel
         """
         kernelImg = afwImage.ImageD(kernel.shape[0], kernel.shape[1])
@@ -429,7 +472,7 @@ class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
         logLevel = self.log.getLevel()
         self.log.setLevel(lsst.log.WARN)
         res = DecorrelateALKernelTask.run(self, subExp2, subExp1, expandedSubExposure,
-                                          psfMatchingKernel)
+                                          psfMatchingKernel, preConvKernel)
         self.log.setLevel(logLevel)  # reset the log level
 
         diffim = res.correctedExposure.Factory(res.correctedExposure, subExposure.getBBox())
@@ -476,9 +519,9 @@ class DecorrelateALKernelSpatialConfig(pexConfig.Config):
     )
 
     def setDefaults(self):
-        self.decorrelateMapReduceConfig.gridStepX = self.decorrelateMapReduceConfig.gridStepY = 19
-        self.decorrelateMapReduceConfig.cellSizeX = self.decorrelateMapReduceConfig.cellSizeY = 20
-        self.decorrelateMapReduceConfig.borderSizeX = self.decorrelateMapReduceConfig.borderSizeY = 6
+        self.decorrelateMapReduceConfig.gridStepX = self.decorrelateMapReduceConfig.gridStepY = 40
+        self.decorrelateMapReduceConfig.cellSizeX = self.decorrelateMapReduceConfig.cellSizeY = 41
+        self.decorrelateMapReduceConfig.borderSizeX = self.decorrelateMapReduceConfig.borderSizeY = 8
         self.decorrelateMapReduceConfig.reducer.reduceOperation = 'average'
 
 
@@ -567,7 +610,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
         return var
 
     def run(self, scienceExposure, templateExposure, subtractedExposure, psfMatchingKernel,
-            spatiallyVarying=True, doPreConvolve=False):
+            spatiallyVarying=True, preConvKernel=None):
         """! Perform decorrelation of an image difference exposure.
 
         Decorrelates the diffim due to the convolution of the
@@ -589,8 +632,8 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
            by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
         spatiallyVarying : bool
            if True, perform the spatially-varying operation
-        doPreConvolve : bool
-           if True, the scienceExposure has been pre-filtered with its PSF. (Currently
+        preConvKernel : lsst.meas.algorithms.Psf
+           if not none, the scienceExposure has been pre-filtered with this kernel. (Currently
            this option is experimental.)
 
         Returns
@@ -602,6 +645,15 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
 
         svar = self.computeVarianceMean(scienceExposure)
         tvar = self.computeVarianceMean(templateExposure)
+        if np.isnan(svar) or np.isnan(tvar):  # Should not happen unless entire image has been masked.
+            # Double check that one of the exposures is all NaNs
+            if (np.all(np.isnan(scienceExposure.getMaskedImage().getImage().getArray())) or
+                    np.all(np.isnan(templateExposure.getMaskedImage().getImage().getArray()))):
+                self.log.warn('Template or science image is entirely NaNs: skipping decorrelation.')
+                if np.isnan(svar):
+                    svar = 1e-9
+                if np.isnan(tvar):
+                    tvar = 1e-9
 
         var = self.computeVarianceMean(subtractedExposure)
 
@@ -612,7 +664,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
             task = ImageMapReduceTask(config=config)
             results = task.run(subtractedExposure, science=scienceExposure,
                                template=templateExposure, psfMatchingKernel=psfMatchingKernel,
-                               preConvKernel=None, forceEvenSized=True)
+                               preConvKernel=preConvKernel, forceEvenSized=True)
             results.correctedExposure = results.exposure
 
             # Make sure masks of input image are propagated to diffim
@@ -627,6 +679,6 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
             config = self.config.decorrelateConfig
             task = DecorrelateALKernelTask(config=config)
             results = task.run(scienceExposure, templateExposure,
-                               subtractedExposure, psfMatchingKernel)
+                               subtractedExposure, psfMatchingKernel, preConvKernel=preConvKernel)
 
         return results
