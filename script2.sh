@@ -6,13 +6,14 @@ cat output_AL.txt
 
 (time imageDifference2.py calexpDir_b1631 --output decamDirTest_ALDec_noSpatial \
                     --id visit=289820 ccdnum=11 --templateId visit=288976 \
-                    --configfile diffimconfig.py --clobber-config --clobber-versions) \
-		    >& output_ALDec_noSpatial.txt
+                    --configfile diffimconfig.py --clobber-config --clobber-versions \
+                    --config makeDiffim.doDecorrelation=True) >& output_ALDec_noSpatial.txt
 cat output_ALDec_noSpatial.txt
 
 (time imageDifference2.py calexpDir_b1631 --output decamDirTest_ALDec_yesSpatial \
                     --id visit=289820 ccdnum=11 --templateId visit=288976 \
                     --configfile diffimconfig.py --clobber-config --clobber-versions \
+                    --config makeDiffim.doDecorrelation=True \
 		    --config makeDiffim.doSpatiallyVarying=True) >& output_ALDec_yesSpatial.txt
 cat output_ALDec_yesSpatial.txt
 
