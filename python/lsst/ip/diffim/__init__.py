@@ -46,6 +46,7 @@ from .zogy import *
 from .registerImage import *
 from .processDiffim import *
 from .makeDiffim import *
+from .imageDifference import *
 from .version import *
 
 # automatically register ip_diffim Algorithms

@@ -70,10 +70,6 @@ class ProcessDiffimConfig(pexConfig.Config):
         target=AstrometryTask,
         doc="astrometry task; used to match sources to reference objects, but not to fit a WCS",
     )
-    getTemplate = pexConfig.ConfigurableField(
-        target=GetCoaddAsTemplateTask,
-        doc="Subtask to retrieve template exposure and sources",
-    )
     controlRandomSeed = pexConfig.Field(
         doc = "Random seed for shuffing the control sample",
         dtype = int,
@@ -136,7 +132,6 @@ class ProcessDiffimTask(pipeBase.CmdLineTask):
         @param[in] butler  Butler object to use in constructing reference object loaders
         """
         pipeBase.CmdLineTask.__init__(self, **kwargs)
-        self.makeSubtask("getTemplate")
 
         self.schema = schema
         if schema is None:
@@ -330,6 +325,4 @@ class ProcessDiffimTask(pipeBase.CmdLineTask):
         """
         parser = pipeBase.ArgumentParser(name=cls._DefaultName)
         parser.add_id_argument("--id", "calexp", help="data ID, e.g. --id visit=12345 ccd=1,2")
-        parser.add_id_argument("--templateId", "calexp", doMakeDataRefList=True,
-                               help="Optional template data ID (visit only), e.g. --templateId visit=6789")
         return parser
