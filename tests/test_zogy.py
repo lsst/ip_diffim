@@ -138,7 +138,9 @@ class ZogyTest(lsst.utils.tests.TestCase):
         task = ZogyTask(templateExposure=self.im2ex, scienceExposure=self.im1ex, config=config)
         D_F = task.computeDiffim(inImageSpace=False)
         D_R = task.computeDiffim(inImageSpace=True)
-        self._compareExposures(D_F.D, D_R.D)
+        # Fourier-space and image-space versions are not identical, so up the tolerance.
+        # This is a known issue with the image-space version.
+        self._compareExposures(D_F.D, D_R.D, tol=0.03)
 
     def _testZogyScorr(self, varAst=0.):
         """Compute Zogy likelihood images (Scorr) using Fourier- and Real-space methods.
@@ -177,7 +179,7 @@ class ZogyTest(lsst.utils.tests.TestCase):
         config.reducer.reduceOperation = 'average'
         task = ImageMapReduceTask(config=config)
         D_mapReduced = task.run(self.im1ex, template=self.im2ex, inImageSpace=inImageSpace,
-                                doScorr=doScorr, forceEvenSized=True, **kwargs).exposure
+                                doScorr=doScorr, forceEvenSized=False, **kwargs).exposure
 
         config = ZogyConfig()
         task = ZogyTask(templateExposure=self.im2ex, scienceExposure=self.im1ex, config=config)
@@ -211,6 +213,11 @@ class ZogyTest(lsst.utils.tests.TestCase):
         Compare resulting diffim version with original, non-spatially-varying version.
         """
         config = ZogyImagePsfMatchConfig()
+        config.zogyMapReduceConfig.gridStepX = config.zogyMapReduceConfig.gridStepY = 9
+        config.zogyMapReduceConfig.borderSizeX = config.zogyMapReduceConfig.borderSizeY = 3
+        if inImageSpace:  # need larger border size for image-space run
+            config.zogyMapReduceConfig.gridStepX = config.zogyMapReduceConfig.gridStepY = 8
+            config.zogyMapReduceConfig.borderSizeX = config.zogyMapReduceConfig.borderSizeY = 6
         task = ZogyImagePsfMatchTask(config=config)
         result = task.subtractExposures(self.im2ex, self.im1ex, inImageSpace=inImageSpace,
                                         doWarping=False, spatiallyVarying=spatiallyVarying)
