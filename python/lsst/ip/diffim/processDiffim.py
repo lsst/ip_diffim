@@ -1,6 +1,7 @@
+from __future__ import absolute_import, division, print_function
 #
 # LSST Data Management System
-# Copyright 2012 LSST Corporation.
+# Copyright 2016 AURA/LSST.
 #
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -12,15 +13,15 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the LSST License Statement and
 # the GNU General Public License along with this program.  If not,
-# see <http://www.lsstcorp.org/LegalNotices/>.
+# see <https://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 import random
+import math
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -29,7 +30,7 @@ import lsst.afw.table as afwTable
 from lsst.meas.extensions.astrometryNet import LoadAstrometryNetObjectsTask
 from lsst.meas.astrom import AstrometryTask
 from lsst.meas.algorithms import SourceDetectionTask, LoadIndexedReferenceObjectsTask
-from . import GetCoaddAsTemplateTask, DipoleFitTask
+from . import MakeDiffimTask, GetCoaddAsTemplateTask, DipoleFitTask
 
 __all__ = ["ProcessDiffimTask", "ProcessDiffimConfig"]
 
@@ -76,17 +77,27 @@ class ProcessDiffimConfig(pexConfig.Config):
         default = 10
     )
 
-    growFootprint = pexConfig.Field(dtype=int, default=2,
-                                    doc="Grow positive and negative footprints by this amount before merging")
+    growFootprint = pexConfig.Field(
+        doc="Grow positive and negative footprints by this amount before merging",
+        dtype=int,
+        default=2
+    )
 
-    diaSourceMatchRadius = pexConfig.Field(dtype=float, default=0.5,
-                                           doc="Match radius (in arcseconds) "
-                                               "for DiaSource to Source association")
-    isPreConvolved = pexConfig.Field(dtype=bool, default=False,
-                                     doc="Diffim is pre-convolved (doPreConvolve=True in makeDiffim)")
-    isDecorrelated = pexConfig.Field(dtype=bool, default=True,
-                                     doc="Diffim is decorrelated (doDecorrelation=True in makeDiffim")
-
+    diaSourceMatchRadius = pexConfig.Field(
+        doc="Match radius (in arcseconds) for DiaSource to Source association",
+        dtype=float,
+        default=0.5
+    )
+    isPreConvolved = pexConfig.Field(
+        doc="Diffim is pre-convolved (doPreConvolve=True in makeDiffim)",
+        dtype=bool,
+        default=False
+    )
+    isDecorrelated = pexConfig.Field(
+        doc="Diffim is decorrelated (doDecorrelation=True in makeDiffim",
+        dtype=bool,
+        default=True
+    )
 
     def setDefaults(self):
         # defaults are OK for catalog and diacatalog
@@ -115,21 +126,93 @@ class ProcessDiffimTaskRunner(pipeBase.ButlerInitializedTaskRunner):
 
     @staticmethod
     def getTargetList(parsedCmd, **kwargs):
-        return pipeBase.TaskRunner.getTargetList(parsedCmd, templateIdList=parsedCmd.templateId.idList,
-                                                 **kwargs)
+        return pipeBase.TaskRunner.getTargetList(parsedCmd, **kwargs)
+
+## \addtogroup LSST_task_documentation
+## \{
+## \page ProcessDiffimTask
+## \ref ProcessDiffimTask_ "ProcessDiffimTask"
+## \copybrief ProcessDiffimTask
+## \}
 
 
 class ProcessDiffimTask(pipeBase.CmdLineTask):
-    """Subtract an image from a template and measure the result
+    """!
+\anchor ProcessDiffimTask_
+
+\brief Subtract an image from a template and save the results
+
+\section ip_diffim_processDiffim_Contents Contents
+
+ - \ref ip_diffim_processDiffim_Purpose
+ - \ref ip_diffim_processDiffim_Initialize
+ - \ref ip_diffim_processDiffim_IO
+ - \ref ip_diffim_processDiffim_Config
+ - \ref ip_diffim_processDiffim_Example
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_processDiffim_Purpose   Description
+
+This task serves to process the image difference (diffim) produced by the
+lsst.ip.diffim.makeDiffim.MakeDiffimTask. This includes detection and measurement
+of sources in the diffim, and optionally saving the resulting catalog to disk.
+
+The detection and measurement algorithms are provided by the `detection` and `measurement`
+subtasks, respectively.
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_processDiffim_Initialize    Task initialization
+
+\copydoc \_\_init\_\_
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_processDiffim_IO        Invoking the Task
+
+This task may be invoked in two ways:
+
+1. its run() method which expects a Butler sensorRef for loading all relevant data
+(template, science image, and diffim).
+2. the doProcessDiffim() method which is called from run() but may also be called separately
+and expects the template and new exposures and optionally an idFactory and sensorRef for
+loading additional data.
+
+See each method's returned lsst.pipe.base.Struct for more details.
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_processDiffim_Config       Configuration parameters
+
+See \ref ProcessDiffimConfig
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_processDiffim_Example   A complete example of using ProcessDiffimTask
+
+This task is called from lsst.ip.diffim.imageDifference.ImageDifferenceTask.run(), which
+may be used as an example. This task itself may be invoked via the command line, for
+example (assuming obs_decam has been set up and decamDiffimRepo was passed to
+makeDiffim.py as the output repo):
+
+\code
+processDiffim.py decamDiffimRepo --output decamDiaSrcRepo --id visit=289820 ccdnum=11
+\endcode
+
+This will add a new diaSrc record in the decamDiaSrcRepo.
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
     """
     ConfigClass = ProcessDiffimConfig
     RunnerClass = ProcessDiffimTaskRunner
     _DefaultName = "processDiffim"
 
     def __init__(self, schema=None, butler=None, **kwargs):
-        """!Construct an ProcessDiffim Task
+        """Construct a ProcessDiffim Task
 
-        @param[in] butler  Butler object to use in constructing reference object loaders
+        Parameters
+        ----------
+        butler : Butler object to use in constructing reference object loaders
         """
         pipeBase.CmdLineTask.__init__(self, **kwargs)
 
@@ -149,28 +232,28 @@ class ProcessDiffimTask(pipeBase.CmdLineTask):
             self.schema.addField("srcMatchId", "L", "unique id of source match")
 
     @pipeBase.timeMethod
-    def run(self, sensorRef, templateIdList=None):
-        """Measure the result of an image subtraction
+    def run(self, sensorRef):
+        """Measure the result of an image subtraction by calling doProcessDiffim
 
-        Steps include:
-        - detect sources
-        - measure sources
+        Parameters
+        ----------
+        sensorRef : sensor-level butler data reference, used for the following data products:
+            Input only:
+            - calexp
+            - psf
+            - ccdExposureId
+            - ccdExposureId_bits
+            - self.config.coaddName + "Coadd_skyMap"
+            - self.config.coaddName + "Coadd"
+            - self.config.coaddName + "Diff_differenceExp"
+            - self.config.coaddName + "Diff_matchedExp"
+            Output, depending on config:
+            - self.config.coaddName + "Diff_src"
 
-        @param sensorRef: sensor-level butler data reference, used for the following data products:
-        Input only:
-        - calexp
-        - psf
-        - ccdExposureId
-        - ccdExposureId_bits
-        - self.config.coaddName + "Coadd_skyMap"
-        - self.config.coaddName + "Coadd"
-        - self.config.coaddName + "Diff_differenceExp"
-        - self.config.coaddName + "Diff_matchedExp"
-        Output, depending on config:
-        - self.config.coaddName + "Diff_src"
-
-        @return pipe_base Struct containing these fields:
-        - sources: detected and possibly measured sources; None if detection not run
+        Returns
+        -------
+        pipe_base Struct containing these fields:
+            - sources: detected and possibly measured sources
         """
         self.log.info("Processing %s" % (sensorRef.dataId))
 
@@ -193,7 +276,6 @@ class ProcessDiffimTask(pipeBase.CmdLineTask):
         subtractedExposure = sensorRef.get(self.config.coaddName + "Diff_differenceExp")
         matchedExposure = sensorRef.get(self.config.coaddName + "Diff_matchedExp")
 
-        # TODO: isPreConvolved needs to be somehow extracted from subtractedExposure.
         result = self.doProcessDiffim(subtractedExposure, exposure, matchedExposure,
                                       isPreConvolved=self.config.isPreConvolved,
                                       isDecorrelated=self.config.isDecorrelated,
@@ -206,6 +288,51 @@ class ProcessDiffimTask(pipeBase.CmdLineTask):
     def doProcessDiffim(self, subtractedExposure, scienceExposure, matchedTemplateExposure,
                         isPreConvolved=False, isDecorrelated=True, selectSources=None,
                         idFactory=None, sensorRef=None):
+        """Measure the result of an image subtraction
+
+        Steps include:
+        - detect sources
+        - measure sources
+
+        Parameters
+        ----------
+        subtractedExposure : lsst.afw.image.Exposure
+            Subtracted exposure
+        scienceExposure : lsst.afw.image.Exposure
+            'Science', or new exposure
+        templateExposure : lsst.afw.image.Exposure
+            Template exposure
+        isPreConvolved : bool
+            Was the subtractedExposure pre-convolved? (see `makeDiffim.MakeDiffimConfig`)
+            This is used to select the type of detection and measurement performed
+        isDecorrelated : bool
+            Was the subtracted exposure decorrelated? (see `makeDiffim.MakeDiffimConfig`)
+            This is used to select the type of dipole measurement performed
+        selectSources : lsst.afw.table.SourceCatalog
+            Source catalog detected on scienceExposure and selected for A&L PSF
+            matching (see `makeDiffim.MakeDiffimTask`). If None, it is read from the
+            butler.
+        idFactory : lsst.afw.table.Factory
+             Factory for the generation of Source ids
+        sensorRef :
+             Sensor-level butler data reference, used for the following data products:
+                Input only:
+                - calexp
+                - psf
+                - ccdExposureId
+                - ccdExposureId_bits
+                - self.config.coaddName + "Coadd_skyMap"
+                - self.config.coaddName + "Coadd"
+                Input or output, depending on config:
+                - self.config.coaddName + "Diff_differenceExp"
+                Output, depending on config:
+                - self.config.coaddName + "Diff_matchedExp"
+
+        Returns
+        -------
+        pipe_base Struct containing these fields:
+            - sources: detected and possibly measured sources
+        """
         self.log.info("Running diaSource detection")
         # Erase existing detection mask planes
         mask = subtractedExposure.getMaskedImage().getMask()
@@ -247,11 +374,10 @@ class ProcessDiffimTask(pipeBase.CmdLineTask):
                     # automatically creates from scienceExposure - subtractedExposure.
                     self.measurement.run(diaSources, subtractedExposure, scienceExposure)
 
-        # Match with the calexp sources if possible
         if self.config.doMatchSources and sensorRef is not None:
-            if selectSources is not None and sensorRef.datasetExists("src"):
-                selectSources = sensorRef.get("src")
-
+            # Match with the calexp sources if possible
+            selectSources = MakeDiffimTask.getSelectSources(scienceExposure, self.config.isPreConvolved,
+                                                            self.log, idFactory, sensorRef)
             refObjLoader = LoadIndexedReferenceObjectsTask(butler=sensorRef.getButler())
             diaSources = self.runMatchSources(diaSources, selectSources, scienceExposure,
                                               refObjLoader)
@@ -266,6 +392,16 @@ class ProcessDiffimTask(pipeBase.CmdLineTask):
         )
 
     def runMatchSources(self, diaSources, selectSources, exposure, refObjLoader):
+        """Match diaSources and selectSources catalogs by RA/Dec
+
+        Parameters
+        ----------
+        diaSources : lsst.afw.table.SourceCatalog
+           Catalog of sources detected on diffim
+        selectSources : lsst.afw.table.SourceCatalog
+           Catalog of sources detected on science image and used for PSF matching
+
+        """
         matchRadAsec = self.config.diaSourceMatchRadius
         if selectSources is not None:
             # Create key,val pair where key=diaSourceId and val=sourceId

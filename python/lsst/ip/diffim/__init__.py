@@ -44,8 +44,8 @@ from .imageDecorrelation import *
 from .imageMapReduce import *
 from .zogy import *
 from .registerImage import *
-from .processDiffim import *
 from .makeDiffim import *
+from .processDiffim import *
 from .imageDifference import *
 from .version import *
 

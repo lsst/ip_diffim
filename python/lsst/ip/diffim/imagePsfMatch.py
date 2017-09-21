@@ -788,3 +788,10 @@ And finally provide some optional debugging displays:
                 (templateExposure.getDimensions() != scienceExposure.getDimensions())):
             return False
         return True
+
+
+subtractAlgorithmRegistry = pexConfig.makeRegistry(
+    doc="A registry of subtraction algorithms for use as a subtask in imageDifference",
+)
+
+subtractAlgorithmRegistry.register('al', ImagePsfMatchTask)

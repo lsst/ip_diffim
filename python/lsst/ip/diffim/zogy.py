@@ -32,7 +32,8 @@ import lsst.pipe.base as pipeBase
 
 from .imageMapReduce import (ImageMapReduceConfig, ImageMapper,
                              ImageMapReduceTask)
-from .imagePsfMatch import (ImagePsfMatchTask, ImagePsfMatchConfig)
+from .imagePsfMatch import (ImagePsfMatchTask, ImagePsfMatchConfig,
+                            subtractAlgorithmRegistry)
 
 __all__ = ["ZogyTask", "ZogyConfig",
            "ZogyMapper", "ZogyMapReduceConfig",
@@ -242,9 +243,6 @@ class ZogyTask(pipeBase.Task):
             psf1 = np.pad(psf1, ((0, 0), (0, pShape2[1] - pShape1[1])), mode='constant', constant_values=0.)
         elif (pShape2[1] < pShape1[1]):
             psf2 = np.pad(psf2, ((0, 0), (0, pShape1[1] - pShape2[1])), mode='constant', constant_values=0.)
-
-        psf1[psf1 < 1e-4] = 1e-4
-        psf2[psf2 < 1e-4] = 1e-4
 
         # PSFs' centers may be offset relative to each other; now fix that!
         maxLoc1 = np.unravel_index(np.argmax(psf1), psf1.shape)
@@ -1183,3 +1181,6 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
                              doWarping=True, spatiallyVarying=True, inImageSpace=False,
                              doPreConvolve=False):
         raise NotImplementedError
+
+
+subtractAlgorithmRegistry.register('zogy', ZogyImagePsfMatchTask)

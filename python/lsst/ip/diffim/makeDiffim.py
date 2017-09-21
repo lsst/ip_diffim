@@ -1,6 +1,7 @@
+from __future__ import absolute_import, division, print_function
 #
 # LSST Data Management System
-# Copyright 2012 LSST Corporation.
+# Copyright 2016 AURA/LSST.
 #
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -12,14 +13,13 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the LSST License Statement and
 # the GNU General Public License along with this program.  If not,
-# see <http://www.lsstcorp.org/LegalNotices/>.
+# see <https://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 from builtins import zip
 import math
 import random
@@ -38,53 +38,80 @@ from lsst.meas.algorithms import SingleGaussianPsf, \
 from . import ImagePsfMatchTask, ZogyImagePsfMatchTask, makeKernelBasisList, \
     KernelCandidateQa, DiaCatalogSourceSelectorTask, DiaCatalogSourceSelectorConfig, \
     RegisterTask, GetCoaddAsTemplateTask, GetCalexpAsTemplateTask, \
-    DecorrelateALKernelSpatialTask
+    DecorrelateALKernelSpatialTask, subtractAlgorithmRegistry
 
 __all__ = ["MakeDiffimTask", "MakeDiffimConfig"]
 
 FwhmPerSigma = 2 * math.sqrt(2 * math.log(2))
 IqrToSigma = 0.741
 
-subtractAlgorithmRegistry = pexConfig.makeRegistry(
-    doc="A registry of subtraction algorithms for use as a subtask in imageDifference",
-)
-
-subtractAlgorithmRegistry.register('al', ImagePsfMatchTask)
-subtractAlgorithmRegistry.register('zogy', ZogyImagePsfMatchTask)
-
 
 class MakeDiffimConfig(pexConfig.Config):
     """Config for MakeDiffimTask
     """
-    doAddCalexpBackground = pexConfig.Field(dtype=bool, default=True,
-                                            doc="Add background to calexp before processing it. "
-                                                "Useful as ipDiffim does background matching.")
-    doUseRegister = pexConfig.Field(dtype=bool, default=True,
-                                    doc="Use image-to-image registration to align template with "
-                                        "science image")
-    doDebugRegister = pexConfig.Field(dtype=bool, default=False,
-                                      doc="Writing debugging data for doUseRegister")
-    doSelectSources = pexConfig.Field(dtype=bool, default=True,
-                                      doc="Select stars to use for kernel fitting")
-    doSelectDcrCatalog = pexConfig.Field(dtype=bool, default=False,
-                                         doc="Select stars of extreme color as part of the control sample")
-    doSelectVariableCatalog = pexConfig.Field(dtype=bool, default=False,
-                                              doc="Select stars that are variable to be part "
-                                                  "of the control sample")
-    doPreConvolve = pexConfig.Field(dtype=bool, default=True,
-                                    doc="Convolve science image by its PSF before PSF-matching?")
-    useGaussianForPreConvolution = pexConfig.Field(dtype=bool, default=True,
-                                                   doc="Use a simple gaussian PSF model for pre-convolution "
-                                                       "(else use fit PSF)? Ignored if doPreConvolve false.")
-    doDecorrelation = pexConfig.Field(dtype=bool, default=False,
-                                      doc="Perform diffim decorrelation to undo pixel correlation due to A&L "
-                                          "kernel convolution? If True, also update the diffim PSF.")
-    doWriteSubtractedExp = pexConfig.Field(dtype=bool, default=True, doc="Write difference exposure?")
-    doWriteMatchedExp = pexConfig.Field(dtype=bool, default=False,
-                                        doc="Write warped and PSF-matched template coadd exposure?")
-    doAddMetrics = pexConfig.Field(dtype=bool, default=True,
-                                   doc="Add columns to the source table to hold analysis metrics?")
+    doAddCalexpBackground = pexConfig.Field(
+        doc="Add background to calexp before processing it. Useful as ipDiffim does background matching.",
+        dtype=bool,
+        default=True
+    )
 
+    doUseRegister = pexConfig.Field(
+        doc="Use image-to-image registration to align template with science image",
+        dtype=bool,
+        default=True
+    )
+    doDebugRegister = pexConfig.Field(
+        doc="Writing debugging data for doUseRegister",
+        dtype=bool,
+        default=False
+    )
+    doSelectSources = pexConfig.Field(
+        doc="Select stars to use for kernel fitting",
+        dtype=bool,
+        default=True
+    )
+    doSelectDcrCatalog = pexConfig.Field(
+        doc="Select stars of extreme color as part of the control sample",
+        dtype=bool,
+        default=False
+    )
+    doSelectVariableCatalog = pexConfig.Field(
+        doc="Select stars that are variable to be part of the control sample",
+        dtype=bool,
+        default=False
+    )
+    doPreConvolve = pexConfig.Field(
+        doc="Convolve science image by its PSF before PSF-matching?",
+        dtype=bool,
+        default=True
+    )
+    useGaussianForPreConvolution = pexConfig.Field(
+        doc="Use a simple gaussian PSF model for pre-convolution "
+            "(else use fit PSF)? Ignored if doPreConvolve false.",
+        dtype=bool,
+        default=True
+    )
+    doDecorrelation = pexConfig.Field(
+        doc="Perform diffim decorrelation to undo pixel correlation due to A&L "
+        "kernel convolution? If True, also update the diffim PSF.",
+        dtype=bool,
+        default=False
+    )
+    doWriteSubtractedExp = pexConfig.Field(
+        doc="Write difference exposure?",
+        dtype=bool,
+        default=True
+    )
+    doWriteMatchedExp = pexConfig.Field(
+        doc="Write warped and PSF-matched template coadd exposure?",
+        dtype=bool,
+        default=False
+    )
+    doAddMetrics = pexConfig.Field(
+        doc="Add columns to the source table to hold analysis metrics?",
+        dtype=bool,
+        default=True
+    )
     coaddName = pexConfig.Field(
         doc="coadd name: typically one of deep or goodSeeing",
         dtype=str,
@@ -94,6 +121,12 @@ class MakeDiffimConfig(pexConfig.Config):
         doc="Which image gets convolved (default = template)",
         dtype=bool,
         default=True
+    )
+    doSpatiallyVarying = pexConfig.Field(
+        doc="If using Zogy or A&L decorrelation, perform these on a grid across the "
+        "image in order to allow for spatial variations",
+        dtype=bool,
+        default=False,
     )
     refObjLoader = pexConfig.ConfigurableField(
         target=LoadAstrometryNetObjectsTask,
@@ -107,18 +140,15 @@ class MakeDiffimConfig(pexConfig.Config):
         target=ObjectSizeStarSelectorTask,
         doc="Source selection algorithm",
     )
-    subtract = subtractAlgorithmRegistry.makeField("Subtraction Algorithm", default="al")
+    subtract = subtractAlgorithmRegistry.makeField(
+        "Subtraction Algorithm",
+        default="al"
+    )
     decorrelate = pexConfig.ConfigurableField(
         target=DecorrelateALKernelSpatialTask,
         doc="Decorrelate effects of A&L kernel convolution on image difference, only if doSubtract is True. "
         "If this option is enabled, then detection.thresholdValue should be set to 5.0 (rather than the "
         "default of 5.5).",
-    )
-    doSpatiallyVarying = pexConfig.Field(
-        dtype=bool,
-        default=False,
-        doc="If using Zogy or A&L decorrelation, perform these on a grid across the "
-        "image in order to allow for spatial variations"
     )
     getTemplate = pexConfig.ConfigurableField(
         target=GetCoaddAsTemplateTask,
@@ -143,13 +173,14 @@ class MakeDiffimConfig(pexConfig.Config):
         dtype=bool,
         default=False
     )
-    templateSipOrder = pexConfig.Field(dtype=int, default=2,
-                                       doc="Sip Order for fitting the Template Wcs "
-                                           "(default is too high, overfitting)")
+    templateSipOrder = pexConfig.Field(
+        doc="Sip Order for fitting the Template Wcs (default is too high, overfitting)",
+        dtype=int,
+        default=2,
+    )
 
     def setDefaults(self):
         # defaults are OK for catalog and diacatalog
-
         self.subtract['al'].kernel.name = "AL"
         self.subtract['al'].kernel.active.fitForBackground = True
         self.subtract['al'].kernel.active.spatialKernelOrder = 1
@@ -176,17 +207,115 @@ class MakeDiffimTaskRunner(pipeBase.ButlerInitializedTaskRunner):
                                                  **kwargs)
 
 
+## \addtogroup LSST_task_documentation
+## \{
+## \page MakeDiffimTask
+## \ref MakeDiffimTask_ "MakeDiffimTask"
+## \copybrief MakeDiffimTask
+## \}
+
+
 class MakeDiffimTask(pipeBase.CmdLineTask):
-    """Subtract an image from a template and measure the result
+    """!
+\anchor MakeDiffimTask_
+
+\brief Subtract an image from a template and save the results
+
+\section ip_diffim_makeDiffim_Contents Contents
+
+ - \ref ip_diffim_makeDiffim_Purpose
+ - \ref ip_diffim_makeDiffim_Initialize
+ - \ref ip_diffim_makeDiffim_IO
+ - \ref ip_diffim_makeDiffim_Config
+ - \ref ip_diffim_makeDiffim_Example
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_makeDiffim_Purpose   Description
+
+This task serves as a wrapper around algorithms which take as input a template
+(exposure or coadd) and a "new" or science image, register the two to the same
+astrometric reference, match their PSFs, and subtract the two, writing out the
+image difference as well as (optionally) intermediate products.
+
+The subtraction algorithms are provided by the `subtract` subtask, which is
+registered in the subtractAlgorithmRegistry. Currently the two available algorithms
+are Alard and Lupton (optionally decorrelated) and ZOGY. See the ImagePsfMatchTask and
+ZogyTask documentation for more information on those algorithms.
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_makeDiffim_Initialize    Task initialization
+
+\copydoc \_\_init\_\_
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_makeDiffim_IO        Invoking the Task
+
+This task may be invoked in two ways:
+
+1. its run() method which expects a Butler sensorRef for loading all relevant data
+(template, science image, and catalogs).
+2. the doMakeDiffim() method which is called from run() but may also be called separately
+and expects the matched template and new exposures, as well as the diffim exposure and
+parameters which specify how the diffim was created by \ref MakeDiffimTask_ .
+
+See each method's returned lsst.pipe.base.Struct for more details.
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_makeDiffim_Config       Configuration parameters
+
+See \ref MakeDiffimConfig
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+\section ip_diffim_makeDiffim_Example   A complete example of using MakeDiffimTask
+
+This task is called from lsst.ip.diffim.imageDifference.ImageDifferenceTask.run(), which
+may be used as an example. This task itself may be invoked via the command line, for
+example (using a single DECam exposure as the template, assuming obs_decam has been set up):
+
+\code
+processDiffim.py decamRepo --output decamDiffimRepo --id visit=289820 ccdnum=11 \
+     --templateId visit=288976 --configfile makeDiffimConfig.py \
+     --config doDecorrelation=True --config doSpatiallyVarying=True
+\endcode
+
+This assumes the following makeDiffimConfig.py file is in your working directory:
+
+\code
+config.doWriteSubtractedExp=True
+config.doWriteMatchedExp=True
+config.doDecorrelation=True
+config.subtract='al'
+
+config.subtract['zogy'].zogyConfig.inImageSpace=False
+
+from lsst.ip.diffim.getTemplate import GetCalexpAsTemplateTask
+config.getTemplate.retarget(GetCalexpAsTemplateTask)
+\endcode
+
+While the above example config contains parameters for the Zogy algorithm,
+it is not utilized by the above example command-line call. It is provided as an
+example of how to configure the `subtract` subtask.
+
+We have enabled some minor display debugging in this script via the
+--debug option.  However, if you have an lsstDebug debug.py in your
+PYTHONPATH you will get additional debugging displays.
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
     """
     ConfigClass = MakeDiffimConfig
     RunnerClass = MakeDiffimTaskRunner
     _DefaultName = "makeDiffim"
 
     def __init__(self, butler=None, **kwargs):
-        """!Construct an MakeDiffim Task
+        """Construct a MakeDiffim Task
 
-        @param[in] butler  Butler object to use in constructing reference object loaders
+        Parameters
+        ----------
+        butler : Butler object to use in constructing reference object loaders
         """
         pipeBase.CmdLineTask.__init__(self, **kwargs)
         self.makeSubtask("getTemplate")
@@ -209,7 +338,7 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
 
     @pipeBase.timeMethod
     def run(self, sensorRef, templateIdList=None):
-        """Subtract an image from a template coadd
+        """Subtract an image from a template and save the results
 
         Steps include:
         - warp template coadd to match WCS of image
@@ -217,20 +346,24 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
         - subtract image from PSF-matched, warped template
         - persist difference image
 
-        @param sensorRef: sensor-level butler data reference, used for the following data products:
-        Input only:
-        - calexp
-        - psf
-        - ccdExposureId
-        - ccdExposureId_bits
-        - self.config.coaddName + "Coadd_skyMap"
-        - self.config.coaddName + "Coadd"
-        Input or output, depending on config:
-        - self.config.coaddName + "Diff_differenceExp"
-        Output, depending on config:
-        - self.config.coaddName + "Diff_matchedExp"
+        Parameters
+        ----------
+        sensorRef : sensor-level butler data reference, used for the following data products:
+            Input only:
+            - calexp
+            - psf
+            - ccdExposureId
+            - ccdExposureId_bits
+            - self.config.coaddName + "Coadd_skyMap"
+            - self.config.coaddName + "Coadd"
+            Input or output, depending on config:
+            - self.config.coaddName + "Diff_differenceExp"
+            Output, depending on config:
+            - self.config.coaddName + "Diff_matchedExp"
 
-        @return pipe_base Struct containing these fields:
+        Returns
+        -------
+        pipe_base Struct containing these fields:
         - subtractedExposure: exposure after subtracting template;
             the unpersisted version if subtraction not run but detection run
             None if neither subtraction nor detection run (i.e. nothing useful done)
@@ -256,6 +389,39 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
 
     @pipeBase.timeMethod
     def doMakeDiffim(self, template, exposure, idFactory=None, sensorRef=None):
+        """Make the diffim.
+
+        Parameters
+        ----------
+        template : lsst.afw.image.Exposure
+            Template exposure
+        exposure : lsst.afw.image.Exposure
+            'Science', or new exposure
+        idFactory : lsst.afw.table.Factory
+             Factory for the generation of Source ids
+        sensorRef :
+             Sensor-level butler data reference, used for the following data products
+                Input only:
+                - calexp
+                - psf
+                - ccdExposureId
+                - ccdExposureId_bits
+                - self.config.coaddName + "Coadd_skyMap"
+                - self.config.coaddName + "Coadd"
+                Input or output, depending on config:
+                - self.config.coaddName + "Diff_differenceExp"
+                Output, depending on config:
+                - self.config.coaddName + "Diff_matchedExp"
+
+        Returns
+        -------
+        pipe_base Struct containing these fields:
+        - subtractedExposure: exposure after subtracting template;
+            the unpersisted version if subtraction not run but detection run
+            None if neither subtraction nor detection run (i.e. nothing useful done)
+        - subtractRes: results of subtraction task; None if subtraction not run
+
+        """
         templateExposure = template.exposure   # Stitched coadd exposure
         templateSources = template.sources    # Sources on the template image
 
@@ -265,10 +431,10 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
 
         # compute scienceSigmaOrig: sigma of PSF of science image
         scienceSigmaOrig = sciencePsf.computeShape().getDeterminantRadius()
-        scienceSigmaPost = scienceSigmaOrig
+        self.scienceSigmaPost = scienceSigmaOrig
         # compute scienceSigmaPost: sigma of PSF of science image after pre-convolution (A&L)
         if self.config.doPreConvolve:
-            scienceSigmaPost = scienceSigmaOrig * math.sqrt(2)
+            self.scienceSigmaPost = scienceSigmaOrig * math.sqrt(2)
 
         # If requested, find sources in the image
         selectSourceRes = None
@@ -277,8 +443,7 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
         matches = None
         if self.config.doSelectSources:
             selectSourcesRes = self.runSelectSources(exposure, templateExposure,
-                                                     templateSources, scienceSigmaPost,
-                                                     idFactory, sensorRef=sensorRef)
+                                                     templateSources, idFactory, sensorRef=sensorRef)
             selectSources = selectSourcesRes.selectSources
             kernelSources = selectSourcesRes.kernelSources
             matches = selectSourcesRes.matches
@@ -296,10 +461,9 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
                 allresids = self.runDebugRegister(wcsResults, matches)
 
         if self.config.subtract.name == 'zogy':
-            spatiallyVarying = self.config.doSpatiallyVarying
             subtractRes = self.subtract.subtractExposures(templateExposure, exposure,
                                                           doWarping=True,
-                                                          spatiallyVarying=spatiallyVarying,
+                                                          spatiallyVarying=self.config.doSpatiallyVarying,
                                                           doPreConvolve=self.config.doPreConvolve)
             subtractedExposure = subtractRes.subtractedExposure
 
@@ -311,8 +475,6 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
 
             # if requested, convolve the science exposure with its PSF
             # (properly, this should be a cross-correlation, but our code does not yet support that)
-            # compute scienceSigmaPost: sigma of science exposure with pre-convolution, if done,
-            # else sigma of original science exposure
             preConvPsf = None
             if self.config.doPreConvolve:
                 convControl = afwMath.ConvolutionControl()
@@ -362,13 +524,12 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
             # Perform diffim decorrelation
             if self.config.doDecorrelation:
                 preConvKernel = None
-                spatiallyVarying = self.config.doSpatiallyVarying
                 if preConvPsf is not None:
                     preConvKernel = preConvPsf.getLocalKernel()
                 decorrResult = self.decorrelate.run(exposure, templateExposure,
                                                     subtractedExposure,
                                                     subtractRes.psfMatchingKernel,
-                                                    spatiallyVarying=spatiallyVarying,
+                                                    spatiallyVarying=self.config.doSpatiallyVarying,
                                                     preConvKernel=preConvKernel)
                 subtractedExposure = decorrResult.correctedExposure
                 subtractRes.subtractedExposure = subtractedExposure
@@ -387,28 +548,84 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
 
         return subtractRes
 
-    def runSelectSources(self, exposure, templateExposure, templateSources,
-                         scienceSigmaPost, idFactory=None, sensorRef=None):
+    @staticmethod
+    def getSelectSources(exposure, isPreConvolved, log=None, idFactory=None, sensorRef=None):
+        """Load sources for exposure or detect them if not available.
+
+        Parameters
+        ----------
+        exposure : lsst.afw.image.Exposure
+            Exposure to detect on
+        isPreConvolved : bool
+            True if exposure was pre-convolved with its own PSF
+        log : lsst.log.Log
+            For logging info on how sources were detected or loaded
+        idFactory : lsst.afw.table.Factory
+             Factory for the generation of Source ids
+        sensorRef :
+             Sensor-level butler data reference, used for input science image src data product
+
+        Returns
+        -------
+        lsst.afw.table.SourceCatalog containing loaded or detected sources
+        """
+
         if sensorRef is not None and sensorRef.datasetExists("src"):
-            self.log.info("Source selection via src product")
+            if log is not None:
+                log.info("Source selection via src product")
             selectSources = sensorRef.get("src")
         else:
-            self.log.warn("Src product does not exist; running detection, measurement, selection")
             # Run own detection and measurement; necessary in nightly processing
+            if log is not None:
+                log.warn("Src product does not exist; running detection, measurement, selection")
+            # compute scienceSigma: sigma of PSF of science image after pre-convolution (A&L)
+            scienceSigma = exposure.getpsf().computeShape().getDeterminantRadius()
+            if isPreConvolved:
+                scienceSigma *= math.sqrt(2)
             selectSources = self.subtract.getSelectSources(
                 exposure,
-                sigma=scienceSigmaPost,
-                doSmooth=not self.config.doPreConvolve,
+                sigma=scienceSigma,
+                doSmooth=not isPreConvolved,
                 idFactory=idFactory,
             )
+        return selectSources
 
+    def runSelectSources(self, exposure, templateExposure, templateSources,
+                         idFactory=None, sensorRef=None):
+        """Select sources for AL kernel fitting
+
+        Parameters
+        ----------
+        exposure : lsst.afw.image.Exposure
+            'Science', or new exposure
+        templateExposure : lsst.afw.image.Exposure
+            Template exposure
+        templateSources : lsst.afw.table.SourceCatalog
+            Sources detected in template
+        idFactory : lsst.afw.table.Factory
+             Factory for the generation of Source ids
+        sensorRef :
+             Sensor-level butler data reference, used for input science image src data product
+
+        Returns
+        -------
+        lsst.pipe.base.Struct containing the following elements:
+            selectSources: sourceCatalog containing sources to be used for registration
+            kernelSources: sourceCatalog containing sources to be used for PSF matching
+            controlSources: sourceCatalog containing control sources for PSF matching
+            matches: astrometric matches from astrometerTask
+            kcQa: KernelCandidateQa object
+            nparam: Number of kernel basis functions)
+        """
+        selectSources = MakeDiffimTask.getSelectSources(exposure, self.config.doPreConvolve,
+                                                        self.log, idFactory, sensorRef)
         kcQa = nparam = None
         if self.config.doAddMetrics:
             # sigma of PSF of template image before warping
             templateSigma = templateExposure.getPsf().computeShape().getDeterminantRadius()
             # Number of basis functions
             nparam = len(makeKernelBasisList(self.subtract.config.kernel.active,
-                                             referenceFwhmPix=scienceSigmaPost * FwhmPerSigma,
+                                             referenceFwhmPix=self.scienceSigmaPost * FwhmPerSigma,
                                              targetFwhmPix=templateSigma * FwhmPerSigma))
             # Modify the schema of all Sources
             kcQa = KernelCandidateQa(nparam)
@@ -464,6 +681,21 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
                                kcQa=kcQa, nparam=nparam)
 
     def runRegister(self, exposure, templateExposure, templateSources, selectSources, idFactory=None):
+        """Perform image-to-image registration to align template with science image
+
+        Parameters
+        ----------
+        exposure : lsst.afw.image.Exposure
+            'Science', or new exposure
+        templateExposure : lsst.afw.image.Exposure
+            Template exposure
+        templateSources : lsst.afw.table.SourceCatalog
+            Sources detected in template
+        selectSources : lsst.afw.table.SourceCatalog
+            Sources in science image
+        idFactory : lsst.afw.table.Factory
+             Factory for the generation of Source ids.
+        """
         self.log.info("Registering images")
 
         if templateSources is None:
@@ -490,9 +722,12 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
                                templateExposure=templateExposure)
 
     def runDebugRegister(self, wcsResults, matches):
-        # Create debugging outputs on the astrometric
-        # residuals as a function of position.  Persistence
-        # not yet implemented; expected on (I believe) #2636.
+        """Create debugging outputs
+
+        Create debugging outputs on the astrometric
+        residuals as a function of position.  Persistence
+        not yet implemented; expected on (I believe) #2636.
+        """
 
         # Grab matches to reference catalog
         srcToMatch = {x.second.getId(): x.first for x in matches}
@@ -559,9 +794,12 @@ class MakeDiffimTask(pipeBase.CmdLineTask):
     def fitAstrometry(self, templateSources, templateExposure, selectSources):
         """Fit the relative astrometry between templateSources and selectSources
 
-        @todo remove this method. It originally fit a new WCS to the template before calling register.run
-        because our TAN-SIP fitter behaved badly for points far from CRPIX, but that's been fixed.
-        It remains because a subtask overrides it.
+        Todo
+        ----
+        Remove this method. It originally fit a new WCS to the template before
+        calling register.run because our TAN-SIP fitter behaved badly
+        for points far from CRPIX, but that's been fixed.  It remains
+        because a subtask overrides it.
         """
         results = self.register.run(templateSources, templateExposure.getWcs(),
                                     templateExposure.getBBox(), selectSources)
@@ -600,7 +838,7 @@ class Winter2013MakeDiffimConfig(MakeDiffimConfig):
 
 
 class Winter2013MakeDiffimTask(MakeDiffimTask):
-    """!Image difference Task used in the Winter 2013 data challege.
+    """Image difference Task used in the Winter 2013 data challege.
     Enables testing the effects of registration shifts and scatter.
 
     For use with winter 2013 simulated images:

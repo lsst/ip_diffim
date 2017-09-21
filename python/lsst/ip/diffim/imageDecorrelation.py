@@ -196,12 +196,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         if svar is None:
             svar = self.computeVarianceMean(exposure)
-        if np.isnan(svar):  # Should not happen unless entire image has been masked.
-            svar = 1e-9
         if tvar is None:
             tvar = self.computeVarianceMean(templateExposure)
-        if np.isnan(tvar):  # Ditto.
-            tvar = 1e-9
         self.log.info("Variance (science, template): (%f, %f)", svar, tvar)
 
         # Should not happen unless entire image has been masked, which could happen
@@ -282,7 +278,6 @@ class DecorrelateALKernelTask(pipeBase.Task):
         kft = np.sqrt((svar + tvar) / denom)
         pck = np.fft.ifft2(kft)
         pck = np.fft.ifftshift(pck.real)
-
         fkernel = DecorrelateALKernelTask._fixEvenKernel(pck)
         if preConvKernel is not None:
             # This is not pretty but seems to be necessary as the preConvKernel term seems to lead
@@ -649,8 +644,6 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
         self.log.info('Running A&L decorrelation: spatiallyVarying=%r' % spatiallyVarying)
 
         svar = self.computeVarianceMean(scienceExposure)
-        if np.isnan(svar):  # Should not happen unless entire image has been masked.
-            svar = 1e-9
         tvar = self.computeVarianceMean(templateExposure)
         if np.isnan(svar) or np.isnan(tvar):  # Should not happen unless entire image has been masked.
             # Double check that one of the exposures is all NaNs
