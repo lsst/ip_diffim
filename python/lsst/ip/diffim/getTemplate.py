@@ -43,6 +43,11 @@ class GetCoaddAsTemplateConfig(pexConfig.Config):
         dtype=str,
         default="deep",
     )
+    warpType = pexConfig.Field(
+        doc="Warp type of the coadd template: one of 'direct' or 'psfMatched'",
+        dtype=str,
+        default="direct",
+    )
 
 
 class GetCoaddAsTemplateTask(pipeBase.Task):
@@ -100,7 +105,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             patchSubBBox = patchInfo.getOuterBBox()
             patchSubBBox.clip(coaddBBox)
             patchArgDict = dict(
-                datasetType=self.config.coaddName + "Coadd_sub",
+                datasetType=self.getCoaddDatasetName() + "_sub",
                 bbox=patchSubBBox,
                 tract=tractInfo.getId(),
                 patch="%s,%s" % (patchInfo.getIndex()[0], patchInfo.getIndex()[1]),
@@ -134,6 +139,19 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         coaddExposure.setFilter(coaddFilter)
         return pipeBase.Struct(exposure=coaddExposure,
                                sources=None)
+
+    def getCoaddDatasetName(self):
+        """Return coadd name for given task config
+
+        Returns
+        -------
+        CoaddDatasetName : `string`
+
+        TODO: This nearly duplicates a method in CoaddBaseTask (DM-11985)
+        """
+        warpType = self.config.warpType
+        suffix = "" if warpType == "direct" else warpType[0].upper() + warpType[1:]
+        return self.config.coaddName + "Coadd" + suffix
 
 
 class GetCalexpAsTemplateConfig(pexConfig.Config):
