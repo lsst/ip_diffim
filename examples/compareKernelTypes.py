@@ -280,6 +280,7 @@ def run(doExit=False):
     """Run the tests"""
     tests.run(suite(), doExit)
 
+
 if __name__ == "__main__":
     from optparse import OptionParser
     parser = OptionParser()

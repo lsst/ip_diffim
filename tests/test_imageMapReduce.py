@@ -34,8 +34,7 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 
 from lsst.ip.diffim.imageMapReduce import (ImageMapReduceTask, ImageMapReduceConfig,
-                                           ImageMapper, ImageMapperConfig,
-                                           ImageReducer, ImageReducerConfig)
+                                           ImageMapper, ImageMapperConfig)
 
 
 def setup_module(module):

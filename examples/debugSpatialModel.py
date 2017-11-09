@@ -112,7 +112,7 @@ if display:
 
     # Inputs
     for cell in kernelCellSet.getCellList():
-        for cand in cell.begin(False): # False = include bad candidates
+        for cand in cell.begin(False):  # False = include bad candidates
             rchi2 = cand.getChi2()
 
             # No kernels made
@@ -173,7 +173,7 @@ if display:
     mos.drawLabels(frame=frame)
 
     # Background
-    backgroundIm = afwImage.ImageF(afwGeom.Extent2I(templateExposure.getWidth(), 
+    backgroundIm = afwImage.ImageF(afwGeom.Extent2I(templateExposure.getWidth(),
                                    templateExposure.getHeight()), 0)
     backgroundIm += spatialBg
     frame += 1

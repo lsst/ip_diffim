@@ -2,24 +2,17 @@ from __future__ import absolute_import, division, print_function
 import lsst.ip.diffim as ipDiffim
 
 import sys
-import re
-import os
-import numpy as num
 
 import lsst.daf.base as dafBase
 import lsst.daf.persistence as dafPersist
-import lsst.afw.detection as afwDet
-import lsst.afw.math as afwMath
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.pex.policy as pexPolicy
 import lsst.log.utils as logUtils
-import lsst.meas.algorithms as measAlg
+import lsst.meas.algorithms as measAlg  # needed to register pcaPsf formatter
 import lsst.afw.display.ds9 as ds9
 
 
 def pcapsf_read_boost(fn):
-    import lsst.meas.algorithms as measAlgorithms # needed to register pcaPsf formatter
 
     print('# Reading', fn, end=' ')
     loc = dafPersist.LogicalLocation(fn)
@@ -29,6 +22,7 @@ def pcapsf_read_boost(fn):
     storageList.append(persistence.getRetrieveStorage("BoostStorage", loc))
     psf = persistence.unsafeRetrieve("Psf", storageList, additionalData)
     return psf
+
 
 if __name__ == '__main__':
     import lsst.ip.diffim.diffimTools as diffimTools

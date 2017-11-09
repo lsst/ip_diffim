@@ -99,8 +99,8 @@ def run(args):
     fpSet.makeSources(diaSources)
 
     print("Merged %s Sources into %d diaSources (from %d +ve, %d -ve)" % (len(results.sources),
-                                                                          len(diaSources), 
-                                                                          results.fpSets.numPos, 
+                                                                          len(diaSources),
+                                                                          results.fpSets.numPos,
                                                                           results.fpSets.numNeg))
 
     measureTask.run(diaSources, exposure)
@@ -110,7 +110,6 @@ def run(args):
         dpa = DipoleAnalysis()
         dpa.displayDipoles(exposure, diaSources)
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 if __name__ == "__main__":
     import argparse

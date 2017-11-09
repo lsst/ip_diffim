@@ -68,7 +68,6 @@ def generateFakeWcs(offset=0):
 
 
 def generateFakeImages():
-    import lsst.ip.diffim.diffimTools
     tSigma = 1.5
     tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(tGaussianWidth=tSigma, bgValue=200)
     sSigma = 2.5
@@ -102,11 +101,11 @@ def run(args):
 
         try:
             templateExp = afwImage.ExposureF(args.template)
-        except pexExcept.LsstCppException as e:
+        except Exception as e:
             raise Exception("Cannot read template image %s" % (args.template))
         try:
             scienceExp = afwImage.ExposureF(args.science)
-        except pexExcept.LsstCppException as e:
+        except Exception as e:
             raise Exception("Cannot read science image %s" % (args.science))
     else:
         templateExp, scienceExp = generateFakeImages()
@@ -133,7 +132,6 @@ def run(args):
         if "subtractedExposure" in result.getDict():
             ds9.mtv(result.subtractedExposure, frame=frame+1, title="Example script: Subtracted Image")
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 if __name__ == "__main__":
     import argparse

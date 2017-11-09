@@ -1,12 +1,10 @@
 from builtins import range
-import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.ip.diffim as ipDiffim
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.display.ds9 as ds9
 import lsst.log.utils as logUtils
-import pylab
 import numpy as num
 
 verbosity = 4
@@ -242,6 +240,7 @@ def doOverConstrained(inMi=None, display=False):
 
 def doUnderConstrained(inMi=None, display=False):
     testAutoCorrelation(orderMake=2, orderFit=0, inMi=inMi, display=display)
+
 
 if __name__ == '__main__':
     doOverConstrained(display=True)

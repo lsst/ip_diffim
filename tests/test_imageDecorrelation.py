@@ -222,10 +222,10 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.Mask\
+        self.statsControl.setAndMask(afwImage.Mask
                                      .getPlaneBitMask(["INTRP", "EDGE", "SAT", "CR",
                                                        "DETECTED", "BAD",
-                                                        "NO_DATA", "DETECTED_NEGATIVE"]))
+                                                       "NO_DATA", "DETECTED_NEGATIVE"]))
 
     def _setUpImages(self, svar=0.04, tvar=0.04, varyPsf=0.):
         """!Generate a fake aligned template and science image.
@@ -264,7 +264,8 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         psf2_sig = self.im2ex.getPsf().computeShape().getDeterminantRadius()
         sig_match = np.sqrt((psf1_sig**2. - psf2_sig**2.))
         # Sanity check - make sure PSFs are correct.
-        self.assertFloatsAlmostEqual(sig_match, np.sqrt((self.psf1_sigma**2. - self.psf2_sigma**2.)), rtol=2e-5)
+        self.assertFloatsAlmostEqual(sig_match, np.sqrt((self.psf1_sigma**2. - self.psf2_sigma**2.)),
+                                     rtol=2e-5)
         # mKernel = measAlg.SingleGaussianPsf(31, 31, sig_match)
         x0 = np.arange(-16, 16, 1)
         y0 = x0.copy()
@@ -421,6 +422,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         self._testDiffimCorrection_spatialTask(svar=0.04, tvar=0.08)
         # Template variance is higher than that of the science img.
         self._testDiffimCorrection_spatialTask(svar=0.08, tvar=0.04)
+
 
 class MemoryTester(lsst.utils.tests.MemoryTestCase):
     pass

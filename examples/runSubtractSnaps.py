@@ -37,7 +37,7 @@ def main():
     defVerbosity = 5
 
     usage = """usage: %%prog [options] snap1 snap2 snapdiff
-    
+
     Notes:
     - image arguments are paths to Expsosure (calexp) fits files
     - snap1 is convolved
@@ -51,7 +51,7 @@ def main():
                       help='verbosity of Trace messages')
 
     (options, args) = parser.parse_args()
-    if options.s1 == None or options.s2 == None or options.sdiff == None:
+    if None in (options.s1, options.s2, options.sdiff):
         parser.print_help()
         sys.exit(1)
 
@@ -71,6 +71,7 @@ def main():
 
 def run():
     main()
+
 
 if __name__ == '__main__':
     run()

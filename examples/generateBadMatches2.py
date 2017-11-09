@@ -15,8 +15,8 @@ kSize = 2**5 + 1
 rdm = afwMath.Random(afwMath.Random.MT19937, 10101)
 scaling = 10000
 doNorm = True
-#gScale         = 1.0 # FFT works!
-gScale = 5.0 # FFT fails!?
+# gScale         = 1.0 # FFT works!
+gScale = 5.0  # FFT fails!?
 
 doAddNoise = False
 writeFits = False
@@ -27,7 +27,7 @@ def makeTest1(doAddNoise):
     kernel1 = afwMath.AnalyticKernel(imSize, imSize, gaussian1)
     image1 = afwImage.ImageD(kernel1.getDimensions())
     kernel1.computeImage(image1, doNorm)
-    image1 *= scaling # total counts = scaling
+    image1 *= scaling  # total counts = scaling
     image1 = image1.convertF()
     mask1 = afwImage.Mask(kernel1.getDimensions())
     var1 = afwImage.ImageF(image1, True)
@@ -39,7 +39,7 @@ def makeTest1(doAddNoise):
     kernel2 = afwMath.AnalyticKernel(imSize, imSize, gaussian2)
     image2 = afwImage.ImageD(kernel2.getDimensions())
     kernel2.computeImage(image2, doNorm)
-    image2 *= scaling # total counts = scaling
+    image2 *= scaling  # total counts = scaling
     image2 = image2.convertF()
     mask2 = afwImage.Mask(kernel2.getDimensions())
     var2 = afwImage.ImageF(image2, True)
@@ -78,7 +78,7 @@ def makeTest2(doAddNoise, shiftX=int(2.0 * gScale), shiftY=int(1.0 * gScale)):
     kernel2 = afwMath.AnalyticKernel(imSize, imSize, gaussian2)
     image2 = afwImage.ImageD(kernel2.getDimensions())
     kernel2.computeImage(image2, doNorm)
-    image2 *= scaling # total counts = scaling
+    image2 *= scaling  # total counts = scaling
     image2 = image2.convertF()
     mask2 = afwImage.Mask(kernel2.getDimensions())
     var2 = afwImage.ImageF(image2, True)
@@ -94,7 +94,7 @@ def makeTest3(doAddNoise):
     kernel1 = afwMath.AnalyticKernel(imSize, imSize, gaussian1)
     image1 = afwImage.ImageD(kernel1.getDimensions())
     kernel1.computeImage(image1, doNorm)
-    image1 *= scaling # total counts = scaling
+    image1 *= scaling  # total counts = scaling
     image1 = image1.convertF()
     mask1 = afwImage.Mask(kernel1.getDimensions())
     var1 = afwImage.ImageF(image1, True)
@@ -104,7 +104,7 @@ def makeTest3(doAddNoise):
     kernel2 = afwMath.AnalyticKernel(imSize, imSize, gaussian2)
     image2 = afwImage.ImageD(kernel2.getDimensions())
     kernel2.computeImage(image2, doNorm)
-    image2 *= scaling # total counts = scaling
+    image2 *= scaling  # total counts = scaling
     image2 = image2.convertF()
     mask2 = afwImage.Mask(kernel2.getDimensions())
     var2 = afwImage.ImageF(image2, True)
