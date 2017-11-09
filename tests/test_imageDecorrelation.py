@@ -371,7 +371,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         self._testDecorrelation(expected_var, corrected_diffExp)
         # Also compare the diffim generated here vs. the non-ImageMapReduce one
         corrected_diffExp_OLD = self._runDecorrelationTask(diffExp, mKernel)
-        self.assertMaskedImagesNearlyEqual(corrected_diffExp.getMaskedImage(),
+        self.assertMaskedImagesAlmostEqual(corrected_diffExp.getMaskedImage(),
                                            corrected_diffExp_OLD.getMaskedImage())
 
     def testDiffimCorrection_mapReduced(self):
