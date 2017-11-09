@@ -176,7 +176,7 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
         metadata.setDouble("CD1_2", 1.85579539217196E-07)
         metadata.setDouble("CD2_2", -5.10281493481982E-05)
         metadata.setDouble("CD2_1", -8.27440751733828E-07)
-        return afwImage.makeWcs(metadata)
+        return afwGeom.makeSkyWcs(metadata)
 
     def makeExposure(imgArray, psfArray, imgVariance):
         """! Convert an image numpy.array and corresponding PSF numpy.array into an exposure.

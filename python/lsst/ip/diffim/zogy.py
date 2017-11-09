@@ -1119,8 +1119,8 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
             if doWarping:
                 self.log.info("Astrometrically registering template to science image")
                 # Also warp the PSF
-                xyTransform = afwImage.XYTransformFromWcsPair(scienceExposure.getWcs(),
-                                                              templateExposure.getWcs())
+                xyTransform = afwGeom.makeWcsPairTransform(templateExposure.getWcs(),
+                                                           scienceExposure.getWcs())
                 psfWarped = measAlg.WarpedPsf(templateExposure.getPsf(), xyTransform)
                 templateExposure = self._warper.warpExposure(scienceExposure.getWcs(),
                                                              templateExposure,
