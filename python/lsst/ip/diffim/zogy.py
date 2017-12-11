@@ -484,8 +484,9 @@ class ZogyTask(pipeBase.Task):
                                                maxInterpolationDistance=0)
         try:
             afwMath.convolve(outExp.getMaskedImage(), exposure.getMaskedImage(), kern, convCntrl)
-        except:
+        except AttributeError:
             # Allow exposure to actually be an image/maskedImage
+            # (getMaskedImage will throw AttributeError in that case)
             afwMath.convolve(outExp, exposure, kern, convCntrl)
 
         return outExp, kern
