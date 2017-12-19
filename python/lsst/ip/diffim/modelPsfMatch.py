@@ -355,7 +355,13 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         as is common with a WarpedPsf, either pad or clip (depending on config.padPsf)
         the dimensions to be constant.
         """
+        sizeCellX = self.kConfig.sizeCellX
+        sizeCellY = self.kConfig.sizeCellY
+
         scienceBBox = exposure.getBBox()
+        # Extend for proper spatial matching kernel all the way to edge, especially for narrow strips
+        scienceBBox.grow(afwGeom.Extent2I(sizeCellX, sizeCellY))
+
         sciencePsfModel = exposure.getPsf()
 
         dimenR = referencePsfModel.getLocalKernel().getDimensions()
@@ -364,8 +370,6 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0, scienceY0 = scienceBBox.getMin()
 
-        sizeCellX = self.kConfig.sizeCellX
-        sizeCellY = self.kConfig.sizeCellY
 
         kernelCellSet = afwMath.SpatialCellSet(
             afwGeom.Box2I(afwGeom.Point2I(scienceX0, scienceY0),
