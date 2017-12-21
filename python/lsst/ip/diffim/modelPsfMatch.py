@@ -370,12 +370,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0, scienceY0 = scienceBBox.getMin()
 
-
-        kernelCellSet = afwMath.SpatialCellSet(
-            afwGeom.Box2I(afwGeom.Point2I(scienceX0, scienceY0),
-                          afwGeom.Extent2I(regionSizeX, regionSizeY)),
-            sizeCellX, sizeCellY
-        )
+        kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(scienceBBox), sizeCellX, sizeCellY)
 
         nCellX = regionSizeX//sizeCellX
         nCellY = regionSizeY//sizeCellY
