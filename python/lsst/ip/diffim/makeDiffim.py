@@ -140,8 +140,8 @@ class MakeDiffimConfig(pexConfig.Config):
         target=ObjectSizeStarSelectorTask,
         doc="Source selection algorithm",
     )
-    subtract = subtractAlgorithmRegistry.makeField(
-        "Subtraction Algorithm",
+    subtractAlgorithm = subtractAlgorithmRegistry.makeField(
+        doc="Which subtraction algorithm will be used",
         default="al"
     )
     decorrelate = pexConfig.ConfigurableField(
@@ -181,10 +181,10 @@ class MakeDiffimConfig(pexConfig.Config):
 
     def setDefaults(self):
         # defaults are OK for catalog and diacatalog
-        self.subtract['al'].kernel.name = "AL"
-        self.subtract['al'].kernel.active.fitForBackground = True
-        self.subtract['al'].kernel.active.spatialKernelOrder = 1
-        self.subtract['al'].kernel.active.spatialBgOrder = 0
+        self.subtractAlgorithm['al'].kernel.name = "AL"
+        self.subtractAlgorithm['al'].kernel.active.fitForBackground = True
+        self.subtractAlgorithm['al'].kernel.active.spatialKernelOrder = 1
+        self.subtractAlgorithm['al'].kernel.active.spatialBgOrder = 0
         self.doPreConvolve = False
         self.doAddMetrics = False
         self.doUseRegister = False
@@ -289,9 +289,9 @@ This assumes the following makeDiffimConfig.py file is in your working directory
 config.doWriteSubtractedExp=True
 config.doWriteMatchedExp=True
 config.doDecorrelation=True
-config.subtract='al'
+config.subtractAlgorithm='al'
 
-config.subtract['zogy'].zogyConfig.inImageSpace=False
+config.subtractAlgorithm['zogy'].zogyConfig.inImageSpace=False
 
 from lsst.ip.diffim.getTemplate import GetCalexpAsTemplateTask
 config.getTemplate.retarget(GetCalexpAsTemplateTask)
@@ -322,7 +322,7 @@ PYTHONPATH you will get additional debugging displays.
 
         self.makeSubtask("subtract")
 
-        if self.config.subtract.name == 'al' and self.config.doDecorrelation:
+        if self.config.subtractAlgorithm.name == 'al' and self.config.doDecorrelation:
             self.makeSubtask("decorrelate")
 
         if self.config.doUseRegister:
@@ -460,14 +460,14 @@ PYTHONPATH you will get additional debugging displays.
             if self.config.doDebugRegister:
                 allresids = self.runDebugRegister(wcsResults, matches)
 
-        if self.config.subtract.name == 'zogy':
+        if self.config.subtractAlgorithm.name == 'zogy':
             subtractRes = self.subtract.subtractExposures(templateExposure, exposure,
                                                           doWarping=True,
                                                           spatiallyVarying=self.config.doSpatiallyVarying,
                                                           doPreConvolve=self.config.doPreConvolve)
             subtractedExposure = subtractRes.subtractedExposure
 
-        elif self.config.subtract.name == 'al':
+        elif self.config.subtractAlgorithm.name == 'al':
             # Useful since AL can match backgrounds (Zogy cannot)
             if self.config.doAddCalexpBackground:
                 mi = exposure.getMaskedImage()

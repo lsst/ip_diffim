@@ -1,6 +1,6 @@
 #
 # LSST Data Management System
-# Copyright 2012 LSST Corporation.
+# Copyright 2012-2018 LSST Corporation.
 #
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
@@ -156,11 +156,11 @@ class ImageDifferenceTask(pipeBase.CmdLineTask):
 
         # Retrieve the science image we wish to analyze
         exposure = sensorRef.get("calexp", immediate=True)
+        if not exposure.hasPsf():
+            raise pipeBase.TaskError("Exposure has no psf")
         if self.config.doAddCalexpBackground:
             mi = exposure.getMaskedImage()
             mi += sensorRef.get("calexpBackground").getImage()
-        if not exposure.hasPsf():
-            raise pipeBase.TaskError("Exposure has no psf")
 
         template = self.getTemplate.run(exposure, sensorRef, templateIdList=templateIdList)
 
@@ -191,7 +191,7 @@ class ImageDifferenceTask(pipeBase.CmdLineTask):
             sensorRef.put(selectSources, self.config.coaddName + "Diff_kernelSrc")
 
             kernelSources = selectSourceResult.kernelSources
-            self.runDebug(exposure, mdResult, selectSources, kernelSources, diaSources)
+            self.makePlots(exposure, mdResult, selectSources, kernelSources, diaSources)
 
         return pipeBase.Struct(
             subtractedExposure=subtractedExposure,
@@ -201,6 +201,9 @@ class ImageDifferenceTask(pipeBase.CmdLineTask):
 
     def doEvaluateMetrics(self, subtractRes, controlSources, selectSources, diaSources, kcQa,
                           nparam, allresids, exposure):
+        """
+        NEED A DOCSTRING
+        """
         self.log.info("Evaluating metrics and control sample")
 
         kernelCandList = []
@@ -211,12 +214,12 @@ class ImageDifferenceTask(pipeBase.CmdLineTask):
         # Get basis list to build control sample kernels
         basisList = kernelCandList[0].getKernel(KernelCandidateF.ORIG).getKernelList()
 
-        controlCandList = \
-            diffimTools.sourceTableToCandidateList(controlSources,
-                                                   subtractRes.warpedExposure, exposure,
-                                                   self.config.subtract.kernel.active,
-                                                   self.config.subtract.kernel.active.detectionConfig,
-                                                   self.log, doBuild=True, basisList=basisList)
+        controlCandList = diffimTools.sourceTableToCandidateList(
+            controlSources,
+            subtractRes.warpedExposure, exposure,
+            self.config.subtract.kernel.active,
+            self.config.subtract.kernel.active.detectionConfig,
+            self.log, doBuild=True, basisList=basisList)
 
         kcQa.apply(kernelCandList, subtractRes.psfMatchingKernel, subtractRes.backgroundModel,
                    dof=nparam)
@@ -227,8 +230,13 @@ class ImageDifferenceTask(pipeBase.CmdLineTask):
         else:
             self.kcQa.aggregate(selectSources, self.metadata, allresids)
 
-    def runDebug(self, exposure, subtractRes, selectSources, kernelSources, diaSources):
-        """@todo Test and update for current debug display and slot names
+    def makePlots(self, exposure, subtractRes, selectSources, kernelSources, diaSources):
+        """
+        Make several plots which may be useful for debugging.
+
+        Set lsstDebug parameters in order to choose which plots to make.                
+
+        @todo Test and update for current debug display and slot names
         """
         import lsstDebug
         display = lsstDebug.Info(__name__).display
@@ -320,8 +328,9 @@ class ImageDifferenceTask(pipeBase.CmdLineTask):
         """Create an argument parser
         """
         parser = pipeBase.ArgumentParser(name=cls._DefaultName)
-        parser.add_id_argument("--id", "calexp", help="data ID, e.g. --id visit=12345 ccd=1,2")
-        parser.add_id_argument("--templateId", "calexp", doMakeDataRefList=True,
+        parser.add_id_argument("--id", datasetType="calexp",
+                               help="data IDs, e.g. --id visit=12345 ccd=1,2")
+        parser.add_id_argument("--templateId", datasetType="calexp", doMakeDataRefList=True,
                                help="Optional template data ID (visit only), e.g. --templateId visit=6789")
         return parser
 
