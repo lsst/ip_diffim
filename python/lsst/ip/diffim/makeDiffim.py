@@ -118,7 +118,8 @@ class MakeDiffimConfig(pexConfig.Config):
         default="deep",
     )
     convolveTemplate = pexConfig.Field(
-        doc="Which image gets convolved (default = template)",
+        doc="Which image gets convolved (default = True, meaning the template is convolved; "
+        "if False, the science image is convolved instead)",
         dtype=bool,
         default=True
     )
@@ -140,7 +141,7 @@ class MakeDiffimConfig(pexConfig.Config):
         target=ObjectSizeStarSelectorTask,
         doc="Source selection algorithm",
     )
-    subtractAlgorithm = subtractAlgorithmRegistry.makeField(
+    subtract = subtractAlgorithmRegistry.makeField(
         doc="Which subtraction algorithm will be used",
         default="al"
     )
@@ -181,10 +182,10 @@ class MakeDiffimConfig(pexConfig.Config):
 
     def setDefaults(self):
         # defaults are OK for catalog and diacatalog
-        self.subtractAlgorithm['al'].kernel.name = "AL"
-        self.subtractAlgorithm['al'].kernel.active.fitForBackground = True
-        self.subtractAlgorithm['al'].kernel.active.spatialKernelOrder = 1
-        self.subtractAlgorithm['al'].kernel.active.spatialBgOrder = 0
+        self.subtract['al'].kernel.name = "AL"
+        self.subtract['al'].kernel.active.fitForBackground = True
+        self.subtract['al'].kernel.active.spatialKernelOrder = 1
+        self.subtract['al'].kernel.active.spatialBgOrder = 0
         self.doPreConvolve = False
         self.doAddMetrics = False
         self.doUseRegister = False
@@ -216,95 +217,57 @@ class MakeDiffimTaskRunner(pipeBase.ButlerInitializedTaskRunner):
 
 
 class MakeDiffimTask(pipeBase.CmdLineTask):
-    """!
-\anchor MakeDiffimTask_
+    """Subtract an image from a template and save the results.
 
-\brief Subtract an image from a template and save the results
+    This task serves as a wrapper around algorithms which take as input a template
+    (exposure or coadd) and a "new" or science image, register the two to the same
+    astrometric reference, match their PSFs, and subtract the two, writing out the
+    image difference as well as (optionally) intermediate products.
 
-\section ip_diffim_makeDiffim_Contents Contents
+    The subtraction algorithms are provided by the `subtract` subtask, which is
+    registered in the subtractAlgorithmRegistry. Currently the two available algorithms
+    are Alard and Lupton (optionally decorrelated) and ZOGY. See the ImagePsfMatchTask and
+    ZogyTask documentation for more information on those algorithms.
 
- - \ref ip_diffim_makeDiffim_Purpose
- - \ref ip_diffim_makeDiffim_Initialize
- - \ref ip_diffim_makeDiffim_IO
- - \ref ip_diffim_makeDiffim_Config
- - \ref ip_diffim_makeDiffim_Example
+    Notes
+    -----
+    This task may be invoked in two ways:
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    1. its run() method which expects a Butler sensorRef for loading all relevant data
+    (template, science image, and catalogs).
+    2. the doMakeDiffim() method which is called from run() but may also be called separately
+    and expects the matched template and new exposures, as well as the diffim exposure and
+    parameters which specify how the diffim was created by \ref MakeDiffimTask_ .
 
-\section ip_diffim_makeDiffim_Purpose   Description
+    See each method's returned lsst.pipe.base.Struct for more details.
 
-This task serves as a wrapper around algorithms which take as input a template
-(exposure or coadd) and a "new" or science image, register the two to the same
-astrometric reference, match their PSFs, and subtract the two, writing out the
-image difference as well as (optionally) intermediate products.
+    Examples
+    --------
+    This task is called from `lsst.ip.diffim.imageDifference.ImageDifferenceTask.run()`, which
+    may be used as an example. This task itself may be invoked via the command line, for
+    example (using a single DECam exposure as the template, assuming obs_decam has been set up):
 
-The subtraction algorithms are provided by the `subtract` subtask, which is
-registered in the subtractAlgorithmRegistry. Currently the two available algorithms
-are Alard and Lupton (optionally decorrelated) and ZOGY. See the ImagePsfMatchTask and
-ZogyTask documentation for more information on those algorithms.
+    .. code-block:: py
+        processDiffim.py decamRepo --output decamDiffimRepo --id visit=289820 ccdnum=11 \
+             --templateId visit=288976 --configfile makeDiffimConfig.py \
+             --config doDecorrelation=True --config doSpatiallyVarying=True
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    This assumes the following `makeDiffimConfig.py` file is in your working directory:
 
-\section ip_diffim_makeDiffim_Initialize    Task initialization
+    .. code-block:: py
+        config.doWriteSubtractedExp=True
+        config.doWriteMatchedExp=True
+        config.doDecorrelation=True
+        config.subtract='zogy'
 
-\copydoc \_\_init\_\_
+        config.subtract['zogy'].zogyConfig.inImageSpace=False
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        from lsst.ip.diffim.getTemplate import GetCalexpAsTemplateTask
+        config.getTemplate.retarget(GetCalexpAsTemplateTask)
 
-\section ip_diffim_makeDiffim_IO        Invoking the Task
-
-This task may be invoked in two ways:
-
-1. its run() method which expects a Butler sensorRef for loading all relevant data
-(template, science image, and catalogs).
-2. the doMakeDiffim() method which is called from run() but may also be called separately
-and expects the matched template and new exposures, as well as the diffim exposure and
-parameters which specify how the diffim was created by \ref MakeDiffimTask_ .
-
-See each method's returned lsst.pipe.base.Struct for more details.
-
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-\section ip_diffim_makeDiffim_Config       Configuration parameters
-
-See \ref MakeDiffimConfig
-
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-\section ip_diffim_makeDiffim_Example   A complete example of using MakeDiffimTask
-
-This task is called from lsst.ip.diffim.imageDifference.ImageDifferenceTask.run(), which
-may be used as an example. This task itself may be invoked via the command line, for
-example (using a single DECam exposure as the template, assuming obs_decam has been set up):
-
-\code
-processDiffim.py decamRepo --output decamDiffimRepo --id visit=289820 ccdnum=11 \
-     --templateId visit=288976 --configfile makeDiffimConfig.py \
-     --config doDecorrelation=True --config doSpatiallyVarying=True
-\endcode
-
-This assumes the following makeDiffimConfig.py file is in your working directory:
-
-\code
-config.doWriteSubtractedExp=True
-config.doWriteMatchedExp=True
-config.doDecorrelation=True
-config.subtractAlgorithm='al'
-
-config.subtractAlgorithm['zogy'].zogyConfig.inImageSpace=False
-
-from lsst.ip.diffim.getTemplate import GetCalexpAsTemplateTask
-config.getTemplate.retarget(GetCalexpAsTemplateTask)
-\endcode
-
-While the above example config contains parameters for the Zogy algorithm,
-it is not utilized by the above example command-line call. It is provided as an
-example of how to configure the `subtract` subtask.
-
-We have enabled some minor display debugging in this script via the
---debug option.  However, if you have an lsstDebug debug.py in your
-PYTHONPATH you will get additional debugging displays.
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    We have enabled some minor display debugging in this script via the
+    --debug option. However, if you have an lsstDebug debug.py in your
+    PYTHONPATH you will get additional debugging displays.
     """
     ConfigClass = MakeDiffimConfig
     RunnerClass = MakeDiffimTaskRunner
@@ -322,7 +285,7 @@ PYTHONPATH you will get additional debugging displays.
 
         self.makeSubtask("subtract")
 
-        if self.config.subtractAlgorithm.name == 'al' and self.config.doDecorrelation:
+        if self.config.subtract.name == 'al' and self.config.doDecorrelation:
             self.makeSubtask("decorrelate")
 
         if self.config.doUseRegister:
@@ -360,6 +323,7 @@ PYTHONPATH you will get additional debugging displays.
             - self.config.coaddName + "Diff_differenceExp"
             Output, depending on config:
             - self.config.coaddName + "Diff_matchedExp"
+        templateIdList : optional template data IDs (only visit field is supported)
 
         Returns
         -------
@@ -460,14 +424,14 @@ PYTHONPATH you will get additional debugging displays.
             if self.config.doDebugRegister:
                 allresids = self.runDebugRegister(wcsResults, matches)
 
-        if self.config.subtractAlgorithm.name == 'zogy':
+        if self.config.subtract.name == 'zogy':
             subtractRes = self.subtract.subtractExposures(templateExposure, exposure,
                                                           doWarping=True,
                                                           spatiallyVarying=self.config.doSpatiallyVarying,
                                                           doPreConvolve=self.config.doPreConvolve)
             subtractedExposure = subtractRes.subtractedExposure
 
-        elif self.config.subtractAlgorithm.name == 'al':
+        elif self.config.subtract.name == 'al':
             # Useful since AL can match backgrounds (Zogy cannot)
             if self.config.doAddCalexpBackground:
                 mi = exposure.getMaskedImage()

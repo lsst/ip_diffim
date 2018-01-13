@@ -62,10 +62,13 @@ class ImageDifferenceConfig(pexConfig.Config):
     )
 
     def setDefaults(self):
-        # Add filtered flux measurement, the correct measurement for pre-convolved images.
-        # Enable all measurements, regardless of doPreConvolve, as it makes data harvesting easier.
-        # To change that you must modify algorithms.names in the task's applyOverrides method,
-        # after the user has set doPreConvolve.
+        """Add PeakLikelihoodFlux measurement algorithm to default measurement list.
+        
+        If `doPreConvolve` is True, then the resulting diffim is already match-filtered.
+        In that case we want to use PeakLikelihoodFlux measurement on that image. Here, we
+        are just adding that measurement algorithm to the default list of measurements, whether
+        doPreConvolve is True or not. This makes sure the catalogs in either case are the same.
+        """
         self.processDiffim.measurement.algorithms.names.add('base_PeakLikelihoodFlux')
 
     def validate(self):
@@ -201,8 +204,7 @@ class ImageDifferenceTask(pipeBase.CmdLineTask):
 
     def doEvaluateMetrics(self, subtractRes, controlSources, selectSources, diaSources, kcQa,
                           nparam, allresids, exposure):
-        """
-        NEED A DOCSTRING
+        """Deprecated metric evaluation option ported from pipe_tasks
         """
         self.log.info("Evaluating metrics and control sample")
 
@@ -221,6 +223,8 @@ class ImageDifferenceTask(pipeBase.CmdLineTask):
             self.config.subtract.kernel.active.detectionConfig,
             self.log, doBuild=True, basisList=basisList)
 
+        # Evaluate the QA metrics for all KernelCandidates in the candidateList
+        # Set the values of the metrics in their associated Sources
         kcQa.apply(kernelCandList, subtractRes.psfMatchingKernel, subtractRes.backgroundModel,
                    dof=nparam)
         kcQa.apply(controlCandList, subtractRes.psfMatchingKernel, subtractRes.backgroundModel)
