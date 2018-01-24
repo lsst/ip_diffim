@@ -317,6 +317,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(), exposure.getWcs())
         psfMatchedExposure.setFilter(exposure.getFilter())
         psfMatchedExposure.setCalib(exposure.getCalib())
+        psfMatchedExposure.getInfo().setVisitInfo(exposure.getInfo().getVisitInfo())
         psfMatchedExposure.setPsf(referencePsfModel)
         psfMatchedMaskedImage = psfMatchedExposure.getMaskedImage()
 
