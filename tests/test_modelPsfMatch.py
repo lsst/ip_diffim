@@ -2,6 +2,8 @@ from __future__ import absolute_import, division, print_function
 import unittest
 
 import lsst.utils.tests
+import lsst.daf.base as dafBase
+import lsst.afw.coord as afwCoord
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
@@ -105,10 +107,38 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
             with self.assertRaises(ValueError):
                 results = psfMatch.run(self.exp, psfModel)
 
+    def testPropagateVisitInfo(self):
+        """Test that a PSF-matched exposure preserves the original VisitInfo.
+        """
+        self.exp.getInfo().setVisitInfo(makeVisitInfo())
+        psfModel = measAlg.DoubleGaussianPsf(self.ksize + 2, self.ksize + 2, self.sigma2)
+        psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
+        psfMatchedExposure = psfMatch.run(self.exp, psfModel).psfMatchedExposure
+        self.assertEqual(psfMatchedExposure.getInfo().getVisitInfo(),
+                         self.exp.getInfo().getVisitInfo())
+
     def tearDown(self):
         del self.exp
         del self.subconfig
 
+
+def makeVisitInfo():
+    """Return a non-NaN visitInfo."""
+    return afwImage.VisitInfo(exposureId=10313423,
+                              exposureTime=10.01,
+                              darkTime=11.02,
+                              date=dafBase.DateTime(65321.1, dafBase.DateTime.MJD, dafBase.DateTime.TAI),
+                              ut1=12345.1,
+                              era=45.1*afwGeom.degrees,
+                              boresightRaDec=afwCoord.IcrsCoord(23.1*afwGeom.degrees, 73.2*afwGeom.degrees),
+                              boresightAzAlt=afwCoord.Coord(134.5*afwGeom.degrees, 33.3*afwGeom.degrees),
+                              boresightAirmass=1.73,
+                              boresightRotAngle=73.2*afwGeom.degrees,
+                              rotType=afwImage.RotType.SKY,
+                              observatory=afwCoord.Observatory(
+                                  11.1*afwGeom.degrees, 22.2*afwGeom.degrees, 0.333),
+                              weather=afwCoord.Weather(1.1, 2.2, 34.5),
+                              )
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
