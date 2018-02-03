@@ -435,12 +435,12 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
             ny = 1
 
     schema = afwTable.SourceTable.makeMinimalSchema()
-    centroidName = "base_GaussianCentroid"
+    centroidName = "base_SdssCentroid"
     shapeName = "base_SdssShape"
-    control = measBase.GaussianCentroidControl()
+    control = measBase.SdssCentroidControl()
     schema.getAliasMap().set("slot_Centroid", centroidName)
     schema.getAliasMap().set("slot_Centroid_flag", centroidName+"_flag")
-    centroider = measBase.GaussianCentroidAlgorithm(control, centroidName, schema)
+    centroider = measBase.SdssCentroidAlgorithm(control, centroidName, schema)
     sdssShape = measBase.SdssShapeControl()
     shaper = measBase.SdssShapeAlgorithm(sdssShape, shapeName, schema)
     table = afwTable.SourceTable.make(schema)
@@ -459,7 +459,7 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
             lab = "Kernel(%d,%d)=%.2f" % (x, y, ksum) if False else ""
             mos.append(im, lab)
 
-            # GaussianCentroidAlgorithm.measure requires an exposure of floats
+            # SdssCentroidAlgorithm.measure requires an exposure of floats
             exp = afwImage.makeExposure(afwImage.makeMaskedImage(im.convertF()))
             w, h = im.getWidth(), im.getHeight()
             centerX = im.getX0() + w//2

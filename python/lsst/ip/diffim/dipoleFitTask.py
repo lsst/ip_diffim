@@ -112,7 +112,7 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
                               "base_PsfFlux",
                               "base_SdssCentroid",
                               "base_SdssShape",
-                              "base_GaussianCentroid",
+                              "base_SdssCentroid",
                               "base_GaussianFlux",
                               "base_PeakLikelihoodFlux",
                               "base_PeakCentroid",
