@@ -53,7 +53,7 @@ class ZogyTest(lsst.utils.tests.TestCase):
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.Mask\
+        self.statsControl.setAndMask(afwImage.Mask
                                      .getPlaneBitMask(["INTRP", "EDGE", "SAT", "CR",
                                                        "DETECTED", "BAD",
                                                        "NO_DATA", "DETECTED_NEGATIVE"]))

@@ -29,6 +29,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.display.ds9 as ds9
 import lsst.daf.base as dafBase
 import lsst.meas.algorithms as measAlg
+from lsst.afw.geom import makeSkyWcs
 from lsst.ip.diffim import ImagePsfMatchTask, diffimTools
 
 
@@ -64,11 +65,10 @@ def generateFakeWcs(offset=0):
     metadata.setDouble("CD1_2", 1.85579539217196E-07)
     metadata.setDouble("CD2_2", -5.10281493481982E-05)
     metadata.setDouble("CD2_1", -8.27440751733828E-07)
-    return afwImage.makeWcs(metadata)
+    return makeSkyWcs(metadata)
 
 
 def generateFakeImages():
-    import lsst.ip.diffim.diffimTools
     tSigma = 1.5
     tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(tGaussianWidth=tSigma, bgValue=200)
     sSigma = 2.5
@@ -102,11 +102,11 @@ def run(args):
 
         try:
             templateExp = afwImage.ExposureF(args.template)
-        except pexExcept.LsstCppException as e:
+        except Exception as e:
             raise Exception("Cannot read template image %s" % (args.template))
         try:
             scienceExp = afwImage.ExposureF(args.science)
-        except pexExcept.LsstCppException as e:
+        except Exception as e:
             raise Exception("Cannot read science image %s" % (args.science))
     else:
         templateExp, scienceExp = generateFakeImages()
@@ -133,7 +133,6 @@ def run(args):
         if "subtractedExposure" in result.getDict():
             ds9.mtv(result.subtractedExposure, frame=frame+1, title="Example script: Subtracted Image")
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 if __name__ == "__main__":
     import argparse

@@ -20,7 +20,7 @@ def main():
     toWarpPath = getArg(1)
     warpedPath = getArg(2)
 
-    if refWcsPath == None or toWarpPath == None or warpedPath == None:
+    if None in (refWcsPath, toWarpPath, warpedPath):
         parser.print_help()
         sys.exit(1)
 
@@ -47,6 +47,7 @@ def run():
     if dafBase.Citizen_census(0, memId0) != 0:
         print(dafBase.Citizen_census(0, memId0), 'Objects leaked:')
         print(dafBase.Citizen_census(dafBase.cout, memId0))
+
 
 if __name__ == '__main__':
     run()

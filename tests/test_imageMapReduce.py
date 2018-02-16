@@ -34,8 +34,7 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 
 from lsst.ip.diffim.imageMapReduce import (ImageMapReduceTask, ImageMapReduceConfig,
-                                           ImageMapper, ImageMapperConfig,
-                                           ImageReducer, ImageReducerConfig)
+                                           ImageMapper, ImageMapperConfig)
 
 
 def setup_module(module):
@@ -62,7 +61,7 @@ def makeWcs(offset=0):
     metadata.setDouble("CD1_2", 1.85579539217196E-07)
     metadata.setDouble("CD2_2", -5.10281493481982E-05)
     metadata.setDouble("CD2_1", -8.27440751733828E-07)
-    return afwImage.makeWcs(metadata)
+    return afwGeom.makeSkyWcs(metadata)
 
 
 def getPsfMoments(psfArray):

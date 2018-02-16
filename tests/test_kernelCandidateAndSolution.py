@@ -55,8 +55,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             scienceExposure = afwImage.ExposureF(defSciencePath)
             templateExposure = afwImage.ExposureF(defTemplatePath)
             # set XY0 = 0
-            scienceExposure.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
-            templateExposure.getMaskedImage().setXY0(afwGeom.Point2I(0, 0))
+            scienceExposure.setXY0(afwGeom.Point2I(0, 0))
+            templateExposure.setXY0(afwGeom.Point2I(0, 0))
             # do the warping first so we don't have any masked pixels in the postage stamps
             warper = afwMath.Warper.fromConfig(self.subconfig.warpingConfig)
             templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
@@ -303,7 +303,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                     pass
         try:
             kc.getImage()
-        except Exception:
+        except Exception as e:
             print(kMethod, e)
             self.fail()
         else:
@@ -516,6 +516,7 @@ class TestMemory(lsst.utils.tests.MemoryTestCase):
 
 def setup_module(module):
     lsst.utils.tests.init()
+
 
 if __name__ == "__main__":
     lsst.utils.tests.init()

@@ -12,8 +12,6 @@ import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
-#import lsst.afw.display.ds9 as ds9
-
 # Increase the number for more verbose messages; decrease for fewer messages
 logUtils.traceSetAt("ip.diffim", 4)
 
@@ -76,10 +74,6 @@ class DiffimTestCases(unittest.TestCase):
         bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy)
         bskv.processCandidate(kc)
         self.assertEqual(kc.isInitialized(), True)
-        #ds9.mtv(kc.getTemplateMaskedImage(), frame=1)
-        #ds9.mtv(kc.getScienceMaskedImage(), frame=2)
-        #ds9.mtv(kc.getKernelImage(ipDiffim.KernelCandidateF.RECENT), frame=3)
-        #ds9.mtv(kc.getDifferenceImage(ipDiffim.KernelCandidateF.RECENT), frame=4)
 
         askv = ipDiffim.AssessSpatialKernelVisitorF(sKernel, sBg, self.policy)
         askv.processCandidate(kc)
@@ -135,6 +129,7 @@ class TestMemory(lsst.utils.tests.MemoryTestCase):
 
 def setup_module(module):
     lsst.utils.tests.init()
+
 
 if __name__ == "__main__":
     lsst.utils.tests.init()

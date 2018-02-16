@@ -176,7 +176,7 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
         metadata.setDouble("CD1_2", 1.85579539217196E-07)
         metadata.setDouble("CD2_2", -5.10281493481982E-05)
         metadata.setDouble("CD2_1", -8.27440751733828E-07)
-        return afwImage.makeWcs(metadata)
+        return afwGeom.makeSkyWcs(metadata)
 
     def makeExposure(imgArray, psfArray, imgVariance):
         """! Convert an image numpy.array and corresponding PSF numpy.array into an exposure.
@@ -222,10 +222,10 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.Mask\
+        self.statsControl.setAndMask(afwImage.Mask
                                      .getPlaneBitMask(["INTRP", "EDGE", "SAT", "CR",
                                                        "DETECTED", "BAD",
-                                                        "NO_DATA", "DETECTED_NEGATIVE"]))
+                                                       "NO_DATA", "DETECTED_NEGATIVE"]))
 
     def _setUpImages(self, svar=0.04, tvar=0.04, varyPsf=0.):
         """!Generate a fake aligned template and science image.
@@ -264,7 +264,8 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         psf2_sig = self.im2ex.getPsf().computeShape().getDeterminantRadius()
         sig_match = np.sqrt((psf1_sig**2. - psf2_sig**2.))
         # Sanity check - make sure PSFs are correct.
-        self.assertFloatsAlmostEqual(sig_match, np.sqrt((self.psf1_sigma**2. - self.psf2_sigma**2.)), rtol=2e-5)
+        self.assertFloatsAlmostEqual(sig_match, np.sqrt((self.psf1_sigma**2. - self.psf2_sigma**2.)),
+                                     rtol=2e-5)
         # mKernel = measAlg.SingleGaussianPsf(31, 31, sig_match)
         x0 = np.arange(-16, 16, 1)
         y0 = x0.copy()
@@ -370,7 +371,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         self._testDecorrelation(expected_var, corrected_diffExp)
         # Also compare the diffim generated here vs. the non-ImageMapReduce one
         corrected_diffExp_OLD = self._runDecorrelationTask(diffExp, mKernel)
-        self.assertMaskedImagesNearlyEqual(corrected_diffExp.getMaskedImage(),
+        self.assertMaskedImagesAlmostEqual(corrected_diffExp.getMaskedImage(),
                                            corrected_diffExp_OLD.getMaskedImage())
 
     def testDiffimCorrection_mapReduced(self):
@@ -421,6 +422,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         self._testDiffimCorrection_spatialTask(svar=0.04, tvar=0.08)
         # Template variance is higher than that of the science img.
         self._testDiffimCorrection_spatialTask(svar=0.08, tvar=0.04)
+
 
 class MemoryTester(lsst.utils.tests.MemoryTestCase):
     pass

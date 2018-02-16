@@ -289,6 +289,7 @@ def run(doExit=False):
     """Run the tests"""
     tests.run(suite(), doExit)
 
+
 if __name__ == "__main__":
     if '-d' in sys.argv:
         display = True

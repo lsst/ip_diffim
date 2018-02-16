@@ -30,7 +30,6 @@ import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
 import lsst.afw.display.ds9 as ds9
-import lsst.daf.base as dafBase
 import lsst.meas.algorithms as measAlg
 from lsst.ip.diffim import ModelPsfMatchTask
 
@@ -108,11 +107,11 @@ def run(args):
 
         try:
             templateExp = afwImage.ExposureF(args.template)
-        except pexExcept.LsstCppException as e:
+        except Exception as e:
             raise Exception("Cannot read template image %s" % (args.template))
         try:
             scienceExp = afwImage.ExposureF(args.science)
-        except pexExcept.LsstCppException as e:
+        except Exception as e:
             raise Exception("Cannot read science image %s" % (args.science))
     else:
         templateExp, scienceExp = generateFakeData()
@@ -137,7 +136,6 @@ def run(args):
             frame = 3
         ds9.mtv(result.psfMatchedExposure, frame=frame, title="Example script: Matched Science Image")
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 if __name__ == "__main__":
     import argparse

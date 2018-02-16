@@ -1,7 +1,5 @@
 from __future__ import absolute_import, division, print_function
-import lsst.utils
 import sys
-import os
 import optparse
 
 import lsst.afw.image as afwImage
@@ -13,8 +11,6 @@ import lsst.ip.diffim.diffimTools as diffimTools
 
 
 def main():
-    imageProcDir = lsst.utils.getPackageDir('ip_diffim')
-
     defSciencePath = None
     defTemplatePath = None
     defOutputPath = 'matchedImage.fits'
@@ -30,7 +26,7 @@ Notes:
 - the template image is convolved, the science image is not
 - default scienceMaskedImage=%s
 - default templateMaskedImage=%s
-- default outputImage=%s 
+- default outputImage=%s
 """ % (defSciencePath, defTemplatePath, defOutputPath)
 
     parser = optparse.OptionParser(usage)
@@ -56,7 +52,7 @@ Notes:
     templatePath = getArg(1, defTemplatePath)
     outputPath = getArg(2, defOutputPath)
 
-    if sciencePath == None or templatePath == None:
+    if sciencePath is None or templatePath is None:
         parser.print_help()
         sys.exit(1)
 
@@ -101,7 +97,7 @@ Notes:
         diffimTools.backgroundSubtract(subconfig.afwBackgroundConfig,
                                        [templateMaskedImage, scienceMaskedImage])
     else:
-        if subconfig.fitForBackground == False:
+        if not subconfig.fitForBackground:
             print('NOTE: no background subtraction at all is requested')
 
     psfmatch = ipDiffim.ImagePsfMatch(subconfig)
@@ -121,6 +117,7 @@ Notes:
 
 def run():
     main()
+
 
 if __name__ == '__main__':
     run()

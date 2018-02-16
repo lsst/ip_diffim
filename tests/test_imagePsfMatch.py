@@ -27,6 +27,7 @@ import unittest
 from builtins import range
 
 import lsst.utils.tests
+from lsst.afw.geom import makeSkyWcs
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -103,7 +104,7 @@ class PsfMatchTestCases(unittest.TestCase):
         metadata.setDouble("CD1_2", 1.85579539217196E-07)
         metadata.setDouble("CD2_2", -5.10281493481982E-05)
         metadata.setDouble("CD2_1", -8.27440751733828E-07)
-        return afwImage.makeWcs(metadata)
+        return makeSkyWcs(metadata)
 
     def testWarping(self):
         tMi, sMi, sK, kcs, confake = diffimTools.makeFakeKernelSet(bgValue=self.bgValue)
@@ -251,6 +252,7 @@ class TestMemory(lsst.utils.tests.MemoryTestCase):
 
 def setup_module(module):
     lsst.utils.tests.init()
+
 
 if __name__ == "__main__":
     lsst.utils.tests.init()

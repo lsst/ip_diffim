@@ -9,6 +9,8 @@ config.log
 *.cfgc
 *.pyc
 *.py~
+.cache
+pytest_session.txt
 doc/html
 doc/xml
 doc/*.tag
@@ -16,7 +18,6 @@ doc/*.inc
 doc/doxygen.conf
 doc/xml
 tests/.tests
-tests/.cache
 version.py
 examples/maskedKernel
 examples/pixelAccess

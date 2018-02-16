@@ -1,7 +1,5 @@
 from __future__ import absolute_import, division, print_function
-import lsst.utils
 import sys
-import os
 import optparse
 
 import lsst.daf.base as dafBase
@@ -14,8 +12,6 @@ import lsst.ip.diffim.diffimTools as diffimTools
 
 
 def main():
-    imageProcDir = lsst.utils.getPackageDir('ip_diffim')
-
     defSciencePath = None
     defTemplatePath = None
     defOutputPath = 'diffImage.fits'
@@ -31,7 +27,7 @@ Notes:
 - the template image is convolved, the science image is not
 - default scienceMaskedImage=%s
 - default templateMaskedImage=%s
-- default outputImage=%s 
+- default outputImage=%s
 """ % (defSciencePath, defTemplatePath, defOutputPath)
 
     parser = optparse.OptionParser(usage)
@@ -57,7 +53,7 @@ Notes:
     templatePath = getArg(1, defTemplatePath)
     outputPath = getArg(2, defOutputPath)
 
-    if sciencePath == None or templatePath == None:
+    if sciencePath is None or templatePath is None:
         parser.print_help()
         sys.exit(1)
 
@@ -102,7 +98,7 @@ Notes:
         diffimTools.backgroundSubtract(subconfig.afwBackgroundConfig,
                                        [templateMaskedImage, scienceMaskedImage])
     else:
-        if subconfig.fitForBackground == False:
+        if not subconfig.fitForBackground:
             print('NOTE: no background subtraction at all is requested')
 
     psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
@@ -127,6 +123,7 @@ def run():
     if dafBase.Citizen_census(0, memId0) != 0:
         print(dafBase.Citizen_census(0, memId0), 'Objects leaked:')
         print(dafBase.Citizen_census(dafBase.cout, memId0))
+
 
 if __name__ == '__main__':
     run()
