@@ -1,2 +1,1 @@
-EXTRACT_PRIVATE = YES
 EXAMPLE_PATH = examples python/lsst/ip/diffim
