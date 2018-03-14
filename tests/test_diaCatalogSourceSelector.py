@@ -27,7 +27,6 @@ import numpy as np
 
 import lsst.utils.tests
 import lsst.afw.table as afwTable
-import lsst.afw.coord as afwCoord
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 from lsst.meas.algorithms import LoadReferenceObjectsTask, getRefFluxField
@@ -65,7 +64,8 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
             refSrc = refCat.addNew()
             srcSrc = srcCat.addNew()
 
-            coord = afwCoord.Coord(afwGeom.Point2D(*np.random.randn(2)), afwGeom.degrees)
+            raDeg, decDeg = np.random.randn(2)
+            coord = afwGeom.SpherePoint(raDeg, decDeg, afwGeom.degrees)
 
             refSrc.set("g_flux", 10**(-0.4*18))
             refSrc.set("r_flux", 10**(-0.4*18))
