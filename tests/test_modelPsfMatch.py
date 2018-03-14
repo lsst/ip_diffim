@@ -140,6 +140,7 @@ def makeVisitInfo():
                               weather=Weather(1.1, 2.2, 34.5),
                               )
 
+
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
 

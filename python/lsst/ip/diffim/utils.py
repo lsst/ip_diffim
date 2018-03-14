@@ -670,11 +670,9 @@ def printSkyDiffs(sources, wcs):
     """Print differences in sky coordinates between source Position and its Centroid mapped through Wcs"""
     for s in sources:
         sCentroid = s.getCentroid()
-        sPosition = s.getCoord().getPosition()
-        dra = 3600*(sPosition.getX() - wcs.pixelToSky(sCentroid.getX(),
-                                                      sCentroid.getY()).getPosition().getX())/0.2
-        ddec = 3600*(sPosition.getY() - wcs.pixelToSky(sCentroid.getX(),
-                                                       sCentroid.getY()).getPosition().getY())/0.2
+        sPosition = s.getCoord().getPosition(afwGeom.degrees)
+        dra = 3600*(sPosition.getX() - wcs.pixelToSky(sCentroid).getPosition(afwGeom.degrees).getX())/0.2
+        ddec = 3600*(sPosition.getY() - wcs.pixelToSky(sCentroid).getPosition(afwGeom.degrees).getY())/0.2
         if np.isfinite(dra) and np.isfinite(ddec):
             print(dra, ddec)
 
@@ -686,9 +684,9 @@ def makeRegions(sources, outfilename, wcs=None):
              "select=1 highlite=1 edit=1 move=1 delete=1 include=1 fixed=0 source\nfk5\n")
     for s in sources:
         if wcs:
-            (ra, dec) = wcs.pixelToSky(s.getCentroid().getX(), s.getCentroid().getY()).getPosition()
+            (ra, dec) = wcs.pixelToSky(s.getCentroid()).getPosition(afwGeom.degrees)
         else:
-            (ra, dec) = s.getCoord().getPosition()
+            (ra, dec) = s.getCoord().getPosition(afwGeom.degrees)
         if np.isfinite(ra) and np.isfinite(dec):
             fh.write("circle(%f,%f,2\")\n"%(ra, dec))
     fh.flush()
