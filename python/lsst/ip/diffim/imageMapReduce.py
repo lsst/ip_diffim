@@ -132,7 +132,7 @@ class ImageMapper(with_metaclass(abc.ABCMeta, pipeBase.Task)):
             the sub-exposure upon which to operate
         expandedSubExposure : lsst.afw.image.Exposure
             the expanded sub-exposure upon which to operate
-        fullBBox : afwGeom.BoundingBox
+        fullBBox : lsst.afw.geom.BoundingBox
             the bounding box of the original exposure
         kwargs :
             additional keyword arguments propagated from

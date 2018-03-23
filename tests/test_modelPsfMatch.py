@@ -3,7 +3,7 @@ import unittest
 
 import lsst.utils.tests
 import lsst.daf.base as dafBase
-import lsst.afw.coord as afwCoord
+from lsst.afw.coord import Observatory, Weather
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
@@ -130,15 +130,16 @@ def makeVisitInfo():
                               date=dafBase.DateTime(65321.1, dafBase.DateTime.MJD, dafBase.DateTime.TAI),
                               ut1=12345.1,
                               era=45.1*afwGeom.degrees,
-                              boresightRaDec=afwCoord.IcrsCoord(23.1*afwGeom.degrees, 73.2*afwGeom.degrees),
-                              boresightAzAlt=afwCoord.Coord(134.5*afwGeom.degrees, 33.3*afwGeom.degrees),
+                              boresightRaDec=afwGeom.SpherePoint(23.1, 73.2, afwGeom.degrees),
+                              boresightAzAlt=afwGeom.SpherePoint(134.5, 33.3, afwGeom.degrees),
                               boresightAirmass=1.73,
                               boresightRotAngle=73.2*afwGeom.degrees,
                               rotType=afwImage.RotType.SKY,
-                              observatory=afwCoord.Observatory(
+                              observatory=Observatory(
                                   11.1*afwGeom.degrees, 22.2*afwGeom.degrees, 0.333),
-                              weather=afwCoord.Weather(1.1, 2.2, 34.5),
+                              weather=Weather(1.1, 2.2, 34.5),
                               )
+
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
