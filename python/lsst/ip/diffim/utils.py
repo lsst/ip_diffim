@@ -22,6 +22,9 @@
 """Support utilities for Measuring sources"""
 from __future__ import absolute_import, division, print_function
 
+# Export DipoleTestImage to expose fake image generating funcs
+__all__ = ["DipoleTestImage"]
+
 from builtins import zip
 from builtins import str
 from builtins import range
@@ -41,9 +44,6 @@ import lsst.meas.base as measBase
 from .dipoleFitTask import DipoleFitAlgorithm
 from . import diffimLib
 from . import diffimTools
-
-# Export DipoleTestImage to expose fake image generating funcs
-__all__ = ("DipoleTestImage")
 
 
 keptPlots = False                       # Have we arranged to keep spatial plots open?

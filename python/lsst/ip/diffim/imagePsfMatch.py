@@ -20,6 +20,8 @@
 #
 from __future__ import absolute_import, division, print_function
 
+__all__ = ["ImagePsfMatchConfig", "ImagePsfMatchTask"]
+
 import numpy as np
 
 import lsst.daf.base as dafBase
