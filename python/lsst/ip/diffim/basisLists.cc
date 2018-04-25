@@ -24,7 +24,6 @@
 
 #include <Eigen/Core>
 
-#include "numpy/arrayobject.h"
 #include "ndarray/pybind11.h"
 
 #include "lsst/ip/diffim/BasisLists.h"
@@ -41,12 +40,6 @@ PYBIND11_PLUGIN(basisLists) {
     py::module::import("lsst.pex.policy");
 
     py::module mod("basisLists");
-
-    // Need to import numpy for ndarray and eigen conversions
-    if (_import_array() < 0) {
-        PyErr_SetString(PyExc_ImportError, "numpy.core.multiarray failed to import");
-        return nullptr;
-    }
 
     mod.def("makeDeltaFunctionBasisList", &makeDeltaFunctionBasisList, "width"_a, "height"_a);
     mod.def("makeRegularizationMatrix", &makeRegularizationMatrix, "policy"_a);

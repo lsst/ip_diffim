@@ -22,7 +22,6 @@
 #include "pybind11/pybind11.h"
 
 #include "Eigen/Core"
-#include "numpy/arrayobject.h"
 #include "ndarray/pybind11.h"
 
 #include "lsst/afw/image/Image.h"
@@ -75,12 +74,6 @@ PYBIND11_PLUGIN(imageSubtract) {
     py::module::import("lsst.afw.math");
 
     py::module mod("imageSubtract");
-
-    // Need to import numpy for ndarray and eigen conversions
-    if (_import_array() < 0) {
-        PyErr_SetString(PyExc_ImportError, "numpy.core.multiarray failed to import");
-        return nullptr;
-    }
 
     declareConvolveAndSubtract<float, double>(mod);
     declareConvolveAndSubtract<float, afw::math::Function2<double> const &>(mod);
