@@ -19,11 +19,8 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 
 __all__ = ["makeKernelBasisList", "generateAlardLuptonBasisList"]
-
-from builtins import range
 
 from . import diffimLib
 from lsst.log import Log

@@ -22,9 +22,6 @@
 
 __all__ = ["backgroundSubtract", "writeKernelCellSet", "sourceToFootprintList", "NbasisEvaluator"]
 
-from builtins import range
-from builtins import object
-
 # python
 import time
 import os

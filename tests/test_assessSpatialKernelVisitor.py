@@ -1,8 +1,6 @@
-from __future__ import absolute_import, division, print_function
 import unittest
 import numpy as num
 
-from builtins import range
 
 import lsst.utils.tests
 import lsst.afw.geom as afwGeom

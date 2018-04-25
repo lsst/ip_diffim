@@ -1,4 +1,3 @@
-from __future__ import absolute_import, division, print_function
 import lsst.utils
 import sys
 import os

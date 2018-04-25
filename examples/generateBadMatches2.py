@@ -1,4 +1,3 @@
-from builtins import range
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath

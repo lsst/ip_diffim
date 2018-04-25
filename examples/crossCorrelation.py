@@ -1,4 +1,3 @@
-from builtins import range
 import lsst.ip.diffim as ipDiffim
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage

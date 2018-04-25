@@ -1,4 +1,3 @@
-from __future__ import absolute_import, division, print_function
 from future import standard_library
 standard_library.install_aliases()
 #
@@ -25,7 +24,6 @@ standard_library.install_aliases()
 
 import numpy as np
 import abc
-from future.utils import with_metaclass
 
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
@@ -88,7 +86,7 @@ class ImageMapperConfig(pexConfig.Config):
     pass
 
 
-class ImageMapper(with_metaclass(abc.ABCMeta, pipeBase.Task)):
+class ImageMapper(pipeBase.Task, metaclass=abc.ABCMeta):
     """Abstract base class for any task that is to be
     used as `ImageMapReduceConfig.mapper`.
 
