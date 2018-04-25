@@ -1,5 +1,3 @@
-from future import standard_library
-standard_library.install_aliases()
 #
 # LSST Data Management System
 # Copyright 2016 AURA/LSST.
@@ -79,6 +77,7 @@ will average all overlapping pixels from sub-exposures produced by the
 implemented `reduceOperation` is 'none', in which case the
 `mapperResults` list is simply returned directly.
 """
+
 
 class ImageMapperConfig(pexConfig.Config):
     """Configuration parameters for ImageMapper
@@ -481,12 +480,12 @@ class ImageMapReduceConfig(pexConfig.Config):
     )
 
 
-## \addtogroup LSST_task_documentation
-## \{
-## \page ImageMapReduceTask
-## \ref ImageMapReduceTask_ "ImageMapReduceTask"
+## @addtogroup LSST_task_documentation
+## @{
+## @page ImageMapReduceTask
+## @ref ImageMapReduceTask_ "ImageMapReduceTask"
 ##      Task for performing operations on an image over a regular-spaced grid
-## \}
+## @}
 
 
 class ImageMapReduceTask(pipeBase.Task):

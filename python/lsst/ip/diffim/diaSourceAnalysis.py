@@ -28,7 +28,6 @@ from optparse import OptionParser
 
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
-import lsst.afw.detection as afwDet
 from lsst.log import Log
 import lsst.pex.policy as pexPolicy
 import lsst.daf.persistence as dafPersist
@@ -183,7 +182,8 @@ class DiaSourceAnalyst(object):
                            source.getId(), ngoodRatio, ngoodTolerance, nPos, nNeg, nPixels)
             return False
 
-        self.log.debug("Candidate %d : OK flux=%.2f nPos=%d nNeg=%d nTot=%d nDetPos=%d nDetNeg=%d fPos=%.2f fNeg=%2f",
+        self.log.debug("Candidate %d : OK flux=%.2f nPos=%d nNeg=%d nTot=%d nDetPos=%d nDetNeg=%d "
+                       "fPos=%.2f fNeg=%2f",
                        source.getId(), flux, nPos, nNeg, nPixels, nDetPos, nDetNeg, fPos, fNeg)
         return True
 
@@ -227,5 +227,3 @@ def main():
         if analyst.testSource(crDiffSource, subMi):
             ds9.mtv(subExp, frame=1)
             input('Next: ')
-if __name__ == "__main__":
-    main()

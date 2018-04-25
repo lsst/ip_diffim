@@ -111,7 +111,7 @@ Notes:
         print(spatialKernel.getSpatialParameters())
 
     if display:
-        ds9.mtv(differenceMaskedImage)
+        ds9.mtv(matchMaskedImage)
 
 
 def run():

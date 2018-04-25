@@ -25,7 +25,6 @@ import numpy as np
 
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
-import lsst.afw.detection as afwDetect
 import lsst.pex.config as pexConfig
 from lsst.log import Log
 import lsst.meas.deblender.baseline as deblendBaseline
@@ -117,39 +116,39 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
         self.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
         self.doReplaceWithNoise = False
 
-## \addtogroup LSST_task_documentation
-## \{
-## \page DipoleMeasurementTask
-## \ref DipoleMeasurementTask_ "DipoleMeasurementTask"
-## \copybrief DipoleMeasurementTask
-## \}
+## @addtogroup LSST_task_documentation
+## @{
+## @page DipoleMeasurementTask
+## @ref DipoleMeasurementTask_ "DipoleMeasurementTask"
+## @copybrief DipoleMeasurementTask
+## @}
 
 
 class DipoleMeasurementTask(SingleFrameMeasurementTask):
     """!
-\anchor DipoleMeasurementTask_
+@anchor DipoleMeasurementTask_
 
-\brief Measurement of Sources, specifically ones from difference images, for characterization as dipoles
+@brief Measurement of Sources, specifically ones from difference images, for characterization as dipoles
 
-\section ip_diffim_dipolemeas_Contents Contents
+@section ip_diffim_dipolemeas_Contents Contents
 
- - \ref ip_diffim_dipolemeas_Purpose
- - \ref ip_diffim_dipolemeas_Initialize
- - \ref ip_diffim_dipolemeas_IO
- - \ref ip_diffim_dipolemeas_Config
- - \ref ip_diffim_dipolemeas_Metadata
- - \ref ip_diffim_dipolemeas_Debug
- - \ref ip_diffim_dipolemeas_Example
+ - @ref ip_diffim_dipolemeas_Purpose
+ - @ref ip_diffim_dipolemeas_Initialize
+ - @ref ip_diffim_dipolemeas_IO
+ - @ref ip_diffim_dipolemeas_Config
+ - @ref ip_diffim_dipolemeas_Metadata
+ - @ref ip_diffim_dipolemeas_Debug
+ - @ref ip_diffim_dipolemeas_Example
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_dipolemeas_Purpose   Description
+@section ip_diffim_dipolemeas_Purpose   Description
 
 This class provides a default configuration for running Source measurement on image differences.
 
 These default plugins include:
-\dontinclude dipoleMeasurement.py
-\skip class DipoleMeasurementConfig
+@dontinclude dipoleMeasurement.py
+@skip class DipoleMeasurementConfig
 @until self.doReplaceWithNoise
 
 These plugins enabled by default allow the user to test the hypothesis that the Source is a dipole.
@@ -170,7 +169,7 @@ least squares minimization.  The fields are stored in table elements ip_diffim_P
 Because this Task is just a config for SourceMeasurementTask, the same result may be acheived by manually
 editing the config and running SourceMeasurementTask. For example:
 
-\code
+@code
 config = SingleFrameMeasurementConfig()
 config.plugins.names = ["base_PsfFlux",
                         "ip_diffim_PsfDipoleFlux",
@@ -191,30 +190,30 @@ schema = afwTable.SourceTable.makeMinimalSchema()
 task = SingleFrameMeasurementTask(schema, config=config)
 
 task.run(sources, exposure)
-\endcode
+@endcode
 
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_dipolemeas_Initialize    Task initialization
+@section ip_diffim_dipolemeas_Initialize    Task initialization
 
-\copydoc \_\_init\_\_
-
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-\section ip_diffim_dipolemeas_IO        Invoking the Task
-
-\copydoc run
+@copydoc \_\_init\_\_
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_dipolemeas_Config       Configuration parameters
+@section ip_diffim_dipolemeas_IO        Invoking the Task
 
-See \ref DipoleMeasurementConfig
+@copydoc run
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_dipolemeas_Metadata   Quantities set in Metadata
+@section ip_diffim_dipolemeas_Config       Configuration parameters
+
+See @ref DipoleMeasurementConfig
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+@section ip_diffim_dipolemeas_Metadata   Quantities set in Metadata
 
 No specific values are set in the Task metadata.  However, the Source schema are modified to store the
 results of the dipole-specific measurements.
@@ -222,13 +221,13 @@ results of the dipole-specific measurements.
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_dipolemeas_Debug     Debug variables
+@section ip_diffim_dipolemeas_Debug     Debug variables
 
-The \link lsst.pipe.base.cmdLineTask.CmdLineTask command line task\endlink interface supports a
-flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py
+The @link lsst.pipe.base.cmdLineTask.CmdLineTask command line task@endlink interface supports a
+flag @c -d/--debug to import @b debug.py from your @c PYTHONPATH.  The relevant contents of debug.py
 for this Task include:
 
-\code{.py}
+@code{.py}
     import sys
     import lsstDebug
     def DebugInfo(name):
@@ -240,57 +239,57 @@ for this Task include:
         return di
     lsstDebug.Info = DebugInfo
     lsstDebug.frame = 1
-\endcode
+@endcode
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_dipolemeas_Example   A complete example of using DipoleMeasurementTask
+@section ip_diffim_dipolemeas_Example   A complete example of using DipoleMeasurementTask
 
-This code is dipoleMeasTask.py in the examples directory, and can be run as \em e.g.
-\code
+This code is dipoleMeasTask.py in the examples directory, and can be run as @em e.g.
+@code
 examples/dipoleMeasTask.py
 examples/dipoleMeasTask.py --debug
 examples/dipoleMeasTask.py --debug --image /path/to/image.fits
-\endcode
+@endcode
 
-\dontinclude dipoleMeasTask.py
+@dontinclude dipoleMeasTask.py
 Start the processing by parsing the command line, where the user has the option of enabling debugging output
 and/or sending their own image for demonstration (in case they have not downloaded the afwdata package).
-\skip main
+@skip main
 @until run
 
-\dontinclude dipoleMeasTask.py
+@dontinclude dipoleMeasTask.py
 The processing occurs in the run function.  We first extract an exposure from disk or afwdata, displaying
 it if requested:
-\skip args
+@skip args
 @until mtv
 
 Create a default source schema that we will append fields to as we add more algorithms:
-\skip makeMinimalSchema
+@skip makeMinimalSchema
 @until makeMinimalSchema
 
 Create the detection and measurement Tasks, with some minor tweaking of their configs:
-\skip Create
+@skip Create
 @until measureTask
 
 Having fully initialied the schema, we create a Source table from it:
-\skip output
+@skip output
 @until SourceTable
 
 Run detection:
-\skip Process
+@skip Process
 @until detectionTask
 
 Because we are looking for dipoles, we need to merge the positive and negative detections:
-\skip Merge
+@skip Merge
 @until numNeg
 
 Finally, perform measurement (both standard and dipole-specialized) on the merged sources:
-\skip measureTask
+@skip measureTask
 @until measureTask
 
 Optionally display debugging information:
-\skip Display
+@skip Display
 @until displayDipoles
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 

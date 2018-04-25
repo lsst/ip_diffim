@@ -40,9 +40,9 @@ __all__ = ("DecorrelateALKernelTask", "DecorrelateALKernelConfig",
 
 class DecorrelateALKernelConfig(pexConfig.Config):
     """!
-    \anchor DecorrelateALKernelConfig_
+    @anchor DecorrelateALKernelConfig_
 
-    \brief Configuration parameters for the DecorrelateALKernelTask
+    @brief Configuration parameters for the DecorrelateALKernelTask
     """
 
     ignoreMaskPlanes = pexConfig.ListField(
@@ -51,37 +51,37 @@ class DecorrelateALKernelConfig(pexConfig.Config):
         default=("INTRP", "EDGE", "DETECTED", "SAT", "CR", "BAD", "NO_DATA", "DETECTED_NEGATIVE")
     )
 
-## \addtogroup LSST_task_documentation
-## \{
-## \page DecorrelateALKernelTask
-## \ref DecorrelateALKernelTask_ "DecorrelateALKernelTask"
+## @addtogroup LSST_task_documentation
+## @{
+## @page DecorrelateALKernelTask
+## @ref DecorrelateALKernelTask_ "DecorrelateALKernelTask"
 ##      Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
-## \}
+## @}
 
 
 class DecorrelateALKernelTask(pipeBase.Task):
     """!
-    \anchor DecorrelateALKernelTask_
+    @anchor DecorrelateALKernelTask_
 
-    \brief Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
+    @brief Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Contents      Contents
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Contents      Contents
 
-      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Purpose
-      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Config
-      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Run
-      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Debug
-      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Example
+      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Purpose
+      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Config
+      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Run
+      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Debug
+      - @ref ip_diffim_imDecorr_DecorrALKernelTask_Example
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Purpose	Description
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Purpose	Description
 
     Pipe-task that removes the neighboring-pixel covariance in an
     image difference that are added when the template image is
     convolved with the Alard-Lupton PSF matching kernel.
 
-    The image differencing pipeline task \link
-    ip.diffim.psfMatch.PsfMatchTask PSFMatchTask\endlink and \link
-    ip.diffim.psfMatch.PsfMatchConfigAL PSFMatchConfigAL\endlink uses
+    The image differencing pipeline task @link
+    ip.diffim.psfMatch.PsfMatchTask PSFMatchTask@endlink and @link
+    ip.diffim.psfMatch.PsfMatchConfigAL PSFMatchConfigAL@endlink uses
     the Alard and Lupton (1998) method for matching the PSFs of the
     template and science exposures prior to subtraction. The
     Alard-Lupton method identifies a matching kernel, which is then
@@ -97,23 +97,23 @@ class DecorrelateALKernelTask(pipeBase.Task):
     convolving the image difference with it. This process is described
     in detail in [DMTN-021](http://dmtn-021.lsst.io).
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Initialize       Task initialization
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Initialize Task initialization
 
-    \copydoc \_\_init\_\_
+    @copydoc \_\_init\_\_
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Run       Invoking the Task
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Run Invoking the Task
 
-    \copydoc run
+    @copydoc run
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Config       Configuration parameters
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Config Configuration parameters
 
-    See \ref DecorrelateALKernelConfig
+    See @ref DecorrelateALKernelConfig
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Debug		Debug variables
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Debug Debug variables
 
     This task has no debug variables
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Example	Example of using DecorrelateALKernelTask
+    @section ip_diffim_imDecorr_DecorrALKernelTask_Example Example of using DecorrelateALKernelTask
 
     This task has no standalone example, however it is applied as a
     subtask of pipe.tasks.imageDifference.ImageDifferenceTask.
@@ -131,8 +131,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.Mask\
-                                     .getPlaneBitMask(self.config.ignoreMaskPlanes))
+        self.statsControl.setAndMask(afwImage.Mask.getPlaneBitMask(self.config.ignoreMaskPlanes))
 
     def computeVarianceMean(self, exposure):
         statObj = afwMath.makeStatistics(exposure.getMaskedImage().getVariance(),
@@ -489,13 +488,13 @@ class DecorrelateALKernelMapReduceConfig(ImageMapReduceConfig):
     )
 
 
-## \addtogroup LSST_task_documentation
-## \{
-## \page DecorrelateALKernelSpatialTask
-## \ref DecorrelateALKernelSpatialTask_ "DecorrelateALKernelSpatialTask"
-##      Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference,
-##      allowing for spatial variations in PSF and noise
-## \}
+## @addtogroup LSST_task_documentation
+## @{
+## @page DecorrelateALKernelSpatialTask
+## @ref DecorrelateALKernelSpatialTask_ "DecorrelateALKernelSpatialTask"
+##      Decorrelate the effect of convolution by Alard-Lupton matching kernel
+##      in image difference, allowing for spatial variations in PSF and noise
+## @}
 
 
 class DecorrelateALKernelSpatialConfig(pexConfig.Config):
@@ -526,51 +525,51 @@ class DecorrelateALKernelSpatialConfig(pexConfig.Config):
 
 class DecorrelateALKernelSpatialTask(pipeBase.Task):
     """!
-    \anchor DecorrelateALKernelSpatialTask_
+    @anchor DecorrelateALKernelSpatialTask_
 
-    \brief Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
+    @brief Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Contents       Contents
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Contents       Contents
 
-      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Purpose
-      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Config
-      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Run
-      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Debug
-      - \ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Example
+      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Purpose
+      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Config
+      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Run
+      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Debug
+      - @ref ip_diffim_imDecorr_DecorrALKerSpatTask_Example
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Purpose	Description
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Purpose	Description
 
     Pipe-task that removes the neighboring-pixel covariance in an
     image difference that are added when the template image is
     convolved with the Alard-Lupton PSF matching kernel.
 
-    This task is a simple wrapper around \ref DecorrelateALKernelTask,
+    This task is a simple wrapper around @ref DecorrelateALKernelTask,
     which takes a `spatiallyVarying` parameter in its `run` method. If
-    it is `False`, then it simply calls the `run` method of \ref
-    DecorrelateALKernelTask. If it is True, then it uses the \ref
+    it is `False`, then it simply calls the `run` method of @ref
+    DecorrelateALKernelTask. If it is True, then it uses the @ref
     ImageMapReduceTask framework to break the exposures into
-    subExposures on a grid, and performs the `run` method of \ref
+    subExposures on a grid, and performs the `run` method of @ref
     DecorrelateALKernelTask on each subExposure. This enables it to
     account for spatially-varying PSFs and noise in the exposures when
     performing the decorrelation.
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Initialize       Task initialization
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Initialize Task initialization
 
-    \copydoc \_\_init\_\_
+    @copydoc \_\_init\_\_
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Run       Invoking the Task
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Run Invoking the Task
 
-    \copydoc run
+    @copydoc run
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Config       Configuration parameters
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Config Configuration parameters
 
-    See \ref DecorrelateALKernelSpatialConfig
+    See @ref DecorrelateALKernelSpatialConfig
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Debug		Debug variables
+    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Debug Debug variables
 
     This task has no debug variables
 
-    \section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Example	Example of using DecorrelateALKernelSpatialTask
+    @section ip_diffim_imDecorr_DecorrALKerSpatTask_Example Example of using DecorrelateALKernelSpatialTask
 
     This task has no standalone example, however it is applied as a
     subtask of pipe.tasks.imageDifference.ImageDifferenceTask.
@@ -596,8 +595,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
         self.statsControl = afwMath.StatisticsControl()
         self.statsControl.setNumSigmaClip(3.)
         self.statsControl.setNumIter(3)
-        self.statsControl.setAndMask(afwImage.Mask\
-                                     .getPlaneBitMask(self.config.ignoreMaskPlanes))
+        self.statsControl.setAndMask(afwImage.Mask.getPlaneBitMask(self.config.ignoreMaskPlanes))
 
     def computeVarianceMean(self, exposure):
         """Compute the mean of the variance plane of `exposure`.

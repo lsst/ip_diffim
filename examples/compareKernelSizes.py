@@ -31,7 +31,7 @@ for kSize in kSizes:
         task_args.append("doDetection=False")
         task_args.append("doMeasurement=False")
 
-        ## Hack around the lack of metadata being returned in cmdLineTask
+        # Hack around the lack of metadata being returned in cmdLineTask
         tmp = ImageDifferenceTask()
         parsedCmd = tmp._makeArgumentParser().parse_args(config=tmp.ConfigClass(), args=task_args,
                                                          log=tmp.log, override=tmp.applyOverrides)
