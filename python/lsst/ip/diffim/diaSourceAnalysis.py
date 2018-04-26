@@ -23,6 +23,8 @@
 #
 from __future__ import absolute_import, division, print_function
 
+__all__ = ["parseOptions", "DiaSourceAnalystConfig", "DiaSourceAnalyst"]
+
 from optparse import OptionParser
 
 from builtins import input

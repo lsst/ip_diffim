@@ -21,11 +21,14 @@
 #
 from __future__ import absolute_import, division, print_function
 
+__all__ = ["makeKernelBasisList", "generateAlardLuptonBasisList"]
+
 from builtins import range
 
 from . import diffimLib
 from lsst.log import Log
 import numpy as np
+
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 

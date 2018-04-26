@@ -21,6 +21,8 @@
 #
 from __future__ import absolute_import, division, print_function
 
+__all__ = ["SnapPsfMatchConfigDF", "SnapPsfMatchConfigAL", "SnapPsfMatchConfig", "SnapPsfMatchTask"]
+
 import lsst.pex.config as pexConfig
 from .psfMatch import PsfMatchConfigDF, PsfMatchConfigAL
 from .imagePsfMatch import ImagePsfMatchTask, ImagePsfMatchConfig

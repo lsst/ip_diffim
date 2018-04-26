@@ -11,4 +11,5 @@ lsst.ip_diffim
 Python API reference
 ====================
 
-.. .. automodapi:: lsst.ip.diffim
+.. automodapi:: lsst.ip.diffim
+   :skip: wrapSimpleAlgorithm
