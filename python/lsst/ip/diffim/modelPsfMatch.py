@@ -18,9 +18,7 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 
-from builtins import range
 import numpy as np
 
 from . import diffimLib
@@ -32,7 +30,7 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigAL
-from . import utils as diUtils
+from . import utils as dituils
 import lsst.afw.display.ds9 as ds9
 
 __all__ = ("ModelPsfMatchTask", "ModelPsfMatchConfig")
@@ -92,33 +90,33 @@ class ModelPsfMatchConfig(pexConfig.Config):
         self.kernel.active.scaleByFwhm = False
 
 
-## \addtogroup LSST_task_documentation
-## \{
-## \page ModelPsfMatchTask
-## \ref ModelPsfMatchTask_ "ModelPsfMatchTask"
-## \copybrief ModelPsfMatchTask
-## \}
+## @addtogroup LSST_task_documentation
+## @{
+## @page ModelPsfMatchTask
+## @ref ModelPsfMatchTask_ "ModelPsfMatchTask"
+## @copybrief ModelPsfMatchTask
+## @}
 
 
 class ModelPsfMatchTask(PsfMatchTask):
     """!
-\anchor ModelPsfMatchTask_
+@anchor ModelPsfMatchTask_
 
-\brief Matching of two model Psfs, and application of the Psf-matching kernel to an input Exposure
+@brief Matching of two model Psfs, and application of the Psf-matching kernel to an input Exposure
 
-\section ip_diffim_modelpsfmatch_Contents Contents
+@section ip_diffim_modelpsfmatch_Contents Contents
 
- - \ref ip_diffim_modelpsfmatch_Purpose
- - \ref ip_diffim_modelpsfmatch_Initialize
- - \ref ip_diffim_modelpsfmatch_IO
- - \ref ip_diffim_modelpsfmatch_Config
- - \ref ip_diffim_modelpsfmatch_Metadata
- - \ref ip_diffim_modelpsfmatch_Debug
- - \ref ip_diffim_modelpsfmatch_Example
+ - @ref ip_diffim_modelpsfmatch_Purpose
+ - @ref ip_diffim_modelpsfmatch_Initialize
+ - @ref ip_diffim_modelpsfmatch_IO
+ - @ref ip_diffim_modelpsfmatch_Config
+ - @ref ip_diffim_modelpsfmatch_Metadata
+ - @ref ip_diffim_modelpsfmatch_Debug
+ - @ref ip_diffim_modelpsfmatch_Example
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_modelpsfmatch_Purpose   Description
+@section ip_diffim_modelpsfmatch_Purpose   Description
 
 This Task differs from ImagePsfMatchTask in that it matches two Psf _models_, by realizing
 them in an Exposure-sized SpatialCellSet and then inserting each Psf-image pair into KernelCandidates.
@@ -142,37 +140,37 @@ reversed, compared to ImagePsfMatchTask, which operates on the template image.
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_modelpsfmatch_Initialize    Task initialization
+@section ip_diffim_modelpsfmatch_Initialize    Task initialization
 
-\copydoc \_\_init\_\_
-
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-\section ip_diffim_modelpsfmatch_IO        Invoking the Task
-
-\copydoc run
+@copydoc \_\_init\_\_
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_modelpsfmatch_Config       Configuration parameters
+@section ip_diffim_modelpsfmatch_IO        Invoking the Task
 
-See \ref ModelPsfMatchConfig
-
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-\section ip_diffim_modelpsfmatch_Metadata   Quantities set in Metadata
-
-See \ref ip_diffim_psfmatch_Metadata "PsfMatchTask"
+@copydoc run
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_modelpsfmatch_Debug     Debug variables
+@section ip_diffim_modelpsfmatch_Config       Configuration parameters
 
-The \link lsst.pipe.base.cmdLineTask.CmdLineTask command line task\endlink interface supports a
-flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py
+See @ref ModelPsfMatchConfig
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+@section ip_diffim_modelpsfmatch_Metadata   Quantities set in Metadata
+
+See @ref ip_diffim_psfmatch_Metadata "PsfMatchTask"
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+@section ip_diffim_modelpsfmatch_Debug     Debug variables
+
+The @link lsst.pipe.base.cmdLineTask.CmdLineTask command line task@endlink interface supports a
+flag @c -d/--debug to import @b debug.py from your @c PYTHONPATH.  The relevant contents of debug.py
 for this Task include:
 
-\code{.py}
+@code{.py}
     import sys
     import lsstDebug
     def DebugInfo(name):
@@ -192,65 +190,65 @@ for this Task include:
         return di
     lsstDebug.Info = DebugInfo
     lsstDebug.frame = 1
-\endcode
+@endcode
 
 Note that if you want addional logging info, you may add to your scripts:
-\code{.py}
+@code{.py}
 import lsst.log.utils as logUtils
 logUtils.traceSetAt("ip.diffim", 4)
-\endcode
+@endcode
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_modelpsfmatch_Example   A complete example of using ModelPsfMatchTask
+@section ip_diffim_modelpsfmatch_Example   A complete example of using ModelPsfMatchTask
 
-This code is modelPsfMatchTask.py in the examples directory, and can be run as \em e.g.
-\code
+This code is modelPsfMatchTask.py in the examples directory, and can be run as @em e.g.
+@code
 examples/modelPsfMatchTask.py
 examples/modelPsfMatchTask.py --debug
 examples/modelPsfMatchTask.py --debug --template /path/to/templateExp.fits --science /path/to/scienceExp.fits
-\endcode
+@endcode
 
-\dontinclude modelPsfMatchTask.py
+@dontinclude modelPsfMatchTask.py
 Create a subclass of ModelPsfMatchTask that accepts two exposures.  Note that the "template" exposure
 contains the Psf that will get matched to, and the "science" exposure is the one that will be convolved:
-\skip MyModelPsfMatchTask
+@skip MyModelPsfMatchTask
 @until return
 
 And allow the user the freedom to either run the script in default mode, or point to their own images on disk.
 Note that these images must be readable as an lsst.afw.image.Exposure:
-\skip main
+@skip main
 @until parse_args
 
 We have enabled some minor display debugging in this script via the --debug option.  However, if you
 have an lsstDebug debug.py in your PYTHONPATH you will get additional debugging displays.  The following
 block checks for this script:
-\skip args.debug
+@skip args.debug
 @until sys.stderr
 
-\dontinclude modelPsfMatchTask.py
+@dontinclude modelPsfMatchTask.py
 Finally, we call a run method that we define below.  First set up a Config and modify some of the parameters.
 In particular we don't want to "grow" the sizes of the kernel or KernelCandidates, since we are operating with
 fixed--size images (i.e. the size of the input Psf models).
-\skip run(args)
+@skip run(args)
 @until False
 
 Make sure the images (if any) that were sent to the script exist on disk and are readable.  If no images
 are sent, make some fake data up for the sake of this example script (have a look at the code if you want
 more details on generateFakeData):
-\skip requested
+@skip requested
 @until sizeCellY
 
 Display the two images if --debug:
-\skip args.debug
+@skip args.debug
 @until Science
 
 Create and run the Task:
-\skip Create
+@skip Create
 @until result
 
 And finally provide optional debugging display of the Psf-matched (via the Psf models) science image:
-\skip args.debug
+@skip args.debug
 @until result.psfMatchedExposure
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -261,8 +259,8 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
     def __init__(self, *args, **kwargs):
         """!Create a ModelPsfMatchTask
 
-        \param *args arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
-        \param **kwargs keyword arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
+        @param *args arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
+        @param **kwargs keyword arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
 
         Upon initialization, the kernel configuration is defined by self.config.kernel.active.  This Task
         does have a run() method, which is the default way to call the Task.
@@ -466,7 +464,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
         if display:
             ds9.setMaskTransparency(maskTransparency)
         if display and displaySpatialCells:
-            diUtils.showKernelSpatialCells(exposure.getMaskedImage(), kernelCellSet,
+            dituils.showKernelSpatialCells(exposure.getMaskedImage(), kernelCellSet,
                                            symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
                                            size=4, frame=lsstDebug.frame, title="Image to be convolved")
             lsstDebug.frame += 1

@@ -22,7 +22,6 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
-from builtins import range
 import os
 import sys
 import lsst.utils

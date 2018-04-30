@@ -1,4 +1,3 @@
-from __future__ import absolute_import, division, print_function
 import sys
 import optparse
 
@@ -112,7 +111,7 @@ Notes:
         print(spatialKernel.getSpatialParameters())
 
     if display:
-        ds9.mtv(differenceMaskedImage)
+        ds9.mtv(matchMaskedImage)
 
 
 def run():

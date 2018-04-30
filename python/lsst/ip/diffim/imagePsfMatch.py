@@ -18,7 +18,6 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 
 __all__ = ["ImagePsfMatchConfig", "ImagePsfMatchTask"]
 
@@ -35,7 +34,7 @@ from lsst.meas.algorithms import SourceDetectionTask, SubtractBackgroundTask
 from lsst.meas.base import SingleFrameMeasurementTask
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigDF, PsfMatchConfigAL
-from . import utils as diUtils
+from . import utils as dituils
 from . import diffimLib
 from . import diffimTools
 import lsst.afw.display.ds9 as ds9
@@ -75,33 +74,33 @@ class ImagePsfMatchConfig(pexConfig.Config):
         self.selectMeasurement.slots.apFlux = None
         self.selectMeasurement.slots.calibFlux = None
 
-## \addtogroup LSST_task_documentation
-## \{
-## \page ImagePsfMatchTask
-## \ref ImagePsfMatchTask_ "ImagePsfMatchTask"
-## \copybrief ImagePsfMatchTask
-## \}
+## @addtogroup LSST_task_documentation
+## @{
+## @page ImagePsfMatchTask
+## @ref ImagePsfMatchTask_ "ImagePsfMatchTask"
+## @copybrief ImagePsfMatchTask
+## @}
 
 
 class ImagePsfMatchTask(PsfMatchTask):
     """!
-\anchor ImagePsfMatchTask_
+@anchor ImagePsfMatchTask_
 
-\brief Psf-match two MaskedImages or Exposures using the sources in the images
+@brief Psf-match two MaskedImages or Exposures using the sources in the images
 
-\section ip_diffim_imagepsfmatch_Contents Contents
+@section ip_diffim_imagepsfmatch_Contents Contents
 
- - \ref ip_diffim_imagepsfmatch_Purpose
- - \ref ip_diffim_imagepsfmatch_Initialize
- - \ref ip_diffim_imagepsfmatch_IO
- - \ref ip_diffim_imagepsfmatch_Config
- - \ref ip_diffim_imagepsfmatch_Metadata
- - \ref ip_diffim_imagepsfmatch_Debug
- - \ref ip_diffim_imagepsfmatch_Example
+ - @ref ip_diffim_imagepsfmatch_Purpose
+ - @ref ip_diffim_imagepsfmatch_Initialize
+ - @ref ip_diffim_imagepsfmatch_IO
+ - @ref ip_diffim_imagepsfmatch_Config
+ - @ref ip_diffim_imagepsfmatch_Metadata
+ - @ref ip_diffim_imagepsfmatch_Debug
+ - @ref ip_diffim_imagepsfmatch_Example
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_imagepsfmatch_Purpose   Description
+@section ip_diffim_imagepsfmatch_Purpose   Description
 
 Build a Psf-matching kernel using two input images, either as MaskedImages (in which case they need
     to be astrometrically aligned) or Exposures (in which case astrometric alignment will happen by
@@ -138,20 +137,20 @@ which are again used to reject bad candidates, using the same thresholds as abov
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_imagepsfmatch_Initialize    Task initialization
+@section ip_diffim_imagepsfmatch_Initialize    Task initialization
 
-\copydoc \_\_init\_\_
+@copydoc \_\_init\_\_
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_imagepsfmatch_IO        Invoking the Task
+@section ip_diffim_imagepsfmatch_IO        Invoking the Task
 
 There is no run() method for this Task.  Instead there are 4 methods that
 may be used to invoke the Psf-matching.  These are
-\link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchMaskedImages matchMaskedImages\endlink,
-\link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractMaskedImages subtractMaskedImages\endlink,
-\link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchExposures matchExposures\endlink, and
-\link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractExposures subtractExposures\endlink.
+@link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchMaskedImages matchMaskedImages@endlink,
+@link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractMaskedImages subtractMaskedImages@endlink,
+@link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchExposures matchExposures@endlink, and
+@link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractExposures subtractExposures@endlink.
 
 The methods that operate on lsst.afw.image.MaskedImage require that the images already be astrometrically
 aligned, and are the same shape.  The methods that operate on lsst.afw.image.Exposure allow for the
@@ -164,25 +163,25 @@ See each method's returned lsst.pipe.base.Struct for more details.
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_imagepsfmatch_Config       Configuration parameters
+@section ip_diffim_imagepsfmatch_Config       Configuration parameters
 
-See \ref ImagePsfMatchConfig
-
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-\section ip_diffim_imagepsfmatch_Metadata   Quantities set in Metadata
-
-See \ref ip_diffim_psfmatch_Metadata "PsfMatchTask"
+See @ref ImagePsfMatchConfig
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_imagepsfmatch_Debug     Debug variables
+@section ip_diffim_imagepsfmatch_Metadata   Quantities set in Metadata
 
-The \link lsst.pipe.base.cmdLineTask.CmdLineTask command line task\endlink interface supports a
-flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py
+See @ref ip_diffim_psfmatch_Metadata "PsfMatchTask"
+
+#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+@section ip_diffim_imagepsfmatch_Debug     Debug variables
+
+The @link lsst.pipe.base.cmdLineTask.CmdLineTask command line task@endlink interface supports a
+flag @c -d/--debug to import @b debug.py from your @c PYTHONPATH.  The relevant contents of debug.py
 for this Task include:
 
-\code{.py}
+@code{.py}
     import sys
     import lsstDebug
     def DebugInfo(name):
@@ -211,60 +210,60 @@ for this Task include:
         return di
     lsstDebug.Info = DebugInfo
     lsstDebug.frame = 1
-\endcode
+@endcode
 
 Note that if you want addional logging info, you may add to your scripts:
-\code{.py}
+@code{.py}
 import lsst.log.utils as logUtils
 logUtils.traceSetAt("ip.diffim", 4)
-\endcode
+@endcode
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_imagepsfmatch_Example   A complete example of using ImagePsfMatchTask
+@section ip_diffim_imagepsfmatch_Example   A complete example of using ImagePsfMatchTask
 
-This code is imagePsfMatchTask.py in the examples directory, and can be run as \em e.g.
-\code
+This code is imagePsfMatchTask.py in the examples directory, and can be run as @em e.g.
+@code
 examples/imagePsfMatchTask.py --debug
 examples/imagePsfMatchTask.py --debug --mode="matchExposures"
 examples/imagePsfMatchTask.py --debug --template /path/to/templateExp.fits --science /path/to/scienceExp.fits
-\endcode
+@endcode
 
-\dontinclude imagePsfMatchTask.py
+@dontinclude imagePsfMatchTask.py
 Create a subclass of ImagePsfMatchTask that allows us to either match exposures, or subtract exposures:
-\skip MyImagePsfMatchTask
+@skip MyImagePsfMatchTask
 @until self.subtractExposures
 
 And allow the user the freedom to either run the script in default mode, or point to their own images on disk.
 Note that these images must be readable as an lsst.afw.image.Exposure:
-\skip main
+@skip main
 @until parse_args
 
 We have enabled some minor display debugging in this script via the --debug option.  However, if you
 have an lsstDebug debug.py in your PYTHONPATH you will get additional debugging displays.  The following
 block checks for this script:
-\skip args.debug
+@skip args.debug
 @until sys.stderr
 
-\dontinclude imagePsfMatchTask.py
+@dontinclude imagePsfMatchTask.py
 Finally, we call a run method that we define below.  First set up a Config and modify some of the parameters.
 E.g. use an "Alard-Lupton" sum-of-Gaussian basis, fit for a differential background, and use low order spatial
 variation in the kernel and background:
-\skip run(args)
+@skip run(args)
 @until spatialBgOrder
 
 Make sure the images (if any) that were sent to the script exist on disk and are readable.  If no images
 are sent, make some fake data up for the sake of this example script (have a look at the code if you want
 more details on generateFakeImages):
-\skip requested
+@skip requested
 @until sizeCellY
 
 Create and run the Task:
-\skip Create
+@skip Create
 @until args.mode
 
 And finally provide some optional debugging displays:
-\skip args.debug
+@skip args.debug
 @until result.subtractedExposure
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -274,8 +273,8 @@ And finally provide some optional debugging displays:
     def __init__(self, *args, **kwargs):
         """!Create the ImagePsfMatchTask
 
-        \param *args arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
-        \param **kwargs keyword arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
+        @param *args arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
+        @param **kwargs keyword arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
 
         Upon initialization, the kernel configuration is defined by self.config.kernel.active.
         The task creates an lsst.afw.math.Warper from the subConfig self.config.kernel.active.warpingConfig.
@@ -446,7 +445,7 @@ And finally provide some optional debugging displays:
                                            candidateList)
 
         if display and displaySpatialCells:
-            diUtils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet,
+            dituils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet,
                                            symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
                                            size=4, frame=lsstDebug.frame, title="Image to not convolve")
             lsstDebug.frame += 1

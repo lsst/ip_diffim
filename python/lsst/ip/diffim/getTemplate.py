@@ -19,7 +19,6 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 
 import numpy as np
 
@@ -63,11 +62,11 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
     def run(self, exposure, sensorRef, templateIdList=None):
         """!Retrieve and mosaic a template coadd exposure that overlaps the exposure
 
-        \param[in] exposure -- an exposure for which to generate an overlapping template
-        \param[in] sensorRef -- a Butler data reference that can be used to obtain coadd data
-        \param[in] templateIdList -- list of data ids (unused)
+        @param[in] exposure -- an exposure for which to generate an overlapping template
+        @param[in] sensorRef -- a Butler data reference that can be used to obtain coadd data
+        @param[in] templateIdList -- list of data ids (unused)
 
-        \return a pipeBase.Struct
+        @return a pipeBase.Struct
          - exposure: a template coadd exposure assembled out of patches
          - sources:  None for this subtask
         """
@@ -96,8 +95,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
         # assemble coadd exposure from subregions of patches
         coaddExposure = afwImage.ExposureF(coaddBBox, coaddWcs)
-        coaddExposure.getMaskedImage().set(np.nan, afwImage.Mask\
-                                           .getPlaneBitMask("NO_DATA"), np.nan)
+        coaddExposure.getMaskedImage().set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
         nPatchesFound = 0
         coaddFilter = None
         coaddPsf = None
@@ -180,12 +178,12 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
         Construct a dataId based on the sensorRef.dataId combined
         with the specifications from the first dataId in templateIdList
 
-        \param[in] exposure -- exposure (unused)
-        \param[in] sensorRef -- a Butler data reference
-        \param[in] templateIdList -- list of data ids, which should contain a single item.
+        @param[in] exposure -- exposure (unused)
+        @param[in] sensorRef -- a Butler data reference
+        @param[in] templateIdList -- list of data ids, which should contain a single item.
                                      If there are multiple items, only the first is used.
 
-        \return a pipeBase.Struct
+        @return a pipeBase.Struct
          - exposure: a template calexp
          - sources: source catalog measured on the template
         """

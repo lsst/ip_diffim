@@ -18,11 +18,8 @@
 # You should have received a copy of the LSST License Statement and
 # the GNU General Public License along with this program.  If not,
 # see <https://www.lsstcorp.org/LegalNotices/>.
-from __future__ import absolute_import, division, print_function
 import unittest
 
-from builtins import range
-from past.builtins import basestring
 import numpy as np
 
 import lsst.utils.tests
@@ -106,10 +103,10 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
     np.random.seed(seed)
 
     psf1 = [3.3, 3.3] if psf1 is None else psf1
-    if not hasattr(psf1, "__len__") and not isinstance(psf1, basestring):
+    if not hasattr(psf1, "__len__") and not isinstance(psf1, str):
         psf1 = [psf1, psf1]
     psf2 = [2.2, 2.2] if psf2 is None else psf2
-    if not hasattr(psf2, "__len__") and not isinstance(psf2, basestring):
+    if not hasattr(psf2, "__len__") and not isinstance(psf2, str):
         psf2 = [psf2, psf2]
     offset = [0., 0.] if offset is None else offset   # astrometric offset (pixels) between the two images
     if verbose:

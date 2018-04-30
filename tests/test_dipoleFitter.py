@@ -23,10 +23,8 @@
 
 Each test generates a fake image with two synthetic dipoles as input data.
 """
-from __future__ import absolute_import, division, print_function
 import unittest
 
-from builtins import object
 import numpy as np
 
 import lsst.utils.tests

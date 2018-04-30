@@ -19,14 +19,9 @@
 # the GNU General Public License along with this program.  If not,
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 
 import numpy as np
 import warnings
-
-from builtins import str
-from builtins import range
-from builtins import object
 
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -779,7 +774,7 @@ class DipoleFitAlgorithm(object):
 
         try:
             signalToNoise = np.sqrt((fluxVal/fluxVar)**2 + (fluxValNeg/fluxVarNeg)**2)
-        except:  # catch divide by zero - should never happen.
+        except ZeroDivisionError:  # catch divide by zero - should never happen.
             signalToNoise = np.nan
 
         out = Struct(posCentroidX=fitParams['xcenPos'], posCentroidY=fitParams['ycenPos'],

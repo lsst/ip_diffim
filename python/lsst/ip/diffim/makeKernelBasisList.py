@@ -19,11 +19,8 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 
 __all__ = ["makeKernelBasisList", "generateAlardLuptonBasisList"]
-
-from builtins import range
 
 from . import diffimLib
 from lsst.log import Log
@@ -129,7 +126,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
             basisSigmaGauss.append(basisSigmaGauss[-1]*basisGaussBeta)
 
         kernelSize = int(fwhmScaling * basisSigmaGauss[-1])
-        kernelSize += 0 if kernelSize%2 else 1 # Make sure it's odd
+        kernelSize += 0 if kernelSize%2 else 1  # Make sure it's odd
         kernelSize = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
 
     else:
@@ -161,7 +158,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
             basisSigmaGauss.append(basisSigmaGauss[-1]*basisGaussBeta)
 
         kernelSize = int(fwhmScaling * basisSigmaGauss[-1])
-        kernelSize += 0 if kernelSize%2 else 1 # Make sure it's odd
+        kernelSize += 0 if kernelSize%2 else 1  # Make sure it's odd
         kernelSize = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
 
         # Now build a deconvolution set from these sigmas

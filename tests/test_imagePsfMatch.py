@@ -20,11 +20,9 @@
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
 
-from __future__ import absolute_import, division, print_function
 
 import unittest
 
-from builtins import range
 
 import lsst.utils.tests
 from lsst.afw.geom import makeSkyWcs

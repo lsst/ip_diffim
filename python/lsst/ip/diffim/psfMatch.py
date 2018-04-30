@@ -19,14 +19,12 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 
 __all__ = ["DetectionConfig", "PsfMatchConfig", "PsfMatchConfigAL", "PsfMatchConfigDF", "PsfMatchTask"]
 
 import time
 
 import numpy as np
-from builtins import range
 
 import lsst.afw.image as afwImage
 import lsst.pex.config as pexConfig
@@ -35,7 +33,7 @@ import lsst.afw.display.ds9 as ds9
 import lsst.log as log
 import lsst.pipe.base as pipeBase
 from lsst.meas.algorithms import SubtractBackgroundConfig
-from . import utils as diUtils
+from . import utils as diutils
 from . import diffimLib
 
 
@@ -521,33 +519,33 @@ class PsfMatchConfigDF(PsfMatchConfig):
     )
 
 
-## \addtogroup LSST_task_documentation
-## \{
-## \page PsfMatchTask
-## \ref PsfMatchTask_ "PsfMatchTask"
-## \copybrief PsfMatchTask
-## \}
+## @addtogroup LSST_task_documentation
+## @{
+## @page PsfMatchTask
+## @ref PsfMatchTask_ "PsfMatchTask"
+## @copybrief PsfMatchTask
+## @}
 
 class PsfMatchTask(pipeBase.Task):
     """!
 
-\anchor PsfMatchTask_
+@anchor PsfMatchTask_
 
-\brief Base class for Psf Matching; should not be called directly
+@brief Base class for Psf Matching; should not be called directly
 
-\section ip_diffim_psfmatch_Contents Contents
+@section ip_diffim_psfmatch_Contents Contents
 
- - \ref ip_diffim_psfmatch_Purpose
- - \ref ip_diffim_psfmatch_Initialize
- - \ref ip_diffim_psfmatch_IO
- - \ref ip_diffim_psfmatch_Config
- - \ref ip_diffim_psfmatch_Metadata
- - \ref ip_diffim_psfmatch_Debug
- - \ref ip_diffim_psfmatch_Example
+ - @ref ip_diffim_psfmatch_Purpose
+ - @ref ip_diffim_psfmatch_Initialize
+ - @ref ip_diffim_psfmatch_IO
+ - @ref ip_diffim_psfmatch_Config
+ - @ref ip_diffim_psfmatch_Metadata
+ - @ref ip_diffim_psfmatch_Debug
+ - @ref ip_diffim_psfmatch_Example
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_psfmatch_Purpose   Description
+@section ip_diffim_psfmatch_Purpose   Description
 
 PsfMatchTask is a base class that implements the core functionality for matching the
 Psfs of two images using a spatially varying Psf-matching lsst.afw.math.LinearCombinationKernel.
@@ -559,13 +557,13 @@ lsst.afw.math.Kernel.SpatialFunction.
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_psfmatch_Initialize    Task initialization
+@ection ip_diffim_psfmatch_Initialize    Task initialization
 
-\copydoc \_\_init\_\_
+@copydoc \_\_init\_\_
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_psfmatch_IO        Invoking the Task
+@section ip_diffim_psfmatch_IO        Invoking the Task
 
 As a base class, this Task is not directly invoked.  However, run() methods that are
 implemented on derived classes will make use of the core _solve() functionality,
@@ -582,64 +580,64 @@ modifies the Task metadata.
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_psfmatch_Config       Configuration parameters
+@section ip_diffim_psfmatch_Config       Configuration parameters
 
-See \ref PsfMatchConfig, \ref PsfMatchConfigAL, \ref PsfMatchConfigDF, and \ref DetectionConfig.
+See @ref PsfMatchConfig, @ref PsfMatchConfigAL, @ref PsfMatchConfigDF, and @ref DetectionConfig.
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_psfmatch_Metadata   Quantities set in Metadata
+@section ip_diffim_psfmatch_Metadata   Quantities set in Metadata
 
 
 <DL>
 <DT> spatialConditionNum <DD> Condition number of the spatial kernel fit;
-    via \link lsst.ip.diffim.PsfMatchTask._diagnostic PsfMatchTask._diagnostic \endlink </DD> </DT>
+    via @link lsst.ip.diffim.PsfMatchTask._diagnostic PsfMatchTask._diagnostic @endlink </DD> </DT>
 <DT> spatialKernelSum <DD> Kernel sum (10^{-0.4 * &Delta; zeropoint}) of the spatial Psf-matching kernel;
-    via \link lsst.ip.diffim.PsfMatchTask._diagnostic PsfMatchTask._diagnostic \endlink </DD> </DT>
+    via @link lsst.ip.diffim.PsfMatchTask._diagnostic PsfMatchTask._diagnostic @endlink </DD> </DT>
 
 <DT> ALBasisNGauss <DD> If using sum-of-Gaussian basis, the number of gaussians used;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
-    generateAlardLuptonBasisList\endlink </DD> </DT>
+    via @link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
+    generateAlardLuptonBasisList@endlink </DD> </DT>
 <DT> ALBasisDegGauss <DD> If using sum-of-Gaussian basis, the degree of spatial variation of the Gaussians;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
-    generateAlardLuptonBasisList\endlink </DD> </DT>
+    via @link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
+    generateAlardLuptonBasisList@endlink </DD> </DT>
 <DT> ALBasisSigGauss <DD> If using sum-of-Gaussian basis, the widths (sigma) of the Gaussians;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
-    generateAlardLuptonBasisList\endlink </DD> </DT>
+    via @link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
+    generateAlardLuptonBasisList@endlink </DD> </DT>
 <DT> ALKernelSize <DD> If using sum-of-Gaussian basis, the kernel size;
-    via \link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
-    generateAlardLuptonBasisList\endlink </DD> </DT>
+    via @link lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList
+    generateAlardLuptonBasisList@endlink </DD> </DT>
 
 <DT> NFalsePositivesTotal <DD> Total number of diaSources;
-    via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
+    via @link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate@endlink </DD> </DT>
 <DT> NFalsePositivesRefAssociated <DD> Number of diaSources that associate with the reference catalog;
-    via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
+    via @link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate@endlink </DD> </DT>
 <DT> NFalsePositivesRefAssociated <DD> Number of diaSources that associate with the source catalog;
-    via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
+    via @link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate@endlink </DD> </DT>
 <DT> NFalsePositivesUnassociated <DD> Number of diaSources that are orphans;
-    via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
+    via @link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate@endlink </DD> </DT>
 <DT> metric_MEAN <DD> Mean value of substamp diffim quality metrics across all KernelCandidates,
     for both the per-candidate (LOCAL) and SPATIAL residuals;
-    via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
+    via @link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate@endlink </DD> </DT>
 <DT> metric_MEDIAN <DD> Median value of substamp diffim quality metrics across all KernelCandidates,
     for both the per-candidate (LOCAL) and SPATIAL residuals;
-    via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
+    via @link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate@endlink </DD> </DT>
 <DT> metric_STDEV <DD> Standard deviation of substamp diffim quality metrics across all KernelCandidates,
     for both the per-candidate (LOCAL) and SPATIAL residuals;
-    via \link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate\endlink </DD> </DT>
+    via @link lsst.ip.diffim.KernelCandidateQa.aggregate KernelCandidateQa.aggregate@endlink </DD> </DT>
 </DL>
 
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_psfmatch_Debug     Debug variables
+@section ip_diffim_psfmatch_Debug     Debug variables
 
 
-The \link lsst.pipe.base.cmdLineTask.CmdLineTask command line task\endlink interface supports a
-flag \c -d/--debug to import \b debug.py from your \c PYTHONPATH.  The relevant contents of debug.py
+The @link lsst.pipe.base.cmdLineTask.CmdLineTask command line task@endlink interface supports a
+flag @c -d/--debug to import @b debug.py from your @c PYTHONPATH.  The relevant contents of debug.py
 for this Task include:
 
-\code{.py}
+@code{.py}
     import sys
     import lsstDebug
     def DebugInfo(name):
@@ -656,22 +654,22 @@ for this Task include:
     lsstDebug.Info = DebugInfo
     lsstDebug.frame = 1
 
-\endcode
+@endcode
 
 Note that if you want addional logging info, you may add to your scripts:
-\code{.py}
+@code{.py}
 import lsst.log.utils as logUtils
 logUtils.traceSetAt("ip.diffim", 4)
-\endcode
+@endcode
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-\section ip_diffim_psfmatch_Example   Example code
+@section ip_diffim_psfmatch_Example   Example code
 
 As a base class, there is no example code for PsfMatchTask.
-However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchTask\endlink,
-\link lsst.ip.diffim.snapPsfMatch.SnapPsfMatchTask SnapPsfMatchTask\endlink, and
-\link lsst.ip.diffim.modelPsfMatch.ModelPsfMatchTask ModelPsfMatchTask\endlink.
+However, see @link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchTask@endlink,
+@link lsst.ip.diffim.snapPsfMatch.SnapPsfMatchTask SnapPsfMatchTask@endlink, and
+@link lsst.ip.diffim.modelPsfMatch.ModelPsfMatchTask ModelPsfMatchTask@endlink.
 
 #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -682,8 +680,8 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
     def __init__(self, *args, **kwargs):
         """!Create the psf-matching Task
 
-        \param *args arguments to be passed to lsst.pipe.base.task.Task.__init__
-        \param **kwargs keyword arguments to be passed to lsst.pipe.base.task.Task.__init__
+        @param *args arguments to be passed to lsst.pipe.base.task.Task.__init__
+        @param **kwargs keyword arguments to be passed to lsst.pipe.base.task.Task.__init__
 
         The initialization sets the Psf-matching kernel configuration using the value of
         self.config.kernel.active.  If the kernel is requested with regularization to moderate
@@ -808,31 +806,31 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         ds9.setMaskTransparency(maskTransparency)
 
         if displayCandidates:
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground,
+            diutils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground,
                                          frame=lsstDebug.frame,
                                          showBadCandidates=showBadCandidates)
             lsstDebug.frame += 1
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground,
+            diutils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground,
                                          frame=lsstDebug.frame,
                                          showBadCandidates=showBadCandidates,
                                          kernels=True)
             lsstDebug.frame += 1
-            diUtils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground,
+            diutils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground,
                                          frame=lsstDebug.frame,
                                          showBadCandidates=showBadCandidates,
                                          resids=True)
             lsstDebug.frame += 1
 
         if displayKernelBasis:
-            diUtils.showKernelBasis(spatialKernel, frame=lsstDebug.frame)
+            diutils.showKernelBasis(spatialKernel, frame=lsstDebug.frame)
             lsstDebug.frame += 1
 
         if displayKernelMosaic:
-            diUtils.showKernelMosaic(kernelCellSet.getBBox(), spatialKernel, frame=lsstDebug.frame)
+            diutils.showKernelMosaic(kernelCellSet.getBBox(), spatialKernel, frame=lsstDebug.frame)
             lsstDebug.frame += 1
 
         if plotKernelSpatialModel:
-            diUtils.plotKernelSpatialModel(spatialKernel, kernelCellSet, showBadCandidates=showBadCandidates)
+            diutils.plotKernelSpatialModel(spatialKernel, kernelCellSet, showBadCandidates=showBadCandidates)
 
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
         """!Create Principal Component basis
@@ -1054,5 +1052,6 @@ However, see \link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask ImagePsfMatchT
         self._diagnostic(kernelCellSet, spatialSolution, spatialKernel, spatialBackground)
 
         return spatialSolution, spatialKernel, spatialBackground
+
 
 PsfMatch = PsfMatchTask

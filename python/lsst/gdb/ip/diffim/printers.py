@@ -1,9 +1,6 @@
-from __future__ import absolute_import, division, print_function
 
 import gdb
 import sys
-
-from builtins import object
 
 try:
     import gdb.printing

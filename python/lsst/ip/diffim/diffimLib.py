@@ -19,7 +19,6 @@
 # the GNU General Public License along with this program.  If not,
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 
 # C++ wrapper
 # hoist symbols lsst.ip.diffim.detail up into lsst.ip.diffim

@@ -1,4 +1,3 @@
-from builtins import range
 import lsst.ip.diffim as ipDiffim
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -19,10 +18,6 @@ logUtils.traceSetAt("ip.diffim", verbosity)
 
 
 def makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot=False):
-    kImage = afwImage.ImageD(spatialKernel.getDimensions())
-    ksImage = afwImage.ImageD(spatialKernel.getDimensions())
-    kInfo = []
-
     candList = []
     for cell in kernelCellSet.getCellList():
         for cand in cell.begin(True):  # only look at non-bad candidates
@@ -173,7 +168,7 @@ def testAutoCorrelation(orderMake, orderFit, inMi=None, display=False):
 
     stride = 100
 
-    if inMi == None:
+    if inMi is None:
         width = 512
         height = 2048
         inMi = afwImage.MaskedImageF(afwGeom.Extent2I(width, height))
@@ -227,9 +222,7 @@ def testAutoCorrelation(orderMake, orderFit, inMi=None, display=False):
     psfmatch = ipDiffim.ImagePsfMatchTask(config=config)
     result = psfmatch.run(inMi, cMi, "subtractMaskedImages")
 
-    differenceMaskedImage = result.subtractedImage
     spatialKernel = result.psfMatchingKernel
-    spatialBg = result.backgroundModel
     kernelCellSet = result.kernelCellSet
     makeAutoCorrelation(kernelCellSet, spatialKernel, makePlot=True)
 

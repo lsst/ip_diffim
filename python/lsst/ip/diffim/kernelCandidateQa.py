@@ -19,12 +19,9 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 
 __all__ = ["KernelCandidateQa"]
 
-from builtins import zip
-from builtins import object
 import numpy as np
 import numpy.ma as ma
 
@@ -49,8 +46,9 @@ class KernelCandidateQa(object):
         @param nKernelSpatial : Number of terms in the spatial model; needed to initialize per-basis QA arrays
         """
         self.fields = []
-        self.fields.append(afwTable.Field["PointD"]("RegisterRefPosition",
-                                                    "Position of reference object for registration (radians)."))
+        self.fields.append(afwTable.Field["PointD"](
+            "RegisterRefPosition",
+            "Position of reference object for registration (radians)."))
         # TODO check units of the following angles
         self.fields.append(afwTable.Field["Angle"]("RegisterResidualBearing",
                                                    "Angle of residual wrt declination parallel in radians"))
@@ -84,23 +82,25 @@ class KernelCandidateQa(object):
                     'KCKernelCentY_%s', 'KCKernelStdX_%s', 'KCKernelStdY_%s', 'KernelCandidateId_%s']
         typeList = ['F', 'F', 'F', 'F', 'F', 'F', 'F', 'ArrayD', 'ArrayD', 'F', 'F', 'F',
                     'F', 'F', 'F', 'I']
-        commentList = [("Mean of KernelCandidate diffim", "sigma"),
-                       ("Median of KernelCandidate diffim", "sigma"),
-                       ("Inner quartile range of KernelCandidate diffim", "sigma"),
-                       ("Standard deviation of KernelCandidate diffim", "sigma"),
-                       ("D from K-S test of diffim pixels relative to Normal", ),
-                       ("Prob from K-S test of diffim pixels relative to Normal", "likelihood"),
-                       ("Anderson-Darling test statistic of diffim pixels relative to Normal", ),
-                       ("Critical values for the significance levels in KCDiffimADSig.  If A2 is greater " +
-                        "than this number, hypothesis that the distributions are similar can be rejected.", 5),
-                       ("Anderson-Darling significance levels for the Normal distribution", 5),
-                       ("Reduced chi^2 of the residual.", "likelihood"),
-                       ("Mean squared error in diffim : Variance + Bias**2",),
-                       ("Centroid in X for this Kernel", "pixel"),
-                       ("Centroid in Y for this Kernel", "pixel"),
-                       ("Standard deviation in X for this Kernel", "pixel"),
-                       ("Standard deviation in Y for this Kernel", "pixel"),
-                       ("Id for this KernelCandidate",)]
+        commentList = [
+            ("Mean of KernelCandidate diffim", "sigma"),
+            ("Median of KernelCandidate diffim", "sigma"),
+            ("Inner quartile range of KernelCandidate diffim", "sigma"),
+            ("Standard deviation of KernelCandidate diffim", "sigma"),
+            ("D from K-S test of diffim pixels relative to Normal", ),
+            ("Prob from K-S test of diffim pixels relative to Normal", "likelihood"),
+            ("Anderson-Darling test statistic of diffim pixels relative to Normal", ),
+            ("Critical values for the significance levels in KCDiffimADSig.  If A2 is greater " +
+             "than this number, hypothesis that the distributions are similar can be rejected.", 5),
+            ("Anderson-Darling significance levels for the Normal distribution", 5),
+            ("Reduced chi^2 of the residual.", "likelihood"),
+            ("Mean squared error in diffim : Variance + Bias**2",),
+            ("Centroid in X for this Kernel", "pixel"),
+            ("Centroid in Y for this Kernel", "pixel"),
+            ("Standard deviation in X for this Kernel", "pixel"),
+            ("Standard deviation in Y for this Kernel", "pixel"),
+            ("Id for this KernelCandidate",),
+        ]
         metricMap = {}
         for name, mtype, comment in zip(nameList, typeList, commentList):
             metricMap[name] = {'type': mtype, 'comment': comment}

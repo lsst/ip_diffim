@@ -19,10 +19,7 @@
 # the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
-from __future__ import absolute_import, division, print_function
 
-from builtins import input
-from builtins import object
 import numpy as np
 
 from lsst.afw.table import SourceCatalog
@@ -103,12 +100,12 @@ class CheckSource(object):
             return False
         return True
 
-## \addtogroup LSST_task_documentation
-## \{
-## \page DiaCatalogSourceSelectorTask
-## \ref DiaCatalogSourceSelectorTask_ "DiaCatalogSourceSelectorTask"
-## \copybrief DiaCatalogSourceSelectorTask
-## \}
+## @addtogroup LSST_task_documentation
+## @{
+## @page DiaCatalogSourceSelectorTask
+## @ref DiaCatalogSourceSelectorTask_ "DiaCatalogSourceSelectorTask"
+## @copybrief DiaCatalogSourceSelectorTask
+## @}
 
 
 class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
@@ -259,5 +256,6 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
         return Struct(
             starCat=starCat,
         )
+
 
 measAlg.starSelectorRegistry.register("diacatalog", DiaCatalogSourceSelectorTask)

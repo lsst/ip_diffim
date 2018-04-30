@@ -1,6 +1,3 @@
-from __future__ import absolute_import, division, print_function
-from future import standard_library
-standard_library.install_aliases()
 #
 # LSST Data Management System
 # Copyright 2016 AURA/LSST.
@@ -25,7 +22,6 @@ standard_library.install_aliases()
 
 import numpy as np
 import abc
-from future.utils import with_metaclass
 
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
@@ -82,13 +78,14 @@ implemented `reduceOperation` is 'none', in which case the
 `mapperResults` list is simply returned directly.
 """
 
+
 class ImageMapperConfig(pexConfig.Config):
     """Configuration parameters for ImageMapper
     """
     pass
 
 
-class ImageMapper(with_metaclass(abc.ABCMeta, pipeBase.Task)):
+class ImageMapper(pipeBase.Task, metaclass=abc.ABCMeta):
     """Abstract base class for any task that is to be
     used as `ImageMapReduceConfig.mapper`.
 
@@ -483,12 +480,12 @@ class ImageMapReduceConfig(pexConfig.Config):
     )
 
 
-## \addtogroup LSST_task_documentation
-## \{
-## \page ImageMapReduceTask
-## \ref ImageMapReduceTask_ "ImageMapReduceTask"
+## @addtogroup LSST_task_documentation
+## @{
+## @page ImageMapReduceTask
+## @ref ImageMapReduceTask_ "ImageMapReduceTask"
 ##      Task for performing operations on an image over a regular-spaced grid
-## \}
+## @}
 
 
 class ImageMapReduceTask(pipeBase.Task):

@@ -26,7 +26,6 @@
 #include <string>
 
 #include <Eigen/Core>
-#include "numpy/arrayobject.h"
 #include "ndarray/pybind11.h"
 
 #include "lsst/afw/math.h"
@@ -77,12 +76,6 @@ PYBIND11_PLUGIN(buildSpatialKernelVisitor) {
     py::module::import("lsst.pex.policy");
 
     py::module mod("buildSpatialKernelVisitor");
-
-    // Need to import numpy for ndarray and eigen conversions
-    if (_import_array() < 0) {
-        PyErr_SetString(PyExc_ImportError, "numpy.core.multiarray failed to import");
-        return nullptr;
-    }
 
     declareBuildSpatialKernelVisitor<float>(mod, "F");
 
