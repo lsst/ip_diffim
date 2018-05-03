@@ -19,7 +19,7 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
-__all__ = ["ImagePsfMatchConfig", "ImagePsfMatchTask"]
+__all__ = ["ImagePsfMatchConfig", "ImagePsfMatchTask", "subtractAlgorithmRegistry"]
 
 import numpy as np
 
