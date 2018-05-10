@@ -37,7 +37,7 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
         schema = afwTable.SourceTable.makeMinimalSchema()
         schema.addField("test_flux", type=float)
         schema.addField("test_fluxSigma", type=float)
-        self.sourceSelector = ipDiffim.DiaCatalogSourceSelectorTask(schema=schema)
+        self.sourceSelector = ipDiffim.DiaCatalogSourceSelectorTask()
         for flag in self.sourceSelector.config.badFlags:
             schema.addField(flag, type="Flag")
         table = afwTable.SourceTable.make(schema)
@@ -89,17 +89,17 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
         refCat = self.makeRefCatalog()
 
         matches = self.makeMatches(refCat, self.srcCat, nSrc)
-        sources = self.sourceSelector.selectStars(self.exposure, self.srcCat, matches).starCat
+        sources = self.sourceSelector.run(self.srcCat, matches=matches, exposure=self.exposure).sourceCat
         self.assertEqual(len(sources), nSrc)
 
         # Set one of the source flags to be bad
         matches[0].second.set(self.sourceSelector.config.badFlags[0], True)
-        sources = self.sourceSelector.selectStars(self.exposure, self.srcCat, matches).starCat
+        sources = self.sourceSelector.run(self.srcCat, matches=matches, exposure=self.exposure).sourceCat
         self.assertEqual(len(sources), nSrc-1)
 
         # Set one of the ref flags to be bad
         matches[1].first.set("photometric", False)
-        sources = self.sourceSelector.selectStars(self.exposure, self.srcCat, matches).starCat
+        sources = self.sourceSelector.run(self.srcCat, matches=matches, exposure=self.exposure).sourceCat
         self.assertEqual(len(sources), nSrc-2)
 
         # Set one of the colors to be bad
@@ -108,13 +108,13 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
         gFluxField = getRefFluxField(refCat.schema, "g")
         gFlux = 10**(-0.4 * (grMin - 0.1)) * matches[2].first.get(rFluxField)
         matches[2].first.set(gFluxField, gFlux)
-        sources = self.sourceSelector.selectStars(self.exposure, self.srcCat, matches).starCat
+        sources = self.sourceSelector.run(self.srcCat, matches=matches, exposure=self.exposure).sourceCat
         self.assertEqual(len(sources), nSrc-3)
 
         # Set one of the types to be bad
         if self.sourceSelector.config.selectStar and not self.sourceSelector.config.selectGalaxy:
             matches[3].first.set("resolved", True)
-            sources = self.sourceSelector.selectStars(self.exposure, self.srcCat, matches).starCat
+            sources = self.sourceSelector.run(self.srcCat, matches=matches, exposure=self.exposure).sourceCat
             self.assertEqual(len(sources), nSrc-4)
 
 
