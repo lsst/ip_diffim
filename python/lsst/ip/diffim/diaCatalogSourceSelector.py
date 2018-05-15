@@ -22,7 +22,6 @@
 
 import numpy as np
 
-from lsst.afw.table import SourceCatalog
 from lsst.pipe.base import Struct
 import lsst.pex.config as pexConfig
 import lsst.afw.display.ds9 as ds9
@@ -108,7 +107,8 @@ class CheckSource(object):
 ## @}
 
 
-class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
+@pexConfig.registerConfigurable("diaCatalog", measAlg.sourceSelectorRegistry)
+class DiaCatalogSourceSelectorTask(measAlg.BaseSourceSelectorTask):
     """!Select sources for Kernel candidates
 
     @anchor DiaCatalogSourceSelectorTask_
@@ -166,16 +166,27 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
     ConfigClass = DiaCatalogSourceSelectorConfig
     usesMatches = True  # selectStars uses (requires) its matches argument
 
-    def selectStars(self, exposure, sourceCat, matches=None):
-        """Select sources for Kernel candidates
+    def selectSources(self, sourceCat, matches=None, exposure=None):
+        """Return a selection of sources for Kernel candidates.
 
-        @param[in] exposure  the exposure containing the sources
-        @param[in] sourceCat  catalog of sources that may be stars (an lsst.afw.table.SourceCatalog)
-        @param[in] matches  a match vector as produced by meas_astrom; required
-                            (defaults to None to match the StarSelector API and improve error handling)
+        Parameters:
+        -----------
+        sourceCat : `lsst.afw.table.SourceCatalog`
+            Catalog of sources to select from.
+            This catalog must be contiguous in memory.
+        matches : `list` of `lsst.afw.table.ReferenceMatch`
+             A match vector as produced by meas_astrom.
+        exposure : `lsst.afw.image.Exposure` or None
+            The exposure the catalog was built from; used for debug display.
 
-        @return an lsst.pipe.base.Struct containing:
-        - starCat  a list of sources to be used as kernel candidates
+        Return
+        ------
+        struct : `lsst.pipe.base.Struct`
+            The struct contains the following data:
+
+            - selected : `array` of `bool``
+                Boolean array of sources that were selected, same length as
+                sourceCat.
         """
         import lsstDebug
         display = lsstDebug.Info(__name__).display
@@ -195,10 +206,8 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
         #
         isGoodSource = CheckSource(sourceCat, self.config.fluxLim, self.config.fluxMax, self.config.badFlags)
 
-        #
         # Go through and find all the acceptable candidates in the catalogue
-        #
-        starCat = SourceCatalog(sourceCat.schema)
+        selected = np.zeros(len(sourceCat), dtype=bool)
 
         if display and displayExposure:
             symbs = []
@@ -209,7 +218,7 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
         refSchema = matches[0][0].schema
         rRefFluxField = measAlg.getRefFluxField(refSchema, "r")
         gRefFluxField = measAlg.getRefFluxField(refSchema, "g")
-        for ref, source, d in matches:
+        for i, (ref, source, d) in enumerate(matches):
             if not isGoodSource(source):
                 if display and displayExposure:
                     symbs.append("+")
@@ -233,7 +242,7 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
                 isRightType = (self.config.selectStar and isStar) or (self.config.selectGalaxy and not isStar)
                 isRightVar = (self.config.includeVariable) or (self.config.includeVariable is isVar)
                 if isRightType and isRightVar and isRightColor:
-                    starCat.append(source)
+                    selected[i] = True
                     if display and displayExposure:
                         symbs.append("+")
                         ctypes.append(ds9.GREEN)
@@ -253,9 +262,4 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseStarSelectorTask):
             if pauseAtEnd:
                 input("Continue? y[es] p[db] ")
 
-        return Struct(
-            starCat=starCat,
-        )
-
-
-measAlg.starSelectorRegistry.register("diacatalog", DiaCatalogSourceSelectorTask)
+        return Struct(selected=selected)
