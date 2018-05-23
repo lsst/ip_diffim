@@ -52,7 +52,7 @@ def generateFakeWcs(offset=0):
     metadata.set("NAXIS", 2)
     metadata.set("NAXIS1", 425)
     metadata.set("NAXIS2", 425)
-    metadata.set("RADECSYS", 'FK5')
+    metadata.set("RADESYS", 'FK5')
     metadata.set("EQUINOX", 2000.)
     metadata.setDouble("CRVAL1", 215.604025685476)
     metadata.setDouble("CRVAL2", 53.1595451514076)
