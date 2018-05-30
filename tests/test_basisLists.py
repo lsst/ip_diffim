@@ -49,9 +49,9 @@ class DiffimTestCases(unittest.TestCase):
                 for rowk in range(self.kSize):
                     for coll in range(self.kSize):
                         if (rowi == rowk) and (colj == coll):
-                            self.assertEqual(kimage.get(coll, rowk), 1.)
+                            self.assertEqual(kimage[coll, rowk, afwImage.LOCAL], 1.)
                         else:
-                            self.assertEqual(kimage.get(coll, rowk), 0.)
+                            self.assertEqual(kimage[coll, rowk, afwImage.LOCAL], 0.)
                 nk += 1
 
     def testMakeDeltaFunction(self):

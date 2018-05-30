@@ -141,7 +141,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.assertAlmostEqual(ksum1, ksum2, delta=1e-5)
             for y in range(kim1.getHeight()):
                 for x in range(kim1.getHeight()):
-                    self.assertAlmostEqual(kim1.get(x, y), kim2.get(x, y), delta=1e-1)
+                    self.assertAlmostEqual(kim1[x, y, afwImage.LOCAL], kim2[x, y, afwImage.LOCAL],
+                                           delta=1e-1)
 
             # Nterms (zeroth order)
             self.assertEqual(backgroundModel1.getNParameters(), 1)
@@ -222,7 +223,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 im2 = cand2.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
                 for y in range(im1.getHeight()):
                     for x in range(im1.getWidth()):
-                        self.assertAlmostEqual(im1.get(x, y), im2.get(x, y), delta=1e-7)
+                        self.assertAlmostEqual(im1[x, y, afwImage.LOCAL], im2[x, y, afwImage.LOCAL],
+                                               delta=1e-7)
 
         # Spatial fits are the same
         skp1 = spatialKernel1.getSpatialParameters()

@@ -138,9 +138,9 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     tim = afwImage.ImageF(afwGeom.Extent2I(totalSize, totalSize))
     for x in range(nCell):
         for y in range(nCell):
-            tim.set(x*sizeCell + sizeCell//2 + border - 1,
-                    y*sizeCell + sizeCell//2 + border - 1,
-                    deltaFunctionCounts)
+            tim[x*sizeCell + sizeCell//2 + border - 1,
+                y*sizeCell + sizeCell//2 + border - 1,
+                afwImage.LOCAL] = deltaFunctionCounts
 
     # Turn this into stars with a narrow width; conserve counts
     gaussFunction = afwMath.GaussianFunction2D(tGaussianWidth, tGaussianWidth)

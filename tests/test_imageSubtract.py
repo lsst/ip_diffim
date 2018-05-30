@@ -90,7 +90,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # image is empty (or the additional background you subtracted off)
         for j in range(diffIm2.getHeight()):
             for i in range(diffIm2.getWidth()):
-                self.assertAlmostEqual(diffIm2.getImage().get(i, j), -1.*bgVal, 3)
+                self.assertAlmostEqual(diffIm2.image[i, j, afwImage.LOCAL], -1.*bgVal, 3)
 
     def runConvolveAndSubtract2(self, bgOrder=0, xloc=408, yloc=580):
         imsize = int(5 * self.kSize)
@@ -108,7 +108,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         diffIm2 = afwImage.MaskedImageF(diffIm, bbox, origin=afwImage.LOCAL)
         for j in range(diffIm2.getHeight()):
             for i in range(diffIm2.getWidth()):
-                self.assertAlmostEqual(diffIm2.getImage().get(i, j), 0., 4)
+                self.assertAlmostEqual(diffIm2.image[i, j, afwImage.LOCAL], 0., 4)
 
     @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testConvolveAndSubtract(self):
