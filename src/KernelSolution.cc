@@ -559,22 +559,22 @@ namespace diffim {
         ndarray::Array<int, 1, 1> maskArray =
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
         fullFp->getSpans()->flatten(maskArray, finalMask.getArray(), templateImage.getXY0());
-        ndarray::EigenView<int, 1, 1> maskEigen(maskArray);
+        auto maskEigen = maskArray.asEigen();
 
         ndarray::Array<InputT, 1, 1> arrayTemplate =
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
         fullFp->getSpans()->flatten(arrayTemplate, templateImage.getArray(), templateImage.getXY0());
-        ndarray::EigenView<InputT, 1, 1> eigenTemplate0(arrayTemplate);
+        auto eigenTemplate0 = arrayTemplate.asEigen();
 
         ndarray::Array<InputT, 1, 1> arrayScience =
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
         fullFp->getSpans()->flatten(arrayScience, scienceImage.getArray(), scienceImage.getXY0());
-        ndarray::EigenView<InputT, 1, 1> eigenScience0(arrayScience);
+        auto eigenScience0 = arrayScience.asEigen();
 
         ndarray::Array<afwImage::VariancePixel, 1, 1> arrayVariance =
             ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
         fullFp->getSpans()->flatten(arrayVariance, varianceEstimate.getArray(), varianceEstimate.getXY0());
-        ndarray::EigenView<afwImage::VariancePixel, 1, 1> eigenVariance0(arrayVariance);
+        auto eigenVariance0 = arrayVariance.asEigen();
 
         int nGood = 0;
         for (int i = 0; i < maskEigen.size(); i++) {
@@ -619,7 +619,7 @@ namespace diffim {
             ndarray::Array<InputT, 1, 1> arrayC =
                 ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
             fullFp->getSpans()->flatten(arrayC, cimage.getArray(), cimage.getXY0());
-            ndarray::EigenView<InputT, 1, 1> eigenC0(arrayC);
+            auto eigenC0 = arrayC.asEigen();
 
             Eigen::VectorXd eigenC(nGood);
             int nUsed = 0;
