@@ -10,6 +10,8 @@ config.log
 *.pyc
 *.py~
 .cache
+.pytest_cache
+.coverage
 pytest_session.txt
 doc/html
 doc/xml
