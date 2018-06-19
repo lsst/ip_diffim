@@ -40,8 +40,8 @@ for kSize in kSizes:
         results = task.run(parsedCmd.dataRefList[0])
 
         try:
-            kSum = task.subtract.metadata.get("spatialKernelSum")
-            cNum = task.subtract.metadata.get("spatialConditionNum")
+            kSum = task.subtract.metadata.getScalar("spatialKernelSum")
+            cNum = task.subtract.metadata.getScalar("spatialConditionNum")
         except Exception:
             kSums.append(np.inf)
             cNums.append(np.inf)
