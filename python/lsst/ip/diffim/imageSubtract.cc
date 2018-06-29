@@ -20,8 +20,8 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
+#include "pybind11/eigen.h"
 
-#include "Eigen/Core"
 #include "ndarray/pybind11.h"
 
 #include "lsst/afw/image/Image.h"
