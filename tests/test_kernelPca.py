@@ -32,10 +32,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def makeCandidate(self, kSum, x, y, size=51):
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
         mi1.getVariance().set(1.0)  # avoid NaNs
-        mi1.set(size//2, size//2, (1, 0x0, 1))
+        mi1[size//2, size//2, afwImage.LOCAL] = (1, 0x0, 1)
         mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
         mi2.getVariance().set(1.0)  # avoid NaNs
-        mi2.set(size//2, size//2, (kSum, 0x0, kSum))
+        mi2[size//2, size//2, afwImage.LOCAL] = (kSum, 0x0, kSum)
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
 
@@ -93,7 +93,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         pcaBasisList1[0].computeImage(kImageM, False)
         for y in range(kRefIm.getHeight()):
             for x in range(kRefIm.getWidth()):
-                self.assertLess(abs(kRefIm.get(x, y) - kImageM.get(x, y)) / kRefIm.get(x, y), 0.2)
+                self.assertLess(abs(kRefIm[x, y, afwImage.LOCAL] - kImageM[x, y, afwImage.LOCAL]) /
+                                kRefIm[x, y, afwImage.LOCAL], 0.2)
 
         # First mean-unsubtracted Pca kernel close to kRefIm (normalized to peak of 1.0)
         kImage0 = afwImage.ImageD(gaussKernel.getDimensions())
@@ -102,7 +103,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kRefIm /= maxVal
         for y in range(kRefIm.getHeight()):
             for x in range(kRefIm.getWidth()):
-                self.assertLess(abs(kRefIm.get(x, y) - kImage0.get(x, y)) / kRefIm.get(x, y), 0.2)
+                self.assertLess(abs(kRefIm[x, y, afwImage.LOCAL] - kImage0[x, y, afwImage.LOCAL]) /
+                                kRefIm[x, y, afwImage.LOCAL], 0.2)
 
     def testImagePca(self):
         # Test out the ImagePca behavior
@@ -193,9 +195,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         for y in range(rows):
             for x in range(cols):
                 if x == cols // 2 and y == rows // 2:
-                    self.assertAlmostEqual(imageMean.get(x, y), 1.0)
+                    self.assertAlmostEqual(imageMean[x, y, afwImage.LOCAL], 1.0)
                 else:
-                    self.assertAlmostEqual(imageMean.get(x, y), 0.0)
+                    self.assertAlmostEqual(imageMean[x, y, afwImage.LOCAL], 0.0)
 
     def testVisit(self, nCell=3):
         imagePca = ipDiffim.KernelPcaD()

@@ -30,10 +30,10 @@ class DiffimTestCases(unittest.TestCase):
     def makeCandidate(self, kSum, x, y):
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
         mi1.getVariance().set(1.0)  # avoid NaNs
-        mi1.set(self.size//2, self.size//2, (1, 0x0, 1))
+        mi1[self.size//2, self.size//2, afwImage.LOCAL] = (1, 0x0, 1)
         mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
         mi2.getVariance().set(1.0)  # avoid NaNs
-        mi2.set(self.size//2, self.size//2, (kSum, 0x0, kSum))
+        mi2[self.size//2, self.size//2, afwImage.LOCAL] = (kSum, 0x0, kSum)
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
 
         return kc
@@ -199,11 +199,11 @@ class DiffimTestCases(unittest.TestCase):
         # bogus candidate
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
         mi1.getVariance().set(0.1)
-        mi1.set(self.size//2, self.size//2, (1, 0x0, 1))
+        mi1[self.size//2, self.size//2, afwImage.LOCAL] = (1, 0x0, 1)
         mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
         mi2.getVariance().set(0.1)
         # make it high enough to make the mean resids large
-        mi2.set(self.size//3, self.size//3, (self.size**2, 0x0, 1))
+        mi2[self.size//3, self.size//3, afwImage.LOCAL] = (self.size**2, 0x0, 1)
         kc4 = ipDiffim.makeKernelCandidate(0, 0, mi1, mi2, self.policy)
         self.assertEqual(kc4.getStatus(), afwMath.SpatialCellCandidate.UNKNOWN)
 

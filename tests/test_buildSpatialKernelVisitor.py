@@ -32,10 +32,10 @@ class DiffimTestCases(unittest.TestCase):
     def makeCandidate(self, kSum, x, y):
         mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
         mi1.getVariance().set(1.0)  # avoid NaNs
-        mi1.set(self.size//2, self.size//2, (1, 0x0, 1))
+        mi1[self.size//2, self.size//2, afwImage.LOCAL] = (1, 0x0, 1)
         mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
         mi2.getVariance().set(1.0)  # avoid NaNs
-        mi2.set(self.size//2, self.size//2, (kSum, 0x0, kSum))
+        mi2[self.size//2, self.size//2, afwImage.LOCAL] = (kSum, 0x0, kSum)
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
         return kc
 

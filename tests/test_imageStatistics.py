@@ -50,7 +50,7 @@ class DiffimTestCases(unittest.TestCase):
         mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
-                mi.set(i, j, (numArray[j][i], 0x0, 0))
+                mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 0)
 
         # inverse variance weight of 0 is NaN
         imstat = ipDiffim.ImageStatisticsF(self.policy)
@@ -66,7 +66,7 @@ class DiffimTestCases(unittest.TestCase):
         mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
-                mi.set(i, j, (numArray[j][i], 0x0, 1))
+                mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 1)
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)
         imstat.apply(mi)
@@ -80,7 +80,7 @@ class DiffimTestCases(unittest.TestCase):
         mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
-                mi.set(i, j, (numArray[j][i], 0x0, 1))
+                mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 1)
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)
         imstat.apply(mi)
@@ -94,7 +94,7 @@ class DiffimTestCases(unittest.TestCase):
         mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
-                mi.set(i, j, (numArray[j][i], 0x0, 1))
+                mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 1)
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)
         imstat.apply(mi, core)
@@ -109,7 +109,7 @@ class DiffimTestCases(unittest.TestCase):
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
                 val = i + 2.3 * j
-                mi.set(i, j, (val, 0x0, 1))
+                mi[i, j, afwImage.LOCAL] = (val, 0x0, 1)
                 numArray[j][i] = val
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)
@@ -136,9 +136,9 @@ class DiffimTestCases(unittest.TestCase):
                 val = i + 2.3 * j
 
                 if i == 19:
-                    mi.set(i, j, (val, maskVal, 1))
+                    mi[i, j, afwImage.LOCAL] = (val, maskVal, 1)
                 else:
-                    mi.set(i, j, (val, 0x0, 1))
+                    mi[i, j, afwImage.LOCAL] = (val, 0x0, 1)
                     numArray[j][i] = val
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)
@@ -165,10 +165,10 @@ class DiffimTestCases(unittest.TestCase):
                 val = i + 2.3 * j
 
                 if i == 19:
-                    mi.set(i, j, (val, maskVal, 1))
+                    mi[i, j, afwImage.LOCAL] = (val, maskVal, 1)
                     numArray[j][i] = val
                 else:
-                    mi.set(i, j, (val, 0x0, 1))
+                    mi[i, j, afwImage.LOCAL] = (val, 0x0, 1)
                     numArray[j][i] = val
 
         imstat = ipDiffim.ImageStatisticsF(self.policy)

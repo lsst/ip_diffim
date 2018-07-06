@@ -102,9 +102,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             for i in range(kImage.getWidth()):
 
                 if (i == kImage.getWidth() // 2) and (j == kImage.getHeight() // 2):
-                    self.assertAlmostEqual(kImage.get(i, j), kSum, 5)
+                    self.assertAlmostEqual(kImage[i, j, afwImage.LOCAL], kSum, 5)
                 else:
-                    self.assertAlmostEqual(kImage.get(i, j), 0., 5)
+                    self.assertAlmostEqual(kImage[i, j, afwImage.LOCAL], 0., 5)
 
     @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testConstructor(self):
@@ -366,10 +366,11 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 # in the outskirts of the kernel, the ratio can get screwed because of low S/N
                 # e.g. 7.45817359824e-09 vs. 1.18062529402e-08
                 # in the guts of the kernel it should look closer
-                if kImageIn.get(i, j) > 1e-4:
+                if kImageIn[i, j, afwImage.LOCAL] > 1e-4:
                     # sigh, too bad this sort of thing fails..
                     # 0.99941584433815966 != 1.0 within 3 places
-                    self.assertAlmostEqual(kImageOut.get(i, j)/kImageIn.get(i, j), 1.0, 2)
+                    self.assertAlmostEqual(kImageOut[i, j, afwImage.LOCAL]/kImageIn[i, j, afwImage.LOCAL],
+                                           1.0, 2)
 
         # now repeat with noise added; decrease precision of comparison
         self.addNoise(smi2)
@@ -389,8 +390,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for j in range(kImageOut.getHeight()):
             for i in range(kImageOut.getWidth()):
-                if kImageIn.get(i, j) > 1e-2:
-                    self.assertAlmostEqual(kImageOut.get(i, j), kImageIn.get(i, j), 2)
+                if kImageIn[i, j, afwImage.LOCAL] > 1e-2:
+                    self.assertAlmostEqual(kImageOut[i, j, afwImage.LOCAL],
+                                           kImageIn[i, j, afwImage.LOCAL], 2)
 
     def testGaussian(self, imsize=50):
         # Convolve a delta function with a known gaussian; try to
@@ -408,7 +410,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         tmi = afwImage.MaskedImageF(afwGeom.Extent2I(tsize, tsize))
         tmi.set(0, 0x0, 1e-4)
         cpix = tsize // 2
-        tmi.set(cpix, cpix, (1, 0x0, 1))
+        tmi[cpix, cpix, afwImage.LOCAL] = (1, 0x0, 1)
 
         # science image
         smi = afwImage.MaskedImageF(tmi.getDimensions())
@@ -426,8 +428,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # make sure its a valid subregion!
         for j in range(tmi2.getHeight()):
             for i in range(tmi2.getWidth()):
-                self.assertEqual(tmi2.getMask().get(i, j), 0)
-                self.assertEqual(smi2.getMask().get(i, j), 0)
+                self.assertEqual(tmi2.mask[i, j, afwImage.LOCAL], 0)
+                self.assertEqual(smi2.mask[i, j, afwImage.LOCAL], 0)
 
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi2, smi2, self.policy)
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
@@ -441,7 +443,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         for j in range(kImageOut.getHeight()):
             for i in range(kImageOut.getWidth()):
-                self.assertAlmostEqual(kImageOut.get(i, j)/kImageIn.get(i, j), 1.0, 5)
+                self.assertAlmostEqual(kImageOut[i, j, afwImage.LOCAL]/kImageIn[i, j, afwImage.LOCAL],
+                                       1.0, 5)
 
     def testZeroVariance(self, imsize=50):
         gsize = self.policy.getInt("kernelSize")
@@ -450,10 +453,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         tmi = afwImage.MaskedImageF(afwGeom.Extent2I(tsize, tsize))
         tmi.set(0, 0x0, 1.0)
         cpix = tsize // 2
-        tmi.set(cpix, cpix, (1, 0x0, 0.0))
+        tmi[cpix, cpix, afwImage.LOCAL] = (1, 0x0, 0.0)
         smi = afwImage.MaskedImageF(afwGeom.Extent2I(tsize, tsize))
         smi.set(0, 0x0, 1.0)
-        smi.set(cpix, cpix, (1, 0x0, 0.0))
+        smi[cpix, cpix, afwImage.LOCAL] = (1, 0x0, 0.0)
 
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
         self.policy.set("constantVarianceWeighting", False)

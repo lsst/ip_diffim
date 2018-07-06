@@ -53,7 +53,7 @@ class DiffimTestCases(unittest.TestCase):
     def testGood(self):
         ti = afwImage.MaskedImageF(afwGeom.Extent2I(100, 100))
         ti.getVariance().set(0.1)
-        ti.set(50, 50, (1., 0x0, 1.))
+        ti[50, 50, afwImage.LOCAL] = (1., 0x0, 1.)
         sKernel = self.makeSpatialKernel(2)
         si = afwImage.MaskedImageF(ti.getDimensions())
         afwMath.convolve(si, ti, sKernel, True)
@@ -83,7 +83,7 @@ class DiffimTestCases(unittest.TestCase):
     def testBad(self):
         ti = afwImage.MaskedImageF(afwGeom.Extent2I(100, 100))
         ti.getVariance().set(0.1)
-        ti.set(50, 50, (1., 0x0, 1.))
+        ti[50, 50, afwImage.LOCAL] = (1., 0x0, 1.)
         sKernel = self.makeSpatialKernel(2)
         si = afwImage.MaskedImageF(ti.getDimensions())
         afwMath.convolve(si, ti, sKernel, True)

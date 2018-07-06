@@ -4,6 +4,7 @@ import unittest
 
 import lsst.utils.tests
 import lsst.utils
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -78,21 +79,20 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             for j in range(tmask.getHeight()):
                 for i in range(tmask.getWidth()):
                     # No masked pixels in either image
-                    self.assertEqual(tmask.get(i, j), 0)
-                    self.assertEqual(smask.get(i, j), 0)
+                    self.assertEqual(tmask[i, j, afwImage.LOCAL], 0)
+                    self.assertEqual(smask[i, j, afwImage.LOCAL], 0)
 
         # add a masked pixel to the template image and make sure you don't get it
-        afwImage.MaskedImageF(self.templateImage, fpList1[0].getBBox(), origin=afwImage.LOCAL).getMask().set(
-            tmask.getWidth()//2, tmask.getHeight()//2, maskVal)
+        tp = afwGeom.Point2I(tmask.getWidth()//2, tmask.getHeight()//2)
+        self.templateImage.mask[fpList1[0].getBBox(), afwImage.LOCAL][tp, afwImage.LOCAL] = maskVal
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList2 = kcDetect.getFootprints()
         self.assertEqual(len(fpList2), (len(fpList1)-1))
 
         # add a masked pixel to the science image and make sure you don't get it
-        afwImage.MaskedImageF(self.scienceImage, fpList1[1].getBBox(), origin=afwImage.LOCAL).getMask().set(
-            smask.getWidth()//2, smask.getHeight()//2, maskVal)
-        afwImage.MaskedImageF(self.scienceImage, fpList1[2].getBBox(), origin=afwImage.LOCAL).getMask().set(
-            smask.getWidth()//2, smask.getHeight()//2, maskVal)
+        sp = afwGeom.Point2I(smask.getWidth()//2, smask.getHeight()//2)
+        self.scienceImage.mask[fpList1[1].getBBox(), afwImage.LOCAL][sp, afwImage.LOCAL] = maskVal
+        self.scienceImage.mask[fpList1[2].getBBox(), afwImage.LOCAL][sp, afwImage.LOCAL] = maskVal
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList3 = kcDetect.getFootprints()
         self.assertEqual(len(fpList3), (len(fpList1)-3))

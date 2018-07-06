@@ -112,7 +112,7 @@ def makeTest3(doAddNoise):
     image3 = afwImage.ImageF(image1, True)
     for y in range(imSize):
         for x in range(imSize//2):
-            image3.set(x, y, image2.get(x, y))
+            image3[x, y, afwImage.LOCAL] = image2[x, y, afwImage.LOCAL]
     counts = afwMath.makeStatistics(image3, afwMath.SUM).getValue()
     image3 /= counts
     image3 *= scaling
