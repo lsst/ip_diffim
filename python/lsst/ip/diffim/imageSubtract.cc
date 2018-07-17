@@ -69,16 +69,12 @@ void declareConvolveAndSubtract(py::module &mod) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(imageSubtract) {
+PYBIND11_MODULE(imageSubtract, mod) {
     py::module::import("lsst.afw.image");
     py::module::import("lsst.afw.math");
 
-    py::module mod("imageSubtract");
-
     declareConvolveAndSubtract<float, double>(mod);
     declareConvolveAndSubtract<float, afw::math::Function2<double> const &>(mod);
-
-    return mod.ptr();
 }
 
 }  // diffim

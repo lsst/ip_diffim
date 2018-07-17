@@ -59,16 +59,12 @@ void declareKernelCandidateDetection(py::module &mod, std::string const &suffix)
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(kernelCandidateDetection) {
+PYBIND11_MODULE(kernelCandidateDetection, mod) {
     py::module::import("lsst.afw.image");
     py::module::import("lsst.afw.detection");
     py::module::import("lsst.pex.policy");
 
-    py::module mod("kernelCandidateDetection");
-
     declareKernelCandidateDetection<float>(mod, "F");
-
-    return mod.ptr();
 }
 
 }  // diffim

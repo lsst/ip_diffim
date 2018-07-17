@@ -81,15 +81,11 @@ void declareBuildSingleKernelVisitor(py::module& mod, std::string const& suffix)
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_PLUGIN(buildSingleKernelVisitor) {
+PYBIND11_MODULE(buildSingleKernelVisitor, mod) {
     py::module::import("lsst.afw.math");
     py::module::import("lsst.pex.policy");
 
-    py::module mod("buildSingleKernelVisitor");
-
     declareBuildSingleKernelVisitor<float>(mod, "F");
-
-    return mod.ptr();
 }
 
 }  // detail

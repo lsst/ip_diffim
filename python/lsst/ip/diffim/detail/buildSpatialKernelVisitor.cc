@@ -70,16 +70,12 @@ void declareBuildSpatialKernelVisitor(py::module& mod, std::string const& suffix
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_PLUGIN(buildSpatialKernelVisitor) {
+PYBIND11_MODULE(buildSpatialKernelVisitor, mod) {
     py::module::import("lsst.afw.math");
     py::module::import("lsst.afw.geom");
     py::module::import("lsst.pex.policy");
 
-    py::module mod("buildSpatialKernelVisitor");
-
     declareBuildSpatialKernelVisitor<float>(mod, "F");
-
-    return mod.ptr();
 }
 
 }  // detail

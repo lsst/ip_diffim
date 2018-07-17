@@ -87,16 +87,12 @@ void declareKernelPcaVisitor(py::module& mod, std::string const& suffix) {
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_PLUGIN(kernelPca) {
+PYBIND11_MODULE(kernelPca, mod) {
     py::module::import("lsst.afw.image");
     py::module::import("lsst.afw.math");
 
-    py::module mod("kernelPca");
-
     declareKernelPca<afw::math::Kernel::Pixel>(mod, "D");
     declareKernelPcaVisitor<float>(mod, "F");
-
-    return mod.ptr();
 }
 
 }  // detail
