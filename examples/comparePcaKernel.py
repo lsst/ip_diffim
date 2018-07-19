@@ -26,7 +26,7 @@ import os
 import sys
 import lsst.utils
 import lsst.afw.geom as afwGeom
-import lsst.afw.image.imageLib as afwImage
+import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
