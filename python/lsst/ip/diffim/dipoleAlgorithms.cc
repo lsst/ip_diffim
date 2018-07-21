@@ -137,12 +137,10 @@ void declarePsfDipoleFlux(py::module &mod) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(_dipoleAlgorithms) {
+PYBIND11_MODULE(_dipoleAlgorithms, mod) {
     py::module::import("lsst.afw.table");
     py::module::import("lsst.meas.base");
     py::module::import("lsst.pex.config");
-
-    py::module mod("_dipoleAlgorithms");
 
     declareDipoleCentroidControl(mod);
     declareDipoleFluxControl(mod);
@@ -152,8 +150,6 @@ PYBIND11_PLUGIN(_dipoleAlgorithms) {
     declareNaiveDipoleFlux(mod);
     declareNaiveDipoleCentroid(mod);
     declarePsfDipoleFlux(mod);
-
-    return mod.ptr();
 }
 
 }  // diffim

@@ -55,14 +55,10 @@ void declareFindSetBits(py::module& mod, std::string const& suffix) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(findSetBits) {
+PYBIND11_MODULE(findSetBits, mod) {
     py::module::import("lsst.afw.image");
 
-    py::module mod("findSetBits");
-
     declareFindSetBits<afw::image::Mask<afw::image::MaskPixel>>(mod, "U");
-
-    return mod.ptr();
 }
 
 }  // diffim

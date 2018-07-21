@@ -70,17 +70,13 @@ void declareImageStatistics(py::module &mod, std::string const &suffix) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(imageStatistics) {
+PYBIND11_MODULE(imageStatistics, mod) {
     py::module::import("lsst.pex.policy");
     py::module::import("lsst.afw.image");
-
-    py::module mod("imageStatistics");
 
     declareImageStatistics<int>(mod, "I");
     declareImageStatistics<float>(mod, "F");
     declareImageStatistics<double>(mod, "D");
-
-    return mod.ptr();
 }
 
 }  // diffim

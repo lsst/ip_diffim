@@ -113,17 +113,13 @@ void declareKernelCandidate(py::module &mod, std::string const &suffix) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(kernelCandidate) {
+PYBIND11_MODULE(kernelCandidate, mod) {
     py::module::import("lsst.afw.image");
     py::module::import("lsst.afw.math");
     py::module::import("lsst.afw.table");
     py::module::import("lsst.pex.policy");
 
-    py::module mod("kernelCandidate");
-
     declareKernelCandidate<float>(mod, "F");
-
-    return mod.ptr();
 }
 
 }  // diffim

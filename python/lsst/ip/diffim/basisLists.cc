@@ -36,11 +36,9 @@ namespace lsst {
 namespace ip {
 namespace diffim {
 
-PYBIND11_PLUGIN(basisLists) {
+PYBIND11_MODULE(basisLists, mod) {
     py::module::import("lsst.afw.math");
     py::module::import("lsst.pex.policy");
-
-    py::module mod("basisLists");
 
     mod.def("makeDeltaFunctionBasisList", &makeDeltaFunctionBasisList, "width"_a, "height"_a);
     mod.def("makeRegularizationMatrix", &makeRegularizationMatrix, "policy"_a);
@@ -51,8 +49,6 @@ PYBIND11_PLUGIN(basisLists) {
     mod.def("renormalizeKernelList", &renormalizeKernelList, "kernelListIn"_a);
     mod.def("makeAlardLuptonBasisList", &makeAlardLuptonBasisList, "halfWidth"_a, "nGauss"_a, "sigGauss"_a,
             "degGauss"_a);
-
-    return mod.ptr();
 }
 
 }  // diffim

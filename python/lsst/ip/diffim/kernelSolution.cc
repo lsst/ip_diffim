@@ -173,21 +173,17 @@ void declareSpatialKernelSolution(py::module &mod) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_PLUGIN(kernelSolution) {
+PYBIND11_MODULE(kernelSolution, mod) {
     py::module::import("lsst.afw.geom");
     py::module::import("lsst.afw.image");
     py::module::import("lsst.afw.math");
     py::module::import("lsst.pex.policy");
-
-    py::module mod("kernelSolution");
 
     declareKernelSolution(mod);
     declareStaticKernelSolution<float>(mod, "F");
     declareMaskedKernelSolution<float>(mod, "F");
     declareRegularizedKernelSolution<float>(mod, "F");
     declareSpatialKernelSolution(mod);
-
-    return mod.ptr();
 }
 
 }  // diffim
