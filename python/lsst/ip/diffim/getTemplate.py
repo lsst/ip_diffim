@@ -26,7 +26,7 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
-from lsst.pipe.tasks.dcrModel import DcrModel
+from lsst.ip.diffim.dcrModel import DcrModel
 
 __all__ = ["GetCoaddAsTemplateTask", "GetCoaddAsTemplateConfig",
            "GetCalexpAsTemplateTask", "GetCalexpAsTemplateConfig"]
