@@ -300,7 +300,7 @@ class DipoleModel(object):
         elif order == 2:
             M = np.vstack([b, x, y, x**2., y**2., x*y]).T
 
-        pars = np.linalg.lstsq(M, B)[0]
+        pars = np.linalg.lstsq(M, B, rcond=-1)[0]
         return pars
 
     def makeStarModel(self, bbox, psf, xcen, ycen, flux):

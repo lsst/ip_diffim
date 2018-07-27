@@ -235,7 +235,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         B *= matrixNorm
 
         # Numpy solution
-        fneg0, fpos0 = np.linalg.lstsq(M, B)[0]
+        fneg0, fpos0 = np.linalg.lstsq(M, B, rcond=-1)[0]
 
         # Afw solution
         lsq = afwMath.LeastSquares.fromDesignMatrix(M, B, afwMath.LeastSquares.DIRECT_SVD)
