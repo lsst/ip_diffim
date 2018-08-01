@@ -132,8 +132,8 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         source.set("centroid_y", 50)
         source.setFootprint(s.getFootprint())
         plugin.measure(source, exposure)
-        for key in ("_pos_x", "_pos_y", "_pos_xSigma", "_pos_ySigma", "_pos_flag",
-                    "_neg_x", "_neg_y", "_neg_xSigma", "_neg_ySigma", "_neg_flag"):
+        for key in ("_pos_x", "_pos_y", "_pos_xErr", "_pos_yErr", "_pos_flag",
+                    "_neg_x", "_neg_y", "_neg_xErr", "_neg_yErr", "_neg_flag"):
             try:
                 source.get("test"+key)
             except Exception:
