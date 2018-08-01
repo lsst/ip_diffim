@@ -351,9 +351,9 @@ class DipoleAnalysis(object):
         @param source  The source that will be examined"""
 
         posflux = source.get("ip_diffim_PsfDipoleFlux_pos_flux")
-        posfluxErr = source.get("ip_diffim_PsfDipoleFlux_pos_fluxSigma")
+        posfluxErr = source.get("ip_diffim_PsfDipoleFlux_pos_fluxErr")
         negflux = source.get("ip_diffim_PsfDipoleFlux_neg_flux")
-        negfluxErr = source.get("ip_diffim_PsfDipoleFlux_neg_fluxSigma")
+        negfluxErr = source.get("ip_diffim_PsfDipoleFlux_neg_fluxErr")
 
         # Not a dipole!
         if (posflux < 0) is (negflux < 0):

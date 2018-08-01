@@ -276,11 +276,11 @@ void NaiveDipoleFlux::measure(
                                                      *(exposure.getMaskedImage().getVariance()));
 
     source.set(getPositiveKeys().getFlux(), functor.getSumPositive());
-    source.set(getPositiveKeys().getFluxSigma(), ::sqrt(functor.getVarPositive()));
+    source.set(getPositiveKeys().getFluxErr(), ::sqrt(functor.getVarPositive()));
     source.set(_numPositiveKey, functor.getNumPositive());
 
     source.set(getNegativeKeys().getFlux(), functor.getSumNegative());
-    source.set(getNegativeKeys().getFluxSigma(), ::sqrt(functor.getVarNegative()));
+    source.set(getNegativeKeys().getFluxErr(), ::sqrt(functor.getVarNegative()));
     source.set(_numNegativeKey, functor.getNumNegative());
     functor.reset();
 }
@@ -492,12 +492,12 @@ void PsfDipoleFlux::measure(
         PTR(afw::geom::Point2D) minNegCentroid(new afw::geom::Point2D(min.UserState().Value(NEGCENTXPAR),
                                                                       min.UserState().Value(NEGCENTYPAR)));
         source.set(getNegativeKeys().getFlux(), min.UserState().Value(NEGFLUXPAR));
-        source.set(getNegativeKeys().getFluxSigma(), min.UserState().Error(NEGFLUXPAR));
+        source.set(getNegativeKeys().getFluxErr(), min.UserState().Error(NEGFLUXPAR));
 
         PTR(afw::geom::Point2D) minPosCentroid(new afw::geom::Point2D(min.UserState().Value(POSCENTXPAR),
                                                                       min.UserState().Value(POSCENTYPAR)));
         source.set(getPositiveKeys().getFlux(), min.UserState().Value(POSFLUXPAR));
-        source.set(getPositiveKeys().getFluxSigma(), min.UserState().Error(POSFLUXPAR));
+        source.set(getPositiveKeys().getFluxErr(), min.UserState().Error(POSFLUXPAR));
 
         source.set(_chi2dofKey, evalChi2 / (nPix - minimizerFunc.getNpar()));
         source.set(_negCentroid.getX(), minNegCentroid->getX());

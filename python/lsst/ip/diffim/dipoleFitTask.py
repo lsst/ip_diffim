@@ -741,7 +741,7 @@ class DipoleFitAlgorithm(object):
         if fitParams['flux'] <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
             out = Struct(posCentroidX=np.nan, posCentroidY=np.nan,
                          negCentroidX=np.nan, negCentroidY=np.nan,
-                         posFlux=np.nan, negFlux=np.nan, posFluxSigma=np.nan, negFluxSigma=np.nan,
+                         posFlux=np.nan, negFlux=np.nan, posFluxErr=np.nan, negFluxErr=np.nan,
                          centroidX=np.nan, centroidY=np.nan, orientation=np.nan,
                          signalToNoise=np.nan, chi2=np.nan, redChi2=np.nan)
             return out, fitResult
@@ -779,7 +779,7 @@ class DipoleFitAlgorithm(object):
 
         out = Struct(posCentroidX=fitParams['xcenPos'], posCentroidY=fitParams['ycenPos'],
                      negCentroidX=fitParams['xcenNeg'], negCentroidY=fitParams['ycenNeg'],
-                     posFlux=fluxVal, negFlux=-fluxValNeg, posFluxSigma=fluxErr, negFluxSigma=fluxErrNeg,
+                     posFlux=fluxVal, negFlux=-fluxValNeg, posFluxErr=fluxErr, negFluxErr=fluxErrNeg,
                      centroidX=centroid[0], centroidY=centroid[1], orientation=angle,
                      signalToNoise=signalToNoise, chi2=fitResult.chisqr, redChi2=fitResult.redchi)
 
@@ -890,9 +890,9 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             setattr(self, ''.join((pos_neg, 'FluxKey')), key)
 
             key = schema.addField(
-                schema.join(name, pos_neg, "fluxSigma"), type=float, units="pixel",
+                schema.join(name, pos_neg, "fluxErr"), type=float, units="pixel",
                 doc="1-sigma uncertainty for {0} dipole flux".format(pos_neg))
-            setattr(self, ''.join((pos_neg, 'FluxSigmaKey')), key)
+            setattr(self, ''.join((pos_neg, 'FluxErrKey')), key)
 
             for x_y in ['x', 'y']:
                 key = schema.addField(
@@ -1003,12 +1003,12 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         # add chi2, coord/flux uncertainties (TBD), dipole classification
         # Add the relevant values to the measRecord
         measRecord[self.posFluxKey] = result.posFlux
-        measRecord[self.posFluxSigmaKey] = result.signalToNoise   # to be changed to actual sigma!
+        measRecord[self.posFluxErrKey] = result.signalToNoise   # to be changed to actual sigma!
         measRecord[self.posCentroidKeyX] = result.posCentroidX
         measRecord[self.posCentroidKeyY] = result.posCentroidY
 
         measRecord[self.negFluxKey] = result.negFlux
-        measRecord[self.negFluxSigmaKey] = result.signalToNoise   # to be changed to actual sigma!
+        measRecord[self.negFluxErrKey] = result.signalToNoise   # to be changed to actual sigma!
         measRecord[self.negCentroidKeyX] = result.negCentroidX
         measRecord[self.negCentroidKeyY] = result.negCentroidY
 
