@@ -385,7 +385,7 @@ std::pair<double,int> PsfDipoleFlux::chi2(
     int negXmax = std::min(negPsfBBox.getMaxX(), negModelBBox.getMaxX());
     int negYmax = std::min(negPsfBBox.getMaxY(), negModelBBox.getMaxY());
     afwGeom::Box2I negBBox = afwGeom::Box2I(afwGeom::Point2I(negXmin, negYmin),
-                                            afwGeom::Point2I(negXmax, negYmax));
+                                            afwGeom::Point2I(negXmax, negYmax), false);
     afwImage::Image<afwMath::Kernel::Pixel> negSubim(*negPsf, negBBox);
     afwImage::Image<double> negModelSubim(negModel, negBBox);
     negModelSubim += negSubim;
@@ -396,7 +396,7 @@ std::pair<double,int> PsfDipoleFlux::chi2(
     int posXmax = std::min(posPsfBBox.getMaxX(), posModelBBox.getMaxX());
     int posYmax = std::min(posPsfBBox.getMaxY(), posModelBBox.getMaxY());
     afwGeom::Box2I posBBox = afwGeom::Box2I(afwGeom::Point2I(posXmin, posYmin),
-                                            afwGeom::Point2I(posXmax, posYmax));
+                                            afwGeom::Point2I(posXmax, posYmax), false);
     afwImage::Image<afwMath::Kernel::Pixel> posSubim(*posPsf, posBBox);
     afwImage::Image<double> posModelSubim(posModel, posBBox);
     posModelSubim += posSubim;

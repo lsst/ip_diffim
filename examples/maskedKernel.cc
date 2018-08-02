@@ -53,7 +53,7 @@ int main() {
 
     /* We want to ignore all pixels from 4,4 to 6,6 */
     afwGeom::Box2I maskBox(afwGeom::Point2I(4, 4),
-                           afwGeom::Point2I(6, 6));
+                           afwGeom::Point2I(6, 6), false);
     
     int maskStartCol = maskBox.getMinX();
     int maskStartRow = maskBox.getMinY();
@@ -64,31 +64,31 @@ int main() {
 
     /*
     afwGeom::Box2I tBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskEndRow),
-                                         afwGeom::Point2I(endCol, endRow));
+                                         afwGeom::Point2I(endCol, endRow), false);
     
     afwGeom::Box2I bBox = afwGeom::Box2I(afwGeom::Point2I(startCol, startRow),
-                                         afwGeom::Point2I(endCol, maskStartRow));
+                                         afwGeom::Point2I(endCol, maskStartRow), false);
     
     afwGeom::Box2I lBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskStartRow),
-                                         afwGeom::Point2I(maskStartCol, maskEndRow));
+                                         afwGeom::Point2I(maskStartCol, maskEndRow), false);
     
     afwGeom::Box2I rBox = afwGeom::Box2I(afwGeom::Point2I(maskEndCol, maskStartRow),
-                                         afwGeom::Point2I(endCol, maskEndRow));
+                                         afwGeom::Point2I(endCol, maskEndRow), false);
     */
 
     endCol -= 1;
     endRow -= 1;
     afwGeom::Box2I tBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskEndRow + 1),
-                                         afwGeom::Point2I(endCol, endRow));
+                                         afwGeom::Point2I(endCol, endRow), false);
     
     afwGeom::Box2I bBox = afwGeom::Box2I(afwGeom::Point2I(startCol, startRow),
-                                         afwGeom::Point2I(endCol, maskStartRow - 1));
+                                         afwGeom::Point2I(endCol, maskStartRow - 1), false);
     
     afwGeom::Box2I lBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskStartRow),
-                                         afwGeom::Point2I(maskStartCol - 1, maskEndRow));
+                                         afwGeom::Point2I(maskStartCol - 1, maskEndRow), false);
     
     afwGeom::Box2I rBox = afwGeom::Box2I(afwGeom::Point2I(maskEndCol + 1, maskStartRow),
-                                         afwGeom::Point2I(endCol, maskEndRow));
+                                         afwGeom::Point2I(endCol, maskEndRow), false);
 
 
     std::vector<afwGeom::Box2I> boxArray;

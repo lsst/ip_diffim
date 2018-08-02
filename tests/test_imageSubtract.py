@@ -78,7 +78,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         p0 = afwGeom.Point2I(xloc - imsize//2, yloc - imsize//2)
         p1 = afwGeom.Point2I(xloc + imsize//2, yloc + imsize//2)
-        bbox = afwGeom.Box2I(p0, p1)
+        bbox = afwGeom.Box2I(p0, p1, invert=False)
 
         tmi = afwImage.MaskedImageF(self.templateImage, bbox, origin=afwImage.LOCAL)
         smi = afwImage.MaskedImageF(self.scienceImage, bbox, origin=afwImage.LOCAL)
@@ -97,7 +97,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         p0 = afwGeom.Point2I(xloc - imsize//2, yloc - imsize//2)
         p1 = afwGeom.Point2I(xloc + imsize//2, yloc + imsize//2)
-        bbox = afwGeom.Box2I(p0, p1)
+        bbox = afwGeom.Box2I(p0, p1, invert=False)
 
         tmi = afwImage.MaskedImageF(self.templateImage, bbox, origin=afwImage.LOCAL)
         smi = afwImage.MaskedImageF(self.scienceImage, bbox, origin=afwImage.LOCAL)

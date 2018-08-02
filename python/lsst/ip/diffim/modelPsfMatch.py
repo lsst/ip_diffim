@@ -485,7 +485,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
             kernelIm = afwImage.ImageF(dimensions)
             bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((dimensions.getX() - rawKernel.getWidth())//2,
                                                         (dimensions.getY() - rawKernel.getHeight())//2),
-                                        rawKernel.getDimensions())
+                                        rawKernel.getDimensions(), invert=False)
             kernelIm.assign(rawKernel, bboxToPlace)
 
         kernelMask = afwImage.Mask(dimensions, 0x0)

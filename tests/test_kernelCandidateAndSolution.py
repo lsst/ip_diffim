@@ -68,7 +68,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.y02 = 717
             size = 40
             bbox2 = afwGeom.Box2I(afwGeom.Point2I(self.x02 - size, self.y02 - size),
-                                  afwGeom.Point2I(self.x02 + size, self.y02 + size))
+                                  afwGeom.Point2I(self.x02 + size, self.y02 + size),
+                                  invert=False)
             self.scienceImage2 = afwImage.ExposureF(scienceExposure, bbox2, origin=afwImage.LOCAL)
             self.templateExposure2 = afwImage.ExposureF(templateExposure, bbox2, origin=afwImage.LOCAL)
 
@@ -486,7 +487,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         sizeCellX = self.policy.get("sizeCellX")
         sizeCellY = self.policy.get("sizeCellY")
-        kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(1, 1)),
+        kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(1, 1),
+                                                             invert=False),
                                                sizeCellX, sizeCellY)
         kernelCellSet.insertCandidate(kc)
         nSeen = 0

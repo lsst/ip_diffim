@@ -59,7 +59,7 @@ class DiffimTestCases(unittest.TestCase):
         afwMath.convolve(si, ti, sKernel, True)
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(25, 25),
-                             afwGeom.Point2I(75, 75))
+                             afwGeom.Point2I(75, 75), invert=False)
         si = afwImage.MaskedImageF(si, bbox, origin=afwImage.LOCAL)
         ti = afwImage.MaskedImageF(ti, bbox, origin=afwImage.LOCAL)
         kc = ipDiffim.KernelCandidateF(50., 50., ti, si, self.policy)
@@ -89,7 +89,7 @@ class DiffimTestCases(unittest.TestCase):
         afwMath.convolve(si, ti, sKernel, True)
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(25, 25),
-                             afwGeom.Point2I(75, 75))
+                             afwGeom.Point2I(75, 75), invert=False)
         si = afwImage.MaskedImageF(si, bbox, origin=afwImage.LOCAL)
         ti = afwImage.MaskedImageF(ti, bbox, origin=afwImage.LOCAL)
         kc = ipDiffim.KernelCandidateF(50., 50., ti, si, self.policy)

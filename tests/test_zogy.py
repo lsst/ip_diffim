@@ -256,7 +256,8 @@ class ZogyTest(lsst.utils.tests.TestCase):
             paddedKern = afwImage.ImageF(kernSize[0] + extraPix[0], kernSize[1] + extraPix[1])
             bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((kernSize[0] + extraPix[0] - kern.getWidth()) // 2,
                                                         (kernSize[1] + extraPix[1] - kern.getHeight()) // 2),
-                                        kern.getDimensions())
+                                        kern.getDimensions(),
+                                        invert=False)
             paddedKern.assign(kern, bboxToPlace)
             fixedKern = afwMath.FixedKernel(paddedKern.convertD())
             psfNew = measAlg.KernelPsf(fixedKern, center)

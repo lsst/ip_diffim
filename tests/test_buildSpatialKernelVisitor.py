@@ -50,7 +50,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('fitForBackground', False)
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0),
-                             afwGeom.Extent2I(self.size*10, self.size*10))
+                             afwGeom.Extent2I(self.size*10, self.size*10), invert=False)
 
         bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
         bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
@@ -92,7 +92,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def testModelType(self):
         bbox = afwGeom.Box2I(afwGeom.Point2I(10, 10),
-                             afwGeom.Extent2I(10, 10))
+                             afwGeom.Extent2I(10, 10), invert=False)
         basisList = ipDiffim.makeKernelBasisList(self.subconfig)
 
         self.policy.set("spatialModelType", "polynomial")
@@ -123,7 +123,7 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('fitForBackground', True)
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0),
-                             afwGeom.Extent2I(self.size*10, self.size*10))
+                             afwGeom.Extent2I(self.size*10, self.size*10), invert=False)
 
         bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
         bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)

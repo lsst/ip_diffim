@@ -39,7 +39,7 @@ class DiffimTestCases(unittest.TestCase):
         fsb = ipDiffim.FindSetBitsU()
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(0, 10),
-                             afwGeom.Point2I(9, 12))
+                             afwGeom.Point2I(9, 12), invert=False)
         fsb.apply(afwImage.Mask(mask, bbox, afwImage.LOCAL))
 
         self.assertEqual(fsb.getBits(), 0)
@@ -51,12 +51,12 @@ class DiffimTestCases(unittest.TestCase):
         fsb = ipDiffim.FindSetBitsU()
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(9, 10),
-                             afwGeom.Point2I(11, 12))
+                             afwGeom.Point2I(11, 12), invert=False)
         submask = afwImage.Mask(mask, bbox, afwImage.LOCAL)
         submask |= bitmaskBad
 
         bbox2 = afwGeom.Box2I(afwGeom.Point2I(8, 8),
-                              afwGeom.Point2I(19, 19))
+                              afwGeom.Point2I(19, 19), invert=False)
         fsb.apply(afwImage.Mask(mask, bbox2, afwImage.LOCAL))
 
         self.assertEqual(fsb.getBits(), bitmaskBad)
@@ -69,17 +69,17 @@ class DiffimTestCases(unittest.TestCase):
         fsb = ipDiffim.FindSetBitsU()
 
         bbox = afwGeom.Box2I(afwGeom.Point2I(9, 10),
-                             afwGeom.Point2I(11, 12))
+                             afwGeom.Point2I(11, 12), invert=False)
         submask = afwImage.Mask(mask, bbox, afwImage.LOCAL)
         submask |= bitmaskBad
 
         bbox2 = afwGeom.Box2I(afwGeom.Point2I(8, 8),
-                              afwGeom.Point2I(19, 19))
+                              afwGeom.Point2I(19, 19), invert=False)
         submask2 = afwImage.Mask(mask, bbox2, afwImage.LOCAL)
         submask2 |= bitmaskSat
 
         bbox3 = afwGeom.Box2I(afwGeom.Point2I(0, 0),
-                              afwGeom.Point2I(19, 19))
+                              afwGeom.Point2I(19, 19), invert=False)
         fsb.apply(afwImage.Mask(mask, bbox3, afwImage.LOCAL))
 
         self.assertEqual(fsb.getBits(), bitmaskBad | bitmaskSat)

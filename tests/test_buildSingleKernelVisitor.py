@@ -231,7 +231,8 @@ class DiffimTestCases(unittest.TestCase):
 
         kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0),
                                                              afwGeom.Extent2I(sizeCellX * nCell,
-                                                                              sizeCellY * nCell)),
+                                                                              sizeCellY * nCell),
+                                                             invert=False),
                                                sizeCellX,
                                                sizeCellY)
         nTot = 0

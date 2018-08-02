@@ -162,7 +162,8 @@ class DiffimTestCases(unittest.TestCase):
         bbox = afwGeom.Box2I(afwGeom.Point2I(xloc - imsize//2,
                                              yloc - imsize//2),
                              afwGeom.Point2I(xloc + imsize//2,
-                                             yloc + imsize//2))
+                                             yloc + imsize//2),
+                             invert=False)
 
         # sometimes the box goes off the image; no big deal...
         try:

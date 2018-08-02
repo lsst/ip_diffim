@@ -219,7 +219,7 @@ def main():
         y0 = max(expY0, int(yAstrom - scaling * Iyy))
         y1 = min(expY1, int(yAstrom + scaling * Iyy))
         bbox = afwGeom.Box2I(afwGeom.Point2I(x0, y0),
-                             afwGeom.Point2I(x1, y1))
+                             afwGeom.Point2I(x1, y1), invert=False)
         subExp = afwImage.ExposureF(crDiffExposure, bbox)
         subMi = subExp.getMaskedImage()
         imArr, maArr, varArr = subMi.getArrays()

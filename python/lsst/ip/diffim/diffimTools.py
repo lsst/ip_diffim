@@ -200,7 +200,8 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     # Finally, make a kernelSet from these 2 images
     kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0),
                                                          afwGeom.Extent2I(sizeCell * nCell,
-                                                                          sizeCell * nCell)),
+                                                                          sizeCell * nCell),
+                                                         invert=False),
                                            sizeCell,
                                            sizeCell)
     stampHalfWidth = 2 * kSize
@@ -212,7 +213,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
                                  yCoord - stampHalfWidth)
             p1 = afwGeom.Point2I(xCoord + stampHalfWidth,
                                  yCoord + stampHalfWidth)
-            bbox = afwGeom.Box2I(p0, p1)
+            bbox = afwGeom.Box2I(p0, p1, invert=False)
             tsi = afwImage.MaskedImageF(tMi, bbox, origin=afwImage.LOCAL)
             ssi = afwImage.MaskedImageF(sMi, bbox, origin=afwImage.LOCAL)
 
@@ -347,7 +348,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
         if xmin > xmax or ymin > ymax:
             continue
 
-        kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
+        kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax), invert=False)
         try:
             fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, deep=False).getMask())
             bm1 = fsb.getBits()

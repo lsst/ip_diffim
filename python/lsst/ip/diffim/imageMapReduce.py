@@ -711,7 +711,8 @@ class ImageMapReduceTask(pipeBase.Task):
             cellCentroids = [(cellCentroidsX[i], cellCentroidsY[i]) for i in range(len(cellCentroidsX))]
 
         # first "main" box at 0,0
-        bbox0 = afwGeom.Box2I(afwGeom.Point2I(bbox.getBegin()), afwGeom.Extent2I(cellSizeX, cellSizeY))
+        bbox0 = afwGeom.Box2I(afwGeom.Point2I(bbox.getBegin()), afwGeom.Extent2I(cellSizeX, cellSizeY),
+                              invert=False)
         # first expanded box
         bbox1 = afwGeom.Box2I(bbox0)
         bbox1.grow(afwGeom.Extent2I(borderSizeX, borderSizeY))

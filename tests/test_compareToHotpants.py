@@ -61,7 +61,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                        (96, 160), (160, 160), (32, 160)]:
             self.footprints.append(afwDet.Footprint(afwGeom.SpanSet(
                 afwGeom.Box2I(afwGeom.Point2I(xc, yc),
-                              afwGeom.Extent2I(1, 1)))))
+                              afwGeom.Extent2I(1, 1), invert=False))))
 
         # Make a basis list that hotpants has been run with
         nGauss = 1
@@ -97,7 +97,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # And a place to put candidates
         self.kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0),
                                                                   afwGeom.Extent2I(self.smi.getWidth(),
-                                                                                   self.smi.getHeight())),
+                                                                                   self.smi.getHeight()),
+                                                                  invert=False),
                                                     self.policy.getInt("sizeCellX"),
                                                     self.policy.getInt("sizeCellY"))
 
@@ -128,7 +129,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49),
+                                 invert=False)
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -192,7 +194,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC) - 24, int(yC) - 24), afwGeom.Extent2I(49, 49),
+                                 invert=False)
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -250,7 +253,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC) - 24, int(yC) - 24), afwGeom.Extent2I(49, 49),
+                                 invert=False)
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -348,7 +352,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49),
+                                 invert=False)
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -410,7 +415,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC) - 24, int(yC) - 24), afwGeom.Extent2I(49, 49),
+                                 invert=False)
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -499,7 +505,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC) - 24, int(yC) - 24), afwGeom.Extent2I(49, 49),
+                                 invert=False)
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -570,7 +577,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC) - 24, int(yC) - 24), afwGeom.Extent2I(49, 49),
+                                 invert=False)
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -685,7 +693,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC) - 24, int(yC) - 24), afwGeom.Extent2I(49, 49),
+                                 invert=False)
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)

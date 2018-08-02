@@ -176,7 +176,8 @@ namespace diffim {
             std::shared_ptr<afwDetect::Footprint> fpCore(
                 new afwDetect::Footprint(
                     std::make_shared<afwGeom::SpanSet>(afwGeom::Box2I(afwGeom::Point2I(xc, yc),
-                                                       afwGeom::Extent2I(1,1))))
+                                                                      afwGeom::Extent2I(1, 1))),
+                                                                      false)
                 );
             return growCandidate(fpCore, fpGrowPix, templateMaskedImage, scienceMaskedImage);
         }

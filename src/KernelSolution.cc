@@ -927,16 +927,16 @@ namespace diffim {
 
         */
         afwGeom::Box2I tBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskEndRow + 1),
-                                             afwGeom::Point2I(endCol, endRow));
+                                             afwGeom::Point2I(endCol, endRow), false);
 
         afwGeom::Box2I bBox = afwGeom::Box2I(afwGeom::Point2I(startCol, startRow),
-                                             afwGeom::Point2I(endCol, maskStartRow - 1));
+                                             afwGeom::Point2I(endCol, maskStartRow - 1), false);
 
         afwGeom::Box2I lBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskStartRow),
-                                             afwGeom::Point2I(maskStartCol - 1, maskEndRow));
+                                             afwGeom::Point2I(maskStartCol - 1, maskEndRow), false);
 
         afwGeom::Box2I rBox = afwGeom::Box2I(afwGeom::Point2I(maskEndCol + 1, maskStartRow),
-                                             afwGeom::Point2I(endCol, maskEndRow));
+                                             afwGeom::Point2I(endCol, maskEndRow), false);
 
         LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
                    "Upper good pixel region: %d,%d -> %d,%d",

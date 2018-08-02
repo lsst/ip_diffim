@@ -186,11 +186,14 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
         @return a new exposure containing the image, PSF and desired variance plane
         """
         # All this code to convert the template image array/psf array into an exposure.
-        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(imgArray.shape[1]-1, imgArray.shape[0]-1))
+        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0),
+                             afwGeom.Point2I(imgArray.shape[1] - 1, imgArray.shape[0] - 1),
+                             invert=False)
         im1ex = afwImage.ExposureD(bbox)
         im1ex.getMaskedImage().getImage().getArray()[:, :] = imgArray
         im1ex.getMaskedImage().getVariance().getArray()[:, :] = imgVariance
-        psfBox = afwGeom.Box2I(afwGeom.Point2I(-12, -12), afwGeom.Point2I(12, 12))  # a 25x25 pixel psf
+        psfBox = afwGeom.Box2I(afwGeom.Point2I(-12, -12), afwGeom.Point2I(12, 12),
+                               invert=False)  # a 25x25 pixel psf
         psf = afwImage.ImageD(psfBox)
         psfBox.shift(afwGeom.Extent2I(size[0]//2, size[1]//2))
         im1_psf_sub = psfArray[psfBox.getMinX():psfBox.getMaxX()+1, psfBox.getMinY():psfBox.getMaxY()+1]

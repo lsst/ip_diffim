@@ -50,9 +50,9 @@ def makeTest2(doAddNoise, shiftX=5, shiftY=3):
     image1 = image1.convertF()
     ####
     boxA = afwGeom.Box2I(afwGeom.PointI(imSize//2, imSize//2),
-                         afwGeom.ExtentI(imSize//2, imSize//2))
+                         afwGeom.ExtentI(imSize//2, imSize//2), invert=False)
     boxB = afwGeom.Box2I(afwGeom.PointI(imSize//2 - shiftX, imSize//2 - shiftY),
-                         afwGeom.ExtentI(imSize//2, imSize//2))
+                         afwGeom.ExtentI(imSize//2, imSize//2), invert=False)
     subregA = afwImage.ImageF(image1, boxA, afwImage.PARENT)
     subregB = afwImage.ImageF(image1, boxB, afwImage.PARENT, True)
     subregA += subregB

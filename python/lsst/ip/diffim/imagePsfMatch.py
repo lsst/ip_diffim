@@ -780,9 +780,11 @@ And finally provide some optional debugging displays:
                       scienceLimit[0], scienceLimit[1])
 
         templateBBox = afwGeom.Box2D(templateOrigin.getPosition(afwGeom.degrees),
-                                     templateLimit.getPosition(afwGeom.degrees))
+                                     templateLimit.getPosition(afwGeom.degrees),
+                                     invert=False)
         scienceBBox = afwGeom.Box2D(scienceOrigin.getPosition(afwGeom.degrees),
-                                    scienceLimit.getPosition(afwGeom.degrees))
+                                    scienceLimit.getPosition(afwGeom.degrees),
+                                    invert=False)
         if not (templateBBox.overlaps(scienceBBox)):
             raise RuntimeError("Input images do not overlap at all")
 

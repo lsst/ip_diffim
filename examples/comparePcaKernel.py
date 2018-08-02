@@ -45,7 +45,7 @@ if len(sys.argv) == 1:
     defSciencePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2")
     templateMaskedImage = afwImage.MaskedImageF(defTemplatePath)
     scienceMaskedImage = afwImage.MaskedImageF(defSciencePath)
-    bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(512, 512))
+    bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(512, 512), invert=False)
     templateMaskedImage = afwImage.MaskedImageF(templateMaskedImage, bbox, origin=afwImage.LOCAL)
     scienceMaskedImage = afwImage.MaskedImageF(scienceMaskedImage, bbox, origin=afwImage.LOCAL)
 

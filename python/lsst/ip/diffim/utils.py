@@ -787,7 +787,8 @@ class DipoleTestImage(object):
         """!Generate an exposure and catalog with the given stellar source(s)"""
 
         from lsst.meas.base.tests import TestDataset
-        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(self.w-1, self.h-1))
+        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(self.w - 1, self.h - 1),
+                             invert=False)
         dataset = TestDataset(bbox, psfSigma=self.psfSigma, threshold=1.)
 
         for i in range(len(xc)):
