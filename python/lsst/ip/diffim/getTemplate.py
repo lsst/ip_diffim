@@ -26,6 +26,7 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
+from lsst.ip.diffim.dcrModel import DcrModel
 
 __all__ = ["GetCoaddAsTemplateTask", "GetCoaddAsTemplateConfig",
            "GetCalexpAsTemplateTask", "GetCalexpAsTemplateConfig"]
@@ -38,9 +39,14 @@ class GetCoaddAsTemplateConfig(pexConfig.Config):
         doc="Number of pixels to grow the requested template image to account for warping"
     )
     coaddName = pexConfig.Field(
-        doc="coadd name: typically one of deep or goodSeeing",
+        doc="coadd name: typically one of 'deep', 'goodSeeing', or 'dcr'",
         dtype=str,
         default="deep",
+    )
+    numSubfilters = pexConfig.Field(
+        doc="Number of subfilters in the DcrCoadd, used only if ``coaddName``='dcr'",
+        dtype=int,
+        default=3,
     )
     warpType = pexConfig.Field(
         doc="Warp type of the coadd template: one of 'direct' or 'psfMatched'",
@@ -95,7 +101,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
         # assemble coadd exposure from subregions of patches
         coaddExposure = afwImage.ExposureF(coaddBBox, coaddWcs)
-        coaddExposure.getMaskedImage().set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
+        coaddExposure.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
         nPatchesFound = 0
         coaddFilter = None
         coaddPsf = None
@@ -107,19 +113,32 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 bbox=patchSubBBox,
                 tract=tractInfo.getId(),
                 patch="%s,%s" % (patchInfo.getIndex()[0], patchInfo.getIndex()[1]),
+                numSubfilters=self.config.numSubfilters,
             )
             if patchSubBBox.isEmpty():
                 self.log.info("skip tract=%(tract)s, patch=%(patch)s; no overlapping pixels" % patchArgDict)
                 continue
-            if not sensorRef.datasetExists(**patchArgDict):
-                self.log.warn("%(datasetType)s, tract=%(tract)s, patch=%(patch)s does not exist"
-                              % patchArgDict)
-                continue
 
+            if self.config.coaddName == 'dcr':
+                if not sensorRef.datasetExists(subfilter=0, **patchArgDict):
+                    self.log.warn("%(datasetType)s, tract=%(tract)s, patch=%(patch)s,"
+                                  " numSubfilters=%(numSubfilters)s, subfilter=0 does not exist"
+                                  % patchArgDict)
+                    continue
+                self.log.info("Constructing DCR-matched template for patch %s" % patchArgDict)
+                dcrModel = DcrModel.fromDataRef(sensorRef, **patchArgDict)
+                coaddPatch = dcrModel.buildMatchedExposure(bbox=patchSubBBox,
+                                                           wcs=coaddWcs,
+                                                           visitInfo=exposure.getInfo().getVisitInfo())
+            else:
+                if not sensorRef.datasetExists(**patchArgDict):
+                    self.log.warn("%(datasetType)s, tract=%(tract)s, patch=%(patch)s does not exist"
+                                  % patchArgDict)
+                    continue
+                self.log.info("Reading patch %s" % patchArgDict)
+                coaddPatch = sensorRef.get(**patchArgDict)
             nPatchesFound += 1
-            self.log.info("Reading patch %s" % patchArgDict)
-            coaddPatch = sensorRef.get(**patchArgDict)
-            coaddExposure.getMaskedImage().assign(coaddPatch.getMaskedImage(), coaddPatch.getBBox())
+            coaddExposure.maskedImage.assign(coaddPatch.maskedImage, coaddPatch.getBBox())
             if coaddFilter is None:
                 coaddFilter = coaddPatch.getFilter()
 
