@@ -119,7 +119,6 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 self.log.info("skip tract=%(tract)s, patch=%(patch)s; no overlapping pixels" % patchArgDict)
                 continue
 
-            nPatchesFound += 1
             if self.config.coaddName == 'dcr':
                 if not sensorRef.datasetExists(subfilter=0, **patchArgDict):
                     self.log.warn("%(datasetType)s, tract=%(tract)s, patch=%(patch)s,"
@@ -138,6 +137,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                     continue
                 self.log.info("Reading patch %s" % patchArgDict)
                 coaddPatch = sensorRef.get(**patchArgDict)
+            nPatchesFound += 1
             coaddExposure.maskedImage.assign(coaddPatch.maskedImage, coaddPatch.getBBox())
             if coaddFilter is None:
                 coaddFilter = coaddPatch.getFilter()

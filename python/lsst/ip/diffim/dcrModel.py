@@ -1,4 +1,4 @@
-# This file is part of pipe_tasks.
+# This file is part of ip_diffim.
 #
 # LSST Data Management System
 # This product includes software developed by the
@@ -97,6 +97,11 @@ class DcrModel:
         model.image.array[badPixels] = 0.
         model.variance.array[badPixels] = 0.
         model.image.array /= dcrNumSubfilters
+        # We divide the variance by N and not N**2 because we will assume each
+        # subfilter is independent. That means that the significance of
+        # detected sources will be lower by a factor of sqrt(N) in the
+        # subfilter images, but we will recover it when we combine the
+        # subfilter images to construct matched templates.
         model.variance.array /= dcrNumSubfilters
         model.mask.array[badPixels] = model.mask.getPlaneBitMask("NO_DATA")
         modelImages = [model, ]
