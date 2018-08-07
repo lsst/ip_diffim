@@ -28,7 +28,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         schema = afwTable.SourceTable.makeMinimalSchema()
         afwTable.Point2DKey.addFields(schema, "Centroid", "input centroid", "pixel")
         schema.addField("PsfFlux_flux", type=float)
-        schema.addField("PsfFlux_fluxSigma", type=float)
+        schema.addField("PsfFlux_fluxErr", type=float)
         schema.addField("PsfFlux_flag", type="Flag")
         self.table = afwTable.SourceTable.make(schema)
         self.table.definePsfFlux("PsfFlux")
