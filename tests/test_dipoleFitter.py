@@ -138,7 +138,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
 
         measureConfig.slots.calibFlux = None
         measureConfig.slots.modelFlux = None
-        measureConfig.slots.instFlux = None
+        measureConfig.slots.gaussianFlux = None
         measureConfig.slots.shape = None
         measureConfig.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
         measureConfig.doReplaceWithNoise = False

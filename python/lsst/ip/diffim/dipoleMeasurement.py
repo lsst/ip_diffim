@@ -111,7 +111,7 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
 
         self.slots.calibFlux = None
         self.slots.modelFlux = None
-        self.slots.instFlux = None
+        self.slots.gaussianFlux = None
         self.slots.shape = None
         self.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
         self.doReplaceWithNoise = False
@@ -181,7 +181,7 @@ config.plugins.names = ["base_PsfFlux",
 
 config.slots.calibFlux = None
 config.slots.modelFlux = None
-config.slots.instFlux = None
+config.slots.gaussianFlux = None
 config.slots.shape = None
 config.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
 config.doReplaceWithNoise = False

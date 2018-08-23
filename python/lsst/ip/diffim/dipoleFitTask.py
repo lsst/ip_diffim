@@ -120,7 +120,7 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
 
         self.slots.calibFlux = None
         self.slots.modelFlux = None
-        self.slots.instFlux = None
+        self.slots.gaussianFlux = None
         self.slots.shape = "base_SdssShape"
         self.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
         self.doReplaceWithNoise = False
