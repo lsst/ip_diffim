@@ -69,9 +69,9 @@ class ClassificationDipolePlugin(SingleFramePlugin):
 
     def measure(self, measRecord, exposure):
         passesSn = self.dipoleAnalysis.getSn(measRecord) > self.config.minSn
-        negFlux = np.abs(measRecord.get("ip_diffim_PsfDipoleFlux_neg_flux"))
+        negFlux = np.abs(measRecord.get("ip_diffim_PsfDipoleFlux_neg_instFlux"))
         negFluxFlag = measRecord.get("ip_diffim_PsfDipoleFlux_neg_flag")
-        posFlux = np.abs(measRecord.get("ip_diffim_PsfDipoleFlux_pos_flux"))
+        posFlux = np.abs(measRecord.get("ip_diffim_PsfDipoleFlux_pos_instFlux"))
         posFluxFlag = measRecord.get("ip_diffim_PsfDipoleFlux_pos_flag")
 
         if negFluxFlag or posFluxFlag:
@@ -350,10 +350,10 @@ class DipoleAnalysis(object):
 
         @param source  The source that will be examined"""
 
-        posflux = source.get("ip_diffim_PsfDipoleFlux_pos_flux")
-        posfluxErr = source.get("ip_diffim_PsfDipoleFlux_pos_fluxErr")
-        negflux = source.get("ip_diffim_PsfDipoleFlux_neg_flux")
-        negfluxErr = source.get("ip_diffim_PsfDipoleFlux_neg_fluxErr")
+        posflux = source.get("ip_diffim_PsfDipoleFlux_pos_instFlux")
+        posfluxErr = source.get("ip_diffim_PsfDipoleFlux_pos_instFluxErr")
+        negflux = source.get("ip_diffim_PsfDipoleFlux_neg_instFlux")
+        negfluxErr = source.get("ip_diffim_PsfDipoleFlux_neg_instFluxErr")
 
         # Not a dipole!
         if (posflux < 0) is (negflux < 0):

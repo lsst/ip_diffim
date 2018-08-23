@@ -885,12 +885,12 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         for pos_neg in ['pos', 'neg']:
 
             key = schema.addField(
-                schema.join(name, pos_neg, "flux"), type=float, units="count",
+                schema.join(name, pos_neg, "instFlux"), type=float, units="count",
                 doc="Dipole {0} lobe flux".format(pos_neg))
             setattr(self, ''.join((pos_neg, 'FluxKey')), key)
 
             key = schema.addField(
-                schema.join(name, pos_neg, "fluxErr"), type=float, units="pixel",
+                schema.join(name, pos_neg, "instFluxErr"), type=float, units="pixel",
                 doc="1-sigma uncertainty for {0} dipole flux".format(pos_neg))
             setattr(self, ''.join((pos_neg, 'FluxErrKey')), key)
 
@@ -907,7 +907,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             setattr(self, ''.join(('centroidKey', x_y.upper())), key)
 
         self.fluxKey = schema.addField(
-            schema.join(name, "flux"), type=float, units="count",
+            schema.join(name, "instFlux"), type=float, units="count",
             doc="Dipole overall flux")
 
         self.orientationKey = schema.addField(

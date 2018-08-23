@@ -111,7 +111,7 @@ class KernelCandidateQa(object):
         """Add the to-be-generated QA keys to the Source schema"""
         schema = inSourceCatalog.getSchema()
         inKeys = []
-        psfDef = inSourceCatalog.getPsfFluxDefinition()
+        psfDef = inSourceCatalog.schema.getAliasMap().get("slot_PsfFlux")
         centroidDef = inSourceCatalog.getCentroidDefinition()
         shapeDef = inSourceCatalog.getShapeDefinition()
         for n in schema.getNames():

@@ -184,8 +184,8 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         offsets = params.offsets
         for i, r1 in enumerate(sources):
             result = r1.extract("ip_diffim_DipoleFit*")
-            self.assertFloatsAlmostEqual((result['ip_diffim_DipoleFit_pos_flux'] +
-                                          abs(result['ip_diffim_DipoleFit_neg_flux']))/2.,
+            self.assertFloatsAlmostEqual((result['ip_diffim_DipoleFit_pos_instFlux'] +
+                                          abs(result['ip_diffim_DipoleFit_neg_instFlux']))/2.,
                                          params.flux[i], rtol=rtol)
             self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_centroid_x'],
                                          params.xc[i] + offsets[i], rtol=rtol)
@@ -201,10 +201,10 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
 
             # compare to the original ip_diffim_PsfDipoleFlux measurements
             result2 = r1.extract("ip_diffim_PsfDipoleFlux*")
-            self.assertFloatsAlmostEqual((result['ip_diffim_DipoleFit_pos_flux'] +
-                                          abs(result['ip_diffim_DipoleFit_neg_flux']))/2.,
-                                         (result2['ip_diffim_PsfDipoleFlux_pos_flux'] +
-                                          abs(result2['ip_diffim_PsfDipoleFlux_neg_flux']))/2.,
+            self.assertFloatsAlmostEqual((result['ip_diffim_DipoleFit_pos_instFlux'] +
+                                          abs(result['ip_diffim_DipoleFit_neg_instFlux']))/2.,
+                                         (result2['ip_diffim_PsfDipoleFlux_pos_instFlux'] +
+                                          abs(result2['ip_diffim_PsfDipoleFlux_neg_instFlux']))/2.,
                                          rtol=rtol)
             self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_centroid_x'],
                                          result2['ip_diffim_PsfDipoleFlux_pos_centroid_x'],

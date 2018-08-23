@@ -73,7 +73,7 @@ KernelCandidate<PixelT>::KernelCandidate(SourcePtr const& source, MaskedImagePtr
           _varianceEstimate(),
           _policy(policy),
           _source(source),
-          _coreFlux(source->getPsfFlux()),
+          _coreFlux(source->getPsfInstFlux()),
           _isInitialized(false),
           _useRegularization(false),
           _fitForBackground(_policy.getBool("fitForBackground")),

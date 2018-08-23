@@ -791,7 +791,7 @@ class DipoleTestImage(object):
         dataset = TestDataset(bbox, psfSigma=self.psfSigma, threshold=1.)
 
         for i in range(len(xc)):
-            dataset.addSource(flux=flux[i], centroid=afwGeom.Point2D(xc[i], yc[i]))
+            dataset.addSource(instFlux=flux[i], centroid=afwGeom.Point2D(xc[i], yc[i]))
 
         if schema is None:
             schema = TestDataset.makeMinimalSchema()
