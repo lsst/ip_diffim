@@ -29,7 +29,7 @@ import numpy as np
 import lsst.afw.image as afwImage
 import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
-import lsst.afw.display.ds9 as ds9
+import lsst.afw.display as afwDisplay
 import lsst.log as log
 import lsst.pipe.base as pipeBase
 from lsst.meas.algorithms import SubtractBackgroundConfig
@@ -599,7 +599,7 @@ class PsfMatchTask(pipeBase.Task):
             if name == "lsst.ip.diffim.psfMatch":
                 # enable debug output
                 di.display = True
-                # ds9 mask transparency
+                # display mask transparency
                 di.maskTransparency = 80
                 # show all the candidates and residuals
                 di.displayCandidates = True
@@ -765,7 +765,7 @@ class PsfMatchTask(pipeBase.Task):
         maskTransparency = lsstDebug.Info(__name__).maskTransparency
         if not maskTransparency:
             maskTransparency = 0
-        ds9.setMaskTransparency(maskTransparency)
+        afwDisplay.setDefaultMaskTransparency(maskTransparency)
 
         if displayCandidates:
             diutils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground,

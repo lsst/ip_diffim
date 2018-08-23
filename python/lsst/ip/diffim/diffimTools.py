@@ -227,9 +227,9 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     tMi = afwImage.MaskedImageF(tim, tmask, tvar)
 
     if display:
-        import lsst.afw.display.ds9 as ds9
-        ds9.mtv(tMi, frame=1)
-        ds9.mtv(sMi, frame=2)
+        import lsst.afw.display as afwDisplay
+        afwDisplay.Display(frame=1).mtv(tMi)
+        afwDisplay.Display(frame=2).mtv(sMi)
 
     # Finally, make a kernelSet from these 2 images
     kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0),

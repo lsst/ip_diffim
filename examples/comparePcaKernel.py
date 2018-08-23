@@ -25,12 +25,12 @@
 import os
 import sys
 import lsst.utils
+import lsst.afw.display as afwDisplay
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
-import lsst.afw.display.ds9 as ds9
 
 display = True
 
@@ -123,14 +123,14 @@ for idx in range(min(5, len(basisList1))):
     kernel = basisList1[idx]
     im = afwImage.ImageD(spatialKernel1.getDimensions())
     ksum = kernel.computeImage(im, False)
-    ds9.mtv(im, frame=frame)
+    afwDisplay.Display(frame=frame).mtv(im, title="delta function")
     frame += 1
 
 for idx in range(min(5, len(basisList2))):
     kernel = basisList2[idx]
     im = afwImage.ImageD(spatialKernel2.getDimensions())
     ksum = kernel.computeImage(im, False)
-    ds9.mtv(im, frame=frame)
+    afwDisplay.Display(frame=frame).mtv(im, title="alard lupton")
     frame += 1
 
 
@@ -138,5 +138,5 @@ for idx in range(min(5, len(basisList3))):
     kernel = basisList3[idx]
     im = afwImage.ImageD(spatialKernel3.getDimensions())
     ksum = kernel.computeImage(im, False)
-    ds9.mtv(im, frame=frame)
+    afwDisplay.Display(frame=frame).mtv(im, title="regularized delta function")
     frame += 1

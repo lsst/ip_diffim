@@ -24,8 +24,8 @@
 import os
 import sys
 
+import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
-import lsst.afw.display.ds9 as ds9
 import lsst.daf.base as dafBase
 import lsst.meas.algorithms as measAlg
 from lsst.afw.geom import makeSkyWcs
@@ -113,8 +113,8 @@ def run(args):
         config.kernel.active.sizeCellY = 128
 
     if args.debug:
-        ds9.mtv(templateExp, frame=1, title="Example script: Input Template")
-        ds9.mtv(scienceExp, frame=2, title="Example script: Input Science Image")
+        afwDisplay.Display(frame=1).mtv(templateExp, title="Example script: Input Template")
+        afwDisplay.Display(frame=2).mtv(scienceExp, title="Example script: Input Science Image")
 
     # Create the Task
     psfMatchTask = MyImagePsfMatchTask(config=config)
@@ -128,9 +128,11 @@ def run(args):
             frame = debug.lsstDebug.frame + 1
         except Exception:
             frame = 3
-        ds9.mtv(result.matchedExposure, frame=frame, title="Example script: Matched Template Image")
+        afwDisplay.Display(frame=frame).mtv(result.matchedExposure,
+                                            title="Example script: Matched Template Image")
         if "subtractedExposure" in result.getDict():
-            ds9.mtv(result.subtractedExposure, frame=frame+1, title="Example script: Subtracted Image")
+            afwDisplay.Display(frame=frame + 1).mtv(result.subtractedExposure,
+                                                    title="Example script: Subtracted Image")
 
 
 if __name__ == "__main__":

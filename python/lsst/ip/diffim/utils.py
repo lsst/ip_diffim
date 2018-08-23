@@ -27,12 +27,11 @@ __all__ = ["DipoleTestImage"]
 import numpy as np
 
 import lsst.afw.detection as afwDet
+import lsst.afw.display as afwDisplay
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
-import lsst.afw.display.ds9 as ds9
-import lsst.afw.display.utils as displayUtils
 from lsst.log import Log
 import lsst.meas.algorithms as measAlg
 import lsst.meas.base as measBase
@@ -40,20 +39,22 @@ from .dipoleFitTask import DipoleFitAlgorithm
 from . import diffimLib
 from . import diffimTools
 
+afwDisplay.setDefaultMaskTransparency(75)
 keptPlots = False                       # Have we arranged to keep spatial plots open?
 
 
-def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=ds9.GREEN, symb="+", size=2):
+def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=afwDisplay.GREEN, symb="+", size=2):
     """Draw the (XAstrom, YAstrom) positions of a set of Sources.  Image has the given XY0"""
 
-    with ds9.Buffering():
+    disp = afwDisplay.afwDisplay(frame=frame)
+    with disp.Buffering():
         for s in sSet:
             xc, yc = s.getXAstrom() - xy0[0], s.getYAstrom() - xy0[1]
 
             if symb == "id":
-                ds9.dot(str(s.getId()), xc, yc, frame=frame, ctype=ctype, size=size)
+                disp.dot(str(s.getId()), xc, yc, ctype=ctype, size=size)
             else:
-                ds9.dot(symb, xc, yc, frame=frame, ctype=ctype, size=size)
+                disp.dot(symb, xc, yc, ctype=ctype, size=size)
 
 
 # Kernel display utilities
@@ -63,15 +64,16 @@ def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=ds9.GREEN, symb="+", size=2):
 def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
                            ctype=None, ctypeUnused=None, ctypeBad=None, size=3,
                            frame=None, title="Spatial Cells"):
-    """Show the SpatialCells.  If symb is something that ds9.dot
+    """Show the SpatialCells.  If symb is something that display.dot
     understands (e.g. "o"), the top nMaxPerCell candidates will be
     indicated with that symbol, using ctype and size"""
 
-    ds9.mtv(maskedIm, frame=frame, title=title)
-    with ds9.Buffering():
+    disp = afwDisplay.Display(frame=frame)
+    disp.mtv(maskedIm, title=title)
+    with disp.Buffering():
         origin = [-maskedIm.getX0(), -maskedIm.getY0()]
         for cell in kernelCellSet.getCellList():
-            displayUtils.drawBBox(cell.getBBox(), origin=origin, frame=frame)
+            afwDisplay.utils.drawBBox(cell.getBBox(), origin=origin, display=disp)
 
             goodies = ctypeBad is None
             for cand in cell.begin(goodies):
@@ -86,14 +88,14 @@ def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
                     continue
 
                 if color:
-                    ds9.dot(symb, xc, yc, frame=frame, ctype=color, size=size)
+                    disp.dot(symb, xc, yc, ctype=color, size=size)
 
                     if showChi2:
                         rchi2 = cand.getChi2()
                         if rchi2 > 1e100:
                             rchi2 = np.nan
-                        ds9.dot("%d %.1f" % (cand.getId(), rchi2),
-                                xc - size, yc - size - 4, frame=frame, ctype=color, size=size)
+                        disp.dot("%d %.1f" % (cand.getId(), rchi2),
+                                 xc - size, yc - size - 4, ctype=color, size=size)
 
 
 def showDiaSources(sources, exposure, isFlagged, isDipole, frame=None):
@@ -103,27 +105,28 @@ def showDiaSources(sources, exposure, isFlagged, isDipole, frame=None):
     # Show us the ccandidates
     #
     # Too many mask planes in diffims
+    disp = afwDisplay.Display(frame=frame)
     for plane in ("BAD", "CR", "EDGE", "INTERPOlATED", "INTRP", "SAT", "SATURATED"):
-        ds9.setMaskPlaneVisibility(plane, False)
+        disp.setMaskPlaneColor(plane, color="ignore")
 
-    mos = displayUtils.Mosaic()
+    mos = afwDisplay.utils.Mosaic()
     for i in range(len(sources)):
         source = sources[i]
         badFlag = isFlagged[i]
         dipoleFlag = isDipole[i]
         bbox = source.getFootprint().getBBox()
         stamp = exposure.Factory(exposure, bbox, True)
-        im = displayUtils.Mosaic(gutter=1, background=0, mode="x")
+        im = afwDisplay.utils.Mosaic(gutter=1, background=0, mode="x")
         im.append(stamp.getMaskedImage())
         lab = "%.1f,%.1f:" % (source.getX(), source.getY())
         if badFlag:
-            ctype = ds9.RED
+            ctype = afwDisplay.RED
             lab += "BAD"
         if dipoleFlag:
-            ctype = ds9.YELLOW
+            ctype = afwDisplay.YELLOW
             lab += "DIPOLE"
         if not badFlag and not dipoleFlag:
-            ctype = ds9.GREEN
+            ctype = afwDisplay.GREEN
             lab += "OK"
         mos.append(im.makeMosaic(), lab, ctype)
     title = "Dia Sources"
@@ -142,9 +145,9 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
     # Show us the ccandidates
     #
     if kernels:
-        mos = displayUtils.Mosaic(gutter=5, background=0)
+        mos = afwDisplay.utils.Mosaic(gutter=5, background=0)
     else:
-        mos = displayUtils.Mosaic(gutter=5, background=-1)
+        mos = afwDisplay.utils.Mosaic(gutter=5, background=-1)
     #
     candidateCenters = []
     candidateCentersBad = []
@@ -164,7 +167,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
             if not showBadCandidates and cand.isBad():
                 continue
 
-            im_resid = displayUtils.Mosaic(gutter=1, background=-0.5, mode="x")
+            im_resid = afwDisplay.utils.Mosaic(gutter=1, background=-0.5, mode="x")
 
             try:
                 im = cand.getScienceMaskedImage()
@@ -219,12 +222,13 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
             im = im_resid.makeMosaic()
 
             lab = "%d chi^2 %.1f" % (cand.getId(), rchi2)
-            ctype = ds9.RED if cand.isBad() else ds9.GREEN
+            ctype = afwDisplay.RED if cand.isBad() else afwDisplay.GREEN
 
             mos.append(im, lab, ctype)
 
             if False and np.isnan(rchi2):
-                ds9.mtv(cand.getScienceMaskedImage.getImage(), title="candidate", frame=1)
+                disp = afwDisplay.Display(frame=1)
+                disp.mtv(cand.getScienceMaskedImage.getImage(), title="candidate")
                 print("rating", cand.getCandidateRating())
 
             im = cand.getScienceMaskedImage()
@@ -249,7 +253,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
 def showKernelBasis(kernel, frame=None):
     """Display a Kernel's basis images
     """
-    mos = displayUtils.Mosaic()
+    mos = afwDisplay.utils.Mosaic()
 
     for k in kernel.getKernelList():
         im = afwImage.ImageD(k.getDimensions())
@@ -416,7 +420,7 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
                      showCenter=True, showEllipticity=True):
     """Show a mosaic of Kernel images.
     """
-    mos = displayUtils.Mosaic()
+    mos = afwDisplay.utils.Mosaic()
 
     x0 = bbox.getBeginX()
     y0 = bbox.getBeginY()
@@ -472,18 +476,19 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
     mos.makeMosaic(frame=frame, title=title if title else "Model Kernel", mode=nx)
 
     if centers and frame is not None:
+        disp = afwDisplay.Display(frame=frame)
         i = 0
-        with ds9.Buffering():
+        with disp.Buffering():
             for cen, shape in zip(centers, shapes):
                 bbox = mos.getBBox(i)
                 i += 1
                 xc, yc = cen[0] + bbox.getMinX(), cen[1] + bbox.getMinY()
                 if showCenter:
-                    ds9.dot("+", xc, yc, ctype=ds9.BLUE, frame=frame)
+                    disp.dot("+", xc, yc, ctype=afwDisplay.BLUE)
 
                 if showEllipticity:
                     ixx, ixy, iyy = shape
-                    ds9.dot("@:%g,%g,%g" % (ixx, ixy, iyy), xc, yc, frame=frame, ctype=ds9.RED)
+                    disp.dot("@:%g,%g,%g" % (ixx, ixy, iyy), xc, yc, ctype=afwDisplay.RED)
 
     return mos
 
@@ -672,7 +677,7 @@ def printSkyDiffs(sources, wcs):
 
 
 def makeRegions(sources, outfilename, wcs=None):
-    """Create regions file for ds9 from input source list"""
+    """Create regions file for display from input source list"""
     fh = open(outfilename, "w")
     fh.write("global color=red font=\"helvetica 10 normal\" "
              "select=1 highlite=1 edit=1 move=1 delete=1 include=1 fixed=0 source\nfk5\n")
@@ -687,14 +692,15 @@ def makeRegions(sources, outfilename, wcs=None):
     fh.close()
 
 
-def showSourceSetSky(sSet, wcs, xy0, frame=0, ctype=ds9.GREEN, symb="+", size=2):
+def showSourceSetSky(sSet, wcs, xy0, frame=0, ctype=afwDisplay.GREEN, symb="+", size=2):
     """Draw the (RA, Dec) positions of a set of Sources. Image has the XY0."""
-    with ds9.Buffering():
+    disp = afwDisplay.Display(frame=frame)
+    with disp.Buffering():
         for s in sSet:
             (xc, yc) = wcs.skyToPixel(s.getCoord().getRa(), s.getCoord().getDec())
             xc -= xy0[0]
             yc -= xy0[1]
-            ds9.dot(symb, xc, yc, frame=frame, ctype=ctype, size=size)
+            disp.dot(symb, xc, yc, ctype=ctype, size=size)
 
 
 def plotWhisker(results, newWcs):

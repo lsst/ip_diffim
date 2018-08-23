@@ -24,10 +24,10 @@
 import os
 import sys
 
+import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
-import lsst.afw.display.ds9 as ds9
 import lsst.meas.algorithms as measAlg
 from lsst.ip.diffim import ModelPsfMatchTask
 
@@ -117,8 +117,8 @@ def run(args):
         config.kernel.active.sizeCellY = 128
 
     if args.debug:
-        ds9.mtv(templateExp, frame=1, title="Example script: Input Template")
-        ds9.mtv(scienceExp, frame=2, title="Example script: Input Science Image")
+        afwDisplay.Display(frame=1).mtv(templateExp, title="Example script: Input Template")
+        afwDisplay.Display(frame=2).mtv(scienceExp, title="Example script: Input Science Image")
 
     # Create the Task
     psfMatchTask = MyModelPsfMatchTask(config=config)
@@ -132,7 +132,8 @@ def run(args):
             frame = debug.lsstDebug.frame + 1
         except Exception:
             frame = 3
-        ds9.mtv(result.psfMatchedExposure, frame=frame, title="Example script: Matched Science Image")
+        afwDisplay.Display(frame=frame).mtv(result.psfMatchedExposure,
+                                            title="Example script: Matched Science Image")
 
 
 if __name__ == "__main__":

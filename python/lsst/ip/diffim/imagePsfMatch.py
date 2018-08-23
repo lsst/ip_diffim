@@ -37,7 +37,7 @@ from .psfMatch import PsfMatchTask, PsfMatchConfigDF, PsfMatchConfigAL
 from . import utils as dituils
 from . import diffimLib
 from . import diffimTools
-import lsst.afw.display.ds9 as ds9
+import lsst.afw.display as afwDisplay
 
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
@@ -165,7 +165,7 @@ class ImagePsfMatchTask(PsfMatchTask):
             di = lsstDebug.getInfo(name)
             if name == "lsst.ip.diffim.psfMatch":
                 di.display = True                 # enable debug output
-                di.maskTransparency = 80          # ds9 mask transparency
+                di.maskTransparency = 80          # display mask transparency
                 di.displayCandidates = True       # show all the candidates and residuals
                 di.displayKernelBasis = False     # show kernel basis functions
                 di.displayKernelMosaic = True     # show kernel realized across the image
@@ -173,7 +173,7 @@ class ImagePsfMatchTask(PsfMatchTask):
                 di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
             elif name == "lsst.ip.diffim.imagePsfMatch":
                 di.display = True                 # enable debug output
-                di.maskTransparency = 30          # ds9 mask transparency
+                di.maskTransparency = 30          # display mask transparency
                 di.displayTemplate = True         # show full (remapped) template
                 di.displaySciIm = True            # show science image to match to
                 di.displaySpatialCells = True     # show spatial cells
@@ -181,7 +181,7 @@ class ImagePsfMatchTask(PsfMatchTask):
                 di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
             elif name == "lsst.ip.diffim.diaCatalogSourceSelector":
                 di.display = False                # enable debug output
-                di.maskTransparency = 30          # ds9 mask transparency
+                di.maskTransparency = 30          # display mask transparency
                 di.displayExposure = True         # show exposure with candidates indicated
                 di.pauseAtEnd = False             # pause when done
             return di
@@ -303,10 +303,11 @@ class ImagePsfMatchTask(PsfMatchTask):
             frame = debug.lsstDebug.frame + 1
         except Exception:
             frame = 3
-        ds9.mtv(result.matchedExposure, frame=frame, title="Example script: Matched Template Image")
+        afwDisplay.Display(frame=frame).mtv(result.matchedExposure,
+                                            title="Example script: Matched Template Image")
         if "subtractedExposure" in result.getDict():
-            ds9.mtv(result.subtractedExposure, frame=frame+1, title="Example script: Subtracted Image")
-
+            afwDisplay.Display(frame=frame + 1).mtv(result.subtractedExposure,
+                                                    title="Example script: Subtracted Image")
     """
 
     ConfigClass = ImagePsfMatchConfig
@@ -496,7 +497,7 @@ class ImagePsfMatchTask(PsfMatchTask):
         if not maskTransparency:
             maskTransparency = 0
         if display:
-            ds9.setMaskTransparency(maskTransparency)
+            afwDisplay.setDefaultMaskTransparency(maskTransparency)
 
         if not candidateList:
             raise RuntimeError("Candidate list must be populated by makeCandidateList")
@@ -506,11 +507,13 @@ class ImagePsfMatchTask(PsfMatchTask):
             raise RuntimeError("Input images different size")
 
         if display and displayTemplate:
-            ds9.mtv(templateMaskedImage, frame=lsstDebug.frame, title="Image to convolve")
+            disp = afwDisplay.Display(frame=lsstDebug.frame)
+            disp.mtv(templateMaskedImage, title="Image to convolve")
             lsstDebug.frame += 1
 
         if display and displaySciIm:
-            ds9.mtv(scienceMaskedImage, frame=lsstDebug.frame, title="Image to not convolve")
+            disp = afwDisplay.Display(frame=lsstDebug.frame)
+            disp.mtv(scienceMaskedImage, title="Image to not convolve")
             lsstDebug.frame += 1
 
         kernelCellSet = self._buildCellSet(templateMaskedImage,
@@ -519,8 +522,9 @@ class ImagePsfMatchTask(PsfMatchTask):
 
         if display and displaySpatialCells:
             dituils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet,
-                                           symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
-                                           size=4, frame=lsstDebug.frame, title="Image to not convolve")
+                                           symb="o", ctype=afwDisplay.CYAN, ctypeUnused=afwDisplay.YELLOW,
+                                           ctypeBad=afwDisplay.RED, size=4, frame=lsstDebug.frame,
+                                           title="Image to not convolve")
             lsstDebug.frame += 1
 
         if templateFwhmPix and scienceFwhmPix:
@@ -642,15 +646,19 @@ class ImagePsfMatchTask(PsfMatchTask):
         if not maskTransparency:
             maskTransparency = 0
         if display:
-            ds9.setMaskTransparency(maskTransparency)
+            afwDisplay.setDefaultMaskTransparency(maskTransparency)
         if display and displayDiffIm:
-            ds9.mtv(templateExposure, frame=lsstDebug.frame, title="Template")
+            disp = afwDisplay.Display(frame=lsstDebug.frame)
+            disp.mtv(templateExposure, title="Template")
             lsstDebug.frame += 1
-            ds9.mtv(results.matchedExposure, frame=lsstDebug.frame, title="Matched template")
+            disp = afwDisplay.Display(frame=lsstDebug.frame)
+            disp.mtv(results.matchedExposure, title="Matched template")
             lsstDebug.frame += 1
-            ds9.mtv(scienceExposure, frame=lsstDebug.frame, title="Science Image")
+            disp = afwDisplay.Display(frame=lsstDebug.frame)
+            disp.mtv(scienceExposure, title="Science Image")
             lsstDebug.frame += 1
-            ds9.mtv(subtractedExposure, frame=lsstDebug.frame, title="Difference Image")
+            disp = afwDisplay.Display(frame=lsstDebug.frame)
+            disp.mtv(subtractedExposure, title="Difference Image")
             lsstDebug.frame += 1
 
         results.subtractedExposure = subtractedExposure
@@ -719,9 +727,10 @@ class ImagePsfMatchTask(PsfMatchTask):
         if not maskTransparency:
             maskTransparency = 0
         if display:
-            ds9.setMaskTransparency(maskTransparency)
+            afwDisplay.setDefaultMaskTransparency(maskTransparency)
         if display and displayDiffIm:
-            ds9.mtv(subtractedMaskedImage, frame=lsstDebug.frame)
+            disp = afwDisplay.Display(frame=lsstDebug.frame)
+            disp.mtv(subtractedMaskedImage, title="Subtracted masked image")
             lsstDebug.frame += 1
 
         return results

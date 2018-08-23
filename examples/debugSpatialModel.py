@@ -23,6 +23,7 @@
 import os
 import sys
 import lsst.utils
+import lsst.afw.display as afwDisplay
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -30,8 +31,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.log.utils as logUtils
 
-import lsst.afw.display.ds9 as ds9
-import lsst.afw.display.utils as displayUtils
+afwDisplay.setDefaultMaskTransparency(75)
 
 subBackground = True
 display = True
@@ -80,9 +80,9 @@ else:
 
 
 frame = 0
-ds9.mtv(templateExposure, frame=frame, title="Template")
+afwDisplay.Display(frame=frame).mtv(templateExposure, title="Template")
 frame += 1
-ds9.mtv(scienceExposure, frame=frame, title="Sci Im")
+afwDisplay.Display(frame=frame).mtv(scienceExposure, title="Sci Im")
 
 psfmatch = ipDiffim.ImagePsfMatchTask(config=config)
 try:
@@ -106,7 +106,7 @@ if False:
 
 # Lets see what we got
 if display:
-    mos = displayUtils.Mosaic()
+    mos = afwDisplay.utils.Mosaic()
 
     # Inputs
     for cell in kernelCellSet.getCellList():
@@ -130,7 +130,7 @@ if display:
 
     mosaic = mos.makeMosaic()
     frame += 1
-    ds9.mtv(mosaic, frame=frame, title="Raw Kernels")
+    afwDisplay.Display(frame=frame).mtv(mosaic, title="Raw Kernels")
     mos.drawLabels(frame=frame)
 
     # KernelCandidates
@@ -147,7 +147,7 @@ if display:
         mos.append(im, "K%d" % (idx))
     mosaic = mos.makeMosaic()
     frame += 1
-    ds9.mtv(mosaic, frame=frame, title="Kernel Bases")
+    afwDisplay.Display(frame=frame).mtv(mosaic, title="Kernel Bases")
     mos.drawLabels(frame=frame)
 
     # Spatial model
@@ -167,7 +167,7 @@ if display:
 
     mosaic = mos.makeMosaic()
     frame += 1
-    ds9.mtv(mosaic, frame=frame, title="Spatial Kernels")
+    afwDisplay.Display(frame=frame).mtv(mosaic, title="Spatial Kernels")
     mos.drawLabels(frame=frame)
 
     # Background
@@ -175,7 +175,7 @@ if display:
                                    templateExposure.getHeight()), 0)
     backgroundIm += spatialBg
     frame += 1
-    ds9.mtv(backgroundIm, frame=frame, title="Background model")
+    afwDisplay.Display(frame=frame).mtv(backgroundIm, title="Background model")
 
     # Diffim!
     diffIm = ipDiffim.convolveAndSubtract(templateExposure.getMaskedImage(),
@@ -183,7 +183,7 @@ if display:
                                           spatialKernel,
                                           spatialBg)
     frame += 1
-    ds9.mtv(diffIm, frame=frame, title="Diffim")
+    afwDisplay.Display(frame=frame).mtv(diffIm, title="Diffim")
 
 
 # examples/runSpatialModel.py $AFWDATA_DIR/DC3a-Sim/sci/v5-e0/v5-e0-c011-a00.sci

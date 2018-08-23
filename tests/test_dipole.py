@@ -25,7 +25,6 @@ import numpy as np
 
 import lsst.utils.tests
 import lsst.daf.base as dafBase
-import lsst.afw.display.ds9 as ds9
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
@@ -34,6 +33,14 @@ import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
 
 display = False
+try:
+    display
+except NameError:
+    display = False
+else:
+    import lsst.afw.display as afwDisplay
+    afwDisplay.setDefaultMaskTransparency(75)
+
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 
@@ -63,8 +70,8 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     var.set(1.0)
 
     if display:
-        ds9.mtv(image, frame=1, title="Original image")
-        ds9.mtv(image.getVariance(), frame=2, title="Original variance")
+        afwDisplay.Display(frame=1).mtv(image, title="Original image")
+        afwDisplay.Display(frame=2).mtv(image.getVariance(), title="Original variance")
 
     # Create Psf for dipole creation and measurement
     psfSize = 17
@@ -87,7 +94,7 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     array[yn:yn+psfh, xn:xn+psfw] -= psfim.getArray()
 
     if display:
-        ds9.mtv(image, frame=3, title="With dipole")
+        afwDisplay.Display(frame=3).mtv(image, title="With dipole")
 
     # Create an exposure, detect positive and negative peaks separately
     exp = afwImage.makeExposure(image)
@@ -100,7 +107,7 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     table = afwTable.SourceTable.make(schema)
     results = task.makeSourceCatalog(table, exp)
     if display:
-        ds9.mtv(image, frame=4, title="Detection plane")
+        afwDisplay.Display(frame=4).mtv(image, title="Detection plane")
 
     # Merge them together
     assert(len(results.sources) == 2)
@@ -223,8 +230,8 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         matrixNorm = 1. / np.sqrt(np.median(var.getArray()))
 
         if display:
-            ds9.mtv(model, frame=5, title="Unfitted model")
-            ds9.mtv(data, frame=6, title="Data")
+            afwDisplay.Display(frame=5).mtv(model, title="Unfitted model")
+            afwDisplay.Display(frame=6).mtv(data, title="Data")
 
         posPsfSum = np.sum(posPsf.getArray())
         negPsfSum = np.sum(negPsf.getArray())
@@ -257,18 +264,18 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         fitSubim = type(fitted)(fitted, posOverlapBBox)
         fitSubim += posFit
         if display:
-            ds9.mtv(fitted, frame=7, title="Fitted model")
+            afwDisplay.Display(frame=7).mtv(fitted, title="Fitted model")
 
         fitted -= data
 
         if display:
-            ds9.mtv(fitted, frame=8, title="Residuals")
+            afwDisplay.Display(frame=8).mtv(fitted, title="Residuals")
 
         fitted *= fitted
         fitted /= var
 
         if display:
-            ds9.mtv(fitted, frame=9, title="Chi2")
+            afwDisplay.Display(frame=9).mtv(fitted, title="Chi2")
 
         return fneg, negPsfSum, fpos, posPsfSum, fitted
 

@@ -10,7 +10,6 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.config as pexConfig
 import lsst.log.utils as logUtils
-import lsst.afw.display.ds9 as ds9
 import lsst.afw.table as afwTable
 
 logUtils.traceSetAt("ip.diffim", 4)
@@ -20,6 +19,15 @@ try:
     defDataDir = lsst.utils.getPackageDir('afwdata')
 except Exception:
     defDataDir = None
+
+try:
+    display
+    defDataDir
+except NameError:
+    display = False
+else:
+    import lsst.afw.display as afwDisplay
+    afwDisplay.setDefaultMaskTransparency(75)
 
 
 class DiffimTestCases(lsst.utils.tests.TestCase):
@@ -496,9 +504,12 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 nSeen += 1
         self.assertEqual(nSeen, 1)
 
-    def dontTestDisp(self):
-        ds9.mtv(self.scienceImage2, frame=1)
-        ds9.mtv(self.templateExposure2, frame=2)
+    @unittest.skipIf(not display, "display is None: skipping testDisp")
+    def testDisp(self):
+        afwDisplay.Display(frame=1).mtv(self.scienceImage2,
+                                        title=self._testMethodName + ": scienceImage2")
+        afwDisplay.Display(frame=2).mtv(self.templateExposure2,
+                                        title=self._testMethodName + ": templateExposure2")
 
     def tearDown(self):
         del self.policy

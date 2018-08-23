@@ -1,12 +1,13 @@
 import sys
 import optparse
 
+import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
-import lsst.afw.display.ds9 as ds9
 import lsst.log.utils as logUtils
-
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
+
+afwDisplay.setDefaultMaskTransparency(75)
 
 
 def main():
@@ -111,7 +112,7 @@ Notes:
         print(spatialKernel.getSpatialParameters())
 
     if display:
-        ds9.mtv(matchMaskedImage)
+        afwDisplay.Display().mtv(matchMaskedImage, title="Match Masked Image")
 
 
 def run():

@@ -28,9 +28,9 @@ import numpy as np
 
 import lsst.utils
 import lsst.daf.base as dafBase
+import lsst.afw.display as afwDisplay
 import lsst.afw.table as afwTable
 import lsst.afw.image as afwImage
-import lsst.afw.display.ds9 as ds9
 import lsst.meas.algorithms as measAlg
 from lsst.meas.algorithms.detection import SourceDetectionTask
 from lsst.ip.diffim import DipoleMeasurementTask, DipoleAnalysis
@@ -66,7 +66,7 @@ def loadData(imFile=None):
 def run(args):
     exposure = loadData(args.image)
     if args.debug:
-        ds9.mtv(exposure, frame=1)
+        afwDisplay.Display(frame=1).mtv(exposure)
 
     schema = afwTable.SourceTable.makeMinimalSchema()
 

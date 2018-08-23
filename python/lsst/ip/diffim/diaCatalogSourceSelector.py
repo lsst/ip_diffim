@@ -24,7 +24,7 @@ import numpy as np
 
 from lsst.pipe.base import Struct
 import lsst.pex.config as pexConfig
-import lsst.afw.display.ds9 as ds9
+import lsst.afw.display as afwDisplay
 import lsst.meas.algorithms as measAlg
 
 __all__ = ["DiaCatalogSourceSelectorConfig", "DiaCatalogSourceSelectorTask"]
@@ -172,9 +172,9 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseSourceSelectorTask):
 
         mi = exposure.getMaskedImage()
 
-        if display:
-            if displayExposure:
-                ds9.mtv(mi, title="Kernel candidates", frame=lsstDebug.frame)
+        if display and displayExposure:
+            disp = afwDisplay.Display(frame=lsstDebug.frame)
+            disp.mtv(mi, title="Kernel candidates")
         #
         # Look for flags in each Source
         #
@@ -196,7 +196,7 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseSourceSelectorTask):
             if not isGoodSource(source):
                 if display and displayExposure:
                     symbs.append("+")
-                    ctypes.append(ds9.RED)
+                    ctypes.append(afwDisplay.RED)
             else:
                 isStar = not ref.get("resolved")
                 isVar = not ref.get("photometric")
@@ -219,17 +219,17 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseSourceSelectorTask):
                     selected[i] = True
                     if display and displayExposure:
                         symbs.append("+")
-                        ctypes.append(ds9.GREEN)
+                        ctypes.append(afwDisplay.GREEN)
                 elif display and displayExposure:
                     symbs.append("o")
-                    ctypes.append(ds9.BLUE)
+                    ctypes.append(afwDisplay.BLUE)
 
         if display and displayExposure:
-            with ds9.Buffering():
+            disp = afwDisplay.Display(frame=lsstDebug.frame)
+            with disp.Buffering():
                 for (ref, source, d), symb, ctype in zip(matches, symbs, ctypes):
-                    if display and displayExposure:
-                        ds9.dot(symb, source.getX() - mi.getX0(), source.getY() - mi.getY0(),
-                                size=4, ctype=ctype, frame=lsstDebug.frame)
+                    disp.dot(symb, source.getX() - mi.getX0(), source.getY() - mi.getY0(),
+                             size=4, ctype=ctype)
 
         if display:
             lsstDebug.frame += 1

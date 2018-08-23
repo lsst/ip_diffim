@@ -1,3 +1,4 @@
+import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
@@ -5,7 +6,7 @@ import lsst.ip.diffim as ipDiffim
 import numpy as num
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
-import lsst.afw.display.ds9 as ds9
+
 verbosity = 4
 logUtils.traceSetAt("ip.diffim", verbosity)
 
@@ -142,7 +143,7 @@ def fft(im1, im2, fftSize):
     kim = afwImage.ImageF(fftSize)
     kim.getArray()[:] = kfft
 
-    ds9.mtv(kim, frame=5)
+    afwDisplay.Display(frame=5).mtv(kim, title="fft image")
 
 
 # If we don't add noise, the edges of the Gaussian images go to zero,
@@ -213,13 +214,13 @@ if __name__ == '__main__':
         kernel.computeImage(kimage, False)
         diffim = kc.getDifferenceImage(ipDiffim.KernelCandidateF.ORIG)
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi, title="Template image")
         fnum += 1
-        ds9.mtv(smi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi, title="Science image")
         fnum += 1
-        ds9.mtv(kimage, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage, title="Kernal image")
         fnum += 1
-        ds9.mtv(diffim, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim, title="Difference image")
         fnum += 1
 
         if writeFits:
@@ -238,13 +239,13 @@ if __name__ == '__main__':
         kernel.computeImage(kimage, False)
         diffim = kc.getDifferenceImage(ipDiffim.KernelCandidateF.ORIG)
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi, title="Template image")
         fnum += 1
-        ds9.mtv(smi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi, title="Science image")
         fnum += 1
-        ds9.mtv(kimage, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage, title="Kernal image")
         fnum += 1
-        ds9.mtv(diffim, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim, title="Difference image")
         fnum += 1
 
         if writeFits:
@@ -270,22 +271,22 @@ if __name__ == '__main__':
         kernel2.computeImage(kimage2, False)
         diffim2 = kc2.getDifferenceImage(ipDiffim.KernelCandidateF.ORIG)
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi, title="Template image")
         fnum += 1
-        ds9.mtv(smi1, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi1, title="Science image: 1")
         fnum += 1
-        ds9.mtv(kimage1, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage1, title="Kernal image: 1")
         fnum += 1
-        ds9.mtv(diffim1, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim1, title="Difference image: 1")
         fnum += 1
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi, title="Template image")
         fnum += 1
-        ds9.mtv(smi2, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi2, title="Science image: 2")
         fnum += 1
-        ds9.mtv(kimage2, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage2, title="Kernal image: 2")
         fnum += 1
-        ds9.mtv(diffim2, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim2, title="Difference image: 2")
         fnum += 1
 
         if writeFits:

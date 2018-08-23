@@ -28,6 +28,7 @@ import unittest
 import lsst.utils.tests as tests
 
 import lsst.utils
+import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -36,7 +37,7 @@ from lsst.log import Log
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
-import lsst.afw.display.ds9 as ds9
+afwDisplay.setDefaultMaskTransparency(75)
 
 verbosity = 2
 logUtils.traceSetAt("ip.diffim", verbosity)
@@ -130,14 +131,15 @@ class DiffimTestCases(unittest.TestCase):
         d2 = ipDiffim.convolveAndSubtract(tmi, smi, fk2, bg2)
 
         if display:
-            ds9.mtv(tmi, frame=frame0+0)
-            ds9.dot("Cand %d" % (cand.getId()), 0, 0, frame=frame0+0)
+            disp = afwDisplay.Display(frame=frame0)
+            disp.mtv(tmi, title="Template Masked Image")
+            disp.dot("Cand %d" % (cand.getId()), 0, 0)
 
-            ds9.mtv(smi, frame=frame0+1)
-            ds9.mtv(im1, frame=frame0+2)
-            ds9.mtv(d1, frame=frame0+3)
-            ds9.mtv(im2, frame=frame0+4)
-            ds9.mtv(d2, frame=frame0+5)
+            afwDisplay.Display(frame=frame0 + 1).mtv(smi, title="Science Masked Image")
+            afwDisplay.Display(frame=frame0 + 2).mtv(im1, title="Masked Image: 1")
+            afwDisplay.Display(frame=frame0 + 3).mtv(d1, title="Difference Image: 1")
+            afwDisplay.Display(frame=frame0 + 4).mtv(im2, title="Masked Image: 2")
+            afwDisplay.Display(frame=frame0 + 5).mtv(d2, title="Difference Image: 2")
 
         logger.debug("Full Spatial Model")
         self.stats(cand.getId(), d1)

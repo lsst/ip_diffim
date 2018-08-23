@@ -1,8 +1,8 @@
 import lsst.ip.diffim as ipDiffim
+import lsst.afw.display as afwDisplay
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.afw.display.ds9 as ds9
 import lsst.log.utils as logUtils
 import numpy as num
 
@@ -210,11 +210,11 @@ def testAutoCorrelation(orderMake, orderFit, inMi=None, display=False):
     afwMath.convolve(cMi, inMi, spatialKernel, True)
 
     if display:
-        ds9.mtv(inMi.getImage(), frame=1)
-        ds9.mtv(inMi.getVariance(), frame=2)
+        afwDisplay.Display(frame=1).mtv(inMi.getImage())
+        afwDisplay.Display(frame=2).mtv(inMi.getVariance())
 
-        ds9.mtv(cMi.getImage(), frame=3)
-        ds9.mtv(cMi.getVariance(), frame=4)
+        afwDisplay.Display(frame=3).mtv(cMi.getImage())
+        afwDisplay.Display(frame=4).mtv(cMi.getVariance())
 
     subconfig.spatialKernelOrder = orderFit
     subconfig.sizeCellX = stride

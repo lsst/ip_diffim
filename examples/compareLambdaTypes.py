@@ -5,6 +5,7 @@ import unittest
 
 import lsst.utils.tests as tests
 import lsst.utils
+import lsst.afw.display as afwDisplay
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -13,8 +14,6 @@ import lsst.ip.diffim.diffimTools as diffimTools
 from lsst.log import Log
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
-
-import lsst.afw.display.ds9 as ds9
 
 logUtils.traceSetAt("ip.diffim", 6)
 logger = Log.getLogger("ip.diffim.compareLambdaTypes")
@@ -197,10 +196,10 @@ class DiffimTestCases(unittest.TestCase):
                                                                              dmean1, dstd1, vmean1)
         logger.debug(res)
         if display:
-            ds9.mtv(tmi, frame=1)  # ds9 switches frame 0 and 1 for some reason
-            ds9.mtv(smi, frame=0)
-            ds9.mtv(kImageOut1, frame=2)
-            ds9.mtv(diffIm1, frame=3)
+            afwDisplay.Display(frame=1).mtv(tmi, title="Template image")  # ds9 switches frame 0 and 1
+            afwDisplay.Display(frame=0).mtv(smi, title="Sciencte image")
+            afwDisplay.Display(frame=2).mtv(kImageOut1, title="Kernal image: 1")
+            afwDisplay.Display(frame=3).mtv(diffIm1, title="Difference image: 1")
         if writefits:
             tmi.writeFits('t.fits')
             smi.writeFits('s.fits')
@@ -217,10 +216,10 @@ class DiffimTestCases(unittest.TestCase):
                                                                                 dmean2, dstd2, vmean2)
         logger.debug(res)
         if display:
-            ds9.mtv(tmi, frame=4)
-            ds9.mtv(smi, frame=5)
-            ds9.mtv(kImageOut2, frame=6)
-            ds9.mtv(diffIm2, frame=7)
+            afwDisplay.Display(frame=4).mtv(tmi, title="Template image")
+            afwDisplay.Display(frame=5).mtv(smi, title="Science image")
+            afwDisplay.Display(frame=6).mtv(kImageOut2, title="Kernal image: 2")
+            afwDisplay.Display(frame=7).mtv(diffIm2, title="Difference image: 2")
         if writefits:
             kImageOut2.writeFits('k2.fits')
             diffIm2.writeFits('d2')
@@ -235,10 +234,10 @@ class DiffimTestCases(unittest.TestCase):
                                                                                 dmean3, dstd3, vmean3)
         logger.debug(res)
         if display:
-            ds9.mtv(tmi, frame=8)
-            ds9.mtv(smi, frame=9)
-            ds9.mtv(kImageOut3, frame=10)
-            ds9.mtv(diffIm3, frame=11)
+            afwDisplay.Display(frame=8).mtv(tmi)
+            afwDisplay.Display(frame=9).mtv(smi)
+            afwDisplay.Display(frame=10).mtv(kImageOut3)
+            afwDisplay.Display(frame=11).mtv(diffIm3)
         if writefits:
             kImageOut2.writeFits('k3.fits')
             diffIm2.writeFits('d3')
@@ -253,10 +252,10 @@ class DiffimTestCases(unittest.TestCase):
                                                                                  dmean4, dstd4, vmean4)
         logger.debug(res)
         if display:
-            ds9.mtv(tmi, frame=12)
-            ds9.mtv(smi, frame=13)
-            ds9.mtv(kImageOut4, frame=14)
-            ds9.mtv(diffIm4, frame=15)
+            afwDisplay.Display(frame=12).mtv(tmi)
+            afwDisplay.Display(frame=13).mtv(smi)
+            afwDisplay.Display(frame=14).mtv(kImageOut4)
+            afwDisplay.Display(frame=15).mtv(diffIm4)
         if writefits:
             kImageOut2.writeFits('k4.fits')
             diffIm2.writeFits('d4')

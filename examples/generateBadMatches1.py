@@ -5,7 +5,7 @@ import lsst.ip.diffim as ipDiffim
 import numpy as num
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
-import lsst.afw.display.ds9 as ds9
+import lsst.afw.display as afwDisplay
 verbosity = 4
 logUtils.traceSetAt("ip.diffim", verbosity)
 
@@ -90,7 +90,7 @@ def fft(im1, im2, fftSize):
     kim = afwImage.ImageF(fftSize)
     kim.getArray()[:] = kfft
 
-    ds9.mtv(kim, frame=5)
+    afwDisplay.Display(frame=5).mtv(kim)
 
 
 # If we don't add noise, the edges of the Gaussian images go to zero,
@@ -155,13 +155,13 @@ if __name__ == '__main__':
         kernel.computeImage(kimage, False)
         diffim = kc.getDifferenceImage(ipDiffim.KernelCandidateF.ORIG)
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi)
         fnum += 1
-        ds9.mtv(smi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi)
         fnum += 1
-        ds9.mtv(kimage, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage)
         fnum += 1
-        ds9.mtv(diffim, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim)
         fnum += 1
 
         if writeFits:
@@ -180,13 +180,13 @@ if __name__ == '__main__':
         kernel.computeImage(kimage, False)
         diffim = kc.getDifferenceImage(ipDiffim.KernelCandidateF.ORIG)
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi)
         fnum += 1
-        ds9.mtv(smi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi)
         fnum += 1
-        ds9.mtv(kimage, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage)
         fnum += 1
-        ds9.mtv(diffim, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim)
         fnum += 1
 
         if writeFits:

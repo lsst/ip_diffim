@@ -22,6 +22,7 @@
 import numpy as np
 
 from . import diffimLib
+import lsst.afw.display as afwDisplay
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -31,7 +32,6 @@ import lsst.pipe.base as pipeBase
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigAL
 from . import utils as dituils
-import lsst.afw.display.ds9 as ds9
 
 __all__ = ("ModelPsfMatchTask", "ModelPsfMatchConfig")
 
@@ -133,7 +133,7 @@ class ModelPsfMatchTask(PsfMatchTask):
             di = lsstDebug.getInfo(name)
             if name == "lsst.ip.diffim.psfMatch":
                 di.display = True                 # global
-                di.maskTransparency = 80          # ds9 mask transparency
+                di.maskTransparency = 80          # mask transparency
                 di.displayCandidates = True       # show all the candidates and residuals
                 di.displayKernelBasis = False     # show kernel basis functions
                 di.displayKernelMosaic = True     # show kernel realized across the image
@@ -141,7 +141,7 @@ class ModelPsfMatchTask(PsfMatchTask):
                 di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
             elif name == "lsst.ip.diffim.modelPsfMatch":
                 di.display = True                 # global
-                di.maskTransparency = 30          # ds9 mask transparency
+                di.maskTransparency = 30          # mask transparency
                 di.displaySpatialCells = True     # show spatial cells before the fit
             return di
         lsstDebug.Info = DebugInfo
@@ -246,13 +246,11 @@ class ModelPsfMatchTask(PsfMatchTask):
             config.kernel.active.sizeCellX = 128
             config.kernel.active.sizeCellY = 128
 
-    Display the two images if –debug:
-
     .. code-block :: none
 
         if args.debug:
-            ds9.mtv(templateExp, frame=1, title="Example script: Input Template")
-            ds9.mtv(scienceExp, frame=2, title="Example script: Input Science Image")
+            afwDisplay.Display(frame=1).mtv(templateExp, title="Example script: Input Template")
+            afwDisplay.Display(frame=2).mtv(scienceExp, title="Example script: Input Science Image")
 
     Create and run the Task:
 
@@ -273,7 +271,8 @@ class ModelPsfMatchTask(PsfMatchTask):
                 frame = debug.lsstDebug.frame + 1
             except Exception:
                 frame = 3
-            ds9.mtv(result.psfMatchedExposure, frame=frame, title="Example script: Matched Science Image")
+            afwDisplay.Display(frame=frame).mtv(result.psfMatchedExposure,
+                                                title="Example script: Matched Science Image")
 
     """
     ConfigClass = ModelPsfMatchConfig
@@ -511,11 +510,12 @@ class ModelPsfMatchTask(PsfMatchTask):
         if not maskTransparency:
             maskTransparency = 0
         if display:
-            ds9.setMaskTransparency(maskTransparency)
+            afwDisplay.setDefaultMaskTransparency(maskTransparency)
         if display and displaySpatialCells:
             dituils.showKernelSpatialCells(exposure.getMaskedImage(), kernelCellSet,
-                                           symb="o", ctype=ds9.CYAN, ctypeUnused=ds9.YELLOW, ctypeBad=ds9.RED,
-                                           size=4, frame=lsstDebug.frame, title="Image to be convolved")
+                                           symb="o", ctype=afwDisplay.CYAN, ctypeUnused=afwDisplay.YELLOW,
+                                           ctypeBad=afwDisplay.RED, size=4, frame=lsstDebug.frame,
+                                           title="Image to be convolved")
             lsstDebug.frame += 1
         return pipeBase.Struct(kernelCellSet=kernelCellSet,
                                referencePsfModel=referencePsfModel,

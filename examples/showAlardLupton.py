@@ -21,8 +21,8 @@
 #
 
 import lsst.ip.diffim as ipDiffim
+import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
-import lsst.afw.display.ds9 as ds9
 import numpy as num
 
 klist = ipDiffim.makeAlardLuptonBasisList(15, 3, [2, 4, 8], [4, 3, 2])
@@ -30,7 +30,7 @@ frame = 1
 for kernel in klist:
     kImageOut = afwImage.ImageD(kernel.getDimensions())
     kSum = kernel.computeImage(kImageOut, False)
-    ds9.mtv(kImageOut, frame=frame)
+    afwDisplay.Display(frame=frame).mtv(kImageOut, title="Kernal Image")
     frame += 1
 
 kim1 = afwImage.ImageD(klist[0].getDimensions())

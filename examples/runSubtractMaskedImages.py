@@ -3,11 +3,11 @@ import optparse
 
 import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
-import lsst.afw.display.ds9 as ds9
 import lsst.log.utils as logUtils
 
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
+import lsst.afw.display as afwDisplay
 
 
 def main():
@@ -112,7 +112,7 @@ Notes:
         print(spatialKernel.getSpatialParameters())
 
     if display:
-        ds9.mtv(differenceMaskedImage)
+        afwDisplay.Display().mtv(differenceMaskedImage, title="Difference Masked Image")
 
 
 def run():

@@ -27,6 +27,7 @@ import unittest
 import lsst.utils.tests as tests
 
 import lsst.utils
+import lsst.afw.display as afwDisplay
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -34,7 +35,6 @@ import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 import lsst.ip.diffim as ipDiffim
 
-import lsst.afw.display.ds9 as ds9
 
 verbosity = 4
 logUtils.traceSetAt("ip.diffim", verbosity)
@@ -195,10 +195,10 @@ class DiffimTestCases(unittest.TestCase):
                                                                                     kSumDF, bgDF,
                                                                                     dmeanDF, dstdDF, vmeanDF))
         if display:
-            ds9.mtv(tmi, frame=1)  # ds9 switches frame 0 and 1 for some reason
-            ds9.mtv(smi, frame=0)
-            ds9.mtv(kImageOutDF, frame=2)
-            ds9.mtv(diffImDF, frame=3)
+            afwDisplay.Display(frame=1).mtv(tmi)  # ds9 switches frame 0 and 1 for some reason
+            afwDisplay.Display(frame=0).mtv(smi)
+            afwDisplay.Display(frame=2).mtv(kImageOutDF)
+            afwDisplay.Display(frame=3).mtv(diffImDF)
         if writefits:
             tmi.writeFits('t')
             smi.writeFits('s')
@@ -219,10 +219,10 @@ class DiffimTestCases(unittest.TestCase):
         print('DFr Diffim residuals : %.2f +/- %.2f; %.2f, %.2f; %.2f %.2f, %.2f' %
               (self.dStats.getMean(), self.dStats.getRms(), kSumDFr, bgDFr, dmeanDFr, dstdDFr, vmeanDFr))
         if display:
-            ds9.mtv(tmi, frame=4)
-            ds9.mtv(smi, frame=5)
-            ds9.mtv(kImageOutDFr, frame=6)
-            ds9.mtv(diffImDFr, frame=7)
+            afwDisplay.Display(frame=4).mtv(tmi)
+            afwDisplay.Display(frame=5).mtv(smi)
+            afwDisplay.Display(frame=6).mtv(kImageOutDFr)
+            afwDisplay.Display(frame=7).mtv(diffImDFr)
         if writefits:
             kImageOutDFr.writeFits('kDFr.fits')
             diffImDFr.writeFits('dDFr')
@@ -244,10 +244,10 @@ class DiffimTestCases(unittest.TestCase):
                                                                                     dmeanAL, dstdAL, vmeanAL))
         # outputs
         if display:
-            ds9.mtv(tmi, frame=8)
-            ds9.mtv(smi, frame=9)
-            ds9.mtv(kImageOutAL, frame=10)
-            ds9.mtv(diffImAL, frame=11)
+            afwDisplay.Display(frame=8).mtv(tmi)
+            afwDisplay.Display(frame=9).mtv(smi)
+            afwDisplay.Display(frame=10).mtv(kImageOutAL)
+            afwDisplay.Display(frame=11).mtv(diffImAL)
         if writefits:
             kImageOutAL.writeFits('kAL.fits')
             diffImAL.writeFits('dAL')
