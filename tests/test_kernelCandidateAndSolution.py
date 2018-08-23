@@ -1,7 +1,6 @@
 import os
 import unittest
 
-
 import lsst.utils.tests
 import lsst.utils
 import lsst.afw.geom as afwGeom
