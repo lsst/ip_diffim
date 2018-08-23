@@ -359,9 +359,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
 
-        # ds9.mtv(kImageIn, frame=1)
-        # ds9.mtv(kImageOut, frame=2)
-
         soln = kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT)
         self.assertAlmostEqual(soln.getKsum(), kSumIn)
         # 8.7499380640430563e-06 != 0.0 within 7 places
@@ -386,9 +383,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
-
-        # ds9.mtv(kImageIn, frame=3)
-        # ds9.mtv(kImageOut, frame=4)
 
         soln = kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT)
         self.assertAlmostEqual(soln.getKsum(), kSumIn, 3)
