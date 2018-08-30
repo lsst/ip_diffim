@@ -22,43 +22,14 @@
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
-__all__ = ["parseOptions", "DiaSourceAnalystConfig", "DiaSourceAnalyst"]
-
-from optparse import OptionParser
+__all__ = ["DiaSourceAnalystConfig", "DiaSourceAnalyst"]
 
 import lsst.afw.image as afwImage
-import lsst.afw.geom as afwGeom
 from lsst.log import Log
-import lsst.pex.policy as pexPolicy
-import lsst.daf.persistence as dafPersist
-import lsst.daf.base as dafBase
 import numpy as num
-import lsst.afw.display.ds9 as ds9
 import lsst.pex.config as pexConfig
 
 scaling = 5
-
-
-def parseOptions():
-    """Parse the command line options."""
-    parser = OptionParser(
-        usage="""%prog cdDiffSources crDiffExposure
-
-Read in sources and test for junk""")
-    options, args = parser.parse_args()
-    if len(args) != 2:
-        parser.error("incorrect number of arguments")
-    return options, args
-
-
-def readSourceSet(boostFile):
-    loc = dafPersist.LogicalLocation(boostFile)
-    storageList = dafPersist.StorageList()
-    additionalData = dafBase.PropertySet()
-    persistence = dafPersist.Persistence.getPersistence(pexPolicy.Policy())
-    storageList.append(persistence.getRetrieveStorage("BoostStorage", loc))
-    psv = persistence.unsafeRetrieve("PersistableSourceVector", storageList, additionalData)
-    return psv.getSources()
 
 
 class DiaSourceAnalystConfig(pexConfig.Config):
@@ -186,44 +157,3 @@ class DiaSourceAnalyst(object):
                        "fPos=%.2f fNeg=%2f",
                        source.getId(), flux, nPos, nNeg, nPixels, nDetPos, nDetNeg, fPos, fNeg)
         return True
-
-
-def main():
-    """Main program"""
-    options, args = parseOptions()
-    (crDiffSourceFile, crDiffExposureFile) = args
-
-    crDiffSources = readSourceSet(crDiffSourceFile)
-    crDiffExposure = afwImage.ExposureF(crDiffExposureFile)
-
-    analyst = DiaSourceAnalyst()
-
-    expX0 = crDiffExposure.getX0()
-    expY0 = crDiffExposure.getY0()
-    expX1 = expX0 + crDiffExposure.getWidth() - 1
-    expY1 = expY0 + crDiffExposure.getHeight() - 1
-
-    for i in range(crDiffSources.size()):
-        crDiffSource = crDiffSources[i]
-
-        # TODO This segfaults; revisit once the stack stabilizes
-        # footprint    = crDiffSource.getFootprint()
-        # bbox         = footprint.getBBox()
-
-        xAstrom = crDiffSource.getXAstrom()
-        yAstrom = crDiffSource.getYAstrom()
-        Ixx = max(1.0, crDiffSource.getIxx())
-        Iyy = max(1.0, crDiffSource.getIyy())
-        x0 = max(expX0, int(xAstrom - scaling * Ixx))
-        x1 = min(expX1, int(xAstrom + scaling * Ixx))
-        y0 = max(expY0, int(yAstrom - scaling * Iyy))
-        y1 = min(expY1, int(yAstrom + scaling * Iyy))
-        bbox = afwGeom.Box2I(afwGeom.Point2I(x0, y0),
-                             afwGeom.Point2I(x1, y1))
-        subExp = afwImage.ExposureF(crDiffExposure, bbox)
-        subMi = subExp.getMaskedImage()
-        imArr, maArr, varArr = subMi.getArrays()
-
-        if analyst.testSource(crDiffSource, subMi):
-            ds9.mtv(subExp, frame=1)
-            input('Next: ')
