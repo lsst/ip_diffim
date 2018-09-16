@@ -19,6 +19,7 @@
 #include "lsst/afw/image.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 #include "lsst/afw/table/Source.h"
+#include "lsst/pex/policy.h"
 
 namespace lsst {
 namespace ip {
