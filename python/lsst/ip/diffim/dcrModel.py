@@ -377,34 +377,32 @@ class DcrModel:
         templateExposure.setFilter(self.filter)
         return templateExposure
 
-    def conditionDcrModel(self, subfilter, newModel, bbox, gain=1.):
+    def conditionDcrModel(self, modelImages, bbox, gain=1.):
         """Average two iterations' solutions to reduce oscillations.
 
         Parameters
         ----------
-        subfilter : `int`
-            Index of the current subfilter within the full band.
-        newModel : `lsst.afw.image.MaskedImage`
-            The new DCR model for one subfilter from the current iteration.
-            Values in ``newModel`` that are extreme compared with the last
-            iteration are modified in place.
+        modelImages : `list` of `lsst.afw.image.MaskedImage`
+            The new DCR model images from the current iteration.
+            The values will be modified in place.
         bbox : `lsst.afw.geom.Box2I`
             Sub-region of the coadd
         gain : `float`, optional
-            Additional weight to apply to the model from the current iteration.
+            Relative weight to give the new solution when updating the model.
             Defaults to 1.0, which gives equal weight to both solutions.
         """
         # Calculate weighted averages of the image and variance planes.
         # Note that ``newModel *= gain`` would multiply the variance by ``gain**2``
-        newModel.image *= gain
-        newModel.image += self[subfilter][bbox].image
-        newModel.image /= 1. + gain
-        newModel.variance *= gain
-        newModel.variance += self[subfilter][bbox].variance
-        newModel.variance /= 1. + gain
-
     def clampModel(self, subfilter, newModel, bbox, statsCtrl, regularizeSigma, modelClampFactor,
                    convergenceMaskPlanes="DETECTED"):
+        for model, newModel in zip(self, modelImages):
+            newModel.image *= gain
+            newModel.image += model[bbox].image
+            newModel.image /= 1. + gain
+            newModel.variance *= gain
+            newModel.variance += model[bbox].variance
+            newModel.variance /= 1. + gain
+
         """Restrict large variations in the model between iterations.
 
         Parameters

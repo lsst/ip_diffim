@@ -217,10 +217,10 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         This additionally tests that the variance and mask planes do not change.
         """
         dcrModels = DcrModel(modelImages=self.makeTestImages())
-        newModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
-        for subfilter, newModel in enumerate(newModels):
-            dcrModels.conditionDcrModel(subfilter, newModel, self.bbox, gain=1.)
-            self.assertMaskedImagesEqual(dcrModels[subfilter], newModel)
+        newModels = [model.clone() for model in dcrModels]
+        dcrModels.conditionDcrModel(newModels, self.bbox, gain=1.)
+        for refModel, newModel in zip(dcrModels, newModels):
+            self.assertMaskedImagesEqual(refModel, newModel)
 
     def testConditionDcrModelNoChangeHighGain(self):
         """Conditioning should not change the model if it equals the reference.
@@ -228,10 +228,10 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         This additionally tests that the variance and mask planes do not change.
         """
         dcrModels = DcrModel(modelImages=self.makeTestImages())
-        newModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
-        for subfilter, newModel in enumerate(newModels):
-            dcrModels.conditionDcrModel(subfilter, newModel, self.bbox, gain=2.5)
-            self.assertMaskedImagesAlmostEqual(dcrModels[subfilter], newModel)
+        newModels = [model.clone() for model in dcrModels]
+        dcrModels.conditionDcrModel(newModels, self.bbox, gain=2.5)
+        for refModel, newModel in zip(dcrModels, newModels):
+            self.assertMaskedImagesAlmostEqual(refModel, newModel)
 
     def testConditionDcrModelWithChange(self):
         """Verify conditioning when the model changes by a known amount.
@@ -239,12 +239,11 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         This additionally tests that the variance and mask planes do not change.
         """
         dcrModels = DcrModel(modelImages=self.makeTestImages())
-        newModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
+        newModels = [model.clone() for model in dcrModels]
         for model in newModels:
             model.image.array[:] *= 3.
-        for subfilter, newModel in enumerate(newModels):
-            dcrModels.conditionDcrModel(subfilter, newModel, self.bbox, gain=1.)
-            refModel = dcrModels[subfilter]
+        dcrModels.conditionDcrModel(newModels, self.bbox, gain=1.)
+        for refModel, newModel in zip(dcrModels, newModels):
             refModel.image.array[:] *= 2.
             self.assertMaskedImagesAlmostEqual(refModel, newModel)
 
