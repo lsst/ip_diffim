@@ -21,6 +21,7 @@
 #
 
 import numpy as np
+from scipy import ndimage
 from lsst.afw.coord.refraction import differentialRefraction
 import lsst.afw.geom as afwGeom
 from lsst.afw.geom import AffineTransform
@@ -393,8 +394,6 @@ class DcrModel:
         """
         # Calculate weighted averages of the image and variance planes.
         # Note that ``newModel *= gain`` would multiply the variance by ``gain**2``
-    def clampModel(self, subfilter, newModel, bbox, statsCtrl, regularizeSigma, modelClampFactor,
-                   convergenceMaskPlanes="DETECTED"):
         for model, newModel in zip(self, modelImages):
             newModel.image *= gain
             newModel.image += model[bbox].image
@@ -403,6 +402,8 @@ class DcrModel:
             newModel.variance += model[bbox].variance
             newModel.variance /= 1. + gain
 
+    def clampModel(self, subfilter, newModel, bbox, statsCtrl, clamp, sigma, bufferSize,
+                   convergenceMaskPlanes="DETECTED", regularizationWidth=2):
         """Restrict large variations in the model between iterations.
 
         Parameters
@@ -417,34 +418,36 @@ class DcrModel:
             Sub-region to coadd
         statsCtrl : `lsst.afw.math.StatisticsControl`
             Statistics control object for coadd
-        regularizeSigma : `float`
-            Threshold to exclude noise-like pixels from regularization.
-        modelClampFactor : `float`
+        clamp : `float`
             Maximum relative change of the model allowed between iterations.
+        sigma : `float`
+            Threshold to exclude noise-like pixels from regularization.
+        bufferSize : `int`
+            Number of additional pixels to exclude
+            from the edges of the bounding box.
         convergenceMaskPlanes : `list` of `str`, or `str`, optional
             Mask planes to use to calculate convergence.
-            Default value is set in ``calculateNoiseCutoff`` if not supplied.
+        regularizationWidth : int, optional
+            Minimum radius of a region to include in regularization, in pixels.
         """
+        denoiseStructure = ndimage.iterate_structure(ndimage.generate_binary_structure(2, 1),
+                                                     regularizationWidth)
         newImage = newModel.image.array
         oldImage = self[subfilter][bbox].image.array
-        noiseCutoff = self.calculateNoiseCutoff(newModel, statsCtrl, regularizeSigma,
+        noiseCutoff = self.calculateNoiseCutoff(newModel, statsCtrl, sigma, bufferSize,
                                                 convergenceMaskPlanes=convergenceMaskPlanes)
-        # Catch any invalid values
-        nanPixels = np.isnan(newImage)
-        newImage[nanPixels] = 0.
-        infPixels = np.isinf(newImage)
-        newImage[infPixels] = oldImage[infPixels]*modelClampFactor
         # Clip pixels that have very high amplitude, compared with the previous iteration.
-        clampPixels = np.abs(newImage - oldImage) > (np.abs(oldImage*(modelClampFactor - 1)) +
-                                                     noiseCutoff)
+        clampPixels = np.abs(newImage - oldImage) > (np.abs(oldImage*(clamp - 1)) + noiseCutoff)
+        # Erode and dilate ``clampPixels`` to exclude noisy pixels.
+        clampPixels = ndimage.morphology.binary_opening(clampPixels, structure=denoiseStructure)
         # Set high amplitude pixels to a multiple or fraction of the old model value,
         #  depending on whether the new model is higher or lower than the old
         highPixels = newImage > oldImage
-        newImage[clampPixels & highPixels] = oldImage[clampPixels & highPixels]*modelClampFactor
-        newImage[clampPixels & ~highPixels] = oldImage[clampPixels & ~highPixels]/modelClampFactor
+        newImage[clampPixels & highPixels] = oldImage[clampPixels & highPixels]*clamp
+        newImage[clampPixels & ~highPixels] = oldImage[clampPixels & ~highPixels]/clamp
 
-    def regularizeModel(self, bbox, mask, statsCtrl, regularizeSigma, clampFrequency,
-                        convergenceMaskPlanes="DETECTED"):
+    def regularizeModel(self, modelImages, bbox, mask, statsCtrl, clamp, sigma, bufferSize,
+                        convergenceMaskPlanes="DETECTED", regularizationWidth=2):
         """Restrict large variations in the model between subfilters.
 
         Any flux subtracted by the restriction is accumulated from all
@@ -453,38 +456,60 @@ class DcrModel:
 
         Parameters
         ----------
+        modelImages : `list` of `lsst.afw.image.MaskedImage`
+            The new DCR model images from the current iteration.
+            The values will be modified in place.
         bbox : `lsst.afw.geom.Box2I`
             Sub-region to coadd
         mask : `lsst.afw.image.Mask`
             Reference mask to use for all model planes.
         statsCtrl : `lsst.afw.math.StatisticsControl`
             Statistics control object for coadd
-        regularizeSigma : `float`
-            Threshold to exclude noise-like pixels from regularization.
-        clampFrequency : `float`
+        clamp : `float`
             Maximum relative change of the model allowed between subfilters.
+        sigma : `float`
+            Threshold to exclude noise-like pixels from regularization.
+        bufferSize : `int`
+            Number of additional pixels to exclude
+            from the edges of the bounding box.
         convergenceMaskPlanes : `list` of `str`, or `str`, optional
             Mask planes to use to calculate convergence. (Default is "DETECTED")
-            Default value is set in ``calculateNoiseCutoff`` if not supplied.
+        regularizationWidth : `int`, optional
+            Minimum radius of a region to include in regularization, in pixels.
         """
-        templateImage = self.getReferenceImage(bbox)
-        excess = np.zeros_like(templateImage)
-        for model in self:
-            noiseCutoff = self.calculateNoiseCutoff(model, statsCtrl, regularizeSigma,
+        clampToRef = np.sqrt(clamp)
+        refImage = self.getReferenceImage(bbox)
+        excesses = []
+        # Generate the structure for binary erosion and dilation, which is used to remove noise-like pixels.
+        # Groups of pixels with a radius smaller than ``regularizationWidth``
+        # will be excluded from regularization
+        denoiseStructure = ndimage.iterate_structure(ndimage.generate_binary_structure(2, 1),
+                                                     regularizationWidth)
+        for model in modelImages:
+            excess = np.zeros_like(refImage)
+            modelVals = model[bbox].image.array
+            noiseCutoff = self.calculateNoiseCutoff(model[bbox], statsCtrl, sigma, bufferSize,
                                                     convergenceMaskPlanes=convergenceMaskPlanes,
                                                     mask=mask[bbox])
-            modelVals = model.image.array
-            highPixels = (modelVals > (templateImage*clampFrequency + noiseCutoff))
-            excess[highPixels] += modelVals[highPixels] - templateImage[highPixels]*clampFrequency
-            modelVals[highPixels] = templateImage[highPixels]*clampFrequency
-            lowPixels = (modelVals < templateImage/clampFrequency - noiseCutoff)
-            excess[lowPixels] += modelVals[lowPixels] - templateImage[lowPixels]/clampFrequency
-            modelVals[lowPixels] = templateImage[lowPixels]/clampFrequency
-        excess /= len(self)
-        for model in self:
-            model.image.array += excess
+            highThreshold = refImage*clampToRef + noiseCutoff
+            lowThreshold = refImage/clampToRef - noiseCutoff
+            highPixels = modelVals > highThreshold
+            # Erode and dilate ``highPixels`` to exclude noisy pixels.
+            highPixels = ndimage.morphology.binary_opening(highPixels, structure=denoiseStructure)
+            excess[highPixels] += modelVals[highPixels] - refImage[highPixels]*clampToRef
+            modelVals[highPixels] -= excess[highPixels]
+            lowPixels = modelVals < lowThreshold
+            lowPixels = ndimage.morphology.binary_opening(lowPixels, structure=denoiseStructure)
+            excess[lowPixels] += modelVals[lowPixels] - refImage[lowPixels]/clampToRef
+            modelVals[lowPixels] -= excess[lowPixels]
+            excesses.append(excess)
+        # We want to preserve flux while reducing extreme variations between subfilters.
+        # So, add the mean clipped flux back to all subfilters equally.
+        meanExcess = np.mean(excesses, axis=0)
+        for model in modelImages:
+            model[bbox].image.array += meanExcess
 
-    def calculateNoiseCutoff(self, maskedImage, statsCtrl, regularizeSigma,
+    def calculateNoiseCutoff(self, maskedImage, statsCtrl, sigma, bufferSize,
                              convergenceMaskPlanes="DETECTED", mask=None, bbox=None):
         """Helper function to calculate the background noise level of an image.
 
@@ -494,25 +519,33 @@ class DcrModel:
             The input image to evaluate the background noise properties.
         statsCtrl : `lsst.afw.math.StatisticsControl`
             Statistics control object for coadd
-        regularizeSigma : `float`
+        sigma : `float`
             Threshold to exclude noise-like pixels from regularization.
+        bufferSize : `int`
+            Number of additional pixels to exclude
+            from the edges of the bounding box.
         convergenceMaskPlanes : `list` of `str`, or `str`
             Mask planes to use to calculate convergence.
         mask : `lsst.afw.image.Mask`, Optional
             Optional alternate mask
+        bbox : `lsst.afw.geom.Box2I`, optional
+            Sub-region of the masked image to calculate the noise level over.
 
         Returns
         -------
         noiseCutoff : `float`
             The threshold value to treat pixels as noise in an image..
         """
-        convergeMask = maskedImage.mask.getPlaneBitMask(convergenceMaskPlanes)
         if bbox is None:
             bbox = self.bbox
         if mask is None:
-        backgroundPixels = mask.array & (statsCtrl.getAndMask() | convergeMask) == 0
-        noiseCutoff = regularizeSigma*np.std(maskedImage.image.array[backgroundPixels])
             mask = maskedImage[bbox].mask
+        bboxShrink = afwGeom.Box2I(bbox)
+        bboxShrink.grow(-bufferSize)
+        convergeMask = mask.getPlaneBitMask(convergenceMaskPlanes)
+
+        backgroundPixels = mask[bboxShrink].array & (statsCtrl.getAndMask() | convergeMask) == 0
+        noiseCutoff = sigma*np.std(maskedImage[bboxShrink].image.array[backgroundPixels])
         return noiseCutoff
 
 
