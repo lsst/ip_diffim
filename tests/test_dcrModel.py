@@ -258,10 +258,10 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         dcrModels = DcrModel(modelImages=self.makeTestImages())
         statsCtrl = afwMath.StatisticsControl()
         refModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
-        mask = refModels[0].mask
         dcrModels.regularizeModel(self.bbox, mask, statsCtrl, regularizeSigma, clampFrequency)
         for subfilter, refModel in enumerate(refModels):
             self.assertMaskedImagesEqual(dcrModels[subfilter], refModel)
+        mask = dcrModels.mask
 
     def testRegularizationSmallClamp(self):
         """Test that large variations between model planes are reduced.
@@ -273,7 +273,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         dcrModels = DcrModel(modelImages=self.makeTestImages())
         statsCtrl = afwMath.StatisticsControl()
         refModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
-        mask = refModels[0].mask
+        mask = dcrModels.mask
         templateImage = dcrModels.getReferenceImage(self.bbox)
 
         dcrModels.regularizeModel(self.bbox, mask, statsCtrl, regularizeSigma, clampFrequency)

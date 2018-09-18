@@ -200,7 +200,7 @@ class DcrModel:
         """
         if np.abs(subfilter) >= len(self):
             raise IndexError("subfilter out of bounds.")
-        if maskedImage.getBBox() != self.getBBox():
+        if maskedImage.getBBox() != self.bbox:
             raise ValueError("The bounding box of a subfilter must not change.")
         self.modelImages[subfilter] = maskedImage
 
@@ -237,6 +237,17 @@ class DcrModel:
         """
         return self[0].getBBox()
 
+    @property
+    def mask(self):
+        """Return the common mask of each subfilter image.
+
+        Returns
+        -------
+        bbox : `lsst.afw.image.Mask`
+            Mask plane of the DCR model.
+        """
+        return self[0].mask
+
     def getReferenceImage(self, bbox=None):
         """Create a simple template from the DCR model.
 
@@ -250,6 +261,8 @@ class DcrModel:
         templateImage : `numpy.ndarray`
             The template with no chromatic effects applied.
         """
+        if bbox is None:
+            bbox = self.bbox
         return np.mean([model[bbox].image.array for model in self], axis=0)
 
     def assign(self, dcrSubModel, bbox=None):
@@ -272,7 +285,7 @@ class DcrModel:
             raise ValueError("The number of DCR subfilters must be the same "
                              "between the old and new models.")
         if bbox is None:
-            bbox = self.getBBox()
+            bbox = self.bbox
         for model, subModel in zip(self, dcrSubModel):
             model.assign(subModel[bbox], bbox)
 
@@ -474,7 +487,7 @@ class DcrModel:
             model.image.array += excess
 
     def calculateNoiseCutoff(self, maskedImage, statsCtrl, regularizeSigma,
-                             convergenceMaskPlanes="DETECTED", mask=None):
+                             convergenceMaskPlanes="DETECTED", mask=None, bbox=None):
         """Helper function to calculate the background noise level of an image.
 
         Parameters
@@ -496,10 +509,12 @@ class DcrModel:
             The threshold value to treat pixels as noise in an image..
         """
         convergeMask = maskedImage.mask.getPlaneBitMask(convergenceMaskPlanes)
+        if bbox is None:
+            bbox = self.bbox
         if mask is None:
-            mask = maskedImage.mask
         backgroundPixels = mask.array & (statsCtrl.getAndMask() | convergeMask) == 0
         noiseCutoff = regularizeSigma*np.std(maskedImage.image.array[backgroundPixels])
+            mask = maskedImage[bbox].mask
         return noiseCutoff
 
 
