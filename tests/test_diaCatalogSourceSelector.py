@@ -35,8 +35,8 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
 
     def setUp(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
-        schema.addField("test_flux", type=float)
-        schema.addField("test_fluxErr", type=float)
+        schema.addField("test_instFlux", type=float)
+        schema.addField("test_instFluxErr", type=float)
         self.sourceSelector = ipDiffim.DiaCatalogSourceSelectorTask()
         for flag in self.sourceSelector.config.badFlags:
             schema.addField(flag, type="Flag")
@@ -72,8 +72,8 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
             refSrc.setCoord(coord)
 
             srcSrc.setCoord(coord)
-            srcSrc.set(srcSrc.getTable().getPsfFluxKey(), 10.)
-            srcSrc.set(srcSrc.getTable().getPsfFluxErrKey(), 1.)
+            srcSrc.set("slot_PsfFlux_instFlux", 10.)
+            srcSrc.set("slot_PsfFlux_instFluxErr", 1.)
             for flag in self.sourceSelector.config.badFlags:
                 srcSrc.set(flag, False)
 

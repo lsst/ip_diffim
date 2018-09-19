@@ -149,8 +149,8 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         source.set("centroid_y", 50)
         source.setFootprint(s.getFootprint())
         plugin.measure(source, exposure)
-        for key in ("_pos_flux", "_pos_fluxErr", "_pos_flag", "_npos",
-                    "_neg_flux", "_neg_fluxErr", "_neg_flag", "_nneg"):
+        for key in ("_pos_instFlux", "_pos_instFluxErr", "_pos_flag", "_npos",
+                    "_neg_instFlux", "_neg_instFluxErr", "_neg_flag", "_nneg"):
             try:
                 source.get("test"+key)
             except Exception:
@@ -167,8 +167,8 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         source.set("centroid_y", 50)
         source.setFootprint(s.getFootprint())
         plugin.measure(source, exposure)
-        for key in ("_pos_flux", "_pos_fluxErr", "_pos_flag",
-                    "_neg_flux", "_neg_fluxErr", "_neg_flag"):
+        for key in ("_pos_instFlux", "_pos_instFluxErr", "_pos_flag",
+                    "_neg_instFlux", "_neg_instFluxErr", "_neg_flag"):
             try:
                 source.get("test"+key)
             except Exception:
@@ -301,11 +301,15 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         # the total flux, while here we are just fitting for the
         # scaling of the Psf.  Therefore the comparison is
         # fneg*negPsfSum to flux.dipole.psf.neg.
-        self.assertAlmostEqual(1e-4*fneg*negPsfSum, 1e-4*source.get("ip_diffim_PsfDipoleFlux_neg_flux"), 2)
-        self.assertAlmostEqual(1e-4*fpos*posPsfSum, 1e-4*source.get("ip_diffim_PsfDipoleFlux_pos_flux"), 2)
+        self.assertAlmostEqual(1e-4*fneg*negPsfSum,
+                               1e-4*source.get("ip_diffim_PsfDipoleFlux_neg_instFlux"),
+                               2)
+        self.assertAlmostEqual(1e-4*fpos*posPsfSum,
+                               1e-4*source.get("ip_diffim_PsfDipoleFlux_pos_instFlux"),
+                               2)
 
-        self.assertGreater(source.get("ip_diffim_PsfDipoleFlux_pos_fluxErr"), 0.0)
-        self.assertGreater(source.get("ip_diffim_PsfDipoleFlux_neg_fluxErr"), 0.0)
+        self.assertGreater(source.get("ip_diffim_PsfDipoleFlux_pos_instFluxErr"), 0.0)
+        self.assertGreater(source.get("ip_diffim_PsfDipoleFlux_neg_instFluxErr"), 0.0)
         self.assertFalse(source.get("ip_diffim_PsfDipoleFlux_neg_flag"))
         self.assertFalse(source.get("ip_diffim_PsfDipoleFlux_pos_flag"))
 

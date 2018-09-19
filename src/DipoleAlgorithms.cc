@@ -275,12 +275,12 @@ void NaiveDipoleFlux::measure(
     source.getFootprint()->getSpans()->applyFunctor(functor, *(exposure.getMaskedImage().getImage()),
                                                      *(exposure.getMaskedImage().getVariance()));
 
-    source.set(getPositiveKeys().getFlux(), functor.getSumPositive());
-    source.set(getPositiveKeys().getFluxErr(), ::sqrt(functor.getVarPositive()));
+    source.set(getPositiveKeys().getInstFlux(), functor.getSumPositive());
+    source.set(getPositiveKeys().getInstFluxErr(), ::sqrt(functor.getVarPositive()));
     source.set(_numPositiveKey, functor.getNumPositive());
 
-    source.set(getNegativeKeys().getFlux(), functor.getSumNegative());
-    source.set(getNegativeKeys().getFluxErr(), ::sqrt(functor.getVarNegative()));
+    source.set(getNegativeKeys().getInstFlux(), functor.getSumNegative());
+    source.set(getNegativeKeys().getInstFluxErr(), ::sqrt(functor.getVarNegative()));
     source.set(_numNegativeKey, functor.getNumNegative());
     functor.reset();
 }
@@ -491,13 +491,13 @@ void PsfDipoleFlux::measure(
 
         PTR(afw::geom::Point2D) minNegCentroid(new afw::geom::Point2D(min.UserState().Value(NEGCENTXPAR),
                                                                       min.UserState().Value(NEGCENTYPAR)));
-        source.set(getNegativeKeys().getFlux(), min.UserState().Value(NEGFLUXPAR));
-        source.set(getNegativeKeys().getFluxErr(), min.UserState().Error(NEGFLUXPAR));
+        source.set(getNegativeKeys().getInstFlux(), min.UserState().Value(NEGFLUXPAR));
+        source.set(getNegativeKeys().getInstFluxErr(), min.UserState().Error(NEGFLUXPAR));
 
         PTR(afw::geom::Point2D) minPosCentroid(new afw::geom::Point2D(min.UserState().Value(POSCENTXPAR),
                                                                       min.UserState().Value(POSCENTYPAR)));
-        source.set(getPositiveKeys().getFlux(), min.UserState().Value(POSFLUXPAR));
-        source.set(getPositiveKeys().getFluxErr(), min.UserState().Error(POSFLUXPAR));
+        source.set(getPositiveKeys().getInstFlux(), min.UserState().Value(POSFLUXPAR));
+        source.set(getPositiveKeys().getInstFluxErr(), min.UserState().Error(POSFLUXPAR));
 
         source.set(_chi2dofKey, evalChi2 / (nPix - minimizerFunc.getNpar()));
         source.set(_negCentroid.getX(), minNegCentroid->getX());

@@ -93,9 +93,9 @@ class CheckSource(object):
         for k in self.keys:
             if source.get(k):
                 return False
-        if self.fluxLim is not None and source.getPsfFlux() < self.fluxLim:  # ignore faint objects
+        if self.fluxLim is not None and source.getPsfInstFlux() < self.fluxLim:  # ignore faint objects
             return False
-        if self.fluxMax != 0.0 and source.getPsfFlux() > self.fluxMax:  # ignore bright objects
+        if self.fluxMax != 0.0 and source.getPsfInstFlux() > self.fluxMax:  # ignore bright objects
             return False
         return True
 

@@ -27,8 +27,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def setUp(self):
         schema = afwTable.SourceTable.makeMinimalSchema()
         afwTable.Point2DKey.addFields(schema, "Centroid", "input centroid", "pixel")
-        schema.addField("PsfFlux_flux", type=float)
-        schema.addField("PsfFlux_fluxErr", type=float)
+        schema.addField("PsfFlux_instFlux", type=float)
+        schema.addField("PsfFlux_instFluxErr", type=float)
         schema.addField("PsfFlux_flag", type="Flag")
         self.table = afwTable.SourceTable.make(schema)
         self.table.definePsfFlux("PsfFlux")
@@ -165,7 +165,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         source.setId(1)
         source.set(self.table.getCentroidKey().getX(), 276)
         source.set(self.table.getCentroidKey().getY(), 717)
-        source.set(self.table.getPsfFluxKey(), 1.)
+        source.set("slot_PsfFlux_instFlux", 1.)
 
         kc = ipDiffim.KernelCandidateF(source,
                                        self.templateExposure2.getMaskedImage(),
@@ -182,7 +182,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         source.setId(1)
         source.set(self.table.getCentroidKey().getX(), 276)
         source.set(self.table.getCentroidKey().getY(), 717)
-        source.set(self.table.getPsfFluxKey(), 1.)
+        source.set("slot_PsfFlux_instFlux", 1.)
 
         kc = ipDiffim.KernelCandidateF(source,
                                        self.templateExposure2.getMaskedImage(),
@@ -194,7 +194,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         # Check that the source is set
         self.assertEqual(kc.getSource(), source)
-        self.assertEqual(kc.getCandidateRating(), source.getPsfFlux())
+        self.assertEqual(kc.getCandidateRating(), source.getPsfInstFlux())
 
         # But this should be set on construction
         try:
