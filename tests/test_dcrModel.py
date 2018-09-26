@@ -21,6 +21,7 @@
 
 from astropy import units as u
 import numpy as np
+from scipy import ndimage
 import unittest
 
 from lsst.afw.coord import Observatory, Weather
@@ -28,7 +29,7 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 from lsst.geom import arcseconds, degrees, radians
-from lsst.ip.diffim.dcrModel import DcrModel, calculateDcr, calculateImageParallacticAngle
+from lsst.ip.diffim.dcrModel import DcrModel, calculateDcr, calculateImageParallacticAngle, applyDcr
 from lsst.meas.algorithms.testUtils import plantSources
 import lsst.utils.tests
 
@@ -71,22 +72,34 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         y0 = 67890
         self.bbox = afwGeom.Box2I(afwGeom.Point2I(x0, y0), afwGeom.Extent2I(xSize, ySize))
 
-    def makeTestImages(self):
+    def makeTestImages(self, seed=5, nSrc=5, psfSize=2., noiseLevel=5.,
+                       detectionSigma=5., sourceSigma=20., fluxRange=2.):
         """Make reproduceable PSF-convolved masked images for testing.
+
+        Parameters
+        ----------
+        seed : `int`, optional
+            Seed value to initialize the random number generator.
+        nSrc : `int`, optional
+            Number of sources to simulate.
+        psfSize : `float`, optional
+            Width of the PSF of the simulated sources, in pixels.
+        noiseLevel : `float`, optional
+            Standard deviation of the noise to add to each pixel.
+        detectionSigma : `float`, optional
+            Threshold amplitude of the image to set the "DETECTED" mask.
+        sourceSigma : `float`, optional
+            Average amplitude of the simulated sources,
+            relative to ``noiseLevel``
+        fluxRange : `float`, optional
+            Range in flux amplitude of the simulated sources.
 
         Returns
         -------
         modelImages : `list` of `lsst.afw.image.maskedImage`
             A list of masked images, each containing the model for one subfilter
         """
-        seed = 5
         rng = np.random.RandomState(seed)
-        psfSize = 2
-        nSrc = 5
-        noiseLevel = 5
-        detectionSigma = 5.
-        sourceSigma = 20.
-        fluxRange = 2.
         x0, y0 = self.bbox.getBegin()
         xSize, ySize = self.bbox.getDimensions()
         xLoc = rng.rand(nSrc)*(xSize - 2*self.bufferSize) + self.bufferSize + x0
@@ -217,10 +230,10 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         This additionally tests that the variance and mask planes do not change.
         """
         dcrModels = DcrModel(modelImages=self.makeTestImages())
-        newModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
-        for subfilter, newModel in enumerate(newModels):
-            dcrModels.conditionDcrModel(subfilter, newModel, self.bbox, gain=1.)
-            self.assertMaskedImagesEqual(dcrModels[subfilter], newModel)
+        newModels = [model.clone() for model in dcrModels]
+        dcrModels.conditionDcrModel(newModels, self.bbox, gain=1.)
+        for refModel, newModel in zip(dcrModels, newModels):
+            self.assertMaskedImagesEqual(refModel, newModel)
 
     def testConditionDcrModelNoChangeHighGain(self):
         """Conditioning should not change the model if it equals the reference.
@@ -228,10 +241,10 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         This additionally tests that the variance and mask planes do not change.
         """
         dcrModels = DcrModel(modelImages=self.makeTestImages())
-        newModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
-        for subfilter, newModel in enumerate(newModels):
-            dcrModels.conditionDcrModel(subfilter, newModel, self.bbox, gain=2.5)
-            self.assertMaskedImagesAlmostEqual(dcrModels[subfilter], newModel)
+        newModels = [model.clone() for model in dcrModels]
+        dcrModels.conditionDcrModel(newModels, self.bbox, gain=2.5)
+        for refModel, newModel in zip(dcrModels, newModels):
+            self.assertMaskedImagesAlmostEqual(refModel, newModel)
 
     def testConditionDcrModelWithChange(self):
         """Verify conditioning when the model changes by a known amount.
@@ -239,77 +252,118 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         This additionally tests that the variance and mask planes do not change.
         """
         dcrModels = DcrModel(modelImages=self.makeTestImages())
-        newModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
+        newModels = [model.clone() for model in dcrModels]
         for model in newModels:
             model.image.array[:] *= 3.
-        for subfilter, newModel in enumerate(newModels):
-            dcrModels.conditionDcrModel(subfilter, newModel, self.bbox, gain=1.)
-            refModel = dcrModels[subfilter]
+        dcrModels.conditionDcrModel(newModels, self.bbox, gain=1.)
+        for refModel, newModel in zip(dcrModels, newModels):
             refModel.image.array[:] *= 2.
             self.assertMaskedImagesAlmostEqual(refModel, newModel)
 
     def testRegularizationLargeClamp(self):
         """Frequency regularization should leave the models unchanged if the clamp factor is large.
-
-        This also tests that noise-like pixels are not regularized.
         """
-        regularizeSigma = 1.
         clampFrequency = 3.
+        regularizationWidth = 2
         dcrModels = DcrModel(modelImages=self.makeTestImages())
-        statsCtrl = afwMath.StatisticsControl()
-        refModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
-        mask = refModels[0].mask
-        dcrModels.regularizeModel(self.bbox, mask, statsCtrl, regularizeSigma, clampFrequency)
-        for subfilter, refModel in enumerate(refModels):
-            self.assertMaskedImagesEqual(dcrModels[subfilter], refModel)
+        newModels = [model.clone() for model in dcrModels]
+        dcrModels.regularizeModelFreq(newModels, self.bbox, clampFrequency, regularizationWidth)
+        for model, refModel in zip(newModels, dcrModels):
+            self.assertMaskedImagesEqual(model, refModel)
 
     def testRegularizationSmallClamp(self):
         """Test that large variations between model planes are reduced.
 
         This also tests that noise-like pixels are not regularized.
         """
-        regularizeSigma = 1.
         clampFrequency = 1.1
-        dcrModels = DcrModel(modelImages=self.makeTestImages())
-        statsCtrl = afwMath.StatisticsControl()
-        refModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
-        mask = refModels[0].mask
+        regularizationWidth = 2
+        fluxRange = 10.
+        dcrModels = DcrModel(modelImages=self.makeTestImages(fluxRange=fluxRange))
+        newModels = [model.clone() for model in dcrModels]
         templateImage = dcrModels.getReferenceImage(self.bbox)
 
-        dcrModels.regularizeModel(self.bbox, mask, statsCtrl, regularizeSigma, clampFrequency)
-        for subfilter, refModel in enumerate(refModels):
-            model = dcrModels[subfilter]
-            noiseLevel = dcrModels.calculateNoiseCutoff(refModel, statsCtrl, regularizeSigma)
+        dcrModels.regularizeModelFreq(newModels, self.bbox, clampFrequency, regularizationWidth)
+        for model, refModel in zip(newModels, dcrModels):
             # The mask and variance planes should be unchanged
             self.assertFloatsEqual(model.mask.array, refModel.mask.array)
             self.assertFloatsEqual(model.variance.array, refModel.variance.array)
             # Make sure the test parameters do reduce the outliers
             self.assertGreater(np.max(refModel.image.array - templateImage),
                                np.max(model.image.array - templateImage))
-            highThreshold = templateImage*clampFrequency + regularizeSigma*noiseLevel
-            self.assertTrue(np.all(model.image.array <= highThreshold))
-            lowThreshold = templateImage/clampFrequency - regularizeSigma*noiseLevel
-            self.assertTrue(np.all(model.image.array >= lowThreshold))
+            highThreshold = templateImage*clampFrequency
+            highPix = model.image.array > highThreshold
+            highPix = ndimage.morphology.binary_opening(highPix, iterations=regularizationWidth)
+            self.assertFalse(np.all(highPix))
+            lowThreshold = templateImage/clampFrequency
+            lowPix = model.image.array < lowThreshold
+            lowPix = ndimage.morphology.binary_opening(lowPix, iterations=regularizationWidth)
+            self.assertFalse(np.all(lowPix))
 
-    def testModelClamp(self):
+    def testRegularizationSidelobes(self):
+        """Test that artificial chromatic sidelobes are suppressed.
+        """
+        warpCtrl = afwMath.WarpingControl("lanczos3", "bilinear",
+                                          cacheSize=0, interpLength=max(self.bbox.getDimensions()))
+        clampFrequency = 2.
+        regularizationWidth = 2
+        noiseLevel = 0.1
+        sourceAmplitude = 100.
+        modelImages = self.makeTestImages(seed=5, nSrc=5, psfSize=3., noiseLevel=noiseLevel,
+                                          detectionSigma=5., sourceSigma=sourceAmplitude, fluxRange=2.)
+        templateImage = np.mean([model.image.array for model in modelImages], axis=0)
+        sidelobeImages = self.makeTestImages(seed=5, nSrc=5, psfSize=1.5, noiseLevel=noiseLevel/10.,
+                                             detectionSigma=5., sourceSigma=sourceAmplitude*5., fluxRange=2.)
+        signList = [-1., 0., 1.]
+        sidelobeShift = afwGeom.Extent2D(4., 0.)
+        for model, sidelobe, sign in zip(modelImages, sidelobeImages, signList):
+            sidelobe.image.array *= sign
+            model += applyDcr(sidelobe, sidelobeShift, warpCtrl, useInverse=False)
+            model += applyDcr(sidelobe, sidelobeShift, warpCtrl, useInverse=True)
+
+        dcrModels = DcrModel(modelImages=modelImages)
+        refModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
+
+        dcrModels.regularizeModelFreq(modelImages, self.bbox, clampFrequency,
+                                      regularizationWidth=regularizationWidth)
+        for model, refModel, sign in zip(modelImages, refModels, signList):
+            # The mask and variance planes should be unchanged
+            self.assertFloatsEqual(model.mask.array, refModel.mask.array)
+            self.assertFloatsEqual(model.variance.array, refModel.variance.array)
+            if sign == 0:
+                # The center subfilter does not have sidelobes, and should be unaffected.
+                self.assertFloatsEqual(model.image.array, refModel.image.array)
+            else:
+                # Make sure the test parameters do reduce the outliers
+                self.assertGreater(np.sum(np.abs(refModel.image.array - templateImage)),
+                                   np.sum(np.abs(model.image.array - templateImage)))
+            highThreshold = templateImage*clampFrequency
+            highPix = model.image.array > highThreshold
+            highPix = ndimage.morphology.binary_opening(highPix, iterations=regularizationWidth)
+            self.assertFalse(np.all(highPix))
+            lowThreshold = templateImage/clampFrequency
+            lowPix = model.image.array < lowThreshold
+            lowPix = ndimage.morphology.binary_opening(lowPix, iterations=regularizationWidth)
+            self.assertFalse(np.all(lowPix))
+
+    def testRegularizeModelIter(self):
         """Test that large amplitude changes between iterations are restricted.
 
         This also tests that noise-like pixels are not regularized.
         """
-        regularizeSigma = 3.
         modelClampFactor = 2.
+        regularizationWidth = 2
         subfilter = 0
         dcrModels = DcrModel(modelImages=self.makeTestImages())
         seed = 5
         rng = np.random.RandomState(seed)
         oldModel = dcrModels[0]
         xSize, ySize = self.bbox.getDimensions()
-        statsCtrl = afwMath.StatisticsControl()
         newModel = oldModel.clone()
         newModel.image.array[:] += rng.rand(ySize, xSize)*np.max(oldModel.image.array)
         newModelRef = newModel.clone()
 
-        dcrModels.clampModel(subfilter, newModel, self.bbox, statsCtrl, regularizeSigma, modelClampFactor)
+        dcrModels.regularizeModelIter(subfilter, newModel, self.bbox, modelClampFactor, regularizationWidth)
 
         # The mask and variance planes should be unchanged
         self.assertFloatsEqual(newModel.mask.array, oldModel.mask.array)
@@ -318,12 +372,14 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         self.assertGreater(np.max(newModelRef.image.array),
                            np.max(newModel.image.array - oldModel.image.array))
         # Check that all of the outliers are clipped
-        noiseLevel = dcrModels.calculateNoiseCutoff(oldModel, statsCtrl, regularizeSigma)
-        highThreshold = (oldModel.image.array*modelClampFactor +
-                         noiseLevel*regularizeSigma)
-        self.assertTrue(np.all(newModel.image.array <= highThreshold))
-        lowThreshold = oldModel.image.array/modelClampFactor - noiseLevel
-        self.assertTrue(np.all(newModel.image.array >= lowThreshold))
+        highThreshold = oldModel.image.array*modelClampFactor
+        highPix = newModel.image.array > highThreshold
+        highPix = ndimage.morphology.binary_opening(highPix, iterations=regularizationWidth)
+        self.assertFalse(np.all(highPix))
+        lowThreshold = oldModel.image.array/modelClampFactor
+        lowPix = newModel.image.array < lowThreshold
+        lowPix = ndimage.morphology.binary_opening(lowPix, iterations=regularizationWidth)
+        self.assertFalse(np.all(lowPix))
 
     def testIterateModel(self):
         """Test that the DcrModel is iterable, and has the right values.
