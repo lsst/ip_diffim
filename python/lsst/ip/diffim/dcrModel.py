@@ -519,13 +519,13 @@ class DcrModel:
         image = maskedImage.image.array
         filterStructure = ndimage.iterate_structure(ndimage.generate_binary_structure(2, 1),
                                                     regularizationWidth)
-        if highThreshold:
+        if highThreshold is not None:
             highPixels = image > highThreshold
             if regularizationWidth > 0:
                 # Erode and dilate ``highPixels`` to exclude noisy pixels.
                 highPixels = ndimage.morphology.binary_opening(highPixels, structure=filterStructure)
             image[highPixels] = highThreshold[highPixels]
-        if lowThreshold:
+        if lowThreshold is not None:
             lowPixels = image < lowThreshold
             if regularizationWidth > 0:
                 # Erode and dilate ``lowPixels`` to exclude noisy pixels.
