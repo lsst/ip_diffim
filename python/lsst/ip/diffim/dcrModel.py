@@ -461,7 +461,7 @@ class DcrModel:
         maskedImage : `lsst.afw.image.MaskedImage`
             The input image to evaluate the background noise properties.
         statsCtrl : `lsst.afw.math.StatisticsControl`
-            Statistics control object for coadd
+            Statistics control object for coaddition.
         bufferSize : `int`
             Number of additional pixels to exclude
             from the edges of the bounding box.
@@ -519,13 +519,13 @@ class DcrModel:
         image = maskedImage.image.array
         filterStructure = ndimage.iterate_structure(ndimage.generate_binary_structure(2, 1),
                                                     regularizationWidth)
-        if highThreshold is not None:
+        if highThreshold:
             highPixels = image > highThreshold
             if regularizationWidth > 0:
                 # Erode and dilate ``highPixels`` to exclude noisy pixels.
                 highPixels = ndimage.morphology.binary_opening(highPixels, structure=filterStructure)
             image[highPixels] = highThreshold[highPixels]
-        if lowThreshold is not None:
+        if lowThreshold:
             lowPixels = image < lowThreshold
             if regularizationWidth > 0:
                 # Erode and dilate ``lowPixels`` to exclude noisy pixels.
