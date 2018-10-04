@@ -85,179 +85,216 @@ class SnapPsfMatchConfig(ImagePsfMatchConfig):
         # With zero spatial order don't worry about spatial clipping
         self.kernel.active.spatialKernelClipping = False
 
-## @addtogroup LSST_task_documentation
-## @{
-## @page SnapPsfMatchTask
-## @ref SnapPsfMatchTask_ "SnapPsfMatchTask"
-## @copybrief SnapPsfMatchTask
-## @}
-
 
 class SnapPsfMatchTask(ImagePsfMatchTask):
-    """!
-@anchor SnapPsfMatchTask_
+    """Image-based Psf-matching of two subsequent snaps from the same visit
 
-@brief Image-based Psf-matching of two subsequent snaps from the same visit
+    Notes
+    -----
+    This Task differs from ImagePsfMatchTask in that it matches two Exposures assuming that the images have
+    been acquired very closely in time.  Under this assumption, the astrometric misalignments and/or
+    relative distortions should be within a pixel, and the Psf-shapes should be very similar.  As a
+    consequence, the default configurations for this class assume a very simple solution.
 
-@section ip_diffim_snappsfmatch_Contents Contents
+    - The spatial variation in the kernel (SnapPsfMatchConfig.spatialKernelOrder) is assumed to be zero
 
- - @ref ip_diffim_snappsfmatch_Purpose
- - @ref ip_diffim_snappsfmatch_Initialize
- - @ref ip_diffim_snappsfmatch_IO
- - @ref ip_diffim_snappsfmatch_Config
- - @ref ip_diffim_snappsfmatch_Metadata
- - @ref ip_diffim_snappsfmatch_Debug
- - @ref ip_diffim_snappsfmatch_Example
+    - With no spatial variation, we turn of the spatial
+        clipping loops (SnapPsfMatchConfig.spatialKernelClipping)
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    - The differential background is not fit for (SnapPsfMatchConfig.fitForBackground)
 
-@section ip_diffim_snappsfmatch_Purpose   Description
+    - The kernel is expected to be appx.
+        a delta function, and has a small size (SnapPsfMatchConfig.kernelSize)
 
-@copybrief SnapPsfMatchTask
+    The sub-configurations for the Alard-Lupton (SnapPsfMatchConfigAL)
+    and delta-function (SnapPsfMatchConfigDF)
+    bases also are designed to generate a small, simple kernel.
 
-This Task differs from ImagePsfMatchTask in that it matches two Exposures assuming that the images have
-been acquired very closely in time.  Under this assumption, the astrometric misalignments and/or
-relative distortions should be within a pixel, and the Psf-shapes should be very similar.  As a
-consequence, the default configurations for this class assume a very simple solution.
+    Task initialization
 
- . The spatial variation in the kernel (SnapPsfMatchConfig.spatialKernelOrder) is assumed to be zero
+    Initialization is the same as base class ImagePsfMatch.__init__,
+    with the difference being that the Task's
+    ConfigClass is SnapPsfMatchConfig.
 
- . With no spatial variation, we turn of the spatial clipping loops (SnapPsfMatchConfig.spatialKernelClipping)
+    Invoking the Task
 
- . The differential background is _not_ fit for (SnapPsfMatchConfig.fitForBackground)
+    The Task is only configured to have a subtractExposures method, which in turn calls
+    ImagePsfMatchTask.subtractExposures.
 
- . The kernel is expected to be appx. a delta function, and has a small size (SnapPsfMatchConfig.kernelSize)
+    Configuration parameters
 
-The sub-configurations for the Alard-Lupton (SnapPsfMatchConfigAL) and delta-function (SnapPsfMatchConfigDF)
-bases also are designed to generate a small, simple kernel.
+    See SnapPsfMatchConfig, which uses either SnapPsfMatchConfigDF and SnapPsfMatchConfigAL
+    as its active configuration.
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    Debug variables
 
-@section ip_diffim_snappsfmatch_Initialize    Task initialization
+    The lsst.pipe.base.cmdLineTask.CmdLineTask command line task interface supports a
+    flag -d/--debug to importdebug.py from your PYTHONPATH.  The relevant contents of debug.py
+    for this Task include:
 
-Initialization is the same as base class ImagePsfMatch.__init__, with the difference being that the Task's
-ConfigClass is SnapPsfMatchConfig.
+    .. code-block:: py
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        import sys
+        import lsstDebug
+        def DebugInfo(name):
+            di = lsstDebug.getInfo(name)
+            if name == "lsst.ip.diffim.psfMatch":
+                di.display = True                 # enable debug output
+                di.maskTransparency = 80          # ds9 mask transparency
+                di.displayCandidates = True       # show all the candidates and residuals
+                di.displayKernelBasis = False     # show kernel basis functions
+                di.displayKernelMosaic = True     # show kernel realized across the image
+                di.plotKernelSpatialModel = False # show coefficients of spatial model
+                di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
+            elif name == "lsst.ip.diffim.imagePsfMatch":
+                di.display = True                 # enable debug output
+                di.maskTransparency = 30          # ds9 mask transparency
+                di.displayTemplate = True         # show full (remapped) template
+                di.displaySciIm = True            # show science image to match to
+                di.displaySpatialCells = True     # show spatial cells
+                di.displayDiffIm = True           # show difference image
+                di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
+            elif name == "lsst.ip.diffim.diaCatalogSourceSelector":
+                di.display = False                # enable debug output
+                di.maskTransparency = 30          # ds9 mask transparency
+                di.displayExposure = True         # show exposure with candidates indicated
+                di.pauseAtEnd = False             # pause when done
+            return di
+        lsstDebug.Info = DebugInfo
+        lsstDebug.frame = 1
 
-@section ip_diffim_snappsfmatch_IO        Invoking the Task
+    Note that if you want addional logging info, you may add to your scripts:
 
-The Task is only configured to have a subtractExposures method, which in turn calls
-ImagePsfMatchTask.subtractExposures.
+    .. code-block:: py
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        import lsst.log.utils as logUtils
+        logUtils.traceSetAt("ip.diffim", 4)
 
-@section ip_diffim_snappsfmatch_Config       Configuration parameters
+    Examples
+    --------
+    This code is snapPsfMatchTask.py in the examples directory, and can be run as e.g.
 
-See @ref SnapPsfMatchConfig, which uses either @ref SnapPsfMatchConfigDF and @ref SnapPsfMatchConfigAL
-as its active configuration.
+    .. code-block:: py
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        examples/snapPsfMatchTask.py
+        examples/snapPsfMatchTask.py --debug
+        examples/snapPsfMatchTask.py --debug --template /path/to/templateExp.fits
+        --science /path/to/scienceExp.fits
 
-@section ip_diffim_snappsfmatch_Metadata   Quantities set in Metadata
+    First, create a subclass of SnapPsfMatchTask that accepts two exposures.
+    Ideally these exposures would have been taken back-to-back,
+    such that the pointing/background/Psf does not vary substantially between the two:
 
-See @ref ip_diffim_psfmatch_Metadata "PsfMatchTask"
+    .. code-block:: py
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        class MySnapPsfMatchTask(SnapPsfMatchTask):
+            def __init__(self, *args, **kwargs):
+                SnapPsfMatchTask.__init__(self, *args, **kwargs)
+            def run(self, templateExp, scienceExp):
+                return self.subtractExposures(templateExp, scienceExp)
 
-@section ip_diffim_snappsfmatch_Debug     Debug variables
+    And allow the user the freedom to either run the script in default mode,
+    or point to their own images on disk. Note that these images must be
+    readable as an lsst.afw.image.Exposure
 
-The @link lsst.pipe.base.cmdLineTask.CmdLineTask command line task@endlink interface supports a
-flag @c -d/--debug to import @b debug.py from your @c PYTHONPATH.  The relevant contents of debug.py
-for this Task include:
+    .. code-block:: py
 
-@code{.py}
-    import sys
-    import lsstDebug
-    def DebugInfo(name):
-        di = lsstDebug.getInfo(name)
-        if name == "lsst.ip.diffim.psfMatch":
-            di.display = True                 # enable debug output
-            di.maskTransparency = 80          # ds9 mask transparency
-            di.displayCandidates = True       # show all the candidates and residuals
-            di.displayKernelBasis = False     # show kernel basis functions
-            di.displayKernelMosaic = True     # show kernel realized across the image
-            di.plotKernelSpatialModel = False # show coefficients of spatial model
-            di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
-        elif name == "lsst.ip.diffim.imagePsfMatch":
-            di.display = True                 # enable debug output
-            di.maskTransparency = 30          # ds9 mask transparency
-            di.displayTemplate = True         # show full (remapped) template
-            di.displaySciIm = True            # show science image to match to
-            di.displaySpatialCells = True     # show spatial cells
-            di.displayDiffIm = True           # show difference image
-            di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
-        elif name == "lsst.ip.diffim.diaCatalogSourceSelector":
-            di.display = False                # enable debug output
-            di.maskTransparency = 30          # ds9 mask transparency
-            di.displayExposure = True         # show exposure with candidates indicated
-            di.pauseAtEnd = False             # pause when done
-        return di
-    lsstDebug.Info = DebugInfo
-    lsstDebug.frame = 1
-@endcode
+        if __name__ == "__main__":
+            import argparse
+            parser = argparse.ArgumentParser(description="Demonstrate the use of ImagePsfMatchTask")
+            parser.add_argument("--debug", "-d", action="store_true", help="Load debug.py?", default=False)
+            parser.add_argument("--template", "-t", help="Template Exposure to use", default=None)
+            parser.add_argument("--science", "-s", help="Science Exposure to use", default=None)
+            args = parser.parse_args()
 
-Note that if you want addional logging info, you may add to your scripts:
-@code{.py}
-import lsst.log.utils as logUtils
-logUtils.traceSetAt("ip.diffim", 4)
-@endcode
+    We have enabled some minor display debugging in this script via the –debug option. However,
+    if you have an lsstDebug debug.in your PYTHONPATH you will get additional debugging displays.
+    The following block checks for this script
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    .. code-block:: py
 
-@section ip_diffim_snappsfmatch_Example   A complete example of using SnapPsfMatchTask
+        if args.debug:
+            try:
+                import debug
+                # Since I am displaying 2 images here, set the starting frame number for the LSST debug LSST
+                debug.lsstDebug.frame = 3
+            except ImportError as e:
+                print(e, file=sys.stderr)
 
-This code is snapPsfMatchTask.py in the examples directory, and can be run as @em e.g.
-@code
-examples/snapPsfMatchTask.py
-examples/snapPsfMatchTask.py --debug
-examples/snapPsfMatchTask.py --debug --template /path/to/templateExp.fits --science /path/to/scienceExp.fits
-@endcode
+    Finally, we call a run method that we define below.
+    First set up a Config and choose the basis set to use:
 
-@dontinclude snapPsfMatchTask.py
-First, create a subclass of SnapPsfMatchTask that accepts two exposures.  Ideally these exposures would have
-been taken back-to-back, such that the pointing/background/Psf does not vary substantially between the two:
-@skip MySnapPsfMatchTask
-@until return
+    .. code-block:: py
 
-And allow the user the freedom to either run the script in default mode, or point to their own images on disk.
-Note that these images must be readable as an lsst.afw.image.Exposure:
-@skip main
-@until parse_args
+        def run(args):
+            #
+            # Create the Config and use sum of gaussian basis
+            #
+            config = SnapPsfMatchTask.ConfigClass()
+            config.doWarping = True
+            config.kernel.name = "AL"
 
-We have enabled some minor display debugging in this script via the --debug option.  However, if you
-have an lsstDebug debug.py in your PYTHONPATH you will get additional debugging displays.  The following
-block checks for this script:
-@skip args.debug
-@until sys.stderr
+    Make sure the images (if any) that were sent to the script exist on disk and are readable.
+    If no images are sent, make some fake data up for the sake of this example script
+    (have a look at the code if you want more details on generateFakeImages;
+    as a detail of how the fake images were made, you do have to fit for a differential background):
 
+    .. code-block:: py
 
-@dontinclude snapPsfMatchTask.py
-Finally, we call a run method that we define below.  First set up a Config and choose the basis set to use:
-@skip run(args)
-@until AL
+        # Run the requested method of the Task
+        if args.template is not None and args.science is not None:
+            if not os.path.isfile(args.template):
+                raise Exception("Template image %s does not exist" % (args.template))
+            if not os.path.isfile(args.science):
+                raise Exception("Science image %s does not exist" % (args.science))
+            try:
+                templateExp = afwImage.ExposureF(args.template)
+            except Exception as e:
+                raise Exception("Cannot read template image %s" % (args.template))
+            try:
+                scienceExp = afwImage.ExposureF(args.science)
+            except Exception as e:
+                raise Exception("Cannot read science image %s" % (args.science))
+        else:
+            templateExp, scienceExp = generateFakeImages()
+            config.kernel.active.fitForBackground = True
+            config.kernel.active.spatialBgOrder = 0
+            config.kernel.active.sizeCellX = 128
+            config.kernel.active.sizeCellY = 128
 
-Make sure the images (if any) that were sent to the script exist on disk and are readable.  If no images
-are sent, make some fake data up for the sake of this example script (have a look at the code if you want
-more details on generateFakeImages; as a detail of how the fake images were made, you do have to fit for a
-differential background):
-@skip requested
-@until sizeCellY
+    Display the two images if -debug
 
-Display the two images if --debug:
-@skip args.debug
-@until Science
+    .. code-block:: py
 
-Create and run the Task:
-@skip Create
-@until result
+        if args.debug:
+            ds9.mtv(templateExp, frame=1, title="Example script: Input Template")
+            ds9.mtv(scienceExp, frame=2, title="Example script: Input Science Image")
 
-And finally provide optional debugging display of the Psf-matched (via the Psf models) science image:
-@skip args.debug
-@until result.subtractedExposure
+    Create and run the Task
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    .. code-block:: py
+
+        # Create the Task
+        psfMatchTask = MySnapPsfMatchTask(config=config)
+        # Run the Task
+        result = psfMatchTask.run(templateExp, scienceExp)
+
+    And finally provide optional debugging display of the Psf-matched (via the Psf models) science image:
+
+    .. code-block:: py
+
+        if args.debug:
+            # See if the LSST debug has incremented the frame number; if not start with frame 3
+            try:
+                frame = debug.lsstDebug.frame + 1
+            except Exception:
+                frame = 3
+            ds9.mtv(result.matchedExposure, frame=frame, title="Example script: Matched Template Image")
+            if "subtractedExposure" in result.getDict():
+                ds9.mtv(result.subtractedExposure, frame=frame+1, title="Example script: Subtracted Image")
+
     """
+
     ConfigClass = SnapPsfMatchConfig
 
     # Override ImagePsfMatchTask.subtractExposures to set doWarping on config.doWarping

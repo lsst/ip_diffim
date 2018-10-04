@@ -59,22 +59,32 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
     """Subtask to retrieve coadd for use as an image difference template.
 
     This is the default getTemplate Task to be run as a subtask by
-    pipe.tasks.ImageDifferenceTask. The main method is run().
+    ``pipe.tasks.ImageDifferenceTask``. The main method is ``run()``.
     It assumes that coadds reside in the repository given by sensorRef.
     """
+
     ConfigClass = GetCoaddAsTemplateConfig
     _DefaultName = "GetCoaddAsTemplateTask"
 
     def run(self, exposure, sensorRef, templateIdList=None):
-        """!Retrieve and mosaic a template coadd exposure that overlaps the exposure
+        """Retrieve and mosaic a template coadd exposure that overlaps the exposure
 
-        @param[in] exposure -- an exposure for which to generate an overlapping template
-        @param[in] sensorRef -- a Butler data reference that can be used to obtain coadd data
-        @param[in] templateIdList -- list of data ids (unused)
+        Parameters
+        ----------
+        exposure: `lsst.afw.image.Exposure`
+            an exposure for which to generate an overlapping template
+        sensorRef : TYPE
+            a Butler data reference that can be used to obtain coadd data
+        templateIdList : TYPE, optional
+            list of data ids (unused)
 
-        @return a pipeBase.Struct
-         - exposure: a template coadd exposure assembled out of patches
-         - sources:  None for this subtask
+        Returns
+        -------
+        result : `struct`
+            return a pipeBase.Struct:
+
+            - ``exposure`` : a template coadd exposure assembled out of patches
+            - ``sources`` :  None for this subtask
         """
         skyMap = sensorRef.get(datasetType=self.config.coaddName + "Coadd_skyMap")
         expWcs = exposure.getWcs()
@@ -192,19 +202,29 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
     _DefaultName = "GetCalexpAsTemplateTask"
 
     def run(self, exposure, sensorRef, templateIdList):
-        """!Return a calexp exposure with based on input sensorRef.
+        """Return a calexp exposure with based on input sensorRef.
 
         Construct a dataId based on the sensorRef.dataId combined
         with the specifications from the first dataId in templateIdList
 
-        @param[in] exposure -- exposure (unused)
-        @param[in] sensorRef -- a Butler data reference
-        @param[in] templateIdList -- list of data ids, which should contain a single item.
-                                     If there are multiple items, only the first is used.
+        Parameters
+        ----------
+        exposure :  `lsst.afw.image.Exposure`
+            exposure (unused)
+        sensorRef : TYPE
+            a Butler data reference
+        templateIdList : TYPE
+            list of data ids, which should contain a single item.
+            If there are multiple items, only the first is used.
 
-        @return a pipeBase.Struct
-         - exposure: a template calexp
-         - sources: source catalog measured on the template
+        Returns
+        -------
+        result : `struct`
+
+            return a pipeBase.Struct:
+
+                - ``exposure`` : a template calexp
+                - ``sources`` : source catalog measured on the template
         """
 
         if len(templateIdList) == 0:

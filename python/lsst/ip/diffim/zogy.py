@@ -153,12 +153,12 @@ class ZogyTask(pipeBase.Task):
         psf2 : 2D `numpy.array`
             (Optional) 2D array containing the PSF image for the science img. If
             `None`, it is extracted from the PSF taken at the center of `scienceExposure`.
-        args :
+        *args
             additional arguments to be passed to
-            `lsst.pipe.base.task.Task.__init__`
-        kwargs :
+            `lsst.pipe.base.Task`
+        **kwargs
             additional keyword arguments to be passed to
-            `lsst.pipe.base.task.Task.__init__`
+            `lsst.pipe.base.Task`
         """
         pipeBase.Task.__init__(self, *args, **kwargs)
         self.template = self.science = None
@@ -191,12 +191,12 @@ class ZogyTask(pipeBase.Task):
         correctBackground : `bool`
             (Optional) subtract sigma-clipped mean of exposures. Zogy doesn't correct
             nonzero backgrounds (unlike AL) so subtract them here.
-        args :
+        *args
             additional arguments to be passed to
-            `lsst.pipe.base.task.Task.__init__`
-        kwargs :
+            `lsst.pipe.base.Task`
+        **kwargs
             additional keyword arguments to be passed to
-            `lsst.pipe.base.task.Task.__init__`
+            `lsst.pipe.base.Task`
         """
         if self.template is None and templateExposure is None:
             return
@@ -338,10 +338,12 @@ class ZogyTask(pipeBase.Task):
             (Optional) Input psf of template, override if already padded
         psf2 : 2D `numpy.array`
             (Optional) Input psf of science image, override if already padded
+        padSize : `int`, optional
+            Number of pixels to pad the image on each side with zeroes.
 
         Returns
         -------
-        A lsst.pipe.base.Struct containing:
+        A `lsst.pipe.base.Struct` containing:
         - Pr : 2D `numpy.array`, the (possibly zero-padded) template PSF
         - Pn : 2D `numpy.array`, the (possibly zero-padded) science PSF
         - Pr_hat : 2D `numpy.array`, the FFT of `Pr`
@@ -373,27 +375,40 @@ class ZogyTask(pipeBase.Task):
         )
         return res
 
-    # In all functions, im1 is R (reference, or template) and im2 is N (new, or science)
     def computeDiffimFourierSpace(self, debug=False, returnMatchedTemplate=False, **kwargs):
         r"""Compute ZOGY diffim `D` as proscribed in ZOGY (2016) manuscript
 
+        Parameters
+        ----------
+        debug : `bool`, optional
+            If set to True, filter the kernels by setting the edges to zero.
+        returnMatchedTemplate : `bool`, optional
+            Calculate the template image.
+            If not set, the returned template will be None.
+
+        Notes
+        -----
+        In all functions, im1 is R (reference, or template) and im2 is N (new, or science)
         Compute the ZOGY eqn. (13):
-        $$
-        \widehat{D} = \frac{Fr\widehat{Pr}\widehat{N} -
-        F_n\widehat{Pn}\widehat{R}}{\sqrt{\sigma_n^2 Fr^2
-        |\widehat{Pr}|^2 + \sigma_r^2 F_n^2 |\widehat{Pn}|^2}}
-        $$
-        where $D$ is the optimal difference image, $R$ and $N$ are the
-        reference and "new" image, respectively, $Pr$ and $P_n$ are their
-        PSFs, $Fr$ and $Fn$ are their flux-based zero-points (which we
-        will set to one here), $\sigma_r^2$ and $\sigma_n^2$ are their
-        variance, and $\widehat{D}$ denotes the FT of $D$.
+        .. math::
+
+            \widehat{D} = \\frac{Fr\widehat{Pr}\widehat{N} -
+            F_n\widehat{Pn}\widehat{R}}{\sqrt{\sigma_n^2 Fr^2
+            \|\widehat{Pr}\|^2 + \sigma_r^2 F_n^2 \|\widehat{Pn}\|^2}}
+
+        where :math:`D` is the optimal difference image, :math:`R` and :math:`N` are the
+        reference and "new" image, respectively, :math:`Pr` and :math:`P_n` are their
+        PSFs, :math:`Fr` and :math:`Fn` are their flux-based zero-points (which we
+        will set to one here), :math:`\sigma_r^2` and :math:`\sigma_n^2` are their
+        variance, and :math:`\widehat{D}` denotes the FT of :math:`D`.
 
         Returns
         -------
-        A `lsst.pipe.base.Struct` containing:
-        - D : 2D `numpy.array`, the proper image difference
-        - D_var : 2D `numpy.array`, the variance image for `D`
+        result : `lsst.pipe.base.Struct`
+            Result struct with components:
+
+            - ``D`` : 2D `numpy.array`, the proper image difference
+            - ``D_var`` : 2D `numpy.array`, the variance image for `D`
         """
         # Do all in fourier space (needs image-sized PSFs)
         psf1 = ZogyTask._padPsfToSize(self.im1_psf, self.im1.shape)
@@ -454,12 +469,16 @@ class ZogyTask(pipeBase.Task):
         return pipeBase.Struct(D=D, D_var=D_var, R=R, R_var=R_var)
 
     def _doConvolve(self, exposure, kernel, recenterKernel=False):
-        """! Convolve an Exposure with a decorrelation convolution kernel.
+        """Convolve an Exposure with a decorrelation convolution kernel.
 
         Parameters
         ----------
-        exposure : `lsst.afw.image.Exposure` to be convolved.
-        kernel : 2D `numpy.array` to convolve the image with
+        exposure : `lsst.afw.image.Exposure`
+            Input exposure to be convolved.
+        kernel : `numpy.array`
+            2D `numpy.array` to convolve the image with
+        recenterKernel : `bool`, optional
+            Force the kernel center to the pixel with the maximum value.
 
         Returns
         -------
@@ -500,8 +519,10 @@ class ZogyTask(pipeBase.Task):
 
         Parameters
         ----------
-        padSize : `int`, the amount to pad the PSFs by
-        debug : `bool`, flag to enable debugging tests and options
+        padSize : `int`
+           The amount to pad the PSFs by
+        debug : `bool`
+           Flag to enable debugging tests and options
 
         Returns
         -------
@@ -571,9 +592,9 @@ class ZogyTask(pipeBase.Task):
            Override config `inImageSpace` parameter
         padSize : `int`
            Override config `padSize` parameter
-        returnMatchedTemplate : bool
+        returnMatchedTemplate : `bool`
            Include the PSF-matched template in the results Struct
-        **kwargs : `dict`
+        **kwargs
             additional keyword arguments to be passed to
             `computeDiffimFourierSpace` or `computeDiffimImageSpace`.
 
@@ -625,7 +646,8 @@ class ZogyTask(pipeBase.Task):
 
         Returns
         -------
-        Pd : 2D `numpy.array`, the diffim PSF (or FFT of PSF if `keepFourier=True`)
+        Pd : 2D `numpy.array`
+            The diffim PSF (or FFT of PSF if `keepFourier=True`)
         """
         preqs = self.computePrereqs(psf1=psf1, psf2=psf2, padSize=padSize)
 
@@ -672,8 +694,8 @@ class ZogyTask(pipeBase.Task):
 
         Returns
         -------
-        VastSR, VastSN : 2-D `numpy.array`s containing the values in eqs. 30 and 32 of
-           ZOGY (2016).
+        VastSR, VastSN : 2-D `numpy.array`
+           Arrays containing the values in eqs. 30 and 32 of ZOGY (2016).
         """
         VastSR = VastSN = 0.
         if xVarAst + yVarAst > 0:  # Do the astrometric variance correction
@@ -712,10 +734,12 @@ class ZogyTask(pipeBase.Task):
 
         Returns
         -------
-        A lsst.pipe.base.Struct containing:
-        - S : `numpy.array`, the likelihood image S (eq. 12 of ZOGY (2016))
-        - S_var : the corrected variance image (denominator of eq. 25 of ZOGY (2016))
-        - Dpsf : the PSF of the diffim D, likely never to be used.
+        result : `lsst.pipe.base.Struct`
+            Result struct with components:
+
+            - ``S`` : `numpy.array`, the likelihood image S (eq. 12 of ZOGY (2016))
+            - ``S_var`` : the corrected variance image (denominator of eq. 25 of ZOGY (2016))
+            - ``Dpsf`` : the PSF of the diffim D, likely never to be used.
         """
         # Some masked regions are NaN or infinite!, and FFTs no likey.
         def fix_nans(im):
@@ -790,7 +814,7 @@ class ZogyTask(pipeBase.Task):
 
         Returns
         -------
-        a tuple containing:
+        A `lsst.pipe.base.Struct` containing:
         - S : `lsst.afw.image.Exposure`, the likelihood exposure S (eq. 12 of ZOGY (2016)),
             including corrected variance, masks, and PSF
         - D : `lsst.afw.image.Exposure`, the proper image difference, including correct
@@ -844,16 +868,17 @@ class ZogyTask(pipeBase.Task):
 
         Parameters
         ----------
-        xVarAst, yVarAst : float
+        xVarAst, yVarAst : `float`
            estimated astrometric noise (variance of astrometric registration errors)
-        inImageSpace : bool
+        inImageSpace : `bool`
            Override config `inImageSpace` parameter
-        padSize : int
+        padSize : `int`
            Override config `padSize` parameter
 
         Returns
         -------
-        S : lsst.afw.image.Exposure, the likelihood exposure S (eq. 12 of ZOGY (2016)),
+        S : `lsst.afw.image.Exposure`
+            The likelihood exposure S (eq. 12 of ZOGY (2016)),
             including corrected variance, masks, and PSF
         """
         inImageSpace = self.config.inImageSpace if inImageSpace is None else inImageSpace
@@ -895,35 +920,37 @@ class ZogyMapper(ZogyTask, ImageMapper):
 
         Parameters
         ----------
-        subExposure : lsst.afw.image.Exposure
+        subExposure : `lsst.afw.image.Exposure`
             the sub-exposure of the diffim
-        expandedSubExposure : lsst.afw.image.Exposure
+        expandedSubExposure : `lsst.afw.image.Exposure`
             the expanded sub-exposure upon which to operate
-        fullBBox : lsst.afw.geom.BoundingBox
+        fullBBox : `lsst.afw.geom.BoundingBox`
             the bounding box of the original exposure
-        template : lsst.afw.image.Exposure
+        template : `lsst.afw.image.Exposure`
             the template exposure, from which a corresponding sub-exposure
             is extracted
-        kwargs :
+        **kwargs
             additional keyword arguments propagated from
             `ImageMapReduceTask.run`. These include:
-        - doScorr : bool
-              Compute and return the corrected likelihood image S_corr
-              rather than the proper image difference
-        - inImageSpace : bool
-              Perform all convolutions in real (image) space rather than
-              in Fourier space. This option currently leads to artifacts
-              when using real (measured and noisy) PSFs, thus it is set
-              to `False` by default.
-            These kwargs may also include arguments to be propagated to
-            `ZogyTask.computeDiffim` and `ZogyTask.computeScorr`.
+
+            ``doScorr`` : `bool`
+                Compute and return the corrected likelihood image S_corr
+                rather than the proper image difference
+            ``inImageSpace`` : `bool`
+                Perform all convolutions in real (image) space rather than
+                in Fourier space. This option currently leads to artifacts
+                when using real (measured and noisy) PSFs, thus it is set
+                to `False` by default.
+                These kwargs may also include arguments to be propagated to
+                `ZogyTask.computeDiffim` and `ZogyTask.computeScorr`.
 
         Returns
         -------
-        A `lsst.pipe.base.Struct` containing the result of the
-        `subExposure` processing, labelled 'subExposure'. In this case
-        it is either the subExposure of the proper image difference D,
-        or (if `doScorr==True`) the corrected likelihood exposure `S`.
+        result : `lsst.pipe.base.Struct`
+            Result struct with components:
+
+                ``subExposure``: Either the subExposure of the proper image difference ``D``,
+                    or (if `doScorr==True`) the corrected likelihood exposure ``S``.
 
         Notes
         -----
@@ -1087,7 +1114,7 @@ class ZogyImagePsfMatchTask(ImagePsfMatchTask):
             what to do if templateExposure's and scienceExposure's WCSs do not match:
             - if True then warp templateExposure to match scienceExposure
             - if False then raise an Exception
-        spatiallyVarying : bool
+        spatiallyVarying : `bool`
             If True, perform the operation over a grid of patches across the two exposures
         inImageSpace : `bool`
             If True, perform the Zogy convolutions in image space rather than in frequency space.

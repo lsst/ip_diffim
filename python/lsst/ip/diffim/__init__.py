@@ -25,6 +25,7 @@
 from .diffimLib import *
 
 # Python code
+from .dcrModel import *
 from .psfMatch import *
 from .imagePsfMatch import *
 from .modelPsfMatch import *
