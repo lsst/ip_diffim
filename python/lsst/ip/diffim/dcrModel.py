@@ -589,18 +589,19 @@ def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
     lambdaEff = filterInfo.getFilterProperty().getLambdaEff()
     for wl0, wl1 in wavelengthGenerator(filterInfo, dcrNumSubfilters):
         # Note that diffRefractAmp can be negative, since it's relative to the midpoint of the full band
-        diffRefractAmp0 = differentialRefraction(wl0, lambdaEff,
+        diffRefractAmp0 = differentialRefraction(wavelength=wl0, wavelengthRef=lambdaEff,
                                                  elevation=visitInfo.getBoresightAzAlt().getLatitude(),
                                                  observatory=visitInfo.getObservatory(),
                                                  weather=visitInfo.getWeather())
-        diffRefractAmp1 = differentialRefraction(wl1, lambdaEff,
+        diffRefractAmp1 = differentialRefraction(wavelength=wl1, wavelengthRef=lambdaEff,
                                                  elevation=visitInfo.getBoresightAzAlt().getLatitude(),
                                                  observatory=visitInfo.getObservatory(),
                                                  weather=visitInfo.getWeather())
         diffRefractAmp = (diffRefractAmp0 + diffRefractAmp1)/2.
         diffRefractPix = diffRefractAmp.asArcseconds()/wcs.getPixelScale().asArcseconds()
-        dcrShift.append(afwGeom.Extent2D(diffRefractPix*np.cos(rotation.asRadians()),
-                                         diffRefractPix*np.sin(rotation.asRadians())))
+        shiftX = diffRefractPix*np.sin(rotation.asRadians())
+        shiftY = diffRefractPix*np.cos(rotation.asRadians())
+        dcrShift.append(afwGeom.Extent2D(shiftX, shiftY))
     return dcrShift
 
 
@@ -627,7 +628,10 @@ def calculateImageParallacticAngle(visitInfo, wcs):
     """
     parAngle = visitInfo.getBoresightParAngle().asRadians()
     cd = wcs.getCdMatrix()
-    cdAngle = (np.arctan2(-cd[0, 1], cd[0, 0]) + np.arctan2(cd[1, 0], cd[1, 1]))/2.
+    if wcs.isFlipped:
+        cdAngle = (np.arctan2(-cd[0, 1], cd[0, 0]) + np.arctan2(cd[1, 0], cd[1, 1]))/2.
+    else:
+        cdAngle = (np.arctan2(cd[0, 1], -cd[0, 0]) + np.arctan2(cd[1, 0], cd[1, 1]))/2.
     rotAngle = (cdAngle + parAngle)*radians
     return rotAngle
 
