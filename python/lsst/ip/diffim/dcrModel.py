@@ -289,7 +289,8 @@ class DcrModel:
             model.assign(subModel[bbox], bbox)
 
     def buildMatchedTemplate(self, exposure=None, warpCtrl=None,
-                             visitInfo=None, bbox=None, wcs=None, mask=None):
+                             visitInfo=None, bbox=None, wcs=None, mask=None,
+                             useMidpoint=True):
         """Create a DCR-matched template image for an exposure.
 
         Parameters
@@ -310,6 +311,8 @@ class DcrModel:
             Ignored if ``exposure`` is set.
         mask : `lsst.afw.image.Mask`, optional
             reference mask to use for the template image.
+        useMidpoint : `bool`, optional
+            Use the midpoint of each subfilter to calculate DCR. Default: True
 
         Returns
         -------
@@ -335,10 +338,10 @@ class DcrModel:
             warpCtrl = afwMath.WarpingControl("lanczos3", "bilinear",
                                               cacheSize=0, interpLength=max(bbox.getDimensions()))
 
-        dcrShift = calculateDcr(visitInfo, wcs, self.filter, len(self))
+        dcrShift = calculateDcr(visitInfo, wcs, self.filter, len(self), useMidpoint=useMidpoint)
         templateImage = afwImage.MaskedImageF(bbox)
         for subfilter, dcr in enumerate(dcrShift):
-            templateImage += applyDcr(self[subfilter][bbox], dcr, warpCtrl)
+            templateImage += applyDcr(self[subfilter][bbox], dcr, warpCtrl, useMidpoint=useMidpoint)
         if mask is not None:
             templateImage.setMask(mask[bbox])
         return templateImage
@@ -533,7 +536,7 @@ class DcrModel:
             image[lowPixels] = lowThreshold[lowPixels]
 
 
-def applyDcr(maskedImage, dcr, warpCtrl, bbox=None, useInverse=False):
+def applyDcr(maskedImage, dcr, warpCtrl, bbox=None, useInverse=False, useMidpoint=True):
     """Shift a masked image.
 
     Parameters
@@ -549,23 +552,37 @@ def applyDcr(maskedImage, dcr, warpCtrl, bbox=None, useInverse=False):
         Shifts the entire image if None (Default).
     useInverse : `bool`, optional
         Use the reverse of ``dcr`` for the shift. Default: False
+    useMidpoint : `bool`, optional
+        Use the midpoint of each subfilter to calculate DCR. Default: True
 
     Returns
     -------
-    `lsst.afw.image.maskedImageF`
+    shiftedImage : `lsst.afw.image.maskedImageF`
         A masked image, with the pixels within the bounding box shifted.
     """
     padValue = afwImage.pixel.SinglePixelF(0., maskedImage.mask.getPlaneBitMask("NO_DATA"), 0)
     if bbox is None:
         bbox = maskedImage.getBBox()
-    shiftedImage = afwImage.MaskedImageF(bbox)
-    transform = makeTransform(AffineTransform((-1.0 if useInverse else 1.0)*dcr))
-    afwMath.warpImage(shiftedImage, maskedImage[bbox],
-                      transform, warpCtrl, padValue=padValue)
+    if useMidpoint:
+        shiftedImage = afwImage.MaskedImageF(bbox)
+        transform = makeTransform(AffineTransform((-1.0 if useInverse else 1.0)*dcr))
+        afwMath.warpImage(shiftedImage, maskedImage[bbox],
+                          transform, warpCtrl, padValue=padValue)
+    else:
+        shiftedImage = afwImage.MaskedImageF(bbox)
+        transform0 = makeTransform(AffineTransform((-1.0 if useInverse else 1.0)*dcr[0]))
+        afwMath.warpImage(shiftedImage, maskedImage[bbox],
+                          transform0, warpCtrl, padValue=padValue)
+        shiftedImage1 = afwImage.MaskedImageF(bbox)
+        transform1 = makeTransform(AffineTransform((-1.0 if useInverse else 1.0)*dcr[1]))
+        afwMath.warpImage(shiftedImage1, maskedImage[bbox],
+                          transform1, warpCtrl, padValue=padValue)
+        shiftedImage += shiftedImage1
+        shiftedImage /= 2.
     return shiftedImage
 
 
-def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
+def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters, useMidpoint=True):
     """Calculate the shift in pixels of an exposure due to DCR.
 
     Parameters
@@ -578,14 +595,17 @@ def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
         The filter definition, set in the current instruments' obs package.
     dcrNumSubfilters : `int`
         Number of sub-filters used to model chromatic effects within a band.
+    useMidpoint : `bool`, optional
+        Use the midpoint of each subfilter to calculate DCR. Default: True
 
     Returns
     -------
-    `lsst.afw.geom.Extent2I`
+    dcrShift : `lsst.afw.geom.Extent2I`
         The 2D shift due to DCR, in pixels.
     """
     rotation = calculateImageParallacticAngle(visitInfo, wcs)
     dcrShift = []
+    weight = [0.75, 0.25]
     lambdaEff = filterInfo.getFilterProperty().getLambdaEff()
     for wl0, wl1 in wavelengthGenerator(filterInfo, dcrNumSubfilters):
         # Note that diffRefractAmp can be negative, since it's relative to the midpoint of the full band
@@ -597,11 +617,20 @@ def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
                                                  elevation=visitInfo.getBoresightAzAlt().getLatitude(),
                                                  observatory=visitInfo.getObservatory(),
                                                  weather=visitInfo.getWeather())
-        diffRefractAmp = (diffRefractAmp0 + diffRefractAmp1)/2.
-        diffRefractPix = diffRefractAmp.asArcseconds()/wcs.getPixelScale().asArcseconds()
-        shiftX = diffRefractPix*np.sin(rotation.asRadians())
-        shiftY = diffRefractPix*np.cos(rotation.asRadians())
-        dcrShift.append(afwGeom.Extent2D(shiftX, shiftY))
+        if useMidpoint:
+            diffRefractAmp = (diffRefractAmp0 + diffRefractAmp1)/2.
+            diffRefractPix = diffRefractAmp.asArcseconds()/wcs.getPixelScale().asArcseconds()
+            shiftX = diffRefractPix*np.sin(rotation.asRadians())
+            shiftY = diffRefractPix*np.cos(rotation.asRadians())
+            dcrShift.append(afwGeom.Extent2D(shiftX, shiftY))
+        else:
+            diffRefractPix0 = diffRefractAmp0.asArcseconds()/wcs.getPixelScale().asArcseconds()
+            diffRefractPix1 = diffRefractAmp1.asArcseconds()/wcs.getPixelScale().asArcseconds()
+            diffRefractArr = [diffRefractPix0*weight[0] + diffRefractPix1*weight[1],
+                              diffRefractPix0*weight[1] + diffRefractPix1*weight[0]]
+            shiftX = [diffRefractPix*np.sin(rotation.asRadians()) for diffRefractPix in diffRefractArr]
+            shiftY = [diffRefractPix*np.cos(rotation.asRadians()) for diffRefractPix in diffRefractArr]
+            dcrShift.append((afwGeom.Extent2D(shiftX[0], shiftY[0]), afwGeom.Extent2D(shiftX[1], shiftY[1])))
     return dcrShift
 
 
