@@ -148,7 +148,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                             kc.getDifferenceImage):
                 try:
                     kMethod(kType)
-                except Exception as e:
+                except Exception:
                     pass
                 else:
                     self.fail()
@@ -227,7 +227,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                             kc.getDifferenceImage):
                 try:
                     kMethod(kType)
-                except Exception as e:
+                except Exception:
                     pass
                 else:
                     self.fail()
@@ -318,7 +318,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                             kc.getDifferenceImage):
                 try:
                     kMethod(kType)
-                except Exception as e:
+                except Exception:
                     pass
                 else:
                     print(kMethod)

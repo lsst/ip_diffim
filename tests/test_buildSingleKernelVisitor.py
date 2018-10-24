@@ -76,7 +76,7 @@ class DiffimTestCases(unittest.TestCase):
             kc1.getKernelSolution(ipDiffim.KernelCandidateF.PCA)
             kc2.getKernelSolution(ipDiffim.KernelCandidateF.PCA)
             kc3.getKernelSolution(ipDiffim.KernelCandidateF.PCA)
-        except Exception as e:
+        except Exception:
             pass
         else:
             self.fail()

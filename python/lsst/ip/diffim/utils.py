@@ -289,7 +289,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
             candCenter = afwGeom.PointD(cand.getXCenter(), cand.getYCenter())
             try:
                 im = cand.getTemplateMaskedImage()
-            except Exception as e:
+            except Exception:
                 continue
 
             targetFits = badFits if cand.isBad() else candFits
