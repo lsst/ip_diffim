@@ -83,7 +83,7 @@ class ImagePsfMatchConfig(pexConfig.Config):
 
 
 class ImagePsfMatchTask(PsfMatchTask):
-    """!
+    r"""!
 @anchor ImagePsfMatchTask_
 
 @brief Psf-match two MaskedImages or Exposures using the sources in the images

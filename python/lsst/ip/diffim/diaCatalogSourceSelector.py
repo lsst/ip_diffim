@@ -109,7 +109,7 @@ class CheckSource(object):
 
 @pexConfig.registerConfigurable("diaCatalog", measAlg.sourceSelectorRegistry)
 class DiaCatalogSourceSelectorTask(measAlg.BaseSourceSelectorTask):
-    """!Select sources for Kernel candidates
+    r"""!Select sources for Kernel candidates
 
     @anchor DiaCatalogSourceSelectorTask_
 

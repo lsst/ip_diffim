@@ -125,7 +125,7 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
 
 
 class DipoleMeasurementTask(SingleFrameMeasurementTask):
-    """!
+    r"""!
 @anchor DipoleMeasurementTask_
 
 @brief Measurement of Sources, specifically ones from difference images, for characterization as dipoles
