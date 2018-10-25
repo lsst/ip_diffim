@@ -101,11 +101,11 @@ def run(args):
 
         try:
             templateExp = afwImage.ExposureF(args.template)
-        except Exception as e:
+        except Exception:
             raise Exception("Cannot read template image %s" % (args.template))
         try:
             scienceExp = afwImage.ExposureF(args.science)
-        except Exception as e:
+        except Exception:
             raise Exception("Cannot read science image %s" % (args.science))
     else:
         templateExp, scienceExp = generateFakeImages()

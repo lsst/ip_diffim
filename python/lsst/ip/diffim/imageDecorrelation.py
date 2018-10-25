@@ -60,7 +60,7 @@ class DecorrelateALKernelConfig(pexConfig.Config):
 
 
 class DecorrelateALKernelTask(pipeBase.Task):
-    """!
+    r"""!
     @anchor DecorrelateALKernelTask_
 
     @brief Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
@@ -524,7 +524,7 @@ class DecorrelateALKernelSpatialConfig(pexConfig.Config):
 
 
 class DecorrelateALKernelSpatialTask(pipeBase.Task):
-    """!
+    r"""!
     @anchor DecorrelateALKernelSpatialTask_
 
     @brief Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference

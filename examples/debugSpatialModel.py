@@ -93,7 +93,7 @@ try:
     spatialKernel = results.psfMatchingKernel
     spatialBg = results.backgroundModel
     kernelCellSet = results.kernelCellSet
-except Exception as e:
+except Exception:
     print('FAIL')
     sys.exit(1)
 

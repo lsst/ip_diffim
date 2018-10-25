@@ -527,7 +527,7 @@ class PsfMatchConfigDF(PsfMatchConfig):
 ## @}
 
 class PsfMatchTask(pipeBase.Task):
-    """!
+    r"""!
 
 @anchor PsfMatchTask_
 

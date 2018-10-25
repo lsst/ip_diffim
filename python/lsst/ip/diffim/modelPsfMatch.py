@@ -99,7 +99,7 @@ class ModelPsfMatchConfig(pexConfig.Config):
 
 
 class ModelPsfMatchTask(PsfMatchTask):
-    """!
+    r"""!
 @anchor ModelPsfMatchTask_
 
 @brief Matching of two model Psfs, and application of the Psf-matching kernel to an input Exposure

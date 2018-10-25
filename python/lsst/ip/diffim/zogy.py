@@ -375,7 +375,7 @@ class ZogyTask(pipeBase.Task):
 
     # In all functions, im1 is R (reference, or template) and im2 is N (new, or science)
     def computeDiffimFourierSpace(self, debug=False, returnMatchedTemplate=False, **kwargs):
-        """Compute ZOGY diffim `D` as proscribed in ZOGY (2016) manuscript
+        r"""Compute ZOGY diffim `D` as proscribed in ZOGY (2016) manuscript
 
         Compute the ZOGY eqn. (13):
         $$
