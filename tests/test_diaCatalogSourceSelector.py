@@ -51,8 +51,9 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
         del self.srcCat
 
     def makeRefCatalog(self):
-        schema = LoadReferenceObjectsTask.makeMinimalSchema(filterNameList=["g", "r"], addFluxErr=False,
-                                                            addIsPhotometric=True, addIsResolved=True)
+        schema = LoadReferenceObjectsTask.makeMinimalSchema(filterNameList=["g", "r"],
+                                                            addIsPhotometric=True,
+                                                            addIsResolved=True)
         catalog = afwTable.SimpleCatalog(schema)
         return catalog
 
