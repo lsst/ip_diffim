@@ -41,8 +41,8 @@ defDataDir = lsst.utils.getPackageDir('afwdata')
 imageProcDir = lsst.utils.getPackageDir('ip_diffim')
 
 if len(sys.argv) == 1:
-    defTemplatePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2_tmpl")
-    defSciencePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2")
+    defTemplatePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2_tmpl.fits")
+    defSciencePath = os.path.join(defDataDir, "CFHT", "D4", "cal-53535-i-797722_2.fits")
     templateMaskedImage = afwImage.MaskedImageF(defTemplatePath)
     scienceMaskedImage = afwImage.MaskedImageF(defSciencePath)
     bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(512, 512))
@@ -88,27 +88,27 @@ footprints = kcDetect.getFootprints()
 
 # delta function
 psfmatch1 = ipDiffim.ImagePsfMatchTask(config=configDF)
-results1 = psfmatch1.run(templateMaskedImage, scienceMaskedImage,
-                         "subtractMaskedImages", candidateList=footprints)
-diffim1 = results1.subtractedImage
+results1 = psfmatch1.subtractMaskedImages(templateMaskedImage, scienceMaskedImage,
+                                          candidateList=footprints)
+diffim1 = results1.subtractedMaskedImage
 spatialKernel1 = results1.psfMatchingKernel
 spatialBg1 = results1.backgroundModel
 kernelCellSet1 = results1.kernelCellSet
 
 # alard lupton
 psfmatch2 = ipDiffim.ImagePsfMatchTask(config=configAL)
-results2 = psfmatch2.run(templateMaskedImage, scienceMaskedImage,
-                         "subtractMaskedImages", candidateList=footprints)
-diffim2 = results2.subtractedImage
+results2 = psfmatch2.subtractMaskedImages(templateMaskedImage, scienceMaskedImage,
+                                          candidateList=footprints)
+diffim2 = results2.subtractedMaskedImage
 spatialKernel2 = results2.psfMatchingKernel
 spatialBg2 = results2.backgroundModel
 kernelCellSet2 = results2.kernelCellSet
 
 # regularized delta function
 psfmatch3 = ipDiffim.ImagePsfMatchTask(config=configDFr)
-results3 = psfmatch3.run(templateMaskedImage, scienceMaskedImage,
-                         "subtractMaskedImages", candidateList=footprints)
-diffim3 = results3.subtractedImage
+results3 = psfmatch3.subtractMaskedImages(templateMaskedImage, scienceMaskedImage,
+                                          candidateList=footprints)
+diffim3 = results3.subtractedMaskedImage
 spatialKernel3 = results3.psfMatchingKernel
 spatialBg3 = results3.backgroundModel
 kernelCellSet3 = results3.kernelCellSet

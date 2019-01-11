@@ -54,9 +54,9 @@ except Exception:
 
 if defDataDir:
     defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                   "v5-e0-c011-a00.sci")
+                                   "v5-e0-c011-a00.sci.fits")
     defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
-                                  "v26-e0-c011-a00.sci")
+                                  "v26-e0-c011-a00.sci.fits")
 
 # THIS IS "LEAVE-ONE-OUT" CROSS VALIDATION OF THE SPATIAL KERNEL
 
@@ -91,20 +91,21 @@ class DiffimTestCases(unittest.TestCase):
 
         self.scienceMaskedImage = self.scienceExposure.getMaskedImage()
         self.templateMaskedImage = self.templateExposure.getMaskedImage()
-        self.dStats = ipDiffim.ImageStatisticsF()
 
         bgConfig = self.subconfigAL.afwBackgroundConfig
         diffimTools.backgroundSubtract(bgConfig, [self.templateMaskedImage,
                                                   self.scienceMaskedImage])
 
     def stats(self, cid, diffim, core=5):
-        self.dStats.apply(diffim)
+        policy = pexConfig.makePolicy(self.config)
+        dStats = ipDiffim.ImageStatisticsF(policy)
+        dStats.apply(diffim)
         logger.debug("Candidate %d : Residuals all (%d px): %.3f +/- %.3f",
-                     cid, self.dStats.getNpix(), self.dStats.getMean(), self.dStats.getRms())
+                     cid, dStats.getNpix(), dStats.getMean(), dStats.getRms())
 
-        self.dStats.apply(diffim, core)
+        dStats.apply(diffim, core)
         logger.debug("Candidate %d : Residuals core (%d px): %.3f +/- %.3f",
-                     cid, self.dStats.getNpix(), self.dStats.getMean(), self.dStats.getRms())
+                     cid, dStats.getNpix(), dStats.getMean(), dStats.getRms())
 
     def assess(self, cand, kFn1, bgFn1, kFn2, bgFn2, frame0):
         tmi = cand.getTemplateMaskedImage()
@@ -204,19 +205,22 @@ class DiffimTestCases(unittest.TestCase):
     def runTest(self, mode):
         logger.debug("Mode %s", mode)
         if mode == "DF":
-            self.config = self.subconfigDF
+            self.config = self.configDF
         elif mode == "DFr":
-            self.config = self.subconfigDFr
+            self.config = self.configDFr
         elif mode == "AL":
-            self.config = self.subconfigAL
+            self.config = self.configAL
         else:
             raise
-
+        subconfig = self.config.kernel.active
         psfmatch = ipDiffim.ImagePsfMatchTask(self.config)
-        results = psfmatch.run(self.templateMaskedImage,
-                               self.scienceMaskedImage,
-                               "subtractMaskedImages")
-        self.jackknifeResample(psfmatch, results)
+        candidateList = []
+        if self.scienceExposure.getPsf():
+            candidateList = psfmatch.makeCandidateList(self.templateExposure, self.scienceExposure,
+                                                       subconfig.kernelSize)
+            results = psfmatch.subtractMaskedImages(self.templateMaskedImage, self.scienceMaskedImage,
+                                                    candidateList)
+            self.jackknifeResample(psfmatch, results)
 
     def test(self):
         if not defDataDir:
@@ -234,7 +238,6 @@ class DiffimTestCases(unittest.TestCase):
         del self.templateExposure
         del self.scienceMaskedImage
         del self.templateMaskedImage
-        del self.dStats
 #####
 
 

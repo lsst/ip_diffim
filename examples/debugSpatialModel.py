@@ -46,9 +46,9 @@ imageProcDir = lsst.utils.getPackageDir('ip_diffim')
 
 if len(sys.argv) == 1:
     defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
-                                  "v26-e0-c011-a10.sci")
+                                  "v26-e0-c011-a10.sci.fits")
     defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                   "v5-e0-c011-a10.sci")
+                                   "v5-e0-c011-a10.sci.fits")
 elif len(sys.argv) == 3:
     defSciencePath = sys.argv[1]
     defTemplatePath = sys.argv[2]
@@ -86,9 +86,9 @@ afwDisplay.Display(frame=frame).mtv(scienceExposure, title="Sci Im")
 
 psfmatch = ipDiffim.ImagePsfMatchTask(config=config)
 try:
-    results = psfmatch.run(templateExposure.getMaskedImage(),
-                           scienceExposure.getMaskedImage(),
-                           "subtractMaskedImages")
+    candidateList = psfmatch.makeCandidateList(templateExposure, scienceExposure, subconfig.kernelSize)
+    results = psfmatch.subtractMaskedImages(templateExposure.getMaskedImage(),
+                                            scienceExposure.getMaskedImage(), candidateList)
     diffim = results.subtractedImage
     spatialKernel = results.psfMatchingKernel
     spatialBg = results.backgroundModel

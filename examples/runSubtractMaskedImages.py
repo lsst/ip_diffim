@@ -1,7 +1,6 @@
 import sys
 import optparse
 
-import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
 import lsst.log.utils as logUtils
 
@@ -40,6 +39,8 @@ Notes:
                       help='Science Image Psf Fwhm (pixel)')
     parser.add_option('--fwhmT', type=float,
                       help='Template Image Psf Fwhm (pixel)')
+    parser.add_option('-w', '--writeOutput', action='store_true', default=False,
+                      help='Write out the subtracted image?')
 
     (options, args) = parser.parse_args()
 
@@ -84,10 +85,17 @@ Notes:
         print('Verbosity =', options.verbosity)
         logUtils.traceSetAt("ip.diffim", options.verbosity)
 
+    writeOutput = False
+    if options.writeOutput:
+        print('writeOutput =', options.writeOutput)
+        writeOutput = True
+
     ####
 
-    templateMaskedImage = afwImage.MaskedImageF(templatePath)
-    scienceMaskedImage = afwImage.MaskedImageF(sciencePath)
+    templateExposure = afwImage.ExposureF(templatePath)
+    scienceExposure = afwImage.ExposureF(sciencePath)
+    templateMaskedImage = templateExposure.getMaskedImage()
+    scienceMaskedImage = scienceExposure.getMaskedImage()
 
     config = ipDiffim.ImagePsfMatchTask.ConfigClass()
     config.kernel.name = "AL"
@@ -100,12 +108,13 @@ Notes:
         if not subconfig.fitForBackground:
             print('NOTE: no background subtraction at all is requested')
 
-    psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
-    results = psfmatch.run(templateMaskedImage, scienceMaskedImage, "subtractMaskedImages",
-                           templateFwhmPix=fwhmT, scienceFwhmPix=fwhmS)
-
-    differenceMaskedImage = results.subtractedImage
-    differenceMaskedImage.writeFits(outputPath)
+    psfmatch = ipDiffim.ImagePsfMatchTask(config)
+    candidateList = psfmatch.makeCandidateList(templateExposure, scienceExposure, subconfig.kernelSize)
+    results = psfmatch.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, candidateList,
+                                            templateFwhmPix=fwhmT, scienceFwhmPix=fwhmS)
+    differenceMaskedImage = results.subtractedMaskedImage
+    if writeOutput:
+        differenceMaskedImage.writeFits(outputPath)
 
     if False:
         spatialKernel = results.psfMatchingKernel
@@ -116,12 +125,7 @@ Notes:
 
 
 def run():
-    memId0 = dafBase.Citizen_getNextMemId()
     main()
-    # check for memory leaks
-    if dafBase.Citizen_census(0, memId0) != 0:
-        print(dafBase.Citizen_census(0, memId0), 'Objects leaked:')
-        print(dafBase.Citizen_census(dafBase.cout, memId0))
 
 
 if __name__ == '__main__':

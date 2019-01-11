@@ -60,8 +60,8 @@ def makeTest2(doAddNoise, shiftX=int(2.0 * gScale), shiftY=int(1.0 * gScale)):
                          afwGeom.ExtentI(imSize-shiftX, imSize - shiftY))
     boxB = afwGeom.Box2I(afwGeom.PointI(shiftX, shiftY),
                          afwGeom.ExtentI(imSize-shiftX, imSize - shiftY))
-    subregA = afwImage.ImageF(image1, boxA, afwImage.PARENT)
-    subregB = afwImage.ImageF(image1, boxB, afwImage.PARENT, True)
+    subregA = afwImage.ImageF(image1, boxA, afwImage.LOCAL)
+    subregB = afwImage.ImageF(image1, boxB, afwImage.LOCAL, True)
     subregA += subregB
     # this messes up the total counts so rescale
     counts = afwMath.makeStatistics(image1, afwMath.SUM).getValue()

@@ -176,15 +176,15 @@ def testAutoCorrelation(orderMake, orderFit, inMi=None, display=False):
             j = int(j)
             for i in num.arange(stride//2, width, stride):
                 i = int(i)
-                inMi.set(i-1, j-1, (100., 0x0, 1.))
-                inMi.set(i-1, j+0, (100., 0x0, 1.))
-                inMi.set(i-1, j+1, (100., 0x0, 1.))
-                inMi.set(i+0, j-1, (100., 0x0, 1.))
-                inMi.set(i+0, j+0, (100., 0x0, 1.))
-                inMi.set(i+0, j+1, (100., 0x0, 1.))
-                inMi.set(i+1, j-1, (100., 0x0, 1.))
-                inMi.set(i+1, j+0, (100., 0x0, 1.))
-                inMi.set(i+1, j+1, (100., 0x0, 1.))
+                inMi._set((i-1, j-1), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i-1, j+0), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i-1, j+1), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+0, j-1), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+0, j+0), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+0, j+1), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+1, j-1), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+1, j+0), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+1, j+1), (100., 0x0, 1.), afwImage.LOCAL)
 
     addNoise(inMi)
 
@@ -220,7 +220,8 @@ def testAutoCorrelation(orderMake, orderFit, inMi=None, display=False):
     subconfig.sizeCellX = stride
     subconfig.sizeCellY = stride
     psfmatch = ipDiffim.ImagePsfMatchTask(config=config)
-    result = psfmatch.run(inMi, cMi, "subtractMaskedImages")
+    candList = psfmatch.makeCandidateList(afwImage.ExposureF(inMi), afwImage.ExposureF(cMi), kSize)
+    result = psfmatch.subtractMaskedImages(inMi, cMi, candList)
 
     spatialKernel = result.psfMatchingKernel
     kernelCellSet = result.kernelCellSet
