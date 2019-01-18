@@ -154,7 +154,7 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseSourceSelectorTask):
         import lsstDebug
         def DebugInfo(name):
             di = lsstDebug.getInfo(name)  # N.b. lsstDebug.Info(name) would call us recursively
-            if name.endswith("catalogStarSelector"):
+            if name.endswith("diaCatalogSourceSelector"):
                 di.display = True
 
             return di
