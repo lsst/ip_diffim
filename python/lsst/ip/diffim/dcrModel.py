@@ -450,7 +450,7 @@ class DcrModel:
         # ``regularizationFactor`` is the maximum change between subfilter images, so the maximum difference
         # between one subfilter image and the average will be the square root of that.
         maxDiff = np.sqrt(regularizationFactor)
-        noiseLevel = self.calculateNoiseCutoff(modelImages[0], statsCtrl, bufferSize=5, mask=mask)
+        noiseLevel = self.calculateNoiseCutoff(modelImages[0], statsCtrl, bufferSize=5, mask=mask, bbox=bbox)
         referenceImage = self.getReferenceImage(bbox)
         badPixels = np.isnan(referenceImage) | (referenceImage <= 0.)
         if np.sum(~badPixels) == 0:
