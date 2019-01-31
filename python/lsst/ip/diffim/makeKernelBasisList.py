@@ -31,7 +31,31 @@ sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
                         basisDegGauss=None, metadata=None):
-    """Generate the appropriate Kernel basis based on the Config"""
+    """Generate the appropriate Kernel basis based on the Config
+
+    Parameters
+    ----------
+    config : TODO: DM-17458
+        TODO: DM-17458
+    targetFwhmPix : TODO: DM-17458, optional
+        TODO: DM-17458
+    referenceFwhmPix : TODO: DM-17458, optional
+        TODO: DM-17458
+    basisDegGauss : TODO: DM-17458, optional
+        TODO: DM-17458
+    metadata : TODO: DM-17458, optional
+        TODO: DM-17458
+
+    Returns
+    -------
+    TODO: DM-17458
+        TODO: DM-17458
+
+    Raises
+    ------
+    ValueError
+        TODO: DM-17458
+    """
     if config.kernelBasisSet == "alard-lupton":
         return generateAlardLuptonBasisList(config, targetFwhmPix=targetFwhmPix,
                                             referenceFwhmPix=referenceFwhmPix,
@@ -47,7 +71,33 @@ def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
 def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
                                  basisDegGauss=None, metadata=None):
     """Generate an Alard-Lupton kernel basis based upon the Config and
-    the input FWHM of the science and template images"""
+    the input FWHM of the science and template images
+
+    Parameters
+    ----------
+    config : TODO: DM-17458
+        TODO: DM-17458
+    targetFwhmPix : `float`, optional
+        TODO: DM-17458
+    referenceFwhmPix : `float`, optional
+        TODO: DM-17458
+    basisDegGauss : TODO: DM-17458, optional
+        TODO: DM-17458
+    metadata : TODO: DM-17458, optional
+        TODO: DM-17458
+
+    Returns
+    -------
+    TYPE
+        TODO: DM-17458
+
+    Raises
+    ------
+    RuntimeError
+        TODO: DM-17458
+    ValueError
+        TODO: DM-17458
+    """
 
     if config.kernelBasisSet != "alard-lupton":
         raise RuntimeError("Cannot generate %s basis within generateAlardLuptonBasisList" %

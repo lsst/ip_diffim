@@ -733,7 +733,7 @@ def plotWhisker(results, newWcs):
 
 class DipoleTestImage(object):
 
-    """!Utility class for dipole measurement testing
+    """Utility class for dipole measurement testing
 
     Generate an image with simulated dipoles and noise; store the original "pre-subtraction" images
     and catalogs as well.
@@ -814,7 +814,7 @@ class DipoleTestImage(object):
         return fitResult
 
     def detectDipoleSources(self, doMerge=True, diffim=None, detectSigma=5.5, grow=3, minBinSize=32):
-        """!Utility function for detecting dipoles.
+        """Utility function for detecting dipoles.
 
         Detect pos/neg sources in the diffim, then merge them. A
         bigger "grow" parameter leads to a larger footprint which

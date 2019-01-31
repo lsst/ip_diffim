@@ -61,13 +61,24 @@ def makeFlatNoiseImage(mi, seedStat=afwMath.MAX):
 def makePoissonNoiseImage(im):
     """Return a Poisson noise image based on im
 
-    Uses numpy.random; you may wish to call numpy.random.seed first.
-
-    @warning This uses an undocumented numpy API (the documented API
-    uses a single float expectation value instead of an array).
-
-    @param[in] im image; the output image has the same dimensions and shape
+    Parameters
+    ----------
+    im : `lsst.afw.image.Image`
+        image; the output image has the same dimensions and shape
         and its expectation value is the value of im at each pixel
+
+    Returns
+    -------
+    noiseIm : 'lsst.afw.image.Image'
+        TODO: DM-17458
+
+    Notes
+    -----
+
+    - Warning: This uses an undocumented numpy API (the documented API
+        uses a single float expectation value instead of an array).
+
+    - Uses numpy.random; you may wish to call numpy.random.seed first.
     """
     import numpy.random as rand
     imArr = im.getArray()
@@ -100,7 +111,30 @@ def fakeCoeffs():
 def makeFakeKernelSet(sizeCell=128, nCell=3,
                       deltaFunctionCounts=1.e4, tGaussianWidth=1.0,
                       addNoise=True, bgValue=100., display=False):
+    """TODO: DM-17458
 
+    Parameters
+    ----------
+    sizeCell : `int`, optional
+        TODO: DM-17458
+    nCell : `int`, optional
+        TODO: DM-17458
+    deltaFunctionCounts : `float`, optional
+        TODO: DM-17458
+    tGaussianWidth : `float`, optional
+        TODO: DM-17458
+    addNoise : `bool`, optional
+        TODO: DM-17458
+    bgValue : `float`, optional
+        TODO: DM-17458
+    display : `bool`, optional
+        TODO: DM-17458
+
+    Returns
+    -------
+    TODO: DM-17458
+        TODO: DM-17458
+    """
     from . import imagePsfMatch
     configFake = imagePsfMatch.ImagePsfMatchConfig()
     configFake.kernel.name = "AL"
@@ -229,6 +263,20 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
 #######
 
 def backgroundSubtract(config, maskedImages):
+    """Subtract the background from masked images.
+
+    Parameters
+    ----------
+    config : TODO: DM-17458
+        TODO: DM-17458
+    maskedImages : `list` of `lsst.afw.image.MaskedImage`
+        TODO: DM-17458
+
+    Returns
+    -------
+    TODO: DM-17458
+        TODO: DM-17458
+    """
     backgrounds = []
     t0 = time.time()
     algorithm = config.algorithm
@@ -257,6 +305,19 @@ def backgroundSubtract(config, maskedImages):
 
 
 def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir):
+    """TODO: DM-17458
+
+    Parameters
+    ----------
+    kernelCellSet : TODO: DM-17458
+        TODO: DM-17458
+    psfMatchingKernel : TODO: DM-17458
+        TODO: DM-17458
+    backgroundModel : TODO: DM-17458
+        TODO: DM-17458
+    outdir : TODO: DM-17458
+        TODO: DM-17458
+    """
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
 
@@ -285,20 +346,41 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
 
 
 def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, kernelSize, config, log):
-    """ Takes an input list of Sources that were selected to constrain
+    """Convert a list of sources for the PSF-matching Kernel to Footprints.
+
+    Parameters
+    ----------
+    candidateInList : TODO: DM-17458
+        Input list of Sources
+    templateExposure : TODO: DM-17458
+        Template image, to be checked for Mask bits in Source Footprint
+    scienceExposure : TODO: DM-17458
+        Science image, to be checked for Mask bits in Source Footprint
+    kernelSize : TODO: DM-17458
+        TODO: DM-17458
+    config : TODO: DM-17458
+        Config that defines the Mask planes that indicate an invalid Source and Bbox grow radius
+    log : TODO: DM-17458
+        Log for output
+
+    Returns
+    -------
+    candidateOutList : `list`
+        a list of dicts having a "source" and "footprint" field, to be used for Psf-matching
+
+    Raises
+    ------
+    RuntimeError
+        TODO: DM-17458
+
+    Notes
+    -----
+    Takes an input list of Sources that were selected to constrain
     the Psf-matching Kernel and turns them into a List of Footprints,
     which are used to seed a set of KernelCandidates.  The function
     checks both the template and science image for masked pixels,
     rejecting the Source if certain Mask bits (defined in config) are
     set within the Footprint.
-
-    @param candidateInList: Input list of Sources
-    @param templateExposure: Template image, to be checked for Mask bits in Source Footprint
-    @param scienceExposure: Science image, to be checked for Mask bits in Source Footprint
-    @param config: Config that defines the Mask planes that indicate an invalid Source and Bbox grow radius
-    @param log: Log for output
-
-    @return a list of dicts having a "source" and "footprint" field, to be used for Psf-matching
     """
 
     candidateOutList = []
@@ -365,8 +447,34 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
 
 def sourceTableToCandidateList(sourceTable, templateExposure, scienceExposure, kConfig, dConfig, log,
                                basisList, doBuild=False):
-    """Takes an input list of Sources, and turns them into
-    KernelCandidates for fitting of the Psf-matching kernel."""
+    """Convert a list of Sources into KernelCandidates.
+
+    The KernelCandidates are used for fitting the Psf-matching kernel.
+
+    Parameters
+    ----------
+    sourceTable : TODO: DM-17458
+        TODO: DM-17458
+    templateExposure : TODO: DM-17458
+        TODO: DM-17458
+    scienceExposure : TODO: DM-17458
+        TODO: DM-17458
+    kConfig : TODO: DM-17458
+        TODO: DM-17458
+    dConfig : TODO: DM-17458
+        TODO: DM-17458
+    log : TODO: DM-17458
+        TODO: DM-17458
+    basisList : TODO: DM-17458
+        TODO: DM-17458
+    doBuild : `bool`, optional
+        TODO: DM-17458
+
+    Returns
+    -------
+    TODO: DM-17458
+        TODO: DM-17458
+    """
     kernelSize = basisList[0].getWidth()
     footprintList = sourceToFootprintList(list(sourceTable), templateExposure, scienceExposure,
                                           kernelSize, dConfig, log)

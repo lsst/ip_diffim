@@ -44,7 +44,7 @@ def nextOddInteger(x):
 
 
 class ModelPsfMatchConfig(pexConfig.Config):
-    """!Configuration for model-to-model Psf matching"""
+    """Configuration for model-to-model Psf matching"""
 
     kernel = pexConfig.ConfigChoiceField(
         doc="kernel type",
@@ -90,178 +90,206 @@ class ModelPsfMatchConfig(pexConfig.Config):
         self.kernel.active.scaleByFwhm = False
 
 
-## @addtogroup LSST_task_documentation
-## @{
-## @page ModelPsfMatchTask
-## @ref ModelPsfMatchTask_ "ModelPsfMatchTask"
-## @copybrief ModelPsfMatchTask
-## @}
-
-
 class ModelPsfMatchTask(PsfMatchTask):
-    r"""!
-@anchor ModelPsfMatchTask_
+    """Matching of two model Psfs, and application of the Psf-matching kernel to an input Exposure
 
-@brief Matching of two model Psfs, and application of the Psf-matching kernel to an input Exposure
+    Notes
+    -----
 
-@section ip_diffim_modelpsfmatch_Contents Contents
+    This Task differs from ImagePsfMatchTask in that it matches two Psf _models_, by realizing
+    them in an Exposure-sized SpatialCellSet and then inserting each Psf-image pair into KernelCandidates.
+    Because none of the pairs of sources that are to be matched should be invalid, all sigma clipping is
+    turned off in ModelPsfMatchConfig.  And because there is no tracked _variance_ in the Psf images, the
+    debugging and logging QA info should be interpreted with caution.
 
- - @ref ip_diffim_modelpsfmatch_Purpose
- - @ref ip_diffim_modelpsfmatch_Initialize
- - @ref ip_diffim_modelpsfmatch_IO
- - @ref ip_diffim_modelpsfmatch_Config
- - @ref ip_diffim_modelpsfmatch_Metadata
- - @ref ip_diffim_modelpsfmatch_Debug
- - @ref ip_diffim_modelpsfmatch_Example
+    One item of note is that the sizes of Psf models are fixed (e.g. its defined as a 21x21 matrix).  When the
+    Psf-matching kernel is being solved for, the Psf "image" is convolved with each kernel basis function,
+    leading to a loss of information around the borders.
+    This pixel loss will be problematic for the numerical
+    stability of the kernel solution if the size of the convolution kernel
+    (set by ModelPsfMatchConfig.kernelSize) is much bigger than: psfSize//2.
+    Thus the sizes of Psf-model matching kernels are typically smaller
+    than their image-matching counterparts.  If the size of the kernel is too small, the convolved stars will
+    look "boxy"; if the kernel is too large, the kernel solution will be "noisy".  This is a trade-off that
+    needs careful attention for a given dataset.
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    The primary use case for this Task is in matching an Exposure to a
+    constant-across-the-sky Psf model for the purposes of image coaddition.
+    It is important to note that in the code, the "template" Psf is the Psf
+    that the science image gets matched to.  In this sense the order of template and science image are
+    reversed, compared to ImagePsfMatchTask, which operates on the template image.
 
-@section ip_diffim_modelpsfmatch_Purpose   Description
+    Debug variables
 
-This Task differs from ImagePsfMatchTask in that it matches two Psf _models_, by realizing
-them in an Exposure-sized SpatialCellSet and then inserting each Psf-image pair into KernelCandidates.
-Because none of the pairs of sources that are to be matched should be invalid, all sigma clipping is
-turned off in ModelPsfMatchConfig.  And because there is no tracked _variance_ in the Psf images, the
-debugging and logging QA info should be interpreted with caution.
+    The `lsst.pipe.base.cmdLineTask.CmdLineTask` command line task interface supports a
+    flag -d/--debug to import debug.py from your PYTHONPATH.  The relevant contents of debug.py
+    for this Task include:
 
-One item of note is that the sizes of Psf models are fixed (e.g. its defined as a 21x21 matrix).  When the
-Psf-matching kernel is being solved for, the Psf "image" is convolved with each kernel basis function,
-leading to a loss of information around the borders.  This pixel loss will be problematic for the numerical
-stability of the kernel solution if the size of the convolution kernel (set by ModelPsfMatchConfig.kernelSize)
-is much bigger than: psfSize//2.  Thus the sizes of Psf-model matching kernels are typically smaller
-than their image-matching counterparts.  If the size of the kernel is too small, the convolved stars will
-look "boxy"; if the kernel is too large, the kernel solution will be "noisy".  This is a trade-off that
-needs careful attention for a given dataset.
+    .. code-block:: py
 
-The primary use case for this Task is in matching an Exposure to a constant-across-the-sky Psf model for the
-purposes of image coaddition.  It is important to note that in the code, the "template" Psf is the Psf
-that the science image gets matched to.  In this sense the order of template and science image are
-reversed, compared to ImagePsfMatchTask, which operates on the template image.
+        import sys
+        import lsstDebug
+        def DebugInfo(name):
+            di = lsstDebug.getInfo(name)
+            if name == "lsst.ip.diffim.psfMatch":
+                di.display = True                 # global
+                di.maskTransparency = 80          # ds9 mask transparency
+                di.displayCandidates = True       # show all the candidates and residuals
+                di.displayKernelBasis = False     # show kernel basis functions
+                di.displayKernelMosaic = True     # show kernel realized across the image
+                di.plotKernelSpatialModel = False # show coefficients of spatial model
+                di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
+            elif name == "lsst.ip.diffim.modelPsfMatch":
+                di.display = True                 # global
+                di.maskTransparency = 30          # ds9 mask transparency
+                di.displaySpatialCells = True     # show spatial cells before the fit
+            return di
+        lsstDebug.Info = DebugInfo
+        lsstDebug.frame = 1
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    Note that if you want addional logging info, you may add to your scripts:
 
-@section ip_diffim_modelpsfmatch_Initialize    Task initialization
+    .. code-block:: py
 
-@copydoc \_\_init\_\_
+        import lsst.log.utils as logUtils
+        logUtils.traceSetAt("ip.diffim", 4)
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    Examples
+    --------
+    A complete example of using ModelPsfMatchTask
 
-@section ip_diffim_modelpsfmatch_IO        Invoking the Task
+    This code is modelPsfMatchTask.py in the examples directory, and can be run as e.g.
 
-@copydoc run
+    .. code-block :: none
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        examples/modelPsfMatchTask.py
+        examples/modelPsfMatchTask.py --debug
+        examples/modelPsfMatchTask.py --debug --template /path/to/templateExp.fits
+        --science /path/to/scienceExp.fits
 
-@section ip_diffim_modelpsfmatch_Config       Configuration parameters
+    Create a subclass of ModelPsfMatchTask that accepts two exposures.
+    Note that the "template" exposure contains the Psf that will get matched to,
+    and the "science" exposure is the one that will be convolved:
 
-See @ref ModelPsfMatchConfig
+    .. code-block :: none
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        class MyModelPsfMatchTask(ModelPsfMatchTask):
+            def __init__(self, *args, **kwargs):
+                ModelPsfMatchTask.__init__(self, *args, **kwargs)
+            def run(self, templateExp, scienceExp):
+                return ModelPsfMatchTask.run(self, scienceExp, templateExp.getPsf())
 
-@section ip_diffim_modelpsfmatch_Metadata   Quantities set in Metadata
+    And allow the user the freedom to either run the script in default mode,
+    or point to their own images on disk. Note that these
+    images must be readable as an lsst.afw.image.Exposure:
 
-See @ref ip_diffim_psfmatch_Metadata "PsfMatchTask"
+    .. code-block :: none
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        if __name__ == "__main__":
+            import argparse
+            parser = argparse.ArgumentParser(description="Demonstrate the use of ModelPsfMatchTask")
+            parser.add_argument("--debug", "-d", action="store_true", help="Load debug.py?", default=False)
+            parser.add_argument("--template", "-t", help="Template Exposure to use", default=None)
+            parser.add_argument("--science", "-s", help="Science Exposure to use", default=None)
+            args = parser.parse_args()
 
-@section ip_diffim_modelpsfmatch_Debug     Debug variables
+    We have enabled some minor display debugging in this script via the –debug option.
+    However, if you have an lsstDebug debug.py in your PYTHONPATH you will get additional
+    debugging displays. The following block checks for this script:
 
-The @link lsst.pipe.base.cmdLineTask.CmdLineTask command line task@endlink interface supports a
-flag @c -d/--debug to import @b debug.py from your @c PYTHONPATH.  The relevant contents of debug.py
-for this Task include:
+    .. code-block :: none
 
-@code{.py}
-    import sys
-    import lsstDebug
-    def DebugInfo(name):
-        di = lsstDebug.getInfo(name)
-        if name == "lsst.ip.diffim.psfMatch":
-            di.display = True                 # global
-            di.maskTransparency = 80          # ds9 mask transparency
-            di.displayCandidates = True       # show all the candidates and residuals
-            di.displayKernelBasis = False     # show kernel basis functions
-            di.displayKernelMosaic = True     # show kernel realized across the image
-            di.plotKernelSpatialModel = False # show coefficients of spatial model
-            di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
-        elif name == "lsst.ip.diffim.modelPsfMatch":
-            di.display = True                 # global
-            di.maskTransparency = 30          # ds9 mask transparency
-            di.displaySpatialCells = True     # show spatial cells before the fit
-        return di
-    lsstDebug.Info = DebugInfo
-    lsstDebug.frame = 1
-@endcode
+        if args.debug:
+            try:
+                import debug
+                # Since I am displaying 2 images here, set the starting frame number for the LSST debug LSST
+                debug.lsstDebug.frame = 3
+            except ImportError as e:
+                print(e, file=sys.stderr)
 
-Note that if you want addional logging info, you may add to your scripts:
-@code{.py}
-import lsst.log.utils as logUtils
-logUtils.traceSetAt("ip.diffim", 4)
-@endcode
+    Finally, we call a run method that we define below.
+    First set up a Config and modify some of the parameters.
+    In particular we don't want to "grow" the sizes of the kernel or KernelCandidates,
+    since we are operating with fixed–size images (i.e. the size of the input Psf models).
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    .. code-block :: none
 
-@section ip_diffim_modelpsfmatch_Example   A complete example of using ModelPsfMatchTask
+        def run(args):
+            #
+            # Create the Config and use sum of gaussian basis
+            #
+            config = ModelPsfMatchTask.ConfigClass()
+            config.kernel.active.scaleByFwhm = False
 
-This code is modelPsfMatchTask.py in the examples directory, and can be run as @em e.g.
-@code
-examples/modelPsfMatchTask.py
-examples/modelPsfMatchTask.py --debug
-examples/modelPsfMatchTask.py --debug --template /path/to/templateExp.fits --science /path/to/scienceExp.fits
-@endcode
+    Make sure the images (if any) that were sent to the script exist on disk and are readable.
+    If no images are sent, make some fake data up for the sake of this example script
+    (have a look at the code if you want more details on generateFakeData):
 
-@dontinclude modelPsfMatchTask.py
-Create a subclass of ModelPsfMatchTask that accepts two exposures.  Note that the "template" exposure
-contains the Psf that will get matched to, and the "science" exposure is the one that will be convolved:
-@skip MyModelPsfMatchTask
-@until return
+    .. code-block :: none
 
-And allow the user the freedom to either run the script in default mode, or point to their own images on disk.
-Note that these images must be readable as an lsst.afw.image.Exposure:
-@skip main
-@until parse_args
+        # Run the requested method of the Task
+        if args.template is not None and args.science is not None:
+            if not os.path.isfile(args.template):
+                raise Exception("Template image %s does not exist" % (args.template))
+            if not os.path.isfile(args.science):
+                raise Exception("Science image %s does not exist" % (args.science))
+            try:
+                templateExp = afwImage.ExposureF(args.template)
+            except Exception as e:
+                raise Exception("Cannot read template image %s" % (args.template))
+            try:
+                scienceExp = afwImage.ExposureF(args.science)
+            except Exception as e:
+                raise Exception("Cannot read science image %s" % (args.science))
+        else:
+            templateExp, scienceExp = generateFakeData()
+            config.kernel.active.sizeCellX = 128
+            config.kernel.active.sizeCellY = 128
 
-We have enabled some minor display debugging in this script via the --debug option.  However, if you
-have an lsstDebug debug.py in your PYTHONPATH you will get additional debugging displays.  The following
-block checks for this script:
-@skip args.debug
-@until sys.stderr
+    Display the two images if –debug:
 
-@dontinclude modelPsfMatchTask.py
-Finally, we call a run method that we define below.  First set up a Config and modify some of the parameters.
-In particular we don't want to "grow" the sizes of the kernel or KernelCandidates, since we are operating with
-fixed--size images (i.e. the size of the input Psf models).
-@skip run(args)
-@until False
+    .. code-block :: none
 
-Make sure the images (if any) that were sent to the script exist on disk and are readable.  If no images
-are sent, make some fake data up for the sake of this example script (have a look at the code if you want
-more details on generateFakeData):
-@skip requested
-@until sizeCellY
+        if args.debug:
+            ds9.mtv(templateExp, frame=1, title="Example script: Input Template")
+            ds9.mtv(scienceExp, frame=2, title="Example script: Input Science Image")
 
-Display the two images if --debug:
-@skip args.debug
-@until Science
+    Create and run the Task:
 
-Create and run the Task:
-@skip Create
-@until result
+    .. code-block :: none
 
-And finally provide optional debugging display of the Psf-matched (via the Psf models) science image:
-@skip args.debug
-@until result.psfMatchedExposure
+        # Create the Task
+        psfMatchTask = MyModelPsfMatchTask(config=config)
+        # Run the Task
+        result = psfMatchTask.run(templateExp, scienceExp)
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    And finally provide optional debugging display of the Psf-matched (via the Psf models) science image:
+
+    .. code-block :: none
+
+        if args.debug:
+            # See if the LSST debug has incremented the frame number; if not start with frame 3
+            try:
+                frame = debug.lsstDebug.frame + 1
+            except Exception:
+                frame = 3
+            ds9.mtv(result.psfMatchedExposure, frame=frame, title="Example script: Matched Science Image")
 
     """
     ConfigClass = ModelPsfMatchConfig
 
     def __init__(self, *args, **kwargs):
-        """!Create a ModelPsfMatchTask
+        """Create a ModelPsfMatchTask
 
-        @param *args arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
-        @param **kwargs keyword arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
+        Parameters
+        ----------
+        *args
+            arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
+        **kwargs
+            keyword arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
 
+        Notes
+        -----
         Upon initialization, the kernel configuration is defined by self.config.kernel.active.  This Task
         does have a run() method, which is the default way to call the Task.
         """
@@ -270,22 +298,34 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
 
     @pipeBase.timeMethod
     def run(self, exposure, referencePsfModel, kernelSum=1.0):
-        """!Psf-match an exposure to a model Psf
+        """Psf-match an exposure to a model Psf
 
-        @param exposure: Exposure to Psf-match to the reference Psf model;
+        Parameters
+        ----------
+        exposure : `lsst.afw.image.Exposure`
+            Exposure to Psf-match to the reference Psf model;
             it must return a valid PSF model via exposure.getPsf()
-        @param referencePsfModel: The Psf model to match to (an lsst.afw.detection.Psf)
-        @param kernelSum: A multipicative factor to apply to the kernel sum (default=1.0)
+        referencePsfModel : `lsst.afw.detection.Psf`
+            The Psf model to match to
+        kernelSum : `float`, optional
+            A multipicative factor to apply to the kernel sum (default=1.0)
 
-        @return
-        - psfMatchedExposure: the Psf-matched Exposure.  This has the same parent bbox, Wcs, Calib and
-            Filter as the input Exposure but no Psf.  In theory the Psf should equal referencePsfModel but
-            the match is likely not exact.
-        - psfMatchingKernel: the spatially varying Psf-matching kernel
-        - kernelCellSet: SpatialCellSet used to solve for the Psf-matching kernel
-        - referencePsfModel: Validated and/or modified reference model used
+        Returns
+        -------
+        result : `struct`
+            - ``psfMatchedExposure`` : the Psf-matched Exposure.
+                This has the same parent bbox, Wcs, Calib and
+                Filter as the input Exposure but no Psf.
+                In theory the Psf should equal referencePsfModel but
+                the match is likely not exact.
+            - ``psfMatchingKernel`` : the spatially varying Psf-matching kernel
+            - ``kernelCellSet`` : SpatialCellSet used to solve for the Psf-matching kernel
+            - ``referencePsfModel`` : Validated and/or modified reference model used
 
-        Raise a RuntimeError if the Exposure does not contain a Psf model
+        Raises
+        ------
+        RuntimeError
+            if the Exposure does not contain a Psf model
         """
         if not exposure.hasPsf():
             raise RuntimeError("exposure does not contain a Psf model")
@@ -332,22 +372,31 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                                )
 
     def _diagnostic(self, kernelCellSet, spatialSolution, spatialKernel, spatialBg):
-        """!Print diagnostic information on spatial kernel and background fit
+        """Print diagnostic information on spatial kernel and background fit
 
         The debugging diagnostics are not really useful here, since the images we are matching have
         no variance.  Thus override the _diagnostic method to generate no logging information"""
         return
 
     def _buildCellSet(self, exposure, referencePsfModel):
-        """!Build a SpatialCellSet for use with the solve method
+        """Build a SpatialCellSet for use with the solve method
 
-        @param exposure: The science exposure that will be convolved; must contain a Psf
-        @param referencePsfModel: Psf model to match to
+        Parameters
+        ----------
+        exposure : `lsst.afw.image.Exposure`
+            The science exposure that will be convolved; must contain a Psf
+        referencePsfModel : `lsst.afw.detection.Psf`
+            Psf model to match to
 
-        @return
-            -kernelCellSet: a SpatialCellSet to be used by self._solve
-            -referencePsfModel: Validated and/or modified reference model used to populate the SpatialCellSet
+        Returns
+        -------
+        result : `struct`
+            - ``kernelCellSet`` : a SpatialCellSet to be used by self._solve
+            - ``referencePsfModel`` : Validated and/or modified
+                reference model used to populate the SpatialCellSet
 
+        Notes
+        -----
         If the reference Psf model and science Psf model have different dimensions,
         adjust the referencePsfModel (the model to which the exposure PSF will be matched)
         to match that of the science Psf. If the science Psf dimensions vary across the image,
@@ -473,7 +522,7 @@ And finally provide optional debugging display of the Psf-matched (via the Psf m
                                )
 
     def _makePsfMaskedImage(self, psfModel, posX, posY, dimensions=None):
-        """! Return a MaskedImage of the a PSF Model of specified dimensions
+        """Return a MaskedImage of the a PSF Model of specified dimensions
         """
         rawKernel = psfModel.computeKernelImage(afwGeom.Point2D(posX, posY)).convertF()
         if dimensions is None:

@@ -43,7 +43,10 @@ class KernelCandidateQa(object):
         are calculated, based on the distribution of residuals in the
         KernelCandidates stamp.
 
-        @param nKernelSpatial : Number of terms in the spatial model; needed to initialize per-basis QA arrays
+        Parameters
+        ----------
+        nKernelSpatial : `int`
+            Number of terms in the spatial model; needed to initialize per-basis QA arrays
         """
         self.fields = []
         self.fields.append(afwTable.Field["PointD"](

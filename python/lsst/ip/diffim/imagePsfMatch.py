@@ -43,7 +43,7 @@ sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 
 class ImagePsfMatchConfig(pexConfig.Config):
-    """!Configuration for image-to-image Psf matching"""
+    """Configuration for image-to-image Psf matching"""
     kernel = pexConfig.ConfigChoiceField(
         doc="kernel type",
         typemap=dict(
@@ -74,213 +74,245 @@ class ImagePsfMatchConfig(pexConfig.Config):
         self.selectMeasurement.slots.apFlux = None
         self.selectMeasurement.slots.calibFlux = None
 
-## @addtogroup LSST_task_documentation
-## @{
-## @page ImagePsfMatchTask
-## @ref ImagePsfMatchTask_ "ImagePsfMatchTask"
-## @copybrief ImagePsfMatchTask
-## @}
-
 
 class ImagePsfMatchTask(PsfMatchTask):
-    r"""!
-@anchor ImagePsfMatchTask_
+    """Psf-match two MaskedImages or Exposures using the sources in the images
 
-@brief Psf-match two MaskedImages or Exposures using the sources in the images
+    Parameters
+    ----------
+    args :
+        arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
+    kwargs :
+        keyword arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
 
-@section ip_diffim_imagepsfmatch_Contents Contents
+    Notes
+    -----
+    Upon initialization, the kernel configuration is defined by self.config.kernel.active.
+    The task creates an lsst.afw.math.Warper from the subConfig self.config.kernel.active.warpingConfig.
+    A schema for the selection and measurement of candidate lsst.ip.diffim.KernelCandidates is
+    defined, and used to initize subTasks selectDetection (for candidate detection) and selectMeasurement
+    (for candidate measurement).
 
- - @ref ip_diffim_imagepsfmatch_Purpose
- - @ref ip_diffim_imagepsfmatch_Initialize
- - @ref ip_diffim_imagepsfmatch_IO
- - @ref ip_diffim_imagepsfmatch_Config
- - @ref ip_diffim_imagepsfmatch_Metadata
- - @ref ip_diffim_imagepsfmatch_Debug
- - @ref ip_diffim_imagepsfmatch_Example
+    Description
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-@section ip_diffim_imagepsfmatch_Purpose   Description
-
-Build a Psf-matching kernel using two input images, either as MaskedImages (in which case they need
+    Build a Psf-matching kernel using two input images, either as MaskedImages (in which case they need
     to be astrometrically aligned) or Exposures (in which case astrometric alignment will happen by
     default but may be turned off).  This requires a list of input Sources which may be provided
-by the calling Task; if not, the Task will perform a coarse source detection and selection for this purpose.
-Sources are vetted for signal-to-noise and masked pixels (in both the template and science image), and
-substamps around each acceptable source are extracted and used to create an instance of KernelCandidate.
-Each KernelCandidate is then placed within a lsst.afw.math.SpatialCellSet, which is used by an ensemble of
-lsst.afw.math.CandidateVisitor instances to build the Psf-matching kernel.   These visitors include, in
-the order that they are called: BuildSingleKernelVisitor, KernelSumVisitor, BuildSpatialKernelVisitor,
-and AssessSpatialKernelVisitor.
+    by the calling Task; if not, the Task will perform a coarse source detection
+    and selection for this purpose. Sources are vetted for signal-to-noise and masked pixels
+    (in both the template and science image), and substamps around each acceptable
+    source are extracted and used to create an instance of KernelCandidate.
+    Each KernelCandidate is then placed within a lsst.afw.math.SpatialCellSet, which is used by an ensemble of
+    lsst.afw.math.CandidateVisitor instances to build the Psf-matching kernel.   These visitors include, in
+    the order that they are called: BuildSingleKernelVisitor, KernelSumVisitor, BuildSpatialKernelVisitor,
+    and AssessSpatialKernelVisitor.
 
-Sigma clipping of KernelCandidates is performed as follows:
- - BuildSingleKernelVisitor, using the substamp diffim residuals from the per-source kernel fit,
-    if PsfMatchConfig.singleKernelClipping is True
- - KernelSumVisitor, using the mean and standard deviation of the kernel sum from all candidates,
-    if PsfMatchConfig.kernelSumClipping is True
- - AssessSpatialKernelVisitor, using the substamp diffim ressiduals from the spatial kernel fit,
-    if PsfMatchConfig.spatialKernelClipping is True
+    Sigma clipping of KernelCandidates is performed as follows:
 
-The actual solving for the kernel (and differential background model) happens in
-lsst.ip.diffim.PsfMatchTask._solve.  This involves a loop over the SpatialCellSet that first builds the
-per-candidate matching kernel for the requested number of KernelCandidates per cell
-(PsfMatchConfig.nStarPerCell).  The quality of this initial per-candidate difference image is examined,
-using moments of the pixel residuals in the difference image normalized by the square root of the variance
-(i.e. sigma); ideally this should follow a normal (0, 1) distribution, but the rejection thresholds are set
-by the config (PsfMatchConfig.candidateResidualMeanMax and PsfMatchConfig.candidateResidualStdMax).
-All candidates that pass this initial build are then examined en masse to find the
-mean/stdev of the kernel sums across all candidates.  Objects that are significantly above or below the mean,
-typically due to variability or sources that are saturated in one image but not the other, are also rejected.
-This threshold is defined by PsfMatchConfig.maxKsumSigma.  Finally, a spatial model is built using all
-currently-acceptable candidates, and the spatial model used to derive a second set of (spatial) residuals
-which are again used to reject bad candidates, using the same thresholds as above.
+    - BuildSingleKernelVisitor, using the substamp diffim residuals from the per-source kernel fit,
+        if PsfMatchConfig.singleKernelClipping is True
+    - KernelSumVisitor, using the mean and standard deviation of the kernel sum from all candidates,
+        if PsfMatchConfig.kernelSumClipping is True
+    - AssessSpatialKernelVisitor, using the substamp diffim ressiduals from the spatial kernel fit,
+        if PsfMatchConfig.spatialKernelClipping is True
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    The actual solving for the kernel (and differential background model) happens in
+    lsst.ip.diffim.PsfMatchTask._solve.  This involves a loop over the SpatialCellSet that first builds the
+    per-candidate matching kernel for the requested number of KernelCandidates per cell
+    (PsfMatchConfig.nStarPerCell).  The quality of this initial per-candidate difference image is examined,
+    using moments of the pixel residuals in the difference image normalized by the square root of the variance
+    (i.e. sigma); ideally this should follow a normal (0, 1) distribution,
+    but the rejection thresholds are set
+    by the config (PsfMatchConfig.candidateResidualMeanMax and PsfMatchConfig.candidateResidualStdMax).
+    All candidates that pass this initial build are then examined en masse to find the
+    mean/stdev of the kernel sums across all candidates.
+    Objects that are significantly above or below the mean,
+    typically due to variability or sources that are saturated in one image but not the other,
+    are also rejected.This threshold is defined by PsfMatchConfig.maxKsumSigma.
+    Finally, a spatial model is built using all currently-acceptable candidates,
+    and the spatial model used to derive a second set of (spatial) residuals
+    which are again used to reject bad candidates, using the same thresholds as above.
 
-@section ip_diffim_imagepsfmatch_Initialize    Task initialization
+    Invoking the Task
 
-@copydoc \_\_init\_\_
+    There is no run() method for this Task.  Instead there are 4 methods that
+    may be used to invoke the Psf-matching.  These are
+    lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchMaskedImages matchMaskedImages
+    lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractMaskedImages subtractMaskedImages,
+    lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchExposures matchExposures, and
+    lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractExposures subtractExposures.
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    The methods that operate on lsst.afw.image.MaskedImage require that the images already be astrometrically
+    aligned, and are the same shape.  The methods that operate on lsst.afw.image.Exposure allow for the
+    input images to be misregistered and potentially be different sizes; by default a
+    lsst.afw.math.LanczosWarpingKernel is used to perform the astrometric alignment.  The methods
+    that "match" images return a Psf-matched image, while the methods that "subtract" images
+    return a Psf-matched and template subtracted image.
 
-@section ip_diffim_imagepsfmatch_IO        Invoking the Task
+    See each method's returned lsst.pipe.base.Struct for more details.
 
-There is no run() method for this Task.  Instead there are 4 methods that
-may be used to invoke the Psf-matching.  These are
-@link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchMaskedImages matchMaskedImages@endlink,
-@link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractMaskedImages subtractMaskedImages@endlink,
-@link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchExposures matchExposures@endlink, and
-@link lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractExposures subtractExposures@endlink.
+    Debug variables
 
-The methods that operate on lsst.afw.image.MaskedImage require that the images already be astrometrically
-aligned, and are the same shape.  The methods that operate on lsst.afw.image.Exposure allow for the
-input images to be misregistered and potentially be different sizes; by default a
-lsst.afw.math.LanczosWarpingKernel is used to perform the astrometric alignment.  The methods
-that "match" images return a Psf-matched image, while the methods that "subtract" images
-return a Psf-matched and template subtracted image.
+    The lsst.pipe.base.cmdLineTask.CmdLineTask command line task interface supports a
+    flag -d/--debug to import debug.py from your PYTHONPATH.  The relevant contents of debug.py
+    for this Task include:
 
-See each method's returned lsst.pipe.base.Struct for more details.
+    .. code-block:: py
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        import sys
+        import lsstDebug
+        def DebugInfo(name):
+            di = lsstDebug.getInfo(name)
+            if name == "lsst.ip.diffim.psfMatch":
+                di.display = True                 # enable debug output
+                di.maskTransparency = 80          # ds9 mask transparency
+                di.displayCandidates = True       # show all the candidates and residuals
+                di.displayKernelBasis = False     # show kernel basis functions
+                di.displayKernelMosaic = True     # show kernel realized across the image
+                di.plotKernelSpatialModel = False # show coefficients of spatial model
+                di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
+            elif name == "lsst.ip.diffim.imagePsfMatch":
+                di.display = True                 # enable debug output
+                di.maskTransparency = 30          # ds9 mask transparency
+                di.displayTemplate = True         # show full (remapped) template
+                di.displaySciIm = True            # show science image to match to
+                di.displaySpatialCells = True     # show spatial cells
+                di.displayDiffIm = True           # show difference image
+                di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
+            elif name == "lsst.ip.diffim.diaCatalogSourceSelector":
+                di.display = False                # enable debug output
+                di.maskTransparency = 30          # ds9 mask transparency
+                di.displayExposure = True         # show exposure with candidates indicated
+                di.pauseAtEnd = False             # pause when done
+            return di
+        lsstDebug.Info = DebugInfo
+        lsstDebug.frame = 1
 
-@section ip_diffim_imagepsfmatch_Config       Configuration parameters
+    Note that if you want addional logging info, you may add to your scripts:
 
-See @ref ImagePsfMatchConfig
+    .. code-block:: py
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+        import lsst.log.utils as logUtils
+        logUtils.traceSetAt("ip.diffim", 4)
 
-@section ip_diffim_imagepsfmatch_Metadata   Quantities set in Metadata
+    Examples
+    --------
+    A complete example of using ImagePsfMatchTask
 
-See @ref ip_diffim_psfmatch_Metadata "PsfMatchTask"
+    This code is imagePsfMatchTask.py in the examples directory, and can be run as e.g.
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    ..code-block:: none
 
-@section ip_diffim_imagepsfmatch_Debug     Debug variables
+        examples/imagePsfMatchTask.py --debug
+        examples/imagePsfMatchTask.py --debug --mode="matchExposures"
+        examples/imagePsfMatchTask.py --debug --template /path/to/templateExp.fits
+        --science /path/to/scienceExp.fits
 
-The @link lsst.pipe.base.cmdLineTask.CmdLineTask command line task@endlink interface supports a
-flag @c -d/--debug to import @b debug.py from your @c PYTHONPATH.  The relevant contents of debug.py
-for this Task include:
+    Create a subclass of ImagePsfMatchTask that allows us to either match exposures, or subtract exposures:
 
-@code{.py}
-    import sys
-    import lsstDebug
-    def DebugInfo(name):
-        di = lsstDebug.getInfo(name)
-        if name == "lsst.ip.diffim.psfMatch":
-            di.display = True                 # enable debug output
-            di.maskTransparency = 80          # ds9 mask transparency
-            di.displayCandidates = True       # show all the candidates and residuals
-            di.displayKernelBasis = False     # show kernel basis functions
-            di.displayKernelMosaic = True     # show kernel realized across the image
-            di.plotKernelSpatialModel = False # show coefficients of spatial model
-            di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
-        elif name == "lsst.ip.diffim.imagePsfMatch":
-            di.display = True                 # enable debug output
-            di.maskTransparency = 30          # ds9 mask transparency
-            di.displayTemplate = True         # show full (remapped) template
-            di.displaySciIm = True            # show science image to match to
-            di.displaySpatialCells = True     # show spatial cells
-            di.displayDiffIm = True           # show difference image
-            di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
-        elif name == "lsst.ip.diffim.diaCatalogSourceSelector":
-            di.display = False                # enable debug output
-            di.maskTransparency = 30          # ds9 mask transparency
-            di.displayExposure = True         # show exposure with candidates indicated
-            di.pauseAtEnd = False             # pause when done
-        return di
-    lsstDebug.Info = DebugInfo
-    lsstDebug.frame = 1
-@endcode
+    ..code-block:: none
 
-Note that if you want addional logging info, you may add to your scripts:
-@code{.py}
-import lsst.log.utils as logUtils
-logUtils.traceSetAt("ip.diffim", 4)
-@endcode
+        class MyImagePsfMatchTask(ImagePsfMatchTask):
 
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+            def __init__(self, args, kwargs):
+                ImagePsfMatchTask.__init__(self, args, kwargs)
 
-@section ip_diffim_imagepsfmatch_Example   A complete example of using ImagePsfMatchTask
+            def run(self, templateExp, scienceExp, mode):
+                if mode == "matchExposures":
+                    return self.matchExposures(templateExp, scienceExp)
+                elif mode == "subtractExposures":
+                    return self.subtractExposures(templateExp, scienceExp)
 
-This code is imagePsfMatchTask.py in the examples directory, and can be run as @em e.g.
-@code
-examples/imagePsfMatchTask.py --debug
-examples/imagePsfMatchTask.py --debug --mode="matchExposures"
-examples/imagePsfMatchTask.py --debug --template /path/to/templateExp.fits --science /path/to/scienceExp.fits
-@endcode
+    And allow the user the freedom to either run the script in default mode,
+    or point to their own images on disk.
+    Note that these images must be readable as an lsst.afw.image.Exposure.
 
-@dontinclude imagePsfMatchTask.py
-Create a subclass of ImagePsfMatchTask that allows us to either match exposures, or subtract exposures:
-@skip MyImagePsfMatchTask
-@until self.subtractExposures
+    We have enabled some minor display debugging in this script via the --debug option.  However, if you
+    have an lsstDebug debug.py in your PYTHONPATH you will get additional debugging displays.  The following
+    block checks for this script:
 
-And allow the user the freedom to either run the script in default mode, or point to their own images on disk.
-Note that these images must be readable as an lsst.afw.image.Exposure:
-@skip main
-@until parse_args
+    .. code-block:: py
 
-We have enabled some minor display debugging in this script via the --debug option.  However, if you
-have an lsstDebug debug.py in your PYTHONPATH you will get additional debugging displays.  The following
-block checks for this script:
-@skip args.debug
-@until sys.stderr
+        if args.debug:
+            try:
+                import debug
+                # Since I am displaying 2 images here, set the starting frame number for the LSST debug LSST
+                debug.lsstDebug.frame = 3
+            except ImportError as e:
+                print(e, file=sys.stderr)
 
-@dontinclude imagePsfMatchTask.py
-Finally, we call a run method that we define below.  First set up a Config and modify some of the parameters.
-E.g. use an "Alard-Lupton" sum-of-Gaussian basis, fit for a differential background, and use low order spatial
-variation in the kernel and background:
-@skip run(args)
-@until spatialBgOrder
+    Finally, we call a run method that we define below.
+    First set up a Config and modify some of the parameters.
+    E.g. use an "Alard-Lupton" sum-of-Gaussian basis,
+    fit for a differential background, and use low order spatial
+    variation in the kernel and background:
 
-Make sure the images (if any) that were sent to the script exist on disk and are readable.  If no images
-are sent, make some fake data up for the sake of this example script (have a look at the code if you want
-more details on generateFakeImages):
-@skip requested
-@until sizeCellY
+    .. code-block:: py
 
-Create and run the Task:
-@skip Create
-@until args.mode
+        def run(args):
+        #
+        # Create the Config and use sum of gaussian basis
+        #
+        config = ImagePsfMatchTask.ConfigClass()
+        config.kernel.name = "AL"
+        config.kernel.active.fitForBackground = True
+        config.kernel.active.spatialKernelOrder = 1
+        config.kernel.active.spatialBgOrder = 0
 
-And finally provide some optional debugging displays:
-@skip args.debug
-@until result.subtractedExposure
-#-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    Make sure the images (if any) that were sent to the script exist on disk and are readable.  If no images
+    are sent, make some fake data up for the sake of this example script (have a look at the code if you want
+    more details on generateFakeImages):
+
+    .. code-block:: py
+
+        # Run the requested method of the Task
+        if args.template is not None and args.science is not None:
+            if not os.path.isfile(args.template):
+                raise Exception("Template image %s does not exist" % (args.template))
+            if not os.path.isfile(args.science):
+                raise Exception("Science image %s does not exist" % (args.science))
+            try:
+                templateExp = afwImage.ExposureF(args.template)
+            except Exception as e:
+                raise Exception("Cannot read template image %s" % (args.template))
+            try:
+                scienceExp = afwImage.ExposureF(args.science)
+            except Exception as e:
+                raise Exception("Cannot read science image %s" % (args.science))
+        else:
+            templateExp, scienceExp = generateFakeImages()
+            config.kernel.active.sizeCellX = 128
+            config.kernel.active.sizeCellY = 128
+
+    Create and run the Task:
+
+    .. code-block:: py
+
+        # Create the Task
+        psfMatchTask = MyImagePsfMatchTask(config=config)
+        # Run the Task
+        result = psfMatchTask.run(templateExp, scienceExp, args.mode)
+
+    And finally provide some optional debugging displays:
+
+    .. code-block:: py
+        if args.debug:
+        # See if the LSST debug has incremented the frame number; if not start with frame 3
+        try:
+            frame = debug.lsstDebug.frame + 1
+        except Exception:
+            frame = 3
+        ds9.mtv(result.matchedExposure, frame=frame, title="Example script: Matched Template Image")
+        if "subtractedExposure" in result.getDict():
+            ds9.mtv(result.subtractedExposure, frame=frame+1, title="Example script: Subtracted Image")
 
     """
+
     ConfigClass = ImagePsfMatchConfig
 
     def __init__(self, *args, **kwargs):
-        """!Create the ImagePsfMatchTask
+        """Create the ImagePsfMatchTask
 
-        @param *args arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
-        @param **kwargs keyword arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
-
-        Upon initialization, the kernel configuration is defined by self.config.kernel.active.
-        The task creates an lsst.afw.math.Warper from the subConfig self.config.kernel.active.warpingConfig.
-        A schema for the selection and measurement of candidate lsst.ip.diffim.KernelCandidates is
-        defined, and used to initize subTasks selectDetection (for candidate detection) and selectMeasurement
-        (for candidate measurement).
         """
         PsfMatchTask.__init__(self, *args, **kwargs)
         self.kConfig = self.config.kernel.active
@@ -295,7 +327,7 @@ And finally provide some optional debugging displays:
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)
 
     def getFwhmPix(self, psf):
-        """!Return the FWHM in pixels of a Psf"""
+        """Return the FWHM in pixels of a Psf"""
         sigPix = psf.computeShape().getDeterminantRadius()
         return sigPix * sigma2fwhm
 
@@ -303,41 +335,65 @@ And finally provide some optional debugging displays:
     def matchExposures(self, templateExposure, scienceExposure,
                        templateFwhmPix=None, scienceFwhmPix=None,
                        candidateList=None, doWarping=True, convolveTemplate=True):
-        """!Warp and PSF-match an exposure to the reference
+        """Warp and PSF-match an exposure to the reference
 
         Do the following, in order:
+
         - Warp templateExposure to match scienceExposure,
             if doWarping True and their WCSs do not already match
         - Determine a PSF matching kernel and differential background model
             that matches templateExposure to scienceExposure
         - Convolve templateExposure by PSF matching kernel
 
-        @param templateExposure: Exposure to warp and PSF-match to the reference masked image
-        @param scienceExposure: Exposure whose WCS and PSF are to be matched to
-        @param templateFwhmPix: FWHM (in pixels) of the Psf in the template image (image to convolve)
-        @param scienceFwhmPix: FWHM (in pixels) of the Psf in the science image
-        @param candidateList: a list of footprints/maskedImages for kernel candidates;
-                              if None then source detection is run.
+        Parameters
+        ----------
+        templateExposure : `lsst.afw.image.Exposure`
+            Exposure to warp and PSF-match to the reference masked image
+        scienceExposure : `lsst.afw.image.Exposure`
+            Exposure whose WCS and PSF are to be matched to
+        templateFwhmPix :`float`
+            FWHM (in pixels) of the Psf in the template image (image to convolve)
+        scienceFwhmPix : `float`
+            FWHM (in pixels) of the Psf in the science image
+        candidateList : `list`, optional
+            a list of footprints/maskedImages for kernel candidates;
+            if None then source detection is run.
+
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
-        @param doWarping: what to do if templateExposure's and scienceExposure's WCSs do not match:
+
+        doWarping : `bool`
+            what to do if templateExposure's and scienceExposure's WCSs do not match:
+
             - if True then warp templateExposure to match scienceExposure
             - if False then raise an Exception
-        @param convolveTemplate: convolve the template image or the science image
+
+        convolveTemplate : `bool`
+            convolve the template image or the science image:
+
             - if True, templateExposure is warped if doWarping, templateExposure is convolved
             - if False, templateExposure is warped if doWarping, scienceExposure is convolved
 
-        @return a pipeBase.Struct containing these fields:
-        - matchedImage: the PSF-matched exposure =
-            warped templateExposure convolved by psfMatchingKernel. This has:
-            - the same parent bbox, Wcs and Calib as scienceExposure
-            - the same filter as templateExposure
-            - no Psf (because the PSF-matching process does not compute one)
-        - psfMatchingKernel: the PSF matching kernel
-        - backgroundModel: differential background model
-        - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
+        Returns
+        -------
+        results : `Struct`
+            a `lsst.pipe.base.Struct` containing these fields:
 
-        Raise a RuntimeError if doWarping is False and templateExposure's and scienceExposure's
-            WCSs do not match
+            - ``matchedImage`` : the PSF-matched exposure =
+                warped templateExposure convolved by psfMatchingKernel. This has:
+
+                - the same parent bbox, Wcs and Calib as scienceExposure
+                - the same filter as templateExposure
+                - no Psf (because the PSF-matching process does not compute one)
+
+            - ``psfMatchingKernel`` : the PSF matching kernel
+            - ``backgroundModel`` : differential background model
+            - ``kernelCellSet`` : SpatialCellSet used to solve for the PSF matching kernel
+
+        Raises
+        ------
+        RuntimeError
+        if doWarping is False and templateExposure's and scienceExposure's
+        WCSs do not match
         """
         if not self._validateWcs(templateExposure, scienceExposure):
             if doWarping:
@@ -387,23 +443,36 @@ And finally provide some optional debugging displays:
     @pipeBase.timeMethod
     def matchMaskedImages(self, templateMaskedImage, scienceMaskedImage, candidateList,
                           templateFwhmPix=None, scienceFwhmPix=None):
-        """!PSF-match a MaskedImage (templateMaskedImage) to a reference MaskedImage (scienceMaskedImage)
+        """PSF-match a MaskedImage (templateMaskedImage) to a reference MaskedImage (scienceMaskedImage)
 
         Do the following, in order:
+
         - Determine a PSF matching kernel and differential background model
             that matches templateMaskedImage to scienceMaskedImage
         - Convolve templateMaskedImage by the PSF matching kernel
 
-        @param templateMaskedImage: masked image to PSF-match to the reference masked image;
+        Parameters
+        ----------
+        templateMaskedImage : `lsst.afw.image.MaskedImage`
+            masked image to PSF-match to the reference masked image;
             must be warped to match the reference masked image
-        @param scienceMaskedImage: maskedImage whose PSF is to be matched to
-        @param templateFwhmPix: FWHM (in pixels) of the Psf in the template image (image to convolve)
-        @param scienceFwhmPix: FWHM (in pixels) of the Psf in the science image
-        @param candidateList: a list of footprints/maskedImages for kernel candidates;
-                              if None then source detection is run.
+        scienceMaskedImage : `lsst.afw.image.MaskedImage`
+            maskedImage whose PSF is to be matched to
+        templateFwhmPix : `float`
+            FWHM (in pixels) of the Psf in the template image (image to convolve)
+        scienceFwhmPix : `float`
+            FWHM (in pixels) of the Psf in the science image
+        candidateList : `list`, optional
+            a list of footprints/maskedImages for kernel candidates;
+            if None then source detection is run.
+
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
 
-        @return a pipeBase.Struct containing these fields:
+        Returns
+        -------
+        result : `callable`
+        a `lsst.pipe.base.Struct` containing these fields:
+
         - psfMatchedMaskedImage: the PSF-matched masked image =
             templateMaskedImage convolved with psfMatchingKernel.
             This has the same xy0, dimensions and wcs as scienceMaskedImage.
@@ -411,7 +480,10 @@ And finally provide some optional debugging displays:
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
 
-        Raise a RuntimeError if input images have different dimensions
+        Raises
+        ------
+        RuntimeError
+            if input images have different dimensions
         """
 
         import lsstDebug
@@ -482,37 +554,58 @@ And finally provide some optional debugging displays:
     def subtractExposures(self, templateExposure, scienceExposure,
                           templateFwhmPix=None, scienceFwhmPix=None,
                           candidateList=None, doWarping=True, convolveTemplate=True):
-        """!Register, Psf-match and subtract two Exposures
+        """Register, Psf-match and subtract two Exposures
 
         Do the following, in order:
+
         - Warp templateExposure to match scienceExposure, if their WCSs do not already match
         - Determine a PSF matching kernel and differential background model
             that matches templateExposure to scienceExposure
         - PSF-match templateExposure to scienceExposure
         - Compute subtracted exposure (see return values for equation).
 
-        @param templateExposure: exposure to PSF-match to scienceExposure
-        @param scienceExposure: reference Exposure
-        @param templateFwhmPix: FWHM (in pixels) of the Psf in the template image (image to convolve)
-        @param scienceFwhmPix: FWHM (in pixels) of the Psf in the science image
-        @param candidateList: a list of footprints/maskedImages for kernel candidates;
-                              if None then source detection is run.
+        Parameters
+        ----------
+        templateExposure : `lsst.afw.image.Exposure`
+            exposure to PSF-match to scienceExposure
+        scienceExposure : `lsst.afw.image.Exposure`
+            reference Exposure
+        templateFwhmPix : `float`
+            FWHM (in pixels) of the Psf in the template image (image to convolve)
+        scienceFwhmPix : `float`
+            FWHM (in pixels) of the Psf in the science image
+        candidateList : `list`, optional
+            a list of footprints/maskedImages for kernel candidates;
+            if None then source detection is run.
+
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
-        @param doWarping: what to do if templateExposure's and scienceExposure's WCSs do not match:
+
+        doWarping : `bool`
+            what to do if templateExposure's and scienceExposure's WCSs do not match:
+
             - if True then warp templateExposure to match scienceExposure
             - if False then raise an Exception
-        @param convolveTemplate: convolve the template image or the science image
+
+        convolveTemplate : `bool`
+            convolve the template image or the science image
+
             - if True, templateExposure is warped if doWarping, templateExposure is convolved
             - if False, templateExposure is warped if doWarping, scienceExposure is convolved
 
-        @return a pipeBase.Struct containing these fields:
-        - subtractedExposure: subtracted Exposure = scienceExposure - (matchedImage + backgroundModel)
-        - matchedImage: templateExposure after warping to match templateExposure (if doWarping true),
-            and convolving with psfMatchingKernel
-        - psfMatchingKernel: PSF matching kernel
-        - backgroundModel: differential background model
-        - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
+        Returns
+        -------
+        result: `Struct`
+            a `lsst.pipe.base.Struct` containing these fields:
+
+            - ``subtractedExposure`` : subtracted Exposure
+                scienceExposure - (matchedImage + backgroundModel)
+            - ``matchedImage`` : templateExposure after warping to match templateExposure (if doWarping true),
+                and convolving with psfMatchingKernel
+            - ``psfMatchingKernel`` : PSF matching kernel
+            - ``backgroundModel`` : differential background model
+            - ``kernelCellSet`` : SpatialCellSet used to determine PSF matching kernel
         """
+
         results = self.matchExposures(
             templateExposure=templateExposure,
             scienceExposure=scienceExposure,
@@ -565,28 +658,42 @@ And finally provide some optional debugging displays:
     @pipeBase.timeMethod
     def subtractMaskedImages(self, templateMaskedImage, scienceMaskedImage, candidateList,
                              templateFwhmPix=None, scienceFwhmPix=None):
-        """!Psf-match and subtract two MaskedImages
+        """Psf-match and subtract two MaskedImages
 
         Do the following, in order:
+
         - PSF-match templateMaskedImage to scienceMaskedImage
         - Determine the differential background
-        - Return the difference: scienceMaskedImage -
+        - Return the difference: scienceMaskedImage
             ((warped templateMaskedImage convolved with psfMatchingKernel) + backgroundModel)
 
-        @param templateMaskedImage: MaskedImage to PSF-match to scienceMaskedImage
-        @param scienceMaskedImage: reference MaskedImage
-        @param templateFwhmPix: FWHM (in pixels) of the Psf in the template image (image to convolve)
-        @param scienceFwhmPix: FWHM (in pixels) of the Psf in the science image
-        @param candidateList: a list of footprints/maskedImages for kernel candidates;
-                              if None then source detection is run.
+        Parameters
+        ----------
+        templateMaskedImage : `lsst.afw.image.MaskedImage`
+            MaskedImage to PSF-match to scienceMaskedImage
+        scienceMaskedImage : `lsst.afw.image.MaskedImage`
+            reference MaskedImage
+        templateFwhmPix : `float`
+            FWHM (in pixels) of the Psf in the template image (image to convolve)
+        scienceFwhmPix : `float`
+            FWHM (in pixels) of the Psf in the science image
+        candidateList : `list`, optional
+            a list of footprints/maskedImages for kernel candidates;
+            if None then source detection is run.
+
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
 
-        @return a pipeBase.Struct containing these fields:
-        - subtractedMaskedImage = scienceMaskedImage - (matchedImage + backgroundModel)
-        - matchedImage: templateMaskedImage convolved with psfMatchingKernel
-        - psfMatchingKernel: PSF matching kernel
-        - backgroundModel: differential background model
-        - kernelCellSet: SpatialCellSet used to determine PSF matching kernel
+        Returns
+        -------
+        results : `Struct`
+            a `lsst.pipe.base.Struct` containing these fields:
+
+            - ``subtractedMaskedImage`` : scienceMaskedImage - (matchedImage + backgroundModel)
+            - ``matchedImage`` : templateMaskedImage convolved with psfMatchingKernel
+            - `psfMatchingKernel`` : PSF matching kernel
+            - ``backgroundModel`` : differential background model
+            - ``kernelCellSet`` : SpatialCellSet used to determine PSF matching kernel
+
         """
         if not candidateList:
             raise RuntimeError("Candidate list must be populated by makeCandidateList")
@@ -619,18 +726,27 @@ And finally provide some optional debugging displays:
         return results
 
     def getSelectSources(self, exposure, sigma=None, doSmooth=True, idFactory=None):
-        """!Get sources to use for Psf-matching
+        """Get sources to use for Psf-matching
 
         This method runs detection and measurement on an exposure.
         The returned set of sources will be used as candidates for
         Psf-matching.
 
-        @param exposure: Exposure on which to run detection/measurement
-        @param sigma: Detection threshold
-        @param doSmooth: Whether or not to smooth the Exposure with Psf before detection
-        @param idFactory: Factory for the generation of Source ids
+        Parameters
+        ----------
+        exposure : `lsst.afw.image.Exposure`
+            Exposure on which to run detection/measurement
+        sigma : `float`
+            Detection threshold
+        doSmooth : `bool`
+            Whether or not to smooth the Exposure with Psf before detection
+        idFactory :
+            Factory for the generation of Source ids
 
-        @return source catalog containing candidates for the Psf-matching
+        Returns
+        -------
+        selectSources :
+            source catalog containing candidates for the Psf-matching
         """
 
         if idFactory:
@@ -667,22 +783,31 @@ And finally provide some optional debugging displays:
         return selectSources
 
     def makeCandidateList(self, templateExposure, scienceExposure, kernelSize, candidateList=None):
-        """!Make a list of acceptable KernelCandidates
+        """Make a list of acceptable KernelCandidates
 
         Accept or generate a list of candidate sources for
         Psf-matching, and examine the Mask planes in both of the
         images for indications of bad pixels
 
-        @param templateExposure: Exposure that will be convolved
-        @param scienceExposure: Exposure that will be matched-to
-        @param kernelSize: Dimensions of the Psf-matching Kernel, used to grow detection footprints
-        @param candidateList: List of Sources to examine. Elements must be of type afw.table.Source
-                              or a type that wraps a Source and has a getSource() method, such as
-                              meas.algorithms.PsfCandidateF.
+        Parameters
+        ----------
+        templateExposure : `lsst.afw.image.Exposure`
+            Exposure that will be convolved
+        scienceExposure : `lsst.afw.image.Exposure`
+            Exposure that will be matched-to
+        kernelSize : `float`
+            Dimensions of the Psf-matching Kernel, used to grow detection footprints
+        candidateList : `list`, optional
+            List of Sources to examine. Elements must be of type afw.table.Source
+            or a type that wraps a Source and has a getSource() method, such as
+            meas.algorithms.PsfCandidateF.
 
-        @return a list of dicts having a "source" and "footprint"
-        field for the Sources deemed to be appropriate for Psf
-        matching
+        Returns
+        -------
+        candidateList : `list` of `dict`
+            a list of dicts having a "source" and "footprint"
+            field for the Sources deemed to be appropriate for Psf
+            matching
         """
         if candidateList is None:
             candidateList = self.getSelectSources(scienceExposure)
@@ -714,19 +839,27 @@ And finally provide some optional debugging displays:
         return candidateList
 
     def _adaptCellSize(self, candidateList):
-        """! NOT IMPLEMENTED YET"""
+        """NOT IMPLEMENTED YET"""
         return self.kConfig.sizeCellX, self.kConfig.sizeCellY
 
     def _buildCellSet(self, templateMaskedImage, scienceMaskedImage, candidateList):
-        """!Build a SpatialCellSet for use with the solve method
+        """Build a SpatialCellSet for use with the solve method
 
-        @param templateMaskedImage: MaskedImage to PSF-matched to scienceMaskedImage
-        @param scienceMaskedImage: reference MaskedImage
-        @param candidateList: a list of footprints/maskedImages for kernel candidates;
-                              if None then source detection is run.
+        Parameters
+        ----------
+        templateMaskedImage : `lsst.afw.image.MaskedImage`
+            MaskedImage to PSF-matched to scienceMaskedImage
+        scienceMaskedImage : `lsst.afw.image.MaskedImage`
+            reference MaskedImage
+        candidateList : `list`
+            a list of footprints/maskedImages for kernel candidates;
+
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
 
-        @return kernelCellSet: a SpatialCellSet for use with self._solve
+        Returns
+        -------
+        kernelCellSet :
+            a SpatialCellSet for use with self._solve
         """
         if not candidateList:
             raise RuntimeError("Candidate list must be populated by makeCandidateList")
@@ -752,12 +885,12 @@ And finally provide some optional debugging displays:
         return kernelCellSet
 
     def _validateSize(self, templateMaskedImage, scienceMaskedImage):
-        """!Return True if two image-like objects are the same size
+        """Return True if two image-like objects are the same size
         """
         return templateMaskedImage.getDimensions() == scienceMaskedImage.getDimensions()
 
     def _validateWcs(self, templateExposure, scienceExposure):
-        """!Return True if the WCS of the two Exposures have the same origin and extent
+        """Return True if the WCS of the two Exposures have the same origin and extent
         """
         templateWcs = templateExposure.getWcs()
         scienceWcs = scienceExposure.getWcs()

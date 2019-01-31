@@ -39,10 +39,7 @@ __all__ = ("DecorrelateALKernelTask", "DecorrelateALKernelConfig",
 
 
 class DecorrelateALKernelConfig(pexConfig.Config):
-    """!
-    @anchor DecorrelateALKernelConfig_
-
-    @brief Configuration parameters for the DecorrelateALKernelTask
+    """Configuration parameters for the DecorrelateALKernelTask
     """
 
     ignoreMaskPlanes = pexConfig.ListField(
@@ -51,29 +48,12 @@ class DecorrelateALKernelConfig(pexConfig.Config):
         default=("INTRP", "EDGE", "DETECTED", "SAT", "CR", "BAD", "NO_DATA", "DETECTED_NEGATIVE")
     )
 
-## @addtogroup LSST_task_documentation
-## @{
-## @page DecorrelateALKernelTask
-## @ref DecorrelateALKernelTask_ "DecorrelateALKernelTask"
-##      Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
-## @}
-
 
 class DecorrelateALKernelTask(pipeBase.Task):
-    r"""!
-    @anchor DecorrelateALKernelTask_
+    """Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
 
-    @brief Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
-
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Contents      Contents
-
-      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Purpose
-      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Config
-      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Run
-      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Debug
-      - @ref ip_diffim_imDecorr_DecorrALKernelTask_Example
-
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Purpose	Description
+    Notes
+    -----
 
     Pipe-task that removes the neighboring-pixel covariance in an
     image difference that are added when the template image is
@@ -97,24 +77,6 @@ class DecorrelateALKernelTask(pipeBase.Task):
     convolving the image difference with it. This process is described
     in detail in [DMTN-021](http://dmtn-021.lsst.io).
 
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Initialize Task initialization
-
-    @copydoc \_\_init\_\_
-
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Run Invoking the Task
-
-    @copydoc run
-
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Config Configuration parameters
-
-    See @ref DecorrelateALKernelConfig
-
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelTask_Debug Debug variables
-
-    This task has no debug variables
-
-    @section ip_diffim_imDecorr_DecorrALKernelTask_Example Example of using DecorrelateALKernelTask
-
     This task has no standalone example, however it is applied as a
     subtask of pipe.tasks.imageDifference.ImageDifferenceTask.
     """
@@ -122,9 +84,14 @@ class DecorrelateALKernelTask(pipeBase.Task):
     _DefaultName = "ip_diffim_decorrelateALKernel"
 
     def __init__(self, *args, **kwargs):
-        """! Create the image decorrelation Task
-        @param *args arguments to be passed to lsst.pipe.base.task.Task.__init__
-        @param **kwargs keyword arguments to be passed to lsst.pipe.base.task.Task.__init__
+        """Create the image decorrelation Task
+
+        Parameters
+        ----------
+        args :
+            arguments to be passed to ``lsst.pipe.base.task.Task.__init__``
+        kwargs :
+            keyword arguments to be passed to ``lsst.pipe.base.task.Task.__init__``
         """
         pipeBase.Task.__init__(self, *args, **kwargs)
 
@@ -143,7 +110,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
     @pipeBase.timeMethod
     def run(self, exposure, templateExposure, subtractedExposure, psfMatchingKernel,
             preConvKernel=None, xcen=None, ycen=None, svar=None, tvar=None):
-        """! Perform decorrelation of an image difference exposure.
+        """Perform decorrelation of an image difference exposure.
 
         Decorrelates the diffim due to the convolution of the templateExposure with the
         A&L PSF matching kernel. Currently can accept a spatially varying matching kernel but in
@@ -153,33 +120,54 @@ class DecorrelateALKernelTask(pipeBase.Task):
         `psfMatchingKernel` is kappa; and svar and tvar are their respective
         variances (see below).
 
-        @param[in] exposure the science afwImage.Exposure used for PSF matching
-        @param[in] templateExposure the template afwImage.Exposure used for PSF matching
-        @param[in] subtractedExposure the subtracted exposure produced by
-        `ip_diffim.ImagePsfMatchTask.subtractExposures()`
-        @param[in] psfMatchingKernel an (optionally spatially-varying) PSF matching kernel produced
-        by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
-        @param[in] preConvKernel if not None, then the `exposure` was pre-convolved with this kernel
-        @param[in] xcen X-pixel coordinate to use for computing constant matching kernel to use
-        If `None` (default), then use the center of the image.
-        @param[in] ycen Y-pixel coordinate to use for computing constant matching kernel to use
-        If `None` (default), then use the center of the image.
-        @param[in] svar image variance for science image
-        If `None` (default) then compute the variance over the entire input science image.
-        @param[in] tvar image variance for template image
-        If `None` (default) then compute the variance over the entire input template image.
+        Parameters
+        ----------
+        exposure : `lsst.afw.image.Exposure`
+            The science afwImage.Exposure used for PSF matching
+        templateExposure : `lsst.afw.image.Exposure`
+            The template exposure used for PSF matching
+        subtractedExposure :
+            the subtracted exposure produced by
+            `ip_diffim.ImagePsfMatchTask.subtractExposures()`
+        psfMatchingKernel :
+            An (optionally spatially-varying) PSF matching kernel produced
+            by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
+        preConvKernel :
+            if not None, then the `exposure` was pre-convolved with this kernel
+        xcen : `float`, optional
+            X-pixel coordinate to use for computing constant matching kernel to use
+            If `None` (default), then use the center of the image.
+        ycen : `float`, optional
+            Y-pixel coordinate to use for computing constant matching kernel to use
+            If `None` (default), then use the center of the image.
+        svar : `float`, optional
+            image variance for science image
+            If `None` (default) then compute the variance over the entire input science image.
+        tvar : `float`, optional
+            Image variance for template image
+            If `None` (default) then compute the variance over the entire input template image.
 
-        @return a `pipeBase.Struct` containing:
-            * `correctedExposure`: the decorrelated diffim
-            * `correctionKernel`: the decorrelation correction kernel (which may be ignored)
+        Returns
+        -------
+        result : `Struct`
+            a `lsst.pipe.base.Struct` containing:
 
-        @note The `subtractedExposure` is NOT updated
-        @note The returned `correctedExposure` has an updated PSF as well.
-        @note Here we currently convert a spatially-varying matching kernel into a constant kernel,
+            - ``correctedExposure`` : the decorrelated diffim
+            - ``correctionKernel`` : the decorrelation correction kernel (which may be ignored)
+
+        Notes
+        -----
+        The `subtractedExposure` is NOT updated
+
+        The returned `correctedExposure` has an updated PSF as well.
+
+        Here we currently convert a spatially-varying matching kernel into a constant kernel,
         just by computing it at the center of the image (tickets DM-6243, DM-6244).
-        @note We are also using a constant accross-the-image measure of sigma (sqrt(variance)) to compute
+
+        We are also using a constant accross-the-image measure of sigma (sqrt(variance)) to compute
         the decorrelation kernel.
-        @note Still TBD (ticket DM-6580): understand whether the convolution is correctly modifying
+
+        Still TBD (ticket DM-6580): understand whether the convolution is correctly modifying
         the variance plane of the new subtractedExposure.
         """
         spatialKernel = psfMatchingKernel
@@ -238,16 +226,28 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
     @staticmethod
     def _computeDecorrelationKernel(kappa, svar=0.04, tvar=0.04, preConvKernel=None):
-        """! Compute the Lupton decorrelation post-conv. kernel for decorrelating an
+        """Compute the Lupton decorrelation post-conv. kernel for decorrelating an
         image difference, based on the PSF-matching kernel.
-        @param kappa  A matching kernel 2-d numpy.array derived from Alard & Lupton PSF matching
-        @param svar   Average variance of science image used for PSF matching
-        @param tvar   Average variance of template image used for PSF matching
-        @param preConvKernel If not None, then pre-filtering was applied
-            to science exposure, and this is the pre-convolution kernel.
-        @return a 2-d numpy.array containing the correction kernel
 
-        @note As currently implemented, kappa is a static (single, non-spatially-varying) kernel.
+        Parameters
+        ----------
+        kappa : `numpy.ndarray`
+            A matching kernel 2-d numpy.array derived from Alard & Lupton PSF matching
+        svar : `float`, optional
+            Average variance of science image used for PSF matching
+        tvar : `float`, optional
+            Average variance of template image used for PSF matching
+        preConvKernel If not None, then pre-filtering was applied
+            to science exposure, and this is the pre-convolution kernel.
+
+        Returns
+        -------
+        fkernel : `numpy.ndarray`
+            a 2-d numpy.array containing the correction kernel
+
+        Notes
+        -----
+        As currently implemented, kappa is a static (single, non-spatially-varying) kernel.
         """
         # Psf should not be <= 0, and messes up denominator; set the minimum value to MIN_KERNEL
         MIN_KERNEL = 1.0e-4
@@ -291,14 +291,24 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
     @staticmethod
     def computeCorrectedDiffimPsf(kappa, psf, svar=0.04, tvar=0.04):
-        """! Compute the (decorrelated) difference image's new PSF.
+        """Compute the (decorrelated) difference image's new PSF.
         new_psf = psf(k) * sqrt((svar + tvar) / (svar + tvar * kappa_ft(k)**2))
 
-        @param kappa  A matching kernel array derived from Alard & Lupton PSF matching
-        @param psf    The uncorrected psf array of the science image (and also of the diffim)
-        @param svar   Average variance of science image used for PSF matching
-        @param tvar   Average variance of template image used for PSF matching
-        @return a 2-d numpy.array containing the new PSF
+        Parameters
+        ----------
+        kappa : `numpy.ndarray`
+            A matching kernel array derived from Alard & Lupton PSF matching
+        psf : `numpy.ndarray`
+            The uncorrected psf array of the science image (and also of the diffim)
+        svar : `float`, optional
+            Average variance of science image used for PSF matching
+        tvar : `float`, optional
+            Average variance of template image used for PSF matching
+
+        Returns
+        -------
+        pcf : `numpy.ndarray`
+            a 2-d numpy.array containing the new PSF
         """
         def post_conv_psf_ft2(psf, kernel, svar, tvar):
             # Pad psf or kernel symmetrically to make them the same size!
@@ -325,11 +335,18 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
     @staticmethod
     def _fixOddKernel(kernel):
-        """! Take a kernel with odd dimensions and make them even for FFT
+        """Take a kernel with odd dimensions and make them even for FFT
 
-        @param kernel a numpy.array
-        @return a fixed kernel numpy.array. Returns a copy if the dimensions needed to change;
-        otherwise just return the input kernel.
+        Parameters
+        ----------
+        kernel : `numpy.array`
+            a numpy.array
+
+        Returns
+        -------
+        out : `numpy.array`
+            a fixed kernel numpy.array. Returns a copy if the dimensions needed to change;
+            otherwise just return the input kernel.
         """
         # Note this works best for the FFT if we left-pad
         out = kernel
@@ -346,9 +363,17 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
     @staticmethod
     def _fixEvenKernel(kernel):
-        """! Take a kernel with even dimensions and make them odd, centered correctly.
-        @param kernel a numpy.array
-        @return a fixed kernel numpy.array
+        """Take a kernel with even dimensions and make them odd, centered correctly.
+
+        Parameters
+        ----------
+        kernel : `numpy.array`
+            a numpy.array
+
+        Returns
+        -------
+        out : `numpy.array`
+            a fixed kernel numpy.array
         """
         # Make sure the peak (close to a delta-function) is in the center!
         maxloc = np.unravel_index(np.argmax(kernel), kernel.shape)
@@ -369,13 +394,24 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
     @staticmethod
     def _doConvolve(exposure, kernel):
-        """! Convolve an Exposure with a decorrelation convolution kernel.
-        @param exposure Input afw.image.Exposure to be convolved.
-        @param kernel Input 2-d numpy.array to convolve the image with
-        @return a new Exposure with the convolved pixels and the (possibly
-        re-centered) kernel.
+        """Convolve an Exposure with a decorrelation convolution kernel.
 
-        @note We re-center the kernel if necessary and return the possibly re-centered kernel
+        Parameters
+        ----------
+        exposure : `lsst.afw.image.Exposure`
+            Input exposure to be convolved.
+        kernel : `numpy.array`
+            Input 2-d numpy.array to convolve the image with
+
+        Returns
+        -------
+        out : `lsst.afw.image.Exposure`
+            a new Exposure with the convolved pixels and the (possibly
+            re-centered) kernel.
+
+        Notes
+        -----
+        We re-center the kernel if necessary and return the possibly re-centered kernel
         """
         kernelImg = afwImage.ImageD(kernel.shape[0], kernel.shape[1])
         kernelImg.getArray()[:, :] = kernel
@@ -397,6 +433,7 @@ class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
     This task subclasses DecorrelateALKernelTask in order to implement
     all of that task's configuration parameters, as well as its `run` method.
     """
+
     ConfigClass = DecorrelateALKernelConfig
     _DefaultName = 'ip_diffim_decorrelateALKernelMapper'
 
@@ -418,17 +455,17 @@ class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
 
         Parameters
         ----------
-        subExposure : lsst.afw.image.Exposure
+        subExposure : `lsst.afw.image.Exposure`
             the sub-exposure of the diffim
-        expandedSubExposure : lsst.afw.image.Exposure
+        expandedSubExposure : `lsst.afw.image.Exposure`
             the expanded sub-exposure upon which to operate
-        fullBBox : afwGeom.BoundingBox
+        fullBBox : `lsst.afw.geom.BoundingBox`
             the bounding box of the original exposure
-        template : afw.Exposure
+        template : `lsst.afw.image.Exposure`
             the corresponding sub-exposure of the template exposure
-        science : afw.Exposure
+        science : `lsst.afw.image.Exposure`
             the corresponding sub-exposure of the science exposure
-        alTaskResult : pipeBase.Struct
+        alTaskResult : `lsst.pipe.base.Struct`
             the result of A&L image differencing on `science` and
             `template`, importantly containing the resulting
             `psfMatchingKernel`. Can be `None`, only if
@@ -445,9 +482,10 @@ class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
         Returns
         -------
         A `pipeBase.Struct` containing:
-        * `subExposure` : the result of the `subExposure` processing.
-        * `decorrelationKernel` : the decorrelation kernel, currently
-          not used.
+
+            - ``subExposure`` : the result of the `subExposure` processing.
+            - ``decorrelationKernel`` : the decorrelation kernel, currently
+                not used.
 
         Notes
         -----
@@ -488,15 +526,6 @@ class DecorrelateALKernelMapReduceConfig(ImageMapReduceConfig):
     )
 
 
-## @addtogroup LSST_task_documentation
-## @{
-## @page DecorrelateALKernelSpatialTask
-## @ref DecorrelateALKernelSpatialTask_ "DecorrelateALKernelSpatialTask"
-##      Decorrelate the effect of convolution by Alard-Lupton matching kernel
-##      in image difference, allowing for spatial variations in PSF and noise
-## @}
-
-
 class DecorrelateALKernelSpatialConfig(pexConfig.Config):
     """Configuration parameters for the DecorrelateALKernelSpatialTask.
     """
@@ -524,20 +553,10 @@ class DecorrelateALKernelSpatialConfig(pexConfig.Config):
 
 
 class DecorrelateALKernelSpatialTask(pipeBase.Task):
-    r"""!
-    @anchor DecorrelateALKernelSpatialTask_
+    """Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
 
-    @brief Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
-
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Contents       Contents
-
-      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Purpose
-      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Config
-      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Run
-      - @ref ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Debug
-      - @ref ip_diffim_imDecorr_DecorrALKerSpatTask_Example
-
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Purpose	Description
+    Notes
+    -----
 
     Pipe-task that removes the neighboring-pixel covariance in an
     image difference that are added when the template image is
@@ -552,24 +571,6 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
     DecorrelateALKernelTask on each subExposure. This enables it to
     account for spatially-varying PSFs and noise in the exposures when
     performing the decorrelation.
-
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Initialize Task initialization
-
-    @copydoc \_\_init\_\_
-
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Run Invoking the Task
-
-    @copydoc run
-
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Config Configuration parameters
-
-    See @ref DecorrelateALKernelSpatialConfig
-
-    @section ip_diffim_imageDecorrelation_DecorrelateALKernelSpatialTask_Debug Debug variables
-
-    This task has no debug variables
-
-    @section ip_diffim_imDecorr_DecorrALKerSpatTask_Example Example of using DecorrelateALKernelSpatialTask
 
     This task has no standalone example, however it is applied as a
     subtask of pipe.tasks.imageDifference.ImageDifferenceTask.
@@ -608,7 +609,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
 
     def run(self, scienceExposure, templateExposure, subtractedExposure, psfMatchingKernel,
             spatiallyVarying=True, preConvKernel=None):
-        """! Perform decorrelation of an image difference exposure.
+        """Perform decorrelation of an image difference exposure.
 
         Decorrelates the diffim due to the convolution of the
         templateExposure with the A&L psfMatchingKernel. If
@@ -618,25 +619,28 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
 
         Parameters
         ----------
-        scienceExposure : lsst.afw.image.Exposure
+        scienceExposure : `lsst.afw.image.Exposure`
            the science Exposure used for PSF matching
-        templateExposure : lsst.afw.image.Exposure
+        templateExposure : `lsst.afw.image.Exposure`
            the template Exposure used for PSF matching
-        subtractedExposure : lsst.afw.image.Exposure
+        subtractedExposure : `lsst.afw.image.Exposure`
            the subtracted Exposure produced by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
         psfMatchingKernel :
            an (optionally spatially-varying) PSF matching kernel produced
            by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
-        spatiallyVarying : bool
+        spatiallyVarying : `bool`
            if True, perform the spatially-varying operation
-        preConvKernel : lsst.meas.algorithms.Psf
+        preConvKernel : `lsst.meas.algorithms.Psf`
            if not none, the scienceExposure has been pre-filtered with this kernel. (Currently
            this option is experimental.)
 
         Returns
         -------
-        a `pipeBase.Struct` containing:
-            * `correctedExposure`: the decorrelated diffim
+        results : `lsst.pipe.base.Struct`
+            a structure containing:
+
+            - ``correctedExposure`` : the decorrelated diffim
+
         """
         self.log.info('Running A&L decorrelation: spatiallyVarying=%r' % spatiallyVarying)
 
