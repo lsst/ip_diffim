@@ -40,18 +40,8 @@ class DcrModel:
     ----------
     dcrNumSubfilters : `int`
         Number of sub-filters used to model chromatic effects within a band.
-    filterInfo : `lsst.afw.image.Filter`
-        The filter definition, set in the current instruments' obs package.
     modelImages : `list` of `lsst.afw.image.MaskedImage`
         A list of masked images, each containing the model for one subfilter
-
-    Parameters
-    ----------
-    modelImages : `list` of `lsst.afw.image.MaskedImage`
-        A list of masked images, each containing the model for one subfilter.
-    filterInfo : `lsst.afw.image.Filter`, optional
-        The filter definition, set in the current instruments' obs package.
-        Required for any calculation of DCR, including making matched templates.
 
     Notes
     -----
@@ -250,7 +240,7 @@ class DcrModel:
         return self[0].mask
 
     def getReferenceImage(self, bbox=None):
-        """Create a simple template from the DCR model.
+        """Calculate a reference image from the average of the subfilter images.
 
         Parameters
         ----------
@@ -259,8 +249,8 @@ class DcrModel:
 
         Returns
         -------
-        templateImage : `numpy.ndarray`
-            The template with no chromatic effects applied.
+        refImage : `numpy.ndarray`
+            The reference image with no chromatic effects applied.
         """
         bbox = bbox or self.bbox
         return np.mean([model[bbox].image.array for model in self], axis=0)
@@ -426,11 +416,12 @@ class DcrModel:
         refImage = self[subfilter][bbox].image.array
         highThreshold = np.abs(refImage)*regularizationFactor
         lowThreshold = refImage/regularizationFactor
-        self.applyImageThresholds(newModel, highThreshold=highThreshold, lowThreshold=lowThreshold,
+        newImage = newModel.image.array
+        self.applyImageThresholds(newImage, highThreshold=highThreshold, lowThreshold=lowThreshold,
                                   regularizationWidth=regularizationWidth)
 
-    def regularizeModelFreq(self, modelImages, bbox, regularizationFactor,
-                            regularizationWidth=2):
+    def regularizeModelFreq(self, modelImages, bbox, statsCtrl, regularizationFactor,
+                            regularizationWidth=2, mask=None, convergenceMaskPlanes="DETECTED"):
         """Restrict large variations in the model between subfilters.
 
         Parameters
@@ -440,21 +431,53 @@ class DcrModel:
             The values will be modified in place.
         bbox : `lsst.afw.geom.Box2I`
             Sub-region to coadd
+        statsCtrl : `lsst.afw.math.StatisticsControl`
+            Statistics control object for coaddition.
         regularizationFactor : `float`
             Maximum relative change of the model allowed between subfilters.
         regularizationWidth : `int`, optional
             Minimum radius of a region to include in regularization, in pixels.
+        mask : `lsst.afw.image.Mask`, optional
+            Optional alternate mask
+        convergenceMaskPlanes : `list` of `str`, or `str`, optional
+            Mask planes to use to calculate convergence.
+
+        Notes
+        -----
+        This implementation of frequency regularization restricts each subfilter
+        image to be a smoothly-varying function times a reference image.
         """
         # ``regularizationFactor`` is the maximum change between subfilter images, so the maximum difference
         # between one subfilter image and the average will be the square root of that.
         maxDiff = np.sqrt(regularizationFactor)
-        refImage = self.getReferenceImage(bbox)
+        noiseLevel = self.calculateNoiseCutoff(modelImages[0], statsCtrl, bufferSize=5, mask=mask, bbox=bbox)
+        referenceImage = self.getReferenceImage(bbox)
+        badPixels = np.isnan(referenceImage) | (referenceImage <= 0.)
+        if np.sum(~badPixels) == 0:
+            # Skip regularization if there are no valid pixels
+            return
+        referenceImage[badPixels] = 0.
+        filterWidth = regularizationWidth
+        fwhm = 2.*filterWidth
+        # The noise should be lower in the smoothed image by sqrt(Nsmooth) ~ fwhm pixels
+        noiseLevel /= fwhm
+        smoothRef = ndimage.filters.gaussian_filter(referenceImage, filterWidth) + noiseLevel
 
-        for model in modelImages:
-            highThreshold = np.abs(refImage)*maxDiff
-            lowThreshold = refImage/maxDiff
-            self.applyImageThresholds(model[bbox], highThreshold=highThreshold, lowThreshold=lowThreshold,
+        baseThresh = np.ones_like(referenceImage)
+        highThreshold = baseThresh*maxDiff
+        lowThreshold = baseThresh/maxDiff
+        for subfilter, model in enumerate(modelImages):
+            smoothModel = ndimage.filters.gaussian_filter(model.image.array, filterWidth) + noiseLevel
+            relativeModel = smoothModel/smoothRef
+            # Now sharpen the smoothed relativeModel using an alpha of 3.
+            relativeModel2 = ndimage.filters.gaussian_filter(relativeModel, filterWidth/3.)
+            relativeModel = relativeModel + 3.*(relativeModel - relativeModel2)
+            self.applyImageThresholds(relativeModel,
+                                      highThreshold=highThreshold,
+                                      lowThreshold=lowThreshold,
                                       regularizationWidth=regularizationWidth)
+            relativeModel *= referenceImage
+            modelImages[subfilter].image.array = relativeModel
 
     def calculateNoiseCutoff(self, maskedImage, statsCtrl, bufferSize,
                              convergenceMaskPlanes="DETECTED", mask=None, bbox=None):
@@ -493,8 +516,7 @@ class DcrModel:
         noiseCutoff = np.std(maskedImage[bboxShrink].image.array[backgroundPixels])
         return noiseCutoff
 
-    def applyImageThresholds(self, maskedImage, highThreshold=None, lowThreshold=None,
-                             regularizationWidth=2):
+    def applyImageThresholds(self, image, highThreshold=None, lowThreshold=None, regularizationWidth=2):
         """Restrict image values to be between upper and lower limits.
 
         This method flags all pixels in an image that are outside of the given
@@ -507,20 +529,19 @@ class DcrModel:
 
         Parameters
         ----------
-        maskedImage : `lsst.afw.image.MaskedImage`
+        image : `numpy.ndarray`
             The image to apply the thresholds to.
-            The image plane values will be modified in place.
+            The values will be modified in place.
         highThreshold : `numpy.ndarray`, optional
-            Array of upper limit values for each pixel of ``maskedImage``.
+            Array of upper limit values for each pixel of ``image``.
         lowThreshold : `numpy.ndarray`, optional
-            Array of lower limit values for each pixel of ``maskedImage``.
+            Array of lower limit values for each pixel of ``image``.
         regularizationWidth : `int`, optional
             Minimum radius of a region to include in regularization, in pixels.
         """
         # Generate the structure for binary erosion and dilation, which is used to remove noise-like pixels.
         # Groups of pixels with a radius smaller than ``regularizationWidth``
         # will be excluded from regularization.
-        image = maskedImage.image.array
         filterStructure = ndimage.iterate_structure(ndimage.generate_binary_structure(2, 1),
                                                     regularizationWidth)
         if highThreshold is not None:

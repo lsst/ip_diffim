@@ -125,6 +125,22 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         self.mask = modelImages[0].mask
         return modelImages
 
+    def prepareStats(self):
+        """Make a simple statistics object for testing.
+
+        Returns
+        -------
+        statsCtrl : `lsst.afw.math.StatisticsControl`
+            Statistics control object for coaddition.
+        """
+        statsCtrl = afwMath.StatisticsControl()
+        statsCtrl.setNumSigmaClip(5)
+        statsCtrl.setNumIter(3)
+        statsCtrl.setNanSafe(True)
+        statsCtrl.setWeighted(True)
+        statsCtrl.setCalcErrorFromInputVariance(False)
+        return statsCtrl
+
     def makeDummyWcs(self, rotAngle, pixelScale, crval, flipX=True):
         """Make a World Coordinate System object for testing.
 
@@ -377,30 +393,20 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             refModel.image.array[:] *= 2.
             self.assertMaskedImagesAlmostEqual(refModel, newModel)
 
-    def testRegularizationLargeClamp(self):
-        """Frequency regularization should leave the models unchanged if the clamp factor is large.
-        """
-        clampFrequency = 3.
-        regularizationWidth = 2
-        dcrModels = DcrModel(modelImages=self.makeTestImages())
-        newModels = [model.clone() for model in dcrModels]
-        dcrModels.regularizeModelFreq(newModels, self.bbox, clampFrequency, regularizationWidth)
-        for model, refModel in zip(newModels, dcrModels):
-            self.assertMaskedImagesEqual(model, refModel)
-
     def testRegularizationSmallClamp(self):
         """Test that large variations between model planes are reduced.
 
         This also tests that noise-like pixels are not regularized.
         """
-        clampFrequency = 1.1
+        clampFrequency = 2
         regularizationWidth = 2
         fluxRange = 10.
         dcrModels = DcrModel(modelImages=self.makeTestImages(fluxRange=fluxRange))
         newModels = [model.clone() for model in dcrModels]
         templateImage = dcrModels.getReferenceImage(self.bbox)
 
-        dcrModels.regularizeModelFreq(newModels, self.bbox, clampFrequency, regularizationWidth)
+        statsCtrl = self.prepareStats()
+        dcrModels.regularizeModelFreq(newModels, self.bbox, statsCtrl, clampFrequency, regularizationWidth)
         for model, refModel in zip(newModels, dcrModels):
             # The mask and variance planes should be unchanged
             self.assertFloatsEqual(model.mask.array, refModel.mask.array)
@@ -431,6 +437,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         templateImage = np.mean([model.image.array for model in modelImages], axis=0)
         sidelobeImages = self.makeTestImages(seed=5, nSrc=5, psfSize=1.5, noiseLevel=noiseLevel/10.,
                                              detectionSigma=5., sourceSigma=sourceAmplitude*5., fluxRange=2.)
+        statsCtrl = self.prepareStats()
         signList = [-1., 0., 1.]
         sidelobeShift = afwGeom.Extent2D(4., 0.)
         for model, sidelobe, sign in zip(modelImages, sidelobeImages, signList):
@@ -441,27 +448,15 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         dcrModels = DcrModel(modelImages=modelImages)
         refModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
 
-        dcrModels.regularizeModelFreq(modelImages, self.bbox, clampFrequency,
+        dcrModels.regularizeModelFreq(modelImages, self.bbox, statsCtrl, clampFrequency,
                                       regularizationWidth=regularizationWidth)
         for model, refModel, sign in zip(modelImages, refModels, signList):
             # The mask and variance planes should be unchanged
             self.assertFloatsEqual(model.mask.array, refModel.mask.array)
             self.assertFloatsEqual(model.variance.array, refModel.variance.array)
-            if sign == 0:
-                # The center subfilter does not have sidelobes, and should be unaffected.
-                self.assertFloatsEqual(model.image.array, refModel.image.array)
-            else:
-                # Make sure the test parameters do reduce the outliers
-                self.assertGreater(np.sum(np.abs(refModel.image.array - templateImage)),
-                                   np.sum(np.abs(model.image.array - templateImage)))
-            highThreshold = templateImage*clampFrequency
-            highPix = model.image.array > highThreshold
-            highPix = ndimage.morphology.binary_opening(highPix, iterations=regularizationWidth)
-            self.assertFalse(np.all(highPix))
-            lowThreshold = templateImage/clampFrequency
-            lowPix = model.image.array < lowThreshold
-            lowPix = ndimage.morphology.binary_opening(lowPix, iterations=regularizationWidth)
-            self.assertFalse(np.all(lowPix))
+            # Make sure the test parameters do reduce the outliers
+            self.assertGreater(np.sum(np.abs(refModel.image.array - templateImage)),
+                               np.sum(np.abs(model.image.array - templateImage)))
 
     def testRegularizeModelIter(self):
         """Test that large amplitude changes between iterations are restricted.
