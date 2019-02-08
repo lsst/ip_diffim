@@ -473,7 +473,7 @@ class DipoleAnalysis(object):
                     if np.isinf(cenX) or np.isinf(cenY):
                         cenX, cenY = source.getCentroid()
 
-                    isdipole = source.get("classification.dipole")
+                    isdipole = source.get("ip_diffim_ClassificationDipole_value")
                     if isdipole and np.isfinite(isdipole):
                         # Dipole
                         ctype = afwDisplay.GREEN
