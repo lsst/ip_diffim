@@ -19,10 +19,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import numpy as np
+
 import lsst.ip.diffim as ipDiffim
 import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
-import numpy as num
 
 klist = ipDiffim.makeAlardLuptonBasisList(15, 3, [2, 4, 8], [4, 3, 2])
 frame = 1
@@ -38,7 +39,7 @@ kim2 = afwImage.ImageD(klist[0].getDimensions())
 for k1 in range(0, len(klist)):
     klist[k1].computeImage(kim1, False)
     # Only first term should have sum != 0.0
-    print(k1, num.sum(num.ravel(kim1.getArray())))
+    print(k1, np.sum(np.ravel(kim1.getArray())))
 
 print()
 
@@ -50,4 +51,4 @@ for k1 in range(0, len(klist)):
         klist[k2].computeImage(kim2, False)
         arr2 = kim2.getArray().ravel()
         # Not orthonormal tho
-        print(k1, k2, num.inner(arr1, arr2))
+        print(k1, k2, np.inner(arr1, arr2))

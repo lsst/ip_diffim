@@ -35,12 +35,12 @@ from . import utils as dituils
 
 __all__ = ("ModelPsfMatchTask", "ModelPsfMatchConfig")
 
-sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
+sigma2fwhm = 2.*np.sqrt(2.*np.log(2.))
 
 
 def nextOddInteger(x):
     nextInt = int(np.ceil(x))
-    return nextInt + 1 if nextInt % 2 == 0 else nextInt
+    return nextInt + 1 if nextInt%2 == 0 else nextInt
 
 
 class ModelPsfMatchConfig(pexConfig.Config):
@@ -335,8 +335,8 @@ class ModelPsfMatchTask(PsfMatchTask):
         result = self._buildCellSet(exposure, referencePsfModel)
         kernelCellSet = result.kernelCellSet
         referencePsfModel = result.referencePsfModel
-        fwhmScience = exposure.getPsf().computeShape().getDeterminantRadius() * sigma2fwhm
-        fwhmModel = referencePsfModel.computeShape().getDeterminantRadius() * sigma2fwhm
+        fwhmScience = exposure.getPsf().computeShape().getDeterminantRadius()*sigma2fwhm
+        fwhmModel = referencePsfModel.computeShape().getDeterminantRadius()*sigma2fwhm
 
         basisList = makeKernelBasisList(self.kConfig, fwhmScience, fwhmModel, metadata=self.metadata)
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
@@ -484,11 +484,11 @@ class ModelPsfMatchTask(PsfMatchTask):
         policy = pexConfig.makePolicy(self.kConfig)
         for row in range(nCellY):
             # place at center of cell
-            posY = sizeCellY * row + sizeCellY//2 + scienceY0
+            posY = sizeCellY*row + sizeCellY//2 + scienceY0
 
             for col in range(nCellX):
                 # place at center of cell
-                posX = sizeCellX * col + sizeCellX//2 + scienceX0
+                posX = sizeCellX*col + sizeCellX//2 + scienceX0
 
                 log.log("TRACE4." + self.log.getName(), log.DEBUG,
                         "Creating Psf candidate at %.1f %.1f", posX, posY)

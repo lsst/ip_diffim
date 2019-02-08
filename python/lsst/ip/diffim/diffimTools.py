@@ -50,7 +50,7 @@ from .makeKernelBasisList import makeKernelBasisList
 
 def makeFlatNoiseImage(mi, seedStat=afwMath.MAX):
     img = mi.getImage()
-    seed = int(10. * afwMath.makeStatistics(mi.getImage(), seedStat).getValue() + 1)
+    seed = int(10.*afwMath.makeStatistics(mi.getImage(), seedStat).getValue() + 1)
     rdm = afwMath.Random(afwMath.Random.MT19937, seed)
     rdmImage = img.Factory(img.getDimensions())
     afwMath.randomGaussianImage(rdmImage, rdm)
@@ -64,16 +64,15 @@ def makePoissonNoiseImage(im):
     ----------
     im : `lsst.afw.image.Image`
         image; the output image has the same dimensions and shape
-        and its expectation value is the value of im at each pixel
+        and its expectation value is the value of ``im`` at each pixel
 
     Returns
     -------
-    noiseIm : 'lsst.afw.image.Image'
+    noiseIm : `lsst.afw.image.Image`
         TODO: DM-17458
 
     Notes
     -----
-
     - Warning: This uses an undocumented numpy API (the documented API
         uses a single float expectation value instead of an array).
 
@@ -167,7 +166,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     border = (gaussKernelWidth + spatialKernelWidth)//2
 
     # Make a fake image with a matrix of delta functions
-    totalSize = nCell * sizeCell + 2*border
+    totalSize = nCell*sizeCell + 2*border
     tim = afwImage.ImageF(afwGeom.Extent2I(totalSize, totalSize))
     for x in range(nCell):
         for y in range(nCell):
@@ -205,7 +204,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     sim += bgValue
 
     # Watch out for negative values
-    tim += 2 * np.abs(np.min(tim.getArray()))
+    tim += 2*np.abs(np.min(tim.getArray()))
 
     # Add noise?
     if addNoise:
@@ -232,15 +231,15 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
 
     # Finally, make a kernelSet from these 2 images
     kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0),
-                                                         afwGeom.Extent2I(sizeCell * nCell,
-                                                                          sizeCell * nCell)),
+                                                         afwGeom.Extent2I(sizeCell*nCell,
+                                                                          sizeCell*nCell)),
                                            sizeCell,
                                            sizeCell)
-    stampHalfWidth = 2 * kSize
+    stampHalfWidth = 2*kSize
     for x in range(nCell):
         for y in range(nCell):
-            xCoord = x * sizeCell + sizeCell // 2
-            yCoord = y * sizeCell + sizeCell // 2
+            xCoord = x*sizeCell + sizeCell//2
+            yCoord = y*sizeCell + sizeCell//2
             p0 = afwGeom.Point2I(xCoord - stampHalfWidth,
                                  yCoord - stampHalfWidth)
             p1 = afwGeom.Point2I(xCoord + stampHalfWidth,
@@ -295,7 +294,7 @@ def backgroundSubtract(config, maskedImages):
 
     t1 = time.time()
     logger = Log.getLogger("ip.diffim.backgroundSubtract")
-    logger.debug("Total time for background subtraction : %.2f s", (t1-t0))
+    logger.debug("Total time for background subtraction : %.2f s", (t1 - t0))
     return backgrounds
 
 #######
@@ -391,7 +390,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
 
     # Size to grow Sources
     if config.scaleByFwhm:
-        fpGrowPix = int(config.fpGrowKernelScaling * kernelSize + 0.5)
+        fpGrowPix = int(config.fpGrowKernelScaling*kernelSize + 0.5)
     else:
         fpGrowPix = config.fpGrowPix
     log.info("Growing %d kernel candidate stars by %d pixels", len(candidateInList), fpGrowPix)
@@ -517,9 +516,9 @@ class NbasisEvaluator(object):
     def __call__(self, kernelCellSet, log):
         d1, d2, d3 = self.psfMatchConfig.alardDegGauss
         bicArray = {}
-        for d1i in range(1, d1+1):
-            for d2i in range(1, d2+1):
-                for d3i in range(1, d3+1):
+        for d1i in range(1, d1 + 1):
+            for d2i in range(1, d2 + 1):
+                for d3i in range(1, d3 + 1):
                     dList = [d1i, d2i, d3i]
                     bicConfig = type(self.psfMatchConfig)(self.psfMatchConfig, alardDegGauss=dList)
                     kList = makeKernelBasisList(bicConfig, self.psfFwhmPixTc, self.psfFwhmPixTnc)
@@ -536,9 +535,9 @@ class NbasisEvaluator(object):
                             bbox = cand.getKernel(diffimLib.KernelCandidateF.RECENT).shrinkBBox(
                                 diffIm.getBBox(afwImage.LOCAL))
                             diffIm = type(diffIm)(diffIm, bbox, True)
-                            chi2 = diffIm.getImage().getArray()**2 / diffIm.getVariance().getArray()
-                            n = chi2.shape[0] * chi2.shape[1]
-                            bic = np.sum(chi2) + k * np.log(n)
+                            chi2 = diffIm.getImage().getArray()**2/diffIm.getVariance().getArray()
+                            n = chi2.shape[0]*chi2.shape[1]
+                            bic = np.sum(chi2) + k*np.log(n)
                             if cand.getId() not in bicArray:
                                 bicArray[cand.getId()] = {}
                             bicArray[cand.getId()][(d1i, d2i, d3i)] = bic

@@ -19,12 +19,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import numpy as np
+
 import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
-import numpy as num
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
@@ -44,7 +45,7 @@ writeFits = False
 
 
 def makeTest1(doAddNoise):
-    gaussian1 = afwMath.GaussianFunction2D(1. * gScale, 1. * gScale, 0.)
+    gaussian1 = afwMath.GaussianFunction2D(1.*gScale, 1.*gScale, 0.)
     kernel1 = afwMath.AnalyticKernel(imSize, imSize, gaussian1)
     image1 = afwImage.ImageD(kernel1.getDimensions())
     kernel1.computeImage(image1, doNorm)
@@ -56,7 +57,7 @@ def makeTest1(doAddNoise):
     if doAddNoise:
         addNoise(mi1)
 
-    gaussian2 = afwMath.GaussianFunction2D(2. * gScale, 1.5 * gScale, 0.5 * num.pi)
+    gaussian2 = afwMath.GaussianFunction2D(2.*gScale, 1.5*gScale, 0.5*np.pi)
     kernel2 = afwMath.AnalyticKernel(imSize, imSize, gaussian2)
     image2 = afwImage.ImageD(kernel2.getDimensions())
     kernel2.computeImage(image2, doNorm)
@@ -70,17 +71,17 @@ def makeTest1(doAddNoise):
     return mi1, mi2
 
 
-def makeTest2(doAddNoise, shiftX=int(2.0 * gScale), shiftY=int(1.0 * gScale)):
-    gaussian1 = afwMath.GaussianFunction2D(1. * gScale, 1. * gScale, 0.)
+def makeTest2(doAddNoise, shiftX=int(2.0*gScale), shiftY=int(1.0*gScale)):
+    gaussian1 = afwMath.GaussianFunction2D(1.*gScale, 1.*gScale, 0.)
     kernel1 = afwMath.AnalyticKernel(imSize, imSize, gaussian1)
     image1 = afwImage.ImageD(kernel1.getDimensions())
     kernel1.computeImage(image1, doNorm)
     image1 = image1.convertF()
     ####
     boxA = afwGeom.Box2I(afwGeom.PointI(0, 0),
-                         afwGeom.ExtentI(imSize-shiftX, imSize - shiftY))
+                         afwGeom.ExtentI(imSize - shiftX, imSize - shiftY))
     boxB = afwGeom.Box2I(afwGeom.PointI(shiftX, shiftY),
-                         afwGeom.ExtentI(imSize-shiftX, imSize - shiftY))
+                         afwGeom.ExtentI(imSize - shiftX, imSize - shiftY))
     subregA = afwImage.ImageF(image1, boxA, afwImage.LOCAL)
     subregB = afwImage.ImageF(image1, boxB, afwImage.LOCAL, True)
     subregA += subregB
@@ -95,7 +96,7 @@ def makeTest2(doAddNoise, shiftX=int(2.0 * gScale), shiftY=int(1.0 * gScale)):
     if doAddNoise:
         addNoise(mi1)
 
-    gaussian2 = afwMath.GaussianFunction2D(2. * gScale, 1.5 * gScale, 0.5 * num.pi)
+    gaussian2 = afwMath.GaussianFunction2D(2.*gScale, 1.5*gScale, 0.5*np.pi)
     kernel2 = afwMath.AnalyticKernel(imSize, imSize, gaussian2)
     image2 = afwImage.ImageD(kernel2.getDimensions())
     kernel2.computeImage(image2, doNorm)
@@ -111,7 +112,7 @@ def makeTest2(doAddNoise, shiftX=int(2.0 * gScale), shiftY=int(1.0 * gScale)):
 
 
 def makeTest3(doAddNoise):
-    gaussian1 = afwMath.GaussianFunction2D(1. * gScale, 1. * gScale, 0.)
+    gaussian1 = afwMath.GaussianFunction2D(1.*gScale, 1.*gScale, 0.)
     kernel1 = afwMath.AnalyticKernel(imSize, imSize, gaussian1)
     image1 = afwImage.ImageD(kernel1.getDimensions())
     kernel1.computeImage(image1, doNorm)
@@ -121,7 +122,7 @@ def makeTest3(doAddNoise):
     var1 = afwImage.ImageF(image1, True)
     mi1 = afwImage.MaskedImageF(image1, mask1, var1)
 
-    gaussian2 = afwMath.GaussianFunction2D(2. * gScale, 1.5 * gScale, 0.5 * num.pi)
+    gaussian2 = afwMath.GaussianFunction2D(2.*gScale, 1.5*gScale, 0.5*np.pi)
     kernel2 = afwMath.AnalyticKernel(imSize, imSize, gaussian2)
     image2 = afwImage.ImageD(kernel2.getDimensions())
     kernel2.computeImage(image2, doNorm)
@@ -155,12 +156,12 @@ def fft(im1, im2, fftSize):
     arr1 = im1.getArray()
     arr2 = im2.getArray()
 
-    fft1 = num.fft.rfft2(arr1)
-    fft2 = num.fft.rfft2(arr2)
-    rat = fft2 / fft1
+    fft1 = np.fft.rfft2(arr1)
+    fft2 = np.fft.rfft2(arr2)
+    rat = fft2/fft1
 
-    kfft = num.fft.irfft2(rat, s=fftSize)
-    kfft = num.fft.fftshift(kfft)
+    kfft = np.fft.irfft2(rat, s=fftSize)
+    kfft = np.fft.fftshift(kfft)
     kim = afwImage.ImageF(fftSize)
     kim.getArray()[:] = kfft
 
@@ -203,7 +204,7 @@ if __name__ == '__main__':
     subconfigDF.kernelSize = kSize
 
     alardSigGauss = subconfigAL.alardSigGauss
-    subconfigAL.alardSigGauss = [x * gScale for x in alardSigGauss]
+    subconfigAL.alardSigGauss = [x*gScale for x in alardSigGauss]
 
     fnum = 1
 

@@ -44,8 +44,10 @@ keptPlots = False                       # Have we arranged to keep spatial plots
 
 
 def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=afwDisplay.GREEN, symb="+", size=2):
-    """Draw the (XAstrom, YAstrom) positions of a set of Sources.  Image has the given XY0"""
+    """Draw the (XAstrom, YAstrom) positions of a set of Sources.
 
+    Image has the given XY0.
+    """
     disp = afwDisplay.afwDisplay(frame=frame)
     with disp.Buffering():
         for s in sSet:
@@ -64,10 +66,12 @@ def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=afwDisplay.GREEN, symb="+", s
 def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
                            ctype=None, ctypeUnused=None, ctypeBad=None, size=3,
                            frame=None, title="Spatial Cells"):
-    """Show the SpatialCells.  If symb is something that display.dot
-    understands (e.g. "o"), the top nMaxPerCell candidates will be
-    indicated with that symbol, using ctype and size"""
+    """Show the SpatialCells.
 
+    If symb is something that display.dot understands (e.g. "o"), the top
+    nMaxPerCell candidates will be indicated with that symbol, using ctype
+    and size.
+    """
     disp = afwDisplay.Display(frame=frame)
     disp.mtv(maskedIm, title=title)
     with disp.Buffering():
@@ -99,7 +103,7 @@ def showKernelSpatialCells(maskedIm, kernelCellSet, showChi2=False, symb="o",
 
 
 def showDiaSources(sources, exposure, isFlagged, isDipole, frame=None):
-    """Display Dia Sources
+    """Display Dia Sources.
     """
     #
     # Show us the ccandidates
@@ -137,10 +141,10 @@ def showDiaSources(sources, exposure, isFlagged, isDipole, frame=None):
 def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadCandidates=True,
                          resids=False, kernels=False):
     """Display the Kernel candidates.
-    If kernel is provided include spatial model and residuals;
-    If chi is True, generate a plot of residuals/sqrt(variance), i.e. chi
-    """
 
+    If kernel is provided include spatial model and residuals;
+    If chi is True, generate a plot of residuals/sqrt(variance), i.e. chi.
+    """
     #
     # Show us the ccandidates
     #
@@ -251,7 +255,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
 
 
 def showKernelBasis(kernel, frame=None):
-    """Display a Kernel's basis images
+    """Display a Kernel's basis images.
     """
     mos = afwDisplay.utils.Mosaic()
 
@@ -268,8 +272,8 @@ def showKernelBasis(kernel, frame=None):
 
 def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
                            numSample=128, keepPlots=True, maxCoeff=10):
-    """Plot the Kernel spatial model."""
-
+    """Plot the Kernel spatial model.
+    """
     try:
         import matplotlib.pyplot as plt
         import matplotlib.colors
@@ -339,8 +343,8 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
             # Can really screw up the range...
             yMin = min([yMin, dfBad.min()])
             yMax = max([yMax, dfBad.max()])
-        yMin -= 0.05 * (yMax - yMin)
-        yMax += 0.05 * (yMax - yMin)
+        yMin -= 0.05*(yMax - yMin)
+        yMax += 0.05*(yMax - yMin)
 
         fRange = np.ndarray((len(xRange), len(yRange)))
         for j, yVal in enumerate(yRange):
@@ -359,12 +363,12 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
 
         # LL
         ax = fig.add_axes((0.1, 0.05, 0.35, 0.35))
-        vmin = fRange.min()  # - 0.05 * np.fabs(fRange.min())
-        vmax = fRange.max()  # + 0.05 * np.fabs(fRange.max())
+        vmin = fRange.min()  # - 0.05*np.fabs(fRange.min())
+        vmax = fRange.max()  # + 0.05*np.fabs(fRange.max())
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
         im = ax.imshow(fRange, aspect='auto', norm=norm,
-                       extent=[0, kernelCellSet.getBBox().getWidth()-1,
-                               0, kernelCellSet.getBBox().getHeight()-1])
+                       extent=[0, kernelCellSet.getBBox().getWidth() - 1,
+                               0, kernelCellSet.getBBox().getHeight() - 1])
         ax.set_title('Spatial polynomial')
         plt.colorbar(im, orientation='horizontal', ticks=[vmin, vmax])
 
@@ -437,7 +441,7 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
     shapeName = "base_SdssShape"
     control = measBase.SdssCentroidControl()
     schema.getAliasMap().set("slot_Centroid", centroidName)
-    schema.getAliasMap().set("slot_Centroid_flag", centroidName+"_flag")
+    schema.getAliasMap().set("slot_Centroid_flag", centroidName + "_flag")
     centroider = measBase.SdssCentroidAlgorithm(control, centroidName, schema)
     sdssShape = measBase.SdssShapeControl()
     shaper = measBase.SdssShapeAlgorithm(sdssShape, shapeName, schema)
@@ -449,8 +453,8 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
     shapes = []
     for iy in range(ny):
         for ix in range(nx):
-            x = int(ix*(width-1)/(nx-1)) + x0
-            y = int(iy*(height-1)/(ny-1)) + y0
+            x = int(ix*(width - 1)/(nx - 1)) + x0
+            y = int(iy*(height - 1)/(ny - 1)) + y0
 
             im = afwImage.ImageD(kernel.getDimensions())
             ksum = kernel.computeImage(im, False, x, y)
@@ -496,7 +500,8 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
 def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCellSet,
                        kernel, background, testSources, config,
                        origVariance=False, nptsFull=1e6, keepPlots=True, titleFs=14):
-    """Plot diffim residuals for LOCAL and SPATIAL models"""
+    """Plot diffim residuals for LOCAL and SPATIAL models.
+    """
     candidateResids = []
     spatialResids = []
     nonfitResids = []
@@ -544,9 +549,9 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     bitmaskBad |= afwImage.Mask.getPlaneBitMask('NO_DATA')
     bitmaskBad |= afwImage.Mask.getPlaneBitMask('SAT')
     idx = np.where((fullMask & bitmaskBad) == 0)
-    stride = int(len(idx[0]) // nptsFull)
+    stride = int(len(idx[0])//nptsFull)
     sidx = idx[0][::stride], idx[1][::stride]
-    allResids = fullIm[sidx] / np.sqrt(fullVar[sidx])
+    allResids = fullIm[sidx]/np.sqrt(fullVar[sidx])
 
     testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure,
                                                        exposure, config, Log.getDefaultLogger())
@@ -557,7 +562,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
             subvar = afwImage.ExposureF(exposure, fp["footprint"].getBBox()).getMaskedImage().getVariance()
         else:
             subvar = subexp.getMaskedImage().getVariance()
-        nonfitResids.append(np.ravel(subim.getArray() / np.sqrt(subvar.getArray())))
+        nonfitResids.append(np.ravel(subim.getArray()/np.sqrt(subvar.getArray())))
 
     candidateResids = np.ravel(np.array(candidateResids))
     spatialResids = np.ravel(np.array(spatialResids))
@@ -586,36 +591,36 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     sp3 = pylab.subplot(223, sharex=sp1, sharey=sp1)
     sp4 = pylab.subplot(224, sharex=sp1, sharey=sp1)
     xs = np.arange(-5, 5.05, 0.1)
-    ys = 1. / np.sqrt(2*np.pi)*np.exp(-0.5*xs**2)
+    ys = 1./np.sqrt(2*np.pi)*np.exp(-0.5*xs**2)
 
     sp1.hist(candidateResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
              % (np.mean(candidateResids), np.var(candidateResids)))
     sp1.plot(xs, ys, "r-", lw=2, label="N(0,1)")
-    sp1.set_title("Candidates: basis fit", fontsize=titleFs-2)
-    sp1.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs-6))
+    sp1.set_title("Candidates: basis fit", fontsize=titleFs - 2)
+    sp1.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs - 6))
 
     sp2.hist(spatialResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
              % (np.mean(spatialResids), np.var(spatialResids)))
     sp2.plot(xs, ys, "r-", lw=2, label="N(0,1)")
-    sp2.set_title("Candidates: spatial fit", fontsize=titleFs-2)
-    sp2.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs-6))
+    sp2.set_title("Candidates: spatial fit", fontsize=titleFs - 2)
+    sp2.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs - 6))
 
     sp3.hist(nonfitResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
              % (np.mean(nonfitResids), np.var(nonfitResids)))
     sp3.plot(xs, ys, "r-", lw=2, label="N(0,1)")
-    sp3.set_title("Control sample: spatial fit", fontsize=titleFs-2)
-    sp3.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs-6))
+    sp3.set_title("Control sample: spatial fit", fontsize=titleFs - 2)
+    sp3.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs - 6))
 
     sp4.hist(allResids, bins=xs, normed=True, alpha=0.5, label="N(%.2f, %.2f)"
              % (np.mean(allResids), np.var(allResids)))
     sp4.plot(xs, ys, "r-", lw=2, label="N(0,1)")
-    sp4.set_title("Full image (subsampled)", fontsize=titleFs-2)
-    sp4.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs-6))
+    sp4.set_title("Full image (subsampled)", fontsize=titleFs - 2)
+    sp4.legend(loc=1, fancybox=True, shadow=True, prop=FontProperties(size=titleFs - 6))
 
-    pylab.setp(sp1.get_xticklabels()+sp1.get_yticklabels(), fontsize=titleFs-4)
-    pylab.setp(sp2.get_xticklabels()+sp2.get_yticklabels(), fontsize=titleFs-4)
-    pylab.setp(sp3.get_xticklabels()+sp3.get_yticklabels(), fontsize=titleFs-4)
-    pylab.setp(sp4.get_xticklabels()+sp4.get_yticklabels(), fontsize=titleFs-4)
+    pylab.setp(sp1.get_xticklabels() + sp1.get_yticklabels(), fontsize=titleFs - 4)
+    pylab.setp(sp2.get_xticklabels() + sp2.get_yticklabels(), fontsize=titleFs - 4)
+    pylab.setp(sp3.get_xticklabels() + sp3.get_yticklabels(), fontsize=titleFs - 4)
+    pylab.setp(sp4.get_xticklabels() + sp4.get_yticklabels(), fontsize=titleFs - 4)
 
     sp1.set_xlim(-5, 5)
     sp1.set_ylim(0, 0.5)
@@ -637,7 +642,8 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
 
 
 def calcCentroid(arr):
-    """Calculate first moment of a (kernel) image"""
+    """Calculate first moment of a (kernel) image.
+    """
     y, x = arr.shape
     sarr = arr*arr
     xarr = np.asarray([[el for el in range(x)] for el2 in range(y)])
@@ -651,7 +657,8 @@ def calcCentroid(arr):
 
 
 def calcWidth(arr, centx, centy):
-    """Calculate second moment of a (kernel) image"""
+    """Calculate second moment of a (kernel) image.
+    """
     y, x = arr.shape
     # Square the flux so we don't have to deal with negatives
     sarr = arr*arr
@@ -666,7 +673,11 @@ def calcWidth(arr, centx, centy):
 
 
 def printSkyDiffs(sources, wcs):
-    """Print differences in sky coordinates between source Position and its Centroid mapped through Wcs"""
+    """Print differences in sky coordinates.
+
+    The difference is that between the source Position and its Centroid mapped
+    through Wcs.
+    """
     for s in sources:
         sCentroid = s.getCentroid()
         sPosition = s.getCoord().getPosition(afwGeom.degrees)
@@ -677,7 +688,8 @@ def printSkyDiffs(sources, wcs):
 
 
 def makeRegions(sources, outfilename, wcs=None):
-    """Create regions file for display from input source list"""
+    """Create regions file for display from input source list.
+    """
     fh = open(outfilename, "w")
     fh.write("global color=red font=\"helvetica 10 normal\" "
              "select=1 highlite=1 edit=1 move=1 delete=1 include=1 fixed=0 source\nfk5\n")
@@ -693,7 +705,8 @@ def makeRegions(sources, outfilename, wcs=None):
 
 
 def showSourceSetSky(sSet, wcs, xy0, frame=0, ctype=afwDisplay.GREEN, symb="+", size=2):
-    """Draw the (RA, Dec) positions of a set of Sources. Image has the XY0."""
+    """Draw the (RA, Dec) positions of a set of Sources. Image has the XY0.
+    """
     disp = afwDisplay.Display(frame=frame)
     with disp.Buffering():
         for s in sSet:
@@ -704,7 +717,8 @@ def showSourceSetSky(sSet, wcs, xy0, frame=0, ctype=afwDisplay.GREEN, symb="+", 
 
 
 def plotWhisker(results, newWcs):
-    """Plot whisker diagram of astromeric offsets between results.matches"""
+    """Plot whisker diagram of astromeric offsets between results.matches.
+    """
     refCoordKey = results.matches[0].first.getTable().getCoordKey()
     inCentroidKey = results.matches[0].second.getTable().getCentroidKey()
     positions = [m.first.get(refCoordKey) for m in results.matches]
@@ -738,11 +752,10 @@ def plotWhisker(results, newWcs):
 
 
 class DipoleTestImage(object):
+    """Utility class for dipole measurement testing.
 
-    """Utility class for dipole measurement testing
-
-    Generate an image with simulated dipoles and noise; store the original "pre-subtraction" images
-    and catalogs as well.
+    Generate an image with simulated dipoles and noise; store the original
+    "pre-subtraction" images and catalogs as well.
     Used to generate test data for DMTN-007 (http://dmtn-007.lsst.io).
     """
 
@@ -764,8 +777,8 @@ class DipoleTestImage(object):
         self._makeDipoleImage()
 
     def _makeDipoleImage(self):
-        """!Generate an exposure and catalog with the given dipole source(s)"""
-
+        """Generate an exposure and catalog with the given dipole source(s).
+        """
         # Must seed the pos/neg images with different values to ensure they get different noise realizations
         posImage, posCatalog = self._makeStarImage(
             xc=self.xcenPos, yc=self.ycenPos, flux=self.flux, randomSeed=111)
@@ -790,10 +803,10 @@ class DipoleTestImage(object):
             = dipole, posImage, posCatalog, negImage, negCatalog
 
     def _makeStarImage(self, xc=[15.3], yc=[18.6], flux=[2500], schema=None, randomSeed=None):
-        """!Generate an exposure and catalog with the given stellar source(s)"""
-
+        """Generate an exposure and catalog with the given stellar source(s).
+        """
         from lsst.meas.base.tests import TestDataset
-        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(self.w-1, self.h-1))
+        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(self.w - 1, self.h - 1))
         dataset = TestDataset(bbox, psfSigma=self.psfSigma, threshold=1.)
 
         for i in range(len(xc)):
@@ -806,9 +819,9 @@ class DipoleTestImage(object):
         if self.gradientParams is not None:
             y, x = np.mgrid[:self.w, :self.h]
             gp = self.gradientParams
-            gradient = gp[0] + gp[1] * x + gp[2] * y
+            gradient = gp[0] + gp[1]*x + gp[2]*y
             if len(self.gradientParams) > 3:  # it includes a set of 2nd-order polynomial params
-                gradient += gp[3] * x*y + gp[4] * x*x + gp[5] * y*y
+                gradient += gp[3]*x*y + gp[4]*x*x + gp[5]*y*y
             imgArr = exposure.getMaskedImage().getArrays()[0]
             imgArr += gradient
 
@@ -829,18 +842,20 @@ class DipoleTestImage(object):
         Parameters
         ----------
         doMerge : `bool`
-           Whether to merge the positive and negagive detections into a single source table
+           Whether to merge the positive and negagive detections into a single
+           source table.
         diffim : `lsst.afw.image.exposure.exposure.ExposureF`
-           Difference image on which to perform detection
+           Difference image on which to perform detection.
         detectSigma : `float`
-           Threshold for object detection
+           Threshold for object detection.
         grow : `int`
-           Number of pixels to grow the footprints before merging
+           Number of pixels to grow the footprints before merging.
         minBinSize : `int`
-           Minimum bin size for the background (re)estimation (only applies if the default leads to
-           min(nBinX, nBinY) < fit order so the default config parameter needs to be decreased, but not
-           to a value smaller than minBinSize, in which case the fitting algorithm will take over and
-           decrease the fit order appropriately.)
+           Minimum bin size for the background (re)estimation (only applies if
+           the default leads to min(nBinX, nBinY) < fit order so the default
+           config parameter needs to be decreased, but not to a value smaller
+           than ``minBinSize``, in which case the fitting algorithm will take
+           over and decrease the fit order appropriately.)
 
         Returns
         -------
@@ -848,7 +863,8 @@ class DipoleTestImage(object):
            If doMerge=True, the merged source catalog is returned OR
         detectTask : `lsst.meas.algorithms.SourceDetectionTask`
         schema : `lsst.afw.table.Schema`
-           If doMerge=False, the source detection task and its schema are returned
+           If doMerge=False, the source detection task and its schema are
+           returned.
         """
         if diffim is None:
             diffim = self.diffim

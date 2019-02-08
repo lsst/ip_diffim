@@ -34,16 +34,17 @@ from lsst.meas.algorithms import SourceDetectionTask, SubtractBackgroundTask
 from lsst.meas.base import SingleFrameMeasurementTask
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigDF, PsfMatchConfigAL
-from . import utils as dituils
+from . import utils as diffimUtils
 from . import diffimLib
 from . import diffimTools
 import lsst.afw.display as afwDisplay
 
-sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
+sigma2fwhm = 2.*np.sqrt(2.*np.log(2.))
 
 
 class ImagePsfMatchConfig(pexConfig.Config):
-    """Configuration for image-to-image Psf matching"""
+    """Configuration for image-to-image Psf matching.
+    """
     kernel = pexConfig.ConfigChoiceField(
         doc="kernel type",
         typemap=dict(
@@ -76,14 +77,14 @@ class ImagePsfMatchConfig(pexConfig.Config):
 
 
 class ImagePsfMatchTask(PsfMatchTask):
-    """Psf-match two MaskedImages or Exposures using the sources in the images
+    """Psf-match two MaskedImages or Exposures using the sources in the images.
 
     Parameters
     ----------
     args :
-        arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
+        Arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
     kwargs :
-        keyword arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
+        Keyword arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
 
     Notes
     -----
@@ -313,8 +314,7 @@ class ImagePsfMatchTask(PsfMatchTask):
     ConfigClass = ImagePsfMatchConfig
 
     def __init__(self, *args, **kwargs):
-        """Create the ImagePsfMatchTask
-
+        """Create the ImagePsfMatchTask.
         """
         PsfMatchTask.__init__(self, *args, **kwargs)
         self.kConfig = self.config.kernel.active
@@ -329,15 +329,16 @@ class ImagePsfMatchTask(PsfMatchTask):
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)
 
     def getFwhmPix(self, psf):
-        """Return the FWHM in pixels of a Psf"""
+        """Return the FWHM in pixels of a Psf.
+        """
         sigPix = psf.computeShape().getDeterminantRadius()
-        return sigPix * sigma2fwhm
+        return sigPix*sigma2fwhm
 
     @pipeBase.timeMethod
     def matchExposures(self, templateExposure, scienceExposure,
                        templateFwhmPix=None, scienceFwhmPix=None,
                        candidateList=None, doWarping=True, convolveTemplate=True):
-        """Warp and PSF-match an exposure to the reference
+        """Warp and PSF-match an exposure to the reference.
 
         Do the following, in order:
 
@@ -359,29 +360,31 @@ class ImagePsfMatchTask(PsfMatchTask):
             FWHM (in pixels) of the Psf in the science image
         candidateList : `list`, optional
             a list of footprints/maskedImages for kernel candidates;
-            if None then source detection is run.
+            if `None` then source detection is run.
 
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
 
         doWarping : `bool`
-            what to do if templateExposure's and scienceExposure's WCSs do not match:
+            what to do if ``templateExposure`` and ``scienceExposure`` WCSs do not match:
 
-            - if True then warp templateExposure to match scienceExposure
-            - if False then raise an Exception
+            - if `True` then warp ``templateExposure`` to match ``scienceExposure``
+            - if `False` then raise an Exception
 
         convolveTemplate : `bool`
-            convolve the template image or the science image:
+            Whether to convolve the template image or the science image:
 
-            - if True, templateExposure is warped if doWarping, templateExposure is convolved
-            - if False, templateExposure is warped if doWarping, scienceExposure is convolved
+            - if `True`, ``templateExposure`` is warped if doWarping,
+              ``templateExposure`` is convolved
+            - if `False`, ``templateExposure`` is warped if doWarping,
+              ``scienceExposure`` is convolved
 
         Returns
         -------
-        results : `Struct`
-            a `lsst.pipe.base.Struct` containing these fields:
+        results : `lsst.pipe.base.Struct`
+            An `lsst.pipe.base.Struct` containing these fields:
 
             - ``matchedImage`` : the PSF-matched exposure =
-                warped templateExposure convolved by psfMatchingKernel. This has:
+                Warped ``templateExposure`` convolved by psfMatchingKernel. This has:
 
                 - the same parent bbox, Wcs and Calib as scienceExposure
                 - the same filter as templateExposure
@@ -394,8 +397,8 @@ class ImagePsfMatchTask(PsfMatchTask):
         Raises
         ------
         RuntimeError
-        if doWarping is False and templateExposure's and scienceExposure's
-        WCSs do not match
+           Raised if doWarping is False and ``templateExposure`` and
+           ``scienceExposure`` WCSs do not match
         """
         if not self._validateWcs(templateExposure, scienceExposure):
             if doWarping:
@@ -445,7 +448,7 @@ class ImagePsfMatchTask(PsfMatchTask):
     @pipeBase.timeMethod
     def matchMaskedImages(self, templateMaskedImage, scienceMaskedImage, candidateList,
                           templateFwhmPix=None, scienceFwhmPix=None):
-        """PSF-match a MaskedImage (templateMaskedImage) to a reference MaskedImage (scienceMaskedImage)
+        """PSF-match a MaskedImage (templateMaskedImage) to a reference MaskedImage (scienceMaskedImage).
 
         Do the following, in order:
 
@@ -465,19 +468,19 @@ class ImagePsfMatchTask(PsfMatchTask):
         scienceFwhmPix : `float`
             FWHM (in pixels) of the Psf in the science image
         candidateList : `list`, optional
-            a list of footprints/maskedImages for kernel candidates;
-            if None then source detection is run.
+            A list of footprints/maskedImages for kernel candidates;
+            if `None` then source detection is run.
 
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
 
         Returns
         -------
         result : `callable`
-        a `lsst.pipe.base.Struct` containing these fields:
+        An `lsst.pipe.base.Struct` containing these fields:
 
         - psfMatchedMaskedImage: the PSF-matched masked image =
-            templateMaskedImage convolved with psfMatchingKernel.
-            This has the same xy0, dimensions and wcs as scienceMaskedImage.
+            ``templateMaskedImage`` convolved with psfMatchingKernel.
+            This has the same xy0, dimensions and wcs as ``scienceMaskedImage``.
         - psfMatchingKernel: the PSF matching kernel
         - backgroundModel: differential background model
         - kernelCellSet: SpatialCellSet used to solve for the PSF matching kernel
@@ -485,9 +488,8 @@ class ImagePsfMatchTask(PsfMatchTask):
         Raises
         ------
         RuntimeError
-            if input images have different dimensions
+            Raised if input images have different dimensions
         """
-
         import lsstDebug
         display = lsstDebug.Info(__name__).display
         displayTemplate = lsstDebug.Info(__name__).displayTemplate
@@ -521,10 +523,10 @@ class ImagePsfMatchTask(PsfMatchTask):
                                            candidateList)
 
         if display and displaySpatialCells:
-            dituils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet,
-                                           symb="o", ctype=afwDisplay.CYAN, ctypeUnused=afwDisplay.YELLOW,
-                                           ctypeBad=afwDisplay.RED, size=4, frame=lsstDebug.frame,
-                                           title="Image to not convolve")
+            diffimUtils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet,
+                                               symb="o", ctype=afwDisplay.CYAN, ctypeUnused=afwDisplay.YELLOW,
+                                               ctypeBad=afwDisplay.RED, size=4, frame=lsstDebug.frame,
+                                               title="Image to not convolve")
             lsstDebug.frame += 1
 
         if templateFwhmPix and scienceFwhmPix:
@@ -559,7 +561,7 @@ class ImagePsfMatchTask(PsfMatchTask):
     def subtractExposures(self, templateExposure, scienceExposure,
                           templateFwhmPix=None, scienceFwhmPix=None,
                           candidateList=None, doWarping=True, convolveTemplate=True):
-        """Register, Psf-match and subtract two Exposures
+        """Register, Psf-match and subtract two Exposures.
 
         Do the following, in order:
 
@@ -572,45 +574,48 @@ class ImagePsfMatchTask(PsfMatchTask):
         Parameters
         ----------
         templateExposure : `lsst.afw.image.Exposure`
-            exposure to PSF-match to scienceExposure
+            Exposure to PSF-match to scienceExposure
         scienceExposure : `lsst.afw.image.Exposure`
-            reference Exposure
+            Reference Exposure
         templateFwhmPix : `float`
             FWHM (in pixels) of the Psf in the template image (image to convolve)
         scienceFwhmPix : `float`
             FWHM (in pixels) of the Psf in the science image
         candidateList : `list`, optional
-            a list of footprints/maskedImages for kernel candidates;
-            if None then source detection is run.
+            A list of footprints/maskedImages for kernel candidates;
+            if `None` then source detection is run.
 
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
 
         doWarping : `bool`
-            what to do if templateExposure's and scienceExposure's WCSs do not match:
+            What to do if ``templateExposure``` and ``scienceExposure`` WCSs do
+            not match:
 
-            - if True then warp templateExposure to match scienceExposure
-            - if False then raise an Exception
+            - if `True` then warp ``templateExposure`` to match ``scienceExposure``
+            - if `False` then raise an Exception
 
         convolveTemplate : `bool`
-            convolve the template image or the science image
+            Convolve the template image or the science image
 
-            - if True, templateExposure is warped if doWarping, templateExposure is convolved
-            - if False, templateExposure is warped if doWarping, scienceExposure is convolved
+            - if `True`, ``templateExposure`` is warped if doWarping,
+              ``templateExposure`` is convolved
+            - if `False`, ``templateExposure`` is warped if doWarping,
+              ``scienceExposure is`` convolved
 
         Returns
         -------
-        result: `Struct`
-            a `lsst.pipe.base.Struct` containing these fields:
+        result : `lsst.pipe.base.Struct`
+            An `lsst.pipe.base.Struct` containing these fields:
 
             - ``subtractedExposure`` : subtracted Exposure
                 scienceExposure - (matchedImage + backgroundModel)
-            - ``matchedImage`` : templateExposure after warping to match templateExposure (if doWarping true),
-                and convolving with psfMatchingKernel
+            - ``matchedImage`` : ``templateExposure`` after warping to match
+                                 ``templateExposure`` (if doWarping true),
+                                 and convolving with psfMatchingKernel
             - ``psfMatchingKernel`` : PSF matching kernel
             - ``backgroundModel`` : differential background model
             - ``kernelCellSet`` : SpatialCellSet used to determine PSF matching kernel
         """
-
         results = self.matchExposures(
             templateExposure=templateExposure,
             scienceExposure=scienceExposure,
@@ -667,7 +672,7 @@ class ImagePsfMatchTask(PsfMatchTask):
     @pipeBase.timeMethod
     def subtractMaskedImages(self, templateMaskedImage, scienceMaskedImage, candidateList,
                              templateFwhmPix=None, scienceFwhmPix=None):
-        """Psf-match and subtract two MaskedImages
+        """Psf-match and subtract two MaskedImages.
 
         Do the following, in order:
 
@@ -679,25 +684,25 @@ class ImagePsfMatchTask(PsfMatchTask):
         Parameters
         ----------
         templateMaskedImage : `lsst.afw.image.MaskedImage`
-            MaskedImage to PSF-match to scienceMaskedImage
+            MaskedImage to PSF-match to ``scienceMaskedImage``
         scienceMaskedImage : `lsst.afw.image.MaskedImage`
-            reference MaskedImage
+            Reference MaskedImage
         templateFwhmPix : `float`
             FWHM (in pixels) of the Psf in the template image (image to convolve)
         scienceFwhmPix : `float`
             FWHM (in pixels) of the Psf in the science image
         candidateList : `list`, optional
-            a list of footprints/maskedImages for kernel candidates;
-            if None then source detection is run.
+            A list of footprints/maskedImages for kernel candidates;
+            if `None` then source detection is run.
 
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
 
         Returns
         -------
-        results : `Struct`
-            a `lsst.pipe.base.Struct` containing these fields:
+        results : `lsst.pipe.base.Struct`
+            An `lsst.pipe.base.Struct` containing these fields:
 
-            - ``subtractedMaskedImage`` : scienceMaskedImage - (matchedImage + backgroundModel)
+            - ``subtractedMaskedImage`` : ``scienceMaskedImage`` - (matchedImage + backgroundModel)
             - ``matchedImage`` : templateMaskedImage convolved with psfMatchingKernel
             - `psfMatchingKernel`` : PSF matching kernel
             - ``backgroundModel`` : differential background model
@@ -736,7 +741,7 @@ class ImagePsfMatchTask(PsfMatchTask):
         return results
 
     def getSelectSources(self, exposure, sigma=None, doSmooth=True, idFactory=None):
-        """Get sources to use for Psf-matching
+        """Get sources to use for Psf-matching.
 
         This method runs detection and measurement on an exposure.
         The returned set of sources will be used as candidates for
@@ -758,7 +763,6 @@ class ImagePsfMatchTask(PsfMatchTask):
         selectSources :
             source catalog containing candidates for the Psf-matching
         """
-
         if idFactory:
             table = afwTable.SourceTable.make(self.selectSchema, idFactory)
         else:
@@ -793,7 +797,7 @@ class ImagePsfMatchTask(PsfMatchTask):
         return selectSources
 
     def makeCandidateList(self, templateExposure, scienceExposure, kernelSize, candidateList=None):
-        """Make a list of acceptable KernelCandidates
+        """Make a list of acceptable KernelCandidates.
 
         Accept or generate a list of candidate sources for
         Psf-matching, and examine the Mask planes in both of the
@@ -815,7 +819,7 @@ class ImagePsfMatchTask(PsfMatchTask):
         Returns
         -------
         candidateList : `list` of `dict`
-            a list of dicts having a "source" and "footprint"
+            A list of dicts having a "source" and "footprint"
             field for the Sources deemed to be appropriate for Psf
             matching
         """
@@ -849,20 +853,21 @@ class ImagePsfMatchTask(PsfMatchTask):
         return candidateList
 
     def _adaptCellSize(self, candidateList):
-        """NOT IMPLEMENTED YET"""
+        """NOT IMPLEMENTED YET.
+        """
         return self.kConfig.sizeCellX, self.kConfig.sizeCellY
 
     def _buildCellSet(self, templateMaskedImage, scienceMaskedImage, candidateList):
-        """Build a SpatialCellSet for use with the solve method
+        """Build a SpatialCellSet for use with the solve method.
 
         Parameters
         ----------
         templateMaskedImage : `lsst.afw.image.MaskedImage`
             MaskedImage to PSF-matched to scienceMaskedImage
         scienceMaskedImage : `lsst.afw.image.MaskedImage`
-            reference MaskedImage
+            Reference MaskedImage
         candidateList : `list`
-            a list of footprints/maskedImages for kernel candidates;
+            A list of footprints/maskedImages for kernel candidates;
 
             - Currently supported: list of Footprints or measAlg.PsfCandidateF
 
@@ -895,12 +900,12 @@ class ImagePsfMatchTask(PsfMatchTask):
         return kernelCellSet
 
     def _validateSize(self, templateMaskedImage, scienceMaskedImage):
-        """Return True if two image-like objects are the same size
+        """Return True if two image-like objects are the same size.
         """
         return templateMaskedImage.getDimensions() == scienceMaskedImage.getDimensions()
 
     def _validateWcs(self, templateExposure, scienceExposure):
-        """Return True if the WCS of the two Exposures have the same origin and extent
+        """Return True if the WCS of the two Exposures have the same origin and extent.
         """
         templateWcs = templateExposure.getWcs()
         scienceWcs = scienceExposure.getWcs()

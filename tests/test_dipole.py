@@ -41,7 +41,7 @@ else:
     import lsst.afw.display as afwDisplay
     afwDisplay.setDefaultMaskTransparency(75)
 
-sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
+sigma2fwhm = 2.*np.sqrt(2.*np.log(2.))
 
 
 def makePluginAndCat(alg, name, control, metadata=False, centroid=None):
@@ -76,22 +76,22 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     # Create Psf for dipole creation and measurement
     psfSize = 17
     psf = measAlg.DoubleGaussianPsf(psfSize, psfSize, 2.0, 3.5, 0.1)
-    psfFwhmPix = sigma2fwhm * psf.computeShape().getDeterminantRadius()
+    psfFwhmPix = sigma2fwhm*psf.computeShape().getDeterminantRadius()
     psfim = psf.computeImage().convertF()
-    psfim *= scaling / psf.computePeak()
+    psfim *= scaling/psf.computePeak()
     psfw, psfh = psfim.getDimensions()
     psfSum = np.sum(psfim.getArray())
 
     # Create the dipole, offset by fracOffset of the Psf FWHM (pixels)
-    offset = fracOffset * psfFwhmPix // 2
+    offset = fracOffset*psfFwhmPix//2
     array = image.getImage().getArray()
     xp = int(xc - psfw//2 + offset)
     yp = int(yc - psfh//2 + offset)
-    array[yp:yp+psfh, xp:xp+psfw] += psfim.getArray()
+    array[yp:yp + psfh, xp:xp + psfw] += psfim.getArray()
 
     xn = int(xc - psfw//2 - offset)
     yn = int(yc - psfh//2 - offset)
-    array[yn:yn+psfh, xn:xn+psfw] -= psfim.getArray()
+    array[yn:yn + psfh, xn:xn + psfw] -= psfim.getArray()
 
     if display:
         afwDisplay.Display(frame=3).mtv(image, title="With dipole")
@@ -142,7 +142,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         for key in ("_pos_x", "_pos_y", "_pos_xErr", "_pos_yErr", "_pos_flag",
                     "_neg_x", "_neg_y", "_neg_xErr", "_neg_yErr", "_neg_flag"):
             try:
-                source.get("test"+key)
+                source.get("test" + key)
             except Exception:
                 self.fail()
 
@@ -159,7 +159,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         for key in ("_pos_instFlux", "_pos_instFluxErr", "_pos_flag", "_npos",
                     "_neg_instFlux", "_neg_instFluxErr", "_neg_flag", "_nneg"):
             try:
-                source.get("test"+key)
+                source.get("test" + key)
             except Exception:
                 self.fail()
 
@@ -177,7 +177,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         for key in ("_pos_instFlux", "_pos_instFluxErr", "_pos_flag",
                     "_neg_instFlux", "_neg_instFluxErr", "_neg_flag"):
             try:
-                source.get("test"+key)
+                source.get("test" + key)
             except Exception:
                 self.fail()
 
@@ -227,7 +227,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
 
         data = afwImage.ImageF(exposure.getMaskedImage().getImage(), fp.getBBox())
         var = afwImage.ImageF(exposure.getMaskedImage().getVariance(), fp.getBBox())
-        matrixNorm = 1. / np.sqrt(np.median(var.getArray()))
+        matrixNorm = 1./np.sqrt(np.median(var.getArray()))
 
         if display:
             afwDisplay.Display(frame=5).mtv(model, title="Unfitted model")
