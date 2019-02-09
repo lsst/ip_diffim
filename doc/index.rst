@@ -9,5 +9,4 @@ ip_diffim documentation preview
 .. toctree::
    :maxdepth: 1
 
-   ip_diffim/index
    lsst.ip.diffim/index
