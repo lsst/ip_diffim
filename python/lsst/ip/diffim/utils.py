@@ -198,7 +198,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
                 resid = resid.getImage()
                 resid /= var
                 bbox = kernel.shrinkBBox(resid.getBBox())
-                resid = resid.Factory(resid, bbox, True)
+                resid = resid.Factory(resid, bbox, deep=True)
             elif kernels:
                 kim = cand.getKernelImage(diffimLib.KernelCandidateF.ORIG).convertF()
                 resid = kim.Factory(kim, True)
@@ -217,7 +217,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
                 resid = sresid.getImage()
                 resid /= var
                 bbox = kernel.shrinkBBox(resid.getBBox())
-                resid = resid.Factory(resid, bbox, True)
+                resid = resid.Factory(resid, bbox, deep=True)
             elif kernels:
                 kim = ski.convertF()
                 resid = kim.Factory(kim, True)
@@ -463,19 +463,24 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
 
             # SdssCentroidAlgorithm.measure requires an exposure of floats
             exp = afwImage.makeExposure(afwImage.makeMaskedImage(im.convertF()))
+
             w, h = im.getWidth(), im.getHeight()
             centerX = im.getX0() + w//2
             centerY = im.getY0() + h//2
             src = table.makeRecord()
-            foot = afwDet.Footprint(exp.getBBox())
+            spans = afwGeom.SpanSet(exp.getBBox())
+            foot = afwDet.Footprint(spans)
             foot.addPeak(centerX, centerY, 1)
             src.setFootprint(foot)
 
-            centroider.measure(src, exp)
-            centers.append((src.getX(), src.getY()))
+            try:  # The centroider requires a psf, so this will fail if none is attached to exp
+                centroider.measure(src, exp)
+                centers.append((src.getX(), src.getY()))
 
-            shaper.measure(src, exp)
-            shapes.append((src.getIxx(), src.getIxy(), src.getIyy()))
+                shaper.measure(src, exp)
+                shapes.append((src.getIxx(), src.getIxy(), src.getIyy()))
+            except Exception:
+                pass
 
     mos.makeMosaic(frame=frame, title=title if title else "Model Kernel", mode=nx)
 
