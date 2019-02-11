@@ -25,6 +25,7 @@ import numpy as np
 
 import lsst.daf.base as dafBase
 import lsst.pex.config as pexConfig
+import lsst.afw.detection as afwDetect
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
@@ -888,11 +889,19 @@ class ImagePsfMatchTask(PsfMatchTask):
         policy = pexConfig.makePolicy(self.kConfig)
         # Place candidates within the spatial grid
         for cand in candidateList:
-            bbox = cand['footprint'].getBBox()
-
+            if isinstance(cand, afwDetect.Footprint):
+                bbox = cand.getBBox()
+            else:
+                bbox = cand['footprint'].getBBox()
             tmi = afwImage.MaskedImageF(templateMaskedImage, bbox)
             smi = afwImage.MaskedImageF(scienceMaskedImage, bbox)
-            cand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
+
+            if not isinstance(cand, afwDetect.Footprint):
+                if 'source' in cand:
+                    cand = cand['source']
+            xPos = cand.getCentroid()[0]
+            yPos = cand.getCentroid()[1]
+            cand = diffimLib.makeKernelCandidate(xPos, yPos, tmi, smi, policy)
 
             self.log.debug("Candidate %d at %f, %f", cand.getId(), cand.getXCenter(), cand.getYCenter())
             kernelCellSet.insertCandidate(cand)
