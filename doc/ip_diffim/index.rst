@@ -10,6 +10,12 @@ ip_diffim
 
 The ``ip_diffim`` package provides algorithms for astronomical image differencing.
 
+
+.. toctree::
+   :maxdepth: 1
+
+   code_notes
+
 Project info
 ============
 
