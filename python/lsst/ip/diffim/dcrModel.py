@@ -299,7 +299,7 @@ class DcrModel:
 
     def buildMatchedTemplate(self, exposure=None, order=3,
                              visitInfo=None, bbox=None, wcs=None, mask=None,
-                             splitSubfilters=False):
+                             splitSubfilters=False, offset=None, removeAverageOffset=False):
         """Create a DCR-matched template image for an exposure.
 
         Parameters
@@ -319,6 +319,8 @@ class DcrModel:
         splitSubfilters : `bool`, optional
             Calculate DCR for two evenly-spaced wavelengths in each subfilter,
             instead of at the midpoint. Default: False
+        offset : `tuple` of two `float`, optional
+            Description
 
         Returns
         -------
@@ -338,11 +340,13 @@ class DcrModel:
             wcs = exposure.getInfo().getWcs()
         elif visitInfo is None or bbox is None or wcs is None:
             raise ValueError("Either exposure or visitInfo, bbox, and wcs must be set.")
-        dcrShift = calculateDcr(visitInfo, wcs, self.filter, len(self), splitSubfilters=splitSubfilters)
+        dcrShift = calculateDcr(visitInfo, wcs, self.filter, len(self), splitSubfilters=splitSubfilters,
+                                removeAverageOffset=removeAverageOffset)
         templateImage = afwImage.ImageF(bbox)
         for subfilter, dcr in enumerate(dcrShift):
             templateImage.array += applyDcr(self[subfilter][bbox].array, dcr,
-                                            splitSubfilters=splitSubfilters, order=order)
+                                            splitSubfilters=splitSubfilters, order=order,
+                                            offset=offset)
         return templateImage
 
     def buildMatchedExposure(self, exposure=None,
@@ -564,7 +568,7 @@ class DcrModel:
             image[lowPixels] = lowThreshold[lowPixels]
 
 
-def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, **kwargs):
+def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, offset=None, **kwargs):
     """Shift an image along the X and Y directions.
 
     Parameters
@@ -583,6 +587,8 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, **kwargs):
     splitSubfilters : `bool`, optional
         Calculate DCR for two evenly-spaced wavelengths in each subfilter,
         instead of at the midpoint. Default: False
+    offset : `tuple` of two `float`, optional
+        Description
     kwargs
         Additional keyword parameters to pass in to
         `scipy.ndimage.interpolation.shift`
@@ -592,26 +598,32 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, **kwargs):
     shiftedImage : `numpy.ndarray`
         A copy of the input image with the specified shift applied.
     """
+    if offset is None:
+        offset = (0., 0.)
     if splitSubfilters:
+        dcrMod = ((dcr[0][0] + offset[0], dcr[0][1] + offset[1]),
+                  (dcr[1][0] + offset[0], dcr[1][1] + offset[1]))
         if useInverse:
-            shift = [-1.*s for s in dcr[0]]
-            shift1 = [-1.*s for s in dcr[1]]
+            shift = [-1.*s for s in dcrMod[0]]
+            shift1 = [-1.*s for s in dcrMod[1]]
         else:
-            shift = dcr[0]
-            shift1 = dcr[1]
+            shift = dcrMod[0]
+            shift1 = dcrMod[1]
         shiftedImage = ndimage.interpolation.shift(image, shift, **kwargs)
         shiftedImage += ndimage.interpolation.shift(image, shift1, **kwargs)
         shiftedImage /= 2.
     else:
+        dcrMod = (dcr[0] + offset[0], dcr[1] + offset[1])
         if useInverse:
-            shift = [-1.*s for s in dcr]
+            shift = [-1.*s for s in dcrMod]
         else:
-            shift = dcr
+            shift = dcrMod
         shiftedImage = ndimage.interpolation.shift(image, shift, **kwargs)
     return shiftedImage
 
 
-def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters, splitSubfilters=False):
+def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters, splitSubfilters=False,
+                 removeAverageOffset=False):
     """Calculate the shift in pixels of an exposure due to DCR.
 
     Parameters
@@ -627,10 +639,12 @@ def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters, splitSubfilters=F
     splitSubfilters : `bool`, optional
         Calculate DCR for two evenly-spaced wavelengths in each subfilter,
         instead of at the midpoint. Default: False
+    removeAverageOffset : bool, optional
+        Description
 
     Returns
     -------
-    dcrShift : `tuple` of two `float`
+    dcrShift : `list` of `tuple` of two `float`
         The 2D shift due to DCR, in pixels.
         Uses numpy axes ordering (Y, X).
     """
@@ -662,6 +676,13 @@ def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters, splitSubfilters=F
             shiftX = diffRefractPix*np.sin(rotation.asRadians())
             shiftY = diffRefractPix*np.cos(rotation.asRadians())
             dcrShift.append((shiftY, shiftX))
+    if removeAverageOffset:
+        if splitSubfilters:
+            offset = np.mean(np.mean(dcrShift, axis=0), axis=0)
+            dcrShift = [tuple([tuple(shift - offset) for shift in split]) for split in dcrShift]
+        else:
+            offset = np.mean(dcrShift, axis=0)
+            dcrShift = [tuple(shift - offset) for shift in dcrShift]
     return dcrShift
 
 
