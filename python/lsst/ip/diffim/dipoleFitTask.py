@@ -792,12 +792,12 @@ class DipoleFitAlgorithm(object):
         fitBackground : `int`, {0, 1, 2}, optional
             How to fit linear background gradient in posImage/negImage
 
-            - 0: do not fit background at all
-            - 1 (default): pre-fit the background using linear least squares and then do not fit it as part
-              of the dipole fitting optimization
-            - 2: pre-fit the background using linear least squares (as in 1), and use the parameter
-              estimates from that fit as starting parameters for an integrated "re-fit" of the background
-              as part of the overall dipole fitting optimization.
+                - 0: do not fit background at all
+                - 1 (default): pre-fit the background using linear least squares and then do not fit it
+                  as part of the dipole fitting optimization
+                - 2: pre-fit the background using linear least squares (as in 1), and use the parameter
+                  estimates from that fit as starting parameters for an integrated "re-fit" of the
+                  background as part of the overall dipole fitting optimization.
         maxSepInSigma : `float`, optional
             Allowed window of centroid parameters relative to peak in input source footprint
         separateNegParams : `bool`, optional
