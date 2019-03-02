@@ -201,7 +201,7 @@ class ImagePsfMatchTask(PsfMatchTask):
 
     This code is imagePsfMatchTask.py in the examples directory, and can be run as e.g.
 
-    ..code-block:: none
+    .. code-block:: none
 
         examples/imagePsfMatchTask.py --debug
         examples/imagePsfMatchTask.py --debug --mode="matchExposures"
@@ -210,7 +210,7 @@ class ImagePsfMatchTask(PsfMatchTask):
 
     Create a subclass of ImagePsfMatchTask that allows us to either match exposures, or subtract exposures:
 
-    ..code-block:: none
+    .. code-block:: none
 
         class MyImagePsfMatchTask(ImagePsfMatchTask):
 
@@ -296,6 +296,7 @@ class ImagePsfMatchTask(PsfMatchTask):
     And finally provide some optional debugging displays:
 
     .. code-block:: py
+
         if args.debug:
         # See if the LSST debug has incremented the frame number; if not start with frame 3
         try:
