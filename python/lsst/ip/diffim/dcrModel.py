@@ -369,13 +369,14 @@ class DcrModel:
         templateExposure : `lsst.afw.image.exposureF`
             The DCR-matched template
         """
-        templateImage = self.buildMatchedTemplate(exposure, visitInfo, bbox, wcs, mask)
+        templateImage = self.buildMatchedTemplate(exposure=exposure, visitInfo=visitInfo,
+                                                  bbox=bbox, wcs=wcs, mask=mask)
         maskedImage = afwImage.MaskedImageF(bbox)
         maskedImage.image = templateImage
         maskedImage.mask = self.mask
         maskedImage.variance = self.variance
         templateExposure = afwImage.ExposureF(bbox, wcs)
-        templateExposure.setMaskedImage(templateImage)
+        templateExposure.setMaskedImage(maskedImage)
         templateExposure.setPsf(self.psf)
         templateExposure.setFilter(self.filter)
         return templateExposure
