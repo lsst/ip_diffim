@@ -1,9 +1,10 @@
+# This file is part of ip_diffim.
 #
-# LSST Data Management System
-# Copyright 2008-2016 LSST Corporation.
-#
-# This product includes software developed by the
-# LSST Project (http://www.lsst.org/).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,10 +16,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the LSST License Statement and
-# the GNU General Public License along with this program.  If not,
-# see <http://www.lsstcorp.org/LegalNotices/>.
-#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 __all__ = ["DetectionConfig", "PsfMatchConfig", "PsfMatchConfigAL", "PsfMatchConfigDF", "PsfMatchTask"]
 
@@ -29,7 +28,7 @@ import numpy as np
 import lsst.afw.image as afwImage
 import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
-import lsst.afw.display.ds9 as ds9
+import lsst.afw.display as afwDisplay
 import lsst.log as log
 import lsst.pipe.base as pipeBase
 from lsst.meas.algorithms import SubtractBackgroundConfig
@@ -599,7 +598,7 @@ class PsfMatchTask(pipeBase.Task):
             if name == "lsst.ip.diffim.psfMatch":
                 # enable debug output
                 di.display = True
-                # ds9 mask transparency
+                # display mask transparency
                 di.maskTransparency = 80
                 # show all the candidates and residuals
                 di.displayCandidates = True
@@ -765,7 +764,7 @@ class PsfMatchTask(pipeBase.Task):
         maskTransparency = lsstDebug.Info(__name__).maskTransparency
         if not maskTransparency:
             maskTransparency = 0
-        ds9.setMaskTransparency(maskTransparency)
+        afwDisplay.setDefaultMaskTransparency(maskTransparency)
 
         if displayCandidates:
             diutils.showKernelCandidates(kernelCellSet, kernel=spatialKernel, background=spatialBackground,

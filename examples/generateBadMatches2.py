@@ -1,11 +1,34 @@
+# This file is part of ip_diffim.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+import numpy as np
+
+import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
-import numpy as num
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
-import lsst.afw.display.ds9 as ds9
+
 verbosity = 4
 logUtils.traceSetAt("ip.diffim", verbosity)
 
@@ -22,7 +45,7 @@ writeFits = False
 
 
 def makeTest1(doAddNoise):
-    gaussian1 = afwMath.GaussianFunction2D(1. * gScale, 1. * gScale, 0.)
+    gaussian1 = afwMath.GaussianFunction2D(1.*gScale, 1.*gScale, 0.)
     kernel1 = afwMath.AnalyticKernel(imSize, imSize, gaussian1)
     image1 = afwImage.ImageD(kernel1.getDimensions())
     kernel1.computeImage(image1, doNorm)
@@ -34,7 +57,7 @@ def makeTest1(doAddNoise):
     if doAddNoise:
         addNoise(mi1)
 
-    gaussian2 = afwMath.GaussianFunction2D(2. * gScale, 1.5 * gScale, 0.5 * num.pi)
+    gaussian2 = afwMath.GaussianFunction2D(2.*gScale, 1.5*gScale, 0.5*np.pi)
     kernel2 = afwMath.AnalyticKernel(imSize, imSize, gaussian2)
     image2 = afwImage.ImageD(kernel2.getDimensions())
     kernel2.computeImage(image2, doNorm)
@@ -48,19 +71,19 @@ def makeTest1(doAddNoise):
     return mi1, mi2
 
 
-def makeTest2(doAddNoise, shiftX=int(2.0 * gScale), shiftY=int(1.0 * gScale)):
-    gaussian1 = afwMath.GaussianFunction2D(1. * gScale, 1. * gScale, 0.)
+def makeTest2(doAddNoise, shiftX=int(2.0*gScale), shiftY=int(1.0*gScale)):
+    gaussian1 = afwMath.GaussianFunction2D(1.*gScale, 1.*gScale, 0.)
     kernel1 = afwMath.AnalyticKernel(imSize, imSize, gaussian1)
     image1 = afwImage.ImageD(kernel1.getDimensions())
     kernel1.computeImage(image1, doNorm)
     image1 = image1.convertF()
     ####
     boxA = afwGeom.Box2I(afwGeom.PointI(0, 0),
-                         afwGeom.ExtentI(imSize-shiftX, imSize - shiftY))
+                         afwGeom.ExtentI(imSize - shiftX, imSize - shiftY))
     boxB = afwGeom.Box2I(afwGeom.PointI(shiftX, shiftY),
-                         afwGeom.ExtentI(imSize-shiftX, imSize - shiftY))
-    subregA = afwImage.ImageF(image1, boxA, afwImage.PARENT)
-    subregB = afwImage.ImageF(image1, boxB, afwImage.PARENT, True)
+                         afwGeom.ExtentI(imSize - shiftX, imSize - shiftY))
+    subregA = afwImage.ImageF(image1, boxA, afwImage.LOCAL)
+    subregB = afwImage.ImageF(image1, boxB, afwImage.LOCAL, True)
     subregA += subregB
     # this messes up the total counts so rescale
     counts = afwMath.makeStatistics(image1, afwMath.SUM).getValue()
@@ -73,7 +96,7 @@ def makeTest2(doAddNoise, shiftX=int(2.0 * gScale), shiftY=int(1.0 * gScale)):
     if doAddNoise:
         addNoise(mi1)
 
-    gaussian2 = afwMath.GaussianFunction2D(2. * gScale, 1.5 * gScale, 0.5 * num.pi)
+    gaussian2 = afwMath.GaussianFunction2D(2.*gScale, 1.5*gScale, 0.5*np.pi)
     kernel2 = afwMath.AnalyticKernel(imSize, imSize, gaussian2)
     image2 = afwImage.ImageD(kernel2.getDimensions())
     kernel2.computeImage(image2, doNorm)
@@ -89,7 +112,7 @@ def makeTest2(doAddNoise, shiftX=int(2.0 * gScale), shiftY=int(1.0 * gScale)):
 
 
 def makeTest3(doAddNoise):
-    gaussian1 = afwMath.GaussianFunction2D(1. * gScale, 1. * gScale, 0.)
+    gaussian1 = afwMath.GaussianFunction2D(1.*gScale, 1.*gScale, 0.)
     kernel1 = afwMath.AnalyticKernel(imSize, imSize, gaussian1)
     image1 = afwImage.ImageD(kernel1.getDimensions())
     kernel1.computeImage(image1, doNorm)
@@ -99,7 +122,7 @@ def makeTest3(doAddNoise):
     var1 = afwImage.ImageF(image1, True)
     mi1 = afwImage.MaskedImageF(image1, mask1, var1)
 
-    gaussian2 = afwMath.GaussianFunction2D(2. * gScale, 1.5 * gScale, 0.5 * num.pi)
+    gaussian2 = afwMath.GaussianFunction2D(2.*gScale, 1.5*gScale, 0.5*np.pi)
     kernel2 = afwMath.AnalyticKernel(imSize, imSize, gaussian2)
     image2 = afwImage.ImageD(kernel2.getDimensions())
     kernel2.computeImage(image2, doNorm)
@@ -133,16 +156,16 @@ def fft(im1, im2, fftSize):
     arr1 = im1.getArray()
     arr2 = im2.getArray()
 
-    fft1 = num.fft.rfft2(arr1)
-    fft2 = num.fft.rfft2(arr2)
-    rat = fft2 / fft1
+    fft1 = np.fft.rfft2(arr1)
+    fft2 = np.fft.rfft2(arr2)
+    rat = fft2/fft1
 
-    kfft = num.fft.irfft2(rat, s=fftSize)
-    kfft = num.fft.fftshift(kfft)
+    kfft = np.fft.irfft2(rat, s=fftSize)
+    kfft = np.fft.fftshift(kfft)
     kim = afwImage.ImageF(fftSize)
     kim.getArray()[:] = kfft
 
-    ds9.mtv(kim, frame=5)
+    afwDisplay.Display(frame=5).mtv(kim, title="fft image")
 
 
 # If we don't add noise, the edges of the Gaussian images go to zero,
@@ -181,7 +204,7 @@ if __name__ == '__main__':
     subconfigDF.kernelSize = kSize
 
     alardSigGauss = subconfigAL.alardSigGauss
-    subconfigAL.alardSigGauss = [x * gScale for x in alardSigGauss]
+    subconfigAL.alardSigGauss = [x*gScale for x in alardSigGauss]
 
     fnum = 1
 
@@ -213,13 +236,13 @@ if __name__ == '__main__':
         kernel.computeImage(kimage, False)
         diffim = kc.getDifferenceImage(ipDiffim.KernelCandidateF.ORIG)
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi, title="Template image")
         fnum += 1
-        ds9.mtv(smi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi, title="Science image")
         fnum += 1
-        ds9.mtv(kimage, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage, title="Kernal image")
         fnum += 1
-        ds9.mtv(diffim, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim, title="Difference image")
         fnum += 1
 
         if writeFits:
@@ -238,13 +261,13 @@ if __name__ == '__main__':
         kernel.computeImage(kimage, False)
         diffim = kc.getDifferenceImage(ipDiffim.KernelCandidateF.ORIG)
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi, title="Template image")
         fnum += 1
-        ds9.mtv(smi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi, title="Science image")
         fnum += 1
-        ds9.mtv(kimage, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage, title="Kernal image")
         fnum += 1
-        ds9.mtv(diffim, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim, title="Difference image")
         fnum += 1
 
         if writeFits:
@@ -270,22 +293,22 @@ if __name__ == '__main__':
         kernel2.computeImage(kimage2, False)
         diffim2 = kc2.getDifferenceImage(ipDiffim.KernelCandidateF.ORIG)
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi, title="Template image")
         fnum += 1
-        ds9.mtv(smi1, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi1, title="Science image: 1")
         fnum += 1
-        ds9.mtv(kimage1, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage1, title="Kernal image: 1")
         fnum += 1
-        ds9.mtv(diffim1, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim1, title="Difference image: 1")
         fnum += 1
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi, title="Template image")
         fnum += 1
-        ds9.mtv(smi2, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi2, title="Science image: 2")
         fnum += 1
-        ds9.mtv(kimage2, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage2, title="Kernal image: 2")
         fnum += 1
-        ds9.mtv(diffim2, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim2, title="Difference image: 2")
         fnum += 1
 
         if writeFits:

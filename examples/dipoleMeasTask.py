@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
+# This file is part of ip_diffim.
 #
-# LSST Data Management System
-# Copyright 2008, 2009, 2010, 2014 LSST Corporation.
-#
-# This product includes software developed by the
-# LSST Project (http://www.lsst.org/).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,10 +18,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the LSST License Statement and
-# the GNU General Public License along with this program.  If not,
-# see <http://www.lsstcorp.org/LegalNotices/>.
-#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
 import sys
@@ -28,9 +27,9 @@ import numpy as np
 
 import lsst.utils
 import lsst.daf.base as dafBase
+import lsst.afw.display as afwDisplay
 import lsst.afw.table as afwTable
 import lsst.afw.image as afwImage
-import lsst.afw.display.ds9 as ds9
 import lsst.meas.algorithms as measAlg
 from lsst.meas.algorithms.detection import SourceDetectionTask
 from lsst.ip.diffim import DipoleMeasurementTask, DipoleAnalysis
@@ -66,7 +65,7 @@ def loadData(imFile=None):
 def run(args):
     exposure = loadData(args.image)
     if args.debug:
-        ds9.mtv(exposure, frame=1)
+        afwDisplay.Display(frame=1).mtv(exposure)
 
     schema = afwTable.SourceTable.makeMinimalSchema()
 

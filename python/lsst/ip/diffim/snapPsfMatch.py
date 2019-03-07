@@ -1,9 +1,10 @@
+# This file is part of ip_diffim.
 #
-# LSST Data Management System
-# Copyright 2008-2016 LSST Corporation.
-#
-# This product includes software developed by the
-# LSST Project (http://www.lsst.org/).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,10 +16,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the LSST License Statement and
-# the GNU General Public License along with this program.  If not,
-# see <http://www.lsstcorp.org/LegalNotices/>.
-#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 __all__ = ["SnapPsfMatchConfigDF", "SnapPsfMatchConfigAL", "SnapPsfMatchConfig", "SnapPsfMatchTask"]
 
@@ -140,7 +139,7 @@ class SnapPsfMatchTask(ImagePsfMatchTask):
             di = lsstDebug.getInfo(name)
             if name == "lsst.ip.diffim.psfMatch":
                 di.display = True                 # enable debug output
-                di.maskTransparency = 80          # ds9 mask transparency
+                di.maskTransparency = 80          # display mask transparency
                 di.displayCandidates = True       # show all the candidates and residuals
                 di.displayKernelBasis = False     # show kernel basis functions
                 di.displayKernelMosaic = True     # show kernel realized across the image
@@ -148,7 +147,7 @@ class SnapPsfMatchTask(ImagePsfMatchTask):
                 di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
             elif name == "lsst.ip.diffim.imagePsfMatch":
                 di.display = True                 # enable debug output
-                di.maskTransparency = 30          # ds9 mask transparency
+                di.maskTransparency = 30          # display mask transparency
                 di.displayTemplate = True         # show full (remapped) template
                 di.displaySciIm = True            # show science image to match to
                 di.displaySpatialCells = True     # show spatial cells
@@ -156,7 +155,7 @@ class SnapPsfMatchTask(ImagePsfMatchTask):
                 di.showBadCandidates = True       # show the bad candidates (red) along with good (green)
             elif name == "lsst.ip.diffim.diaCatalogSourceSelector":
                 di.display = False                # enable debug output
-                di.maskTransparency = 30          # ds9 mask transparency
+                di.maskTransparency = 30          # display mask transparency
                 di.displayExposure = True         # show exposure with candidates indicated
                 di.pauseAtEnd = False             # pause when done
             return di
@@ -267,8 +266,8 @@ class SnapPsfMatchTask(ImagePsfMatchTask):
     .. code-block:: py
 
         if args.debug:
-            ds9.mtv(templateExp, frame=1, title="Example script: Input Template")
-            ds9.mtv(scienceExp, frame=2, title="Example script: Input Science Image")
+            afwDisplay.Display(frame=1).mtv(templateExp, title="Example script: Input Template")
+            afwDisplay.Display(frame=2).mtv(scienceExp, title="Example script: Input Science Image")
 
     Create and run the Task
 
@@ -289,9 +288,11 @@ class SnapPsfMatchTask(ImagePsfMatchTask):
                 frame = debug.lsstDebug.frame + 1
             except Exception:
                 frame = 3
-            ds9.mtv(result.matchedExposure, frame=frame, title="Example script: Matched Template Image")
+            afwDisplay.Display(frame=frame).mtv(result.matchedExposure,
+                                            title="Example script: Matched Template Image")
             if "subtractedExposure" in result.getDict():
-                ds9.mtv(result.subtractedExposure, frame=frame+1, title="Example script: Subtracted Image")
+                afwDisplay.Display(frame=frame + 1).mtv(result.subtractedExposure,
+                                                        title="Example script: Subtracted Image")
 
     """
 

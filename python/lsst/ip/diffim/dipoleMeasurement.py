@@ -1,9 +1,10 @@
+# This file is part of ip_diffim.
 #
-# LSST Data Management System
-# Copyright 2008-2016 AURA/LSST.
-#
-# This product includes software developed by the
-# LSST Project (http://www.lsst.org/).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,11 +16,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the LSST License Statement and
-# the GNU General Public License along with this program.  If not,
-# see <https://www.lsstcorp.org/LegalNotices/>.
-#
-
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
 
@@ -31,7 +29,7 @@ import lsst.meas.deblender.baseline as deblendBaseline
 from lsst.meas.base.pluginRegistry import register
 from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig, \
     SingleFramePluginConfig, SingleFramePlugin
-import lsst.afw.display.ds9 as ds9
+import lsst.afw.display as afwDisplay
 
 __all__ = ("DipoleMeasurementConfig", "DipoleMeasurementTask", "DipoleAnalysis", "DipoleDeblender",
            "SourceFlagChecker", "ClassificationDipoleConfig", "ClassificationDipolePlugin")
@@ -221,7 +219,7 @@ class DipoleMeasurementTask(SingleFrameMeasurementTask):
             di = lsstDebug.getInfo(name)
             if name == "lsst.ip.diffim.dipoleMeasurement":
                 di.display = True                 # enable debug output
-                di.maskTransparency = 90          # ds9 mask transparency
+                di.maskTransparency = 90          # display mask transparency
                 di.displayDiaSources = True       # show exposure with dipole results
             return di
         lsstDebug.Info = DebugInfo
@@ -273,7 +271,7 @@ class DipoleMeasurementTask(SingleFrameMeasurementTask):
         def run(args):
             exposure = loadData(args.image)
             if args.debug:
-                ds9.mtv(exposure, frame=1)
+                afwDisplay.Display(frame=1).mtv(exposure)
 
     Create a default source schema that we will append fields to as we add more algorithms:
 
@@ -464,25 +462,26 @@ class DipoleAnalysis(object):
         maskTransparency = lsstDebug.Info(__name__).maskTransparency
         if not maskTransparency:
             maskTransparency = 90
-        ds9.setMaskTransparency(maskTransparency)
-        ds9.mtv(exposure, frame=lsstDebug.frame)
+        disp = afwDisplay.Display(frame=lsstDebug.frame)
+        disp.setMaskTransparency(maskTransparency)
+        disp.mtv(exposure)
 
         if display and displayDiaSources:
-            with ds9.Buffering():
+            with disp.Buffering():
                 for source in sources:
                     cenX, cenY = source.get("ipdiffim_DipolePsfFlux_centroid")
                     if np.isinf(cenX) or np.isinf(cenY):
                         cenX, cenY = source.getCentroid()
 
-                    isdipole = source.get("classification.dipole")
+                    isdipole = source.get("ip_diffim_ClassificationDipole_value")
                     if isdipole and np.isfinite(isdipole):
                         # Dipole
-                        ctype = "green"
+                        ctype = afwDisplay.GREEN
                     else:
                         # Not dipole
-                        ctype = "red"
+                        ctype = afwDisplay.RED
 
-                    ds9.dot("o", cenX, cenY, size=2, ctype=ctype, frame=lsstDebug.frame)
+                    disp.dot("o", cenX, cenY, size=2, ctype=ctype)
 
                     negCenX = source.get("ip_diffim_PsfDipoleFlux_neg_centroid_x")
                     negCenY = source.get("ip_diffim_PsfDipoleFlux_neg_centroid_y")
@@ -491,7 +490,7 @@ class DipoleAnalysis(object):
                     if (np.isinf(negCenX) or np.isinf(negCenY) or np.isinf(posCenX) or np.isinf(posCenY)):
                         continue
 
-                    ds9.line([(negCenX, negCenY), (posCenX, posCenY)], ctype="yellow", frame=lsstDebug.frame)
+                    disp.line([(negCenX, negCenY), (posCenX, posCenY)], ctype=afwDisplay.YELLOW)
 
             lsstDebug.frame += 1
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
+# This file is part of ip_diffim.
 #
-# LSST Data Management System
-# Copyright 2008, 2009, 2010, 2014 LSST Corporation.
-#
-# This product includes software developed by the
-# LSST Project (http://www.lsst.org/).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,22 +18,22 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the LSST License Statement and
-# the GNU General Public License along with this program.  If not,
-# see <http://www.lsstcorp.org/LegalNotices/>.
-#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import os
 import sys
 
 from lsst.afw.geom import makeSkyWcs
+import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
-import lsst.afw.display.ds9 as ds9
 import lsst.daf.base as dafBase
 import lsst.meas.algorithms as measAlg
 from lsst.ip.diffim import SnapPsfMatchTask, diffimTools
-
 import lsst.log.utils as logUtils
 logUtils.traceSetAt("ip.diffim", 4)
+
+afwDisplay.setDefaultMaskTransparency(75)
 
 
 class MySnapPsfMatchTask(SnapPsfMatchTask):
@@ -113,8 +114,8 @@ def run(args):
         config.kernel.active.sizeCellY = 128
 
     if args.debug:
-        ds9.mtv(templateExp, frame=1, title="Example script: Input Template")
-        ds9.mtv(scienceExp, frame=2, title="Example script: Input Science Image")
+        afwDisplay.Display(frame=1).mtv(templateExp, title="Example script: Input Template")
+        afwDisplay.Display(frame=2).mtv(scienceExp, title="Example script: Input Science Image")
 
     # Create the Task
     psfMatchTask = MySnapPsfMatchTask(config=config)
@@ -128,9 +129,11 @@ def run(args):
             frame = debug.lsstDebug.frame + 1
         except Exception:
             frame = 3
-        ds9.mtv(result.matchedExposure, frame=frame, title="Example script: Matched Template Image")
+        afwDisplay.Display(frame=frame).mtv(result.matchedExposure,
+                                            title="Example script: Matched Template Image")
         if "subtractedExposure" in result.getDict():
-            ds9.mtv(result.subtractedExposure, frame=frame+1, title="Example script: Subtracted Image")
+            disp = afwDisplay.Display(frame=frame + 1)
+            disp.mtv(result.subtractedExposure, title="Example script: Subtracted Image")
 
 
 if __name__ == "__main__":

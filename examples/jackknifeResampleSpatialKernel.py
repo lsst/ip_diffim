@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
+# This file is part of ip_diffim.
 #
-# LSST Data Management System
-# Copyright 2008, 2009, 2010 LSST Corporation.
-#
-# This product includes software developed by the
-# LSST Project (http://www.lsst.org/).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,10 +18,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the LSST License Statement and
-# the GNU General Public License along with this program.  If not,
-# see <http://www.lsstcorp.org/LegalNotices/>.
-#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
 import sys
@@ -28,6 +27,7 @@ import unittest
 import lsst.utils.tests as tests
 
 import lsst.utils
+import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -36,7 +36,7 @@ from lsst.log import Log
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
-import lsst.afw.display.ds9 as ds9
+afwDisplay.setDefaultMaskTransparency(75)
 
 verbosity = 2
 logUtils.traceSetAt("ip.diffim", verbosity)
@@ -53,9 +53,9 @@ except Exception:
 
 if defDataDir:
     defTemplatePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v5-e0",
-                                   "v5-e0-c011-a00.sci")
+                                   "v5-e0-c011-a00.sci.fits")
     defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
-                                  "v26-e0-c011-a00.sci")
+                                  "v26-e0-c011-a00.sci.fits")
 
 # THIS IS "LEAVE-ONE-OUT" CROSS VALIDATION OF THE SPATIAL KERNEL
 
@@ -90,20 +90,21 @@ class DiffimTestCases(unittest.TestCase):
 
         self.scienceMaskedImage = self.scienceExposure.getMaskedImage()
         self.templateMaskedImage = self.templateExposure.getMaskedImage()
-        self.dStats = ipDiffim.ImageStatisticsF()
 
         bgConfig = self.subconfigAL.afwBackgroundConfig
         diffimTools.backgroundSubtract(bgConfig, [self.templateMaskedImage,
                                                   self.scienceMaskedImage])
 
     def stats(self, cid, diffim, core=5):
-        self.dStats.apply(diffim)
+        policy = pexConfig.makePolicy(self.config)
+        dStats = ipDiffim.ImageStatisticsF(policy)
+        dStats.apply(diffim)
         logger.debug("Candidate %d : Residuals all (%d px): %.3f +/- %.3f",
-                     cid, self.dStats.getNpix(), self.dStats.getMean(), self.dStats.getRms())
+                     cid, dStats.getNpix(), dStats.getMean(), dStats.getRms())
 
-        self.dStats.apply(diffim, core)
+        dStats.apply(diffim, core)
         logger.debug("Candidate %d : Residuals core (%d px): %.3f +/- %.3f",
-                     cid, self.dStats.getNpix(), self.dStats.getMean(), self.dStats.getRms())
+                     cid, dStats.getNpix(), dStats.getMean(), dStats.getRms())
 
     def assess(self, cand, kFn1, bgFn1, kFn2, bgFn2, frame0):
         tmi = cand.getTemplateMaskedImage()
@@ -130,14 +131,15 @@ class DiffimTestCases(unittest.TestCase):
         d2 = ipDiffim.convolveAndSubtract(tmi, smi, fk2, bg2)
 
         if display:
-            ds9.mtv(tmi, frame=frame0+0)
-            ds9.dot("Cand %d" % (cand.getId()), 0, 0, frame=frame0+0)
+            disp = afwDisplay.Display(frame=frame0)
+            disp.mtv(tmi, title="Template Masked Image")
+            disp.dot("Cand %d" % (cand.getId()), 0, 0)
 
-            ds9.mtv(smi, frame=frame0+1)
-            ds9.mtv(im1, frame=frame0+2)
-            ds9.mtv(d1, frame=frame0+3)
-            ds9.mtv(im2, frame=frame0+4)
-            ds9.mtv(d2, frame=frame0+5)
+            afwDisplay.Display(frame=frame0 + 1).mtv(smi, title="Science Masked Image")
+            afwDisplay.Display(frame=frame0 + 2).mtv(im1, title="Masked Image: 1")
+            afwDisplay.Display(frame=frame0 + 3).mtv(d1, title="Difference Image: 1")
+            afwDisplay.Display(frame=frame0 + 4).mtv(im2, title="Masked Image: 2")
+            afwDisplay.Display(frame=frame0 + 5).mtv(d2, title="Difference Image: 2")
 
         logger.debug("Full Spatial Model")
         self.stats(cand.getId(), d1)
@@ -202,19 +204,22 @@ class DiffimTestCases(unittest.TestCase):
     def runTest(self, mode):
         logger.debug("Mode %s", mode)
         if mode == "DF":
-            self.config = self.subconfigDF
+            self.config = self.configDF
         elif mode == "DFr":
-            self.config = self.subconfigDFr
+            self.config = self.configDFr
         elif mode == "AL":
-            self.config = self.subconfigAL
+            self.config = self.configAL
         else:
             raise
-
+        subconfig = self.config.kernel.active
         psfmatch = ipDiffim.ImagePsfMatchTask(self.config)
-        results = psfmatch.run(self.templateMaskedImage,
-                               self.scienceMaskedImage,
-                               "subtractMaskedImages")
-        self.jackknifeResample(psfmatch, results)
+        candidateList = []
+        if self.scienceExposure.getPsf():
+            candidateList = psfmatch.makeCandidateList(self.templateExposure, self.scienceExposure,
+                                                       subconfig.kernelSize)
+            results = psfmatch.subtractMaskedImages(self.templateMaskedImage, self.scienceMaskedImage,
+                                                    candidateList)
+            self.jackknifeResample(psfmatch, results)
 
     def test(self):
         if not defDataDir:
@@ -232,7 +237,6 @@ class DiffimTestCases(unittest.TestCase):
         del self.templateExposure
         del self.scienceMaskedImage
         del self.templateMaskedImage
-        del self.dStats
 #####
 
 

@@ -1,9 +1,10 @@
+# This file is part of ip_diffim.
 #
-# LSST Data Management System
-# Copyright 2008-2016 LSST Corporation.
-#
-# This product includes software developed by the
-# LSST Project (http://www.lsst.org/).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,16 +16,14 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the LSST License Statement and
-# the GNU General Public License along with this program.  If not,
-# see <http://www.lsstcorp.org/LegalNotices/>.
-#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
 
 from lsst.pipe.base import Struct
 import lsst.pex.config as pexConfig
-import lsst.afw.display.ds9 as ds9
+import lsst.afw.display as afwDisplay
 import lsst.meas.algorithms as measAlg
 
 __all__ = ["DiaCatalogSourceSelectorConfig", "DiaCatalogSourceSelectorTask"]
@@ -172,9 +171,9 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseSourceSelectorTask):
 
         mi = exposure.getMaskedImage()
 
-        if display:
-            if displayExposure:
-                ds9.mtv(mi, title="Kernel candidates", frame=lsstDebug.frame)
+        if display and displayExposure:
+            disp = afwDisplay.Display(frame=lsstDebug.frame)
+            disp.mtv(mi, title="Kernel candidates")
         #
         # Look for flags in each Source
         #
@@ -196,7 +195,7 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseSourceSelectorTask):
             if not isGoodSource(source):
                 if display and displayExposure:
                     symbs.append("+")
-                    ctypes.append(ds9.RED)
+                    ctypes.append(afwDisplay.RED)
             else:
                 isStar = not ref.get("resolved")
                 isVar = not ref.get("photometric")
@@ -219,17 +218,17 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseSourceSelectorTask):
                     selected[i] = True
                     if display and displayExposure:
                         symbs.append("+")
-                        ctypes.append(ds9.GREEN)
+                        ctypes.append(afwDisplay.GREEN)
                 elif display and displayExposure:
                     symbs.append("o")
-                    ctypes.append(ds9.BLUE)
+                    ctypes.append(afwDisplay.BLUE)
 
         if display and displayExposure:
-            with ds9.Buffering():
+            disp = afwDisplay.Display(frame=lsstDebug.frame)
+            with disp.Buffering():
                 for (ref, source, d), symb, ctype in zip(matches, symbs, ctypes):
-                    if display and displayExposure:
-                        ds9.dot(symb, source.getX() - mi.getX0(), source.getY() - mi.getY0(),
-                                size=4, ctype=ctype, frame=lsstDebug.frame)
+                    disp.dot(symb, source.getX() - mi.getX0(), source.getY() - mi.getY0(),
+                             size=4, ctype=ctype)
 
         if display:
             lsstDebug.frame += 1

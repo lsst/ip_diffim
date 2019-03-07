@@ -1,9 +1,10 @@
+# This file is part of ip_diffim.
 #
-# LSST Data Management System
-# Copyright 2008-2016 AURA/LSST
-#
-# This product includes software developed by the
-# LSST Project (http://www.lsst.org/).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,17 +16,15 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the LSST License Statement and
-# the GNU General Public License along with this program.  If not,
-# see <http://www.lsstcorp.org/LegalNotices/>.
-#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import unittest
 
 import numpy as np
 
 import lsst.utils.tests
 import lsst.daf.base as dafBase
-import lsst.afw.display.ds9 as ds9
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
@@ -34,7 +33,15 @@ import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
 
 display = False
-sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
+try:
+    display
+except NameError:
+    display = False
+else:
+    import lsst.afw.display as afwDisplay
+    afwDisplay.setDefaultMaskTransparency(75)
+
+sigma2fwhm = 2.*np.sqrt(2.*np.log(2.))
 
 
 def makePluginAndCat(alg, name, control, metadata=False, centroid=None):
@@ -63,31 +70,31 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     var.set(1.0)
 
     if display:
-        ds9.mtv(image, frame=1, title="Original image")
-        ds9.mtv(image.getVariance(), frame=2, title="Original variance")
+        afwDisplay.Display(frame=1).mtv(image, title="Original image")
+        afwDisplay.Display(frame=2).mtv(image.getVariance(), title="Original variance")
 
     # Create Psf for dipole creation and measurement
     psfSize = 17
     psf = measAlg.DoubleGaussianPsf(psfSize, psfSize, 2.0, 3.5, 0.1)
-    psfFwhmPix = sigma2fwhm * psf.computeShape().getDeterminantRadius()
+    psfFwhmPix = sigma2fwhm*psf.computeShape().getDeterminantRadius()
     psfim = psf.computeImage().convertF()
-    psfim *= scaling / psf.computePeak()
+    psfim *= scaling/psf.computePeak()
     psfw, psfh = psfim.getDimensions()
     psfSum = np.sum(psfim.getArray())
 
     # Create the dipole, offset by fracOffset of the Psf FWHM (pixels)
-    offset = fracOffset * psfFwhmPix // 2
+    offset = fracOffset*psfFwhmPix//2
     array = image.getImage().getArray()
     xp = int(xc - psfw//2 + offset)
     yp = int(yc - psfh//2 + offset)
-    array[yp:yp+psfh, xp:xp+psfw] += psfim.getArray()
+    array[yp:yp + psfh, xp:xp + psfw] += psfim.getArray()
 
     xn = int(xc - psfw//2 - offset)
     yn = int(yc - psfh//2 - offset)
-    array[yn:yn+psfh, xn:xn+psfw] -= psfim.getArray()
+    array[yn:yn + psfh, xn:xn + psfw] -= psfim.getArray()
 
     if display:
-        ds9.mtv(image, frame=3, title="With dipole")
+        afwDisplay.Display(frame=3).mtv(image, title="With dipole")
 
     # Create an exposure, detect positive and negative peaks separately
     exp = afwImage.makeExposure(image)
@@ -100,7 +107,7 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     table = afwTable.SourceTable.make(schema)
     results = task.makeSourceCatalog(table, exp)
     if display:
-        ds9.mtv(image, frame=4, title="Detection plane")
+        afwDisplay.Display(frame=4).mtv(image, title="Detection plane")
 
     # Merge them together
     assert(len(results.sources) == 2)
@@ -135,7 +142,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         for key in ("_pos_x", "_pos_y", "_pos_xErr", "_pos_yErr", "_pos_flag",
                     "_neg_x", "_neg_y", "_neg_xErr", "_neg_yErr", "_neg_flag"):
             try:
-                source.get("test"+key)
+                source.get("test" + key)
             except Exception:
                 self.fail()
 
@@ -152,7 +159,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         for key in ("_pos_instFlux", "_pos_instFluxErr", "_pos_flag", "_npos",
                     "_neg_instFlux", "_neg_instFluxErr", "_neg_flag", "_nneg"):
             try:
-                source.get("test"+key)
+                source.get("test" + key)
             except Exception:
                 self.fail()
 
@@ -170,7 +177,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         for key in ("_pos_instFlux", "_pos_instFluxErr", "_pos_flag",
                     "_neg_instFlux", "_neg_instFluxErr", "_neg_flag"):
             try:
-                source.get("test"+key)
+                source.get("test" + key)
             except Exception:
                 self.fail()
 
@@ -220,11 +227,11 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
 
         data = afwImage.ImageF(exposure.getMaskedImage().getImage(), fp.getBBox())
         var = afwImage.ImageF(exposure.getMaskedImage().getVariance(), fp.getBBox())
-        matrixNorm = 1. / np.sqrt(np.median(var.getArray()))
+        matrixNorm = 1./np.sqrt(np.median(var.getArray()))
 
         if display:
-            ds9.mtv(model, frame=5, title="Unfitted model")
-            ds9.mtv(data, frame=6, title="Data")
+            afwDisplay.Display(frame=5).mtv(model, title="Unfitted model")
+            afwDisplay.Display(frame=6).mtv(data, title="Data")
 
         posPsfSum = np.sum(posPsf.getArray())
         negPsfSum = np.sum(negPsf.getArray())
@@ -257,18 +264,18 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         fitSubim = type(fitted)(fitted, posOverlapBBox)
         fitSubim += posFit
         if display:
-            ds9.mtv(fitted, frame=7, title="Fitted model")
+            afwDisplay.Display(frame=7).mtv(fitted, title="Fitted model")
 
         fitted -= data
 
         if display:
-            ds9.mtv(fitted, frame=8, title="Residuals")
+            afwDisplay.Display(frame=8).mtv(fitted, title="Residuals")
 
         fitted *= fitted
         fitted /= var
 
         if display:
-            ds9.mtv(fitted, frame=9, title="Chi2")
+            afwDisplay.Display(frame=9).mtv(fitted, title="Chi2")
 
         return fneg, negPsfSum, fpos, posPsfSum, fitted
 

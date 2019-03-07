@@ -1,8 +1,29 @@
+# This file is part of ip_diffim.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import lsst.ip.diffim as ipDiffim
+import lsst.afw.display as afwDisplay
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.afw.display.ds9 as ds9
 import lsst.log.utils as logUtils
 import numpy as num
 
@@ -176,15 +197,15 @@ def testAutoCorrelation(orderMake, orderFit, inMi=None, display=False):
             j = int(j)
             for i in num.arange(stride//2, width, stride):
                 i = int(i)
-                inMi.set(i-1, j-1, (100., 0x0, 1.))
-                inMi.set(i-1, j+0, (100., 0x0, 1.))
-                inMi.set(i-1, j+1, (100., 0x0, 1.))
-                inMi.set(i+0, j-1, (100., 0x0, 1.))
-                inMi.set(i+0, j+0, (100., 0x0, 1.))
-                inMi.set(i+0, j+1, (100., 0x0, 1.))
-                inMi.set(i+1, j-1, (100., 0x0, 1.))
-                inMi.set(i+1, j+0, (100., 0x0, 1.))
-                inMi.set(i+1, j+1, (100., 0x0, 1.))
+                inMi._set((i-1, j-1), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i-1, j+0), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i-1, j+1), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+0, j-1), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+0, j+0), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+0, j+1), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+1, j-1), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+1, j+0), (100., 0x0, 1.), afwImage.LOCAL)
+                inMi._set((i+1, j+1), (100., 0x0, 1.), afwImage.LOCAL)
 
     addNoise(inMi)
 
@@ -210,17 +231,18 @@ def testAutoCorrelation(orderMake, orderFit, inMi=None, display=False):
     afwMath.convolve(cMi, inMi, spatialKernel, True)
 
     if display:
-        ds9.mtv(inMi.getImage(), frame=1)
-        ds9.mtv(inMi.getVariance(), frame=2)
+        afwDisplay.Display(frame=1).mtv(inMi.getImage())
+        afwDisplay.Display(frame=2).mtv(inMi.getVariance())
 
-        ds9.mtv(cMi.getImage(), frame=3)
-        ds9.mtv(cMi.getVariance(), frame=4)
+        afwDisplay.Display(frame=3).mtv(cMi.getImage())
+        afwDisplay.Display(frame=4).mtv(cMi.getVariance())
 
     subconfig.spatialKernelOrder = orderFit
     subconfig.sizeCellX = stride
     subconfig.sizeCellY = stride
     psfmatch = ipDiffim.ImagePsfMatchTask(config=config)
-    result = psfmatch.run(inMi, cMi, "subtractMaskedImages")
+    candList = psfmatch.makeCandidateList(afwImage.ExposureF(inMi), afwImage.ExposureF(cMi), kSize)
+    result = psfmatch.subtractMaskedImages(inMi, cMi, candList)
 
     spatialKernel = result.psfMatchingKernel
     kernelCellSet = result.kernelCellSet

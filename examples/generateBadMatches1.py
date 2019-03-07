@@ -1,3 +1,24 @@
+# This file is part of ip_diffim.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
@@ -5,7 +26,7 @@ import lsst.ip.diffim as ipDiffim
 import numpy as num
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
-import lsst.afw.display.ds9 as ds9
+import lsst.afw.display as afwDisplay
 verbosity = 4
 logUtils.traceSetAt("ip.diffim", verbosity)
 
@@ -90,7 +111,7 @@ def fft(im1, im2, fftSize):
     kim = afwImage.ImageF(fftSize)
     kim.getArray()[:] = kfft
 
-    ds9.mtv(kim, frame=5)
+    afwDisplay.Display(frame=5).mtv(kim)
 
 
 # If we don't add noise, the edges of the Gaussian images go to zero,
@@ -155,13 +176,13 @@ if __name__ == '__main__':
         kernel.computeImage(kimage, False)
         diffim = kc.getDifferenceImage(ipDiffim.KernelCandidateF.ORIG)
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi)
         fnum += 1
-        ds9.mtv(smi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi)
         fnum += 1
-        ds9.mtv(kimage, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage)
         fnum += 1
-        ds9.mtv(diffim, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim)
         fnum += 1
 
         if writeFits:
@@ -180,13 +201,13 @@ if __name__ == '__main__':
         kernel.computeImage(kimage, False)
         diffim = kc.getDifferenceImage(ipDiffim.KernelCandidateF.ORIG)
 
-        ds9.mtv(tmi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(tmi)
         fnum += 1
-        ds9.mtv(smi, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(smi)
         fnum += 1
-        ds9.mtv(kimage, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(kimage)
         fnum += 1
-        ds9.mtv(diffim, frame=fnum)
+        afwDisplay.Display(frame=fnum).mtv(diffim)
         fnum += 1
 
         if writeFits:

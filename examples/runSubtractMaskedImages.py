@@ -1,13 +1,33 @@
+# This file is part of ip_diffim.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import sys
 import optparse
 
-import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
-import lsst.afw.display.ds9 as ds9
 import lsst.log.utils as logUtils
 
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
+import lsst.afw.display as afwDisplay
 
 
 def main():
@@ -40,6 +60,8 @@ Notes:
                       help='Science Image Psf Fwhm (pixel)')
     parser.add_option('--fwhmT', type=float,
                       help='Template Image Psf Fwhm (pixel)')
+    parser.add_option('-w', '--writeOutput', action='store_true', default=False,
+                      help='Write out the subtracted image?')
 
     (options, args) = parser.parse_args()
 
@@ -84,10 +106,17 @@ Notes:
         print('Verbosity =', options.verbosity)
         logUtils.traceSetAt("ip.diffim", options.verbosity)
 
+    writeOutput = False
+    if options.writeOutput:
+        print('writeOutput =', options.writeOutput)
+        writeOutput = True
+
     ####
 
-    templateMaskedImage = afwImage.MaskedImageF(templatePath)
-    scienceMaskedImage = afwImage.MaskedImageF(sciencePath)
+    templateExposure = afwImage.ExposureF(templatePath)
+    scienceExposure = afwImage.ExposureF(sciencePath)
+    templateMaskedImage = templateExposure.getMaskedImage()
+    scienceMaskedImage = scienceExposure.getMaskedImage()
 
     config = ipDiffim.ImagePsfMatchTask.ConfigClass()
     config.kernel.name = "AL"
@@ -100,28 +129,24 @@ Notes:
         if not subconfig.fitForBackground:
             print('NOTE: no background subtraction at all is requested')
 
-    psfmatch = ipDiffim.ImagePsfMatchTask(subconfig)
-    results = psfmatch.run(templateMaskedImage, scienceMaskedImage, "subtractMaskedImages",
-                           templateFwhmPix=fwhmT, scienceFwhmPix=fwhmS)
-
-    differenceMaskedImage = results.subtractedImage
-    differenceMaskedImage.writeFits(outputPath)
+    psfmatch = ipDiffim.ImagePsfMatchTask(config)
+    candidateList = psfmatch.makeCandidateList(templateExposure, scienceExposure, subconfig.kernelSize)
+    results = psfmatch.subtractMaskedImages(templateMaskedImage, scienceMaskedImage, candidateList,
+                                            templateFwhmPix=fwhmT, scienceFwhmPix=fwhmS)
+    differenceMaskedImage = results.subtractedMaskedImage
+    if writeOutput:
+        differenceMaskedImage.writeFits(outputPath)
 
     if False:
         spatialKernel = results.psfMatchingKernel
         print(spatialKernel.getSpatialParameters())
 
     if display:
-        ds9.mtv(differenceMaskedImage)
+        afwDisplay.Display().mtv(differenceMaskedImage, title="Difference Masked Image")
 
 
 def run():
-    memId0 = dafBase.Citizen_getNextMemId()
     main()
-    # check for memory leaks
-    if dafBase.Citizen_census(0, memId0) != 0:
-        print(dafBase.Citizen_census(0, memId0), 'Objects leaked:')
-        print(dafBase.Citizen_census(dafBase.cout, memId0))
 
 
 if __name__ == '__main__':
