@@ -574,7 +574,7 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, **kwargs):
     dcr : `tuple`
         Shift calculated with ``calculateDcr``.
         Uses numpy axes ordering (Y, X).
-        If ``splitSubfilters` is set, each element is itself a `tuple`
+        If ``splitSubfilters`` is set, each element is itself a `tuple`
         of two `float`, corresponding to the DCR shift at the two wavelengths.
         Otherwise, each element is a `float` corresponding to the DCR shift at
         the effective wavelength of the subfilter.

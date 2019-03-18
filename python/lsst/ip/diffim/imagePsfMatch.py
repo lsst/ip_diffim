@@ -139,10 +139,10 @@ class ImagePsfMatchTask(PsfMatchTask):
 
     There is no run() method for this Task.  Instead there are 4 methods that
     may be used to invoke the Psf-matching.  These are
-    lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchMaskedImages matchMaskedImages
-    lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractMaskedImages subtractMaskedImages,
-    lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchExposures matchExposures, and
-    lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractExposures subtractExposures.
+    `~lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchMaskedImages`,
+    `~lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractMaskedImages`,
+    `~lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchExposures`, and
+    `~lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractExposures`.
 
     The methods that operate on lsst.afw.image.MaskedImage require that the images already be astrometrically
     aligned, and are the same shape.  The methods that operate on lsst.afw.image.Exposure allow for the
