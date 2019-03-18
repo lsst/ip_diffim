@@ -313,7 +313,7 @@ class ModelPsfMatchTask(PsfMatchTask):
         -------
         result : `struct`
             - ``psfMatchedExposure`` : the Psf-matched Exposure.
-                This has the same parent bbox, Wcs, Calib and
+                This has the same parent bbox, Wcs, PhotoCalib and
                 Filter as the input Exposure but no Psf.
                 In theory the Psf should equal referencePsfModel but
                 the match is likely not exact.
@@ -353,7 +353,7 @@ class ModelPsfMatchTask(PsfMatchTask):
         self.log.info("Psf-match science exposure to reference")
         psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(), exposure.getWcs())
         psfMatchedExposure.setFilter(exposure.getFilter())
-        psfMatchedExposure.setCalib(exposure.getCalib())
+        psfMatchedExposure.setPhotoCalib(exposure.getPhotoCalib())
         psfMatchedExposure.getInfo().setVisitInfo(exposure.getInfo().getVisitInfo())
         psfMatchedExposure.setPsf(referencePsfModel)
         psfMatchedMaskedImage = psfMatchedExposure.getMaskedImage()
