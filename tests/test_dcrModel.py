@@ -27,6 +27,7 @@ import unittest
 from lsst.afw.coord import Observatory, Weather
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
+import lsst.afw.image.utils as afwImageUtils
 import lsst.afw.math as afwMath
 from lsst.geom import arcseconds, degrees, radians
 from lsst.ip.diffim.dcrModel import DcrModel, calculateDcr, calculateImageParallacticAngle, applyDcr
@@ -229,8 +230,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         The shift is compared to pre-computed values.
         """
         dcrNumSubfilters = 3
-        afwImage.utils.defineFilter("gTest", self.lambdaEff,
-                                    lambdaMin=self.lambdaMin, lambdaMax=self.lambdaMax)
+        afwImageUtils.defineFilter("gTest", self.lambdaEff,
+                                   lambdaMin=self.lambdaMin, lambdaMax=self.lambdaMax)
         filterInfo = afwImage.Filter("gTest")
         rotAngle = 0.*degrees
         azimuth = 30.*degrees
@@ -251,8 +252,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         """Test that the bluest subfilter always has the largest DCR amplitude.
         """
         dcrNumSubfilters = 3
-        afwImage.utils.defineFilter("gTest", self.lambdaEff,
-                                    lambdaMin=self.lambdaMin, lambdaMax=self.lambdaMax)
+        afwImageUtils.defineFilter("gTest", self.lambdaEff,
+                                   lambdaMin=self.lambdaMin, lambdaMax=self.lambdaMax)
         filterInfo = afwImage.Filter("gTest")
         pixelScale = 0.2*arcseconds
         for testIter in range(self.nRandIter):
