@@ -94,9 +94,13 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
     Raises
     ------
     RuntimeError
-        TODO: DM-17458
+        - if configuration `kernelBasisSet` is not for "alard-lupton"
     ValueError
-        TODO: DM-17458
+        - if `kernelSize` is even
+        - if the number of Gaussians and the number of given 
+          sigma values are not equal or
+        - if the number of Gaussians and the number of given
+          polynomial degrees are not equal
     """
 
     if config.kernelBasisSet != "alard-lupton":
