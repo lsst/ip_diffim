@@ -31,30 +31,41 @@ sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
                         basisDegGauss=None, metadata=None):
-    """Generate the appropriate Kernel basis based on the Config
+    """Generate the delta function or Alard-Lupton kernel bases depending on the Config.
+    Wrapper to call either `lsst.ip.diffim.makeDeltaFunctionBasisList` or
+    `lsst.ip.diffim.generateAlardLuptonBasisList`.
 
     Parameters
     ----------
-    config : TODO: DM-17458
-        TODO: DM-17458
-    targetFwhmPix : TODO: DM-17458, optional
-        TODO: DM-17458
-    referenceFwhmPix : TODO: DM-17458, optional
-        TODO: DM-17458
-    basisDegGauss : TODO: DM-17458, optional
-        TODO: DM-17458
-    metadata : TODO: DM-17458, optional
-        TODO: DM-17458
+    config : `lsst.ip.diffim.PsfMatchConfigAL`
+        Configuration object.
+    targetFwhmPix : `float`, optional
+        Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
+        Not used for delta function basis sets.
+    referenceFwhmPix : `float`, optional
+        Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
+        Not used for delta function basis sets.
+    basisDegGauss : `list` of `int`, optional
+        Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
+        Not used for delta function basis sets.
+    metadata : `lsst.daf.base.PropertySet`, optional
+        Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
+        Not used for delta function basis sets.
 
     Returns
     -------
-    TODO: DM-17458
-        TODO: DM-17458
+    basisList: `list` of `lsst.afw.math.kernel.FixedKernel`
+        List of basis kernels.
+
+    Notes
+    -----
+    See `lsst.ip.diffim.generateAlardLuptonBasisList` and
+    `lsst.ip.diffim.makeDeltaFunctionBasisList` for more information.
 
     Raises
     ------
     ValueError
-        TODO: DM-17458
+        If ``config.kernelBasisSet`` has an invalid value (not "alard-lupton" or "delta-function").
     """
     if config.kernelBasisSet == "alard-lupton":
         return generateAlardLuptonBasisList(config, targetFwhmPix=targetFwhmPix,
@@ -70,33 +81,66 @@ def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
 
 def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
                                  basisDegGauss=None, metadata=None):
-    """Generate an Alard-Lupton kernel basis based upon the Config and
-    the input FWHM of the science and template images
+    """Generate an Alard-Lupton kernel basis list based upon the Config and
+    the input FWHM of the science and template images.
 
     Parameters
     ----------
-    config : TODO: DM-17458
-        TODO: DM-17458
+    config : `lsst.ip.diffim.PsfMatchConfigAL`
+        Configuration object for the Alard-Lupton algorithm.
     targetFwhmPix : `float`, optional
-        TODO: DM-17458
+        Fwhm width (pixel) of the template exposure characteristic psf.
+        This is the _target_ that will be matched to the science exposure.
     referenceFwhmPix : `float`, optional
-        TODO: DM-17458
-    basisDegGauss : TODO: DM-17458, optional
-        TODO: DM-17458
-    metadata : TODO: DM-17458, optional
-        TODO: DM-17458
+        Fwhm width (pixel) of the science exposure characteristic psf.
+    basisDegGauss : `list` of `int`, optional
+        Polynomial degree of each Gaussian (sigma) basis. If None, defaults to `config.alardDegGauss`.
+    metadata : `lsst.daf.base.PropertySet`, optional
+        If specified, object to collect metadata fields about the kernel basis list.
 
     Returns
     -------
-    TYPE
-        TODO: DM-17458
+    basisList : `list` of `lsst.afw.math.kernel.FixedKernel`
+        List of basis kernels. For each degree value ``n`` in ``config.basisDegGauss`` (n+2)(n+1)/2 kernels
+        are generated and appended to the list in the order of the polynomial parameter number.
+        See `lsst.afw.math.polynomialFunction2D` documentation for more details.
+
+    Notes
+    -----
+    The polynomial functions (``f``) are always evaluated in the -1.0, +1.0 range in both x, y directions,
+    edge to edge, with ``f(0,0)`` evaluated at the kernel center pixel, ``f(-1.0,-1.0)`` at the kernel
+    ``(0,0)`` pixel. They are not scaled by the sigmas of the Gaussians.
+
+    Base Gaussian widths (sigmas in pixels) of the kernels are determined as:
+        - If not all fwhm parameters are provided or ``config.scaleByFwhm==False``
+          then ``config.alardNGauss`` and  ``config.alardSigGauss`` are used.
+        - If ``targetFwhmPix<referenceFwhmPix`` (normal convolution):
+          First sigma ``Sig_K`` is determined to satisfy: ``Sig_reference**2 = Sig_target**2 + Sig_K**2``.
+          If it's larger than ``config.alardMinSig * config.alardGaussBeta``, make it the
+          second kernel. Else make it the smallest kernel, unless only 1 kernel is asked for.
+        - If ``referenceFwhmPix < targetFwhmPix`` (deconvolution):
+          Define the progression of Gaussians using a
+          method to derive a deconvolution sum-of-Gaussians from it's
+          convolution counterpart. [1]_ Only use 3 since the algorithm
+          assumes 3 components.
+
+    References
+    ----------
+
+    .. [1] Ulmer, W.: Inverse problem of linear combinations of Gaussian convolution kernels
+       (deconvolution) and some applications to proton/photon dosimetry and image
+       processing. http://iopscience.iop.org/0266-5611/26/8/085002  Equation 40
 
     Raises
     ------
     RuntimeError
-        TODO: DM-17458
+        - if ``config.kernelBasisSet`` is not equal to "alard-lupton"
     ValueError
-        TODO: DM-17458
+        - if ``config.kernelSize`` is even
+        - if the number of Gaussians and the number of given
+          sigma values are not equal or
+        - if the number of Gaussians and the number of given
+          polynomial degree values are not equal
     """
 
     if config.kernelBasisSet != "alard-lupton":

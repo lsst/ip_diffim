@@ -169,18 +169,18 @@ class PsfMatchConfig(pexConfig.Config):
     )
     kernelSizeFwhmScaling = pexConfig.Field(
         dtype=float,
-        doc="""How much to scale the kernel size based on the largest AL Sigma""",
+        doc="Multiplier of the largest AL Gaussian basis sigma to get the kernel bbox (pixel) size.",
         default=6.0,
         check=lambda x: x >= 1.0
     )
     kernelSizeMin = pexConfig.Field(
         dtype=int,
-        doc="""Minimum Kernel Size""",
+        doc="Minimum kernel bbox (pixel) size.",
         default=21,
     )
     kernelSizeMax = pexConfig.Field(
         dtype=int,
-        doc="""Maximum Kernel Size""",
+        doc="Maximum kernel bbox (pixel) size.",
         default=35,
     )
     spatialModelType = pexConfig.ChoiceField(
@@ -382,17 +382,19 @@ class PsfMatchConfigAL(PsfMatchConfig):
     )
     alardDegGauss = pexConfig.ListField(
         dtype=int,
-        doc="Polynomial order of spatial modification of Gaussians.  Must in number equal alardNGauss",
+        doc="Polynomial order of spatial modification of Gaussian basis functions. "
+            "List length must be `alardNGauss`.",
         default=(4, 2, 2),
     )
     alardSigGauss = pexConfig.ListField(
         dtype=float,
-        doc="""Sigma in pixels of Gaussians (FWHM = 2.35 sigma).  Must in number equal alardNGauss""",
+        doc="Default sigma values in pixels of Gaussian kernel base functions. "
+            "List length must be `alardNGauss`.",
         default=(0.7, 1.5, 3.0),
     )
     alardGaussBeta = pexConfig.Field(
         dtype=float,
-        doc="""Default scale factor between Gaussian sigmas """,
+        doc="""Multiplier of Gaussian sigmas between adjacent elements of the kernel basis list.""",
         default=2.0,
         check=lambda x: x >= 0.0,
     )
@@ -410,8 +412,8 @@ class PsfMatchConfigAL(PsfMatchConfig):
     )
     alardMinSigDeconv = pexConfig.Field(
         dtype=float,
-        doc="""Minimum Sigma (pixels) for Gaussians during deconvolution;
-        make smaller than alardMinSig as this is only indirectly used""",
+        doc="Minimum Sigma (pixels) for Gaussians during deconvolution; "
+            "make smaller than alardMinSig as this is only indirectly used",
         default=0.4,
         check=lambda x: x >= 0.25
     )
@@ -526,18 +528,19 @@ class PsfMatchTask(pipeBase.Task):
     Notes
     -----
     PsfMatchTask is a base class that implements the core functionality for matching the
-    Psfs of two images using a spatially varying Psf-matching lsst.afw.math.LinearCombinationKernel.
-    The Task requires the user to provide an instance of an lsst.afw.math.SpatialCellSet,
-    filled with lsst.ip.diffim.KernelCandidate instances, and a list of lsst.afw.math.Kernels
+    Psfs of two images using a spatially varying Psf-matching `lsst.afw.math.LinearCombinationKernel`.
+    The Task requires the user to provide an instance of an `lsst.afw.math.SpatialCellSet`,
+    filled with `lsst.ip.diffim.KernelCandidate` instances, and a list of `lsst.afw.math.Kernels`
     of basis shapes that will be used for the decomposition.  If requested, the Task
     also performs background matching and returns the differential background model as an
-    lsst.afw.math.Kernel.SpatialFunction.
+    `lsst.afw.math.Kernel.SpatialFunction`.
 
     Invoking the Task
+    -----------------
 
-    As a base class, this Task is not directly invoked.  However, run() methods that are
-    implemented on derived classes will make use of the core _solve() functionality,
-    which defines a sequence of lsst.afw.math.CandidateVisitor classes that iterate
+    As a base class, this Task is not directly invoked.  However, ``run()`` methods that are
+    implemented on derived classes will make use of the core ``_solve()`` functionality,
+    which defines a sequence of `lsst.afw.math.CandidateVisitor` classes that iterate
     through the KernelCandidates, first building up a per-candidate solution and then
     building up a spatial model from the ensemble of candidates.  Sigma clipping is
     performed using the mean and standard deviation of all kernel sums (to reject
@@ -545,7 +548,7 @@ class PsfMatchTask(pipeBase.Task):
     (to indicate a bad choice of kernel basis shapes for that particular object),
     and on the substamp diffim residuals using the spatial kernel fit (to indicate a bad
     choice of spatial kernel order, or poor constraints on the spatial model).  The
-    _diagnostic() method logs information on the quality of the spatial fit, and also
+    ``_diagnostic()`` method logs information on the quality of the spatial fit, and also
     modifies the Task metadata.
 
     .. list-table:: Quantities set in Metadata
@@ -553,39 +556,40 @@ class PsfMatchTask(pipeBase.Task):
 
        * - Parameter
          - Description
-       * - `spatialConditionNum`
+       * - ``spatialConditionNum``
          - Condition number of the spatial kernel fit
-       * - `spatialKernelSum`
+       * - ``spatialKernelSum``
          - Kernel sum (10^{-0.4 * ``Delta``; zeropoint}) of the spatial Psf-matching kernel
-       * - `ALBasisNGauss`
+       * - ``ALBasisNGauss``
          - If using sum-of-Gaussian basis, the number of gaussians used
-       * - `ALBasisDegGauss`
+       * - ``ALBasisDegGauss``
          - If using sum-of-Gaussian basis, the deg of spatial variation of the Gaussians
-       * - `ALBasisSigGauss`
+       * - ``ALBasisSigGauss``
          - If using sum-of-Gaussian basis, the widths (sigma) of the Gaussians
-       * - `ALKernelSize`
+       * - ``ALKernelSize``
          - If using sum-of-Gaussian basis, the kernel size
-       * - `NFalsePositivesTotal`
+       * - ``NFalsePositivesTotal``
          - Total number of diaSources
-       * - `NFalsePositivesRefAssociated`
+       * - ``NFalsePositivesRefAssociated``
          - Number of diaSources that associate with the reference catalog
-       * - `NFalsePositivesRefAssociated`
+       * - ``NFalsePositivesRefAssociated``
          - Number of diaSources that associate with the source catalog
-       * - `NFalsePositivesUnassociated`
+       * - ``NFalsePositivesUnassociated``
          - Number of diaSources that are orphans
-       * - `metric_MEAN`
+       * - ``metric_MEAN``
          - Mean value of substamp diffim quality metrics across all KernelCandidates,
            for both the per-candidate (LOCAL) and SPATIAL residuals
-       * - `metric_MEDIAN`
+       * - ``metric_MEDIAN``
          - Median value of substamp diffim quality metrics across all KernelCandidates,
            for both the per-candidate (LOCAL) and SPATIAL residuals
-       * - `metric_STDEV`
+       * - ``metric_STDEV``
          - Standard deviation of substamp diffim quality metrics across all KernelCandidates,
            for both the per-candidate (LOCAL) and SPATIAL residuals
 
     Debug variables
+    ---------------
 
-    The lsst.pipe.base.cmdLineTask.CmdLineTask command line task interface supports a
+    The `lsst.pipe.base.cmdLineTask.CmdLineTask` command line task interface supports a
     flag -d/--debug to import @b debug.py from your PYTHONPATH.  The relevant contents of debug.py
     for this Task include:
 
@@ -614,7 +618,7 @@ class PsfMatchTask(pipeBase.Task):
         lsstDebug.Info = DebugInfo
         lsstDebug.frame = 1
 
-    Note that if you want addional logging info, you may add to your scripts:
+    Note that if you want additional logging info, you may add to your scripts:
 
     .. code-block:: py
 
@@ -658,13 +662,13 @@ class PsfMatchTask(pipeBase.Task):
 
         Parameters
         ----------
-        kernelCellSet : TYPE
+        kernelCellSet : `lsst.afw.math.SpatialCellSet`
             Cellset that contains the KernelCandidates used in the fitting
-        spatialSolution : TYPE
+        spatialSolution : `lsst.ip.diffim.SpatialKernelSolution`
             KernelSolution of best-fit
-        spatialKernel : TYPE
+        spatialKernel : `lsst.afw.math.LinearCombinationKernel`
             Best-fit spatial Kernel model
-        spatialBg : TYPE
+        spatialBg : `lsst.afw.math.Function2D`
             Best-fit spatial background model
         """
         # What is the final kernel sum
@@ -748,11 +752,11 @@ class PsfMatchTask(pipeBase.Task):
 
         Parameters
         ----------
-        kernelCellSet : TYPE
+        kernelCellSet : `lsst.afw.math.SpatialCellSet`
             The SpatialCellSet used in determining the matching kernel and background
-        spatialKernel : TYPE
+        spatialKernel : `lsst.afw.math.LinearCombinationKernel`
             Spatially varying Psf-matching kernel
-        spatialBackground : TYPE
+        spatialBackground : `lsst.afw.math.Function2D`
             Spatially varying background-matching function
         """
         import lsstDebug
@@ -801,18 +805,18 @@ class PsfMatchTask(pipeBase.Task):
 
         Parameters
         ----------
-        kernelCellSet : TYPE
+        kernelCellSet : `lsst.afw.math.SpatialCellSet`
             a SpatialCellSet containing KernelCandidates, from which components are derived
-        nStarPerCell : TYPE
+        nStarPerCell : `int`
             the number of stars per cell to visit when doing the PCA
-        policy : TYPE
+        policy : `lsst.pex.policy.Policy`
             input policy controlling the single kernel visitor
 
         Returns
         -------
-        nRejectedPca : TYPE
+        nRejectedPca : `int`
             number of KernelCandidates rejected during PCA loop
-        spatialBasisList : TYPE
+        spatialBasisList : `list` of `lsst.afw.math.kernel.FixedKernel`
             basis list containing the principal shapes as Kernels
 
         Raises
@@ -870,10 +874,10 @@ class PsfMatchTask(pipeBase.Task):
 
         Parameters
         ----------
-        kernelCellSet : TYPE
+        kernelCellSet : `lsst.afw.math.SpatialCellSet`
             a SpatialCellSet to use in determining the matching kernel
              (typically as provided by _buildCellSet)
-        basisList : TYPE
+        basisList : `list` of `lsst.afw.math.kernel.FixedKernel`
             list of Kernels to be used in the decomposition of the spatially varying kernel
             (typically as provided by makeKernelBasisList)
         returnOnExcept : `bool`, optional
@@ -881,15 +885,15 @@ class PsfMatchTask(pipeBase.Task):
 
         Returns
         -------
-        psfMatchingKernel : TYPE
-            PSF matching kernel
-        backgroundModel : TYPE
-            differential background model
+        psfMatchingKernel : `lsst.afw.math.LinearCombinationKernel`
+            Spatially varying Psf-matching kernel
+        backgroundModel : `lsst.afw.math.Function2D`
+            Spatially varying background-matching function
 
         Raises
         ------
-        Exception
-            if unable to determine PSF matching kernel and returnOnExcept False
+        RuntimeError :
+            If unable to determine PSF matching kernel and ``returnOnExcept==False``.
         """
 
         import lsstDebug

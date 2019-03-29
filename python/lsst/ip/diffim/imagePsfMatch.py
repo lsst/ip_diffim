@@ -878,7 +878,7 @@ class ImagePsfMatchTask(PsfMatchTask):
 
         Returns
         -------
-        kernelCellSet :
+        kernelCellSet : `lsst.afw.math.SpatialCellSet`
             a SpatialCellSet for use with self._solve
         """
         if not candidateList:
