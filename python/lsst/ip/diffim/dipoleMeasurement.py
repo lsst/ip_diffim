@@ -181,8 +181,8 @@ class DipoleMeasurementTask(SingleFrameMeasurementTask):
     lobe centroids and fluxes using non-linear least squares minimization.
     The fields are stored in table elements ip_diffim_PsfDipoleFlux*.
 
-    Because this Task is just a config for SourceMeasurementTask, the same result may be acheived by manually
-    editing the config and running SourceMeasurementTask. For example:
+    Because this Task is just a config for SingleFrameMeasurementTask, the same result may be acheived by
+    manually editing the config and running SingleFrameMeasurementTask. For example:
 
     .. code-block:: py
 
