@@ -387,7 +387,7 @@ class ImagePsfMatchTask(PsfMatchTask):
             - ``matchedImage`` : the PSF-matched exposure =
                 Warped ``templateExposure`` convolved by psfMatchingKernel. This has:
 
-                - the same parent bbox, Wcs and Calib as scienceExposure
+                - the same parent bbox, Wcs and PhotoCalib as scienceExposure
                 - the same filter as templateExposure
                 - no Psf (because the PSF-matching process does not compute one)
 
@@ -441,7 +441,7 @@ class ImagePsfMatchTask(PsfMatchTask):
 
         psfMatchedExposure = afwImage.makeExposure(results.matchedImage, scienceExposure.getWcs())
         psfMatchedExposure.setFilter(templateExposure.getFilter())
-        psfMatchedExposure.setCalib(scienceExposure.getCalib())
+        psfMatchedExposure.setPhotoCalib(scienceExposure.getPhotoCalib())
         results.warpedExposure = templateExposure
         results.matchedExposure = psfMatchedExposure
         return results
