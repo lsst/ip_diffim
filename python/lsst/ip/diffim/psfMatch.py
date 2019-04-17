@@ -169,18 +169,18 @@ class PsfMatchConfig(pexConfig.Config):
     )
     kernelSizeFwhmScaling = pexConfig.Field(
         dtype=float,
-        doc="""How much to scale the kernel size based on the largest AL Sigma""",
+        doc="Multiplier of the largest AL Gaussian basis sigma to get the kernel bbox (pixel) size.",
         default=6.0,
         check=lambda x: x >= 1.0
     )
     kernelSizeMin = pexConfig.Field(
         dtype=int,
-        doc="""Minimum Kernel Size""",
+        doc="Minimum kernel bbox (pixel) size.",
         default=21,
     )
     kernelSizeMax = pexConfig.Field(
         dtype=int,
-        doc="""Maximum Kernel Size""",
+        doc="Maximum kernel bbox (pixel) size.",
         default=35,
     )
     spatialModelType = pexConfig.ChoiceField(
@@ -382,17 +382,19 @@ class PsfMatchConfigAL(PsfMatchConfig):
     )
     alardDegGauss = pexConfig.ListField(
         dtype=int,
-        doc="Polynomial order of spatial modification of Gaussians.  Must in number equal alardNGauss",
+        doc="Polynomial order of spatial modification of Gaussian basis functions. "
+            "List length must be `alardNGauss`.",
         default=(4, 2, 2),
     )
     alardSigGauss = pexConfig.ListField(
         dtype=float,
-        doc="""Sigma in pixels of Gaussians (FWHM = 2.35 sigma).  Must in number equal alardNGauss""",
+        doc="Default sigma values in pixels of Gaussian kernel base functions. "
+            "List length must be `alardNGauss`.",
         default=(0.7, 1.5, 3.0),
     )
     alardGaussBeta = pexConfig.Field(
         dtype=float,
-        doc="""Default scale factor between Gaussian sigmas """,
+        doc="""Multiplier of Gaussian sigmas between adjacent elements of the kernel basis list.""",
         default=2.0,
         check=lambda x: x >= 0.0,
     )
@@ -410,8 +412,8 @@ class PsfMatchConfigAL(PsfMatchConfig):
     )
     alardMinSigDeconv = pexConfig.Field(
         dtype=float,
-        doc="""Minimum Sigma (pixels) for Gaussians during deconvolution;
-        make smaller than alardMinSig as this is only indirectly used""",
+        doc="Minimum Sigma (pixels) for Gaussians during deconvolution; "
+            "make smaller than alardMinSig as this is only indirectly used",
         default=0.4,
         check=lambda x: x >= 0.25
     )

@@ -211,11 +211,11 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
         ----------
         exposure :  `lsst.afw.image.Exposure`
             exposure (unused)
-        sensorRef : TYPE
-            a Butler data reference
-        templateIdList : TYPE
-            list of data ids, which should contain a single item.
-            If there are multiple items, only the first is used.
+        sensorRef : `lsst.daf.persistence.ButlerDataRef`
+            Data reference of the calexp(s) to subtract from.
+        templateIdList : `lsst.daf.persistence.ButlerDataRef`
+            Data reference of the template calexp to be subtraced.
+            Can be incomplete, fields are initialized from `sensorRef`.
 
         Returns
         -------

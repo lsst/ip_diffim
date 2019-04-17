@@ -75,8 +75,8 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
 
     Parameters
     ----------
-    config : TODO: DM-17458
-        TODO: DM-17458
+    config : `lsst.pex.config.Config`
+        Configuration object for algorithm.
     targetFwhmPix : `float`, optional
         TODO: DM-17458
     referenceFwhmPix : `float`, optional
