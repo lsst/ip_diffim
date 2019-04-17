@@ -872,10 +872,10 @@ class PsfMatchTask(pipeBase.Task):
 
         Parameters
         ----------
-        kernelCellSet : TYPE
+        kernelCellSet : `lsst.afw.math.SpatialCellSet`
             a SpatialCellSet to use in determining the matching kernel
              (typically as provided by _buildCellSet)
-        basisList : TYPE
+        basisList : `list` of `lsst.afw.math.kernel.FixedKernel`
             list of Kernels to be used in the decomposition of the spatially varying kernel
             (typically as provided by makeKernelBasisList)
         returnOnExcept : `bool`, optional
@@ -890,8 +890,8 @@ class PsfMatchTask(pipeBase.Task):
 
         Raises
         ------
-        Exception
-            if unable to determine PSF matching kernel and returnOnExcept False
+        RuntimeError :
+            If unable to determine PSF matching kernel and `returnOnExcept==False`
         """
 
         import lsstDebug

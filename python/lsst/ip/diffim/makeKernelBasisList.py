@@ -35,8 +35,8 @@ def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
 
     Parameters
     ----------
-    config : TODO: DM-17458
-        TODO: DM-17458
+    config : `lsst.ip.diffim.PsfMatchConfigAL`
+        Configuration object for the Alard-Lupton algorithm.
     targetFwhmPix : TODO: DM-17458, optional
         TODO: DM-17458
     referenceFwhmPix : TODO: DM-17458, optional
@@ -48,7 +48,7 @@ def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
 
     Returns
     -------
-    TODO: DM-17458
+    basisList: `list` of `lsst.afw.math.kernel.FixedKernel`
         TODO: DM-17458
 
     Raises
@@ -75,16 +75,17 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
 
     Parameters
     ----------
-    config : `lsst.pex.config.Config`
-        Configuration object for algorithm.
+    config : `lsst.ip.diffim.PsfMatchConfigAL`
+        Configuration object for the Alard-Lupton algorithm.
     targetFwhmPix : `float`, optional
-        TODO: DM-17458
+        Fwhm width (pixel) of the template exposure characteristic psf. 
+        This is the _target_ that will be matched to the science exposure.
     referenceFwhmPix : `float`, optional
-        TODO: DM-17458
-    basisDegGauss : TODO: DM-17458, optional
-        TODO: DM-17458
-    metadata : TODO: DM-17458, optional
-        TODO: DM-17458
+        Fwhm width (pixel) of the science exposure characteristic psf. 
+    basisDegGauss : list of `int`, optional
+        Polynomial degrees of of each Gaussian basis. If None, defaults to `config.alardDegGauss`.
+    metadata : `lsst.daf.base.PropertySet`, optional
+        If specified, object to collect metadata fields about the kernel basis list.
 
     Returns
     -------
