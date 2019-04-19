@@ -228,10 +228,9 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
         """
 
         if len(templateIdList) == 0:
-            raise RuntimeError("No template supplied! Please supply a template visit id.")
+            raise RuntimeError("No template data reference supplied.")
         if len(templateIdList) > 1:
-            self.log.warn("Multiple template visits supplied. Getting template from first visit: %s" %
-                          (templateIdList[0]['visit']))
+            self.log.warn("Multiple template data references supplied. Using the first one only.")
 
         templateId = sensorRef.dataId.copy()
         templateId.update(templateIdList[0])

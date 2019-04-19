@@ -390,9 +390,10 @@ class ZogyTask(pipeBase.Task):
         -----
         In all functions, im1 is R (reference, or template) and im2 is N (new, or science)
         Compute the ZOGY eqn. (13):
+
         .. math::
 
-            \widehat{D} = \\frac{Fr\widehat{Pr}\widehat{N} -
+            \widehat{D} = \frac{Fr\widehat{Pr}\widehat{N} -
             F_n\widehat{Pn}\widehat{R}}{\sqrt{\sigma_n^2 Fr^2
             \|\widehat{Pr}\|^2 + \sigma_r^2 F_n^2 \|\widehat{Pn}\|^2}}
 

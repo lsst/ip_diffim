@@ -18,6 +18,11 @@ Using lsst.ip.diffim
 .. toctree::
    :maxdepth: 1
 
+.. toctree::
+   :maxdepth: 1
+
+   code_notes
+
 .. _lsst.ip.diffim-contributing:
 
 Contributing
