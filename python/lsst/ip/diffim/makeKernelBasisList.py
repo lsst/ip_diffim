@@ -78,10 +78,10 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
     config : `lsst.ip.diffim.PsfMatchConfigAL`
         Configuration object for the Alard-Lupton algorithm.
     targetFwhmPix : `float`, optional
-        Fwhm width (pixel) of the template exposure characteristic psf. 
+        Fwhm width (pixel) of the template exposure characteristic psf.
         This is the _target_ that will be matched to the science exposure.
     referenceFwhmPix : `float`, optional
-        Fwhm width (pixel) of the science exposure characteristic psf. 
+        Fwhm width (pixel) of the science exposure characteristic psf.
     basisDegGauss : list of `int`, optional
         Polynomial degrees of of each Gaussian basis. If None, defaults to `config.alardDegGauss`.
     metadata : `lsst.daf.base.PropertySet`, optional
@@ -98,7 +98,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         - if configuration `kernelBasisSet` is not for "alard-lupton"
     ValueError
         - if `kernelSize` is even
-        - if the number of Gaussians and the number of given 
+        - if the number of Gaussians and the number of given
           sigma values are not equal or
         - if the number of Gaussians and the number of given
           polynomial degrees are not equal
