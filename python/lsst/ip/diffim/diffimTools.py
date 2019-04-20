@@ -395,7 +395,16 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
         fpGrowPix = config.fpGrowPix
     log.info("Growing %d kernel candidate stars by %d pixels", len(candidateInList), fpGrowPix)
 
-    for kernelCandidate in candidateInList:
+    # debug DM-17825
+    # Reducing the number of selected sources to maximum 100
+    np.random.seed(12345)
+    indKeepList = np.random.permutation(len(candidateInList))[:15]
+    log.info("Limiting number of kernel candidates to 100")
+
+    for indCand, kernelCandidate in enumerate(candidateInList):
+        if indCand not in indKeepList:
+            continue
+
         if not type(kernelCandidate) == afwTable.SourceRecord:
             raise RuntimeError("Candiate not of type afwTable.SourceRecord")
         bm1 = 0
@@ -439,7 +448,9 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
             if not((bm1 & badBitMask) or (bm2 & badBitMask)):
                 candidateOutList.append({'source': kernelCandidate,
                                          'footprint': afwDetect.Footprint(afwGeom.SpanSet(kbbox))})
+
     log.info("Selected %d / %d sources for KernelCandidacy", len(candidateOutList), len(candidateInList))
+
     return candidateOutList
 
 
