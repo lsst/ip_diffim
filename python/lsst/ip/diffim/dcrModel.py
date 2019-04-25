@@ -307,6 +307,8 @@ class DcrModel:
         exposure : `lsst.afw.image.Exposure`, optional
             The input exposure to build a matched template for.
             May be omitted if all of the metadata is supplied separately
+        order : `int`, optional
+            Interpolation order of the DCR shift.
         visitInfo : `lsst.afw.image.VisitInfo`, optional
             Metadata for the exposure. Ignored if ``exposure`` is set.
         bbox : `lsst.afw.geom.Box2I`, optional
