@@ -137,7 +137,18 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                     continue
                 self.log.info("Constructing DCR-matched template for patch %s" % patchArgDict)
                 dcrModel = DcrModel.fromDataRef(sensorRef, **patchArgDict)
-                coaddPatch = dcrModel.buildMatchedExposure(bbox=patchSubBBox,
+                # The edge pixels of the DcrCoadd may contain artifacts due to missing data.
+                # Each patch has significant overlap, and the contaminated edge pixels in
+                # a new patch will overwrite good pixels in the overlap region from
+                # previous patches.
+                # Shrink the BBox to remove the contaminated pixels,
+                # but make sure it is only the overlap region that is reduced.
+                patchInnerBBox = patchInfo.getInnerBBox()
+                patchInnerBBox.clip(coaddBBox)
+                dcrBBox = afwGeom.Box2I(patchSubBBox)
+                dcrBBox.grow(-self.config.templateBorderSize)
+                dcrBBox.include(patchInnerBBox)
+                coaddPatch = dcrModel.buildMatchedExposure(bbox=dcrBBox,
                                                            wcs=coaddWcs,
                                                            visitInfo=exposure.getInfo().getVisitInfo())
             else:
