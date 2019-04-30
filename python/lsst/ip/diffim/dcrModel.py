@@ -467,7 +467,7 @@ class DcrModel:
         """
         # ``regularizationFactor`` is the maximum change between subfilter images, so the maximum difference
         # between one subfilter image and the average will be the square root of that.
-        maxDiff = regularizationFactor/(self.dcrNumSubfilters - 1.)
+        maxDiff = np.sqrt(regularizationFactor)
         noiseLevel = self.calculateNoiseCutoff(modelImages[0], statsCtrl, bufferSize=5, mask=mask, bbox=bbox)
         referenceImage = self.getReferenceImage(bbox)
         badPixels = np.isnan(referenceImage) | (referenceImage <= 0.)
@@ -479,24 +479,26 @@ class DcrModel:
         fwhm = 2.*filterWidth
         # The noise should be lower in the smoothed image by sqrt(Nsmooth) ~ fwhm pixels
         noiseLevel /= fwhm
-        smoothRef = ndimage.filters.gaussian_filter(referenceImage, filterWidth) + noiseLevel
+        smoothRef = ndimage.filters.gaussian_filter(referenceImage, filterWidth, mode='constant')
+        # Add a three sigma offset to both the reference and model to prevent dividing by zero.
+        # Note that this will also slightly suppress faint variations in color.
+        smoothRef += 3.*noiseLevel
 
-        baseThresh = np.ones_like(referenceImage)
-        lowThreshold = baseThresh/maxDiff
-        highThreshold = baseThresh + lowThreshold*(maxDiff - 1.)
-        for subfilter, model in enumerate(modelImages):
-            smoothModel = ndimage.filters.gaussian_filter(model.array, filterWidth) + noiseLevel
+        lowThreshold = smoothRef/maxDiff
+        highThreshold = smoothRef*maxDiff
+        for model in modelImages:
+            self.applyImageThresholds(model.array,
+                                      highThreshold=highThreshold,
+                                      lowThreshold=lowThreshold,
+                                      regularizationWidth=regularizationWidth)
+            smoothModel = ndimage.filters.gaussian_filter(model.array, filterWidth, mode='constant')
+            smoothModel += 3.*noiseLevel
             relativeModel = smoothModel/smoothRef
             # Now sharpen the smoothed relativeModel using an alpha of 3.
             alpha = 3.
             relativeModel2 = ndimage.filters.gaussian_filter(relativeModel, filterWidth/alpha)
             relativeModel += alpha*(relativeModel - relativeModel2)
-            self.applyImageThresholds(relativeModel,
-                                      highThreshold=highThreshold,
-                                      lowThreshold=lowThreshold,
-                                      regularizationWidth=regularizationWidth)
-            relativeModel *= referenceImage
-            modelImages[subfilter].array = relativeModel
+            model.array = relativeModel*referenceImage
 
     def calculateNoiseCutoff(self, image, statsCtrl, bufferSize,
                              convergenceMaskPlanes="DETECTED", mask=None, bbox=None):
