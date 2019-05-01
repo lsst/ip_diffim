@@ -299,7 +299,7 @@ class DcrModel:
 
     def buildMatchedTemplate(self, exposure=None, order=3,
                              visitInfo=None, bbox=None, wcs=None, mask=None,
-                             splitSubfilters=False):
+                             splitSubfilters=True, amplifyModel=1.):
         """Create a DCR-matched template image for an exposure.
 
         Parameters
@@ -320,7 +320,10 @@ class DcrModel:
             reference mask to use for the template image.
         splitSubfilters : `bool`, optional
             Calculate DCR for two evenly-spaced wavelengths in each subfilter,
-            instead of at the midpoint. Default: False
+            instead of at the midpoint. Default: True
+        amplifyModel : `float`, optional
+            Multiplication factor to amplify differences between model planes.
+            Used to speed convergence of iterative forward modeling.
 
         Returns
         -------
@@ -342,9 +345,13 @@ class DcrModel:
             raise ValueError("Either exposure or visitInfo, bbox, and wcs must be set.")
         dcrShift = calculateDcr(visitInfo, wcs, self.filter, len(self), splitSubfilters=splitSubfilters)
         templateImage = afwImage.ImageF(bbox)
+        refModel = self.getReferenceImage(bbox)
         for subfilter, dcr in enumerate(dcrShift):
-            templateImage.array += applyDcr(self[subfilter][bbox].array, dcr,
-                                            splitSubfilters=splitSubfilters, order=order)
+            if amplifyModel > 1:
+                model = (self[subfilter][bbox].array - refModel)*amplifyModel + refModel
+            else:
+                model = self[subfilter][bbox].array
+            templateImage.array += applyDcr(model, dcr, splitSubfilters=splitSubfilters, order=order)
         return templateImage
 
     def buildMatchedExposure(self, exposure=None,
@@ -460,7 +467,7 @@ class DcrModel:
         """
         # ``regularizationFactor`` is the maximum change between subfilter images, so the maximum difference
         # between one subfilter image and the average will be the square root of that.
-        maxDiff = np.sqrt(regularizationFactor)
+        maxDiff = regularizationFactor/(self.dcrNumSubfilters - 1.)
         noiseLevel = self.calculateNoiseCutoff(modelImages[0], statsCtrl, bufferSize=5, mask=mask, bbox=bbox)
         referenceImage = self.getReferenceImage(bbox)
         badPixels = np.isnan(referenceImage) | (referenceImage <= 0.)
@@ -475,14 +482,15 @@ class DcrModel:
         smoothRef = ndimage.filters.gaussian_filter(referenceImage, filterWidth) + noiseLevel
 
         baseThresh = np.ones_like(referenceImage)
-        highThreshold = baseThresh*maxDiff
         lowThreshold = baseThresh/maxDiff
+        highThreshold = baseThresh + lowThreshold*(maxDiff - 1.)
         for subfilter, model in enumerate(modelImages):
             smoothModel = ndimage.filters.gaussian_filter(model.array, filterWidth) + noiseLevel
             relativeModel = smoothModel/smoothRef
             # Now sharpen the smoothed relativeModel using an alpha of 3.
-            relativeModel2 = ndimage.filters.gaussian_filter(relativeModel, filterWidth/3.)
-            relativeModel = relativeModel + 3.*(relativeModel - relativeModel2)
+            alpha = 3.
+            relativeModel2 = ndimage.filters.gaussian_filter(relativeModel, filterWidth/alpha)
+            relativeModel += alpha*(relativeModel - relativeModel2)
             self.applyImageThresholds(relativeModel,
                                       highThreshold=highThreshold,
                                       lowThreshold=lowThreshold,
