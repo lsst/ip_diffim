@@ -299,7 +299,7 @@ class DcrModel:
 
     def buildMatchedTemplate(self, exposure=None, order=3,
                              visitInfo=None, bbox=None, wcs=None, mask=None,
-                             splitSubfilters=False):
+                             splitSubfilters=True, amplifyModel=1.):
         """Create a DCR-matched template image for an exposure.
 
         Parameters
@@ -307,6 +307,8 @@ class DcrModel:
         exposure : `lsst.afw.image.Exposure`, optional
             The input exposure to build a matched template for.
             May be omitted if all of the metadata is supplied separately
+        order : `int`, optional
+            Interpolation order of the DCR shift.
         visitInfo : `lsst.afw.image.VisitInfo`, optional
             Metadata for the exposure. Ignored if ``exposure`` is set.
         bbox : `lsst.afw.geom.Box2I`, optional
@@ -318,7 +320,10 @@ class DcrModel:
             reference mask to use for the template image.
         splitSubfilters : `bool`, optional
             Calculate DCR for two evenly-spaced wavelengths in each subfilter,
-            instead of at the midpoint. Default: False
+            instead of at the midpoint. Default: True
+        amplifyModel : `float`, optional
+            Multiplication factor to amplify differences between model planes.
+            Used to speed convergence of iterative forward modeling.
 
         Returns
         -------
@@ -340,9 +345,13 @@ class DcrModel:
             raise ValueError("Either exposure or visitInfo, bbox, and wcs must be set.")
         dcrShift = calculateDcr(visitInfo, wcs, self.filter, len(self), splitSubfilters=splitSubfilters)
         templateImage = afwImage.ImageF(bbox)
+        refModel = self.getReferenceImage(bbox)
         for subfilter, dcr in enumerate(dcrShift):
-            templateImage.array += applyDcr(self[subfilter][bbox].array, dcr,
-                                            splitSubfilters=splitSubfilters, order=order)
+            if amplifyModel > 1:
+                model = (self[subfilter][bbox].array - refModel)*amplifyModel + refModel
+            else:
+                model = self[subfilter][bbox].array
+            templateImage.array += applyDcr(model, dcr, splitSubfilters=splitSubfilters, order=order)
         return templateImage
 
     def buildMatchedExposure(self, exposure=None,
@@ -369,14 +378,16 @@ class DcrModel:
         templateExposure : `lsst.afw.image.exposureF`
             The DCR-matched template
         """
+        if bbox is None:
+            bbox = exposure.getBBox()
         templateImage = self.buildMatchedTemplate(exposure=exposure, visitInfo=visitInfo,
                                                   bbox=bbox, wcs=wcs, mask=mask)
         maskedImage = afwImage.MaskedImageF(bbox)
-        maskedImage.image = templateImage
-        maskedImage.mask = self.mask
-        maskedImage.variance = self.variance
+        maskedImage.image = templateImage[bbox]
+        maskedImage.mask = self.mask[bbox]
+        maskedImage.variance = self.variance[bbox]
         templateExposure = afwImage.ExposureF(bbox, wcs)
-        templateExposure.setMaskedImage(maskedImage)
+        templateExposure.setMaskedImage(maskedImage[bbox])
         templateExposure.setPsf(self.psf)
         templateExposure.setFilter(self.filter)
         return templateExposure
@@ -468,23 +479,26 @@ class DcrModel:
         fwhm = 2.*filterWidth
         # The noise should be lower in the smoothed image by sqrt(Nsmooth) ~ fwhm pixels
         noiseLevel /= fwhm
-        smoothRef = ndimage.filters.gaussian_filter(referenceImage, filterWidth) + noiseLevel
+        smoothRef = ndimage.filters.gaussian_filter(referenceImage, filterWidth, mode='constant')
+        # Add a three sigma offset to both the reference and model to prevent dividing by zero.
+        # Note that this will also slightly suppress faint variations in color.
+        smoothRef += 3.*noiseLevel
 
-        baseThresh = np.ones_like(referenceImage)
-        highThreshold = baseThresh*maxDiff
-        lowThreshold = baseThresh/maxDiff
-        for subfilter, model in enumerate(modelImages):
-            smoothModel = ndimage.filters.gaussian_filter(model.array, filterWidth) + noiseLevel
-            relativeModel = smoothModel/smoothRef
-            # Now sharpen the smoothed relativeModel using an alpha of 3.
-            relativeModel2 = ndimage.filters.gaussian_filter(relativeModel, filterWidth/3.)
-            relativeModel = relativeModel + 3.*(relativeModel - relativeModel2)
-            self.applyImageThresholds(relativeModel,
+        lowThreshold = smoothRef/maxDiff
+        highThreshold = smoothRef*maxDiff
+        for model in modelImages:
+            self.applyImageThresholds(model.array,
                                       highThreshold=highThreshold,
                                       lowThreshold=lowThreshold,
                                       regularizationWidth=regularizationWidth)
-            relativeModel *= referenceImage
-            modelImages[subfilter].array = relativeModel
+            smoothModel = ndimage.filters.gaussian_filter(model.array, filterWidth, mode='constant')
+            smoothModel += 3.*noiseLevel
+            relativeModel = smoothModel/smoothRef
+            # Now sharpen the smoothed relativeModel using an alpha of 3.
+            alpha = 3.
+            relativeModel2 = ndimage.filters.gaussian_filter(relativeModel, filterWidth/alpha)
+            relativeModel += alpha*(relativeModel - relativeModel2)
+            model.array = relativeModel*referenceImage
 
     def calculateNoiseCutoff(self, image, statsCtrl, bufferSize,
                              convergenceMaskPlanes="DETECTED", mask=None, bbox=None):
