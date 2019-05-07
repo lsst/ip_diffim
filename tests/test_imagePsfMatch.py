@@ -131,6 +131,7 @@ class PsfMatchTestCases(unittest.TestCase):
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
         sExp.setPsf(self.psf)
+        tExp.setPsf(self.psf)
 
         psfMatchAL = ipDiffim.ImagePsfMatchTask(config=self.configAL)
         psfMatchDF = ipDiffim.ImagePsfMatchTask(config=self.configDF)
@@ -158,6 +159,7 @@ class PsfMatchTestCases(unittest.TestCase):
         tExp = afwImage.ExposureF(tMi, tWcs)
         sExp = afwImage.ExposureF(sMi, sWcs)
         sExp.setPsf(self.psf)
+        tExp.setPsf(self.psf)
 
         psfMatchAL = ipDiffim.ImagePsfMatchTask(config=self.configAL)
         resultsAL = psfMatchAL.matchExposures(tExp, sExp,
