@@ -19,8 +19,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["ImagePsfMatchConfig", "ImagePsfMatchTask", "subtractAlgorithmRegistry"]
-
 import numpy as np
 
 import lsst.daf.base as dafBase
@@ -31,7 +29,7 @@ import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.pipe.base as pipeBase
-from lsst.meas.algorithms import SourceDetectionTask, SubtractBackgroundTask
+from lsst.meas.algorithms import SourceDetectionTask, SubtractBackgroundTask, WarpedPsf
 from lsst.meas.base import SingleFrameMeasurementTask
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigDF, PsfMatchConfigAL
@@ -39,6 +37,8 @@ from . import utils as diffimUtils
 from . import diffimLib
 from . import diffimTools
 import lsst.afw.display as afwDisplay
+
+__all__ = ["ImagePsfMatchConfig", "ImagePsfMatchTask", "subtractAlgorithmRegistry"]
 
 sigma2fwhm = 2.*np.sqrt(2.*np.log(2.))
 
@@ -405,10 +405,14 @@ class ImagePsfMatchTask(PsfMatchTask):
             if doWarping:
                 self.log.info("Astrometrically registering template to science image")
                 templatePsf = templateExposure.getPsf()
+                # Warp PSF before overwriting exposure
+                xyTransform = afwGeom.makeWcsPairTransform(templateExposure.getWcs(),
+                                                           scienceExposure.getWcs())
+                psfWarped = WarpedPsf(templatePsf, xyTransform)
                 templateExposure = self._warper.warpExposure(scienceExposure.getWcs(),
                                                              templateExposure,
                                                              destBBox=scienceExposure.getBBox())
-                templateExposure.setPsf(templatePsf)
+                templateExposure.setPsf(psfWarped)
             else:
                 self.log.error("ERROR: Input images not registered")
                 raise RuntimeError("Input images not registered")
