@@ -22,6 +22,7 @@ Using lsst.ip.diffim
    :maxdepth: 1
 
    code_notes
+   AL_implementation
 
 .. _lsst.ip.diffim-contributing:
 
