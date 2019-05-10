@@ -70,6 +70,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             sigma = 2.0
             self.psf = measAlg.DoubleGaussianPsf(ksize, ksize, sigma)
             self.scienceImage.setPsf(self.psf)
+            self.templateImage.setPsf(self.psf)
 
     def tearDown(self):
         del self.config
@@ -181,20 +182,26 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.subconfig.spatialModelType = poly
         self.subconfig.fitForBackground = fitForBackground
 
-        templateSubImage = afwImage.ExposureF(self.templateImage, self.bbox)
-        scienceSubImage = afwImage.ExposureF(self.scienceImage, self.bbox)
+        templateSubImage = afwImage.ExposureF(self.templateImage.clone(), self.bbox)
+        scienceSubImage = afwImage.ExposureF(self.scienceImage.clone(), self.bbox)
 
         # Have an XY0
         psfmatch = ipDiffim.ImagePsfMatchTask(config=self.config)
-        results1 = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping=True)
+        fwhm = psfmatch.getFwhmPix(self.psf)
+        results1 = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping=True,
+                                              templateFwhmPix=fwhm, scienceFwhmPix=fwhm)
         spatialKernel1 = results1.psfMatchingKernel
         backgroundModel1 = results1.backgroundModel
         kernelCellSet1 = results1.kernelCellSet
 
         # And then take away XY0
+        templateSubImage = afwImage.ExposureF(self.templateImage.clone(), self.bbox)
+        scienceSubImage = afwImage.ExposureF(self.scienceImage.clone(), self.bbox)
         templateSubImage.setXY0(afwGeom.Point2I(0, 0))
         scienceSubImage.setXY0(afwGeom.Point2I(0, 0))
-        results2 = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping=True)
+
+        results2 = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping=True,
+                                              templateFwhmPix=fwhm, scienceFwhmPix=fwhm)
         spatialKernel2 = results2.psfMatchingKernel
         backgroundModel2 = results2.backgroundModel
         kernelCellSet2 = results2.kernelCellSet
