@@ -608,6 +608,8 @@ class PsfMatchTask(pipeBase.Task):
                 di.displayKernelMosaic = True
                 # show coefficients of spatial model
                 di.plotKernelSpatialModel = False
+                # show fixed and spatial coefficients and coefficient histograms
+                di.plotKernelCoefficients = True
                 # show the bad candidates (red) along with good (green)
                 di.showBadCandidates = True
             return di
@@ -760,6 +762,7 @@ class PsfMatchTask(pipeBase.Task):
         displayKernelBasis = lsstDebug.Info(__name__).displayKernelBasis
         displayKernelMosaic = lsstDebug.Info(__name__).displayKernelMosaic
         plotKernelSpatialModel = lsstDebug.Info(__name__).plotKernelSpatialModel
+        plotKernelCoefficients = lsstDebug.Info(__name__).plotKernelCoefficients
         showBadCandidates = lsstDebug.Info(__name__).showBadCandidates
         maskTransparency = lsstDebug.Info(__name__).maskTransparency
         if not maskTransparency:
@@ -792,6 +795,9 @@ class PsfMatchTask(pipeBase.Task):
 
         if plotKernelSpatialModel:
             diutils.plotKernelSpatialModel(spatialKernel, kernelCellSet, showBadCandidates=showBadCandidates)
+
+        if plotKernelCoefficients:
+            diutils.plotKernelCoefficients(spatialKernel, kernelCellSet)
 
     def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
         """Create Principal Component basis

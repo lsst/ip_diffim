@@ -131,7 +131,8 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
 
     targetSigma = targetFwhmPix / sigma2fwhm
     referenceSigma = referenceFwhmPix / sigma2fwhm
-    logger = Log.getLogger("lsst.ip.diffim.generateAlardLuptonBasisList")
+    logger = Log.getLogger("ip.diffim.generateAlardLuptonBasisList")
+#     logger.setLevel(logger.DEBUG)
     logger.debug("Generating matching bases for sigma %.2f pix -> %.2f pix", targetSigma, referenceSigma)
 
     # Modify the size of Alard Lupton kernels based upon the images FWHM
@@ -233,5 +234,9 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         metadata.add("ALBasisDegGauss", basisDegGauss)
         metadata.add("ALBasisSigGauss", basisSigmaGauss)
         metadata.add("ALKernelSize", kernelSize)
+
+    logger.debug("basisSigmaGauss: %s basisDegGauss: %s",
+                 ','.join(['{:.1f}'.format(v) for v in basisSigmaGauss]),
+                 ','.join(['{:d}'.format(v) for v in basisDegGauss]))
 
     return diffimLib.makeAlardLuptonBasisList(kernelSize//2, basisNGauss, basisSigmaGauss, basisDegGauss)

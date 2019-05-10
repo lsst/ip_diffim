@@ -3,7 +3,7 @@ Package usage and technical notes
 #################################
 
 This page is a collection of usage and code related notes about the
-image differencing implmentation. We do not summarise the Alard-Lupton
+image differencing implementation. We do not summarise the Alard-Lupton
 (AL) [AL_1998]_ and Zackay, Ofek, Gal-Yam (ZOGY) [ZOGY2016]_ papers
 themselves here. 
 
@@ -54,6 +54,10 @@ specified for the subtasks directly.
     :alt: Subtasks page 2
 
     Top level configuration options in ``ZogyTask``.
+
+.. 
+	Figure source on github:  
+	lsst-dm/diffimTests/figure_subtasks/ImageDifference_flowchart.draw.io
 
 Specifying a coadd as template
 ------------------------------
