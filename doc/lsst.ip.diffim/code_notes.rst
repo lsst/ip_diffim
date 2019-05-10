@@ -3,7 +3,7 @@ Package usage and technical notes
 #################################
 
 This page is a collection of usage and code related notes about the
-image differencing implmentation. We do not summarise the Alard-Lupton
+image differencing implementation. We do not summarise the Alard-Lupton
 (AL) [AL_1998]_ and Zackay, Ofek, Gal-Yam (ZOGY) [ZOGY2016]_ papers
 themselves here. 
 
@@ -30,12 +30,14 @@ steps included in ``ImageDifferenceTask`` around the actual
 subtraction operation of the images. Including the subtraction
 operation itself, these steps can be enabled or disabled by top level
 ``do<ACTION>`` configuration options. These top-level configuration
-options are summarised in Figures 1 and 2 (`flowchart source and
-standalone pdf version
+options are summarised in :numref:`flowchart1` and
+:numref:`flowchart2` (`flowchart source and standalone pdf version
 <https://github.com/lsst-dm/diffimTests/tree/master/figure_subtasks>`_
 ). Some of these top level configuration options are also passed on to
 invoked subtasks and influence their functionality. They may not be
 specified for the subtasks directly.
+
+.. _flowchart1:
 
 .. figure:: figures/ImageDifference_flowchart.draw.io-Page-1.svg
     :align: center
@@ -49,11 +51,17 @@ specified for the subtasks directly.
     and ends with post processing steps following the subtraction on
     the bottom.
 
+.. _flowchart2:
+
 .. figure:: figures/ImageDifference_flowchart.draw.io-Page-2.svg
     :align: center
     :alt: Subtasks page 2
 
     Top level configuration options in ``ZogyTask``.
+
+.. 
+	Figure source on github:  
+	lsst-dm/diffimTests/figure_subtasks/ImageDifference_flowchart.draw.io
 
 Specifying a coadd as template
 ------------------------------
