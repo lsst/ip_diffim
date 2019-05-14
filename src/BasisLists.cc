@@ -104,8 +104,8 @@ namespace diffim {
             double sig  = sigGauss[i];
             int deg     = degGauss[i];
 
-            LOGL_DEBUG("TRACE1.ip.diffim.BasisLists.makeAlardLuptonBasisList",
-                       "Gaussian %d : sigma %.2f degree %d", i, sig, deg);
+            LOGL_DEBUG("ip.diffim.BasisLists.makeAlardLuptonBasisList",
+                       "Sigma scaling Gaussian %d : sigma %.2f degree %d", i, sig, deg);
             
             afwMath::GaussianFunction2<Pixel> gaussian(sig, sig);
             afwMath::AnalyticKernel kernel(fullWidth, fullWidth, gaussian);
@@ -131,8 +131,10 @@ namespace diffim {
                                  end = image.xy_at(image.getWidth(), y); 
                              ptr != end; ++ptr.x(), u++) {
                             /* Evaluate from -1 to 1 */
-                            *ptr  = *ptr * polynomial(u/static_cast<double>(halfWidth), 
-                                                      v/static_cast<double>(halfWidth));
+                            // *ptr  = *ptr * polynomial(u/static_cast<double>(halfWidth), 
+                            //                          v/static_cast<double>(halfWidth));
+			  *ptr  = *ptr * polynomial(u/sig/2.0, 
+						    v/sig/2.0);
                         }
                     }
                     std::shared_ptr<afwMath::Kernel> 
