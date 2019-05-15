@@ -103,9 +103,10 @@ namespace diffim {
             */
             double sig  = sigGauss[i];
             int deg     = degGauss[i];
-
+            const double threeSig = 3.0 * sig;
+	    
             LOGL_DEBUG("ip.diffim.BasisLists.makeAlardLuptonBasisList",
-                       "Sigma scaling Gaussian %d : sigma %.2f degree %d", i, sig, deg);
+                       "3-sigma scaling Gaussian %d : sigma %.2f degree %d", i, sig, deg);
             
             afwMath::GaussianFunction2<Pixel> gaussian(sig, sig);
             afwMath::AnalyticKernel kernel(fullWidth, fullWidth, gaussian);
@@ -113,6 +114,10 @@ namespace diffim {
             
             for (int j = 0, n = 0; j <= deg; j++) {
                 for (int k = 0; k <= (deg - j); k++, n++) {
+                	/* Just generate odd spatial modulation */
+//                	if ((i>0) && (j % 2) ==0 && (k%2) ==0 )
+//                		continue;
+
                     /* for 0th order term, skip polynomial */
                     (void)kernel.computeImage(image, true);
                     if (n == 0) {
@@ -133,8 +138,9 @@ namespace diffim {
                             /* Evaluate from -1 to 1 */
                             // *ptr  = *ptr * polynomial(u/static_cast<double>(halfWidth), 
                             //                          v/static_cast<double>(halfWidth));
-			  *ptr  = *ptr * polynomial(u/sig/2.0, 
-						    v/sig/2.0);
+
+                        	*ptr  = *ptr * polynomial(u/threeSig,
+                        			v/threeSig);
                         }
                     }
                     std::shared_ptr<afwMath::Kernel> 

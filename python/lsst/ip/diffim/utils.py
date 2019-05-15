@@ -509,7 +509,7 @@ def plotKernelCoefficients(spatialKernel, kernelCellSet, showBadCandidates=False
     fig = plt.figure()
     fig.suptitle("Hist. of parameters marked with spatial solution at img center")
     arrAx = fig.subplots(nrows=int(nKernelParams//nX)+1, ncols=nX)
-    arrAx = arrAx[::-1, :]
+    arrAx = arrAx[::-1]
     allParams = np.array(allParams)
     for k in range(nKernelParams):
         ax = arrAx.ravel()[k]
