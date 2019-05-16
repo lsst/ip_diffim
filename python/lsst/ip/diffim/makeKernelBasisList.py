@@ -207,8 +207,8 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
             nAppended = 1
         else:
             if (kernelSigma/basisGaussBeta) > basisMinSigma:
-                basisSigmaGauss.append(kernelSigma/basisGaussBeta)
                 basisSigmaGauss.append(kernelSigma)
+                basisSigmaGauss.append(kernelSigma/basisGaussBeta)
                 nAppended = 2
             else:
                 basisSigmaGauss.append(kernelSigma)
@@ -216,8 +216,10 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
 
         # Any other Gaussians above basisNGauss=1 come from a scaling
         # relationship: Sig_i+1 / Sig_i = basisGaussBeta
+        lastSigma = kernelSigma
         for i in range(nAppended, basisNGauss):
-            basisSigmaGauss.append(basisSigmaGauss[-1]*basisGaussBeta)
+            lastSigma *= basisGaussBeta
+            basisSigmaGauss.append(lastSigma)
 
         kernelSize = int(fwhmScaling * basisSigmaGauss[-1])
         kernelSize += 0 if kernelSize%2 else 1  # Make sure it's odd
