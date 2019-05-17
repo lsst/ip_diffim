@@ -220,10 +220,18 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         for i in range(nAppended, basisNGauss):
             lastSigma *= basisGaussBeta
             basisSigmaGauss.append(lastSigma)
+            if lastSigma > max(referenceSigma, targetSigma):
+                basisNGauss = len(basisSigmaGauss)
+                basisDegGauss = basisDegGauss[:basisNGauss]
+                break
 
         kernelSize = int(fwhmScaling * basisSigmaGauss[-1])
         kernelSize += 0 if kernelSize%2 else 1  # Make sure it's odd
         kernelSize = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
+
+        logger.debug("Convolution basisSigmaGauss: %s basisDegGauss: %s",
+                     ','.join(['{:.1f}'.format(v) for v in basisSigmaGauss]),
+                     ','.join(['{:d}'.format(v) for v in basisDegGauss]))
 
     else:
         # Deconvolution; Define the progression of Gaussians using a
@@ -232,7 +240,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         # assumes 3 components.
         #
         # http://iopscience.iop.org/0266-5611/26/8/085002  Equation 40
-
+        raise NotImplementedError("Deconvolution is temporarily disabled")
         # Use specializations for deconvolution
         basisNGauss = config.alardNGaussDeconv
         basisMinSigma = config.alardMinSigDeconv
@@ -267,21 +275,25 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
                 sigma2jn = (n - j)*sig1**2
                 sigma2jn += j * sig2**2
                 sigma2jn -= (n + 1)*sig0**2
-                sigmajn = np.sqrt(sigma2jn)
+                # Protection from nan values
+                if sigma2jn > 0:
+                    sigmajn = np.sqrt(sigma2jn)
+                else:
+                    sigmajn = basisMinSigma
                 basisSigmaGauss.append(sigmajn)
 
         basisSigmaGauss.sort()
         basisNGauss = len(basisSigmaGauss)
         basisDegGauss = [config.alardDegGaussDeconv for x in basisSigmaGauss]
 
+        logger.debug("Deconvolution basisSigmaGauss: %s basisDegGauss: %s",
+                     ','.join(['{:.1f}'.format(v) for v in basisSigmaGauss]),
+                     ','.join(['{:d}'.format(v) for v in basisDegGauss]))
+
     if metadata is not None:
         metadata.add("ALBasisNGauss", basisNGauss)
         metadata.add("ALBasisDegGauss", basisDegGauss)
         metadata.add("ALBasisSigGauss", basisSigmaGauss)
         metadata.add("ALKernelSize", kernelSize)
-
-    logger.debug("basisSigmaGauss: %s basisDegGauss: %s",
-                 ','.join(['{:.1f}'.format(v) for v in basisSigmaGauss]),
-                 ','.join(['{:d}'.format(v) for v in basisDegGauss]))
 
     return diffimLib.makeAlardLuptonBasisList(kernelSize//2, basisNGauss, basisSigmaGauss, basisDegGauss)

@@ -103,10 +103,13 @@ namespace diffim {
             */
             double sig  = sigGauss[i];
             int deg     = degGauss[i];
-            const double threeSig = 3.0 * sig;
-	    
+            /* By default size = 6 * fwhm, halfwidth = 3* fwhm = 7 * sigma
+             * Use sigma in case sigma is small and size is limited by minsize.
+             * */
+            const double fiveSig = 5.0 * sig;
+
             LOGL_DEBUG("ip.diffim.BasisLists.makeAlardLuptonBasisList",
-                       "3-sigma scaling Gaussian %d : sigma %.2f degree %d", i, sig, deg);
+                       "5-sigma scaling Gaussian %d : sigma %.2f degree %d", i, sig, deg);
 
             afwMath::GaussianFunction2<Pixel> gaussian(sig, sig);
             afwMath::AnalyticKernel kernel(fullWidth, fullWidth, gaussian);
@@ -139,8 +142,8 @@ namespace diffim {
                             // *ptr  = *ptr * polynomial(u/static_cast<double>(halfWidth),
                             //                          v/static_cast<double>(halfWidth));
 
-                        	*ptr  = *ptr * polynomial(u/threeSig,
-                        			v/threeSig);
+                        	*ptr  = *ptr * polynomial(u/fiveSig,
+                        			v/fiveSig);
                         }
                     }
                     std::shared_ptr<afwMath::Kernel>
