@@ -90,7 +90,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(self.kSize % 2, 1)       # odd sized
         kHalfWidth = self.kSize // 2
 
-        ks = ipDiffim.makeAlardLuptonBasisList(kHalfWidth, nGauss, sigGauss, degGauss)
+        ks = ipDiffim.makeAlardLuptonBasisList(kHalfWidth, nGauss, sigGauss, degGauss, sigGauss[0])
 
         # right size
         nTot = 0

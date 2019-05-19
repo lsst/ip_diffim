@@ -79,8 +79,9 @@ namespace diffim {
         int halfWidth,                ///< size is 2*N + 1
         int nGauss,                   ///< number of gaussians
         std::vector<double> const &sigGauss,   ///< width of the gaussians
-        std::vector<int>    const &degGauss    ///< local spatial variation of gaussians
-        ) {
+        std::vector<int>    const &degGauss,    ///< local spatial variation of gaussians
+        double scaleSig
+		) {
         typedef afwMath::Kernel::Pixel Pixel;
         typedef afwImage::Image<Pixel> Image;
 
@@ -153,7 +154,7 @@ namespace diffim {
                 }
             }
         }
-        return renormalizeKernelList(kernelBasisList);
+        return renormalizeKernelListScaled(kernelBasisList,scaleSig);
     }
 
 
@@ -452,6 +453,7 @@ namespace diffim {
         B_0 * B_0 != 1.0
 
         */
+
         afwMath::KernelList kernelListOut;
         if (kernelListIn.size() == 0) {
             return kernelListOut;
@@ -512,6 +514,109 @@ namespace diffim {
         return kernelListOut;
     }
 
+    /**
+     * @brief Rescale an input set of kernels
+     *
+     * @return Vector of renormalized kernels
+     *
+     * @ingroup ip_diffim
+     */
+     lsst::afw::math::KernelList
+     renormalizeKernelListScaled(
+         lsst::afw::math::KernelList const &kernelListIn, ///< Input list to be renormalized
+         double scaleSig) {
+         typedef afwMath::Kernel::Pixel Pixel;
+         typedef afwImage::Image<Pixel> Image;
+         double kSum;
+
+         /*
+
+         We want all the bases except for the first to sum to 0.0.  This allows
+         us to achieve kernel flux conservation (Ksum) across the image since all
+         the power will be in the first term, which will not vary spatially.
+
+         K(x,y) = Ksum * B_0 + Sum_i : a(x,y) * B_i
+
+         To do this, normalize all Kernels to sum = 1. and subtract B_0 from all
+         subsequent kenrels.
+
+         To get an idea of the relative contribution of each of these basis
+         functions later on down the line, lets also normalize them such that
+
+         Sum(B_i)  == 0.0   *and*
+         B_i * B_i == 1.0
+
+         For completeness
+
+         Sum(B_0)  == 1.0
+         B_0 * B_0 != 1.0
+
+         */
+         afwMath::GaussianFunction2<Pixel> normGaussian(scaleSig, scaleSig);
+         afwMath::AnalyticKernel normKernel(kernelListIn[0]->getWidth(),
+                  kernelListIn[0]->getHeight(), normGaussian);
+         Image normImage(kernelListIn[0]->getDimensions());
+         normKernel.computeImage(normImage, true);
+
+         afwMath::KernelList kernelListOut;
+         if (kernelListIn.size() == 0) {
+             return kernelListOut;
+         }
+
+         Image image0(kernelListIn[0]->getDimensions());
+         for (unsigned int i = 0; i < kernelListIn.size(); i++) {
+             if (i == 0) {
+                 /* Make sure that it is normalized to kSum 1. */
+                 (void)kernelListIn[i]->computeImage(image0, true);
+                 std::shared_ptr<afwMath::Kernel>
+                     kernelPtr(new afwMath::FixedKernel(image0));
+                 kernelListOut.push_back(kernelPtr);
+
+                 continue;
+             }
+
+             /* Don't normalize here */
+             Image image(kernelListIn[i]->getDimensions());
+             (void)kernelListIn[i]->computeImage(image, false);
+             /* image.writeFits(str(boost::format("in_k%d.fits") % i)); */
+
+             /* Check the kernel sum; if its close to zero don't do anything */
+             kSum = 0.;
+             for (int y = 0; y < image.getHeight(); y++) {
+                 for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y);
+                      ptr != end; ++ptr.x()) {
+                     kSum += *ptr;
+                 }
+             }
+
+             /* std::numeric_limits<float>::epsilon() ~ e-7
+                std::numeric_limits<double>::epsilon() ~ e-16
+
+                If we end up with 2e-16 kernel sum, this still blows up the kernel values.
+                Even though the kernels are double, use the float limits instead
+             */
+             if (fabs(kSum) > std::numeric_limits<float>::epsilon()) {
+                 image /= kSum;
+                 image -= normImage;
+             }
+
+             /* Finally, rescale such that the inner product is 1 */
+             kSum = 0.;
+             for (int y = 0; y < image.getHeight(); y++) {
+                 for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y);
+                      ptr != end; ++ptr.x()) {
+                     kSum += *ptr * *ptr;
+                 }
+             }
+             image /= std::sqrt(kSum);
+             /* image.writeFits(str(boost::format("out_k%d.fits") % i));  */
+
+             std::shared_ptr<afwMath::Kernel>
+                 kernelPtr(new afwMath::FixedKernel(image));
+             kernelListOut.push_back(kernelPtr);
+         }
+         return kernelListOut;
+     }
 
 
    /**

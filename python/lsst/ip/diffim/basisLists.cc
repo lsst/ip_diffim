@@ -48,7 +48,7 @@ PYBIND11_MODULE(basisLists, mod) {
             "borderPenalty"_a, "fitForBackground"_a);
     mod.def("renormalizeKernelList", &renormalizeKernelList, "kernelListIn"_a);
     mod.def("makeAlardLuptonBasisList", &makeAlardLuptonBasisList, "halfWidth"_a, "nGauss"_a, "sigGauss"_a,
-            "degGauss"_a);
+            "degGauss"_a, "scaleSig"_a);
 }
 
 }  // diffim

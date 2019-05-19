@@ -107,7 +107,10 @@ namespace diffim {
      * @ingroup ip_diffim
      */
     lsst::afw::math::KernelList renormalizeKernelList(
-        lsst::afw::math::KernelList const &kernelListIn
+        lsst::afw::math::KernelList const &kernelListIn);
+
+    lsst::afw::math::KernelList renormalizeKernelListScaled(
+        lsst::afw::math::KernelList const &kernelListIn, double scaleSig
         );
 
     /**
@@ -127,7 +130,8 @@ namespace diffim {
         int halfWidth,
         int nGauss,
         std::vector<double> const& sigGauss,
-        std::vector<int>    const& degGauss
+        std::vector<int>    const& degGauss,
+		double scaleSig
         );
 
 }}} // end of namespace lsst::ip::diffim
