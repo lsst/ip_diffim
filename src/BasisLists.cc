@@ -118,9 +118,6 @@ namespace diffim {
 
             for (int j = 0, n = 0; j <= deg; j++) {
                 for (int k = 0; k <= (deg - j); k++, n++) {
-                	/* Just generate odd spatial modulation */
-//                	if ((i>0) && (j % 2) ==0 && (k%2) ==0 )
-//                		continue;
 
                     /* for 0th order term, skip polynomial */
                     (void)kernel.computeImage(image, true);
