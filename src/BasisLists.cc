@@ -102,11 +102,8 @@ namespace diffim {
             /*
                sigma = FWHM / ( 2 * sqrt(2 * ln(2)) )
             */
-            double sig  = sigGauss[i];
-            int deg     = degGauss[i];
-            /* By default size = 6 * fwhm, halfwidth = 3* fwhm = 7 * sigma
-             * Use sigma in case sigma is small and size is limited by minsize.
-             * */
+            const double sig  = sigGauss[i];
+            const int deg     = degGauss[i];
             const double fiveSig = 5.0 * sig;
 
             LOGL_DEBUG("ip.diffim.BasisLists.makeAlardLuptonBasisList",
@@ -118,43 +115,42 @@ namespace diffim {
 
             for (int j = 0, n = 0; j <= deg; j++) {
                 for (int k = 0; k <= (deg - j); k++, n++) {
-                	/* Just generate odd spatial modulation */
-//                	if ((i>0) && (j % 2) ==0 && (k%2) ==0 )
-//                		continue;
+                    /* gaussian to be modified by this term in the polynomial */
+                    (void)kernel.computeImage(image, true);
 
                     /* for 0th order term, skip polynomial */
-                    (void)kernel.computeImage(image, true);
-                    if (n == 0) {
-                        std::shared_ptr<afwMath::Kernel>
-                            kernelPtr(new afwMath::FixedKernel(image));
-                        kernelBasisList.push_back(kernelPtr);
-                        continue;
-                    }
-
-                    /* gaussian to be modified by this term in the polynomial */
-                    polynomial.setParameter(n, 1.);
-                    (void)kernel.computeImage(image, true);
-                    for (int y = 0, v = -halfWidth; y < image.getHeight(); y++, v++) {
-                        int u = -halfWidth;
-                        for (Image::xy_locator ptr = image.xy_at(0, y),
-                                 end = image.xy_at(image.getWidth(), y);
-                             ptr != end; ++ptr.x(), u++) {
-                            /* Evaluate from -1 to 1 */
-                            // *ptr  = *ptr * polynomial(u/static_cast<double>(halfWidth),
-                            //                          v/static_cast<double>(halfWidth));
-
-                        	*ptr  = *ptr * polynomial(u/fiveSig,
-                        			v/fiveSig);
+                    if (n > 0) {
+                        polynomial.setParameter(n, 1.);
+                        for (int y = 0, v = -halfWidth; y < image.getHeight(); y++, v++) {
+                            int u = -halfWidth;
+                            for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(),
+                                    y); ptr != end; ++ptr.x(), u++) {
+                                /* -5sig to 5sig corresponds to -1 to 1 */
+                                *ptr = *ptr * polynomial(u / fiveSig, v / fiveSig);
+                            }
                         }
+                        polynomial.setParameter(n, 0.);
                     }
-                    std::shared_ptr<afwMath::Kernel>
-                        kernelPtr(new afwMath::FixedKernel(image));
-                    kernelBasisList.push_back(kernelPtr);
-                    polynomial.setParameter(n, 0.);
+                    /* With the exception of the very first basis, all the others are
+                     * to be zero normalised.
+                     */
+                    if (!((i == 0) && (n == 0))){
+                        auto img2 = Image(image,true);
+                        if (renormalizeImageToZero(img2,sig/scaleSig))
+                            kernelBasisList.emplace_back(new afwMath::FixedKernel(img2));
+                        if (renormalizeImageToZero(image,sig*scaleSig))
+                            kernelBasisList.emplace_back(new afwMath::FixedKernel(image));
+
+                    } else
+                        kernelBasisList.emplace_back(new afwMath::FixedKernel(image));
+//                    std::shared_ptr<afwMath::Kernel>
+//                        kernelPtr(new afwMath::FixedKernel(image));
+//                    kernelBasisList.push_back(kernelPtr);
+
                 }
             }
         }
-        return renormalizeKernelListScaled(kernelBasisList,scaleSig);
+        return kernelBasisList;
     }
 
 
@@ -513,6 +509,91 @@ namespace diffim {
         }
         return kernelListOut;
     }
+
+    /**
+     * @brief Renormalize one kernel image to zero sum using the given sigma width gaussian
+     *
+     * @return Vector of renormalized kernels
+     *
+     * @ingroup ip_diffim
+     */
+     bool
+     renormalizeImageToZero(afwImage::Image<afwMath::Kernel::Pixel> & kernelImage, double normSig) {
+         typedef afwMath::Kernel::Pixel Pixel;
+         typedef afwImage::Image<Pixel> Image;
+
+         /*
+
+         TODO: UPDATE FOR ONE IMAGE
+         We want all the bases except for the first to sum to 0.0.  This allows
+         us to achieve kernel flux conservation (Ksum) across the image since all
+         the power will be in the first term, which will not vary spatially.
+
+         K(x,y) = Ksum * B_0 + Sum_i : a(x,y) * B_i
+
+         To do this, normalize all Kernels to sum = 1. and subtract B_0 from all
+         subsequent kenrels.
+
+         To get an idea of the relative contribution of each of these basis
+         functions later on down the line, lets also normalize them such that
+
+         Sum(B_i)  == 0.0   *and*
+         B_i * B_i == 1.0
+
+         For completeness
+
+         Sum(B_0)  == 1.0
+         B_0 * B_0 != 1.0
+
+         */
+         /* Check the kernel sum; if its close to zero don't do anything */
+         double kSum = 0.;
+         for (int y = 0; y < kernelImage.getHeight(); ++y) {
+                 for (Image::xy_locator ptr = kernelImage.xy_at(0, y),
+                         end = kernelImage.xy_at(kernelImage.getWidth(), y);
+                      ptr != end; ++ptr.x()) {
+                     kSum += *ptr;
+                 }
+             }
+
+             /* std::numeric_limits<float>::epsilon() ~ e-7
+                std::numeric_limits<double>::epsilon() ~ e-16
+
+                If we end up with 2e-16 kernel sum, this still blows up the kernel values.
+                Even though the kernels are double, use the float limits instead
+             */
+             /* kernel sum already zero ? */
+             if (fabs(kSum) > std::numeric_limits<float>::epsilon()) {
+                 /* First scale to sum 1. then subtract the normalization gaussian with sum 1. */
+                 kernelImage /= kSum;
+
+                 afwMath::GaussianFunction2<Pixel> normGaussian(normSig, normSig);
+                 afwMath::AnalyticKernel normKernel(kernelImage.getWidth(),
+                          kernelImage.getHeight(), normGaussian);
+                 Image normImage(kernelImage.getDimensions());
+                 normKernel.computeImage(normImage, true);
+                 kernelImage -= normImage;
+             }
+
+             /* Finally, rescale such that the inner product is 1 */
+             kSum = 0.;
+             for (int y = 0; y < kernelImage.getHeight(); ++y) {
+                 for (Image::xy_locator ptr = kernelImage.xy_at(0, y),
+                         end = kernelImage.xy_at(kernelImage.getWidth(), y);
+                      ptr != end; ++ptr.x()) {
+                     kSum += *ptr * *ptr;
+                 }
+             }
+             /* If the normalization subtraction and the original sigma is the same, we end up with all
+              * zeros.
+              */
+             if (kSum > std::numeric_limits<float>::epsilon()) {
+                kernelImage /= std::sqrt(kSum);
+                return true;
+             }
+             return false;
+     }
+
 
     /**
      * @brief Rescale an input set of kernels

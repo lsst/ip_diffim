@@ -172,7 +172,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
             metadata.add("ALKernelSize", kernelSize)
 
         return diffimLib.makeAlardLuptonBasisList(kernelSize//2, basisNGauss, basisSigmaGauss, basisDegGauss,
-                                                  basisSigmaGauss[0])
+                                                  1.5)
 
     targetSigma = targetFwhmPix / sigma2fwhm
     referenceSigma = referenceFwhmPix / sigma2fwhm
@@ -299,4 +299,4 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         
     logger.debug("scaleSigma: %.1f ",max(targetSigma, referenceSigma))
     return diffimLib.makeAlardLuptonBasisList(kernelSize//2, basisNGauss, basisSigmaGauss, basisDegGauss,
-                                              max(targetSigma, referenceSigma))
+                                              1.5)
