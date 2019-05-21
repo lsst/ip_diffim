@@ -113,7 +113,7 @@ namespace diffim {
         lsst::afw::math::KernelList const &kernelListIn, double scaleSig
         );
 
-    bool renormalizeImageToZero(lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> & kernelImage,
+    int renormalizeImageToZero(lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> & kernelImage,
             double normSig);
 
     /**

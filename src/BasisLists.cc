@@ -136,11 +136,13 @@ namespace diffim {
                      */
                     if (!((i == 0) && (n == 0))){
                         auto img2 = Image(image,true);
-                        if (renormalizeImageToZero(img2,sig/scaleSig))
+                        const int normStatus = renormalizeImageToZero(img2,sig/scaleSig);
+                        if ( normStatus < 2)
+                        {
                             kernelBasisList.emplace_back(new afwMath::FixedKernel(img2));
-                        if (renormalizeImageToZero(image,sig*scaleSig))
+                        if ((normStatus == 0) && (renormalizeImageToZero(image,sig*scaleSig) == 0))
                             kernelBasisList.emplace_back(new afwMath::FixedKernel(image));
-
+                        }
                     } else
                         kernelBasisList.emplace_back(new afwMath::FixedKernel(image));
 //                    std::shared_ptr<afwMath::Kernel>
@@ -517,7 +519,7 @@ namespace diffim {
      *
      * @ingroup ip_diffim
      */
-     bool
+     int
      renormalizeImageToZero(afwImage::Image<afwMath::Kernel::Pixel> & kernelImage, double normSig) {
          typedef afwMath::Kernel::Pixel Pixel;
          typedef afwImage::Image<Pixel> Image;
@@ -562,6 +564,7 @@ namespace diffim {
                 If we end up with 2e-16 kernel sum, this still blows up the kernel values.
                 Even though the kernels are double, use the float limits instead
              */
+             int status = 0;
              /* kernel sum already zero ? */
              if (fabs(kSum) > std::numeric_limits<float>::epsilon()) {
                  /* First scale to sum 1. then subtract the normalization gaussian with sum 1. */
@@ -574,6 +577,8 @@ namespace diffim {
                  normKernel.computeImage(normImage, true);
                  kernelImage -= normImage;
              }
+             else
+                 status = 1;
 
              /* Finally, rescale such that the inner product is 1 */
              kSum = 0.;
@@ -589,9 +594,9 @@ namespace diffim {
               */
              if (kSum > std::numeric_limits<float>::epsilon()) {
                 kernelImage /= std::sqrt(kSum);
-                return true;
+                return status;
              }
-             return false;
+             return 2;
      }
 
 
