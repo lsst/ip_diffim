@@ -176,7 +176,6 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
     targetSigma = targetFwhmPix / sigma2fwhm
     referenceSigma = referenceFwhmPix / sigma2fwhm
     logger = Log.getLogger("ip.diffim.generateAlardLuptonBasisList")
-#     logger.setLevel(logger.DEBUG)
     logger.debug("Generating matching bases for sigma %.2f pix -> %.2f pix", targetSigma, referenceSigma)
 
     # Modify the size of Alard Lupton kernels based upon the images FWHM

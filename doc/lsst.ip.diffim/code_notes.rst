@@ -49,7 +49,8 @@ specified for the subtasks directly.
     Following the reading of the template and science images, the task
     starts with the preprocessing of the science exposure on the top
     and ends with post processing steps following the subtraction on
-    the bottom.
+    the bottom. Figure source
+    :download:`here <figures/ImageDifference_flowchart.drawio>`.
 
 .. _flowchart2:
 
@@ -58,10 +59,6 @@ specified for the subtasks directly.
     :alt: Subtasks page 2
 
     Top level configuration options in ``ZogyTask``.
-
-.. 
-	Figure source on github:  
-	lsst-dm/diffimTests/figure_subtasks/ImageDifference_flowchart.draw.io
 
 Specifying a coadd as template
 ------------------------------

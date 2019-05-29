@@ -421,7 +421,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
 
 
 def plotKernelCoefficients(spatialKernel, kernelCellSet, showBadCandidates=False, keepPlots=True):
-    """Plot the individual spatialKernel candidate coefficients.
+    """Plot the individual kernel candidate and the spatial kernel solution coefficients.
 
     Parameters
     ----------
@@ -435,14 +435,32 @@ def plotKernelCoefficients(spatialKernel, kernelCellSet, showBadCandidates=False
         The spatial cells that was used for solution for the spatialKernel. They contain the
         local solutions of the AL kernel for the selected sources.
 
+    showBadCandidates : `bool`, optional
+        If True, plot the coefficient values for kernel candidates where the solution was marked
+        bad by the numerical algorithm. Defaults to False.
+
+    keepPlots: `bool`, optional
+        If True, sets ``plt.show()`` to be called before the task terminates, so that the plots
+        can be explored interactively. Defaults to True.
+
     Notes
     -----
     This function produces 3 figures per image subtraction operation.
+    * A grid plot of the local solutions. Each grid cell corresponds to a proportional area in
+      the image. In each cell, local kernel solution coefficients are plotted of kernel candidates (color)
+      that fall into this area as a function of the kernel basis function number.
+    * A grid plot of the spatial solution. Each grid cell corresponds to a proportional area in
+      the image. In each cell, the spatial solution coefficients are evaluated for the center of the cell.
+    * Histogram of the local solution coefficients. Red line marks the spatial solution value at
+      center of the image.
+
+    This function is called if ``lsst.ip.diffim.psfMatch.plotKernelCoefficients==True`` in lsstDebug. This
+    function was implemented as part of DM-17825.
     """
     try:
         import matplotlib.pyplot as plt
     except ImportError as e:
-        print("Unable to import numpy and matplotlib: %s" % e)
+        print("Unable to import matplotlib: %s" % e)
         return
 
     # Image dimensions
