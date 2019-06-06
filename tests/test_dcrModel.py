@@ -27,13 +27,15 @@ from scipy import ndimage
 import unittest
 
 from lsst.afw.coord import Observatory, Weather
+from lsst.afw.coord.refraction import differentialRefraction
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.image.utils as afwImageUtils
 import lsst.afw.math as afwMath
 from lsst.daf.base import DateTime
 from lsst.geom import arcseconds, degrees, radians
-from lsst.ip.diffim.dcrModel import DcrModel, calculateDcr, calculateImageParallacticAngle, applyDcr
+from lsst.ip.diffim.dcrModel import (DcrModel, calculateDcr, calculateImageParallacticAngle,
+                                     applyDcr, wavelengthGenerator)
 from lsst.meas.algorithms.testUtils import plantSources
 import lsst.utils.tests
 
@@ -271,6 +273,63 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         for shiftOld, shiftNew in zip(refShift, dcrShift):
             self.assertFloatsAlmostEqual(shiftOld[1], shiftNew[1], rtol=1e-6, atol=1e-8)
             self.assertFloatsAlmostEqual(shiftOld[0], shiftNew[0], rtol=1e-6, atol=1e-8)
+
+    def testCoordinateTransformDcrCalculation(self):
+        """Check the DCR calculation using astropy coordinate transformations.
+
+        Astmospheric refraction causes sources to appear closer to zenith than
+        they really are. An alternate calculation of the shift due to DCR is to
+        transform the pixel coordinates to altitude and azimuth, add the DCR
+        amplitude to the altitude, and transform back to pixel coordinates.
+        """
+        dcrNumSubfilters = 3
+        afwImageUtils.defineFilter("gTest", self.lambdaEff,
+                                   lambdaMin=self.lambdaMin, lambdaMax=self.lambdaMax)
+        filterInfo = afwImage.Filter("gTest")
+        lambdaEff = filterInfo.getFilterProperty().getLambdaEff()
+        pixelScale = 0.2*arcseconds
+
+        for testIter in range(self.nRandIter):
+            rotAngle = 360.*self.rng.rand()*degrees
+            azimuth = 360.*self.rng.rand()*degrees
+            elevation = (45. + self.rng.rand()*40.)*degrees  # Restrict to 45 < elevation < 85 degrees
+            visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
+            loc = EarthLocation(lat=visitInfo.getObservatory().getLatitude().asDegrees()*u.degree,
+                                lon=visitInfo.getObservatory().getLongitude().asDegrees()*u.degree,
+                                height=visitInfo.getObservatory().getElevation()*u.m)
+            wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
+            date = visitInfo.getDate()
+            time = Time(date.get(date.MJD, date.TAI), format='mjd', location=loc, scale='tai')
+            # The DCR calculations are performed at the boresight
+            ra0 = visitInfo.getBoresightRaDec().getLongitude()
+            dec0 = visitInfo.getBoresightRaDec().getLatitude()
+            x0, y0 = wcs.skyToPixel(afwGeom.SpherePoint(ra0, dec0))
+            dcrShifts = calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters)
+            refShifts = []
+            for wl0, wl1 in wavelengthGenerator(filterInfo, dcrNumSubfilters):
+                # Note that diffRefractAmp can be negative,
+                # since it is relative to the midpoint of the full band
+                diffRefractAmp0 = differentialRefraction(wavelength=wl0, wavelengthRef=lambdaEff,
+                                                         elevation=elevation,
+                                                         observatory=visitInfo.getObservatory(),
+                                                         weather=visitInfo.getWeather())
+                diffRefractAmp1 = differentialRefraction(wavelength=wl1, wavelengthRef=lambdaEff,
+                                                         elevation=elevation,
+                                                         observatory=visitInfo.getObservatory(),
+                                                         weather=visitInfo.getWeather())
+                diffRefractAmp = (diffRefractAmp0 + diffRefractAmp1)/2.
+
+                elevation1 = elevation + diffRefractAmp
+                altaz = SkyCoord(alt=elevation1.asDegrees(), az=azimuth.asDegrees(),
+                                 unit='deg', obstime=time, frame='altaz', location=loc)
+                ra1 = altaz.icrs.ra.degree*degrees
+                dec1 = altaz.icrs.dec.degree*degrees
+                x1, y1 = wcs.skyToPixel(afwGeom.SpherePoint(ra1, dec1))
+                refShifts.append((y1-y0, x1-x0))
+            for refShift, dcrShift in zip(refShifts, dcrShifts):
+                # Use a fairly loose tolerance, since 1% of a pixel is good enough agreement.
+                self.assertFloatsAlmostEqual(refShift[1], dcrShift[1], rtol=1e-2, atol=1e-2)
+                self.assertFloatsAlmostEqual(refShift[0], dcrShift[0], rtol=1e-2, atol=1e-2)
 
     def testDcrSubfilterOrder(self):
         """Test that the bluest subfilter always has the largest DCR amplitude.
