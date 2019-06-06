@@ -365,9 +365,9 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
                                         crval=visitInfo.getBoresightRaDec(),
                                         flipX=flip)
                 rotAngle = calculateImageParallacticAngle(visitInfo, wcs)
-                if flip:
+                if ~flip:
                     rotAngle *= -1
-                self.assertAnglesAlmostEqual(cdRotAngle, rotAngle, maxDiff=1e-6*radians)
+                self.assertAnglesAlmostEqual(cdRotAngle, rotAngle)
 
     def testConditionDcrModelNoChange(self):
         """Conditioning should not change the model if it equals the reference.
