@@ -20,24 +20,29 @@
 # see <https://www.lsstcorp.org/LegalNotices/>.
 
 from astropy import units as u
-from astropy.coordinates import SkyCoord, EarthLocation
+from astropy.coordinates import SkyCoord, EarthLocation, Angle
 from astropy.time import Time
 import numpy as np
 from scipy import ndimage
 import unittest
 
-from lsst.afw.coord import Observatory, Weather
+from astro_metadata_translator import makeObservationInfo
 from lsst.afw.coord.refraction import differentialRefraction
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.image.utils as afwImageUtils
 import lsst.afw.math as afwMath
-from lsst.daf.base import DateTime
-from lsst.geom import arcseconds, degrees, radians
+from lsst.geom import arcseconds, degrees, radians, arcminutes
 from lsst.ip.diffim.dcrModel import (DcrModel, calculateDcr, calculateImageParallacticAngle,
                                      applyDcr, wavelengthGenerator)
+from lsst.obs.base import MakeRawVisitInfoViaObsInfo
 from lsst.meas.algorithms.testUtils import plantSources
 import lsst.utils.tests
+
+
+# Our calculation of hour angle and parallactic angle ignore precession
+# and nutation, so calculations depending on these are not precise. DM-20133
+coordinateTolerance = 1.*arcminutes
 
 
 class DcrModelTestTask(lsst.utils.tests.TestCase):
@@ -170,7 +175,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         wcs = afwGeom.makeSkyWcs(crpix=crpix, crval=crval, cdMatrix=cdMatrix)
         return wcs
 
-    def makeDummyVisitInfo(self, azimuth, elevation):
+    def makeDummyVisitInfo(self, azimuth, elevation, exposureId=12345, randomizeTime=False):
         """Make a self-consistent visitInfo object for testing.
 
         Parameters
@@ -179,50 +184,50 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             Azimuth angle of the simulated observation.
         elevation : `lsst.geom.Angle`
             Elevation angle of the simulated observation.
+        exposureId : `int`, optional
+            Unique integer identifier for this observation.
+        randomizeTime : `bool`, optional
+            Add a random offset to the observation time.
 
         Returns
         -------
         `lsst.afw.image.VisitInfo`
             VisitInfo for the exposure.
         """
-        lsstLat = -30.244639*degrees
-        lsstLon = -70.749417*degrees
-        lsstAlt = 2663.
-        lsstTemperature = 20.*u.Celsius  # in degrees Celcius
+        lsstLat = -30.244639*u.degree
+        lsstLon = -70.749417*u.degree
+        lsstAlt = 2663.*u.m
+        lsstTemperature = 20.*u.Celsius
         lsstHumidity = 40.  # in percent
         lsstPressure = 73892.*u.pascal
-        lsstWeather = Weather(lsstTemperature.value, lsstPressure.value, lsstHumidity)
-        lsstObservatory = Observatory(lsstLon, lsstLat, lsstAlt)
-        loc = EarthLocation(lat=lsstLat.asDegrees()*u.degree,
-                            lon=lsstLon.asDegrees()*u.degree,
-                            height=lsstAlt*u.m)
+        loc = EarthLocation(lat=lsstLat,
+                            lon=lsstLon,
+                            height=lsstAlt)
         airmass = 1.0/np.sin(elevation.asDegrees())
 
         time = Time(2000., format='decimalyear', scale='tai', location=loc)
-        # Pick a random date and time within a 20-year span
-        time += 20*365*self.rng.rand()
+        time += 0.5*u.day  # Add half a day since J2000 is defined at noon
+        if randomizeTime:
+            # Pick a random date and time within a 20-year span
+            time += 20*u.year*self.rng.rand()
         altaz = SkyCoord(alt=elevation.asDegrees(), az=azimuth.asDegrees(),
                          unit='deg', obstime=time, frame='altaz', location=loc)
-        ra = altaz.icrs.ra.degree*degrees
-        dec = altaz.icrs.dec.degree*degrees
-        dateTime = DateTime(time.mjd, system=DateTime.DateSystem.MJD, scale=DateTime.Timescale.TAI)
-        # Calculate the hour angle from geometry, ignoring precession.
-        # Note that we do not use ``lst = time.siderial_time("apparent")`` here.
-        # The Hour Angle derived from that calculation is inconsistent with
-        # other coordinate calculations within the LSST software stack by
-        # several arcseconds, even after accounting for precession and nutation.
-        HA = calculateHourAngle(elevation, azimuth, lsstLat)
-        lst = HA + ra
-        era = lst - lsstLon
-        visitInfo = afwImage.VisitInfo(era=era,
-                                       boresightRaDec=afwGeom.SpherePoint(ra, dec),
-                                       boresightAzAlt=afwGeom.SpherePoint(azimuth, elevation),
-                                       boresightAirmass=airmass,
-                                       boresightRotAngle=0.*radians,
-                                       date=dateTime,
-                                       observatory=lsstObservatory,
-                                       weather=lsstWeather
-                                       )
+        obsInfo = makeObservationInfo(location=loc,
+                                      detector_exposure_id=exposureId,
+                                      datetime_begin=time,
+                                      datetime_end=time,
+                                      boresight_airmass=airmass,
+                                      boresight_rotation_angle=Angle(0.*u.degree),
+                                      boresight_rotation_coord='sky',
+                                      temperature=lsstTemperature,
+                                      pressure=lsstPressure,
+                                      relative_humidity=lsstHumidity,
+                                      tracking_radec=altaz.icrs,
+                                      altaz_begin=altaz,
+                                      observation_type='science',
+                                      )
+        makeVisitInfo = MakeRawVisitInfoViaObsInfo()
+        visitInfo = makeVisitInfo.observationInfo2visitInfo(obsInfo=obsInfo)
         return visitInfo
 
     def testDummyVisitInfo(self):
@@ -242,13 +247,13 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             # The hour angle should be zero for azimuth=0
             HA = visitInfo.getBoresightHourAngle()
             refHA = 0.*degrees
-            self.assertAnglesAlmostEqual(HA, refHA)
+            self.assertAnglesAlmostEqual(HA, refHA, maxDiff=coordinateTolerance)
             # If the observation is North of the telescope's latitude, the
             # direction to zenith should be along the -y axis
             # with a parallactic angle of 180 degrees
             parAngle = visitInfo.getBoresightParAngle()
             refParAngle = 180.*degrees
-            self.assertAnglesAlmostEqual(parAngle, refParAngle)
+            self.assertAnglesAlmostEqual(parAngle, refParAngle, maxDiff=coordinateTolerance)
 
     def testDcrCalculation(self):
         """Test that the shift in pixels due to DCR is consistently computed.
@@ -267,9 +272,9 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
         dcrShift = calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters)
         # Compare to precomputed values.
-        refShift = [(-0.5575046818186551, -0.2705169391233882),
-                    (0.001961727697724214, 0.0009518854091965191),
-                    (0.40398777927558477, 0.1960262237374977)]
+        refShift = [(-0.5575567724366292, -0.2704095599533037),
+                    (0.001961910992342903, 0.000951507567181944),
+                    (0.40402552599550073, 0.19594841296051665)]
         for shiftOld, shiftNew in zip(refShift, dcrShift):
             self.assertFloatsAlmostEqual(shiftOld[1], shiftNew[1], rtol=1e-6, atol=1e-8)
             self.assertFloatsAlmostEqual(shiftOld[0], shiftNew[0], rtol=1e-6, atol=1e-8)
@@ -300,12 +305,16 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
             date = visitInfo.getDate()
             time = Time(date.get(date.MJD, date.TAI), format='mjd', location=loc, scale='tai')
+            altaz = SkyCoord(alt=elevation.asDegrees(), az=azimuth.asDegrees(),
+                             unit='deg', obstime=time, frame='altaz', location=loc)
             # The DCR calculations are performed at the boresight
-            ra0 = visitInfo.getBoresightRaDec().getLongitude()
-            dec0 = visitInfo.getBoresightRaDec().getLatitude()
+            ra0 = altaz.icrs.ra.degree*degrees
+            dec0 = altaz.icrs.dec.degree*degrees
             x0, y0 = wcs.skyToPixel(afwGeom.SpherePoint(ra0, dec0))
             dcrShifts = calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters)
             refShifts = []
+            # We divide the filter into "subfilters" with with the full wavelength range
+            # divided into equal sub-ranges.
             for wl0, wl1 in wavelengthGenerator(filterInfo, dcrNumSubfilters):
                 # Note that diffRefractAmp can be negative,
                 # since it is relative to the midpoint of the full band
@@ -386,7 +395,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
         wcs = self.makeDummyWcs(cdRotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
         rotAngle = calculateImageParallacticAngle(visitInfo, wcs)
-        refAngle = -1.0840342148738267*radians
+        refAngle = -1.0848040464064805*radians
         self.assertAnglesAlmostEqual(refAngle, rotAngle)
 
     def testRotationSouthZero(self):
@@ -405,7 +414,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
             wcs = self.makeDummyWcs(cdRotAngle, pixelScale, crval=visitInfo.getBoresightRaDec(), flipX=True)
             rotAngle = calculateImageParallacticAngle(visitInfo, wcs)
-            self.assertAnglesAlmostEqual(refAngle - cdRotAngle, rotAngle)
+            self.assertAnglesAlmostEqual(refAngle - cdRotAngle, rotAngle, maxDiff=coordinateTolerance)
 
     def testRotationFlipped(self):
         """Check the interpretation of rotations in the WCS.
@@ -424,9 +433,9 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
                                         crval=visitInfo.getBoresightRaDec(),
                                         flipX=flip)
                 rotAngle = calculateImageParallacticAngle(visitInfo, wcs)
-                if ~flip:
+                if flip:
                     rotAngle *= -1
-                self.assertAnglesAlmostEqual(cdRotAngle, rotAngle)
+                self.assertAnglesAlmostEqual(cdRotAngle, rotAngle, maxDiff=coordinateTolerance)
 
     def testConditionDcrModelNoChange(self):
         """Conditioning should not change the model if it equals the reference.
@@ -559,31 +568,6 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             self.assertFloatsEqual(refVal, np.sum(model.array))
         # Negative indices are allowed, so check that those return models from the end.
         self.assertFloatsEqual(refVals[-1], np.sum(dcrModels[-1].array))
-
-
-def calculateHourAngle(alt, az, lat):
-    """Convert local horizon coordinates to equatorial, ignoring precession.
-
-    Parameters
-    ----------
-    alt : `lsst.geom.Angle`
-        Local altitude angle, measured from the horizon.
-    az : `lsst.geom.Angle`
-        Azimuth angle, measured East from North.
-    lat : `lsst.geom.Angle`
-        Latitude of the observer.
-
-    Returns
-    -------
-    ha : `lsst.geom.Angle`
-        Hour Angle of the given local coordinates.
-    """
-    az_r = az.asRadians()
-    alt_r = alt.asRadians()
-    lat_r = lat.asRadians()
-    ha = np.arctan2(-np.sin(az_r)*np.cos(alt_r),
-                    -np.cos(az_r)*np.sin(lat_r)*np.cos(alt_r) + np.sin(alt_r)*np.cos(lat_r))
-    return ha*radians
 
 
 class MyMemoryTestCase(lsst.utils.tests.MemoryTestCase):
