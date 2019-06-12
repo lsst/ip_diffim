@@ -205,8 +205,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
                             height=lsstAlt)
         airmass = 1.0/np.sin(elevation.asDegrees())
 
-        time = Time(2000., format='decimalyear', scale='tai', location=loc)
-        time += 0.5*u.day  # Add half a day since J2000 is defined at noon
+        time = Time(2000.0, format="jyear", scale="tai")
         if randomizeTime:
             # Pick a random date and time within a 20-year span
             time += 20*u.year*self.rng.rand()
@@ -226,8 +225,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
                                       altaz_begin=altaz,
                                       observation_type='science',
                                       )
-        makeVisitInfo = MakeRawVisitInfoViaObsInfo()
-        visitInfo = makeVisitInfo.observationInfo2visitInfo(obsInfo=obsInfo)
+        visitInfo = MakeRawVisitInfoViaObsInfo.observationInfo2visitInfo(obsInfo)
         return visitInfo
 
     def testDummyVisitInfo(self):
@@ -313,7 +311,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             x0, y0 = wcs.skyToPixel(afwGeom.SpherePoint(ra0, dec0))
             dcrShifts = calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters)
             refShifts = []
-            # We divide the filter into "subfilters" with with the full wavelength range
+            # We divide the filter into "subfilters" with the full wavelength range
             # divided into equal sub-ranges.
             for wl0, wl1 in wavelengthGenerator(filterInfo, dcrNumSubfilters):
                 # Note that diffRefractAmp can be negative,
