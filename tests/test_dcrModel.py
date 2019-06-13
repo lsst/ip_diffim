@@ -20,19 +20,29 @@
 # see <https://www.lsstcorp.org/LegalNotices/>.
 
 from astropy import units as u
+from astropy.coordinates import SkyCoord, EarthLocation, Angle
+from astropy.time import Time
 import numpy as np
 from scipy import ndimage
 import unittest
 
-from lsst.afw.coord import Observatory, Weather
+from astro_metadata_translator import makeObservationInfo
+from lsst.afw.coord.refraction import differentialRefraction
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.image.utils as afwImageUtils
 import lsst.afw.math as afwMath
-from lsst.geom import arcseconds, degrees, radians
-from lsst.ip.diffim.dcrModel import DcrModel, calculateDcr, calculateImageParallacticAngle, applyDcr
+from lsst.geom import arcseconds, degrees, radians, arcminutes
+from lsst.ip.diffim.dcrModel import (DcrModel, calculateDcr, calculateImageParallacticAngle,
+                                     applyDcr, wavelengthGenerator)
+from lsst.obs.base import MakeRawVisitInfoViaObsInfo
 from lsst.meas.algorithms.testUtils import plantSources
 import lsst.utils.tests
+
+
+# Our calculation of hour angle and parallactic angle ignore precession
+# and nutation, so calculations depending on these are not precise. DM-20133
+coordinateTolerance = 1.*arcminutes
 
 
 class DcrModelTestTask(lsst.utils.tests.TestCase):
@@ -165,11 +175,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         wcs = afwGeom.makeSkyWcs(crpix=crpix, crval=crval, cdMatrix=cdMatrix)
         return wcs
 
-    def makeDummyVisitInfo(self, azimuth, elevation):
+    def makeDummyVisitInfo(self, azimuth, elevation, exposureId=12345, randomizeTime=False):
         """Make a self-consistent visitInfo object for testing.
-
-        For simplicity, the simulated observation is assumed
-        to be taken on the local meridian.
 
         Parameters
         ----------
@@ -177,33 +184,48 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             Azimuth angle of the simulated observation.
         elevation : `lsst.geom.Angle`
             Elevation angle of the simulated observation.
+        exposureId : `int`, optional
+            Unique integer identifier for this observation.
+        randomizeTime : `bool`, optional
+            Add a random offset to the observation time.
 
         Returns
         -------
         `lsst.afw.image.VisitInfo`
             VisitInfo for the exposure.
         """
-        lsstLat = -30.244639*degrees
-        lsstLon = -70.749417*degrees
-        lsstAlt = 2663.
-        lsstTemperature = 20.*u.Celsius  # in degrees Celcius
+        lsstLat = -30.244639*u.degree
+        lsstLon = -70.749417*u.degree
+        lsstAlt = 2663.*u.m
+        lsstTemperature = 20.*u.Celsius
         lsstHumidity = 40.  # in percent
         lsstPressure = 73892.*u.pascal
-        lsstWeather = Weather(lsstTemperature.value, lsstPressure.value, lsstHumidity)
-        lsstObservatory = Observatory(lsstLon, lsstLat, lsstAlt)
-        airmass = 1.0/np.sin(elevation.asRadians())
-        era = 0.*radians  # on the meridian
-        zenithAngle = 90.*degrees - elevation
-        ra = lsstLon + np.sin(azimuth.asRadians())*zenithAngle/np.cos(lsstLat.asRadians())
-        dec = lsstLat + np.cos(azimuth.asRadians())*zenithAngle
-        visitInfo = afwImage.VisitInfo(era=era,
-                                       boresightRaDec=afwGeom.SpherePoint(ra, dec),
-                                       boresightAzAlt=afwGeom.SpherePoint(azimuth, elevation),
-                                       boresightAirmass=airmass,
-                                       boresightRotAngle=0.*radians,
-                                       observatory=lsstObservatory,
-                                       weather=lsstWeather
-                                       )
+        loc = EarthLocation(lat=lsstLat,
+                            lon=lsstLon,
+                            height=lsstAlt)
+        airmass = 1.0/np.sin(elevation.asDegrees())
+
+        time = Time(2000.0, format="jyear", scale="tt")
+        if randomizeTime:
+            # Pick a random date and time within a 20-year span
+            time += 20*u.year*self.rng.rand()
+        altaz = SkyCoord(alt=elevation.asDegrees(), az=azimuth.asDegrees(),
+                         unit='deg', obstime=time, frame='altaz', location=loc)
+        obsInfo = makeObservationInfo(location=loc,
+                                      detector_exposure_id=exposureId,
+                                      datetime_begin=time,
+                                      datetime_end=time,
+                                      boresight_airmass=airmass,
+                                      boresight_rotation_angle=Angle(0.*u.degree),
+                                      boresight_rotation_coord='sky',
+                                      temperature=lsstTemperature,
+                                      pressure=lsstPressure,
+                                      relative_humidity=lsstHumidity,
+                                      tracking_radec=altaz.icrs,
+                                      altaz_begin=altaz,
+                                      observation_type='science',
+                                      )
+        visitInfo = MakeRawVisitInfoViaObsInfo.observationInfo2visitInfo(obsInfo)
         return visitInfo
 
     def testDummyVisitInfo(self):
@@ -211,18 +233,25 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         """
         azimuth = 0*degrees
         for testIter in range(self.nRandIter):
-            elevation = (45. + self.rng.rand()*40.)*degrees  # Restrict to 45 < elevation < 85 degrees
+            # Restrict to 45 < elevation < 85 degrees
+            elevation = (45. + self.rng.rand()*40.)*degrees
             visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
-            dec = visitInfo.getBoresightRaDec().getLatitude().asRadians()
-            lat = visitInfo.getObservatory().getLatitude().asRadians()
+            dec = visitInfo.getBoresightRaDec().getLatitude()
+            lat = visitInfo.getObservatory().getLatitude()
             # An observation made with azimuth=0 should be pointed to the North
             # So the RA should be North of the telescope's latitude
-            self.assertGreater(dec, lat)
-            parAngle = visitInfo.getBoresightParAngle()
+            self.assertGreater(dec.asDegrees(), lat.asDegrees())
+
+            # The hour angle should be zero for azimuth=0
+            HA = visitInfo.getBoresightHourAngle()
+            refHA = 0.*degrees
+            self.assertAnglesAlmostEqual(HA, refHA, maxDiff=coordinateTolerance)
             # If the observation is North of the telescope's latitude, the
             # direction to zenith should be along the -y axis
             # with a parallactic angle of 180 degrees
-            self.assertAnglesAlmostEqual(parAngle, 180*degrees)
+            parAngle = visitInfo.getBoresightParAngle()
+            refParAngle = 180.*degrees
+            self.assertAnglesAlmostEqual(parAngle, refParAngle, maxDiff=coordinateTolerance)
 
     def testDcrCalculation(self):
         """Test that the shift in pixels due to DCR is consistently computed.
@@ -241,12 +270,41 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
         dcrShift = calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters)
         # Compare to precomputed values.
-        refShift = [(-0.5363512808, -0.3103517169),
-                    (0.001887293861, 0.001092054612),
-                    (0.3886592703, 0.2248919247)]
+        refShift = [(-0.5575567724366292, -0.2704095599533037),
+                    (0.001961910992342903, 0.000951507567181944),
+                    (0.40402552599550073, 0.19594841296051665)]
         for shiftOld, shiftNew in zip(refShift, dcrShift):
             self.assertFloatsAlmostEqual(shiftOld[1], shiftNew[1], rtol=1e-6, atol=1e-8)
             self.assertFloatsAlmostEqual(shiftOld[0], shiftNew[0], rtol=1e-6, atol=1e-8)
+
+    def testCoordinateTransformDcrCalculation(self):
+        """Check the DCR calculation using astropy coordinate transformations.
+
+        Astmospheric refraction causes sources to appear closer to zenith than
+        they really are. An alternate calculation of the shift due to DCR is to
+        transform the pixel coordinates to altitude and azimuth, add the DCR
+        amplitude to the altitude, and transform back to pixel coordinates.
+        """
+        afwImageUtils.defineFilter("gTest", self.lambdaEff,
+                                   lambdaMin=self.lambdaMin, lambdaMax=self.lambdaMax)
+        filterInfo = afwImage.Filter("gTest")
+        pixelScale = 0.2*arcseconds
+        doFlip = [False, True]
+
+        for testIter in range(self.nRandIter):
+            rotAngle = 360.*self.rng.rand()*degrees
+            azimuth = 360.*self.rng.rand()*degrees
+            elevation = (45. + self.rng.rand()*40.)*degrees  # Restrict to 45 < elevation < 85 degrees
+            visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
+            for flip in doFlip:
+                # Repeat the calculation for both WCS orientations
+                wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec(), flipX=flip)
+                dcrShifts = calculateDcr(visitInfo, wcs, filterInfo, self.dcrNumSubfilters)
+                refShifts = calculateAstropyDcr(visitInfo, wcs, filterInfo, self.dcrNumSubfilters)
+                for refShift, dcrShift in zip(refShifts, dcrShifts):
+                    # Use a fairly loose tolerance, since 1% of a pixel is good enough agreement.
+                    self.assertFloatsAlmostEqual(refShift[1], dcrShift[1], rtol=1e-2, atol=1e-2)
+                    self.assertFloatsAlmostEqual(refShift[0], dcrShift[0], rtol=1e-2, atol=1e-2)
 
     def testDcrSubfilterOrder(self):
         """Test that the bluest subfilter always has the largest DCR amplitude.
@@ -303,8 +361,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
         wcs = self.makeDummyWcs(cdRotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
         rotAngle = calculateImageParallacticAngle(visitInfo, wcs)
-        refAngle = -0.9344289857053072*radians
-        self.assertAnglesAlmostEqual(refAngle, rotAngle, maxDiff=1e-6*radians)
+        refAngle = -1.0848032636337364*radians
+        self.assertAnglesAlmostEqual(refAngle, rotAngle)
 
     def testRotationSouthZero(self):
         """Test that an observation pointed due South has zero rotation angle.
@@ -322,7 +380,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
             wcs = self.makeDummyWcs(cdRotAngle, pixelScale, crval=visitInfo.getBoresightRaDec(), flipX=True)
             rotAngle = calculateImageParallacticAngle(visitInfo, wcs)
-            self.assertAnglesAlmostEqual(refAngle - cdRotAngle, rotAngle, maxDiff=1e-6*radians)
+            self.assertAnglesAlmostEqual(refAngle - cdRotAngle, rotAngle, maxDiff=coordinateTolerance)
 
     def testRotationFlipped(self):
         """Check the interpretation of rotations in the WCS.
@@ -343,7 +401,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
                 rotAngle = calculateImageParallacticAngle(visitInfo, wcs)
                 if flip:
                     rotAngle *= -1
-                self.assertAnglesAlmostEqual(cdRotAngle, rotAngle, maxDiff=1e-6*radians)
+                self.assertAnglesAlmostEqual(cdRotAngle, rotAngle, maxDiff=coordinateTolerance)
 
     def testConditionDcrModelNoChange(self):
         """Conditioning should not change the model if it equals the reference.
@@ -476,6 +534,66 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             self.assertFloatsEqual(refVal, np.sum(model.array))
         # Negative indices are allowed, so check that those return models from the end.
         self.assertFloatsEqual(refVals[-1], np.sum(dcrModels[-1].array))
+
+
+def calculateAstropyDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
+    """Calculate the DCR shift using astropy coordinate transformations.
+
+    Parameters
+    ----------
+    visitInfo : `lsst.afw.image.VisitInfo`
+        VisitInfo for the exposure.
+    wcs : `lsst.afw.geom.skyWcs.SkyWcs`
+        A wcs that matches the inputs.
+    filterInfo : `lsst.afw.image.Filter`
+        The filter definition, set in the current instruments' obs package.
+    dcrNumSubfilters : `int`
+        Number of sub-filters used to model chromatic effects within a band.
+
+    Returns
+    -------
+    dcrShift : `tuple` of two `float`
+        The 2D shift due to DCR, in pixels.
+        Uses numpy axes ordering (Y, X).
+    """
+    elevation = visitInfo.getBoresightAzAlt().getLatitude()
+    azimuth = visitInfo.getBoresightAzAlt().getLongitude()
+    lambdaEff = filterInfo.getFilterProperty().getLambdaEff()
+    loc = EarthLocation(lat=visitInfo.getObservatory().getLatitude().asDegrees()*u.degree,
+                        lon=visitInfo.getObservatory().getLongitude().asDegrees()*u.degree,
+                        height=visitInfo.getObservatory().getElevation()*u.m)
+    date = visitInfo.getDate()
+    time = Time(date.get(date.MJD, date.TAI), format='mjd', location=loc, scale='tai')
+    altaz = SkyCoord(alt=elevation.asDegrees(), az=azimuth.asDegrees(),
+                     unit='deg', obstime=time, frame='altaz', location=loc)
+    # The DCR calculations are performed at the boresight
+    ra0 = altaz.icrs.ra.degree*degrees
+    dec0 = altaz.icrs.dec.degree*degrees
+    x0, y0 = wcs.skyToPixel(afwGeom.SpherePoint(ra0, dec0))
+    dcrShift = []
+    # We divide the filter into "subfilters" with the full wavelength range
+    # divided into equal sub-ranges.
+    for wl0, wl1 in wavelengthGenerator(filterInfo, dcrNumSubfilters):
+        # Note that diffRefractAmp can be negative,
+        # since it is relative to the midpoint of the full band
+        diffRefractAmp0 = differentialRefraction(wavelength=wl0, wavelengthRef=lambdaEff,
+                                                 elevation=elevation,
+                                                 observatory=visitInfo.getObservatory(),
+                                                 weather=visitInfo.getWeather())
+        diffRefractAmp1 = differentialRefraction(wavelength=wl1, wavelengthRef=lambdaEff,
+                                                 elevation=elevation,
+                                                 observatory=visitInfo.getObservatory(),
+                                                 weather=visitInfo.getWeather())
+        diffRefractAmp = (diffRefractAmp0 + diffRefractAmp1)/2.
+
+        elevation1 = elevation + diffRefractAmp
+        altaz = SkyCoord(alt=elevation1.asDegrees(), az=azimuth.asDegrees(),
+                         unit='deg', obstime=time, frame='altaz', location=loc)
+        ra1 = altaz.icrs.ra.degree*degrees
+        dec1 = altaz.icrs.dec.degree*degrees
+        x1, y1 = wcs.skyToPixel(afwGeom.SpherePoint(ra1, dec1))
+        dcrShift.append((y1-y0, x1-x0))
+    return dcrShift
 
 
 class MyMemoryTestCase(lsst.utils.tests.MemoryTestCase):

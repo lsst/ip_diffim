@@ -705,9 +705,10 @@ def calculateImageParallacticAngle(visitInfo, wcs):
     cd = wcs.getCdMatrix()
     if wcs.isFlipped:
         cdAngle = (np.arctan2(-cd[0, 1], cd[0, 0]) + np.arctan2(cd[1, 0], cd[1, 1]))/2.
+        rotAngle = (cdAngle + parAngle)*radians
     else:
         cdAngle = (np.arctan2(cd[0, 1], -cd[0, 0]) + np.arctan2(cd[1, 0], cd[1, 1]))/2.
-    rotAngle = (cdAngle + parAngle)*radians
+        rotAngle = (cdAngle - parAngle)*radians
     return rotAngle
 
 
