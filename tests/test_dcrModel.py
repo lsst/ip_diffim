@@ -285,58 +285,26 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         transform the pixel coordinates to altitude and azimuth, add the DCR
         amplitude to the altitude, and transform back to pixel coordinates.
         """
-        dcrNumSubfilters = 3
         afwImageUtils.defineFilter("gTest", self.lambdaEff,
                                    lambdaMin=self.lambdaMin, lambdaMax=self.lambdaMax)
         filterInfo = afwImage.Filter("gTest")
-        lambdaEff = filterInfo.getFilterProperty().getLambdaEff()
         pixelScale = 0.2*arcseconds
+        doFlip = [False, True]
 
         for testIter in range(self.nRandIter):
             rotAngle = 360.*self.rng.rand()*degrees
             azimuth = 360.*self.rng.rand()*degrees
             elevation = (45. + self.rng.rand()*40.)*degrees  # Restrict to 45 < elevation < 85 degrees
             visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
-            loc = EarthLocation(lat=visitInfo.getObservatory().getLatitude().asDegrees()*u.degree,
-                                lon=visitInfo.getObservatory().getLongitude().asDegrees()*u.degree,
-                                height=visitInfo.getObservatory().getElevation()*u.m)
-            wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
-            date = visitInfo.getDate()
-            time = Time(date.get(date.MJD, date.TAI), format='mjd', location=loc, scale='tai')
-            altaz = SkyCoord(alt=elevation.asDegrees(), az=azimuth.asDegrees(),
-                             unit='deg', obstime=time, frame='altaz', location=loc)
-            # The DCR calculations are performed at the boresight
-            ra0 = altaz.icrs.ra.degree*degrees
-            dec0 = altaz.icrs.dec.degree*degrees
-            x0, y0 = wcs.skyToPixel(afwGeom.SpherePoint(ra0, dec0))
-            dcrShifts = calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters)
-            refShifts = []
-            # We divide the filter into "subfilters" with the full wavelength range
-            # divided into equal sub-ranges.
-            for wl0, wl1 in wavelengthGenerator(filterInfo, dcrNumSubfilters):
-                # Note that diffRefractAmp can be negative,
-                # since it is relative to the midpoint of the full band
-                diffRefractAmp0 = differentialRefraction(wavelength=wl0, wavelengthRef=lambdaEff,
-                                                         elevation=elevation,
-                                                         observatory=visitInfo.getObservatory(),
-                                                         weather=visitInfo.getWeather())
-                diffRefractAmp1 = differentialRefraction(wavelength=wl1, wavelengthRef=lambdaEff,
-                                                         elevation=elevation,
-                                                         observatory=visitInfo.getObservatory(),
-                                                         weather=visitInfo.getWeather())
-                diffRefractAmp = (diffRefractAmp0 + diffRefractAmp1)/2.
-
-                elevation1 = elevation + diffRefractAmp
-                altaz = SkyCoord(alt=elevation1.asDegrees(), az=azimuth.asDegrees(),
-                                 unit='deg', obstime=time, frame='altaz', location=loc)
-                ra1 = altaz.icrs.ra.degree*degrees
-                dec1 = altaz.icrs.dec.degree*degrees
-                x1, y1 = wcs.skyToPixel(afwGeom.SpherePoint(ra1, dec1))
-                refShifts.append((y1-y0, x1-x0))
-            for refShift, dcrShift in zip(refShifts, dcrShifts):
-                # Use a fairly loose tolerance, since 1% of a pixel is good enough agreement.
-                self.assertFloatsAlmostEqual(refShift[1], dcrShift[1], rtol=1e-2, atol=1e-2)
-                self.assertFloatsAlmostEqual(refShift[0], dcrShift[0], rtol=1e-2, atol=1e-2)
+            for flip in doFlip:
+                # Repeat the calculation for both WCS orientations
+                wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec(), flipX=flip)
+                dcrShifts = calculateDcr(visitInfo, wcs, filterInfo, self.dcrNumSubfilters)
+                refShifts = calculateAstropyDcr(visitInfo, wcs, filterInfo, self.dcrNumSubfilters)
+                for refShift, dcrShift in zip(refShifts, dcrShifts):
+                    # Use a fairly loose tolerance, since 1% of a pixel is good enough agreement.
+                    self.assertFloatsAlmostEqual(refShift[1], dcrShift[1], rtol=1e-2, atol=1e-2)
+                    self.assertFloatsAlmostEqual(refShift[0], dcrShift[0], rtol=1e-2, atol=1e-2)
 
     def testDcrSubfilterOrder(self):
         """Test that the bluest subfilter always has the largest DCR amplitude.
@@ -566,6 +534,66 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             self.assertFloatsEqual(refVal, np.sum(model.array))
         # Negative indices are allowed, so check that those return models from the end.
         self.assertFloatsEqual(refVals[-1], np.sum(dcrModels[-1].array))
+
+
+def calculateAstropyDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
+    """Calculate the DCR shift using astropy coordinate transformations.
+
+    Parameters
+    ----------
+    visitInfo : `lsst.afw.image.VisitInfo`
+        VisitInfo for the exposure.
+    wcs : `lsst.afw.geom.skyWcs.SkyWcs`
+        A wcs that matches the inputs.
+    filterInfo : `lsst.afw.image.Filter`
+        The filter definition, set in the current instruments' obs package.
+    dcrNumSubfilters : `int`
+        Number of sub-filters used to model chromatic effects within a band.
+
+    Returns
+    -------
+    dcrShift : `tuple` of two `float`
+        The 2D shift due to DCR, in pixels.
+        Uses numpy axes ordering (Y, X).
+    """
+    elevation = visitInfo.getBoresightAzAlt().getLatitude()
+    azimuth = visitInfo.getBoresightAzAlt().getLongitude()
+    lambdaEff = filterInfo.getFilterProperty().getLambdaEff()
+    loc = EarthLocation(lat=visitInfo.getObservatory().getLatitude().asDegrees()*u.degree,
+                        lon=visitInfo.getObservatory().getLongitude().asDegrees()*u.degree,
+                        height=visitInfo.getObservatory().getElevation()*u.m)
+    date = visitInfo.getDate()
+    time = Time(date.get(date.MJD, date.TAI), format='mjd', location=loc, scale='tai')
+    altaz = SkyCoord(alt=elevation.asDegrees(), az=azimuth.asDegrees(),
+                     unit='deg', obstime=time, frame='altaz', location=loc)
+    # The DCR calculations are performed at the boresight
+    ra0 = altaz.icrs.ra.degree*degrees
+    dec0 = altaz.icrs.dec.degree*degrees
+    x0, y0 = wcs.skyToPixel(afwGeom.SpherePoint(ra0, dec0))
+    dcrShift = []
+    # We divide the filter into "subfilters" with the full wavelength range
+    # divided into equal sub-ranges.
+    for wl0, wl1 in wavelengthGenerator(filterInfo, dcrNumSubfilters):
+        # Note that diffRefractAmp can be negative,
+        # since it is relative to the midpoint of the full band
+        diffRefractAmp0 = differentialRefraction(wavelength=wl0, wavelengthRef=lambdaEff,
+                                                 elevation=elevation,
+                                                 observatory=visitInfo.getObservatory(),
+                                                 weather=visitInfo.getWeather())
+        diffRefractAmp1 = differentialRefraction(wavelength=wl1, wavelengthRef=lambdaEff,
+                                                 elevation=elevation,
+                                                 observatory=visitInfo.getObservatory(),
+                                                 weather=visitInfo.getWeather())
+        diffRefractAmp = (diffRefractAmp0 + diffRefractAmp1)/2.
+
+        elevation1 = elevation + diffRefractAmp
+        altaz = SkyCoord(alt=elevation1.asDegrees(), az=azimuth.asDegrees(),
+                         unit='deg', obstime=time, frame='altaz', location=loc)
+        ra1 = altaz.icrs.ra.degree*degrees
+        dec1 = altaz.icrs.dec.degree*degrees
+        x1, y1 = wcs.skyToPixel(afwGeom.SpherePoint(ra1, dec1))
+        dcrShift.append((y1-y0, x1-x0))
+    return dcrShift
 
 
 class MyMemoryTestCase(lsst.utils.tests.MemoryTestCase):
