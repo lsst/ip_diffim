@@ -205,7 +205,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
                             height=lsstAlt)
         airmass = 1.0/np.sin(elevation.asDegrees())
 
-        time = Time(2000.0, format="jyear", scale="tai")
+        time = Time(2000.0, format="jyear", scale="tt")
         if randomizeTime:
             # Pick a random date and time within a 20-year span
             time += 20*u.year*self.rng.rand()
@@ -361,7 +361,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
         wcs = self.makeDummyWcs(cdRotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
         rotAngle = calculateImageParallacticAngle(visitInfo, wcs)
-        refAngle = -1.0848040464064805*radians
+        refAngle = -1.0848032636337364*radians
         self.assertAnglesAlmostEqual(refAngle, rotAngle)
 
     def testRotationSouthZero(self):
