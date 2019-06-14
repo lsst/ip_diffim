@@ -127,8 +127,6 @@ namespace diffim {
         for (std::vector<std::shared_ptr<afwDetect::Footprint>>::iterator i = footprintListInPtr->begin();
              i != footprintListInPtr->end(); ++i) {
 
-            LOGL_DEBUG("TRACE3.ip.diffim.KernelCandidateDetection.apply",
-                       "Processing footprint %d", (*i)->getId());
             growCandidate((*i), fpGrowPix, templateMaskedImage, scienceMaskedImage);
         }
 
