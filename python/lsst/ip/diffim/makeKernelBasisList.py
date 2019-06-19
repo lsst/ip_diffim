@@ -164,18 +164,21 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
     if (kernelSize % 2) != 1:
         raise ValueError("Only odd-sized Alard-Lupton bases allowed")
 
+    logger = Log.getLogger("ip.diffim.generateAlardLuptonBasisList")
     if (targetFwhmPix is None) or (referenceFwhmPix is None) or (not config.scaleByFwhm):
+        logger.debug("PSF sigmas are not available or scaling by fwhm disabled, "
+                     "falling back to config values")
         if metadata is not None:
             metadata.add("ALBasisNGauss", basisNGauss)
             metadata.add("ALBasisDegGauss", basisDegGauss)
             metadata.add("ALBasisSigGauss", basisSigmaGauss)
             metadata.add("ALKernelSize", kernelSize)
+            metadata.add("ALBasisMode", "config")
 
         return diffimLib.makeAlardLuptonBasisList(kernelSize//2, basisNGauss, basisSigmaGauss, basisDegGauss)
 
     targetSigma = targetFwhmPix / sigma2fwhm
     referenceSigma = referenceFwhmPix / sigma2fwhm
-    logger = Log.getLogger("ip.diffim.generateAlardLuptonBasisList")
     logger.debug("Generating matching bases for sigma %.2f pix -> %.2f pix", targetSigma, referenceSigma)
 
     # Modify the size of Alard Lupton kernels based upon the images FWHM
@@ -187,7 +190,8 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
     #
     if targetSigma == referenceSigma:
         # Leave defaults as-is
-        pass
+        logger.debug("Target and reference psf fwhms are equal, falling back to config values")
+        basisMode = "config"
     elif referenceSigma > targetSigma:
         # Normal convolution
 
@@ -197,6 +201,8 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         # If it's larger than basisMinSigma * basisGaussBeta, make it the
         # second kernel.  Else make it the smallest kernel.  Unless
         # only 1 kernel is asked for.
+        logger.debug("Reference psf fwhm is the greater, normal convolution mode")
+        basisMode = "convolution"
         kernelSigma = np.sqrt(referenceSigma**2 - targetSigma**2)
         if kernelSigma < basisMinSigma:
             kernelSigma = basisMinSigma
@@ -232,6 +238,8 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         # http://iopscience.iop.org/0266-5611/26/8/085002  Equation 40
 
         # Use specializations for deconvolution
+        logger.debug("Target psf fwhm is the greater, deconvolution mode")
+        basisMode = "deconvolution"
         basisNGauss = config.alardNGaussDeconv
         basisMinSigma = config.alardMinSigDeconv
 
@@ -277,6 +285,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         metadata.add("ALBasisDegGauss", basisDegGauss)
         metadata.add("ALBasisSigGauss", basisSigmaGauss)
         metadata.add("ALKernelSize", kernelSize)
+        metadata.add("ALBasisMode", basisMode)
 
     logger.debug("basisSigmaGauss: %s basisDegGauss: %s",
                  ','.join(['{:.1f}'.format(v) for v in basisSigmaGauss]),
