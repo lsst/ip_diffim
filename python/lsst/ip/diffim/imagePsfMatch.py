@@ -29,6 +29,7 @@ import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.pipe.base as pipeBase
+from lsst.log import Log
 from lsst.meas.algorithms import SourceDetectionTask, SubtractBackgroundTask, WarpedPsf
 from lsst.meas.base import SingleFrameMeasurementTask
 from .makeKernelBasisList import makeKernelBasisList
@@ -430,6 +431,13 @@ class ImagePsfMatchTask(PsfMatchTask):
             else:
                 scienceFwhmPix = self.getFwhmPix(scienceExposure.getPsf())
                 self.log.info("scienceFwhmPix: {}".format(scienceFwhmPix))
+
+        logger = Log.getLogger("ip.diffim.subtractExposures")
+        
+        if scienceFwhmPix <= templateFwhmPix:
+            logger.info("visit_deconvolution_case")
+        else:
+            logger.info("visit_normal_convolution_case")
 
         kernelSize = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix)[0].getWidth()
         candidateList = self.makeCandidateList(templateExposure, scienceExposure, kernelSize, candidateList)
