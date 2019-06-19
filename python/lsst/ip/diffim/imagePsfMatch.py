@@ -433,7 +433,7 @@ class ImagePsfMatchTask(PsfMatchTask):
                 self.log.info("scienceFwhmPix: {}".format(scienceFwhmPix))
 
         logger = Log.getLogger("ip.diffim.subtractExposures")
-        
+
         if scienceFwhmPix <= templateFwhmPix:
             logger.info("visit_deconvolution_case")
         else:
