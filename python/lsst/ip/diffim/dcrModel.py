@@ -299,7 +299,7 @@ class DcrModel:
 
     def buildMatchedTemplate(self, exposure=None, order=3,
                              visitInfo=None, bbox=None, wcs=None, mask=None,
-                             splitSubfilters=True, amplifyModel=1.):
+                             splitSubfilters=True, splitThreshold=0., amplifyModel=1.):
         """Create a DCR-matched template image for an exposure.
 
         Parameters
@@ -321,6 +321,8 @@ class DcrModel:
         splitSubfilters : `bool`, optional
             Calculate DCR for two evenly-spaced wavelengths in each subfilter,
             instead of at the midpoint. Default: True
+        splitThreshold : `float`, optional
+            Minimum DCR difference within a subfilter required to use ``splitSubfilters``
         amplifyModel : `float`, optional
             Multiplication factor to amplify differences between model planes.
             Used to speed convergence of iterative forward modeling.
@@ -351,7 +353,8 @@ class DcrModel:
                 model = (self[subfilter][bbox].array - refModel)*amplifyModel + refModel
             else:
                 model = self[subfilter][bbox].array
-            templateImage.array += applyDcr(model, dcr, splitSubfilters=splitSubfilters, order=order)
+            templateImage.array += applyDcr(model, dcr, splitSubfilters=splitSubfilters,
+                                            splitThreshold=splitThreshold, order=order)
         return templateImage
 
     def buildMatchedExposure(self, exposure=None,
@@ -579,7 +582,7 @@ class DcrModel:
             image[lowPixels] = lowThreshold[lowPixels]
 
 
-def applyDcr(image, dcr, useInverse=False, splitSubfilters=False,
+def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, splitThreshold=0.,
              doPrefilter=True, order=3):
     """Shift an image along the X and Y directions.
 
@@ -599,6 +602,8 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False,
     splitSubfilters : `bool`, optional
         Calculate DCR for two evenly-spaced wavelengths in each subfilter,
         instead of at the midpoint. Default: False
+    splitThreshold : `float`, optional
+        Minimum DCR difference within a subfilter required to use ``splitSubfilters``
     doPrefilter : `bool`, optional
         Spline filter the image before shifting, if set. Filtering is required,
         so only set to False if the image is already filtered.
@@ -618,21 +623,26 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False,
     else:
         prefilteredImage = image
     if splitSubfilters:
-        if useInverse:
-            shift = [-1.*s for s in dcr[0]]
-            shift1 = [-1.*s for s in dcr[1]]
-        shiftedImage = ndimage.shift(prefilteredImage, shift, prefilter=False, order=order)
-        shiftedImage += ndimage.shift(prefilteredImage, shift1, prefilter=False, order=order)
+        shiftAmp = np.max(np.abs([_dcr0 - _dcr1 for _dcr0, _dcr1 in zip(dcr[0], dcr[1])]))
+        if shiftAmp >= splitThreshold:
+            if useInverse:
+                shift = [-1.*s for s in dcr[0]]
+                shift1 = [-1.*s for s in dcr[1]]
+            else:
+                shift = dcr[0]
+                shift1 = dcr[1]
+            shiftedImage = ndimage.shift(prefilteredImage, shift, prefilter=False, order=order)
+            shiftedImage += ndimage.shift(prefilteredImage, shift1, prefilter=False, order=order)
+            shiftedImage /= 2.
+            return shiftedImage
         else:
-            shift = dcr[0]
-            shift1 = dcr[1]
-        shiftedImage /= 2.
+            # If the difference in the DCR shifts is less than the threshold,
+            # then just use the average shift for efficiency.
+            dcr = (np.mean(dcr[0]), np.mean(dcr[1]))
+    if useInverse:
+        shift = [-1.*s for s in dcr]
     else:
-        if useInverse:
-            shift = [-1.*s for s in dcr]
-        else:
-            shift = dcr
-        shiftedImage = ndimage.interpolation.shift(image, shift, **kwargs)
+        shift = dcr
     shiftedImage = ndimage.shift(prefilteredImage, shift, prefilter=False, order=order)
     return shiftedImage
 
