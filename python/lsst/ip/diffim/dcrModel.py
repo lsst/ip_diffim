@@ -579,7 +579,8 @@ class DcrModel:
             image[lowPixels] = lowThreshold[lowPixels]
 
 
-def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, **kwargs):
+def applyDcr(image, dcr, useInverse=False, splitSubfilters=False,
+             doPrefilter=True, order=3):
     """Shift an image along the X and Y directions.
 
     Parameters
@@ -598,24 +599,33 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, **kwargs):
     splitSubfilters : `bool`, optional
         Calculate DCR for two evenly-spaced wavelengths in each subfilter,
         instead of at the midpoint. Default: False
-    kwargs
-        Additional keyword parameters to pass in to
-        `scipy.ndimage.interpolation.shift`
+    doPrefilter : `bool`, optional
+        Spline filter the image before shifting, if set. Filtering is required,
+        so only set to False if the image is already filtered.
+        Filtering takes ~20% of the time of shifting, so if `applyDcr` will be
+        called repeatedly on the same image it is more efficient to precalculate
+        the filter.
+    order : `int`, optional
+        The order of the spline interpolation, default is 3.
 
     Returns
     -------
     shiftedImage : `numpy.ndarray`
         A copy of the input image with the specified shift applied.
     """
+    if doPrefilter:
+        prefilteredImage = ndimage.spline_filter(image, order=order)
+    else:
+        prefilteredImage = image
     if splitSubfilters:
         if useInverse:
             shift = [-1.*s for s in dcr[0]]
             shift1 = [-1.*s for s in dcr[1]]
+        shiftedImage = ndimage.shift(prefilteredImage, shift, prefilter=False, order=order)
+        shiftedImage += ndimage.shift(prefilteredImage, shift1, prefilter=False, order=order)
         else:
             shift = dcr[0]
             shift1 = dcr[1]
-        shiftedImage = ndimage.interpolation.shift(image, shift, **kwargs)
-        shiftedImage += ndimage.interpolation.shift(image, shift1, **kwargs)
         shiftedImage /= 2.
     else:
         if useInverse:
@@ -623,6 +633,7 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, **kwargs):
         else:
             shift = dcr
         shiftedImage = ndimage.interpolation.shift(image, shift, **kwargs)
+    shiftedImage = ndimage.shift(prefilteredImage, shift, prefilter=False, order=order)
     return shiftedImage
 
 
