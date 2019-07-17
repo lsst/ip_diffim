@@ -22,6 +22,7 @@
 
 import numpy as np
 
+import lsst.geom as geom
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.meas.algorithms as measAlg
@@ -224,7 +225,7 @@ class ZogyTask(pipeBase.Task):
                 bbox1 = self.template.getBBox()
                 xcen = (bbox1.getBeginX() + bbox1.getEndX()) / 2.
                 ycen = (bbox1.getBeginY() + bbox1.getEndY()) / 2.
-                return exposure.getPsf().computeKernelImage(afwGeom.Point2D(xcen, ycen)).getArray()
+                return exposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen)).getArray()
 
         self.im1_psf = selectPsf(psf1, self.template)
         self.im2_psf = selectPsf(psf2, self.science)
@@ -572,7 +573,7 @@ class ZogyTask(pipeBase.Task):
         """
         bbox = exposure.getBBox()
         center = ((bbox.getBeginX() + bbox.getEndX()) // 2., (bbox.getBeginY() + bbox.getEndY()) // 2.)
-        center = afwGeom.Point2D(center[0], center[1])
+        center = geom.Point2D(center[0], center[1])
         psfI = afwImage.ImageD(psfArr.shape[1], psfArr.shape[0])
         psfI.getArray()[:, :] = psfArr
         psfK = afwMath.FixedKernel(psfI)
@@ -961,7 +962,7 @@ class ZogyMapper(ZogyTask, ImageMapper):
         """
         bbox = subExposure.getBBox()
         center = ((bbox.getBeginX() + bbox.getEndX()) // 2., (bbox.getBeginY() + bbox.getEndY()) // 2.)
-        center = afwGeom.Point2D(center[0], center[1])
+        center = geom.Point2D(center[0], center[1])
 
         imageSpace = kwargs.pop('inImageSpace', False)
         doScorr = kwargs.pop('doScorr', False)

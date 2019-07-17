@@ -22,7 +22,7 @@
 import unittest
 
 import lsst.utils.tests
-import lsst.afw.geom as afwGeom
+import lsst.geom as geom
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
@@ -34,52 +34,52 @@ logUtils.traceSetAt("ip.diffim", verbosity)
 class DiffimTestCases(unittest.TestCase):
 
     def testNoMask(self):
-        mask = afwImage.Mask(afwGeom.Extent2I(20, 20))
+        mask = afwImage.Mask(geom.Extent2I(20, 20))
         mask.set(0)
         fsb = ipDiffim.FindSetBitsU()
 
-        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 10),
-                             afwGeom.Point2I(9, 12))
+        bbox = geom.Box2I(geom.Point2I(0, 10),
+                          geom.Point2I(9, 12))
         fsb.apply(afwImage.Mask(mask, bbox, afwImage.LOCAL))
 
         self.assertEqual(fsb.getBits(), 0)
 
     def testOneMask(self):
-        mask = afwImage.Mask(afwGeom.Extent2I(20, 20))
+        mask = afwImage.Mask(geom.Extent2I(20, 20))
         mask.set(0)
         bitmaskBad = mask.getPlaneBitMask('BAD')
         fsb = ipDiffim.FindSetBitsU()
 
-        bbox = afwGeom.Box2I(afwGeom.Point2I(9, 10),
-                             afwGeom.Point2I(11, 12))
+        bbox = geom.Box2I(geom.Point2I(9, 10),
+                          geom.Point2I(11, 12))
         submask = afwImage.Mask(mask, bbox, afwImage.LOCAL)
         submask |= bitmaskBad
 
-        bbox2 = afwGeom.Box2I(afwGeom.Point2I(8, 8),
-                              afwGeom.Point2I(19, 19))
+        bbox2 = geom.Box2I(geom.Point2I(8, 8),
+                           geom.Point2I(19, 19))
         fsb.apply(afwImage.Mask(mask, bbox2, afwImage.LOCAL))
 
         self.assertEqual(fsb.getBits(), bitmaskBad)
 
     def testManyMask(self):
-        mask = afwImage.Mask(afwGeom.Extent2I(20, 20))
+        mask = afwImage.Mask(geom.Extent2I(20, 20))
         mask.set(0)
         bitmaskBad = mask.getPlaneBitMask('BAD')
         bitmaskSat = mask.getPlaneBitMask('SAT')
         fsb = ipDiffim.FindSetBitsU()
 
-        bbox = afwGeom.Box2I(afwGeom.Point2I(9, 10),
-                             afwGeom.Point2I(11, 12))
+        bbox = geom.Box2I(geom.Point2I(9, 10),
+                          geom.Point2I(11, 12))
         submask = afwImage.Mask(mask, bbox, afwImage.LOCAL)
         submask |= bitmaskBad
 
-        bbox2 = afwGeom.Box2I(afwGeom.Point2I(8, 8),
-                              afwGeom.Point2I(19, 19))
+        bbox2 = geom.Box2I(geom.Point2I(8, 8),
+                           geom.Point2I(19, 19))
         submask2 = afwImage.Mask(mask, bbox2, afwImage.LOCAL)
         submask2 |= bitmaskSat
 
-        bbox3 = afwGeom.Box2I(afwGeom.Point2I(0, 0),
-                              afwGeom.Point2I(19, 19))
+        bbox3 = geom.Box2I(geom.Point2I(0, 0),
+                           geom.Point2I(19, 19))
         fsb.apply(afwImage.Mask(mask, bbox3, afwImage.LOCAL))
 
         self.assertEqual(fsb.getBits(), bitmaskBad | bitmaskSat)

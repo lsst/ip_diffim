@@ -26,6 +26,7 @@ __all__ = ["DipoleTestImage"]
 
 import numpy as np
 
+import lsst.geom as geom
 import lsst.afw.detection as afwDet
 import lsst.afw.display as afwDisplay
 import lsst.afw.geom as afwGeom
@@ -294,7 +295,7 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
         for cand in cell.begin(False):
             if not showBadCandidates and cand.isBad():
                 continue
-            candCenter = afwGeom.PointD(cand.getXCenter(), cand.getYCenter())
+            candCenter = geom.PointD(cand.getXCenter(), cand.getYCenter())
             try:
                 im = cand.getTemplateMaskedImage()
             except Exception:
@@ -844,9 +845,9 @@ def printSkyDiffs(sources, wcs):
     """
     for s in sources:
         sCentroid = s.getCentroid()
-        sPosition = s.getCoord().getPosition(afwGeom.degrees)
-        dra = 3600*(sPosition.getX() - wcs.pixelToSky(sCentroid).getPosition(afwGeom.degrees).getX())/0.2
-        ddec = 3600*(sPosition.getY() - wcs.pixelToSky(sCentroid).getPosition(afwGeom.degrees).getY())/0.2
+        sPosition = s.getCoord().getPosition(geom.degrees)
+        dra = 3600*(sPosition.getX() - wcs.pixelToSky(sCentroid).getPosition(geom.degrees).getX())/0.2
+        ddec = 3600*(sPosition.getY() - wcs.pixelToSky(sCentroid).getPosition(geom.degrees).getY())/0.2
         if np.isfinite(dra) and np.isfinite(ddec):
             print(dra, ddec)
 
@@ -859,9 +860,9 @@ def makeRegions(sources, outfilename, wcs=None):
              "select=1 highlite=1 edit=1 move=1 delete=1 include=1 fixed=0 source\nfk5\n")
     for s in sources:
         if wcs:
-            (ra, dec) = wcs.pixelToSky(s.getCentroid()).getPosition(afwGeom.degrees)
+            (ra, dec) = wcs.pixelToSky(s.getCentroid()).getPosition(geom.degrees)
         else:
-            (ra, dec) = s.getCoord().getPosition(afwGeom.degrees)
+            (ra, dec) = s.getCoord().getPosition(geom.degrees)
         if np.isfinite(ra) and np.isfinite(dec):
             fh.write("circle(%f,%f,2\")\n"%(ra, dec))
     fh.flush()
@@ -970,11 +971,11 @@ class DipoleTestImage(object):
         """Generate an exposure and catalog with the given stellar source(s).
         """
         from lsst.meas.base.tests import TestDataset
-        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Point2I(self.w - 1, self.h - 1))
+        bbox = geom.Box2I(geom.Point2I(0, 0), geom.Point2I(self.w - 1, self.h - 1))
         dataset = TestDataset(bbox, psfSigma=self.psfSigma, threshold=1.)
 
         for i in range(len(xc)):
-            dataset.addSource(instFlux=flux[i], centroid=afwGeom.Point2D(xc[i], yc[i]))
+            dataset.addSource(instFlux=flux[i], centroid=geom.Point2D(xc[i], yc[i]))
 
         if schema is None:
             schema = TestDataset.makeMinimalSchema()

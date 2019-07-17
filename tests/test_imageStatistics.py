@@ -23,7 +23,7 @@ import unittest
 
 
 import lsst.utils.tests
-import lsst.afw.geom as afwGeom
+import lsst.geom as geom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -47,7 +47,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def testImageStatisticsNan(self, core=3):
         numArray = num.zeros((20, 20))
-        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(geom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
                 mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 0)
@@ -63,7 +63,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def testImageStatisticsZero(self):
         numArray = num.zeros((20, 20))
-        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(geom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
                 mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 1)
@@ -77,7 +77,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def testImageStatisticsOne(self):
         numArray = num.ones((20, 20))
-        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(geom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
                 mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 1)
@@ -91,7 +91,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def testImageStatisticsCore(self, core=3):
         numArray = num.ones((20, 20))
-        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(geom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
                 mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 1)
@@ -105,7 +105,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def testImageStatisticsGeneral(self):
         numArray = num.ones((20, 20))
-        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(geom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
                 val = i + 2.3 * j
@@ -130,7 +130,7 @@ class DiffimTestCases(unittest.TestCase):
         maskPlane = self.policy.getStringArray("badMaskPlanes")[0]
         maskVal = afwImage.Mask.getPlaneBitMask(maskPlane)
         numArray = num.ones((20, 19))
-        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(geom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
                 val = i + 2.3 * j
@@ -159,7 +159,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertGreater(maskVal, 0)
 
         numArray = num.ones((20, 20))
-        mi = afwImage.MaskedImageF(afwGeom.Extent2I(20, 20))
+        mi = afwImage.MaskedImageF(geom.Extent2I(20, 20))
         for j in range(mi.getHeight()):
             for i in range(mi.getWidth()):
                 val = i + 2.3 * j

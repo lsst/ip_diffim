@@ -24,7 +24,7 @@ import numpy as np
 import abc
 
 import lsst.afw.image as afwImage
-import lsst.afw.geom as afwGeom
+import lsst.geom as geom
 import lsst.afw.table as afwTable
 import lsst.meas.algorithms as measAlg
 import lsst.pex.config as pexConfig
@@ -707,10 +707,10 @@ class ImageMapReduceTask(pipeBase.Task):
             cellCentroids = [(cellCentroidsX[i], cellCentroidsY[i]) for i in range(len(cellCentroidsX))]
 
         # first "main" box at 0,0
-        bbox0 = afwGeom.Box2I(afwGeom.Point2I(bbox.getBegin()), afwGeom.Extent2I(cellSizeX, cellSizeY))
+        bbox0 = geom.Box2I(geom.Point2I(bbox.getBegin()), geom.Extent2I(cellSizeX, cellSizeY))
         # first expanded box
-        bbox1 = afwGeom.Box2I(bbox0)
-        bbox1.grow(afwGeom.Extent2I(borderSizeX, borderSizeY))
+        bbox1 = geom.Box2I(bbox0)
+        bbox1.grow(geom.Extent2I(borderSizeX, borderSizeY))
 
         self.boxes0 = []  # "main" boxes; store in task so can be extracted if needed
         self.boxes1 = []  # "expanded" boxes
@@ -719,16 +719,16 @@ class ImageMapReduceTask(pipeBase.Task):
             """Force a bounding-box to have dimensions that are modulo 2."""
 
             if bb.getWidth() % 2 == 1:  # grow to the right
-                bb.include(afwGeom.Point2I(bb.getMaxX()+1, bb.getMaxY()))  # Expand by 1 pixel!
+                bb.include(geom.Point2I(bb.getMaxX()+1, bb.getMaxY()))  # Expand by 1 pixel!
                 bb.clip(bbox)
                 if bb.getWidth() % 2 == 1:  # clipped at right -- so grow to the left
-                    bb.include(afwGeom.Point2I(bb.getMinX()-1, bb.getMaxY()))
+                    bb.include(geom.Point2I(bb.getMinX()-1, bb.getMaxY()))
                     bb.clip(bbox)
             if bb.getHeight() % 2 == 1:  # grow upwards
-                bb.include(afwGeom.Point2I(bb.getMaxX(), bb.getMaxY()+1))  # Expand by 1 pixel!
+                bb.include(geom.Point2I(bb.getMaxX(), bb.getMaxY()+1))  # Expand by 1 pixel!
                 bb.clip(bbox)
                 if bb.getHeight() % 2 == 1:  # clipped upwards -- so grow down
-                    bb.include(afwGeom.Point2I(bb.getMaxX(), bb.getMinY()-1))
+                    bb.include(geom.Point2I(bb.getMaxX(), bb.getMinY()-1))
                     bb.clip(bbox)
             if bb.getWidth() % 2 == 1 or bb.getHeight() % 2 == 1:  # Box is probably too big
                 raise RuntimeError('Cannot make bounding box even-sized. Probably too big.')
@@ -738,16 +738,16 @@ class ImageMapReduceTask(pipeBase.Task):
         # Use given or grid-parameterized centroids as centers for bounding boxes
         if cellCentroids is not None and len(cellCentroids) > 0:
             for x, y in cellCentroids:
-                centroid = afwGeom.Point2D(x, y)
-                bb0 = afwGeom.Box2I(bbox0)
+                centroid = geom.Point2D(x, y)
+                bb0 = geom.Box2I(bbox0)
                 xoff = int(np.floor(centroid.getX())) - bb0.getWidth()//2
                 yoff = int(np.floor(centroid.getY())) - bb0.getHeight()//2
-                bb0.shift(afwGeom.Extent2I(xoff, yoff))
+                bb0.shift(geom.Extent2I(xoff, yoff))
                 bb0.clip(bbox)
                 if forceEvenSized:
                     bb0 = _makeBoxEvenSized(bb0)
-                bb1 = afwGeom.Box2I(bbox1)
-                bb1.shift(afwGeom.Extent2I(xoff, yoff))
+                bb1 = geom.Box2I(bbox1)
+                bb1.shift(geom.Extent2I(xoff, yoff))
                 bb1.clip(bbox)
                 if forceEvenSized:
                     bb1 = _makeBoxEvenSized(bb1)
@@ -787,7 +787,7 @@ class ImageMapReduceTask(pipeBase.Task):
         Parameters
         ----------
         boxes : `list`
-            a list of `afwGeom.BoundingBox`es
+            a list of `lsst.afw.geom.BoundingBox`es
         bbox : `lsst.afw.geom.BoundingBox`
             an overall bounding box
         **kwargs

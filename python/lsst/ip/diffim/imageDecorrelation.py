@@ -23,7 +23,7 @@
 import numpy as np
 
 import lsst.afw.image as afwImage
-import lsst.afw.geom as afwGeom
+import lsst.geom as geom
 import lsst.meas.algorithms as measAlg
 import lsst.afw.math as afwMath
 import lsst.pex.config as pexConfig
@@ -211,7 +211,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         correctedExposure, corrKern = DecorrelateALKernelTask._doConvolve(subtractedExposure, corrKernel)
 
         # Compute the subtracted exposure's updated psf
-        psf = subtractedExposure.getPsf().computeKernelImage(afwGeom.Point2D(xcen, ycen)).getArray()
+        psf = subtractedExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen)).getArray()
         psfc = DecorrelateALKernelTask.computeCorrectedDiffimPsf(corrKernel, psf, svar=svar, tvar=tvar)
         psfcI = afwImage.ImageD(psfc.shape[0], psfc.shape[1])
         psfcI.getArray()[:, :] = psfc

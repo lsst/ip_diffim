@@ -2,7 +2,7 @@ import unittest
 
 
 import lsst.utils.tests
-import lsst.afw.geom as afwGeom
+import lsst.geom as geom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
@@ -28,10 +28,10 @@ class DiffimTestCases(unittest.TestCase):
         self.size = 51
 
     def makeCandidate(self, kSum, x, y):
-        mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
+        mi1 = afwImage.MaskedImageF(geom.Extent2I(self.size, self.size))
         mi1.getVariance().set(1.0)  # avoid NaNs
         mi1[self.size//2, self.size//2, afwImage.LOCAL] = (1, 0x0, 1)
-        mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
+        mi2 = afwImage.MaskedImageF(geom.Extent2I(self.size, self.size))
         mi2.getVariance().set(1.0)  # avoid NaNs
         mi2[self.size//2, self.size//2, afwImage.LOCAL] = (kSum, 0x0, kSum)
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
@@ -197,10 +197,10 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(len(eigenKernels), 1)
 
         # bogus candidate
-        mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
+        mi1 = afwImage.MaskedImageF(geom.Extent2I(self.size, self.size))
         mi1.getVariance().set(0.1)
         mi1[self.size//2, self.size//2, afwImage.LOCAL] = (1, 0x0, 1)
-        mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
+        mi2 = afwImage.MaskedImageF(geom.Extent2I(self.size, self.size))
         mi2.getVariance().set(0.1)
         # make it high enough to make the mean resids large
         mi2[self.size//3, self.size//3, afwImage.LOCAL] = (self.size**2, 0x0, 1)
@@ -229,9 +229,9 @@ class DiffimTestCases(unittest.TestCase):
         sizeCellX = self.policy.get("sizeCellX")
         sizeCellY = self.policy.get("sizeCellY")
 
-        kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0),
-                                                             afwGeom.Extent2I(sizeCellX * nCell,
-                                                                              sizeCellY * nCell)),
+        kernelCellSet = afwMath.SpatialCellSet(geom.Box2I(geom.Point2I(0, 0),
+                                                          geom.Extent2I(sizeCellX * nCell,
+                                                                        sizeCellY * nCell)),
                                                sizeCellX,
                                                sizeCellY)
         nTot = 0

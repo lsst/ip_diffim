@@ -23,6 +23,7 @@ import unittest
 import numpy as np
 
 import lsst.utils.tests
+import lsst.geom as geom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
@@ -268,7 +269,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         extentY = int(self.exposure.getHeight()*0.05)
         for x in np.linspace(extentX, self.exposure.getWidth()-extentX, 10):
             for y in np.linspace(extentY, self.exposure.getHeight()-extentY, 10):
-                point = afwGeom.Point2D(np.rint(x), np.rint(y))
+                point = geom.Point2D(np.rint(x), np.rint(y))
                 oPsf = origPsf.computeImage(point).getArray()
                 nPsf = newPsf.computeImage(point).getArray()
                 if oPsf.shape[0] < nPsf.shape[0]:  # sometimes CoaddPsf does this.

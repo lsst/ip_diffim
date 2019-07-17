@@ -25,7 +25,7 @@ import numpy as np
 
 import lsst.utils.tests
 import lsst.afw.table as afwTable
-import lsst.afw.geom as afwGeom
+import lsst.geom as geom
 import lsst.afw.image as afwImage
 from lsst.meas.algorithms import LoadReferenceObjectsTask, getRefFluxField
 import lsst.ip.diffim as ipDiffim
@@ -64,7 +64,7 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
             srcSrc = srcCat.addNew()
 
             raDeg, decDeg = np.random.randn(2)
-            coord = afwGeom.SpherePoint(raDeg, decDeg, afwGeom.degrees)
+            coord = geom.SpherePoint(raDeg, decDeg, geom.degrees)
 
             refSrc.set("g_flux", 10**(-0.4*18))
             refSrc.set("r_flux", 10**(-0.4*18))
@@ -80,7 +80,7 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
 
         mc = afwTable.MatchControl()
         mc.symmetricMatch = False
-        mat = afwTable.matchRaDec(refCat, srcCat, 1.0 * afwGeom.arcseconds, mc)
+        mat = afwTable.matchRaDec(refCat, srcCat, 1.0 * geom.arcseconds, mc)
         self.assertEqual(len(mat), nSrc)
         return mat
 

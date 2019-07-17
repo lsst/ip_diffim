@@ -23,7 +23,7 @@
 import numpy as np
 from scipy import ndimage
 from lsst.afw.coord.refraction import differentialRefraction
-import lsst.afw.geom as afwGeom
+import lsst.geom as geom
 import lsst.afw.image as afwImage
 from lsst.geom import radians
 
@@ -532,7 +532,7 @@ class DcrModel:
             bbox = self.bbox
         if mask is None:
             mask = self.mask[bbox]
-        bboxShrink = afwGeom.Box2I(bbox)
+        bboxShrink = geom.Box2I(bbox)
         bboxShrink.grow(-bufferSize)
         convergeMask = mask.getPlaneBitMask(convergenceMaskPlanes)
 

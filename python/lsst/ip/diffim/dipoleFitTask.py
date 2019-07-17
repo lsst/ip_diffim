@@ -23,7 +23,7 @@
 import numpy as np
 import warnings
 
-import lsst.afw.geom as afwGeom
+import lsst.geom as geom
 import lsst.afw.image as afwImage
 import lsst.meas.base as measBase
 import lsst.afw.table as afwTable
@@ -362,7 +362,7 @@ class DipoleModel(object):
         """
 
         # Generate the psf image, normalize to flux
-        psf_img = psf.computeImage(afwGeom.Point2D(xcen, ycen)).convertF()
+        psf_img = psf.computeImage(geom.Point2D(xcen, ycen)).convertF()
         psf_img_sum = np.nansum(psf_img.getArray())
         psf_img *= (flux/psf_img_sum)
 
