@@ -2,7 +2,7 @@
 /**
  * @file BuildSingleKernelVisitor.h
  *
- * @brief Implementation of BuildSingleKernelVisitor 
+ * @brief Implementation of BuildSingleKernelVisitor
  *
  * @author Andrew Becker, University of Washington
  *
@@ -26,12 +26,12 @@
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
-namespace pexPolicy      = lsst::pex::policy; 
-namespace pexExcept      = lsst::pex::exceptions; 
+namespace pexPolicy      = lsst::pex::policy;
+namespace pexExcept      = lsst::pex::exceptions;
 namespace ipDiffim       = lsst::ip::diffim;
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 namespace detail {
 
@@ -48,7 +48,7 @@ namespace detail {
         policy->set("singleKernelClipping", true);
         policy->set("candidateResidualMeanMax", 0.25);
         policy->set("candidateResidualStdMax", 1.25);
-    
+
         detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter(*policy);
         int nRejected = -1;
         while (nRejected != 0) {
@@ -82,7 +82,7 @@ namespace detail {
      * kernels, we want to re-Visit each candidate and re-fit the kernel using
      * this Pca basis.  This requires the user to setSkipBuilt(false) so that
      * the candidate is reprocessed with this new basis.
-     * 
+     *
      */
     template<typename PixelT>
     BuildSingleKernelVisitor<PixelT>::BuildSingleKernelVisitor(
@@ -123,13 +123,13 @@ namespace detail {
         _coreRadius(_policy.getInt("candidateCoreRadius"))
     {};
 
-    
+
     template<typename PixelT>
     void BuildSingleKernelVisitor<PixelT>::processCandidate(
         lsst::afw::math::SpatialCellCandidate *candidate
         ) {
-        
-        ipDiffim::KernelCandidate<PixelT> *kCandidate = 
+
+        ipDiffim::KernelCandidate<PixelT> *kCandidate =
             dynamic_cast<ipDiffim::KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
             LOGL_DEBUG("TRACE2.ip.diffim.BuildSingleKernelVisitor.processCandidate",
@@ -138,18 +138,18 @@ namespace detail {
             throw LSST_EXCEPT(pexExcept::LogicError,
                               "Failed to cast SpatialCellCandidate to KernelCandidate");
         }
-        
+
         if (_skipBuilt and kCandidate->isInitialized()) {
             return;
         }
-        
+
         LOGL_DEBUG("TRACE1.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                    "Processing candidate %d", kCandidate->getId());
         LOGL_DEBUG("TRACE4.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                    "X = %.2f Y = %.2f",
                    kCandidate->getXCenter(),
                    kCandidate->getYCenter());
-                              
+
         /* Build its kernel here */
         try {
             if (_useRegularization)
@@ -165,7 +165,7 @@ namespace detail {
                        e.what());
             _nRejected += 1;
             return;
-        } 
+        }
 
         if (kCandidate->getStatus() == afwMath::SpatialCellCandidate::BAD) {
             LOGL_DEBUG("TRACE3.ip.diffim.BuildSingleKernelVisitor.processCandidate",
@@ -174,15 +174,15 @@ namespace detail {
             _nRejected += 1;
             return;
         }
-            
-         
-         /* 
+
+
+         /*
          * Make diffim and set chi2 from result.  Note that you need to use the
          * most recent kernel
          */
         MaskedImageT diffim = kCandidate->getDifferenceImage(ipDiffim::KernelCandidate<PixelT>::RECENT);
         try {
-            if (_useCoreStats) 
+            if (_useCoreStats)
                 _imstats.apply(diffim, _coreRadius);
             else
                 _imstats.apply(diffim);
@@ -195,12 +195,12 @@ namespace detail {
         _nProcessed += 1;
 
         kCandidate->setChi2(_imstats.getVariance());
-        
+
         /* When using a Pca basis, we don't reset the kernel or background,
            so we need to evaluate these locally for the Trace */
         double kSum = kCandidate->getKsum(ipDiffim::KernelCandidate<PixelT>::RECENT);
         double background = kCandidate->getBackground(ipDiffim::KernelCandidate<PixelT>::RECENT);
-        
+
         LOGL_DEBUG("TRACE4.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                    "Chi2 = %.3f", kCandidate->getChi2());
         LOGL_DEBUG("TRACE4.ip.diffim.BuildSingleKernelVisitor.processCandidate",
@@ -213,7 +213,7 @@ namespace detail {
                    _imstats.getMean(),
                    _imstats.getRms(),
                    _imstats.getNpix());
-        
+
         bool meanIsNan = std::isnan(_imstats.getMean());
         bool rmsIsNan  = std::isnan(_imstats.getRms());
         if (meanIsNan || rmsIsNan) {
@@ -224,7 +224,7 @@ namespace detail {
             _nRejected += 1;
             return;
         }
-        
+
         if (_policy.getBool("singleKernelClipping")) {
             if (fabs(_imstats.getMean()) > _policy.getDouble("candidateResidualMeanMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
@@ -255,7 +255,7 @@ namespace detail {
             LOGL_DEBUG("TRACE5.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                        "Sigma clipping not enabled");
         }
-        
+
         /* Core resids for debugging */
         if (!(_useCoreStats)) {
             try {
@@ -274,7 +274,7 @@ namespace detail {
                        _imstats.getRms(),
                        _imstats.getNpix());
         }
-        
+
     }
 
     typedef float PixelT;

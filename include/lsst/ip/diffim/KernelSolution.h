@@ -20,11 +20,11 @@
 #include "lsst/afw/image.h"
 #include "lsst/pex/policy.h"
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 
-    /* 
+    /*
      * @brief Method used to solve for M and B
      */
 
@@ -55,9 +55,9 @@ namespace diffim {
 
         virtual ~KernelSolution() {};
         virtual void solve();
-        virtual void solve(Eigen::MatrixXd const& mMat, 
+        virtual void solve(Eigen::MatrixXd const& mMat,
                            Eigen::VectorXd const& bVec);
-        KernelSolvedBy getSolvedBy() {return _solvedBy;} 
+        KernelSolvedBy getSolvedBy() {return _solvedBy;}
         virtual double getConditionNumber(ConditionNumberType conditionType);
         virtual double getConditionNumber(Eigen::MatrixXd const& mMat, ConditionNumberType conditionType);
 
@@ -125,19 +125,19 @@ namespace diffim {
         virtual ~MaskedKernelSolution() {};
         virtual void buildOrig(lsst::afw::image::Image<InputT> const &templateImage,
                                lsst::afw::image::Image<InputT> const &scienceImage,
-                               lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
+                               lsst::afw::image::Image<lsst::afw::image::VariancePixel>
                                const &varianceEstimate,
                                lsst::afw::image::Mask<lsst::afw::image::MaskPixel> pixelMask);
 
         virtual void buildWithMask(lsst::afw::image::Image<InputT> const &templateImage,
                                    lsst::afw::image::Image<InputT> const &scienceImage,
-                                   lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
+                                   lsst::afw::image::Image<lsst::afw::image::VariancePixel>
                                    const &varianceEstimate,
                                    lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const &pixelMask);
 
         virtual void buildSingleMaskOrig(lsst::afw::image::Image<InputT> const &templateImage,
                                          lsst::afw::image::Image<InputT> const &scienceImage,
-                                         lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
+                                         lsst::afw::image::Image<lsst::afw::image::VariancePixel>
                                          const &varianceEstimate,
                                          lsst::afw::geom::Box2I maskBox);
     };

@@ -1,7 +1,7 @@
 /* 
  * LSST Data Management System
  * Copyright 2008, 2009, 2010 LSST Corporation.
- * 
+ *
  * This product includes software developed by the
  * LSST Project (http://www.lsst.org/).
  *
@@ -9,18 +9,18 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
- * You should have received a copy of the LSST License Statement and 
- * the GNU General Public License along with this program.  If not, 
+ *
+ * You should have received a copy of the LSST License Statement and
+ * the GNU General Public License along with this program.  If not,
  * see <http://www.lsstcorp.org/LegalNotices/>.
  */
- 
-#include <cmath> 
+
+#include <cmath>
 
 #include "lsst/afw/geom.h"
 #include "lsst/afw/math.h"
@@ -38,7 +38,7 @@ int main() {
     int kSize = 5;
     unsigned int nBases = kSize * kSize;
     int spatialKernelOrder = 2;
-    
+
     lsst::afw::math::KernelList basisList = makeDeltaFunctionBasisList(kSize, kSize);
     /* Spatial Kernel */
     afwMath::Kernel::SpatialFunctionPtr spatialKernelFunction(
@@ -63,7 +63,7 @@ int main() {
         }
     }
     spatialKernel->setSpatialParameters(kCoeffs);
-    
+
     unsigned int loc = 50;
     std::shared_ptr<afwImage::MaskedImage<PixelT>> mimg1(
         new afwImage::MaskedImage<PixelT>(afwGeom::Extent2I(100,100))
@@ -75,11 +75,11 @@ int main() {
     afwMath::convolve(*mimg2, *mimg1, *spatialKernel, false);
     mimg1->writeFits("mimg1");
     mimg2->writeFits("mimg2");
-    
+
     afwImage::Image<double> kImage(spatialKernel->getDimensions());
-    (void)spatialKernel->computeImage(kImage, 
-                                      false, 
-                                      afwImage::indexToPosition(loc), 
+    (void)spatialKernel->computeImage(kImage,
+                                      false,
+                                      afwImage::indexToPosition(loc),
                                       afwImage::indexToPosition(loc));
     kImage.writeFits("kernel.fits");
 

@@ -2,7 +2,7 @@
 /**
  * @file BuildSpatialKernelVisitor.h
  *
- * @brief Declaration of BuildSpatialKernelVisitor 
+ * @brief Declaration of BuildSpatialKernelVisitor
  *
  * @author Andrew Becker, University of Washington
  *
@@ -18,9 +18,9 @@
 #include "lsst/ip/diffim.h"
 #include "lsst/pex/policy/Policy.h"
 
-namespace lsst { 
-namespace ip { 
-namespace diffim { 
+namespace lsst {
+namespace ip {
+namespace diffim {
 namespace detail {
 
     template<typename PixelT>
@@ -39,7 +39,7 @@ namespace detail {
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
 
         void solveLinearEquation();
-  
+
         inline std::shared_ptr<SpatialKernelSolution> getKernelSolution() {return _kernelSolution;}
 
         std::pair<std::shared_ptr<lsst::afw::math::LinearCombinationKernel>,

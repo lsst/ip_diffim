@@ -17,9 +17,9 @@
 #include "lsst/ip/diffim.h"
 #include "lsst/pex/policy/Policy.h"
 
-namespace lsst { 
-namespace ip { 
-namespace diffim { 
+namespace lsst {
+namespace ip {
+namespace diffim {
 namespace detail {
 
     template<typename PixelT>
@@ -31,7 +31,7 @@ namespace detail {
         AssessSpatialKernelVisitor(
             std::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatialKernel,   ///< Spatially varying kernel
             lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground, ///< Spatially varying background
-            lsst::pex::policy::Policy const& policy                        ///< Policy file 
+            lsst::pex::policy::Policy const& policy                        ///< Policy file
             );
         virtual ~AssessSpatialKernelVisitor() {};
 
@@ -50,7 +50,7 @@ namespace detail {
         int _nGood;                           ///< Number of good candidates remaining
         int _nRejected;                       ///< Number of candidates rejected during processCandidate()
         int _nProcessed;                      ///< Number of candidates processed during processCandidate()
-       
+
         bool _useCoreStats;                   ///< Extracted from policy
         int _coreRadius;                      ///< Extracted from policy
     };
@@ -59,8 +59,8 @@ namespace detail {
     std::shared_ptr<AssessSpatialKernelVisitor<PixelT> >
     makeAssessSpatialKernelVisitor(
         std::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatialKernel,
-        lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground, 
-        lsst::pex::policy::Policy const& policy                        
+        lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground,
+        lsst::pex::policy::Policy const& policy
          ) {
 
         return std::shared_ptr<AssessSpatialKernelVisitor<PixelT>>(

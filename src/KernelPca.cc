@@ -2,7 +2,7 @@
 /**
  * @file KernelPca.cc
  *
- * @brief Implementation of KernelPca and KernelPcaVisitor 
+ * @brief Implementation of KernelPca and KernelPcaVisitor
  *
  * @author Andrew Becker, University of Washington
  *
@@ -19,10 +19,10 @@
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
-namespace pexExcept      = lsst::pex::exceptions; 
+namespace pexExcept      = lsst::pex::exceptions;
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 namespace detail {
 
@@ -43,14 +43,14 @@ namespace detail {
      * off the mean kernel from all entries, which makes the resulting basis
      * more compact.  The user needs to manually add this mean image into the
      * resulting basis list after imagePca.analyze() is called.
-     * 
+     *
      * @note KernelPca (and base class afwImage::ImagePca) weight objects of
      * different brightness differently.  However we don't necessarily want
      * images with larger kernel sums to have more weight.  Each kernel should
      * have constant weight in the Pca.  For simplicity we scale them to have
      * the same kernel sum, 1.0, and send to ImagePca that the flux (weight) is
      * 1.0.
-     * 
+     *
      */
     template<typename PixelT>
     KernelPcaVisitor<PixelT>::KernelPcaVisitor(
@@ -58,7 +58,7 @@ namespace detail {
         ) :
         afwMath::CandidateVisitor(),
         _imagePca(imagePca),
-        _mean() 
+        _mean()
     {};
 
     template<typename PixelT>
@@ -75,7 +75,7 @@ namespace detail {
                                          (*_mean, true))));
         }
         for (int i = 0; i < ncomp; i++) {
-            afwImage::Image<afwMath::Kernel::Pixel> img = 
+            afwImage::Image<afwMath::Kernel::Pixel> img =
                 afwImage::Image<afwMath::Kernel::Pixel>(*eigenImages[i], true);
             kernelList.push_back(std::shared_ptr<afwMath::Kernel>(
                                      new afwMath::FixedKernel(img)
@@ -87,7 +87,7 @@ namespace detail {
 
     template<typename PixelT>
     void KernelPcaVisitor<PixelT>::processCandidate(lsst::afw::math::SpatialCellCandidate *candidate) {
-        
+
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
             throw LSST_EXCEPT(pexExcept::LogicError,
@@ -95,7 +95,7 @@ namespace detail {
         }
         LOGL_DEBUG("TRACE5.ip.diffim.SetPcaImageVisitor.processCandidate",
                    "Processing candidate %d", kCandidate->getId());
-        
+
         try {
             /* Normalize to unit sum */
             PTR(ImageT) kImage = kCandidate->getKernelSolution(
@@ -111,18 +111,18 @@ namespace detail {
 
     template<typename PixelT>
     void KernelPcaVisitor<PixelT>::subtractMean() {
-        /* 
+        /*
            If we don't subtract off the mean before we do the Pca, the
            subsequent terms carry less of the power than if you do subtract
            off the mean.  Explicit example:
-           
+
            With mean subtraction:
              DEBUG: Eigenvalue 0 : 0.010953 (0.373870 %)
              DEBUG: Eigenvalue 1 : 0.007927 (0.270604 %)
              DEBUG: Eigenvalue 2 : 0.001393 (0.047542 %)
              DEBUG: Eigenvalue 3 : 0.001092 (0.037261 %)
              DEBUG: Eigenvalue 4 : 0.000829 (0.028283 %)
-           
+
            Without mean subtraction:
              DEBUG: Eigenvalue 0 : 0.168627 (0.876046 %)
              DEBUG: Eigenvalue 1 : 0.007935 (0.041223 %)
@@ -136,10 +136,10 @@ namespace detail {
          */
         LOGL_DEBUG("TRACE5.ip.diffim.KernelPcaVisitor.subtractMean",
                    "Subtracting mean feature before Pca");
-        
+
         _mean = _imagePca->getMean();
         KernelPca<ImageT>::ImageList imageList = _imagePca->getImageList();
-        for (typename KernelPca<ImageT>::ImageList::const_iterator ptr = imageList.begin(), 
+        for (typename KernelPca<ImageT>::ImageList::const_iterator ptr = imageList.begin(),
                  end = imageList.end(); ptr != end; ++ptr) {
             **ptr -= *_mean;
         }
@@ -163,12 +163,12 @@ namespace detail {
     void KernelPca<ImageT>::analyze()
     {
         Super::analyze();
-        
+
         typename Super::ImageList const &eImageList = this->getEigenImages();
         typename Super::ImageList::const_iterator iter = eImageList.begin(), end = eImageList.end();
         for (size_t i = 0; iter != end; ++i, ++iter) {
             PTR(ImageT) eImage = *iter;
-            
+
             /*
              * Normalise eigenImages to have a maximum of 1.0.  For n > 0 they
              * (should) have mean == 0, so we can't use that to normalize
@@ -176,7 +176,7 @@ namespace detail {
             afwMath::Statistics stats = afwMath::makeStatistics(*eImage, (afwMath::MIN | afwMath::MAX));
             double const min = stats.getValue(afwMath::MIN);
             double const max = stats.getValue(afwMath::MAX);
-            
+
             double const extreme = (fabs(min) > max) ? min :max;
             if (extreme != 0.0) {
                 *eImage /= extreme;

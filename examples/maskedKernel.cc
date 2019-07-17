@@ -21,14 +21,14 @@ int main() {
     Eigen::MatrixXd test = ipDiffim::imageToEigenMatrix(foo);
     /*
     test << 90, 91, 92, 93, 94, 95, 96, 97, 98, 99,
-        80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 
-        70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 
-        60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 
-        50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 
-        40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 
-        30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 
-        20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 
-        10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 
+        80, 81, 82, 83, 84, 85, 86, 87, 88, 89,
+        70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
+        60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
+        50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+        40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+        30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+        20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+        10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9;
     */
 
@@ -42,19 +42,19 @@ int main() {
     // endCol/Row is one past the index of the last good col/row
     int endCol = goodBBox.getMaxX() + 1;
     int endRow = goodBBox.getMaxY() + 1;
-    
+
     std::cout << "A " << startCol << " " << startRow << " " << endCol << " " << endRow << std::endl;
-        
-    Eigen::MatrixXd subimage = test.block(startRow, 
-                                          startCol, 
-                                          endRow-startRow, 
+
+    Eigen::MatrixXd subimage = test.block(startRow,
+                                          startCol,
+                                          endRow-startRow,
                                           endCol-startCol);
     std::cout << "Good pixels after convolution:" << std::endl << subimage << std::endl << std::endl;
 
     /* We want to ignore all pixels from 4,4 to 6,6 */
     afwGeom::Box2I maskBox(afwGeom::Point2I(4, 4),
                            afwGeom::Point2I(6, 6));
-    
+
     int maskStartCol = maskBox.getMinX();
     int maskStartRow = maskBox.getMinY();
     int maskEndCol   = maskBox.getMaxX();
@@ -65,13 +65,13 @@ int main() {
     /*
     afwGeom::Box2I tBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskEndRow),
                                          afwGeom::Point2I(endCol, endRow));
-    
+
     afwGeom::Box2I bBox = afwGeom::Box2I(afwGeom::Point2I(startCol, startRow),
                                          afwGeom::Point2I(endCol, maskStartRow));
-    
+
     afwGeom::Box2I lBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskStartRow),
                                          afwGeom::Point2I(maskStartCol, maskEndRow));
-    
+
     afwGeom::Box2I rBox = afwGeom::Box2I(afwGeom::Point2I(maskEndCol, maskStartRow),
                                          afwGeom::Point2I(endCol, maskEndRow));
     */
@@ -80,13 +80,13 @@ int main() {
     endRow -= 1;
     afwGeom::Box2I tBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskEndRow + 1),
                                          afwGeom::Point2I(endCol, endRow));
-    
+
     afwGeom::Box2I bBox = afwGeom::Box2I(afwGeom::Point2I(startCol, startRow),
                                          afwGeom::Point2I(endCol, maskStartRow - 1));
-    
+
     afwGeom::Box2I lBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskStartRow),
                                          afwGeom::Point2I(maskStartCol - 1, maskEndRow));
-    
+
     afwGeom::Box2I rBox = afwGeom::Box2I(afwGeom::Point2I(maskEndCol + 1, maskStartRow),
                                          afwGeom::Point2I(endCol, maskEndRow));
 
@@ -107,6 +107,3 @@ int main() {
         std::cout << subeigen << std::endl << std::endl;
     }
 }
-
-        
-    
