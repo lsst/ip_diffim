@@ -22,8 +22,8 @@
 import unittest
 
 import lsst.utils.tests
-from lsst.afw.geom import makeSkyWcs
 import lsst.afw.image as afwImage
+from lsst.afw.geom import makeSkyWcs
 import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools

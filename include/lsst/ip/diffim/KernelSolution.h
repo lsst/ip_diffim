@@ -16,15 +16,15 @@
 #include "Eigen/Core"
 
 #include "lsst/afw/math.h"
-#include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
+#include "lsst/geom.h"
 #include "lsst/pex/policy.h"
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 
-    /* 
+    /*
      * @brief Method used to solve for M and B
      */
 
@@ -55,9 +55,9 @@ namespace diffim {
 
         virtual ~KernelSolution() {};
         virtual void solve();
-        virtual void solve(Eigen::MatrixXd const& mMat, 
+        virtual void solve(Eigen::MatrixXd const& mMat,
                            Eigen::VectorXd const& bVec);
-        KernelSolvedBy getSolvedBy() {return _solvedBy;} 
+        KernelSolvedBy getSolvedBy() {return _solvedBy;}
         virtual double getConditionNumber(ConditionNumberType conditionType);
         virtual double getConditionNumber(Eigen::MatrixXd const& mMat, ConditionNumberType conditionType);
 
@@ -125,21 +125,21 @@ namespace diffim {
         virtual ~MaskedKernelSolution() {};
         virtual void buildOrig(lsst::afw::image::Image<InputT> const &templateImage,
                                lsst::afw::image::Image<InputT> const &scienceImage,
-                               lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
+                               lsst::afw::image::Image<lsst::afw::image::VariancePixel>
                                const &varianceEstimate,
                                lsst::afw::image::Mask<lsst::afw::image::MaskPixel> pixelMask);
 
         virtual void buildWithMask(lsst::afw::image::Image<InputT> const &templateImage,
                                    lsst::afw::image::Image<InputT> const &scienceImage,
-                                   lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
+                                   lsst::afw::image::Image<lsst::afw::image::VariancePixel>
                                    const &varianceEstimate,
                                    lsst::afw::image::Mask<lsst::afw::image::MaskPixel> const &pixelMask);
 
         virtual void buildSingleMaskOrig(lsst::afw::image::Image<InputT> const &templateImage,
                                          lsst::afw::image::Image<InputT> const &scienceImage,
-                                         lsst::afw::image::Image<lsst::afw::image::VariancePixel> 
+                                         lsst::afw::image::Image<lsst::afw::image::VariancePixel>
                                          const &varianceEstimate,
-                                         lsst::afw::geom::Box2I maskBox);
+                                         lsst::geom::Box2I maskBox);
     };
 
 
@@ -183,13 +183,13 @@ namespace diffim {
             );
 
         virtual ~SpatialKernelSolution() {};
-        
+
         void addConstraint(float xCenter, float yCenter,
                            Eigen::MatrixXd const& qMat,
                            Eigen::VectorXd const& wVec);
 
         void solve();
-        std::shared_ptr<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>> makeKernelImage(lsst::afw::geom::Point2D const& pos);
+        std::shared_ptr<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>> makeKernelImage(lsst::geom::Point2D const& pos);
         std::pair<std::shared_ptr<lsst::afw::math::LinearCombinationKernel>,
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getSolutionPair();
 

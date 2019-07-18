@@ -4,7 +4,7 @@ import unittest
 import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.afw.geom as afwGeom
+import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.log.utils as logUtils
@@ -30,10 +30,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         del self.kList
 
     def makeCandidate(self, kSum, x, y, size=51):
-        mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
+        mi1 = afwImage.MaskedImageF(geom.Extent2I(size, size))
         mi1.getVariance().set(1.0)  # avoid NaNs
         mi1[size//2, size//2, afwImage.LOCAL] = (1, 0x0, 1)
-        mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(size, size))
+        mi2 = afwImage.MaskedImageF(geom.Extent2I(size, size))
         mi2.getVariance().set(1.0)  # avoid NaNs
         mi2[size//2, size//2, afwImage.LOCAL] = (kSum, 0x0, kSum)
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
@@ -206,10 +206,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         sizeCellX = self.policy.get("sizeCellX")
         sizeCellY = self.policy.get("sizeCellY")
 
-        kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0,
-                                                                             0),
-                                                             afwGeom.Extent2I(sizeCellX * nCell,
-                                                                              sizeCellY * nCell)),
+        kernelCellSet = afwMath.SpatialCellSet(geom.Box2I(geom.Point2I(0, 0),
+                                                          geom.Extent2I(sizeCellX * nCell,
+                                                                        sizeCellY * nCell)),
                                                sizeCellX,
                                                sizeCellY)
 

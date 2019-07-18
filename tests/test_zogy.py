@@ -25,6 +25,9 @@ import numpy as np
 import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.geom as geom
+import lsst.meas.algorithms as measAlg
+
 from test_imageDecorrelation import makeFakeImages
 
 from lsst.ip.diffim.zogy import ZogyTask, ZogyConfig, ZogyMapReduceConfig, \
@@ -243,20 +246,18 @@ class ZogyTest(lsst.utils.tests.TestCase):
         to ensure this edge case passes. This also tests cases where one of the PSFs
         is not square.
         """
-        import lsst.afw.geom as afwGeom
-        import lsst.meas.algorithms as measAlg
 
         # All this to grow the PSF of im1ex by a few pixels:
         def _growPsf(exp, extraPix=(2, 3)):
             bbox = exp.getBBox()
             center = ((bbox.getBeginX() + bbox.getEndX()) // 2., (bbox.getBeginY() + bbox.getEndY()) // 2.)
-            center = afwGeom.Point2D(center[0], center[1])
+            center = geom.Point2D(center[0], center[1])
             kern = exp.getPsf().computeKernelImage(center).convertF()
             kernSize = kern.getDimensions()
             paddedKern = afwImage.ImageF(kernSize[0] + extraPix[0], kernSize[1] + extraPix[1])
-            bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((kernSize[0] + extraPix[0] - kern.getWidth()) // 2,
-                                                        (kernSize[1] + extraPix[1] - kern.getHeight()) // 2),
-                                        kern.getDimensions())
+            bboxToPlace = geom.Box2I(geom.Point2I((kernSize[0] + extraPix[0] - kern.getWidth()) // 2,
+                                                  (kernSize[1] + extraPix[1] - kern.getHeight()) // 2),
+                                     kern.getDimensions())
             paddedKern.assign(kern, bboxToPlace)
             fixedKern = afwMath.FixedKernel(paddedKern.convertD())
             psfNew = measAlg.KernelPsf(fixedKern, center)

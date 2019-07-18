@@ -26,9 +26,9 @@ import numpy as np
 import lsst.utils.tests
 import lsst.daf.base as dafBase
 import lsst.afw.image as afwImage
-import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
 
@@ -204,12 +204,12 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         modelBBox = model.getBBox()
 
         # Portion of the negative Psf that overlaps the montage
-        negOverlapBBox = afwGeom.Box2I(negPsfBBox)
+        negOverlapBBox = geom.Box2I(negPsfBBox)
         negOverlapBBox.clip(modelBBox)
         self.assertFalse(negOverlapBBox.isEmpty())
 
         # Portion of the positivePsf that overlaps the montage
-        posOverlapBBox = afwGeom.Box2I(posPsfBBox)
+        posOverlapBBox = geom.Box2I(posPsfBBox)
         posOverlapBBox.clip(modelBBox)
         self.assertFalse(posOverlapBBox.isEmpty())
 
@@ -289,8 +289,8 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         speaks.sort()
         dpeaks = [speaks[0][1], speaks[-1][1]]
 
-        negCenter = afwGeom.Point2D(dpeaks[0].getFx(), dpeaks[0].getFy())
-        posCenter = afwGeom.Point2D(dpeaks[1].getFx(), dpeaks[1].getFy())
+        negCenter = geom.Point2D(dpeaks[0].getFx(), dpeaks[0].getFy())
+        posCenter = geom.Point2D(dpeaks[1].getFx(), dpeaks[1].getFy())
 
         fneg, negPsfSum, fpos, posPsfSum, residIm = self._makeModel(exposure, psf, fp, negCenter, posCenter)
 

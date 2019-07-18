@@ -25,9 +25,9 @@ import unittest
 
 import lsst.utils.tests
 import lsst.utils
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 
@@ -76,9 +76,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def runConvolveAndSubtract1(self, bgVal=0, xloc=408, yloc=580):
         imsize = int(5 * self.kSize)
 
-        p0 = afwGeom.Point2I(xloc - imsize//2, yloc - imsize//2)
-        p1 = afwGeom.Point2I(xloc + imsize//2, yloc + imsize//2)
-        bbox = afwGeom.Box2I(p0, p1)
+        p0 = geom.Point2I(xloc - imsize//2, yloc - imsize//2)
+        p1 = geom.Point2I(xloc + imsize//2, yloc + imsize//2)
+        bbox = geom.Box2I(p0, p1)
 
         tmi = afwImage.MaskedImageF(self.templateImage, bbox, origin=afwImage.LOCAL)
         smi = afwImage.MaskedImageF(self.scienceImage, bbox, origin=afwImage.LOCAL)
@@ -95,9 +95,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def runConvolveAndSubtract2(self, bgOrder=0, xloc=408, yloc=580):
         imsize = int(5 * self.kSize)
 
-        p0 = afwGeom.Point2I(xloc - imsize//2, yloc - imsize//2)
-        p1 = afwGeom.Point2I(xloc + imsize//2, yloc + imsize//2)
-        bbox = afwGeom.Box2I(p0, p1)
+        p0 = geom.Point2I(xloc - imsize//2, yloc - imsize//2)
+        p1 = geom.Point2I(xloc + imsize//2, yloc + imsize//2)
+        bbox = geom.Box2I(p0, p1)
 
         tmi = afwImage.MaskedImageF(self.templateImage, bbox, origin=afwImage.LOCAL)
         smi = afwImage.MaskedImageF(self.scienceImage, bbox, origin=afwImage.LOCAL)

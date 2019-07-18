@@ -3,9 +3,9 @@ import numpy as num
 
 
 import lsst.utils.tests
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
@@ -51,15 +51,15 @@ class DiffimTestCases(unittest.TestCase):
         del self.kList
 
     def testGood(self):
-        ti = afwImage.MaskedImageF(afwGeom.Extent2I(100, 100))
+        ti = afwImage.MaskedImageF(geom.Extent2I(100, 100))
         ti.getVariance().set(0.1)
         ti[50, 50, afwImage.LOCAL] = (1., 0x0, 1.)
         sKernel = self.makeSpatialKernel(2)
         si = afwImage.MaskedImageF(ti.getDimensions())
         afwMath.convolve(si, ti, sKernel, True)
 
-        bbox = afwGeom.Box2I(afwGeom.Point2I(25, 25),
-                             afwGeom.Point2I(75, 75))
+        bbox = geom.Box2I(geom.Point2I(25, 25),
+                          geom.Point2I(75, 75))
         si = afwImage.MaskedImageF(si, bbox, origin=afwImage.LOCAL)
         ti = afwImage.MaskedImageF(ti, bbox, origin=afwImage.LOCAL)
         kc = ipDiffim.KernelCandidateF(50., 50., ti, si, self.policy)
@@ -81,15 +81,15 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(kc.getStatus(), afwMath.SpatialCellCandidate.GOOD)
 
     def testBad(self):
-        ti = afwImage.MaskedImageF(afwGeom.Extent2I(100, 100))
+        ti = afwImage.MaskedImageF(geom.Extent2I(100, 100))
         ti.getVariance().set(0.1)
         ti[50, 50, afwImage.LOCAL] = (1., 0x0, 1.)
         sKernel = self.makeSpatialKernel(2)
         si = afwImage.MaskedImageF(ti.getDimensions())
         afwMath.convolve(si, ti, sKernel, True)
 
-        bbox = afwGeom.Box2I(afwGeom.Point2I(25, 25),
-                             afwGeom.Point2I(75, 75))
+        bbox = geom.Box2I(geom.Point2I(25, 25),
+                          geom.Point2I(75, 75))
         si = afwImage.MaskedImageF(si, bbox, origin=afwImage.LOCAL)
         ti = afwImage.MaskedImageF(ti, bbox, origin=afwImage.LOCAL)
         kc = ipDiffim.KernelCandidateF(50., 50., ti, si, self.policy)

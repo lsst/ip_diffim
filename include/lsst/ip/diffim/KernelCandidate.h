@@ -149,7 +149,7 @@ namespace diffim {
          */
 
         /**
-         * @brief Build KernelSolution matrices for M x = B with regularization matrix H 
+         * @brief Build KernelSolution matrices for M x = B with regularization matrix H
          *
          * @note Modified equation is (Mt.M + lambda H) x = Mt.B with lambda a
          * degree of freedom describing the "strength" of the regularization.
@@ -209,7 +209,7 @@ namespace diffim {
      *
      * @param xCenter  X-center of candidate
      * @param yCenter  Y-center of candidate
-     * @param templateMaskedImage  Template subimage 
+     * @param templateMaskedImage  Template subimage
      * @param scienceMaskedImage  Science image subimage
      * @param policy   Policy file for creation of rating
      *
@@ -234,7 +234,7 @@ namespace diffim {
      *
      * @param source  afw::table::SourceRecord used to construct the
      * KernelCandidate
-     * @param templateMaskedImage  Template subimage 
+     * @param templateMaskedImage  Template subimage
      * @param scienceMaskedImage  Science image subimage
      * @param policy   Policy file for creation of rating
      *

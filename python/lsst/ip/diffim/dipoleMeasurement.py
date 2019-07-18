@@ -21,8 +21,8 @@
 
 import numpy as np
 
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
+import lsst.geom as geom
 import lsst.pex.config as pexConfig
 from lsst.log import Log
 import lsst.meas.deblender.baseline as deblendBaseline
@@ -423,8 +423,8 @@ class DipoleAnalysis(object):
         if (np.isinf(negCenX) or np.isinf(negCenY) or np.isinf(posCenX) or np.isinf(posCenY)):
             return None
 
-        center = afwGeom.Point2D(0.5*(negCenX+posCenX),
-                                 0.5*(negCenY+posCenY))
+        center = geom.Point2D(0.5*(negCenX+posCenX),
+                              0.5*(negCenY+posCenY))
         return center
 
     def getOrientation(self, source):
@@ -443,7 +443,7 @@ class DipoleAnalysis(object):
             return None
 
         dx, dy = posCenX-negCenX, posCenY-negCenY
-        angle = afwGeom.Angle(np.arctan2(dx, dy), afwGeom.radians)
+        angle = geom.Angle(np.arctan2(dx, dy), geom.radians)
         return angle
 
     def displayDipoles(self, exposure, sources):

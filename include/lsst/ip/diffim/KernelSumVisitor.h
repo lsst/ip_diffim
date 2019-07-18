@@ -2,7 +2,7 @@
 /**
  * @file KernelSumVisitor.h
  *
- * @brief Declaration of KernelSumVisitor 
+ * @brief Declaration of KernelSumVisitor
  *
  * @author Andrew Becker, University of Washington
  *
@@ -18,9 +18,9 @@
 #include "lsst/afw/image.h"
 #include "lsst/pex/policy/Policy.h"
 
-namespace lsst { 
-namespace ip { 
-namespace diffim { 
+namespace lsst {
+namespace ip {
+namespace diffim {
 namespace detail {
 
     template<typename PixelT>
@@ -29,21 +29,21 @@ namespace detail {
         typedef std::shared_ptr<KernelSumVisitor<PixelT> > Ptr;
 
         enum Mode {AGGREGATE = 0, REJECT = 1};
-        
+
         KernelSumVisitor(lsst::pex::policy::Policy const& policy);
         virtual ~KernelSumVisitor() {};
-        
+
         void setMode(Mode mode) {_mode = mode;}
         int    getNRejected() {return _nRejected;}
         double getkSumMean()  {return _kSumMean;}
         double getkSumStd()   {return _kSumStd;}
         double getdkSumMax()  {return _dkSumMax;}
         int    getkSumNpts()  {return _kSumNpts;}
-        
+
         void resetKernelSum();
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
         void processKsumDistribution();
-        
+
     private:
         Mode _mode;                  ///< Processing mode; AGGREGATE or REJECT
         std::vector<double> _kSums;  ///< List of all candidate kernel sums
@@ -53,8 +53,8 @@ namespace detail {
         int    _kSumNpts;            ///< Number of points used in the statistics
         int    _nRejected;           ///< Number of candidates rejected during processCandidate()
         lsst::pex::policy::Policy _policy;   ///< Policy controlling behavior
-    };    
-    
+    };
+
     template<typename PixelT>
     std::shared_ptr<KernelSumVisitor<PixelT> >
     makeKernelSumVisitor(lsst::pex::policy::Policy const& policy) {

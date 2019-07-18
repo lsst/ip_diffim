@@ -2,7 +2,7 @@
 /**
  * @file KernelSumVisitor.h
  *
- * @brief Implementation of KernelSumVisitor 
+ * @brief Implementation of KernelSumVisitor
  *
  * @author Andrew Becker, University of Washington
  *
@@ -19,25 +19,25 @@
 #include "lsst/ip/diffim/KernelSumVisitor.h"
 
 namespace afwMath        = lsst::afw::math;
-namespace pexPolicy      = lsst::pex::policy; 
-namespace pexExcept      = lsst::pex::exceptions; 
+namespace pexPolicy      = lsst::pex::policy;
+namespace pexExcept      = lsst::pex::exceptions;
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 namespace detail {
-    
+
     /**
      * @class KernelSumVisitor
      * @ingroup ip_diffim
      *
-     * @brief A class to accumulate kernel sums across SpatialCells 
+     * @brief A class to accumulate kernel sums across SpatialCells
      *
      * @code
         std::shared_ptr<Policy> policy(new Policy);
         policy->set("kernelSumClipping", false);
         policy->set("maxKsumSigma", 3.0);
-     
+
         detail::KernelSumVisitor<PixelT> kernelSumVisitor(*policy);
         kernelSumVisitor.reset();
         kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::AGGREGATE);
@@ -73,9 +73,9 @@ namespace detail {
         _dkSumMax(0.),
         _kSumNpts(0),
         _nRejected(0),
-        _policy(policy) 
+        _policy(policy)
     {};
-    
+
     template<typename PixelT>
     void KernelSumVisitor<PixelT>::resetKernelSum() {
         _kSums.clear();
@@ -87,7 +87,7 @@ namespace detail {
     }
 
     template<typename PixelT>
-    void KernelSumVisitor<PixelT>::processCandidate(lsst::afw::math::SpatialCellCandidate 
+    void KernelSumVisitor<PixelT>::processCandidate(lsst::afw::math::SpatialCellCandidate
                                                     *candidate) {
 
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
@@ -97,14 +97,14 @@ namespace detail {
         }
         LOGL_DEBUG("TRACE5.ip.diffim.KernelSumVisitor.processCandidate",
                    "Processing candidate %d, mode %d", kCandidate->getId(), _mode);
-        
+
         /* Grab all kernel sums and look for outliers */
         if (_mode == AGGREGATE) {
             _kSums.push_back(kCandidate->getKernelSolution(KernelCandidate<PixelT>::ORIG)->getKsum());
         }
         else if (_mode == REJECT) {
             if (_policy.getBool("kernelSumClipping")) {
-                double kSum = 
+                double kSum =
                     kCandidate->getKernelSolution(KernelCandidate<PixelT>::ORIG)->getKsum();
 
                 if (fabs(kSum - _kSumMean) > _dkSumMax) {
@@ -122,27 +122,27 @@ namespace detail {
             }
         }
     }
-    
+
     template<typename PixelT>
     void KernelSumVisitor<PixelT>::processKsumDistribution() {
         if (_kSums.size() == 0) {
-            throw LSST_EXCEPT(pexExcept::Exception, 
+            throw LSST_EXCEPT(pexExcept::Exception,
                               "Unable to determine kernel sum; 0 candidates");
         }
         else if (_kSums.size() == 1) {
             LOGL_DEBUG("TRACE1.ip.diffim.KernelSumVisitor.processKsumDistribution",
                        "WARNING: only 1 kernel candidate");
-            
+
             _kSumMean = _kSums[0];
             _kSumStd  = 0.0;
             _kSumNpts = 1;
         }
         else {
             try {
-                afwMath::Statistics stats = afwMath::makeStatistics(_kSums, 
-                                                                    afwMath::NPOINT | 
-                                                                    afwMath::MEANCLIP | 
-                                                                    afwMath::STDEVCLIP); 
+                afwMath::Statistics stats = afwMath::makeStatistics(_kSums,
+                                                                    afwMath::NPOINT |
+                                                                    afwMath::MEANCLIP |
+                                                                    afwMath::STDEVCLIP);
                 _kSumMean = stats.getValue(afwMath::MEANCLIP);
                 _kSumStd  = stats.getValue(afwMath::STDEVCLIP);
                 _kSumNpts = static_cast<int>(stats.getValue(afwMath::NPOINT));
@@ -151,13 +151,13 @@ namespace detail {
                 throw e;
             }
             if (std::isnan(_kSumMean)) {
-                throw LSST_EXCEPT(pexExcept::Exception, 
-                                  str(boost::format("Mean kernel sum returns NaN (%d points)") 
+                throw LSST_EXCEPT(pexExcept::Exception,
+                                  str(boost::format("Mean kernel sum returns NaN (%d points)")
                                       % _kSumNpts));
             }
             if (std::isnan(_kSumStd)) {
-                throw LSST_EXCEPT(pexExcept::Exception, 
-                                  str(boost::format("Kernel sum stdev returns NaN (%d points)") 
+                throw LSST_EXCEPT(pexExcept::Exception,
+                                  str(boost::format("Kernel sum stdev returns NaN (%d points)")
                                       % _kSumNpts));
             }
         }
@@ -166,12 +166,12 @@ namespace detail {
                    "Kernel Sum Distribution : %.3f +/- %.3f (%d points)",
                    _kSumMean, _kSumStd, _kSumNpts);
     }
-    
+
     typedef float PixelT;
 
     template class KernelSumVisitor<PixelT>;
 
-    template std::shared_ptr<KernelSumVisitor<PixelT> > 
+    template std::shared_ptr<KernelSumVisitor<PixelT> >
     makeKernelSumVisitor<PixelT>(lsst::pex::policy::Policy const&);
 
 }}}} // end of namespace lsst::ip::diffim::detail

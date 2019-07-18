@@ -2,7 +2,7 @@
 /**
  * @file BuildSingleKernelVisitor.h
  *
- * @brief Declaration of BuildSingleKernelVisitor 
+ * @brief Declaration of BuildSingleKernelVisitor
  *
  * @author Andrew Becker, University of Washington
  *
@@ -21,9 +21,9 @@
 
 #include "lsst/ip/diffim/ImageStatistics.h"
 
-namespace lsst { 
-namespace ip { 
-namespace diffim { 
+namespace lsst {
+namespace ip {
+namespace diffim {
 namespace detail {
 
     template<typename PixelT>
@@ -34,16 +34,16 @@ namespace detail {
 
         BuildSingleKernelVisitor(
             lsst::afw::math::KernelList const& basisList,
-            lsst::pex::policy::Policy const& policy  
+            lsst::pex::policy::Policy const& policy
             );
         BuildSingleKernelVisitor(
             lsst::afw::math::KernelList const& basisList,
-            lsst::pex::policy::Policy const& policy, 
-            Eigen::MatrixXd const& hMat  
+            lsst::pex::policy::Policy const& policy,
+            Eigen::MatrixXd const& hMat
             );
         virtual ~BuildSingleKernelVisitor() {};
-        
-        /* 
+
+        /*
            Don't reprocess candidate if its already been build.  The use
            case for this functionality is : when iterating over all Cells
            and rejecting bad Kernels, we need to re-visit *all* Cells to
@@ -51,11 +51,11 @@ namespace detail {
            unncessarily re-build all the good Kernels.
         */
         void setSkipBuilt(bool skip)      {_skipBuilt = skip;}
-        
+
         int getNRejected()    {return _nRejected;}
         int getNProcessed()   {return _nProcessed;}
         void reset()          {_nRejected = 0; _nProcessed = 0;}
-        
+
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
 
     private:
@@ -71,7 +71,7 @@ namespace detail {
         bool _useCoreStats;                   ///< Extracted from _policy
         int _coreRadius;                      ///< Extracted from _policy
     };
-    
+
     template<typename PixelT>
     std::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor(

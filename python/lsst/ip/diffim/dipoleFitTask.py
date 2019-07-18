@@ -23,11 +23,11 @@
 import numpy as np
 import warnings
 
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.meas.base as measBase
 import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDet
+import lsst.geom as geom
 from lsst.log import Log
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
@@ -238,8 +238,8 @@ class DipoleModel(object):
 
         Parameters
         ----------
-        bbox : `lsst.geom.Box`
-            input BoundingBox defining the coordinate limits
+        bbox : `lsst.geom.Box2I`
+            input Bounding Box defining the coordinate limits
 
         Returns
         -------
@@ -362,7 +362,7 @@ class DipoleModel(object):
         """
 
         # Generate the psf image, normalize to flux
-        psf_img = psf.computeImage(afwGeom.Point2D(xcen, ycen)).convertF()
+        psf_img = psf.computeImage(geom.Point2D(xcen, ycen)).convertF()
         psf_img_sum = np.nansum(psf_img.getArray())
         psf_img *= (flux/psf_img_sum)
 

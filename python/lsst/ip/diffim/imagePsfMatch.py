@@ -28,6 +28,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
+import lsst.geom as geom
 import lsst.pipe.base as pipeBase
 from lsst.meas.algorithms import SourceDetectionTask, SubtractBackgroundTask, WarpedPsf
 from lsst.meas.base import SingleFrameMeasurementTask
@@ -926,12 +927,12 @@ class ImagePsfMatchTask(PsfMatchTask):
         scienceBBox = scienceExposure.getBBox()
 
         # LLC
-        templateOrigin = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getBegin()))
-        scienceOrigin = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getBegin()))
+        templateOrigin = templateWcs.pixelToSky(geom.Point2D(templateBBox.getBegin()))
+        scienceOrigin = scienceWcs.pixelToSky(geom.Point2D(scienceBBox.getBegin()))
 
         # URC
-        templateLimit = templateWcs.pixelToSky(afwGeom.Point2D(templateBBox.getEnd()))
-        scienceLimit = scienceWcs.pixelToSky(afwGeom.Point2D(scienceBBox.getEnd()))
+        templateLimit = templateWcs.pixelToSky(geom.Point2D(templateBBox.getEnd()))
+        scienceLimit = scienceWcs.pixelToSky(geom.Point2D(scienceBBox.getEnd()))
 
         self.log.info("Template Wcs : %f,%f -> %f,%f",
                       templateOrigin[0], templateOrigin[1],
@@ -940,10 +941,10 @@ class ImagePsfMatchTask(PsfMatchTask):
                       scienceOrigin[0], scienceOrigin[1],
                       scienceLimit[0], scienceLimit[1])
 
-        templateBBox = afwGeom.Box2D(templateOrigin.getPosition(afwGeom.degrees),
-                                     templateLimit.getPosition(afwGeom.degrees))
-        scienceBBox = afwGeom.Box2D(scienceOrigin.getPosition(afwGeom.degrees),
-                                    scienceLimit.getPosition(afwGeom.degrees))
+        templateBBox = geom.Box2D(templateOrigin.getPosition(geom.degrees),
+                                  templateLimit.getPosition(geom.degrees))
+        scienceBBox = geom.Box2D(scienceOrigin.getPosition(geom.degrees),
+                                 scienceLimit.getPosition(geom.degrees))
         if not (templateBBox.overlaps(scienceBBox)):
             raise RuntimeError("Input images do not overlap at all")
 

@@ -2,7 +2,7 @@
 /**
  * @file BasisLists.h
  *
- * @brief Subroutines associated with generating, normalising, and regularising Basis functions 
+ * @brief Subroutines associated with generating, normalising, and regularising Basis functions
  *
  * @author Andrew Becker, University of Washington
  *
@@ -20,42 +20,42 @@
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/afw/math/Kernel.h"
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 
     /**
      * @brief Build a set of Delta Function basis kernels
-     * 
+     *
      * @note Total number of basis functions is width*height
-     * 
+     *
      * @param width  Width of basis set (cols)
      * @param height Height of basis set (rows)
      *
      * @ingroup ip_diffim
-     */    
+     */
     lsst::afw::math::KernelList makeDeltaFunctionBasisList(
         int width,
         int height
         );
-    
+
     /**
      * @brief Build a regularization matrix for Delta function kernels
-     * 
+     *
      * @param policy           Policy file dictating which type of matrix to make
      *
      * @ingroup ip_diffim
      *
      * @note Calls either makeForwardDifferenceMatrix or
      * makeCentralDifferenceMatrix based on the policy file.
-     */    
+     */
     Eigen::MatrixXd makeRegularizationMatrix(
         lsst::pex::policy::Policy policy
         );
 
     /**
      * @brief Build a forward difference regularization matrix for Delta function kernels
-     * 
+     *
      * @param width            Width of basis set you want to regularize
      * @param height           Height of basis set you want to regularize
      * @param orders           Which derivatives to penalize (1,2,3)
@@ -63,7 +63,7 @@ namespace diffim {
      * @param fitForBackground Fit for differential background?
      *
      * @ingroup ip_diffim
-     */    
+     */
     Eigen::MatrixXd makeForwardDifferenceMatrix(
         int width,
         int height,
@@ -74,7 +74,7 @@ namespace diffim {
 
     /**
      * @brief Build a central difference Laplacian regularization matrix for Delta function kernels
-     * 
+     *
      * @param width            Width of basis set you want to regularize
      * @param height           Height of basis set you want to regularize
      * @param stencil          Which type of Laplacian approximation to use
@@ -82,7 +82,7 @@ namespace diffim {
      * @param fitForBackground Fit for differential background?
      *
      * @ingroup ip_diffim
-     */    
+     */
     Eigen::MatrixXd makeCentralDifferenceMatrix(
         int width,
         int height,
@@ -115,14 +115,14 @@ namespace diffim {
      *
      * @note Should consider implementing as SeparableKernels for additional speed,
      * but this will make the normalization a bit more complicated
-     * 
+     *
      * @param halfWidth  size is 2*N + 1
      * @param nGauss     number of gaussians
      * @param sigGauss   Widths of the Gaussian Kernels
      * @param degGauss   Local spatial variation of bases
      *
      * @ingroup ip_diffim
-     */    
+     */
     lsst::afw::math::KernelList makeAlardLuptonBasisList(
         int halfWidth,
         int nGauss,

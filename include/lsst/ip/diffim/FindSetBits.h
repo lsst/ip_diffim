@@ -1,9 +1,9 @@
 // -*- lsst-c++ -*-
 
-/* 
+/*
  * LSST Data Management System
  * Copyright 2008, 2009, 2010 LSST Corporation.
- * 
+ *
  * This product includes software developed by the
  * LSST Project (http://www.lsst.org/).
  *
@@ -11,17 +11,17 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
- * You should have received a copy of the LSST License Statement and 
- * the GNU General Public License along with this program.  If not, 
+ *
+ * You should have received a copy of the LSST License Statement and
+ * the GNU General Public License along with this program.  If not,
  * see <http://www.lsstcorp.org/LegalNotices/>.
  */
- 
+
 /**
  * @file FindSetBits.h
  *
@@ -37,16 +37,16 @@
 
 #include "lsst/afw/image.h"
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 
-    
+
     /**
      * @brief Class to accumulate Mask bits
      *
      * @note Search through a Mask for any set bits.
-     * 
+     *
      * @ingroup ip_diffim
      */
     template <typename MaskT>
@@ -54,7 +54,7 @@ namespace diffim {
     public:
         typedef typename MaskT::x_iterator x_iterator;
 
-        FindSetBits() : 
+        FindSetBits() :
             _bits(0) {;}
         virtual ~FindSetBits() {} ;
 
@@ -82,6 +82,3 @@ namespace diffim {
 
 
 #endif
-
-
-

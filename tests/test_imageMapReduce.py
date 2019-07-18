@@ -27,6 +27,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.daf.base as dafBase
+import lsst.geom as geom
 import lsst.meas.algorithms as measAlg
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -112,7 +113,7 @@ class AddAmountImageMapper(ImageMapper):
             Input `subExposure` upon which to operate
         expandedSubExp : `afwImage.Exposure`
             Input expanded subExposure (not used here)
-        fullBBox : `afwGeom.BoundingBox`
+        fullBBox : `lsst.geom.Box2I`
             Bounding box of original exposure (not used here)
         addNaNs : boolean
             Set a single pixel of `subExposure` to `np.nan`
@@ -157,7 +158,7 @@ class GetMeanImageMapper(ImageMapper):
             Input `subExposure` upon which to operate
         expandedSubExp : `afwImage.Exposure`
             Input expanded subExposure (not used here)
-        fullBBox : `afwGeom.BoundingBox`
+        fullBBox : `lsst.geom.Box2I`
             Bounding box of original exposure (not used here)
         kwargs
             Arbitrary keyword arguments (ignored)
@@ -268,7 +269,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         extentY = int(self.exposure.getHeight()*0.05)
         for x in np.linspace(extentX, self.exposure.getWidth()-extentX, 10):
             for y in np.linspace(extentY, self.exposure.getHeight()-extentY, 10):
-                point = afwGeom.Point2D(np.rint(x), np.rint(y))
+                point = geom.Point2D(np.rint(x), np.rint(y))
                 oPsf = origPsf.computeImage(point).getArray()
                 nPsf = newPsf.computeImage(point).getArray()
                 if oPsf.shape[0] < nPsf.shape[0]:  # sometimes CoaddPsf does this.

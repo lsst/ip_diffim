@@ -2,7 +2,7 @@
 /**
  * @file BuildSpatialKernelVisitor.h
  *
- * @brief Implementation of BuildSpatialKernelVisitor 
+ * @brief Implementation of BuildSpatialKernelVisitor
  *
  * @author Andrew Becker, University of Washington
  *
@@ -10,7 +10,7 @@
  */
 
 #include <memory>
-#include "boost/timer.hpp" 
+#include "boost/timer.hpp"
 
 #include "Eigen/Core"
 #include "Eigen/Cholesky"
@@ -18,7 +18,7 @@
 #include "Eigen/QR"
 
 #include "lsst/afw/math.h"
-#include "lsst/afw/geom.h"
+#include "lsst/geom.h"
 #include "lsst/log/Log.h"
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/exceptions/Runtime.h"
@@ -28,12 +28,12 @@
 #include "lsst/ip/diffim/BuildSpatialKernelVisitor.h"
 
 namespace afwMath        = lsst::afw::math;
-namespace afwGeom        = lsst::afw::geom;
-namespace pexPolicy      = lsst::pex::policy; 
-namespace pexExcept      = lsst::pex::exceptions; 
+namespace geom           = lsst::afw::geom;
+namespace pexPolicy      = lsst::pex::policy;
+namespace pexExcept      = lsst::pex::exceptions;
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 namespace detail {
     /**
@@ -48,15 +48,15 @@ namespace detail {
         policy->set("spatialBgOrder", spatialBgOrder);
         policy->set("kernelBasisSet", "delta-function");
         policy->set("usePcaForSpatialKernel", true);
-    
-        detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse, 
+
+        detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse,
                                                                       *policy);
         kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
         spatialKernelFitter.solveLinearEquation();
         std::pair<std::shared_ptr<afwMath::LinearCombinationKernel>,
             afwMath::Kernel::SpatialFunctionPtr> kb = spatialKernelFitter.getKernelSolution();
         spatialKernel     = kb.first;
-        spatialBackground = kb.second; 
+        spatialBackground = kb.second;
      * @endcode
      *
      * @note After visiting all candidates, solveLinearEquation() must be called to
@@ -67,17 +67,17 @@ namespace detail {
      * for spatial variation.  This requires a little extra code to make sure the
      * matrices are the correct size, and that it is accessing the appropriate terms
      * in the matrices when creating the spatial models.
-     * 
+     *
      */
     template<typename PixelT>
     BuildSpatialKernelVisitor<PixelT>::BuildSpatialKernelVisitor(
         lsst::afw::math::KernelList const& basisList, ///< Basis functions used in the fit
-        lsst::afw::geom::Box2I const& regionBBox,     ///< Spatial region over which the function is fit
+        lsst::geom::Box2I const& regionBBox,     ///< Spatial region over which the function is fit
         lsst::pex::policy::Policy policy              ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _kernelSolution(),
-        _nCandidates(0) 
+        _nCandidates(0)
     {
         int spatialKernelOrder = policy.getInt("spatialKernelOrder");
         afwMath::Kernel::SpatialFunctionPtr spatialKernelFunction;
@@ -89,10 +89,10 @@ namespace detail {
         std::string spatialModelType = policy.getString("spatialModelType");
         if (spatialModelType == "chebyshev1") {
             spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
-                new afwMath::Chebyshev1Function2<double>(spatialKernelOrder, afwGeom::Box2D(regionBBox))
+                new afwMath::Chebyshev1Function2<double>(spatialKernelOrder, geom::Box2D(regionBBox))
                 );
             background = afwMath::Kernel::SpatialFunctionPtr(
-                new afwMath::Chebyshev1Function2<double>(spatialBgOrder, afwGeom::Box2D(regionBBox))
+                new afwMath::Chebyshev1Function2<double>(spatialBgOrder, geom::Box2D(regionBBox))
                 );
 
         }
@@ -106,7 +106,7 @@ namespace detail {
         }
         else {
             throw LSST_EXCEPT(pexExcept::Exception,
-                              str(boost::format("Invalid type (%s) for spatial models") % 
+                              str(boost::format("Invalid type (%s) for spatial models") %
                                   spatialModelType));
         }
 
@@ -115,8 +115,8 @@ namespace detail {
         _kernelSolution = std::shared_ptr<SpatialKernelSolution>(
             new SpatialKernelSolution(basisList, spatialKernelFunction, background, policy));
     };
-    
-    
+
+
     template<typename PixelT>
     void BuildSpatialKernelVisitor<PixelT>::processCandidate(
         lsst::afw::math::SpatialCellCandidate *candidate
@@ -132,15 +132,15 @@ namespace detail {
                        "Cannot process candidate %d, continuing", kCandidate->getId());
             return;
         }
-        
+
         LOGL_DEBUG("TRACE5.ip.diffim.BuildSpatialKernelVisitor.processCandidate",
                    "Processing candidate %d", kCandidate->getId());
         _nCandidates += 1;
 
-        /* 
+        /*
            Build the spatial kernel from the most recent fit, e.g. if its Pca
            you want to build a spatial model on the Pca basis, not original
-           basis 
+           basis
         */
         _kernelSolution->addConstraint(kCandidate->getXCenter(),
                                        kCandidate->getYCenter(),
@@ -150,7 +150,7 @@ namespace detail {
                                        kCandidate->getKernelSolution(
                                            KernelCandidate<PixelT>::RECENT
                                            )->getB());
-        
+
     }
 
     template<typename PixelT>
@@ -166,6 +166,5 @@ namespace detail {
 
     typedef float PixelT;
     template class BuildSpatialKernelVisitor<PixelT>;
-  
+
 }}}} // end of namespace lsst::ip::diffim::detail
-    

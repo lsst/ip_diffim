@@ -2,7 +2,7 @@
 /**
  * @file BuildSpatialKernelVisitor.h
  *
- * @brief Declaration of BuildSpatialKernelVisitor 
+ * @brief Declaration of BuildSpatialKernelVisitor
  *
  * @author Andrew Becker, University of Washington
  *
@@ -15,12 +15,13 @@
 #include "Eigen/Core"
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
+#include "lsst/geom.h"
 #include "lsst/ip/diffim.h"
 #include "lsst/pex/policy/Policy.h"
 
-namespace lsst { 
-namespace ip { 
-namespace diffim { 
+namespace lsst {
+namespace ip {
+namespace diffim {
 namespace detail {
 
     template<typename PixelT>
@@ -30,7 +31,7 @@ namespace detail {
 
         BuildSpatialKernelVisitor(
             lsst::afw::math::KernelList const& basisList,  ///< Basis functions
-            lsst::afw::geom::Box2I const& regionBBox,  ///< Spatial region over which the function is fit
+            lsst::geom::Box2I const& regionBBox,  ///< Spatial region over which the function is fit
             lsst::pex::policy::Policy policy           ///< Policy file directing behavior
             );
 
@@ -39,7 +40,7 @@ namespace detail {
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
 
         void solveLinearEquation();
-  
+
         inline std::shared_ptr<SpatialKernelSolution> getKernelSolution() {return _kernelSolution;}
 
         std::pair<std::shared_ptr<lsst::afw::math::LinearCombinationKernel>,
@@ -54,7 +55,7 @@ namespace detail {
     std::shared_ptr<BuildSpatialKernelVisitor<PixelT> >
     makeBuildSpatialKernelVisitor(
         lsst::afw::math::KernelList const& basisList,
-        lsst::afw::geom::Box2I const& regionBBox,
+        lsst::geom::Box2I const& regionBBox,
         lsst::pex::policy::Policy policy
         ) {
 
