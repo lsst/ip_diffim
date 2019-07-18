@@ -113,7 +113,7 @@ class AddAmountImageMapper(ImageMapper):
             Input `subExposure` upon which to operate
         expandedSubExp : `afwImage.Exposure`
             Input expanded subExposure (not used here)
-        fullBBox : `afwGeom.BoundingBox`
+        fullBBox : `lsst.geom.Box2I`
             Bounding box of original exposure (not used here)
         addNaNs : boolean
             Set a single pixel of `subExposure` to `np.nan`
@@ -158,7 +158,7 @@ class GetMeanImageMapper(ImageMapper):
             Input `subExposure` upon which to operate
         expandedSubExp : `afwImage.Exposure`
             Input expanded subExposure (not used here)
-        fullBBox : `afwGeom.BoundingBox`
+        fullBBox : `lsst.geom.Box2I`
             Bounding box of original exposure (not used here)
         kwargs
             Arbitrary keyword arguments (ignored)

@@ -238,8 +238,8 @@ class DipoleModel(object):
 
         Parameters
         ----------
-        bbox : `lsst.geom.Box`
-            input BoundingBox defining the coordinate limits
+        bbox : `lsst.geom.Box2I`
+            input Bounding Box defining the coordinate limits
 
         Returns
         -------

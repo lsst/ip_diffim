@@ -131,7 +131,7 @@ class ImageMapper(pipeBase.Task, metaclass=abc.ABCMeta):
             the sub-exposure upon which to operate
         expandedSubExposure : `lsst.afw.image.Exposure`
             the expanded sub-exposure upon which to operate
-        fullBBox : `lsst.afw.geom.BoundingBox`
+        fullBBox : `lsst.geom.Box2I`
             the bounding box of the original exposure
         kwargs :
             additional keyword arguments propagated from
@@ -786,9 +786,9 @@ class ImageMapReduceTask(pipeBase.Task):
 
         Parameters
         ----------
-        boxes : `list`
-            a list of `lsst.afw.geom.BoundingBox`es
-        bbox : `lsst.afw.geom.BoundingBox`
+        boxes : `list` of `lsst.geom.Box2I`
+            a list of bounding boxes.
+        bbox : `lsst.geom.Box2I`
             an overall bounding box
         **kwargs
             additional keyword arguments for matplotlib

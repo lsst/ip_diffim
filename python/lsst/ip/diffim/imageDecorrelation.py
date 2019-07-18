@@ -460,7 +460,7 @@ class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
             the sub-exposure of the diffim
         expandedSubExposure : `lsst.afw.image.Exposure`
             the expanded sub-exposure upon which to operate
-        fullBBox : `lsst.afw.geom.BoundingBox`
+        fullBBox : `lsst.geom.Box2I`
             the bounding box of the original exposure
         template : `lsst.afw.image.Exposure`
             the corresponding sub-exposure of the template exposure
