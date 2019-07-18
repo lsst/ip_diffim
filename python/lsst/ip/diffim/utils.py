@@ -420,6 +420,165 @@ def plotKernelSpatialModel(kernel, kernelCellSet, showBadCandidates=True,
         keptPlots = True
 
 
+def plotKernelCoefficients(spatialKernel, kernelCellSet, showBadCandidates=False, keepPlots=True):
+    """Plot the individual kernel candidate and the spatial kernel solution coefficients.
+
+    Parameters
+    ----------
+
+    spatialKernel : `lsst.afw.math.LinearCombinationKernel`
+        The spatial spatialKernel solution model which is a spatially varying linear combination
+        of the spatialKernel basis functions.
+        Typically returned by `lsst.ip.diffim.SpatialKernelSolution.getSolutionPair()`.
+
+    kernelCellSet : `lsst.afw.math.SpatialCellSet`
+        The spatial cells that was used for solution for the spatialKernel. They contain the
+        local solutions of the AL kernel for the selected sources.
+
+    showBadCandidates : `bool`, optional
+        If True, plot the coefficient values for kernel candidates where the solution was marked
+        bad by the numerical algorithm. Defaults to False.
+
+    keepPlots: `bool`, optional
+        If True, sets ``plt.show()`` to be called before the task terminates, so that the plots
+        can be explored interactively. Defaults to True.
+
+    Notes
+    -----
+    This function produces 3 figures per image subtraction operation.
+    * A grid plot of the local solutions. Each grid cell corresponds to a proportional area in
+      the image. In each cell, local kernel solution coefficients are plotted of kernel candidates (color)
+      that fall into this area as a function of the kernel basis function number.
+    * A grid plot of the spatial solution. Each grid cell corresponds to a proportional area in
+      the image. In each cell, the spatial solution coefficients are evaluated for the center of the cell.
+    * Histogram of the local solution coefficients. Red line marks the spatial solution value at
+      center of the image.
+
+    This function is called if ``lsst.ip.diffim.psfMatch.plotKernelCoefficients==True`` in lsstDebug. This
+    function was implemented as part of DM-17825.
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError as e:
+        print("Unable to import matplotlib: %s" % e)
+        return
+
+    # Image dimensions
+    imgBBox = kernelCellSet.getBBox()
+    x0 = imgBBox.getBeginX()
+    y0 = imgBBox.getBeginY()
+    wImage = imgBBox.getWidth()
+    hImage = imgBBox.getHeight()
+    imgCenterX = imgBBox.getCenterX()
+    imgCenterY = imgBBox.getCenterY()
+
+    # Plot the local solutions
+    # ----
+
+    # Grid size
+    nX = 8
+    nY = 8
+    wCell = wImage / nX
+    hCell = hImage / nY
+
+    fig = plt.figure()
+    fig.suptitle("Kernel candidate parameters on an image grid")
+    arrAx = fig.subplots(nrows=nY, ncols=nX, sharex=True, sharey=True, gridspec_kw=dict(
+        wspace=0, hspace=0))
+
+    # Bottom left panel is for bottom left part of the image
+    arrAx = arrAx[::-1, :]
+
+    allParams = []
+    for cell in kernelCellSet.getCellList():
+        cellBBox = afwGeom.Box2D(cell.getBBox())
+        # Determine which panel this spatial cell belongs to
+        iX = int((cellBBox.getCenterX() - x0)//wCell)
+        iY = int((cellBBox.getCenterY() - y0)//hCell)
+
+        for cand in cell.begin(False):
+            try:
+                kernel = cand.getKernel(cand.ORIG)
+            except Exception:
+                continue
+
+            if not showBadCandidates and cand.isBad():
+                continue
+
+            nKernelParams = kernel.getNKernelParameters()
+            kernelParams = np.array(kernel.getKernelParameters())
+            allParams.append(kernelParams)
+
+            if cand.isBad():
+                color = 'red'
+            else:
+                color = None
+            arrAx[iY, iX].plot(np.arange(nKernelParams), kernelParams, '.-',
+                               color=color, drawstyle='steps-mid', linewidth=0.1)
+    for ax in arrAx.ravel():
+        ax.grid(True, axis='y')
+
+    # Plot histogram of the local parameters and the global solution at the image center
+    # ----
+
+    spatialFuncs = spatialKernel.getSpatialFunctionList()
+    nKernelParams = spatialKernel.getNKernelParameters()
+    nX = 8
+    fig = plt.figure()
+    fig.suptitle("Hist. of parameters marked with spatial solution at img center")
+    arrAx = fig.subplots(nrows=int(nKernelParams//nX)+1, ncols=nX)
+    arrAx = arrAx[::-1, :]
+    allParams = np.array(allParams)
+    for k in range(nKernelParams):
+        ax = arrAx.ravel()[k]
+        ax.hist(allParams[:, k], bins=20, edgecolor='black')
+        ax.set_xlabel('P{}'.format(k))
+        valueParam = spatialFuncs[k](imgCenterX, imgCenterY)
+        ax.axvline(x=valueParam, color='red')
+        ax.text(0.1, 0.9, '{:.1f}'.format(valueParam),
+                transform=ax.transAxes, backgroundcolor='lightsteelblue')
+
+    # Plot grid of the spatial solution
+    # ----
+
+    nX = 8
+    nY = 8
+    wCell = wImage / nX
+    hCell = hImage / nY
+    x0 += wCell / 2
+    y0 += hCell / 2
+
+    fig = plt.figure()
+    fig.suptitle("Spatial solution of kernel parameters on an image grid")
+    arrAx = fig.subplots(nrows=nY, ncols=nX, sharex=True, sharey=True, gridspec_kw=dict(
+        wspace=0, hspace=0))
+    arrAx = arrAx[::-1, :]
+    kernelParams = np.zeros(nKernelParams, dtype=float)
+
+    for iX in range(nX):
+        for iY in range(nY):
+            x = x0 + iX * wCell
+            y = y0 + iY * hCell
+            # Evaluate the spatial solution functions for this x,y location
+            kernelParams = [f(x, y) for f in spatialFuncs]
+            arrAx[iY, iX].plot(np.arange(nKernelParams), kernelParams, '.-', drawstyle='steps-mid')
+            arrAx[iY, iX].grid(True, axis='y')
+
+    global keptPlots
+    if keepPlots and not keptPlots:
+        # Keep plots open when done
+        def show():
+            print("%s: Please close plots when done." % __name__)
+            try:
+                plt.show()
+            except Exception:
+                pass
+            print("Plots closed, exiting...")
+        import atexit
+        atexit.register(show)
+        keptPlots = True
+
+
 def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
                      showCenter=True, showEllipticity=True):
     """Show a mosaic of Kernel images.
