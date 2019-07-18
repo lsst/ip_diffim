@@ -15,9 +15,9 @@
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
 
-namespace lsst { 
-namespace ip { 
-namespace diffim { 
+namespace lsst {
+namespace ip {
+namespace diffim {
 namespace detail {
 
     template <typename ImageT>
@@ -31,20 +31,20 @@ namespace detail {
 
         /// Ctor
         explicit KernelPca(bool constantWeight=true) : Super(constantWeight) {}
-        
-        /// Generate eigenimages that are normalised 
+
+        /// Generate eigenimages that are normalised
         virtual void analyze();
     };
-    
+
     template<typename PixelT>
     class KernelPcaVisitor : public lsst::afw::math::CandidateVisitor {
     public:
         typedef lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel> ImageT;
         typedef std::shared_ptr<KernelPcaVisitor<PixelT> > Ptr;
-        
+
         KernelPcaVisitor(std::shared_ptr<KernelPca<ImageT> > imagePca);
         virtual ~KernelPcaVisitor() {};
-        
+
         lsst::afw::math::KernelList getEigenKernels();
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
         void subtractMean();

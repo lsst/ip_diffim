@@ -6,6 +6,7 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.detection as afwDet
+import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
@@ -60,8 +61,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                        (96, 95), (31, 96), (160, 96),
                        (96, 160), (160, 160), (32, 160)]:
             self.footprints.append(afwDet.Footprint(afwGeom.SpanSet(
-                afwGeom.Box2I(afwGeom.Point2I(xc, yc),
-                              afwGeom.Extent2I(1, 1)))))
+                geom.Box2I(geom.Point2I(xc, yc),
+                           geom.Extent2I(1, 1)))))
 
         # Make a basis list that hotpants has been run with
         nGauss = 1
@@ -95,9 +96,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.basisList.append(k)
 
         # And a place to put candidates
-        self.kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0),
-                                                                  afwGeom.Extent2I(self.smi.getWidth(),
-                                                                                   self.smi.getHeight())),
+        self.kernelCellSet = afwMath.SpatialCellSet(geom.Box2I(geom.Point2I(0, 0),
+                                                               geom.Extent2I(self.smi.getWidth(),
+                                                                             self.smi.getHeight())),
                                                     self.policy.getInt("sizeCellX"),
                                                     self.policy.getInt("sizeCellY"))
 
@@ -128,7 +129,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = geom.Box2I(geom.Point2I(int(xC)-24, int(yC)-24), geom.Extent2I(49, 49))
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -192,7 +193,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = geom.Box2I(geom.Point2I(int(xC)-24, int(yC)-24), geom.Extent2I(49, 49))
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -250,7 +251,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = geom.Box2I(geom.Point2I(int(xC)-24, int(yC)-24), geom.Extent2I(49, 49))
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -348,7 +349,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = geom.Box2I(geom.Point2I(int(xC)-24, int(yC)-24), geom.Extent2I(49, 49))
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -410,7 +411,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = geom.Box2I(geom.Point2I(int(xC)-24, int(yC)-24), geom.Extent2I(49, 49))
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -499,7 +500,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = geom.Box2I(geom.Point2I(int(xC)-24, int(yC)-24), geom.Extent2I(49, 49))
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -570,7 +571,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = geom.Box2I(geom.Point2I(int(xC)-24, int(yC)-24), geom.Extent2I(49, 49))
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
@@ -685,7 +686,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             xC = int(0.5 * (bbox.getMinX() + bbox.getMaxX()))
             yC = int(0.5 * (bbox.getMinY() + bbox.getMaxY()))
 
-            bbox = afwGeom.Box2I(afwGeom.Point2I(int(xC)-24, int(yC)-24), afwGeom.Extent2I(49, 49))
+            bbox = geom.Box2I(geom.Point2I(int(xC)-24, int(yC)-24), geom.Extent2I(49, 49))
 
             tsmi = afwImage.MaskedImageF(self.tmi, bbox, origin=afwImage.LOCAL)
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)

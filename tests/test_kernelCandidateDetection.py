@@ -4,9 +4,9 @@ import unittest
 
 import lsst.utils.tests
 import lsst.utils
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.log.utils as logUtils
@@ -83,14 +83,14 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                     self.assertEqual(smask[i, j, afwImage.LOCAL], 0)
 
         # add a masked pixel to the template image and make sure you don't get it
-        tp = afwGeom.Point2I(tmask.getWidth()//2, tmask.getHeight()//2)
+        tp = geom.Point2I(tmask.getWidth()//2, tmask.getHeight()//2)
         self.templateImage.mask[fpList1[0].getBBox(), afwImage.LOCAL][tp, afwImage.LOCAL] = maskVal
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList2 = kcDetect.getFootprints()
         self.assertEqual(len(fpList2), (len(fpList1)-1))
 
         # add a masked pixel to the science image and make sure you don't get it
-        sp = afwGeom.Point2I(smask.getWidth()//2, smask.getHeight()//2)
+        sp = geom.Point2I(smask.getWidth()//2, smask.getHeight()//2)
         self.scienceImage.mask[fpList1[1].getBBox(), afwImage.LOCAL][sp, afwImage.LOCAL] = maskVal
         self.scienceImage.mask[fpList1[2].getBBox(), afwImage.LOCAL][sp, afwImage.LOCAL] = maskVal
         kcDetect.apply(self.templateImage, self.scienceImage)

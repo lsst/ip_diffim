@@ -22,10 +22,10 @@
 
 import numpy as np
 
+import lsst.afw.image as afwImage
+import lsst.geom as geom
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-import lsst.afw.geom as afwGeom
-import lsst.afw.image as afwImage
 from lsst.ip.diffim.dcrModel import DcrModel
 
 __all__ = ["GetCoaddAsTemplateTask", "GetCoaddAsTemplateConfig",
@@ -88,7 +88,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         """
         skyMap = sensorRef.get(datasetType=self.config.coaddName + "Coadd_skyMap")
         expWcs = exposure.getWcs()
-        expBoxD = afwGeom.Box2D(exposure.getBBox())
+        expBoxD = geom.Box2D(exposure.getBBox())
         expBoxD.grow(self.config.templateBorderSize)
         ctrSkyPos = expWcs.pixelToSky(expBoxD.getCenter())
         tractInfo = skyMap.findTract(ctrSkyPos)
@@ -102,10 +102,10 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
         # compute coadd bbox
         coaddWcs = tractInfo.getWcs()
-        coaddBBox = afwGeom.Box2D()
+        coaddBBox = geom.Box2D()
         for skyPos in skyCorners:
             coaddBBox.include(coaddWcs.skyToPixel(skyPos))
-        coaddBBox = afwGeom.Box2I(coaddBBox)
+        coaddBBox = geom.Box2I(coaddBBox)
         self.log.info("exposure dimensions=%s; coadd dimensions=%s" %
                       (exposure.getDimensions(), coaddBBox.getDimensions()))
 
@@ -145,7 +145,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 # but make sure it is only the overlap region that is reduced.
                 patchInnerBBox = patchInfo.getInnerBBox()
                 patchInnerBBox.clip(coaddBBox)
-                dcrBBox = afwGeom.Box2I(patchSubBBox)
+                dcrBBox = geom.Box2I(patchSubBBox)
                 dcrBBox.grow(-self.config.templateBorderSize)
                 dcrBBox.include(patchInnerBBox)
                 coaddPatch = dcrModel.buildMatchedExposure(bbox=dcrBBox,

@@ -23,9 +23,9 @@ import numpy as np
 
 from . import diffimLib
 import lsst.afw.display as afwDisplay
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 import lsst.log as log
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -407,7 +407,7 @@ class ModelPsfMatchTask(PsfMatchTask):
 
         scienceBBox = exposure.getBBox()
         # Extend for proper spatial matching kernel all the way to edge, especially for narrow strips
-        scienceBBox.grow(afwGeom.Extent2I(sizeCellX, sizeCellY))
+        scienceBBox.grow(geom.Extent2I(sizeCellX, sizeCellY))
 
         sciencePsfModel = exposure.getPsf()
 
@@ -417,7 +417,7 @@ class ModelPsfMatchTask(PsfMatchTask):
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0, scienceY0 = scienceBBox.getMin()
 
-        kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(scienceBBox), sizeCellX, sizeCellY)
+        kernelCellSet = afwMath.SpatialCellSet(geom.Box2I(scienceBBox), sizeCellX, sizeCellY)
 
         nCellX = regionSizeX//sizeCellX
         nCellY = regionSizeY//sizeCellY
@@ -434,7 +434,7 @@ class ModelPsfMatchTask(PsfMatchTask):
             posY = sizeCellY*row + sizeCellY//2 + scienceY0
             for col in range(nCellX):
                 posX = sizeCellX*col + sizeCellX//2 + scienceX0
-                widthS, heightS = sciencePsfModel.computeBBox(afwGeom.Point2D(posX, posY)).getDimensions()
+                widthS, heightS = sciencePsfModel.computeBBox(geom.Point2D(posX, posY)).getDimensions()
                 widthList.append(widthS)
                 heightList.append(heightS)
 
@@ -469,7 +469,7 @@ class ModelPsfMatchTask(PsfMatchTask):
                        maxKernelSize, self.kConfig.kernelSize - maxKernelSize)
             raise ValueError(message)
 
-        dimenS = afwGeom.Extent2I(psfSize, psfSize)
+        dimenS = geom.Extent2I(psfSize, psfSize)
 
         if (dimenR != dimenS):
             try:
@@ -524,7 +524,7 @@ class ModelPsfMatchTask(PsfMatchTask):
     def _makePsfMaskedImage(self, psfModel, posX, posY, dimensions=None):
         """Return a MaskedImage of the a PSF Model of specified dimensions
         """
-        rawKernel = psfModel.computeKernelImage(afwGeom.Point2D(posX, posY)).convertF()
+        rawKernel = psfModel.computeKernelImage(geom.Point2D(posX, posY)).convertF()
         if dimensions is None:
             dimensions = rawKernel.getDimensions()
         if rawKernel.getDimensions() == dimensions:
@@ -532,9 +532,9 @@ class ModelPsfMatchTask(PsfMatchTask):
         else:
             # make image of proper size
             kernelIm = afwImage.ImageF(dimensions)
-            bboxToPlace = afwGeom.Box2I(afwGeom.Point2I((dimensions.getX() - rawKernel.getWidth())//2,
-                                                        (dimensions.getY() - rawKernel.getHeight())//2),
-                                        rawKernel.getDimensions())
+            bboxToPlace = geom.Box2I(geom.Point2I((dimensions.getX() - rawKernel.getWidth())//2,
+                                                  (dimensions.getY() - rawKernel.getHeight())//2),
+                                     rawKernel.getDimensions())
             kernelIm.assign(rawKernel, bboxToPlace)
 
         kernelMask = afwImage.Mask(dimensions, 0x0)

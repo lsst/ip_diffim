@@ -2,8 +2,8 @@ import unittest
 
 
 import lsst.utils.tests
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
+import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
@@ -30,10 +30,10 @@ class DiffimTestCases(unittest.TestCase):
         del self.policy
 
     def makeCandidate(self, kSum, x, y):
-        mi1 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
+        mi1 = afwImage.MaskedImageF(geom.Extent2I(self.size, self.size))
         mi1.getVariance().set(1.0)  # avoid NaNs
         mi1[self.size//2, self.size//2, afwImage.LOCAL] = (1, 0x0, 1)
-        mi2 = afwImage.MaskedImageF(afwGeom.Extent2I(self.size, self.size))
+        mi2 = afwImage.MaskedImageF(geom.Extent2I(self.size, self.size))
         mi2.getVariance().set(1.0)  # avoid NaNs
         mi2[self.size//2, self.size//2, afwImage.LOCAL] = (kSum, 0x0, kSum)
         kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
@@ -49,8 +49,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('spatialKernelOrder', sko)
         self.policy.set('fitForBackground', False)
 
-        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0),
-                             afwGeom.Extent2I(self.size*10, self.size*10))
+        bbox = geom.Box2I(geom.Point2I(0, 0),
+                          geom.Extent2I(self.size*10, self.size*10))
 
         bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
         bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
@@ -91,8 +91,8 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(len(spatialBgSolution), nBgTerms)
 
     def testModelType(self):
-        bbox = afwGeom.Box2I(afwGeom.Point2I(10, 10),
-                             afwGeom.Extent2I(10, 10))
+        bbox = geom.Box2I(geom.Point2I(10, 10),
+                          geom.Extent2I(10, 10))
         basisList = ipDiffim.makeKernelBasisList(self.subconfig)
 
         self.policy.set("spatialModelType", "polynomial")
@@ -122,8 +122,8 @@ class DiffimTestCases(unittest.TestCase):
         self.policy.set('spatialBgOrder', bgo)
         self.policy.set('fitForBackground', True)
 
-        bbox = afwGeom.Box2I(afwGeom.Point2I(0, 0),
-                             afwGeom.Extent2I(self.size*10, self.size*10))
+        bbox = geom.Box2I(geom.Point2I(0, 0),
+                          geom.Extent2I(self.size*10, self.size*10))
 
         bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
         bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)

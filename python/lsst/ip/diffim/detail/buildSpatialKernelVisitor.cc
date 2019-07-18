@@ -55,7 +55,7 @@ void declareBuildSpatialKernelVisitor(py::module& mod, std::string const& suffix
                afw::math::CandidateVisitor>
             cls(mod, ("BuildSpatialKernelVisitor" + suffix).c_str());
 
-    cls.def(py::init<afw::math::KernelList, afw::geom::Box2I const&, pex::policy::Policy>(), "basisList"_a,
+    cls.def(py::init<afw::math::KernelList, geom::Box2I const&, pex::policy::Policy>(), "basisList"_a,
             "regionBBox"_a, "policy"_a);
 
     cls.def("getNCandidates", &BuildSpatialKernelVisitor<PixelT>::getNCandidates);

@@ -23,11 +23,11 @@
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
-namespace pexPolicy      = lsst::pex::policy; 
-namespace pexExcept      = lsst::pex::exceptions; 
+namespace pexPolicy      = lsst::pex::policy;
+namespace pexExcept      = lsst::pex::exceptions;
 
-namespace lsst { 
-namespace ip { 
+namespace lsst {
+namespace ip {
 namespace diffim {
 namespace detail {
     /**
@@ -37,8 +37,8 @@ namespace detail {
      * @brief Asseses the quality of a candidate given a spatial kernel and background model
      *
      * @code
-        detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel, 
-                                                                         spatialBackground, 
+        detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel,
+                                                                         spatialBackground,
                                                                          policy);
         spatialKernelAssessor.reset();
         kernelCells.visitCandidates(&spatialKernelAssessor, nStarPerCell);
@@ -48,14 +48,14 @@ namespace detail {
      * @note Evaluates the spatial kernel and spatial background at the location of
      * each candidate, and computes the resulting difference image.  Sets candidate
      * as afwMath::SpatialCellCandidate::GOOD/BAD if requested by the Policy.
-     * 
+     *
      */
     template<typename PixelT>
     AssessSpatialKernelVisitor<PixelT>::AssessSpatialKernelVisitor(
         std::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatialKernel,   ///< Spatially varying kernel model
         lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground, ///< Spatially varying backgound model
         lsst::pex::policy::Policy const& policy                        ///< Policy file directing behavior
-        ) : 
+        ) :
         afwMath::CandidateVisitor(),
         _spatialKernel(spatialKernel),
         _spatialBackground(spatialBackground),
@@ -72,7 +72,7 @@ namespace detail {
     void AssessSpatialKernelVisitor<PixelT>::processCandidate(
         lsst::afw::math::SpatialCellCandidate *candidate
         ) {
-        
+
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
             throw LSST_EXCEPT(pexExcept::LogicError,
@@ -84,24 +84,24 @@ namespace detail {
                        "Cannot process candidate %d, continuing", kCandidate->getId());
             return;
         }
-        
+
         LOGL_DEBUG("TRACE1.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                    "Processing candidate %d", kCandidate->getId());
 
-        /* 
+        /*
            Note - this is a hack until the Kernel API is upgraded by the
            Davis crew.  I need a "local" version of the spatially varying
            Kernel
         */
         afwImage::Image<double> kImage(_spatialKernel->getDimensions());
-        double kSum = _spatialKernel->computeImage(kImage, false, 
+        double kSum = _spatialKernel->computeImage(kImage, false,
                                                    kCandidate->getXCenter(), kCandidate->getYCenter());
         std::shared_ptr<afwMath::Kernel>
             kernelPtr(new afwMath::FixedKernel(kImage));
         /* </hack> */
-        
+
         double background = (*_spatialBackground)(kCandidate->getXCenter(), kCandidate->getYCenter());
-        
+
         MaskedImageT diffim = kCandidate->getDifferenceImage(kernelPtr, background);
 
         if (DEBUG_IMAGES) {
@@ -111,7 +111,7 @@ namespace detail {
 
         /* Official resids */
         try {
-            if (_useCoreStats) 
+            if (_useCoreStats)
                 _imstats.apply(diffim, _coreRadius);
             else
                 _imstats.apply(diffim);
@@ -123,7 +123,7 @@ namespace detail {
         }
 
         _nProcessed += 1;
-        
+
         LOGL_DEBUG("TRACE4.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                    "Chi2 = %.3f", _imstats.getVariance());
         LOGL_DEBUG("TRACE4.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
@@ -140,7 +140,7 @@ namespace detail {
                    _imstats.getMean(),
                    _imstats.getRms(),
                    _imstats.getNpix());
-        
+
         bool meanIsNan = std::isnan(_imstats.getMean());
         bool rmsIsNan  = std::isnan(_imstats.getRms());
         if (meanIsNan || rmsIsNan) {
@@ -151,8 +151,8 @@ namespace detail {
             _nRejected += 1;
             return;
         }
-        
-        if (_policy.getBool("spatialKernelClipping")) {            
+
+        if (_policy.getBool("spatialKernelClipping")) {
             if (fabs(_imstats.getMean()) > _policy.getDouble("candidateResidualMeanMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 LOGL_DEBUG("TRACE3.ip.diffim.AssessSpatialKernelVisitor.processCandidate",

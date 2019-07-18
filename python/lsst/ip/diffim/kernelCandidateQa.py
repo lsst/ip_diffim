@@ -25,10 +25,10 @@ __all__ = ["KernelCandidateQa"]
 import numpy as np
 import numpy.ma as ma
 
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 from . import diffimLib
 from .utils import calcCentroid, calcWidth
 
@@ -307,8 +307,8 @@ class KernelCandidateQa(object):
                 setter(key, resids[1])
                 key = source.schema["RegisterRefPosition"].asKey()
                 setter = getattr(source, "set"+key.getTypeString())
-                setter(key, afwGeom.Point2D(coord.getRa().asRadians(),
-                                            coord.getDec().asRadians()))
+                setter(key, geom.Point2D(coord.getRa().asRadians(),
+                                         coord.getDec().asRadians()))
         if diaSources:
             metadata.add("NFalsePositivesTotal", len(diaSources))
             nRefMatch = 0

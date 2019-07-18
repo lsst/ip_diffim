@@ -36,6 +36,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDetect
 import lsst.afw.math.mathLib as afwMath
+import lsst.geom as geom
 from lsst.log import Log
 import lsst.pex.config as pexConfig
 from .makeKernelBasisList import makeKernelBasisList
@@ -193,7 +194,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
 
     # Make a fake image with a matrix of delta functions
     totalSize = nCell*sizeCell + 2*border
-    tim = afwImage.ImageF(afwGeom.Extent2I(totalSize, totalSize))
+    tim = afwImage.ImageF(geom.Extent2I(totalSize, totalSize))
     for x in range(nCell):
         for y in range(nCell):
             tim[x*sizeCell + sizeCell//2 + border - 1,
@@ -256,9 +257,9 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
         afwDisplay.Display(frame=2).mtv(sMi)
 
     # Finally, make a kernelSet from these 2 images
-    kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0),
-                                                         afwGeom.Extent2I(sizeCell*nCell,
-                                                                          sizeCell*nCell)),
+    kernelCellSet = afwMath.SpatialCellSet(geom.Box2I(geom.Point2I(0, 0),
+                                                      geom.Extent2I(sizeCell*nCell,
+                                                                    sizeCell*nCell)),
                                            sizeCell,
                                            sizeCell)
     stampHalfWidth = 2*kSize
@@ -266,11 +267,11 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
         for y in range(nCell):
             xCoord = x*sizeCell + sizeCell//2
             yCoord = y*sizeCell + sizeCell//2
-            p0 = afwGeom.Point2I(xCoord - stampHalfWidth,
-                                 yCoord - stampHalfWidth)
-            p1 = afwGeom.Point2I(xCoord + stampHalfWidth,
-                                 yCoord + stampHalfWidth)
-            bbox = afwGeom.Box2I(p0, p1)
+            p0 = geom.Point2I(xCoord - stampHalfWidth,
+                              yCoord - stampHalfWidth)
+            p1 = geom.Point2I(xCoord + stampHalfWidth,
+                              yCoord + stampHalfWidth)
+            bbox = geom.Box2I(p0, p1)
             tsi = afwImage.MaskedImageF(tMi, bbox, origin=afwImage.LOCAL)
             ssi = afwImage.MaskedImageF(sMi, bbox, origin=afwImage.LOCAL)
 
@@ -426,7 +427,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
             raise RuntimeError("Candiate not of type afwTable.SourceRecord")
         bm1 = 0
         bm2 = 0
-        center = afwGeom.Point2I(scienceExposure.getWcs().skyToPixel(kernelCandidate.getCoord()))
+        center = geom.Point2I(scienceExposure.getWcs().skyToPixel(kernelCandidate.getCoord()))
         if center[0] < bbox.getMinX() or center[0] > bbox.getMaxX():
             continue
         if center[1] < bbox.getMinY() or center[1] > bbox.getMaxY():
@@ -453,7 +454,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
         if xmin > xmax or ymin > ymax:
             continue
 
-        kbbox = afwGeom.Box2I(afwGeom.Point2I(xmin, ymin), afwGeom.Point2I(xmax, ymax))
+        kbbox = geom.Box2I(geom.Point2I(xmin, ymin), geom.Point2I(xmax, ymax))
         try:
             fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, deep=False).getMask())
             bm1 = fsb.getBits()

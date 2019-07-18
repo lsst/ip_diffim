@@ -32,6 +32,7 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.image.utils as afwImageUtils
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 from lsst.geom import arcseconds, degrees, radians, arcminutes
 from lsst.ip.diffim.dcrModel import (DcrModel, calculateDcr, calculateImageParallacticAngle,
                                      applyDcr, wavelengthGenerator)
@@ -83,7 +84,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         ySize = 42
         x0 = 12345
         y0 = 67890
-        self.bbox = afwGeom.Box2I(afwGeom.Point2I(x0, y0), afwGeom.Extent2I(xSize, ySize))
+        self.bbox = geom.Box2I(geom.Point2I(x0, y0), geom.Extent2I(xSize, ySize))
 
     def makeTestImages(self, seed=5, nSrc=5, psfSize=2., noiseLevel=5.,
                        detectionSigma=5., sourceSigma=20., fluxRange=2.):
@@ -170,7 +171,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         `lsst.afw.geom.skyWcs.SkyWcs`
             A wcs that matches the inputs.
         """
-        crpix = afwGeom.Box2D(self.bbox).getCenter()
+        crpix = geom.Box2D(self.bbox).getCenter()
         cdMatrix = afwGeom.makeCdMatrix(scale=pixelScale, orientation=rotAngle, flipX=flipX)
         wcs = afwGeom.makeSkyWcs(crpix=crpix, crval=crval, cdMatrix=cdMatrix)
         return wcs
@@ -569,7 +570,7 @@ def calculateAstropyDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
     # The DCR calculations are performed at the boresight
     ra0 = altaz.icrs.ra.degree*degrees
     dec0 = altaz.icrs.dec.degree*degrees
-    x0, y0 = wcs.skyToPixel(afwGeom.SpherePoint(ra0, dec0))
+    x0, y0 = wcs.skyToPixel(geom.SpherePoint(ra0, dec0))
     dcrShift = []
     # We divide the filter into "subfilters" with the full wavelength range
     # divided into equal sub-ranges.
@@ -591,7 +592,7 @@ def calculateAstropyDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
                          unit='deg', obstime=time, frame='altaz', location=loc)
         ra1 = altaz.icrs.ra.degree*degrees
         dec1 = altaz.icrs.dec.degree*degrees
-        x1, y1 = wcs.skyToPixel(afwGeom.SpherePoint(ra1, dec1))
+        x1, y1 = wcs.skyToPixel(geom.SpherePoint(ra1, dec1))
         dcrShift.append((y1-y0, x1-x0))
     return dcrShift
 

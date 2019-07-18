@@ -3,8 +3,8 @@ import unittest
 import lsst.utils.tests
 import lsst.daf.base as dafBase
 from lsst.afw.coord import Observatory, Weather
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
+import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 import lsst.meas.algorithms as measAlg
@@ -26,7 +26,7 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
         self.ksize = 11
         self.sigma1 = 2.0
         self.sigma2 = 3.7
-        self.exp = afwImage.ExposureF(afwGeom.Extent2I(self.imsize, self.imsize))
+        self.exp = afwImage.ExposureF(geom.Extent2I(self.imsize, self.imsize))
         self.exp.setPsf(measAlg.DoubleGaussianPsf(self.ksize, self.ksize, self.sigma1))
 
     def testTooBig(self):
@@ -128,14 +128,14 @@ def makeVisitInfo():
                               darkTime=11.02,
                               date=dafBase.DateTime(65321.1, dafBase.DateTime.MJD, dafBase.DateTime.TAI),
                               ut1=12345.1,
-                              era=45.1*afwGeom.degrees,
-                              boresightRaDec=afwGeom.SpherePoint(23.1, 73.2, afwGeom.degrees),
-                              boresightAzAlt=afwGeom.SpherePoint(134.5, 33.3, afwGeom.degrees),
+                              era=45.1*geom.degrees,
+                              boresightRaDec=geom.SpherePoint(23.1, 73.2, geom.degrees),
+                              boresightAzAlt=geom.SpherePoint(134.5, 33.3, geom.degrees),
                               boresightAirmass=1.73,
-                              boresightRotAngle=73.2*afwGeom.degrees,
+                              boresightRotAngle=73.2*geom.degrees,
                               rotType=afwImage.RotType.SKY,
                               observatory=Observatory(
-                                  11.1*afwGeom.degrees, 22.2*afwGeom.degrees, 0.333),
+                                  11.1*geom.degrees, 22.2*geom.degrees, 0.333),
                               weather=Weather(1.1, 2.2, 34.5),
                               )
 

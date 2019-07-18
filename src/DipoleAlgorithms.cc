@@ -43,7 +43,7 @@
 #include "lsst/afw/detection.h"
 #include "lsst/afw/table.h"
 #include "lsst/afw/math.h"
-#include "lsst/afw/geom.h"
+#include "lsst/geom.h"
 #include "lsst/ip/diffim/DipoleAlgorithms.h"
 #include "ndarray/eigen.h"
 
@@ -51,7 +51,7 @@ namespace pexExceptions = lsst::pex::exceptions;
 namespace afwDet = lsst::afw::detection;
 namespace afwImage = lsst::afw::image;
 namespace afwMath = lsst::afw::math;
-namespace afwGeom = lsst::afw::geom;
+namespace geom = lsst::geom;
 
 namespace lsst { namespace ip { namespace diffim {
 
@@ -92,7 +92,7 @@ namespace {
 void naiveCentroid(
     afw::table::SourceRecord & source,
     afw::image::Exposure<float> const& exposure,
-    afw::geom::Point2I const & center,
+    geom::Point2I const & center,
     meas::base::CentroidResultKey const & keys
     )
 {
@@ -229,7 +229,7 @@ public:
     void reset(afwDet::Footprint const&) {}
 
     /// method called for each pixel by applyFunctor
-    void operator() (afw::geom::Point2I const & pos,
+    void operator() (geom::Point2I const & pos,
                      afw::image::MaskedImage<float>::Image::Pixel const & ival,
                      afw::image::MaskedImage<float>::Image::Pixel const & vval) {
         if (ival >= 0.0) {
@@ -356,8 +356,8 @@ std::pair<double,int> PsfDipoleFlux::chi2(
     double posCenterX, double posCenterY, double posFlux
 ) const {
 
-    afw::geom::Point2D negCenter(negCenterX, negCenterY);
-    afw::geom::Point2D posCenter(posCenterX, posCenterY);
+    geom::Point2D negCenter(negCenterX, negCenterY);
+    geom::Point2D posCenter(posCenterX, posCenterY);
 
     CONST_PTR(afw::detection::Footprint) footprint = source.getFootprint();
 
@@ -374,18 +374,18 @@ std::pair<double,int> PsfDipoleFlux::chi2(
     afwImage::Image<afwImage::VariancePixel> var(*(exposure.getMaskedImage().getVariance()),
                                                  footprint->getBBox());
 
-    afwGeom::Box2I negPsfBBox = negPsf->getBBox();
-    afwGeom::Box2I posPsfBBox = posPsf->getBBox();
-    afwGeom::Box2I negModelBBox = negModel.getBBox();
-    afwGeom::Box2I posModelBBox = posModel.getBBox();
+    geom::Box2I negPsfBBox = negPsf->getBBox();
+    geom::Box2I posPsfBBox = posPsf->getBBox();
+    geom::Box2I negModelBBox = negModel.getBBox();
+    geom::Box2I posModelBBox = posModel.getBBox();
 
     // Portion of the negative Psf that overlaps the model
     int negXmin = std::max(negPsfBBox.getMinX(), negModelBBox.getMinX());
     int negYmin = std::max(negPsfBBox.getMinY(), negModelBBox.getMinY());
     int negXmax = std::min(negPsfBBox.getMaxX(), negModelBBox.getMaxX());
     int negYmax = std::min(negPsfBBox.getMaxY(), negModelBBox.getMaxY());
-    afwGeom::Box2I negBBox = afwGeom::Box2I(afwGeom::Point2I(negXmin, negYmin),
-                                            afwGeom::Point2I(negXmax, negYmax));
+    geom::Box2I negBBox = geom::Box2I(geom::Point2I(negXmin, negYmin),
+                                      geom::Point2I(negXmax, negYmax));
     afwImage::Image<afwMath::Kernel::Pixel> negSubim(*negPsf, negBBox);
     afwImage::Image<double> negModelSubim(negModel, negBBox);
     negModelSubim += negSubim;
@@ -395,8 +395,8 @@ std::pair<double,int> PsfDipoleFlux::chi2(
     int posYmin = std::max(posPsfBBox.getMinY(), posModelBBox.getMinY());
     int posXmax = std::min(posPsfBBox.getMaxX(), posModelBBox.getMaxX());
     int posYmax = std::min(posPsfBBox.getMaxY(), posModelBBox.getMaxY());
-    afwGeom::Box2I posBBox = afwGeom::Box2I(afwGeom::Point2I(posXmin, posYmin),
-                                            afwGeom::Point2I(posXmax, posYmax));
+    geom::Box2I posBBox = geom::Box2I(geom::Point2I(posXmin, posYmin),
+                                      geom::Point2I(posXmax, posYmax));
     afwImage::Image<afwMath::Kernel::Pixel> posSubim(*posPsf, posBBox);
     afwImage::Image<double> posModelSubim(posModel, posBBox);
     posModelSubim += posSubim;
@@ -489,13 +489,13 @@ void PsfDipoleFlux::measure(
         double evalChi2 = fit.first;
         int nPix = fit.second;
 
-        PTR(afw::geom::Point2D) minNegCentroid(new afw::geom::Point2D(min.UserState().Value(NEGCENTXPAR),
-                                                                      min.UserState().Value(NEGCENTYPAR)));
+        PTR(geom::Point2D) minNegCentroid(new geom::Point2D(min.UserState().Value(NEGCENTXPAR),
+                                                            min.UserState().Value(NEGCENTYPAR)));
         source.set(getNegativeKeys().getInstFlux(), min.UserState().Value(NEGFLUXPAR));
         source.set(getNegativeKeys().getInstFluxErr(), min.UserState().Error(NEGFLUXPAR));
 
-        PTR(afw::geom::Point2D) minPosCentroid(new afw::geom::Point2D(min.UserState().Value(POSCENTXPAR),
-                                                                      min.UserState().Value(POSCENTYPAR)));
+        PTR(geom::Point2D) minPosCentroid(new geom::Point2D(min.UserState().Value(POSCENTXPAR),
+                                                            min.UserState().Value(POSCENTYPAR)));
         source.set(getPositiveKeys().getInstFlux(), min.UserState().Value(POSFLUXPAR));
         source.set(getPositiveKeys().getInstFluxErr(), min.UserState().Error(POSFLUXPAR));
 

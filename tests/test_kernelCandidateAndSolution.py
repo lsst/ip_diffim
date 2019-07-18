@@ -24,9 +24,9 @@ import unittest
 
 import lsst.utils.tests
 import lsst.utils
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.config as pexConfig
 import lsst.log.utils as logUtils
@@ -81,8 +81,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             scienceExposure = afwImage.ExposureF(defSciencePath)
             templateExposure = afwImage.ExposureF(defTemplatePath)
             # set XY0 = 0
-            scienceExposure.setXY0(afwGeom.Point2I(0, 0))
-            templateExposure.setXY0(afwGeom.Point2I(0, 0))
+            scienceExposure.setXY0(geom.Point2I(0, 0))
+            templateExposure.setXY0(geom.Point2I(0, 0))
             # do the warping first so we don't have any masked pixels in the postage stamps
             warper = afwMath.Warper.fromConfig(self.subconfig.warpingConfig)
             templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
@@ -95,8 +95,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.x02 = 276
             self.y02 = 717
             size = 40
-            bbox2 = afwGeom.Box2I(afwGeom.Point2I(self.x02 - size, self.y02 - size),
-                                  afwGeom.Point2I(self.x02 + size, self.y02 + size))
+            bbox2 = geom.Box2I(geom.Point2I(self.x02 - size, self.y02 - size),
+                               geom.Point2I(self.x02 + size, self.y02 + size))
             self.scienceImage2 = afwImage.ExposureF(scienceExposure, bbox2, origin=afwImage.LOCAL)
             self.templateExposure2 = afwImage.ExposureF(templateExposure, bbox2, origin=afwImage.LOCAL)
 
@@ -362,11 +362,11 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         gsize = self.policy.getInt("kernelSize")
         gaussFunction = afwMath.GaussianFunction2D(2, 3)
         gaussKernel = afwMath.AnalyticKernel(gsize, gsize, gaussFunction)
-        kImageIn = afwImage.ImageD(afwGeom.Extent2I(gsize, gsize))
+        kImageIn = afwImage.ImageD(geom.Extent2I(gsize, gsize))
         kSumIn = gaussKernel.computeImage(kImageIn, False)
 
         imX, imY = self.templateExposure2.getMaskedImage().getDimensions()
-        smi = afwImage.MaskedImageF(afwGeom.Extent2I(imX, imY))
+        smi = afwImage.MaskedImageF(geom.Extent2I(imX, imY))
         afwMath.convolve(smi, self.templateExposure2.getMaskedImage(), gaussKernel, False)
 
         bbox = gaussKernel.shrinkBBox(smi.getBBox(afwImage.LOCAL))
@@ -425,11 +425,11 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         gaussFunction = afwMath.GaussianFunction2D(2, 3)
         gaussKernel = afwMath.AnalyticKernel(gsize, gsize, gaussFunction)
-        kImageIn = afwImage.ImageD(afwGeom.Extent2I(gsize, gsize))
+        kImageIn = afwImage.ImageD(geom.Extent2I(gsize, gsize))
         gaussKernel.computeImage(kImageIn, False)
 
         # template image with a single hot pixel in the exact center
-        tmi = afwImage.MaskedImageF(afwGeom.Extent2I(tsize, tsize))
+        tmi = afwImage.MaskedImageF(geom.Extent2I(tsize, tsize))
         tmi.set(0, 0x0, 1e-4)
         cpix = tsize // 2
         tmi[cpix, cpix, afwImage.LOCAL] = (1, 0x0, 1)
@@ -472,11 +472,11 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         gsize = self.policy.getInt("kernelSize")
         tsize = imsize + gsize
 
-        tmi = afwImage.MaskedImageF(afwGeom.Extent2I(tsize, tsize))
+        tmi = afwImage.MaskedImageF(geom.Extent2I(tsize, tsize))
         tmi.set(0, 0x0, 1.0)
         cpix = tsize // 2
         tmi[cpix, cpix, afwImage.LOCAL] = (1, 0x0, 0.0)
-        smi = afwImage.MaskedImageF(afwGeom.Extent2I(tsize, tsize))
+        smi = afwImage.MaskedImageF(geom.Extent2I(tsize, tsize))
         smi.set(0, 0x0, 1.0)
         smi[cpix, cpix, afwImage.LOCAL] = (1, 0x0, 0.0)
 
@@ -502,13 +502,13 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.testGaussian()
 
     def testInsert(self):
-        mi = afwImage.MaskedImageF(afwGeom.Extent2I(10, 10))
+        mi = afwImage.MaskedImageF(geom.Extent2I(10, 10))
         kc = ipDiffim.makeKernelCandidate(0., 0., mi, mi, self.policy)
         kc.setStatus(afwMath.SpatialCellCandidate.GOOD)
 
         sizeCellX = self.policy.get("sizeCellX")
         sizeCellY = self.policy.get("sizeCellY")
-        kernelCellSet = afwMath.SpatialCellSet(afwGeom.Box2I(afwGeom.Point2I(0, 0), afwGeom.Extent2I(1, 1)),
+        kernelCellSet = afwMath.SpatialCellSet(geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(1, 1)),
                                                sizeCellX, sizeCellY)
         kernelCellSet.insertCandidate(kc)
         nSeen = 0

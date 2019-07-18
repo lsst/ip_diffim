@@ -4,9 +4,9 @@ import unittest
 
 import lsst.utils.tests
 import lsst.utils
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 from lsst.log import Log
 import lsst.log.utils as logUtils
 import lsst.meas.algorithms as measAlg
@@ -60,8 +60,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                             self.scienceImage.getMaskedImage()])
 
             self.offset = 1500
-            self.bbox = afwGeom.Box2I(afwGeom.Point2I(0, self.offset),
-                                      afwGeom.Point2I(511, 2046))
+            self.bbox = geom.Box2I(geom.Point2I(0, self.offset),
+                                   geom.Point2I(511, 2046))
             self.subconfig.spatialKernelOrder = 1
             self.subconfig.spatialBgOrder = 0
 
@@ -197,8 +197,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # And then take away XY0
         templateSubImage = afwImage.ExposureF(self.templateImage.clone(), self.bbox)
         scienceSubImage = afwImage.ExposureF(self.scienceImage.clone(), self.bbox)
-        templateSubImage.setXY0(afwGeom.Point2I(0, 0))
-        scienceSubImage.setXY0(afwGeom.Point2I(0, 0))
+        templateSubImage.setXY0(geom.Point2I(0, 0))
+        scienceSubImage.setXY0(geom.Point2I(0, 0))
 
         results2 = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping=True,
                                               templateFwhmPix=fwhm, scienceFwhmPix=fwhm)
