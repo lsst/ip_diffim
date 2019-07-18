@@ -9,6 +9,7 @@
  * @ingroup ip_diffim
  */
 
+#include "lsst/geom.h"
 #include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/detection.h"
@@ -19,6 +20,7 @@
 #include "lsst/ip/diffim/FindSetBits.h"
 #include "lsst/ip/diffim/KernelCandidateDetection.h"
 
+namespace geom      = lsst::geom;
 namespace afwGeom   = lsst::afw::geom;
 namespace afwImage  = lsst::afw::image;
 namespace afwDetect = lsst::afw::detection;
@@ -156,7 +158,7 @@ namespace diffim {
          */
         FindSetBits<afwImage::Mask<afwImage::MaskPixel> > fsb;
 
-        afwGeom::Box2I fpBBox = fp->getBBox();
+        geom::Box2I fpBBox = fp->getBBox();
         /* Failure Condition 1)
          *
          * Footprint has too many pixels off the bat.  We don't want to throw
@@ -173,8 +175,8 @@ namespace diffim {
             int yc = int(0.5 * (fpBBox.getMinY() + fpBBox.getMaxY()));
             std::shared_ptr<afwDetect::Footprint> fpCore(
                 new afwDetect::Footprint(
-                    std::make_shared<afwGeom::SpanSet>(afwGeom::Box2I(afwGeom::Point2I(xc, yc),
-                                                       afwGeom::Extent2I(1,1))))
+                    std::make_shared<afwGeom::SpanSet>(geom::Box2I(geom::Point2I(xc, yc),
+                                                       geom::Extent2I(1,1))))
                 );
             return growCandidate(fpCore, fpGrowPix, templateMaskedImage, scienceMaskedImage);
         }
@@ -210,7 +212,7 @@ namespace diffim {
 
         /* Next we look at the image within this Footprint.
          */
-        afwGeom::Box2I fpGrowBBox = fpGrow->getBBox();
+        geom::Box2I fpGrowBBox = fpGrow->getBBox();
         LOGL_DEBUG("TRACE5.ip.diffim.KernelCandidateDetection.apply",
                    "Grown footprint in parent : %d,%d -> %d,%d -> %d,%d",
                    fpGrowBBox.getMinX(), fpGrowBBox.getMinY(),

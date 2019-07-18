@@ -18,7 +18,7 @@
 #include "Eigen/QR"
 
 #include "lsst/afw/math.h"
-#include "lsst/afw/geom.h"
+#include "lsst/geom.h"
 #include "lsst/log/Log.h"
 #include "lsst/pex/policy/Policy.h"
 #include "lsst/pex/exceptions/Runtime.h"
@@ -28,7 +28,7 @@
 #include "lsst/ip/diffim/BuildSpatialKernelVisitor.h"
 
 namespace afwMath        = lsst::afw::math;
-namespace afwGeom        = lsst::afw::geom;
+namespace geom           = lsst::afw::geom;
 namespace pexPolicy      = lsst::pex::policy;
 namespace pexExcept      = lsst::pex::exceptions;
 
@@ -72,7 +72,7 @@ namespace detail {
     template<typename PixelT>
     BuildSpatialKernelVisitor<PixelT>::BuildSpatialKernelVisitor(
         lsst::afw::math::KernelList const& basisList, ///< Basis functions used in the fit
-        lsst::afw::geom::Box2I const& regionBBox,     ///< Spatial region over which the function is fit
+        lsst::geom::Box2I const& regionBBox,     ///< Spatial region over which the function is fit
         lsst::pex::policy::Policy policy              ///< Policy file directing behavior
         ) :
         afwMath::CandidateVisitor(),
@@ -89,10 +89,10 @@ namespace detail {
         std::string spatialModelType = policy.getString("spatialModelType");
         if (spatialModelType == "chebyshev1") {
             spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
-                new afwMath::Chebyshev1Function2<double>(spatialKernelOrder, afwGeom::Box2D(regionBBox))
+                new afwMath::Chebyshev1Function2<double>(spatialKernelOrder, geom::Box2D(regionBBox))
                 );
             background = afwMath::Kernel::SpatialFunctionPtr(
-                new afwMath::Chebyshev1Function2<double>(spatialBgOrder, afwGeom::Box2D(regionBBox))
+                new afwMath::Chebyshev1Function2<double>(spatialBgOrder, geom::Box2D(regionBBox))
                 );
 
         }

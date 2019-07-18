@@ -1,16 +1,16 @@
 #include "Eigen/Core"
 #include "lsst/afw/math.h"
-#include "lsst/afw/geom.h"
+#include "lsst/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/ip/diffim.h"
 
 namespace ipDiffim       = lsst::ip::diffim;
 namespace afwMath        = lsst::afw::math;
-namespace afwGeom        = lsst::afw::geom;
+namespace geom           = lsst::geom;
 namespace afwImage       = lsst::afw::image;
 int main() {
     int dimen = 11;
-    afwImage::Image<float> foo(afwGeom::Extent2I(dimen,dimen));
+    afwImage::Image<float> foo(geom::Extent2I(dimen,dimen));
     for (int y = 0, n = 0; y < dimen; y++) {
         for (int x = 0; x < dimen; x++, n++) {
             foo(x,y) = n;
@@ -32,11 +32,11 @@ int main() {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9;
     */
 
-    afwImage::Image<double> kImage(afwGeom::Extent2I(5, 5));
+    afwImage::Image<double> kImage(geom::Extent2I(5, 5));
     afwMath::FixedKernel kernel(kImage);
 
     std::cout << "All data:" << std::endl << test << std::endl << std::endl;
-    afwGeom::Box2I goodBBox = kernel.shrinkBBox(foo.getBBox(afwImage::LOCAL));
+    geom::Box2I goodBBox = kernel.shrinkBBox(foo.getBBox(afwImage::LOCAL));
     int startCol = goodBBox.getMinX();
     int startRow = goodBBox.getMinY();
     // endCol/Row is one past the index of the last good col/row
@@ -52,8 +52,8 @@ int main() {
     std::cout << "Good pixels after convolution:" << std::endl << subimage << std::endl << std::endl;
 
     /* We want to ignore all pixels from 4,4 to 6,6 */
-    afwGeom::Box2I maskBox(afwGeom::Point2I(4, 4),
-                           afwGeom::Point2I(6, 6));
+    geom::Box2I maskBox(geom::Point2I(4, 4),
+                        geom::Point2I(6, 6));
 
     int maskStartCol = maskBox.getMinX();
     int maskStartRow = maskBox.getMinY();
@@ -63,40 +63,40 @@ int main() {
     std::cout << "B " << maskStartCol << " " << maskStartRow << " " << maskEndCol << " " << maskEndRow << std::endl;
 
     /*
-    afwGeom::Box2I tBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskEndRow),
-                                         afwGeom::Point2I(endCol, endRow));
+    geom::Box2I tBox = geom::Box2I(geom::Point2I(startCol, maskEndRow),
+                                   geom::Point2I(endCol, endRow));
 
-    afwGeom::Box2I bBox = afwGeom::Box2I(afwGeom::Point2I(startCol, startRow),
-                                         afwGeom::Point2I(endCol, maskStartRow));
+    geom::Box2I bBox = geom::Box2I(geom::Point2I(startCol, startRow),
+                                   geom::Point2I(endCol, maskStartRow));
 
-    afwGeom::Box2I lBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskStartRow),
-                                         afwGeom::Point2I(maskStartCol, maskEndRow));
+    geom::Box2I lBox = geom::Box2I(geom::Point2I(startCol, maskStartRow),
+                                   geom::Point2I(maskStartCol, maskEndRow));
 
-    afwGeom::Box2I rBox = afwGeom::Box2I(afwGeom::Point2I(maskEndCol, maskStartRow),
-                                         afwGeom::Point2I(endCol, maskEndRow));
+    geom::Box2I rBox = geom::Box2I(geom::Point2I(maskEndCol, maskStartRow),
+                                   geom::Point2I(endCol, maskEndRow));
     */
 
     endCol -= 1;
     endRow -= 1;
-    afwGeom::Box2I tBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskEndRow + 1),
-                                         afwGeom::Point2I(endCol, endRow));
+    geom::Box2I tBox = geom::Box2I(geom::Point2I(startCol, maskEndRow + 1),
+                                   geom::Point2I(endCol, endRow));
 
-    afwGeom::Box2I bBox = afwGeom::Box2I(afwGeom::Point2I(startCol, startRow),
-                                         afwGeom::Point2I(endCol, maskStartRow - 1));
+    geom::Box2I bBox = geom::Box2I(geom::Point2I(startCol, startRow),
+                                   geom::Point2I(endCol, maskStartRow - 1));
 
-    afwGeom::Box2I lBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskStartRow),
-                                         afwGeom::Point2I(maskStartCol - 1, maskEndRow));
+    geom::Box2I lBox = geom::Box2I(geom::Point2I(startCol, maskStartRow),
+                                   geom::Point2I(maskStartCol - 1, maskEndRow));
 
-    afwGeom::Box2I rBox = afwGeom::Box2I(afwGeom::Point2I(maskEndCol + 1, maskStartRow),
-                                         afwGeom::Point2I(endCol, maskEndRow));
+    geom::Box2I rBox = geom::Box2I(geom::Point2I(maskEndCol + 1, maskStartRow),
+                                   geom::Point2I(endCol, maskEndRow));
 
 
-    std::vector<afwGeom::Box2I> boxArray;
+    std::vector<geom::Box2I> boxArray;
     boxArray.push_back(tBox);
     boxArray.push_back(bBox);
     boxArray.push_back(lBox);
     boxArray.push_back(rBox);
-    std::vector<afwGeom::Box2I>::iterator biter = boxArray.begin();
+    std::vector<geom::Box2I>::iterator biter = boxArray.begin();
     for (; biter != boxArray.end(); ++biter) {
         int area = (*biter).getWidth() * (*biter).getHeight();
         afwImage::Image<float> subimage = afwImage::Image<float>(foo, *biter, afwImage::LOCAL);

@@ -2,11 +2,11 @@
 #include <memory>
 #include "boost/timer.hpp"
 
-#include "lsst/afw/geom.h"
+#include "lsst/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/ip/diffim/ImageSubtract.h"
 
-namespace afwGeom = lsst::afw::geom;
+namespace geom = lsst::geom;
 namespace afwImage = lsst::afw::image;
 namespace diffim = lsst::ip::diffim;
 
@@ -179,7 +179,7 @@ Eigen::MatrixXd test(afwImage::Image<ImageT> varianceEstimate,
 int main() {
     boost::timer t;
 
-    afwImage::Image<float> varianceEstimate(afwGeom::Extent2I(100, 100));
+    afwImage::Image<float> varianceEstimate(geom::Extent2I(100, 100));
     varianceEstimate = 1;
 
     t.restart();

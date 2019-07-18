@@ -1,4 +1,4 @@
-/* 
+/*
  * LSST Data Management System
  * Copyright 2008, 2009, 2010 LSST Corporation.
  *
@@ -22,12 +22,12 @@
 
 #include <cmath>
 
-#include "lsst/afw/geom.h"
+#include "lsst/geom.h"
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
 #include "lsst/ip/diffim.h"
 
-namespace afwGeom = lsst::afw::geom;
+namespace geom = lsst::geom;
 namespace afwImage = lsst::afw::image;
 namespace afwMath = lsst::afw::math;
 using namespace lsst::ip::diffim;
@@ -66,7 +66,7 @@ int main() {
 
     unsigned int loc = 50;
     std::shared_ptr<afwImage::MaskedImage<PixelT>> mimg1(
-        new afwImage::MaskedImage<PixelT>(afwGeom::Extent2I(100,100))
+        new afwImage::MaskedImage<PixelT>(geom::Extent2I(100,100))
         );
     *mimg1->at(loc, loc) = afwImage::MaskedImage<PixelT>::Pixel(1, 0x0, 1);
     std::shared_ptr<afwImage::MaskedImage<PixelT>> mimg2(

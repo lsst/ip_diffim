@@ -16,7 +16,7 @@
 #include "Eigen/Core"
 
 #include "lsst/afw/math.h"
-#include "lsst/afw/geom.h"
+#include "lsst/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/pex/policy.h"
 
@@ -139,7 +139,7 @@ namespace diffim {
                                          lsst::afw::image::Image<InputT> const &scienceImage,
                                          lsst::afw::image::Image<lsst::afw::image::VariancePixel>
                                          const &varianceEstimate,
-                                         lsst::afw::geom::Box2I maskBox);
+                                         lsst::geom::Box2I maskBox);
     };
 
 
@@ -183,13 +183,13 @@ namespace diffim {
             );
 
         virtual ~SpatialKernelSolution() {};
-        
+
         void addConstraint(float xCenter, float yCenter,
                            Eigen::MatrixXd const& qMat,
                            Eigen::VectorXd const& wVec);
 
         void solve();
-        std::shared_ptr<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>> makeKernelImage(lsst::afw::geom::Point2D const& pos);
+        std::shared_ptr<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>> makeKernelImage(lsst::geom::Point2D const& pos);
         std::pair<std::shared_ptr<lsst::afw::math::LinearCombinationKernel>,
                   lsst::afw::math::Kernel::SpatialFunctionPtr> getSolutionPair();
 

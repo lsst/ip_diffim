@@ -23,6 +23,7 @@
 #include "Eigen/Eigenvalues"
 #include "Eigen/SVD"
 
+#include "lsst/geom.h"
 #include "lsst/afw/math.h"
 #include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
@@ -39,6 +40,7 @@
 #define DEBUG_MATRIX  0
 #define DEBUG_MATRIX2 0
 
+namespace geom           = lsst::geom;
 namespace afwDet         = lsst::afw::detection;
 namespace afwMath        = lsst::afw::math;
 namespace afwGeom        = lsst::afw::geom;
@@ -313,7 +315,7 @@ namespace diffim {
            these coordinates, therefore they need to be in LOCAL coordinates.
            This was written before ndarray unification.
         */
-        afwGeom::Box2I goodBBox = (*kiter)->shrinkBBox(templateImage.getBBox(afwImage::LOCAL));
+        geom::Box2I goodBBox = (*kiter)->shrinkBBox(templateImage.getBBox(afwImage::LOCAL));
         unsigned int const startCol = goodBBox.getMinX();
         unsigned int const startRow = goodBBox.getMinY();
         // endCol/Row is one past the index of the last good col/row
@@ -699,7 +701,7 @@ namespace diffim {
            This was written before ndarray unification.
         */
         /* Ignore known EDGE pixels for speed */
-        afwGeom::Box2I shrunkLocalBBox = (*kiter)->shrinkBBox(templateImage.getBBox(afwImage::LOCAL));
+        geom::Box2I shrunkLocalBBox = (*kiter)->shrinkBBox(templateImage.getBBox(afwImage::LOCAL));
         LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
                    "Limits of good pixels after convolution: %d,%d -> %d,%d (local)",
                    shrunkLocalBBox.getMinX(), shrunkLocalBBox.getMinY(),
@@ -827,7 +829,7 @@ namespace diffim {
         lsst::afw::image::Image<InputT> const &templateImage,
         lsst::afw::image::Image<InputT> const &scienceImage,
         lsst::afw::image::Image<lsst::afw::image::VariancePixel> const &varianceEstimate,
-        lsst::afw::geom::Box2I maskBox
+        lsst::geom::Box2I maskBox
         ) {
 
         afwMath::Statistics varStats = afwMath::makeStatistics(varianceEstimate, afwMath::MIN);
@@ -853,7 +855,7 @@ namespace diffim {
            NOTE : If we are using these views in Afw's Image space, we need to
            make sure and compensate for the XY0 of the image:
 
-           afwGeom::Box2I fullBBox = templateImage.getBBox();
+           geom::Box2I fullBBox = templateImage.getBBox();
            int maskStartCol = maskBox.getMinX();
            int maskStartRow = maskBox.getMinY();
            int maskEndCol   = maskBox.getMaxX();
@@ -863,7 +865,7 @@ namespace diffim {
           If we are going to be doing the slicing in Eigen matrices derived from
           the images, ignore the XY0.
 
-           afwGeom::Box2I fullBBox = templateImage.getBBox(afwImage::LOCAL);
+           geom::Box2I fullBBox = templateImage.getBBox(afwImage::LOCAL);
 
            int maskStartCol = maskBox.getMinX() - templateImage.getX0();
            int maskStartRow = maskBox.getMinY() - templateImage.getY0();
@@ -873,7 +875,7 @@ namespace diffim {
         */
 
 
-        afwGeom::Box2I shrunkBBox = (*kiter)->shrinkBBox(templateImage.getBBox());
+        geom::Box2I shrunkBBox = (*kiter)->shrinkBBox(templateImage.getBBox());
 
         LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
                    "Limits of good pixels after convolution: %d,%d -> %d,%d",
@@ -926,17 +928,17 @@ namespace diffim {
         4 regions we want to extract from the pixels: top bottom left right
 
         */
-        afwGeom::Box2I tBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskEndRow + 1),
-                                             afwGeom::Point2I(endCol, endRow));
+        geom::Box2I tBox = geom::Box2I(geom::Point2I(startCol, maskEndRow + 1),
+                                       geom::Point2I(endCol, endRow));
 
-        afwGeom::Box2I bBox = afwGeom::Box2I(afwGeom::Point2I(startCol, startRow),
-                                             afwGeom::Point2I(endCol, maskStartRow - 1));
+        geom::Box2I bBox = geom::Box2I(geom::Point2I(startCol, startRow),
+                                       geom::Point2I(endCol, maskStartRow - 1));
 
-        afwGeom::Box2I lBox = afwGeom::Box2I(afwGeom::Point2I(startCol, maskStartRow),
-                                             afwGeom::Point2I(maskStartCol - 1, maskEndRow));
+        geom::Box2I lBox = geom::Box2I(geom::Point2I(startCol, maskStartRow),
+                                       geom::Point2I(maskStartCol - 1, maskEndRow));
 
-        afwGeom::Box2I rBox = afwGeom::Box2I(afwGeom::Point2I(maskEndCol + 1, maskStartRow),
-                                             afwGeom::Point2I(endCol, maskEndRow));
+        geom::Box2I rBox = geom::Box2I(geom::Point2I(maskEndCol + 1, maskStartRow),
+                                       geom::Point2I(endCol, maskEndRow));
 
         LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
                    "Upper good pixel region: %d,%d -> %d,%d",
@@ -951,7 +953,7 @@ namespace diffim {
                    "Right good pixel region: %d,%d -> %d,%d",
                    rBox.getMinX(), rBox.getMinY(), rBox.getMaxX(), rBox.getMaxY());
 
-        std::vector<afwGeom::Box2I> boxArray;
+        std::vector<geom::Box2I> boxArray;
         boxArray.push_back(tBox);
         boxArray.push_back(bBox);
         boxArray.push_back(lBox);
@@ -973,7 +975,7 @@ namespace diffim {
         t.restart();
 
         int nTerms = 0;
-        typename std::vector<afwGeom::Box2I>::iterator biter = boxArray.begin();
+        typename std::vector<geom::Box2I>::iterator biter = boxArray.begin();
         for (; biter != boxArray.end(); ++biter) {
             int area = (*biter).getWidth() * (*biter).getHeight();
 
@@ -1007,7 +1009,7 @@ namespace diffim {
             cMat.setZero();
 
             int nTerms = 0;
-            typename std::vector<afwGeom::Box2I>::iterator biter = boxArray.begin();
+            typename std::vector<geom::Box2I>::iterator biter = boxArray.begin();
             for (; biter != boxArray.end(); ++biter) {
                 int area = (*biter).getWidth() * (*biter).getHeight();
 
@@ -1445,7 +1447,7 @@ namespace diffim {
 
     }
 
-    std::shared_ptr<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>> SpatialKernelSolution::makeKernelImage(afwGeom::Point2D const& pos) {
+    std::shared_ptr<lsst::afw::image::Image<lsst::afw::math::Kernel::Pixel>> SpatialKernelSolution::makeKernelImage(geom::Point2D const& pos) {
         if (_solvedBy == KernelSolution::NONE) {
             throw LSST_EXCEPT(pexExcept::Exception, "Kernel not solved; cannot return image");
         }
