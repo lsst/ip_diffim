@@ -24,8 +24,8 @@ import numpy as np
 import abc
 
 import lsst.afw.image as afwImage
-import lsst.geom as geom
 import lsst.afw.table as afwTable
+import lsst.geom as geom
 import lsst.meas.algorithms as measAlg
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase

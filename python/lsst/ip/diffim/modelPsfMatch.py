@@ -23,9 +23,9 @@ import numpy as np
 
 from . import diffimLib
 import lsst.afw.display as afwDisplay
-import lsst.geom as geom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 import lsst.log as log
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase

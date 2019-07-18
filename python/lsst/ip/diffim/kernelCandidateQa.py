@@ -25,10 +25,10 @@ __all__ = ["KernelCandidateQa"]
 import numpy as np
 import numpy.ma as ma
 
-import lsst.geom as geom
 import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 from . import diffimLib
 from .utils import calcCentroid, calcWidth
 

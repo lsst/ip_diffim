@@ -25,8 +25,8 @@ import numpy as np
 
 import lsst.utils.tests
 import lsst.afw.table as afwTable
-import lsst.geom as geom
 import lsst.afw.image as afwImage
+import lsst.geom as geom
 from lsst.meas.algorithms import LoadReferenceObjectsTask, getRefFluxField
 import lsst.ip.diffim as ipDiffim
 

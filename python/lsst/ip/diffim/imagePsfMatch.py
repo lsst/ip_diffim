@@ -27,8 +27,8 @@ import lsst.afw.detection as afwDetect
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
-import lsst.geom as geom
 import lsst.afw.table as afwTable
+import lsst.geom as geom
 import lsst.pipe.base as pipeBase
 from lsst.meas.algorithms import SourceDetectionTask, SubtractBackgroundTask, WarpedPsf
 from lsst.meas.base import SingleFrameMeasurementTask

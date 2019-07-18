@@ -23,12 +23,13 @@
 import numpy as np
 
 import lsst.afw.image as afwImage
-import lsst.geom as geom
-import lsst.meas.algorithms as measAlg
 import lsst.afw.math as afwMath
+import lsst.geom as geom
+import lsst.log
+import lsst.meas.algorithms as measAlg
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-import lsst.log
+
 
 from .imageMapReduce import (ImageMapReduceConfig, ImageMapReduceTask,
                              ImageMapper)

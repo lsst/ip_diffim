@@ -9,10 +9,10 @@
  * @ingroup ip_diffim
  */
 
-#include "lsst/geom.h"
 #include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/detection.h"
+#include "lsst/geom.h"
 #include "lsst/log/Log.h"
 #include "lsst/pex/exceptions/Exception.h"
 #include "lsst/pex/policy/Policy.h"

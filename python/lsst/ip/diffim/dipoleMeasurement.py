@@ -21,8 +21,8 @@
 
 import numpy as np
 
-import lsst.geom as geom
 import lsst.afw.image as afwImage
+import lsst.geom as geom
 import lsst.pex.config as pexConfig
 from lsst.log import Log
 import lsst.meas.deblender.baseline as deblendBaseline

@@ -2,8 +2,8 @@
 #include <memory>
 #include "boost/timer.hpp"
 
-#include "lsst/geom.h"
 #include "lsst/afw/image.h"
+#include "lsst/geom.h"
 #include "lsst/ip/diffim/ImageSubtract.h"
 
 namespace geom = lsst::geom;

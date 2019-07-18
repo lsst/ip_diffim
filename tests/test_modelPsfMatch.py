@@ -3,8 +3,8 @@ import unittest
 import lsst.utils.tests
 import lsst.daf.base as dafBase
 from lsst.afw.coord import Observatory, Weather
-import lsst.geom as geom
 import lsst.afw.image as afwImage
+import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 import lsst.meas.algorithms as measAlg

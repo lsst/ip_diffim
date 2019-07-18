@@ -23,11 +23,11 @@
 #include "Eigen/Eigenvalues"
 #include "Eigen/SVD"
 
-#include "lsst/geom.h"
 #include "lsst/afw/math.h"
 #include "lsst/afw/geom.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/detection.h"
+#include "lsst/geom.h"
 #include "lsst/log/Log.h"
 #include "lsst/pex/exceptions/Runtime.h"
 

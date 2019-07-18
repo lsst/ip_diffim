@@ -2,11 +2,11 @@ import unittest
 
 
 import lsst.utils.tests
-import lsst.geom as geom
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.detection as afwDet
+import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig

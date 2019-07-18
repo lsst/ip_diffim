@@ -23,11 +23,11 @@
 import numpy as np
 import warnings
 
-import lsst.geom as geom
 import lsst.afw.image as afwImage
 import lsst.meas.base as measBase
 import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDet
+import lsst.geom as geom
 from lsst.log import Log
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig

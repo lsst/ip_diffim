@@ -23,11 +23,11 @@ import unittest
 import numpy as np
 
 import lsst.utils.tests
-import lsst.geom as geom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
 import lsst.daf.base as dafBase
+import lsst.geom as geom
 import lsst.meas.algorithms as measAlg
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase

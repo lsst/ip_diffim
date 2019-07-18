@@ -22,10 +22,10 @@
 
 import numpy as np
 
+import lsst.afw.image as afwImage
+import lsst.geom as geom
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-import lsst.geom as geom
-import lsst.afw.image as afwImage
 from lsst.ip.diffim.dcrModel import DcrModel
 
 __all__ = ["GetCoaddAsTemplateTask", "GetCoaddAsTemplateConfig",

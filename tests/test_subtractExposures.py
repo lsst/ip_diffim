@@ -4,9 +4,9 @@ import unittest
 
 import lsst.utils.tests
 import lsst.utils
-import lsst.geom as geom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 from lsst.log import Log
 import lsst.log.utils as logUtils
 import lsst.meas.algorithms as measAlg

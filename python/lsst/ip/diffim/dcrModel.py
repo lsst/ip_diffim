@@ -23,9 +23,8 @@
 import numpy as np
 from scipy import ndimage
 from lsst.afw.coord.refraction import differentialRefraction
-import lsst.geom as geom
 import lsst.afw.image as afwImage
-from lsst.geom import radians
+import lsst.geom as geom
 
 __all__ = ["DcrModel", "applyDcr", "calculateDcr", "calculateImageParallacticAngle"]
 
@@ -726,10 +725,10 @@ def calculateImageParallacticAngle(visitInfo, wcs):
     cd = wcs.getCdMatrix()
     if wcs.isFlipped:
         cdAngle = (np.arctan2(-cd[0, 1], cd[0, 0]) + np.arctan2(cd[1, 0], cd[1, 1]))/2.
-        rotAngle = (cdAngle + parAngle)*radians
+        rotAngle = (cdAngle + parAngle)*geom.radians
     else:
         cdAngle = (np.arctan2(cd[0, 1], -cd[0, 0]) + np.arctan2(cd[1, 0], cd[1, 1]))/2.
-        rotAngle = (cdAngle - parAngle)*radians
+        rotAngle = (cdAngle - parAngle)*geom.radians
     return rotAngle
 
 

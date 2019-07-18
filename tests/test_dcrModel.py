@@ -28,11 +28,11 @@ import unittest
 
 from astro_metadata_translator import makeObservationInfo
 from lsst.afw.coord.refraction import differentialRefraction
-import lsst.geom as geom
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.image.utils as afwImageUtils
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 from lsst.geom import arcseconds, degrees, radians, arcminutes
 from lsst.ip.diffim.dcrModel import (DcrModel, calculateDcr, calculateImageParallacticAngle,
                                      applyDcr, wavelengthGenerator)

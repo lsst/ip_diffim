@@ -1,7 +1,7 @@
 #include "Eigen/Core"
 #include "lsst/afw/math.h"
-#include "lsst/geom.h"
 #include "lsst/afw/image.h"
+#include "lsst/geom.h"
 #include "lsst/ip/diffim.h"
 
 namespace ipDiffim       = lsst::ip::diffim;
