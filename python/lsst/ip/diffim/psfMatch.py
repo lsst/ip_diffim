@@ -376,50 +376,52 @@ class PsfMatchConfigAL(PsfMatchConfig):
 
     alardNGauss = pexConfig.Field(
         dtype=int,
-        doc="Number of Gaussians in alard-lupton basis",
+        doc="Number of base Gaussians in alard-lupton kernel basis function generation.",
         default=3,
         check=lambda x: x >= 1
     )
     alardDegGauss = pexConfig.ListField(
         dtype=int,
-        doc="Polynomial order of spatial modification of Gaussian basis functions. "
+        doc="Polynomial order of spatial modification of base Gaussians. "
             "List length must be `alardNGauss`.",
         default=(4, 2, 2),
     )
     alardSigGauss = pexConfig.ListField(
         dtype=float,
-        doc="Default sigma values in pixels of Gaussian kernel base functions. "
+        doc="Default sigma values in pixels of base Gaussians. "
             "List length must be `alardNGauss`.",
         default=(0.7, 1.5, 3.0),
     )
     alardGaussBeta = pexConfig.Field(
         dtype=float,
-        doc="""Multiplier of Gaussian sigmas between adjacent elements of the kernel basis list.""",
+        doc="Used if `scaleByFwhm==True`, scaling multiplier of base "
+            "Gaussian sigmas for automated sigma determination",
         default=2.0,
         check=lambda x: x >= 0.0,
     )
     alardMinSig = pexConfig.Field(
         dtype=float,
-        doc="""Minimum Sigma (pixels) for Gaussians""",
+        doc="Used if `scaleByFwhm==True`, minimum sigma (pixels) for base Gaussians",
         default=0.7,
         check=lambda x: x >= 0.25
     )
     alardDegGaussDeconv = pexConfig.Field(
         dtype=int,
-        doc="""Degree of spatial modification of ALL gaussians in AL basis during deconvolution""",
+        doc="Used if `scaleByFwhm==True`, degree of spatial modification of ALL base Gaussians "
+            "in AL basis during deconvolution",
         default=3,
         check=lambda x: x >= 1
     )
     alardMinSigDeconv = pexConfig.Field(
         dtype=float,
-        doc="Minimum Sigma (pixels) for Gaussians during deconvolution; "
-            "make smaller than alardMinSig as this is only indirectly used",
+        doc="Used if `scaleByFwhm==True`, minimum sigma (pixels) for base Gaussians during deconvolution; "
+            "make smaller than `alardMinSig` as this is only indirectly used",
         default=0.4,
         check=lambda x: x >= 0.25
     )
     alardNGaussDeconv = pexConfig.Field(
         dtype=int,
-        doc="Number of Gaussians in AL basis during deconvolution",
+        doc="Used if `scaleByFwhm==True`, number of base Gaussians in AL basis during deconvolution",
         default=3,
         check=lambda x: x >= 1
     )
