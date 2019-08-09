@@ -83,7 +83,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.runModelType(fitForBackground=True)
         self.runModelType(fitForBackground=False)
 
-    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
+#    @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
+    @unittest.skip("Warning: deconvolution is disabled, not testing subtraction.")
     def runModelType(self, fitForBackground):
         self.subconfig.fitForBackground = fitForBackground
 

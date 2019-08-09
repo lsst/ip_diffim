@@ -230,7 +230,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         # assumes 3 components.
         #
         # http://iopscience.iop.org/0266-5611/26/8/085002  Equation 40
-
+        raise NotImplementedError("Deconvolution is temporarily disabled")
         # Use specializations for deconvolution
         basisNGauss = config.alardNGaussDeconv
         basisMinSigma = config.alardMinSigDeconv
