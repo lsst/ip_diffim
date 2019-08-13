@@ -13,7 +13,6 @@ setupRequired(pipe_base)
 setupRequired(utils)
 setupRequired(lmfit)
 setupRequired(pybind11)
-setupRequired(verify)
 setupRequired(geom)
 
 setupOptional(afwdata)
