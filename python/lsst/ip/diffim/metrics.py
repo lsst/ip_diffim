@@ -28,19 +28,28 @@ __all__ = [
 
 import astropy.units as u
 
-from lsst.pipe.base import Struct, InputDatasetField
+from lsst.pipe.base import Struct, PipelineTaskConnections, connectionTypes
 from lsst.verify import Measurement
 from lsst.verify.gen2tasks import MetricTask, register
 from lsst.verify.tasks import MetricComputationError
 
 
-class NumberSciSourcesMetricConfig(MetricTask.ConfigClass):
-    sources = InputDatasetField(
+class NumberSciSourcesMetricConnections(
+        PipelineTaskConnections,
+        dimensions={"Instrument", "Exposure", "Detector"}):
+    sources = connectionTypes.Input(
         doc="The catalog of science sources.",
         name="src",
         storageClass="SourceCatalog",
         dimensions={"Instrument", "Exposure", "Detector"},
+        multiple=True,
     )
+
+
+class NumberSciSourcesMetricConfig(
+        MetricTask.ConfigClass,
+        pipelineConnections=NumberSciSourcesMetricConnections):
+    pass
 
 
 @register("numSciSources")
@@ -88,20 +97,30 @@ class NumberSciSourcesMetricTask(MetricTask):
         return "ip_diffim.numSciSources"
 
 
-class FractionDiaSourcesToSciSourcesMetricConfig(MetricTask.ConfigClass):
-    sciSources = InputDatasetField(
+class FractionDiaSourcesToSciSourcesMetricConnections(
+        PipelineTaskConnections,
+        dimensions={"Instrument", "Exposure", "Detector"},
+        defaultTemplates={"coaddName": "deep"}):
+    sciSources = connectionTypes.Input(
         doc="The catalog of science sources.",
         name="src",
         storageClass="SourceCatalog",
         dimensions={"Instrument", "Exposure", "Detector"},
+        multiple=True,
     )
-    diaSources = InputDatasetField(
+    diaSources = connectionTypes.Input(
         doc="The catalog of DIASources.",
-        name="deepDiff_diaSrc",
-        nameTemplate="{coaddName}Diff_diaSrc",
+        name="{coaddName}Diff_diaSrc",
         storageClass="SourceCatalog",
         dimensions={"Instrument", "Exposure", "Detector"},
+        multiple=True,
     )
+
+
+class FractionDiaSourcesToSciSourcesMetricConfig(
+        MetricTask.ConfigClass,
+        pipelineConnections=FractionDiaSourcesToSciSourcesMetricConnections):
+    pass
 
 
 @register("fracDiaSourcesToSciSources")
