@@ -17,7 +17,7 @@
 
 #include "Eigen/Core"
 
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 #include "lsst/afw/math/Kernel.h"
 
 namespace lsst {
@@ -42,15 +42,15 @@ namespace diffim {
     /**
      * @brief Build a regularization matrix for Delta function kernels
      *
-     * @param policy           Policy file dictating which type of matrix to make
+     * @param ps           PropertySet file dictating which type of matrix to make
      *
      * @ingroup ip_diffim
      *
      * @note Calls either makeForwardDifferenceMatrix or
-     * makeCentralDifferenceMatrix based on the policy file.
+     * makeCentralDifferenceMatrix based on the config file.
      */
     Eigen::MatrixXd makeRegularizationMatrix(
-        lsst::pex::policy::Policy policy
+        lsst::daf::base::PropertySet ps
         );
 
     /**

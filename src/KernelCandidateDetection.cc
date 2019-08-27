@@ -15,7 +15,7 @@
 #include "lsst/geom.h"
 #include "lsst/log/Log.h"
 #include "lsst/pex/exceptions/Exception.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 #include "lsst/ip/diffim/FindSetBits.h"
 #include "lsst/ip/diffim/KernelCandidateDetection.h"
@@ -33,13 +33,13 @@ namespace diffim {
 
     template <typename PixelT>
     KernelCandidateDetection<PixelT>::KernelCandidateDetection(
-        lsst::pex::policy::Policy const& policy
+        lsst::daf::base::PropertySet const& ps
         ) :
-        _policy(policy),
+        _ps(ps),
         _badBitMask(0),
         _footprints(std::vector<std::shared_ptr<lsst::afw::detection::Footprint>>()) {
 
-        std::vector<std::string> detBadMaskPlanes = _policy.getStringArray("badMaskPlanes");
+        std::vector<std::string> detBadMaskPlanes = _ps.getArray<std::string>("badMaskPlanes");
         for (std::vector<std::string>::iterator mi = detBadMaskPlanes.begin();
              mi != detBadMaskPlanes.end(); ++mi){
             try {
@@ -68,7 +68,7 @@ namespace diffim {
      * template, you might not have significant S/N objects in the science image).
      * The subimages associated with each returned Footprint in both images are
      * checked for Masked pixels; Footprints containing Masked pixels are rejected.
-     * The Footprints are grown by an amount specified in the Policy.  The
+     * The Footprints are grown by an amount specified in the ps.  The
      * acceptible Footprints are returned in a vector.
      *
      * @return Vector of "clean" Footprints around which Image Subtraction
@@ -81,13 +81,13 @@ namespace diffim {
         MaskedImagePtr const& scienceMaskedImage
         ) {
 
-        // Parse the Policy
-        int fpNpixMin                = _policy.getInt("fpNpixMin");
-        int fpGrowPix                = _policy.getInt("fpGrowPix");
+        // Parse the ps
+        int fpNpixMin                = _ps.getAsInt("fpNpixMin");
+        int fpGrowPix                = _ps.getAsInt("fpGrowPix");
 
-        bool detOnTemplate           = _policy.getBool("detOnTemplate");
-        double detThreshold          = _policy.getDouble("detThreshold");
-        std::string detThresholdType = _policy.getString("detThresholdType");
+        bool detOnTemplate           = _ps.getAsBool("detOnTemplate");
+        double detThreshold          = _ps.getAsDouble("detThreshold");
+        std::string detThresholdType = _ps.getAsString("detThresholdType");
 
         /* reset private variables */
         _footprints.clear();
@@ -150,7 +150,7 @@ namespace diffim {
         MaskedImagePtr const& templateMaskedImage,
         MaskedImagePtr const& scienceMaskedImage
         ) {
-        int fpNpixMax = _policy.getInt("fpNpixMax");
+        int fpNpixMax = _ps.getAsInt("fpNpixMax");
 
         /* Functor to search through the images for masked pixels within *
          * candidate footprints.  Might want to consider changing the default

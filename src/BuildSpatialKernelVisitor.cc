@@ -20,7 +20,7 @@
 #include "lsst/afw/math.h"
 #include "lsst/geom.h"
 #include "lsst/log/Log.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 #include "lsst/pex/exceptions/Runtime.h"
 
 #include "lsst/ip/diffim/KernelCandidate.h"
@@ -29,7 +29,7 @@
 
 namespace afwMath        = lsst::afw::math;
 namespace geom           = lsst::afw::geom;
-namespace pexPolicy      = lsst::pex::policy;
+namespace dafBase        = lsst::daf::base;
 namespace pexExcept      = lsst::pex::exceptions;
 
 namespace lsst {
@@ -43,14 +43,14 @@ namespace detail {
      * @brief Creates a spatial kernel and background from a list of candidates
      *
      * @code
-        std::shared_ptr<Policy> policy(new Policy);
-        policy->set("spatialKernelOrder", spatialKernelOrder);
-        policy->set("spatialBgOrder", spatialBgOrder);
-        policy->set("kernelBasisSet", "delta-function");
-        policy->set("usePcaForSpatialKernel", true);
+        std::shared_ptr<PropertySet> ps(new PropertySet);
+        ps->set("spatialKernelOrder", spatialKernelOrder);
+        ps->set("spatialBgOrder", spatialBgOrder);
+        ps->set("kernelBasisSet", "delta-function");
+        ps->set("usePcaForSpatialKernel", true);
 
         detail::BuildSpatialKernelVisitor<PixelT> spatialKernelFitter(*basisListToUse,
-                                                                      *policy);
+                                                                      *ps);
         kernelCells.visitCandidates(&spatialKernelFitter, nStarPerCell);
         spatialKernelFitter.solveLinearEquation();
         std::pair<std::shared_ptr<afwMath::LinearCombinationKernel>,
@@ -63,7 +63,7 @@ namespace detail {
      * trigger the matrix math.
      *
      * @note The user has the option to enfore conservation of the kernel sum across
-     * the image through the policy.  In this case, all terms but the first are fit
+     * the image through the property set.  In this case, all terms but the first are fit
      * for spatial variation.  This requires a little extra code to make sure the
      * matrices are the correct size, and that it is accessing the appropriate terms
      * in the matrices when creating the spatial models.
@@ -73,20 +73,20 @@ namespace detail {
     BuildSpatialKernelVisitor<PixelT>::BuildSpatialKernelVisitor(
         lsst::afw::math::KernelList const& basisList, ///< Basis functions used in the fit
         lsst::geom::Box2I const& regionBBox,     ///< Spatial region over which the function is fit
-        lsst::pex::policy::Policy policy              ///< Policy file directing behavior
+        lsst::daf::base::PropertySet ps              ///< ps file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _kernelSolution(),
         _nCandidates(0)
     {
-        int spatialKernelOrder = policy.getInt("spatialKernelOrder");
+        int spatialKernelOrder = ps.getAsInt("spatialKernelOrder");
         afwMath::Kernel::SpatialFunctionPtr spatialKernelFunction;
 
-        int fitForBackground = policy.getBool("fitForBackground");
-        int spatialBgOrder   = fitForBackground ? policy.getInt("spatialBgOrder") : 0;
+        int fitForBackground = ps.getAsBool("fitForBackground");
+        int spatialBgOrder   = fitForBackground ? ps.getAsInt("spatialBgOrder") : 0;
         afwMath::Kernel::SpatialFunctionPtr background;
 
-        std::string spatialModelType = policy.getString("spatialModelType");
+        std::string spatialModelType = ps.getAsString("spatialModelType");
         if (spatialModelType == "chebyshev1") {
             spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
                 new afwMath::Chebyshev1Function2<double>(spatialKernelOrder, geom::Box2D(regionBBox))
@@ -113,7 +113,7 @@ namespace detail {
         /* */
 
         _kernelSolution = std::shared_ptr<SpatialKernelSolution>(
-            new SpatialKernelSolution(basisList, spatialKernelFunction, background, policy));
+            new SpatialKernelSolution(basisList, spatialKernelFunction, background, ps));
     };
 
 

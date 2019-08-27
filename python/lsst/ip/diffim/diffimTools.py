@@ -176,7 +176,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     if bgValue > 0.0:
         subconfigFake.fitForBackground = True
 
-    policyFake = pexConfig.makePolicy(subconfigFake)
+    psFake = pexConfig.makePropertySet(subconfigFake)
 
     basisList = makeKernelBasisList(subconfigFake)
     kSize = subconfigFake.kernelSize
@@ -275,7 +275,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
             tsi = afwImage.MaskedImageF(tMi, bbox, origin=afwImage.LOCAL)
             ssi = afwImage.MaskedImageF(sMi, bbox, origin=afwImage.LOCAL)
 
-            kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policyFake)
+            kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, psFake)
             kernelCellSet.insertCandidate(kc)
 
     tMi.setXY0(0, 0)

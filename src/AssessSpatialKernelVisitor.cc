@@ -12,7 +12,7 @@
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
 #include "lsst/log/Log.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 #include "lsst/pex/exceptions/Runtime.h"
 
 #include "lsst/ip/diffim/ImageSubtract.h"
@@ -23,7 +23,7 @@
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
-namespace pexPolicy      = lsst::pex::policy;
+namespace dafBase        = lsst::daf::base;
 namespace pexExcept      = lsst::pex::exceptions;
 
 namespace lsst {
@@ -39,7 +39,7 @@ namespace detail {
      * @code
         detail::AssessSpatialKernelVisitor<PixelT> spatialKernelAssessor(spatialKernel,
                                                                          spatialBackground,
-                                                                         policy);
+                                                                         ps);
         spatialKernelAssessor.reset();
         kernelCells.visitCandidates(&spatialKernelAssessor, nStarPerCell);
         nRejected = spatialKernelAssessor.getNRejected();
@@ -47,25 +47,25 @@ namespace detail {
      *
      * @note Evaluates the spatial kernel and spatial background at the location of
      * each candidate, and computes the resulting difference image.  Sets candidate
-     * as afwMath::SpatialCellCandidate::GOOD/BAD if requested by the Policy.
+     * as afwMath::SpatialCellCandidate::GOOD/BAD if requested by the config.
      *
      */
     template<typename PixelT>
     AssessSpatialKernelVisitor<PixelT>::AssessSpatialKernelVisitor(
         std::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatialKernel,   ///< Spatially varying kernel model
         lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground, ///< Spatially varying backgound model
-        lsst::pex::policy::Policy const& policy                        ///< Policy file directing behavior
+        lsst::daf::base::PropertySet const& ps                        ///< ps file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _spatialKernel(spatialKernel),
         _spatialBackground(spatialBackground),
-        _policy(policy),
-        _imstats(ImageStatistics<PixelT>(_policy)),
+        _ps(ps),
+        _imstats(ImageStatistics<PixelT>(_ps)),
         _nGood(0),
         _nRejected(0),
         _nProcessed(0),
-        _useCoreStats(_policy.getBool("useCoreStats")),
-        _coreRadius(_policy.getInt("candidateCoreRadius"))
+        _useCoreStats(_ps.getAsBool("useCoreStats")),
+        _coreRadius(_ps.getAsInt("candidateCoreRadius"))
     {};
 
     template<typename PixelT>
@@ -152,23 +152,23 @@ namespace detail {
             return;
         }
 
-        if (_policy.getBool("spatialKernelClipping")) {
-            if (fabs(_imstats.getMean()) > _policy.getDouble("candidateResidualMeanMax")) {
+        if (_ps.getAsBool("spatialKernelClipping")) {
+            if (fabs(_imstats.getMean()) > _ps.getAsDouble("candidateResidualMeanMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 LOGL_DEBUG("TRACE3.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                            "Rejecting candidate %d; bad mean residual : |%.3f| > %.3f",
                            kCandidate->getId(),
                            _imstats.getMean(),
-                           _policy.getDouble("candidateResidualMeanMax"));
+                           _ps.getAsDouble("candidateResidualMeanMax"));
                 _nRejected += 1;
             }
-            else if (_imstats.getRms() > _policy.getDouble("candidateResidualStdMax")) {
+            else if (_imstats.getRms() > _ps.getAsDouble("candidateResidualStdMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 LOGL_DEBUG("TRACE3.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                            "Rejecting candidate %d; bad residual rms : %.3f > %.3f",
                            kCandidate->getId(),
                            _imstats.getRms(),
-                           _policy.getDouble("candidateResidualStdMax"));
+                           _ps.getAsDouble("candidateResidualStdMax"));
                 _nRejected += 1;
             }
             else {

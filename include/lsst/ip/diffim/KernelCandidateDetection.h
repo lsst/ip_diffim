@@ -14,7 +14,7 @@
 
 #include "lsst/afw/image/Image.h"
 #include "lsst/afw/detection/Footprint.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 namespace lsst {
 namespace ip {
@@ -27,7 +27,7 @@ namespace diffim {
      *
      * @param templateMaskedImage  MaskedImage that will be convolved with kernel
      * @param scienceMaskedImage   MaskedImage to subtract convolved template from
-     * @param policy  Policy for operations; in particular object detection
+     * @param ps  PropertySet for operations; in particular object detection
      *
      * @ingroup ip_diffim
      */
@@ -37,7 +37,7 @@ namespace diffim {
         typedef std::shared_ptr<KernelCandidateDetection> Ptr;
         typedef std::shared_ptr<lsst::afw::image::MaskedImage<PixelT> > MaskedImagePtr;
 
-        KernelCandidateDetection(lsst::pex::policy::Policy const& policy);
+        KernelCandidateDetection(lsst::daf::base::PropertySet const& ps);
 
         virtual ~KernelCandidateDetection() {};
 
@@ -52,7 +52,7 @@ namespace diffim {
         std::vector<std::shared_ptr<lsst::afw::detection::Footprint>> getFootprints() {return _footprints;};
 
     private:
-        lsst::pex::policy::Policy _policy;
+        lsst::daf::base::PropertySet _ps;
         lsst::afw::image::MaskPixel _badBitMask;
         std::vector<std::shared_ptr<lsst::afw::detection::Footprint>> _footprints;
     };

@@ -14,7 +14,7 @@
 #include "boost/timer.hpp"
 
 #include "lsst/pex/exceptions/Exception.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
 #include "lsst/geom.h"
@@ -147,7 +147,7 @@ namespace diffim {
 
 
     Eigen::MatrixXd makeRegularizationMatrix(
-        lsst::pex::policy::Policy policy
+        lsst::daf::base::PropertySet ps
         ) {
 
         /* NOTES
@@ -180,19 +180,19 @@ namespace diffim {
          *
          */
 
-        std::string regularizationType = policy.getString("regularizationType");
-        int width   = policy.getInt("kernelSize");
-        int height  = policy.getInt("kernelSize");
-        float borderPenalty  = policy.getDouble("regularizationBorderPenalty");
-        bool fitForBackground = policy.getBool("fitForBackground");
+        std::string regularizationType = ps.getAsString("regularizationType");
+        int width   = ps.getAsInt("kernelSize");
+        int height  = ps.getAsInt("kernelSize");
+        float borderPenalty  = ps.getAsDouble("regularizationBorderPenalty");
+        bool fitForBackground = ps.getAsBool("fitForBackground");
 
         Eigen::MatrixXd bMat;
         if (regularizationType == "centralDifference") {
-            int stencil = policy.getInt("centralRegularizationStencil");
+            int stencil = ps.getAsInt("centralRegularizationStencil");
             bMat = makeCentralDifferenceMatrix(width, height, stencil, borderPenalty, fitForBackground);
         }
         else if (regularizationType == "forwardDifference") {
-            std::vector<int> orders = policy.getIntArray("forwardRegularizationOrders");
+            std::vector<int> orders = ps.getAsIntArray("forwardRegularizationOrders");
             bMat = makeForwardDifferenceMatrix(width, height, orders, borderPenalty, fitForBackground);
         }
         else {

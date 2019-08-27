@@ -12,14 +12,14 @@
 
 #include "lsst/afw/math.h"
 #include "lsst/log/Log.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySer.h"
 #include "lsst/pex/exceptions/Runtime.h"
 
 #include "lsst/ip/diffim/KernelCandidate.h"
 #include "lsst/ip/diffim/KernelSumVisitor.h"
 
 namespace afwMath        = lsst::afw::math;
-namespace pexPolicy      = lsst::pex::policy;
+namespace dafBase        = lsst::daf::base;
 namespace pexExcept      = lsst::pex::exceptions;
 
 namespace lsst {
@@ -34,11 +34,11 @@ namespace detail {
      * @brief A class to accumulate kernel sums across SpatialCells
      *
      * @code
-        std::shared_ptr<Policy> policy(new Policy);
-        policy->set("kernelSumClipping", false);
-        policy->set("maxKsumSigma", 3.0);
+        std::shared_ptr<PropertySet> ps(new PropertySet);
+        ps->set("kernelSumClipping", false);
+        ps->set("maxKsumSigma", 3.0);
 
-        detail::KernelSumVisitor<PixelT> kernelSumVisitor(*policy);
+        detail::KernelSumVisitor<PixelT> kernelSumVisitor(*ps);
         kernelSumVisitor.reset();
         kernelSumVisitor.setMode(detail::KernelSumVisitor<PixelT>::AGGREGATE);
         kernelCells.visitCandidates(&kernelSumVisitor, nStarPerCell);
@@ -53,7 +53,7 @@ namespace detail {
      * across all candidates.  You must the process the distribution to set member
      * variables representing the mean and standard deviation of the kernel sums.
      * The second mode then REJECTs candidates with kernel sums outside the
-     * acceptable range (set by the policy).  It does this by setting candidate
+     * acceptable range (set by the ps).  It does this by setting candidate
      * status to afwMath::SpatialCellCandidate::BAD.  In this mode it also
      * accumulates the number of candidates it sets as bad.
      *
@@ -63,7 +63,7 @@ namespace detail {
      */
     template<typename PixelT>
     KernelSumVisitor<PixelT>::KernelSumVisitor(
-        lsst::pex::policy::Policy const& policy ///< Policy file directing behavior
+        lsst::daf::base::PropertySet const& ps ///< ps file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _mode(AGGREGATE),
@@ -73,7 +73,7 @@ namespace detail {
         _dkSumMax(0.),
         _kSumNpts(0),
         _nRejected(0),
-        _policy(policy)
+        _ps(ps)
     {};
 
     template<typename PixelT>
@@ -103,7 +103,7 @@ namespace detail {
             _kSums.push_back(kCandidate->getKernelSolution(KernelCandidate<PixelT>::ORIG)->getKsum());
         }
         else if (_mode == REJECT) {
-            if (_policy.getBool("kernelSumClipping")) {
+            if (_ps.getAsBool("kernelSumClipping")) {
                 double kSum =
                     kCandidate->getKernelSolution(KernelCandidate<PixelT>::ORIG)->getKsum();
 
@@ -161,7 +161,7 @@ namespace detail {
                                       % _kSumNpts));
             }
         }
-        _dkSumMax = _policy.getDouble("maxKsumSigma") * _kSumStd;
+        _dkSumMax = _ps.getAsDouble("maxKsumSigma") * _kSumStd;
         LOGL_DEBUG("TRACE1.ip.diffim.KernelSumVisitor.processCandidate",
                    "Kernel Sum Distribution : %.3f +/- %.3f (%d points)",
                    _kSumMean, _kSumStd, _kSumNpts);
@@ -172,6 +172,6 @@ namespace detail {
     template class KernelSumVisitor<PixelT>;
 
     template std::shared_ptr<KernelSumVisitor<PixelT> >
-    makeKernelSumVisitor<PixelT>(lsst::pex::policy::Policy const&);
+    makeKernelSumVisitor<PixelT>(lsst::daf::base::PropertySet const&);
 
 }}}} // end of namespace lsst::ip::diffim::detail

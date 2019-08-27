@@ -1,4 +1,4 @@
-/*
+daf::base::PropertySet/*
  * LSST Data Management System
  *
  * This product includes software developed by the
@@ -63,12 +63,12 @@ void declareKernelCandidate(py::module &mod, std::string const &suffix) {
             .export_values();
 
     cls.def(py::init<float const, float const, std::shared_ptr<afw::image::MaskedImage<PixelT>> const &,
-                     std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, pex::policy::Policy const &>(),
-            "xCenter"_a, "yCenter"_a, "templateMaskedImage"_a, "scienceMaskedImage"_a, "policy"_a);
+                     std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, daf::base::PropertySet const &>(),
+            "xCenter"_a, "yCenter"_a, "templateMaskedImage"_a, "scienceMaskedImage"_a, "ps"_a);
     cls.def(py::init<std::shared_ptr<afw::table::SourceRecord> const &,
                      std::shared_ptr<afw::image::MaskedImage<PixelT>> const &,
-                     std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, pex::policy::Policy const &>(),
-            "source"_a, "templateMaskedImage"_a, "scienceMaskedImage"_a, "policy"_a);
+                     std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, daf::base::PropertySet const &>(),
+            "source"_a, "templateMaskedImage"_a, "scienceMaskedImage"_a, "ps"_a);
 
     cls.def("getCandidateRating", &KernelCandidate<PixelT>::getCandidateRating);
     cls.def("getSource", &KernelCandidate<PixelT>::getSource);
@@ -99,16 +99,16 @@ void declareKernelCandidate(py::module &mod, std::string const &suffix) {
     mod.def("makeKernelCandidate",
             (std::shared_ptr<KernelCandidate<PixelT>>(*)(
                     float const, float const, std::shared_ptr<afw::image::MaskedImage<PixelT>> const &,
-                    std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, pex::policy::Policy const &)) &
+                    std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, daf::base::PropertySet const &)) &
                     makeKernelCandidate,
-            "xCenter"_a, "yCenter"_a, "templateMaskedImage"_a, "scienceMaskedImage"_a, "policy"_a);
+            "xCenter"_a, "yCenter"_a, "templateMaskedImage"_a, "scienceMaskedImage"_a, "ps"_a);
     mod.def("makeKernelCandidate",
             (std::shared_ptr<KernelCandidate<PixelT>>(*)(
                     std::shared_ptr<afw::table::SourceRecord> const &,
                     std::shared_ptr<afw::image::MaskedImage<PixelT>> const &,
-                    std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, pex::policy::Policy const &)) &
+                    std::shared_ptr<afw::image::MaskedImage<PixelT>> const &, daf::base::PropertySet const &)) &
                     makeKernelCandidate,
-            "source"_a, "templateMaskedImage"_a, "scienceMaskedImage"_a, "policy"_a);
+            "source"_a, "templateMaskedImage"_a, "scienceMaskedImage"_a, "ps"_a);
 }
 
 }  // namespace lsst::ip::diffim::<anonymous>
@@ -117,7 +117,7 @@ PYBIND11_MODULE(kernelCandidate, mod) {
     py::module::import("lsst.afw.image");
     py::module::import("lsst.afw.math");
     py::module::import("lsst.afw.table");
-    py::module::import("lsst.pex.policy");
+    py::module::import("lsst.daf.base");
 
     declareKernelCandidate<float>(mod, "F");
 }

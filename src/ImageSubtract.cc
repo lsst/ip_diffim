@@ -42,7 +42,7 @@
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
 #include "lsst/log/Log.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 #include "lsst/pex/exceptions/Runtime.h"
 
 #include "lsst/ip/diffim.h"
@@ -50,7 +50,7 @@
 namespace afwImage   = lsst::afw::image;
 namespace afwMath    = lsst::afw::math;
 namespace pexExcept  = lsst::pex::exceptions;
-namespace pexPolicy  = lsst::pex::policy;
+namespace dafBase    = lsst::daf::base;
 
 namespace lsst {
 namespace ip {
