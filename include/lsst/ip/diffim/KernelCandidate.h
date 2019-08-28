@@ -186,7 +186,7 @@ namespace diffim {
         MaskedImagePtr _templateMaskedImage;                ///< Subimage around which you build kernel
         MaskedImagePtr _scienceMaskedImage;                 ///< Subimage around which you build kernel
         VariancePtr _varianceEstimate;                      ///< Estimate of the local variance
-        daf::base::PropertySet _ps;                         ///< Parameters
+        daf::base::PropertySet::Ptr _ps;                    ///< Parameters
         SourcePtr _source;
         double _coreFlux;                                   ///< Mean S/N in the science image
         bool _isInitialized;                                ///< Has the kernel been built

@@ -35,11 +35,11 @@ namespace diffim {
     KernelCandidateDetection<PixelT>::KernelCandidateDetection(
         lsst::daf::base::PropertySet const& ps
         ) :
-        _ps(ps),
+        _ps(ps.deepCopy()),
         _badBitMask(0),
         _footprints(std::vector<std::shared_ptr<lsst::afw::detection::Footprint>>()) {
 
-        std::vector<std::string> detBadMaskPlanes = _ps.getArray<std::string>("badMaskPlanes");
+        std::vector<std::string> detBadMaskPlanes = _ps->getArray<std::string>("badMaskPlanes");
         for (std::vector<std::string>::iterator mi = detBadMaskPlanes.begin();
              mi != detBadMaskPlanes.end(); ++mi){
             try {
@@ -82,12 +82,12 @@ namespace diffim {
         ) {
 
         // Parse the ps
-        int fpNpixMin                = _ps.getAsInt("fpNpixMin");
-        int fpGrowPix                = _ps.getAsInt("fpGrowPix");
+        int fpNpixMin                = _ps->getAsInt("fpNpixMin");
+        int fpGrowPix                = _ps->getAsInt("fpGrowPix");
 
-        bool detOnTemplate           = _ps.getAsBool("detOnTemplate");
-        double detThreshold          = _ps.getAsDouble("detThreshold");
-        std::string detThresholdType = _ps.getAsString("detThresholdType");
+        bool detOnTemplate           = _ps->getAsBool("detOnTemplate");
+        double detThreshold          = _ps->getAsDouble("detThreshold");
+        std::string detThresholdType = _ps->getAsString("detThresholdType");
 
         /* reset private variables */
         _footprints.clear();
@@ -150,7 +150,7 @@ namespace diffim {
         MaskedImagePtr const& templateMaskedImage,
         MaskedImagePtr const& scienceMaskedImage
         ) {
-        int fpNpixMax = _ps.getAsInt("fpNpixMax");
+        int fpNpixMax = _ps->getAsInt("fpNpixMax");
 
         /* Functor to search through the images for masked pixels within *
          * candidate footprints.  Might want to consider changing the default

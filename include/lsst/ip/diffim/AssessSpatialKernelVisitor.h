@@ -45,7 +45,7 @@ namespace detail {
     private:
         std::shared_ptr<lsst::afw::math::LinearCombinationKernel> _spatialKernel;   ///< Spatial kernel function
         lsst::afw::math::Kernel::SpatialFunctionPtr _spatialBackground; ///< Spatial background function
-        lsst::daf::base::PropertySet _ps;     ///< Configuration controlling behavior
+        lsst::daf::base::PropertySet::Ptr _ps; ///< Configuration controlling behavior
         ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
         int _nGood;                           ///< Number of good candidates remaining
         int _nRejected;                       ///< Number of candidates rejected during processCandidate()

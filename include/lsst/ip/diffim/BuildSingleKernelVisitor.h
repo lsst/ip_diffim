@@ -60,7 +60,7 @@ namespace detail {
 
     private:
         lsst::afw::math::KernelList const _basisList; ///< Basis set
-        lsst::daf::base::PropertySet _ps;            ///< PS controlling behavior
+        lsst::daf::base::PropertySet::Ptr _ps; ///< PS controlling behavior
         Eigen::MatrixXd const _hMat;          ///< Regularization matrix
         ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
         bool _skipBuilt;                      ///< Skip over built candidates during processCandidate()

@@ -92,15 +92,15 @@ namespace detail {
         ) :
         afwMath::CandidateVisitor(),
         _basisList(basisList),
-        _ps(ps),
+        _ps(ps.deepCopy()),
         _hMat(),
-        _imstats(ImageStatistics<PixelT>(_ps)),
+        _imstats(ImageStatistics<PixelT>(ps)),
         _skipBuilt(true),
         _nRejected(0),
         _nProcessed(0),
         _useRegularization(false),
-        _useCoreStats(_ps.getAsBool("useCoreStats")),
-        _coreRadius(_ps.getAsInt("candidateCoreRadius"))
+        _useCoreStats(ps.getAsBool("useCoreStats")),
+        _coreRadius(ps.getAsInt("candidateCoreRadius"))
     {};
 
     template<typename PixelT>
@@ -112,15 +112,15 @@ namespace detail {
         ) :
         afwMath::CandidateVisitor(),
         _basisList(basisList),
-        _ps(ps),
+        _ps(ps.deepCopy()),
         _hMat(hMat),
-        _imstats(ImageStatistics<PixelT>(_ps)),
+        _imstats(ImageStatistics<PixelT>(ps)),
         _skipBuilt(true),
         _nRejected(0),
         _nProcessed(0),
         _useRegularization(true),
-        _useCoreStats(_ps.getAsBool("useCoreStats")),
-        _coreRadius(_ps.getAsInt("candidateCoreRadius"))
+        _useCoreStats(ps.getAsBool("useCoreStats")),
+        _coreRadius(ps.getAsInt("candidateCoreRadius"))
     {};
 
 
@@ -225,23 +225,23 @@ namespace detail {
             return;
         }
 
-        if (_ps.getAsBool("singleKernelClipping")) {
-            if (fabs(_imstats.getMean()) > _ps.getAsDouble("candidateResidualMeanMax")) {
+        if (_ps->getAsBool("singleKernelClipping")) {
+            if (fabs(_imstats.getMean()) > _ps->getAsDouble("candidateResidualMeanMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 LOGL_DEBUG("TRACE3.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                            "Rejecting candidate %d; bad mean residual : |%.3f| > %.3f",
                            kCandidate->getId(),
                            _imstats.getMean(),
-                           _ps.getAsDouble("candidateResidualMeanMax"));
+                           _ps->getAsDouble("candidateResidualMeanMax"));
                 _nRejected += 1;
             }
-            else if (_imstats.getRms() > _ps.getAsDouble("candidateResidualStdMax")) {
+            else if (_imstats.getRms() > _ps->getAsDouble("candidateResidualStdMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 LOGL_DEBUG("TRACE3.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                            "Rejecting candidate %d; bad residual rms : %.3f > %.3f",
                            kCandidate->getId(),
                            _imstats.getRms(),
-                           _ps.getAsDouble("candidateResidualStdMax"));
+                           _ps->getAsDouble("candidateResidualStdMax"));
                 _nRejected += 1;
             }
             else {

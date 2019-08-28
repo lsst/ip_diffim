@@ -1060,12 +1060,12 @@ namespace diffim {
         lsst::afw::math::KernelList const& basisList,
         bool fitForBackground,
         Eigen::MatrixXd const& hMat,
-        lsst::daf::base::PropertySet ps
+        lsst::daf::base::PropertySet const& ps
         )
         :
         StaticKernelSolution<InputT>(basisList, fitForBackground),
         _hMat(hMat),
-        _ps(ps)
+        _ps(ps.deepCopy())
     {};
 
     template <typename InputT>
@@ -1218,16 +1218,16 @@ namespace diffim {
 
         */
 
-        std::string lambdaType = _ps.getAsString("lambdaType");
+        std::string lambdaType = _ps->getAsString("lambdaType");
         if (lambdaType == "absolute") {
-            _lambda = _ps.getAsDouble("lambdaValue");
+            _lambda = _ps->getAsDouble("lambdaValue");
         }
         else if (lambdaType ==  "relative") {
             _lambda  = this->_mMat.trace() / this->_hMat.trace();
-            _lambda *= _ps.getAsDouble("lambdaScaling");
+            _lambda *= _ps->getAsDouble("lambdaScaling");
         }
         else if (lambdaType ==  "minimizeBiasedRisk") {
-            double tol = _ps.getAsDouble("maxConditionNumber");
+            double tol = _ps->getAsDouble("maxConditionNumber");
             _lambda = estimateRisk(tol);
         }
         else if (lambdaType ==  "minimizeUnbiasedRisk") {
@@ -1255,19 +1255,19 @@ namespace diffim {
     std::vector<double> RegularizedKernelSolution<InputT>::_createLambdaSteps() {
         std::vector<double> lambdas;
 
-        std::string lambdaStepType = _ps.getAsString("lambdaStepType");
+        std::string lambdaStepType = _ps->getAsString("lambdaStepType");
         if (lambdaStepType == "linear") {
-            double lambdaLinMin   = _ps.getAsDouble("lambdaLinMin");
-            double lambdaLinMax   = _ps.getAsDouble("lambdaLinMax");
-            double lambdaLinStep  = _ps.getAsDouble("lambdaLinStep");
+            double lambdaLinMin   = _ps->getAsDouble("lambdaLinMin");
+            double lambdaLinMax   = _ps->getAsDouble("lambdaLinMax");
+            double lambdaLinStep  = _ps->getAsDouble("lambdaLinStep");
             for (double l = lambdaLinMin; l <= lambdaLinMax; l += lambdaLinStep) {
                 lambdas.push_back(l);
             }
         }
         else if (lambdaStepType == "log") {
-            double lambdaLogMin   = _ps.getAsDouble("lambdaLogMin");
-            double lambdaLogMax   = _ps.getAsDouble("lambdaLogMax");
-            double lambdaLogStep  = _ps.getAsDouble("lambdaLogStep");
+            double lambdaLogMin   = _ps->getAsDouble("lambdaLogMin");
+            double lambdaLogMax   = _ps->getAsDouble("lambdaLogMax");
+            double lambdaLogStep  = _ps->getAsDouble("lambdaLogStep");
             for (double l = lambdaLogMin; l <= lambdaLogMax; l += lambdaLogStep) {
                 lambdas.push_back(pow(10, l));
             }
@@ -1284,7 +1284,7 @@ namespace diffim {
         lsst::afw::math::KernelList const& basisList,
         lsst::afw::math::Kernel::SpatialFunctionPtr spatialKernelFunction,
         lsst::afw::math::Kernel::SpatialFunctionPtr background,
-        lsst::daf::base::PropertySet ps
+        lsst::daf::base::PropertySet const& ps
         ) :
         KernelSolution(),
         _spatialKernelFunction(spatialKernelFunction),
@@ -1292,18 +1292,18 @@ namespace diffim {
         _kernel(),
         _background(background),
         _kSum(0.0),
-        _ps(ps),
+        _ps(ps.deepCopy()),
         _nbases(0),
         _nkt(0),
         _nbt(0),
         _nt(0) {
 
-        bool isAlardLupton    = _ps.getAsString("kernelBasisSet") == "alard-lupton";
-        bool usePca           = _ps.getAsBool("usePcaForSpatialKernel");
+        bool isAlardLupton    = _ps->getAsString("kernelBasisSet") == "alard-lupton";
+        bool usePca           = _ps->getAsBool("usePcaForSpatialKernel");
         if (isAlardLupton || usePca) {
             _constantFirstTerm = true;
         }
-        this->_fitForBackground = _ps.getAsBool("fitForBackground");
+        this->_fitForBackground = _ps->getAsBool("fitForBackground");
 
         _nbases = basisList.size();
         _nkt = _spatialKernelFunction->getParameters().size();

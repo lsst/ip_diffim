@@ -38,17 +38,17 @@ KernelCandidate<PixelT>::KernelCandidate(float const xCenter, float const yCente
           _templateMaskedImage(templateMaskedImage),
           _scienceMaskedImage(scienceMaskedImage),
           _varianceEstimate(),
-          _ps(ps),
+          _ps(ps.deepCopy()),
           _source(),
           _coreFlux(),
           _isInitialized(false),
           _useRegularization(false),
-          _fitForBackground(_ps.getAsBool("fitForBackground")),
+          _fitForBackground(ps.getAsBool("fitForBackground")),
           _kernelSolutionOrig(),
           _kernelSolutionPca() {
     /* Rank by mean core S/N in science image */
-    ImageStatistics<PixelT> imstats(_ps);
-    int candidateCoreRadius = _ps.getAsInt("candidateCoreRadius");
+    ImageStatistics<PixelT> imstats(ps);
+    int candidateCoreRadius = _ps->getAsInt("candidateCoreRadius");
     try {
         imstats.apply(*_scienceMaskedImage, candidateCoreRadius);
     } catch (pexExcept::Exception& e) {
@@ -71,12 +71,12 @@ KernelCandidate<PixelT>::KernelCandidate(SourcePtr const& source, MaskedImagePtr
           _templateMaskedImage(templateMaskedImage),
           _scienceMaskedImage(scienceMaskedImage),
           _varianceEstimate(),
-          _ps(ps),
+          _ps(ps.deepCopy()),
           _source(source),
           _coreFlux(source->getPsfInstFlux()),
           _isInitialized(false),
           _useRegularization(false),
-          _fitForBackground(_ps.getAsBool("fitForBackground")),
+          _fitForBackground(ps.getAsBool("fitForBackground")),
           _kernelSolutionOrig(),
           _kernelSolutionPca() {
     LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate", "Candidate %d at %.2f %.2f with ranking %.2f",
@@ -97,7 +97,7 @@ void KernelCandidate<PixelT>::build(lsst::afw::math::KernelList const& basisList
     /* Variance estimate comes from sum of image variances */
     var += (*(_templateMaskedImage->getVariance()));
 
-    if (_ps.getAsBool("constantVarianceWeighting")) {
+    if (_ps->getAsBool("constantVarianceWeighting")) {
         /* Constant variance weighting */
         afwMath::Statistics varStats = afwMath::makeStatistics(var, afwMath::MEDIAN);
         float varValue;
@@ -118,7 +118,7 @@ void KernelCandidate<PixelT>::build(lsst::afw::math::KernelList const& basisList
         throw e;
     }
 
-    if (_ps.getAsBool("iterateSingleKernel") && (!(_ps.getAsBool("constantVarianceWeighting")))) {
+    if (_ps->getAsBool("iterateSingleKernel") && (!(_ps->getAsBool("constantVarianceWeighting")))) {
         afwImage::MaskedImage<PixelT> diffim = getDifferenceImage(KernelCandidate::RECENT);
         _varianceEstimate = diffim.getVariance();
 
@@ -135,9 +135,9 @@ void KernelCandidate<PixelT>::build(lsst::afw::math::KernelList const& basisList
 template <typename PixelT>
 void KernelCandidate<PixelT>::_buildKernelSolution(lsst::afw::math::KernelList const& basisList,
                                                    Eigen::MatrixXd const& hMat) {
-    bool checkConditionNumber = _ps.getAsBool("checkConditionNumber");
-    double maxConditionNumber = _ps.getAsDouble("maxConditionNumber");
-    std::string conditionNumberType = _ps.getAsString("conditionNumberType");
+    bool checkConditionNumber = _ps->getAsBool("checkConditionNumber");
+    double maxConditionNumber = _ps->getAsDouble("maxConditionNumber");
+    std::string conditionNumberType = _ps->getAsString("conditionNumberType");
     KernelSolution::ConditionNumberType ctype;
     if (conditionNumberType == "SVD") {
         ctype = KernelSolution::SVD;
@@ -154,7 +154,7 @@ void KernelCandidate<PixelT>::_buildKernelSolution(lsst::afw::math::KernelList c
 
         if (_isInitialized) {
             _kernelSolutionPca = std::shared_ptr<StaticKernelSolution<PixelT> >(
-                    new RegularizedKernelSolution<PixelT>(basisList, _fitForBackground, hMat, _ps));
+                    new RegularizedKernelSolution<PixelT>(basisList, _fitForBackground, hMat, *_ps));
             _kernelSolutionPca->build(*(_templateMaskedImage->getImage()), *(_scienceMaskedImage->getImage()),
                                       *_varianceEstimate);
             if (checkConditionNumber) {
@@ -168,7 +168,7 @@ void KernelCandidate<PixelT>::_buildKernelSolution(lsst::afw::math::KernelList c
             _kernelSolutionPca->solve();
         } else {
             _kernelSolutionOrig = std::shared_ptr<StaticKernelSolution<PixelT> >(
-                    new RegularizedKernelSolution<PixelT>(basisList, _fitForBackground, hMat, _ps));
+                    new RegularizedKernelSolution<PixelT>(basisList, _fitForBackground, hMat, *_ps));
             _kernelSolutionOrig->build(*(_templateMaskedImage->getImage()),
                                        *(_scienceMaskedImage->getImage()), *_varianceEstimate);
             if (checkConditionNumber) {

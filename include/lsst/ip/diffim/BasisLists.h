@@ -50,7 +50,7 @@ namespace diffim {
      * makeCentralDifferenceMatrix based on the config file.
      */
     Eigen::MatrixXd makeRegularizationMatrix(
-        lsst::daf::base::PropertySet ps
+        lsst::daf::base::PropertySet const& ps
         );
 
     /**

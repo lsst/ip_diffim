@@ -12,7 +12,7 @@
 
 #include "lsst/afw/math.h"
 #include "lsst/log/Log.h"
-#include "lsst/daf/base/PropertySer.h"
+#include "lsst/daf/base/PropertySet.h"
 #include "lsst/pex/exceptions/Runtime.h"
 
 #include "lsst/ip/diffim/KernelCandidate.h"
@@ -73,7 +73,7 @@ namespace detail {
         _dkSumMax(0.),
         _kSumNpts(0),
         _nRejected(0),
-        _ps(ps)
+        _ps(ps.deepCopy())
     {};
 
     template<typename PixelT>
@@ -103,7 +103,7 @@ namespace detail {
             _kSums.push_back(kCandidate->getKernelSolution(KernelCandidate<PixelT>::ORIG)->getKsum());
         }
         else if (_mode == REJECT) {
-            if (_ps.getAsBool("kernelSumClipping")) {
+            if (_ps->getAsBool("kernelSumClipping")) {
                 double kSum =
                     kCandidate->getKernelSolution(KernelCandidate<PixelT>::ORIG)->getKsum();
 
@@ -161,7 +161,7 @@ namespace detail {
                                       % _kSumNpts));
             }
         }
-        _dkSumMax = _ps.getAsDouble("maxKsumSigma") * _kSumStd;
+        _dkSumMax = _ps->getAsDouble("maxKsumSigma") * _kSumStd;
         LOGL_DEBUG("TRACE1.ip.diffim.KernelSumVisitor.processCandidate",
                    "Kernel Sum Distribution : %.3f +/- %.3f (%d points)",
                    _kSumMean, _kSumStd, _kSumNpts);

@@ -52,7 +52,7 @@ namespace diffim {
         std::vector<std::shared_ptr<lsst::afw::detection::Footprint>> getFootprints() {return _footprints;};
 
     private:
-        lsst::daf::base::PropertySet _ps;
+        lsst::daf::base::PropertySet::Ptr _ps;
         lsst::afw::image::MaskPixel _badBitMask;
         std::vector<std::shared_ptr<lsst::afw::detection::Footprint>> _footprints;
     };

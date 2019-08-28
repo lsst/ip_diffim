@@ -147,7 +147,7 @@ namespace diffim {
 
 
     Eigen::MatrixXd makeRegularizationMatrix(
-        lsst::daf::base::PropertySet ps
+        lsst::daf::base::PropertySet const& ps
         ) {
 
         /* NOTES
@@ -192,7 +192,7 @@ namespace diffim {
             bMat = makeCentralDifferenceMatrix(width, height, stencil, borderPenalty, fitForBackground);
         }
         else if (regularizationType == "forwardDifference") {
-            std::vector<int> orders = ps.getAsIntArray("forwardRegularizationOrders");
+            std::vector<int> orders = ps.getArray<int>("forwardRegularizationOrders");
             bMat = makeForwardDifferenceMatrix(width, height, orders, borderPenalty, fitForBackground);
         }
         else {

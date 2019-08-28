@@ -52,7 +52,7 @@ namespace detail {
         double _dkSumMax;            ///< Maximum acceptable deviation from mean sum
         int    _kSumNpts;            ///< Number of points used in the statistics
         int    _nRejected;           ///< Number of candidates rejected during processCandidate()
-        lsst::daf::base::PropertySet _ps;   ///< Config controlling behavior
+        lsst::daf::base::PropertySet::Ptr _ps;   ///< Config controlling behavior
     };
 
     template<typename PixelT>

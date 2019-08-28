@@ -152,7 +152,7 @@ namespace diffim {
         RegularizedKernelSolution(lsst::afw::math::KernelList const& basisList,
                                   bool fitForBackground,
                                   Eigen::MatrixXd const& hMat,
-                                  lsst::daf::base::PropertySet ps
+                                  lsst::daf::base::PropertySet const& ps
                                   );
         virtual ~RegularizedKernelSolution() {};
         void solve();
@@ -165,7 +165,7 @@ namespace diffim {
     private:
         Eigen::MatrixXd const _hMat;               ///< Regularization weights
         double _lambda;                                         ///< Overall regularization strength
-        lsst::daf::base::PropertySet _ps;
+        lsst::daf::base::PropertySet::Ptr _ps;
 
         std::vector<double> _createLambdaSteps();
     };
@@ -179,7 +179,7 @@ namespace diffim {
         SpatialKernelSolution(lsst::afw::math::KernelList const& basisList,
                               lsst::afw::math::Kernel::SpatialFunctionPtr spatialKernelFunction,
                               lsst::afw::math::Kernel::SpatialFunctionPtr background,
-                              lsst::daf::base::PropertySet ps
+                              lsst::daf::base::PropertySet const& ps
             );
 
         virtual ~SpatialKernelSolution() {};
@@ -201,7 +201,7 @@ namespace diffim {
         lsst::afw::math::Kernel::SpatialFunctionPtr _background; ///< Spatial background model
         double _kSum;                                            ///< Derived kernel sum
 
-        lsst::daf::base::PropertySet _ps;                        ///< Config to control processing
+        lsst::daf::base::PropertySet::Ptr _ps;                   ///< Config to control processing
         int _nbases;                                             ///< Number of basis functions
         int _nkt;                                                ///< Number of kernel terms
         int _nbt;                                                ///< Number of background terms

@@ -59,13 +59,13 @@ namespace detail {
         afwMath::CandidateVisitor(),
         _spatialKernel(spatialKernel),
         _spatialBackground(spatialBackground),
-        _ps(ps),
-        _imstats(ImageStatistics<PixelT>(_ps)),
+        _ps(ps.deepCopy()),
+        _imstats(ImageStatistics<PixelT>(ps)),
         _nGood(0),
         _nRejected(0),
         _nProcessed(0),
-        _useCoreStats(_ps.getAsBool("useCoreStats")),
-        _coreRadius(_ps.getAsInt("candidateCoreRadius"))
+        _useCoreStats(ps.getAsBool("useCoreStats")),
+        _coreRadius(ps.getAsInt("candidateCoreRadius"))
     {};
 
     template<typename PixelT>
@@ -152,23 +152,23 @@ namespace detail {
             return;
         }
 
-        if (_ps.getAsBool("spatialKernelClipping")) {
-            if (fabs(_imstats.getMean()) > _ps.getAsDouble("candidateResidualMeanMax")) {
+        if (_ps->getAsBool("spatialKernelClipping")) {
+            if (fabs(_imstats.getMean()) > _ps->getAsDouble("candidateResidualMeanMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 LOGL_DEBUG("TRACE3.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                            "Rejecting candidate %d; bad mean residual : |%.3f| > %.3f",
                            kCandidate->getId(),
                            _imstats.getMean(),
-                           _ps.getAsDouble("candidateResidualMeanMax"));
+                           _ps->getAsDouble("candidateResidualMeanMax"));
                 _nRejected += 1;
             }
-            else if (_imstats.getRms() > _ps.getAsDouble("candidateResidualStdMax")) {
+            else if (_imstats.getRms() > _ps->getAsDouble("candidateResidualStdMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 LOGL_DEBUG("TRACE3.ip.diffim.AssessSpatialKernelVisitor.processCandidate",
                            "Rejecting candidate %d; bad residual rms : %.3f > %.3f",
                            kCandidate->getId(),
                            _imstats.getRms(),
-                           _ps.getAsDouble("candidateResidualStdMax"));
+                           _ps->getAsDouble("candidateResidualStdMax"));
                 _nRejected += 1;
             }
             else {

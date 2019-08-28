@@ -73,7 +73,7 @@ namespace detail {
     BuildSpatialKernelVisitor<PixelT>::BuildSpatialKernelVisitor(
         lsst::afw::math::KernelList const& basisList, ///< Basis functions used in the fit
         lsst::geom::Box2I const& regionBBox,     ///< Spatial region over which the function is fit
-        lsst::daf::base::PropertySet ps              ///< ps file directing behavior
+        lsst::daf::base::PropertySet const& ps        ///< ps file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _kernelSolution(),

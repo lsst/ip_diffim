@@ -32,7 +32,7 @@ namespace detail {
         BuildSpatialKernelVisitor(
             lsst::afw::math::KernelList const& basisList,  ///< Basis functions
             lsst::geom::Box2I const& regionBBox,  ///< Spatial region over which the function is fit
-            lsst::daf::base::PropertySet ps           ///< PropertySet directing behavior
+            lsst::daf::base::PropertySet const& ps         ///< PropertySet directing behavior
             );
 
         int getNCandidates() {return _nCandidates;}
@@ -56,7 +56,7 @@ namespace detail {
     makeBuildSpatialKernelVisitor(
         lsst::afw::math::KernelList const& basisList,
         lsst::geom::Box2I const& regionBBox,
-        lsst::daf::base::PropertySet ps
+        lsst::daf::base::PropertySet const& ps
         ) {
 
         return std::shared_ptr<BuildSpatialKernelVisitor<PixelT>>(
