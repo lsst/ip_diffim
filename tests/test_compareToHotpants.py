@@ -27,7 +27,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.subconfig.scaleByFwhm = False
         self.subconfig.fitForBackground = True
         self.subconfig.spatialModelType = "polynomial"
-        self.policy = pexConfig.makePolicy(self.subconfig)
+        self.ps = pexConfig.makePropertySet(self.subconfig)
 
         self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
         self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')
@@ -99,8 +99,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.kernelCellSet = afwMath.SpatialCellSet(geom.Box2I(geom.Point2I(0, 0),
                                                                geom.Extent2I(self.smi.getWidth(),
                                                                              self.smi.getHeight())),
-                                                    self.policy.getInt("sizeCellX"),
-                                                    self.policy.getInt("sizeCellY"))
+                                                    self.ps["sizeCellX"],
+                                                    self.ps["sizeCellY"])
 
         # There are some -1 factors that come from differences in how
         # convolution is done.  Some resulting convovled images end up
@@ -109,7 +109,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.parity = [1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1]
 
     def tearDown(self):
-        del self.policy
+        del self.ps
         del self.tmi
         del self.smi
         del self.basisList
@@ -117,9 +117,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         del self.kernelCellSet
 
     def testSingleNoVariation(self):
-        self.policy.set('constantVarianceWeighting', True)
-        self.policy.set('spatialKernelOrder', 0)
-        self.policy.set('spatialBgOrder', 0)
+        self.ps['constantVarianceWeighting'] = True
+        self.ps['spatialKernelOrder'] = 0
+        self.ps['spatialBgOrder'] = 0
 
         # Place candidate footprints within the spatial grid
         for fp in self.footprints:
@@ -141,13 +141,13 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                                     (0.5 * self.smi.getWidth()),
                                                     (yC - 0.5 * self.smi.getHeight()) /
                                                     (0.5 * self.smi.getHeight()),
-                                                    tsmi, ssmi, self.policy)
+                                                    tsmi, ssmi, self.ps)
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
         bbox = self.kernelCellSet.getBBox()
-        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
+        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.ps)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.ps)
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
@@ -181,9 +181,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.assertAlmostEqual(sb.getParameters()[0], HPspatialSolution[-1], 5)
 
     def testFourNoVariation(self):
-        self.policy.set('constantVarianceWeighting', True)
-        self.policy.set('spatialKernelOrder', 0)
-        self.policy.set('spatialBgOrder', 0)
+        self.ps['constantVarianceWeighting'] = True
+        self.ps['spatialKernelOrder'] = 0
+        self.ps['spatialBgOrder'] = 0
 
         # Place candidate footprints within the spatial grid
         for fp in self.footprints:
@@ -204,14 +204,14 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                                     (0.5 * self.smi.getWidth()),
                                                     (yC - 0.5 * self.smi.getHeight()) /
                                                     (0.5 * self.smi.getHeight()),
-                                                    tsmi, ssmi, self.policy)
+                                                    tsmi, ssmi, self.ps)
 
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
         bbox = self.kernelCellSet.getBBox()
-        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
+        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.ps)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.ps)
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
@@ -239,9 +239,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.assertAlmostEqual(sb.getParameters()[0], HPspatialSolution[-1], 5)
 
     def testFourKernelVariation(self):
-        self.policy.set('constantVarianceWeighting', True)
-        self.policy.set('spatialKernelOrder', 1)
-        self.policy.set('spatialBgOrder', 0)
+        self.ps['constantVarianceWeighting'] = True
+        self.ps['spatialKernelOrder'] = 1
+        self.ps['spatialBgOrder'] = 0
 
         # Place candidate footprints within the spatial grid
         for fp in self.footprints:
@@ -262,13 +262,13 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                                     (0.5 * self.smi.getWidth()),
                                                     (yC - 0.5 * self.smi.getHeight()) /
                                                     (0.5 * self.smi.getHeight()),
-                                                    tsmi, ssmi, self.policy)
+                                                    tsmi, ssmi, self.ps)
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
         bbox = self.kernelCellSet.getBBox()
-        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
+        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.ps)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.ps)
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
@@ -337,9 +337,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         #            //yf = (j - rPixY2) / rPixY2;
         #            yf = (yi - rPixY2) / rPixY2;
 
-        self.policy.set('constantVarianceWeighting', True)
-        self.policy.set('spatialKernelOrder', 0)
-        self.policy.set('spatialBgOrder', 1)
+        self.ps['constantVarianceWeighting'] = True
+        self.ps['spatialKernelOrder'] = 0
+        self.ps['spatialBgOrder'] = 1
 
         # Place candidate footprints within the spatial grid
         for fp in self.footprints:
@@ -360,14 +360,14 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                                     (0.5 * self.smi.getWidth()),
                                                     (yC - 0.5 * self.smi.getHeight()) /
                                                     (0.5 * self.smi.getHeight()),
-                                                    tsmi, ssmi, self.policy)
+                                                    tsmi, ssmi, self.ps)
                 # print 'OBJECT', cand.getId(), 'AT', xC, yC, cand.getXCenter(), cand.getYCenter()
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
         bbox = self.kernelCellSet.getBBox()
-        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
+        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.ps)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.ps)
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
@@ -399,9 +399,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.assertAlmostEqual(sb.getParameters()[2], HPspatialSolution[-1][1], 5)  # x<->y
 
     def testFourVariation(self):
-        self.policy.set('constantVarianceWeighting', True)
-        self.policy.set('spatialKernelOrder', 1)
-        self.policy.set('spatialBgOrder', 1)
+        self.ps['constantVarianceWeighting'] = True
+        self.ps['spatialKernelOrder'] = 1
+        self.ps['spatialBgOrder'] = 1
 
         # Place candidate footprints within the spatial grid
         for fp in self.footprints:
@@ -422,13 +422,13 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                                     (0.5 * self.smi.getWidth()),
                                                     (yC - 0.5 * self.smi.getHeight()) /
                                                     (0.5 * self.smi.getHeight()),
-                                                    tsmi, ssmi, self.policy)
+                                                    tsmi, ssmi, self.ps)
                 self.kernelCellSet.insertCandidate(cand)
 
         # Visitors
         bbox = self.kernelCellSet.getBBox()
-        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
+        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.ps)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.ps)
 
         for cell in self.kernelCellSet.getCellList():
             for cand in cell.begin(False):  # False = include bad candidates
@@ -487,9 +487,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # OK, I ran HP on all the things in this image.  Enough for
         # second order spatial variation
 
-        self.policy.set('constantVarianceWeighting', True)
-        self.policy.set('spatialKernelOrder', 0)
-        self.policy.set('spatialBgOrder', 2)
+        self.ps['constantVarianceWeighting'] = True
+        self.ps['spatialKernelOrder'] = 0
+        self.ps['spatialBgOrder'] = 2
 
         # Ignore the whole kernelCellSet thing
         cands = []
@@ -510,13 +510,13 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                                 (0.5 * self.smi.getWidth()),
                                                 (yC - 0.5 * self.smi.getHeight()) /
                                                 (0.5 * self.smi.getHeight()),
-                                                tsmi, ssmi, self.policy)
+                                                tsmi, ssmi, self.ps)
             cands.append(cand)
 
         # Visitors
         bbox = self.kernelCellSet.getBBox()
-        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
+        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.ps)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.ps)
 
         for cand in cands:
             bsikv.processCandidate(cand)
@@ -558,9 +558,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # OK, I ran HP on all the things in this image.  Enough for
         # second order spatial variation
 
-        self.policy.set('constantVarianceWeighting', True)
-        self.policy.set('spatialKernelOrder', 2)
-        self.policy.set('spatialBgOrder', 0)
+        self.ps['constantVarianceWeighting'] = True
+        self.ps['spatialKernelOrder'] = 2
+        self.ps['spatialBgOrder'] = 0
 
         # Ignore the whole kernelCellSet thing
         cands = []
@@ -581,13 +581,13 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                                 (0.5 * self.smi.getWidth()),
                                                 (yC - 0.5 * self.smi.getHeight()) /
                                                 (0.5 * self.smi.getHeight()),
-                                                tsmi, ssmi, self.policy)
+                                                tsmi, ssmi, self.ps)
             cands.append(cand)
 
         # Visitors
         bbox = self.kernelCellSet.getBBox()
-        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
+        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.ps)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.ps)
 
         for cand in cands:
             bsikv.processCandidate(cand)
@@ -673,9 +673,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # OK, I ran HP on all the things in this image.  Enough for
         # second order spatial variation
 
-        self.policy.set('constantVarianceWeighting', True)
-        self.policy.set('spatialKernelOrder', 2)
-        self.policy.set('spatialBgOrder', 2)
+        self.ps['constantVarianceWeighting'] = True
+        self.ps['spatialKernelOrder'] = 2
+        self.ps['spatialBgOrder'] = 2
 
         # Ignore the whole kernelCellSet thing
         cands = []
@@ -696,13 +696,13 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                                 (0.5 * self.smi.getWidth()),
                                                 (yC - 0.5 * self.smi.getHeight()) /
                                                 (0.5 * self.smi.getHeight()),
-                                                tsmi, ssmi, self.policy)
+                                                tsmi, ssmi, self.ps)
             cands.append(cand)
 
         # Visitors
         bbox = self.kernelCellSet.getBBox()
-        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.policy)
+        bsikv = ipDiffim.BuildSingleKernelVisitorF(self.basisList, self.ps)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(self.basisList, bbox, self.ps)
 
         for cand in cands:
             bsikv.processCandidate(cand)

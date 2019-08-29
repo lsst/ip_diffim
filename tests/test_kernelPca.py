@@ -21,12 +21,12 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.subconfig = self.config.kernel.active
 
         self.kList = ipDiffim.makeKernelBasisList(self.subconfig)
-        self.policy = pexConfig.makePolicy(self.subconfig)
-        self.policy.set("useRegularization", False)
+        self.ps = pexConfig.makePropertySet(self.subconfig)
+        self.ps["useRegularization"] = False
 
     def tearDown(self):
         del self.config
-        del self.policy
+        del self.ps
         del self.kList
 
     def makeCandidate(self, kSum, x, y, size=51):
@@ -36,7 +36,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         mi2 = afwImage.MaskedImageF(geom.Extent2I(size, size))
         mi2.getVariance().set(1.0)  # avoid NaNs
         mi2[size//2, size//2, afwImage.LOCAL] = (kSum, 0x0, kSum)
-        kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
+        kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.ps)
         return kc
 
     def testGaussian(self, size=51):
@@ -203,8 +203,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         imagePca = ipDiffim.KernelPcaD()
         kpv = ipDiffim.makeKernelPcaVisitor(imagePca)
 
-        sizeCellX = self.policy.get("sizeCellX")
-        sizeCellY = self.policy.get("sizeCellY")
+        sizeCellX = self.ps["sizeCellX"]
+        sizeCellY = self.ps["sizeCellY"]
 
         kernelCellSet = afwMath.SpatialCellSet(geom.Box2I(geom.Point2I(0, 0),
                                                           geom.Extent2I(sizeCellX * nCell,

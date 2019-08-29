@@ -23,11 +23,11 @@ class DiffimTestCases(unittest.TestCase):
         self.config.kernel.name = "AL"
         self.subconfig = self.config.kernel.active
 
-        self.policy = pexConfig.makePolicy(self.subconfig)
+        self.ps = pexConfig.makePropertySet(self.subconfig)
         self.size = 51
 
     def tearDown(self):
-        del self.policy
+        del self.ps
 
     def makeCandidate(self, kSum, x, y):
         mi1 = afwImage.MaskedImageF(geom.Extent2I(self.size, self.size))
@@ -36,7 +36,7 @@ class DiffimTestCases(unittest.TestCase):
         mi2 = afwImage.MaskedImageF(geom.Extent2I(self.size, self.size))
         mi2.getVariance().set(1.0)  # avoid NaNs
         mi2[self.size//2, self.size//2, afwImage.LOCAL] = (kSum, 0x0, kSum)
-        kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
+        kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.ps)
         return kc
 
     def testNoBg(self):
@@ -46,14 +46,14 @@ class DiffimTestCases(unittest.TestCase):
 
     def runNoBg(self, sko):
         basisList = ipDiffim.makeKernelBasisList(self.subconfig)
-        self.policy.set('spatialKernelOrder', sko)
-        self.policy.set('fitForBackground', False)
+        self.ps['spatialKernelOrder'] = sko
+        self.ps['fitForBackground'] = False
 
         bbox = geom.Box2I(geom.Point2I(0, 0),
                           geom.Extent2I(self.size*10, self.size*10))
 
-        bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
+        bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.ps)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.ps)
 
         for x in range(1, self.size, 10):
             for y in range(1, self.size, 10):
@@ -95,15 +95,15 @@ class DiffimTestCases(unittest.TestCase):
                           geom.Extent2I(10, 10))
         basisList = ipDiffim.makeKernelBasisList(self.subconfig)
 
-        self.policy.set("spatialModelType", "polynomial")
-        ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
+        self.ps["spatialModelType"] = "polynomial"
+        ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.ps)
 
-        self.policy.set("spatialModelType", "chebyshev1")
-        ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
+        self.ps["spatialModelType"] = "chebyshev1"
+        ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.ps)
 
         try:
-            self.policy.set("spatialModelType", "foo")
-            ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
+            self.ps["spatialModelType"] = "foo"
+            ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.ps)
         except Exception:
             pass
         else:
@@ -118,15 +118,15 @@ class DiffimTestCases(unittest.TestCase):
 
     def runAlSpatialModel(self, sko, bgo):
         basisList = ipDiffim.makeKernelBasisList(self.subconfig)
-        self.policy.set('spatialKernelOrder', sko)
-        self.policy.set('spatialBgOrder', bgo)
-        self.policy.set('fitForBackground', True)
+        self.ps['spatialKernelOrder'] = sko
+        self.ps['spatialBgOrder'] = bgo
+        self.ps['fitForBackground'] = True
 
         bbox = geom.Box2I(geom.Point2I(0, 0),
                           geom.Extent2I(self.size*10, self.size*10))
 
-        bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.policy)
-        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.policy)
+        bsikv = ipDiffim.BuildSingleKernelVisitorF(basisList, self.ps)
+        bspkv = ipDiffim.BuildSpatialKernelVisitorF(basisList, bbox, self.ps)
 
         for x in range(1, self.size, 10):
             for y in range(1, self.size, 10):

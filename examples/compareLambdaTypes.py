@@ -92,22 +92,26 @@ class DiffimTestCases(unittest.TestCase):
         self.subconfig4.forwardRegularizationOrders = [1, 2]
 
         self.kList1 = ipDiffim.makeKernelBasisList(self.subconfig1)
-        self.bskv1 = ipDiffim.BuildSingleKernelVisitorF(self.kList1, pexConfig.makePolicy(self.subconfig1))
+        self.bskv1 = ipDiffim.BuildSingleKernelVisitorF(self.kList1,
+                                                        pexConfig.makePropertySet(self.subconfig1))
 
         self.kList2 = ipDiffim.makeKernelBasisList(self.subconfig2)
-        self.hMat2 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig2))
+        self.hMat2 = ipDiffim.makeRegularizationMatrix(pexConfig.makePropertySet(self.subconfig2))
         self.bskv2 = ipDiffim.BuildSingleKernelVisitorF(self.kList2,
-                                                        pexConfig.makePolicy(self.subconfig2), self.hMat2)
+                                                        pexConfig.makePropertySet(self.subconfig2),
+                                                        self.hMat2)
 
         self.kList3 = ipDiffim.makeKernelBasisList(self.subconfig3)
-        self.hMat3 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig3))
+        self.hMat3 = ipDiffim.makeRegularizationMatrix(pexConfig.makePropertySet(self.subconfig3))
         self.bskv3 = ipDiffim.BuildSingleKernelVisitorF(self.kList3,
-                                                        pexConfig.makePolicy(self.subconfig3), self.hMat3)
+                                                        pexConfig.makePropertySet(self.subconfig3),
+                                                        self.hMat3)
 
         self.kList4 = ipDiffim.makeKernelBasisList(self.subconfig4)
-        self.hMat4 = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfig4))
+        self.hMat4 = ipDiffim.makeRegularizationMatrix(pexConfig.makePropertySet(self.subconfig4))
         self.bskv4 = ipDiffim.BuildSingleKernelVisitorF(self.kList4,
-                                                        pexConfig.makePolicy(self.subconfig4), self.hMat4)
+                                                        pexConfig.makePropertySet(self.subconfig4),
+                                                        self.hMat4)
 
         # known input images
         defDataDir = lsst.utils.getPackageDir('afwdata')
@@ -139,10 +143,10 @@ class DiffimTestCases(unittest.TestCase):
         smi = self.scienceExposure.getMaskedImage()
 
         detConfig = self.subconfig1.detectionConfig
-        detPolicy = pexConfig.makePolicy(detConfig)
-        detPolicy.set("detThreshold", 50.)
-        detPolicy.set("detOnTemplate", False)
-        kcDetect = ipDiffim.KernelCandidateDetectionF(detPolicy)
+        detps = pexConfig.makePropertySet(detConfig)
+        detps["detThreshold"] = 50.
+        detps["detOnTemplate"] = False
+        kcDetect = ipDiffim.KernelCandidateDetectionF(detps)
         kcDetect.apply(tmi, smi)
         self.footprints = kcDetect.getFootprints()
 
@@ -163,9 +167,9 @@ class DiffimTestCases(unittest.TestCase):
         del self.scienceExposure
         del self.templateExposure
 
-    def apply(self, policy, visitor, xloc, yloc, tmi, smi):
-        dStats = ipDiffim.ImageStatisticsF(policy)
-        kc = ipDiffim.makeKernelCandidate(xloc, yloc, tmi, smi, policy)
+    def apply(self, ps, visitor, xloc, yloc, tmi, smi):
+        dStats = ipDiffim.ImageStatisticsF(ps)
+        kc = ipDiffim.makeKernelCandidate(xloc, yloc, tmi, smi, ps)
         visitor.processCandidate(kc)
         kim = kc.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
         diffIm = kc.getDifferenceImage(ipDiffim.KernelCandidateF.RECENT)
@@ -208,7 +212,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # delta function kernel
         logger.debug('DF run')
-        results1 = self.apply(pexConfig.makePolicy(self.subconfig1), self.bskv1, xloc, yloc, tmi, smi)
+        results1 = self.apply(pexConfig.makePropertySet(self.subconfig1), self.bskv1, xloc, yloc, tmi, smi)
         kSum1, bg1, dmean1, dstd1, vmean1, kImageOut1, diffIm1, kc1, dStats1 = results1
         res = 'DF residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (dStats1.getMean(),
                                                                              dStats1.getRms(),
@@ -228,7 +232,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # regularized delta function kernel
         logger.debug('DFrC5 run')
-        results2 = self.apply(pexConfig.makePolicy(self.subconfig2), self.bskv2, xloc, yloc, tmi, smi)
+        results2 = self.apply(pexConfig.makePropertySet(self.subconfig2), self.bskv2, xloc, yloc, tmi, smi)
         kSum2, bg2, dmean2, dstd2, vmean2, kImageOut2, diffIm2, kc2, dStats2 = results2
         res = 'DFrC5 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (dStats2.getMean(),
                                                                                 dStats2.getRms(),
@@ -246,7 +250,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # regularized delta function kernel
         logger.debug('DFrC9 run')
-        results3 = self.apply(pexConfig.makePolicy(self.subconfig3), self.bskv3, xloc, yloc, tmi, smi)
+        results3 = self.apply(pexConfig.makePropertySet(self.subconfig3), self.bskv3, xloc, yloc, tmi, smi)
         kSum3, bg3, dmean3, dstd3, vmean3, kImageOut3, diffIm3, kc3, dStats3 = results3
         res = 'DFrC9 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (dStats3.getMean(),
                                                                                 dStats3.getRms(),
@@ -264,7 +268,7 @@ class DiffimTestCases(unittest.TestCase):
 
         # regularized delta function kernel
         logger.debug('DFrF12 run')
-        results4 = self.apply(pexConfig.makePolicy(self.subconfig4), self.bskv4, xloc, yloc, tmi, smi)
+        results4 = self.apply(pexConfig.makePropertySet(self.subconfig4), self.bskv4, xloc, yloc, tmi, smi)
         kSum4, bg4, dmean4, dstd4, vmean4, kImageOut4, diffIm4, kc4, dStats4 = results4
         res = 'DFrF12 residuals : %.3f +/- %.3f; %.2f, %.2f; %.2f %.2f, %.2f' % (dStats4.getMean(),
                                                                                  dStats4.getRms(),

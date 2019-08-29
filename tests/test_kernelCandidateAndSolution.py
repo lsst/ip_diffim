@@ -67,10 +67,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.config.kernel.name = "DF"
         self.subconfig = self.config.kernel.active
 
-        self.policy = pexConfig.makePolicy(self.subconfig)
-        self.policy.set('fitForBackground', True)  # we are testing known background recovery here
-        self.policy.set('checkConditionNumber', False)  # just in case
-        self.policy.set("useRegularization", False)
+        self.ps = pexConfig.makePropertySet(self.subconfig)
+        self.ps['fitForBackground'] = True  # we are testing known background recovery here
+        self.ps['checkConditionNumber'] = False  # just in case
+        self.ps["useRegularization"] = False
 
         if defDataDir:
             defSciencePath = os.path.join(defDataDir, "DC3a-Sim", "sci", "v26-e0",
@@ -140,7 +140,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.templateExposure2.getMaskedImage(),
                                        self.scienceImage2.getMaskedImage(),
-                                       self.policy)
+                                       self.ps)
 
         # Kernel not initialized
         self.assertEqual(kc.isInitialized(), False)
@@ -198,7 +198,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kc = ipDiffim.KernelCandidateF(source,
                                        self.templateExposure2.getMaskedImage(),
                                        self.scienceImage2.getMaskedImage(),
-                                       self.policy)
+                                       self.ps)
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
 
         kc.build(kList)
@@ -215,7 +215,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kc = ipDiffim.KernelCandidateF(source,
                                        self.templateExposure2.getMaskedImage(),
                                        self.scienceImage2.getMaskedImage(),
-                                       self.policy)
+                                       self.ps)
 
         # Kernel not initialized
         self.assertEqual(kc.isInitialized(), False)
@@ -278,7 +278,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.templateExposure2.getMaskedImage(),
                                        sIm,
-                                       self.policy)
+                                       self.ps)
 
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
@@ -290,7 +290,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.templateExposure2.getMaskedImage(),
                                        sIm,
-                                       self.policy)
+                                       self.ps)
 
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
@@ -304,7 +304,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02,
                                        self.templateExposure2.getMaskedImage(),
                                        self.templateExposure2.getMaskedImage(),
-                                       self.policy)
+                                       self.ps)
 
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
 
@@ -359,7 +359,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # Convolve a real image with a gaussian and try and recover
         # it.  Add noise and perform the same test.
 
-        gsize = self.policy.getInt("kernelSize")
+        gsize = self.ps["kernelSize"]
         gaussFunction = afwMath.GaussianFunction2D(2, 3)
         gaussKernel = afwMath.AnalyticKernel(gsize, gsize, gaussFunction)
         kImageIn = afwImage.ImageD(geom.Extent2I(gsize, gsize))
@@ -374,7 +374,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         tmi2 = afwImage.MaskedImageF(self.templateExposure2.getMaskedImage(), bbox, origin=afwImage.LOCAL)
         smi2 = afwImage.MaskedImageF(smi, bbox, origin=afwImage.LOCAL)
 
-        kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
+        kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.ps)
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
@@ -399,7 +399,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         # now repeat with noise added; decrease precision of comparison
         self.addNoise(smi2)
-        kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.policy)
+        kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.ps)
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
@@ -407,7 +407,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         soln = kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT)
         self.assertAlmostEqual(soln.getKsum(), kSumIn, 3)
-        if not (self.policy.get("fitForBackground")):
+        if not self.ps.get("fitForBackground"):
             self.assertEqual(soln.getBackground(), 0.0)
 
         for j in range(kImageOut.getHeight()):
@@ -420,7 +420,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # Convolve a delta function with a known gaussian; try to
         # recover using delta-function basis
 
-        gsize = self.policy.getInt("kernelSize")
+        gsize = self.ps["kernelSize"]
         tsize = imsize + gsize
 
         gaussFunction = afwMath.GaussianFunction2D(2, 3)
@@ -453,7 +453,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 self.assertEqual(tmi2.mask[i, j, afwImage.LOCAL], 0)
                 self.assertEqual(smi2.mask[i, j, afwImage.LOCAL], 0)
 
-        kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi2, smi2, self.policy)
+        kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi2, smi2, self.ps)
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
@@ -469,7 +469,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                        1.0, 5)
 
     def testZeroVariance(self, imsize=50):
-        gsize = self.policy.getInt("kernelSize")
+        gsize = self.ps["kernelSize"]
         tsize = imsize + gsize
 
         tmi = afwImage.MaskedImageF(geom.Extent2I(tsize, tsize))
@@ -481,8 +481,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         smi[cpix, cpix, afwImage.LOCAL] = (1, 0x0, 0.0)
 
         kList = ipDiffim.makeKernelBasisList(self.subconfig)
-        self.policy.set("constantVarianceWeighting", False)
-        kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi, smi, self.policy)
+        self.ps["constantVarianceWeighting"] = False
+        kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi, smi, self.ps)
         try:
             kc.build(kList)
         except Exception:
@@ -492,22 +492,22 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
     @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testConstantWeighting(self):
-        self.policy.set("fitForBackground", False)
+        self.ps["fitForBackground"] = False
         self.testGaussian()
         self.testGaussianWithNoise()
 
     @unittest.skipIf(not defDataDir, "Warning: afwdata is not set up")
     def testNoBackgroundFit(self):
-        self.policy.set("constantVarianceWeighting", True)
+        self.ps["constantVarianceWeighting"] = True
         self.testGaussian()
 
     def testInsert(self):
         mi = afwImage.MaskedImageF(geom.Extent2I(10, 10))
-        kc = ipDiffim.makeKernelCandidate(0., 0., mi, mi, self.policy)
+        kc = ipDiffim.makeKernelCandidate(0., 0., mi, mi, self.ps)
         kc.setStatus(afwMath.SpatialCellCandidate.GOOD)
 
-        sizeCellX = self.policy.get("sizeCellX")
-        sizeCellY = self.policy.get("sizeCellY")
+        sizeCellX = self.ps["sizeCellX"]
+        sizeCellY = self.ps["sizeCellY"]
         kernelCellSet = afwMath.SpatialCellSet(geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(1, 1)),
                                                sizeCellX, sizeCellY)
         kernelCellSet.insertCandidate(kc)
@@ -526,7 +526,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                         title=self._testMethodName + ": templateExposure2")
 
     def tearDown(self):
-        del self.policy
+        del self.ps
         del self.table
         del self.ss
         if defDataDir:

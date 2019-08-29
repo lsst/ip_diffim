@@ -26,8 +26,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def setUp(self):
         self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.subconfig = self.config.kernel.active
-        self.policy = pexConfig.makePolicy(self.subconfig)
-        self.kSize = self.policy.getInt('kernelSize')
+        self.ps = pexConfig.makePropertySet(self.subconfig)
+        self.kSize = self.ps['kernelSize']
 
         # gaussian reference kernel
         self.gSize = self.kSize
@@ -44,7 +44,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
     def tearDown(self):
         del self.config
-        del self.policy
+        del self.ps
         del self.gaussFunction
         del self.gaussKernel
         if defDataDir:
@@ -63,7 +63,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         maskPlane = detConfig.badMaskPlanes[0]
         maskVal = afwImage.Mask.getPlaneBitMask(maskPlane)
 
-        kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
+        kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePropertySet(detConfig))
         kcDetect.apply(self.templateImage, self.scienceImage)
         fpList1 = kcDetect.getFootprints()
 
