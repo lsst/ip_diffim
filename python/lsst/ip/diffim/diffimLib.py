@@ -33,3 +33,12 @@ from .kernelCandidate import *
 from .kernelCandidateDetection import *
 from .kernelSolution import *
 
+from .deprecated import deprecate_policy as _deprecate_policy
+
+
+KernelCandidateF = _deprecate_policy(KernelCandidateF)
+KernelCandidateDetectionF = _deprecate_policy(KernelCandidateDetectionF)
+ImageStatisticsF = _deprecate_policy(ImageStatisticsF)
+
+makeRegularizationMatrix = _deprecate_policy(makeRegularizationMatrix)
+makeKernelCandidate = _deprecate_policy(makeKernelCandidate)
