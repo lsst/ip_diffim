@@ -30,7 +30,7 @@
 
 #include "lsst/afw/math.h"
 #include "lsst/ip/diffim/BuildSpatialKernelVisitor.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -55,8 +55,8 @@ void declareBuildSpatialKernelVisitor(py::module& mod, std::string const& suffix
                afw::math::CandidateVisitor>
             cls(mod, ("BuildSpatialKernelVisitor" + suffix).c_str());
 
-    cls.def(py::init<afw::math::KernelList, geom::Box2I const&, pex::policy::Policy>(), "basisList"_a,
-            "regionBBox"_a, "policy"_a);
+    cls.def(py::init<afw::math::KernelList, geom::Box2I const&, daf::base::PropertySet const&>(), "basisList"_a,
+            "regionBBox"_a, "ps"_a);
 
     cls.def("getNCandidates", &BuildSpatialKernelVisitor<PixelT>::getNCandidates);
     cls.def("processCandidate", &BuildSpatialKernelVisitor<PixelT>::processCandidate, "candidate"_a);
@@ -65,7 +65,7 @@ void declareBuildSpatialKernelVisitor(py::module& mod, std::string const& suffix
     cls.def("getSolutionPair", &BuildSpatialKernelVisitor<PixelT>::getSolutionPair);
 
     mod.def("makeBuildSpatialKernelVisitor", &makeBuildSpatialKernelVisitor<PixelT>, "basisList"_a,
-            "regionBBox"_a, "policy"_a);
+            "regionBBox"_a, "ps"_a);
 }
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
@@ -73,7 +73,7 @@ void declareBuildSpatialKernelVisitor(py::module& mod, std::string const& suffix
 PYBIND11_MODULE(buildSpatialKernelVisitor, mod) {
     py::module::import("lsst.afw.math");
     py::module::import("lsst.afw.geom");
-    py::module::import("lsst.pex.policy");
+    py::module::import("lsst.daf.base");
 
     declareBuildSpatialKernelVisitor<float>(mod, "F");
 }

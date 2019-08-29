@@ -1,4 +1,4 @@
-daf::base::PropertySet/*
+/*
  * LSST Data Management System
  *
  * This product includes software developed by the

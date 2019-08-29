@@ -26,7 +26,7 @@
 
 #include "lsst/afw/math/SpatialCell.h"
 #include "lsst/ip/diffim/KernelSumVisitor.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -57,7 +57,7 @@ void declareKernelSumVisitor(py::module& mod, std::string const& suffix) {
             .value("REJECT", Class::Mode::REJECT)
             .export_values();
 
-    cls.def(py::init<pex::policy::Policy>(), "policy"_a);
+    cls.def(py::init<daf::base::PropertySet const&>(), "ps"_a);
 
     cls.def("setMode", &Class::setMode, "mode"_a);
     cls.def("getNRejected", &Class::getNRejected);
@@ -69,14 +69,14 @@ void declareKernelSumVisitor(py::module& mod, std::string const& suffix) {
     cls.def("processCandidate", &Class::processCandidate, "candidate"_a);
     cls.def("processKsumDistribution", &Class::processKsumDistribution);
 
-    mod.def("makeKernelSumVisitor", &makeKernelSumVisitor<PixelT>, "policy"_a);
+    mod.def("makeKernelSumVisitor", &makeKernelSumVisitor<PixelT>, "ps"_a);
 }
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
 PYBIND11_MODULE(kernelSumVisitor, mod) {
     py::module::import("lsst.afw.math");
-    py::module::import("lsst.pex.policy");
+    py::module::import("lsst.daf.base");
 
     declareKernelSumVisitor<float>(mod, "F");
 }

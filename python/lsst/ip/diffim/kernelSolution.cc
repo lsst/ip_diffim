@@ -27,7 +27,7 @@
 #include "Eigen/Core"
 #include "ndarray/pybind11.h"
 
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 
 namespace py = pybind11;
@@ -143,8 +143,8 @@ void declareRegularizedKernelSolution(py::module &mod, std::string const &suffix
             cls(mod, ("RegularizedKernelSolution" + suffix).c_str());
 
     cls.def(py::init<lsst::afw::math::KernelList const &, bool, Eigen::MatrixXd const &,
-                     pex::policy::Policy>(),
-            "basisList"_a, "fitForBackground"_a, "hMat"_a, "policy"_a);
+                     daf::base::PropertySet const&>(),
+            "basisList"_a, "fitForBackground"_a, "hMat"_a, "ps"_a);
 
     cls.def("solve",
             (void (RegularizedKernelSolution<InputT>::*)()) & RegularizedKernelSolution<InputT>::solve);
@@ -161,8 +161,8 @@ void declareSpatialKernelSolution(py::module &mod) {
             mod, "SpatialKernelSolution");
 
     cls.def(py::init<lsst::afw::math::KernelList const &, lsst::afw::math::Kernel::SpatialFunctionPtr,
-                     lsst::afw::math::Kernel::SpatialFunctionPtr, pex::policy::Policy>(),
-            "basisList"_a, "spatialKernelFunction"_a, "background"_a, "policy"_a);
+                     lsst::afw::math::Kernel::SpatialFunctionPtr, daf::base::PropertySet const&>(),
+            "basisList"_a, "spatialKernelFunction"_a, "background"_a, "ps"_a);
 
     cls.def("solve", (void (SpatialKernelSolution::*)()) & SpatialKernelSolution::solve);
     cls.def("addConstraint", &SpatialKernelSolution::addConstraint, "xCenter"_a, "yCenter"_a, "qMat"_a,
@@ -177,7 +177,7 @@ PYBIND11_MODULE(kernelSolution, mod) {
     py::module::import("lsst.afw.geom");
     py::module::import("lsst.afw.image");
     py::module::import("lsst.afw.math");
-    py::module::import("lsst.pex.policy");
+    py::module::import("lsst.daf.base");
 
     declareKernelSolution(mod);
     declareStaticKernelSolution<float>(mod, "F");

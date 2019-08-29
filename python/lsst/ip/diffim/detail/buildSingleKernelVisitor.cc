@@ -32,7 +32,7 @@
 #include "lsst/afw/math/Kernel.h"
 #include "lsst/afw/math/SpatialCell.h"
 #include "lsst/ip/diffim/BuildSingleKernelVisitor.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -57,9 +57,9 @@ void declareBuildSingleKernelVisitor(py::module& mod, std::string const& suffix)
                afw::math::CandidateVisitor>
             cls(mod, ("BuildSingleKernelVisitor" + suffix).c_str());
 
-    cls.def(py::init<afw::math::KernelList, pex::policy::Policy>(), "basisList"_a, "policy"_a);
-    cls.def(py::init<afw::math::KernelList, pex::policy::Policy, Eigen::MatrixXd const&>(), "basisList"_a,
-            "policy"_a, "hMat"_a);
+    cls.def(py::init<afw::math::KernelList, daf::base::PropertySet const&>(), "basisList"_a, "ps"_a);
+    cls.def(py::init<afw::math::KernelList, daf::base::PropertySet const&, Eigen::MatrixXd const&>(), "basisList"_a,
+            "ps"_a, "hMat"_a);
 
     cls.def("setSkipBuilt", &BuildSingleKernelVisitor<PixelT>::setSkipBuilt, "skip"_a);
     cls.def("getNRejected", &BuildSingleKernelVisitor<PixelT>::getNRejected);
@@ -69,21 +69,21 @@ void declareBuildSingleKernelVisitor(py::module& mod, std::string const& suffix)
 
     mod.def("makeBuildSingleKernelVisitor",
             (std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(*)(afw::math::KernelList const&,
-                                                                  pex::policy::Policy const&)) &
+                                                                  daf::base::PropertySet const&)) &
                     makeBuildSingleKernelVisitor<PixelT>,
-            "basisList"_a, "policy"_a);
+            "basisList"_a, "ps"_a);
     mod.def("makeBuildSingleKernelVisitor",
             (std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(*)(
-                    afw::math::KernelList const&, pex::policy::Policy const&, Eigen::MatrixXd const&)) &
+                    afw::math::KernelList const&, daf::base::PropertySet const&, Eigen::MatrixXd const&)) &
                     makeBuildSingleKernelVisitor<PixelT>,
-            "basisList"_a, "policy"_a, "hMat"_a);
+            "basisList"_a, "ps"_a, "hMat"_a);
 }
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
 PYBIND11_MODULE(buildSingleKernelVisitor, mod) {
     py::module::import("lsst.afw.math");
-    py::module::import("lsst.pex.policy");
+    py::module::import("lsst.daf.base");
 
     declareBuildSingleKernelVisitor<float>(mod, "F");
 }

@@ -38,10 +38,10 @@ namespace diffim {
 
 PYBIND11_MODULE(basisLists, mod) {
     py::module::import("lsst.afw.math");
-    py::module::import("lsst.pex.policy");
+    py::module::import("lsst.daf.base");
 
     mod.def("makeDeltaFunctionBasisList", &makeDeltaFunctionBasisList, "width"_a, "height"_a);
-    mod.def("makeRegularizationMatrix", &makeRegularizationMatrix, "policy"_a);
+    mod.def("makeRegularizationMatrix", &makeRegularizationMatrix, "ps"_a);
     mod.def("makeForwardDifferenceMatrix", &makeForwardDifferenceMatrix, "width"_a, "height"_a, "orders"_a,
             "borderPenalty"_a, "fitForBackground"_a);
     mod.def("makeCentralDifferenceMatrix", &makeCentralDifferenceMatrix, "width"_a, "height"_a, "stencil"_a,
