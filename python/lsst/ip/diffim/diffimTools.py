@@ -84,8 +84,7 @@ def makePoissonNoiseImage(im):
     noiseIm = im.Factory(im.getBBox())
     noiseArr = noiseIm.getArray()
 
-    with np.errstate(invalid='ignore'):
-        intNoiseArr = rand.poisson(imArr)
+    intNoiseArr = rand.poisson(np.where(np.isfinite(imArr), imArr, 0.0))
 
     noiseArr[:, :] = intNoiseArr.astype(noiseArr.dtype)
     return noiseIm
