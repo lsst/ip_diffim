@@ -25,20 +25,38 @@ import functools
 from lsst.pex.policy import Policy
 
 
-def deprecate_policy(func):
+def deprecate_policy(func, policy_args=None):
     """Issue a deprecation warning if one of the supplied arguments
-    is a Policy, and convert that to a PropertySet."""
+    is a Policy, and convert that to a PropertySet.
+
+    Parameters
+    ----------
+    policy_args : `~collections.abc.Sequence`, optional
+        Known positions of likely `~lsst.pex.Policy` arguments for the wrapped
+        function.  Can be out of range since some pybind11 constructors take
+        different numbers of arguments.  If `None` all arguments will be
+        checked.
+    """
 
     @functools.wraps(func)
     def internal(*args, **kwargs):
-        newargs = []
-        for i, a in enumerate(args):
+        newargs = list(args)
+
+        if policy_args is None:
+            # Check all arguments
+            args_to_check = range(len(args))
+        else:
+            max_i = len(newargs) - 1
+            args_to_check = [p for p in policy_args if p <= max_i]
+
+        for i in args_to_check:
+            a = newargs[i]
             if isinstance(a, Policy):
                 warnings.warn(f"pexPolicy in argument {i} is deprecated. Replace with PropertySet"
                               " (Policy support will be removed in v20)",
                               FutureWarning, stacklevel=2)
                 a = a.asPropertySet()
-            newargs.append(a)
+            newargs[i] = a
         return func(*newargs, **kwargs)
 
     return internal

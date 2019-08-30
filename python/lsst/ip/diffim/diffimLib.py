@@ -36,9 +36,9 @@ from .kernelSolution import *
 from .deprecated import deprecate_policy as _deprecate_policy
 
 
-KernelCandidateF = _deprecate_policy(KernelCandidateF)
+KernelCandidateF = _deprecate_policy(KernelCandidateF, policy_args=[3, 4])  # Alternate constructors
 KernelCandidateDetectionF = _deprecate_policy(KernelCandidateDetectionF)
 ImageStatisticsF = _deprecate_policy(ImageStatisticsF)
 
 makeRegularizationMatrix = _deprecate_policy(makeRegularizationMatrix)
-makeKernelCandidate = _deprecate_policy(makeKernelCandidate)
+makeKernelCandidate = _deprecate_policy(makeKernelCandidate, policy_args=[4])
