@@ -42,7 +42,6 @@ class NumberSciSourcesMetricConnections(
         name="src",
         storageClass="SourceCatalog",
         dimensions={"Instrument", "Exposure", "Detector"},
-        multiple=True,
     )
 
 
@@ -64,10 +63,8 @@ class NumberSciSourcesMetricTask(MetricTask):
 
         Parameters
         ----------
-        sources : iterable of `lsst.afw.table.SourceCatalog`
-            A collection of science source catalogs, one for each unit of
-            processing to be incorporated into this metric. Its elements may
-            be `None` to represent missing data.
+        sources : `lsst.afw.table.SourceCatalog` or `None`
+            A science source catalog, which may be empty or `None`.
 
         Returns
         -------
@@ -78,14 +75,8 @@ class NumberSciSourcesMetricTask(MetricTask):
                 the total number of science sources (`lsst.verify.Measurement`
                 or `None`)
         """
-        nSciSources = 0
-        inputData = False
-        for catalog in sources:
-            if catalog is not None:
-                nSciSources += len(catalog)
-                inputData = True
-
-        if inputData:
+        if sources is not None:
+            nSciSources = len(sources)
             meas = Measurement(self.getOutputMetricName(self.config), nSciSources * u.count)
         else:
             self.log.info("Nothing to do: no catalogs found.")
@@ -106,14 +97,12 @@ class FractionDiaSourcesToSciSourcesMetricConnections(
         name="src",
         storageClass="SourceCatalog",
         dimensions={"Instrument", "Exposure", "Detector"},
-        multiple=True,
     )
     diaSources = connectionTypes.Input(
         doc="The catalog of DIASources.",
         name="{coaddName}Diff_diaSrc",
         storageClass="SourceCatalog",
         dimensions={"Instrument", "Exposure", "Detector"},
-        multiple=True,
     )
 
 
@@ -136,13 +125,11 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
 
         Parameters
         ----------
-        sciSources : iterable of `lsst.afw.table.SourceCatalog`
-            A collection of science source catalogs, one for each unit of
-            processing to be incorporated into this metric. Its elements may
-            be `None` to represent missing data.
-        diaSources : iterable of `lsst.afw.table.SourceCatalog`
-            A collection of difference imaging catalogs similar to
-            ``sciSources``.
+        sciSources : `lsst.afw.table.SourceCatalog` or `None`
+            A science source catalog, which may be empty or `None`.
+        diaSources : `lsst.afw.table.SourceCatalog` or `None`
+            A DIASource catalog for the same unit of processing
+            as ``sciSources``.
 
         Returns
         -------
@@ -152,22 +139,13 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
             ``measurement``
                 the ratio (`lsst.verify.Measurement` or `None`)
         """
-        nSciSources = 0
-        nDiaSources = 0
-        inputData = False
-
-        for sciCatalog, diaCatalog in zip(sciSources, diaSources):
-            if diaCatalog is not None and sciCatalog is not None:
-                nSciSources += len(sciCatalog)
-                nDiaSources += len(diaCatalog)
-                inputData = True
-
-        if inputData:
+        if diaSources is not None and sciSources is not None:
+            nSciSources = len(sciSources)
+            nDiaSources = len(diaSources)
             metricName = self.getOutputMetricName(self.config)
             if nSciSources <= 0.0:
                 raise MetricComputationError(
                     "No science sources found; ratio of DIASources to science sources ill-defined.")
-                meas = Measurement(metricName, 0.0 * u.dimensionless_unscaled)
             else:
                 meas = Measurement(metricName, nDiaSources / nSciSources * u.dimensionless_unscaled)
         else:
