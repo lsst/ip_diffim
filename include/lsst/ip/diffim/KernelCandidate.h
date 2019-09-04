@@ -19,7 +19,7 @@
 #include "lsst/afw/image.h"
 #include "lsst/ip/diffim/KernelSolution.h"
 #include "lsst/afw/table/Source.h"
-#include "lsst/pex/policy.h"
+#include "lsst/daf/base.h"
 
 namespace lsst {
 namespace ip {
@@ -59,13 +59,13 @@ namespace diffim {
          * @param yCenter Row position of object
          * @param templateMaskedImage  Pointer to template image
          * @param scienceMaskedImage  Pointer to science image
-         * @param policy  Policy file
+         * @param ps   PropertySet
          */
         KernelCandidate(float const xCenter,
                         float const yCenter,
                         MaskedImagePtr const& templateMaskedImage,
                         MaskedImagePtr const& scienceMaskedImage,
-                        pex::policy::Policy const& policy);
+                        daf::base::PropertySet const& ps);
 
         /**
 	 * @brief Constructor
@@ -74,12 +74,12 @@ namespace diffim {
          * candidate
          * @param templateMaskedImage  Pointer to template image
          * @param scienceMaskedImage  Pointer to science image
-         * @param policy  Policy file
+         * @param ps  PropertySet
          */
         KernelCandidate(SourcePtr const& source,
                         MaskedImagePtr const& templateMaskedImage,
                         MaskedImagePtr const& scienceMaskedImage,
-                        pex::policy::Policy const& policy);
+                        daf::base::PropertySet const& ps);
         /// Destructor
         virtual ~KernelCandidate() {};
 
@@ -164,13 +164,13 @@ namespace diffim {
 
         /*
          * @note This method uses an estimate of the variance which is the
-         * straight difference of the 2 images.  If requested in the Policy
+         * straight difference of the 2 images.  If requested in the PropertySet
          * ("iterateSingleKernel"), the kernel will be rebuilt using the
          * variance of the difference image resulting from this first
          * approximate step.  This is particularly useful when convolving a
          * single-depth science image; the variance (and thus resulting kernel)
          * generally converges after 1 iteration.  If
-         * "constantVarianceWeighting" is requested in the Policy, no iterations
+         * "constantVarianceWeighting" is requested in the PropertySet, no iterations
          * will be performed even if requested.
          */
 
@@ -186,7 +186,7 @@ namespace diffim {
         MaskedImagePtr _templateMaskedImage;                ///< Subimage around which you build kernel
         MaskedImagePtr _scienceMaskedImage;                 ///< Subimage around which you build kernel
         VariancePtr _varianceEstimate;                      ///< Estimate of the local variance
-        pex::policy::Policy _policy;                  ///< Policy
+        daf::base::PropertySet::Ptr _ps;                    ///< Parameters
         SourcePtr _source;
         double _coreFlux;                                   ///< Mean S/N in the science image
         bool _isInitialized;                                ///< Has the kernel been built
@@ -211,7 +211,7 @@ namespace diffim {
      * @param yCenter  Y-center of candidate
      * @param templateMaskedImage  Template subimage
      * @param scienceMaskedImage  Science image subimage
-     * @param policy   Policy file for creation of rating
+     * @param ps    PropertySet for creation of rating
      *
      * @ingroup ip_diffim
      */
@@ -221,12 +221,12 @@ namespace diffim {
                         float const yCenter,
                         std::shared_ptr<afw::image::MaskedImage<PixelT> > const& templateMaskedImage,
                         std::shared_ptr<afw::image::MaskedImage<PixelT> > const& scienceMaskedImage,
-                        pex::policy::Policy const& policy){
+                        daf::base::PropertySet const& ps){
 
         return std::shared_ptr<KernelCandidate<PixelT>>(new KernelCandidate<PixelT>(xCenter, yCenter,
                                                                                  templateMaskedImage,
                                                                                  scienceMaskedImage,
-                                                                                 policy));
+                                                                                 ps));
     }
 
     /**
@@ -236,7 +236,7 @@ namespace diffim {
      * KernelCandidate
      * @param templateMaskedImage  Template subimage
      * @param scienceMaskedImage  Science image subimage
-     * @param policy   Policy file for creation of rating
+     * @param ps      PropertySet for creation of rating
      *
      * @ingroup ip_diffim
      */
@@ -245,12 +245,12 @@ namespace diffim {
     makeKernelCandidate(std::shared_ptr<afw::table::SourceRecord> const & source,
                         std::shared_ptr<afw::image::MaskedImage<PixelT> > const& templateMaskedImage,
                         std::shared_ptr<afw::image::MaskedImage<PixelT> > const& scienceMaskedImage,
-                        pex::policy::Policy const& policy){
+                        daf::base::PropertySet const& ps){
 
         return std::shared_ptr<KernelCandidate<PixelT>>(new KernelCandidate<PixelT>(source,
                                                                                     templateMaskedImage,
                                                                                     scienceMaskedImage,
-                                                                                    policy));
+                                                                                    ps));
     }
 
 

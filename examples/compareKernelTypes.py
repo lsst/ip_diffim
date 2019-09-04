@@ -80,12 +80,14 @@ class DiffimTestCases(unittest.TestCase):
         self.kListAL = ipDiffim.makeKernelBasisList(self.subconfigAL)
         self.kListDF = ipDiffim.makeKernelBasisList(self.subconfigDF)
         self.kListDFr = ipDiffim.makeKernelBasisList(self.subconfigDFr)
-        self.hMatDFr = ipDiffim.makeRegularizationMatrix(pexConfig.makePolicy(self.subconfigDFr))
+        self.hMatDFr = ipDiffim.makeRegularizationMatrix(pexConfig.makePropertySet(self.subconfigDFr))
 
-        self.bskvAL = ipDiffim.BuildSingleKernelVisitorF(self.kListAL, pexConfig.makePolicy(self.subconfigAL))
-        self.bskvDF = ipDiffim.BuildSingleKernelVisitorF(self.kListDF, pexConfig.makePolicy(self.subconfigDF))
+        self.bskvAL = ipDiffim.BuildSingleKernelVisitorF(self.kListAL,
+                                                         pexConfig.makePropertySet(self.subconfigAL))
+        self.bskvDF = ipDiffim.BuildSingleKernelVisitorF(self.kListDF,
+                                                         pexConfig.makePropertySet(self.subconfigDF))
         self.bskvDFr = ipDiffim.BuildSingleKernelVisitorF(self.kListDFr,
-                                                          pexConfig.makePolicy(self.subconfigDF),
+                                                          pexConfig.makePropertySet(self.subconfigDF),
                                                           self.hMatDFr)
 
         defSciencePath = globals()['defSciencePath']
@@ -112,11 +114,11 @@ class DiffimTestCases(unittest.TestCase):
 
         # Object detection
         detConfig = self.subconfigAL.detectionConfig
-        detPolicy = pexConfig.makePolicy(detConfig)
-        detPolicy.set("detThreshold", 50.)
-        detPolicy.set("detThresholdType", "stdev")
-        detPolicy.set("detOnTemplate", False)
-        kcDetect = ipDiffim.KernelCandidateDetectionF(detPolicy)
+        detps = pexConfig.makePropertySet(detConfig)
+        detps["detThreshold"] = 50.
+        detps["detThresholdType"] = "stdev"
+        detps["detOnTemplate"] = False
+        kcDetect = ipDiffim.KernelCandidateDetectionF(detps)
         kcDetect.apply(tmi, smi)
         self.footprints = kcDetect.getFootprints()
 
@@ -132,10 +134,10 @@ class DiffimTestCases(unittest.TestCase):
         del self.templateExposure
         del self.footprints
 
-    def apply(self, policy, visitor, xloc, yloc, tmi, smi):
+    def apply(self, ps, visitor, xloc, yloc, tmi, smi):
         # image statistics
-        dStats = ipDiffim.ImageStatisticsF(policy)
-        kc = ipDiffim.makeKernelCandidate(xloc, yloc, tmi, smi, policy)
+        dStats = ipDiffim.ImageStatisticsF(ps)
+        kc = ipDiffim.makeKernelCandidate(xloc, yloc, tmi, smi, ps)
         visitor.processCandidate(kc)
         kim = kc.getKernelImage(ipDiffim.KernelCandidateF.RECENT)
         diffIm = kc.getDifferenceImage(ipDiffim.KernelCandidateF.RECENT)
@@ -182,7 +184,7 @@ class DiffimTestCases(unittest.TestCase):
         #
 
         # delta function kernel
-        resultsDF = self.apply(pexConfig.makePolicy(self.subconfigDF), self.bskvDF, xloc, yloc, tmi, smi)
+        resultsDF = self.apply(pexConfig.makePropertySet(self.subconfigDF), self.bskvDF, xloc, yloc, tmi, smi)
         kSumDF, bgDF, dmeanDF, dstdDF, vmeanDF, kImageOutDF, diffImDF, kcDF, dStats = resultsDF
         kcDF.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
             ipDiffim.KernelSolution.EIGENVALUE)
@@ -208,7 +210,8 @@ class DiffimTestCases(unittest.TestCase):
         #
 
         # regularized delta function kernel
-        resultsDFr = self.apply(pexConfig.makePolicy(self.subconfigDFr), self.bskvDFr, xloc, yloc, tmi, smi)
+        resultsDFr = self.apply(pexConfig.makePropertySet(self.subconfigDFr),
+                                self.bskvDFr, xloc, yloc, tmi, smi)
         kSumDFr, bgDFr, dmeanDFr, dstdDFr, vmeanDFr, kImageOutDFr, diffImDFr, kcDFr, dStats = resultsDFr
         kcDFr.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
             ipDiffim.KernelSolution.EIGENVALUE)
@@ -230,7 +233,7 @@ class DiffimTestCases(unittest.TestCase):
         #
 
         # alard-lupton kernel
-        resultsAL = self.apply(pexConfig.makePolicy(self.subconfigAL), self.bskvAL, xloc, yloc, tmi, smi)
+        resultsAL = self.apply(pexConfig.makePropertySet(self.subconfigAL), self.bskvAL, xloc, yloc, tmi, smi)
         kSumAL, bgAL, dmeanAL, dstdAL, vmeanAL, kImageOutAL, diffImAL, kcAL, dStats = resultsAL
         kcAL.getKernelSolution(ipDiffim.KernelCandidateF.RECENT).getConditionNumber(
             ipDiffim.KernelSolution.EIGENVALUE)

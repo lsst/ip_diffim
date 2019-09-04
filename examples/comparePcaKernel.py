@@ -81,7 +81,7 @@ for param in [["spatialKernelOrder", 0],
     exec("subconfigDFr.%s = %s" % (param[0], param[1]))
 
 detConfig = subconfigAL.detectionConfig
-kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePolicy(detConfig))
+kcDetect = ipDiffim.KernelCandidateDetectionF(pexConfig.makePropertySet(detConfig))
 kcDetect.apply(templateMaskedImage, scienceMaskedImage)
 footprints = kcDetect.getFootprints()
 

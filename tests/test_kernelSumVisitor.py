@@ -19,7 +19,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.config.kernel.name = "DF"
         self.subconfig = self.config.kernel.active
 
-        self.policy = pexConfig.makePolicy(self.subconfig)
+        self.ps = pexConfig.makePropertySet(self.subconfig)
         self.kList = ipDiffim.makeKernelBasisList(self.subconfig)
 
     def makeCandidate(self, kSum, x, y, size=51):
@@ -29,15 +29,15 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         mi2 = afwImage.MaskedImageF(geom.Extent2I(size, size))
         mi2.getVariance().set(1.0)  # avoid NaNs
         mi2[size//2, size//2, afwImage.LOCAL] = (kSum, 0x0, kSum)
-        kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
+        kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.ps)
         return kc
 
     def tearDown(self):
-        del self.policy
+        del self.ps
         del self.kList
 
     def testAggregate(self, kSums=[1., 1., 1., 1., 2., 3., 4.]):
-        ksv = ipDiffim.KernelSumVisitorF(self.policy)
+        ksv = ipDiffim.KernelSumVisitorF(self.ps)
         ksv.setMode(ipDiffim.KernelSumVisitorF.AGGREGATE)
 
         # should fail, kernel not initialized
@@ -70,7 +70,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.assertAlmostEqual(ksv.getkSumStd(),
                                afwMath.makeStatistics(kSums, afwMath.STDEVCLIP).getValue(afwMath.STDEVCLIP))
         self.assertEqual(ksv.getdkSumMax(),
-                         self.policy.get("maxKsumSigma") * ksv.getkSumStd())
+                         self.ps["maxKsumSigma"] * ksv.getkSumStd())
         self.assertEqual(ksv.getkSumNpts(), len(kSums))
 
     def testReject(self):
@@ -78,8 +78,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.doReject(clipping=True)
 
     def doReject(self, clipping, kSums=[1., 1., 1., 1., 2., 3., 4., 50.]):
-        self.policy.set("kernelSumClipping", clipping)
-        ksv = ipDiffim.KernelSumVisitorF(self.policy)
+        self.ps["kernelSumClipping"] = clipping
+        ksv = ipDiffim.KernelSumVisitorF(self.ps)
         ksv.setMode(ipDiffim.KernelSumVisitorF.AGGREGATE)
         kcList = []
 
@@ -107,10 +107,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.assertEqual(ksv.getNRejected(), 0)
 
     def testVisit(self, nCell=3):
-        ksv = ipDiffim.makeKernelSumVisitor(self.policy)
+        ksv = ipDiffim.makeKernelSumVisitor(self.ps)
 
-        sizeCellX = self.policy.get("sizeCellX")
-        sizeCellY = self.policy.get("sizeCellY")
+        sizeCellX = self.ps["sizeCellX"]
+        sizeCellY = self.ps["sizeCellY"]
 
         kernelCellSet = afwMath.SpatialCellSet(geom.Box2I(geom.Point2I(0, 0),
                                                           geom.Extent2I(sizeCellX * nCell,

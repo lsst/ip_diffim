@@ -40,10 +40,10 @@ class DiffimTestCases(unittest.TestCase):
     def setUp(self):
         self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
         self.subconfig = self.config.kernel["DF"]
-        self.policy = pexConfig.makePolicy(self.subconfig)
+        self.ps = pexConfig.makePropertySet(self.subconfig)
 
     def tearDown(self):
-        del self.policy
+        del self.ps
 
     def testImageStatisticsNan(self, core=3):
         numArray = num.zeros((20, 20))
@@ -53,11 +53,11 @@ class DiffimTestCases(unittest.TestCase):
                 mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 0)
 
         # inverse variance weight of 0 is NaN
-        imstat = ipDiffim.ImageStatisticsF(self.policy)
+        imstat = ipDiffim.ImageStatisticsF(self.ps)
         imstat.apply(mi)
         self.assertEqual(imstat.getNpix(), 0)
 
-        imstat = ipDiffim.ImageStatisticsF(self.policy)
+        imstat = ipDiffim.ImageStatisticsF(self.ps)
         imstat.apply(mi, core)
         self.assertEqual(imstat.getNpix(), 0)
 
@@ -68,7 +68,7 @@ class DiffimTestCases(unittest.TestCase):
             for i in range(mi.getWidth()):
                 mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 1)
 
-        imstat = ipDiffim.ImageStatisticsF(self.policy)
+        imstat = ipDiffim.ImageStatisticsF(self.ps)
         imstat.apply(mi)
 
         self.assertEqual(imstat.getMean(), 0)
@@ -82,7 +82,7 @@ class DiffimTestCases(unittest.TestCase):
             for i in range(mi.getWidth()):
                 mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 1)
 
-        imstat = ipDiffim.ImageStatisticsF(self.policy)
+        imstat = ipDiffim.ImageStatisticsF(self.ps)
         imstat.apply(mi)
 
         self.assertEqual(imstat.getMean(), 1)
@@ -96,7 +96,7 @@ class DiffimTestCases(unittest.TestCase):
             for i in range(mi.getWidth()):
                 mi[i, j, afwImage.LOCAL] = (numArray[j][i], 0x0, 1)
 
-        imstat = ipDiffim.ImageStatisticsF(self.policy)
+        imstat = ipDiffim.ImageStatisticsF(self.ps)
         imstat.apply(mi, core)
 
         self.assertEqual(imstat.getMean(), 1)
@@ -112,7 +112,7 @@ class DiffimTestCases(unittest.TestCase):
                 mi[i, j, afwImage.LOCAL] = (val, 0x0, 1)
                 numArray[j][i] = val
 
-        imstat = ipDiffim.ImageStatisticsF(self.policy)
+        imstat = ipDiffim.ImageStatisticsF(self.ps)
         imstat.apply(mi)
 
         self.assertAlmostEqual(imstat.getMean(), numArray.mean())
@@ -127,7 +127,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def testImageStatisticsMask1(self):
         # Mask value that gets ignored
-        maskPlane = self.policy.getStringArray("badMaskPlanes")[0]
+        maskPlane = self.ps.getArray("badMaskPlanes")[0]
         maskVal = afwImage.Mask.getPlaneBitMask(maskPlane)
         numArray = num.ones((20, 19))
         mi = afwImage.MaskedImageF(geom.Extent2I(20, 20))
@@ -141,7 +141,7 @@ class DiffimTestCases(unittest.TestCase):
                     mi[i, j, afwImage.LOCAL] = (val, 0x0, 1)
                     numArray[j][i] = val
 
-        imstat = ipDiffim.ImageStatisticsF(self.policy)
+        imstat = ipDiffim.ImageStatisticsF(self.ps)
         imstat.apply(mi)
 
         self.assertAlmostEqual(imstat.getMean(), numArray.mean())
@@ -151,7 +151,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def testImageStatisticsMask2(self):
         # Mask value that does not get ignored
-        maskPlanes = self.policy.getStringArray("badMaskPlanes")
+        maskPlanes = self.ps.getArray("badMaskPlanes")
         for maskPlane in ("BAD", "EDGE", "CR", "SAT", "INTRP"):
             if maskPlane not in maskPlanes:
                 maskVal = afwImage.Mask.getPlaneBitMask(maskPlane)
@@ -171,7 +171,7 @@ class DiffimTestCases(unittest.TestCase):
                     mi[i, j, afwImage.LOCAL] = (val, 0x0, 1)
                     numArray[j][i] = val
 
-        imstat = ipDiffim.ImageStatisticsF(self.policy)
+        imstat = ipDiffim.ImageStatisticsF(self.ps)
         imstat.apply(mi)
 
         self.assertAlmostEqual(imstat.getMean(), numArray.mean())

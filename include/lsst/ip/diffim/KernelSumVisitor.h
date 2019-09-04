@@ -16,7 +16,7 @@
 
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 namespace lsst {
 namespace ip {
@@ -30,7 +30,7 @@ namespace detail {
 
         enum Mode {AGGREGATE = 0, REJECT = 1};
 
-        KernelSumVisitor(lsst::pex::policy::Policy const& policy);
+        KernelSumVisitor(lsst::daf::base::PropertySet const& ps);
         virtual ~KernelSumVisitor() {};
 
         void setMode(Mode mode) {_mode = mode;}
@@ -52,13 +52,13 @@ namespace detail {
         double _dkSumMax;            ///< Maximum acceptable deviation from mean sum
         int    _kSumNpts;            ///< Number of points used in the statistics
         int    _nRejected;           ///< Number of candidates rejected during processCandidate()
-        lsst::pex::policy::Policy _policy;   ///< Policy controlling behavior
+        lsst::daf::base::PropertySet::Ptr _ps;   ///< Config controlling behavior
     };
 
     template<typename PixelT>
     std::shared_ptr<KernelSumVisitor<PixelT> >
-    makeKernelSumVisitor(lsst::pex::policy::Policy const& policy) {
-        return std::shared_ptr<KernelSumVisitor<PixelT>>(new KernelSumVisitor<PixelT>(policy));
+    makeKernelSumVisitor(lsst::daf::base::PropertySet const& ps) {
+        return std::shared_ptr<KernelSumVisitor<PixelT>>(new KernelSumVisitor<PixelT>(ps));
     }
 
 }}}} // end of namespace lsst::ip::diffim::detail

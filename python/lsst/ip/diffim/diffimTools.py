@@ -176,7 +176,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     if bgValue > 0.0:
         subconfigFake.fitForBackground = True
 
-    policyFake = pexConfig.makePolicy(subconfigFake)
+    psFake = pexConfig.makePropertySet(subconfigFake)
 
     basisList = makeKernelBasisList(subconfigFake)
     kSize = subconfigFake.kernelSize
@@ -275,7 +275,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
             tsi = afwImage.MaskedImageF(tMi, bbox, origin=afwImage.LOCAL)
             ssi = afwImage.MaskedImageF(sMi, bbox, origin=afwImage.LOCAL)
 
-            kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, policyFake)
+            kc = diffimLib.makeKernelCandidate(xCoord, yCoord, tsi, ssi, psFake)
             kernelCellSet.insertCandidate(kc)
 
     tMi.setXY0(0, 0)
@@ -508,15 +508,15 @@ def sourceTableToCandidateList(sourceTable, templateExposure, scienceExposure, k
     if doBuild and not basisList:
         doBuild = False
     else:
-        policy = pexConfig.makePolicy(kConfig)
-        visitor = diffimLib.BuildSingleKernelVisitorF(basisList, policy)
+        ps = pexConfig.makePropertySet(kConfig)
+        visitor = diffimLib.BuildSingleKernelVisitorF(basisList, ps)
 
-    policy = pexConfig.makePolicy(kConfig)
+    ps = pexConfig.makePropertySet(kConfig)
     for cand in footprintList:
         bbox = cand['footprint'].getBBox()
         tmi = afwImage.MaskedImageF(templateExposure.getMaskedImage(), bbox)
         smi = afwImage.MaskedImageF(scienceExposure.getMaskedImage(), bbox)
-        kCand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, policy)
+        kCand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, ps)
         if doBuild:
             visitor.processCandidate(kCand)
             kCand.setStatus(afwMath.SpatialCellCandidate.UNKNOWN)
@@ -550,7 +550,8 @@ class NbasisEvaluator(object):
                     bicConfig = type(self.psfMatchConfig)(self.psfMatchConfig, alardDegGauss=dList)
                     kList = makeKernelBasisList(bicConfig, self.psfFwhmPixTc, self.psfFwhmPixTnc)
                     k = len(kList)
-                    visitor = diffimLib.BuildSingleKernelVisitorF(kList, pexConfig.makePolicy(bicConfig))
+                    visitor = diffimLib.BuildSingleKernelVisitorF(kList,
+                                                                  pexConfig.makePropertySet(bicConfig))
                     visitor.setSkipBuilt(False)
                     kernelCellSet.visitCandidates(visitor, bicConfig.nStarPerCell)
 

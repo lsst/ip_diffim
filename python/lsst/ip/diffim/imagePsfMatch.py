@@ -891,7 +891,7 @@ class ImagePsfMatchTask(PsfMatchTask):
         kernelCellSet = afwMath.SpatialCellSet(templateMaskedImage.getBBox(),
                                                sizeCellX, sizeCellY)
 
-        policy = pexConfig.makePolicy(self.kConfig)
+        ps = pexConfig.makePropertySet(self.kConfig)
         # Place candidates within the spatial grid
         for cand in candidateList:
             if isinstance(cand, afwDetect.Footprint):
@@ -906,7 +906,7 @@ class ImagePsfMatchTask(PsfMatchTask):
                     cand = cand['source']
             xPos = cand.getCentroid()[0]
             yPos = cand.getCentroid()[1]
-            cand = diffimLib.makeKernelCandidate(xPos, yPos, tmi, smi, policy)
+            cand = diffimLib.makeKernelCandidate(xPos, yPos, tmi, smi, ps)
 
             self.log.debug("Candidate %d at %f, %f", cand.getId(), cand.getXCenter(), cand.getYCenter())
             kernelCellSet.insertCandidate(cand)

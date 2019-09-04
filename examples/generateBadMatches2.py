@@ -223,12 +223,12 @@ if __name__ == '__main__':
 
         kList = ipDiffim.makeKernelBasisList(config)
 
-        policy = pexConfig.makePolicy(config)
-        bskv = ipDiffim.BuildSingleKernelVisitorF(kList, policy)
+        ps = pexConfig.makePropertySet(config)
+        bskv = ipDiffim.BuildSingleKernelVisitorF(kList, ps)
 
         # TEST 1
         tmi, smi = makeTest1(doAddNoise)
-        kc = ipDiffim.makeKernelCandidate(0.0, 0.0, tmi, smi, policy)
+        kc = ipDiffim.makeKernelCandidate(0.0, 0.0, tmi, smi, ps)
         bskv.processCandidate(kc)
 
         kernel = kc.getKernel(ipDiffim.KernelCandidateF.ORIG)
@@ -253,7 +253,7 @@ if __name__ == '__main__':
 
         # TEST 2
         tmi, smi = makeTest2(doAddNoise)
-        kc = ipDiffim.makeKernelCandidate(0.0, 0.0, tmi, smi, policy)
+        kc = ipDiffim.makeKernelCandidate(0.0, 0.0, tmi, smi, ps)
         bskv.processCandidate(kc)
 
         kernel = kc.getKernel(ipDiffim.KernelCandidateF.ORIG)
@@ -278,8 +278,8 @@ if __name__ == '__main__':
 
         # TEST 3
         smi1, smi2, tmi = makeTest3(doAddNoise)
-        kc1 = ipDiffim.makeKernelCandidate(0.0, 0.0, tmi, smi1, policy)
-        kc2 = ipDiffim.makeKernelCandidate(0.0, 0.0, tmi, smi2, policy)
+        kc1 = ipDiffim.makeKernelCandidate(0.0, 0.0, tmi, smi1, ps)
+        kc2 = ipDiffim.makeKernelCandidate(0.0, 0.0, tmi, smi2, ps)
         bskv.processCandidate(kc1)
         bskv.processCandidate(kc2)
 

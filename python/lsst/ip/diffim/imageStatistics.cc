@@ -27,7 +27,7 @@
 
 #include "lsst/afw/image/MaskedImage.h"
 #include "lsst/ip/diffim/ImageStatistics.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -50,7 +50,7 @@ void declareImageStatistics(py::module &mod, std::string const &suffix) {
     py::class_<ImageStatistics<PixelT>, std::shared_ptr<ImageStatistics<PixelT>>> cls(
             mod, ("ImageStatistics" + suffix).c_str());
 
-    cls.def(py::init<pex::policy::Policy const &>(), "policy"_a);
+    cls.def(py::init<daf::base::PropertySet const &>(), "ps"_a);
 
     cls.def("reset", &ImageStatistics<PixelT>::reset);
     cls.def("apply", (void (ImageStatistics<PixelT>::*)(afw::image::MaskedImage<PixelT> const &)) &
@@ -65,13 +65,13 @@ void declareImageStatistics(py::module &mod, std::string const &suffix) {
     cls.def("getVariance", &ImageStatistics<PixelT>::getVariance);
     cls.def("getRms", &ImageStatistics<PixelT>::getRms);
     cls.def("getNpix", &ImageStatistics<PixelT>::getNpix);
-    cls.def("evaluateQuality", &ImageStatistics<PixelT>::evaluateQuality, "policy"_a);
+    cls.def("evaluateQuality", &ImageStatistics<PixelT>::evaluateQuality, "ps"_a);
 }
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
 PYBIND11_MODULE(imageStatistics, mod) {
-    py::module::import("lsst.pex.policy");
+    py::module::import("lsst.daf.base");
     py::module::import("lsst.afw.image");
 
     declareImageStatistics<int>(mod, "I");

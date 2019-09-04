@@ -481,7 +481,7 @@ class ModelPsfMatchTask(PsfMatchTask):
                               referencePsfModel.__class__.__name__, dimenR, dimenS, e)
             dimenR = dimenS
 
-        policy = pexConfig.makePolicy(self.kConfig)
+        ps = pexConfig.makePropertySet(self.kConfig)
         for row in range(nCellY):
             # place at center of cell
             posY = sizeCellY*row + sizeCellY//2 + scienceY0
@@ -500,7 +500,7 @@ class ModelPsfMatchTask(PsfMatchTask):
                 scienceMI = self._makePsfMaskedImage(sciencePsfModel, posX, posY, dimensions=dimenR)
 
                 # The image to convolve is the science image, to the reference Psf.
-                kc = diffimLib.makeKernelCandidate(posX, posY, scienceMI, referenceMI, policy)
+                kc = diffimLib.makeKernelCandidate(posX, posY, scienceMI, referenceMI, ps)
                 kernelCellSet.insertCandidate(kc)
 
         import lsstDebug

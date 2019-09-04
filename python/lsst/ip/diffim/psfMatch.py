@@ -659,7 +659,7 @@ class PsfMatchTask(pipeBase.Task):
             self.useRegularization = False
 
         if self.useRegularization:
-            self.hMat = diffimLib.makeRegularizationMatrix(pexConfig.makePolicy(self.kConfig))
+            self.hMat = diffimLib.makeRegularizationMatrix(pexConfig.makePropertySet(self.kConfig))
 
     def _diagnostic(self, kernelCellSet, spatialSolution, spatialKernel, spatialBg):
         """Provide logging diagnostics on quality of spatial kernel fit
@@ -805,7 +805,7 @@ class PsfMatchTask(pipeBase.Task):
         if plotKernelCoefficients:
             diutils.plotKernelCoefficients(spatialKernel, kernelCellSet)
 
-    def _createPcaBasis(self, kernelCellSet, nStarPerCell, policy):
+    def _createPcaBasis(self, kernelCellSet, nStarPerCell, ps):
         """Create Principal Component basis
 
         If a principal component analysis is requested, typically when using a delta function basis,
@@ -817,8 +817,8 @@ class PsfMatchTask(pipeBase.Task):
             a SpatialCellSet containing KernelCandidates, from which components are derived
         nStarPerCell : `int`
             the number of stars per cell to visit when doing the PCA
-        policy : `lsst.pex.policy.Policy`
-            input policy controlling the single kernel visitor
+        ps : `lsst.daf.base.PropertySet`
+            input property set controlling the single kernel visitor
 
         Returns
         -------
@@ -863,7 +863,7 @@ class PsfMatchTask(pipeBase.Task):
         spatialBasisList = diffimLib.renormalizeKernelList(trimBasisList)
 
         # New Kernel visitor for this new basis list (no regularization explicitly)
-        singlekvPca = diffimLib.BuildSingleKernelVisitorF(spatialBasisList, policy)
+        singlekvPca = diffimLib.BuildSingleKernelVisitorF(spatialBasisList, ps)
         singlekvPca.setSkipBuilt(False)
         kernelCellSet.visitCandidates(singlekvPca, nStarPerCell)
         singlekvPca.setSkipBuilt(True)
@@ -912,14 +912,14 @@ class PsfMatchTask(pipeBase.Task):
         usePcaForSpatialKernel = self.kConfig.usePcaForSpatialKernel
 
         # Visitor for the single kernel fit
-        policy = pexConfig.makePolicy(self.kConfig)
+        ps = pexConfig.makePropertySet(self.kConfig)
         if self.useRegularization:
-            singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy, self.hMat)
+            singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, ps, self.hMat)
         else:
-            singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, policy)
+            singlekv = diffimLib.BuildSingleKernelVisitorF(basisList, ps)
 
         # Visitor for the kernel sum rejection
-        ksv = diffimLib.KernelSumVisitorF(policy)
+        ksv = diffimLib.KernelSumVisitorF(ps)
 
         # Main loop
         t0 = time.time()
@@ -966,7 +966,7 @@ class PsfMatchTask(pipeBase.Task):
                     log.log("TRACE0." + self.log.getName() + "._solve", log.DEBUG,
                             "Building Pca basis")
 
-                    nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
+                    nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, ps)
                     log.log("TRACE1." + self.log.getName() + "._solve", log.DEBUG,
                             "Iteration %d, rejected %d candidates due to Pca kernel fit",
                             thisIteration, nRejectedPca)
@@ -988,7 +988,7 @@ class PsfMatchTask(pipeBase.Task):
 
                 # We have gotten on to the spatial modeling part
                 regionBBox = kernelCellSet.getBBox()
-                spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, policy)
+                spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, ps)
                 kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
                 log.log("TRACE2." + self.log.getName() + "._solve", log.DEBUG,
@@ -996,7 +996,7 @@ class PsfMatchTask(pipeBase.Task):
                 spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
                 # Check the quality of the spatial fit (look at residuals)
-                assesskv = diffimLib.AssessSpatialKernelVisitorF(spatialKernel, spatialBackground, policy)
+                assesskv = diffimLib.AssessSpatialKernelVisitorF(spatialKernel, spatialBackground, ps)
                 kernelCellSet.visitCandidates(assesskv, nStarPerCell)
                 nRejectedSpatial = assesskv.getNRejected()
                 nGoodSpatial = assesskv.getNGood()
@@ -1021,9 +1021,9 @@ class PsfMatchTask(pipeBase.Task):
             if (nRejectedSpatial > 0) and (thisIteration == maxSpatialIterations):
                 log.log("TRACE1." + self.log.getName() + "._solve", log.DEBUG, "Final spatial fit")
                 if (usePcaForSpatialKernel):
-                    nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, policy)
+                    nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, ps)
                 regionBBox = kernelCellSet.getBBox()
-                spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, policy)
+                spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, ps)
                 kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
                 log.log("TRACE2." + self.log.getName() + "._solve", log.DEBUG,

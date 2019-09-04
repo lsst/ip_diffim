@@ -96,8 +96,8 @@ class DiffimTestCases(unittest.TestCase):
                                                   self.scienceMaskedImage])
 
     def stats(self, cid, diffim, core=5):
-        policy = pexConfig.makePolicy(self.config)
-        dStats = ipDiffim.ImageStatisticsF(policy)
+        ps = pexConfig.makePropertySet(self.config)
+        dStats = ipDiffim.ImageStatisticsF(ps)
         dStats.apply(diffim)
         logger.debug("Candidate %d : Residuals all (%d px): %.3f +/- %.3f",
                      cid, dStats.getNpix(), dStats.getMean(), dStats.getRms())
@@ -173,7 +173,7 @@ class DiffimTestCases(unittest.TestCase):
                     cand.setStatus(afwMath.SpatialCellCandidate.BAD)
 
         nStarPerCell = self.config.nStarPerCell
-        policy = pexConfig.makePolicy(self.config)
+        ps = pexConfig.makePropertySet(self.config)
         for idx in range(len(goodList)):
             cid = goodList[idx]
 
@@ -184,7 +184,7 @@ class DiffimTestCases(unittest.TestCase):
 
             # From _solve
             regionBBox = cellSet.getBBox()
-            spatialkv = ipDiffim.BuildSpatialKernelVisitorF(kernel.getKernelList(), regionBBox, policy)
+            spatialkv = ipDiffim.BuildSpatialKernelVisitorF(kernel.getKernelList(), regionBBox, ps)
             cellSet.visitCandidates(spatialkv, nStarPerCell)
             spatialkv.solveLinearEquation()
             jkKernel, jkBg = spatialkv.getSolutionPair()

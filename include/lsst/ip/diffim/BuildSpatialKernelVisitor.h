@@ -17,7 +17,7 @@
 #include "lsst/afw/image.h"
 #include "lsst/geom.h"
 #include "lsst/ip/diffim.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 namespace lsst {
 namespace ip {
@@ -32,7 +32,7 @@ namespace detail {
         BuildSpatialKernelVisitor(
             lsst::afw::math::KernelList const& basisList,  ///< Basis functions
             lsst::geom::Box2I const& regionBBox,  ///< Spatial region over which the function is fit
-            lsst::pex::policy::Policy policy           ///< Policy file directing behavior
+            lsst::daf::base::PropertySet const& ps         ///< PropertySet directing behavior
             );
 
         int getNCandidates() {return _nCandidates;}
@@ -56,11 +56,11 @@ namespace detail {
     makeBuildSpatialKernelVisitor(
         lsst::afw::math::KernelList const& basisList,
         lsst::geom::Box2I const& regionBBox,
-        lsst::pex::policy::Policy policy
+        lsst::daf::base::PropertySet const& ps
         ) {
 
         return std::shared_ptr<BuildSpatialKernelVisitor<PixelT>>(
-            new BuildSpatialKernelVisitor<PixelT>(basisList, regionBBox, policy)
+            new BuildSpatialKernelVisitor<PixelT>(basisList, regionBBox, ps)
             );
     }
 

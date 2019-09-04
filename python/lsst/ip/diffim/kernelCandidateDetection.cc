@@ -48,7 +48,7 @@ void declareKernelCandidateDetection(py::module &mod, std::string const &suffix)
     py::class_<KernelCandidateDetection<PixelT>, std::shared_ptr<KernelCandidateDetection<PixelT>>> cls(
             mod, ("KernelCandidateDetection" + suffix).c_str());
 
-    cls.def(py::init<pex::policy::Policy const &>(), "policy"_a);
+    cls.def(py::init<daf::base::PropertySet const &>(), "ps"_a);
 
     cls.def("apply", &KernelCandidateDetection<PixelT>::apply, "templateMaskedImage"_a,
             "scienceMaskedImage"_a);
@@ -62,7 +62,7 @@ void declareKernelCandidateDetection(py::module &mod, std::string const &suffix)
 PYBIND11_MODULE(kernelCandidateDetection, mod) {
     py::module::import("lsst.afw.image");
     py::module::import("lsst.afw.detection");
-    py::module::import("lsst.pex.policy");
+    py::module::import("lsst.daf.base");
 
     declareKernelCandidateDetection<float>(mod, "F");
 }

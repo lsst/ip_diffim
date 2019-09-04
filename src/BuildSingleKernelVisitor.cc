@@ -16,7 +16,7 @@
 #include "lsst/afw/image.h"
 #include "lsst/log/Log.h"
 #include "lsst/pex/exceptions/Runtime.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 #include "lsst/ip/diffim/ImageSubtract.h"
 #include "lsst/ip/diffim/KernelCandidate.h"
@@ -26,7 +26,7 @@
 
 namespace afwMath        = lsst::afw::math;
 namespace afwImage       = lsst::afw::image;
-namespace pexPolicy      = lsst::pex::policy;
+namespace dafBase        = lsst::daf::base;
 namespace pexExcept      = lsst::pex::exceptions;
 namespace ipDiffim       = lsst::ip::diffim;
 
@@ -42,14 +42,14 @@ namespace detail {
      * @brief Builds the convolution kernel for a given candidate
      *
      * @code
-        std::shared_ptr<Policy> policy(new Policy);
-        policy->set("constantVarianceWeighting", false);
-        policy->set("iterateSingleKernel", false);
-        policy->set("singleKernelClipping", true);
-        policy->set("candidateResidualMeanMax", 0.25);
-        policy->set("candidateResidualStdMax", 1.25);
+        std::shared_ptr<PropertySet> ps(new PropertySet);
+        ps->set("constantVarianceWeighting", false);
+        ps->set("iterateSingleKernel", false);
+        ps->set("singleKernelClipping", true);
+        ps->set("candidateResidualMeanMax", 0.25);
+        ps->set("candidateResidualStdMax", 1.25);
 
-        detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter(*policy);
+        detail::BuildSingleKernelVisitor<PixelT> singleKernelFitter(*ps);
         int nRejected = -1;
         while (nRejected != 0) {
             singleKernelFitter.reset();
@@ -63,7 +63,7 @@ namespace detail {
      * for *every* candidate since this is computationally expensive, only when
      * its the current candidate in the cell.  During the course of building the
      * kernel, it also assesses the quality of the difference image.  If it is
-     * determined to be bad (based on the Policy paramters) the candidate is
+     * determined to be bad (based on the PropertySet paramters) the candidate is
      * flagged as afwMath::SpatialCellCandidate::BAD; otherwise its marked as
      * afwMath::SpatialCellCandidate::GOOD.  Keeps a running sample of all the
      * new candidates it visited that turned out to be bad.
@@ -88,39 +88,39 @@ namespace detail {
     BuildSingleKernelVisitor<PixelT>::BuildSingleKernelVisitor(
         lsst::afw::math::KernelList const& basisList,   ///< List of basis kernels
             ///< for resulting LinearCombinationKernel
-        lsst::pex::policy::Policy const& policy  ///< Policy file directing behavior
+        lsst::daf::base::PropertySet const& ps  ///< ps file directing behavior
         ) :
         afwMath::CandidateVisitor(),
         _basisList(basisList),
-        _policy(policy),
+        _ps(ps.deepCopy()),
         _hMat(),
-        _imstats(ImageStatistics<PixelT>(_policy)),
+        _imstats(ImageStatistics<PixelT>(ps)),
         _skipBuilt(true),
         _nRejected(0),
         _nProcessed(0),
         _useRegularization(false),
-        _useCoreStats(_policy.getBool("useCoreStats")),
-        _coreRadius(_policy.getInt("candidateCoreRadius"))
+        _useCoreStats(ps.getAsBool("useCoreStats")),
+        _coreRadius(ps.getAsInt("candidateCoreRadius"))
     {};
 
     template<typename PixelT>
     BuildSingleKernelVisitor<PixelT>::BuildSingleKernelVisitor(
         lsst::afw::math::KernelList const& basisList,   ///< List of basis kernels
             ///< for resulting LinearCombinationKernel
-        lsst::pex::policy::Policy const& policy,  ///< Policy file directing behavior
+        lsst::daf::base::PropertySet const& ps,  ///< ps file directing behavior
         Eigen::MatrixXd const& hMat   ///< Regularization matrix
         ) :
         afwMath::CandidateVisitor(),
         _basisList(basisList),
-        _policy(policy),
+        _ps(ps.deepCopy()),
         _hMat(hMat),
-        _imstats(ImageStatistics<PixelT>(_policy)),
+        _imstats(ImageStatistics<PixelT>(ps)),
         _skipBuilt(true),
         _nRejected(0),
         _nProcessed(0),
         _useRegularization(true),
-        _useCoreStats(_policy.getBool("useCoreStats")),
-        _coreRadius(_policy.getInt("candidateCoreRadius"))
+        _useCoreStats(ps.getAsBool("useCoreStats")),
+        _coreRadius(ps.getAsInt("candidateCoreRadius"))
     {};
 
 
@@ -225,23 +225,23 @@ namespace detail {
             return;
         }
 
-        if (_policy.getBool("singleKernelClipping")) {
-            if (fabs(_imstats.getMean()) > _policy.getDouble("candidateResidualMeanMax")) {
+        if (_ps->getAsBool("singleKernelClipping")) {
+            if (fabs(_imstats.getMean()) > _ps->getAsDouble("candidateResidualMeanMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 LOGL_DEBUG("TRACE3.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                            "Rejecting candidate %d; bad mean residual : |%.3f| > %.3f",
                            kCandidate->getId(),
                            _imstats.getMean(),
-                           _policy.getDouble("candidateResidualMeanMax"));
+                           _ps->getAsDouble("candidateResidualMeanMax"));
                 _nRejected += 1;
             }
-            else if (_imstats.getRms() > _policy.getDouble("candidateResidualStdMax")) {
+            else if (_imstats.getRms() > _ps->getAsDouble("candidateResidualStdMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 LOGL_DEBUG("TRACE3.ip.diffim.BuildSingleKernelVisitor.processCandidate",
                            "Rejecting candidate %d; bad residual rms : %.3f > %.3f",
                            kCandidate->getId(),
                            _imstats.getRms(),
-                           _policy.getDouble("candidateResidualStdMax"));
+                           _ps->getAsDouble("candidateResidualStdMax"));
                 _nRejected += 1;
             }
             else {
@@ -283,11 +283,11 @@ namespace detail {
 
     template std::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor<PixelT>(lsst::afw::math::KernelList const&,
-                                         lsst::pex::policy::Policy const&);
+                                         lsst::daf::base::PropertySet const&);
 
     template std::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor<PixelT>(lsst::afw::math::KernelList const&,
-                                         lsst::pex::policy::Policy const&,
+                                         lsst::daf::base::PropertySet const&,
                                          Eigen::MatrixXd const &);
 
 }}}} // end of namespace lsst::ip::diffim::detail

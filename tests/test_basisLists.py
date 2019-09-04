@@ -25,16 +25,16 @@ class DiffimTestCases(unittest.TestCase):
         self.configDF.kernel.name = "DF"
         self.subconfigDF = self.configDF.kernel.active
 
-        self.policyAL = pexConfig.makePolicy(self.subconfigAL)
-        self.policyDF = pexConfig.makePolicy(self.subconfigDF)
+        self.psAL = pexConfig.makePropertySet(self.subconfigAL)
+        self.psDF = pexConfig.makePropertySet(self.subconfigDF)
 
-        self.kSize = self.policyAL.getInt("kernelSize")
+        self.kSize = self.psAL["kernelSize"]
 
     def tearDown(self):
         del self.configAL
-        del self.policyAL
+        del self.psAL
         del self.configDF
-        del self.policyDF
+        del self.psDF
 
     def deltaFunctionTest(self, ks):
         # right shape
@@ -82,9 +82,9 @@ class DiffimTestCases(unittest.TestCase):
             self.assertAlmostEqual(num.sum(arr*arr), 1.0)
 
     def testMakeAlardLupton(self):
-        nGauss = self.policyAL.get("alardNGauss")
-        sigGauss = self.policyAL.getDoubleArray("alardSigGauss")
-        degGauss = self.policyAL.getIntArray("alardDegGauss")
+        nGauss = self.psAL["alardNGauss"]
+        sigGauss = self.psAL.getArray("alardSigGauss")
+        degGauss = self.psAL.getArray("alardDegGauss")
         self.assertEqual(len(sigGauss), nGauss)
         self.assertEqual(len(degGauss), nGauss)
         self.assertEqual(self.kSize % 2, 1)       # odd sized
@@ -159,66 +159,65 @@ class DiffimTestCases(unittest.TestCase):
 
     def testCentralRegularization(self):
         # stencil of 1 not allowed
-        self.policyDF.set("regularizationType", "centralDifference")
+        self.psDF["regularizationType"] = "centralDifference"
         with self.assertRaises(lsst.pex.exceptions.Exception):
-            self.policyDF.set("centralRegularizationStencil", 1)
-            ipDiffim.makeRegularizationMatrix(self.policyDF)
+            self.psDF["centralRegularizationStencil"] = 1
+            ipDiffim.makeRegularizationMatrix(self.psDF)
 
         # stencil of 5 allowed
-        self.policyDF.set("centralRegularizationStencil", 5)
+        self.psDF["centralRegularizationStencil"] = 5
         try:
-            ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.psDF)
         except lsst.pex.exceptions.Exception as e:
             self.fail("Should not raise %s: stencil of 5 is allowed."%e)
 
         # stencil of 9 allowed
-        self.policyDF.set("centralRegularizationStencil", 9)
+        self.psDF["centralRegularizationStencil"] = 9
         try:
-            ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.psDF)
         except lsst.pex.exceptions.Exception as e:
             self.fail("Should not raise %s: stencil of 9 is allowed"%e)
 
         # border penalty < 0
-        self.policyDF.set("regularizationBorderPenalty", -1.0)
+        self.psDF["regularizationBorderPenalty"] = -1.0
         with self.assertRaises(lsst.pex.exceptions.Exception):
-            ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.psDF)
 
         # border penalty > 0
-        self.policyDF.set("regularizationBorderPenalty", 0.0)
+        self.psDF["regularizationBorderPenalty"] = 0.0
         try:
-            ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.psDF)
         except lsst.pex.exceptions.Exception as e:
             self.fail("Should not raise %s: Border penalty > 0"%e)
 
     def testForwardRegularization(self):
-        self.policyDF.set("regularizationType", "forwardDifference")
+        self.psDF["regularizationType"] = "forwardDifference"
 
         # order 1..3 allowed
-        self.policyDF.set("forwardRegularizationOrders", 0)
+        self.psDF["forwardRegularizationOrders"] = 0
         with self.assertRaises(lsst.pex.exceptions.Exception):
-            ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.psDF)
 
-        self.policyDF.set("forwardRegularizationOrders", 1)
+        self.psDF["forwardRegularizationOrders"] = 1
         try:
-            ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.psDF)
         except lsst.pex.exceptions.Exception as e:
             self.fail("Should not raise %s: order 1 allowed"%e)
 
-        self.policyDF.set("forwardRegularizationOrders", 4)
+        self.psDF["forwardRegularizationOrders"] = 4
         with self.assertRaises(lsst.pex.exceptions.Exception):
-            ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.psDF)
 
-        self.policyDF.set("forwardRegularizationOrders", 1)
-        self.policyDF.add("forwardRegularizationOrders", 2)
+        self.psDF["forwardRegularizationOrders"] = [1, 2]
         try:
-            ipDiffim.makeRegularizationMatrix(self.policyDF)
+            ipDiffim.makeRegularizationMatrix(self.psDF)
         except lsst.pex.exceptions.Exception as e:
             self.fail("Should not raise %s: order 1,2 allowed"%e)
 
     def testBadRegularization(self):
         with self.assertRaises(lsst.pex.exceptions.Exception):
-            self.policyDF.set("regularizationType", "foo")
-            ipDiffim.makeRegularizationMatrix(self.policyDF)
+            self.psDF["regularizationType"] = "foo"
+            ipDiffim.makeRegularizationMatrix(self.psDF)
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):

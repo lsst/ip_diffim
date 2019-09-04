@@ -19,11 +19,11 @@ class DiffimTestCases(unittest.TestCase):
         self.config.kernel.name = "DF"
         self.subconfig = self.config.kernel.active
 
-        self.policy = pexConfig.makePolicy(self.subconfig)
+        self.ps = pexConfig.makePropertySet(self.subconfig)
 
-        self.policy.set("useRegularization", False)
-        self.policy.set("checkConditionNumber", False)  # I am making shady kernels by hand
-        self.policy.set("useCoreStats", False)  # I am making off-center resids
+        self.ps["useRegularization"] = False
+        self.ps["checkConditionNumber"] = False  # I am making shady kernels by hand
+        self.ps["useCoreStats"] = False  # I am making off-center resids
         self.kList = ipDiffim.makeKernelBasisList(self.subconfig)
         self.size = 51
 
@@ -34,7 +34,7 @@ class DiffimTestCases(unittest.TestCase):
         mi2 = afwImage.MaskedImageF(geom.Extent2I(self.size, self.size))
         mi2.getVariance().set(1.0)  # avoid NaNs
         mi2[self.size//2, self.size//2, afwImage.LOCAL] = (kSum, 0x0, kSum)
-        kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.policy)
+        kc = ipDiffim.makeKernelCandidate(x, y, mi1, mi2, self.ps)
 
         return kc
 
@@ -48,10 +48,10 @@ class DiffimTestCases(unittest.TestCase):
         kc3 = self.makeCandidate(3, 0.0, 0.0)
 
         if useRegularization:
-            hMat = ipDiffim.makeRegularizationMatrix(self.policy)
-            bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy, hMat)
+            hMat = ipDiffim.makeRegularizationMatrix(self.ps)
+            bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.ps, hMat)
         else:
-            bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy)
+            bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.ps)
 
         bskv.processCandidate(kc1)
         bskv.processCandidate(kc2)
@@ -100,7 +100,7 @@ class DiffimTestCases(unittest.TestCase):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc2 = self.makeCandidate(2, 0.0, 0.0)
         kc3 = self.makeCandidate(3, 0.0, 0.0)
-        bskv1 = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy)
+        bskv1 = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.ps)
         bskv1.processCandidate(kc1)
         bskv1.processCandidate(kc2)
         bskv1.processCandidate(kc3)
@@ -127,7 +127,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(len(eigenKernels), 1)  # the other eKernels are 0.0 and you can't get their coeffs!
 
         # do twice to mimic a Pca loop
-        bskv2 = ipDiffim.BuildSingleKernelVisitorF(eigenKernels, self.policy)
+        bskv2 = ipDiffim.BuildSingleKernelVisitorF(eigenKernels, self.ps)
         bskv2.setSkipBuilt(False)
         bskv2.processCandidate(kc1)
         bskv2.processCandidate(kc2)
@@ -151,7 +151,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertNotEqual(soln3_2, soln3_1)
 
         # do twice to mimic a Pca loop
-        bskv3 = ipDiffim.BuildSingleKernelVisitorF(eigenKernels, self.policy)
+        bskv3 = ipDiffim.BuildSingleKernelVisitorF(eigenKernels, self.ps)
         bskv3.setSkipBuilt(False)
         bskv3.processCandidate(kc1)
         bskv3.processCandidate(kc2)
@@ -180,7 +180,7 @@ class DiffimTestCases(unittest.TestCase):
         kc1 = self.makeCandidate(1, 0.0, 0.0)
         kc2 = self.makeCandidate(2, 0.0, 0.0)
         kc3 = self.makeCandidate(3, 0.0, 0.0)
-        bskv1 = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy)
+        bskv1 = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.ps)
         bskv1.processCandidate(kc1)
         bskv1.processCandidate(kc2)
         bskv1.processCandidate(kc3)
@@ -204,11 +204,11 @@ class DiffimTestCases(unittest.TestCase):
         mi2.getVariance().set(0.1)
         # make it high enough to make the mean resids large
         mi2[self.size//3, self.size//3, afwImage.LOCAL] = (self.size**2, 0x0, 1)
-        kc4 = ipDiffim.makeKernelCandidate(0, 0, mi1, mi2, self.policy)
+        kc4 = ipDiffim.makeKernelCandidate(0, 0, mi1, mi2, self.ps)
         self.assertEqual(kc4.getStatus(), afwMath.SpatialCellCandidate.UNKNOWN)
 
         # process with eigenKernels
-        bskv2 = ipDiffim.BuildSingleKernelVisitorF(eigenKernels, self.policy)
+        bskv2 = ipDiffim.BuildSingleKernelVisitorF(eigenKernels, self.ps)
         bskv2.setSkipBuilt(False)
         bskv2.processCandidate(kc1)
         bskv2.processCandidate(kc2)
@@ -224,10 +224,10 @@ class DiffimTestCases(unittest.TestCase):
         self.assertEqual(kc4.getStatus(), afwMath.SpatialCellCandidate.BAD)
 
     def testVisit(self, nCell=3):
-        bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.policy)
+        bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.ps)
 
-        sizeCellX = self.policy.get("sizeCellX")
-        sizeCellY = self.policy.get("sizeCellY")
+        sizeCellX = self.ps["sizeCellX"]
+        sizeCellY = self.ps["sizeCellY"]
 
         kernelCellSet = afwMath.SpatialCellSet(geom.Box2I(geom.Point2I(0, 0),
                                                           geom.Extent2I(sizeCellX * nCell,
@@ -258,7 +258,7 @@ class DiffimTestCases(unittest.TestCase):
 
     def tearDown(self):
         del self.config
-        del self.policy
+        del self.ps
         del self.kList
 
 

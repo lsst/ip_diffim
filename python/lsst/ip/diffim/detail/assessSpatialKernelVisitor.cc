@@ -51,8 +51,8 @@ void declareAssessSpatialKernelVisitor(py::module& mod, std::string const& suffi
             cls(mod, ("AssessSpatialKernelVisitor" + suffix).c_str());
 
     cls.def(py::init<std::shared_ptr<afw::math::LinearCombinationKernel>,
-                     afw::math::Kernel::SpatialFunctionPtr, pex::policy::Policy const&>(),
-            "spatialKernel"_a, "spatialBackground"_a, "policy"_a);
+                     afw::math::Kernel::SpatialFunctionPtr, daf::base::PropertySet const&>(),
+            "spatialKernel"_a, "spatialBackground"_a, "ps"_a);
 
     cls.def("reset", &AssessSpatialKernelVisitor<PixelT>::reset);
     cls.def("getNGood", &AssessSpatialKernelVisitor<PixelT>::getNGood);
@@ -61,14 +61,14 @@ void declareAssessSpatialKernelVisitor(py::module& mod, std::string const& suffi
     cls.def("processCandidate", &AssessSpatialKernelVisitor<PixelT>::processCandidate, "candidate"_a);
 
     mod.def("makeAssessSpatialKernelVisitor", &makeAssessSpatialKernelVisitor<PixelT>, "spatialKernel"_a,
-            "spatialBackground"_a, "policy"_a);
+            "spatialBackground"_a, "ps"_a);
 }
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
 PYBIND11_MODULE(assessSpatialKernelVisitor, mod) {
     py::module::import("lsst.afw.math");
-    py::module::import("lsst.pex.policy");
+    py::module::import("lsst.daf.base");
 
     declareAssessSpatialKernelVisitor<float>(mod, "F");
 }

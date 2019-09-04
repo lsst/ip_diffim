@@ -17,7 +17,7 @@
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
 
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 #include "lsst/ip/diffim/ImageStatistics.h"
 
@@ -34,11 +34,11 @@ namespace detail {
 
         BuildSingleKernelVisitor(
             lsst::afw::math::KernelList const& basisList,
-            lsst::pex::policy::Policy const& policy
+            lsst::daf::base::PropertySet const& ps
             );
         BuildSingleKernelVisitor(
             lsst::afw::math::KernelList const& basisList,
-            lsst::pex::policy::Policy const& policy,
+            lsst::daf::base::PropertySet const& ps,
             Eigen::MatrixXd const& hMat
             );
         virtual ~BuildSingleKernelVisitor() {};
@@ -60,7 +60,7 @@ namespace detail {
 
     private:
         lsst::afw::math::KernelList const _basisList; ///< Basis set
-        lsst::pex::policy::Policy _policy;            ///< Policy controlling behavior
+        lsst::daf::base::PropertySet::Ptr _ps; ///< PS controlling behavior
         Eigen::MatrixXd const _hMat;          ///< Regularization matrix
         ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
         bool _skipBuilt;                      ///< Skip over built candidates during processCandidate()
@@ -68,19 +68,19 @@ namespace detail {
         int _nProcessed;                      ///< Number of candidates processed during processCandidate()
         bool _useRegularization;              ///< Regularize if delta function basis
 
-        bool _useCoreStats;                   ///< Extracted from _policy
-        int _coreRadius;                      ///< Extracted from _policy
+        bool _useCoreStats;                   ///< Extracted from _ps
+        int _coreRadius;                      ///< Extracted from _ps
     };
 
     template<typename PixelT>
     std::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor(
         lsst::afw::math::KernelList const& basisList,
-        lsst::pex::policy::Policy const& policy
+        lsst::daf::base::PropertySet const& ps
         ) {
 
         return std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(
-            new BuildSingleKernelVisitor<PixelT>(basisList, policy)
+            new BuildSingleKernelVisitor<PixelT>(basisList, ps)
             );
     }
 
@@ -88,12 +88,12 @@ namespace detail {
     std::shared_ptr<BuildSingleKernelVisitor<PixelT> >
     makeBuildSingleKernelVisitor(
         lsst::afw::math::KernelList const& basisList,
-        lsst::pex::policy::Policy const& policy,
+        lsst::daf::base::PropertySet const& ps,
         Eigen::MatrixXd const & hMat
         ) {
 
         return std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(
-            new BuildSingleKernelVisitor<PixelT>(basisList, policy, hMat)
+            new BuildSingleKernelVisitor<PixelT>(basisList, ps, hMat)
             );
     }
 

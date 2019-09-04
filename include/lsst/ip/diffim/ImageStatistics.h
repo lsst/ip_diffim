@@ -41,7 +41,7 @@
 
 #include "lsst/afw/image.h"
 #include "lsst/log/Log.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 namespace lsst {
 namespace ip {
@@ -61,10 +61,10 @@ namespace diffim {
         typedef std::shared_ptr<ImageStatistics> Ptr;
         typedef typename lsst::afw::image::MaskedImage<PixelT>::x_iterator x_iterator;
 
-        ImageStatistics(lsst::pex::policy::Policy const& policy) :
+        ImageStatistics(lsst::daf::base::PropertySet const& ps) :
         _xsum(0.), _x2sum(0.), _npix(0), _bpMask(0) {
 
-            std::vector<std::string> detBadMaskPlanes = policy.getStringArray("badMaskPlanes");
+            std::vector<std::string> detBadMaskPlanes = ps.getArray<std::string>("badMaskPlanes");
             for (std::vector<std::string>::iterator mi = detBadMaskPlanes.begin();
                  mi != detBadMaskPlanes.end(); ++mi){
 
@@ -143,9 +143,9 @@ namespace diffim {
         int getNpix() const { return _npix; }
 
         // Return Sdqa rating
-        bool evaluateQuality(lsst::pex::policy::Policy const& policy) {
-            if ( fabs(getMean())     > policy.getDouble("maximumFootprintResidualMean") ) return false;
-            if ( getRms()            > policy.getDouble("maximumFootprintResidualStd")  ) return false;
+        bool evaluateQuality(lsst::daf::base::PropertySet const& ps) {
+            if ( fabs(getMean())     > ps.getAsDouble("maximumFootprintResidualMean") ) return false;
+            if ( getRms()            > ps.getAsDouble("maximumFootprintResidualStd")  ) return false;
             return true;
         }
 

@@ -15,7 +15,7 @@
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
 #include "lsst/ip/diffim.h"
-#include "lsst/pex/policy/Policy.h"
+#include "lsst/daf/base/PropertySet.h"
 
 namespace lsst {
 namespace ip {
@@ -31,7 +31,7 @@ namespace detail {
         AssessSpatialKernelVisitor(
             std::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatialKernel,   ///< Spatially varying kernel
             lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground, ///< Spatially varying background
-            lsst::pex::policy::Policy const& policy                        ///< Policy file
+            lsst::daf::base::PropertySet const& ps                        ///< PropertySet config
             );
         virtual ~AssessSpatialKernelVisitor() {};
 
@@ -45,14 +45,14 @@ namespace detail {
     private:
         std::shared_ptr<lsst::afw::math::LinearCombinationKernel> _spatialKernel;   ///< Spatial kernel function
         lsst::afw::math::Kernel::SpatialFunctionPtr _spatialBackground; ///< Spatial background function
-        lsst::pex::policy::Policy _policy;            ///< Policy controlling behavior
+        lsst::daf::base::PropertySet::Ptr _ps; ///< PropertySet configuration controlling behavior
         ImageStatistics<PixelT> _imstats;     ///< To calculate statistics of difference image
         int _nGood;                           ///< Number of good candidates remaining
         int _nRejected;                       ///< Number of candidates rejected during processCandidate()
         int _nProcessed;                      ///< Number of candidates processed during processCandidate()
 
-        bool _useCoreStats;                   ///< Extracted from policy
-        int _coreRadius;                      ///< Extracted from policy
+        bool _useCoreStats;                   ///< Extracted from PropertySet config
+        int _coreRadius;                      ///< Extracted from PropertySet config
     };
 
     template<typename PixelT>
@@ -60,11 +60,11 @@ namespace detail {
     makeAssessSpatialKernelVisitor(
         std::shared_ptr<lsst::afw::math::LinearCombinationKernel> spatialKernel,
         lsst::afw::math::Kernel::SpatialFunctionPtr spatialBackground,
-        lsst::pex::policy::Policy const& policy
+        lsst::daf::base::PropertySet const& ps
          ) {
 
         return std::shared_ptr<AssessSpatialKernelVisitor<PixelT>>(
-            new AssessSpatialKernelVisitor<PixelT>(spatialKernel, spatialBackground, policy)
+            new AssessSpatialKernelVisitor<PixelT>(spatialKernel, spatialBackground, ps)
             );
     }
 
