@@ -42,12 +42,12 @@ namespace diffim {
     /**
      * @brief Build a regularization matrix for Delta function kernels
      *
-     * @param ps           PropertySet file dictating which type of matrix to make
+     * @param ps           PropertySet dictating which type of matrix to make
      *
      * @ingroup ip_diffim
      *
      * @note Calls either makeForwardDifferenceMatrix or
-     * makeCentralDifferenceMatrix based on the config file.
+     * makeCentralDifferenceMatrix based on the PropertySet config.
      */
     Eigen::MatrixXd makeRegularizationMatrix(
         lsst::daf::base::PropertySet const& ps

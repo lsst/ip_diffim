@@ -164,13 +164,13 @@ namespace diffim {
 
         /*
          * @note This method uses an estimate of the variance which is the
-         * straight difference of the 2 images.  If requested in the config
+         * straight difference of the 2 images.  If requested in the PropertySet
          * ("iterateSingleKernel"), the kernel will be rebuilt using the
          * variance of the difference image resulting from this first
          * approximate step.  This is particularly useful when convolving a
          * single-depth science image; the variance (and thus resulting kernel)
          * generally converges after 1 iteration.  If
-         * "constantVarianceWeighting" is requested in the config, no iterations
+         * "constantVarianceWeighting" is requested in the PropertySet, no iterations
          * will be performed even if requested.
          */
 

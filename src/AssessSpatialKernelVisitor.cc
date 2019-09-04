@@ -47,7 +47,7 @@ namespace detail {
      *
      * @note Evaluates the spatial kernel and spatial background at the location of
      * each candidate, and computes the resulting difference image.  Sets candidate
-     * as afwMath::SpatialCellCandidate::GOOD/BAD if requested by the config.
+     * as afwMath::SpatialCellCandidate::GOOD/BAD if requested by the PropertySet configuration.
      *
      */
     template<typename PixelT>

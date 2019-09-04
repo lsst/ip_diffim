@@ -42,7 +42,6 @@
 #include "lsst/afw/image.h"
 #include "lsst/afw/math.h"
 #include "lsst/log/Log.h"
-#include "lsst/daf/base/PropertySet.h"
 #include "lsst/pex/exceptions/Runtime.h"
 
 #include "lsst/ip/diffim.h"
