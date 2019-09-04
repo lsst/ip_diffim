@@ -53,7 +53,7 @@ def deprecate_policy(func, policy_args=None):
             a = newargs[i]
             if isinstance(a, Policy):
                 warnings.warn(f"pexPolicy in argument {i} is deprecated. Replace with PropertySet"
-                              " (Policy support will be removed in v20)",
+                              " (Policy support will be removed in v19)",
                               FutureWarning, stacklevel=2)
                 a = a.asPropertySet()
             newargs[i] = a
