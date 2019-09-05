@@ -50,7 +50,7 @@ class TestNumSciSources(MetricTaskTestCase):
 
     def testValid(self):
         catalog = _makeDummyCatalog(3)
-        result = self.task.run([catalog])
+        result = self.task.run(catalog)
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.numSciSources"))
@@ -58,19 +58,14 @@ class TestNumSciSources(MetricTaskTestCase):
 
     def testEmptyCatalog(self):
         catalog = _makeDummyCatalog(0)
-        result = self.task.run([catalog])
+        result = self.task.run(catalog)
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.numSciSources"))
         self.assertEqual(meas.quantity, 0 * u.count)
 
     def testMissingData(self):
-        result = self.task.run([None])
-        meas = result.measurement
-        self.assertIsNone(meas)
-
-    def testNoDataExpected(self):
-        result = self.task.run([])
+        result = self.task.run(None)
         meas = result.measurement
         self.assertIsNone(meas)
 
@@ -83,24 +78,13 @@ class TestNumSciSources(MetricTaskTestCase):
 
     def testFineGrainedMetric(self):
         catalog = _makeDummyCatalog(3)
-        inputData = {"sources": [catalog]}
-        inputDataIds = {"sources": [{"visit": 42, "ccd": 1}]}
+        inputData = {"sources": catalog}
+        inputDataIds = {"sources": {"visit": 42, "ccd": 1}}
         outputDataId = {"measurement": {"visit": 42, "ccd": 1}}
-        measDirect = self.task.run([catalog]).measurement
+        measDirect = self.task.run(catalog).measurement
         measIndirect = self.task.adaptArgsAndRun(inputData, inputDataIds, outputDataId).measurement
 
         assert_quantity_allclose(measIndirect.quantity, measDirect.quantity)
-
-    def testCoarseGrainedMetric(self):
-        catalog = _makeDummyCatalog(3)
-        nCcds = 3
-        inputData = {"sources": [catalog] * nCcds}
-        inputDataIds = {"sources": [{"visit": 42, "ccd": x} for x in range(nCcds)]}
-        outputDataId = {"measurement": {"visit": 42}}
-        measDirect = self.task.run([catalog]).measurement
-        measMany = self.task.adaptArgsAndRun(inputData, inputDataIds, outputDataId).measurement
-
-        assert_quantity_allclose(measMany.quantity, nCcds * measDirect.quantity)
 
 
 class TestFractionDiaSources(MetricTaskTestCase):
@@ -112,7 +96,7 @@ class TestFractionDiaSources(MetricTaskTestCase):
     def testValid(self):
         sciCatalog = _makeDummyCatalog(5)
         diaCatalog = _makeDummyCatalog(3)
-        result = self.task.run([sciCatalog], [diaCatalog])
+        result = self.task.run(sciCatalog, diaCatalog)
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.fracDiaSourcesToSciSources"))
@@ -121,7 +105,7 @@ class TestFractionDiaSources(MetricTaskTestCase):
     def testEmptyDiaCatalog(self):
         sciCatalog = _makeDummyCatalog(5)
         diaCatalog = _makeDummyCatalog(0)
-        result = self.task.run([sciCatalog], [diaCatalog])
+        result = self.task.run(sciCatalog, diaCatalog)
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.fracDiaSourcesToSciSources"))
@@ -131,26 +115,21 @@ class TestFractionDiaSources(MetricTaskTestCase):
         sciCatalog = _makeDummyCatalog(0)
         diaCatalog = _makeDummyCatalog(3)
         with self.assertRaises(MetricComputationError):
-            self.task.run([sciCatalog], [diaCatalog])
+            self.task.run(sciCatalog, diaCatalog)
 
     def testEmptyCatalogs(self):
         sciCatalog = _makeDummyCatalog(0)
         diaCatalog = _makeDummyCatalog(0)
         with self.assertRaises(MetricComputationError):
-            self.task.run([sciCatalog], [diaCatalog])
+            self.task.run(sciCatalog, diaCatalog)
 
     def testMissingData(self):
-        result = self.task.run([None], [None])
+        result = self.task.run(None, None)
         meas = result.measurement
         self.assertIsNone(meas)
 
     def testSemiMissingData(self):
-        result = self.task.run(sciSources=[_makeDummyCatalog(3)], diaSources=[None])
-        meas = result.measurement
-        self.assertIsNone(meas)
-
-    def testNoDataExpected(self):
-        result = self.task.run([], [])
+        result = self.task.run(sciSources=_makeDummyCatalog(3), diaSources=None)
         meas = result.measurement
         self.assertIsNone(meas)
 
@@ -168,26 +147,13 @@ class TestFractionDiaSources(MetricTaskTestCase):
     def testFineGrainedMetric(self):
         sciCatalog = _makeDummyCatalog(5)
         diaCatalog = _makeDummyCatalog(1)
-        inputData = {"sciSources": [sciCatalog], "diaSources": [diaCatalog]}
-        inputDataIds = {"sciSources": [{"visit": 42, "ccd": 1}], "diaSources": [{"visit": 42, "ccd": 1}]}
+        inputData = {"sciSources": sciCatalog, "diaSources": diaCatalog}
+        inputDataIds = {"sciSources": {"visit": 42, "ccd": 1}, "diaSources": {"visit": 42, "ccd": 1}}
         outputDataId = {"measurement": {"visit": 42, "ccd": 1}}
-        measDirect = self.task.run([sciCatalog], [diaCatalog]).measurement
+        measDirect = self.task.run(sciCatalog, diaCatalog).measurement
         measIndirect = self.task.adaptArgsAndRun(inputData, inputDataIds, outputDataId).measurement
 
         assert_quantity_allclose(measIndirect.quantity, measDirect.quantity)
-
-    def testCoarseGrainedMetric(self):
-        sciCatalog = _makeDummyCatalog(5)
-        diaCatalog = _makeDummyCatalog(1)
-        nCcds = 3
-        inputData = {"sciSources": [sciCatalog] * nCcds, "diaSources": [diaCatalog] * nCcds}
-        dataIds = [{"visit": 42, "ccd": x} for x in range(nCcds)]
-        inputDataIds = {"sciSources": dataIds, "diaSources": dataIds}
-        outputDataId = {"measurement": {"visit": 42}}
-        measDirect = self.task.run([sciCatalog], [diaCatalog]).measurement
-        measMany = self.task.adaptArgsAndRun(inputData, inputDataIds, outputDataId).measurement
-
-        assert_quantity_allclose(measMany.quantity, measDirect.quantity)
 
 
 # Hack around unittest's hacky test setup system
