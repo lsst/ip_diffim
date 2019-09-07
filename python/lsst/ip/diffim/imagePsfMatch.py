@@ -402,6 +402,10 @@ class ImagePsfMatchTask(PsfMatchTask):
            Raised if doWarping is False and ``templateExposure`` and
            ``scienceExposure`` WCSs do not match
         """
+        sScale1 = scienceExposure.getWcs().getPixelScale().asArcseconds()
+        tScale1 = templateExposure.getWcs().getPixelScale().asArcseconds()
+        scienceSigmaHack1 = scienceExposure.getPsf().computeShape().getDeterminantRadius()*sScale1
+        templateSigmaHack1 = templateExposure.getPsf().computeShape().getDeterminantRadius()*tScale1
         if not self._validateWcs(templateExposure, scienceExposure):
             if doWarping:
                 self.log.info("Astrometrically registering template to science image")
@@ -417,6 +421,11 @@ class ImagePsfMatchTask(PsfMatchTask):
             else:
                 self.log.error("ERROR: Input images not registered")
                 raise RuntimeError("Input images not registered")
+        tScale2 = templateExposure.getWcs().getPixelScale().asArcseconds()
+        templateSigmaHack2 = templateExposure.getPsf().computeShape().getDeterminantRadius()*tScale2
+        self.log.info(f"Science image sigma: {scienceSigmaHack1} and scale: {sScale1}")
+        self.log.info(f"Initial template image sigma: {templateSigmaHack1} and scale: {tScale1}")
+        self.log.info(f"Final template image sigma: {templateSigmaHack2} and scale: {tScale2}")
 
         if templateFwhmPix is None:
             if not templateExposure.hasPsf():
