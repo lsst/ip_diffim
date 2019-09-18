@@ -130,8 +130,11 @@ class TestFractionDiaSources(MetricTaskTestCase):
         self.assertEqual(types["sciSources"], "src")
         self.assertEqual(types["diaSources"], "deepDiff_diaSrc")
 
-    # TODO: add a test for the templating in FractionDiaSourcesToSciSourcesMetricConfig
-    # once we've migrated to PipelineTaskConfig
+    def testGetInputDatasetTypesCustom(self):
+        config = self.taskClass.ConfigClass()
+        config.connections.coaddName = "fancy"
+        types = self.taskClass.getInputDatasetTypes(config)
+        self.assertEqual(types["diaSources"], "fancyDiff_diaSrc")
 
 
 # Hack around unittest's hacky test setup system
