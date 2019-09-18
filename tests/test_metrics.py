@@ -68,13 +68,6 @@ class TestNumSciSources(MetricTaskTestCase):
         meas = result.measurement
         self.assertIsNone(meas)
 
-    def testGetInputDatasetTypes(self):
-        config = self.taskClass.ConfigClass()
-        types = self.taskClass.getInputDatasetTypes(config)
-        # dict.keys() is a collections.abc.Set, which has a narrower interface than __builtins__.set...
-        self.assertSetEqual(set(types.keys()), {"sources"})
-        self.assertEqual(types["sources"], "src")
-
 
 class TestFractionDiaSources(MetricTaskTestCase):
 
@@ -121,20 +114,6 @@ class TestFractionDiaSources(MetricTaskTestCase):
         result = self.task.run(sciSources=_makeDummyCatalog(3), diaSources=None)
         meas = result.measurement
         self.assertIsNone(meas)
-
-    def testGetInputDatasetTypes(self):
-        config = self.taskClass.ConfigClass()
-        types = self.taskClass.getInputDatasetTypes(config)
-        # dict.keys() is a collections.abc.Set, which has a narrower interface than __builtins__.set...
-        self.assertSetEqual(set(types.keys()), {"sciSources", "diaSources"})
-        self.assertEqual(types["sciSources"], "src")
-        self.assertEqual(types["diaSources"], "deepDiff_diaSrc")
-
-    def testGetInputDatasetTypesCustom(self):
-        config = self.taskClass.ConfigClass()
-        config.connections.coaddName = "fancy"
-        types = self.taskClass.getInputDatasetTypes(config)
-        self.assertEqual(types["diaSources"], "fancyDiff_diaSrc")
 
 
 # Hack around unittest's hacky test setup system
