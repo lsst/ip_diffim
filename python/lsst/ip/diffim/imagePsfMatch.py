@@ -444,14 +444,9 @@ class ImagePsfMatchTask(PsfMatchTask):
         kernelSize = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix)[0].getWidth()
         candidateList = self.makeCandidateList(templateExposure, scienceExposure, kernelSize, candidateList)
 
-        if convolveTemplate:
-            results = self.matchMaskedImages(
-                templateExposure.getMaskedImage(), scienceExposure.getMaskedImage(), candidateList,
-                templateFwhmPix=templateFwhmPix, scienceFwhmPix=scienceFwhmPix)
-        else:
-            results = self.matchMaskedImages(
-                scienceExposure.getMaskedImage(), templateExposure.getMaskedImage(), candidateList,
-                templateFwhmPix=scienceFwhmPix, scienceFwhmPix=templateFwhmPix)
+        results = self.matchMaskedImages(
+            templateExposure.getMaskedImage(), scienceExposure.getMaskedImage(), candidateList,
+            templateFwhmPix=templateFwhmPix, scienceFwhmPix=scienceFwhmPix, convolveTemplate=convolveTemplate)
 
         psfMatchedExposure = afwImage.makeExposure(results.matchedImage, scienceExposure.getWcs())
         psfMatchedExposure.setFilter(templateExposure.getFilter())
@@ -462,7 +457,7 @@ class ImagePsfMatchTask(PsfMatchTask):
 
     @pipeBase.timeMethod
     def matchMaskedImages(self, templateMaskedImage, scienceMaskedImage, candidateList,
-                          templateFwhmPix=None, scienceFwhmPix=None):
+                          templateFwhmPix=None, scienceFwhmPix=None, convolveTemplate=True):
         """PSF-match a MaskedImage (templateMaskedImage) to a reference MaskedImage (scienceMaskedImage).
 
         Do the following, in order:
@@ -538,33 +533,60 @@ class ImagePsfMatchTask(PsfMatchTask):
                                            candidateList)
 
         if display and displaySpatialCells:
-            diffimUtils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet,
-                                               symb="o", ctype=afwDisplay.CYAN, ctypeUnused=afwDisplay.YELLOW,
-                                               ctypeBad=afwDisplay.RED, size=4, frame=lsstDebug.frame,
-                                               title="Image to not convolve")
+            if convolveTemplate:
+                diffimUtils.showKernelSpatialCells(scienceMaskedImage, kernelCellSet,
+                                                   symb="o", ctype=afwDisplay.CYAN,
+                                                   ctypeUnused=afwDisplay.YELLOW,
+                                                   ctypeBad=afwDisplay.RED, size=4,
+                                                   frame=lsstDebug.frame,
+                                                   title="Image to not convolve")
+            else:
+                diffimUtils.showKernelSpatialCells(templateMaskedImage, kernelCellSet,
+                                                   symb="o", ctype=afwDisplay.CYAN,
+                                                   ctypeUnused=afwDisplay.YELLOW,
+                                                   ctypeBad=afwDisplay.RED, size=4,
+                                                   frame=lsstDebug.frame,
+                                                   title="Image to not convolve")
             lsstDebug.frame += 1
 
         if templateFwhmPix and scienceFwhmPix:
-            self.log.info("Matching Psf FWHM %.2f -> %.2f pix", templateFwhmPix, scienceFwhmPix)
+            if convolveTemplate:
+                self.log.info("Matching template Psf FWHM %.2f -> %.2f pix", templateFwhmPix, scienceFwhmPix)
+            else:
+                self.log.info("Matching science Psf FWHM %.2f -> %.2f pix", scienceFwhmPix, templateFwhmPix)
 
         if self.kConfig.useBicForKernelBasis:
             tmpKernelCellSet = self._buildCellSet(templateMaskedImage,
                                                   scienceMaskedImage,
                                                   candidateList)
-            nbe = diffimTools.NbasisEvaluator(self.kConfig, templateFwhmPix, scienceFwhmPix)
-            bicDegrees = nbe(tmpKernelCellSet, self.log)
-            basisList = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix,
-                                            alardDegGauss=bicDegrees[0], metadata=self.metadata)
+            if convolveTemplate:
+                nbe = diffimTools.NbasisEvaluator(self.kConfig, templateFwhmPix, scienceFwhmPix)
+                bicDegrees = nbe(tmpKernelCellSet, self.log)
+                basisList = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix,
+                                                alardDegGauss=bicDegrees[0], metadata=self.metadata)
+            else:
+                nbe = diffimTools.NbasisEvaluator(self.kConfig, scienceFwhmPix, templateFwhmPix)
+                bicDegrees = nbe(tmpKernelCellSet, self.log)
+                basisList = makeKernelBasisList(self.kConfig, scienceFwhmPix, templateFwhmPix,
+                                                alardDegGauss=bicDegrees[0], metadata=self.metadata)
             del tmpKernelCellSet
         else:
-            basisList = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix,
-                                            metadata=self.metadata)
+            if convolveTemplate:
+                basisList = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix,
+                                                metadata=self.metadata)
+            else:
+                basisList = makeKernelBasisList(self.kConfig, scienceFwhmPix, templateFwhmPix,
+                                                metadata=self.metadata)
 
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
 
-        psfMatchedMaskedImage = afwImage.MaskedImageF(templateMaskedImage.getBBox())
         doNormalize = False
-        afwMath.convolve(psfMatchedMaskedImage, templateMaskedImage, psfMatchingKernel, doNormalize)
+        if convolveTemplate:
+            psfMatchedMaskedImage = afwImage.MaskedImageF(templateMaskedImage.getBBox())
+            afwMath.convolve(psfMatchedMaskedImage, templateMaskedImage, psfMatchingKernel, doNormalize)
+        else:
+            psfMatchedMaskedImage = afwImage.MaskedImageF(scienceMaskedImage.getBBox())
+            afwMath.convolve(psfMatchedMaskedImage, scienceMaskedImage, psfMatchingKernel, doNormalize)
         return pipeBase.Struct(
             matchedImage=psfMatchedMaskedImage,
             psfMatchingKernel=psfMatchingKernel,
@@ -647,13 +669,10 @@ class ImagePsfMatchTask(PsfMatchTask):
             subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
             subtractedMaskedImage -= results.backgroundModel
         else:
-            subtractedExposure.setMaskedImage(results.warpedExposure.getMaskedImage())
+            subtractedExposure.setMaskedImage(results.matchedExposure.getMaskedImage())
             subtractedMaskedImage = subtractedExposure.getMaskedImage()
-            subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
+            subtractedMaskedImage -= results.warpedExposure.getMaskedImage()
             subtractedMaskedImage -= results.backgroundModel
-
-            # Preserve polarity of differences
-            subtractedMaskedImage *= -1
 
             # Place back on native photometric scale
             subtractedMaskedImage /= results.psfMatchingKernel.computeImage(
