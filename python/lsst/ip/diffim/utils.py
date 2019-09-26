@@ -135,7 +135,7 @@ def showDiaSources(sources, exposure, isFlagged, isDipole, frame=None):
             lab += "OK"
         mos.append(im.makeMosaic(), lab, ctype)
     title = "Dia Sources"
-    mosaicImage = mos.makeMosaic(frame=frame, title=title)
+    mosaicImage = mos.makeMosaic(display=disp, title=title)
     return mosaicImage
 
 
@@ -250,7 +250,9 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
         title = "Kernels"
     else:
         title = "Candidates & residuals"
-    mosaicImage = mos.makeMosaic(frame=frame, title=title)
+
+    disp = afwDisplay.Display(frame=frame)
+    mosaicImage = mos.makeMosaic(display=disp, title=title)
 
     return mosaicImage
 
@@ -264,7 +266,9 @@ def showKernelBasis(kernel, frame=None):
         im = afwImage.ImageD(k.getDimensions())
         k.computeImage(im, False)
         mos.append(im)
-    mos.makeMosaic(frame=frame, title="Kernel Basis Images")
+
+    disp = afwDisplay.Display(frame=frame)
+    mos.makeMosaic(display=disp, title="Kernel Basis Images")
 
     return mos
 
@@ -642,7 +646,8 @@ def showKernelMosaic(bbox, kernel, nx=7, ny=None, frame=None, title=None,
             except Exception:
                 pass
 
-    mos.makeMosaic(frame=frame, title=title if title else "Model Kernel", mode=nx)
+    disp = afwDisplay.Display(frame=frame)
+    mos.makeMosaic(display=disp, title=title if title else "Model Kernel", mode=nx)
 
     if centers and frame is not None:
         disp = afwDisplay.Display(frame=frame)
