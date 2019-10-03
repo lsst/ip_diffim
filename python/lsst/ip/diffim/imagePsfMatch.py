@@ -650,9 +650,9 @@ class ImagePsfMatchTask(PsfMatchTask):
             # Preserve polarity of differences
             subtractedMaskedImage *= -1
 
-            # Place back on native photometric scale
-            subtractedMaskedImage /= results.psfMatchingKernel.computeImage(
-                afwImage.ImageD(results.psfMatchingKernel.getDimensions()), False)
+#             Place back on native photometric scale
+#            subtractedMaskedImage /= results.psfMatchingKernel.computeImage(
+#               afwImage.ImageD(results.psfMatchingKernel.getDimensions()), False)
 
         import lsstDebug
         display = lsstDebug.Info(__name__).display
