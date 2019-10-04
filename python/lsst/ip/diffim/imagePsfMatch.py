@@ -528,9 +528,43 @@ class ImagePsfMatchTask(PsfMatchTask):
             disp.mtv(scienceMaskedImage, title="Image to not convolve")
             lsstDebug.frame += 1
 
-        kernelCellSet = self._buildCellSet(templateMaskedImage,
-                                           scienceMaskedImage,
-                                           candidateList)
+        if templateFwhmPix and scienceFwhmPix:
+            if convolveTemplate:
+                self.log.info("Matching template Psf FWHM %.2f -> %.2f pix", templateFwhmPix, scienceFwhmPix)
+            else:
+                self.log.info("Matching science Psf FWHM %.2f -> %.2f pix", scienceFwhmPix, templateFwhmPix)
+
+        if self.kConfig.useBicForKernelBasis:
+            if convolveTemplate:
+                tmpKernelCellSet = self._buildCellSet(templateMaskedImage,
+                                                      scienceMaskedImage,
+                                                      candidateList)
+                nbe = diffimTools.NbasisEvaluator(self.kConfig, templateFwhmPix, scienceFwhmPix)
+                bicDegrees = nbe(tmpKernelCellSet, self.log)
+                basisList = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix,
+                                                alardDegGauss=bicDegrees[0], metadata=self.metadata)
+            else:
+                tmpKernelCellSet = self._buildCellSet(scienceMaskedImage,
+                                                      templateMaskedImage,
+                                                      candidateList)
+                nbe = diffimTools.NbasisEvaluator(self.kConfig, scienceFwhmPix, templateFwhmPix)
+                bicDegrees = nbe(tmpKernelCellSet, self.log)
+                basisList = makeKernelBasisList(self.kConfig, scienceFwhmPix, templateFwhmPix,
+                                                alardDegGauss=bicDegrees[0], metadata=self.metadata)
+            del tmpKernelCellSet
+        else:
+            if convolveTemplate:
+                kernelCellSet = self._buildCellSet(templateMaskedImage,
+                                                   scienceMaskedImage,
+                                                   candidateList)
+                basisList = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix,
+                                                metadata=self.metadata)
+            else:
+                kernelCellSet = self._buildCellSet(scienceMaskedImage,
+                                                   templateMaskedImage,
+                                                   candidateList)
+                basisList = makeKernelBasisList(self.kConfig, scienceFwhmPix, templateFwhmPix,
+                                                metadata=self.metadata)
 
         if display and displaySpatialCells:
             if convolveTemplate:
@@ -549,44 +583,17 @@ class ImagePsfMatchTask(PsfMatchTask):
                                                    title="Image to not convolve")
             lsstDebug.frame += 1
 
-        if templateFwhmPix and scienceFwhmPix:
-            if convolveTemplate:
-                self.log.info("Matching template Psf FWHM %.2f -> %.2f pix", templateFwhmPix, scienceFwhmPix)
-            else:
-                self.log.info("Matching science Psf FWHM %.2f -> %.2f pix", scienceFwhmPix, templateFwhmPix)
-
-        if self.kConfig.useBicForKernelBasis:
-            tmpKernelCellSet = self._buildCellSet(templateMaskedImage,
-                                                  scienceMaskedImage,
-                                                  candidateList)
-            if convolveTemplate:
-                nbe = diffimTools.NbasisEvaluator(self.kConfig, templateFwhmPix, scienceFwhmPix)
-                bicDegrees = nbe(tmpKernelCellSet, self.log)
-                basisList = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix,
-                                                alardDegGauss=bicDegrees[0], metadata=self.metadata)
-            else:
-                nbe = diffimTools.NbasisEvaluator(self.kConfig, scienceFwhmPix, templateFwhmPix)
-                bicDegrees = nbe(tmpKernelCellSet, self.log)
-                basisList = makeKernelBasisList(self.kConfig, scienceFwhmPix, templateFwhmPix,
-                                                alardDegGauss=bicDegrees[0], metadata=self.metadata)
-            del tmpKernelCellSet
-        else:
-            if convolveTemplate:
-                basisList = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix,
-                                                metadata=self.metadata)
-            else:
-                basisList = makeKernelBasisList(self.kConfig, scienceFwhmPix, templateFwhmPix,
-                                                metadata=self.metadata)
-
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
 
-        doNormalize = False
         if convolveTemplate:
+            doNormalize = False
             psfMatchedMaskedImage = afwImage.MaskedImageF(templateMaskedImage.getBBox())
             afwMath.convolve(psfMatchedMaskedImage, templateMaskedImage, psfMatchingKernel, doNormalize)
         else:
+            doNormalize = True
             psfMatchedMaskedImage = afwImage.MaskedImageF(scienceMaskedImage.getBBox())
             afwMath.convolve(psfMatchedMaskedImage, scienceMaskedImage, psfMatchingKernel, doNormalize)
+            psfMatchedMaskedImage.variance = scienceMaskedImage.variance
         return pipeBase.Struct(
             matchedImage=psfMatchedMaskedImage,
             psfMatchingKernel=psfMatchingKernel,
@@ -663,20 +670,62 @@ class ImagePsfMatchTask(PsfMatchTask):
             convolveTemplate=convolveTemplate
         )
 
+        goodPix1 = np.isfinite(scienceExposure.image.array)
+        goodPix2 = np.isfinite(templateExposure.image.array)
+        goodPix3 = np.isfinite(results.matchedExposure.image.array)
+        goodPix4 = np.isfinite(results.warpedExposure.image.array)
+        self.log.info("Science image level: "
+                      f"{np.nanmean(np.abs(scienceExposure.image.array[goodPix1]))}")
+        self.log.info("Science variance level: "
+                      f"{np.nanmean(np.abs(scienceExposure.variance.array[goodPix1]))}")
+        self.log.info("Template image level: "
+                      f"{np.nanmean(np.abs(templateExposure.image.array[goodPix2]))}")
+        self.log.info("Template variance level: "
+                      f"{np.nanmean(np.abs(templateExposure.variance.array[goodPix2]))}")
+        self.log.info("Matched image level: "
+                      f"{np.nanmean(np.abs(results.matchedExposure.image.array[goodPix3]))}")
+        self.log.info("Matched variance level: "
+                      f"{np.nanmean(np.abs(results.matchedExposure.variance.array[goodPix3]))}")
+        self.log.info("Warped image level: "
+                      f"{np.nanmean(np.abs(results.warpedExposure.image.array[goodPix4]))}")
+        self.log.info("Warped variance level: "
+                      f"{np.nanmean(np.abs(results.warpedExposure.variance.array[goodPix4]))}")
         subtractedExposure = afwImage.ExposureF(scienceExposure, True)
         if convolveTemplate:
             subtractedMaskedImage = subtractedExposure.getMaskedImage()
             subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
+            goodPix5 = np.isfinite(subtractedExposure.image.array)
+            self.log.info("Subtracted image level0: "
+                          f"{np.nanmean(np.abs(subtractedExposure.image.array[goodPix5]))}")
+            self.log.info("Subtracted variance level0: "
+                          f"{np.nanmean(np.abs(subtractedExposure.variance.array[goodPix5]))}")
             subtractedMaskedImage -= results.backgroundModel
         else:
             subtractedExposure.setMaskedImage(results.matchedExposure.getMaskedImage())
             subtractedMaskedImage = subtractedExposure.getMaskedImage()
-            subtractedMaskedImage -= results.warpedExposure.getMaskedImage()
+            templateMaskedImage = results.warpedExposure.getMaskedImage()
+            templateMaskedImage /= results.psfMatchingKernel.computeImage(
+                afwImage.ImageD(results.psfMatchingKernel.getDimensions()), False)
+            self.log.info("Warped image level2: "
+                          f"{np.nanmean(np.abs(templateMaskedImage.image.array[goodPix4]))}")
+            self.log.info("Warped variance level2: "
+                          f"{np.nanmean(np.abs(templateMaskedImage.variance.array[goodPix4]))}")
+            subtractedMaskedImage -= templateMaskedImage
+            goodPix5 = np.isfinite(subtractedExposure.image.array)
+            self.log.info("Subtracted image level0: "
+                          f"{np.nanmean(np.abs(subtractedExposure.image.array[goodPix5]))}")
+            self.log.info("Subtracted variance level0: "
+                          f"{np.nanmean(np.abs(subtractedExposure.variance.array[goodPix5]))}")
             subtractedMaskedImage -= results.backgroundModel
 
-            # Place back on native photometric scale
-            subtractedMaskedImage /= results.psfMatchingKernel.computeImage(
-                afwImage.ImageD(results.psfMatchingKernel.getDimensions()), False)
+            # # Place back on native photometric scale
+            # subtractedMaskedImage /= results.psfMatchingKernel.computeImage(
+            #     afwImage.ImageD(results.psfMatchingKernel.getDimensions()), False)
+        goodPix6 = np.isfinite(subtractedExposure.image.array)
+        self.log.info("Subtracted image level1: "
+                      f"{np.nanmean(np.abs(subtractedExposure.image.array[goodPix6]))}")
+        self.log.info("Subtracted variance level1: "
+                      f"{np.nanmean(np.abs(subtractedExposure.variance.array[goodPix6]))}")
 
         import lsstDebug
         display = lsstDebug.Info(__name__).display
