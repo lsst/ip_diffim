@@ -701,6 +701,7 @@ class ImagePsfMatchTask(PsfMatchTask):
                           f"{np.nanmean(np.abs(subtractedExposure.variance.array[goodPix5]))}")
             subtractedMaskedImage -= results.backgroundModel
         else:
+            subtractedExposure.setPsf(results.warpedExposure.getPsf())
             subtractedExposure.setMaskedImage(results.matchedExposure.getMaskedImage())
             subtractedMaskedImage = subtractedExposure.getMaskedImage()
             templateMaskedImage = results.warpedExposure.getMaskedImage()
