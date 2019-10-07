@@ -22,7 +22,6 @@
 import unittest
 
 import astropy.units as u
-from astropy.tests.helper import assert_quantity_allclose
 
 from lsst.afw.table import SourceCatalog
 import lsst.utils.tests
@@ -68,23 +67,6 @@ class TestNumSciSources(MetricTaskTestCase):
         result = self.task.run(None)
         meas = result.measurement
         self.assertIsNone(meas)
-
-    def testGetInputDatasetTypes(self):
-        config = self.taskClass.ConfigClass()
-        types = self.taskClass.getInputDatasetTypes(config)
-        # dict.keys() is a collections.abc.Set, which has a narrower interface than __builtins__.set...
-        self.assertSetEqual(set(types.keys()), {"sources"})
-        self.assertEqual(types["sources"], "src")
-
-    def testFineGrainedMetric(self):
-        catalog = _makeDummyCatalog(3)
-        inputData = {"sources": catalog}
-        inputDataIds = {"sources": {"visit": 42, "ccd": 1}}
-        outputDataId = {"measurement": {"visit": 42, "ccd": 1}}
-        measDirect = self.task.run(catalog).measurement
-        measIndirect = self.task.adaptArgsAndRun(inputData, inputDataIds, outputDataId).measurement
-
-        assert_quantity_allclose(measIndirect.quantity, measDirect.quantity)
 
 
 class TestFractionDiaSources(MetricTaskTestCase):
@@ -132,28 +114,6 @@ class TestFractionDiaSources(MetricTaskTestCase):
         result = self.task.run(sciSources=_makeDummyCatalog(3), diaSources=None)
         meas = result.measurement
         self.assertIsNone(meas)
-
-    def testGetInputDatasetTypes(self):
-        config = self.taskClass.ConfigClass()
-        types = self.taskClass.getInputDatasetTypes(config)
-        # dict.keys() is a collections.abc.Set, which has a narrower interface than __builtins__.set...
-        self.assertSetEqual(set(types.keys()), {"sciSources", "diaSources"})
-        self.assertEqual(types["sciSources"], "src")
-        self.assertEqual(types["diaSources"], "deepDiff_diaSrc")
-
-    # TODO: add a test for the templating in FractionDiaSourcesToSciSourcesMetricConfig
-    # once we've migrated to PipelineTaskConfig
-
-    def testFineGrainedMetric(self):
-        sciCatalog = _makeDummyCatalog(5)
-        diaCatalog = _makeDummyCatalog(1)
-        inputData = {"sciSources": sciCatalog, "diaSources": diaCatalog}
-        inputDataIds = {"sciSources": {"visit": 42, "ccd": 1}, "diaSources": {"visit": 42, "ccd": 1}}
-        outputDataId = {"measurement": {"visit": 42, "ccd": 1}}
-        measDirect = self.task.run(sciCatalog, diaCatalog).measurement
-        measIndirect = self.task.adaptArgsAndRun(inputData, inputDataIds, outputDataId).measurement
-
-        assert_quantity_allclose(measIndirect.quantity, measDirect.quantity)
 
 
 # Hack around unittest's hacky test setup system
