@@ -626,6 +626,22 @@ class ImagePsfMatchTask(PsfMatchTask):
             - ``backgroundModel`` : differential background model
             - ``kernelCellSet`` : SpatialCellSet used to determine PSF matching kernel
         """
+
+        templateMaskedImage = templateExposure.getMaskedImage()
+        level_template = np.median(np.fabs(templateMaskedImage.getImage().getArray()))
+        level_science = np.median(np.fabs(scienceExposure.getMaskedImage().getImage().getArray()))
+
+        if level_template < 0.001:
+            level_template += 0.001
+            level_science += 0.001
+
+        sfactor = level_science / level_template
+
+        self.log.debug("Template level %.1f, science level %.1f -> scaling factor %.1f",
+                       level_template, level_science, sfactor)
+
+        templateMaskedImage *= sfactor
+
         results = self.matchExposures(
             templateExposure=templateExposure,
             scienceExposure=scienceExposure,
