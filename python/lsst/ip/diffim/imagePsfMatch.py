@@ -627,10 +627,12 @@ class ImagePsfMatchTask(PsfMatchTask):
             - ``kernelCellSet`` : SpatialCellSet used to determine PSF matching kernel
         """
 
-        templateMaskedImage = templateExposure.getMaskedImage()
-        sfactor = 10.0
-        self.log.warn("Scaling template by hard wired factor %.1f", sfactor)
-        templateMaskedImage *= sfactor
+#        templateMaskedImage = templateExposure.getMaskedImage()
+#        sfactor = 100.0
+#        sfactor = 10.0
+#        sfactor = 20.0
+#        self.log.warn("Scaling template by hard wired factor %.1f", sfactor)
+#        templateMaskedImage *= sfactor
 
         results = self.matchExposures(
             templateExposure=templateExposure,
@@ -650,6 +652,10 @@ class ImagePsfMatchTask(PsfMatchTask):
         else:
             subtractedExposure.setMaskedImage(results.warpedExposure.getMaskedImage())
             subtractedMaskedImage = subtractedExposure.getMaskedImage()
+# Clear out the template variance to see whether the pattern makes any difference 
+# for the detection -- not likely, it is orders of magnitude smaller numbers than the
+# variance on the image -- commenting it out by now
+#            subtractedMaskedImage.getVariance().getArray()[...] = 0
             subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
             subtractedMaskedImage -= results.backgroundModel
 
