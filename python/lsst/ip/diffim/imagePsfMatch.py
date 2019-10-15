@@ -432,14 +432,17 @@ class ImagePsfMatchTask(PsfMatchTask):
                 scienceFwhmPix = self.getFwhmPix(scienceExposure.getPsf())
                 self.log.info("scienceFwhmPix: {}".format(scienceFwhmPix))
 
-        kernelSize = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix)[0].getWidth()
-        candidateList = self.makeCandidateList(templateExposure, scienceExposure, kernelSize, candidateList)
-
         if convolveTemplate:
+            kernelSize = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix)[0].getWidth()
+            candidateList = self.makeCandidateList(
+                templateExposure, scienceExposure, kernelSize, candidateList)
             results = self.matchMaskedImages(
                 templateExposure.getMaskedImage(), scienceExposure.getMaskedImage(), candidateList,
                 templateFwhmPix=templateFwhmPix, scienceFwhmPix=scienceFwhmPix)
         else:
+            kernelSize = makeKernelBasisList(self.kConfig, scienceFwhmPix, templateFwhmPix)[0].getWidth()
+            candidateList = self.makeCandidateList(
+                templateExposure, scienceExposure, kernelSize, candidateList)
             results = self.matchMaskedImages(
                 scienceExposure.getMaskedImage(), templateExposure.getMaskedImage(), candidateList,
                 templateFwhmPix=scienceFwhmPix, scienceFwhmPix=templateFwhmPix)
