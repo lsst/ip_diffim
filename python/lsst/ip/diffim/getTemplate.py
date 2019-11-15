@@ -115,6 +115,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         nPatchesFound = 0
         coaddFilter = None
         coaddPsf = None
+        coaddPhotoCalib = None
         for patchInfo in patchList:
             patchSubBBox = patchInfo.getOuterBBox()
             patchSubBBox.clip(coaddBBox)
@@ -167,12 +168,20 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             if coaddPsf is None and coaddPatch.hasPsf():
                 coaddPsf = coaddPatch.getPsf()
 
+            # Retrieve the calibration for this coadd tract, if not already retrieved
+            if coaddPhotoCalib is None:
+                coaddPhotoCalib = coaddPatch.getPhotoCalib()
+
         if nPatchesFound == 0:
             raise RuntimeError("No patches found!")
 
         if coaddPsf is None:
             raise RuntimeError("No coadd Psf found!")
 
+        if coaddPhotoCalib is None:
+            raise RuntimeError("No coadd PhotoCalib found!")
+
+        coaddExposure.setPhotoCalib(coaddPhotoCalib)
         coaddExposure.setPsf(coaddPsf)
         coaddExposure.setFilter(coaddFilter)
         return pipeBase.Struct(exposure=coaddExposure,
