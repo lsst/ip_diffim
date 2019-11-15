@@ -176,7 +176,7 @@ class ZogyTask(pipeBase.Task):
             Template exposure ("Reference image" in ZOGY (2016)).
         scienceExposure : `lsst.afw.image.Exposure`
             Science exposure ("New image" in ZOGY (2016)). Must have already been
-            registered and photmetrically matched to template.
+            registered and photometrically matched to template.
         sig1 : `float`
             (Optional) sqrt(variance) of `templateExposure`. If `None`, it is
             computed from the sqrt(mean) of the `templateExposure` variance image.
