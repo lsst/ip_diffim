@@ -30,8 +30,8 @@ import astropy.units as u
 
 from lsst.pipe.base import Struct, PipelineTaskConnections, connectionTypes
 from lsst.verify import Measurement
-from lsst.verify.gen2tasks import MetricTask, register
-from lsst.verify.tasks import MetricComputationError
+from lsst.verify.gen2tasks import register
+from lsst.verify.tasks import MetricTask, MetricComputationError
 
 
 class NumberSciSourcesMetricConnections(
