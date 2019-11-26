@@ -98,6 +98,12 @@ class ZogyConfig(pexConfig.Config):
         doc="Science flux scaling factor (Fn in ZOGY paper)"
     )
 
+    scaleByCalibration = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Compute the flux normalization scaling based on the image calibration.  This overrides 'templateFluxScaling' and 'scienceFluxScaling'.",
+    )
+
     doTrimKernels = pexConfig.Field(
         dtype=bool,
         default=False,
@@ -290,8 +296,18 @@ class ZogyTask(pipeBase.Task):
             _subtractImageMean(self.template)
             _subtractImageMean(self.science)
 
+        # Define the normalization of each image from the config
         self.Fr = self.config.templateFluxScaling  # default is 1
         self.Fn = self.config.scienceFluxScaling  # default is 1
+        # If 'scaleByCalibration' is True then these norms are overwritten
+        if self.config.scaleByCalibration:
+            calib_template = self.template.getPhotoCalib()
+            calib_science = self.science.getPhotoCalib()
+            self.Fr = 1/calib_template.getCalibrationMean()
+            self.Fn = 1/calib_science.getCalibrationMean()
+            self.log.info("Setting template image scaling to Fr=%f" % self.Fr)
+            self.log.info("Setting science  image scaling to Fn=%f" % self.Fn)
+
         self.padSize = self.config.padSize  # default is 7
 
     def _computeVarianceMean(self, exposure):
