@@ -302,9 +302,11 @@ class ZogyTask(pipeBase.Task):
         # If 'scaleByCalibration' is True then these norms are overwritten
         if self.config.scaleByCalibration:
             calib_template = self.template.getPhotoCalib()
-            calib_exposure = self.science.getPhotoCalib()
-            self.Fr = calib_template.getCalibrationMean()
-            self.Fn = calib_exposure.getCalibrationMean()
+            calib_science = self.science.getPhotoCalib()
+            self.Fr = 1/calib_template.getCalibrationMean()
+            self.Fn = 1/calib_science.getCalibrationMean()
+            self.log.info("Setting template image scaling to Fr=%f" % self.Fr)
+            self.log.info("Setting science  image scaling to Fn=%f" % self.Fn)
 
         self.padSize = self.config.padSize  # default is 7
 
