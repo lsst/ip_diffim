@@ -101,7 +101,8 @@ class ZogyConfig(pexConfig.Config):
     scaleByCalibration = pexConfig.Field(
         dtype=bool,
         default=False,
-        doc="Compute the flux normalization scaling based on the image calibration.  This overrides 'templateFluxScaling' and 'scienceFluxScaling'.",
+        doc="Compute the flux normalization scaling based on the image calibration."
+        "This overrides 'templateFluxScaling' and 'scienceFluxScaling'."
     )
 
     doTrimKernels = pexConfig.Field(
