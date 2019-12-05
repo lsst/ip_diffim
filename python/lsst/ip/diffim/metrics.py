@@ -28,15 +28,19 @@ __all__ = [
 
 import astropy.units as u
 
-from lsst.pipe.base import Struct, PipelineTaskConnections, connectionTypes
+from lsst.pipe.base import Struct, connectionTypes
 from lsst.verify import Measurement
 from lsst.verify.gen2tasks import register
-from lsst.verify.tasks import MetricTask, MetricComputationError
+from lsst.verify.tasks import MetricTask, MetricConfig, MetricConnections, \
+    MetricComputationError
 
 
 class NumberSciSourcesMetricConnections(
-        PipelineTaskConnections,
-        dimensions={"Instrument", "Exposure", "Detector"}):
+        MetricConnections,
+        defaultTemplates={"package": "ip_diffim",
+                          "metric": "numSciSources"},
+        dimensions={"Instrument", "Exposure", "Detector"},
+):
     sources = connectionTypes.Input(
         doc="The catalog of science sources.",
         name="src",
@@ -46,7 +50,7 @@ class NumberSciSourcesMetricConnections(
 
 
 class NumberSciSourcesMetricConfig(
-        MetricTask.ConfigClass,
+        MetricConfig,
         pipelineConnections=NumberSciSourcesMetricConnections):
     pass
 
@@ -77,21 +81,19 @@ class NumberSciSourcesMetricTask(MetricTask):
         """
         if sources is not None:
             nSciSources = len(sources)
-            meas = Measurement(self.getOutputMetricName(self.config), nSciSources * u.count)
+            meas = Measurement(self.config.metricName, nSciSources * u.count)
         else:
             self.log.info("Nothing to do: no catalogs found.")
             meas = None
         return Struct(measurement=meas)
 
-    @classmethod
-    def getOutputMetricName(cls, config):
-        return "ip_diffim.numSciSources"
-
 
 class FractionDiaSourcesToSciSourcesMetricConnections(
-        PipelineTaskConnections,
+        MetricTask.ConfigClass.ConnectionsClass,
         dimensions={"Instrument", "Exposure", "Detector"},
-        defaultTemplates={"coaddName": "deep"}):
+        defaultTemplates={"coaddName": "deep",
+                          "package": "ip_diffim",
+                          "metric": "fracDiaSourcesToSciSources"}):
     sciSources = connectionTypes.Input(
         doc="The catalog of science sources.",
         name="src",
@@ -142,7 +144,7 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
         if diaSources is not None and sciSources is not None:
             nSciSources = len(sciSources)
             nDiaSources = len(diaSources)
-            metricName = self.getOutputMetricName(self.config)
+            metricName = self.config.metricName
             if nSciSources <= 0.0:
                 raise MetricComputationError(
                     "No science sources found; ratio of DIASources to science sources ill-defined.")
@@ -152,7 +154,3 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
             self.log.info("Nothing to do: no catalogs found.")
             meas = None
         return Struct(measurement=meas)
-
-    @classmethod
-    def getOutputMetricName(cls, config):
-        return "ip_diffim.fracDiaSourcesToSciSources"
