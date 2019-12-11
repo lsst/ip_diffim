@@ -137,7 +137,8 @@ class KernelCandidateQa(object):
         outSourceCatalog.defineShape(shapeDef)
         return outSourceCatalog
 
-    def _calculateStats(self, di, dof=0.):
+    @staticmethod
+    def _calculateStats(di, dof=0.):
         """Calculate the core QA statistics on a difference image"""
         mask = di.getMask()
         maskArr = di.getMask().getArray()
@@ -195,7 +196,8 @@ class KernelCandidateQa(object):
                 "D": D, "prob": prob, "A2": A2, "crit": crit, "sig": sig,
                 "rchisq": rchisq, "mseResids": mseResids}
 
-    def apply(self, candidateList, spatialKernel, spatialBackground, dof=0):
+    @classmethod
+    def apply(cls, candidateList, spatialKernel, spatialBackground, dof=0):
         """Evaluate the QA metrics for all KernelCandidates in the
         candidateList; set the values of the metrics in their
         associated Sources"""
@@ -216,7 +218,7 @@ class KernelCandidateQa(object):
                 # NOTE
                 # What is the difference between kernelValues and solution?
 
-                localResults = self._calculateStats(di, dof=dof)
+                localResults = cls._calculateStats(di, dof=dof)
 
                 metrics = {"KCDiffimMean_LOCAL": localResults["mean"],
                            "KCDiffimMedian_LOCAL": localResults["median"],
@@ -257,7 +259,7 @@ class KernelCandidateQa(object):
             sk = afwMath.FixedKernel(skim)
             sbg = spatialBackground(kernelCandidate.getXCenter(), kernelCandidate.getYCenter())
             di = kernelCandidate.getDifferenceImage(sk, sbg)
-            spatialResults = self._calculateStats(di, dof=dof)
+            spatialResults = cls._calculateStats(di, dof=dof)
 
             # Kernel mse
             if lkim is not None:
@@ -290,7 +292,8 @@ class KernelCandidateQa(object):
                 setter = getattr(source, "set"+key.getTypeString())
                 setter(key, metrics[k])
 
-    def aggregate(self, sourceCatalog, metadata, wcsresids, diaSources=None):
+    @staticmethod
+    def aggregate(sourceCatalog, metadata, wcsresids, diaSources=None):
         """Generate aggregate metrics (e.g. total numbers of false
         positives) from all the Sources in the sourceCatalog"""
         for source in sourceCatalog:
