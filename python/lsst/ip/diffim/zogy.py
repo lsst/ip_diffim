@@ -100,7 +100,7 @@ class ZogyConfig(pexConfig.Config):
 
     scaleByCalibration = pexConfig.Field(
         dtype=bool,
-        default=False,
+        default=True,
         doc="Compute the flux normalization scaling based on the image calibration."
         "This overrides 'templateFluxScaling' and 'scienceFluxScaling'."
     )
