@@ -135,7 +135,13 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                                   " numSubfilters=%(numSubfilters)s, subfilter=0 does not exist"
                                   % patchArgDict)
                     continue
+                patchInnerBBox = patchInfo.getInnerBBox()
+                patchInnerBBox.clip(coaddBBox)
+                if np.min(patchInnerBBox.getDimensions()) <= 2*self.config.templateBorderSize:
+                    self.log.info("skip tract=%(tract)s, patch=%(patch)s; too few pixels." % patchArgDict)
+                    continue
                 self.log.info("Constructing DCR-matched template for patch %s" % patchArgDict)
+
                 dcrModel = DcrModel.fromDataRef(sensorRef, **patchArgDict)
                 # The edge pixels of the DcrCoadd may contain artifacts due to missing data.
                 # Each patch has significant overlap, and the contaminated edge pixels in
@@ -143,8 +149,6 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 # previous patches.
                 # Shrink the BBox to remove the contaminated pixels,
                 # but make sure it is only the overlap region that is reduced.
-                patchInnerBBox = patchInfo.getInnerBBox()
-                patchInnerBBox.clip(coaddBBox)
                 dcrBBox = geom.Box2I(patchSubBBox)
                 dcrBBox.grow(-self.config.templateBorderSize)
                 dcrBBox.include(patchInnerBBox)
