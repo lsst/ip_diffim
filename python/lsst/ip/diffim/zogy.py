@@ -320,8 +320,11 @@ class ZogyTask(pipeBase.Task):
             The padded copy of the input `psf`.
         """
         newArr = np.zeros(size)
+        # Calculate the offset to where we're going to put the PSF into newArr
         offset = [size[0]//2 - psf.shape[0]//2 - 1, size[1]//2 - psf.shape[1]//2 - 1]
+        # Define a view into this zero array
         tmp = newArr[offset[0]:(psf.shape[0] + offset[0]), offset[1]:(psf.shape[1] + offset[1])]
+        # Use the view to insert the PSF in against the sea of zeros
         tmp[:, :] = psf
         return newArr
 
@@ -430,6 +433,7 @@ class ZogyTask(pipeBase.Task):
         if debug and self.config.doTrimKernels:  # default False
             # Suggestion from Barak to trim Kr and Kn to remove artifacts
             # Here we just filter them (in image space) to keep them the same size
+            ### 2019-11-26 MWV:  Why '80'?
             ps = (Kn_hat.shape[1] - 80)//2
             Kn = _filterKernel(np.fft.ifft2(Kn_hat), ps)
             Kn_hat = np.fft.fft2(Kn)
