@@ -304,8 +304,17 @@ class ZogyTask(pipeBase.Task):
         if self.config.scaleByCalibration:
             calib_template = self.template.getPhotoCalib()
             calib_science = self.science.getPhotoCalib()
-            self.Fr = 1/calib_template.getCalibrationMean()
-            self.Fn = 1/calib_science.getCalibrationMean()
+            if calib_template is None:
+                self.log.warning("No calibration information available for template image.")
+            if calib_science is None:
+                self.log.warning("No calibration information available for science image.")
+            if calib_template is None or calib_science is None:
+                self.log.warning("Due to lack of calibration information, "
+                                 "reverting to templateFluxScaling and scienceFluxScaling.")
+            else:
+                self.Fr = 1/calib_template.getCalibrationMean()
+                self.Fn = 1/calib_science.getCalibrationMean()
+
             self.log.info("Setting template image scaling to Fr=%f" % self.Fr)
             self.log.info("Setting science  image scaling to Fn=%f" % self.Fn)
 
