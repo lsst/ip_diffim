@@ -105,7 +105,7 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     schema = afwTable.SourceTable.makeMinimalSchema()
     task = measAlg.SourceDetectionTask(schema, config=config)
     table = afwTable.SourceTable.make(schema)
-    results = task.makeSourceCatalog(table, exp)
+    results = task.run(table, exp)
     if display:
         afwDisplay.Display(frame=4).mtv(image, title="Detection plane")
 

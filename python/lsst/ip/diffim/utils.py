@@ -1063,7 +1063,7 @@ class DipoleTestImage(object):
         detectTask = measAlg.SourceDetectionTask(schema, config=detectConfig)
 
         table = afwTable.SourceTable.make(schema)
-        catalog = detectTask.makeSourceCatalog(table, diffim, sigma=psfSigma)
+        catalog = detectTask.run(table, diffim, sigma=psfSigma)
 
         # Now do the merge.
         if doMerge:

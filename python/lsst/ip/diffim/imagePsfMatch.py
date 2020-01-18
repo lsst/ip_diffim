@@ -791,7 +791,7 @@ class ImagePsfMatchTask(PsfMatchTask):
         mi -= bkgd
         try:
             table.setMetadata(self.selectAlgMetadata)
-            detRet = self.selectDetection.makeSourceCatalog(
+            detRet = self.selectDetection.run(
                 table=table,
                 exposure=exposure,
                 sigma=sigma,
