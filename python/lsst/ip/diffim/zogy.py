@@ -98,6 +98,13 @@ class ZogyConfig(pexConfig.Config):
         doc="Science flux scaling factor (Fn in ZOGY paper)"
     )
 
+    scaleByCalibration = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Compute the flux normalization scaling based on the image calibration."
+        "This overrides 'templateFluxScaling' and 'scienceFluxScaling'."
+    )
+
     doTrimKernels = pexConfig.Field(
         dtype=bool,
         default=False,
@@ -176,7 +183,7 @@ class ZogyTask(pipeBase.Task):
             Template exposure ("Reference image" in ZOGY (2016)).
         scienceExposure : `lsst.afw.image.Exposure`
             Science exposure ("New image" in ZOGY (2016)). Must have already been
-            registered and photmetrically matched to template.
+            registered and photometrically matched to template.
         sig1 : `float`
             (Optional) sqrt(variance) of `templateExposure`. If `None`, it is
             computed from the sqrt(mean) of the `templateExposure` variance image.
@@ -290,8 +297,27 @@ class ZogyTask(pipeBase.Task):
             _subtractImageMean(self.template)
             _subtractImageMean(self.science)
 
+        # Define the normalization of each image from the config
         self.Fr = self.config.templateFluxScaling  # default is 1
         self.Fn = self.config.scienceFluxScaling  # default is 1
+        # If 'scaleByCalibration' is True then these norms are overwritten
+        if self.config.scaleByCalibration:
+            calib_template = self.template.getPhotoCalib()
+            calib_science = self.science.getPhotoCalib()
+            if calib_template is None:
+                self.log.warning("No calibration information available for template image.")
+            if calib_science is None:
+                self.log.warning("No calibration information available for science image.")
+            if calib_template is None or calib_science is None:
+                self.log.warning("Due to lack of calibration information, "
+                                 "reverting to templateFluxScaling and scienceFluxScaling.")
+            else:
+                self.Fr = 1/calib_template.getCalibrationMean()
+                self.Fn = 1/calib_science.getCalibrationMean()
+
+        self.log.info("Setting template image scaling to Fr=%f" % self.Fr)
+        self.log.info("Setting science  image scaling to Fn=%f" % self.Fn)
+
         self.padSize = self.config.padSize  # default is 7
 
     def _computeVarianceMean(self, exposure):
