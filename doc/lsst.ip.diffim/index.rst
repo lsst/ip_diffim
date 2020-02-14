@@ -37,6 +37,14 @@ You can find Jira issues for this module under the `ip_diffim <https://jira.lsst
 Task reference
 ==============
 
+.. _lsst.ip.diffim-pipeline-tasks:
+
+Pipeline tasks
+--------------
+
+.. lsst-pipelinetasks::
+   :root: lsst.ip.diffim
+
 .. _lsst.ip.diffim-tasks:
 
 Tasks
