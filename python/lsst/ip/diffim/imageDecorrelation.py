@@ -226,6 +226,117 @@ class DecorrelateALKernelTask(pipeBase.Task):
         return pipeBase.Struct(correctedExposure=correctedExposure, correctionKernel=corrKern)
 
     @staticmethod
+    def _getPaddedShape(*shapes):
+        """Calculate the common shape for FFT.
+
+        Parameters
+        ----------
+        shapes : two or more `tuple` of `int`
+            Shapes of the arrays. All must have the same dimensionality.
+
+        Returns
+        -------
+        paddedShape : tuple of `int`
+            The common shape, with all dimensions even.
+
+        Notes
+        -----
+        For each dimension, gets the smallest even number greater than or equal to N1+N2-1.
+        `N1`, `N2` are the two largest values if the number of shapes given is greater than 2.
+
+
+
+        """
+        S = np.array(shapes, dtype=int)
+        if len(shapes) > 2:
+            S.sort(axis=0)
+            S = S[-2:]
+        paddedShape = np.sum(S, axis=0) - 1
+        paddedShape[paddedShape % 2 != 0] += 1
+        return tuple(paddedShape)
+
+    @staticmethod
+    def _padCornerArray(A, newShape, onwardOp=True):
+        """Zero pad an array to the `right` . Implement also the inverse operation.
+        """
+        if onwardOp:
+            # R[..., 0:A.shape[i], ...] = A
+            cornerR = tuple([slice(None, x) for x in A.shape])
+            cornerA = Ellipsis
+        else:
+            # R[...] = A[ ..., 0:newshape[i], ...]
+            cornerR = Ellipsis
+            cornerA = tuple([slice(None, x) for x in newShape])
+
+        R = np.zeros_like(A, shape=newShape)
+        R[cornerR] = A[cornerA]
+        return R
+
+    @staticmethod
+    def _padCenterOriginArray(A, newShape: tuple, onwardOp=True):
+        """Zero pad an image where the origin is at the center and replace the
+        origin to the corner as required by the periodic input of FFT. Implement also
+        the inverse operation, crop the padding and re-center data.
+
+        Parameters
+        ----------
+        A : `numpy.ndarray`
+            An array to copy from.
+        newShape : `tuple` of `int`
+            The dimensions of the resulting array. For padding, the resulting array
+            must be larger than A in each dimension. For the inverse operation this
+            must be the original, before padding size of the array.
+        onwardOp : bool, optional
+            Selector of the padding (True) or its inverse (False) operation.
+
+        Returns
+        -------
+        R : `numpy.ndarray`
+            The padded or unpadded array with shape of `newShape` and the same dtype as A.
+
+        Notes
+        -----
+        Supports n-dimension arrays. For odd dimensions, the splitting is rounded to
+        put the center element into the new origin (eg. the center pixel of an odd sized
+        kernel will be located at (0,0) ready for FFT).
+
+        """
+        R = np.zeros_like(A, shape=newShape)
+        # The onward and inverse operations should round odd dimension halves at the opposite
+        # sides to get the pixels back to their original positions.
+        if onwardOp:
+            firstHalfSizes = [x//2 for x in A.shape]
+            secondHalfSizes = [x-y for x, y in zip(A.shape, firstHalfSizes)]
+        else:
+            secondHalfSizes = [x//2 for x in newShape]
+            firstHalfSizes = [x-y for x, y in zip(newShape, secondHalfSizes)]
+
+        # R[..., -firstHalf: , ... ] = A[..., :firstHalf, ...]
+        firstAs = [slice(None, x) for x in firstHalfSizes]
+        firstRs = [slice(-x, None) for x in firstHalfSizes]
+
+        # R[..., :secondHalf , ... ] = A[..., -secondHalf:, ...]
+        secondAs = [slice(-x, None) for x in secondHalfSizes]
+        secondRs = [slice(None, x) for x in secondHalfSizes]
+
+        nDim = len(A.shape)
+        # Loop through all 2**nDim corners
+        # (all combination of first and second halves regarding A)
+        for c in range(1 << nDim):
+            cornerA = []
+            cornerR = []
+            for i in range(nDim):
+                if c & (1 << i):
+                    cornerA.append(firstAs[i])
+                    cornerR.append(firstRs[i])
+                else:
+                    cornerA.append(secondAs[i])
+                    cornerR.append(secondRs[i])
+
+            R[tuple(cornerR)] = A[tuple(cornerA)]
+        return R
+
+    @staticmethod
     def _computeDecorrelationKernel(kappa, svar=0.04, tvar=0.04, preConvKernel=None):
         """Compute the Lupton decorrelation post-conv. kernel for decorrelating an
         image difference, based on the PSF-matching kernel.
