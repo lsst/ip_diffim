@@ -74,29 +74,54 @@ def singleGaussian2d(x, y, xc, yc, sigma_x=1., sigma_y=1., theta=0., ampl=1.):
 def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, offset=None,
                    psf_yvary_factor=0., varSourceChange=1/50., theta1=0., theta2=0.,
                    n_sources=500, seed=66, verbose=False):
-    """! Make two exposures: a template and a science exposure.
-    Add random sources with randomly-distributed and identical fluxes and a given PSF, then add noise.
+    """Make two exposures: science and template pair with flux sources and random noise.
     In all cases below, index (1) is the science image, and (2) is the template.
-    @param size tuple givein image pixel size. Pixel coordinates are set to
-    (-size[0]//2:size[0]//2, -size[1]//2:size[1]//2)
-    @param svar,tar variance of noise to be generated on science/template images. Default is 0.04 for both.
-    @param psf1,psf2 std. dev. of (Gaussian) PSFs for the two images in x,y direction. Default is
-    [3.3, 3.3] and [2.2, 2.2] for im1 and im2 respectively.
-    @param offset add a constant (pixel) astrometric offset between the two images
-    @param psf_yvary_factor vary the y-width of the PSF across the x-axis of the science image (zero,
-    the default, means no variation)
-    @param varSourceChange add this amount of fractional flux to a single source closest to
-    the center of the science image
-    @param n_sources the number of sources to add to the images
-    @param seed the numpy random seed to set prior to image generation
-    @param verbose be verbose
 
-    @return im1, im2: the science and template afwImage.Exposures
+    Parameters
+    ----------
+    size : `tuple` of `int`
+        Image pixel size (x,y). Pixel coordinates are set to
+        (-size[0]//2:size[0]//2, -size[1]//2:size[1]//2)
+    svar, tvar : `float`, optional
+        Per pixel variance of the added noise.
+    psf1, psf2 : `float`, optional
+        std. dev. of (Gaussian) PSFs for the two images in x,y direction. Default is
+        [3.3, 3.3] and [2.2, 2.2] for im1 and im2 respectively.
+    offset : `float`, optional
+        add a constant (pixel) astrometric offset between the two images.
+    psf_yvary_factor : `float`, optional
+        psf_yvary_factor vary the y-width of the PSF across the x-axis of the science image (zero,
+        the default, means no variation)
+    varSourceChange : `float`, optional
+        varSourceChange add this amount of fractional flux to a single source closest to
+        the center of the science image.
+    theta1, theta2: `float`, optional
+        PSF Gaussian rotation angles in degrees.
+    n_sources : `int`, optional
+        The number of sources to add to the images. If zero, no sources are
+        generated just background noise.
+    seed : `int`, optional
+        Random number generator seed.
+    verbose : `bool`, optional
+        Print some actual values.
 
-    @note having sources near the edges really messes up the
+    Returns
+    -------
+    im1, im2 : `lsst.afw.image.Exposure`
+        The science and template exposures.
+
+    Notes
+    -----
+    If ``n_sources > 0`` and ``varSourceChange > 0.`` exactly one source,
+    that is closest to the center, will have different fluxes in the two
+    generated images. The flux on the science image will be higher by
+    ``varSourceChange`` fraction.
+
+    Having sources near the edges really messes up the
     fitting (probably because of the convolution). So we make sure no
     sources are near the edge.
-    @note also it seems that having the variable source with a large
+
+    Also it seems that having the variable source with a large
     flux increase also messes up the fitting (seems to lead to
     overfitting -- perhaps to the source itself). This might be fixed by
     adding more constant sources.
@@ -122,17 +147,18 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
     im1 = np.random.normal(scale=np.sqrt(svar), size=x0im.shape)  # variance of science image
     im2 = np.random.normal(scale=np.sqrt(tvar), size=x0im.shape)  # variance of template
 
-    fluxes = np.random.uniform(50, 30000, n_sources)
-    xposns = np.random.uniform(xim.min()+16, xim.max()-5, n_sources)
-    yposns = np.random.uniform(yim.min()+16, yim.max()-5, n_sources)
+    if n_sources > 0:
+        fluxes = np.random.uniform(50, 30000, n_sources)
+        xposns = np.random.uniform(xim.min()+16, xim.max()-5, n_sources)
+        yposns = np.random.uniform(yim.min()+16, yim.max()-5, n_sources)
 
-    # Make the source closest to the center of the image the one that increases in flux
-    ind = np.argmin(xposns**2. + yposns**2.)
+        # Make the source closest to the center of the image the one that increases in flux
+        ind = np.argmin(xposns**2. + yposns**2.)
 
-    # vary the y-width of psf across x-axis of science image (zero means no variation):
-    psf1_yvary = psf_yvary_factor * (yim.mean() - yposns) / yim.max()
-    if verbose:
-        print('PSF y spatial-variation:', psf1_yvary.min(), psf1_yvary.max())
+        # vary the y-width of psf across x-axis of science image (zero means no variation):
+        psf1_yvary = psf_yvary_factor * (yim.mean() - yposns) / yim.max()
+        if verbose:
+            print('PSF y spatial-variation:', psf1_yvary.min(), psf1_yvary.max())
 
     for i in range(n_sources):
         flux = fluxes[i]
@@ -209,8 +235,48 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
     return im1ex, im2ex
 
 
+def estimatePixelCorrelation(B, nDist=40, convEdge=17):
+    """Estimate correlation as a function of pixel distance in the image
+    by sampling pixel pairs.
+
+    Parameters
+    ----------
+    B : `numpy.ndarray` of N x N `float` elements
+        Noise only image with zero pixel expectation value and identical variance
+        in all pixels. Must have equal dimensions.
+    nDist : `int`, optional
+        Estimated distances goes from 0 to nDist-1.
+        nDist must be smaller than the half dimensions of B.
+    convEdge : `int`, optional
+        Edge width where convolution did not happen.
+
+    Returns
+    -------
+    S : `numpy.ndarray` of nDist `float` elements
+        Correlation from 0 to nDist-1 pix distance. Pixels are normed by their
+        variance estimation. S[0], the autocorrelation, should be close to 1.
+    """
+    S = np.zeros(nDist, dtype=float)
+    nSample = 10000
+    # Cannot use nDist wide edge, otherwise 2nd pixel can go off the image.
+    # Don't bother with it.
+    A = B/np.sqrt(np.mean(B[convEdge:-convEdge, convEdge:-convEdge]
+                          * B[convEdge:-convEdge, convEdge:-convEdge]))
+    lEdge = nDist + convEdge
+    rEdge = B.shape[0] - lEdge
+    for r in range(nDist):
+        ind1 = np.random.randint(lEdge, rEdge, (2, nSample))
+        ind2 = np.copy(ind1)
+        # generate delta x,y in random directions uniformly
+        c_dxy = np.exp(2.j*np.pi*np.random.random(nSample))
+        ind2[0] += np.around(np.real(c_dxy)*r).astype(int)
+        ind2[1] += np.around(np.imag(c_dxy)*r).astype(int)
+        S[r] = np.sum(A[ind1[0], ind1[1]] * A[ind2[0], ind2[1]])/nSample
+    return S
+
+
 class DiffimCorrectionTest(lsst.utils.tests.TestCase):
-    """!A test case for the diffim image decorrelation algorithm.
+    """A test case for the diffim image decorrelation algorithm.
     """
 
     def setUp(self):
@@ -226,7 +292,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
                                                        "NO_DATA", "DETECTED_NEGATIVE"]))
 
     def _setUpImages(self, svar=0.04, tvar=0.04, varyPsf=0.):
-        """!Generate a fake aligned template and science image.
+        """Generate a fake aligned template and science image.
         """
 
         self.svar = svar  # variance of noise in science image
@@ -235,6 +301,17 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         self.im1ex, self.im2ex \
             = makeFakeImages(svar=self.svar, tvar=self.tvar, psf1=self.psf1_sigma, psf2=self.psf2_sigma,
                              n_sources=50, psf_yvary_factor=varyPsf, verbose=False)
+
+    def _setUpSourcelessImages(self, svar, tvar):
+        """Generate noise only template and science images.
+        """
+
+        self.svar = svar  # variance of noise in science image
+        self.tvar = tvar  # variance of noise in template image
+
+        self.im1ex, self.im2ex = makeFakeImages(
+            svar=self.svar, tvar=self.tvar, psf1=self.psf1_sigma, psf2=self.psf2_sigma,
+            n_sources=0, seed=22, varSourceChange=0, psf_yvary_factor=0)
 
     def _computeVarianceMean(self, maskedIm):
         statObj = afwMath.makeStatistics(maskedIm.getVariance(),
@@ -347,6 +424,45 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         # Template variance is higher than that of the science img.
         self._testDiffimCorrection(svar=0.04, tvar=0.08)
 
+    def testNoiseDiffimCorrection(self):
+        """Test correction by estimating correlation directly on a noise difference image.
+
+        Notes
+        ------
+
+        See `lsst-dm/diffimTests` notebook `DM-24371_correlation_estimate.ipynb`
+        for further details of how the correlation looks like in the uncorrected
+        and corrected cases and where the tolerance numbers come from.
+        """
+        svar = 1.
+        tvar = 100.
+        # Based on DM-24371_correlation_estimate.ipynb
+        someCorrelationThreshold = 0.2
+
+        self._setUpSourcelessImages(svar=svar, tvar=tvar)
+        diffExp, mKernel, expected_var = self._makeAndTestUncorrectedDiffim()
+        corrected_diffExp = self._runDecorrelationTask(diffExp, mKernel)
+
+        rho_sci = estimatePixelCorrelation(self.im1ex.getImage().getArray())
+        rho_rawdiff = estimatePixelCorrelation(diffExp.getImage().getArray())
+        rho_corrdiff = estimatePixelCorrelation(corrected_diffExp.getImage().getArray())
+
+        # Autocorrelation sanity check
+        self.assertFloatsAlmostEqual(rho_sci[0], 1., atol=0.1, rtol=None)
+        self.assertFloatsAlmostEqual(rho_rawdiff[0], 1., atol=0.1, rtol=None)
+        self.assertFloatsAlmostEqual(rho_corrdiff[0], 1., atol=0.1, rtol=None)
+
+        # Uncorrelated input check
+        self.assertFloatsAlmostEqual(rho_sci[1:], 0., atol=0.1, rtol=None)
+
+        # Without correction there should be correlation up to a few pixel distance
+        self.assertGreater(rho_rawdiff[1], someCorrelationThreshold)
+        self.assertGreater(rho_rawdiff[2], someCorrelationThreshold)
+        self.assertGreater(rho_rawdiff[3], someCorrelationThreshold)
+
+        # Uncorrelated corrected image check
+        self.assertFloatsAlmostEqual(rho_corrdiff[1:], 0., atol=0.1, rtol=None)
+
     def _runDecorrelationTaskMapReduced(self, diffExp, mKernel):
         """ Run decorrelation using the imageMapReducer.
         """
@@ -372,6 +488,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         self.assertMaskedImagesAlmostEqual(corrected_diffExp.getMaskedImage(),
                                            corrected_diffExp_OLD.getMaskedImage())
 
+    @unittest.skip("DM-21868 ImageMapReduce usage is not yet supported")
     def testDiffimCorrection_mapReduced(self):
         """ Test decorrelated diffim when using the imageMapReduce task.
             Compare results with those from the original DecorrelateALKernelTask.
