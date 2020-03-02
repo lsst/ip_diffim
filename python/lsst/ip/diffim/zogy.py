@@ -346,7 +346,7 @@ class ZogyTask(pipeBase.Task):
             The padded copy of the input `psf`.
         """
         newArr = np.zeros(size)
-        # The center of the PSF sould be placed in the center-right. 
+        # The center of the PSF sould be placed in the center-right.
         offset = [size[0]//2 - psf.shape[0]//2, size[1]//2 - psf.shape[1]//2]
         tmp = newArr[offset[0]:(psf.shape[0] + offset[0]), offset[1]:(psf.shape[1] + offset[1])]
         tmp[:, :] = psf
