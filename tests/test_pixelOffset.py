@@ -12,8 +12,8 @@ class PixelOffsetTest(unittest.TestCase):
 
     @staticmethod
     def _makeImage(w, h, psfsize, psfsig, set_peak=False):
-        """Make fake images for testing. If set_peak=True, the
-        image would have a peak at [50][50].
+        """Make fake images for testing. If set_peak is True, the
+        image would have a peak at [300][300].
         """
         # Make image
         image = afwImage.MaskedImageF(w, h)
