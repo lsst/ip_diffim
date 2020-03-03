@@ -198,65 +198,90 @@ class DecorrelateALKernelTask(pipeBase.Task):
                 outExposure = subtractedExposure.clone()
                 return pipeBase.Struct(correctedExposure=outExposure, correctionKernel=None)
 
+        tOverSVar = tvar/svar
+        if tOverSVar > 1e8:
+            self.log.warn("Science image variance is much smaller than template"
+                          f", tavar/svar:{tOverSVar:.2e}")
+
         var = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance (uncorrected diffim): %f", var)
 
-        pck = None
         if preConvKernel is not None:
-            self.log.info('Using a pre-convolution kernel as part of decorrelation.')
+            self.log.info('Using a pre-convolution kernel as part of decorrelation correction.')
             kimg2 = afwImage.ImageD(preConvKernel.getDimensions())
             preConvKernel.computeImage(kimg2, False)
-            pck = kimg2.getArray()
-        corrKernel = DecorrelateALKernelTask._computeDecorrelationKernel(kimg.getArray(), svar, tvar,
-                                                                         pck)
-        correctedExposure, corrKern = DecorrelateALKernelTask._doConvolve(subtractedExposure, corrKernel)
+            pckArr = kimg2.getArray()
 
-        # Compute the subtracted exposure's updated psf
-        psf = subtractedExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen)).getArray()
-        psfc = DecorrelateALKernelTask.computeCorrectedDiffimPsf(corrKernel, psf, svar=svar, tvar=tvar)
-        psfcI = afwImage.ImageD(psfc.shape[0], psfc.shape[1])
-        psfcI.getArray()[:, :] = psfc
+        kArr = kimg.getArray()
+        expArr = subtractedExposure.getMaskedImage().getArray()
+        varArr = subtractedExposure.getMaskedImage().getVariance()
+        psfArr = subtractedExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen)).getArray()
+
+        # Determine the common shape
+        if preConvKernel is None:
+            self.freqSpaceShape = self.getCommonShape(kArr.shape, psfArr.shape, expArr.shape)
+            corrft = self.computeCorrection(kArr, svar, tvar)
+        else:
+            self.freqSpaceShape = self.getCommonShape(pckArr.shape, kArr.shape,
+                                                      psfArr.shape, expArr.shape)
+            corrft = self.computeCorrection(kArr, svar, tvar, preConvArr=pckArr)
+
+        expArr = self.computeCorrectedImage(corrft, expArr)
+        # The whitening should remove the correlation and scale the diffexp variance
+        # to svar + tvar on average
+        varArr = exposure.getMaskedImage().getVariance() + templateExposure.getMaskedImage().getVariance()
+        psfArr = self.computeCorrectedDiffimPsf(corrft, psfArr)
+
+        psfcI = afwImage.ImageD(psfArr.shape[0], psfArr.shape[1])
+        psfcI.getArray()[...] = psfArr
         psfcK = afwMath.FixedKernel(psfcI)
         psfNew = measAlg.KernelPsf(psfcK)
+
+        correctedExposure = subtractedExposure.clone()
+        correctedExposure.getMaskedImage().getArray()[...] = expArr
+        correctedExposure.getMaskedImage().getVariance()[...] = varArr
         correctedExposure.setPsf(psfNew)
 
         var = self.computeVarianceMean(correctedExposure)
         self.log.info("Variance (corrected diffim): %f", var)
 
-        return pipeBase.Struct(correctedExposure=correctedExposure, correctionKernel=corrKern)
+        return pipeBase.Struct(correctedExposure=correctedExposure, )
 
     @staticmethod
-    def _getPaddedShape(*shapes):
+    def getCommonShape(*shapes):
         """Calculate the common shape for FFT.
 
         Parameters
         ----------
-        shapes : two or more `tuple` of `int`
+        shapes : one or more`tuple` of `int`
             Shapes of the arrays. All must have the same dimensionality.
+            At least one shape must be provided.
 
         Returns
         -------
-        paddedShape : tuple of `int`
+        commonShape : tuple of `int`
             The common shape, with all dimensions even.
 
         Notes
         -----
-        For each dimension, gets the smallest even number greater than or equal to N1+N2-1.
-        `N1`, `N2` are the two largest values if the number of shapes given is greater than 2.
-
-
+        For each dimension, gets the smallest even number greater than or equal to
+        `N1+N2-1` where `N1` and `N2` are the two largest values.
+        In case of only one shape given, rounds up to even each dimension value.
 
         """
         S = np.array(shapes, dtype=int)
         if len(shapes) > 2:
             S.sort(axis=0)
             S = S[-2:]
-        paddedShape = np.sum(S, axis=0) - 1
-        paddedShape[paddedShape % 2 != 0] += 1
-        return tuple(paddedShape)
+        if len(shapes) > 1:
+            commonShape = np.sum(S, axis=0) - 1
+        else:
+            commonShape = S[0]
+        commonShape[commonShape % 2 != 0] += 1
+        return tuple(commonShape)
 
     @staticmethod
-    def _padCornerArray(A, newShape, onwardOp=True):
+    def padCornerArray(A, newShape: tuple, onwardOp=True):
         """Zero pad an array to the `right` . Implement also the inverse operation.
         """
         if onwardOp:
@@ -273,7 +298,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         return R
 
     @staticmethod
-    def _padCenterOriginArray(A, newShape: tuple, onwardOp=True):
+    def padCenterOriginArray(A, newShape: tuple, onwardOp=True):
         """Zero pad an image where the origin is at the center and replace the
         origin to the corner as required by the periodic input of FFT. Implement also
         the inverse operation, crop the padding and re-center data.
@@ -336,8 +361,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
             R[tuple(cornerR)] = A[tuple(cornerA)]
         return R
 
-    @staticmethod
-    def _computeDecorrelationKernel(kappa, svar=0.04, tvar=0.04, preConvKernel=None):
+    def computeCorrection(self, kappa, svar, tvar, preConvArr=None):
         """Compute the Lupton decorrelation post-conv. kernel for decorrelating an
         image difference, based on the PSF-matching kernel.
 
@@ -348,164 +372,57 @@ class DecorrelateALKernelTask(pipeBase.Task):
         svar : `float`, optional
             Average variance of science image used for PSF matching
         tvar : `float`, optional
-            Average variance of template image used for PSF matching
+            Average variance of the template (matched) image used for PSF matching
         preConvKernel If not None, then pre-filtering was applied
             to science exposure, and this is the pre-convolution kernel.
 
         Returns
         -------
-        fkernel : `numpy.ndarray`
-            a 2-d numpy.array containing the correction kernel
+        corrft : `numpy.ndarray` dtype complex but contains real numbers
+            TBD
 
         Notes
         -----
-        As currently implemented, kappa is a static (single, non-spatially-varying) kernel.
+        kappa, and preConvKernel must have shape of self.freqSpaceShape.
+        The maximum correction factor converges to sqrt(tvar/svar) towards high frequencies.
+        This should be a plausible value.
         """
-        # Psf should not be <= 0, and messes up denominator; set the minimum value to MIN_KERNEL
-        MIN_KERNEL = 1.0e-4
-
-        kappa = DecorrelateALKernelTask._fixOddKernel(kappa)
-        if preConvKernel is not None:
-            mk = DecorrelateALKernelTask._fixOddKernel(preConvKernel)
-            # Need to make them the same size
-            if kappa.shape[0] < mk.shape[0]:
-                diff = (mk.shape[0] - kappa.shape[0]) // 2
-                kappa = np.pad(kappa, (diff, diff), mode='constant')
-            elif kappa.shape[0] > mk.shape[0]:
-                diff = (kappa.shape[0] - mk.shape[0]) // 2
-                mk = np.pad(mk, (diff, diff), mode='constant')
-
+        kappa = self.padCenterOriginArray(kappa, self.freqSpaceShape)
         kft = np.fft.fft2(kappa)
         kft2 = np.conj(kft) * kft
-        kft2[np.abs(kft2) < MIN_KERNEL] = MIN_KERNEL
-        denom = svar + tvar * kft2
-        if preConvKernel is not None:
-            mk = np.fft.fft2(mk)
+        if preConvArr is None:
+            denom = svar + tvar * kft2
+        else:
+            preConvArr = self.padCenterOriginArray(preConvArr, self.freqSpaceShape)
+            mk = np.fft.fft2(preConvArr)
             mk2 = np.conj(mk) * mk
-            mk2[np.abs(mk2) < MIN_KERNEL] = MIN_KERNEL
             denom = svar * mk2 + tvar * kft2
-        denom[np.abs(denom) < MIN_KERNEL] = MIN_KERNEL
         kft = np.sqrt((svar + tvar) / denom)
-        pck = np.fft.ifft2(kft)
-        pck = np.fft.ifftshift(pck.real)
-        fkernel = DecorrelateALKernelTask._fixEvenKernel(pck)
-        if preConvKernel is not None:
-            # This is not pretty but seems to be necessary as the preConvKernel term seems to lead
-            # to a kernel that amplifies the noise way too much.
-            fkernel[fkernel > -np.min(fkernel)] = -np.min(fkernel)
+        return kft
 
-        # I think we may need to "reverse" the PSF, as in the ZOGY (and Kaiser) papers...
-        # This is the same as taking the complex conjugate in Fourier space before FFT-ing back to real space.
-        if False:  # TBD: figure this out. For now, we are turning it off.
-            fkernel = fkernel[::-1, :]
-
-        return fkernel
-
-    @staticmethod
-    def computeCorrectedDiffimPsf(kappa, psf, svar=0.04, tvar=0.04):
+    def computeCorrectedDiffimPsf(self, corrft, psfArr):
         """Compute the (decorrelated) difference image's new PSF.
         new_psf = psf(k) * sqrt((svar + tvar) / (svar + tvar * kappa_ft(k)**2))
 
         Parameters
         ----------
-        kappa : `numpy.ndarray`
-            A matching kernel array derived from Alard & Lupton PSF matching
-        psf : `numpy.ndarray`
-            The uncorrected psf array of the science image (and also of the diffim)
-        svar : `float`, optional
-            Average variance of science image used for PSF matching
-        tvar : `float`, optional
-            Average variance of template image used for PSF matching
+        TBD
 
         Returns
         -------
-        pcf : `numpy.ndarray`
-            a 2-d numpy.array containing the new PSF
+        TBD
         """
-        def post_conv_psf_ft2(psf, kernel, svar, tvar):
-            # Pad psf or kernel symmetrically to make them the same size!
-            # Note this assumes they are both square (width == height)
-            if psf.shape[0] < kernel.shape[0]:
-                diff = (kernel.shape[0] - psf.shape[0]) // 2
-                psf = np.pad(psf, (diff, diff), mode='constant')
-            elif psf.shape[0] > kernel.shape[0]:
-                diff = (psf.shape[0] - kernel.shape[0]) // 2
-                kernel = np.pad(kernel, (diff, diff), mode='constant')
-            psf_ft = np.fft.fft2(psf)
-            kft = np.fft.fft2(kernel)
-            out = psf_ft * np.sqrt((svar + tvar) / (svar + tvar * kft**2))
-            return out
+        psfShape = psfArr.shape
+        psfArr = self.padCenterOriginArray(psfArr, self.freqSpaceShape)
+        psfArr = np.fft.fft2(psfArr)
+        psfArr *= corrft
+        psfArr = np.fft.ifft2(psfArr)
+        psfArr = psfArr.real
+        psfArr = self.padCenterOriginArray(psfArr, psfShape, onwardOp=False)
+        psfArr = psfArr/psfArr.sum()
+        return psfArr
 
-        def post_conv_psf(psf, kernel, svar, tvar):
-            kft = post_conv_psf_ft2(psf, kernel, svar, tvar)
-            out = np.fft.ifft2(kft)
-            return out
-
-        pcf = post_conv_psf(psf=psf, kernel=kappa, svar=svar, tvar=tvar)
-        pcf = pcf.real / pcf.real.sum()
-        return pcf
-
-    @staticmethod
-    def _fixOddKernel(kernel):
-        """Take a kernel with odd dimensions and make them even for FFT
-
-        Parameters
-        ----------
-        kernel : `numpy.array`
-            a numpy.array
-
-        Returns
-        -------
-        out : `numpy.array`
-            a fixed kernel numpy.array. Returns a copy if the dimensions needed to change;
-            otherwise just return the input kernel.
-        """
-        # Note this works best for the FFT if we left-pad
-        out = kernel
-        changed = False
-        if (out.shape[0] % 2) == 1:
-            out = np.pad(out, ((1, 0), (0, 0)), mode='constant')
-            changed = True
-        if (out.shape[1] % 2) == 1:
-            out = np.pad(out, ((0, 0), (1, 0)), mode='constant')
-            changed = True
-        if changed:
-            out *= (np.mean(kernel) / np.mean(out))  # need to re-scale to same mean for FFT
-        return out
-
-    @staticmethod
-    def _fixEvenKernel(kernel):
-        """Take a kernel with even dimensions and make them odd, centered correctly.
-
-        Parameters
-        ----------
-        kernel : `numpy.array`
-            a numpy.array
-
-        Returns
-        -------
-        out : `numpy.array`
-            a fixed kernel numpy.array
-        """
-        # Make sure the peak (close to a delta-function) is in the center!
-        maxloc = np.unravel_index(np.argmax(kernel), kernel.shape)
-        out = np.roll(kernel, kernel.shape[0]//2 - maxloc[0], axis=0)
-        out = np.roll(out, out.shape[1]//2 - maxloc[1], axis=1)
-        # Make sure it is odd-dimensioned by trimming it.
-        if (out.shape[0] % 2) == 0:
-            maxloc = np.unravel_index(np.argmax(out), out.shape)
-            if out.shape[0] - maxloc[0] > maxloc[0]:
-                out = out[:-1, :]
-            else:
-                out = out[1:, :]
-            if out.shape[1] - maxloc[1] > maxloc[1]:
-                out = out[:, :-1]
-            else:
-                out = out[:, 1:]
-        return out
-
-    @staticmethod
-    def _doConvolve(exposure, kernel):
+    def computeCorrectedImage(self, corrft, expArr):
         """Convolve an Exposure with a decorrelation convolution kernel.
 
         Parameters
@@ -517,25 +434,27 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         Returns
         -------
-        out : `lsst.afw.image.Exposure`
-            a new Exposure with the convolved pixels and the (possibly
-            re-centered) kernel.
+        out :
+            TBD
 
         Notes
         -----
-        We re-center the kernel if necessary and return the possibly re-centered kernel
-        """
-        kernelImg = afwImage.ImageD(kernel.shape[0], kernel.shape[1])
-        kernelImg.getArray()[:, :] = kernel
-        kern = afwMath.FixedKernel(kernelImg)
-        maxloc = np.unravel_index(np.argmax(kernel), kernel.shape)
-        kern.setCtrX(maxloc[0])
-        kern.setCtrY(maxloc[1])
-        outExp = exposure.clone()  # Do this to keep WCS, PSF, masks, etc.
-        convCntrl = afwMath.ConvolutionControl(False, True, 0)
-        afwMath.convolve(outExp.getMaskedImage(), exposure.getMaskedImage(), kern, convCntrl)
 
-        return outExp, kern
+        """
+        expShape = expArr.shape
+        filtInf = np.isinf(expArr)
+        filtNan = np.isnan(expArr)
+        expArr[filtInf] = np.nan
+        expArr[filtInf | filtNan] = np.nanmean(expArr)
+        expArr = self._padCornerArray(expArr, self.freqSpaceShape)
+        expft = np.fft.fft2(expArr)
+        expft *= corrft
+        expArr = np.fft.ifft2(expArr)
+        expArr = expArr.real
+        expArr = self._padCornerArray(expArr, expShape, onwardOp=False)
+        expArr[filtNan] = np.nan
+        expArr[filtInf] = np.inf
+        return expArr
 
 
 class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
