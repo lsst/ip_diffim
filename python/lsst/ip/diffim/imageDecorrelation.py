@@ -201,7 +201,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         tOverSVar = tvar/svar
         if tOverSVar > 1e8:
             self.log.warn("Science image variance is much smaller than template"
-                          f", tavar/svar:{tOverSVar:.2e}")
+                          f", tvar/svar:{tOverSVar:.2e}")
 
         var = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance (uncorrected diffim): %f", var)
@@ -219,11 +219,11 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         # Determine the common shape
         if preConvKernel is None:
-            self.freqSpaceShape = self.getCommonShape(kArr.shape, psfArr.shape, expArr.shape)
+            self.computeCommonShape(kArr.shape, psfArr.shape, expArr.shape)
             corrft = self.computeCorrection(kArr, svar, tvar)
         else:
-            self.freqSpaceShape = self.getCommonShape(pckArr.shape, kArr.shape,
-                                                      psfArr.shape, expArr.shape)
+            self.computeCommonShape(pckArr.shape, kArr.shape,
+                                    psfArr.shape, expArr.shape)
             corrft = self.computeCorrection(kArr, svar, tvar, preConvArr=pckArr)
 
         expArr = self.computeCorrectedImage(corrft, expArr)
@@ -243,13 +243,12 @@ class DecorrelateALKernelTask(pipeBase.Task):
         correctedExposure.setPsf(psfNew)
 
         var = self.computeVarianceMean(correctedExposure)
-        self.log.info("Variance (corrected diffim): %f", var)
+        self.log.info(f"Variance (corrected diffim): {var:.1f}")
 
         return pipeBase.Struct(correctedExposure=correctedExposure, )
 
-    @staticmethod
-    def getCommonShape(*shapes):
-        """Calculate the common shape for FFT.
+    def computeCommonShape(*shapes):
+        """Calculate and sets internally the common shape for FFT operations.
 
         Parameters
         ----------
@@ -259,15 +258,13 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         Returns
         -------
-        commonShape : tuple of `int`
-            The common shape, with all dimensions even.
+        None
 
         Notes
         -----
         For each dimension, gets the smallest even number greater than or equal to
         `N1+N2-1` where `N1` and `N2` are the two largest values.
         In case of only one shape given, rounds up to even each dimension value.
-
         """
         S = np.array(shapes, dtype=int)
         if len(shapes) > 2:
@@ -278,7 +275,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         else:
             commonShape = S[0]
         commonShape[commonShape % 2 != 0] += 1
-        return tuple(commonShape)
+        self.freqSpaceShape = tuple(commonShape)
 
     @staticmethod
     def padCornerArray(A, newShape: tuple, onwardOp=True):
@@ -326,39 +323,21 @@ class DecorrelateALKernelTask(pipeBase.Task):
         kernel will be located at (0,0) ready for FFT).
 
         """
-        R = np.zeros_like(A, shape=newShape)
+
         # The onward and inverse operations should round odd dimension halves at the opposite
         # sides to get the pixels back to their original positions.
         if onwardOp:
-            firstHalfSizes = [x//2 for x in A.shape]
-            secondHalfSizes = [x-y for x, y in zip(A.shape, firstHalfSizes)]
+            firstHalves = [x//2 for x in A.shape]
+            secondHalves = [x-y for x, y in zip(A.shape, firstHalves)]
         else:
-            secondHalfSizes = [x//2 for x in newShape]
-            firstHalfSizes = [x-y for x, y in zip(newShape, secondHalfSizes)]
+            secondHalves = [x//2 for x in newShape]
+            firstHalves = [x-y for x, y in zip(newShape, secondHalves)]
 
-        # R[..., -firstHalf: , ... ] = A[..., :firstHalf, ...]
-        firstAs = [slice(None, x) for x in firstHalfSizes]
-        firstRs = [slice(-x, None) for x in firstHalfSizes]
-
-        # R[..., :secondHalf , ... ] = A[..., -secondHalf:, ...]
-        secondAs = [slice(-x, None) for x in secondHalfSizes]
-        secondRs = [slice(None, x) for x in secondHalfSizes]
-
-        nDim = len(A.shape)
-        # Loop through all 2**nDim corners
-        # (all combination of first and second halves regarding A)
-        for c in range(1 << nDim):
-            cornerA = []
-            cornerR = []
-            for i in range(nDim):
-                if c & (1 << i):
-                    cornerA.append(firstAs[i])
-                    cornerR.append(firstRs[i])
-                else:
-                    cornerA.append(secondAs[i])
-                    cornerR.append(secondRs[i])
-
-            R[tuple(cornerR)] = A[tuple(cornerA)]
+        R = np.zeros_like(A, shape=newShape)
+        R[-firstHalves[0]:, -firstHalves[1]:] = A[:firstHalves[0], :firstHalves[1]]
+        R[:secondHalves[0], -firstHalves[1]:] = A[-secondHalves[0]:, :firstHalves[1]]
+        R[:secondHalves[0], :secondHalves[1]] = A[-secondHalves[0]:, -secondHalves[1]:]
+        R[-firstHalves[0]:, :secondHalves[1]] = A[:firstHalves[0], -secondHalves[1]:]
         return R
 
     def computeCorrection(self, kappa, svar, tvar, preConvArr=None):
@@ -446,12 +425,12 @@ class DecorrelateALKernelTask(pipeBase.Task):
         filtNan = np.isnan(expArr)
         expArr[filtInf] = np.nan
         expArr[filtInf | filtNan] = np.nanmean(expArr)
-        expArr = self._padCornerArray(expArr, self.freqSpaceShape)
+        expArr = self.padCenterOriginArray(expArr, self.freqSpaceShape)
         expft = np.fft.fft2(expArr)
         expft *= corrft
         expArr = np.fft.ifft2(expArr)
         expArr = expArr.real
-        expArr = self._padCornerArray(expArr, expShape, onwardOp=False)
+        expArr = self.padCenterOriginArray(expArr, expShape, onwardOp=False)
         expArr[filtNan] = np.nan
         expArr[filtInf] = np.inf
         return expArr
