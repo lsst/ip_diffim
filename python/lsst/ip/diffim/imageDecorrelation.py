@@ -213,23 +213,21 @@ class DecorrelateALKernelTask(pipeBase.Task):
             pckArr = kimg2.getArray()
 
         kArr = kimg.getArray()
-        expArr = subtractedExposure.getMaskedImage().getArray()
-        varArr = subtractedExposure.getMaskedImage().getVariance()
+        diffExpArr = subtractedExposure.getMaskedImage().getImage().getArray()
         psfArr = subtractedExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen)).getArray()
 
         # Determine the common shape
         if preConvKernel is None:
-            self.computeCommonShape(kArr.shape, psfArr.shape, expArr.shape)
+            self.computeCommonShape(kArr.shape, psfArr.shape, diffExpArr.shape)
             corrft = self.computeCorrection(kArr, svar, tvar)
         else:
             self.computeCommonShape(pckArr.shape, kArr.shape,
-                                    psfArr.shape, expArr.shape)
+                                    psfArr.shape, diffExpArr.shape)
             corrft = self.computeCorrection(kArr, svar, tvar, preConvArr=pckArr)
 
-        expArr = self.computeCorrectedImage(corrft, expArr)
+        diffExpArr = self.computeCorrectedImage(corrft, diffExpArr)
         # The whitening should remove the correlation and scale the diffexp variance
         # to svar + tvar on average
-        varArr = exposure.getMaskedImage().getVariance() + templateExposure.getMaskedImage().getVariance()
         psfArr = self.computeCorrectedDiffimPsf(corrft, psfArr)
 
         psfcI = afwImage.ImageD(psfArr.shape[0], psfArr.shape[1])
@@ -238,16 +236,18 @@ class DecorrelateALKernelTask(pipeBase.Task):
         psfNew = measAlg.KernelPsf(psfcK)
 
         correctedExposure = subtractedExposure.clone()
-        correctedExposure.getMaskedImage().getArray()[...] = expArr
-        correctedExposure.getMaskedImage().getVariance()[...] = varArr
+        correctedExposure.getMaskedImage().getImage().getArray()[...] = diffExpArr
+        var = correctedExposure.getMaskedImage().getVariance()
+        var.assign(exposure.getMaskedImage().getVariance())
+        var += templateExposure.getMaskedImage().getVariance()
         correctedExposure.setPsf(psfNew)
 
         var = self.computeVarianceMean(correctedExposure)
-        self.log.info(f"Variance (corrected diffim): {var:.1f}")
+        self.log.info(f"Variance (corrected diffim): {var:.2e}")
 
         return pipeBase.Struct(correctedExposure=correctedExposure, )
 
-    def computeCommonShape(*shapes):
+    def computeCommonShape(self, *shapes):
         """Calculate and sets internally the common shape for FFT operations.
 
         Parameters
@@ -276,23 +276,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
             commonShape = S[0]
         commonShape[commonShape % 2 != 0] += 1
         self.freqSpaceShape = tuple(commonShape)
-
-    @staticmethod
-    def padCornerArray(A, newShape: tuple, onwardOp=True):
-        """Zero pad an array to the `right` . Implement also the inverse operation.
-        """
-        if onwardOp:
-            # R[..., 0:A.shape[i], ...] = A
-            cornerR = tuple([slice(None, x) for x in A.shape])
-            cornerA = Ellipsis
-        else:
-            # R[...] = A[ ..., 0:newshape[i], ...]
-            cornerR = Ellipsis
-            cornerA = tuple([slice(None, x) for x in newShape])
-
-        R = np.zeros_like(A, shape=newShape)
-        R[cornerR] = A[cornerA]
-        return R
+        self.log.info(f"Common frequency space shape {self.freqSpaceShape}")
 
     @staticmethod
     def padCenterOriginArray(A, newShape: tuple, onwardOp=True):
@@ -426,8 +410,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
         expArr[filtInf] = np.nan
         expArr[filtInf | filtNan] = np.nanmean(expArr)
         expArr = self.padCenterOriginArray(expArr, self.freqSpaceShape)
-        expft = np.fft.fft2(expArr)
-        expft *= corrft
+        expArr = np.fft.fft2(expArr)
+        expArr *= corrft
         expArr = np.fft.ifft2(expArr)
         expArr = expArr.real
         expArr = self.padCenterOriginArray(expArr, expShape, onwardOp=False)
@@ -522,7 +506,7 @@ class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
         self.log.setLevel(logLevel)  # reset the log level
 
         diffim = res.correctedExposure.Factory(res.correctedExposure, subExposure.getBBox())
-        out = pipeBase.Struct(subExposure=diffim, decorrelationKernel=res.correctionKernel)
+        out = pipeBase.Struct(subExposure=diffim, )
         return out
 
 
