@@ -124,9 +124,10 @@ class DecorrelateALKernelTask(pipeBase.Task):
         Parameters
         ----------
         exposure : `lsst.afw.image.Exposure`
-            The science afwImage.Exposure used for PSF matching
+            The original science exposure (before `preConvKernel` applied) used for PSF matching.
         templateExposure : `lsst.afw.image.Exposure`
-            The template exposure used for PSF matching
+            The original template exposure (before matched to the science exposure
+            by `psfMatchingKernel`) warped into the science exposure dimensions.
         subtractedExposure :
             the subtracted exposure produced by
             `ip_diffim.ImagePsfMatchTask.subtractExposures()`
@@ -142,7 +143,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
             Y-pixel coordinate to use for computing constant matching kernel to use
             If `None` (default), then use the center of the image.
         svar : `float`, optional
-            image variance for science image
+            Image variance for science image
             If `None` (default) then compute the variance over the entire input science image.
         tvar : `float`, optional
             Image variance for template image
@@ -150,26 +151,25 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         Returns
         -------
-        result : `Struct`
-            a `lsst.pipe.base.Struct` containing:
-
+        result : `lsst.pipe.base.Struct`
             - ``correctedExposure`` : the decorrelated diffim
-            - ``correctionKernel`` : the decorrelation correction kernel (which may be ignored)
 
         Notes
         -----
-        The `subtractedExposure` is NOT updated
+        The `subtractedExposure` is NOT updated. The returned `correctedExposure` has an updated but fixed
+        PSF.
 
-        The returned `correctedExposure` has an updated PSF as well.
+        In this task, it is _always_ the `templateExposure` that was matched to the `exposure`
+        by `psfMatchingKernel`. Swap arguments accordingly if actually the science exposure was matched
+        to a co-added template.
+
+        The `templateExposure` and `exposure` image dimensions must be the same.
 
         Here we currently convert a spatially-varying matching kernel into a constant kernel,
         just by computing it at the center of the image (tickets DM-6243, DM-6244).
 
         We are also using a constant accross-the-image measure of sigma (sqrt(variance)) to compute
         the decorrelation kernel.
-
-        Still TBD (ticket DM-6580): understand whether the convolution is correctly modifying
-        the variance plane of the new subtractedExposure.
         """
         spatialKernel = psfMatchingKernel
         kimg = afwImage.ImageD(spatialKernel.getDimensions())
@@ -196,7 +196,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
                     np.all(np.isnan(templateExposure.getMaskedImage().getImage().getArray()))):
                 self.log.warn('Template or science image is entirely NaNs: skipping decorrelation.')
                 outExposure = subtractedExposure.clone()
-                return pipeBase.Struct(correctedExposure=outExposure, correctionKernel=None)
+                return pipeBase.Struct(correctedExposure=outExposure, )
 
         tOverSVar = tvar/svar
         if tOverSVar > 1e8:
@@ -214,7 +214,9 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         kArr = kimg.getArray()
         diffExpArr = subtractedExposure.getMaskedImage().getImage().getArray()
-        psfArr = subtractedExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen)).getArray()
+        psfImg = subtractedExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen))
+        psfDim = psfImg.getDimensions()
+        psfArr = psfImg.getArray()
 
         # Determine the common shape
         if preConvKernel is None:
@@ -226,17 +228,18 @@ class DecorrelateALKernelTask(pipeBase.Task):
             corrft = self.computeCorrection(kArr, svar, tvar, preConvArr=pckArr)
 
         diffExpArr = self.computeCorrectedImage(corrft, diffExpArr)
-        # The whitening should remove the correlation and scale the diffexp variance
-        # to svar + tvar on average
         psfArr = self.computeCorrectedDiffimPsf(corrft, psfArr)
 
-        psfcI = afwImage.ImageD(psfArr.shape[0], psfArr.shape[1])
+        psfcI = afwImage.ImageD(psfDim)
         psfcI.getArray()[...] = psfArr
         psfcK = afwMath.FixedKernel(psfcI)
         psfNew = measAlg.KernelPsf(psfcK)
 
         correctedExposure = subtractedExposure.clone()
         correctedExposure.getMaskedImage().getImage().getArray()[...] = diffExpArr
+        # The subtracted exposure variance plane is already correlated, we cannot propagate
+        # it through another convolution; instead we need to use the uncorrelated originals
+        # The whitening should scale it to svar + tvar on average
         var = correctedExposure.getMaskedImage().getVariance()
         var.assign(exposure.getMaskedImage().getVariance())
         var += templateExposure.getMaskedImage().getVariance()
