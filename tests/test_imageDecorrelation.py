@@ -208,6 +208,7 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
 
     return im1ex, im2ex
 
+
 @unittest.skip("DM-21868 Tests are disabled in development branch")
 class DiffimCorrectionTest(lsst.utils.tests.TestCase):
     """!A test case for the diffim image decorrelation algorithm.
