@@ -49,16 +49,17 @@ class DcrModel:
     iterations of forward modeling or between the subfilters of the model.
     """
 
-    def __init__(self, modelImages, filterInfo=None, psf=None, mask=None, variance=None):
+    def __init__(self, modelImages, filterInfo=None, psf=None, mask=None, variance=None, photoCalib=None):
         self.dcrNumSubfilters = len(modelImages)
         self.modelImages = modelImages
         self._filter = filterInfo
         self._psf = psf
         self._mask = mask
         self._variance = variance
+        self.photoCalib = photoCalib
 
     @classmethod
-    def fromImage(cls, maskedImage, dcrNumSubfilters, filterInfo=None, psf=None):
+    def fromImage(cls, maskedImage, dcrNumSubfilters, filterInfo=None, psf=None, photoCalib=None):
         """Initialize a DcrModel by dividing a coadd between the subfilters.
 
         Parameters
@@ -73,6 +74,9 @@ class DcrModel:
         psf : `lsst.afw.detection.Psf`, optional
             Point spread function (PSF) of the model.
             Required if the ``DcrModel`` will be persisted.
+        photoCalib : `lsst.afw.image.PhotoCalib`, optional
+            Calibration to convert instrumental flux and
+            flux error to nanoJansky.
 
         Returns
         -------
@@ -99,7 +103,7 @@ class DcrModel:
         modelImages = [model, ]
         for subfilter in range(1, dcrNumSubfilters):
             modelImages.append(model.clone())
-        return cls(modelImages, filterInfo, psf, mask, variance)
+        return cls(modelImages, filterInfo, psf, mask, variance, photoCalib=photoCalib)
 
     @classmethod
     def fromDataRef(cls, dataRef, datasetType="dcrCoadd", numSubfilters=None, **kwargs):
@@ -129,6 +133,7 @@ class DcrModel:
         psf = None
         mask = None
         variance = None
+        photoCalib = None
         for subfilter in range(numSubfilters):
             dcrCoadd = dataRef.get(datasetType, subfilter=subfilter,
                                    numSubfilters=numSubfilters, **kwargs)
@@ -140,8 +145,10 @@ class DcrModel:
                 mask = dcrCoadd.mask
             if variance is None:
                 variance = dcrCoadd.variance
+            if photoCalib is None:
+                photoCalib = dcrCoadd.getPhotoCalib()
             modelImages.append(dcrCoadd.image)
-        return cls(modelImages, filterInfo, psf, mask, variance)
+        return cls(modelImages, filterInfo, psf, mask, variance, photoCalib)
 
     def __len__(self):
         """Return the number of subfilters.
@@ -392,6 +399,11 @@ class DcrModel:
         templateExposure.setMaskedImage(maskedImage[bbox])
         templateExposure.setPsf(self.psf)
         templateExposure.setFilter(self.filter)
+        if self.photoCalib is None:
+            raise RuntimeError("No PhotoCalib set for the DcrModel. "
+                               "If the DcrModel was created from a masked image"
+                               " you must also specify the photoCalib.")
+        templateExposure.setPhotoCalib(self.photoCalib)
         return templateExposure
 
     def conditionDcrModel(self, modelImages, bbox, gain=1.):
