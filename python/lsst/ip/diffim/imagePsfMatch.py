@@ -782,7 +782,9 @@ class ImagePsfMatchTask(PsfMatchTask):
         maskArr = mi.getMask().getArray()
         miArr = np.ma.masked_array(imArr, mask=maskArr)
         try:
-            bkgd = self.background.fitBackground(mi).getImageF()
+            fitBg = self.background.fitBackground(mi)
+            bkgd = fitBg.getImageF(self.background.config.algorithm,
+                                   self.background.config.undersampleStyle)
         except Exception:
             self.log.warn("Failed to get background model.  Falling back to median background estimation")
             bkgd = np.ma.extras.median(miArr)
