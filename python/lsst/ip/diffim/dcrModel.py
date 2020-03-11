@@ -395,6 +395,9 @@ class DcrModel:
         maskedImage.image = templateImage[bbox]
         maskedImage.mask = self.mask[bbox]
         maskedImage.variance = self.variance[bbox]
+        # The variance of the stacked image will be `dcrNumSubfilters`
+        # times the variance of the individual subfilters.
+        maskedImage.variance *= self.dcrNumSubfilters
         templateExposure = afwImage.ExposureF(bbox, wcs)
         templateExposure.setMaskedImage(maskedImage[bbox])
         templateExposure.setPsf(self.psf)
