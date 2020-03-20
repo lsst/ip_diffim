@@ -59,15 +59,27 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
     """Subtask to retrieve coadd for use as an image difference template.
 
     This is the default getTemplate Task to be run as a subtask by
-    ``pipe.tasks.ImageDifferenceTask``. The main method is ``run()``.
-    It assumes that coadds reside in the repository given by sensorRef.
+    ``pipe.tasks.ImageDifferenceTask``. The main methods are ``run()`` and
+    ``runGen3()``.
+
+    Notes
+    -----
+    From the given skymap, the closest tract is selected;  multiple tracts  are
+    not supported. The assembled template inherits the WCS of the selected
+    skymap tract and the resolution of the template exposures. Overlapping box
+    regions of the input template patches are pixel by pixel copied into the
+    assembled template image. There is no warping or pixel resampling.
+
+    Pixels with no overlap of any available input patches are set to ``nan`` value
+    and ``NO_DATA`` flagged.
     """
 
     ConfigClass = GetCoaddAsTemplateConfig
     _DefaultName = "GetCoaddAsTemplateTask"
 
-    def run(self, exposure, sensorRef, templateIdList=None):
-        """Retrieve and mosaic a template coadd exposure that overlaps the exposure
+    def runDataRef(self, exposure, sensorRef, templateIdList=None):
+        """Gen2 task entry point. Retrieve and mosaic a template coadd exposure
+        that overlaps the science exposure.
 
         Parameters
         ----------
@@ -76,17 +88,97 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         sensorRef : TYPE
             a Butler data reference that can be used to obtain coadd data
         templateIdList : TYPE, optional
-            list of data ids (unused)
+            list of data ids, unused here, in the case of coadd template
 
         Returns
         -------
-        result : `struct`
-            return a pipeBase.Struct:
-
-            - ``exposure`` : a template coadd exposure assembled out of patches
+        result : `lsst.pipe.base.Struct`
+            - ``exposure`` : `lsst.afw.image.ExposureF`
+                a template coadd exposure assembled out of patches
             - ``sources`` :  None for this subtask
         """
         skyMap = sensorRef.get(datasetType=self.config.coaddName + "Coadd_skyMap")
+        tractInfo, patchList, skyCorners = self.getOverlapPatchList(exposure, skyMap)
+
+        availableCoaddRefs = dict()
+        for patchInfo in patchList:
+            patchNumber = tractInfo.getSequentialPatchIndex(patchInfo)
+            patchArgDict = dict(
+                datasetType=self.getCoaddDatasetName() + "_sub",
+                bbox=patchInfo.getOuterBBox(),
+                tract=tractInfo.getId(),
+                patch="%s,%s" % (patchInfo.getIndex()[0], patchInfo.getIndex()[1]),
+                numSubfilters=self.config.numSubfilters,
+            )
+
+            if self.config.coaddName != 'dcr' and sensorRef.datasetExists(**patchArgDict):
+                self.log.info("Reading patch %s" % patchArgDict)
+                availableCoaddRefs[patchNumber] = patchArgDict
+
+        templateExposure = self.run(
+            tractInfo, patchList, skyCorners, availableCoaddRefs,
+            sensorRef=sensorRef, visitInfo=exposure.getInfo().getVisitInfo()
+        )
+        return pipeBase.Struct(exposure=templateExposure, sources=None)
+
+    def runQuantum(self, exposure, butlerQC, skyMapRef, coaddExposureRefs):
+        """Gen3 task entry point. Retrieve and mosaic a template coadd exposure
+        that overlaps the science exposure.
+
+        Parameters
+        ----------
+        exposure : `lsst.afw.image.Exposure`
+            The science exposure to define the sky region of the template coadd.
+        butlerQC : `lsst.pipe.base.ButlerQuantumContext`
+            Butler like object that supports getting data by DatasetRef.
+        skyMapRef : `lsst.daf.butler.DatasetRef`
+            Reference to SkyMap object that corresponds to the template coadd.
+        coaddExposureRefs : iterable of `lsst.daf.butler.DeferredDatasetRef`
+            Iterable of references to the available template coadd patches.
+
+        Returns
+        -------
+        result : `lsst.pipe.base.Struct`
+            - ``exposure`` : `lsst.afw.image.ExposureF`
+                a template coadd exposure assembled out of patches
+            - ``sources`` :  `None` for this subtask
+        """
+        skyMap = butlerQC.get(skyMapRef)
+        tractInfo, patchList, skyCorners = self.getOverlapPatchList(exposure, skyMap)
+        patchNumFilter = frozenset(tractInfo.getSequentialPatchIndex(p) for p in patchList)
+
+        availableCoaddRefs = dict()
+        for coaddRef in coaddExposureRefs:
+            dataId = coaddRef.datasetRef.dataId
+            if dataId['tract'] == tractInfo.getId() and dataId['patch'] in patchNumFilter:
+                self.log.info("Using template input tract=%s, patch=%s" %
+                              (tractInfo.getId(), dataId['patch']))
+                availableCoaddRefs[dataId['patch']] = butlerQC.get(coaddRef)
+
+        templateExposure = self.run(tractInfo, patchList, skyCorners, availableCoaddRefs)
+        return pipeBase.Struct(exposure=templateExposure, sources=None)
+
+    def getOverlapPatchList(self, exposure, skyMap):
+        """Select the relevant tract and its patches that overlap with the science exposure.
+
+        Parameters
+        ----------
+        exposure : `lsst.afw.image.Exposure`
+            The science exposure to define the sky region of the template coadd.
+
+        skyMap : `lsst.skymap.BaseSkyMap`
+            SkyMap object that corresponds to the template coadd.
+
+        Returns
+        -------
+        result : `tuple` of
+         - ``tractInfo`` : `lsst.skymap.TractInfo`
+             The selected tract.
+         - ``patchList`` : `list` of `lsst.skymap.PatchInfo`
+             List of all overlap patches of the selected tract.
+         - ``skyCorners`` : `list` of `lsst.geom.SpherePoint`
+             Corners of the exposure in the sky in the order given by `lsst.geom.Box2D.getCorners`.
+        """
         expWcs = exposure.getWcs()
         expBoxD = geom.Box2D(exposure.getBBox())
         expBoxD.grow(self.config.templateBorderSize)
@@ -98,18 +190,52 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
         if not patchList:
             raise RuntimeError("No suitable tract found")
+
         self.log.info("Assembling %s coadd patches" % (len(patchList),))
+        self.log.info("exposure dimensions=%s" % exposure.getDimensions())
+
+        return (tractInfo, patchList, skyCorners)
+
+    def run(self, tractInfo, patchList, skyCorners, availableCoaddRefs,
+            sensorRef=None, visitInfo=None):
+        """Gen2 and gen3 shared code: determination of exposure dimensions and
+        copying of pixels from overlapping patch regions.
+
+        Parameters
+        ----------
+        skyMap : `lsst.skymap.BaseSkyMap`
+            SkyMap object that corresponds to the template coadd.
+        tractInfo : `lsst.skymap.TractInfo`
+            The selected tract.
+        patchList : iterable of `lsst.skymap.patchInfo.PatchInfo`
+            Patches to consider for making the template exposure.
+        skyCorners : list of `lsst.geom.SpherePoint`
+            Sky corner coordinates to be covered by the template exposure.
+        availableCoaddRefs : `dict` of `int` : `lsst.daf.butler.DeferredDatasetHandle` (Gen3)
+        `dict` (Gen2)
+            Dictionary of spatially relevant retrieved coadd patches,
+            indexed by their sequential patch number. In Gen3 mode, .get() is called,
+            in Gen2 mode, sensorRef.get(**coaddef) is called to retrieve the coadd.
+        sensorRef : `lsst.daf.persistence.ButlerDataRef`, Gen2 only
+            TODO DM-22952 Butler data reference to get coadd data.
+            Must be `None` for Gen3.
+        visitInfo : `lsst.afw.image.VisitInfo`, Gen2 only
+            TODO DM-22952 VisitInfo to make dcr model.
+
+        Returns
+        -------
+        templateExposure: `lsst.afw.image.ExposureF`
+            The created template exposure.
+        """
+        coaddWcs = tractInfo.getWcs()
 
         # compute coadd bbox
-        coaddWcs = tractInfo.getWcs()
         coaddBBox = geom.Box2D()
         for skyPos in skyCorners:
             coaddBBox.include(coaddWcs.skyToPixel(skyPos))
         coaddBBox = geom.Box2I(coaddBBox)
-        self.log.info("exposure dimensions=%s; coadd dimensions=%s" %
-                      (exposure.getDimensions(), coaddBBox.getDimensions()))
+        self.log.info("coadd dimensions=%s" % coaddBBox.getDimensions())
 
-        # assemble coadd exposure from subregions of patches
         coaddExposure = afwImage.ExposureF(coaddBBox, coaddWcs)
         coaddExposure.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
         nPatchesFound = 0
@@ -117,6 +243,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         coaddPsf = None
         coaddPhotoCalib = None
         for patchInfo in patchList:
+            patchNumber = tractInfo.getSequentialPatchIndex(patchInfo)
             patchSubBBox = patchInfo.getOuterBBox()
             patchSubBBox.clip(coaddBBox)
             patchArgDict = dict(
@@ -127,9 +254,14 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 numSubfilters=self.config.numSubfilters,
             )
             if patchSubBBox.isEmpty():
-                self.log.info("skip tract=%(tract)s, patch=%(patch)s; no overlapping pixels" % patchArgDict)
+                self.log.info(f"skip tract={patchArgDict['tract']}, "
+                              f"patch={patchNumber}; no overlapping pixels")
                 continue
 
+            # TODO DM-22952
+            # Dcr coadd support is gen2 only
+            # Under gen3, sensorRef will be None and execution is stopped in runQuantum if dcr coadd is
+            # configured
             if self.config.coaddName == 'dcr':
                 if not sensorRef.datasetExists(subfilter=0, **patchArgDict):
                     self.log.warn("%(datasetType)s, tract=%(tract)s, patch=%(patch)s,"
@@ -155,16 +287,26 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 dcrBBox.include(patchInnerBBox)
                 coaddPatch = dcrModel.buildMatchedExposure(bbox=dcrBBox,
                                                            wcs=coaddWcs,
-                                                           visitInfo=exposure.getInfo().getVisitInfo())
+                                                           visitInfo=visitInfo)
             else:
-                if not sensorRef.datasetExists(**patchArgDict):
-                    self.log.warn("%(datasetType)s, tract=%(tract)s, patch=%(patch)s does not exist"
-                                  % patchArgDict)
+                if patchNumber not in availableCoaddRefs:
+                    self.log.warn(f"{patchArgDict['datasetType']}, "
+                                  f"tract={patchArgDict['tract']}, patch={patchNumber} does not exist")
                     continue
-                self.log.info("Reading patch %s" % patchArgDict)
-                coaddPatch = sensorRef.get(**patchArgDict)
+                if sensorRef is None:
+                    # Gen3
+                    coaddPatch = availableCoaddRefs[patchNumber].get()
+                else:
+                    # Gen2
+                    coaddPatch = sensorRef.get(**availableCoaddRefs[patchNumber])
             nPatchesFound += 1
-            coaddExposure.maskedImage.assign(coaddPatch.maskedImage, coaddPatch.getBBox())
+
+            # Gen2 get() seems to clip based on bbox kwarg but we removed bbox
+            # calculation from caller code. Gen3 also does not do this.
+            overlapBox = coaddPatch.getBBox()
+            overlapBox.clip(coaddBBox)
+            coaddExposure.maskedImage.assign(coaddPatch.maskedImage[overlapBox], overlapBox)
+
             if coaddFilter is None:
                 coaddFilter = coaddPatch.getFilter()
 
@@ -176,20 +318,17 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             if coaddPhotoCalib is None:
                 coaddPhotoCalib = coaddPatch.getPhotoCalib()
 
-        if nPatchesFound == 0:
-            raise RuntimeError("No patches found!")
-
-        if coaddPsf is None:
-            raise RuntimeError("No coadd Psf found!")
-
         if coaddPhotoCalib is None:
             raise RuntimeError("No coadd PhotoCalib found!")
+        if nPatchesFound == 0:
+            raise RuntimeError("No patches found!")
+        if coaddPsf is None:
+            raise RuntimeError("No coadd Psf found!")
 
         coaddExposure.setPhotoCalib(coaddPhotoCalib)
         coaddExposure.setPsf(coaddPsf)
         coaddExposure.setFilter(coaddFilter)
-        return pipeBase.Struct(exposure=coaddExposure,
-                               sources=None)
+        return coaddExposure
 
     def getCoaddDatasetName(self):
         """Return coadd name for given task config
@@ -215,7 +354,7 @@ class GetCalexpAsTemplateConfig(pexConfig.Config):
 
 class GetCalexpAsTemplateTask(pipeBase.Task):
     """Subtask to retrieve calexp of the same ccd number as the science image SensorRef
-    for use as an image difference template.
+    for use as an image difference template. Only gen2 supported.
 
     To be run as a subtask by pipe.tasks.ImageDifferenceTask.
     Intended for use with simulations and surveys that repeatedly visit the same pointing.
@@ -275,3 +414,9 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
         templateSources = butler.get(datasetType="src", dataId=templateId)
         return pipeBase.Struct(exposure=template,
                                sources=templateSources)
+
+    def runDataRef(self, *args, **kwargs):
+        return self.run(*args, **kwargs)
+
+    def runQuantum(self, **kwargs):
+        raise NotImplementedError("Calexp template is not supported with gen3 middleware")
