@@ -296,7 +296,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
             must be larger than A in each dimension. For the inverse operation this
             must be the original, before padding size of the array.
         onwardOp : bool, optional
-            Selector of the padding (True) or its inverse (False) operation.
+            Selector of the padding (True) or its inverse (False), crop of padding operation.
 
         Returns
         -------
@@ -305,18 +305,19 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         Notes
         -----
-        Supports n-dimension arrays. For odd dimensions, the splitting is rounded to
-        put the center element into the new origin (eg. the center pixel of an odd sized
-        kernel will be located at (0,0) ready for FFT).
-
+        For odd dimensions, the splitting is rounded to
+        put the center pixel into the new corner origin (0,0). This is to be consistent
+        e.g. for a dirac delta kernel that is originally located at the center pixel.
         """
 
         # The onward and inverse operations should round odd dimension halves at the opposite
         # sides to get the pixels back to their original positions.
         if onwardOp:
+            # First and second halves in with respect to the axes of A.
             firstHalves = [x//2 for x in A.shape]
             secondHalves = [x-y for x, y in zip(A.shape, firstHalves)]
         else:
+            # Opposite rounding for inverse operation
             secondHalves = [x//2 for x in newShape]
             firstHalves = [x-y for x, y in zip(newShape, secondHalves)]
 
@@ -339,18 +340,19 @@ class DecorrelateALKernelTask(pipeBase.Task):
             Average variance of science image used for PSF matching
         tvar : `float`, optional
             Average variance of the template (matched) image used for PSF matching
-        preConvKernel If not None, then pre-filtering was applied
+        preConvArr : `numpy.ndarray`, optional
+            If not None, then pre-filtering was applied
             to science exposure, and this is the pre-convolution kernel.
 
         Returns
         -------
-        corrft : `numpy.ndarray` dtype complex but contains real numbers
-            TBD
+        corrft : `numpy.ndarray` of complexes
+            The frequency space representation of the correction. The array is of complex
+            dtype but contains all real numbers. Shape is `self.freqSpaceShape`.
 
         Notes
         -----
-        kappa, and preConvKernel must have shape of self.freqSpaceShape.
-        The maximum correction factor converges to sqrt(tvar/svar) towards high frequencies.
+        The maximum correction factor converges to `sqrt(tvar/svar)` towards high frequencies.
         This should be a plausible value.
         """
         kappa = self.padCenterOriginArray(kappa, self.freqSpaceShape)
@@ -368,15 +370,24 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
     def computeCorrectedDiffimPsf(self, corrft, psfArr):
         """Compute the (decorrelated) difference image's new PSF.
-        new_psf = psf(k) * sqrt((svar + tvar) / (svar + tvar * kappa_ft(k)**2))
 
         Parameters
         ----------
-        TBD
+        corrft : `numpy.ndarray`
+            The frequency space representation of the correction calculated by
+            `computeCorrection`. Shape must be `self.freqSpaceShape`.
+        psfArr : `numpy.ndarray`
+            The psf of the difference image to be corrected.
 
         Returns
         -------
-        TBD
+        psfNew : `numpy.ndarray`
+            The corrected psf, same shape as `psfArr`, sum normed to 1.
+
+        Notes
+        ----
+        There is no algorithmic guarantee that the corrected psf can
+        meaningfully fit to the same size as the original one.
         """
         psfShape = psfArr.shape
         psfArr = self.padCenterOriginArray(psfArr, self.freqSpaceShape)
@@ -389,23 +400,20 @@ class DecorrelateALKernelTask(pipeBase.Task):
         return psfArr
 
     def computeCorrectedImage(self, corrft, expArr):
-        """Convolve an Exposure with a decorrelation convolution kernel.
+        """Compute the decorrelated difference image.
 
         Parameters
         ----------
-        exposure : `lsst.afw.image.Exposure`
-            Input exposure to be convolved.
-        kernel : `numpy.array`
-            Input 2-d numpy.array to convolve the image with
+        corrft : `numpy.ndarray`
+            The frequency space representation of the correction calculated by
+            `computeCorrection`. Shape must be `self.freqSpaceShape`.
+        expArr : `numpy.ndarray`
+            The difference image to be corrected.
 
         Returns
         -------
-        out :
-            TBD
-
-        Notes
-        -----
-
+        imgNew : `numpy.ndarray`
+            The corrected image, same size as the input.
         """
         expShape = expArr.shape
         filtInf = np.isinf(expArr)
