@@ -25,6 +25,7 @@ import astropy.units as u
 
 from lsst.afw.table import SourceCatalog
 import lsst.utils.tests
+import lsst.pipe.base.testUtils
 from lsst.verify import Name
 from lsst.verify.gen2tasks.testUtils import MetricTaskTestCase
 from lsst.verify.tasks import MetricComputationError
@@ -50,6 +51,7 @@ class TestNumSciSources(MetricTaskTestCase):
     def testValid(self):
         catalog = _makeDummyCatalog(3)
         result = self.task.run(catalog)
+        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.numSciSources"))
@@ -58,6 +60,7 @@ class TestNumSciSources(MetricTaskTestCase):
     def testEmptyCatalog(self):
         catalog = _makeDummyCatalog(0)
         result = self.task.run(catalog)
+        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.numSciSources"))
@@ -65,6 +68,7 @@ class TestNumSciSources(MetricTaskTestCase):
 
     def testMissingData(self):
         result = self.task.run(None)
+        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
         meas = result.measurement
         self.assertIsNone(meas)
 
@@ -79,6 +83,7 @@ class TestFractionDiaSources(MetricTaskTestCase):
         sciCatalog = _makeDummyCatalog(5)
         diaCatalog = _makeDummyCatalog(3)
         result = self.task.run(sciCatalog, diaCatalog)
+        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.fracDiaSourcesToSciSources"))
@@ -88,6 +93,7 @@ class TestFractionDiaSources(MetricTaskTestCase):
         sciCatalog = _makeDummyCatalog(5)
         diaCatalog = _makeDummyCatalog(0)
         result = self.task.run(sciCatalog, diaCatalog)
+        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.fracDiaSourcesToSciSources"))
@@ -107,11 +113,13 @@ class TestFractionDiaSources(MetricTaskTestCase):
 
     def testMissingData(self):
         result = self.task.run(None, None)
+        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
         meas = result.measurement
         self.assertIsNone(meas)
 
     def testSemiMissingData(self):
         result = self.task.run(sciSources=_makeDummyCatalog(3), diaSources=None)
+        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
         meas = result.measurement
         self.assertIsNone(meas)
 
