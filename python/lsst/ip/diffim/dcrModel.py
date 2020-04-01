@@ -107,7 +107,7 @@ class DcrModel:
 
     @classmethod
     def fromDataRef(cls, dataRef, datasetType="dcrCoadd", numSubfilters=None, **kwargs):
-        """Load an existing DcrModel from a repository.
+        """Load an existing DcrModel from a Gen 2 repository.
 
         Parameters
         ----------
@@ -148,6 +148,44 @@ class DcrModel:
             if photoCalib is None:
                 photoCalib = dcrCoadd.getPhotoCalib()
             modelImages.append(dcrCoadd.image)
+        return cls(modelImages, filterInfo, psf, mask, variance, photoCalib)
+
+    @classmethod
+    def fromQuantum(cls, availableCoaddRefs):
+        """Load an existing DcrModel from a Gen 3 repository.
+
+        Parameters
+        ----------
+        availableCoaddRefs : `dict` of `int` : `lsst.daf.butler.DeferredDatasetHandle`
+            Dictionary of spatially relevant retrieved coadd patches,
+            indexed by their sequential patch number.
+
+        Returns
+        -------
+        dcrModel : `lsst.pipe.tasks.DcrModel`
+            Best fit model of the true sky after correcting chromatic effects.
+        """
+        filterInfo = None
+        psf = None
+        mask = None
+        variance = None
+        photoCalib = None
+        modelImages = [None]*len(availableCoaddRefs)
+
+        for coaddRef in availableCoaddRefs:
+            subfilter = coaddRef.dataId["subfilter"]
+            dcrCoadd = coaddRef.get()
+            if filterInfo is None:
+                filterInfo = dcrCoadd.getFilter()
+            if psf is None:
+                psf = dcrCoadd.getPsf()
+            if mask is None:
+                mask = dcrCoadd.mask
+            if variance is None:
+                variance = dcrCoadd.variance
+            if photoCalib is None:
+                photoCalib = dcrCoadd.getPhotoCalib()
+            modelImages[subfilter] = dcrCoadd.image
         return cls(modelImages, filterInfo, psf, mask, variance, photoCalib)
 
     def __len__(self):
