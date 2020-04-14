@@ -524,8 +524,7 @@ class ZogyTask(pipeBase.Task):
         kern = afwMath.FixedKernel(kernelImg)
         if recenterKernel:
             maxloc = np.unravel_index(np.argmax(kernel), kernel.shape)
-            kern.setCtrX(maxloc[0])
-            kern.setCtrY(maxloc[1])
+            kern.setCtr(geom.Point2I(maxloc))
         outExp = exposure.clone()  # Do this to keep WCS, PSF, masks, etc.
         convCntrl = afwMath.ConvolutionControl(doNormalize=False, doCopyEdge=False,
                                                maxInterpolationDistance=0)
