@@ -111,7 +111,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 numSubfilters=self.config.numSubfilters,
             )
 
-            if self.config.coaddName != 'dcr' and sensorRef.datasetExists(**patchArgDict):
+            if sensorRef.datasetExists(**patchArgDict):
                 self.log.info("Reading patch %s" % patchArgDict)
                 availableCoaddRefs[patchNumber] = patchArgDict
 
@@ -151,11 +151,20 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         for coaddRef in coaddExposureRefs:
             dataId = coaddRef.datasetRef.dataId
             if dataId['tract'] == tractInfo.getId() and dataId['patch'] in patchNumFilter:
-                self.log.info("Using template input tract=%s, patch=%s" %
-                              (tractInfo.getId(), dataId['patch']))
-                availableCoaddRefs[dataId['patch']] = butlerQC.get(coaddRef)
+                if self.config.coaddName == 'dcr':
+                    self.log.info("Using template input tract=%s, patch=%s, subfilter=%s" %
+                                  (tractInfo.getId(), dataId['patch'], dataId['subfilter']))
+                    if dataId['patch'] in availableCoaddRefs:
+                        availableCoaddRefs[dataId['patch']].append(butlerQC.get(coaddRef))
+                    else:
+                        availableCoaddRefs[dataId['patch']] = [butlerQC.get(coaddRef), ]
+                else:
+                    self.log.info("Using template input tract=%s, patch=%s" %
+                                  (tractInfo.getId(), dataId['patch']))
+                    availableCoaddRefs[dataId['patch']] = butlerQC.get(coaddRef)
 
-        templateExposure = self.run(tractInfo, patchList, skyCorners, availableCoaddRefs)
+        templateExposure = self.run(tractInfo, patchList, skyCorners, availableCoaddRefs,
+                                    visitInfo=exposure.getInfo().getVisitInfo())
         return pipeBase.Struct(exposure=templateExposure, sources=None)
 
     def getOverlapPatchList(self, exposure, skyMap):
@@ -257,13 +266,13 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 self.log.info(f"skip tract={patchArgDict['tract']}, "
                               f"patch={patchNumber}; no overlapping pixels")
                 continue
+            if patchNumber not in availableCoaddRefs:
+                self.log.warn(f"{patchArgDict['datasetType']}, "
+                              f"tract={patchArgDict['tract']}, patch={patchNumber} does not exist")
+                continue
 
-            # TODO DM-22952
-            # Dcr coadd support is gen2 only
-            # Under gen3, sensorRef will be None and execution is stopped in runQuantum if dcr coadd is
-            # configured
             if self.config.coaddName == 'dcr':
-                if not sensorRef.datasetExists(subfilter=0, **patchArgDict):
+                if sensorRef and not sensorRef.datasetExists(subfilter=0, **patchArgDict):
                     self.log.warn("%(datasetType)s, tract=%(tract)s, patch=%(patch)s,"
                                   " numSubfilters=%(numSubfilters)s, subfilter=0 does not exist"
                                   % patchArgDict)
@@ -275,7 +284,10 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                     continue
                 self.log.info("Constructing DCR-matched template for patch %s" % patchArgDict)
 
-                dcrModel = DcrModel.fromDataRef(sensorRef, **patchArgDict)
+                if sensorRef:
+                    dcrModel = DcrModel.fromDataRef(sensorRef, **patchArgDict)
+                else:
+                    dcrModel = DcrModel.fromQuantum(availableCoaddRefs[patchNumber])
                 # The edge pixels of the DcrCoadd may contain artifacts due to missing data.
                 # Each patch has significant overlap, and the contaminated edge pixels in
                 # a new patch will overwrite good pixels in the overlap region from
@@ -289,10 +301,6 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                                                            wcs=coaddWcs,
                                                            visitInfo=visitInfo)
             else:
-                if patchNumber not in availableCoaddRefs:
-                    self.log.warn(f"{patchArgDict['datasetType']}, "
-                                  f"tract={patchArgDict['tract']}, patch={patchNumber} does not exist")
-                    continue
                 if sensorRef is None:
                     # Gen3
                     coaddPatch = availableCoaddRefs[patchNumber].get()
